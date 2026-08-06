@@ -61,16 +61,34 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {}
 
 /// Parse a document protected-content stream without copying its ciphertext.
+///
+/// # Errors
+///
+/// Returns an [`Error`] when the stream is truncated, the ciphertext is
+/// missing, misaligned, or shorter than the declared plaintext size requires,
+/// or the padded size overflows `u64`.
 pub fn parse_document(data: &[u8]) -> Result<Envelope<'_>, Error> {
     parse_content(data, Kind::Document)
 }
 
 /// Parse an optional viewer-content stream without copying its ciphertext.
+///
+/// # Errors
+///
+/// Returns an [`Error`] when the stream is truncated, the ciphertext is
+/// missing, misaligned, or shorter than the declared plaintext size requires,
+/// or the padded size overflows `u64`.
 pub fn parse_viewer(data: &[u8]) -> Result<Envelope<'_>, Error> {
     parse_content(data, Kind::Viewer)
 }
 
 /// Serialize an already-encrypted content envelope.
+///
+/// # Errors
+///
+/// Returns an [`Error`] when the ciphertext is missing, misaligned, or shorter
+/// than the declared plaintext size requires, or the padded size overflows
+/// `u64`.
 pub fn write(plaintext_size: u64, ciphertext: &[u8]) -> Result<Vec<u8>, Error> {
     validate_ciphertext(plaintext_size, ciphertext)?;
     let mut output = Vec::with_capacity(LENGTH_FIELD_BYTES + ciphertext.len());
@@ -80,8 +98,8 @@ pub fn write(plaintext_size: u64, ciphertext: &[u8]) -> Result<Vec<u8>, Error> {
 }
 
 fn parse_content(data: &[u8], kind: Kind) -> Result<Envelope<'_>, Error> {
-    let length = data.get(..LENGTH_FIELD_BYTES).ok_or(Error::Truncated)?;
-    let length = length.try_into().map_err(|_| Error::Truncated)?;
+    let length_bytes = data.get(..LENGTH_FIELD_BYTES).ok_or(Error::Truncated)?;
+    let length = length_bytes.try_into().map_err(|_err| Error::Truncated)?;
     let plaintext_size = u64::from_le_bytes(length);
     let ciphertext = &data[LENGTH_FIELD_BYTES..];
     validate_ciphertext(plaintext_size, ciphertext)?;
@@ -101,13 +119,13 @@ fn validate_ciphertext(plaintext_size: u64, ciphertext: &[u8]) -> Result<(), Err
             length: ciphertext.len(),
         });
     }
-    let block_size = u64::try_from(AES_BLOCK_BYTES).map_err(|_| Error::SizeOverflow)?;
+    let block_size = u64::try_from(AES_BLOCK_BYTES).map_err(|_err| Error::SizeOverflow)?;
     let minimum = plaintext_size
         .checked_add(block_size - 1)
         .ok_or(Error::SizeOverflow)?
         / block_size
         * block_size;
-    if u64::try_from(ciphertext.len()).map_err(|_| Error::SizeOverflow)? < minimum {
+    if u64::try_from(ciphertext.len()).map_err(|_err| Error::SizeOverflow)? < minimum {
         return Err(Error::CiphertextTooShort {
             expected: minimum,
             actual: ciphertext.len(),
@@ -118,6 +136,10 @@ fn validate_ciphertext(plaintext_size: u64, ciphertext: &[u8]) -> Result<(), Err
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        reason = "test code panics on failure; unwrap keeps assertions concise"
+    )]
     use super::*;
 
     #[test]

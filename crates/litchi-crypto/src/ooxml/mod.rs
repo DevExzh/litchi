@@ -62,7 +62,7 @@ pub enum Error {
     /// A bounded buffer could not reserve the memory required for an operation.
     #[error("OOXML encryption could not reserve memory for {0}")]
     Allocation(&'static str),
-    /// The storage container or StrongEncryptionDataSpace graph is malformed.
+    /// The storage container or `StrongEncryptionDataSpace` graph is malformed.
     #[error("OOXML encrypted container error: {0}")]
     Container(String),
     /// A bounded output sink failed.
@@ -107,7 +107,7 @@ pub struct Limits {
     pub max_encrypted_bytes: usize,
     /// Maximum bytes emitted for the complete compound container.
     pub max_output_bytes: usize,
-    /// Accept LibreOffice's nonconforming encrypted container without DataSpaces.
+    /// Accept `LibreOffice`'s nonconforming encrypted container without `DataSpaces`.
     pub allow_missing_data_spaces: bool,
 }
 
@@ -176,7 +176,7 @@ impl Limits {
         Ok(self)
     }
 
-    fn bytes(self, resource: &'static str, actual: usize, maximum: usize) -> Result<()> {
+    fn bytes(resource: &'static str, actual: usize, maximum: usize) -> Result<()> {
         if actual > maximum {
             return Err(Error::Limit {
                 resource,
@@ -187,8 +187,8 @@ impl Limits {
         Ok(())
     }
 
-    fn count(self, resource: &'static str, actual: usize, maximum: usize) -> Result<()> {
-        self.bytes(resource, actual, maximum)
+    fn count(resource: &'static str, actual: usize, maximum: usize) -> Result<()> {
+        Self::bytes(resource, actual, maximum)
     }
 }
 
@@ -200,11 +200,13 @@ pub struct Password(Zeroizing<String>);
 
 impl Password {
     /// Take ownership of a password without copying its allocation.
+    #[must_use]
     pub fn new(value: String) -> Self {
         Self(Zeroizing::new(value))
     }
 
     /// Borrow the password for one operation.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
@@ -267,16 +269,19 @@ impl fmt::Debug for Opened {
 
 impl Opened {
     /// Encryption profile used by the input, or `None` for an ordinary OPC package.
+    #[must_use]
     pub const fn mode(&self) -> Option<Mode> {
         self.mode
     }
 
     /// Borrow the clear package bytes.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Move the clear package allocation to the caller.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.bytes
     }
@@ -285,11 +290,21 @@ impl Opened {
 /// Open an ordinary or encrypted package with safe default limits.
 ///
 /// Ordinary OPC input is returned in the exact caller-provided allocation.
+///
+/// # Errors
+///
+/// Returns an [`enum@Error`] when the input violates the default resource policy
+/// or the encrypted package cannot be validated or decrypted.
 pub fn open(bytes: Vec<u8>, password: &str) -> Result<Opened> {
     open_with(bytes, password, &Limits::default())
 }
 
 /// Classify an ordinary or encrypted package without reading encrypted content.
+///
+/// # Errors
+///
+/// Returns an [`enum@Error`] when the input violates the default resource policy
+/// or the encryption metadata is malformed or unsupported.
 pub fn inspect(bytes: &[u8]) -> Result<Kind> {
     inspect_with(bytes, &Limits::default())
 }
@@ -298,17 +313,22 @@ pub fn inspect(bytes: &[u8]) -> Result<Kind> {
 ///
 /// This parses the CFB header and `EncryptionInfo` only; it does not allocate
 /// or read the potentially large `EncryptedPackage` stream.
+///
+/// # Errors
+///
+/// Returns an [`enum@Error`] when the limits are invalid, the input exceeds them,
+/// or the encryption metadata is malformed or unsupported.
 pub fn inspect_with(bytes: &[u8], limits: &Limits) -> Result<Kind> {
-    let limits = limits.validate()?;
-    limits.bytes("input", bytes.len(), limits.max_input_bytes)?;
+    let validated = limits.validate()?;
+    Limits::bytes("input", bytes.len(), validated.max_input_bytes)?;
     if !is_ole_file(bytes) {
         return Ok(Kind::Plain);
     }
-    let info = container::read_info(bytes, &limits)?;
+    let info = container::read_info(bytes, &validated)?;
     let mode = mode(&info)?;
     match mode {
-        Mode::Standard => standard::validate_info(&info, &limits)?,
-        Mode::Agile => agile::validate_info(&info, &limits)?,
+        Mode::Standard => standard::validate_info(&info, &validated)?,
+        Mode::Agile => agile::validate_info(&info, &validated)?,
     }
     Ok(Kind::Encrypted(mode))
 }
@@ -317,41 +337,51 @@ pub fn inspect_with(bytes: &[u8], limits: &Limits) -> Result<Kind> {
 ///
 /// The reader is runtime-neutral and never consumes more than the configured
 /// input ceiling plus one detection byte.
+///
+/// # Errors
+///
+/// Returns an [`enum@Error`] when reading fails, the input violates the default
+/// resource policy, or the encrypted package cannot be opened.
 pub fn load<R: Read>(reader: R, password: &str) -> Result<Opened> {
     load_with(reader, password, &Limits::default())
 }
 
 /// Read and open an ordinary or encrypted package under an explicit policy.
+///
+/// # Errors
+///
+/// Returns an [`enum@Error`] when reading fails, the limits are invalid or
+/// exceeded, or the encrypted package cannot be opened.
 pub fn load_with<R: Read>(mut reader: R, password: &str, limits: &Limits) -> Result<Opened> {
-    let limits = limits.validate()?;
+    let validated = limits.validate()?;
     let mut bytes = Vec::new();
     let mut buffer = [0u8; 8 * 1024];
-    while bytes.len() < limits.max_input_bytes {
-        let remaining = limits.max_input_bytes - bytes.len();
+    while bytes.len() < validated.max_input_bytes {
+        let remaining = validated.max_input_bytes - bytes.len();
         let read_len = remaining.min(buffer.len());
         let count = match reader.read(&mut buffer[..read_len]) {
-            Ok(0) => return open_with(bytes, password, &limits),
+            Ok(0) => return open_with(bytes, password, &validated),
             Ok(count) => count,
             Err(error) if error.kind() == ErrorKind::Interrupted => continue,
             Err(error) => return Err(Error::Io(error)),
         };
         bytes
             .try_reserve(count)
-            .map_err(|_| Error::Allocation("OOXML package input"))?;
+            .map_err(|_err| Error::Allocation("OOXML package input"))?;
         bytes.extend_from_slice(&buffer[..count]);
     }
 
     let mut probe = [0u8; 1];
     loop {
         match reader.read(&mut probe) {
-            Ok(0) => return open_with(bytes, password, &limits),
+            Ok(0) => return open_with(bytes, password, &validated),
             Ok(_) => {
                 return Err(Error::Limit {
                     resource: "input",
-                    actual: u64::try_from(limits.max_input_bytes)
+                    actual: u64::try_from(validated.max_input_bytes)
                         .unwrap_or(u64::MAX)
                         .saturating_add(1),
-                    maximum: u64::try_from(limits.max_input_bytes).unwrap_or(u64::MAX),
+                    maximum: u64::try_from(validated.max_input_bytes).unwrap_or(u64::MAX),
                 });
             },
             Err(error) if error.kind() == ErrorKind::Interrupted => {},
@@ -361,62 +391,89 @@ pub fn load_with<R: Read>(mut reader: R, password: &str, limits: &Limits) -> Res
 }
 
 /// Open an ordinary or encrypted package under an explicit resource policy.
+///
+/// # Errors
+///
+/// Returns an [`enum@Error`] when the limits are invalid or exceeded, the password
+/// violates policy or is incorrect, or the package is malformed.
 pub fn open_with(bytes: Vec<u8>, password: &str, limits: &Limits) -> Result<Opened> {
-    let limits = limits.validate()?;
-    limits.bytes("input", bytes.len(), limits.max_input_bytes)?;
+    let validated = limits.validate()?;
+    Limits::bytes("input", bytes.len(), validated.max_input_bytes)?;
 
     if !is_ole_file(&bytes) {
-        limits.bytes("plaintext", bytes.len(), limits.max_plaintext_bytes)?;
+        Limits::bytes("plaintext", bytes.len(), validated.max_plaintext_bytes)?;
         return Ok(Opened { mode: None, bytes });
     }
 
-    validate_password(password, &limits)?;
-    let (info, encrypted) = container::read(bytes, &limits)?;
+    validate_password(password, &validated)?;
+    let (info, encrypted) = container::read(bytes, &validated)?;
     let mode = mode(&info)?;
-    let bytes = match mode {
-        Mode::Standard => standard::decrypt(&info, encrypted, password, &limits)?,
-        Mode::Agile => agile::decrypt(&info, encrypted, password, &limits)?,
+    let package = match mode {
+        Mode::Standard => standard::decrypt(&info, encrypted, password, &validated)?,
+        Mode::Agile => agile::decrypt(&info, encrypted, password, &validated)?,
     };
     Ok(Opened {
         mode: Some(mode),
-        bytes,
+        bytes: package,
     })
 }
 
 /// Encrypt a moved OPC package with safe default limits.
+///
+/// # Errors
+///
+/// Returns an [`enum@Error`] when the package is empty, the password is empty or
+/// violates policy, the default limits are exceeded, or encryption fails.
 pub fn encrypt(bytes: Vec<u8>, password: &str, mode: Mode) -> Result<Vec<u8>> {
     encrypt_with(bytes, password, mode, &Limits::default())
 }
 
 /// Encrypt a moved OPC package under an explicit resource policy.
+///
+/// # Errors
+///
+/// Returns an [`enum@Error`] when the package is empty, the password is empty or
+/// violates policy, the limits are invalid or exceeded, or encryption fails.
 pub fn encrypt_with(
     bytes: Vec<u8>,
     password: &str,
     mode: Mode,
     limits: &Limits,
 ) -> Result<Vec<u8>> {
-    let limits = limits.validate()?;
+    let validated = limits.validate()?;
     if bytes.is_empty() {
         return Err(malformed("cannot encrypt an empty OPC package"));
     }
     if password.is_empty() {
         return Err(Error::PasswordRequired);
     }
-    limits.bytes("plaintext", bytes.len(), limits.max_plaintext_bytes)?;
-    validate_password(password, &limits)?;
+    Limits::bytes("plaintext", bytes.len(), validated.max_plaintext_bytes)?;
+    validate_password(password, &validated)?;
 
     match mode {
-        Mode::Standard => standard::encrypt(bytes, password, &limits),
-        Mode::Agile => agile::encrypt(bytes, password, &limits),
+        Mode::Standard => standard::encrypt(bytes, password, &validated),
+        Mode::Agile => agile::encrypt(bytes, password, &validated),
     }
 }
 
 /// Change an encrypted package password while preserving its encryption mode.
+///
+/// # Errors
+///
+/// Returns an [`enum@Error`] when the input is not encrypted, the old password is
+/// incorrect, the new password violates policy, or the default limits are
+/// exceeded.
 pub fn rekey(bytes: Vec<u8>, old_password: &str, new_password: &str) -> Result<Vec<u8>> {
     rekey_with(bytes, old_password, new_password, &Limits::default())
 }
 
 /// Change a password under an explicit policy without copying clear package bytes.
+///
+/// # Errors
+///
+/// Returns an [`enum@Error`] when the input is not encrypted, the old password is
+/// incorrect, the new password violates policy, or the limits are invalid or
+/// exceeded.
 pub fn rekey_with(
     bytes: Vec<u8>,
     old_password: &str,
@@ -447,7 +504,7 @@ fn mode(info: &[u8]) -> Result<Mode> {
 
 fn validate_password(password: &str, limits: &Limits) -> Result<usize> {
     let characters = password.chars().count();
-    limits.count("password characters", characters, limits.max_password_chars)?;
+    Limits::count("password characters", characters, limits.max_password_chars)?;
     let units = password.encode_utf16().count();
     units
         .checked_mul(2)
@@ -459,7 +516,7 @@ fn password_bytes(password: &str, limits: &Limits) -> Result<Zeroizing<Vec<u8>>>
     let mut output = Vec::new();
     output
         .try_reserve_exact(byte_len)
-        .map_err(|_| Error::Allocation("UTF-16 password"))?;
+        .map_err(|_err| Error::Allocation("UTF-16 password"))?;
     for unit in password.encode_utf16() {
         output.extend_from_slice(&unit.to_le_bytes());
     }
@@ -467,12 +524,12 @@ fn password_bytes(password: &str, limits: &Limits) -> Result<Zeroizing<Vec<u8>>>
 }
 
 fn declared_size(value: u64, limits: &Limits) -> Result<usize> {
-    let size = usize::try_from(value).map_err(|_| Error::Limit {
+    let size = usize::try_from(value).map_err(|_err| Error::Limit {
         resource: "declared plaintext",
         actual: value,
         maximum: u64::try_from(limits.max_plaintext_bytes).unwrap_or(u64::MAX),
     })?;
-    limits.bytes("declared plaintext", size, limits.max_plaintext_bytes)?;
+    Limits::bytes("declared plaintext", size, limits.max_plaintext_bytes)?;
     Ok(size)
 }
 
@@ -482,6 +539,10 @@ fn malformed(message: impl Into<String>) -> Error {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::expect_used,
+        reason = "test code panics on failure; expect keeps assertions concise"
+    )]
     use std::io::Cursor;
 
     use super::*;
@@ -492,8 +553,8 @@ mod tests {
         let pointer = bytes.as_ptr();
         let opened = open(bytes, "unused").expect("ordinary input");
         assert_eq!(opened.mode(), None);
-        let bytes = opened.into_bytes();
-        assert_eq!(bytes.as_ptr(), pointer);
+        let moved = opened.into_bytes();
+        assert_eq!(moved.as_ptr(), pointer);
     }
 
     #[test]
@@ -516,8 +577,8 @@ mod tests {
         };
         let opened = open_with(bytes, "deliberately over limit", &limits)
             .expect("password is irrelevant to ordinary OPC input");
-        let bytes = opened.into_bytes();
-        assert_eq!(bytes.as_ptr(), pointer);
+        let moved = opened.into_bytes();
+        assert_eq!(moved.as_ptr(), pointer);
     }
 
     #[test]

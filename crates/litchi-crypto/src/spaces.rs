@@ -1,6 +1,6 @@
-//! Typed MS-OFFCRYPTO DataSpaces and IRM metadata.
+//! Typed `MS-OFFCRYPTO` `DataSpaces` and IRM metadata.
 //!
-//! This module validates the structural graph only. XrML licenses and
+//! This module validates the structural graph only. `XrML` licenses and
 //! protected content remain inert and are never activated, fetched, or
 //! decrypted.
 //!
@@ -153,7 +153,7 @@ pub struct IrmTransform {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EncryptionTransform {
     pub header: Header,
-    /// Null when EncryptionInfo is authoritative, as with Agile encryption.
+    /// Null when `EncryptionInfo` is authoritative, as with Agile encryption.
     pub encryption_name: Option<String>,
     pub encryption_block_size: u32,
     pub cipher_mode: u32,
@@ -162,7 +162,7 @@ pub struct EncryptionTransform {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct License {
     pub stream_name: String,
-    /// Base64-encoded Unicode LicenseID retained verbatim.
+    /// Base64-encoded Unicode `LicenseID` retained verbatim.
     pub encoded_license_id: String,
     /// Certificate-chain XML retained verbatim and never interpreted.
     pub certificate_chain: Option<String>,
@@ -210,9 +210,9 @@ pub struct Graph {
     pub label_info: Option<Vec<u8>>,
     /// Validated typed view of `label_info`.
     pub labels: Option<List>,
-    /// Integrity metadata for the public SummaryInformation property stream.
+    /// Integrity metadata for the public `SummaryInformation` property stream.
     pub summary_information_integrity: Option<Integrity>,
-    /// Integrity metadata for the public DocumentSummaryInformation property stream.
+    /// Integrity metadata for the public `DocumentSummaryInformation` property stream.
     pub document_summary_information_integrity: Option<Integrity>,
     /// Public legacy Custom XML mirror and its IRM promotion semantics.
     pub custom_xml_data_store: Option<Store>,
@@ -225,11 +225,11 @@ pub struct Integrity {
     pub valid: Option<bool>,
 }
 
-/// A deterministic identity for the DataSpaces streams captured by a snapshot.
+/// A deterministic identity for the `DataSpaces` streams captured by a snapshot.
 ///
-/// This is intentionally scoped to the DataSpaces graph rather than to the
+/// This is intentionally scoped to the `DataSpaces` graph rather than to the
 /// physical CFB allocation. Package patches therefore remain applicable when
-/// unrelated streams are rewritten, while exact DataSpaces source bytes are
+/// unrelated streams are rewritten, while exact `DataSpaces` source bytes are
 /// still required before a patch can be applied.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Revision(u64);
@@ -267,9 +267,9 @@ struct Source {
     revision: Revision,
 }
 
-/// An immutable, source-preserving DataSpaces graph snapshot.
+/// An immutable, source-preserving `DataSpaces` graph snapshot.
 ///
-/// The snapshot owns the exact bytes of every DataSpaces stream that it
+/// The snapshot owns the exact bytes of every `DataSpaces` stream that it
 /// exposes. An unchanged transaction therefore replays producer bytes exactly
 /// and never canonicalizes IRM, license, encryption, label, or opaque payloads.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -279,9 +279,13 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parses and captures a validated DataSpaces graph from an OLE package.
+    /// Parses and captures a validated `DataSpaces` graph from an OLE package.
     ///
     /// `None` means the package has no `\x06DataSpaces` storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error`] when the OLE container or a `DataSpaces` stream cannot be read or validated.
     pub fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Self>, Error> {
         let Some(graph) = inspect(ole)? else {
             return Ok(None);
@@ -299,13 +303,13 @@ impl Snapshot {
         &self.graph
     }
 
-    /// Returns the exact DataSpaces source revision.
+    /// Returns the exact `DataSpaces` source revision.
     #[must_use]
     pub fn revision(&self) -> Revision {
         self.source.revision
     }
 
-    /// Returns the exact DataSpaces source fingerprint.
+    /// Returns the exact `DataSpaces` source fingerprint.
     #[must_use]
     pub fn fingerprint(&self) -> u64 {
         self.revision().value()
@@ -320,7 +324,7 @@ impl Snapshot {
         }
     }
 
-    fn patch_to(&self, after: Snapshot) -> Result<Patch, Error> {
+    fn patch_to(&self, after: &Snapshot) -> Result<Patch, Error> {
         if self.source.components != after.source.components
             || self
                 .source
@@ -338,11 +342,11 @@ impl Snapshot {
             .streams
             .iter()
             .zip(&after.source.streams)
-            .filter(|(before, after)| before.bytes != after.bytes)
-            .map(|(before, after)| StreamChange {
+            .filter(|(before, changed)| before.bytes != changed.bytes)
+            .map(|(before, changed)| StreamChange {
                 path: before.path.clone(),
                 before: Arc::clone(&before.bytes),
-                after: Arc::clone(&after.bytes),
+                after: Arc::clone(&changed.bytes),
             })
             .collect();
         Ok(Patch {
@@ -357,7 +361,7 @@ impl Snapshot {
     }
 }
 
-/// A failure-atomic typed DataSpaces edit.
+/// A failure-atomic typed `DataSpaces` edit.
 #[derive(Debug, Clone)]
 pub struct Transaction {
     source: Snapshot,
@@ -377,21 +381,33 @@ impl Transaction {
         &self.candidate
     }
 
-    /// Replaces the checked DataSpaceVersionInfo value.
+    /// Replaces the checked `DataSpaceVersionInfo` value.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when `value` fails `DataSpaceVersionInfo` validation.
     pub fn set_version_info(&mut self, value: VersionInfo) -> Result<&mut Self, Error> {
         validate_version_info(&value)?;
         self.candidate.version = value;
         Ok(self)
     }
 
-    /// Replaces and checks the DataSpaceMap value.
+    /// Replaces and checks the `DataSpaceMap` value.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when `value` fails `DataSpaceMap` validation.
     pub fn set_map(&mut self, value: Map) -> Result<&mut Self, Error> {
         validate_map(&value)?;
         self.candidate.map = value;
         Ok(self)
     }
 
-    /// Replaces an existing named DataSpaceDefinition.
+    /// Replaces an existing named `DataSpaceDefinition`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when `name` or `value` is invalid, or no definition named `name` exists.
     pub fn set_definition(&mut self, name: &str, value: Definition) -> Result<&mut Self, Error> {
         validate_name(name, "data space name")?;
         validate_definition(&value)?;
@@ -409,7 +425,11 @@ impl Transaction {
     ///
     /// The identity of a known IRM or encryption transform is immutable here;
     /// changing it would reinterpret its inert payload. Version fields are
-    /// still validated by the transform-specific MS-OFFCRYPTO rules.
+    /// still validated by the transform-specific `MS-OFFCRYPTO` rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when `name` or `value` is invalid, the transform is unknown, or the edit would change a known transform's identity.
     pub fn set_transform_header(&mut self, name: &str, value: Header) -> Result<&mut Self, Error> {
         validate_name(name, "transform name")?;
         validate_transform_header(&value)?;
@@ -420,22 +440,21 @@ impl Transaction {
             .find(|transform| transform.name == name)
             .ok_or_else(|| invalid(format!("unknown transform '{name}'")))?;
         let mut candidate = transform.clone();
-        if candidate.irm.is_some() || candidate.encryption.is_some() {
-            if candidate.header.transform_id != value.transform_id
-                || candidate.header.transform_name != value.transform_name
-            {
-                return Err(invalid(
-                    "known transform identity cannot be changed while its payload is inert",
-                ));
-            }
+        if (candidate.irm.is_some() || candidate.encryption.is_some())
+            && (candidate.header.transform_id != value.transform_id
+                || candidate.header.transform_name != value.transform_name)
+        {
+            return Err(invalid(
+                "known transform identity cannot be changed while its payload is inert",
+            ));
         }
-        candidate.header = value.clone();
         if let Some(irm) = candidate.irm.as_mut() {
             irm.header = value.clone();
         }
         if let Some(encryption) = candidate.encryption.as_mut() {
             encryption.header = value.clone();
         }
+        candidate.header = value;
         validate_transform_model(&candidate)?;
         *transform = candidate;
         Ok(self)
@@ -446,6 +465,10 @@ impl Transaction {
     /// This never touches `EncryptedPackage`, `EncryptionInfo`, or any other
     /// encrypted payload. The transform metadata remains advisory when the
     /// authoritative encryption information says otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when the transform is unknown or is not an encryption transform, or the resulting metadata is invalid.
     pub fn set_encryption_info(
         &mut self,
         name: &str,
@@ -475,6 +498,10 @@ impl Transaction {
     /// Replaces the opaque tail of an unknown transform header.
     ///
     /// Known IRM and encryption payloads cannot be edited by this owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when `value` exceeds the parser limit, the transform is unknown, or its payload is inert.
     pub fn set_transform_opaque_tail(
         &mut self,
         name: &str,
@@ -505,6 +532,10 @@ impl Transaction {
     }
 
     /// Validates and materializes the current candidate snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when the candidate graph fails validation.
     pub fn snapshot(&self) -> Result<Snapshot, Error> {
         self.materialize()
     }
@@ -516,9 +547,13 @@ impl Transaction {
     }
 
     /// Validates and publishes the candidate with a reversible patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when the candidate graph fails validation.
     pub fn commit(self) -> Result<Commit, Error> {
         let snapshot = self.materialize()?;
-        let patch = self.source.patch_to(snapshot.clone())?;
+        let patch = self.source.patch_to(&snapshot)?;
         Ok(Commit { snapshot, patch })
     }
 
@@ -540,7 +575,7 @@ impl Transaction {
     }
 }
 
-/// A successful DataSpaces publication.
+/// A successful `DataSpaces` publication.
 #[derive(Debug, Clone)]
 pub struct Commit {
     snapshot: Snapshot,
@@ -548,7 +583,7 @@ pub struct Commit {
 }
 
 impl Commit {
-    /// Whether any DataSpaces stream changed.
+    /// Whether any `DataSpaces` stream changed.
     #[must_use]
     pub fn changed(&self) -> bool {
         !self.patch.is_noop()
@@ -579,7 +614,7 @@ impl Commit {
     }
 }
 
-/// One source-checked replacement of a DataSpaces stream.
+/// One source-checked replacement of a `DataSpaces` stream.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StreamChange {
     path: Vec<String>,
@@ -607,7 +642,7 @@ impl StreamChange {
     }
 }
 
-/// A reversible, source-checked DataSpaces graph patch.
+/// A reversible, source-checked `DataSpaces` graph patch.
 #[derive(Debug, Clone)]
 pub struct Patch {
     base: Revision,
@@ -656,13 +691,13 @@ impl Patch {
         &self.after_graph
     }
 
-    /// Borrows the changed DataSpaces stream replacements.
+    /// Borrows the changed `DataSpaces` stream replacements.
     #[must_use]
     pub fn changes(&self) -> &[StreamChange] {
         &self.changes
     }
 
-    /// Whether this patch is an exact DataSpaces no-op.
+    /// Whether this patch is an exact `DataSpaces` no-op.
     #[must_use]
     pub fn is_noop(&self) -> bool {
         self.changes.is_empty()
@@ -675,6 +710,10 @@ impl Patch {
     }
 
     /// Applies the patch only to its exact source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when `source` is not this patch's base snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source.revision() != self.base || source.source.as_ref() != self.before.as_ref() {
             return Err(invalid(
@@ -710,13 +749,17 @@ impl Patch {
         }
     }
 
-    /// Rebuilds an OLE package after validating the exact DataSpaces source.
+    /// Rebuilds an OLE package after validating the exact `DataSpaces` source.
     ///
     /// All current streams and storages are copied into a fresh CFB writer;
     /// only the streams listed by [`Self::changes`] are replaced. IRM/license,
     /// encryption, and unrelated payloads are copied as inert bytes. The
     /// physical CFB allocation is intentionally rebuilt, while logical
     /// storage names, stream contents, and storage CLSIDs are retained.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error`] when the package has no `DataSpaces` graph, its source does not match this patch's base, or the output cannot be written.
     pub fn write_to<R: Read + Seek, W: Write + Seek>(
         &self,
         ole: &mut OleFile<R>,
@@ -727,16 +770,6 @@ impl Patch {
         self.apply(&current)?;
         rebuild_ole(ole, &self.changes, output)
     }
-}
-
-/// Runs one checked DataSpaces edit and publishes it atomically.
-pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, Error>
-where
-    F: FnOnce(&mut Transaction) -> Result<(), Error>,
-{
-    let mut transaction = snapshot.edit();
-    edit(&mut transaction)?;
-    transaction.commit()
 }
 
 impl Source {
@@ -830,6 +863,156 @@ impl Revision {
     }
 }
 
+impl Graph {
+    fn end_user_license_count(&self) -> usize {
+        self.transforms
+            .iter()
+            .map(|transform| transform.end_user_licenses.len())
+            .sum()
+    }
+}
+
+#[derive(Debug)]
+struct StorageCopy {
+    path: Vec<String>,
+    clsid: Option<[u8; 16]>,
+}
+
+#[derive(Debug)]
+struct StreamCopy {
+    path: Vec<String>,
+}
+
+struct SliceReader<'a> {
+    data: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> SliceReader<'a> {
+    fn new(data: &'a [u8]) -> Result<Self, Error> {
+        if data.len() > MAX_STREAM_BYTES {
+            return Err(invalid("DataSpaces stream exceeds parser limit"));
+        }
+        Ok(Self { data, offset: 0 })
+    }
+
+    fn at(data: &'a [u8], offset: usize) -> Result<Self, Error> {
+        let mut reader = Self::new(data)?;
+        if offset > data.len() {
+            return Err(invalid("parser offset exceeds stream"));
+        }
+        reader.offset = offset;
+        Ok(reader)
+    }
+
+    fn position(&self) -> usize {
+        self.offset
+    }
+
+    fn take(&mut self, count: usize) -> Result<&'a [u8], Error> {
+        let end = self
+            .offset
+            .checked_add(count)
+            .ok_or_else(|| invalid("stream offset overflow"))?;
+        let bytes = self
+            .data
+            .get(self.offset..end)
+            .ok_or_else(|| invalid("truncated DataSpaces stream"))?;
+        self.offset = end;
+        Ok(bytes)
+    }
+
+    fn u16(&mut self) -> Result<u16, Error> {
+        let bytes = self
+            .take(2)?
+            .try_into()
+            .map_err(|_err| invalid("invalid two-byte DataSpaces field"))?;
+        Ok(u16::from_le_bytes(bytes))
+    }
+
+    fn u32(&mut self) -> Result<u32, Error> {
+        let bytes = self
+            .take(4)?
+            .try_into()
+            .map_err(|_err| invalid("invalid four-byte DataSpaces field"))?;
+        Ok(u32::from_le_bytes(bytes))
+    }
+
+    fn version(&mut self) -> Result<Version, Error> {
+        Ok(Version {
+            major: self.u16()?,
+            minor: self.u16()?,
+        })
+    }
+
+    fn unicode_lpp4(&mut self) -> Result<String, Error> {
+        let byte_len = usize::try_from(self.u32()?)
+            .map_err(|_err| invalid("UNICODE-LP-P4 length overflows usize"))?;
+        if byte_len == 0 || byte_len > MAX_STRING_BYTES || byte_len % 2 != 0 {
+            return Err(invalid("invalid UNICODE-LP-P4 length"));
+        }
+        let bytes = self.take(byte_len)?;
+        let mut units = Vec::with_capacity(byte_len / 2);
+        for pair in bytes.chunks_exact(2) {
+            units.push(u16::from_le_bytes([pair[0], pair[1]]));
+        }
+        let value =
+            String::from_utf16(&units).map_err(|_err| invalid("invalid UNICODE-LP-P4 UTF-16"))?;
+        if value.contains('\0') {
+            return Err(invalid("UNICODE-LP-P4 string contains NUL"));
+        }
+        let padding = (4 - (byte_len % 4)) % 4;
+        if self.take(padding)?.iter().any(|byte| *byte != 0) {
+            return Err(invalid("UNICODE-LP-P4 padding is nonzero"));
+        }
+        Ok(value)
+    }
+
+    fn utf8_lpp4(&mut self) -> Result<Option<String>, Error> {
+        let byte_len = usize::try_from(self.u32()?)
+            .map_err(|_err| invalid("UTF-8-LP-P4 length overflows usize"))?;
+        if byte_len == 0 {
+            return Ok(None);
+        }
+        if byte_len > MAX_STRING_BYTES {
+            return Err(invalid("UTF-8-LP-P4 length exceeds parser limit"));
+        }
+        let bytes = self.take(byte_len)?;
+        let value =
+            std::str::from_utf8(bytes).map_err(|_err| invalid("invalid UTF-8-LP-P4 UTF-8"))?;
+        if value.contains('\0') {
+            return Err(invalid("UTF-8-LP-P4 string contains NUL"));
+        }
+        let padding = (4 - (byte_len % 4)) % 4;
+        if self.take(padding)?.iter().any(|byte| *byte != 0) {
+            return Err(invalid("UTF-8-LP-P4 padding is nonzero"));
+        }
+        Ok(Some(value.to_string()))
+    }
+
+    fn finish(self) -> Result<(), Error> {
+        if self.offset == self.data.len() {
+            Ok(())
+        } else {
+            Err(invalid("trailing bytes in DataSpaces stream"))
+        }
+    }
+}
+
+/// Runs one checked `DataSpaces` edit and publishes it atomically.
+///
+/// # Errors
+///
+/// Returns [`Error`] when `edit` fails or the edited graph cannot be validated and published.
+pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, Error>
+where
+    F: FnOnce(&mut Transaction) -> Result<(), Error>,
+{
+    let mut transaction = snapshot.edit();
+    edit(&mut transaction)?;
+    transaction.commit()
+}
+
 fn graph_stream_paths(graph: &Graph) -> Result<Vec<Vec<String>>, Error> {
     let mut paths = Vec::with_capacity(
         2 + graph.definitions.len() + graph.transforms.len() + graph.end_user_license_count(),
@@ -872,15 +1055,6 @@ fn graph_stream_paths(graph: &Graph) -> Result<Vec<Vec<String>>, Error> {
     Ok(paths)
 }
 
-impl Graph {
-    fn end_user_license_count(&self) -> usize {
-        self.transforms
-            .iter()
-            .map(|transform| transform.end_user_licenses.len())
-            .sum()
-    }
-}
-
 fn collect_components<R: Read + Seek>(ole: &OleFile<R>) -> Result<Vec<Component>, Error> {
     let mut components = Vec::new();
     let mut path = Vec::new();
@@ -898,8 +1072,8 @@ fn collect_directory_components<R: Read + Seek>(
         return Err(invalid("OLE directory nesting exceeds parser limit"));
     }
     let references = path.iter().map(String::as_str).collect::<Vec<_>>();
-    let entries = ole.list_directory_entries(&references)?;
-    let entries = entries
+    let raw_entries = ole.list_directory_entries(&references)?;
+    let entries = raw_entries
         .into_iter()
         .map(|entry| (entry.name.clone(), entry.entry_type))
         .collect::<Vec<_>>();
@@ -1087,7 +1261,7 @@ fn same_path(left: &[String], right: &[String]) -> bool {
         && left
             .iter()
             .zip(right)
-            .all(|(left, right)| left.eq_ignore_ascii_case(right))
+            .all(|(lhs, rhs)| lhs.eq_ignore_ascii_case(rhs))
 }
 
 fn validate_derived_graph(graph: &Graph) -> Result<(), Error> {
@@ -1221,17 +1395,6 @@ fn encode_transform_primary(transform: &Transform) -> Result<Vec<u8>, Error> {
     }
 }
 
-#[derive(Debug)]
-struct StorageCopy {
-    path: Vec<String>,
-    clsid: Option<[u8; 16]>,
-}
-
-#[derive(Debug)]
-struct StreamCopy {
-    path: Vec<String>,
-}
-
 fn rebuild_ole<R: Read + Seek, W: Write + Seek>(
     ole: &mut OleFile<R>,
     changes: &[StreamChange],
@@ -1239,10 +1402,10 @@ fn rebuild_ole<R: Read + Seek, W: Write + Seek>(
 ) -> Result<(), Error> {
     let (storages, mut streams) = collect_ole_layout(ole)?;
     let mut writer = OleWriter::with_sector_size(ole.sector_size())?;
-    if let Some(root) = ole.root_entry() {
-        if let Some(clsid) = parse_clsid(&root.clsid)? {
-            writer.set_root_clsid(clsid);
-        }
+    if let Some(root) = ole.root_entry()
+        && let Some(clsid) = parse_clsid(&root.clsid)?
+    {
+        writer.set_root_clsid(clsid);
     }
     for storage in &storages {
         let path = storage.path.iter().map(String::as_str).collect::<Vec<_>>();
@@ -1255,13 +1418,7 @@ fn rebuild_ole<R: Read + Seek, W: Write + Seek>(
     // Word's legacy writer requires WordDocument to receive the first large
     // stream allocation. Keep that format-specific invariant while preserving
     // the source traversal order for every other stream.
-    streams.sort_by_key(|stream| {
-        if stream.path.as_slice() == ["WordDocument"] {
-            0u8
-        } else {
-            1u8
-        }
-    });
+    streams.sort_by_key(|stream| u8::from(stream.path.as_slice() != ["WordDocument"]));
     for stream in streams {
         let path = stream.path.iter().map(String::as_str).collect::<Vec<_>>();
         let data = if let Some(change) = changes
@@ -1299,8 +1456,8 @@ fn collect_ole_layout_directory<R: Read + Seek>(
         return Err(invalid("OLE directory nesting exceeds parser limit"));
     }
     let references = path.iter().map(String::as_str).collect::<Vec<_>>();
-    let entries = ole.list_directory_entries(&references)?;
-    let entries = entries
+    let raw_entries = ole.list_directory_entries(&references)?;
+    let entries = raw_entries
         .into_iter()
         .map(|entry| (entry.name.clone(), entry.entry_type, entry.clsid.clone()))
         .collect::<Vec<_>>();
@@ -1345,11 +1502,11 @@ fn parse_clsid(value: &str) -> Result<Option<[u8; 16]>, Error> {
         return Err(invalid(format!("invalid CFB CLSID '{value}'")));
     }
     let data1 = u32::from_str_radix(fields[0], 16)
-        .map_err(|_| invalid(format!("invalid CFB CLSID '{value}'")))?;
+        .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?;
     let data2 = u16::from_str_radix(fields[1], 16)
-        .map_err(|_| invalid(format!("invalid CFB CLSID '{value}'")))?;
+        .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?;
     let data3 = u16::from_str_radix(fields[2], 16)
-        .map_err(|_| invalid(format!("invalid CFB CLSID '{value}'")))?;
+        .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?;
     let mut bytes = [0u8; 16];
     bytes[..4].copy_from_slice(&data1.to_le_bytes());
     bytes[4..6].copy_from_slice(&data2.to_le_bytes());
@@ -1357,22 +1514,27 @@ fn parse_clsid(value: &str) -> Result<Option<[u8; 16]>, Error> {
     for (index, pair) in fields[3].as_bytes().chunks_exact(2).enumerate() {
         bytes[8 + index] = u8::from_str_radix(
             std::str::from_utf8(pair)
-                .map_err(|_| invalid(format!("invalid CFB CLSID '{value}'")))?,
+                .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?,
             16,
         )
-        .map_err(|_| invalid(format!("invalid CFB CLSID '{value}'")))?;
+        .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?;
     }
     for (index, pair) in fields[4].as_bytes().chunks_exact(2).enumerate() {
         bytes[10 + index] = u8::from_str_radix(
             std::str::from_utf8(pair)
-                .map_err(|_| invalid(format!("invalid CFB CLSID '{value}'")))?,
+                .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?,
             16,
         )
-        .map_err(|_| invalid(format!("invalid CFB CLSID '{value}'")))?;
+        .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?;
     }
     Ok(Some(bytes))
 }
 
+/// Parses a `DataSpaceVersionInfo` stream.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
 pub fn parse_version_info(data: &[u8]) -> Result<VersionInfo, Error> {
     let mut reader = SliceReader::new(data)?;
     let value = VersionInfo {
@@ -1386,6 +1548,11 @@ pub fn parse_version_info(data: &[u8]) -> Result<VersionInfo, Error> {
     Ok(value)
 }
 
+/// Serializes a `DataSpaceVersionInfo` value.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the value fails validation.
 pub fn write_version_info(value: &VersionInfo) -> Result<Vec<u8>, Error> {
     validate_version_info(value)?;
     let mut output = Vec::new();
@@ -1396,6 +1563,11 @@ pub fn write_version_info(value: &VersionInfo) -> Result<Vec<u8>, Error> {
     Ok(output)
 }
 
+/// Parses a `DataSpaceMap` stream.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
 pub fn parse_map(data: &[u8]) -> Result<Map, Error> {
     let mut reader = SliceReader::new(data)?;
     require_u32(reader.u32()?, HEADER_LENGTH, "DataSpaceMap.HeaderLength")?;
@@ -1407,7 +1579,7 @@ pub fn parse_map(data: &[u8]) -> Result<Map, Error> {
     for _ in 0..count {
         let start = reader.position();
         let length = usize::try_from(reader.u32()?)
-            .map_err(|_| invalid("DataSpaceMapEntry.Length overflows usize"))?;
+            .map_err(|_err| invalid("DataSpaceMapEntry.Length overflows usize"))?;
         if length < 12 || start.checked_add(length).is_none_or(|end| end > data.len()) {
             return Err(invalid("DataSpaceMapEntry.Length exceeds its stream"));
         }
@@ -1449,6 +1621,11 @@ pub fn parse_map(data: &[u8]) -> Result<Map, Error> {
     Ok(value)
 }
 
+/// Serializes a `DataSpaceMap` value.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the value fails validation.
 pub fn write_map(value: &Map) -> Result<Vec<u8>, Error> {
     validate_map(value)?;
     let mut output = Vec::new();
@@ -1472,12 +1649,17 @@ pub fn write_map(value: &Map) -> Result<Vec<u8>, Error> {
         }
         write_unicode_lpp4(&mut output, &entry.data_space_name)?;
         let length = u32::try_from(output.len() - start)
-            .map_err(|_| invalid("DataSpaceMapEntry.Length exceeds u32"))?;
+            .map_err(|_err| invalid("DataSpaceMapEntry.Length exceeds u32"))?;
         output[start..start + 4].copy_from_slice(&length.to_le_bytes());
     }
     Ok(output)
 }
 
+/// Parses a `DataSpaceDefinition` stream.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
 pub fn parse_definition(data: &[u8]) -> Result<Definition, Error> {
     let mut reader = SliceReader::new(data)?;
     require_u32(
@@ -1501,6 +1683,11 @@ pub fn parse_definition(data: &[u8]) -> Result<Definition, Error> {
     Ok(value)
 }
 
+/// Serializes a `DataSpaceDefinition` value.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the value fails validation.
 pub fn write_definition(value: &Definition) -> Result<Vec<u8>, Error> {
     validate_definition(value)?;
     let mut output = Vec::new();
@@ -1516,10 +1703,15 @@ pub fn write_definition(value: &Definition) -> Result<Vec<u8>, Error> {
     Ok(output)
 }
 
+/// Parses a transform header, returning the header and the byte count it consumed.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
 pub fn parse_transform_header(data: &[u8]) -> Result<(Header, usize), Error> {
     let mut reader = SliceReader::new(data)?;
-    let transform_length =
-        usize::try_from(reader.u32()?).map_err(|_| invalid("TransformLength overflows usize"))?;
+    let transform_length = usize::try_from(reader.u32()?)
+        .map_err(|_err| invalid("TransformLength overflows usize"))?;
     require_u32(reader.u32()?, TRANSFORM_TYPE, "TransformType")?;
     let transform_id = reader.unicode_lpp4()?;
     if reader.position() != transform_length {
@@ -1536,6 +1728,11 @@ pub fn parse_transform_header(data: &[u8]) -> Result<(Header, usize), Error> {
     Ok((value, reader.position()))
 }
 
+/// Serializes a transform header.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the value fails validation.
 pub fn write_transform_header(value: &Header) -> Result<Vec<u8>, Error> {
     validate_transform_header(value)?;
     let mut output = Vec::new();
@@ -1543,7 +1740,7 @@ pub fn write_transform_header(value: &Header) -> Result<Vec<u8>, Error> {
     output.extend_from_slice(&TRANSFORM_TYPE.to_le_bytes());
     write_unicode_lpp4(&mut output, &value.transform_id)?;
     let transform_length =
-        u32::try_from(output.len()).map_err(|_| invalid("TransformLength exceeds u32"))?;
+        u32::try_from(output.len()).map_err(|_err| invalid("TransformLength exceeds u32"))?;
     output[..4].copy_from_slice(&transform_length.to_le_bytes());
     write_unicode_lpp4(&mut output, &value.transform_name)?;
     write_version(&mut output, value.reader);
@@ -1552,6 +1749,11 @@ pub fn write_transform_header(value: &Header) -> Result<Vec<u8>, Error> {
     Ok(output)
 }
 
+/// Parses an IRM transform stream.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
 pub fn parse_irm_transform(data: &[u8]) -> Result<IrmTransform, Error> {
     let (header, consumed) = parse_transform_header(data)?;
     validate_drm_header(&header)?;
@@ -1574,6 +1776,11 @@ pub fn parse_irm_transform(data: &[u8]) -> Result<IrmTransform, Error> {
     })
 }
 
+/// Serializes an IRM transform.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the value fails validation.
 pub fn write_irm_transform(value: &IrmTransform) -> Result<Vec<u8>, Error> {
     validate_drm_header(&value.header)?;
     let license = value
@@ -1588,6 +1795,11 @@ pub fn write_irm_transform(value: &IrmTransform) -> Result<Vec<u8>, Error> {
     Ok(output)
 }
 
+/// Parses an `EncryptionTransformInfo` stream.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
 pub fn parse_encryption_transform(data: &[u8]) -> Result<EncryptionTransform, Error> {
     let (header, consumed) = parse_transform_header(data)?;
     validate_encryption_header(&header)?;
@@ -1604,6 +1816,11 @@ pub fn parse_encryption_transform(data: &[u8]) -> Result<EncryptionTransform, Er
     Ok(value)
 }
 
+/// Serializes an `EncryptionTransformInfo` value.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the value fails validation.
 pub fn write_encryption_transform(value: &EncryptionTransform) -> Result<Vec<u8>, Error> {
     validate_encryption_transform(value)?;
     let mut output = write_transform_header(&value.header)?;
@@ -1614,12 +1831,17 @@ pub fn write_encryption_transform(value: &EncryptionTransform) -> Result<Vec<u8>
     Ok(output)
 }
 
+/// Parses an end-user license stream.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
 pub fn parse_license(stream_name: &str, data: &[u8]) -> Result<License, Error> {
     validate_eul_stream_name(stream_name)?;
     let mut reader = SliceReader::new(data)?;
     let header_start = reader.position();
     let header_length = usize::try_from(reader.u32()?)
-        .map_err(|_| invalid("EndUserLicenseHeader.Length overflows usize"))?;
+        .map_err(|_err| invalid("EndUserLicenseHeader.Length overflows usize"))?;
     if header_length < 8 || header_length > data.len() {
         return Err(invalid("invalid EndUserLicenseHeader.Length"));
     }
@@ -1645,6 +1867,11 @@ pub fn parse_license(stream_name: &str, data: &[u8]) -> Result<License, Error> {
     })
 }
 
+/// Serializes an end-user license stream.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the value fails validation.
 pub fn write_license(value: &License) -> Result<Vec<u8>, Error> {
     validate_eul_stream_name(&value.stream_name)?;
     if value.encoded_license_id.is_empty() {
@@ -1659,13 +1886,17 @@ pub fn write_license(value: &License) -> Result<Vec<u8>, Error> {
     let mut output = vec![0; 4];
     write_utf8_lpp4(&mut output, Some(&value.encoded_license_id))?;
     let header_length = u32::try_from(output.len())
-        .map_err(|_| invalid("EndUserLicenseHeader.Length exceeds u32"))?;
+        .map_err(|_err| invalid("EndUserLicenseHeader.Length exceeds u32"))?;
     output[..4].copy_from_slice(&header_length.to_le_bytes());
     write_utf8_lpp4(&mut output, value.certificate_chain.as_deref())?;
     Ok(output)
 }
 
-/// Inspect and cross-validate a complete DataSpaces graph in an OLE file.
+/// Inspect and cross-validate a complete `DataSpaces` graph in an OLE file.
+///
+/// # Errors
+///
+/// Returns [`Error`] when the OLE container or a `DataSpaces` stream cannot be read or validated.
 pub fn inspect<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Graph>, Error> {
     let custom_xml_data_store = inspect_custom_xml(ole)
         .map_err(|error| invalid(format!("MsoDataStore validation failed: {error}")))?;
@@ -1838,7 +2069,7 @@ pub fn inspect<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Graph>, Er
 }
 
 fn validate_custom_xml_promotion(store: Option<&Store>, irm: Option<&Irm>) -> Result<(), Error> {
-    if store.is_some_and(|store| store.promotion != Promotion::Unspecified) && irm.is_none() {
+    if store.is_some_and(|inner| inner.promotion != Promotion::Unspecified) && irm.is_none() {
         return Err(invalid(
             "MsoDataStore promotion marker requires an IRM data space",
         ));
@@ -1846,7 +2077,11 @@ fn validate_custom_xml_promotion(store: Option<&Store>, irm: Option<&Irm>) -> Re
     Ok(())
 }
 
-/// Open an OLE compound file and inspect its DataSpaces graph.
+/// Open an OLE compound file and inspect its `DataSpaces` graph.
+///
+/// # Errors
+///
+/// Returns [`Error`] when the bytes are not a valid OLE container or its `DataSpaces` graph cannot be read or validated.
 pub fn inspect_bytes(bytes: &[u8]) -> Result<Option<Graph>, Error> {
     let mut ole = OleFile::open(std::io::Cursor::new(bytes))?;
     inspect(&mut ole)
@@ -2206,11 +2441,12 @@ fn validate_inert_xml(value: &str, label: &str) -> Result<(), Error> {
 }
 
 fn bounded_count(value: u32, label: &str) -> Result<usize, Error> {
-    let value = usize::try_from(value).map_err(|_| invalid(format!("{label} overflows usize")))?;
-    if value > MAX_ENTRIES {
+    let count =
+        usize::try_from(value).map_err(|_err| invalid(format!("{label} overflows usize")))?;
+    if count > MAX_ENTRIES {
         return Err(invalid(format!("{label} exceeds {MAX_ENTRIES}")));
     }
-    Ok(value)
+    Ok(count)
 }
 
 fn write_count(output: &mut Vec<u8>, count: usize, label: &str) -> Result<(), Error> {
@@ -2219,7 +2455,7 @@ fn write_count(output: &mut Vec<u8>, count: usize, label: &str) -> Result<(), Er
     }
     output.extend_from_slice(
         &u32::try_from(count)
-            .map_err(|_| invalid(format!("{label} exceeds u32")))?
+            .map_err(|_err| invalid(format!("{label} exceeds u32")))?
             .to_le_bytes(),
     );
     Ok(())
@@ -2248,7 +2484,7 @@ fn write_unicode_lpp4(output: &mut Vec<u8>, value: &str) -> Result<(), Error> {
         .ok_or_else(|| invalid("UNICODE-LP-P4 length overflow"))?;
     output.extend_from_slice(
         &u32::try_from(byte_len)
-            .map_err(|_| invalid("UNICODE-LP-P4 length exceeds u32"))?
+            .map_err(|_err| invalid("UNICODE-LP-P4 length exceeds u32"))?
             .to_le_bytes(),
     );
     for unit in units {
@@ -2261,19 +2497,19 @@ fn write_unicode_lpp4(output: &mut Vec<u8>, value: &str) -> Result<(), Error> {
 }
 
 fn write_utf8_lpp4(output: &mut Vec<u8>, value: Option<&str>) -> Result<(), Error> {
-    let Some(value) = value else {
+    let Some(text) = value else {
         output.extend_from_slice(&0u32.to_le_bytes());
         return Ok(());
     };
-    if value.len() > MAX_STRING_BYTES || value.contains('\0') {
+    if text.len() > MAX_STRING_BYTES || text.contains('\0') {
         return Err(invalid("UTF-8-LP-P4 string is too long or contains NUL"));
     }
     output.extend_from_slice(
-        &u32::try_from(value.len())
-            .map_err(|_| invalid("UTF-8-LP-P4 length exceeds u32"))?
+        &u32::try_from(text.len())
+            .map_err(|_err| invalid("UTF-8-LP-P4 length exceeds u32"))?
             .to_le_bytes(),
     );
-    output.extend_from_slice(value.as_bytes());
+    output.extend_from_slice(text.as_bytes());
     output.resize(output.len().next_multiple_of(4), 0);
     Ok(())
 }
@@ -2293,123 +2529,12 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-struct SliceReader<'a> {
-    data: &'a [u8],
-    offset: usize,
-}
-
-impl<'a> SliceReader<'a> {
-    fn new(data: &'a [u8]) -> Result<Self, Error> {
-        if data.len() > MAX_STREAM_BYTES {
-            return Err(invalid("DataSpaces stream exceeds parser limit"));
-        }
-        Ok(Self { data, offset: 0 })
-    }
-
-    fn at(data: &'a [u8], offset: usize) -> Result<Self, Error> {
-        let mut reader = Self::new(data)?;
-        if offset > data.len() {
-            return Err(invalid("parser offset exceeds stream"));
-        }
-        reader.offset = offset;
-        Ok(reader)
-    }
-
-    fn position(&self) -> usize {
-        self.offset
-    }
-
-    fn take(&mut self, count: usize) -> Result<&'a [u8], Error> {
-        let end = self
-            .offset
-            .checked_add(count)
-            .ok_or_else(|| invalid("stream offset overflow"))?;
-        let bytes = self
-            .data
-            .get(self.offset..end)
-            .ok_or_else(|| invalid("truncated DataSpaces stream"))?;
-        self.offset = end;
-        Ok(bytes)
-    }
-
-    fn u16(&mut self) -> Result<u16, Error> {
-        let bytes = self
-            .take(2)?
-            .try_into()
-            .map_err(|_| invalid("invalid two-byte DataSpaces field"))?;
-        Ok(u16::from_le_bytes(bytes))
-    }
-
-    fn u32(&mut self) -> Result<u32, Error> {
-        let bytes = self
-            .take(4)?
-            .try_into()
-            .map_err(|_| invalid("invalid four-byte DataSpaces field"))?;
-        Ok(u32::from_le_bytes(bytes))
-    }
-
-    fn version(&mut self) -> Result<Version, Error> {
-        Ok(Version {
-            major: self.u16()?,
-            minor: self.u16()?,
-        })
-    }
-
-    fn unicode_lpp4(&mut self) -> Result<String, Error> {
-        let byte_len = usize::try_from(self.u32()?)
-            .map_err(|_| invalid("UNICODE-LP-P4 length overflows usize"))?;
-        if byte_len == 0 || byte_len > MAX_STRING_BYTES || byte_len % 2 != 0 {
-            return Err(invalid("invalid UNICODE-LP-P4 length"));
-        }
-        let bytes = self.take(byte_len)?;
-        let mut units = Vec::with_capacity(byte_len / 2);
-        for bytes in bytes.chunks_exact(2) {
-            units.push(u16::from_le_bytes([bytes[0], bytes[1]]));
-        }
-        let value =
-            String::from_utf16(&units).map_err(|_| invalid("invalid UNICODE-LP-P4 UTF-16"))?;
-        if value.contains('\0') {
-            return Err(invalid("UNICODE-LP-P4 string contains NUL"));
-        }
-        let padding = (4 - (byte_len % 4)) % 4;
-        if self.take(padding)?.iter().any(|byte| *byte != 0) {
-            return Err(invalid("UNICODE-LP-P4 padding is nonzero"));
-        }
-        Ok(value)
-    }
-
-    fn utf8_lpp4(&mut self) -> Result<Option<String>, Error> {
-        let byte_len = usize::try_from(self.u32()?)
-            .map_err(|_| invalid("UTF-8-LP-P4 length overflows usize"))?;
-        if byte_len == 0 {
-            return Ok(None);
-        }
-        if byte_len > MAX_STRING_BYTES {
-            return Err(invalid("UTF-8-LP-P4 length exceeds parser limit"));
-        }
-        let bytes = self.take(byte_len)?;
-        let value = std::str::from_utf8(bytes).map_err(|_| invalid("invalid UTF-8-LP-P4 UTF-8"))?;
-        if value.contains('\0') {
-            return Err(invalid("UTF-8-LP-P4 string contains NUL"));
-        }
-        let padding = (4 - (byte_len % 4)) % 4;
-        if self.take(padding)?.iter().any(|byte| *byte != 0) {
-            return Err(invalid("UTF-8-LP-P4 padding is nonzero"));
-        }
-        Ok(Some(value.to_string()))
-    }
-
-    fn finish(self) -> Result<(), Error> {
-        if self.offset == self.data.len() {
-            Ok(())
-        } else {
-            Err(invalid("trailing bytes in DataSpaces stream"))
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        reason = "test code panics on failure; unwrap keeps assertions concise"
+    )]
     use super::*;
     use litchi_cfb::OleWriter;
     use std::io::Cursor;

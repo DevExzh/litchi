@@ -1,4 +1,4 @@
-//! StrongEncryptionDataSpace compound-container adapter.
+//! `StrongEncryptionDataSpace` compound-container adapter.
 
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
@@ -15,32 +15,150 @@ use super::{Error, Limits, Mode, Result, malformed, mode};
 const DATA_SPACE: &str = "StrongEncryptionDataSpace";
 const TRANSFORM: &str = "StrongEncryptionTransform";
 
-/// Read only the bounded EncryptionInfo stream for password-free classification.
+/// A `Write + Seek` sink that refuses growth before allocation.
+struct Bounded {
+    inner: Cursor<Vec<u8>>,
+    maximum: u64,
+    failure: Option<SinkFailure>,
+}
+
+#[derive(Clone, Copy)]
+enum SinkFailure {
+    Limit { actual: u64, maximum: u64 },
+    Allocation,
+}
+
+impl Bounded {
+    fn new(maximum: usize) -> Self {
+        Self {
+            inner: Cursor::new(Vec::new()),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+            failure: None,
+        }
+    }
+
+    fn take_failure(&mut self) -> Option<SinkFailure> {
+        self.failure.take()
+    }
+
+    fn finish(self) -> Result<Vec<u8>> {
+        let bytes = self.inner.into_inner();
+        if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > self.maximum {
+            return Err(Error::Limit {
+                resource: "compound output",
+                actual: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+                maximum: self.maximum,
+            });
+        }
+        Ok(bytes)
+    }
+
+    fn checked_position(&mut self, position: i128) -> std::io::Result<u64> {
+        if position < 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "OOXML encrypted output seeked before byte zero",
+            ));
+        }
+        let Ok(absolute) = u64::try_from(position) else {
+            return Err(self.limit(u64::MAX));
+        };
+        if absolute > self.maximum {
+            return Err(self.limit(absolute));
+        }
+        Ok(absolute)
+    }
+
+    fn limit(&mut self, actual: u64) -> std::io::Error {
+        self.failure.get_or_insert(SinkFailure::Limit {
+            actual,
+            maximum: self.maximum,
+        });
+        limit_io()
+    }
+
+    fn allocation(&mut self) -> std::io::Error {
+        self.failure.get_or_insert(SinkFailure::Allocation);
+        allocation_io()
+    }
+}
+
+impl Write for Bounded {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let Ok(length) = u64::try_from(bytes.len()) else {
+            return Err(self.limit(u64::MAX));
+        };
+        let Some(end) = self.inner.position().checked_add(length) else {
+            return Err(self.limit(u64::MAX));
+        };
+        if end > self.maximum {
+            return Err(self.limit(end));
+        }
+        let Ok(end_index) = usize::try_from(end) else {
+            return Err(self.limit(end));
+        };
+        let capacity = self.inner.get_ref().capacity();
+        let current = self.inner.get_ref().len();
+        let maximum = usize::try_from(self.maximum).unwrap_or(usize::MAX);
+        let target = end_index.max(capacity.saturating_mul(2)).min(maximum);
+        if end_index > capacity
+            && self
+                .inner
+                .get_mut()
+                .try_reserve_exact(target.saturating_sub(current))
+                .is_err()
+        {
+            return Err(self.allocation());
+        }
+        self.inner.write(bytes)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl Seek for Bounded {
+    fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+        let next = match position {
+            SeekFrom::Start(value) => i128::from(value),
+            SeekFrom::Current(delta) => i128::from(self.inner.position()) + i128::from(delta),
+            SeekFrom::End(delta) => {
+                i128::try_from(self.inner.get_ref().len()).map_err(|_err| limit_io())?
+                    + i128::from(delta)
+            },
+        };
+        let checked = self.checked_position(next)?;
+        self.inner.seek(SeekFrom::Start(checked))
+    }
+}
+
+/// Read only the bounded `EncryptionInfo` stream for password-free classification.
 pub(super) fn read_info(bytes: &[u8], limits: &Limits) -> Result<Vec<u8>> {
-    limits.bytes("compound input", bytes.len(), limits.max_input_bytes)?;
+    Limits::bytes("compound input", bytes.len(), limits.max_input_bytes)?;
     let mut ole = OleFile::open(Cursor::new(bytes)).map_err(map_reader_error)?;
     let info = ole
         .open_stream(&["EncryptionInfo"])
         .map_err(map_reader_error)?;
-    limits.bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
+    Limits::bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
     Ok(info)
 }
 
 /// Wrap one `EncryptionInfo` and `EncryptedPackage` pair in the normative CFB graph.
 pub(super) fn write(info: &[u8], encrypted: Vec<u8>, limits: &Limits) -> Result<Vec<u8>> {
-    limits.bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
-    limits.bytes(
+    Limits::bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
+    Limits::bytes(
         "EncryptedPackage",
         encrypted.len(),
         limits.max_encrypted_bytes,
     )?;
 
     let mode = mode(info)?;
-    let map = spaces::write_map(&expected_map()).map_err(map_spaces_error)?;
+    let map = spaces::write_map(&expected_map()).map_err(|error| map_spaces_error(&error))?;
     let definition = spaces::write_definition(&Definition {
         transforms: vec![TRANSFORM.to_string()],
     })
-    .map_err(map_spaces_error)?;
+    .map_err(|error| map_spaces_error(&error))?;
     let primary = spaces::write_encryption_transform(&EncryptionTransform {
         header: Header {
             transform_id: ENCRYPTION_ID.to_string(),
@@ -56,8 +174,9 @@ pub(super) fn write(info: &[u8], encrypted: Vec<u8>, limits: &Limits) -> Result<
         encryption_block_size: 16,
         cipher_mode: 0,
     })
-    .map_err(map_spaces_error)?;
-    let version = spaces::write_version_info(&VersionInfo::default()).map_err(map_spaces_error)?;
+    .map_err(|error| map_spaces_error(&error))?;
+    let version = spaces::write_version_info(&VersionInfo::default())
+        .map_err(|error| map_spaces_error(&error))?;
 
     let mut writer = OleWriter::new();
     stream(&mut writer, &["EncryptionInfo"], info)?;
@@ -100,19 +219,19 @@ pub(super) fn write(info: &[u8], encrypted: Vec<u8>, limits: &Limits) -> Result<
 
 /// Read and validate the two encryption streams from a bounded compound file.
 pub(super) fn read(bytes: Vec<u8>, limits: &Limits) -> Result<(Vec<u8>, Vec<u8>)> {
-    limits.bytes("compound input", bytes.len(), limits.max_input_bytes)?;
+    Limits::bytes("compound input", bytes.len(), limits.max_input_bytes)?;
     let mut ole = OleFile::open(Cursor::new(bytes)).map_err(map_reader_error)?;
 
     let info = ole
         .open_stream(&["EncryptionInfo"])
         .map_err(map_reader_error)?;
-    limits.bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
+    Limits::bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
     let mode = mode(&info)?;
 
     // LibreOffice has emitted otherwise valid encrypted packages without the
     // DataSpaces storage. Retain that narrow read compatibility, but when the
     // graph exists require the complete StrongEncryption profile.
-    match spaces::inspect(&mut ole).map_err(map_spaces_error)? {
+    match spaces::inspect(&mut ole).map_err(|error| map_spaces_error(&error))? {
         Some(graph) => validate_graph(&graph, mode)?,
         None if limits.allow_missing_data_spaces => {},
         None => {
@@ -125,7 +244,7 @@ pub(super) fn read(bytes: Vec<u8>, limits: &Limits) -> Result<(Vec<u8>, Vec<u8>)
     let encrypted = ole
         .open_stream(&["EncryptedPackage"])
         .map_err(map_reader_error)?;
-    limits.bytes(
+    Limits::bytes(
         "EncryptedPackage",
         encrypted.len(),
         limits.max_encrypted_bytes,
@@ -214,7 +333,7 @@ fn stream(writer: &mut OleWriter, path: &[&str], bytes: &[u8]) -> Result<()> {
 
 fn map_writer_error(error: OleError) -> Error {
     match error {
-        OleError::Io(error) => Error::Io(error),
+        OleError::Io(io_error) => Error::Io(io_error),
         OleError::Allocation { resource, .. } => Error::Allocation(resource),
         OleError::Committed { source } => Error::Io(source),
         OleError::InvalidFormat(message) => Error::Container(format!("Invalid format: {message}")),
@@ -229,7 +348,7 @@ fn map_reader_error(error: OleError) -> Error {
     // All readers in this adapter are in-memory cursors. An I/O-looking error
     // therefore denotes truncated container bytes, not an external I/O fault.
     match error {
-        OleError::Io(error) => Error::Container(format!("IO error: {error}")),
+        OleError::Io(io_error) => Error::Container(format!("IO error: {io_error}")),
         OleError::Allocation { resource, .. } => Error::Allocation(resource),
         OleError::Committed { source } => Error::Io(source),
         OleError::InvalidFormat(message) => Error::Container(format!("Invalid format: {message}")),
@@ -240,130 +359,8 @@ fn map_reader_error(error: OleError) -> Error {
     }
 }
 
-fn map_spaces_error(error: spaces::Error) -> Error {
+fn map_spaces_error(error: &spaces::Error) -> Error {
     Error::Container(error.to_string())
-}
-
-/// A `Write + Seek` sink that refuses growth before allocation.
-struct Bounded {
-    inner: Cursor<Vec<u8>>,
-    maximum: u64,
-    failure: Option<SinkFailure>,
-}
-
-#[derive(Clone, Copy)]
-enum SinkFailure {
-    Limit { actual: u64, maximum: u64 },
-    Allocation,
-}
-
-impl Bounded {
-    fn new(maximum: usize) -> Self {
-        Self {
-            inner: Cursor::new(Vec::new()),
-            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
-            failure: None,
-        }
-    }
-
-    fn take_failure(&mut self) -> Option<SinkFailure> {
-        self.failure.take()
-    }
-
-    fn finish(self) -> Result<Vec<u8>> {
-        let bytes = self.inner.into_inner();
-        if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > self.maximum {
-            return Err(Error::Limit {
-                resource: "compound output",
-                actual: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
-                maximum: self.maximum,
-            });
-        }
-        Ok(bytes)
-    }
-
-    fn checked_position(&mut self, position: i128) -> std::io::Result<u64> {
-        if position < 0 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "OOXML encrypted output seeked before byte zero",
-            ));
-        }
-        let position = match u64::try_from(position) {
-            Ok(position) => position,
-            Err(_) => return Err(self.limit(u64::MAX)),
-        };
-        if position > self.maximum {
-            return Err(self.limit(position));
-        }
-        Ok(position)
-    }
-
-    fn limit(&mut self, actual: u64) -> std::io::Error {
-        self.failure.get_or_insert(SinkFailure::Limit {
-            actual,
-            maximum: self.maximum,
-        });
-        limit_io()
-    }
-
-    fn allocation(&mut self) -> std::io::Error {
-        self.failure.get_or_insert(SinkFailure::Allocation);
-        allocation_io()
-    }
-}
-
-impl Write for Bounded {
-    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        let length = match u64::try_from(bytes.len()) {
-            Ok(length) => length,
-            Err(_) => return Err(self.limit(u64::MAX)),
-        };
-        let end = match self.inner.position().checked_add(length) {
-            Some(end) => end,
-            None => return Err(self.limit(u64::MAX)),
-        };
-        if end > self.maximum {
-            return Err(self.limit(end));
-        }
-        let end = match usize::try_from(end) {
-            Ok(end) => end,
-            Err(_) => return Err(self.limit(end)),
-        };
-        let capacity = self.inner.get_ref().capacity();
-        let length = self.inner.get_ref().len();
-        let maximum = usize::try_from(self.maximum).unwrap_or(usize::MAX);
-        let target = end.max(capacity.saturating_mul(2)).min(maximum);
-        if end > capacity
-            && self
-                .inner
-                .get_mut()
-                .try_reserve_exact(target.saturating_sub(length))
-                .is_err()
-        {
-            return Err(self.allocation());
-        }
-        self.inner.write(bytes)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.inner.flush()
-    }
-}
-
-impl Seek for Bounded {
-    fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
-        let next = match position {
-            SeekFrom::Start(value) => i128::from(value),
-            SeekFrom::Current(delta) => i128::from(self.inner.position()) + i128::from(delta),
-            SeekFrom::End(delta) => {
-                i128::try_from(self.inner.get_ref().len()).map_err(|_| limit_io())?
-                    + i128::from(delta)
-            },
-        };
-        let next = self.checked_position(next)?;
-        self.inner.seek(SeekFrom::Start(next))
-    }
 }
 
 fn limit_io() -> std::io::Error {
@@ -376,6 +373,10 @@ fn allocation_io() -> std::io::Error {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::expect_used,
+        reason = "test code panics on failure; expect keeps assertions concise"
+    )]
     use super::*;
     use crate::spaces::{ENCRYPTION_ID, inspect_bytes};
 

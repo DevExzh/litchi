@@ -44,6 +44,13 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+/// Parse an encrypted property hash stream into its [`Info`] structure.
+///
+/// # Errors
+///
+/// Returns [`Error::Truncated`] when `data` ends before the fixed header, and
+/// [`Error::InvalidStreamId`] when the leading byte is not the expected
+/// stream identifier.
 pub fn parse(data: &[u8]) -> Result<Info, Error> {
     let Some((&stream_id, tail)) = data.split_first() else {
         return Err(Error::Truncated);
@@ -61,13 +68,15 @@ pub fn parse(data: &[u8]) -> Result<Info, Error> {
         .get(..4)
         .ok_or(Error::Truncated)?
         .try_into()
-        .map_err(|_| Error::Truncated)?;
+        .map_err(|_err| Error::Truncated)?;
     Ok(Info::Version0 {
         checksum: u32::from_le_bytes(checksum),
         reserved: payload[4..].to_vec(),
     })
 }
 
+/// Serialize a version 0 stream from `checksum` and its reserved bytes.
+#[must_use]
 pub fn write(checksum: u32, reserved: &[u8]) -> Vec<u8> {
     let mut output = Vec::with_capacity(HEADER_BYTES + reserved.len());
     output.push(STREAM_ID);
@@ -77,10 +86,11 @@ pub fn write(checksum: u32, reserved: &[u8]) -> Vec<u8> {
     output
 }
 
-/// Continue the MS-OSHARED MsoCrc32Compute algorithm from `initial`.
+/// Continue the MS-OSHARED `MsoCrc32Compute` algorithm from `initial`.
 ///
 /// Passing the returned value into a later call is equivalent to hashing the
 /// concatenated slices. The value normally used for a new stream is zero.
+#[must_use]
 pub fn update(initial: u32, data: &[u8]) -> u32 {
     data.iter().fold(initial, |crc, byte| {
         let index = ((crc >> 24) as u8 ^ byte) as usize;
@@ -89,10 +99,16 @@ pub fn update(initial: u32, data: &[u8]) -> u32 {
 }
 
 /// Compute the property-stream checksum from the protocol's zero seed.
+#[must_use]
 pub fn crc32(data: &[u8]) -> u32 {
     update(0, data)
 }
 
+/// Check `property_stream` against the checksum recorded in `info`.
+///
+/// Returns `None` for [`Info::UnsupportedVersion`], whose payload readers are
+/// required to ignore.
+#[must_use]
 pub fn verify(info: &Info, property_stream: &[u8]) -> Option<bool> {
     match info {
         Info::Version0 { checksum, .. } => Some(*checksum == crc32(property_stream)),
@@ -102,8 +118,8 @@ pub fn verify(info: &Info, property_stream: &[u8]) -> Option<bool> {
 
 fn build_crc_cache() -> [u32; 256] {
     let mut cache = [0; 256];
-    for (index, slot) in cache.iter_mut().enumerate() {
-        let mut value = (index as u32) << 24;
+    for (index, slot) in (0u32..256).zip(cache.iter_mut()) {
+        let mut value = index << 24;
         for _ in 0..8 {
             value = if value & 0x8000_0000 != 0 {
                 value.wrapping_shl(1) ^ CRC_POLYNOMIAL
@@ -118,6 +134,10 @@ fn build_crc_cache() -> [u32; 256] {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        reason = "test code panics on failure; unwrap keeps assertions concise"
+    )]
     use super::*;
 
     #[test]

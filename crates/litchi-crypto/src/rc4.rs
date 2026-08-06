@@ -1,4 +1,4 @@
-//! Format-neutral Office Binary Document RC4 CryptoAPI primitives.
+//! Format-neutral Office Binary Document RC4 `CryptoAPI` primitives.
 
 use bitflags::bitflags;
 use rc4::{KeyInit, Rc4, StreamCipher};
@@ -26,7 +26,72 @@ bitflags! {
     }
 }
 
-/// Build a validated RC4 CryptoAPI header and its reusable cipher context.
+/// A malformed or unsupported RC4 `CryptoAPI` header or operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Error {
+    Malformed(String),
+    UnsupportedVersion { major: u16, minor: u16 },
+    UnsupportedAlgorithm,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Malformed(message) => write!(formatter, "malformed CryptoAPI data: {message}"),
+            Self::UnsupportedVersion { major, minor } => {
+                write!(formatter, "unsupported CryptoAPI version {major}.{minor}")
+            },
+            Self::UnsupportedAlgorithm => {
+                formatter.write_str("unsupported CryptoAPI algorithm or flags")
+            },
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+/// A validated RC4 `CryptoAPI` header.
+pub struct Header {
+    salt: [u8; 16],
+    encrypted_verifier: [u8; 16],
+    encrypted_verifier_hash: [u8; 20],
+    key_bits: usize,
+}
+
+/// Password-derived RC4 `CryptoAPI` key material with zeroizing storage.
+///
+/// Contexts are intentionally move-only so secret material is not duplicated
+/// accidentally. Cipher operations borrow a context for reuse.
+///
+/// ```compile_fail
+/// let context = litchi_crypto::rc4::context("password", &[0; 16], 128)?;
+/// let duplicate = context.clone();
+/// # Ok::<(), litchi_crypto::rc4::Error>(())
+/// ```
+pub struct Context {
+    secret: Zeroizing<[u8; 20]>,
+    key_bits: usize,
+}
+
+struct BlockKey {
+    bytes: Zeroizing<[u8; 16]>,
+    len: usize,
+}
+
+impl BlockKey {
+    fn as_slice(&self) -> &[u8] {
+        &self.bytes[..self.len]
+    }
+}
+
+/// Build a validated RC4 `CryptoAPI` header and its reusable cipher context.
+///
+/// # Errors
+///
+/// Returns [`Error::UnsupportedAlgorithm`] when `flags` request an external
+/// or AES provider, or when `key_bits` is outside the validated RC4 range.
+/// Returns [`Error::Malformed`] when the provider name is empty, contains a
+/// NUL, or a length computation overflows.
 pub fn build_header(
     password: &str,
     key_bits: usize,
@@ -40,6 +105,7 @@ pub fn build_header(
         return malformed("CryptoAPI provider name is empty or contains NUL");
     }
     let context = context(password, salt, key_bits)?;
+    let key_bits_field = u32::try_from(key_bits).map_err(|_err| Error::UnsupportedAlgorithm)?;
     let mut encrypted = Zeroizing::new([0u8; 36]);
     encrypted[..16].copy_from_slice(verifier);
     encrypted[16..].copy_from_slice(&Sha1::digest(verifier));
@@ -68,7 +134,7 @@ pub fn build_header(
     header.extend_from_slice(&0u32.to_le_bytes());
     header.extend_from_slice(&CALG_RC4.to_le_bytes());
     header.extend_from_slice(&CALG_SHA1.to_le_bytes());
-    header.extend_from_slice(&(key_bits as u32).to_le_bytes());
+    header.extend_from_slice(&key_bits_field.to_le_bytes());
     header.extend_from_slice(&1u32.to_le_bytes());
     header.extend_from_slice(&0u32.to_le_bytes());
     header.extend_from_slice(&0u32.to_le_bytes());
@@ -83,54 +149,12 @@ pub fn build_header(
     Ok((header, context))
 }
 
-/// A malformed or unsupported RC4 CryptoAPI header or operation.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Error {
-    Malformed(String),
-    UnsupportedVersion { major: u16, minor: u16 },
-    UnsupportedAlgorithm,
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Malformed(message) => write!(formatter, "malformed CryptoAPI data: {message}"),
-            Self::UnsupportedVersion { major, minor } => {
-                write!(formatter, "unsupported CryptoAPI version {major}.{minor}")
-            },
-            Self::UnsupportedAlgorithm => {
-                formatter.write_str("unsupported CryptoAPI algorithm or flags")
-            },
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
-/// A validated RC4 CryptoAPI header.
-pub struct Header {
-    salt: [u8; 16],
-    encrypted_verifier: [u8; 16],
-    encrypted_verifier_hash: [u8; 20],
-    key_bits: usize,
-}
-
-/// Password-derived RC4 CryptoAPI key material with zeroizing storage.
-///
-/// Contexts are intentionally move-only so secret material is not duplicated
-/// accidentally. Cipher operations borrow a context for reuse.
-///
-/// ```compile_fail
-/// let context = litchi_crypto::rc4::context("password", &[0; 16], 128)?;
-/// let duplicate = context.clone();
-/// # Ok::<(), litchi_crypto::rc4::Error>(())
-/// ```
-pub struct Context {
-    secret: Zeroizing<[u8; 20]>,
-    key_bits: usize,
-}
-
 /// Derive a reusable cipher context from a password, salt, and key size.
+///
+/// # Errors
+///
+/// Returns [`Error::UnsupportedAlgorithm`] when `key_bits` is not a multiple
+/// of 8 within the supported 40..=128 range.
 pub fn context(password: &str, salt: &[u8; 16], key_bits: usize) -> Result<Context, Error> {
     if !(40..=128).contains(&key_bits) || !key_bits.is_multiple_of(8) {
         return Err(Error::UnsupportedAlgorithm);
@@ -147,7 +171,14 @@ pub fn context(password: &str, salt: &[u8; 16], key_bits: usize) -> Result<Conte
     })
 }
 
-/// Parse and validate one complete RC4 CryptoAPI header.
+/// Parse and validate one complete RC4 `CryptoAPI` header.
+///
+/// # Errors
+///
+/// Returns [`Error::UnsupportedVersion`] for an unrecognized version pair,
+/// [`Error::UnsupportedAlgorithm`] for non-RC4/SHA1 algorithm identifiers or
+/// invalid key sizes, and [`Error::Malformed`] when fixed fields, lengths, or
+/// the verifier layout do not match the RC4 `CryptoAPI` grammar.
 pub fn parse_header(data: &[u8]) -> Result<Header, Error> {
     if data.len() < 12 {
         return malformed("CryptoAPI header is truncated");
@@ -159,7 +190,7 @@ pub fn parse_header(data: &[u8]) -> Result<Header, Error> {
     }
     let outer_flags = Flags::from_bits_retain(le_u32(data, 4)?);
     validate_flags(outer_flags)?;
-    let header_size = usize::try_from(le_u32(data, 8)?).map_err(|_| {
+    let header_size = usize::try_from(le_u32(data, 8)?).map_err(|_err| {
         Error::Malformed("CryptoAPI header size does not fit in memory".to_string())
     })?;
     if header_size < 32 {
@@ -219,11 +250,17 @@ pub fn parse_header(data: &[u8]) -> Result<Header, Error> {
 }
 
 /// Verify a password and return its context only on a constant-time match.
+///
+/// # Errors
+///
+/// Returns [`Error::UnsupportedAlgorithm`] when the header's key size is
+/// invalid, and [`Error::Malformed`] when the derived RC4 key length is
+/// rejected by the cipher.
 pub fn verify(header: &Header, password: &str) -> Result<Option<Context>, Error> {
     let context = context(password, &header.salt, header.key_bits)?;
     let key = derive_block_key(&context, 0);
     let mut cipher = Rc4::new_from_slice(key.as_slice())
-        .map_err(|_| Error::Malformed("invalid CryptoAPI RC4 key length".to_string()))?;
+        .map_err(|_err| Error::Malformed("invalid CryptoAPI RC4 key length".to_string()))?;
     let mut verifier = Zeroizing::new(header.encrypted_verifier);
     let mut verifier_hash = Zeroizing::new(header.encrypted_verifier_hash);
     cipher.apply_keystream(verifier.as_mut());
@@ -233,11 +270,21 @@ pub fn verify(header: &Header, password: &str) -> Result<Option<Context>, Error>
 }
 
 /// Apply a record-block RC4 keystream in place.
+///
+/// # Errors
+///
+/// Returns [`Error::Malformed`] when the derived RC4 key length is rejected
+/// by the cipher.
 pub fn apply(context: &Context, block: u32, data: &mut [u8]) -> Result<(), Error> {
     apply_at(context, block, 0, data)
 }
 
 /// Apply a record-block RC4 keystream after skipping `offset` bytes.
+///
+/// # Errors
+///
+/// Returns [`Error::Malformed`] when the derived RC4 key length is rejected
+/// by the cipher.
 pub fn apply_at(
     context: &Context,
     block: u32,
@@ -246,7 +293,7 @@ pub fn apply_at(
 ) -> Result<(), Error> {
     let key = derive_block_key(context, block);
     let mut cipher = Rc4::new_from_slice(key.as_slice())
-        .map_err(|_| Error::Malformed("invalid CryptoAPI RC4 key length".to_string()))?;
+        .map_err(|_err| Error::Malformed("invalid CryptoAPI RC4 key length".to_string()))?;
     if offset != 0 {
         let mut discarded = Zeroizing::new([0u8; RC4_DISCARD_BUFFER_LEN]);
         let mut remaining = offset;
@@ -258,17 +305,6 @@ pub fn apply_at(
     }
     cipher.apply_keystream(data);
     Ok(())
-}
-
-struct BlockKey {
-    bytes: Zeroizing<[u8; 16]>,
-    len: usize,
-}
-
-impl BlockKey {
-    fn as_slice(&self) -> &[u8] {
-        &self.bytes[..self.len]
-    }
 }
 
 fn derive_block_key(context: &Context, block: u32) -> BlockKey {
@@ -313,14 +349,14 @@ fn checked_slice<'a>(
 fn le_u16(data: &[u8], offset: usize) -> Result<u16, Error> {
     let bytes = checked_slice(data, offset, 2, "16-bit encryption field")?
         .try_into()
-        .map_err(|_| Error::Malformed("invalid 16-bit encryption field".to_string()))?;
+        .map_err(|_err| Error::Malformed("invalid 16-bit encryption field".to_string()))?;
     Ok(u16::from_le_bytes(bytes))
 }
 
 fn le_u32(data: &[u8], offset: usize) -> Result<u32, Error> {
     let bytes = checked_slice(data, offset, 4, "32-bit encryption field")?
         .try_into()
-        .map_err(|_| Error::Malformed("invalid 32-bit encryption field".to_string()))?;
+        .map_err(|_err| Error::Malformed("invalid 32-bit encryption field".to_string()))?;
     Ok(u32::from_le_bytes(bytes))
 }
 
@@ -338,6 +374,10 @@ fn test_context(secret: [u8; 20], key_bits: usize) -> Context {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        reason = "test code panics on failure; unwrap keeps assertions concise"
+    )]
     use super::*;
 
     fn assert_send_sync<T: Send + Sync>() {}

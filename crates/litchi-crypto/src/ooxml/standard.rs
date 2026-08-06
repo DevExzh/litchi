@@ -29,6 +29,12 @@ struct Verifier {
     hash: [u8; 32],
 }
 
+#[derive(Clone, Copy)]
+enum Direction {
+    Encrypt,
+    Decrypt,
+}
+
 pub(super) fn encrypt(package: Vec<u8>, password: &str, limits: &Limits) -> Result<Vec<u8>> {
     let mut rng = SysRng;
     let mut salt = Zeroizing::new([0u8; BLOCK]);
@@ -48,9 +54,9 @@ fn encrypt_with(
     limits: &Limits,
 ) -> Result<Vec<u8>> {
     let key = key(password, salt, limits)?;
-    let (encrypted, hash) = encrypt_verifier(&key, verifier)?;
-    let info = build_info(salt, &encrypted, &hash)?;
-    limits.bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
+    let (encrypted_verifier, hash) = encrypt_verifier(&key, verifier)?;
+    let info = build_info(salt, &encrypted_verifier, &hash)?;
+    Limits::bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
     let encrypted = encrypt_package(package, &key, limits)?;
     container::write(&info, encrypted, limits)
 }
@@ -61,8 +67,8 @@ pub(super) fn decrypt(
     password: &str,
     limits: &Limits,
 ) -> Result<Vec<u8>> {
-    limits.bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
-    limits.bytes(
+    Limits::bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
+    Limits::bytes(
         "EncryptedPackage",
         encrypted.len(),
         limits.max_encrypted_bytes,
@@ -74,28 +80,28 @@ pub(super) fn decrypt(
 }
 
 pub(super) fn validate_info(info: &[u8], limits: &Limits) -> Result<()> {
-    limits.bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
+    Limits::bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
     parse(info).map(|_| ())
 }
 
 fn key(password: &str, salt: &[u8; BLOCK], limits: &Limits) -> Result<Zeroizing<[u8; BLOCK]>> {
-    let password = password_bytes(password, limits)?;
-    let mut sha = Sha1::new();
-    sha.update(salt);
-    sha.update(password.as_slice());
-    let mut hash = Zeroizing::new(<[u8; 20]>::from(sha.finalize()));
+    let encoded = password_bytes(password, limits)?;
+    let mut hasher = Sha1::new();
+    hasher.update(salt);
+    hasher.update(encoded.as_slice());
+    let mut hash = Zeroizing::new(<[u8; 20]>::from(hasher.finalize()));
 
     for iterator in 0..SPIN_COUNT {
-        let mut sha = Sha1::new();
-        sha.update(iterator.to_le_bytes());
-        sha.update(hash.as_slice());
-        hash = Zeroizing::new(<[u8; 20]>::from(sha.finalize()));
+        let mut spin = Sha1::new();
+        spin.update(iterator.to_le_bytes());
+        spin.update(hash.as_slice());
+        hash = Zeroizing::new(<[u8; 20]>::from(spin.finalize()));
     }
 
-    let mut sha = Sha1::new();
-    sha.update(hash.as_slice());
-    sha.update([0u8; 4]);
-    let intermediate = Zeroizing::new(<[u8; 20]>::from(sha.finalize()));
+    let mut finalizer = Sha1::new();
+    finalizer.update(hash.as_slice());
+    finalizer.update([0u8; 4]);
+    let intermediate = Zeroizing::new(<[u8; 20]>::from(finalizer.finalize()));
     let x1 = digest_xor(intermediate.as_slice(), 0x36);
     let x2 = digest_xor(intermediate.as_slice(), 0x5c);
     let mut output = Zeroizing::new([0u8; BLOCK]);
@@ -134,7 +140,7 @@ fn build_info(salt: &[u8; BLOCK], verifier: &[u8; BLOCK], hash: &[u8; 32]) -> Re
     let mut output = Vec::new();
     output
         .try_reserve_exact(256)
-        .map_err(|_| Error::Allocation("Standard EncryptionInfo"))?;
+        .map_err(|_err| Error::Allocation("Standard EncryptionInfo"))?;
     output.extend_from_slice(&3u16.to_le_bytes());
     output.extend_from_slice(&2u16.to_le_bytes());
     output.extend_from_slice(&FLAGS.to_le_bytes());
@@ -172,6 +178,8 @@ fn build_info(salt: &[u8; BLOCK], verifier: &[u8; BLOCK], hash: &[u8; 32]) -> Re
 }
 
 fn parse(info: &[u8]) -> Result<Verifier> {
+    const VERIFIER_LEN: usize = 4 + BLOCK + BLOCK + 4 + 32;
+
     if info.len() < 12 {
         return Err(malformed(
             "Standard EncryptionInfo is shorter than its header",
@@ -187,7 +195,7 @@ fn parse(info: &[u8]) -> Result<Verifier> {
     let outer_flags = read_u32(info, 4, "Standard outer flags")?;
     validate_flags(outer_flags)?;
     let header_size = usize::try_from(read_u32(info, 8, "EncryptionHeaderSize")?)
-        .map_err(|_| malformed("EncryptionHeaderSize does not fit usize"))?;
+        .map_err(|_err| malformed("EncryptionHeaderSize does not fit usize"))?;
     let header_end = 12usize
         .checked_add(header_size)
         .ok_or_else(|| malformed("EncryptionHeader size overflows usize"))?;
@@ -214,7 +222,6 @@ fn parse(info: &[u8]) -> Result<Verifier> {
     require_u32(header, 28, 0, "EncryptionHeader.Reserved2")?;
     validate_provider_name(&header[32..])?;
 
-    const VERIFIER_LEN: usize = 4 + BLOCK + BLOCK + 4 + 32;
     let verifier_end = header_end
         .checked_add(VERIFIER_LEN)
         .ok_or_else(|| malformed("Standard verifier size overflows usize"))?;
@@ -285,11 +292,11 @@ fn encrypt_package(mut package: Vec<u8>, key: &[u8; BLOCK], limits: &Limits) -> 
     let total = cipher_len
         .checked_add(8)
         .ok_or_else(|| malformed("Standard EncryptedPackage size overflows usize"))?;
-    limits.bytes("EncryptedPackage", total, limits.max_encrypted_bytes)?;
+    Limits::bytes("EncryptedPackage", total, limits.max_encrypted_bytes)?;
 
     package
         .try_reserve_exact(total.saturating_sub(package.len()))
-        .map_err(|_| Error::Allocation("Standard EncryptedPackage"))?;
+        .map_err(|_err| Error::Allocation("Standard EncryptedPackage"))?;
     package.resize(total, 0);
     package.copy_within(0..clear_len, 8);
     package
@@ -297,7 +304,7 @@ fn encrypt_package(mut package: Vec<u8>, key: &[u8; BLOCK], limits: &Limits) -> 
         .ok_or_else(|| malformed("Standard EncryptedPackage prefix is unavailable"))?
         .copy_from_slice(
             &u64::try_from(clear_len)
-                .map_err(|_| malformed("plaintext size does not fit u64"))?
+                .map_err(|_err| malformed("plaintext size does not fit u64"))?
                 .to_le_bytes(),
         );
     let cipher = cipher(key)?;
@@ -342,13 +349,8 @@ fn decrypt_package(mut encrypted: Vec<u8>, key: &[u8; BLOCK], limits: &Limits) -
 }
 
 fn cipher(key: &[u8; BLOCK]) -> Result<Aes128> {
-    Aes128::new_from_slice(key).map_err(|_| malformed("AES-128 key length invariant was violated"))
-}
-
-#[derive(Clone, Copy)]
-enum Direction {
-    Encrypt,
-    Decrypt,
+    Aes128::new_from_slice(key)
+        .map_err(|_err| malformed("AES-128 key length invariant was violated"))
 }
 
 fn crypt_blocks(cipher: &Aes128, bytes: &mut [u8], direction: Direction) -> Result<()> {
@@ -358,7 +360,7 @@ fn crypt_blocks(cipher: &Aes128, bytes: &mut [u8], direction: Direction) -> Resu
     for chunk in bytes.chunks_exact_mut(BLOCK) {
         let block: &mut Block<Aes128> = chunk
             .try_into()
-            .map_err(|_| malformed("AES block conversion failed"))?;
+            .map_err(|_err| malformed("AES block conversion failed"))?;
         match direction {
             Direction::Encrypt => cipher.encrypt_block(block),
             Direction::Decrypt => cipher.decrypt_block(block),
@@ -370,7 +372,7 @@ fn crypt_blocks(cipher: &Aes128, bytes: &mut [u8], direction: Direction) -> Resu
 fn round_up(value: usize, multiple: usize) -> Result<usize> {
     value
         .checked_add(multiple - 1)
-        .map(|value| value / multiple * multiple)
+        .map(|padded| padded / multiple * multiple)
         .ok_or_else(|| malformed("encrypted block length overflows usize"))
 }
 
@@ -405,11 +407,15 @@ fn array<const N: usize>(bytes: &[u8], offset: usize, field: &'static str) -> Re
         .get(offset..end)
         .ok_or_else(|| malformed(format!("{field} is truncated")))?
         .try_into()
-        .map_err(|_| malformed(format!("{field} has the wrong length")))
+        .map_err(|_err| malformed(format!("{field} has the wrong length")))
 }
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::expect_used,
+        reason = "test code panics on failure; expect keeps assertions concise"
+    )]
     use super::*;
     use crate::ooxml::{Kind, Mode, inspect, open_with, rekey};
 
@@ -438,9 +444,9 @@ mod tests {
             Err(Error::Password)
         ));
 
-        let encrypted = encrypt_with(clear.clone(), "old", &SALT, &VERIFIER, &limits)
+        let for_rekey = encrypt_with(clear.clone(), "old", &SALT, &VERIFIER, &limits)
             .expect("encrypt package for rekey");
-        let rekeyed = rekey(encrypted, "old", "new").expect("rekey Standard package");
+        let rekeyed = rekey(for_rekey, "old", "new").expect("rekey Standard package");
         assert_eq!(
             open_with(rekeyed.clone(), "new", &limits)
                 .expect("open rekeyed package")

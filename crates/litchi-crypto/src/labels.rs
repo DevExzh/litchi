@@ -22,10 +22,12 @@ const MAX_ATTRIBUTE_BYTES: usize = 1_048_576;
 pub struct Guid([u8; 16]);
 
 impl Guid {
+    #[must_use]
     pub const fn from_bytes(bytes: [u8; 16]) -> Self {
         Self(bytes)
     }
 
+    #[must_use]
     pub const fn as_bytes(&self) -> &[u8; 16] {
         &self.0
     }
@@ -57,15 +59,15 @@ impl std::str::FromStr for Guid {
         }
         let mut output = [0; 16];
         for (nibble, byte) in value.bytes().filter(|byte| *byte != b'-').enumerate() {
-            let value = match byte {
+            let digit = match byte {
                 b'0'..=b'9' => byte - b'0',
                 b'a'..=b'f' => byte - b'a' + 10,
                 _ => return Err(invalid("siteId contains a non-hexadecimal digit")),
             };
             if nibble % 2 == 0 {
-                output[nibble / 2] = value << 4;
+                output[nibble / 2] = digit << 4;
             } else {
-                output[nibble / 2] |= value;
+                output[nibble / 2] |= digit;
             }
         }
         Ok(Self(output))
@@ -84,6 +86,7 @@ pub enum Method {
 }
 
 impl Method {
+    #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
             Self::Standard => "Standard",
@@ -106,6 +109,7 @@ bitflags! {
 }
 
 impl Content {
+    #[must_use]
     pub const fn unknown_bits(self) -> u32 {
         self.bits() & !Self::all().bits()
     }
@@ -151,7 +155,13 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-/// Parse and validate a complete LabelInfo XML stream.
+/// Parse and validate a complete `LabelInfo` XML stream.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the stream violates the `LabelInfo`
+/// grammar or a safety limit, and [`Error::Xml`] when the underlying XML is
+/// malformed.
 pub fn parse(xml: &[u8]) -> Result<List, Error> {
     if xml.len() > MAX_LABEL_INFO_BYTES {
         return Err(invalid("stream exceeds the 16 MiB safety limit"));
@@ -160,9 +170,9 @@ pub fn parse(xml: &[u8]) -> Result<List, Error> {
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
 
-    match read_event(&mut reader, &mut buffer)? {
-        Event::Decl(_) if reader.buffer_position() > 0 => {},
-        _ => return Err(invalid("XML declaration must be the initial construct")),
+    let declaration = read_event(&mut reader, &mut buffer)?;
+    if !matches!(declaration, Event::Decl(_)) || reader.buffer_position() == 0 {
+        return Err(invalid("XML declaration must be the initial construct"));
     }
     buffer.clear();
     let root = match read_event(&mut reader, &mut buffer)? {
@@ -172,7 +182,15 @@ pub fn parse(xml: &[u8]) -> Result<List, Error> {
             ensure_only_trailing_misc(&mut reader, &mut buffer)?;
             return Ok(List::default());
         },
-        _ => return Err(invalid("labelList must be the one root element")),
+        Event::End(_)
+        | Event::Text(_)
+        | Event::CData(_)
+        | Event::Comment(_)
+        | Event::Decl(_)
+        | Event::PI(_)
+        | Event::DocType(_)
+        | Event::Eof
+        | Event::GeneralRef(_) => return Err(invalid("labelList must be the one root element")),
     };
     let prefixes = validate_root(&root, reader.decoder())?;
     let mut result = List::default();
@@ -182,7 +200,7 @@ pub fn parse(xml: &[u8]) -> Result<List, Error> {
     loop {
         buffer.clear();
         let event_start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("XML position overflows usize"))?;
+            .map_err(|_err| invalid("XML position overflows usize"))?;
         match read_event(&mut reader, &mut buffer)? {
             Event::Empty(element) if has_name(&element, &prefixes, b"label") => {
                 if extension_list_seen {
@@ -226,7 +244,12 @@ pub fn parse(xml: &[u8]) -> Result<List, Error> {
                 return Err(invalid("DTD and general entity references are forbidden"));
             },
             Event::Eof => return Err(invalid("labelList is not closed")),
-            event => {
+            event @ (Event::Start(_)
+            | Event::Empty(_)
+            | Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Decl(_)) => {
                 return Err(invalid(format!(
                     "unexpected construct at byte {event_start}: {}",
                     event_kind(&event)
@@ -239,8 +262,13 @@ pub fn parse(xml: &[u8]) -> Result<List, Error> {
     Ok(result)
 }
 
-/// Serialize LabelInfo deterministically, including the normative label
+/// Serialize `LabelInfo` deterministically, including the normative label
 /// attribute order. Unknown extension fragments remain byte-for-byte intact.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the list violates validation rules or the
+/// serialized stream exceeds the 16 MiB safety limit.
 pub fn write(value: &List) -> Result<Vec<u8>, Error> {
     validate_list(value, true)?;
     let mut output = Vec::new();
@@ -304,7 +332,7 @@ fn parse_extension_list(
     loop {
         buffer.clear();
         let start = usize::try_from(reader.buffer_position())
-            .map_err(|_| invalid("XML position overflows usize"))?;
+            .map_err(|_err| invalid("XML position overflows usize"))?;
         match read_event(reader, buffer)? {
             Event::Start(element) if has_name(&element, prefixes, b"ext") => {
                 validate_inherited_namespace(&element, prefixes, reader.decoder())?;
@@ -317,7 +345,7 @@ fn parse_extension_list(
                 }
                 consume_extension(reader, buffer, prefixes)?;
                 let end = usize::try_from(reader.buffer_position())
-                    .map_err(|_| invalid("XML position overflows usize"))?;
+                    .map_err(|_err| invalid("XML position overflows usize"))?;
                 result.extensions.push(Extension {
                     uri,
                     xml: xml
@@ -339,7 +367,12 @@ fn parse_extension_list(
                 return Err(invalid("DTD and general entity references are forbidden"));
             },
             Event::Eof => return Err(invalid("extLst is not closed")),
-            _ => return Err(invalid("extLst contains an unexpected construct")),
+            Event::Start(_)
+            | Event::Empty(_)
+            | Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Decl(_) => return Err(invalid("extLst contains an unexpected construct")),
         }
     }
 }
@@ -389,7 +422,9 @@ fn consume_extension(
                 return Err(invalid("DTD and general entity references are forbidden"));
             },
             Event::Eof => return Err(invalid("extension is not closed")),
-            _ => return Err(invalid("extension has text outside its child element")),
+            Event::Text(_) | Event::CData(_) | Event::Decl(_) => {
+                return Err(invalid("extension has text outside its child element"));
+            },
         }
     }
 }
@@ -406,8 +441,8 @@ fn parse_label(
     let mut site_id = None;
     let mut content_bits = None;
     let mut removed = None;
-    for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
+    for raw_attribute in element.attributes().with_checks(true) {
+        let attribute = raw_attribute.map_err(|error| xml_error(error.to_string()))?;
         if is_namespace_attribute(attribute.key.as_ref()) {
             continue;
         }
@@ -424,9 +459,9 @@ fn parse_label(
             b"method" => method.replace(parse_method(value)).is_some(),
             b"siteId" => site_id.replace(value.parse()?).is_some(),
             b"contentBits" => content_bits
-                .replace(Content::from_bits_retain(value.parse().map_err(|_| {
-                    invalid("contentBits is not an unsigned decimal DWORD")
-                })?))
+                .replace(Content::from_bits_retain(value.parse().map_err(
+                    |_err| invalid("contentBits is not an unsigned decimal DWORD"),
+                )?))
                 .is_some(),
             b"removed" => removed.replace(parse_bool(&value)?).is_some(),
             name => {
@@ -524,7 +559,17 @@ fn parse_extension_fragment(xml: &[u8]) -> Result<String, Error> {
             ensure_only_trailing_misc(&mut reader, &mut buffer)?;
             Ok(uri)
         },
-        _ => Err(invalid("extension XML is not one complete ext element")),
+        Event::Start(_)
+        | Event::End(_)
+        | Event::Empty(_)
+        | Event::Text(_)
+        | Event::CData(_)
+        | Event::Comment(_)
+        | Event::Decl(_)
+        | Event::PI(_)
+        | Event::DocType(_)
+        | Event::Eof
+        | Event::GeneralRef(_) => Err(invalid("extension XML is not one complete ext element")),
     }
 }
 
@@ -572,8 +617,8 @@ fn validate_root(
         return Err(invalid("labelList uses the wrong namespace"));
     }
     let mut prefixes = HashSet::new();
-    for attribute in root.attributes().with_checks(true) {
-        let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
+    for raw_attribute in root.attributes().with_checks(true) {
+        let attribute = raw_attribute.map_err(|error| xml_error(error.to_string()))?;
         if !is_namespace_attribute(attribute.key.as_ref()) {
             return Err(invalid("labelList has an unexpected attribute"));
         }
@@ -650,7 +695,17 @@ fn expect_empty_element_body(
             Event::End(end) if has_end_name(&end, prefixes, local) => return Ok(()),
             Event::Text(text) if whitespace(text.as_ref()) => {},
             Event::Comment(_) | Event::PI(_) => {},
-            _ => return Err(invalid("label element must not contain content")),
+            Event::Start(_)
+            | Event::Empty(_)
+            | Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::Eof
+            | Event::GeneralRef(_) => {
+                return Err(invalid("label element must not contain content"));
+            },
         }
     }
 }
@@ -665,7 +720,14 @@ fn ensure_only_trailing_misc(
             Event::Eof => return Ok(()),
             Event::Text(text) if whitespace(text.as_ref()) => {},
             Event::Comment(_) | Event::PI(_) => {},
-            _ => return Err(invalid("XML has content after labelList")),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => return Err(invalid("XML has content after labelList")),
         }
     }
 }
@@ -685,14 +747,14 @@ fn optional_attribute(
     decoder: quick_xml::encoding::Decoder,
 ) -> Result<Option<String>, Error> {
     let mut value = None;
-    for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
+    for raw_attribute in element.attributes().with_checks(true) {
+        let attribute = raw_attribute.map_err(|error| xml_error(error.to_string()))?;
         if attribute.key.as_ref() == key {
-            let decoded = attribute
+            let normalized = attribute
                 .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
                 .map_err(|error| xml_error(error.to_string()))?
                 .into_owned();
-            if value.replace(decoded).is_some() {
+            if value.replace(normalized).is_some() {
                 return Err(invalid("duplicate XML attribute"));
             }
         }
@@ -701,8 +763,8 @@ fn optional_attribute(
 }
 
 fn reject_non_namespace_attributes(element: &BytesStart<'_>) -> Result<(), Error> {
-    for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
+    for raw_attribute in element.attributes().with_checks(true) {
+        let attribute = raw_attribute.map_err(|error| xml_error(error.to_string()))?;
         if !is_namespace_attribute(attribute.key.as_ref()) {
             return Err(invalid("element has an unexpected attribute"));
         }
@@ -808,6 +870,10 @@ fn xml_error(message: impl Into<String>) -> Error {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        reason = "test code panics on failure; unwrap keeps assertions concise"
+    )]
     use super::*;
 
     const SITE: &str = "12345678-1234-5678-90ab-1234567890ab";

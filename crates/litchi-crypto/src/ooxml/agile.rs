@@ -86,6 +86,12 @@ struct Parsed {
     spin_count: Option<u32>,
 }
 
+#[derive(Clone, Copy)]
+enum Direction {
+    Encrypt,
+    Decrypt,
+}
+
 pub(super) fn encrypt(package: Vec<u8>, password: &str, limits: &Limits) -> Result<Vec<u8>> {
     let mut material = Zeroizing::new(Material {
         verifier_salt: [0; BLOCK],
@@ -114,26 +120,26 @@ pub(super) fn decrypt(
     password: &str,
     limits: &Limits,
 ) -> Result<Vec<u8>> {
-    limits.bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
-    limits.bytes(
+    Limits::bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
+    Limits::bytes(
         "EncryptedPackage",
         encrypted.len(),
         limits.max_encrypted_bytes,
     )?;
-    let info = parse(info, limits)?;
-    let password_hash = password_hash(password, &info.verifier_salt, info.spin_count, limits)?;
+    let parsed = parse(info, limits)?;
+    let password_hash = password_hash(password, &parsed.verifier_salt, parsed.spin_count, limits)?;
 
     let verifier = decrypt_value::<BLOCK>(
-        &info.verifier_salt,
+        &parsed.verifier_salt,
         &password_hash,
-        &VERIFIER_INPUT_BLOCK,
-        &info.encrypted_verifier,
+        VERIFIER_INPUT_BLOCK,
+        &parsed.encrypted_verifier,
     )?;
     let verifier_hash = decrypt_value::<HASH_BYTES>(
-        &info.verifier_salt,
+        &parsed.verifier_salt,
         &password_hash,
-        &HASHED_VERIFIER_BLOCK,
-        &info.encrypted_verifier_hash,
+        HASHED_VERIFIER_BLOCK,
+        &parsed.encrypted_verifier_hash,
     )?;
     let expected_hash = Zeroizing::new(<[u8; HASH_BYTES]>::from(Sha1::digest(verifier.as_slice())));
     if !bool::from(verifier_hash.ct_eq(expected_hash.as_slice())) {
@@ -141,14 +147,14 @@ pub(super) fn decrypt(
     }
 
     let content_key = decrypt_value::<KEY_BYTES>(
-        &info.verifier_salt,
+        &parsed.verifier_salt,
         &password_hash,
-        &CRYPTO_KEY_BLOCK,
-        &info.encrypted_key,
+        CRYPTO_KEY_BLOCK,
+        &parsed.encrypted_key,
     )?;
-    verify_integrity(&info, &content_key, &encrypted)?;
+    verify_integrity(&parsed, &content_key, &encrypted)?;
     let clear_len = package_size(&encrypted, limits)?;
-    decrypt_package(encrypted, clear_len, &content_key, &info.key_salt)
+    decrypt_package(encrypted, clear_len, &content_key, &parsed.key_salt)
 }
 
 pub(super) fn validate_info(info: &[u8], limits: &Limits) -> Result<()> {
@@ -171,7 +177,7 @@ fn encrypt_parts(
     let encrypted_verifier = encrypt_value::<BLOCK>(
         &material.verifier_salt,
         &password_hash,
-        &VERIFIER_INPUT_BLOCK,
+        VERIFIER_INPUT_BLOCK,
         &material.verifier,
     )?;
     let mut verifier_digest = Sha1::new();
@@ -180,13 +186,13 @@ fn encrypt_parts(
     let encrypted_verifier_hash = encrypt_value::<ENCRYPTED_HASH_BYTES>(
         &material.verifier_salt,
         &password_hash,
-        &HASHED_VERIFIER_BLOCK,
+        HASHED_VERIFIER_BLOCK,
         verifier_hash.as_slice(),
     )?;
     let encrypted_key = encrypt_value::<KEY_BYTES>(
         &material.verifier_salt,
         &password_hash,
-        &CRYPTO_KEY_BLOCK,
+        CRYPTO_KEY_BLOCK,
         &material.content_key,
     )?;
 
@@ -195,13 +201,13 @@ fn encrypt_parts(
     let encrypted_hmac_key = encrypt_content::<ENCRYPTED_HASH_BYTES>(
         &material.content_key,
         &material.key_salt,
-        &INTEGRITY_KEY_BLOCK,
+        INTEGRITY_KEY_BLOCK,
         &material.integrity_salt,
     )?;
     let encrypted_hmac_value = encrypt_content::<ENCRYPTED_HASH_BYTES>(
         &material.content_key,
         &material.key_salt,
-        &INTEGRITY_VALUE_BLOCK,
+        INTEGRITY_VALUE_BLOCK,
         integrity_value.as_slice(),
     )?;
 
@@ -225,16 +231,16 @@ fn password_hash(
     limits: &Limits,
 ) -> Result<Zeroizing<[u8; HASH_BYTES]>> {
     check_spin(spin_count, limits)?;
-    let password = password_bytes(password, limits)?;
-    let mut sha = Sha1::new();
-    sha.update(salt);
-    sha.update(password.as_slice());
-    let mut hash = Zeroizing::new(<[u8; HASH_BYTES]>::from(sha.finalize()));
+    let encoded = password_bytes(password, limits)?;
+    let mut hasher = Sha1::new();
+    hasher.update(salt);
+    hasher.update(encoded.as_slice());
+    let mut hash = Zeroizing::new(<[u8; HASH_BYTES]>::from(hasher.finalize()));
     for iterator in 0..spin_count {
-        let mut sha = Sha1::new();
-        sha.update(iterator.to_le_bytes());
-        sha.update(hash.as_slice());
-        hash = Zeroizing::new(<[u8; HASH_BYTES]>::from(sha.finalize()));
+        let mut spin = Sha1::new();
+        spin.update(iterator.to_le_bytes());
+        spin.update(hash.as_slice());
+        hash = Zeroizing::new(<[u8; HASH_BYTES]>::from(spin.finalize()));
     }
     Ok(hash)
 }
@@ -253,7 +259,7 @@ fn check_spin(spin_count: u32, limits: &Limits) -> Result<()> {
     Ok(())
 }
 
-fn derive_key(password_hash: &[u8; HASH_BYTES], block_key: &[u8; 8]) -> Zeroizing<[u8; KEY_BYTES]> {
+fn derive_key(password_hash: &[u8; HASH_BYTES], block_key: [u8; 8]) -> Zeroizing<[u8; KEY_BYTES]> {
     let mut sha = Sha1::new();
     sha.update(password_hash);
     sha.update(block_key);
@@ -264,12 +270,12 @@ fn derive_key(password_hash: &[u8; HASH_BYTES], block_key: &[u8; 8]) -> Zeroizin
 }
 
 fn iv(salt: &[u8; BLOCK], block_key: Option<&[u8]>) -> [u8; BLOCK] {
-    let Some(block_key) = block_key else {
+    let Some(segment) = block_key else {
         return *salt;
     };
     let mut sha = Sha1::new();
     sha.update(salt);
-    sha.update(block_key);
+    sha.update(segment);
     let digest = <[u8; HASH_BYTES]>::from(sha.finalize());
     let mut output = [0u8; BLOCK];
     output.copy_from_slice(&digest[..BLOCK]);
@@ -279,7 +285,7 @@ fn iv(salt: &[u8; BLOCK], block_key: Option<&[u8]>) -> [u8; BLOCK] {
 fn encrypt_value<const N: usize>(
     salt: &[u8; BLOCK],
     password_hash: &[u8; HASH_BYTES],
-    block_key: &[u8; 8],
+    block_key: [u8; 8],
     input: &[u8],
 ) -> Result<[u8; N]> {
     if round_up(input.len(), BLOCK)? != N {
@@ -299,7 +305,7 @@ fn encrypt_value<const N: usize>(
 fn decrypt_value<const N: usize>(
     salt: &[u8; BLOCK],
     password_hash: &[u8; HASH_BYTES],
-    block_key: &[u8; 8],
+    block_key: [u8; 8],
     encrypted: &[u8],
 ) -> Result<Zeroizing<[u8; N]>> {
     if encrypted.is_empty()
@@ -330,7 +336,7 @@ fn decrypt_value<const N: usize>(
 fn encrypt_content<const N: usize>(
     key: &[u8; KEY_BYTES],
     salt: &[u8; BLOCK],
-    block_key: &[u8; 8],
+    block_key: [u8; 8],
     input: &[u8],
 ) -> Result<[u8; N]> {
     if round_up(input.len(), BLOCK)? != N {
@@ -343,21 +349,21 @@ fn encrypt_content<const N: usize>(
         .get_mut(..input.len())
         .ok_or_else(|| malformed("Agile integrity value exceeds its destination"))?;
     destination.copy_from_slice(input);
-    cbc_encrypt(key, &iv(salt, Some(block_key)), &mut output[..])?;
+    cbc_encrypt(key, &iv(salt, Some(&block_key)), &mut output[..])?;
     Ok(*output)
 }
 
 fn decrypt_content<const N: usize>(
     key: &[u8; KEY_BYTES],
     salt: &[u8; BLOCK],
-    block_key: &[u8; 8],
+    block_key: [u8; 8],
     encrypted: &[u8; ENCRYPTED_HASH_BYTES],
 ) -> Result<Zeroizing<[u8; N]>> {
     if N > ENCRYPTED_HASH_BYTES {
         return Err(malformed("Agile integrity output size is unsupported"));
     }
     let mut buffer = Zeroizing::new(*encrypted);
-    cbc_decrypt(key, &iv(salt, Some(block_key)), &mut buffer[..])?;
+    cbc_decrypt(key, &iv(salt, Some(&block_key)), &mut buffer[..])?;
     let source = buffer
         .get(..N)
         .ok_or_else(|| malformed("Agile decrypted integrity value is truncated"))?;
@@ -368,7 +374,7 @@ fn decrypt_content<const N: usize>(
 
 fn hmac(key: &[u8], bytes: &[u8]) -> Result<Zeroizing<[u8; HASH_BYTES]>> {
     let mut mac = <HmacSha1 as KeyInit>::new_from_slice(key)
-        .map_err(|_| malformed("HMAC-SHA1 key length invariant was violated"))?;
+        .map_err(|_err| malformed("HMAC-SHA1 key length invariant was violated"))?;
     mac.update(bytes);
     Ok(Zeroizing::new(<[u8; HASH_BYTES]>::from(
         mac.finalize().into_bytes(),
@@ -379,13 +385,13 @@ fn verify_integrity(info: &Info, content_key: &[u8; KEY_BYTES], encrypted: &[u8]
     let integrity_salt = decrypt_content::<HASH_BYTES>(
         content_key,
         &info.key_salt,
-        &INTEGRITY_KEY_BLOCK,
+        INTEGRITY_KEY_BLOCK,
         &info.encrypted_hmac_key,
     )?;
     let stored = decrypt_content::<HASH_BYTES>(
         content_key,
         &info.key_salt,
-        &INTEGRITY_VALUE_BLOCK,
+        INTEGRITY_VALUE_BLOCK,
         &info.encrypted_hmac_value,
     )?;
     let expected = hmac(integrity_salt.as_slice(), encrypted)?;
@@ -406,10 +412,10 @@ fn encrypt_package(
     let total = cipher_len
         .checked_add(8)
         .ok_or_else(|| malformed("Agile EncryptedPackage size overflows usize"))?;
-    limits.bytes("EncryptedPackage", total, limits.max_encrypted_bytes)?;
+    Limits::bytes("EncryptedPackage", total, limits.max_encrypted_bytes)?;
     package
         .try_reserve_exact(total.saturating_sub(package.len()))
-        .map_err(|_| Error::Allocation("Agile EncryptedPackage"))?;
+        .map_err(|_err| Error::Allocation("Agile EncryptedPackage"))?;
     package.resize(total, 0);
     package.copy_within(0..clear_len, 8);
     let prefix = package
@@ -417,7 +423,7 @@ fn encrypt_package(
         .ok_or_else(|| malformed("Agile EncryptedPackage prefix is unavailable"))?;
     prefix.copy_from_slice(
         &u64::try_from(clear_len)
-            .map_err(|_| malformed("plaintext size does not fit u64"))?
+            .map_err(|_err| malformed("plaintext size does not fit u64"))?
             .to_le_bytes(),
     );
 
@@ -439,7 +445,7 @@ fn package_size(encrypted: &[u8], limits: &Limits) -> Result<usize> {
         .get(..8)
         .ok_or_else(|| malformed("Agile EncryptedPackage has no StreamSize"))?
         .try_into()
-        .map_err(|_| malformed("Agile StreamSize has the wrong length"))?;
+        .map_err(|_err| malformed("Agile StreamSize has the wrong length"))?;
     let clear_len = declared_size(u64::from_le_bytes(prefix), limits)?;
     if clear_len == 0 {
         return Err(malformed(
@@ -481,12 +487,6 @@ fn decrypt_package(
     Ok(encrypted)
 }
 
-#[derive(Clone, Copy)]
-enum Direction {
-    Encrypt,
-    Decrypt,
-}
-
 fn crypt_segments(
     bytes: &mut [u8],
     clear_len: usize,
@@ -514,7 +514,7 @@ fn crypt_segments(
             .get_mut(start..end)
             .ok_or_else(|| malformed("Agile encrypted segment is truncated"))?;
         let block = u32::try_from(index)
-            .map_err(|_| malformed("Agile segment index exceeds u32"))?
+            .map_err(|_err| malformed("Agile segment index exceeds u32"))?
             .to_le_bytes();
         let iv = iv(key_salt, Some(&block));
         match direction {
@@ -528,24 +528,24 @@ fn crypt_segments(
 fn cbc_encrypt(key: &[u8; KEY_BYTES], iv: &[u8; BLOCK], bytes: &mut [u8]) -> Result<()> {
     let message_len = bytes.len();
     AesCbcEnc::new_from_slices(key, iv)
-        .map_err(|_| malformed("AES-128-CBC key or IV length invariant was violated"))?
+        .map_err(|_err| malformed("AES-128-CBC key or IV length invariant was violated"))?
         .encrypt_padded::<NoPadding>(bytes, message_len)
         .map(|_| ())
-        .map_err(|_| malformed("AES-128-CBC input is not block aligned"))
+        .map_err(|_err| malformed("AES-128-CBC input is not block aligned"))
 }
 
 fn cbc_decrypt(key: &[u8; KEY_BYTES], iv: &[u8; BLOCK], bytes: &mut [u8]) -> Result<()> {
     AesCbcDec::new_from_slices(key, iv)
-        .map_err(|_| malformed("AES-128-CBC key or IV length invariant was violated"))?
+        .map_err(|_err| malformed("AES-128-CBC key or IV length invariant was violated"))?
         .decrypt_padded::<NoPadding>(bytes)
         .map(|_| ())
-        .map_err(|_| malformed("AES-128-CBC input is not block aligned"))
+        .map_err(|_err| malformed("AES-128-CBC input is not block aligned"))
 }
 
 fn round_up(value: usize, multiple: usize) -> Result<usize> {
     value
         .checked_add(multiple - 1)
-        .map(|value| value / multiple * multiple)
+        .map(|padded| padded / multiple * multiple)
         .ok_or_else(|| malformed("Agile block length overflows usize"))
 }
 
@@ -560,7 +560,7 @@ fn build_info(info: &Info, limits: &Limits) -> Result<Vec<u8>> {
 
     let mut xml = String::new();
     xml.try_reserve(1_024)
-        .map_err(|_| Error::Allocation("Agile EncryptionInfo XML"))?;
+        .map_err(|_err| Error::Allocation("Agile EncryptionInfo XML"))?;
     write!(
         xml,
         concat!(
@@ -581,17 +581,17 @@ fn build_info(info: &Info, limits: &Limits) -> Result<Vec<u8>> {
         encrypted_verifier_hash,
         encrypted_key,
     )
-    .map_err(|_| Error::Allocation("Agile EncryptionInfo XML"))?;
-    limits.bytes("Agile XML", xml.len(), limits.max_xml_bytes)?;
+    .map_err(|_err| Error::Allocation("Agile EncryptionInfo XML"))?;
+    Limits::bytes("Agile XML", xml.len(), limits.max_xml_bytes)?;
     let total = xml
         .len()
         .checked_add(8)
         .ok_or_else(|| malformed("Agile EncryptionInfo length overflows usize"))?;
-    limits.bytes("EncryptionInfo", total, limits.max_info_bytes)?;
+    Limits::bytes("EncryptionInfo", total, limits.max_info_bytes)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(total)
-        .map_err(|_| Error::Allocation("Agile EncryptionInfo"))?;
+        .map_err(|_err| Error::Allocation("Agile EncryptionInfo"))?;
     output.extend_from_slice(&4u16.to_le_bytes());
     output.extend_from_slice(&4u16.to_le_bytes());
     output.extend_from_slice(&0x40u32.to_le_bytes());
@@ -600,7 +600,7 @@ fn build_info(info: &Info, limits: &Limits) -> Result<Vec<u8>> {
 }
 
 fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
-    limits.bytes("EncryptionInfo", bytes.len(), limits.max_info_bytes)?;
+    Limits::bytes("EncryptionInfo", bytes.len(), limits.max_info_bytes)?;
     let prefix = bytes
         .get(..8)
         .ok_or_else(|| malformed("Agile EncryptionInfo is shorter than its header"))?;
@@ -615,7 +615,7 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
     if xml.is_empty() {
         return Err(malformed("Agile EncryptionInfo XML is empty"));
     }
-    limits.bytes("Agile XML", xml.len(), limits.max_xml_bytes)?;
+    Limits::bytes("Agile XML", xml.len(), limits.max_xml_bytes)?;
 
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().check_comments = true;
@@ -1049,18 +1049,18 @@ fn exact_attributes(
     mut visitor: impl FnMut(&[u8], &str) -> Result<()>,
 ) -> Result<()> {
     if allowed.len()
-        > u16::BITS
-            .try_into()
-            .map_err(|_| Error::InvalidLimit("Agile attribute schema width does not fit usize"))?
+        > u16::BITS.try_into().map_err(|_err| {
+            Error::InvalidLimit("Agile attribute schema width does not fit usize")
+        })?
     {
         return Err(Error::InvalidLimit(
             "Agile attribute schema exceeds its bitset",
         ));
     }
     let mut seen = 0u16;
-    for attribute in element.attributes().with_checks(true) {
+    for raw_attribute in element.attributes().with_checks(true) {
         count(total, limits.max_xml_attributes, "Agile XML attributes")?;
-        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let attribute = raw_attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -1094,7 +1094,7 @@ fn exact_attributes(
                 ))
             })?;
         let shift =
-            u32::try_from(index).map_err(|_| malformed("Agile attribute index exceeds u32"))?;
+            u32::try_from(index).map_err(|_err| malformed("Agile attribute index exceeds u32"))?;
         let bit = 1u16
             .checked_shl(shift)
             .ok_or_else(|| malformed("Agile attribute index exceeds its bitset"))?;
@@ -1109,7 +1109,7 @@ fn exact_attributes(
     }
     for (index, name) in allowed.iter().enumerate() {
         let shift =
-            u32::try_from(index).map_err(|_| malformed("Agile attribute index exceeds u32"))?;
+            u32::try_from(index).map_err(|_err| malformed("Agile attribute index exceeds u32"))?;
         let bit = 1u16
             .checked_shl(shift)
             .ok_or_else(|| malformed("Agile attribute index exceeds its bitset"))?;
@@ -1161,17 +1161,17 @@ fn validate_declaration(declaration: &BytesDecl<'_>) -> Result<()> {
         return Err(malformed("Agile XML declaration must use version 1.0"));
     }
     if let Some(encoding) = declaration.encoding() {
-        let encoding = encoding.map_err(|error| Error::Xml(error.to_string()))?;
-        if !encoding.eq_ignore_ascii_case(b"UTF-8") {
+        let encoding_name = encoding.map_err(|error| Error::Xml(error.to_string()))?;
+        if !encoding_name.eq_ignore_ascii_case(b"UTF-8") {
             return Err(Error::Unsupported(format!(
                 "Agile XML encoding '{}'",
-                String::from_utf8_lossy(&encoding)
+                String::from_utf8_lossy(&encoding_name)
             )));
         }
     }
     if let Some(standalone) = declaration.standalone() {
-        let standalone = standalone.map_err(|error| Error::Xml(error.to_string()))?;
-        if !matches!(standalone.as_ref(), b"yes" | b"no") {
+        let standalone_value = standalone.map_err(|error| Error::Xml(error.to_string()))?;
+        if !matches!(standalone_value.as_ref(), b"yes" | b"no") {
             return Err(malformed("Agile XML standalone must be 'yes' or 'no'"));
         }
     }
@@ -1191,7 +1191,7 @@ fn exact_number(value: &str, expected: u32, field: &'static str) -> Result<()> {
 fn number(value: &str, field: &'static str) -> Result<u32> {
     value
         .parse()
-        .map_err(|_| malformed(format!("{field} is not a u32")))
+        .map_err(|_err| malformed(format!("{field} is not a u32")))
 }
 
 fn exact_text(value: &str, expected: &str, field: &'static str) -> Result<()> {
@@ -1237,6 +1237,10 @@ fn limit(resource: &'static str, actual: usize, maximum: usize) -> Error {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::expect_used,
+        reason = "test code panics on failure; expect keeps assertions concise"
+    )]
     use super::*;
     use crate::ooxml::{Mode, open_with};
 
@@ -1337,12 +1341,12 @@ mod tests {
     #[test]
     fn parser_enforces_attribute_spin_and_tree_budgets() {
         let info = published_info();
-        let limits = Limits {
+        let spin_limits = Limits {
             max_spin_count: 99_999,
             ..Limits::default()
         };
         assert!(matches!(
-            parse(&info, &limits),
+            parse(&info, &spin_limits),
             Err(Error::Limit {
                 resource: "Agile spin count",
                 actual: 100_000,
@@ -1350,12 +1354,12 @@ mod tests {
             })
         ));
 
-        let limits = Limits {
+        let depth_limits = Limits {
             max_xml_depth: 3,
             ..Limits::default()
         };
         assert!(matches!(
-            parse(&info, &limits),
+            parse(&info, &depth_limits),
             Err(Error::Limit {
                 resource: "Agile XML depth",
                 actual: 4,
@@ -1363,12 +1367,12 @@ mod tests {
             })
         ));
 
-        let limits = Limits {
+        let attribute_limits = Limits {
             max_xml_attributes: 1,
             ..Limits::default()
         };
         assert!(matches!(
-            parse(&info, &limits),
+            parse(&info, &attribute_limits),
             Err(Error::Limit {
                 resource: "Agile XML attributes",
                 actual: 2,
