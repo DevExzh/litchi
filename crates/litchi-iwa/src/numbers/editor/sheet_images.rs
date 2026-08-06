@@ -10,10 +10,10 @@ use crate::data_reference_registry::{
 };
 use crate::image_adjustments::replace_image_adjustments;
 use crate::image_caption::{CaptionObjectIds, DrawableCaptionKind};
+use crate::media::MediaAssetId;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    ShapeImageDataIdentifier, flip_drawable_geometry, offset_drawable_geometry,
-    restore_drawable_original_size,
+    flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
 };
 use litchi_iwa_common::comment::DrawableId;
 use litchi_iwa_common::shape::image::ImageAdjustments;
@@ -117,7 +117,7 @@ impl NumbersEditor {
             ids,
             sheet_id,
             context.style_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             geometry,
             options.natural_size,
         )?;
@@ -138,7 +138,7 @@ impl NumbersEditor {
         add_component_data_reference(
             &mut staged,
             context.component_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             ids.drawable,
         )?;
         if context.stylesheet_component_id != context.component_id {
@@ -160,12 +160,13 @@ impl NumbersEditor {
                 Error::InvalidFormat("Numbers image creation failed validation".to_owned())
             })?;
         let created_graph = image_graph(&verified, sheet_id, ids.drawable)?;
-        if created.image_data_identifier != asset.data_identifier
+        let created_data_identifier = MediaAssetId::try_from(created.image_data_identifier)?;
+        if created_data_identifier != asset.data_identifier
             || created.geometry != geometry
             || created.original_size != Some(options.natural_size)
             || created.natural_size != Some(options.natural_size)
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(asset.data_identifier)? != data
+            || verified.extract_media(created_data_identifier.get())? != data
         {
             return Err(Error::InvalidFormat(
                 "Numbers image creation produced an inconsistent graph".to_owned(),
@@ -605,8 +606,7 @@ impl NumbersEditor {
         replacement: &[u8],
     ) -> Result<Vec<u8>> {
         let source = image_graph(self, sheet_id.get(), drawable_object_id.get())?;
-        let image_data_identifier =
-            ShapeImageDataIdentifier::new(source.info.image_data_identifier)?;
+        let image_data_identifier = MediaAssetId::try_from(source.info.image_data_identifier)?;
         self.replace_media(image_data_identifier.get(), replacement)
     }
 
@@ -670,13 +670,14 @@ impl NumbersEditor {
             .iter()
             .map(|(data, _)| *data)
             .collect::<HashSet<_>>();
-        for identifier in data_identifiers {
+        for raw_identifier in data_identifiers {
+            let identifier = MediaAssetId::try_from(raw_identifier)?;
             if media
                 .asset(identifier)
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier);
+                removed_data_identifiers.push(identifier.get());
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -690,7 +691,7 @@ impl NumbersEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_assets
                     .iter()
-                    .any(|asset| asset.data_identifier == *identifier)
+                    .any(|asset| asset.data_identifier.get() == *identifier)
             })
         {
             return Err(Error::InvalidFormat(
@@ -848,7 +849,7 @@ mod tests {
     fn replace_image_selector_types_reject_null_wire_identifiers() {
         assert!(ObjectId::try_from(0).is_err());
         assert!(DrawableId::new(0).is_none());
-        assert!(ShapeImageDataIdentifier::new(0).is_err());
+        assert!(MediaAssetId::try_from(0).is_err());
     }
 
     #[test]
