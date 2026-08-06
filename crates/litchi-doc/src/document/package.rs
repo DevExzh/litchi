@@ -10,6 +10,7 @@ use crate::parts::captions::CaptionTables;
 use crate::parts::chp_bin_table::ChpBinTable;
 use crate::parts::comments::CommentsTable;
 use crate::parts::embedded_fonts::DocumentEmbeddedFonts;
+use crate::parts::envelope::Envelope;
 use crate::parts::fib::{FileInformationBlock, WORD_97_NFIB};
 use crate::parts::fields::FieldsTable;
 use crate::parts::footnotes::{EndnotesTable, FootnotesTable};
@@ -123,6 +124,7 @@ impl Document {
         let rsids = DocumentRsids::parse(&fib, &table_stream)?;
         let rmd_threading = DocumentRmdThreading::parse(&fib, &table_stream)?;
         let embedded_fonts = DocumentEmbeddedFonts::parse(&fib, &table_stream)?;
+        let envelope = Envelope::parse_fib(&fib, &table_stream)?;
         let auto_summary = DocumentAutoSummary::parse(&fib, &table_stream)?;
         let route_slip = Metadata::parse(&fib, &table_stream);
         let protected_ranges = Ranges::parse(&fib, &table_stream)?;
@@ -236,6 +238,7 @@ impl Document {
             rsids,
             rmd_threading,
             embedded_fonts,
+            envelope,
             auto_summary,
             route_slip,
             protected_ranges,

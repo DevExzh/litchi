@@ -153,6 +153,14 @@ also decodes bounded variable TBC data through the common model and rejects
 ambiguous boundaries or unknown Tcg records when a safe boundary cannot be
 recovered.
 
+DOC also adds a contextual `parts/envelope` owner for the optional
+`fcMsoEnvelope`/`lcbMsoEnvelope` FIB range. Its typed `Envelope` facade models
+the documented `[MS-OSHARED]` Office 6/8 message body, recipient property bags,
+and attachment metadata, while retaining unknown CLSID payloads as bounded
+opaque bytes. `Document::envelope()` is read-only and inert; no mail transport,
+recipient resolution, attachment activation, or package-writer emission is
+part of this owner.
+
 ## ODF
 
 [`litchi-odf-common`](../../crates/litchi-odf-common/Cargo.toml) is the shared

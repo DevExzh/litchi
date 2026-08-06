@@ -42,6 +42,16 @@ impl Document {
         self.embedded_fonts.as_ref()
     }
 
+    /// Typed, inert `MsoEnvelopeCLSID` metadata from the table stream
+    /// (`fcMsoEnvelope`, `[MS-DOC]` 2.5.8 and `[MS-OSHARED]` 2.3.8).
+    ///
+    /// Unknown CLSIDs remain bounded opaque payloads. No mail transport,
+    /// recipient resolution, attachment activation, or external lookup is
+    /// performed.
+    pub fn envelope(&self) -> Option<&crate::parts::envelope::Envelope> {
+        self.envelope.as_ref()
+    }
+
     /// AutoSummary priority ranges for the main document (MS-DOC 2.8.4),
     /// when the document carries a `PlcfAsumy`.
     pub fn auto_summary(&self) -> Option<&DocumentAutoSummary> {

@@ -129,6 +129,11 @@ pub use parts::document_properties_2003::{
     DocumentProtectionMode, DocumentStateToolbars, Dop2003, ReadingModePageLock,
 };
 pub use parts::embedded_fonts::{DocumentEmbeddedFonts, EmbeddedFont};
+pub use parts::envelope::{
+    Attachment, Envelope, FollowUpStatus, Importance, MSO_ENVELOPE_CLSID, Message, Payload,
+    PropertyValue, RecipientCollection, RecipientProperties, RecipientProperty, SecurityFlags,
+    Sensitivity, Text, Version,
+};
 pub use parts::fields::BarcodeField;
 pub use parts::fields::BidiOutlineField;
 pub use parts::fields::CompareField;

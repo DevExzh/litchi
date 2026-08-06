@@ -22,6 +22,7 @@ pub mod document_properties_2002;
 pub mod document_properties_2003;
 pub mod document_properties_97;
 pub mod embedded_fonts;
+pub mod envelope;
 pub mod fib;
 pub mod fields;
 pub mod fkp;

@@ -32,6 +32,10 @@ shared Office codecs are counted only where the DOC API exposes them.
 
 ## Core Word binary document model
 
+| Feature | Status | Read | Write | Notes |
+|---------|--------|------|-------|-------|
+| `MsoEnvelopeCLSID` / `MsoEnvelope` metadata | 🟡 | ✅ | 🟡 | `parts::envelope` owns the `[MS-DOC]` `fcMsoEnvelope` FIB range and the documented `[MS-OSHARED]` Office 6/8 body, recipient property bags, and attachments. Unknown CLSIDs are preserved as bounded opaque payloads; `Document::envelope()` is inert and the detached codec does not deliver mail, resolve recipients, activate attachments, or emit package mutations. |
+
 
 ## [MS-DOC] file structure and version audit
 
@@ -105,5 +109,5 @@ shared Office codecs are counted only where the DOC API exposes them.
 
 - crates/litchi-doc/src/package.rs owns DOC opening, OLE access, encryption selection, properties, signatures, custom XML, and macro/storage access.
 - crates/litchi-doc/src/document.rs, paragraph.rs, table.rs, section.rs, sprm.rs, parts/, and writer/ own CP/text, PLC, FKP, style/list, story, and formatting behavior.
-- crates/litchi-doc/src/parts/fields/, revisions.rs, mail_merge/, route_slip/, captions/, command_bars/, structured_tags.rs, ole_controls/, smart_tags.rs, document_properties*.rs, and PLC helpers provide bounded metadata codecs; `route_slip/` layers the binary codec, validation, package editor, snapshot transactions, and selector facade.
+- crates/litchi-doc/src/parts/fields/, revisions.rs, mail_merge/, route_slip/, captions/, command_bars/, envelope/, structured_tags.rs, ole_controls/, smart_tags.rs, document_properties*.rs, and PLC helpers provide bounded metadata codecs; `route_slip/` layers the binary codec, validation, package editor, snapshot transactions, and selector facade, while `envelope/` layers the typed message body over its FIB owner.
 - crates/litchi-doc/src/shapes.rs, image.rs, equation.rs, embedded_object.rs, and vba.rs own payload-oriented OfficeArt, picture, MTEF, OLE, and VBA support.

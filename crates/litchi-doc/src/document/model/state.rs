@@ -6,6 +6,7 @@ use crate::parts::captions::CaptionTables;
 use crate::parts::chp_bin_table::ChpBinTable;
 use crate::parts::comments::CommentsTable;
 use crate::parts::embedded_fonts::DocumentEmbeddedFonts;
+use crate::parts::envelope::Envelope;
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::fields::FieldsTable;
 use crate::parts::footnotes::{EndnotesTable, FootnotesTable};
@@ -95,6 +96,8 @@ pub struct Document {
     pub(in crate::document) rmd_threading: Option<DocumentRmdThreading>,
     /// Embedded TrueType font descriptions.
     pub(in crate::document) embedded_fonts: Option<DocumentEmbeddedFonts>,
+    /// Typed, inert `MsoEnvelopeCLSID` metadata from the table stream.
+    pub(in crate::document) envelope: Option<Envelope>,
     /// AutoSummary priority ranges for the main document.
     pub(in crate::document) auto_summary: Option<DocumentAutoSummary>,
     /// Deferred legacy Word routing-slip lifecycle metadata (`RouteSlip`).
