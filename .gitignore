@@ -95,20 +95,22 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+# Root-anchored so these Python packaging directories can never swallow
+# Rust workspace sources (a bare `parts/` rule ignored crates/*/src/parts/).
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
+/share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
