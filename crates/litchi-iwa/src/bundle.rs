@@ -14,11 +14,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use plist::Value;
-use soapberry_zip::office::{ArchiveLimits as ZipArchiveLimits, ArchiveReader};
-
+use soapberry_zip::office::ArchiveLimits as ZipArchiveLimits;
 use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits, ArchiveObject, extract_text};
 use crate::snappy::{SnappyLimits, SnappyStream};
-use crate::zip_utils::parse_iwa_files_from_archive_with_limits;
 use crate::{Error, Result};
 
 /// Represents an iWork document bundle
@@ -182,6 +180,17 @@ impl BundleLimits {
             )));
         }
         Ok(())
+    }
+
+    fn archive_ingress_limits(self) -> Result<litchi_iwa_archive::Limits> {
+        let limits = litchi_iwa_archive::Limits::new(
+            self.max_input_bytes,
+            self.max_entries,
+            self.max_entry_bytes,
+            self.max_total_bytes,
+            self.max_iwa_stream_bytes,
+        )?;
+        Ok(limits.with_archive_limits(self.effective_archive_limits()?)?)
     }
 }
 
@@ -513,10 +522,7 @@ impl Bundle {
         })?;
         limits.check_input_size(input_size, "iWork bundle input")?;
 
-        // Parse IWA files from the ZIP archive
-        let archive = ArchiveReader::new_with_limits(bytes, limits.zip_archive_limits())
-            .map_err(|e| Error::Bundle(format!("Failed to open ZIP archive: {}", e)))?;
-        let archives = parse_iwa_files_from_archive_with_limits(&archive, limits)?;
+        let archives = Self::parse_zip_bytes(bytes, limits)?;
 
         // For single-file bundles, metadata is typically embedded
         let metadata = BundleMetadata {
@@ -668,10 +674,7 @@ impl Bundle {
         let index_zip_path = bundle_path.join("Index.zip");
         let data = read_bounded_file(&index_zip_path, limits, "iWork Index.zip")?;
 
-        let archive = ArchiveReader::new_with_limits(&data, limits.zip_archive_limits())
-            .map_err(|e| Error::Bundle(format!("Failed to open Index.zip: {}", e)))?;
-
-        parse_iwa_files_from_archive_with_limits(&archive, limits)
+        Self::parse_zip_bytes(&data, limits)
     }
 
     /// Parse a single-file bundle (zip archive) and extract all IWA files
@@ -681,18 +684,20 @@ impl Bundle {
     ) -> Result<HashMap<String, Archive>> {
         let data = read_bounded_file(bundle_path, limits, "iWork bundle")?;
 
-        let archive = ArchiveReader::new_with_limits(&data, limits.zip_archive_limits())
-            .map_err(|e| Error::Bundle(format!("Failed to open bundle file: {}", e)))?;
-
-        parse_iwa_files_from_archive_with_limits(&archive, limits)
+        Self::parse_zip_bytes(&data, limits)
     }
 
     /// Parse a ZIP archive from raw bytes and extract all IWA files
     fn parse_zip_bytes(bytes: &[u8], limits: BundleLimits) -> Result<HashMap<String, Archive>> {
-        let archive = ArchiveReader::new_with_limits(bytes, limits.zip_archive_limits())
-            .map_err(|e| Error::Bundle(format!("Failed to open ZIP archive from bytes: {}", e)))?;
-
-        parse_iwa_files_from_archive_with_limits(&archive, limits)
+        let ingress_limits = limits.archive_ingress_limits()?;
+        let catalog = litchi_iwa_archive::ComponentCatalog::from_bytes_with_limits(
+            bytes,
+            ingress_limits,
+        )?;
+        Ok(catalog
+            .iter()
+            .map(|component| (component.name().to_owned(), component.archive().clone()))
+            .collect())
     }
 
     /// Parse metadata from Metadata/ directory

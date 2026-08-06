@@ -292,6 +292,12 @@ impl From<litchi_iwa_core::Error> for Error {
     }
 }
 
+impl From<litchi_iwa_archive::Error> for Error {
+    fn from(error: litchi_iwa_archive::Error) -> Self {
+        Self::Bundle(format!("archive ingress: {error}"))
+    }
+}
+
 impl From<litchi_numbers::table::dimension::Error> for Error {
     fn from(error: litchi_numbers::table::dimension::Error) -> Self {
         Self::ParseError(error.to_string())

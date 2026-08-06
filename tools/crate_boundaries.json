@@ -82,6 +82,7 @@
     ],
     "litchi-iwa": [
       "litchi-core",
+      "litchi-iwa-archive",
       "litchi-iwa-common",
       "litchi-iwa-core",
       "litchi-iwa-graph",
@@ -93,6 +94,10 @@
       "litchi-keynote",
       "litchi-numbers",
       "litchi-pages",
+      "soapberry-zip"
+    ],
+    "litchi-iwa-archive": [
+      "litchi-iwa-core",
       "soapberry-zip"
     ],
     "litchi-iwa-common": [],
@@ -297,6 +302,7 @@
     "litchi-docx",
     "litchi-drawingml",
     "litchi-eval",
+    "litchi-iwa-archive",
     "litchi-iwa-common",
     "litchi-iwa-core",
     "litchi-iwa-graph",

@@ -1,0 +1,17 @@
+[package]
+name        = "litchi-iwa-archive"
+description = "Bounded physical bundle and ZIP ingress for Apple iWork documents."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+litchi-iwa-core = { workspace = true }
+soapberry-zip   = { workspace = true }
+thiserror       = { workspace = true }
+
+[lints]
+workspace = true
