@@ -682,18 +682,16 @@ fn typed_build_mutators_preserve_transactional_invariants() {
         simple.semantic().unwrap().effect(),
         &litchi_keynote::build::Effect::Appear
     );
-    let before_invalid_effect = simple.clone();
-    let custom_rotation =
-        litchi_keynote::build::Effect::action(litchi_keynote::build::Action::Rotate(
-            litchi_keynote::build::Rotation::new(
-                90.0,
-                litchi_keynote::build::RotationDirection::Clockwise,
-                BuildAcceleration::Custom,
-            )
-            .unwrap(),
-        ));
-    assert!(simple.set_effect(custom_rotation).is_err());
-    assert_eq!(simple, before_invalid_effect);
+    let before_invalid_path = move_settings.clone();
+    let invalid_path = KeynoteMotionPath {
+        subpaths: Vec::new(),
+        natural_width: 0.0,
+        natural_height: 0.0,
+        horizontal_flip: false,
+        vertical_flip: false,
+    };
+    assert!(move_settings.set_move_path(invalid_path).is_err());
+    assert_eq!(move_settings, before_invalid_path);
 }
 
 #[test]
