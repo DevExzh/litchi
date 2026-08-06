@@ -50,7 +50,7 @@ pub(super) fn extract(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
                 reference.identifier
             ))
         })?;
-        let storage = super::text::from_archive(
+        let storage = super::decode_text_storage(
             storage,
             &format!("Pages body object {}", reference.identifier),
         )?;

@@ -316,7 +316,7 @@ fn decode_storage(messages: &[crate::archive::RawMessage], context: &str) -> Res
             "{context} text-storage payload is invalid: {error}"
         ))
     })?;
-    super::text::from_archive(storage, context)
+    super::decode_text_storage(storage, context)
 }
 
 fn unique_payload<'a>(

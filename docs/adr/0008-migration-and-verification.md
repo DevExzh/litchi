@@ -6495,6 +6495,35 @@ closed after verification. This remains a bounded semantic/API and native-open
 slice; raw `IWorkTextEditor` storage selectors and the wider monolithic adapter
 split remain open.
 
+This 2026-08-06 slice extracts the structured text wire adapter into the new
+`litchi-iwa-text-wire` crate. The leaf depends only on common wire errors,
+generated IWA protobufs, and `litchi-iwa-text`; it converts one decoded
+`TSWP.StorageArchive` into the canonical `Storage` value with one owned UTF-8
+buffer, boxed semantic runs, checked fragment and allocation limits, and typed
+errors. `litchi-iwa` now retains only the application-specific context/error
+mapping and structured traversal, while the old 55-line facade-local
+converter is deleted. No package, archive, graph, or application crate enters
+the new leaf, and the boundary checker reports 50 packages and 142 internal
+declarations with the existing 13 explicitly ordered OOXML debt edges.
+
+The new leaf's three unit tests and doc-test target pass, strict no-dependency
+Clippy passes for the leaf, the integrated IWA library passes 1,484 tests, and
+the IWA library target passes strict Clippy with the three existing dead-code
+groups allowed. ZIP integrity and the text-style inspector remain unchanged
+for the known-good native fixtures: Pages storage 147, Numbers storage 130,
+and Keynote storage 155 each retain their expected outline, drop shadow,
+background, and highlight values. Computer Use opened those fixtures in the
+real Pages, Numbers, and Keynote applications without repair prompts; their
+accessibility trees exposed the expected Overview, Numbers hyperlink/comment,
+and Quarterly result markers, and screenshots showed the native highlighted
+content. All three applications were quit through their application UI and
+confirmed absent from `sky.list_apps()` afterward.
+
+This is a focused wire-layer split toward deleting the `litchi-iwa` monolith;
+the dedicated IWA-owned `TextStorageId` migration, removal of public storage
+message metadata, and the remaining monolithic adapters are intentionally the
+next API/topology slices.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

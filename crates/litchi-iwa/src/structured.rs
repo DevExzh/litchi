@@ -8,7 +8,6 @@
 mod keynote;
 mod numbers;
 mod pages;
-mod text;
 
 use crate::Result;
 use crate::application::Application;
@@ -19,6 +18,29 @@ use litchi_keynote::Slide;
 use litchi_numbers::Table;
 use litchi_pages::Section;
 use prost::Message;
+
+fn decode_text_storage(
+    archive: crate::protobuf::tswp::StorageArchive,
+    context: &str,
+) -> Result<litchi_iwa_text::storage::Storage> {
+    litchi_iwa_text_wire::from_archive(archive).map_err(|error| match error {
+        litchi_iwa_text_wire::Error::TooManyFragments { actual, limit } => {
+            crate::Error::InvalidFormat(format!(
+                "{context} contains {actual} text fragments; maximum is {limit}"
+            ))
+        },
+        litchi_iwa_text_wire::Error::TextLengthOverflow => crate::Error::InvalidFormat(format!(
+            "{context} text length overflows the host address space"
+        )),
+        litchi_iwa_text_wire::Error::Common(error) => crate::Error::IwaCommon(error),
+        litchi_iwa_text_wire::Error::Storage(error) => crate::Error::InvalidFormat(format!(
+            "{context} semantic text storage is invalid: {error}"
+        )),
+        error => crate::Error::InvalidFormat(format!(
+            "{context} text-storage conversion failed: {error}"
+        )),
+    })
+}
 
 pub use litchi_iwa_structured::StructuredData;
 

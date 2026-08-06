@@ -92,6 +92,7 @@
       "litchi-iwa-protos",
       "litchi-iwa-structured",
       "litchi-iwa-text",
+      "litchi-iwa-text-wire",
       "litchi-keynote",
       "litchi-numbers",
       "litchi-pages"
@@ -125,6 +126,11 @@
     ],
     "litchi-iwa-text": [
       "litchi-iwa-common"
+    ],
+    "litchi-iwa-text-wire": [
+      "litchi-iwa-common",
+      "litchi-iwa-protos",
+      "litchi-iwa-text"
     ],
     "litchi-keynote": [
       "litchi-iwa-common",
@@ -322,6 +328,7 @@
     "litchi-iwa-protos",
     "litchi-iwa-structured",
     "litchi-iwa-text",
+    "litchi-iwa-text-wire",
     "litchi-keynote",
     "litchi-numbers",
     "litchi-odb",

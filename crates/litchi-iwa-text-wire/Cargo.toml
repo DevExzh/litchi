@@ -1,0 +1,18 @@
+[package]
+name        = "litchi-iwa-text-wire"
+description = "Native protobuf-to-semantic text-storage conversion for iWork adapters."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+litchi-iwa-common = { workspace = true }
+litchi-iwa-protos = { workspace = true }
+litchi-iwa-text   = { workspace = true }
+thiserror        = { workspace = true }
+
+[lints]
+workspace = true
