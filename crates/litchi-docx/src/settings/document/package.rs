@@ -48,7 +48,7 @@ impl DocumentSettings {
     ///
     /// A Settings object
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Self> {
-        let xml = litchi_ooxml_common::mce::process_part(part)?;
+        let xml = super::super::extensions::process_part(part)?;
         let mut settings = Self::extract_from_xml(xml.as_ref())?;
         validate_mail_merge_relationships(part, settings.mail_merge.as_ref())?;
         validate_attached_template_relationship(part, &mut settings)?;

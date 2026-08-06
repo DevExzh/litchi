@@ -4,6 +4,7 @@ use super::compatibility::{
     CompatibilitySetting,
 };
 use super::editing::{ProofingState, ProtectionType, ThemeFontLanguages, View};
+use super::extensions::Extensions;
 use super::notes::{NoteNumberFormat, NoteNumberingProperties};
 
 /// Format-owned scalar settings extracted from a Word settings part.
@@ -23,6 +24,7 @@ pub struct Settings<F = NoteNumberFormat> {
     pub(crate) default_tab_stop_twips: Option<u32>,
     pub(crate) theme_font_languages: Option<ThemeFontLanguages>,
     pub(crate) color_scheme_mapping: Option<ColorSchemeMapping>,
+    pub(crate) extensions: Extensions,
 }
 
 impl<F> Default for Settings<F> {
@@ -42,6 +44,7 @@ impl<F> Default for Settings<F> {
             default_tab_stop_twips: None,
             theme_font_languages: None,
             color_scheme_mapping: None,
+            extensions: Extensions::new(),
         }
     }
 }
@@ -139,6 +142,12 @@ impl<F> Settings<F> {
     /// Replace the theme color mapping.
     pub fn set_color_scheme_mapping(&mut self, value: Option<ColorSchemeMapping>) -> &mut Self {
         self.color_scheme_mapping = value;
+        self
+    }
+
+    /// Replace the ordered Word 2010/2012 settings extensions.
+    pub fn set_extensions(&mut self, value: Extensions) -> &mut Self {
+        self.extensions = value;
         self
     }
 }
@@ -240,6 +249,12 @@ impl<F: Copy> Settings<F> {
     pub fn color_scheme_mapping(&self) -> Option<&ColorSchemeMapping> {
         self.color_scheme_mapping.as_ref()
     }
+
+    /// Return the ordered Word 2010/2012 settings extensions.
+    #[inline]
+    pub fn extensions(&self) -> &Extensions {
+        &self.extensions
+    }
 }
 
 impl Settings<NoteNumberFormat> {
@@ -263,6 +278,7 @@ impl Settings<NoteNumberFormat> {
             default_tab_stop_twips,
             theme_font_languages,
             color_scheme_mapping,
+            extensions,
         } = self;
         Ok(Settings {
             protected,
@@ -283,6 +299,7 @@ impl Settings<NoteNumberFormat> {
             default_tab_stop_twips,
             theme_font_languages,
             color_scheme_mapping,
+            extensions,
         })
     }
 }

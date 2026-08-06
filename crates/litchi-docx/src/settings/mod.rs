@@ -9,6 +9,7 @@ mod colors;
 mod compatibility;
 mod document;
 mod editing;
+mod extensions;
 mod model;
 mod notes;
 mod smart_tags;
@@ -40,6 +41,7 @@ pub(crate) use document::{
 };
 pub use document::{AttachedTemplate, DocumentSettings};
 pub use editing::*;
+pub use extensions::*;
 pub use model::*;
 pub use notes::*;
 pub use smart_tags::*;

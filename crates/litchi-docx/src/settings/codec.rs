@@ -3,6 +3,7 @@
 use super::colors::*;
 use super::compatibility::*;
 use super::editing::*;
+use super::extensions::Extensions;
 use super::model::Settings;
 use super::notes::*;
 use super::support::{invalid, reserve_one, xml_error};
@@ -59,6 +60,7 @@ impl Settings<NoteNumberFormat> {
 
         let mut reader = NsReader::from_reader(xml);
         let mut settings = Self::new();
+        settings.set_extensions(Extensions::parse(xml)?);
         let mut depth = 0usize;
         let mut nodes = 0usize;
         let mut saw_root = false;
@@ -233,6 +235,7 @@ impl Settings<NoteNumberFormat> {
             xml.push_str(&properties.to_xml(prefix, "endnotePr"));
         }
         xml.push_str(&self.to_editing_settings_xml(prefix));
+        xml.push_str(&self.extensions.to_xml(prefix));
         xml
     }
 }

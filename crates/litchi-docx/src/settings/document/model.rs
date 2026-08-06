@@ -6,7 +6,7 @@ use crate::mail_merge::Settings as MailMergeSettings;
 use crate::numbering::Format;
 use crate::settings::{
     ColorSchemeMapping, CompatibilityOption, CompatibilitySetting, ProofingState, ProtectionType,
-    SmartTagType, ThemeFontLanguages, View,
+    Extensions, SmartTagType, ThemeFontLanguages, View,
 };
 
 /// An inert reference to the external template associated with a document.
@@ -196,6 +196,17 @@ impl DocumentSettings {
     #[inline]
     pub fn color_scheme_mapping(&self) -> Option<&ColorSchemeMapping> {
         self.values.color_scheme_mapping()
+    }
+
+    /// Return the ordered Word 2010/2012 settings extensions.
+    #[inline]
+    pub fn extensions(&self) -> &Extensions {
+        self.values.extensions()
+    }
+
+    /// Serialize the direct Word 2010/2012 settings extension children.
+    pub fn extensions_xml(&self, prefix: &str) -> String {
+        self.values.extensions().to_xml(prefix)
     }
 
     /// Serialize the editing view, proofing, and theme default elements
