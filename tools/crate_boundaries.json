@@ -85,6 +85,7 @@
       "litchi-iwa-common",
       "litchi-iwa-core",
       "litchi-iwa-graph",
+      "litchi-iwa-index",
       "litchi-iwa-package",
       "litchi-iwa-protos",
       "litchi-iwa-structured",
