@@ -364,17 +364,11 @@ impl IWorkPackage {
     /// Parse a package under caller-selected ingress ceilings.
     ///
     /// The same ceilings are applied to the outer ZIP and, when present, the
-    /// embedded legacy `Index.zip` archive.
+    /// embedded legacy `Index.zip` archive. The owned source baseline is
+    /// retained for flat packages, so an unchanged package can be written
+    /// back byte-for-byte without rebuilding the ZIP envelope.
     pub fn from_bytes_with_limits(bytes: &[u8], limits: PackageLimits) -> Result<Self> {
-        let input_size = u64::try_from(bytes.len()).map_err(|_| {
-            Error::InvalidFormat("iWork package input length does not fit u64".to_owned())
-        })?;
-        limits.check_input_size(input_size, "iWork package input")?;
-        let catalog = litchi_iwa_archive::package::Catalog::from_bytes_with_limits(
-            bytes,
-            limits.physical_archive_limits()?,
-        )?;
-        Self::from_catalog(catalog, limits, None)
+        Self::from_shared_bytes_with_limits(bytes.to_vec().into(), limits)
     }
 
     /// Parse an already-owned package source under caller-selected ingress
@@ -1142,6 +1136,23 @@ mod tests {
         package.write_to(&mut written).unwrap();
         assert_eq!(written, source.as_ref());
         assert_eq!(package.entry_names().collect::<Vec<_>>(), ["preview.jpg"]);
+    }
+
+    #[test]
+    fn borrowed_bytes_preserve_the_source_for_noop_writes() {
+        let mut bytes = zip(&[("preview.jpg", b"preview")]);
+        let end_of_central_directory = bytes.len() - 22;
+        let comment = b"borrowed-preserve-mode-comment";
+        bytes[end_of_central_directory + 20..end_of_central_directory + 22]
+            .copy_from_slice(&(comment.len() as u16).to_le_bytes());
+        bytes.extend_from_slice(comment);
+
+        let package = IWorkPackage::from_bytes(&bytes).unwrap();
+
+        assert_eq!(package.to_bytes().unwrap(), bytes);
+        let mut written = Vec::new();
+        package.write_to(&mut written).unwrap();
+        assert_eq!(written, bytes);
     }
 
     #[test]
