@@ -1,125 +1,38 @@
-//! OLE metadata stream generation for DOC files
+//! Layered OLE metadata stream generation for DOC files.
 //!
-//! Microsoft Word requires `\x01CompObj` and `\x01Ole` streams to recognize
-//! the file as a valid Word document embedded object.
-//!
-//! Based on MS-OLEDS specification.
+//! The semantic model describes the metadata Word places in the `\x01CompObj`
+//! and `\x01Ole` streams. The codec owns the little-endian wire layout and the
+//! validation module keeps the fixed writer profile independently checked.
+//! The two generator functions remain the concise DOC-package facade.
 
-/// Generate the `\x01CompObj` stream
-///
-/// This stream contains OLE2 embedded object metadata including:
-/// - Object CLSID
-/// - User type string (display name)
-/// - Clipboard format name
-/// - ProgID (programmatic identifier)
-///
-/// # Returns
-///
-/// Vector of bytes containing the CompObj stream data
-pub fn generate_compobj_stream() -> Vec<u8> {
-    let mut data = Vec::new();
-
-    // Version (4 bytes): 0x0001FFFE
-    data.extend_from_slice(&[0x01, 0x00, 0xFE, 0xFF]);
-
-    // Reserved (4 bytes)
-    data.extend_from_slice(&[0x03, 0x0A, 0x00, 0x00]);
-
-    // Reserved (4 bytes)
-    data.extend_from_slice(&[0xFF, 0xFF, 0xFF, 0xFF]);
-
-    // CLSID for Word.Document.8: {00020906-0000-0000-C000-000000000046}
-    data.extend_from_slice(&[
-        0x06, 0x09, 0x02, 0x00, // Data1
-        0x00, 0x00, // Data2
-        0x00, 0x00, // Data3
-        0xC0, 0x00, // Data4[0-1]
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x46, // Data4[2-7]
-    ]);
-
-    // AnsiUserType string: "Microsoft Word Document" (null-terminated)
-    let user_type = b"Microsoft Word Document\0";
-    data.extend_from_slice(&(user_type.len() as u32).to_le_bytes());
-    data.extend_from_slice(user_type);
-
-    // Clipboard format name: "MSWordDoc" (null-terminated)
-    let clip_format = b"MSWordDoc\0";
-    data.extend_from_slice(&(clip_format.len() as u32).to_le_bytes());
-    data.extend_from_slice(clip_format);
-
-    // ProgID: "Word.Document.8" (null-terminated)
-    let prog_id = b"Word.Document.8\0";
-    data.extend_from_slice(&(prog_id.len() as u32).to_le_bytes());
-    data.extend_from_slice(prog_id);
-
-    // CRITICAL: Unicode marker (REQUIRED by Microsoft Word!)
-    // If present, indicates Unicode versions of strings follow
-    // Magic value: 0x71B239F4
-    data.extend_from_slice(&0x71B239F4u32.to_le_bytes());
-
-    // Unicode strings (empty but present to match Word format)
-    // UnicodeUserType (4 bytes = length 0)
-    data.extend_from_slice(&0u32.to_le_bytes());
-
-    // UnicodeClipFormat (4 bytes = length 0)
-    data.extend_from_slice(&0u32.to_le_bytes());
-
-    // UnicodeProgID (4 bytes = length 0)
-    data.extend_from_slice(&0u32.to_le_bytes());
-
-    data
-}
-
-/// Generate the `\x01Ole` stream
-///
-/// This stream contains OLE version information.
-///
-/// # Returns
-///
-/// Vector of bytes containing the Ole stream data (20 bytes)
-pub fn generate_ole_stream() -> Vec<u8> {
-    let mut data = vec![0u8; 20];
-
-    // OLE version: 0x02000001 (OLE 2.1)
-    data[0..4].copy_from_slice(&[0x01, 0x00, 0x00, 0x02]);
-
-    // Reserved (16 bytes): all zeros
-
-    data
-}
+mod codec;
+mod model;
+mod validation;
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod tests;
 
-    #[test]
-    fn test_compobj_generation() {
-        let compobj = generate_compobj_stream();
+pub use model::{ClassId, CompObj, Metadata, Ole};
 
-        // Check version marker
-        assert_eq!(&compobj[0..4], &[0x01, 0x00, 0xFE, 0xFF]);
+/// Generate the `\x01CompObj` stream for a Word document.
+///
+/// The returned bytes contain the Word.Document.8 class identifier and the
+/// ANSI/Unicode metadata profile required by Word's embedded-object loader.
+#[must_use]
+pub fn generate_compobj_stream() -> Vec<u8> {
+    let metadata = Metadata::word_document();
+    let data = codec::write_comp_obj(metadata.comp_obj());
+    debug_assert!(validation::comp_obj(&data, metadata.comp_obj()).is_ok());
+    data
+}
 
-        // Check CLSID is present
-        assert_eq!(
-            &compobj[12..28],
-            &[
-                0x06, 0x09, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0x00, 0x46
-            ]
-        );
-
-        // Should be at least 90 bytes
-        assert!(compobj.len() >= 90);
-    }
-
-    #[test]
-    fn test_ole_generation() {
-        let ole = generate_ole_stream();
-
-        // Check version
-        assert_eq!(&ole[0..4], &[0x01, 0x00, 0x00, 0x02]);
-
-        // Should be exactly 20 bytes
-        assert_eq!(ole.len(), 20);
-    }
+/// Generate the `\x01Ole` stream for a Word document.
+///
+/// This is the fixed 20-byte OLE version stream used by the DOC writer.
+#[must_use]
+pub fn generate_ole_stream() -> Vec<u8> {
+    let metadata = Metadata::word_document();
+    let data = codec::write_ole(metadata.ole());
+    debug_assert!(validation::ole(&data, metadata.ole()).is_ok());
+    data
 }

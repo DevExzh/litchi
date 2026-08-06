@@ -1,4 +1,4 @@
-//! ODF table-style templates stored in common or automatic style collections.
+//! XML codec for ODF table-style templates.
 
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
@@ -9,99 +9,14 @@ use quick_xml::{
 };
 use std::collections::HashSet;
 
+use super::semantic::{Axis, Region, Style, Template};
+use super::validation::{MAX_AGGREGATE_BYTES, MAX_EXTENSION_DEPTH, MAX_TEMPLATES, MAX_VALUE_BYTES};
+
 const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const TEXT_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
-const MAX_TEMPLATES: usize = 1_000_000;
-const MAX_VALUE_BYTES: usize = 65_536;
-const MAX_AGGREGATE_BYTES: usize = 16 * 1_048_576;
-const MAX_EXTENSION_DEPTH: usize = 256;
-
-/// Legacy row/column selector used by deprecated table-template edge attributes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Axis {
-    Row,
-    Column,
-}
-
-/// Cell and optional paragraph styles for one table-template region.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Style {
-    pub style_name: String,
-    pub paragraph_style_name: Option<String>,
-}
-
-/// Named cell-style regions which make up an ODF table template.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Template {
-    pub name: String,
-    pub first_row_start_column: Option<Axis>,
-    pub first_row_end_column: Option<Axis>,
-    pub last_row_start_column: Option<Axis>,
-    pub last_row_end_column: Option<Axis>,
-    pub use_first_row_styles: Option<bool>,
-    pub use_last_row_styles: Option<bool>,
-    pub use_first_column_styles: Option<bool>,
-    pub use_last_column_styles: Option<bool>,
-    pub use_banding_rows_styles: Option<bool>,
-    pub use_banding_columns_styles: Option<bool>,
-    pub first_row: Option<Style>,
-    pub last_row: Option<Style>,
-    pub first_column: Option<Style>,
-    pub last_column: Option<Style>,
-    pub body: Option<Style>,
-    pub even_rows: Option<Style>,
-    pub odd_rows: Option<Style>,
-    pub even_columns: Option<Style>,
-    pub odd_columns: Option<Style>,
-    pub background: Option<Style>,
-}
 
 impl Template {
-    /// Validate the template's required band structure and style references.
-    pub fn validate(&self) -> Result<()> {
-        validate_template_value(&self.name, "table template name")?;
-        if self.even_rows.is_some() != self.odd_rows.is_some() {
-            return Err(Error::InvalidFormat(
-                "table template requires both even-rows and odd-rows".to_string(),
-            ));
-        }
-        if self.even_columns.is_some() != self.odd_columns.is_some() {
-            return Err(Error::InvalidFormat(
-                "table template requires both even-columns and odd-columns".to_string(),
-            ));
-        }
-        if self.body.is_none() && self.even_rows.is_none() && self.even_columns.is_none() {
-            return Err(Error::InvalidFormat(
-                "table template requires body or a complete row/column band pair".to_string(),
-            ));
-        }
-        for (name, style) in [
-            ("first-row", self.first_row.as_ref()),
-            ("last-row", self.last_row.as_ref()),
-            ("first-column", self.first_column.as_ref()),
-            ("last-column", self.last_column.as_ref()),
-            ("body", self.body.as_ref()),
-            ("even-rows", self.even_rows.as_ref()),
-            ("odd-rows", self.odd_rows.as_ref()),
-            ("even-columns", self.even_columns.as_ref()),
-            ("odd-columns", self.odd_columns.as_ref()),
-            ("background", self.background.as_ref()),
-        ] {
-            let Some(style) = style else { continue };
-            validate_template_value(&style.style_name, &format!("{name} style name"))?;
-            if let Some(paragraph) = &style.paragraph_style_name {
-                if name == "background" {
-                    return Err(Error::InvalidFormat(
-                        "table:background cannot have a paragraph style".to_string(),
-                    ));
-                }
-                validate_template_value(paragraph, &format!("{name} paragraph style name"))?;
-            }
-        }
-        Ok(())
-    }
-
     /// Append deterministic ODF XML for this template to an existing buffer.
     pub fn write_xml(&self, output: &mut String) -> Result<()> {
         self.validate()?;
@@ -139,20 +54,9 @@ impl Template {
             self.use_banding_columns_styles,
         );
         output.push('>');
-        for (name, style) in [
-            ("first-row", self.first_row.as_ref()),
-            ("last-row", self.last_row.as_ref()),
-            ("first-column", self.first_column.as_ref()),
-            ("last-column", self.last_column.as_ref()),
-            ("body", self.body.as_ref()),
-            ("even-rows", self.even_rows.as_ref()),
-            ("odd-rows", self.odd_rows.as_ref()),
-            ("even-columns", self.even_columns.as_ref()),
-            ("odd-columns", self.odd_columns.as_ref()),
-            ("background", self.background.as_ref()),
-        ] {
-            if let Some(style) = style {
-                write_region(output, name, style);
+        for region in Region::ALL {
+            if let Some(style) = self.region(region) {
+                write_region(output, region.name(), style);
             }
         }
         output.push_str("</table:table-template>");
@@ -165,16 +69,6 @@ impl Template {
         self.write_xml(&mut output)?;
         Ok(output)
     }
-}
-
-fn validate_template_value(value: &str, name: &str) -> Result<()> {
-    if value.is_empty() {
-        return Err(Error::InvalidFormat(format!("{name} must not be empty")));
-    }
-    if value.len() > MAX_VALUE_BYTES {
-        return Err(Error::InvalidFormat(format!("{name} exceeds 64 KiB")));
-    }
-    Ok(())
 }
 
 fn write_axis_attribute(output: &mut String, name: &str, value: Option<Axis>) {
@@ -226,7 +120,13 @@ struct Attribute {
     value: String,
 }
 
-pub(crate) fn parse_table_templates(parts: &[&str]) -> Result<Vec<Template>> {
+/// Parse table-template elements from one ODF styles XML part.
+pub fn parse(xml: &str) -> Result<Vec<Template>> {
+    parse_parts(&[xml])
+}
+
+/// Parse table-template elements from multiple ODF styles XML parts.
+pub fn parse_parts(parts: &[&str]) -> Result<Vec<Template>> {
     let mut templates = Vec::new();
     let mut names = HashSet::new();
     let mut aggregate = 0usize;
@@ -483,37 +383,17 @@ impl TemplateRegions {
         }
         Ok(())
     }
-
-    fn validate(&self) -> Result<()> {
-        if self.even_rows.is_some() != self.odd_rows.is_some() {
-            return Err(Error::InvalidFormat(
-                "table template requires both even-rows and odd-rows".to_string(),
-            ));
-        }
-        if self.even_columns.is_some() != self.odd_columns.is_some() {
-            return Err(Error::InvalidFormat(
-                "table template requires both even-columns and odd-columns".to_string(),
-            ));
-        }
-        if self.body.is_none() && self.even_rows.is_none() && self.even_columns.is_none() {
-            return Err(Error::InvalidFormat(
-                "table template requires body or a complete row/column band pair".to_string(),
-            ));
-        }
-        Ok(())
-    }
 }
 
 fn build_template(attributes: &[Attribute], regions: TemplateRegions) -> Result<Template> {
     reject_template_attributes(attributes)?;
-    regions.validate()?;
     let name = required_attribute_either(attributes, "name")?.to_string();
     if name.is_empty() {
         return Err(Error::InvalidFormat(
             "table template name must not be empty".to_string(),
         ));
     }
-    Ok(Template {
+    let template = Template {
         name,
         first_row_start_column: parse_axis_attribute(attributes, "first-row-start-column")?,
         first_row_end_column: parse_axis_attribute(attributes, "first-row-end-column")?,
@@ -535,7 +415,9 @@ fn build_template(attributes: &[Attribute], regions: TemplateRegions) -> Result<
         even_columns: regions.even_columns,
         odd_columns: regions.odd_columns,
         background: regions.background,
-    })
+    };
+    template.validate()?;
+    Ok(template)
 }
 
 fn parse_region_attributes(
@@ -792,19 +674,7 @@ fn skip_extension(reader: &mut NsReader<&[u8]>) -> Result<()> {
 }
 
 fn is_region_name(local: &str) -> bool {
-    matches!(
-        local,
-        "first-row"
-            | "last-row"
-            | "first-column"
-            | "last-column"
-            | "body"
-            | "even-rows"
-            | "odd-rows"
-            | "even-columns"
-            | "odd-columns"
-            | "background"
-    )
+    Region::from_name(local).is_some()
 }
 
 fn append_size(aggregate: &mut usize, amount: usize) -> Result<()> {
@@ -848,98 +718,4 @@ fn decode_name(value: &[u8]) -> Result<String> {
 
 fn xml_error(error: quick_xml::Error) -> Error {
     Error::InvalidFormat(format!("invalid table-template XML: {error}"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const PREFIX: &str = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:styles>"#;
-    const SUFFIX: &str = "</office:styles></office:document-styles>";
-
-    fn parse(fragment: &str) -> Result<Vec<Template>> {
-        parse_table_templates(&[&format!("{PREFIX}{fragment}{SUFFIX}")])
-    }
-
-    #[test]
-    fn parses_complete_templates_and_legacy_axes() {
-        let templates = parse(
-            r#"<table:table-template table:name="Bands &amp; Body" text:first-row-start-column="row" table:first-row-end-column="column" table:use-first-row-styles="true" table:use-banding-rows-styles="1"><table:first-row table:style-name="Header" table:paragraph-style-name="HeaderP"/><table:body table:style-name="Body"/><table:even-rows table:style-name="Even"/><table:odd-rows table:style-name="Odd"/><table:background table:style-name="Background"/></table:table-template>"#,
-        )
-        .unwrap();
-        let template = &templates[0];
-        assert_eq!(template.name, "Bands & Body");
-        assert_eq!(template.first_row_start_column, Some(Axis::Row));
-        assert_eq!(template.first_row_end_column, Some(Axis::Column));
-        assert_eq!(template.use_first_row_styles, Some(true));
-        assert_eq!(
-            template
-                .first_row
-                .as_ref()
-                .unwrap()
-                .paragraph_style_name
-                .as_deref(),
-            Some("HeaderP")
-        );
-        assert_eq!(
-            template.background.as_ref().unwrap().style_name,
-            "Background"
-        );
-    }
-
-    #[test]
-    fn rejects_invalid_locations_shapes_and_duplicates() {
-        for fragment in [
-            r#"<table:table-template table:name="Missing"/>"#,
-            r#"<table:table-template table:name="Partial"><table:even-rows table:style-name="E"/></table:table-template>"#,
-            r#"<table:table-template table:name="MissingStyle"><table:body/></table:table-template>"#,
-            r#"<table:table-template table:name="Duplicate"><table:body table:style-name="A"/><table:body table:style-name="B"/></table:table-template>"#,
-            r#"<table:table-template table:name="Text"><table:body table:style-name="A">bad</table:body></table:table-template>"#,
-            r#"<table:table-template table:name="Bool" table:use-first-row-styles="yes"><table:body table:style-name="A"/></table:table-template>"#,
-        ] {
-            assert!(parse(fragment).is_err(), "accepted {fragment}");
-        }
-        let duplicate = format!(
-            "{PREFIX}<table:table-template table:name=\"A\"><table:body table:style-name=\"A\"/></table:table-template><table:table-template table:name=\"A\"><table:body table:style-name=\"B\"/></table:table-template>{SUFFIX}"
-        );
-        assert!(parse_table_templates(&[&duplicate]).is_err());
-        assert!(parse_table_templates(&[r#"<table:table-template xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" table:name="A"><table:body table:style-name="A"/></table:table-template>"#]).is_err());
-    }
-
-    #[test]
-    fn parses_libreoffice_table_style_catalog() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../test-data/libreoffice-core/sc/res/xml/tablestyles.xml");
-        let xml = std::fs::read_to_string(path).unwrap();
-        let templates = parse_table_templates(&[&xml]).unwrap();
-        assert!(templates.len() > 10);
-        let default = templates
-            .iter()
-            .find(|template| template.name == "Default Style")
-            .unwrap();
-        assert_eq!(
-            default.body.as_ref().unwrap().style_name,
-            "Default-Style.body"
-        );
-        assert!(default.background.is_some());
-    }
-
-    #[test]
-    fn validates_and_round_trips_deterministic_template_xml() {
-        let mut template = parse(
-            r#"<table:table-template table:name="A &amp; B" table:use-banding-columns-styles="false"><table:first-row table:style-name="Head&amp;" table:paragraph-style-name="P&amp;"/><table:even-columns table:style-name="Even"/><table:odd-columns table:style-name="Odd"/></table:table-template>"#,
-        )
-        .unwrap()
-        .remove(0);
-        let xml = template.to_xml().unwrap();
-        assert!(xml.contains(r#"table:name="A &amp; B""#));
-        assert!(xml.contains(r#"table:style-name="Head&amp;""#));
-        let reparsed = parse(&xml).unwrap().remove(0);
-        assert_eq!(reparsed, template);
-
-        template.odd_columns = None;
-        let mut untouched = String::from("prefix");
-        assert!(template.write_xml(&mut untouched).is_err());
-        assert_eq!(untouched, "prefix");
-    }
 }

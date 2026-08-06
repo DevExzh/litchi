@@ -3,6 +3,7 @@
 use super::codec::{self, Package};
 use super::discovery;
 use super::model::{Limits, Objects};
+use super::snapshot::Snapshot;
 use super::target::{Target, Targets};
 use litchi_cfb::{OleError, OleFile};
 use std::io::Cursor;
@@ -49,6 +50,33 @@ impl Editor {
             objects,
             changed: false,
         })
+    }
+
+    /// Captures the current read state as an immutable, shareable snapshot.
+    ///
+    /// Snapshot clones share large stream allocations and are independent of
+    /// this editor's subsequent edits.
+    #[must_use]
+    pub fn snapshot(&self) -> Snapshot {
+        Snapshot::new(
+            self.targets.clone(),
+            self.limits,
+            Arc::clone(&self.original),
+            self.package.clone(),
+            self.objects.clone(),
+            self.changed,
+        )
+    }
+
+    pub(crate) fn from_snapshot(snapshot: &Snapshot) -> Self {
+        Self {
+            targets: snapshot.targets().clone(),
+            limits: snapshot.limits(),
+            original: snapshot.original(),
+            package: snapshot.package(),
+            objects: snapshot.objects_clone(),
+            changed: snapshot.changed(),
+        }
     }
 
     /// The target catalog used by this editor.

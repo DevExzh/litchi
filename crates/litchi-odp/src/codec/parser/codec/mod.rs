@@ -3,8 +3,6 @@
 //! XML traversal, semantic model assembly, and structural validation are kept in
 //! separate implementation seams while this module owns the parser type.
 
-mod semantic;
-mod validation;
 mod xml;
 
 pub(super) use super::model::{

@@ -18,7 +18,7 @@ pub mod source;
 pub mod sparkline;
 pub mod structure;
 pub mod style_protection;
-pub mod table_template;
+pub use crate::styles::table_template;
 pub mod tracked_changes;
 
 pub use litchi_odf_common::{annotation, calculation, rdf};

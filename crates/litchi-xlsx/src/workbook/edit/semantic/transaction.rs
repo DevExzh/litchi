@@ -1,5 +1,10 @@
 //! Public semantic transaction and worksheet-editing facade.
 
+mod conflicts;
+mod guard;
+mod order;
+mod snapshot;
+
 use std::collections::{BTreeMap, BTreeSet, HashMap, btree_map::Entry};
 use std::sync::Arc;
 
@@ -29,8 +34,8 @@ use super::super::model::{
     PartChange, StyleGuard, defaults_after, ensure_merge_area, merge_conflicts, project_merges,
 };
 use super::super::validation::{
-    Added, FinalOrder, MergeIntent, MoveIntent, OrderPlan, PanesAction, Placement, SheetActions,
-    TabAction, Target, pending_merge,
+    Added, FinalOrder, MergeIntent, OrderPlan, PanesAction, Placement, SheetActions, TabAction,
+    Target, pending_merge,
 };
 use super::super::{
     ActiveTab, Change, Commit, Conflict, ConflictSet, JoinError, JoinFailure, PackageChange, Patch,
@@ -38,6 +43,7 @@ use super::super::{
 };
 use super::super::{codec, package};
 
+use self::snapshot::Snapshot;
 use super::worksheet::{NewSheet, TabEdit, WorksheetEdit};
 
 /// Isolated workbook transaction. Dropping it rolls back every pending change.
@@ -76,9 +82,7 @@ impl Edit {
         panes: common_web::Panes,
         conformance: common_web::Conformance,
     ) -> Result<&mut Self> {
-        if !self.removed.is_empty() {
-            return Err(self.remove_block(RemoveBlock::MixedEdit, "task panes"));
-        }
+        guard::no_removal(self, "task panes")?;
         self.panes = Some(PanesAction::Put { panes, conformance });
         Ok(self)
     }
@@ -86,9 +90,7 @@ impl Edit {
     /// Remove persisted task panes when no effective worksheet binding would
     /// dangle in the same transaction.
     pub fn remove_task_panes(&mut self) -> Result<&mut Self> {
-        if !self.removed.is_empty() {
-            return Err(self.remove_block(RemoveBlock::MixedEdit, "task panes"));
-        }
+        guard::no_removal(self, "task panes")?;
         self.panes = Some(PanesAction::Remove);
         Ok(self)
     }
@@ -119,10 +121,8 @@ impl Edit {
         T: TryInto<Name>,
         Error: From<T::Error>,
     {
-        if !self.removed.is_empty() {
-            return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
-        }
-        let Some(anchor) = self.base.sheet(anchor)? else {
+        guard::no_removal(self, "transaction")?;
+        let Some(anchor) = Snapshot::new(&self.base).tab(anchor)? else {
             return Ok(None);
         };
         self.add_placed(name, Placement::Before(anchor.position()))
@@ -142,10 +142,8 @@ impl Edit {
         T: TryInto<Name>,
         Error: From<T::Error>,
     {
-        if !self.removed.is_empty() {
-            return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
-        }
-        let Some(anchor) = self.base.sheet(anchor)? else {
+        guard::no_removal(self, "transaction")?;
+        let Some(anchor) = Snapshot::new(&self.base).tab(anchor)? else {
             return Ok(None);
         };
         self.add_placed(name, Placement::After(anchor.position()))
@@ -157,18 +155,11 @@ impl Edit {
         &'e mut self,
         selector: impl Into<Selector<'s>>,
     ) -> Result<Option<WorksheetEdit<'e>>> {
-        if !self.removed.is_empty() {
-            return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
-        }
-        let sheet = self.base.sheet(selector)?;
+        guard::no_removal(self, "transaction")?;
+        let sheet = Snapshot::new(&self.base).worksheet(selector)?;
         let Some(sheet) = sheet else {
             return Ok(None);
         };
-        if sheet.kind() != WorksheetKind::Worksheet {
-            return Err(Error::NotWorksheet {
-                sheet: sheet.name().to_owned(),
-            });
-        }
         let position = sheet.position();
         Ok(Some(WorksheetEdit {
             edit: self,
@@ -184,10 +175,8 @@ impl Edit {
         &'e mut self,
         selector: impl Into<Selector<'s>>,
     ) -> Result<Option<TabEdit<'e>>> {
-        if !self.removed.is_empty() {
-            return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
-        }
-        let tab = self.base.sheet(selector)?;
+        guard::no_removal(self, "transaction")?;
+        let tab = Snapshot::new(&self.base).tab(selector)?;
         Ok(tab.map(|tab| TabEdit {
             edit: self,
             position: tab.position(),
@@ -204,16 +193,11 @@ impl Edit {
         sheet: impl Into<Selector<'a>>,
         anchor: impl Into<Selector<'b>>,
     ) -> Result<Option<&mut Self>> {
-        if !self.removed.is_empty() {
-            return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
-        }
-        let Some(sheet) = self.base.sheet(sheet)? else {
+        guard::no_removal(self, "transaction")?;
+        let Some((sheet, anchor)) = Snapshot::new(&self.base).pair(sheet, anchor)? else {
             return Ok(None);
         };
-        let Some(anchor) = self.base.sheet(anchor)? else {
-            return Ok(None);
-        };
-        self.move_relative(sheet.position(), anchor.position(), false)?;
+        order::move_relative(self, sheet.position(), anchor.position(), false)?;
         Ok(Some(self))
     }
 
@@ -225,16 +209,11 @@ impl Edit {
         sheet: impl Into<Selector<'a>>,
         anchor: impl Into<Selector<'b>>,
     ) -> Result<Option<&mut Self>> {
-        if !self.removed.is_empty() {
-            return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
-        }
-        let Some(sheet) = self.base.sheet(sheet)? else {
+        guard::no_removal(self, "transaction")?;
+        let Some((sheet, anchor)) = Snapshot::new(&self.base).pair(sheet, anchor)? else {
             return Ok(None);
         };
-        let Some(anchor) = self.base.sheet(anchor)? else {
-            return Ok(None);
-        };
-        self.move_relative(sheet.position(), anchor.position(), true)?;
+        order::move_relative(self, sheet.position(), anchor.position(), true)?;
         Ok(Some(self))
     }
 
@@ -248,16 +227,14 @@ impl Edit {
         sheet: impl Into<Selector<'a>>,
         position: usize,
     ) -> Result<Option<&mut Self>> {
-        if !self.removed.is_empty() {
-            return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
-        }
-        let Some(sheet) = self.base.sheet(sheet)? else {
+        guard::no_removal(self, "transaction")?;
+        let Some(sheet) = Snapshot::new(&self.base).tab(sheet)? else {
             return Ok(None);
         };
         if position >= self.base.len() {
             return Ok(None);
         }
-        self.move_position(sheet.position(), position)?;
+        order::move_to(self, sheet.position(), position)?;
         Ok(Some(self))
     }
 
@@ -269,14 +246,9 @@ impl Edit {
     /// incoming relationships, and mixed mutation plans. Multiple independent
     /// worksheet removals may be collected in one atomic transaction.
     pub fn remove<'a>(&mut self, selector: impl Into<Selector<'a>>) -> Result<Option<&mut Self>> {
-        let Some(sheet) = self.base.sheet(selector)? else {
+        let Some(sheet) = Snapshot::new(&self.base).worksheet(selector)? else {
             return Ok(None);
         };
-        if sheet.kind() != WorksheetKind::Worksheet {
-            return Err(Error::NotWorksheet {
-                sheet: sheet.name().to_owned(),
-            });
-        }
         let position = sheet.position();
         let name = sheet.name().to_owned();
         if self.has_non_removal() {
@@ -1734,9 +1706,7 @@ impl Edit {
         T: TryInto<Name>,
         Error: From<T::Error>,
     {
-        if !self.removed.is_empty() {
-            return Err(self.remove_block(RemoveBlock::MixedEdit, "transaction"));
-        }
+        guard::no_removal(self, "transaction")?;
         let name = name.try_into().map_err(Error::from)?;
         let limit_position = self
             .base
@@ -1840,92 +1810,6 @@ impl Edit {
         self.active = Some(Target::Base(position));
     }
 
-    fn order_plan(&mut self) -> Result<&mut OrderPlan> {
-        if self.order.is_none() {
-            let len = self.base.inner.sheets.len();
-            let mut positions = Vec::new();
-            positions
-                .try_reserve_exact(len)
-                .map_err(|source| allocation("tab-order plan", source))?;
-            positions.extend(0..len);
-            self.order = Some(OrderPlan {
-                positions,
-                moves: Vec::new(),
-            });
-        }
-        self.order
-            .as_mut()
-            .ok_or_else(|| invalid("tab-order plan initialization failed"))
-    }
-
-    fn move_position(&mut self, identity: usize, to: usize) -> Result<()> {
-        let order = self.order_plan()?;
-        if to >= order.positions.len() {
-            return Err(invalid("tab move destination exceeds the workbook order"));
-        }
-        let from = order
-            .positions
-            .iter()
-            .position(|candidate| *candidate == identity)
-            .ok_or_else(|| invalid("selected tab disappeared from the pending order"))?;
-        if from == to {
-            return Ok(());
-        }
-        order
-            .moves
-            .try_reserve(1)
-            .map_err(|source| allocation("tab move", source))?;
-        let identity = order.positions.remove(from);
-        order.positions.insert(to, identity);
-        order.moves.push(MoveIntent {
-            sheet: identity,
-            from,
-            to,
-        });
-        Ok(())
-    }
-
-    fn move_relative(&mut self, identity: usize, anchor: usize, after: bool) -> Result<()> {
-        if identity == anchor {
-            return Ok(());
-        }
-        let order = self.order_plan()?;
-        let from = order
-            .positions
-            .iter()
-            .position(|candidate| *candidate == identity)
-            .ok_or_else(|| invalid("selected tab disappeared from the pending order"))?;
-        if !order.positions.contains(&anchor) {
-            return Err(invalid("anchor tab disappeared from the pending order"));
-        }
-        order
-            .moves
-            .try_reserve(1)
-            .map_err(|source| allocation("tab move", source))?;
-        let identity = order.positions.remove(from);
-        let anchor = order
-            .positions
-            .iter()
-            .position(|candidate| *candidate == anchor)
-            .ok_or_else(|| invalid("anchor tab disappeared during reorder"))?;
-        let to = if after {
-            anchor
-                .checked_add(1)
-                .ok_or_else(|| invalid("tab move position overflow"))?
-        } else {
-            anchor
-        };
-        order.positions.insert(to, identity);
-        if from != to {
-            order.moves.push(MoveIntent {
-                sheet: identity,
-                from,
-                to,
-            });
-        }
-        Ok(())
-    }
-
     fn conflicts_with(&self, other: &Self) -> ConflictSet {
         let mut conflicts = Vec::new();
         let removal_conflict = self
@@ -1990,8 +1874,7 @@ impl Edit {
             {
                 conflicts.push(Conflict::Name {
                     sheet: left.name.as_str().into(),
-                    position: self
-                        .projected_position(Target::Added(left_index))
+                    position: order::projected_position(self, Target::Added(left_index))
                         .unwrap_or_else(|| self.base.len().saturating_add(left_index)),
                 });
             }
@@ -2005,8 +1888,7 @@ impl Edit {
             }) {
                 conflicts.push(Conflict::Name {
                     sheet: right.name.as_str().into(),
-                    position: other
-                        .projected_position(Target::Added(right_index))
+                    position: order::projected_position(&other, Target::Added(right_index))
                         .unwrap_or_else(|| other.base.len().saturating_add(right_index)),
                 });
             }
@@ -2057,28 +1939,10 @@ impl Edit {
                     ranges: ranges.into_boxed_slice(),
                 });
             }
-            let mut addresses = Vec::new();
-            let mut left_cells = left.cells.iter().peekable();
-            let mut right_cells = right.cells.iter().peekable();
-            while let (Some((left_address, left_action)), Some((right_address, right_action))) =
-                (left_cells.peek(), right_cells.peek())
-            {
-                match left_address.cmp(right_address) {
-                    std::cmp::Ordering::Less => {
-                        left_cells.next();
-                    },
-                    std::cmp::Ordering::Greater => {
-                        right_cells.next();
-                    },
-                    std::cmp::Ordering::Equal => {
-                        if left_action.overlaps(right_action) {
-                            addresses.push(**left_address);
-                        }
-                        left_cells.next();
-                        right_cells.next();
-                    },
-                }
-            }
+            let addresses =
+                conflicts::overlapping_keys(&left.cells, &right.cells, |left, right| {
+                    left.overlaps(right)
+                });
             if !addresses.is_empty() {
                 conflicts.push(Conflict::Cells {
                     sheet: sheet.into(),
@@ -2087,17 +1951,9 @@ impl Edit {
                 });
             }
 
-            let rows = left
-                .rows
-                .iter()
-                .filter_map(|(row, action)| {
-                    right
-                        .rows
-                        .get(row)
-                        .is_some_and(|other| action.overlaps(*other))
-                        .then_some(*row)
-                })
-                .collect::<Vec<_>>();
+            let rows = conflicts::overlapping_keys(&left.rows, &right.rows, |left, right| {
+                left.overlaps(*right)
+            });
             if !rows.is_empty() {
                 conflicts.push(Conflict::Rows {
                     sheet: sheet.into(),
@@ -2106,17 +1962,10 @@ impl Edit {
                 });
             }
 
-            let columns = left
-                .columns
-                .iter()
-                .filter_map(|(column, action)| {
-                    right
-                        .columns
-                        .get(column)
-                        .is_some_and(|other| action.overlaps(*other))
-                        .then_some(*column)
-                })
-                .collect::<Vec<_>>();
+            let columns =
+                conflicts::overlapping_keys(&left.columns, &right.columns, |left, right| {
+                    left.overlaps(*right)
+                });
             if !columns.is_empty() {
                 conflicts.push(Conflict::Columns {
                     sheet: sheet.into(),
@@ -2131,7 +1980,7 @@ impl Edit {
     }
 
     fn target_context(&self, target: Target) -> (&str, usize) {
-        let projected = self.projected_position(target);
+        let projected = order::projected_position(self, target);
         match target {
             Target::Base(position) => (
                 self.base
@@ -2151,16 +2000,6 @@ impl Edit {
                 },
             ),
         }
-    }
-
-    fn projected_position(&self, target: Target) -> Option<usize> {
-        FinalOrder::plan(
-            self.base.len(),
-            self.order.as_ref().filter(|order| order.is_effective()),
-            &self.added,
-        )
-        .ok()?
-        .position(target)
     }
 
     pub(in crate::workbook::edit) fn has_non_removal(&self) -> bool {

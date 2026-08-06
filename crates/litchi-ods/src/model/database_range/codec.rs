@@ -1,0 +1,936 @@
+//! Namespace-aware XML parsing and serialization for database ranges.
+
+use super::{
+    semantic::{
+        Condition, ConditionSource, DataType, EmbeddedNumberBehavior, Expression, Field, Filter,
+        Key, Order, Orientation, Range, Rule, Rules, Sort, SortGroups, Source,
+    },
+    validation::{
+        FilterParent, MAX_FILTER_DEPTH, invalid, missing, unexpected_eof,
+        validate_database_range_collection, xml_error,
+    },
+};
+use litchi_core::{Error, Result, xml::escape_xml};
+use quick_xml::XmlVersion;
+use quick_xml::events::{BytesEnd, BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
+
+const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+
+trait HasLocalName {
+    fn has_local_name(&self, expected: &[u8]) -> bool;
+}
+
+impl HasLocalName for BytesStart<'_> {
+    fn has_local_name(&self, expected: &[u8]) -> bool {
+        self.local_name().as_ref() == expected
+    }
+}
+
+impl HasLocalName for BytesEnd<'_> {
+    fn has_local_name(&self, expected: &[u8]) -> bool {
+        self.local_name().as_ref() == expected
+    }
+}
+
+impl Orientation {
+    pub(super) fn parse(value: &str) -> Result<Self> {
+        match value {
+            "column" => Ok(Self::Column),
+            "row" => Ok(Self::Row),
+            _ => Err(invalid("table:orientation", value)),
+        }
+    }
+
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Column => "column",
+            Self::Row => "row",
+        }
+    }
+}
+
+impl Order {
+    pub(super) fn parse(value: &str) -> Result<Self> {
+        match value {
+            "ascending" => Ok(Self::Ascending),
+            "descending" => Ok(Self::Descending),
+            _ => Err(invalid("table:order", value)),
+        }
+    }
+
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Ascending => "ascending",
+            Self::Descending => "descending",
+        }
+    }
+}
+
+impl EmbeddedNumberBehavior {
+    pub(super) fn parse(value: &str) -> Result<Self> {
+        match value {
+            "alpha-numeric" => Ok(Self::AlphaNumeric),
+            "integer" => Ok(Self::Integer),
+            "double" => Ok(Self::Double),
+            _ => Err(invalid("table:embedded-number-behavior", value)),
+        }
+    }
+
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::AlphaNumeric => "alpha-numeric",
+            Self::Integer => "integer",
+            Self::Double => "double",
+        }
+    }
+}
+
+impl ConditionSource {
+    pub(super) fn parse(value: &str) -> Result<Self> {
+        match value {
+            "self" => Ok(Self::SelfContained),
+            "cell-range" => Ok(Self::CellRange),
+            _ => Err(invalid("table:condition-source", value)),
+        }
+    }
+
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::SelfContained => "self",
+            Self::CellRange => "cell-range",
+        }
+    }
+}
+
+impl DataType {
+    pub(super) fn parse(value: &str) -> Result<Self> {
+        match value {
+            "text" => Ok(Self::Text),
+            "number" => Ok(Self::Number),
+            _ => Err(invalid("table:data-type", value)),
+        }
+    }
+
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Text => "text",
+            Self::Number => "number",
+        }
+    }
+}
+
+pub(crate) fn parse_database_ranges(xml: &str) -> Result<Vec<Range>> {
+    if xml.len() > 64 * 1_048_576 {
+        return Err(Error::InvalidFormat(
+            "database-range XML exceeds 64 MiB".to_string(),
+        ));
+    }
+    let mut reader = NsReader::from_str(xml);
+    let mut buf = Vec::new();
+    let mut in_ranges = false;
+    let mut ranges = Vec::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buf)
+            .map_err(xml_error)?;
+        match event {
+            Event::Start(ref element) if is_table(&namespace, element, b"database-ranges") => {
+                in_ranges = true;
+            },
+            Event::Start(ref element)
+                if in_ranges && is_table(&namespace, element, b"database-range") =>
+            {
+                let range = parse_database_range(&mut reader, element)?;
+                range.validate()?;
+                ranges.push(range);
+            },
+            Event::Empty(ref element)
+                if in_ranges && is_table(&namespace, element, b"database-range") =>
+            {
+                let range = database_range_from_start(&reader, element)?;
+                range.validate()?;
+                ranges.push(range);
+            },
+            Event::End(ref element) if is_table(&namespace, element, b"database-ranges") => {
+                in_ranges = false;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buf.clear();
+    }
+    validate_database_range_collection(&ranges)?;
+    Ok(ranges)
+}
+
+fn parse_database_range(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Range> {
+    let mut range = database_range_from_start(reader, start)?;
+    let mut buf = Vec::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buf)
+            .map_err(xml_error)?;
+        match event {
+            Event::Start(ref element) | Event::Empty(ref element)
+                if is_table(&namespace, element, b"database-source-sql") =>
+            {
+                ensure_absent(&range.source, "database source")?;
+                range.source = Some(parse_source_sql(reader, element)?);
+            },
+            Event::Start(ref element) | Event::Empty(ref element)
+                if is_table(&namespace, element, b"database-source-table") =>
+            {
+                ensure_absent(&range.source, "database source")?;
+                range.source = Some(parse_source_table(reader, element)?);
+            },
+            Event::Start(ref element) | Event::Empty(ref element)
+                if is_table(&namespace, element, b"database-source-query") =>
+            {
+                ensure_absent(&range.source, "database source")?;
+                range.source = Some(parse_source_query(reader, element)?);
+            },
+            Event::Start(ref element) if is_table(&namespace, element, b"filter") => {
+                ensure_absent(&range.filter, "database filter")?;
+                range.filter = Some(parse_filter(reader, element)?);
+            },
+            Event::Empty(ref element) if is_table(&namespace, element, b"filter") => {
+                return Err(Error::InvalidFormat(
+                    "table:filter has no expression".to_string(),
+                ));
+            },
+            Event::Start(ref element) if is_table(&namespace, element, b"sort") => {
+                ensure_absent(&range.sort, "database sort")?;
+                range.sort = Some(parse_sort(reader, element)?);
+            },
+            Event::Empty(ref element) if is_table(&namespace, element, b"sort") => {
+                return Err(Error::InvalidFormat(
+                    "database sort requires at least one sort key".to_string(),
+                ));
+            },
+            Event::Start(ref element) if is_table(&namespace, element, b"subtotal-rules") => {
+                ensure_absent(&range.subtotals, "subtotal rules")?;
+                range.subtotals = Some(parse_subtotals(reader, element)?);
+            },
+            Event::Empty(ref element) if is_table(&namespace, element, b"subtotal-rules") => {
+                ensure_absent(&range.subtotals, "subtotal rules")?;
+                range.subtotals = Some(Rules::default());
+            },
+            Event::End(ref element) if is_table(&namespace, element, b"database-range") => break,
+            Event::Eof => return Err(unexpected_eof("table:database-range")),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(range)
+}
+
+fn database_range_from_start(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Range> {
+    let target = required_attr(reader, element, b"target-range-address")?;
+    Ok(Range {
+        name: optional_attr(reader, element, b"name")?,
+        is_selection: optional_bool(reader, element, b"is-selection")?,
+        on_update_keep_styles: optional_bool(reader, element, b"on-update-keep-styles")?,
+        on_update_keep_size: optional_bool(reader, element, b"on-update-keep-size")?,
+        has_persistent_data: optional_bool(reader, element, b"has-persistent-data")?,
+        orientation: optional_attr(reader, element, b"orientation")?
+            .map(|value| Orientation::parse(&value))
+            .transpose()?,
+        contains_header: optional_bool(reader, element, b"contains-header")?,
+        display_filter_buttons: optional_bool(reader, element, b"display-filter-buttons")?,
+        target_range_address: target,
+        refresh_delay: optional_attr(reader, element, b"refresh-delay")?,
+        source: None,
+        filter: None,
+        sort: None,
+        subtotals: None,
+    })
+}
+
+pub(crate) fn parse_source_sql(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<Source> {
+    let parse_statement = optional_bool(reader, element, b"parse-sql-statement")?
+        .or(optional_bool(reader, element, b"parse-sql-statements")?);
+    Ok(Source::Sql {
+        database_name: required_attr(reader, element, b"database-name")?,
+        statement: required_attr(reader, element, b"sql-statement")?,
+        parse_statement,
+    })
+}
+
+pub(crate) fn parse_source_table(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<Source> {
+    Ok(Source::Table {
+        database_name: required_attr(reader, element, b"database-name")?,
+        table_name: optional_attr(reader, element, b"database-table-name")?
+            .or(optional_attr(reader, element, b"table-name")?)
+            .ok_or_else(|| missing("table:database-table-name"))?,
+    })
+}
+
+pub(crate) fn parse_source_query(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<Source> {
+    Ok(Source::Query {
+        database_name: required_attr(reader, element, b"database-name")?,
+        query_name: required_attr(reader, element, b"query-name")?,
+    })
+}
+
+pub(crate) fn parse_filter(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Filter> {
+    let target_range_address = optional_attr(reader, start, b"target-range-address")?;
+    let condition_source = optional_attr(reader, start, b"condition-source")?
+        .map(|value| ConditionSource::parse(&value))
+        .transpose()?;
+    let condition_source_range_address =
+        optional_attr(reader, start, b"condition-source-range-address")?;
+    let display_duplicates = optional_bool(reader, start, b"display-duplicates")?;
+    let mut expression = None;
+    let mut buf = Vec::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buf)
+            .map_err(xml_error)?;
+        match event {
+            Event::Start(ref element) if is_table(&namespace, element, b"filter-condition") => {
+                ensure_absent(&expression, "filter root expression")?;
+                expression = Some(Expression::Condition(parse_condition(reader, element)?));
+            },
+            Event::Empty(ref element) if is_table(&namespace, element, b"filter-condition") => {
+                ensure_absent(&expression, "filter root expression")?;
+                expression = Some(Expression::Condition(condition_from_start(
+                    reader, element,
+                )?));
+            },
+            Event::Start(ref element) if is_table(&namespace, element, b"filter-and") => {
+                ensure_absent(&expression, "filter root expression")?;
+                expression = Some(parse_filter_group(reader, FilterParent::And, 1)?);
+            },
+            Event::Start(ref element) if is_table(&namespace, element, b"filter-or") => {
+                ensure_absent(&expression, "filter root expression")?;
+                expression = Some(parse_filter_group(reader, FilterParent::Or, 1)?);
+            },
+            Event::End(ref element) if is_table(&namespace, element, b"filter") => break,
+            Event::Eof => return Err(unexpected_eof("table:filter")),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(Filter {
+        target_range_address,
+        condition_source,
+        condition_source_range_address,
+        display_duplicates,
+        expression: expression
+            .ok_or_else(|| Error::InvalidFormat("table:filter has no expression".to_string()))?,
+    })
+}
+
+fn parse_filter_group(
+    reader: &mut NsReader<&[u8]>,
+    kind: FilterParent,
+    depth: usize,
+) -> Result<Expression> {
+    if depth > MAX_FILTER_DEPTH {
+        return Err(Error::InvalidFormat(
+            "filter expression exceeds the supported nesting limit".to_string(),
+        ));
+    }
+    let mut children = Vec::new();
+    let mut buf = Vec::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buf)
+            .map_err(xml_error)?;
+        match event {
+            Event::Start(ref element) if is_table(&namespace, element, b"filter-condition") => {
+                children.push(Expression::Condition(parse_condition(reader, element)?));
+            },
+            Event::Empty(ref element) if is_table(&namespace, element, b"filter-condition") => {
+                children.push(Expression::Condition(condition_from_start(
+                    reader, element,
+                )?));
+            },
+            Event::Start(ref element)
+                if kind == FilterParent::And && is_table(&namespace, element, b"filter-or") =>
+            {
+                children.push(parse_filter_group(reader, FilterParent::Or, depth + 1)?);
+            },
+            Event::Start(ref element)
+                if kind == FilterParent::Or && is_table(&namespace, element, b"filter-and") =>
+            {
+                children.push(parse_filter_group(reader, FilterParent::And, depth + 1)?);
+            },
+            Event::Start(ref element)
+                if is_table(&namespace, element, b"filter-and")
+                    || is_table(&namespace, element, b"filter-or") =>
+            {
+                return Err(Error::InvalidFormat(
+                    "ODF filter groups must alternate AND and OR operators".to_string(),
+                ));
+            },
+            Event::End(ref element)
+                if (kind == FilterParent::And && is_table(&namespace, element, b"filter-and"))
+                    || (kind == FilterParent::Or
+                        && is_table(&namespace, element, b"filter-or")) =>
+            {
+                break;
+            },
+            Event::Eof => return Err(unexpected_eof("filter boolean group")),
+            _ => {},
+        }
+        buf.clear();
+    }
+    if children.is_empty() {
+        return Err(Error::InvalidFormat(
+            "filter boolean group cannot be empty".to_string(),
+        ));
+    }
+    Ok(match kind {
+        FilterParent::And => Expression::And(children),
+        FilterParent::Or => Expression::Or(children),
+    })
+}
+
+fn parse_condition(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Condition> {
+    let mut condition = condition_from_start(reader, start)?;
+    let mut buf = Vec::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buf)
+            .map_err(xml_error)?;
+        match event {
+            Event::Empty(ref element) | Event::Start(ref element)
+                if is_table(&namespace, element, b"filter-set-item") =>
+            {
+                condition
+                    .set_items
+                    .push(required_attr(reader, element, b"value")?);
+            },
+            Event::End(ref element) if is_table(&namespace, element, b"filter-condition") => break,
+            Event::Eof => return Err(unexpected_eof("table:filter-condition")),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(condition)
+}
+
+fn condition_from_start(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Condition> {
+    Ok(Condition {
+        field_number: required_u64(reader, element, b"field-number")?,
+        value: required_attr(reader, element, b"value")?,
+        operator: required_attr(reader, element, b"operator")?,
+        case_sensitive: optional_bool(reader, element, b"case-sensitive")?,
+        data_type: optional_attr(reader, element, b"data-type")?
+            .map(|value| DataType::parse(&value))
+            .transpose()?,
+        set_items: Vec::new(),
+    })
+}
+
+fn parse_sort(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Sort> {
+    let mut sort = Sort {
+        bind_styles_to_content: optional_bool(reader, start, b"bind-styles-to-content")?,
+        target_range_address: optional_attr(reader, start, b"target-range-address")?,
+        case_sensitive: optional_bool(reader, start, b"case-sensitive")?,
+        language: optional_attr(reader, start, b"language")?,
+        country: optional_attr(reader, start, b"country")?,
+        script: optional_attr(reader, start, b"script")?,
+        rfc_language_tag: optional_attr(reader, start, b"rfc-language-tag")?,
+        algorithm: optional_attr(reader, start, b"algorithm")?,
+        embedded_number_behavior: optional_attr(reader, start, b"embedded-number-behavior")?
+            .map(|value| EmbeddedNumberBehavior::parse(&value))
+            .transpose()?,
+        keys: Vec::new(),
+    };
+    let mut buf = Vec::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buf)
+            .map_err(xml_error)?;
+        match event {
+            Event::Empty(ref element) | Event::Start(ref element)
+                if is_table(&namespace, element, b"sort-by") =>
+            {
+                sort.keys.push(Key {
+                    field_number: required_u64(reader, element, b"field-number")?,
+                    data_type: optional_attr(reader, element, b"data-type")?,
+                    order: optional_attr(reader, element, b"order")?
+                        .map(|value| Order::parse(&value))
+                        .transpose()?,
+                });
+            },
+            Event::End(ref element) if is_table(&namespace, element, b"sort") => break,
+            Event::Eof => return Err(unexpected_eof("table:sort")),
+            _ => {},
+        }
+        buf.clear();
+    }
+    if sort.keys.is_empty() {
+        return Err(Error::InvalidFormat(
+            "database sort requires at least one sort key".to_string(),
+        ));
+    }
+    Ok(sort)
+}
+
+fn parse_subtotals(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Rules> {
+    let mut subtotals = Rules {
+        bind_styles_to_content: optional_bool(reader, start, b"bind-styles-to-content")?,
+        case_sensitive: optional_bool(reader, start, b"case-sensitive")?,
+        page_breaks_on_group_change: optional_bool(reader, start, b"page-breaks-on-group-change")?,
+        sort_groups: None,
+        rules: Vec::new(),
+    };
+    let mut buf = Vec::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buf)
+            .map_err(xml_error)?;
+        match event {
+            Event::Empty(ref element) | Event::Start(ref element)
+                if is_table(&namespace, element, b"sort-groups") =>
+            {
+                ensure_absent(&subtotals.sort_groups, "subtotal sort-groups")?;
+                subtotals.sort_groups = Some(SortGroups {
+                    data_type: optional_attr(reader, element, b"data-type")?,
+                    order: optional_attr(reader, element, b"order")?
+                        .map(|value| Order::parse(&value))
+                        .transpose()?,
+                });
+            },
+            Event::Start(ref element) if is_table(&namespace, element, b"subtotal-rule") => {
+                subtotals.rules.push(parse_subtotal_rule(reader, element)?);
+            },
+            Event::Empty(ref element) if is_table(&namespace, element, b"subtotal-rule") => {
+                subtotals.rules.push(Rule {
+                    group_by_field_number: required_u64(reader, element, b"group-by-field-number")?,
+                    fields: Vec::new(),
+                });
+            },
+            Event::End(ref element) if is_table(&namespace, element, b"subtotal-rules") => break,
+            Event::Eof => return Err(unexpected_eof("table:subtotal-rules")),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(subtotals)
+}
+
+fn parse_subtotal_rule(reader: &mut NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<Rule> {
+    let mut rule = Rule {
+        group_by_field_number: required_u64(reader, start, b"group-by-field-number")?,
+        fields: Vec::new(),
+    };
+    let mut buf = Vec::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buf)
+            .map_err(xml_error)?;
+        match event {
+            Event::Empty(ref element) | Event::Start(ref element)
+                if is_table(&namespace, element, b"subtotal-field") =>
+            {
+                rule.fields.push(Field {
+                    field_number: required_u64(reader, element, b"field-number")?,
+                    function: required_attr(reader, element, b"function")?,
+                });
+            },
+            Event::End(ref element) if is_table(&namespace, element, b"subtotal-rule") => break,
+            Event::Eof => return Err(unexpected_eof("table:subtotal-rule")),
+            _ => {},
+        }
+        buf.clear();
+    }
+    Ok(rule)
+}
+
+pub(crate) fn write_database_ranges(output: &mut String, ranges: &[Range]) -> Result<()> {
+    validate_database_range_collection(ranges)?;
+    if ranges.is_empty() {
+        return Ok(());
+    }
+    output.push_str("<table:database-ranges>");
+    for range in ranges {
+        range.validate()?;
+        write_database_range(output, range);
+    }
+    output.push_str("</table:database-ranges>");
+    Ok(())
+}
+
+pub(crate) fn write_database_range_fragment(range: &Range) -> Result<String> {
+    range.validate()?;
+    let mut output = String::with_capacity(512);
+    output.push_str(
+        "<table:database-ranges xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\">",
+    );
+    write_database_range(&mut output, range);
+    output.push_str("</table:database-ranges>");
+    let start = output.find('>').expect("generated container") + 1;
+    let end = output
+        .rfind("</table:database-ranges>")
+        .expect("generated container end");
+    Ok(output[start..end].to_string())
+}
+
+fn write_database_range(output: &mut String, range: &Range) {
+    output.push_str("<table:database-range");
+    attr(output, "table:name", range.name.as_deref());
+    bool_attr(output, "table:is-selection", range.is_selection);
+    bool_attr(
+        output,
+        "table:on-update-keep-styles",
+        range.on_update_keep_styles,
+    );
+    bool_attr(
+        output,
+        "table:on-update-keep-size",
+        range.on_update_keep_size,
+    );
+    bool_attr(
+        output,
+        "table:has-persistent-data",
+        range.has_persistent_data,
+    );
+    attr(
+        output,
+        "table:orientation",
+        range.orientation.map(Orientation::as_str),
+    );
+    bool_attr(output, "table:contains-header", range.contains_header);
+    bool_attr(
+        output,
+        "table:display-filter-buttons",
+        range.display_filter_buttons,
+    );
+    attr(
+        output,
+        "table:target-range-address",
+        Some(&range.target_range_address),
+    );
+    attr(
+        output,
+        "table:refresh-delay",
+        range.refresh_delay.as_deref(),
+    );
+    if range.source.is_none()
+        && range.filter.is_none()
+        && range.sort.is_none()
+        && range.subtotals.is_none()
+    {
+        output.push_str("/>");
+        return;
+    }
+    output.push('>');
+    if let Some(source) = &range.source {
+        write_database_source(output, source);
+    }
+    if let Some(filter) = &range.filter {
+        write_filter(output, filter);
+    }
+    if let Some(sort) = &range.sort {
+        write_sort(output, sort);
+    }
+    if let Some(subtotals) = &range.subtotals {
+        write_subtotals(output, subtotals);
+    }
+    output.push_str("</table:database-range>");
+}
+
+pub(crate) fn write_database_source(output: &mut String, source: &Source) {
+    match source {
+        Source::Sql {
+            database_name,
+            statement,
+            parse_statement,
+        } => {
+            output.push_str("<table:database-source-sql");
+            attr(output, "table:database-name", Some(database_name));
+            attr(output, "table:sql-statement", Some(statement));
+            bool_attr(output, "table:parse-sql-statement", *parse_statement);
+        },
+        Source::Table {
+            database_name,
+            table_name,
+        } => {
+            output.push_str("<table:database-source-table");
+            attr(output, "table:database-name", Some(database_name));
+            attr(output, "table:database-table-name", Some(table_name));
+        },
+        Source::Query {
+            database_name,
+            query_name,
+        } => {
+            output.push_str("<table:database-source-query");
+            attr(output, "table:database-name", Some(database_name));
+            attr(output, "table:query-name", Some(query_name));
+        },
+    }
+    output.push_str("/>");
+}
+
+pub(crate) fn write_filter(output: &mut String, filter: &Filter) {
+    output.push_str("<table:filter");
+    attr(
+        output,
+        "table:target-range-address",
+        filter.target_range_address.as_deref(),
+    );
+    attr(
+        output,
+        "table:condition-source",
+        filter.condition_source.map(ConditionSource::as_str),
+    );
+    attr(
+        output,
+        "table:condition-source-range-address",
+        filter.condition_source_range_address.as_deref(),
+    );
+    bool_attr(
+        output,
+        "table:display-duplicates",
+        filter.display_duplicates,
+    );
+    output.push('>');
+    write_filter_expression(output, &filter.expression);
+    output.push_str("</table:filter>");
+}
+
+fn write_filter_expression(output: &mut String, expression: &Expression) {
+    match expression {
+        Expression::Condition(condition) => {
+            output.push_str("<table:filter-condition");
+            u64_attr(output, "table:field-number", condition.field_number);
+            attr(output, "table:value", Some(&condition.value));
+            attr(output, "table:operator", Some(&condition.operator));
+            bool_attr(output, "table:case-sensitive", condition.case_sensitive);
+            attr(
+                output,
+                "table:data-type",
+                condition.data_type.map(DataType::as_str),
+            );
+            if condition.set_items.is_empty() {
+                output.push_str("/>");
+            } else {
+                output.push('>');
+                for item in &condition.set_items {
+                    output.push_str("<table:filter-set-item");
+                    attr(output, "table:value", Some(item));
+                    output.push_str("/>");
+                }
+                output.push_str("</table:filter-condition>");
+            }
+        },
+        Expression::And(children) => {
+            output.push_str("<table:filter-and>");
+            children
+                .iter()
+                .for_each(|child| write_filter_expression(output, child));
+            output.push_str("</table:filter-and>");
+        },
+        Expression::Or(children) => {
+            output.push_str("<table:filter-or>");
+            children
+                .iter()
+                .for_each(|child| write_filter_expression(output, child));
+            output.push_str("</table:filter-or>");
+        },
+    }
+}
+
+fn write_sort(output: &mut String, sort: &Sort) {
+    output.push_str("<table:sort");
+    bool_attr(
+        output,
+        "table:bind-styles-to-content",
+        sort.bind_styles_to_content,
+    );
+    attr(
+        output,
+        "table:target-range-address",
+        sort.target_range_address.as_deref(),
+    );
+    bool_attr(output, "table:case-sensitive", sort.case_sensitive);
+    attr(output, "table:language", sort.language.as_deref());
+    attr(output, "table:country", sort.country.as_deref());
+    attr(output, "table:script", sort.script.as_deref());
+    attr(
+        output,
+        "table:rfc-language-tag",
+        sort.rfc_language_tag.as_deref(),
+    );
+    attr(output, "table:algorithm", sort.algorithm.as_deref());
+    attr(
+        output,
+        "table:embedded-number-behavior",
+        sort.embedded_number_behavior
+            .map(EmbeddedNumberBehavior::as_str),
+    );
+    output.push('>');
+    for key in &sort.keys {
+        output.push_str("<table:sort-by");
+        u64_attr(output, "table:field-number", key.field_number);
+        attr(output, "table:data-type", key.data_type.as_deref());
+        attr(output, "table:order", key.order.map(Order::as_str));
+        output.push_str("/>");
+    }
+    output.push_str("</table:sort>");
+}
+
+fn write_subtotals(output: &mut String, subtotals: &Rules) {
+    output.push_str("<table:subtotal-rules");
+    bool_attr(
+        output,
+        "table:bind-styles-to-content",
+        subtotals.bind_styles_to_content,
+    );
+    bool_attr(output, "table:case-sensitive", subtotals.case_sensitive);
+    bool_attr(
+        output,
+        "table:page-breaks-on-group-change",
+        subtotals.page_breaks_on_group_change,
+    );
+    if subtotals.sort_groups.is_none() && subtotals.rules.is_empty() {
+        output.push_str("/>");
+        return;
+    }
+    output.push('>');
+    if let Some(groups) = &subtotals.sort_groups {
+        output.push_str("<table:sort-groups");
+        attr(output, "table:data-type", groups.data_type.as_deref());
+        attr(output, "table:order", groups.order.map(Order::as_str));
+        output.push_str("/>");
+    }
+    for rule in &subtotals.rules {
+        output.push_str("<table:subtotal-rule");
+        u64_attr(
+            output,
+            "table:group-by-field-number",
+            rule.group_by_field_number,
+        );
+        if rule.fields.is_empty() {
+            output.push_str("/>");
+            continue;
+        }
+        output.push('>');
+        for field in &rule.fields {
+            output.push_str("<table:subtotal-field");
+            u64_attr(output, "table:field-number", field.field_number);
+            attr(output, "table:function", Some(&field.function));
+            output.push_str("/>");
+        }
+        output.push_str("</table:subtotal-rule>");
+    }
+    output.push_str("</table:subtotal-rules>");
+}
+
+fn optional_attr(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    local_name: &[u8],
+) -> Result<Option<String>> {
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| {
+            Error::InvalidFormat(format!("invalid database-range attribute: {error}"))
+        })?;
+        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == TABLE_NAMESPACE)
+            && local.as_ref() == local_name
+        {
+            return attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .map(|value| Some(value.into_owned()))
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("invalid database-range attribute value: {error}"))
+                });
+        }
+    }
+    Ok(None)
+}
+
+fn required_attr(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    local_name: &[u8],
+) -> Result<String> {
+    optional_attr(reader, element, local_name)?
+        .ok_or_else(|| missing(&format!("table:{}", String::from_utf8_lossy(local_name))))
+}
+
+fn optional_bool(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    local_name: &[u8],
+) -> Result<Option<bool>> {
+    optional_attr(reader, element, local_name)?
+        .map(|value| match value.as_str() {
+            "true" | "1" => Ok(true),
+            "false" | "0" => Ok(false),
+            _ => Err(invalid(
+                &format!("table:{}", String::from_utf8_lossy(local_name)),
+                &value,
+            )),
+        })
+        .transpose()
+}
+
+fn required_u64(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    local_name: &[u8],
+) -> Result<u64> {
+    let value = required_attr(reader, element, local_name)?;
+    value.parse().map_err(|_| {
+        invalid(
+            &format!("table:{}", String::from_utf8_lossy(local_name)),
+            &value,
+        )
+    })
+}
+
+fn is_table(namespace: &ResolveResult<'_>, element: &impl HasLocalName, local: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == TABLE_NAMESPACE)
+        && element.has_local_name(local)
+}
+
+fn ensure_absent<T>(value: &Option<T>, what: &str) -> Result<()> {
+    if value.is_some() {
+        Err(Error::InvalidFormat(format!("duplicate {what}")))
+    } else {
+        Ok(())
+    }
+}
+
+fn attr(output: &mut String, name: &str, value: Option<&str>) {
+    if let Some(value) = value {
+        output.push(' ');
+        output.push_str(name);
+        output.push_str("=\"");
+        output.push_str(&escape_xml(value));
+        output.push('"');
+    }
+}
+
+fn bool_attr(output: &mut String, name: &str, value: Option<bool>) {
+    attr(
+        output,
+        name,
+        value.map(|value| if value { "true" } else { "false" }),
+    );
+}
+
+fn u64_attr(output: &mut String, name: &str, value: u64) {
+    output.push(' ');
+    output.push_str(name);
+    output.push_str("=\"");
+    output.push_str(&value.to_string());
+    output.push('"');
+}

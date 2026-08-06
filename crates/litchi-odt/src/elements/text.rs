@@ -3,12 +3,25 @@
 //! This module provides classes for text elements like paragraphs, spans,
 //! headings, and other text content elements.
 
+mod codec;
+mod model;
+mod validation;
+
 use super::element::{Element, ElementBase};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
+
+pub use codec::Elements;
+pub use model::{Block, Kind, LinkActuate, LinkShow};
+
+/// Compatibility facade for the historic text-element collection name.
+pub type TextElements = Elements;
+
+/// Internal name retained for the decoder's block slots.
+pub(crate) type TextBlock = Block;
 
 const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
@@ -325,57 +338,13 @@ pub struct Hyperlink {
     element: Element,
 }
 
-/// Allowed `xlink:show` values for an ODF `text:a` hyperlink.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TextHyperlinkShow {
-    /// Open the target in a new frame or window.
-    New,
-    /// Replace the current frame or window.
-    Replace,
-}
+/// Historic prefixed alias retained for callers that already use the ODT
+/// facade.  New code should use [`LinkShow`] inside this text context.
+pub type TextHyperlinkShow = LinkShow;
 
-impl TextHyperlinkShow {
-    /// Return the ODF/XLink lexical value.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::New => "new",
-            Self::Replace => "replace",
-        }
-    }
-
-    /// Parse an ODF/XLink lexical value.
-    pub fn parse(value: &str) -> Option<Self> {
-        match value {
-            "new" => Some(Self::New),
-            "replace" => Some(Self::Replace),
-            _ => None,
-        }
-    }
-}
-
-/// Allowed explicit `xlink:actuate` value for an ODF `text:a` hyperlink.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TextHyperlinkActuate {
-    /// Activate the target only on an explicit user request.
-    OnRequest,
-}
-
-impl TextHyperlinkActuate {
-    /// Return the ODF/XLink lexical value.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::OnRequest => "onRequest",
-        }
-    }
-
-    /// Parse an ODF/XLink lexical value.
-    pub fn parse(value: &str) -> Option<Self> {
-        match value {
-            "onRequest" => Some(Self::OnRequest),
-            _ => None,
-        }
-    }
-}
+/// Historic prefixed alias retained for callers that already use the ODT
+/// facade.  New code should use [`LinkActuate`] inside this text context.
+pub type TextHyperlinkActuate = LinkActuate;
 
 impl Default for Hyperlink {
     fn default() -> Self {
@@ -397,7 +366,7 @@ impl Hyperlink {
     /// Create a validated simple hyperlink with visible text.
     pub fn with_href(href: impl AsRef<str>, text: impl AsRef<str>) -> Result<Self> {
         let href = href.as_ref();
-        validate_href(href)?;
+        validation::href(href)?;
         let mut hyperlink = Self::new();
         hyperlink.set_href(href);
         hyperlink.set_text(text.as_ref());
@@ -477,14 +446,14 @@ impl Hyperlink {
     ///
     /// Returns `None` when the attribute is absent or malformed; use
     /// [`Self::validate`] to distinguish those cases.
-    pub fn show(&self) -> Option<TextHyperlinkShow> {
+    pub fn show(&self) -> Option<LinkShow> {
         self.element
             .get_attribute("xlink:show")
-            .and_then(TextHyperlinkShow::parse)
+            .and_then(LinkShow::parse)
     }
 
     /// Set or omit the XLink display behavior (`xlink:show`).
-    pub fn set_show(&mut self, show: Option<TextHyperlinkShow>) {
+    pub fn set_show(&mut self, show: Option<LinkShow>) {
         match show {
             Some(show) => self.element.set_attribute("xlink:show", show.as_str()),
             None => self.element.remove_attribute("xlink:show"),
@@ -495,14 +464,14 @@ impl Hyperlink {
     ///
     /// Returns `None` when the attribute is absent or malformed; use
     /// [`Self::validate`] to distinguish those cases.
-    pub fn actuate(&self) -> Option<TextHyperlinkActuate> {
+    pub fn actuate(&self) -> Option<LinkActuate> {
         self.element
             .get_attribute("xlink:actuate")
-            .and_then(TextHyperlinkActuate::parse)
+            .and_then(LinkActuate::parse)
     }
 
     /// Set or omit the explicit XLink activation behavior (`xlink:actuate`).
-    pub fn set_actuate(&mut self, actuate: Option<TextHyperlinkActuate>) {
+    pub fn set_actuate(&mut self, actuate: Option<LinkActuate>) {
         match actuate {
             Some(actuate) => self
                 .element
@@ -534,86 +503,8 @@ impl Hyperlink {
 
     /// Validate attributes required for safe authoring of an ODF `text:a`.
     pub fn validate(&self) -> Result<()> {
-        let href = self.href().ok_or_else(|| {
-            Error::InvalidFormat("text:a hyperlink requires xlink:href".to_string())
-        })?;
-        validate_href(href)?;
-        match self.link_type() {
-            Some("simple") => {},
-            None => {
-                return Err(Error::InvalidFormat(
-                    "text:a hyperlink requires xlink:type='simple'".to_string(),
-                ));
-            },
-            Some(value) => {
-                return Err(Error::InvalidFormat(format!(
-                    "text:a hyperlink xlink:type must be 'simple', got '{value}'"
-                )));
-            },
-        }
-        if self
-            .element
-            .get_attribute("xlink:show")
-            .is_some_and(|value| TextHyperlinkShow::parse(value).is_none())
-        {
-            return Err(Error::InvalidFormat(
-                "text:a hyperlink xlink:show must be 'new' or 'replace'".to_string(),
-            ));
-        }
-        if self
-            .element
-            .get_attribute("xlink:actuate")
-            .is_some_and(|value| TextHyperlinkActuate::parse(value).is_none())
-        {
-            return Err(Error::InvalidFormat(
-                "text:a hyperlink xlink:actuate must be 'onRequest'".to_string(),
-            ));
-        }
-        for (attribute, label) in [
-            ("office:name", "text:a hyperlink name"),
-            ("office:title", "text:a hyperlink title"),
-            (
-                "office:target-frame-name",
-                "text:a hyperlink target frame name",
-            ),
-            ("text:style-name", "text:a hyperlink style name"),
-            (
-                "text:visited-style-name",
-                "text:a hyperlink visited style name",
-            ),
-        ] {
-            if let Some(value) = self.element.get_attribute(attribute) {
-                validate_xml_string(value, label)?;
-            }
-        }
-        Ok(())
+        validation::hyperlink(&self.element)
     }
-}
-
-fn validate_href(href: &str) -> Result<()> {
-    if href.is_empty() {
-        return Err(Error::InvalidFormat(
-            "text:a hyperlink href must not be empty".to_string(),
-        ));
-    }
-    if href.chars().any(|character| character.is_control()) {
-        return Err(Error::InvalidFormat(
-            "text:a hyperlink href must not contain control characters".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_xml_string(value: &str, label: &str) -> Result<()> {
-    if value
-        .chars()
-        .any(|character| matches!(character, '\0'..='\x08' | '\x0B'..='\x0C' | '\x0E'..='\x1F'))
-    {
-        return Err(Error::InvalidFormat(format!(
-            "{label} must not contain XML control characters"
-        )));
-    }
-    Ok(())
 }
 
 impl From<Hyperlink> for Element {
@@ -1001,72 +892,6 @@ impl From<PageBreak> for Element {
     fn from(pb: PageBreak) -> Element {
         pb.element
     }
-}
-
-/// Collection of text elements for easy parsing
-pub struct TextElements;
-
-impl TextElements {
-    /// Parse all paragraphs from an XML reader
-    pub fn parse_paragraphs(xml_content: &str) -> Result<Vec<Paragraph>> {
-        parse_text_blocks(xml_content).map(|blocks| {
-            blocks
-                .into_iter()
-                .filter_map(|block| match block {
-                    TextBlock::Paragraph(paragraph) => Some(paragraph),
-                    TextBlock::Heading(_) => None,
-                })
-                .collect()
-        })
-    }
-
-    /// Parse all headings from XML content
-    #[allow(dead_code)]
-    pub fn parse_headings(xml_content: &str) -> Result<Vec<Heading>> {
-        parse_text_blocks(xml_content).map(|blocks| {
-            blocks
-                .into_iter()
-                .filter_map(|block| match block {
-                    TextBlock::Paragraph(_) => None,
-                    TextBlock::Heading(heading) => Some(heading),
-                })
-                .collect()
-        })
-    }
-
-    /// Extract all text content from XML with improved handling of nested elements.
-    ///
-    /// This method finds paragraphs and headings by namespace URI, including those
-    /// nested in lists, sections, and text boxes. It preserves inline mixed content,
-    /// XML entities and CDATA, plus ODF spaces, tabs, and line breaks. Stored tracked
-    /// change definitions are excluded from visible text.
-    ///
-    /// # Arguments
-    ///
-    /// * `xml_content` - The XML content to extract text from
-    ///
-    /// # Returns
-    ///
-    /// Extracted plain text with paragraph breaks preserved
-    pub fn extract_text(xml_content: &str) -> Result<String> {
-        let mut output = String::new();
-        for (index, block) in parse_text_blocks(xml_content)?.into_iter().enumerate() {
-            let block_text = match block {
-                TextBlock::Paragraph(paragraph) => paragraph.text()?,
-                TextBlock::Heading(heading) => heading.text()?,
-            };
-            if index > 0 {
-                output.push('\n');
-            }
-            output.push_str(&block_text);
-        }
-        Ok(output)
-    }
-}
-
-pub(crate) enum TextBlock {
-    Paragraph(Paragraph),
-    Heading(Heading),
 }
 
 struct ActiveTextBlock {
@@ -1771,6 +1596,21 @@ mod tests {
         assert_eq!(headings[0].level(), Some(1));
         assert_eq!(headings[0].text().unwrap(), "Heading 1");
         assert_eq!(headings[1].level(), Some(2));
+    }
+
+    #[test]
+    fn typed_codec_blocks_expose_contextual_semantics() {
+        let xml = r#"<office:text xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+            <text:h text:outline-level="1">Heading</text:h>
+            <text:p>Body</text:p>
+        </office:text>"#;
+
+        let blocks = Elements::parse(xml).unwrap();
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].kind(), Kind::Heading);
+        assert_eq!(blocks[0].as_heading().unwrap().text().unwrap(), "Heading");
+        assert_eq!(blocks[1].kind(), Kind::Paragraph);
+        assert_eq!(blocks[1].as_paragraph().unwrap().text().unwrap(), "Body");
     }
 
     #[test]

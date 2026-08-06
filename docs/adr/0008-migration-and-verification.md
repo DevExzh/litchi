@@ -5533,6 +5533,33 @@ These changes are specification-backed migration evidence for `[MS-DOC]`,
 DrawingML/OOXML. They do not claim complete format conformance or runtime
 control execution.
 
+## Layered ODF/OOXML owner continuation and common object snapshots
+
+The next migration wave keeps the same contextual hierarchy while moving
+another set of dense owners behind thin facades. ODT document and text-element
+owners, ODS database ranges and table-template styles, and ODP parser XML and
+authoring builders now separate semantic state, XML/package codecs, validation,
+and focused tests. DOC OLE metadata, PPT animation timing, and XLS differential
+formats follow the same shape for the legacy binary owners.
+
+The OOXML owners receive the corresponding glossary, animation, modern-comment,
+XLSB formula/resolution, XLSX worksheet-snapshot, and XLSX workbook-transaction
+seams. Their public types remain contextual and prefix-free; moving a file does
+not create a second compatibility facade or duplicate a format-specific wire
+grammar.
+
+`litchi-ole-common::object` now also exposes an immutable `Snapshot`. Snapshot
+clones share captured CFB stream allocations and create independent editors,
+so DOC/PPT/XLS hosts can retain read state without copying large embedded
+payloads. Format-owned metadata remains opaque in the common layer, while
+semantic interpretation stays in the owning format crate.
+
+The affected all-target check and lint-capped library matrix pass after the
+migration. Focused evidence includes the common OLE object/property/toolbar
+suites, ODP authoring/parser tests, ODT and OOXML owner suites, and DOC/PPT/XLS
+integration tests. This is bounded topology and regression evidence, not a
+claim of complete ODF, OOXML, or `[MS-DOC]`/`[MS-PPT]`/`[MS-XLS]` conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

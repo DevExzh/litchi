@@ -1,73 +1,17 @@
-//! BIFF8 global differential formats (`DXF`) and formatting properties (`XFProps`).
+//! BIFF8 wire codec for DXF and XFProp payloads.
+//!
+//! This module owns all byte-level parsing and emission. The parent module
+//! remains the semantic facade exposed to the rest of the XLS crate.
 
+use super::validation::validate_unit_interval;
 use super::{
-    BorderStyle, Error, FillPattern, FontCharset, FontEscapement, FontFamily, FontUnderline,
-    HorizontalAlignment, ReadingOrder, Result, TextRotation, VerticalAlignment,
+    BorderStyle, DXF_RECORD_TYPE, DifferentialFormat, Error, FIXED_PAYLOAD_LEN, FRT_HEADER_LEN,
+    FillPattern, FontCharset, FontEscapement, FontFamily, FontUnderline, HorizontalAlignment,
+    MAX_BIFF8_PAYLOAD_LEN, MAX_XF_PROPERTIES, ReadingOrder, Result, TextRotation, ThemeColor,
+    VerticalAlignment, XfBorder, XfColor, XfColorSource, XfFontScheme, XfFontWeight, XfGradient,
+    XfGradientStop, XfProperties, XfProperty, invalid, read_bytes, read_f64, read_i16, read_u8,
+    read_u16, read_u32,
 };
-
-pub(crate) const DXF_RECORD_TYPE: u16 = 0x088D;
-const FRT_HEADER_LEN: usize = 12;
-const FIXED_PAYLOAD_LEN: usize = FRT_HEADER_LEN + 2 + 4;
-const MAX_BIFF8_PAYLOAD_LEN: usize = 8_224;
-const MAX_XF_PROPERTIES: usize = 2_048;
-
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidRecord {
-        record_type: DXF_RECORD_TYPE,
-        message: message.into(),
-    }
-}
-
-fn read_bytes<const N: usize>(data: &[u8], offset: usize, field: &str) -> Result<[u8; N]> {
-    let end = offset
-        .checked_add(N)
-        .ok_or_else(|| invalid(format!("truncated {field}")))?;
-    let bytes = data
-        .get(offset..end)
-        .ok_or_else(|| invalid(format!("truncated {field}")))?;
-    bytes
-        .try_into()
-        .map_err(|_| invalid(format!("truncated {field}")))
-}
-
-fn read_u8(data: &[u8], offset: usize, field: &str) -> Result<u8> {
-    data.get(offset)
-        .copied()
-        .ok_or_else(|| invalid(format!("truncated {field}")))
-}
-
-fn read_u16(data: &[u8], offset: usize, field: &str) -> Result<u16> {
-    Ok(u16::from_le_bytes(read_bytes::<2>(data, offset, field)?))
-}
-
-fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
-    Ok(u32::from_le_bytes(read_bytes::<4>(data, offset, field)?))
-}
-
-fn read_i16(data: &[u8], offset: usize, field: &str) -> Result<i16> {
-    Ok(read_u16(data, offset, field)? as i16)
-}
-
-fn read_f64(data: &[u8], offset: usize, field: &str) -> Result<f64> {
-    Ok(f64::from_le_bytes(read_bytes::<8>(data, offset, field)?))
-}
-
-/// A theme color slot used by an extended formatting property.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ThemeColor {
-    Dark1,
-    Light1,
-    Dark2,
-    Light2,
-    Accent1,
-    Accent2,
-    Accent3,
-    Accent4,
-    Accent5,
-    Accent6,
-    Hyperlink,
-    FollowedHyperlink,
-}
 
 impl ThemeColor {
     fn from_byte(value: u8) -> Result<Self> {
@@ -88,7 +32,7 @@ impl ThemeColor {
         }
     }
 
-    const fn to_byte(self) -> u8 {
+    pub(super) const fn to_byte(self) -> u8 {
         match self {
             Self::Dark1 => 0,
             Self::Light1 => 1,
@@ -106,58 +50,7 @@ impl ThemeColor {
     }
 }
 
-/// The source used to resolve an extended formatting color.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XfColorSource {
-    Automatic,
-    Indexed(u8),
-    Rgb,
-    Theme(ThemeColor),
-    NotSet,
-}
-
-/// An `XFPropColor`, including its resolved RGBA cache and tint.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct XfColor {
-    source: XfColorSource,
-    tint: i16,
-    rgba: [u8; 4],
-    ignored_index: u8,
-}
-
 impl XfColor {
-    pub fn try_new(source: XfColorSource, tint: i16, rgba: [u8; 4]) -> Result<Self> {
-        if tint == i16::MIN {
-            return Err(invalid("XFPropColor tint cannot equal -32768"));
-        }
-        if let XfColorSource::Indexed(index) = source
-            && !matches!(index, 0..=65 | 72)
-        {
-            return Err(invalid(format!("invalid indexed XF color {index}")));
-        }
-        let ignored_index = match source {
-            XfColorSource::Indexed(index) => index,
-            XfColorSource::Theme(theme) => theme.to_byte(),
-            _ => 0,
-        };
-        Ok(Self {
-            source,
-            tint,
-            rgba,
-            ignored_index,
-        })
-    }
-
-    pub const fn source(&self) -> XfColorSource {
-        self.source
-    }
-    pub const fn tint(&self) -> i16 {
-        self.tint
-    }
-    pub const fn rgba(&self) -> [u8; 4] {
-        self.rgba
-    }
-
     pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != 8 {
             return Err(invalid(format!(
@@ -210,85 +103,7 @@ impl XfColor {
     }
 }
 
-/// Border formatting stored by an `XFProp`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct XfBorder {
-    color: XfColor,
-    style: BorderStyle,
-}
-
-impl XfBorder {
-    pub const fn new(color: XfColor, style: BorderStyle) -> Self {
-        Self { color, style }
-    }
-    pub const fn color(&self) -> XfColor {
-        self.color
-    }
-    pub const fn style(&self) -> BorderStyle {
-        self.style
-    }
-}
-
-/// Gradient fill parameters stored by an `XFProp`.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct XfGradient {
-    rectangular: bool,
-    degree: f64,
-    fill_to_left: f64,
-    fill_to_right: f64,
-    fill_to_top: f64,
-    fill_to_bottom: f64,
-}
-
 impl XfGradient {
-    pub fn linear(degree: f64) -> Result<Self> {
-        if !degree.is_finite() {
-            return Err(invalid("linear gradient degree must be finite"));
-        }
-        Ok(Self {
-            rectangular: false,
-            degree,
-            fill_to_left: 0.0,
-            fill_to_right: 0.0,
-            fill_to_top: 0.0,
-            fill_to_bottom: 0.0,
-        })
-    }
-
-    pub fn rectangular(left: f64, right: f64, top: f64, bottom: f64) -> Result<Self> {
-        validate_unit_interval(left, "left")?;
-        validate_unit_interval(right, "right")?;
-        validate_unit_interval(top, "top")?;
-        validate_unit_interval(bottom, "bottom")?;
-        Ok(Self {
-            rectangular: true,
-            degree: 0.0,
-            fill_to_left: left,
-            fill_to_right: right,
-            fill_to_top: top,
-            fill_to_bottom: bottom,
-        })
-    }
-
-    pub const fn is_rectangular(&self) -> bool {
-        self.rectangular
-    }
-    pub const fn degree(&self) -> f64 {
-        self.degree
-    }
-    pub const fn fill_to_left(&self) -> f64 {
-        self.fill_to_left
-    }
-    pub const fn fill_to_right(&self) -> f64 {
-        self.fill_to_right
-    }
-    pub const fn fill_to_top(&self) -> f64 {
-        self.fill_to_top
-    }
-    pub const fn fill_to_bottom(&self) -> f64 {
-        self.fill_to_bottom
-    }
-
     pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != 44 {
             return Err(invalid(format!(
@@ -333,39 +148,7 @@ impl XfGradient {
     }
 }
 
-fn validate_unit_interval(value: f64, field: &str) -> Result<()> {
-    if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-        return Err(invalid(format!(
-            "gradient {field} coordinate must be between 0.0 and 1.0"
-        )));
-    }
-    Ok(())
-}
-
-/// One color stop in an extended gradient fill.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct XfGradientStop {
-    position: f64,
-    color: XfColor,
-    unused: u16,
-}
-
 impl XfGradientStop {
-    pub fn try_new(position: f64, color: XfColor) -> Result<Self> {
-        validate_unit_interval(position, "stop")?;
-        Ok(Self {
-            position,
-            color,
-            unused: 0,
-        })
-    }
-    pub const fn position(&self) -> f64 {
-        self.position
-    }
-    pub const fn color(&self) -> XfColor {
-        self.color
-    }
-
     pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() != 18 {
             return Err(invalid(format!(
@@ -387,71 +170,6 @@ impl XfGradientStop {
         output.extend_from_slice(&self.position.to_le_bytes());
         self.color.write_to(output);
     }
-}
-
-/// Font weight stored by an extended formatting property.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XfFontWeight {
-    Normal,
-    Bold,
-}
-
-/// Theme-font scheme stored by an extended formatting property.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum XfFontScheme {
-    None,
-    Major,
-    Minor,
-    NotSpecified,
-}
-
-/// One typed entry in an `XFProps` array.
-#[derive(Debug, Clone, PartialEq)]
-pub enum XfProperty {
-    FillPattern(FillPattern),
-    ForegroundColor(XfColor),
-    BackgroundColor(XfColor),
-    Gradient(XfGradient),
-    GradientStop(XfGradientStop),
-    TextColor(XfColor),
-    TopBorder(XfBorder),
-    BottomBorder(XfBorder),
-    LeftBorder(XfBorder),
-    RightBorder(XfBorder),
-    DiagonalBorder(XfBorder),
-    VerticalBorder(XfBorder),
-    HorizontalBorder(XfBorder),
-    DiagonalUp(bool),
-    DiagonalDown(bool),
-    /// `None` represents the specification's explicit "alignment not specified" value.
-    HorizontalAlignment(Option<HorizontalAlignment>),
-    VerticalAlignment(VerticalAlignment),
-    TextRotation(TextRotation),
-    AbsoluteIndent(u16),
-    ReadingOrder(ReadingOrder),
-    WrapText(bool),
-    JustifyDistributed(bool),
-    ShrinkToFit(bool),
-    Merged(bool),
-    FontName(String),
-    FontWeight(XfFontWeight),
-    FontUnderline(FontUnderline),
-    FontEscapement(FontEscapement),
-    FontItalic(bool),
-    FontStrikethrough(bool),
-    FontOutline(bool),
-    FontShadow(bool),
-    FontCondensed(bool),
-    FontExtended(bool),
-    FontCharset(FontCharset),
-    FontFamily(FontFamily),
-    FontSizeTwips(u32),
-    FontScheme(XfFontScheme),
-    NumberFormatCode(String),
-    NumberFormatId(u16),
-    RelativeIndent(Option<i16>),
-    Locked(bool),
-    Hidden(bool),
 }
 
 impl XfProperty {
@@ -685,7 +403,7 @@ impl XfProperty {
         }
     }
 
-    fn data_bytes(&self) -> Result<Vec<u8>> {
+    pub(crate) fn data_bytes(&self) -> Result<Vec<u8>> {
         let mut data = Vec::new();
         match self {
             Self::FillPattern(value) => data.push(fill_pattern_byte(*value)),
@@ -775,27 +493,7 @@ impl XfProperty {
     }
 }
 
-/// The complete ordered formatting-property array embedded in a DXF.
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct XfProperties {
-    properties: Vec<XfProperty>,
-}
-
 impl XfProperties {
-    pub fn try_new(properties: Vec<XfProperty>) -> Result<Self> {
-        let value = Self { properties };
-        value.validate()?;
-        Ok(value)
-    }
-
-    pub fn properties(&self) -> &[XfProperty] {
-        &self.properties
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.properties.is_empty()
-    }
-
     pub(crate) fn parse(data: &[u8]) -> Result<Self> {
         if data.len() < 4 {
             return Err(invalid("truncated XFProps header"));
@@ -842,54 +540,8 @@ impl XfProperties {
         Self::try_new(properties)
     }
 
-    fn validate(&self) -> Result<()> {
-        if self.properties.len() > MAX_XF_PROPERTIES || self.properties.len() > u16::MAX as usize {
-            return Err(invalid(format!(
-                "XFProps count exceeds resource cap {MAX_XF_PROPERTIES}"
-            )));
-        }
-        let has_pattern = self
-            .properties
-            .iter()
-            .any(|property| matches!(property, XfProperty::FillPattern(_)));
-        let has_gradient = self.properties.iter().any(|property| {
-            matches!(
-                property,
-                XfProperty::Gradient(_) | XfProperty::GradientStop(_)
-            )
-        });
-        if has_pattern && has_gradient {
-            return Err(invalid(
-                "XFProps cannot combine pattern-fill and gradient properties",
-            ));
-        }
-        let mut preceding_gradient = false;
-        let mut distributed = false;
-        let mut horizontal_distributed = false;
-        for property in &self.properties {
-            match property {
-                XfProperty::Gradient(_) => preceding_gradient = true,
-                XfProperty::GradientStop(_) if !preceding_gradient => {
-                    return Err(invalid("gradient stop has no preceding gradient property"));
-                },
-                XfProperty::JustifyDistributed(true) => distributed = true,
-                XfProperty::HorizontalAlignment(Some(HorizontalAlignment::Distributed)) => {
-                    horizontal_distributed = true;
-                },
-                _ => {},
-            }
-            property.data_bytes()?;
-        }
-        if distributed && !horizontal_distributed {
-            return Err(invalid(
-                "justify-distributed requires distributed horizontal alignment",
-            ));
-        }
-        Ok(())
-    }
-
     pub(crate) fn to_bytes(&self) -> Result<Vec<u8>> {
-        self.validate()?;
+        super::validation::validate_properties(self)?;
         let mut data = Vec::new();
         data.extend_from_slice(&0u16.to_le_bytes());
         let property_count = u16::try_from(self.properties.len())
@@ -910,32 +562,7 @@ impl XfProperties {
     }
 }
 
-/// A global BIFF8 differential format referenced by table-style elements.
-#[derive(Debug, Clone, PartialEq)]
-pub struct DifferentialFormat {
-    new_border: bool,
-    properties: XfProperties,
-    unused_flags: u16,
-}
-
 impl DifferentialFormat {
-    pub fn try_new(new_border: bool, properties: Vec<XfProperty>) -> Result<Self> {
-        let value = Self {
-            new_border,
-            properties: XfProperties::try_new(properties)?,
-            unused_flags: 0,
-        };
-        value.validate()?;
-        Ok(value)
-    }
-
-    pub const fn has_new_border(&self) -> bool {
-        self.new_border
-    }
-    pub fn properties(&self) -> &XfProperties {
-        &self.properties
-    }
-
     pub fn parse_payload(data: &[u8]) -> Result<Self> {
         if !(FIXED_PAYLOAD_LEN..=MAX_BIFF8_PAYLOAD_LEN).contains(&data.len()) {
             return Err(invalid(format!(
@@ -956,12 +583,12 @@ impl DifferentialFormat {
                     .ok_or_else(|| invalid("truncated DXF properties"))?,
             )?,
         };
-        value.validate()?;
+        super::validation::validate_format(&value)?;
         Ok(value)
     }
 
     pub fn to_payload(&self) -> Result<Vec<u8>> {
-        self.validate()?;
+        super::validation::validate_format(self)?;
         let properties = self.properties.to_bytes()?;
         let size = FRT_HEADER_LEN
             .checked_add(2)
@@ -991,21 +618,6 @@ impl DifferentialFormat {
         data.extend_from_slice(&payload_len.to_le_bytes());
         data.extend_from_slice(&payload);
         Ok(data)
-    }
-
-    fn validate(&self) -> Result<()> {
-        self.properties.validate()?;
-        if !self.new_border
-            && self.properties.properties.iter().any(|property| {
-                matches!(
-                    property,
-                    XfProperty::VerticalBorder(_) | XfProperty::HorizontalBorder(_)
-                )
-            })
-        {
-            return Err(invalid("internal border properties require fNewBorder"));
-        }
-        Ok(())
     }
 }
 
@@ -1379,7 +991,7 @@ fn write_lp_wide_string(value: &str, data: &mut Vec<u8>) -> Result<()> {
     Ok(())
 }
 
-fn parse_number_format_code(data: &[u8]) -> Result<String> {
+pub(crate) fn parse_number_format_code(data: &[u8]) -> Result<String> {
     if data.len() < 2 {
         return Err(invalid("truncated number-format string"));
     }
@@ -1405,7 +1017,7 @@ fn parse_number_format_code(data: &[u8]) -> Result<String> {
     )
 }
 
-fn write_number_format_code(value: &str, data: &mut Vec<u8>) -> Result<()> {
+pub(crate) fn write_number_format_code(value: &str, data: &mut Vec<u8>) -> Result<()> {
     let units = value.encode_utf16().collect::<Vec<_>>();
     if !(1..=255).contains(&units.len()) {
         return Err(invalid("number-format string length must be 1..=255"));
@@ -1430,217 +1042,4 @@ fn decode_utf16(data: &[u8], field: &str) -> Result<String> {
     char::decode_utf16(units)
         .collect::<Result<String, _>>()
         .map_err(|_| invalid(format!("{field} contains invalid UTF-16")))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn color() -> XfColor {
-        XfColor::try_new(
-            XfColorSource::Theme(ThemeColor::Accent2),
-            100,
-            [1, 2, 3, 255],
-        )
-        .unwrap()
-    }
-
-    #[test]
-    fn typed_dxf_round_trips_representative_property_families() {
-        let dxf = DifferentialFormat::try_new(
-            true,
-            vec![
-                XfProperty::Gradient(XfGradient::linear(45.0).unwrap()),
-                XfProperty::GradientStop(XfGradientStop::try_new(0.5, color()).unwrap()),
-                XfProperty::TopBorder(XfBorder::new(color(), BorderStyle::Thin)),
-                XfProperty::VerticalBorder(XfBorder::new(color(), BorderStyle::Dashed)),
-                XfProperty::HorizontalAlignment(Some(HorizontalAlignment::Distributed)),
-                XfProperty::JustifyDistributed(true),
-                XfProperty::TextRotation(TextRotation::Clockwise(30)),
-                XfProperty::FontName("Aptos".to_string()),
-                XfProperty::FontWeight(XfFontWeight::Bold),
-                XfProperty::FontUnderline(FontUnderline::Double),
-                XfProperty::FontSizeTwips(220),
-                XfProperty::NumberFormatCode("0.00".to_string()),
-                XfProperty::RelativeIndent(Some(-2)),
-                XfProperty::Locked(true),
-            ],
-        )
-        .unwrap();
-        let payload = dxf.to_payload().unwrap();
-        assert_eq!(DifferentialFormat::parse_payload(&payload).unwrap(), dxf);
-        let record = dxf.to_record_bytes().unwrap();
-        assert_eq!(&record[..2], &[0x8D, 0x08]);
-    }
-
-    #[test]
-    fn xfprop_color_uses_low_flag_bit_and_high_seven_type_bits() {
-        // Apache POI producer forms: bit 7 is clear, while fValidRGBA in bit 0 is set.
-        let rgb = [0x05, 0xFF, 0x00, 0x00, 0xFF, 0xC7, 0xCE, 0xFF];
-        let parsed = XfColor::parse(&rgb).unwrap();
-        assert_eq!(parsed.source(), XfColorSource::Rgb);
-        let mut encoded = Vec::new();
-        parsed.write_to(&mut encoded);
-        assert_eq!(encoded, rgb);
-
-        let theme = [0x07, 0x04, 0x65, 0x66, 0xDC, 0xE6, 0xF1, 0xFF];
-        let parsed = XfColor::parse(&theme).unwrap();
-        assert_eq!(parsed.source(), XfColorSource::Theme(ThemeColor::Accent1));
-        let mut encoded = Vec::new();
-        parsed.write_to(&mut encoded);
-        assert_eq!(encoded, theme);
-
-        let indexed = [0x03, 0x40, 0, 0, 1, 2, 3, 4];
-        assert_eq!(
-            XfColor::parse(&indexed).unwrap().source(),
-            XfColorSource::Indexed(0x40)
-        );
-        let automatic = [0x01, 0xAA, 0, 0, 1, 2, 3, 4];
-        assert_eq!(
-            XfColor::parse(&automatic).unwrap().source(),
-            XfColorSource::Automatic
-        );
-        let not_set = [0x09, 0xAA, 0, 0, 1, 2, 3, 4];
-        assert_eq!(
-            XfColor::parse(&not_set).unwrap().source(),
-            XfColorSource::NotSet
-        );
-    }
-
-    #[test]
-    fn xfprop_color_rejects_clear_valid_flag_and_invalid_type_data() {
-        assert!(XfColor::parse(&[0x04, 0, 0, 0, 0, 0, 0, 0]).is_err());
-        assert!(XfColor::parse(&[0x0B, 0, 0, 0, 0, 0, 0, 0]).is_err());
-        assert!(XfColor::parse(&[0x03, 66, 0, 0, 0, 0, 0, 0]).is_err());
-        assert!(XfColor::parse(&[0x07, 12, 0, 0, 0, 0, 0, 0]).is_err());
-        assert!(XfColor::parse(&[0x05, 0, 0x00, 0x80, 0, 0, 0, 0]).is_err());
-    }
-
-    #[test]
-    fn rejects_hostile_headers_sizes_flags_and_property_relationships() {
-        let empty = DifferentialFormat::try_new(false, vec![])
-            .unwrap()
-            .to_payload()
-            .unwrap();
-        assert!(DifferentialFormat::parse_payload(&empty[..17]).is_err());
-        let mut bad = empty.clone();
-        bad[0] = 0;
-        assert!(DifferentialFormat::parse_payload(&bad).is_err());
-        let mut bad = empty.clone();
-        bad[14] = 1;
-        assert!(DifferentialFormat::parse_payload(&bad).is_err());
-        let mut bad = empty;
-        bad[16..18].copy_from_slice(&1u16.to_le_bytes());
-        assert!(DifferentialFormat::parse_payload(&bad).is_err());
-
-        assert!(
-            DifferentialFormat::try_new(
-                false,
-                vec![XfProperty::VerticalBorder(XfBorder::new(
-                    color(),
-                    BorderStyle::Thin,
-                ))],
-            )
-            .is_err()
-        );
-        assert!(
-            DifferentialFormat::try_new(
-                false,
-                vec![
-                    XfProperty::FillPattern(FillPattern::Solid),
-                    XfProperty::Gradient(XfGradient::linear(0.0).unwrap()),
-                ],
-            )
-            .is_err()
-        );
-        assert!(
-            DifferentialFormat::try_new(false, vec![XfProperty::JustifyDistributed(true)],)
-                .is_err()
-        );
-    }
-
-    #[test]
-    fn fixed_width_reads_reject_offset_overflow_without_panicking() {
-        assert!(matches!(
-            std::panic::catch_unwind(|| read_u16(&[], usize::MAX, "u16")),
-            Ok(Err(_))
-        ));
-        assert!(matches!(
-            std::panic::catch_unwind(|| read_u32(&[], usize::MAX, "u32")),
-            Ok(Err(_))
-        ));
-        assert!(matches!(
-            std::panic::catch_unwind(|| read_f64(&[], usize::MAX, "f64")),
-            Ok(Err(_))
-        ));
-    }
-
-    #[test]
-    fn malformed_fixed_width_properties_return_errors_without_panicking() {
-        let empty = DifferentialFormat::try_new(false, vec![])
-            .unwrap()
-            .to_payload()
-            .unwrap();
-        for property_type in [
-            0x0000u16, 0x0001, 0x0003, 0x0004, 0x0006, 0x000D, 0x000F, 0x0010, 0x0011, 0x0012,
-            0x0013, 0x0018, 0x0019, 0x001A, 0x001B, 0x0022, 0x0023, 0x0024, 0x0025, 0x0029, 0x002A,
-        ] {
-            let mut payload = empty.clone();
-            payload[16..18].copy_from_slice(&1u16.to_le_bytes());
-            payload.extend_from_slice(&property_type.to_le_bytes());
-            payload.extend_from_slice(&4u16.to_le_bytes());
-            let parsed = std::panic::catch_unwind(|| DifferentialFormat::parse_payload(&payload));
-            assert!(
-                matches!(parsed, Ok(Err(_))),
-                "property type 0x{property_type:04X} did not reject empty data"
-            );
-        }
-    }
-
-    #[test]
-    fn oversized_dxf_writes_are_rejected_without_truncating_record_length() {
-        let dxf = DifferentialFormat::try_new(
-            false,
-            vec![XfProperty::WrapText(false); MAX_XF_PROPERTIES],
-        )
-        .unwrap();
-        assert!(dxf.to_payload().is_err());
-        assert!(dxf.to_record_bytes().is_err());
-    }
-
-    #[test]
-    fn enforces_resource_caps() {
-        assert!(
-            XfProperties::try_new(vec![XfProperty::WrapText(false); MAX_XF_PROPERTIES + 1])
-                .is_err()
-        );
-        let huge = "x".repeat(256);
-        assert!(
-            DifferentialFormat::try_new(false, vec![XfProperty::NumberFormatCode(huge)]).is_err()
-        );
-    }
-
-    #[test]
-    fn number_format_code_matches_producer_wide_string_bytes() {
-        let producer = [
-            0x05, 0x00, 0x22, 0x00, 0x24, 0x00, 0x22, 0x00, 0x30, 0x00, 0x30, 0x00,
-        ];
-        assert_eq!(parse_number_format_code(&producer).unwrap(), "\"$\"00");
-
-        let mut encoded = Vec::new();
-        write_number_format_code("\"$\"00", &mut encoded).unwrap();
-        assert_eq!(encoded, producer);
-    }
-
-    #[test]
-    fn number_format_code_rejects_malformed_wide_strings() {
-        assert!(parse_number_format_code(&[0x00, 0x00]).is_err());
-        assert!(parse_number_format_code(&[0x00, 0x01]).is_err());
-        assert!(parse_number_format_code(&[0x02, 0x00, 0x30, 0x00]).is_err());
-        assert!(parse_number_format_code(&[0x01, 0x00, 0x30, 0x00, 0x00]).is_err());
-        assert!(parse_number_format_code(&[0x01, 0x00, 0x00, 0xD8]).is_err());
-
-        // A BIFF XLUnicodeString flags byte is not part of this XFProp payload.
-        assert!(parse_number_format_code(&[0x01, 0x00, 0x01, 0x30, 0x00]).is_err());
-    }
 }

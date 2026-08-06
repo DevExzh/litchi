@@ -12,6 +12,7 @@ pub mod facade;
 pub mod media;
 pub mod model;
 pub mod package;
+pub mod styles;
 
 pub use drawing::{Frame, Part};
 pub use embedded::{Kind, Object, Parameter, Root};

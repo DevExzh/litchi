@@ -4,7 +4,6 @@
 
 use crate::Reference;
 use crate::Slide;
-use crate::core::{PackageWriter, Structure};
 use crate::model::action::write_event_listeners;
 use crate::model::animation::validate_animation_roots;
 use crate::model::legacy_animation::validate_legacy_animation_root;
@@ -13,6 +12,20 @@ use crate::model::slide::validate_z_index;
 use litchi_core::{Metadata, Result, xml::escape_xml};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
+
+mod edit;
+mod package;
+mod snapshot;
+mod transition;
+mod validation;
+mod xml;
+
+use self::transition::{generate_transition_styles, slide_style_name};
+use self::validation::{
+    push_drawing_attributes, validate_drawing_shape_parent,
+    validate_required_three_dimensional_attributes, validate_three_dimensional_child_order,
+};
+use self::xml::{generate_text_paragraphs, push_optional_attribute};
 
 /// Builder for creating new ODP presentations.
 ///
@@ -40,292 +53,6 @@ pub struct Builder {
     declarations: Option<crate::model::declaration::Collection>,
     page_metadata: Option<crate::model::page_metadata::Collection>,
     page_layouts: crate::model::page_layout::Collection,
-}
-
-fn encode_text_content(text: &str) -> String {
-    fn flush_plain(output: &mut String, plain: &mut String) {
-        if !plain.is_empty() {
-            output.push_str(&escape_xml(plain));
-            plain.clear();
-        }
-    }
-
-    let mut output = String::with_capacity(text.len());
-    let mut plain = String::new();
-    let mut characters = text.chars().peekable();
-    while let Some(character) = characters.next() {
-        match character {
-            ' ' => {
-                flush_plain(&mut output, &mut plain);
-                let mut count = 1usize;
-                while characters.next_if_eq(&' ').is_some() {
-                    count += 1;
-                }
-                if count == 1 && !output.is_empty() && characters.peek().is_some() {
-                    output.push(' ');
-                } else if count == 1 {
-                    output.push_str("<text:s/>");
-                } else {
-                    output.push_str(&format!(r#"<text:s text:c="{count}"/>"#));
-                }
-            },
-            '\t' => {
-                flush_plain(&mut output, &mut plain);
-                output.push_str("<text:tab/>");
-            },
-            '\r' => {
-                flush_plain(&mut output, &mut plain);
-                output.push_str("<text:line-break/>");
-            },
-            _ => plain.push(character),
-        }
-    }
-    flush_plain(&mut output, &mut plain);
-    output
-}
-
-pub(super) fn generate_text_paragraphs(text: &str, style_name: Option<&str>) -> String {
-    let escaped_style = style_name.map(escape_xml);
-    let mut output = String::with_capacity(text.len() + 32);
-    for paragraph in text.split('\n') {
-        output.push_str("<text:p");
-        if let Some(style) = escaped_style.as_deref() {
-            output.push_str(r#" text:style-name="#);
-            output.push('"');
-            output.push_str(style);
-            output.push('"');
-        }
-        output.push('>');
-        output.push_str(&encode_text_content(paragraph));
-        output.push_str("</text:p>");
-    }
-    output
-}
-
-fn push_optional_attribute(output: &mut String, name: &str, value: Option<&str>) {
-    if let Some(value) = value {
-        output.push(' ');
-        output.push_str(name);
-        output.push_str("=\"");
-        output.push_str(&escape_xml(value));
-        output.push('"');
-    }
-}
-
-fn push_drawing_attributes(
-    output: &mut String,
-    attributes: &[crate::DrawingAttribute],
-) -> Result<()> {
-    let mut names = BTreeSet::new();
-    for attribute in attributes {
-        let qualified_name = format!("{}:{}", attribute.namespace.prefix(), attribute.local_name);
-        if !names.insert(qualified_name.clone()) {
-            return Err(litchi_core::Error::InvalidFormat(format!(
-                "duplicate drawing attribute '{qualified_name}'"
-            )));
-        }
-        output.push(' ');
-        output.push_str(&qualified_name);
-        output.push_str("=\"");
-        output.push_str(&escape_xml(&attribute.value));
-        output.push('"');
-    }
-    Ok(())
-}
-
-fn validate_drawing_shape_parent(
-    kind: crate::DrawingShapeKind,
-    parent: Option<crate::DrawingShapeKind>,
-) -> Result<()> {
-    use crate::DrawingShapeKind;
-
-    match parent {
-        None if kind.is_three_dimensional() && kind != DrawingShapeKind::ThreeDimensionalScene => {
-            Err(litchi_core::Error::InvalidFormat(
-                "3D drawing objects require a dr3d:scene parent".to_string(),
-            ))
-        },
-        None => Ok(()),
-        Some(DrawingShapeKind::Group) => {
-            if kind.is_three_dimensional() && kind != DrawingShapeKind::ThreeDimensionalScene {
-                Err(litchi_core::Error::InvalidFormat(
-                    "3D drawing objects require a dr3d:scene parent".to_string(),
-                ))
-            } else {
-                Ok(())
-            }
-        },
-        Some(DrawingShapeKind::ThreeDimensionalScene) if kind.is_three_dimensional() => Ok(()),
-        Some(DrawingShapeKind::ThreeDimensionalScene) => Err(litchi_core::Error::InvalidFormat(
-            "dr3d:scene can only contain 3D lights and objects".to_string(),
-        )),
-        Some(_) => Err(litchi_core::Error::InvalidFormat(
-            "nested drawing shapes require a draw:g or dr3d:scene parent".to_string(),
-        )),
-    }
-}
-
-fn validate_three_dimensional_child_order(children: &[crate::Shape]) -> Result<()> {
-    use crate::DrawingShapeKind;
-
-    let mut object_seen = false;
-    for child in children {
-        let kind = child.drawing_kind().ok_or_else(|| {
-            litchi_core::Error::InvalidFormat(
-                "dr3d:scene child is missing its exact 3D element kind".to_string(),
-            )
-        })?;
-        if kind == DrawingShapeKind::ThreeDimensionalLight {
-            if object_seen {
-                return Err(litchi_core::Error::InvalidFormat(
-                    "dr3d:light elements must precede 3D objects".to_string(),
-                ));
-            }
-        } else {
-            object_seen = true;
-        }
-    }
-    Ok(())
-}
-
-fn validate_required_three_dimensional_attributes(
-    kind: crate::DrawingShapeKind,
-    attributes: &[crate::DrawingAttribute],
-) -> Result<()> {
-    use crate::{DrawingAttributeNamespace, DrawingShapeKind};
-
-    let has = |namespace, local_name| {
-        attributes.iter().any(|attribute| {
-            attribute.namespace() == namespace && attribute.local_name() == local_name
-        })
-    };
-    if kind == DrawingShapeKind::ThreeDimensionalLight
-        && !has(DrawingAttributeNamespace::Dr3d, "direction")
-    {
-        return Err(litchi_core::Error::InvalidFormat(
-            "dr3d:light requires dr3d:direction".to_string(),
-        ));
-    }
-    if matches!(
-        kind,
-        DrawingShapeKind::ThreeDimensionalExtrude | DrawingShapeKind::ThreeDimensionalRotate
-    ) {
-        for (namespace, local_name) in [
-            (DrawingAttributeNamespace::Svg, "viewBox"),
-            (DrawingAttributeNamespace::Svg, "d"),
-        ] {
-            if !has(namespace, local_name) {
-                return Err(litchi_core::Error::InvalidFormat(format!(
-                    "{} requires svg:{local_name}",
-                    kind.element_name()
-                )));
-            }
-        }
-    }
-    Ok(())
-}
-
-pub(super) fn slide_style_name(slide: &Slide, index: usize) -> String {
-    if slide
-        .transition
-        .as_ref()
-        .is_some_and(|value| !value.is_empty())
-    {
-        format!("dpTransition{}", index + 1)
-    } else {
-        DEFAULT_DRAWING_PAGE_STYLE_NAME.to_string()
-    }
-}
-
-/// Name of the fallback drawing-page style referenced by generated slides.
-pub(super) const DEFAULT_DRAWING_PAGE_STYLE_NAME: &str = "dp1";
-
-/// Definition of [`DEFAULT_DRAWING_PAGE_STYLE_NAME`].
-pub(super) const DEFAULT_DRAWING_PAGE_STYLE: &str = r#"<style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties/></style:style>"#;
-
-pub(super) fn generate_transition_styles(slides: &[Slide]) -> String {
-    let mut output = String::from(DEFAULT_DRAWING_PAGE_STYLE);
-    for (index, slide) in slides.iter().enumerate() {
-        push_transition_style(&mut output, slide, index);
-    }
-    output
-}
-
-/// Append the drawing-page style for one slide's transition, if it has one.
-///
-/// Slides without a transition reference [`DEFAULT_DRAWING_PAGE_STYLE_NAME`]
-/// and therefore need no dedicated definition.
-pub(super) fn push_transition_style(target: &mut String, slide: &Slide, index: usize) {
-    let Some(transition) = slide.transition.as_ref().filter(|value| !value.is_empty()) else {
-        return;
-    };
-    let mut output = String::new();
-    output.push_str(r#"<style:style style:name=""#);
-    output.push_str(&slide_style_name(slide, index));
-    output.push_str(r#"" style:family="drawing-page"><style:drawing-page-properties"#);
-    push_optional_attribute(
-        &mut output,
-        "presentation:transition-type",
-        transition.transition_type.map(|value| value.as_str()),
-    );
-    push_optional_attribute(
-        &mut output,
-        "presentation:transition-style",
-        transition.style.as_ref().map(|value| value.as_str()),
-    );
-    push_optional_attribute(
-        &mut output,
-        "presentation:transition-speed",
-        transition.speed.map(|value| value.as_str()),
-    );
-    push_optional_attribute(&mut output, "smil:type", transition.smil_type.as_deref());
-    push_optional_attribute(
-        &mut output,
-        "smil:subtype",
-        transition.smil_subtype.as_deref(),
-    );
-    push_optional_attribute(
-        &mut output,
-        "smil:direction",
-        transition.direction.map(|value| value.as_str()),
-    );
-    push_optional_attribute(
-        &mut output,
-        "smil:fadeColor",
-        transition.fade_color.as_deref(),
-    );
-    push_optional_attribute(
-        &mut output,
-        "presentation:duration",
-        transition.duration.as_deref(),
-    );
-    if let Some(sound) = transition.sound.as_ref() {
-        output.push('>');
-        output.push_str(r#"<presentation:sound xlink:type="simple" xlink:href=""#);
-        output.push_str(&escape_xml(&sound.href));
-        output.push('"');
-        if sound.actuate_on_request {
-            output.push_str(r#" xlink:actuate="onRequest""#);
-        }
-        push_optional_attribute(
-            &mut output,
-            "xlink:show",
-            sound.show.map(|value| value.as_str()),
-        );
-        push_optional_attribute(&mut output, "xml:id", sound.xml_id.as_deref());
-        push_optional_attribute(
-            &mut output,
-            "presentation:play-full",
-            sound
-                .play_full
-                .map(|value| if value { "true" } else { "false" }),
-        );
-        output.push_str("/></style:drawing-page-properties>");
-    } else {
-        output.push_str("/>");
-    }
-    output.push_str("</style:style>");
-    target.push_str(&output);
 }
 
 impl Default for Builder {
@@ -511,18 +238,7 @@ impl Builder {
     /// # }
     /// ```
     pub fn add_slide_with_title(&mut self, title: &str, text: &str) -> Result<&mut Self> {
-        let slide = Slide {
-            title: Some(title.to_string()),
-            text: text.to_string(),
-            index: self.slides.len(),
-            notes: None,
-            transition: None,
-            animations: Vec::new(),
-            legacy_animation: None,
-            shapes: Vec::new(),
-        };
-        self.slides.push(slide);
-        Ok(self)
+        self.append_slide(edit::titled_slide(self.slides.len(), title, text))
     }
 
     /// Add a slide with only text content (no title)
@@ -543,18 +259,7 @@ impl Builder {
     /// # }
     /// ```
     pub fn add_slide(&mut self, text: &str) -> Result<&mut Self> {
-        let slide = Slide {
-            title: None,
-            text: text.to_string(),
-            index: self.slides.len(),
-            notes: None,
-            transition: None,
-            animations: Vec::new(),
-            legacy_animation: None,
-            shapes: Vec::new(),
-        };
-        self.slides.push(slide);
-        Ok(self)
+        self.append_slide(edit::text_slide(self.slides.len(), text))
     }
 
     /// Add a Slide element directly
@@ -584,10 +289,8 @@ impl Builder {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn add_slide_element(&mut self, mut slide: Slide) -> Result<&mut Self> {
-        slide.index = self.slides.len();
-        self.slides.push(slide);
-        Ok(self)
+    pub fn add_slide_element(&mut self, slide: Slide) -> Result<&mut Self> {
+        self.append_slide(slide)
     }
 
     /// Generate XML for a shape
@@ -1200,32 +903,7 @@ impl Builder {
     /// # }
     /// ```
     pub fn build(self) -> Result<Vec<u8>> {
-        let mut writer = PackageWriter::new();
-
-        // Set MIME type
-        writer.set_mimetype("application/vnd.oasis.opendocument.presentation")?;
-
-        // Add content.xml
-        let content_xml = self.generate_content_xml()?;
-        writer.add_file("content.xml", content_xml.as_bytes())?;
-
-        // Add styles.xml
-        let mut styles_xml = Structure::default_styles_xml();
-        for layout in &self.page_layouts.layouts {
-            styles_xml = crate::model::page_layout::set_xml(&styles_xml, layout)?;
-        }
-        writer.add_file("styles.xml", styles_xml.as_bytes())?;
-
-        // Add meta.xml
-        let meta_xml = self.generate_meta_xml();
-        writer.add_file("meta.xml", meta_xml.as_bytes())?;
-
-        for (path, media) in &self.media_files {
-            writer.add_file_with_media_type(path, &media.bytes, &media.media_type)?;
-        }
-
-        // Finish and return bytes
-        writer.finish_to_bytes()
+        package::build(self)
     }
 
     /// Build and save the presentation to a file

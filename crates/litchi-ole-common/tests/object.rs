@@ -1,5 +1,5 @@
 use litchi_cfb::{OleFile, OleWriter};
-use litchi_ole_common::object::{Editor, Limits, Target, Targets, discover};
+use litchi_ole_common::object::{Editor, Limits, Snapshot, Target, Targets, discover};
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -256,4 +256,30 @@ fn add_and_remove_use_explicit_targets() {
     assert!(removed.starts_with(&[0xD0, 0xCF, 0x11, 0xE0]));
     assert!(editor.objects().get("second").is_none());
     assert!(editor.objects().get("first").is_some());
+}
+
+#[test]
+fn snapshots_share_streams_and_edit_independently() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let selected = targets("object", &["ObjectPool", "_42"]);
+    let snapshot = Snapshot::open(original.clone(), selected, Limits::default())
+        .expect("snapshot should open");
+    let clone = snapshot.clone();
+    assert!(!snapshot.is_changed());
+    let path = vec!["WordDocument".to_string()];
+    let first = snapshot
+        .stream_shared(&path)
+        .expect("snapshot stream should exist");
+    let second = clone
+        .stream_shared(&path)
+        .expect("cloned snapshot stream should exist");
+    assert!(Arc::ptr_eq(&first, &second));
+
+    let mut editor = snapshot.edit();
+    editor
+        .put_stream(&path, b"edited from snapshot".to_vec())
+        .expect("snapshot edit should commit");
+    assert!(!snapshot.is_changed());
+    assert_eq!(snapshot.finish().expect("source should finish"), original);
+    assert_eq!(editor.stream(&path), Some(&b"edited from snapshot"[..]));
 }

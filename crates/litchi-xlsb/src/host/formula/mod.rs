@@ -22,8 +22,12 @@
 //! - [MS-XLSB] Section 2.5.98 - Formulas
 //! - [MS-XLS] Section 2.5.198 - Ptg (for token details, largely compatible)
 
+mod error;
 #[path = "../function_table.rs"]
 mod function_table;
+mod parser;
+mod semantic;
+mod validation;
 
 pub mod model;
 pub mod pivot;
@@ -37,160 +41,22 @@ pub use resolution::{Context, ExternalBook, SupportingLink};
 pub use table::Definition;
 pub(crate) use text::{CompilationContext, DefinedName, excel_name_eq};
 
-use crate::named_ranges::validate_name;
 use crate::package::error::{Error, Result};
+#[cfg(test)]
 use crate::package::external_link::Link;
 
-pub use crate::formula::ptg_types;
-pub use crate::formula::{
+pub use parser::{
     ArrayValue, BinaryOperator, Compiler, ExternalTableReference, Group, GroupKind,
     MAX_CELL_FORMULA_BYTES, MemoryKind, ParsedFormula, Parser, Range, Resolution, TableColumns,
     TableDataType, TableNamedColumns, TableReference, TableRowType, Token, UnaryOperator,
+    ptg_types,
 };
 
-impl From<crate::formula::Error> for Error {
-    fn from(error: crate::formula::Error) -> Self {
-        match error {
-            crate::formula::Error::InvalidFormula(message) => Self::InvalidFormula(message),
-            crate::formula::Error::InvalidCellReference(reference) => {
-                Self::InvalidCellReference(reference)
-            },
-            crate::formula::Error::InvalidLength { expected, found } => {
-                Self::InvalidLength { expected, found }
-            },
-            crate::formula::Error::UnsupportedFeature(feature) => Self::UnsupportedFeature(feature),
-            crate::formula::Error::Encoding(message) => Self::Encoding(message),
-        }
-    }
-}
-
-fn validate_pivot_identifier(name: &str, field: &str, max_utf16_len: usize) -> Result<()> {
-    let utf16_len = name.encode_utf16().count();
-    if utf16_len == 0 || utf16_len > max_utf16_len || name.contains('\0') {
-        return Err(invalid(
-            "PtgSxName",
-            format!("{field} must contain 1..={max_utf16_len} UTF-16 code units and no NUL"),
-        ));
-    }
-    Ok(())
-}
-
-fn invalid(typ: &'static str, value: impl Into<String>) -> Error {
-    Error::InvalidFormula(format!("{typ}: {}", value.into()))
-}
-
-fn format_pivot_identifier(name: &str) -> String {
-    if !name.eq_ignore_ascii_case("All")
-        && !name.eq_ignore_ascii_case("Blank")
-        && validate_table_name(name).is_ok()
-    {
-        name.to_string()
-    } else {
-        format!("'{}'", name.replace('\'', "''"))
-    }
-}
-
-fn validate_table_name(name: &str) -> Result<()> {
-    validate_name(name)?;
-    if name
-        .get(..3)
-        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("_xl"))
-    {
-        return Err(Error::InvalidFormula(format!(
-            "table display name {name:?} uses reserved _xl prefix"
-        )));
-    }
-    Ok(())
-}
-
-fn validate_table_column_name(name: &str, index: usize) -> Result<()> {
-    let units = name.encode_utf16().count();
-    if units == 0 || units > 255 || name.contains('\0') {
-        return Err(Error::InvalidFormula(format!(
-            "table column {index} has invalid name length or NUL content"
-        )));
-    }
-    Ok(())
-}
-
-fn validate_named_table_columns(columns: &TableNamedColumns) -> Result<()> {
-    match columns {
-        TableNamedColumns::All => Ok(()),
-        TableNamedColumns::One(name) => validate_table_column_name(name, 0),
-        TableNamedColumns::Range { first, last } => {
-            validate_table_column_name(first, 0)?;
-            validate_table_column_name(last, 1)
-        },
-    }
-}
-
-fn escape_structured_column(name: &str) -> String {
-    let mut escaped = String::with_capacity(name.len());
-    for ch in name.chars() {
-        if matches!(ch, '#' | '[' | ']' | '\'' | '@') {
-            escaped.push('\'');
-        }
-        escaped.push(ch);
-    }
-    escaped
-}
-
-fn format_structured_reference(
-    table: &str,
-    row_type: TableRowType,
-    columns: &TableNamedColumns,
-    square_bracket_space: bool,
-    comma_space: bool,
-) -> String {
-    let mut items = Vec::new();
-    match row_type {
-        TableRowType::Data => {},
-        TableRowType::All => items.push("[#All]".to_string()),
-        TableRowType::Headers => items.push("[#Headers]".to_string()),
-        TableRowType::DataAlternate => items.push("[#Data]".to_string()),
-        TableRowType::DataAndHeaders => {
-            items.push("[#Headers]".to_string());
-            items.push("[#Data]".to_string());
-        },
-        TableRowType::Totals => items.push("[#Totals]".to_string()),
-        TableRowType::DataAndTotals => {
-            items.push("[#Data]".to_string());
-            items.push("[#Totals]".to_string());
-        },
-        TableRowType::Current => items.push("[#This Row]".to_string()),
-    }
-    let has_range = matches!(columns, TableNamedColumns::Range { .. });
-    match columns {
-        TableNamedColumns::All => {},
-        TableNamedColumns::One(name) => {
-            items.push(format!("[{}]", escape_structured_column(name)));
-        },
-        TableNamedColumns::Range { first, last } => {
-            items.push(format!(
-                "[{}]:[{}]",
-                escape_structured_column(first),
-                escape_structured_column(last)
-            ));
-        },
-    }
-    if items.is_empty() {
-        return table.to_string();
-    }
-    let separator = if comma_space { ", " } else { "," };
-    let body = items.join(separator);
-    let specifiers = if items.len() == 1 && !has_range {
-        if square_bracket_space {
-            format!("[ {} ]", &body[1..body.len() - 1])
-        } else {
-            body
-        }
-    } else if square_bracket_space {
-        format!("[ {body} ]")
-    } else {
-        format!("[{body}]")
-    };
-    format!("{table}{specifiers}")
-}
+use semantic::{format_pivot_identifier, format_structured_reference};
+use validation::{
+    invalid, validate_named_table_columns, validate_pivot_identifier, validate_table_column_name,
+    validate_table_name,
+};
 
 #[cfg(test)]
 mod tests {
@@ -1445,9 +1311,11 @@ mod pivot_name_resolution_tests {
             tables: Vec::new().into(),
             pivot_views: vec![View::try_new(7, 1, "Sales Pivot".to_string()).unwrap()].into(),
             pivot_name_scopes: vec![scope()].into(),
-            active_pivot_scope: Some((7, 1, "Sales Pivot".to_string())),
+            active_pivot_scope: None,
             current_sheet: Some(1),
         }
+        .for_pivot_formula(scope())
+        .unwrap()
     }
 
     fn render(index: u32, context: &Context) -> Result<String> {
@@ -1491,7 +1359,8 @@ mod pivot_name_resolution_tests {
         assert!(render(0, &context).is_err());
 
         let mut context = pivot_context();
-        context.active_pivot_scope = Some((8, 1, "Sales Pivot".to_string()));
+        context.pivot_name_scopes =
+            vec![Scope::try_new(8, 1, "Sales Pivot".to_string(), references()).unwrap()].into();
         assert!(render(0, &context).is_err());
     }
 

@@ -11,9 +11,11 @@ mod codec;
 mod discovery;
 mod editor;
 mod model;
+mod snapshot;
 pub mod target;
 
 pub use discovery::discover;
 pub use editor::Editor;
 pub use model::{Limits, Object, Objects, Storage, Stream};
+pub use snapshot::Snapshot;
 pub use target::{Target, Targets};

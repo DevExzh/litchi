@@ -228,6 +228,19 @@ semantic, wire/XML or BIFF, validation, package, and test ownership nested;
 they remain inert with respect to control activation, macros, and external
 behavior.
 
+The current continuation extends the topology with layered ODT document and
+text-element owners; ODS database-range and table-template style owners; ODP
+parser XML and authoring-builder owners; DOC OLE metadata; PPT animation
+timing; XLS differential formats; DOCX glossary codecs; PPTX animation and
+modern-comment codecs; XLSB formula/resolution; and XLSX worksheet-snapshot
+and workbook-transaction owners. Each keeps a concise contextual facade over
+semantic, wire/XML, package, validation, and test modules.
+
+`litchi-ole-common::object` now additionally owns an immutable `Snapshot`
+read facade. It shares captured stream buffers across clones and creates
+independent transactional editors, keeping large OLE payloads out of format
+neutral copies while leaving DOC/PPT/XLS interpretation in their owners.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

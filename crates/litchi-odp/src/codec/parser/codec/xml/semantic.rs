@@ -1,6 +1,6 @@
-//! Semantic ODP model assembly helpers.
+//! Semantic ODP model assembly from XML elements.
 
-use super::*;
+use super::super::*;
 
 impl Parser {
     pub(super) fn classify(namespace: &ResolveResult<'_>, local_name: &[u8]) -> Element {
@@ -113,6 +113,7 @@ impl Parser {
             ShapeElement::ThreeDimensionalRotate => DrawingShapeKind::ThreeDimensionalRotate,
         }
     }
+
     pub(super) fn shape_builder(
         reader: &NsReader<&[u8]>,
         element: &BytesStart<'_>,
@@ -220,44 +221,6 @@ impl Parser {
                 namespace,
                 String::from_utf8(local_name.to_vec()).map_err(|_| {
                     Error::InvalidFormat("non-UTF-8 ODP shape attribute name".to_string())
-                })?,
-                value,
-            )?);
-        }
-        Ok(attributes)
-    }
-
-    pub(super) fn exact_geometry_attributes(
-        reader: &NsReader<&[u8]>,
-        element: &BytesStart<'_>,
-    ) -> Result<Vec<DrawingAttribute>> {
-        let mut attributes = Vec::new();
-        for attribute in element.attributes() {
-            let attribute = attribute.map_err(|error| {
-                Error::InvalidFormat(format!("invalid enhanced-geometry attribute: {error}"))
-            })?;
-            let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
-            let namespace = if Self::is_namespace(&namespace, DRAW_NAMESPACE) {
-                DrawingAttributeNamespace::Drawing
-            } else if Self::is_namespace(&namespace, SVG_NAMESPACE) {
-                DrawingAttributeNamespace::Svg
-            } else if Self::is_namespace(&namespace, DR3D_NAMESPACE) {
-                DrawingAttributeNamespace::Dr3d
-            } else {
-                continue;
-            };
-            let value = attribute
-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                .map_err(|error| {
-                    Error::InvalidFormat(format!(
-                        "invalid enhanced-geometry attribute value: {error}"
-                    ))
-                })?
-                .into_owned();
-            attributes.push(DrawingAttribute::new(
-                namespace,
-                String::from_utf8(local_name.as_ref().to_vec()).map_err(|_| {
-                    Error::InvalidFormat("non-UTF-8 enhanced-geometry attribute name".to_string())
                 })?,
                 value,
             )?);
@@ -527,5 +490,42 @@ impl Parser {
             )?;
         }
         Ok((resolved, definitions.default))
+    }
+
+    pub(super) fn parse_transition_sound(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+    ) -> Result<Sound> {
+        let href = Self::get_attr(reader, element, XLINK_NAMESPACE, b"href")?.ok_or_else(|| {
+            Error::InvalidFormat("presentation:sound is missing xlink:href".to_string())
+        })?;
+        if let Some(link_type) = Self::get_attr(reader, element, XLINK_NAMESPACE, b"type")?
+            && link_type != "simple"
+        {
+            return Err(Error::InvalidFormat(format!(
+                "invalid presentation:sound xlink:type '{link_type}'"
+            )));
+        }
+        let actuate = Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")?;
+        if actuate.as_deref().is_some_and(|value| value != "onRequest") {
+            return Err(Error::InvalidFormat(format!(
+                "invalid presentation:sound xlink:actuate '{}'",
+                actuate.as_deref().expect("actuate checked above")
+            )));
+        }
+        let show = Self::get_attr(reader, element, XLINK_NAMESPACE, b"show")?
+            .map(|value| SoundShow::parse(&value))
+            .transpose()?;
+        let play_full = Self::parse_optional_bool(
+            Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"play-full")?,
+            "presentation:play-full",
+        )?;
+        Ok(Sound {
+            href,
+            play_full,
+            actuate_on_request: actuate.is_some(),
+            show,
+            xml_id: Self::get_attr(reader, element, XML_NAMESPACE, b"id")?,
+        })
     }
 }
