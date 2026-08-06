@@ -405,6 +405,15 @@ owners remain nested by semantic, wire, validation, package, and transaction
 responsibility, preserve unknown source material, and keep referenced files,
 SmartArt layout, collaboration, activation, and external execution inert.
 
+The following continuation adds source-checked BIFF8 Revision Log metadata
+transactions, SpreadsheetML revision package snapshots and CRUD, legacy-PPT
+diagram publication through the owning slide envelope, and PresentationML
+media-track/caption/narration transactions. The XLSX revision owner validates
+relationship and orphan topology before atomic publication; the PPTX owner
+retains unknown extension XML and treats WebVTT/media targets as inert. No
+owner activates collaboration, playback, SmartArt layout, external links, or
+formula/revision replay.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

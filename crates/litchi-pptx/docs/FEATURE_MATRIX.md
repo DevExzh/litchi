@@ -74,7 +74,7 @@ for DrawingML, charts, diagrams, ink, math, and 3D extensions, [MS-OWEXML] for w
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Audio, video, posters, and media relationships | ✅ | ✅ | ✅ | Typed slide-level media resources, embedded/linked relationships, poster frames, trim/fade/bookmark metadata, and bounded payload authoring |
-| Media tracks, captions, and narration metadata | 🟡 | ✅ | 🟡 | High-level text-track inventory, media extension controls, bookmarks, and selected show-narration metadata are supported; this is not a full p15 tracksInfo or playback model |
+| Media tracks, captions, and narration metadata | 🟡 | ✅ | 🟡 | `presentation_properties::metadata::tracks::{Snapshot, Transaction, Commit, Patch}` provides bounded source-checked edits for `p173:tracksInfo`, caption identity/language/display location, and authored `p15:isNarration` values while preserving unknown extension XML and inert media targets; this is not a full track/player model |
 | Animations and timing trees | ✅ | ✅ | ✅ | Shape effects, sequences, triggers, timing metadata, chart/diagram relationships, and timing on slides, layouts, and masters |
 | Transitions and slide advance timing | ✅ | ✅ | ✅ | Typed effect/option combinations, direction/axis/corner/origin/shape/ripple/spoke variants, inherited slide/layout/master transitions, duration, speed, click, and timed advance |
 | PowerPoint 2010 transition extensions | ✅ | ✅ | ✅ | Compatibility-choice ripple effects, typed direction and duration, deterministic fade fallback, bounded unknown-child retention, and safe prefix handling |

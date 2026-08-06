@@ -62,7 +62,7 @@ query, macro, chart, pivot, or external content is executed.
 | Page margins, setup, print options, and breaks | ✅ | ✅ | ✅ | Margins, paper, scale/fit, orientation, print order, comments/errors display, gridlines, print options, page breaks, and setup relationships are supported. |
 | Headers, footers, and printer settings | ✅ | ✅ | ✅ | Header/footer sections, odd/even/first-page settings, pictures/relationships, and supported printer-setting parts are typed; printing is not performed. |
 | Worksheet and workbook protection | ✅ | ✅ | ✅ | Sheet/workbook protection flags, legacy hashes, and supported modern hash/salt/spin metadata are validated and writable. Protection is not encryption or authorization. |
-| Revisions and collaboration metadata | 🟡 | ✅ | 🟡 | Revision headers, authors, changes, and supported revision records are modeled as package metadata; live coauthoring, conflict resolution, and locking are not implemented. |
+| Revisions and collaboration metadata | 🟡 | ✅ | 🟡 | `revisions::{Snapshot, Transaction, Commit, Patch}` provides source-checked package CRUD for revision users, headers, and inert logs with relationship/orphan validation and exact no-op preservation; live coauthoring, conflict resolution, locking, and recalculation are not implemented. |
 | Sparkline groups | 🟡 | ✅ | 🟡 | Supported sparkline group and worksheet relationships are bounded; the crate does not render sparklines or calculate their source values. |
 
 ## Charts, drawings, pivots, and external references
