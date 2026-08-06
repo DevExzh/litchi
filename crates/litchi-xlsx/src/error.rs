@@ -174,6 +174,10 @@ pub enum Error {
     /// A selector variant is not supported by this API version.
     #[error("unsupported sheet selector")]
     UnsupportedSelector,
+    /// The package owner intentionally does not execute host/runtime
+    /// behavior such as recalculation, refresh, or rendering.
+    #[error("unsupported XLSX operation: {feature}")]
+    Unsupported { feature: &'static str },
 }
 
 impl From<std::convert::Infallible> for Error {

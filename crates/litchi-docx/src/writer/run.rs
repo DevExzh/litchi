@@ -1,6 +1,7 @@
 //! Run types and implementation for DOCX documents.
 use crate::OfficeMath;
 use crate::error::{Error, Result};
+use crate::run_effects::RunEffects;
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
@@ -148,6 +149,18 @@ impl MutableRun {
         self
     }
 
+    /// Borrow the typed Word 2010 visual effects attached to this new run.
+    pub fn run_effects(&self) -> &RunEffects {
+        &self.properties.effects
+    }
+
+    /// Replace the visual effects for this run after validating their schema.
+    pub fn set_run_effects(&mut self, effects: RunEffects) -> Result<&mut Self> {
+        effects.validate()?;
+        self.properties.effects = effects;
+        Ok(self)
+    }
+
     /// Add a line break.
     pub fn add_break(&mut self) -> &mut Self {
         self.properties.has_break = true;
@@ -216,7 +229,7 @@ impl MutableRun {
 
         // Write run properties
         if self.properties.has_properties() || self.property_change.is_some() {
-            xml.push_str("<w:rPr>");
+            self.properties.write_open(xml);
 
             if let Some(bold) = self.properties.bold
                 && bold
@@ -267,6 +280,8 @@ impl MutableRun {
                 xml.push_str("<w:webHidden/>");
             }
 
+            crate::run_effects::codec::write(&self.properties.effects, xml)?;
+
             if let Some(change) = &self.property_change {
                 change.write_xml(xml)?;
             }
@@ -294,12 +309,13 @@ impl MutableRun {
                 // Field begin
                 xml.push_str("<w:fldChar w:fldCharType=\"begin\"/></w:r><w:r>");
                 if self.properties.has_properties() {
-                    xml.push_str("<w:rPr>");
+                    self.properties.write_open(xml);
                     if let Some(bold) = self.properties.bold
                         && bold
                     {
                         xml.push_str("<w:b/>");
                     }
+                    crate::run_effects::codec::write(&self.properties.effects, xml)?;
                     xml.push_str("</w:rPr>");
                 }
                 // Field instruction
@@ -317,12 +333,13 @@ impl MutableRun {
                 // Field separate
                 xml.push_str("<w:fldChar w:fldCharType=\"separate\"/></w:r><w:r>");
                 if self.properties.has_properties() {
-                    xml.push_str("<w:rPr>");
+                    self.properties.write_open(xml);
                     if let Some(bold) = self.properties.bold
                         && bold
                     {
                         xml.push_str("<w:b/>");
                     }
+                    crate::run_effects::codec::write(&self.properties.effects, xml)?;
                     xml.push_str("</w:rPr>");
                 }
                 // Placeholder text
@@ -337,12 +354,13 @@ impl MutableRun {
             RunContent::PageCount => {
                 xml.push_str("<w:fldChar w:fldCharType=\"begin\"/></w:r><w:r>");
                 if self.properties.has_properties() {
-                    xml.push_str("<w:rPr>");
+                    self.properties.write_open(xml);
                     if let Some(bold) = self.properties.bold
                         && bold
                     {
                         xml.push_str("<w:b/>");
                     }
+                    crate::run_effects::codec::write(&self.properties.effects, xml)?;
                     xml.push_str("</w:rPr>");
                 }
                 if mode == RevisionTextMode::Deleted {
@@ -354,12 +372,13 @@ impl MutableRun {
                 }
                 xml.push_str("<w:fldChar w:fldCharType=\"separate\"/></w:r><w:r>");
                 if self.properties.has_properties() {
-                    xml.push_str("<w:rPr>");
+                    self.properties.write_open(xml);
                     if let Some(bold) = self.properties.bold
                         && bold
                     {
                         xml.push_str("<w:b/>");
                     }
+                    crate::run_effects::codec::write(&self.properties.effects, xml)?;
                     xml.push_str("</w:rPr>");
                 }
                 if mode == RevisionTextMode::Deleted {
@@ -410,6 +429,7 @@ pub(crate) struct RunProperties {
     pub(crate) has_break: bool,
     pub(crate) no_proof: bool,
     pub(crate) web_hidden: bool,
+    pub(crate) effects: RunEffects,
 }
 
 impl RunProperties {
@@ -423,6 +443,19 @@ impl RunProperties {
             || self.highlight.is_some()
             || self.no_proof
             || self.web_hidden
+            || !self.effects.is_empty()
+    }
+
+    pub(crate) fn write_open(&self, xml: &mut String) {
+        if self.effects.is_empty() {
+            xml.push_str("<w:rPr>");
+        } else {
+            xml.push_str(
+                "<w:rPr xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" \
+                 xmlns:w14=\"http://schemas.microsoft.com/office/word/2010/wordml\" \
+                 mc:Ignorable=\"w14\">",
+            );
+        }
     }
 
     pub(crate) fn write_values(&self, xml: &mut String) -> Result<()> {

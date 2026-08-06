@@ -2,6 +2,7 @@
 
 use crate::UnderlineStyle;
 use crate::error::{Error, Result};
+use crate::run_effects::RunEffects;
 use litchi_core::VerticalPosition;
 use litchi_ooxml_common::xml::{decode_xml_reference, extract_omml_formulas};
 use quick_xml::events::Event;
@@ -149,6 +150,15 @@ impl Run {
     /// underline for compatibility with documents emitted by Word processors.
     pub fn underline_formatting(&self) -> Result<Option<RunUnderline>> {
         parse_run_underline(self.xml_bytes())
+    }
+
+    /// Return the typed Word 2010 visual effects attached directly to this run.
+    ///
+    /// The result is a detached semantic snapshot. Unsupported direct
+    /// extension children remain bounded and ordered as
+    /// [`crate::run_effects::OpaqueExtension`] values.
+    pub fn run_effects(&self) -> Result<RunEffects> {
+        RunEffects::parse(self.xml_bytes())
     }
 
     /// Check if this run is strikethrough.

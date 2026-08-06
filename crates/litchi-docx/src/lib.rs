@@ -35,6 +35,7 @@ pub mod package;
 pub mod paragraph;
 pub mod parts;
 pub mod revision;
+pub mod run_effects;
 pub mod section;
 pub mod settings;
 pub mod smart_tag;
@@ -115,6 +116,7 @@ pub use paragraph::{
     Paragraph, Run, RunBreak, RunBreakClear, RunBreakType, RunProperties, RunUnderline,
     RunUnderlineColor,
 };
+pub use run_effects::{Effect, OpaqueExtension, RunEffects};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
 pub use table::{Cell, Row, Table, VMergeState};
 pub use writer::*;

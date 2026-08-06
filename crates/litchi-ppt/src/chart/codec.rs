@@ -1,6 +1,6 @@
 //! Bounded OLE2 and `[MS-OGRAPH]` chart payload decoding.
 
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Write};
 
 use litchi_cfb::OleFile;
 use litchi_cfb::consts::STGTY_STREAM;
@@ -20,6 +20,7 @@ pub(super) enum Parsed {
     Graph {
         package: Box<GraphPackage>,
         book: Book,
+        compression: Compression,
     },
     Excel {
         book: Book,
@@ -66,6 +67,25 @@ pub(super) fn decode(storage: Storage, limits: Limits) -> Result<Vec<u8>> {
     }
 }
 
+/// Encode a replacement OLE payload with the same PowerPoint storage envelope
+/// as the source object. The compressed form receives the new payload length
+/// required by `ExOleObjStg`; its zlib bytes remain inert and are never opened
+/// here.
+pub(super) fn encode_storage(bytes: Vec<u8>, compression: Compression) -> Result<Storage> {
+    match compression {
+        Compression::Uncompressed => Storage::uncompressed(StorageKind::OleObject, bytes),
+        Compression::Zlib => {
+            let declared = u32::try_from(bytes.len())
+                .map_err(|_| Error::Corrupted("chart package exceeds u32 size".into()))?;
+            let mut encoder =
+                flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+            encoder.write_all(&bytes)?;
+            let compressed = encoder.finish()?;
+            Storage::compressed(StorageKind::OleObject, declared, compressed)
+        },
+    }
+}
+
 pub(super) fn parse(
     presentation: &Presentation,
     persist_id: u32,
@@ -77,6 +97,7 @@ pub(super) fn parse(
             "chart object persist ID {persist_id} has no storage"
         ))
     })?;
+    let compression = storage.compression();
     let package_bytes = decode(storage, limits)?;
     match kind {
         Kind::Graph => {
@@ -87,6 +108,7 @@ pub(super) fn parse(
             Ok(Parsed::Graph {
                 package: Box::new(package),
                 book,
+                compression,
             })
         },
         Kind::Excel => {

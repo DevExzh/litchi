@@ -1,5 +1,6 @@
-use litchi_core::Result;
-use litchi_odf_common::core::{OwnedPackage, family};
+use litchi_core::{Error, Result};
+use litchi_odf_common::calculation::Settings;
+use litchi_odf_common::core::{OwnedPackage, PackageWriter, family};
 use std::path::Path;
 
 use crate::model::names::Definition;
@@ -35,6 +36,27 @@ impl Package {
         self.0.package()
     }
 
+    /// Decode the complete ODS metadata snapshot, retaining the bounded
+    /// source part for unknown-XML-preserving transactions.
+    pub(crate) fn metadata_snapshot(&self) -> Result<crate::metadata::Snapshot> {
+        let source =
+            if self.package().has_file("meta.xml")? {
+                let bytes = self.package().get_file("meta.xml")?;
+                Some(String::from_utf8(bytes).map_err(|_| {
+                    Error::InvalidFormat("ODS meta.xml is not valid UTF-8".to_string())
+                })?)
+            } else {
+                None
+            };
+        crate::metadata::Snapshot::from_source(source)
+    }
+
+    /// Decode the optional spreadsheet calculation-settings owner.
+    pub(crate) fn calculation_settings(&self) -> Result<Option<Settings>> {
+        crate::settings::Snapshot::from_content_xml(self.content_xml())
+            .map(|snapshot| snapshot.calculation().cloned())
+    }
+
     /// Read the ordered named-definition catalog from `content.xml`.
     pub fn definitions(&self) -> Result<Vec<Definition>> {
         crate::codec::names::parse(self.content_xml())
@@ -48,15 +70,59 @@ impl Package {
 
     /// Rebuild this package with a replacement `content.xml`.
     pub(crate) fn replace_content_xml(&self, content_xml: &str) -> Result<Self> {
-        let bytes = litchi_odf_common::package::rebuild_package(
-            self.package(),
-            content_xml,
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
+        let bytes = self.rebuild(content_xml, Part::Preserve, Part::Preserve)?;
+        Self::from_bytes(bytes)
+    }
+
+    /// Replace or remove `meta.xml` while preserving every other package
+    /// member and all unknown metadata XML not selected by the common patch.
+    pub(crate) fn replace_metadata_xml(&self, metadata_xml: Option<&str>) -> Result<Self> {
+        let bytes = self.rebuild(
+            self.content_xml(),
+            Part::from_option(metadata_xml),
+            Part::Preserve,
         )?;
         Self::from_bytes(bytes)
+    }
+
+    /// Replace the content-level calculation-settings owner atomically.
+    pub(crate) fn replace_calculation_settings(&self, settings: Option<&Settings>) -> Result<Self> {
+        let snapshot = crate::settings::Snapshot::from_content_xml(self.content_xml())?;
+        let mut transaction = snapshot.transaction();
+        match settings {
+            Some(settings) => transaction.replace(settings.clone())?,
+            None => transaction.remove(),
+        }
+        let commit = transaction.commit()?;
+        if !commit.changed() {
+            return Self::from_bytes(self.0.as_bytes().to_vec());
+        }
+        let content_xml = commit.into_owned();
+        let bytes = self.rebuild(&content_xml, Part::Preserve, Part::Preserve)?;
+        Self::from_bytes(bytes)
+    }
+
+    fn rebuild(
+        &self,
+        content_xml: &str,
+        metadata: Part<'_>,
+        settings: Part<'_>,
+    ) -> Result<Vec<u8>> {
+        let source = self.package();
+        let mut writer = PackageWriter::new();
+        writer.set_mimetype(&source.mimetype()?)?;
+        writer.add_file("content.xml", content_xml.as_bytes())?;
+        if source.has_file("styles.xml")? {
+            writer.add_file("styles.xml", &source.get_file("styles.xml")?)?;
+        }
+        write_part(&mut writer, source, "meta.xml", metadata)?;
+        write_part(&mut writer, source, "settings.xml", settings)?;
+        writer.copy_auxiliary_files_from_except(
+            source,
+            &["meta.xml".to_string(), "settings.xml".to_string()],
+            &[],
+        )?;
+        writer.finish_to_bytes()
     }
 
     /// Rebuild the package after an atomic semantic worksheet edit.
@@ -68,4 +134,37 @@ impl Package {
     pub fn into_bytes(self) -> Vec<u8> {
         self.0.into_bytes()
     }
+}
+
+enum Part<'a> {
+    Preserve,
+    Set(&'a str),
+    Remove,
+}
+
+impl<'a> Part<'a> {
+    fn from_option(value: Option<&'a str>) -> Self {
+        match value {
+            Some(value) => Self::Set(value),
+            None => Self::Remove,
+        }
+    }
+}
+
+fn write_part(
+    writer: &mut PackageWriter,
+    source: &OwnedPackage,
+    path: &str,
+    part: Part<'_>,
+) -> Result<()> {
+    match part {
+        Part::Preserve => {
+            if source.has_file(path)? {
+                writer.add_file(path, &source.get_file(path)?)?;
+            }
+        },
+        Part::Set(xml) => writer.add_file(path, xml.as_bytes())?,
+        Part::Remove => {},
+    }
+    Ok(())
 }

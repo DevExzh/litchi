@@ -5295,13 +5295,21 @@ root facade keeps the reader-side `StyleDefinition` distinct from the writer
 facade's same contextual name, avoiding an ambiguous root export.
 
 The `[MS-DOC]` `RouteSlip`, `RouteSlipInfo`, and protection metadata now have
-a typed, lossless `parts::route_slip` facade. Its byte-oriented ANSI strings
-avoid an incorrect UTF-8 assumption; the codec validates Bool16 values,
-reserved fields, enum domains, signed lengths, recipient counts, stage
-relationships, truncation, overflow, and trailing bytes. It reads and writes
-the optional FIB `fcRouteSlip`/`lcbRouteSlip` range through the table-stream
-seam. The `Document` object does not yet own route-slip lifecycle editing and
-the protection enum remains metadata rather than an enforced editing policy.
+a typed, lossless `parts::route_slip` owner and contextual
+`litchi_doc::route_slip` facade. Its byte-oriented ANSI strings avoid an
+incorrect UTF-8 assumption; the codec validates Bool16 values, reserved
+fields, enum domains, signed lengths, recipient counts, stage relationships,
+truncation, overflow, and trailing bytes. It reads and writes the optional
+FIB `fcRouteSlip`/`lcbRouteSlip` range through the table-stream seam.
+`Document::route_slip()` exposes deferred optional metadata, while the package
+editor owns immutable package snapshots, typed recipient selectors,
+transactional lifecycle edits, reversible semantic/OLE patches, and a
+round-trip reparse check. Route protection rejects lifecycle mutations unless
+the policy is `Off`; the protection value is not conflated with DOP/range
+protection, and authentication, mail transport, and host routing remain
+inert. The focused route-slip suite covers selector errors, rollback,
+stage/recipient lifecycle, clearing the FIB range, protected atomic rejection,
+and `Document` round-trip visibility.
 
 Strict DOC all-target and umbrella-library checks pass, as do lint-capped
 checks, 837 DOC library tests (two ignored), 162 umbrella library tests, the
@@ -5588,6 +5596,15 @@ check`. This is specification-backed ownership and round-trip evidence for
 the touched `[MS-OLEPS]`, `[MS-OSHARED]`, `[MS-DOC]`, `[MS-ODRAW]`,
 `[MS-OGRAPH]`, `[MS-PPT]`, `[MS-XLS]`, `[MS-XLSB]`, ODF, and DrawingML paths,
 not a claim of complete format conformance.
+
+The subsequent continuation adds focused, bounded owners for DOC route slips,
+DOCX run effects, ODP handout masters, ODS metadata/settings, ODraw geometry,
+OGraph chart patches, PPT masters and hosted charts, PPTX model3d resources,
+and XLSB/XLSX slicer and timeline parts. The affected-crate check passes with
+zero boundary debt; focused suites cover rollback, exact round trips,
+relationship/dependency guards, malformed input, and source-checked OLE patch
+application. This remains incremental specification coverage, not a claim of
+complete Office or ODF conformance.
 
 ## Evidence levels
 

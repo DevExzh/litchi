@@ -198,6 +198,38 @@ fn no_op_editor_round_trip_is_byte_identical() {
 }
 
 #[test]
+fn commit_exposes_snapshot_and_reversible_patch() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let mut editor = Editor::open(
+        original.clone(),
+        targets("object", &["ObjectPool", "_42"]),
+        Limits::default(),
+    )
+    .expect("editor should open");
+    editor
+        .put_stream(&["WordDocument".into()], b"changed".to_vec())
+        .expect("stream edit should commit");
+
+    let committed = editor.commit().expect("commit should validate");
+    assert_eq!(committed.patch().before(), original.as_slice());
+    assert_eq!(
+        committed
+            .snapshot()
+            .finish()
+            .expect("snapshot should finish"),
+        committed.patch().after()
+    );
+    assert_eq!(
+        committed
+            .patch()
+            .inverse()
+            .apply(committed.patch().after())
+            .expect("inverse should apply"),
+        original
+    );
+}
+
+#[test]
 fn failed_replacement_is_transactional() {
     let original = doc_with_object(&[0, 0, 0, 0]);
     let mut editor = Editor::open(

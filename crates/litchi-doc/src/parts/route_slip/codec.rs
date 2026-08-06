@@ -3,6 +3,7 @@
 use super::model::{
     DeliveryOption, Metadata, NarrowString, Protection, Recipient, validate_short_string,
 };
+use super::validation;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 
@@ -22,16 +23,7 @@ pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<M
         return Ok(None);
     }
 
-    let start =
-        usize::try_from(offset).map_err(|_| corrupted("Metadata table offset exceeds usize"))?;
-    let length =
-        usize::try_from(length).map_err(|_| corrupted("Metadata table length exceeds usize"))?;
-    let end = start
-        .checked_add(length)
-        .ok_or_else(|| corrupted("Metadata table range overflows"))?;
-    let data = table_stream
-        .get(start..end)
-        .ok_or_else(|| corrupted("Metadata extends beyond the table stream"))?;
+    let data = validation::table_range(table_stream, offset, length)?;
     parse_bytes(data).map(Some)
 }
 

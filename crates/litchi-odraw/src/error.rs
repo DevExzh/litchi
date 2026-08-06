@@ -57,6 +57,11 @@ pub enum Error {
         /// Concise validation failure description.
         reason: &'static str,
     },
+    /// A custom OfficeArt geometry property violates `[MS-ODRAW]`.
+    MalformedGeometry {
+        /// Concise validation failure description.
+        reason: &'static str,
+    },
     /// A shape container violates an OfficeArt structural invariant.
     MalformedShape {
         /// Concise validation failure description.
@@ -147,6 +152,9 @@ impl core::fmt::Display for Error {
             ),
             Self::MalformedProperties { reason } => {
                 write!(formatter, "malformed OfficeArt properties: {reason}")
+            },
+            Self::MalformedGeometry { reason } => {
+                write!(formatter, "malformed OfficeArt geometry: {reason}")
             },
             Self::MalformedShape { reason } => {
                 write!(formatter, "malformed OfficeArt shape: {reason}")

@@ -7,4 +7,4 @@
 mod model;
 mod records;
 
-pub(super) use records::{encode, parse};
+pub(super) use records::{encode, parse, patch};

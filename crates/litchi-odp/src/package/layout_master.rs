@@ -389,7 +389,7 @@ impl Presentation {
         self.commit_design(required_styles(self)?.to_string(), content)
     }
 
-    fn commit_design(&mut self, styles: String, content: String) -> Result<()> {
+    pub(crate) fn commit_design(&mut self, styles: String, content: String) -> Result<()> {
         validate_references(&styles, &content)?;
         let package = self.owned_package().package()?;
         let mut writer = PackageWriter::new();
@@ -891,6 +891,38 @@ fn validate_references(styles: &str, content: &str) -> Result<()> {
         PRESENTATION,
         "name",
     )?;
+    if let Some(handout) = crate::handout_master::codec::read(styles)? {
+        require(
+            Some(&handout.page_layout_name),
+            &page_layouts,
+            "handout physical page layout",
+        )?;
+        require(
+            handout.presentation_page_layout_name.as_deref(),
+            &layouts,
+            "handout presentation page layout",
+        )?;
+        require(
+            handout.drawing_style_name.as_deref(),
+            &drawing_styles,
+            "handout drawing-page style",
+        )?;
+        require(
+            handout.header_name.as_deref(),
+            &headers,
+            "handout header declaration",
+        )?;
+        require(
+            handout.footer_name.as_deref(),
+            &footers,
+            "handout footer declaration",
+        )?;
+        require(
+            handout.date_time_name.as_deref(),
+            &dates,
+            "handout date-time declaration",
+        )?;
+    }
     for master in &masters {
         require(
             master.master_page.page_layout_name.as_deref(),

@@ -34,6 +34,65 @@ impl MutableSpreadsheet {
         &self.spreadsheet
     }
 
+    /// Borrow the compact cross-format metadata projection.
+    pub fn metadata(&self) -> &litchi_core::Metadata {
+        self.spreadsheet.metadata()
+    }
+
+    /// Borrow the complete typed ODF metadata model.
+    pub fn odf_metadata(&self) -> &crate::metadata::Metadata {
+        self.spreadsheet.odf_metadata()
+    }
+
+    /// Replace the supported metadata projection atomically.
+    pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<()> {
+        self.spreadsheet.publish_metadata(metadata)
+    }
+
+    /// Apply a short-lived metadata update transactionally.
+    pub fn update_metadata<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut litchi_core::Metadata) -> Result<()>,
+    {
+        let mut metadata = self.metadata().clone();
+        update(&mut metadata)?;
+        self.set_metadata(metadata)
+    }
+
+    /// Remove the physical `meta.xml` part atomically.
+    pub fn clear_metadata(&mut self) -> Result<()> {
+        self.spreadsheet.remove_metadata()
+    }
+
+    /// Borrow spreadsheet calculation settings, if present.
+    pub fn settings(&self) -> Option<&crate::settings::Settings> {
+        self.spreadsheet.settings()
+    }
+
+    /// Replace or remove calculation settings atomically.
+    pub fn set_settings(&mut self, settings: Option<crate::settings::Settings>) -> Result<()> {
+        if let Some(settings) = &settings {
+            settings.validate()?;
+        }
+        self.spreadsheet.publish_settings(settings)
+    }
+
+    /// Apply a typed calculation-settings update, creating the owner when it
+    /// is absent.
+    pub fn update_settings<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::settings::Settings) -> Result<()>,
+    {
+        let mut settings = self.settings().cloned().unwrap_or_default();
+        update(&mut settings)?;
+        self.set_settings(Some(settings))
+    }
+
+    /// Remove the calculation-settings element from `content.xml`.
+    pub fn clear_settings(&mut self) -> Result<()> {
+        self.set_settings(None)
+    }
+
     /// Return the typed worksheet graph in document order.
     pub fn sheets(&self) -> &[Sheet] {
         self.spreadsheet.sheets()

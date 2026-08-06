@@ -51,12 +51,16 @@ pub mod sheet;
 pub mod sheet_calculation_properties;
 pub mod sheet_protection;
 pub mod sheet_view;
-pub mod slicer_cache;
+pub mod slicer;
+#[allow(dead_code, unreachable_pub, unused_imports)]
+mod slicer_cache;
 pub mod sort;
 pub mod style;
 pub mod table;
 pub mod threaded_comments;
-pub mod timelines;
+pub mod timeline;
+#[allow(dead_code, unreachable_pub, unused_imports)]
+mod timelines;
 pub mod views;
 pub mod volatile_dependencies;
 pub mod web;
@@ -175,7 +179,6 @@ pub use sheet_protection::{
     validate_metadata, write_core, write_extensions, write_protection,
 };
 pub use sheet_view::parse_worksheet_views;
-pub use slicer_cache::{SLICER_CACHE_CONTENT_TYPE, SLICER_CACHE_RELATIONSHIP_TYPE};
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use style::{LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use table::{
@@ -186,14 +189,6 @@ pub use threaded_comments::{
     Comment, CommentsPart, Graph, Mention, People, PeoplePart, Person, parse_comments,
     parse_persons, validate_comments, validate_graph, validate_guid, validate_people,
     validate_timestamp, write_comments, write_persons,
-};
-pub use timelines::{
-    Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, Part, PivotFilter,
-    TIMELINE_CACHE_CONTENT_TYPE, TIMELINE_CACHE_EXTENSION_URI, TIMELINE_CACHE_RELATIONSHIP_TYPE,
-    TIMELINES_CONTENT_TYPE, TIMELINES_EXTENSION_URI, TIMELINES_RELATIONSHIP_TYPE, View, Views,
-    load_timeline_caches, load_timelines, parse_timeline_cache_definition, parse_timelines,
-    store_timeline_caches, store_worksheet_timelines, write_timeline_cache_definition,
-    write_timelines,
 };
 pub use views::{Pane, PanePosition, PaneState, Selection, ViewType};
 pub use workbook::{

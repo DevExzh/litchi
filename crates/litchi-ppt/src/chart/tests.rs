@@ -172,6 +172,7 @@ fn semantic_validation_is_opt_in_without_changing_raw_inventory() {
         Info::new(1, 1, Some("MSGraph.Chart.8".into()), None),
         Box::new(package),
         book,
+        Compression::Uncompressed,
     ));
 
     assert!(chart.charts().next().expect("raw chart").is_ok());
@@ -184,5 +185,30 @@ fn semantic_validation_is_opt_in_without_changing_raw_inventory() {
     assert_eq!(
         semantic.encode().expect("lossless replay").as_bytes(),
         chart_bytes
+    );
+}
+
+#[test]
+fn replacement_storage_preserves_compression_mode() {
+    let original = b"original chart package";
+    let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+    encoder.write_all(original).expect("compress source");
+    let source = storage(
+        Compression::Zlib,
+        original.len() as u32,
+        encoder.finish().expect("finish source compression"),
+    );
+    let replacement = b"replacement chart package with a new size".to_vec();
+    let encoded = super::codec::encode_storage(replacement.clone(), source.compression())
+        .expect("encode replacement");
+
+    assert_eq!(encoded.compression(), Compression::Zlib);
+    assert_eq!(
+        encoded.declared_uncompressed_len(),
+        Some(replacement.len() as u32)
+    );
+    assert_eq!(
+        decode(encoded, Limits::default()).expect("decode replacement"),
+        replacement
     );
 }

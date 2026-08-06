@@ -10,6 +10,7 @@
 pub mod authoring;
 pub mod codec;
 pub mod facade;
+pub mod handout_master;
 pub mod model;
 pub mod package;
 

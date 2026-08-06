@@ -83,6 +83,24 @@ impl Package {
         writer::write_to(&self.0, sink)
     }
 
+    /// Start a clone-staged transaction for worksheet slicers.
+    ///
+    /// Dropping the returned transaction rolls back; `commit` publishes the
+    /// validated feature graph without rebuilding unrelated workbook parts.
+    pub fn edit_slicers(&mut self) -> Result<crate::slicer::Transaction<'_>> {
+        crate::slicer::Transaction::new(&mut self.0)
+    }
+
+    /// Start a clone-staged transaction for worksheet timelines.
+    ///
+    /// Timeline cache references are workbook-owned, so the workbook part
+    /// identity is captured once at transaction start and is not exposed by
+    /// the ordinary package facade.
+    pub fn edit_timelines(&mut self) -> Result<crate::timeline::Transaction<'_>> {
+        let workbook = self.0.main_document_part()?.partname().clone();
+        crate::timeline::Transaction::new(&mut self.0, &workbook)
+    }
+
     /// Atomically save the package to a filesystem path.
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
         writer::save(&self.0, path)

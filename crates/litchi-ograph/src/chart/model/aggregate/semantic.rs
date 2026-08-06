@@ -117,6 +117,17 @@ impl Chart {
         Ok(chart)
     }
 
+    /// Starts the bounded, lossless cache-value transaction.
+    ///
+    /// The transaction consumes this immutable chart snapshot. Only existing
+    /// cache cells may be changed, and only when the replacement keeps the
+    /// producer-specific record kind and physical payload length. Unknown
+    /// records, series identities, coordinates, formatting indices, and
+    /// record order therefore remain untouched.
+    pub fn edit(self) -> Result<crate::chart::transaction::Editor> {
+        crate::chart::transaction::Editor::new(self)
+    }
+
     /// Replays an untouched parsed chart, or refuses unsupported fresh authoring.
     pub fn encode(self) -> Result<Stream> {
         let limits = self.limits;

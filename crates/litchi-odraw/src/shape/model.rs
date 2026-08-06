@@ -2,8 +2,8 @@
 
 use bitflags::bitflags;
 
-use crate::prop::{Anchor, Props};
-use crate::{Container, Record};
+use crate::prop::{Anchor, Props, geometry::Geometry};
+use crate::{Container, Record, Result};
 
 bitflags! {
     /// Flags encoded by an OfficeArt `Sp` atom (`[MS-ODRAW]` section 2.2.40).
@@ -205,6 +205,13 @@ impl<'data> Shape<'data> {
     /// Returns the primary shape property table.
     pub const fn props(&self) -> &Props<'data> {
         &self.props
+    }
+
+    /// Decodes this shape's custom geometry without copying its property
+    /// arrays.  Preset shapes simply return `None` when no geometry property
+    /// family was encoded.
+    pub fn geometry(&self) -> Result<Option<Geometry<'data>>> {
+        self.props.geometry()
     }
 
     /// Returns the format-neutral child anchor when present.

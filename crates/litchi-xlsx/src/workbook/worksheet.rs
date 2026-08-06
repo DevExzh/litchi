@@ -238,9 +238,9 @@ pub(crate) fn active_x(sheet: &Worksheet) -> Result<crate::active_x::ControlSet>
 }
 
 /// Load timeline views associated with this worksheet.
-pub(crate) fn timelines(sheet: &Worksheet) -> Result<Vec<crate::timelines::Part>> {
+pub(crate) fn timelines(sheet: &Worksheet) -> Result<Vec<crate::timeline::Part>> {
     Ok(
-        crate::timelines::load_timelines(&sheet.owner.package, &sheet.owner.workbook_uri)?
+        crate::timeline::load_parts(&sheet.owner.package, &sheet.owner.workbook_uri)?
             .into_iter()
             .filter(|part| part.worksheet_part_name == sheet.data.part_uri.as_str())
             .collect(),

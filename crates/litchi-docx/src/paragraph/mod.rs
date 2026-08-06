@@ -12,6 +12,8 @@ mod package;
 #[cfg(test)]
 mod tests;
 
+pub use crate::run_effects;
+pub use crate::run_effects::RunEffects;
 pub use model::{
     LineSpacingRule, Paragraph, ParagraphSpacing, Run, RunBreak, RunBreakClear, RunBreakType,
     RunProperties, RunUnderline, RunUnderlineColor,

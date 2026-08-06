@@ -85,6 +85,19 @@ impl<'a> Slide<'a> {
         package::slide_shape_tags(self.package, &self.part, shape)
     }
 
+    /// Read all contextual 3D-model owners on this slide in source order.
+    pub fn model3ds(&self) -> Result<Vec<crate::model3d::Model>> {
+        crate::model3d::package::load_all(self.package, self.part.part().partname())
+    }
+
+    /// Read the model3d owner attached to one semantic shape, if present.
+    pub fn model3d<'k>(
+        &self,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<Option<crate::model3d::Model>> {
+        crate::model3d::package::load(self.package, self.part.part().partname(), shape.into())
+    }
+
     /// Inspect all tag relationships on this slide in stable relationship-ID
     /// order. Shape-owned and unanchored producer markup remains visible here
     /// but is not flattened into [`Self::tags`].

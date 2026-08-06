@@ -12,6 +12,8 @@ pub struct Spreadsheet {
     package: crate::package::Package,
     definitions: Vec<Definition>,
     sheets: Vec<crate::worksheet::Sheet>,
+    metadata: crate::metadata::Snapshot,
+    settings: Option<crate::settings::Settings>,
 }
 
 impl Spreadsheet {
@@ -28,10 +30,14 @@ impl Spreadsheet {
     fn from_package(package: crate::package::Package) -> Result<Self> {
         let definitions = package.definitions()?;
         let sheets = package.sheets()?;
+        let metadata = package.metadata_snapshot()?;
+        let settings = package.calculation_settings()?;
         Ok(Self {
             package,
             definitions,
             sheets,
+            metadata,
+            settings,
         })
     }
 
@@ -41,6 +47,31 @@ impl Spreadsheet {
 
     pub fn styles_xml(&self) -> Option<&str> {
         self.package.styles_xml()
+    }
+
+    /// Borrow the compact cross-format metadata projection.
+    pub fn metadata(&self) -> &litchi_core::Metadata {
+        self.metadata.value()
+    }
+
+    /// Borrow the complete typed ODF metadata model.
+    pub fn odf_metadata(&self) -> &crate::metadata::Metadata {
+        self.metadata.odf()
+    }
+
+    /// Borrow the retained metadata snapshot, including bounded source XML.
+    pub fn metadata_snapshot(&self) -> &crate::metadata::Snapshot {
+        &self.metadata
+    }
+
+    /// Borrow spreadsheet calculation settings, if the document declares them.
+    pub fn settings(&self) -> Option<&crate::settings::Settings> {
+        self.settings.as_ref()
+    }
+
+    /// Alias whose name makes the content-level ODF owner explicit.
+    pub fn calculation_settings(&self) -> Option<&crate::settings::Settings> {
+        self.settings()
     }
 
     /// Return the typed worksheet graph in document order.
@@ -169,6 +200,51 @@ impl Spreadsheet {
         let package = self.package.replace_sheets(&sheets)?;
         self.package = package;
         self.sheets = sheets;
+        Ok(())
+    }
+
+    pub(crate) fn publish_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<()> {
+        let package = self.package.metadata_snapshot()?;
+        let mut transaction = package.transaction();
+        transaction.replace(metadata)?;
+        let commit = transaction.commit()?;
+        if !commit.changed() {
+            return Ok(());
+        }
+        let metadata_xml = commit.into_owned_xml().ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(
+                "changed ODS metadata transaction produced no XML".to_string(),
+            )
+        })?;
+        let package = self.package.replace_metadata_xml(Some(&metadata_xml))?;
+        *self = Self::from_package(package)?;
+        Ok(())
+    }
+
+    pub(crate) fn remove_metadata(&mut self) -> Result<()> {
+        let snapshot = self.package.metadata_snapshot()?;
+        let mut transaction = snapshot.transaction();
+        transaction.remove();
+        let commit = transaction.commit()?;
+        if !commit.changed() {
+            return Ok(());
+        }
+        let package = self.package.replace_metadata_xml(None)?;
+        *self = Self::from_package(package)?;
+        Ok(())
+    }
+
+    pub(crate) fn publish_settings(
+        &mut self,
+        settings: Option<crate::settings::Settings>,
+    ) -> Result<()> {
+        if self.settings == settings {
+            return Ok(());
+        }
+        let package = self
+            .package
+            .replace_calculation_settings(settings.as_ref())?;
+        *self = Self::from_package(package)?;
         Ok(())
     }
 

@@ -2,14 +2,14 @@ use super::super::{Kind, cache as chart_cache};
 use super::series::RowCol;
 
 /// One cached chart value.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Number(f64),
     Text(String),
     Blank,
 }
 /// Excel cached value, including the producer-specific `BoolErr` union.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum XlValue {
     Number(f64),
     Text(String),

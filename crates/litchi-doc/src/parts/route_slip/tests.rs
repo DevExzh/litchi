@@ -1,7 +1,10 @@
 use super::{
-    DeliveryOption, Metadata, NarrowString, Protection, Recipient, parse, parse_bytes, to_bytes,
+    DeliveryOption, Editor, Metadata, NarrowString, Protection, Recipient, RecipientSelector,
+    Snapshot, TransactionError, parse, parse_bytes, to_bytes,
 };
 use crate::parts::fib::FileInformationBlock;
+use litchi_cfb::OleWriter;
+use std::io::Cursor;
 
 fn sample() -> Metadata {
     Metadata::try_new(
@@ -114,6 +117,107 @@ fn validates_models_before_serializing() {
     assert!(invalid.to_bytes().is_err());
 
     assert!(Recipient::parse_bytes(&[0, 0, 1, 0, b'a', 0]).is_err());
+}
+
+#[test]
+fn selectors_reject_ambiguous_names_and_out_of_bounds_indices() {
+    let mut metadata = editable_sample();
+    metadata.recipients[0].name = NarrowString::new(b"same".to_vec());
+    metadata.recipients[1].name = NarrowString::new(b"same".to_vec());
+    let mut transaction = Snapshot::new(metadata).unwrap().edit();
+
+    assert!(matches!(
+        transaction.set_stage(RecipientSelector::Name(b"same")),
+        Err(TransactionError::Selection(
+            super::RecipientSelectionError::AmbiguousName { matches, .. }
+        )) if matches == vec![0, 1]
+    ));
+    assert!(matches!(
+        transaction.set_stage(RecipientSelector::Index(2)),
+        Err(TransactionError::Selection(
+            super::RecipientSelectionError::IndexOutOfBounds { index: 2, len: 2 }
+        ))
+    ));
+}
+
+#[test]
+fn transaction_rollback_and_commit_produce_reversible_semantic_patch() {
+    let source = Snapshot::new(editable_sample()).unwrap();
+    let mut transaction = source.edit();
+    transaction.set_stage(RecipientSelector::Index(0)).unwrap();
+    assert!(transaction.is_changed());
+    transaction.rollback();
+    assert!(!transaction.is_changed());
+
+    transaction.set_stage(RecipientSelector::Index(1)).unwrap();
+    let committed = transaction.commit().unwrap();
+    assert_eq!(committed.snapshot().metadata().unwrap().stage, 1);
+    assert_eq!(
+        committed
+            .patch()
+            .inverse()
+            .apply(committed.snapshot())
+            .unwrap(),
+        source
+    );
+}
+
+#[test]
+fn protected_route_metadata_rejects_semantic_edits() {
+    let mut transaction = Snapshot::new(sample()).unwrap().edit();
+    assert!(matches!(
+        transaction.set_stage(RecipientSelector::Index(0)),
+        Err(TransactionError::Protected(Protection::Annotation))
+    ));
+}
+
+#[test]
+fn package_lifecycle_appends_route_data_and_clears_only_fib_pointer() {
+    let original_table = b"unrelated table bytes";
+    let original = write_base_doc(original_table);
+    let mut editor = Editor::open(original.clone()).unwrap();
+    let metadata = editable_sample();
+    let committed = editor.set(metadata.clone()).unwrap();
+    let routed = committed.snapshot().finish().unwrap();
+
+    let mut ole = litchi_cfb::OleFile::open(Cursor::new(routed.clone())).unwrap();
+    let table = ole.open_stream(&["0Table"]).unwrap();
+    assert!(table.starts_with(original_table));
+    assert_eq!(
+        Editor::open(routed.clone()).unwrap().metadata(),
+        Some(&metadata)
+    );
+    assert!(committed.package_patch().inverse().apply(&routed).is_ok());
+
+    let completed = Editor::open(routed).unwrap().complete().unwrap();
+    let finished = completed.snapshot().finish().unwrap();
+    let reopened = Editor::open(finished.clone()).unwrap();
+    assert!(reopened.metadata().is_none());
+    let mut ole = litchi_cfb::OleFile::open(Cursor::new(finished)).unwrap();
+    let word = ole.open_stream(&["WordDocument"]).unwrap();
+    let pointer = 154 + 70 * 8;
+    assert_eq!(&word[pointer..pointer + 8], &[0; 8]);
+}
+
+fn editable_sample() -> Metadata {
+    let mut value = sample();
+    value.protection = Protection::Off;
+    value
+}
+
+fn write_base_doc(table: &[u8]) -> Vec<u8> {
+    let pointer = 154 + 70 * 8;
+    let mut word = vec![0; pointer + 8];
+    word[0..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
+    word[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
+    word[152..154].copy_from_slice(&71u16.to_le_bytes());
+
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["WordDocument"], &word).unwrap();
+    writer.create_stream(&["0Table"], table).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
 }
 
 fn first_recipient_name_length_offset(bytes: &[u8]) -> usize {

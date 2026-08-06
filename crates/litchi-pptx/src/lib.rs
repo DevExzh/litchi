@@ -24,6 +24,7 @@ pub mod format;
 pub mod hyperlinks;
 pub mod laser;
 pub mod media_parts;
+pub mod model3d;
 pub mod modern_comments;
 
 pub mod master_layout;

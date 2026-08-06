@@ -475,7 +475,9 @@ pub(crate) fn validate_package_graph(package: &OpcPackage) -> Result<()> {
         .iter_parts()
         .filter(|part| part.content_type() == SLICERS_CONTENT_TYPE)
     {
-        if !relationship_targets.contains(part.partname().as_str()) {
+        if !relationship_targets.contains(part.partname().as_str())
+            && !has_inbound_reference(package, part.partname())
+        {
             return Err(invalid(format!(
                 "orphan Slicers part '{}'",
                 part.partname()
@@ -483,6 +485,22 @@ pub(crate) fn validate_package_graph(package: &OpcPackage) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn has_inbound_reference(package: &OpcPackage, target: &PackURI) -> bool {
+    package.rels().iter().any(|relationship| {
+        !relationship.is_external()
+            && relationship
+                .target_partname()
+                .is_ok_and(|candidate| candidate == *target)
+    }) || package.iter_parts().any(|source| {
+        source.rels().iter().any(|relationship| {
+            !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|candidate| candidate == *target)
+        })
+    })
 }
 
 fn parse_slicer_start(element: &BytesStart<'_>, decoder: Decoder) -> Result<Slicer> {

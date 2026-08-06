@@ -17,9 +17,37 @@ pub enum Protection {
     Form = 3,
 }
 
+/// A document-change family described by route-slip protection.
+///
+/// This is a policy projection only. The DOC crate does not authenticate a
+/// caller, execute a route, or silently rewrite `DopBase` or range-protection
+/// records when this value is queried.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditKind {
+    /// An unrestricted content edit.
+    Content,
+    /// A change-tracked revision operation.
+    Revision,
+    /// An annotation/comment operation.
+    Annotation,
+    /// An edit confined to a form field or unprotected section.
+    FormField,
+}
+
 impl Protection {
     pub(crate) const fn raw(self) -> u16 {
         self as u16
+    }
+
+    /// Whether this route policy describes the supplied document-change kind.
+    #[must_use]
+    pub const fn allows(self, change: EditKind) -> bool {
+        match self {
+            Self::Off => true,
+            Self::RevisionMark => matches!(change, EditKind::Revision),
+            Self::Annotation => matches!(change, EditKind::Annotation),
+            Self::Form => matches!(change, EditKind::FormField),
+        }
     }
 }
 

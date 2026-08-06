@@ -468,6 +468,10 @@ impl Presentation {
         Ok(record)
     }
 
+    pub(crate) fn document_stream(&self) -> &[u8] {
+        &self.powerpoint_document
+    }
+
     /// Return a payload-free descriptor for the document's VBA project storage.
     ///
     /// Macro bytes are not returned, decompressed, interpreted, or executed.

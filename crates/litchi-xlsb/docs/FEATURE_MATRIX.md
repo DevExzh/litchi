@@ -71,8 +71,8 @@ formula results are recalculated or that external, macro, or embedded content is
 | Pivot caches | ✅ | ✅ | ✅ | Typed inert PivotCache definitions cover refresh metadata, worksheet/consolidation sources, all shared-item value kinds, range/discrete grouping, OLAP hierarchies and tuple caches, calculated items/members with inert formula tokens, and supported Excel extensions. |
 | PivotTable views | ✅ | ✅ | ✅ | Pivot views, fields, items, layouts, data fields, filters, and workbook cache-ID wiring are read and serialized with lossless-or-refuse validation. No pivot refresh or calculation is performed. |
 | Pivot charts | 🟡 | ✅ | 🟡 | Pivot-chart resources and relationships are recognized through the chart package model; chart rendering and full pivot-chart authoring are bounded. |
-| Slicers and slicer caches | ❌ | ❌ | ❌ | [MS-XLSB] 3.10 documents the BIFF12 slicer/slicer-cache parts, but this crate has no public typed slicer model or CRUD. |
-| Timelines | ❌ | ❌ | ❌ | Timeline cache/view parts and timeline filtering are not implemented. |
+| Slicers and slicer caches | 🟡 | ✅ | ✅ | Bounded native/table BIFF12 cache definitions, worksheet slicer views, workbook/sheet relationship wiring, and transactional inert CRUD are supported. OLAP item-range authoring and filter execution remain outside this slice. |
+| Timelines | 🟡 | ✅ | ✅ | Bounded timeline cache/view XML, BIFF12 workbook/sheet relationship wiring, and transactional inert CRUD are supported. Extension payloads, active filtering, and refresh remain outside this slice. |
 
 ## External references, connections, and extensibility
 
@@ -98,7 +98,7 @@ formula results are recalculated or that external, macro, or embedded content is
 | Rich values, rich-data metadata, and modern data types | ❌ | ❌ | ❌ | The [MS-XLSB] metadata examples include MDX and cell/value metadata families, but no public rich-value model is provided. |
 | MDX/cell/value metadata semantics | 🟡 | 🟡 | 🟡 | Raw/package records may be retained or inspected through lower-level paths, but cube metadata is not a typed semantic model and MDX is never evaluated. |
 | Complete chart grammar and rendering | ❌ | ❌ | ❌ | Chart-sheet/resource coverage is deliberately bounded; the crate does not provide an Excel renderer or unrestricted chart graph editor. |
-| Slicers, timelines, and their filter behavior | ❌ | ❌ | ❌ | The protocol exposes slicer and timeline parts, but no corresponding typed model is available. |
+| Slicers, timelines, and their filter behavior | 🟡 | ✅ | ✅ | Typed cache/view snapshots and safe transactional CRUD are available; selection/filter behavior, refresh, calculation, and unsupported opaque structures are intentionally inert or refused. |
 | XML maps and mapped XML import/export | ❌ | ❌ | ❌ | No XLSB XML-map/data-binding authoring model is exposed. |
 | ActiveX/form-control execution | ❌ | ❌ | ❌ | Drawing and embedded-object payloads are inert; controls are not instantiated, activated, or run. |
 | Macro execution and external-link/connection refresh | ❌ | ❌ | ❌ | VBA, DDE, OLE, URLs, commands, credentials, and cached external data are never executed, fetched, or refreshed. |

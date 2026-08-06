@@ -29,6 +29,10 @@ pub mod comments;
 /// Contextual facade for inert threaded-comments/person package CRUD. The
 /// legacy `package::comments` adapter remains separate and owns BIFF12 notes.
 pub use crate::comments::threaded::package as threaded_comments;
+/// Contextual facade for XLSB slicer cache and worksheet-view parts.
+pub use crate::slicer::package as slicers;
+/// Contextual facade for XLSB timeline cache and worksheet-view parts.
+pub use crate::timeline::package as timelines;
 #[path = "../host/connections/mod.rs"]
 pub mod connections;
 #[path = "../host/data_validation.rs"]

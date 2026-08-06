@@ -3,6 +3,7 @@
 use super::codec::{self, Package};
 use super::discovery;
 use super::model::{Limits, Objects};
+use super::patch::{Commit, Patch};
 use super::snapshot::Snapshot;
 use super::target::{Target, Targets};
 use litchi_cfb::{OleError, OleFile};
@@ -155,7 +156,7 @@ impl Editor {
         candidate
             .package
             .replace_object(object.path(), &replacement, self.limits)?;
-        *self = candidate.commit()?;
+        *self = candidate.commit_candidate()?;
         Ok(())
     }
 
@@ -184,7 +185,7 @@ impl Editor {
         }
         let mut candidate = self.clone();
         candidate.package.put_stream(path, data, self.limits)?;
-        *self = candidate.commit()?;
+        *self = candidate.commit_candidate()?;
         Ok(())
     }
 
@@ -199,7 +200,7 @@ impl Editor {
         candidate
             .package
             .add_stream(path, data.into(), self.limits)?;
-        *self = candidate.commit()?;
+        *self = candidate.commit_candidate()?;
         Ok(())
     }
 
@@ -223,7 +224,7 @@ impl Editor {
             .package
             .add_object(&target, &nested, self.limits)?;
         candidate.targets.push(target)?;
-        *self = candidate.commit()?;
+        *self = candidate.commit_candidate()?;
         Ok(())
     }
 
@@ -244,7 +245,7 @@ impl Editor {
             .package
             .remove_object(object.path(), self.limits)?;
         candidate.targets = candidate.targets.without(key)?;
-        *self = candidate.commit()?;
+        *self = candidate.commit_candidate()?;
         Ok(removed)
     }
 
@@ -264,7 +265,20 @@ impl Editor {
         }
     }
 
-    fn commit(mut self) -> Result<Self, OleError> {
+    /// Commits this edit as an immutable snapshot plus a reversible patch.
+    ///
+    /// The source editor is consumed, so callers cannot accidentally keep
+    /// mutating a value after using the commit result. The patch is checked
+    /// against the exact original artifact and the snapshot has already
+    /// passed the common CFB/resource validation performed by each edit.
+    pub fn commit(self) -> Result<Commit, OleError> {
+        let before = self.original.as_ref().clone();
+        let snapshot = self.snapshot();
+        let after = self.finish()?;
+        Ok(Commit::new(snapshot, Patch::new(before, after)))
+    }
+
+    fn commit_candidate(mut self) -> Result<Self, OleError> {
         self.package.check(self.limits)?;
         let rendered = self.package.render()?;
         let mut check = OleFile::open(Cursor::new(rendered))?;

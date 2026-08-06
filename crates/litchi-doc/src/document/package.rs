@@ -29,6 +29,7 @@ use crate::parts::protection::Ranges;
 use crate::parts::repair_bookmarks::DocumentRepairBookmarks;
 use crate::parts::revisions::RevisionAuthorTable;
 use crate::parts::rmd_threading::DocumentRmdThreading;
+use crate::parts::route_slip::Metadata;
 use crate::parts::rsids::DocumentRsids;
 use crate::parts::saved_by::SavedByTable;
 use crate::parts::sections::SectionsTable;
@@ -123,6 +124,7 @@ impl Document {
         let rmd_threading = DocumentRmdThreading::parse(&fib, &table_stream)?;
         let embedded_fonts = DocumentEmbeddedFonts::parse(&fib, &table_stream)?;
         let auto_summary = DocumentAutoSummary::parse(&fib, &table_stream)?;
+        let route_slip = Metadata::parse(&fib, &table_stream);
         let protected_ranges = Ranges::parse(&fib, &table_stream)?;
         let format_consistency_marks = DocumentFormatConsistencyMarks::parse(&fib, &table_stream)?;
         let structured_tags = DocumentStructuredTags::parse(&fib, &table_stream)?;
@@ -235,6 +237,7 @@ impl Document {
             rmd_threading,
             embedded_fonts,
             auto_summary,
+            route_slip,
             protected_ranges,
             format_consistency_marks,
             structured_tags,

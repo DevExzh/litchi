@@ -1,8 +1,9 @@
 //! Layered SpreadsheetML timeline cache and worksheet timeline owners.
 //!
 //! Semantic values live in [`model`], bounded XML conversion in [`codec`],
-//! and OPC relationship/part ownership in [`package`]. The historical
-//! `litchi_xlsx::timelines` path remains the public facade.
+//! and OPC relationship/part ownership in [`package`]. The public contextual
+//! owner is [`crate::timeline`]; this module is a private grammar core used by
+//! that facade and the shared feature transaction implementation.
 
 mod codec;
 mod model;

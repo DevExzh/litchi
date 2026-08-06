@@ -1,6 +1,7 @@
 use crate::{Container, RecordKind, Result};
 use std::collections::HashMap;
 
+use super::geometry::Geometry;
 use super::model::{Array, ColorRef, Id, Prop, Value};
 
 /// An ordered OfficeArt shape-property collection.
@@ -204,6 +205,12 @@ impl<'data> Props<'data> {
     #[inline]
     pub fn get_adjust(&self, id: Id) -> Option<i32> {
         self.get_int(id)
+    }
+
+    /// Decodes the custom `pVertices`/`pSegmentInfo` geometry family when it
+    /// is present, retaining the underlying arrays as borrowed wire views.
+    pub fn geometry(&self) -> Result<Option<Geometry<'data>>> {
+        super::geometry::parse(self)
     }
 }
 fn boolean_group_terminal(id: u16) -> Option<u16> {

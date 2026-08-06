@@ -24,6 +24,7 @@ const IS_COMPLEX: u16 = 0x8000;
 const PROPERTY_ID_MASK: u16 = 0x3FFF;
 
 mod codec;
+pub mod geometry;
 mod model;
 mod package;
 #[cfg(test)]

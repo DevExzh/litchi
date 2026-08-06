@@ -115,6 +115,11 @@ pub mod html_publish;
 pub mod hyperlink;
 pub mod kinsoku;
 pub mod main_master;
+/// Contextual inventory of the legacy presentation's main, title, notes, and
+/// handout masters.
+pub mod master;
+/// Lossless, snapshot-isolated authoring of one contextual master layout.
+pub mod master_layout;
 pub mod master_style;
 pub mod modify_password;
 pub mod named_shows;

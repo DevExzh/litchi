@@ -1,6 +1,7 @@
 use crate::model::names::{Definition, Expression, Range};
 use crate::worksheet::{Cell, Sheet};
 use litchi_core::{Error, Result};
+use litchi_odf_common::calculation::Settings;
 use litchi_odf_common::core::PackageWriter;
 use quick_xml::{
     events::Event,
@@ -18,6 +19,8 @@ const MAX_CONTENT_XML_DEPTH: usize = 1024;
 pub struct Builder {
     content_xml: String,
     definitions: Vec<Definition>,
+    metadata: litchi_core::Metadata,
+    settings: Option<Settings>,
 }
 
 impl Default for Builder {
@@ -31,12 +34,42 @@ impl Builder {
         Self {
             content_xml: empty_content().to_owned(),
             definitions: Vec::new(),
+            metadata: litchi_core::Metadata::default(),
+            settings: None,
         }
     }
 
     pub fn content_xml(mut self, xml: impl Into<String>) -> Self {
         self.content_xml = xml.into();
         self
+    }
+
+    /// Borrow the compact metadata value that will be written to `meta.xml`.
+    pub fn metadata(&self) -> &litchi_core::Metadata {
+        &self.metadata
+    }
+
+    /// Replace the supported metadata value used for the next build.
+    pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<&mut Self> {
+        let snapshot = crate::metadata::Snapshot::from_source(None)?;
+        let mut transaction = snapshot.transaction();
+        transaction.replace(metadata.clone())?;
+        self.metadata = metadata;
+        Ok(self)
+    }
+
+    /// Borrow the calculation settings that will be emitted in `content.xml`.
+    pub fn settings(&self) -> Option<&Settings> {
+        self.settings.as_ref()
+    }
+
+    /// Set or clear validated calculation settings.
+    pub fn set_settings(&mut self, settings: Option<Settings>) -> Result<&mut Self> {
+        if let Some(settings) = &settings {
+            settings.validate()?;
+        }
+        self.settings = settings;
+        Ok(self)
     }
 
     /// Decode the builder's current typed worksheet snapshot.
@@ -156,16 +189,30 @@ impl Builder {
     }
 
     pub fn build(self) -> Result<Vec<u8>> {
-        let content_xml = if self.definitions.is_empty() {
+        let mut content_xml = if self.definitions.is_empty() {
             self.content_xml
         } else {
             crate::codec::names::replace(&self.content_xml, &self.definitions)?
         };
+        if let Some(settings) = &self.settings {
+            let snapshot = crate::settings::Snapshot::from_content_xml(&content_xml)?;
+            let mut transaction = snapshot.transaction();
+            transaction.replace(settings.clone())?;
+            content_xml = transaction.commit()?.into_owned();
+        }
         validate_content_xml(&content_xml)?;
         crate::worksheet::codec::parse(&content_xml)?;
         let mut writer = PackageWriter::new();
         writer.set_mimetype(MIMETYPE)?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
+        if self.metadata.has_data() {
+            let snapshot = crate::metadata::Snapshot::from_source(None)?;
+            let mut transaction = snapshot.transaction();
+            transaction.replace(self.metadata)?;
+            if let Some(metadata_xml) = transaction.commit()?.into_owned_xml() {
+                writer.add_file("meta.xml", metadata_xml.as_bytes())?;
+            }
+        }
         writer.finish_to_bytes()
     }
 }

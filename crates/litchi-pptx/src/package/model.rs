@@ -158,6 +158,52 @@ impl Package {
         self.edit_typed(move |opc| crate::tag::shape::remove(opc, &slide_name, shape))
     }
 
+    /// Read all contextual 3D-model owners on one slide in source order.
+    pub fn model3ds<'a>(
+        &self,
+        slide: impl Into<crate::slide::Key<'a>>,
+    ) -> Result<Vec<crate::model3d::Model>> {
+        self.ensure_graph_current("model3ds")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        crate::model3d::package::load_all(&self.opc, &slide_name)
+    }
+
+    /// Read the model3d owner attached to one semantic shape, if present.
+    pub fn model3d<'s, 'k>(
+        &self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<Option<crate::model3d::Model>> {
+        self.ensure_graph_current("model3d")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        crate::model3d::package::load(&self.opc, &slide_name, shape.into())
+    }
+
+    /// Replace one existing model3d owner transactionally.
+    pub fn put_model3d<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+        model: crate::model3d::Model,
+    ) -> Result<Option<crate::model3d::Model>> {
+        self.ensure_graph_current("put_model3d")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        self.edit_typed(move |opc| {
+            crate::model3d::package::put(opc, &slide_name, shape.into(), model)
+        })
+    }
+
+    /// Remove one model3d owner and collect unreachable binary resources.
+    pub fn remove_model3d<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<Option<crate::model3d::Model>> {
+        self.ensure_graph_current("remove_model3d")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        self.edit_typed(move |opc| crate::model3d::package::remove(opc, &slide_name, shape.into()))
+    }
+
     /// Load the presentation's optional DrawingML table-style catalog.
     pub fn styles(&self) -> Result<Option<crate::table::style::List>> {
         // Table styles are owned by their OPC part, independently of the

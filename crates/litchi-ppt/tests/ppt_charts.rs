@@ -50,10 +50,15 @@ fn graph_workbook() -> Vec<u8> {
     let mut workbook = record(BOF, &graph_bof(0x0005));
     workbook.extend(record(UNKNOWN, &[1, 2, 3]));
     workbook.extend(record(EOF, &[]));
-    workbook.extend(record(BOF, &graph_bof(0x8000)));
-    workbook.extend(record(UNKNOWN, &[4, 5]));
-    workbook.extend(record(EOF, &[]));
+    workbook.extend(graph_chart(&[4, 5]));
     workbook
+}
+
+fn graph_chart(data: &[u8]) -> Vec<u8> {
+    let mut chart = record(BOF, &graph_bof(0x8000));
+    chart.extend(record(UNKNOWN, data));
+    chart.extend(record(EOF, &[]));
+    chart
 }
 
 fn excel_workbook() -> Vec<u8> {
@@ -222,6 +227,53 @@ fn program_identifies_chart_when_subtype_is_default() {
     assert_eq!(inventory.failures().count(), 0);
     assert_eq!(inventory.charts().count(), 1);
     assert_eq!(inventory.get(0).map(Chart::kind), Some(Kind::Excel));
+}
+
+#[test]
+fn graph_package_replacement_uses_typed_host_storage_transaction() {
+    let mut seed = editor_with_seed(9);
+    seed.add(
+        chart_object(7, ObjectSubtype::Graph, "MSGraph.Chart.8"),
+        uncompressed(compound(&graph_workbook())),
+    )
+    .expect("add Graph object");
+    let objects = seed.objects().clone();
+    let original = seed.finish().expect("finish initial package");
+
+    let mut package = Package::from_reader(Cursor::new(original.clone())).expect("open package");
+    let presentation = package.presentation().expect("read presentation");
+    let inventory = presentation.charts().expect("enumerate charts");
+    let graph = match inventory.get(0).expect("Graph chart") {
+        Chart::Graph(graph) => graph,
+        Chart::Excel(_) => panic!("expected Graph chart"),
+    };
+    let persist_id = graph.info().persist_id();
+    let replacement = graph_chart(&[9, 8, 7]);
+    let mut chart_package = graph.edit_package().expect("open chart package");
+    chart_package
+        .replace_chart(
+            litchi_ograph::chart::Stream::open(replacement.clone())
+                .expect("typed Graph chart stream"),
+        )
+        .expect("stage chart replacement");
+    let mut host = Editor::open(original, objects).expect("open host editor");
+    graph
+        .replace_package(&mut host, chart_package)
+        .expect("stage typed host replacement");
+    let rewritten = host.finish().expect("finish host transaction");
+
+    let mut reopened = Package::from_reader(Cursor::new(rewritten)).expect("reopen package");
+    let presentation = reopened
+        .presentation()
+        .expect("read rewritten presentation");
+    let inventory = presentation.charts().expect("enumerate rewritten charts");
+    let Chart::Graph(graph) = inventory.get(0).expect("rewritten Graph chart") else {
+        panic!("expected rewritten Graph chart");
+    };
+    let workbook = graph.package().workbook().expect("rewritten Workbook");
+    assert_eq!(workbook.chart().as_bytes(), replacement.as_slice());
+    assert_eq!(graph.info().object_id(), 7);
+    assert_eq!(graph.info().persist_id(), persist_id);
 }
 
 #[test]

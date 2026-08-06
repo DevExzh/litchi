@@ -77,7 +77,7 @@ the existence of a PPTX feature is never treated as ODP support.
 | Presentation page layouts | ✅ | ✅ | ✅ | Named presentation page layouts and typed placeholder roles/geometry are parsed, validated, added, replaced, and serialized through public builder/package APIs |
 | Slide page metadata and layout references | ✅ | ✅ | ✅ | Page names, IDs, page-layout/master references, and related declaration bindings are inspected and authored through the public page metadata model |
 | Master pages | ✅ | ✅ | ✅ | Typed master-page metadata, shared ODF regions/children, lossless XML fragments, package CRUD, ordering, and slide master/layout assignment are exposed through the layered `master` facade |
-| Handout master | ❌ | ❌ | ❌ | No public typed handout-master model or authoring path is exposed |
+| Handout master | ✅ | ✅ | ✅ | `handout_master::Master` provides typed XML, shared drawing children, package set/replace/clear, and bounded one-hop presentation-layout resolution |
 | Headers, footers, and date-time declarations | ✅ | ✅ | ✅ | Typed declaration collections cover header/footer/date-time values and page bindings; field expansion and host clock identity remain inert |
 | Backgrounds and named drawing resources | 🟡 | 🟡 | 🟡 | Direct background/drawing properties and source-level named fill-image, gradient, hatch, marker, opacity, and stroke-dash values are bounded; no complete public resolver or renderer is provided |
 | Speaker notes | ✅ | ✅ | ✅ | Slide notes are extracted and builder-generated notes stories are serialized; notes are text-oriented rather than a complete notes-layout editor |

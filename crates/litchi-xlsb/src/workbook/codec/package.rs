@@ -33,6 +33,115 @@ struct MergeBlockLayout {
 }
 
 impl Workbook {
+    /// Return inert slicer cache snapshots in workbook relationship order.
+    pub fn slicer_caches(&self) -> Result<Vec<crate::slicer::Cache>> {
+        Ok(crate::package::slicers::load_caches(
+            &self.package,
+            &litchi_opc::PackURI::new("/xl/workbook.bin")?,
+        )?
+        .into_iter()
+        .map(|part| part.cache)
+        .collect())
+    }
+
+    /// Atomically replace workbook slicer caches.
+    pub fn set_slicer_caches(&mut self, caches: Vec<crate::slicer::Cache>) -> Result<()> {
+        self.edit_opc(|package| {
+            let workbook = litchi_opc::PackURI::new("/xl/workbook.bin")?;
+            crate::package::slicers::store_caches(package, &workbook, &caches)
+        })
+    }
+
+    /// Remove all workbook slicer caches. Returns whether any were present.
+    pub fn remove_slicer_caches(&mut self) -> Result<bool> {
+        let had = !self.slicer_caches()?.is_empty();
+        if had {
+            self.set_slicer_caches(Vec::new())?;
+        }
+        Ok(had)
+    }
+
+    /// Return inert slicer views attached to one worksheet.
+    pub fn slicers(&self, worksheet_index: usize) -> Result<Option<crate::slicer::Views>> {
+        let worksheet = self.worksheet_uri(worksheet_index)?;
+        Ok(crate::package::slicers::load_views(&self.package, &worksheet)?.map(|part| part.views))
+    }
+
+    /// Atomically replace one worksheet's slicer views.
+    pub fn set_slicers(
+        &mut self,
+        worksheet_index: usize,
+        views: crate::slicer::Views,
+    ) -> Result<()> {
+        let worksheet = self.worksheet_uri(worksheet_index)?;
+        self.edit_opc(|package| crate::package::slicers::store_views(package, &worksheet, &views))
+    }
+
+    /// Remove one worksheet's slicer views. Returns whether a part was present.
+    pub fn remove_slicers(&mut self, worksheet_index: usize) -> Result<bool> {
+        let had = self.slicers(worksheet_index)?.is_some();
+        if had {
+            self.set_slicers(worksheet_index, crate::slicer::Views::new())?;
+        }
+        Ok(had)
+    }
+
+    /// Return inert timeline cache snapshots in workbook relationship order.
+    pub fn timeline_caches(&self) -> Result<Vec<crate::timeline::Cache>> {
+        Ok(crate::package::timelines::load_caches(
+            &self.package,
+            &litchi_opc::PackURI::new("/xl/workbook.bin")?,
+        )?
+        .into_iter()
+        .map(|part| part.cache)
+        .collect())
+    }
+
+    /// Atomically replace workbook timeline caches.
+    pub fn set_timeline_caches(&mut self, caches: Vec<crate::timeline::Cache>) -> Result<()> {
+        self.edit_opc(|package| {
+            let workbook = litchi_opc::PackURI::new("/xl/workbook.bin")?;
+            crate::package::timelines::store_caches(package, &workbook, &caches)
+        })
+    }
+
+    /// Remove all workbook timeline caches. Returns whether any were present.
+    pub fn remove_timeline_caches(&mut self) -> Result<bool> {
+        let had = !self.timeline_caches()?.is_empty();
+        if had {
+            self.set_timeline_caches(Vec::new())?;
+        }
+        Ok(had)
+    }
+
+    /// Return inert timeline views attached to one worksheet.
+    pub fn timelines(&self, worksheet_index: usize) -> Result<Option<crate::timeline::Views>> {
+        let worksheet = self.worksheet_uri(worksheet_index)?;
+        Ok(
+            crate::package::timelines::load_views(&self.package, &worksheet)?
+                .map(|part| part.views),
+        )
+    }
+
+    /// Atomically replace one worksheet's timeline views.
+    pub fn set_timelines(
+        &mut self,
+        worksheet_index: usize,
+        views: crate::timeline::Views,
+    ) -> Result<()> {
+        let worksheet = self.worksheet_uri(worksheet_index)?;
+        self.edit_opc(|package| crate::package::timelines::store_views(package, &worksheet, &views))
+    }
+
+    /// Remove one worksheet's timeline views. Returns whether a part was present.
+    pub fn remove_timelines(&mut self, worksheet_index: usize) -> Result<bool> {
+        let had = self.timelines(worksheet_index)?.is_some();
+        if had {
+            self.set_timelines(worksheet_index, crate::timeline::Views::new())?;
+        }
+        Ok(had)
+    }
+
     /// Return the typed Scenario Manager stored in one worksheet, if any.
     ///
     /// Scenario values are inert snapshots. The reader does not apply them to

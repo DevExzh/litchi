@@ -19,12 +19,14 @@ pub mod format;
 pub mod group;
 pub mod layout;
 mod model;
+pub mod transaction;
 
 pub use model::{
     Ai, Binding, Cache, CellRef, Chart, Context, Count, DataKind, Edit, Family, Group, GroupId,
     Label, Legend, Link, Order, Owner, Props, Raw, Rect, Role, RowCol, Series, Source, Value,
     ValueRef, XlValue,
 };
+pub use transaction::{CacheValue, Change, Commit, Editor, Identity, Patch};
 
 const BOF: RecordKind = RecordKind::from_wire(0x0809);
 const EOF: RecordKind = RecordKind::from_wire(0x000A);
@@ -208,6 +210,10 @@ impl Stream {
     /// Recover the original allocation without copying.
     pub fn into_bytes(self) -> Vec<u8> {
         self.bytes
+    }
+
+    pub(crate) fn as_bytes_mut(&mut self) -> &mut [u8] {
+        &mut self.bytes
     }
 
     pub(crate) fn relimit(mut self, limits: Limits) -> Result<Self> {

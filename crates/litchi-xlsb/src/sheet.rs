@@ -9,6 +9,7 @@ use crate::package::merged_cells::MergedCell;
 use crate::package::scenarios::Manager;
 use crate::package::sheet_view::SheetView;
 use crate::package::web_extension_bindings::Binding;
+use crate::slicer;
 use litchi_core::sheet::{
     Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet as SheetWorksheet,
 };
@@ -137,6 +138,8 @@ pub struct Worksheet {
     web_extension_bindings: Vec<Binding>,
     sheet_views: Vec<SheetView>,
     scenarios: Option<Manager>,
+    slicers: Option<slicer::Views>,
+    timelines: Option<crate::timeline::Views>,
 }
 
 impl Worksheet {
@@ -162,6 +165,8 @@ impl Worksheet {
             web_extension_bindings: Vec::new(),
             sheet_views: Vec::new(),
             scenarios: None,
+            slicers: None,
+            timelines: None,
         }
     }
 
@@ -238,6 +243,14 @@ impl Worksheet {
 
     pub(crate) fn set_scenarios(&mut self, scenarios: Option<Manager>) {
         self.scenarios = scenarios;
+    }
+
+    pub(crate) fn set_slicers(&mut self, slicers: Option<slicer::Views>) {
+        self.slicers = slicers;
+    }
+
+    pub(crate) fn set_timelines(&mut self, timelines: Option<crate::timeline::Views>) {
+        self.timelines = timelines;
     }
 
     /// Get all merged cells
@@ -319,6 +332,16 @@ impl Worksheet {
     /// cells or recalculates the workbook.
     pub fn scenarios(&self) -> Option<&Manager> {
         self.scenarios.as_ref()
+    }
+
+    /// The worksheet's inert XLSB slicer views, if present.
+    pub fn slicers(&self) -> Option<&slicer::Views> {
+        self.slicers.as_ref()
+    }
+
+    /// The worksheet's inert XLSB timeline views, if present.
+    pub fn timelines(&self) -> Option<&crate::timeline::Views> {
+        self.timelines.as_ref()
     }
 }
 

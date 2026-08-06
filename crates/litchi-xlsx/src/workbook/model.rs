@@ -562,7 +562,7 @@ impl Worksheet {
     }
 
     /// Load timeline views associated with this worksheet.
-    pub fn timelines(&self) -> Result<Vec<crate::timelines::Part>> {
+    pub fn timelines(&self) -> Result<Vec<crate::timeline::Part>> {
         worksheet::timelines(self)
     }
 

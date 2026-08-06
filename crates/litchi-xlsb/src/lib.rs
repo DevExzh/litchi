@@ -21,7 +21,9 @@ pub mod package;
 pub mod pivot_view;
 pub mod raw;
 pub mod sheet;
+pub mod slicer;
 pub mod styles;
+pub mod timeline;
 pub mod workbook;
 pub mod writer;
 

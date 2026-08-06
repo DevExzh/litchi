@@ -6,7 +6,11 @@ use std::num::{NonZeroU32, NonZeroUsize};
 use litchi_ograph::chart::{Book, Context, Refs};
 use litchi_ograph::{Package as GraphPackage, PackageRef};
 
+use super::codec::encode_storage;
+use super::package::classify;
 use super::transaction::PackageEditor;
+use crate::embedded::object::{ContainerKind, Editor as ObjectEditor, ExternalObject};
+use crate::embedded::storage::Compression;
 use crate::package::{Error, Result as PackageResult};
 
 /// Owned host-neutral semantic view of one validated chart substream.
@@ -148,6 +152,7 @@ pub struct Graph {
     info: Info,
     package: Box<GraphPackage>,
     book: Book,
+    compression: Compression,
 }
 
 impl Graph {
@@ -211,13 +216,81 @@ impl Graph {
         PackageEditor::with_limits(package.finish().into_bytes(), limits)
     }
 
-    pub(super) fn new(info: Info, package: Box<GraphPackage>, book: Book) -> Self {
+    /// Stage a committed Graph package back into its owning PPT object.
+    ///
+    /// The host editor is checked against this chart's `[MS-PPT]`
+    /// `ExOleObjAtom`: the external-object ID, persist ID, embedded-object
+    /// container, and Graph subtype/ProgID must all still agree. The supplied
+    /// [`PackageEditor`] is then committed and stored as one inert
+    /// `ExOleObjStg` payload. No slide record, OfficeArt frame, or
+    /// `ExObjRefAtom` is rewritten, so the existing `[MS-ODRAW]` anchor remains
+    /// attached to the same external object.
+    ///
+    /// This is the host-side half of the typed replacement path. The package
+    /// transaction still owns `[MS-OGRAPH]` chart-stream validation and
+    /// replacement; this method only bridges its resulting OLE2 bytes into the
+    /// PPT editor's failure-atomic storage transaction.
+    pub fn replace_package(
+        &self,
+        editor: &mut ObjectEditor,
+        package: PackageEditor,
+    ) -> PackageResult<()> {
+        validate_replacement_target(editor, &self.info)?;
+        let bytes = package.finish()?;
+        let storage = encode_storage(bytes, self.compression)?;
+        editor.replace_storage(self.info.persist_id(), storage)
+    }
+
+    pub(super) fn new(
+        info: Info,
+        package: Box<GraphPackage>,
+        book: Book,
+        compression: Compression,
+    ) -> Self {
         Self {
             info,
             package,
             book,
+            compression,
         }
     }
+}
+
+fn validate_replacement_target(editor: &ObjectEditor, info: &Info) -> PackageResult<()> {
+    let object = editor
+        .objects()
+        .objects
+        .iter()
+        .find(|object| object.id() == info.object_id())
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "chart external-object ID {} is not present in the host editor",
+                info.object_id()
+            ))
+        })?;
+    let ExternalObject::Object(definition) = object else {
+        return Err(Error::InvalidFormat(
+            "chart replacement target is not an OLE object definition".to_string(),
+        ));
+    };
+    if !matches!(definition.kind, ContainerKind::Embedded(_)) {
+        return Err(Error::InvalidFormat(
+            "chart replacement target is not an embedded OLE object".to_string(),
+        ));
+    }
+    if definition.object.persist_id != info.persist_id() {
+        return Err(Error::InvalidFormat(format!(
+            "chart persist ID {} does not match host object persist ID {}",
+            info.persist_id(),
+            definition.object.persist_id
+        )));
+    }
+    if classify(definition.object.subtype, definition.program_id.as_deref()) != Some(Kind::Graph) {
+        return Err(Error::InvalidFormat(
+            "chart replacement target is not a Graph OLE object".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Validated Excel-hosted chart object.

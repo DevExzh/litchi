@@ -48,6 +48,21 @@ impl Document {
         self.auto_summary.as_ref()
     }
 
+    /// The legacy Word routing-slip lifecycle metadata (`RouteSlip`), when
+    /// the document carries the optional FIB `fcRouteSlip` range.
+    ///
+    /// Recipient names and route text remain exact narrow bytes. The route
+    /// protection value is descriptive policy metadata; this read facade does
+    /// not authenticate callers or execute mail routing.
+    pub fn route_slip(&self) -> Result<Option<&crate::parts::route_slip::Metadata>> {
+        self.route_slip
+            .as_ref()
+            .map(Option::as_ref)
+            .map_err(|error| {
+                PackageError::Corrupted(format!("invalid route-slip metadata: {error}"))
+            })
+    }
+
     /// Word 2003 range-level protection ("editable ranges") metadata, when
     /// the document carries it (MS-DOC 2.9.283 and 2.9.293).
     ///

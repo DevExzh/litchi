@@ -78,6 +78,13 @@ impl Workbook {
             self.styles.cell_xfs.len(),
         )?;
         worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(blob)?);
+        worksheet.set_slicers(
+            crate::package::slicers::load_views(&self.package, &sheet_uri)?.map(|part| part.views),
+        );
+        worksheet.set_timelines(
+            crate::package::timelines::load_views(&self.package, &sheet_uri)?
+                .map(|part| part.views),
+        );
         if let Some(uri) = comments_uri {
             let part = self.package.get_part(&uri)?;
             if !part.rels().is_empty() {

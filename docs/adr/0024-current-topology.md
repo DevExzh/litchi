@@ -111,10 +111,15 @@ The DOC writer facade now exports contextual `Writer`, `WriteError`,
 `StyleWriteError`; writer-only `StyleDefinition` remains under
 `litchi_doc::writer` because the root reader facade already owns that name.
 Tracked revisions, MTEF equation options, text boxes, and small writer I/O
-errors use the same prefix-free rule. DOC also has a nested
-`parts/route_slip` owner for typed, lossless MS-DOC routing-slip metadata; its
-FIB/table-stream parser and serializer are exposed without claiming Document
-lifecycle integration or protection-policy enforcement.
+errors use the same prefix-free rule. DOC also has a nested `parts/route_slip`
+owner for typed, lossless MS-DOC routing-slip metadata. The public
+`litchi_doc::route_slip` facade layers its FIB/table-stream codec, bounded
+validation, package editor, exact recipient selectors, and snapshot
+transactions. `Document::route_slip()` exposes the optional metadata through a
+deferred `Result`, while the package editor publishes reversible route and OLE
+patches and rejects protected lifecycle edits. This remains passive metadata
+ownership: authentication, mail transport, and host routing are not
+implemented.
 
 The OLE2 owner now also has `parts/ole_controls`, which layers the inert
 `OcxInfo`/`RgxOcxInfo` metadata model, binary codec, FIB/table-stream seam, and
@@ -240,6 +245,9 @@ semantic, wire/XML, package, validation, and test modules.
 read facade. It shares captured stream buffers across clones and creates
 independent transactional editors, keeping large OLE payloads out of format
 neutral copies while leaving DOC/PPT/XLS interpretation in their owners.
+Its public `object::Commit` now pairs a validated post-edit `Snapshot` with a
+reversible, source-checked `object::Patch`; applying a patch to a different
+artifact is a typed conflict rather than a last-writer-wins replacement.
 
 The current continuation adds typed multidimensional `property_set::Array` and
 scalar-typed `property_set::Vector` models, including checked
@@ -256,6 +264,16 @@ package operations now use nested model, codec, package/transaction,
 validation, and test folders. These changes preserve the prefix-free facade
 rule and the standalone OOXML/ODF crate topology; no compatibility wrapper or
 duplicate shared-format grammar was introduced.
+
+The current OLE2/OOXML/ODF continuation adds DOC route-slip lifecycle edits,
+DOCX run effects, ODP handout masters, ODS metadata and calculation settings,
+ODraw custom geometry, OGraph chart patches, PPT master inventories and chart
+host replacement, PPTX model3d resources, and bounded slicer/timeline owners in
+XLSB and XLSX. Each owner keeps semantic, wire/XML or BIFF, package,
+validation, and focused-test layers; common OLE snapshot commits stay at the
+artifact boundary, while host crates retain semantic dependency closure.
+Unsupported records and active behavior remain inert or lossless, and invalid
+state returns typed errors rather than panicking.
 
 This continuation adds ODP master-page editing through the shared
 `litchi-odf-common::style::master` model, a transactional ODS worksheet graph,

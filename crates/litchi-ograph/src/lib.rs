@@ -5,6 +5,7 @@
 //! - [`litchi_biff`] provides bounded borrowed and move-owned BIFF record framing;
 //! - [`record`] contains small typed record codecs;
 //! - [`chart`] discovers standalone and Excel-hosted chart substreams;
+//! - [`chart::Editor`] provides a bounded, source-checked cache-value patch;
 //! - [`PackageRef`] and [`Package`] validate standalone OGraph compound files.
 //!
 //! Parsing preserves record order, unknown records, reserved bits, and unused

@@ -70,8 +70,12 @@ pub(crate) fn enumerate(presentation: &Presentation, limits: Limits) -> Result<I
                 .find_map(|(object, frame)| (*object == definition.object.id).then_some(*frame)),
         );
         match parse(presentation, info.persist_id(), kind, limits) {
-            Ok(Parsed::Graph { package, book }) => {
-                inventory.push_chart(Chart::Graph(Graph::new(info, package, book)));
+            Ok(Parsed::Graph {
+                package,
+                book,
+                compression,
+            }) => {
+                inventory.push_chart(Chart::Graph(Graph::new(info, package, book, compression)));
             },
             Ok(Parsed::Excel { book }) => {
                 inventory.push_chart(Chart::Excel(Excel::new(info, book)));

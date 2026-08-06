@@ -25,6 +25,7 @@ use crate::parts::protection::Ranges;
 use crate::parts::repair_bookmarks::DocumentRepairBookmarks;
 use crate::parts::revisions::RevisionAuthorTable;
 use crate::parts::rmd_threading::DocumentRmdThreading;
+use crate::parts::route_slip::Metadata;
 use crate::parts::rsids::DocumentRsids;
 use crate::parts::saved_by::SavedByTable;
 use crate::parts::sections::SectionsTable;
@@ -96,6 +97,11 @@ pub struct Document {
     pub(in crate::document) embedded_fonts: Option<DocumentEmbeddedFonts>,
     /// AutoSummary priority ranges for the main document.
     pub(in crate::document) auto_summary: Option<DocumentAutoSummary>,
+    /// Deferred legacy Word routing-slip lifecycle metadata (`RouteSlip`).
+    ///
+    /// Optional route-slip corruption is reported at the semantic boundary so
+    /// opening a document does not discard otherwise readable content.
+    pub(in crate::document) route_slip: Result<Option<Metadata>>,
     /// Word 2003 range-level protection ("editable ranges") metadata.
     pub(in crate::document) protected_ranges: Option<Ranges>,
     /// Format consistency-checker marks.

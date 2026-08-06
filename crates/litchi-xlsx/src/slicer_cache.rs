@@ -1,10 +1,11 @@
-//! Bounded SpreadsheetML slicer-cache definition codec.
+//! Private bounded SpreadsheetML slicer grammar core.
 ///
 /// This module owns the inert XML grammar rooted at `x14:slicerCacheDefinition`
 /// from the checked-in [MS-XLSX] anchors §§2.1.4, 2.2.4.8, 2.3.2.1, 2.4.38,
 /// 2.4.60, 2.6.70--2.6.85, 2.6.97, and 2.6.103--2.6.104. It deliberately
-/// does not open or resolve package relationships; the OOXML host retains
-/// workbook extension and OPC graph operations.
+/// does not open or resolve package relationships. The public contextual owner
+/// is [`crate::slicer`]; this module is retained only as its shared grammar
+/// implementation so slicer and transaction layers do not duplicate codecs.
 ///
 /// Cache data and extension payloads are validated and retained inertly with
 /// bounded sizes. Serialization is deterministic and never interprets

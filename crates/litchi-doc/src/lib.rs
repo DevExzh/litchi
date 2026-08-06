@@ -71,6 +71,8 @@ pub mod paragraph;
 pub mod parts;
 mod plcf;
 pub mod revision;
+/// Layered route-slip lifecycle and protection metadata.
+pub mod route_slip;
 pub mod section;
 pub mod shape;
 pub mod table;
