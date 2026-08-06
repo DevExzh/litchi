@@ -238,11 +238,16 @@ mod tests {
         let mut settings = Settings::default();
         assert_eq!(settings.set_volume(Some(0.5)), Ok(()));
         assert_eq!(settings.volume(), Some(0.5));
-        assert_eq!(
-            settings.set_volume(Some(f64::NAN)),
-            Err(Error::NonFiniteVolume)
-        );
-        assert_eq!(settings.volume(), Some(0.5));
+        for volume in [
+            Some(-f64::EPSILON),
+            Some(1.0 + f64::EPSILON),
+            Some(f64::NAN),
+            Some(f64::INFINITY),
+            Some(f64::NEG_INFINITY),
+        ] {
+            assert!(settings.set_volume(volume).is_err());
+            assert_eq!(settings.volume(), Some(0.5));
+        }
         assert_eq!(settings.set_mode(Some(Mode::Loop)), Ok(()));
         assert_eq!(settings.mode(), Some(Mode::Loop));
         assert_eq!(

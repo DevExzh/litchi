@@ -20,7 +20,7 @@ impl Size {
     ///
     /// Returns [`Error::InvalidDimensions`] when either dimension is not
     /// finite and strictly positive.
-    pub fn new(width: f32, height: f32) -> Result<Self> {
+    pub const fn new(width: f32, height: f32) -> Result<Self> {
         if width.is_finite() && width > 0.0 && height.is_finite() && height > 0.0 {
             Ok(Self { width, height })
         } else {
@@ -431,7 +431,19 @@ mod tests {
 
     #[test]
     fn size_and_modes_are_checked_and_lossless() -> Result<()> {
-        assert_eq!(Size::new(0.0, 1.0), Err(Error::InvalidDimensions));
+        for (width, height) in [
+            (0.0, 1.0),
+            (-1.0, 1.0),
+            (f32::NAN, 1.0),
+            (f32::INFINITY, 1.0),
+            (1.0, 0.0),
+            (1.0, -1.0),
+            (1.0, f32::NAN),
+            (1.0, f32::INFINITY),
+            (1.0, f32::NEG_INFINITY),
+        ] {
+            assert_eq!(Size::new(width, height), Err(Error::InvalidDimensions));
+        }
         for raw in [0, 1, 2, 19, -1] {
             assert_eq!(Mode::from_raw(raw).as_raw(), raw);
         }

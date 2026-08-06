@@ -469,7 +469,8 @@ impl AnimationParameters {
     /// Returns [`Error::PayloadTooLarge`] when `payload` exceeds the bounded
     /// semantic storage budget.
     pub fn set_color_payload(&mut self, payload: Option<&[u8]>) -> Result<()> {
-        self.color_payload = bounded_payload(payload)?;
+        let replacement = bounded_payload(payload)?;
+        self.color_payload = replacement;
         Ok(())
     }
 
@@ -496,7 +497,8 @@ impl AnimationParameters {
         slot: TimingCurveSlot,
         payload: Option<&[u8]>,
     ) -> Result<()> {
-        self.timing_curve_payloads[slot.index()] = bounded_payload(payload)?;
+        let replacement = bounded_payload(payload)?;
+        self.timing_curve_payloads[slot.index()] = replacement;
         Ok(())
     }
 
@@ -555,7 +557,8 @@ impl AnimationParameters {
         slot: TimingCurveSlot,
         value: Option<&str>,
     ) -> Result<()> {
-        self.timing_curve_theme_names[slot.index()] = bounded_text(value)?;
+        let replacement = bounded_text(value)?;
+        self.timing_curve_theme_names[slot.index()] = replacement;
         Ok(())
     }
 
@@ -622,8 +625,10 @@ impl CustomParameters {
     /// # Errors
     ///
     /// Returns [`Error::InvalidCustomFloat`] when `value` is non-finite.
-    pub fn set_twist(&mut self, value: Option<f32>) -> Result<()> {
-        validate_custom_float(value)?;
+    pub const fn set_twist(&mut self, value: Option<f32>) -> Result<()> {
+        if let Err(error) = validate_custom_float(value) {
+            return Err(error);
+        }
         self.twist = value;
         Ok(())
     }
@@ -716,8 +721,10 @@ impl CustomParameters {
     /// # Errors
     ///
     /// Returns [`Error::InvalidCustomFloat`] when `value` is non-finite.
-    pub fn set_travel_distance(&mut self, value: Option<f32>) -> Result<()> {
-        validate_custom_float(value)?;
+    pub const fn set_travel_distance(&mut self, value: Option<f32>) -> Result<()> {
+        if let Err(error) = validate_custom_float(value) {
+            return Err(error);
+        }
         self.travel_distance = value;
         Ok(())
     }
@@ -802,7 +809,8 @@ impl Settings {
     /// Returns [`Error::IdentifierTooLarge`] or [`Error::NulString`] when the
     /// candidate name cannot be represented by the semantic text field.
     pub fn set_animation_type(&mut self, value: Option<&str>) -> Result<()> {
-        self.animation_type = bounded_text(value)?;
+        let replacement = bounded_text(value)?;
+        self.animation_type = replacement;
         Ok(())
     }
 
@@ -839,8 +847,10 @@ impl Settings {
     ///
     /// Returns [`Error::InvalidDuration`] when `value` is non-finite or
     /// negative.
-    pub fn set_duration(&mut self, value: Option<f64>) -> Result<()> {
-        validate_non_negative(value, Error::InvalidDuration)?;
+    pub const fn set_duration(&mut self, value: Option<f64>) -> Result<()> {
+        if let Err(error) = validate_non_negative(value, Error::InvalidDuration) {
+            return Err(error);
+        }
         self.duration = value;
         Ok(())
     }
@@ -867,8 +877,10 @@ impl Settings {
     /// # Errors
     ///
     /// Returns [`Error::InvalidDelay`] when `value` is non-finite or negative.
-    pub fn set_delay(&mut self, value: Option<f64>) -> Result<()> {
-        validate_non_negative(value, Error::InvalidDelay)?;
+    pub const fn set_delay(&mut self, value: Option<f64>) -> Result<()> {
+        if let Err(error) = validate_non_negative(value, Error::InvalidDelay) {
+            return Err(error);
+        }
         self.delay = value;
         Ok(())
     }
@@ -1093,15 +1105,21 @@ fn bounded_text(candidate: Option<&str>) -> Result<Option<Box<str>>> {
     Ok(Some(text.into()))
 }
 
-fn validate_custom_float(candidate: Option<f32>) -> Result<()> {
-    if candidate.is_some_and(|number| !number.is_finite()) {
+const fn validate_custom_float(candidate: Option<f32>) -> Result<()> {
+    let Some(number) = candidate else {
+        return Ok(());
+    };
+    if !number.is_finite() {
         return Err(Error::InvalidCustomFloat);
     }
     Ok(())
 }
 
-fn validate_non_negative(candidate: Option<f64>, error: Error) -> Result<()> {
-    if candidate.is_some_and(|number| !number.is_finite() || number < 0.0) {
+const fn validate_non_negative(candidate: Option<f64>, error: Error) -> Result<()> {
+    let Some(number) = candidate else {
+        return Ok(());
+    };
+    if !number.is_finite() || number < 0.0 {
         return Err(error);
     }
     Ok(())
@@ -1209,36 +1227,53 @@ mod tests {
     #[test]
     fn checked_setters_reject_invalid_candidates_before_mutation() {
         let mut settings = Settings::new();
-        assert_eq!(
-            settings.set_duration(Some(-0.1)),
-            Err(Error::InvalidDuration)
-        );
-        assert_eq!(settings.duration(), None);
-        assert_eq!(settings.set_delay(Some(f64::NAN)), Err(Error::InvalidDelay));
-        assert_eq!(settings.delay(), None);
+        settings.set_duration(Some(1.25)).unwrap();
+        for value in [-0.1, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(
+                settings.set_duration(Some(value)),
+                Err(Error::InvalidDuration)
+            );
+            assert_eq!(settings.duration(), Some(1.25));
+        }
+        settings.set_delay(Some(0.75)).unwrap();
+        for value in [-0.1, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(settings.set_delay(Some(value)), Err(Error::InvalidDelay));
+            assert_eq!(settings.delay(), Some(0.75));
+        }
+        settings.set_animation_type(Some("old-animation")).unwrap();
         assert_eq!(
             settings.set_animation_type(Some("bad\0name")),
             Err(Error::NulString)
         );
-        assert_eq!(settings.animation_type(), None);
+        assert_eq!(settings.animation_type(), Some("old-animation"));
 
         let mut custom_parameters = CustomParameters::new();
-        assert_eq!(
-            custom_parameters.set_twist(Some(f32::INFINITY)),
-            Err(Error::InvalidCustomFloat)
-        );
-        assert_eq!(custom_parameters.twist(), None);
-        assert_eq!(
-            custom_parameters.set_travel_distance(Some(f32::NAN)),
-            Err(Error::InvalidCustomFloat)
-        );
+        custom_parameters.set_twist(Some(0.25)).unwrap();
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            assert_eq!(
+                custom_parameters.set_twist(Some(value)),
+                Err(Error::InvalidCustomFloat)
+            );
+            assert_eq!(custom_parameters.twist(), Some(0.25));
+        }
+        custom_parameters.set_travel_distance(Some(3.5)).unwrap();
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            assert_eq!(
+                custom_parameters.set_travel_distance(Some(value)),
+                Err(Error::InvalidCustomFloat)
+            );
+            assert_eq!(custom_parameters.travel_distance(), Some(3.5));
+        }
 
         let mut animation_parameters = AnimationParameters::new();
-        assert_eq!(
-            animation_parameters.set_detail(Some(f64::NEG_INFINITY)),
-            Err(Error::InvalidDetail)
-        );
-        assert_eq!(animation_parameters.detail(), None);
+        animation_parameters.set_detail(Some(0.5)).unwrap();
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(
+                animation_parameters.set_detail(Some(value)),
+                Err(Error::InvalidDetail)
+            );
+            assert_eq!(animation_parameters.detail(), Some(0.5));
+        }
         assert_eq!(
             animation_parameters
                 .set_timing_curve_theme_name(TimingCurveSlot::Third, Some("bad\0name"),),
