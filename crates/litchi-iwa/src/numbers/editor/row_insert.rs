@@ -21,7 +21,12 @@ impl NumbersEditor {
     /// column slots. The operation is transactional: table features whose row
     /// topology cannot yet be rewritten safely are rejected without changing
     /// the package.
-    pub fn insert_table_row(&mut self, table_id: u64, insertion: TableRowInsertion) -> Result<()> {
+    pub fn insert_table_row(
+        &mut self,
+        selector: litchi_numbers::TableSelector<'_>,
+        insertion: TableRowInsertion,
+    ) -> Result<()> {
+        let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
         let new_rows = insert_attached_table_row(&mut staged, table_id, insertion)?;
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;

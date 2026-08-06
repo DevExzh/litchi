@@ -66,7 +66,7 @@ impl NumbersEditor {
     /// expose their persisted [`Scope::SelectedRows`] scope;
     /// their view-state selected interval is intentionally not guessed.
     pub fn table_sort_order(&self, selector: TableSelector) -> Result<Option<Order>> {
-        let table_id = resolve_table_selector(self, &selector)?;
+        let table_id = super::selectors::table_id(self, selector)?;
         table_sort_order_in_package(&self.package, table_id)
     }
 
@@ -78,7 +78,7 @@ impl NumbersEditor {
     /// does not execute it or reorder stored rows. Numbers exposes that
     /// separate action as **Sort Now**.
     pub fn set_table_sort_order(&mut self, selector: TableSelector, order: Order) -> Result<()> {
-        let table_id = resolve_table_selector(self, &selector)?;
+        let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
         set_table_sort_order_in_package(&mut staged, table_id, &order)?;
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
@@ -97,7 +97,7 @@ impl NumbersEditor {
     /// Numbers' empty-order marker and any associated reference tracker,
     /// exactly as removing the final rule in the Numbers UI does.
     pub fn clear_table_sort_order(&mut self, selector: TableSelector) -> Result<()> {
-        let table_id = resolve_table_selector(self, &selector)?;
+        let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
         if !clear_table_sort_order_in_package(&mut staged, table_id)? {
             return Ok(());
@@ -132,7 +132,7 @@ impl NumbersEditor {
     /// Returns `true` when one or more body rows were physically reordered,
     /// and `false` when the body was already in the requested stable order.
     pub fn apply_table_sort_order(&mut self, selector: TableSelector) -> Result<bool> {
-        let table_id = resolve_table_selector(self, &selector)?;
+        let table_id = super::selectors::table_id(self, selector)?;
         let order = table_sort_order_in_package(&self.package, table_id)?.ok_or_else(|| {
             Error::ParseError(
                 "Cannot execute a Numbers sort without a configured table sort order".to_owned(),
@@ -173,7 +173,7 @@ impl NumbersEditor {
         selector: TableSelector,
         rows: RowRange,
     ) -> Result<bool> {
-        let table_id = resolve_table_selector(self, &selector)?;
+        let table_id = super::selectors::table_id(self, selector)?;
         let order = table_sort_order_in_package(&self.package, table_id)?.ok_or_else(|| {
             Error::ParseError(
                 "Cannot execute a Numbers sort without a configured table sort order".to_owned(),
@@ -197,39 +197,6 @@ impl NumbersEditor {
         }
         self.package = staged;
         Ok(true)
-    }
-}
-
-pub(super) fn resolve_table_selector(
-    editor: &NumbersEditor,
-    selector: &TableSelector,
-) -> Result<u64> {
-    let tables = editor.tables()?;
-    match selector {
-        TableSelector::Name(name) => {
-            let mut matches = tables.iter().filter(|table| table.name == *name);
-            let Some(table) = matches.next() else {
-                return Err(Error::ParseError(format!(
-                    "Numbers table named {name:?} not found"
-                )));
-            };
-            if matches.next().is_some() {
-                return Err(Error::ParseError(format!(
-                    "Numbers table name {name:?} is ambiguous"
-                )));
-            }
-            Ok(table.object_id)
-        },
-        TableSelector::Index(index) => {
-            tables
-                .get(*index)
-                .map(|table| table.object_id)
-                .ok_or_else(|| {
-                    Error::ParseError(format!(
-                        "Numbers table catalog index {index} is out of bounds"
-                    ))
-                })
-        },
     }
 }
 
@@ -542,10 +509,16 @@ mod tests {
             .unwrap();
 
         editor
-            .insert_table_row(table_id, TableRowInsertion::body(0))
+            .insert_table_row(
+                test_table_selector(&editor, table_id),
+                TableRowInsertion::body(0),
+            )
             .unwrap();
         editor
-            .insert_table_column(table_id, TableColumnInsertion::body(0))
+            .insert_table_column(
+                test_table_selector(&editor, table_id),
+                TableColumnInsertion::body(0),
+            )
             .unwrap();
         assert_eq!(
             editor.table_sort_order(selector.clone()).unwrap(),
@@ -553,10 +526,16 @@ mod tests {
         );
 
         editor
-            .remove_table_row(table_id, TableRowDeletion::body(0))
+            .remove_table_row(
+                test_table_selector(&editor, table_id),
+                TableRowDeletion::body(0),
+            )
             .unwrap();
         editor
-            .remove_table_column(table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, table_id),
+                TableColumnDeletion::body(0),
+            )
             .unwrap();
         let remaining = Order::new([Rule::new(
             ColumnIndex::new(3).unwrap(),
@@ -569,7 +548,10 @@ mod tests {
         );
 
         editor
-            .remove_table_column(table_id, TableColumnDeletion::body(2))
+            .remove_table_column(
+                test_table_selector(&editor, table_id),
+                TableColumnDeletion::body(2),
+            )
             .unwrap();
         assert_eq!(editor.table_sort_order(selector).unwrap(), None);
     }

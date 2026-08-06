@@ -48,7 +48,12 @@ impl NumbersEditor {
     /// reference the deleted row cause the entire operation to fail unchanged.
     /// Full-table sort rules are preserved because row edits do not change
     /// their physical column slots.
-    pub fn remove_table_row(&mut self, table_id: u64, deletion: TableRowDeletion) -> Result<()> {
+    pub fn remove_table_row(
+        &mut self,
+        selector: litchi_numbers::TableSelector<'_>,
+        deletion: TableRowDeletion,
+    ) -> Result<()> {
+        let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
         let (new_rows, columns) = remove_attached_table_row(&mut staged, table_id, deletion)?;
         verify_numbers_dimensions(&staged, table_id, new_rows, columns)?;
@@ -65,9 +70,10 @@ impl NumbersEditor {
     /// all other rule indices remain unchanged, matching Numbers.
     pub fn remove_table_column(
         &mut self,
-        table_id: u64,
+        selector: litchi_numbers::TableSelector<'_>,
         deletion: TableColumnDeletion,
     ) -> Result<()> {
+        let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
         let (rows, new_columns) = remove_attached_table_column(&mut staged, table_id, deletion)?;
         verify_numbers_dimensions(&staged, table_id, rows, new_columns)?;

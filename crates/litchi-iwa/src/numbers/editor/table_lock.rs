@@ -10,7 +10,7 @@ use litchi_numbers::TableSelector;
 impl NumbersEditor {
     /// Read one table's interactive lock state.
     pub fn table_lock_state(&self, selector: TableSelector) -> Result<TableLockState> {
-        let table_id = super::table_sort::resolve_table_selector(self, &selector)?;
+        let table_id = super::selectors::table_id(self, selector)?;
         let (drawable_id, archive_name) = table_lock_context(&self.package, table_id)?;
         read_native_table_lock_state(&self.package, &archive_name, drawable_id, table_id)
     }
@@ -21,8 +21,8 @@ impl NumbersEditor {
         selector: TableSelector,
         state: TableLockState,
     ) -> Result<()> {
-        let table_id = super::table_sort::resolve_table_selector(self, &selector)?;
-        if self.table_lock_state(selector.clone())? == state {
+        let table_id = super::selectors::table_id(self, selector)?;
+        if self.table_lock_state(selector)? == state {
             return Ok(());
         }
         let (drawable_id, archive_name) = table_lock_context(&self.package, table_id)?;
@@ -83,7 +83,9 @@ mod tests {
         editor
             .set_table_lock_state(TableSelector::name("Locked Table"), TableLockState::Locked)
             .unwrap();
-        let duplicate = editor.duplicate_table(table.object_id).unwrap();
+        let duplicate = editor
+            .duplicate_table(test_table_selector(&editor, table.object_id))
+            .unwrap();
         assert_eq!(
             editor.table_lock_state(TableSelector::index(1)).unwrap(),
             TableLockState::Locked
@@ -98,7 +100,9 @@ mod tests {
                 .unwrap(),
             TableLockState::Locked
         );
-        editor.remove_table(duplicate.object_id).unwrap();
+        editor
+            .remove_table(test_table_selector(&editor, duplicate.object_id))
+            .unwrap();
         editor
             .set_table_lock_state(
                 TableSelector::name("Locked Table"),

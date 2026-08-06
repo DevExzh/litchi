@@ -28,10 +28,8 @@ pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
     FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
 };
-pub use selector::TableSelector;
-pub use sheet::{
-    Builder as SheetBuilder, Selector as SheetSelector, SelectorError as SheetSelectorError, Sheet,
-};
+pub use selector::{SheetSelector, TableSelector};
+pub use sheet::{Builder as SheetBuilder, SelectorError as TableSelectorError, Sheet};
 pub use table::dimension::{Dimension, Points, Size};
 pub use table::title::Settings;
 pub use table::topology::{ColumnDeletion, RowDeletion};

@@ -52,7 +52,11 @@ impl NumbersEditor {
     /// reclaims private objects, UUID registrations, component references, and
     /// unshared media assets. Unknown drawable kinds and incoming formula edges
     /// reject the operation transactionally instead of leaving unreachable data.
-    pub fn remove_sheet(&mut self, sheet_id: u64) -> Result<NumbersSheetInfo> {
+    pub fn remove_sheet(
+        &mut self,
+        selector: litchi_numbers::SheetSelector<'_>,
+    ) -> Result<NumbersSheetInfo> {
+        let sheet_id = super::selectors::sheet_id(self, selector)?;
         let sheets = self.sheets()?;
         if sheets.len() <= 1 {
             return Err(Error::ParseError(
@@ -179,7 +183,8 @@ fn delete_sheet_contents(
         editor.remove_sheet_text_box(sheet_id, identifier)?;
     }
     for identifier in contents.tables {
-        editor.remove_table(identifier)?;
+        let table_index = super::selectors::table_index(editor, identifier)?;
+        editor.remove_table(litchi_numbers::TableSelector::index(table_index))?;
     }
     let (_, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
     if !sheet.drawable_infos.is_empty() {
@@ -270,7 +275,7 @@ mod tests {
             .collect::<HashSet<_>>();
         let sheet = editor.add_empty_sheet("Disposable").unwrap();
         editor
-            .add_empty_table(sheet.object_id, "Data", 3, 2)
+            .add_empty_table(test_sheet_selector(&editor, sheet.object_id), "Data", 3, 2)
             .unwrap();
         editor
             .add_sheet_text_box(sheet.object_id, "Text", POSITION, SIZE)
@@ -319,7 +324,9 @@ mod tests {
             )
             .unwrap();
 
-        let removed = editor.remove_sheet(sheet.object_id).unwrap();
+        let removed = editor
+            .remove_sheet(test_sheet_selector(&editor, sheet.object_id))
+            .unwrap();
         assert_eq!(removed, sheet);
         assert_eq!(object_ids(editor.package()), baseline_ids);
         assert_eq!(
@@ -342,12 +349,20 @@ mod tests {
         let baseline = editor.to_bytes().unwrap();
         let only_sheet = editor.sheets().unwrap()[0].object_id;
 
-        assert!(editor.remove_sheet(only_sheet).is_err());
+        assert!(
+            editor
+                .remove_sheet(test_sheet_selector(&editor, only_sheet))
+                .is_err()
+        );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
         editor.add_empty_sheet("Second").unwrap();
         let baseline = editor.to_bytes().unwrap();
-        assert!(editor.remove_sheet(u64::MAX).is_err());
+        assert!(
+            editor
+                .remove_sheet(test_sheet_selector(&editor, u64::MAX))
+                .is_err()
+        );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
     }
 }

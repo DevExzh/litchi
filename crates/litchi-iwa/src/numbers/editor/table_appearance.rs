@@ -5,26 +5,29 @@ use crate::table_appearance::{
     TableAppearance, set_table_appearance as set_native_table_appearance,
     table_appearance as read_native_table_appearance,
 };
+use litchi_numbers::TableSelector;
 
 impl NumbersEditor {
     /// Read the effective alternating-row and automatic-sizing settings.
-    pub fn table_appearance(&self, table_id: u64) -> Result<TableAppearance> {
+    pub fn table_appearance(&self, selector: TableSelector<'_>) -> Result<TableAppearance> {
+        let table_id = super::selectors::table_id(self, selector)?;
         read_native_table_appearance(&self.package, table_id)
     }
 
     /// Replace appearance settings without mutating styles shared by other tables.
     pub fn set_table_appearance(
         &mut self,
-        table_id: u64,
+        selector: TableSelector<'_>,
         appearance: TableAppearance,
     ) -> Result<()> {
-        if self.table_appearance(table_id)? == appearance {
+        let table_id = super::selectors::table_id(self, selector)?;
+        if self.table_appearance(selector)? == appearance {
             return Ok(());
         }
         let mut staged = self.package.clone();
         set_native_table_appearance(&mut staged, table_id, appearance)?;
         let verified = Self::from_package(staged)?;
-        if verified.table_appearance(table_id)? != appearance {
+        if verified.table_appearance(selector)? != appearance {
             return Err(Error::InvalidFormat(
                 "Numbers table appearance failed round-trip validation".to_owned(),
             ));
@@ -50,7 +53,9 @@ mod tests {
             .build()
             .unwrap();
         let source = editor.tables().unwrap()[0].clone();
-        let duplicate = editor.duplicate_table(source.object_id).unwrap();
+        let duplicate = editor
+            .duplicate_table(test_table_selector(&editor, source.object_id))
+            .unwrap();
         let appearance = TableAppearance {
             row_banding: TableRowBanding::Enabled,
             row_sizing: TableRowSizing::FitCellContents,
@@ -64,15 +69,22 @@ mod tests {
         };
 
         editor
-            .set_table_appearance(duplicate.object_id, appearance)
+            .set_table_appearance(
+                test_table_selector(&editor, duplicate.object_id),
+                appearance,
+            )
             .unwrap();
 
         assert_eq!(
-            editor.table_appearance(source.object_id).unwrap(),
+            editor
+                .table_appearance(test_table_selector(&editor, source.object_id))
+                .unwrap(),
             TableAppearance::default()
         );
         assert_eq!(
-            editor.table_appearance(duplicate.object_id).unwrap(),
+            editor
+                .table_appearance(test_table_selector(&editor, duplicate.object_id))
+                .unwrap(),
             appearance
         );
         assert_eq!(

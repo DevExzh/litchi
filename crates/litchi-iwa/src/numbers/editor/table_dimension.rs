@@ -1,6 +1,7 @@
 //! Typed row-height and column-width editing for Numbers tables.
 
 use super::*;
+use litchi_numbers::TableSelector;
 use litchi_numbers::table::dimension::{Dimension, Points, Size};
 
 mod storage;
@@ -11,22 +12,28 @@ const DEFAULT_DIMENSION_POINTS: f32 = 0.0;
 
 impl NumbersEditor {
     /// Read a row-height or column-width override.
-    pub fn table_dimension_size(&self, table_id: u64, dimension: Dimension) -> Result<Size> {
+    pub fn table_dimension_size(
+        &self,
+        selector: TableSelector<'_>,
+        dimension: Dimension,
+    ) -> Result<Size> {
+        let table_id = super::selectors::table_id(self, selector)?;
         read_attached_table_dimension_size(&self.package, table_id, dimension)
     }
 
     /// Transactionally set or clear a row-height or column-width override.
     pub fn set_table_dimension_size(
         &mut self,
-        table_id: u64,
+        selector: TableSelector<'_>,
         dimension: Dimension,
         size: Size,
     ) -> Result<()> {
+        let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
         set_attached_table_dimension_size(&mut staged, table_id, dimension, size)?;
 
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
-        if verified.table_dimension_size(table_id, dimension)? != size {
+        if verified.table_dimension_size(selector, dimension)? != size {
             return Err(Error::InvalidFormat(format!(
                 "Numbers table {} size failed validation",
                 dimension.noun()
@@ -37,28 +44,33 @@ impl NumbersEditor {
     }
 
     /// Read a row-height override by zero-based row index.
-    pub fn table_row_height(&self, table_id: u64, row: usize) -> Result<Size> {
-        self.table_dimension_size(table_id, Dimension::Row(row))
+    pub fn table_row_height(&self, selector: TableSelector<'_>, row: usize) -> Result<Size> {
+        self.table_dimension_size(selector, Dimension::Row(row))
     }
 
     /// Transactionally set or clear a row-height override.
-    pub fn set_table_row_height(&mut self, table_id: u64, row: usize, size: Size) -> Result<()> {
-        self.set_table_dimension_size(table_id, Dimension::Row(row), size)
+    pub fn set_table_row_height(
+        &mut self,
+        selector: TableSelector<'_>,
+        row: usize,
+        size: Size,
+    ) -> Result<()> {
+        self.set_table_dimension_size(selector, Dimension::Row(row), size)
     }
 
     /// Read a column-width override by zero-based column index.
-    pub fn table_column_width(&self, table_id: u64, column: usize) -> Result<Size> {
-        self.table_dimension_size(table_id, Dimension::Column(column))
+    pub fn table_column_width(&self, selector: TableSelector<'_>, column: usize) -> Result<Size> {
+        self.table_dimension_size(selector, Dimension::Column(column))
     }
 
     /// Transactionally set or clear a column-width override.
     pub fn set_table_column_width(
         &mut self,
-        table_id: u64,
+        selector: TableSelector<'_>,
         column: usize,
         size: Size,
     ) -> Result<()> {
-        self.set_table_dimension_size(table_id, Dimension::Column(column), size)
+        self.set_table_dimension_size(selector, Dimension::Column(column), size)
     }
 }
 

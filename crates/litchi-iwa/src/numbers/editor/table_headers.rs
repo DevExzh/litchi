@@ -145,24 +145,29 @@ impl NumbersTableHeaderSettings {
 
 impl NumbersEditor {
     /// Read the lossless header and footer configuration of an attached table.
-    pub fn table_header_settings(&self, table_id: u64) -> Result<NumbersTableHeaderSettings> {
+    pub fn table_header_settings(
+        &self,
+        selector: litchi_numbers::TableSelector<'_>,
+    ) -> Result<NumbersTableHeaderSettings> {
+        let table_id = super::selectors::table_id(self, selector)?;
         read_attached_table_header_settings(&self.package, table_id)
     }
 
     /// Replace an attached table's header and footer configuration transactionally.
     pub fn set_table_header_settings(
         &mut self,
-        table_id: u64,
+        selector: litchi_numbers::TableSelector<'_>,
         settings: NumbersTableHeaderSettings,
     ) -> Result<()> {
-        if read_attached_table_header_settings(&self.package, table_id)? == settings {
+        let table_id = super::selectors::table_id(self, selector)?;
+        if self.table_header_settings(selector)? == settings {
             return Ok(());
         }
         let mut staged = self.package.clone();
         set_attached_table_header_settings(&mut staged, table_id, settings)?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        if verified.table_header_settings(table_id)? != settings {
+        if verified.table_header_settings(selector)? != settings {
             return Err(Error::InvalidFormat(
                 "Numbers table header settings failed round-trip validation".to_owned(),
             ));

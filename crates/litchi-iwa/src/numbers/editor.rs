@@ -15,6 +15,7 @@ use std::path::Path;
 use litchi_iwa_common::table::cell::BorderSide;
 pub use litchi_numbers::table::dimension::{Dimension, Points, Size};
 use litchi_iwa_common::table::cell::number_format::NumberFormat;
+use litchi_numbers::{SheetSelector, TableSelector};
 use litchi_numbers::cell::data_format::{
     Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,
     Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,
@@ -174,6 +175,7 @@ mod formula_dependency_shift;
 mod model;
 mod named_paragraph_styles;
 mod row_insert;
+mod selectors;
 mod sheet_audio;
 mod sheet_charts;
 mod sheet_delete;
@@ -208,6 +210,41 @@ pub use crate::charts::Direction;
 pub use cell_merge::IWorkTableCellRegion;
 pub use litchi_numbers::table::title::Settings;
 use model::*;
+
+#[cfg(test)]
+pub(crate) fn test_sheet_selector(
+    editor: &NumbersEditor,
+    native_id: u64,
+) -> SheetSelector<'static> {
+    let index = editor
+        .sheets()
+        .ok()
+        .and_then(|sheets| {
+            sheets
+                .iter()
+                .position(|sheet| sheet.native_id() == native_id)
+        })
+        .unwrap_or(usize::MAX);
+    SheetSelector::index(index)
+}
+
+#[cfg(test)]
+pub(crate) fn test_table_selector(
+    editor: &NumbersEditor,
+    native_id: u64,
+) -> TableSelector<'static> {
+    let index = editor
+        .tables()
+        .ok()
+        .and_then(|tables| {
+            tables
+                .iter()
+                .position(|table| table.native_id() == native_id)
+        })
+        .unwrap_or(usize::MAX);
+    TableSelector::index(index)
+}
+
 pub use semantic::*;
 pub use sheet_audio::{NumbersSheetAudioInfo, NumbersSheetAudioOptions, RemovedNumbersSheetAudio};
 pub use sheet_charts::{NumbersSheetChartInfo, RemovedNumbersSheetChart};

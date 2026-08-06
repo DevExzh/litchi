@@ -1,29 +1,7 @@
 //! Dependency-free Numbers sheet semantics.
 
+use super::selector::TableSelector;
 use super::table::{Error, InsertError, InsertResult, Table};
-
-/// A checked semantic table selector.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Selector<'a> {
-    /// Select by exact producer-visible table name.
-    Name(&'a str),
-    /// Select by checked zero-based source order.
-    Index(usize),
-}
-
-impl<'a> Selector<'a> {
-    /// Creates a name-first sheet selector without allocating.
-    #[must_use]
-    pub const fn name(name: &'a str) -> Self {
-        Self::Name(name)
-    }
-
-    /// Creates a checked zero-based sheet selector.
-    #[must_use]
-    pub const fn index(index: usize) -> Self {
-        Self::Index(index)
-    }
-}
 
 /// Errors raised while resolving a semantic table selector.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -99,9 +77,9 @@ impl Sheet {
     ///
     /// Returns [`SelectorError::DuplicateTableName`] if a malformed semantic
     /// model contains the requested name more than once.
-    pub fn select(&self, selector: Selector<'_>) -> Result<Option<&Table>> {
+    pub fn select(&self, selector: TableSelector<'_>) -> Result<Option<&Table>> {
         match selector {
-            Selector::Name(name) => {
+            TableSelector::Name(name) => {
                 let mut matches = self.tables.iter().filter(|table| table.name() == name);
                 let Some(table) = matches.next() else {
                     return Ok(None);
@@ -111,7 +89,7 @@ impl Sheet {
                 }
                 Ok(Some(table))
             },
-            Selector::Index(index) => Ok(self.tables.get(index)),
+            TableSelector::Index(index) => Ok(self.tables.get(index)),
         }
     }
 
@@ -122,7 +100,7 @@ impl Sheet {
     /// Returns [`SelectorError::DuplicateTableName`] if a malformed semantic
     /// model contains the requested name more than once.
     pub fn get(&self, name: &str) -> Result<Option<&Table>> {
-        self.select(Selector::Name(name))
+        self.select(TableSelector::Name(name))
     }
 
     /// Returns a table by checked zero-based source position.
@@ -132,7 +110,7 @@ impl Sheet {
     /// This selector currently cannot fail for a valid position; the
     /// `Result` keeps the selector boundary explicit for future validation.
     pub fn at(&self, index: usize) -> Result<Option<&Table>> {
-        self.select(Selector::Index(index))
+        self.select(TableSelector::Index(index))
     }
 
     /// Returns whether the sheet has no tables.
@@ -281,6 +259,39 @@ mod tests {
                 .at(1)
                 .unwrap_or_else(|error| panic!("unexpected selector failure: {error}"))
                 .is_none()
+        );
+        assert!(
+            sheet
+                .get("table 1")
+                .unwrap_or_else(|error| panic!("unexpected selector failure: {error}"))
+                .is_none()
+        );
+
+        let second = TableBuilder::new("Second", Dimensions::new(1, 1))
+            .finish()
+            .unwrap_or_else(|error| panic!("unexpected table error: {error}"));
+        let mut builder = Builder::new("Sheet 1", 0);
+        let first = TableBuilder::new("First", Dimensions::new(1, 1))
+            .finish()
+            .unwrap_or_else(|error| panic!("unexpected table error: {error}"));
+        assert!(builder.push_table(first).is_ok());
+        assert!(builder.push_table(second).is_ok());
+        let sheet = builder.finish();
+        assert_eq!(
+            sheet
+                .select(TableSelector::index(1))
+                .unwrap()
+                .unwrap()
+                .name(),
+            "Second"
+        );
+        assert_eq!(
+            sheet
+                .select(TableSelector::name("First"))
+                .unwrap()
+                .unwrap()
+                .name(),
+            "First"
         );
     }
 }

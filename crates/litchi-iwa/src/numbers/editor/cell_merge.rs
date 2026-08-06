@@ -553,20 +553,32 @@ mod tests {
 
         editor.merge_cells(table_id, original).unwrap();
         editor
-            .insert_table_row(table_id, TableRowInsertion::body(0))
+            .insert_table_row(
+                test_table_selector(&editor, table_id),
+                TableRowInsertion::body(0),
+            )
             .unwrap();
         assert_eq!(
             editor.table_cell_merges(table_id).unwrap(),
             vec![IWorkTableCellRegion::new(2, 1, 2, 3).unwrap()]
         );
         editor
-            .insert_table_row(table_id, TableRowInsertion::body(2))
+            .insert_table_row(
+                test_table_selector(&editor, table_id),
+                TableRowInsertion::body(2),
+            )
             .unwrap();
         editor
-            .insert_table_column(table_id, TableColumnInsertion::body(0))
+            .insert_table_column(
+                test_table_selector(&editor, table_id),
+                TableColumnInsertion::body(0),
+            )
             .unwrap();
         editor
-            .insert_table_column(table_id, TableColumnInsertion::body(2))
+            .insert_table_column(
+                test_table_selector(&editor, table_id),
+                TableColumnInsertion::body(2),
+            )
             .unwrap();
 
         let expected = IWorkTableCellRegion::new(2, 2, 3, 4).unwrap();
@@ -597,7 +609,10 @@ mod tests {
         editor.merge_cells(table_id, region).unwrap();
 
         editor
-            .remove_table_row(table_id, TableRowDeletion::body(0))
+            .remove_table_row(
+                test_table_selector(&editor, table_id),
+                TableRowDeletion::body(0),
+            )
             .unwrap();
         assert_eq!(
             editor.table_cell_merges(table_id).unwrap(),
@@ -614,21 +629,30 @@ mod tests {
         );
 
         editor
-            .remove_table_column(table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, table_id),
+                TableColumnDeletion::body(0),
+            )
             .unwrap();
         assert_eq!(
             editor.table_cell_merges(table_id).unwrap(),
             vec![IWorkTableCellRegion::new(1, 1, 2, 2).unwrap()]
         );
         editor
-            .remove_table_row(table_id, TableRowDeletion::body(0))
+            .remove_table_row(
+                test_table_selector(&editor, table_id),
+                TableRowDeletion::body(0),
+            )
             .unwrap();
         assert_eq!(
             editor.table_cell_merges(table_id).unwrap(),
             vec![IWorkTableCellRegion::new(1, 1, 1, 2).unwrap()]
         );
         editor
-            .remove_table_column(table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, table_id),
+                TableColumnDeletion::body(0),
+            )
             .unwrap();
         assert!(editor.table_cell_merges(table_id).unwrap().is_empty());
         assert_eq!(editor.tables().unwrap()[0].rows, 3);
@@ -675,7 +699,10 @@ mod tests {
         editor.merge_cells(table_id, region).unwrap();
 
         editor
-            .remove_table_row(table_id, TableRowDeletion::body(0))
+            .remove_table_row(
+                test_table_selector(&editor, table_id),
+                TableRowDeletion::body(0),
+            )
             .unwrap();
         assert_eq!(
             editor.table_cell_merges(table_id).unwrap(),
@@ -688,7 +715,10 @@ mod tests {
         );
 
         editor
-            .remove_table_column(table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, table_id),
+                TableColumnDeletion::body(0),
+            )
             .unwrap();
         assert!(editor.table_cell_merges(table_id).unwrap().is_empty());
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -713,7 +743,7 @@ mod tests {
         let source_table_id = editor.tables().unwrap()[0].object_id;
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let target_table = editor
-            .add_empty_table(sheet_id, "Referenced", 5, 6)
+            .add_empty_table(test_sheet_selector(&editor, sheet_id), "Referenced", 5, 6)
             .unwrap();
         let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
         editor
@@ -752,7 +782,10 @@ mod tests {
             .internal_owner_id_for_edge[0];
 
         editor
-            .remove_table_row(source_table_id, TableRowDeletion::body(0))
+            .remove_table_row(
+                test_table_selector(&editor, source_table_id),
+                TableRowDeletion::body(0),
+            )
             .unwrap();
         assert_eq!(
             editor.table_cell_merges(source_table_id).unwrap(),
@@ -767,7 +800,10 @@ mod tests {
         assert_formula_host_dependencies(&editor, external_owner_id, 2, 0);
 
         editor
-            .remove_table_column(source_table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, source_table_id),
+                TableColumnDeletion::body(0),
+            )
             .unwrap();
         assert!(
             editor
@@ -795,7 +831,7 @@ mod tests {
         let source_table_id = editor.tables().unwrap()[0].object_id;
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let target_table = editor
-            .add_empty_table(sheet_id, "Referenced", 5, 6)
+            .add_empty_table(test_sheet_selector(&editor, sheet_id), "Referenced", 5, 6)
             .unwrap();
         let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
         editor
@@ -845,7 +881,10 @@ mod tests {
             .internal_owner_id_for_edge[0];
 
         editor
-            .remove_table_row(source_table_id, TableRowDeletion::body(0))
+            .remove_table_row(
+                test_table_selector(&editor, source_table_id),
+                TableRowDeletion::body(0),
+            )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -858,7 +897,10 @@ mod tests {
         assert_formula_host_range_edges(&editor, external_owner_id, &[2, 3], &[0, 0]);
 
         editor
-            .remove_table_column(source_table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, source_table_id),
+                TableColumnDeletion::body(0),
+            )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -882,7 +924,7 @@ mod tests {
         let source_table_id = editor.tables().unwrap()[0].object_id;
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let target_table = editor
-            .add_empty_table(sheet_id, "Referenced", 5, 6)
+            .add_empty_table(test_sheet_selector(&editor, sheet_id), "Referenced", 5, 6)
             .unwrap();
         let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
         editor
@@ -935,7 +977,10 @@ mod tests {
         let mut editor = NumbersEditor::from_package(package).unwrap();
 
         editor
-            .remove_table_row(source_table_id, TableRowDeletion::body(0))
+            .remove_table_row(
+                test_table_selector(&editor, source_table_id),
+                TableRowDeletion::body(0),
+            )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -958,7 +1003,10 @@ mod tests {
         );
 
         editor
-            .remove_table_column(source_table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, source_table_id),
+                TableColumnDeletion::body(0),
+            )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1002,7 +1050,7 @@ mod tests {
         let source_table_id = editor.tables().unwrap()[0].object_id;
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let target_table = editor
-            .add_empty_table(sheet_id, "Referenced", 5, 6)
+            .add_empty_table(test_sheet_selector(&editor, sheet_id), "Referenced", 5, 6)
             .unwrap();
         let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
         editor
@@ -1061,7 +1109,10 @@ mod tests {
         );
 
         editor
-            .remove_table_row(source_table_id, TableRowDeletion::body(0))
+            .remove_table_row(
+                test_table_selector(&editor, source_table_id),
+                TableRowDeletion::body(0),
+            )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1097,7 +1148,7 @@ mod tests {
         let source_table_id = editor.tables().unwrap()[0].object_id;
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let target_table = editor
-            .add_empty_table(sheet_id, "Referenced", 5, 6)
+            .add_empty_table(test_sheet_selector(&editor, sheet_id), "Referenced", 5, 6)
             .unwrap();
         let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
         editor
@@ -1150,7 +1201,10 @@ mod tests {
         let mut editor = NumbersEditor::from_package(package).unwrap();
 
         editor
-            .remove_table_column(source_table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, source_table_id),
+                TableColumnDeletion::body(0),
+            )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1198,7 +1252,10 @@ mod tests {
         editor.merge_cells(table_id, shifted).unwrap();
 
         editor
-            .remove_table_column(table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, table_id),
+                TableColumnDeletion::body(0),
+            )
             .unwrap();
 
         let expected = IWorkTableCellRegion::new(2, 1, 2, 2).unwrap();
@@ -1329,7 +1386,10 @@ mod tests {
         let mut editor = NumbersEditor::from_package(package).unwrap();
 
         editor
-            .insert_table_row(table_id, TableRowInsertion::body(1))
+            .insert_table_row(
+                test_table_selector(&editor, table_id),
+                TableRowInsertion::body(1),
+            )
             .unwrap();
         assert_eq!(
             editor.table_cell_merges(table_id).unwrap(),

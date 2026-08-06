@@ -25,9 +25,10 @@ impl NumbersEditor {
     /// package.
     pub fn insert_table_column(
         &mut self,
-        table_id: u64,
+        selector: litchi_numbers::TableSelector<'_>,
         insertion: TableColumnInsertion,
     ) -> Result<()> {
+        let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
         let new_columns = insert_attached_table_column(&mut staged, table_id, insertion)?;
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;

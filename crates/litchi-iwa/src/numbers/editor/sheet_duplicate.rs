@@ -46,7 +46,8 @@ impl NumbersEditor {
     /// writable object storage is independent.
     /// Unsupported drawable kinds and cross-table formula edges are rejected
     /// transactionally.
-    pub fn duplicate_sheet(&mut self, sheet_id: u64) -> Result<NumbersSheetInfo> {
+    pub fn duplicate_sheet(&mut self, selector: SheetSelector<'_>) -> Result<NumbersSheetInfo> {
+        let sheet_id = super::selectors::sheet_id(self, selector)?;
         let sheets = self.sheets()?;
         let source = sheets
             .iter()
@@ -130,12 +131,14 @@ impl NumbersEditor {
                     name: table_name,
                     ..
                 } => {
-                    let cloned = working.duplicate_table(model_id)?;
+                    let source_index = super::selectors::table_index(&working, model_id)?;
+                    let cloned = working.duplicate_table(TableSelector::index(source_index))?;
                     working.move_table(
                         TableSelector::name(&cloned.name),
                         SheetSelector::name(&new_sheet_name),
                     )?;
-                    working.rename_table(cloned.object_id, &table_name)?;
+                    let cloned_index = super::selectors::table_index(&working, cloned.native_id())?;
+                    working.rename_table(TableSelector::index(cloned_index), &table_name)?;
                     restore_table_geometry(&mut working.package, model_id, cloned.object_id)?;
                     cloned_drawable_ids
                         .push(find_table_owner(working.package(), cloned.object_id)?.table_info_id);
@@ -486,7 +489,9 @@ mod tests {
             )
             .unwrap();
 
-        let duplicate = editor.duplicate_sheet(source_sheet.object_id).unwrap();
+        let duplicate = editor
+            .duplicate_sheet(test_sheet_selector(&editor, source_sheet.object_id))
+            .unwrap();
 
         assert_eq!(duplicate.index, 1);
         assert_eq!(duplicate.name, "Movie-1");
@@ -594,7 +599,9 @@ mod tests {
             )
             .unwrap();
 
-        let duplicate = editor.duplicate_sheet(source_sheet.object_id).unwrap();
+        let duplicate = editor
+            .duplicate_sheet(test_sheet_selector(&editor, source_sheet.object_id))
+            .unwrap();
 
         assert_eq!(duplicate.index, 1);
         assert_eq!(duplicate.name, "Audio-1");
@@ -667,7 +674,9 @@ mod tests {
             )
             .unwrap();
 
-        let duplicate = editor.duplicate_sheet(source_sheet.object_id).unwrap();
+        let duplicate = editor
+            .duplicate_sheet(test_sheet_selector(&editor, source_sheet.object_id))
+            .unwrap();
 
         assert_eq!(duplicate.index, 1);
         assert_eq!(duplicate.name, "Shapes-1");
@@ -768,7 +777,9 @@ mod tests {
             )
             .unwrap();
 
-        let duplicate = editor.duplicate_sheet(source_sheet.object_id).unwrap();
+        let duplicate = editor
+            .duplicate_sheet(test_sheet_selector(&editor, source_sheet.object_id))
+            .unwrap();
 
         assert_eq!(duplicate.index, 1);
         assert_eq!(duplicate.name, "Media-1");

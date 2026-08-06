@@ -17,13 +17,13 @@ impl NumbersEditor {
         selector: TableSelector,
         target: SheetSelector,
     ) -> Result<NumbersTableInfo> {
-        let table_id = super::table_sort::resolve_table_selector(self, &selector)?;
+        let table_id = super::selectors::table_id(self, selector)?;
         let table = self
             .tables()?
             .into_iter()
             .find(|table| table.object_id == table_id)
             .ok_or_else(|| Error::ParseError(format!("Numbers table {table_id} not found")))?;
-        let target_sheet_id = resolve_sheet_selector(self, &target)?;
+        let target_sheet_id = super::selectors::sheet_id(self, target)?;
 
         let owner = find_table_owner(&self.package, table_id)?;
         if owner.sheet_id == target_sheet_id {
@@ -85,36 +85,6 @@ impl NumbersEditor {
         }
         self.package = staged;
         Ok(verified_table)
-    }
-}
-
-fn resolve_sheet_selector(editor: &NumbersEditor, selector: &SheetSelector) -> Result<u64> {
-    let sheets = editor.sheets()?;
-    match selector {
-        SheetSelector::Name(name) => {
-            let mut matches = sheets.iter().filter(|sheet| sheet.name == *name);
-            let Some(sheet) = matches.next() else {
-                return Err(Error::ParseError(format!(
-                    "Numbers sheet named {name:?} not found"
-                )));
-            };
-            if matches.next().is_some() {
-                return Err(Error::ParseError(format!(
-                    "Numbers sheet name {name:?} is ambiguous"
-                )));
-            }
-            Ok(sheet.object_id)
-        },
-        SheetSelector::Index(index) => {
-            sheets
-                .get(*index)
-                .map(|sheet| sheet.object_id)
-                .ok_or_else(|| {
-                    Error::ParseError(format!(
-                        "Numbers sheet catalog index {index} is out of bounds"
-                    ))
-                })
-        },
     }
 }
 

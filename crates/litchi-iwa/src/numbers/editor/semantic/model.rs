@@ -7,7 +7,10 @@ use super::*;
 /// Stable identity and dimensions of a Numbers table.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NumbersTableInfo {
-    pub object_id: u64,
+    /// Native model identity retained only inside the IWA adapter.
+    pub(crate) object_id: u64,
+    /// Checked zero-based position in the editor's semantic table catalog.
+    pub index: usize,
     pub name: String,
     pub rows: usize,
     pub columns: usize,
@@ -20,9 +23,22 @@ pub struct NumbersTableInfo {
 /// Stable identity and name of a sheet in workbook order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NumbersSheetInfo {
-    pub object_id: u64,
+    /// Native identity retained only inside the IWA adapter.
+    pub(crate) object_id: u64,
     pub index: usize,
     pub name: String,
+}
+
+impl NumbersTableInfo {
+    pub(crate) const fn native_id(&self) -> u64 {
+        self.object_id
+    }
+}
+
+impl NumbersSheetInfo {
+    pub(crate) const fn native_id(&self) -> u64 {
+        self.object_id
+    }
 }
 
 /// A writable ordinary text box owned by one Numbers sheet.

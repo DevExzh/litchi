@@ -1256,7 +1256,10 @@ mod tests {
         editor
             .set_table_cell_paragraph_list(source, ROW, COLUMN, ParagraphList::Bullet)
             .unwrap();
-        let duplicate = editor.duplicate_table(source).unwrap().object_id;
+        let duplicate = editor
+            .duplicate_table(test_table_selector(&editor, source))
+            .unwrap()
+            .object_id;
         editor
             .set_table_cell_paragraph_list(duplicate, ROW, COLUMN, ParagraphList::Numbered)
             .unwrap();
@@ -1680,7 +1683,10 @@ mod tests {
                 source_indentation,
             )
             .unwrap();
-        let duplicate = editor.duplicate_table(source).unwrap().object_id;
+        let duplicate = editor
+            .duplicate_table(test_table_selector(&editor, source))
+            .unwrap()
+            .object_id;
         editor
             .set_table_cell_paragraph_list_bullet(duplicate, ROW, COLUMN, paragraph, &diamond)
             .unwrap();
@@ -1733,7 +1739,10 @@ mod tests {
         editor
             .set_table_cell_paragraph_lists(source, ROW, COLUMN, &mixed_lists())
             .unwrap();
-        let duplicate = editor.duplicate_table(source).unwrap().object_id;
+        let duplicate = editor
+            .duplicate_table(test_table_selector(&editor, source))
+            .unwrap()
+            .object_id;
         let replacement = vec![ParagraphListPlacement::new(
             ParagraphStart::ZERO,
             ParagraphList::Numbered,
@@ -2061,7 +2070,10 @@ mod tests {
         editor
             .set_table_cell_paragraph_lists(source, ROW, COLUMN, &mixed_lists())
             .unwrap();
-        let duplicate = editor.duplicate_table(source).unwrap().object_id;
+        let duplicate = editor
+            .duplicate_table(test_table_selector(&editor, source))
+            .unwrap()
+            .object_id;
         editor
             .set_table_cell_paragraph_list_level(
                 duplicate,
@@ -2119,7 +2131,10 @@ mod tests {
         editor
             .set_table_cell_paragraph_lists(source, ROW, COLUMN, &mixed_lists())
             .unwrap();
-        let duplicate = editor.duplicate_table(source).unwrap().object_id;
+        let duplicate = editor
+            .duplicate_table(test_table_selector(&editor, source))
+            .unwrap()
+            .object_id;
         editor
             .set_table_cell_paragraph_list_numbering(duplicate, ROW, COLUMN, paragraph, restart)
             .unwrap();
