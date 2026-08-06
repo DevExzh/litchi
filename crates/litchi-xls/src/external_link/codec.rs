@@ -686,6 +686,182 @@ pub(super) fn read_u16(data: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes([data[offset], data[offset + 1]])
 }
 
+/// Re-encodes only the specified supporting-book metadata.  Sheet cache
+/// records and all records outside this SupBook remain owned by the source
+/// package.
+pub(super) fn encode_supporting_book(
+    book: &SupportingBook,
+    target: Option<&str>,
+    sheet_edit: Option<(usize, &str)>,
+) -> Result<Vec<u8>> {
+    let target = match book {
+        SupportingBook::ExternalWorkbook(book) => {
+            let target = target.unwrap_or(book.encoded_virtual_path());
+            validate_target(target, false)?;
+            target
+        },
+        SupportingBook::DdeOrOle {
+            encoded_virtual_path,
+        } => {
+            if sheet_edit.is_some() {
+                return invalid(
+                    SUP_BOOK_RECORD_TYPE,
+                    "DDE/OLE supporting books do not own external sheet names",
+                );
+            }
+            let target = target.unwrap_or(encoded_virtual_path);
+            validate_target(target, true)?;
+            target
+        },
+        SupportingBook::Unused { .. } => {
+            return invalid(
+                SUP_BOOK_RECORD_TYPE,
+                "unused supporting-book placeholders do not own editable target metadata",
+            );
+        },
+        SupportingBook::SelfReference | SupportingBook::AddIn | SupportingBook::SameSheet => {
+            return invalid(
+                SUP_BOOK_RECORD_TYPE,
+                "this supporting-book kind does not own editable target metadata",
+            );
+        },
+    };
+
+    let mut payload = Vec::new();
+    match book {
+        SupportingBook::ExternalWorkbook(book) => {
+            let sheet_count = u16::try_from(book.sheets.len())
+                .map_err(|_| Error::Allocation("encoding external supporting-book sheet count"))?;
+            if book.sheets.len() > MAX_EXTERNAL_SHEETS {
+                return invalid(
+                    SUP_BOOK_RECORD_TYPE,
+                    "external SupBook sheet count exceeds resource bound",
+                );
+            }
+            payload.extend_from_slice(&sheet_count.to_le_bytes());
+            append_counted_unicode(&mut payload, target, 255, SUP_BOOK_RECORD_TYPE)?;
+            for (index, sheet) in book.sheets.iter().enumerate() {
+                let name = sheet_edit
+                    .filter(|(edited, _)| *edited == index)
+                    .map_or(sheet.name(), |(_, name)| name);
+                append_counted_unicode(&mut payload, name, 31, SUP_BOOK_RECORD_TYPE)?;
+            }
+        },
+        SupportingBook::DdeOrOle { .. } => {
+            payload.extend_from_slice(&0u16.to_le_bytes());
+            append_counted_unicode(&mut payload, target, 255, SUP_BOOK_RECORD_TYPE)?;
+        },
+        _ => unreachable!(),
+    }
+    if payload.len() > 8_224 {
+        return invalid(
+            SUP_BOOK_RECORD_TYPE,
+            "encoded supporting-book payload exceeds BIFF8 bounds",
+        );
+    }
+    Ok(payload)
+}
+
+/// Replaces the `stName` field in one existing `ExternName` while retaining
+/// all flags, formula bytes, matrix bytes, and the record's following Continue
+/// payloads exactly.
+pub(super) fn encode_external_name(data: &[u8], name: &str) -> Result<Vec<u8>> {
+    if data.len() < 8 {
+        return invalid(
+            EXTERN_NAME_RECORD_TYPE,
+            "ExternName payload is too short for a name edit",
+        );
+    }
+    let (_, name_end) = parse_short_unicode_string(data, 6, EXTERN_NAME_RECORD_TYPE)?;
+    let encoded = encode_short_unicode(name, EXTERN_NAME_RECORD_TYPE)?;
+    let mut payload = Vec::with_capacity(data.len() + encoded.len().saturating_sub(name_end - 6));
+    payload.extend_from_slice(&data[..6]);
+    payload.extend_from_slice(&encoded);
+    payload.extend_from_slice(&data[name_end..]);
+    if payload.len() > 8_224 {
+        return invalid(
+            EXTERN_NAME_RECORD_TYPE,
+            "encoded ExternName payload exceeds BIFF8 bounds",
+        );
+    }
+    Ok(payload)
+}
+
+fn validate_target(target: &str, allow_space: bool) -> Result<()> {
+    let count = target.encode_utf16().count();
+    if !(1..=255).contains(&count) {
+        return invalid(
+            SUP_BOOK_RECORD_TYPE,
+            "supporting-book target must contain 1..=255 UTF-16 code units",
+        );
+    }
+    if target.chars().any(|character| character == '\0') {
+        return invalid(
+            SUP_BOOK_RECORD_TYPE,
+            "supporting-book target cannot contain NUL characters",
+        );
+    }
+    if !allow_space && target == " " {
+        return invalid(
+            SUP_BOOK_RECORD_TYPE,
+            "external-workbook target cannot become the unused-book marker",
+        );
+    }
+    Ok(())
+}
+
+fn append_counted_unicode(
+    output: &mut Vec<u8>,
+    value: &str,
+    maximum: usize,
+    record_type: u16,
+) -> Result<()> {
+    if value.chars().any(|character| character == '\0') {
+        return invalid(record_type, "Unicode string cannot contain NUL characters");
+    }
+    let count = value.encode_utf16().count();
+    if count > maximum {
+        return invalid(
+            record_type,
+            format!("Unicode string exceeds {maximum} UTF-16 code units"),
+        );
+    }
+    let count = u16::try_from(count).map_err(|_| Error::Allocation("encoding BIFF8 string"))?;
+    output.extend_from_slice(&count.to_le_bytes());
+    append_unicode_no_cch(output, value);
+    Ok(())
+}
+
+fn append_unicode_no_cch(output: &mut Vec<u8>, value: &str) {
+    let compressed = value.chars().all(|character| u32::from(character) <= 0xFF);
+    output.push(if compressed { 0 } else { 1 });
+    if compressed {
+        output.extend(value.chars().map(|character| character as u8));
+    } else {
+        for unit in value.encode_utf16() {
+            output.extend_from_slice(&unit.to_le_bytes());
+        }
+    }
+}
+
+fn encode_short_unicode(value: &str, record_type: u16) -> Result<Vec<u8>> {
+    let count = value.encode_utf16().count();
+    let count = u8::try_from(count).map_err(|_| Error::InvalidRecord {
+        record_type,
+        message: "ExternName short Unicode name exceeds 255 UTF-16 code units".into(),
+    })?;
+    if value.chars().any(|character| character == '\0') {
+        return invalid(
+            record_type,
+            "ExternName short Unicode name cannot contain NUL characters",
+        );
+    }
+    let mut output = Vec::new();
+    output.push(count);
+    append_unicode_no_cch(&mut output, value);
+    Ok(output)
+}
+
 pub(super) fn invalid<T>(record_type: u16, message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidRecord {
         record_type,

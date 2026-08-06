@@ -5,8 +5,10 @@
 //! no external path is resolved or opened.
 
 mod codec;
+mod edit;
 mod model;
 mod package;
+mod validation;
 
 #[cfg(test)]
 mod tests;
@@ -26,6 +28,8 @@ pub(super) const MAX_EXTERNAL_NAMES: usize = 4096;
 pub(super) const MAX_EXTERNAL_NAME_BYTES: usize = 1_048_576;
 pub(super) const MAX_DDE_OLE_VALUES: usize = 65_536;
 
+#[allow(unused_imports, unreachable_pub)]
+pub use edit::{Commit, Patch, Snapshot, Transaction};
 pub use model::{
     CacheRow, CachedValue, ClipboardFormat, ErrorValue, Links, Name, NameBody, Sheet,
     SheetReference, SupportingBook, ValueMatrix, Workbook,

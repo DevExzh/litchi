@@ -10,6 +10,7 @@ use super::codec::{
     parse_sup_book, read_u16, validate_reference,
 };
 use super::model::*;
+use super::validation::{RecordSpan, replace_record, scan_records};
 use super::{
     CONTINUE_RECORD_TYPE, CRN_RECORD_TYPE, EXTERN_NAME_RECORD_TYPE, EXTERN_SHEET_RECORD_TYPE,
     MAX_CACHED_CELLS, MAX_EXTERNAL_NAME_BYTES, MAX_EXTERNAL_NAMES, MAX_EXTERNAL_REFERENCES,
@@ -40,6 +41,212 @@ pub(crate) struct ExternalLinkCollector {
     closed: bool,
     cached_cells: usize,
     external_name_bytes: usize,
+}
+
+/// A validated workbook-global BIFF8 stream with contextual external-link
+/// ownership.  Raw records remain in their source order; only a transaction's
+/// explicitly selected owner may replace its payload.
+#[derive(Clone)]
+pub(crate) struct Package {
+    records: Vec<RecordSpan>,
+    supporting_books: Vec<usize>,
+    external_names: Vec<(usize, usize)>,
+    caches: Vec<CacheRecord>,
+    links: Links,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct CacheRecord {
+    pub(crate) record: RecordSpan,
+    pub(crate) book_index: usize,
+    pub(crate) sheet_index: usize,
+    pub(crate) declared: i16,
+}
+
+impl Package {
+    pub(crate) fn parse(bytes: &[u8]) -> Result<Self> {
+        let records = scan_records(bytes)?;
+        let internal_sheet_count = records
+            .iter()
+            .filter(|record| record.record_type == 0x0085)
+            .count();
+        let mut collector = ExternalLinkCollector::new();
+        for record in &records {
+            collector.feed_record(record.record_type, record.payload(bytes))?;
+        }
+        let links = collector.finish(internal_sheet_count)?;
+
+        let mut supporting_books = Vec::new();
+        let mut external_names = Vec::new();
+        let mut caches = Vec::new();
+        let mut current_book = None;
+        let mut names_allowed = false;
+        let mut collection_started = false;
+        let mut collection_closed = false;
+        for (record_index, record) in records.iter().copied().enumerate() {
+            match record.record_type {
+                SUP_BOOK_RECORD_TYPE => {
+                    collection_started = true;
+                    if collection_closed {
+                        return Err(Error::InvalidRecord {
+                            record_type: record.record_type,
+                            message: "SupBook appears outside the external-link collection".into(),
+                        });
+                    }
+                    current_book = Some(supporting_books.len());
+                    supporting_books.push(record_index);
+                    names_allowed = true;
+                },
+                EXTERN_NAME_RECORD_TYPE => {
+                    let book_index = current_book.ok_or_else(|| Error::InvalidRecord {
+                        record_type: record.record_type,
+                        message: "ExternName has no owning SupBook".into(),
+                    })?;
+                    if !names_allowed {
+                        return Err(Error::InvalidRecord {
+                            record_type: record.record_type,
+                            message: "ExternName is outside its owning SupBook name collection"
+                                .into(),
+                        });
+                    }
+                    external_names.push((record_index, book_index));
+                },
+                XCT_RECORD_TYPE => {
+                    let book_index = current_book.ok_or_else(|| Error::InvalidRecord {
+                        record_type: record.record_type,
+                        message: "XCT has no owning SupBook".into(),
+                    })?;
+                    let payload = record.payload(bytes);
+                    if payload.len() != 4 {
+                        return Err(Error::InvalidLength {
+                            expected: 4,
+                            found: payload.len(),
+                        });
+                    }
+                    caches.push(CacheRecord {
+                        record,
+                        book_index,
+                        sheet_index: usize::from(u16::from_le_bytes([payload[2], payload[3]])),
+                        declared: i16::from_le_bytes([payload[0], payload[1]]),
+                    });
+                    names_allowed = false;
+                },
+                CRN_RECORD_TYPE | EXTERN_SHEET_RECORD_TYPE => names_allowed = false,
+                CONTINUE_RECORD_TYPE => {},
+                _ if collection_started => collection_closed = true,
+                _ => {},
+            }
+        }
+
+        if supporting_books.len() != links.supporting_books().len()
+            || external_names.len() != links.external_names().len()
+        {
+            return Err(Error::InvalidRecord {
+                record_type: SUP_BOOK_RECORD_TYPE,
+                message: "external-link owner map does not match the semantic collection".into(),
+            });
+        }
+        for (name_index, (_, book_index)) in external_names.iter().enumerate() {
+            if usize::from(links.external_names()[name_index].supporting_book_index())
+                != *book_index
+            {
+                return Err(Error::InvalidRecord {
+                    record_type: EXTERN_NAME_RECORD_TYPE,
+                    message: "ExternName owner does not match its SupBook record".into(),
+                });
+            }
+        }
+        for cache in &caches {
+            let Some(SupportingBook::ExternalWorkbook(book)) =
+                links.supporting_books().get(cache.book_index)
+            else {
+                return Err(Error::InvalidRecord {
+                    record_type: XCT_RECORD_TYPE,
+                    message: "XCT owner map does not match its supporting-book sheet".into(),
+                });
+            };
+            if cache.sheet_index >= book.sheets.len() {
+                return Err(Error::InvalidRecord {
+                    record_type: XCT_RECORD_TYPE,
+                    message: "XCT sheet index exceeds its supporting-book sheet count".into(),
+                });
+            }
+        }
+        Ok(Self {
+            records,
+            supporting_books,
+            external_names,
+            caches,
+            links,
+        })
+    }
+
+    pub(crate) fn links(&self) -> &Links {
+        &self.links
+    }
+
+    pub(crate) fn supporting_book_record(&self, index: usize) -> Result<RecordSpan> {
+        self.supporting_books
+            .get(index)
+            .and_then(|record| self.records.get(*record).copied())
+            .ok_or_else(|| {
+                Error::UnsafeEdit(format!(
+                    "supporting-book index {index} is outside the external-link collection"
+                ))
+            })
+    }
+
+    pub(crate) fn external_name_record(&self, index: usize) -> Result<RecordSpan> {
+        self.external_names
+            .get(index)
+            .and_then(|(record, _)| self.records.get(*record).copied())
+            .ok_or_else(|| {
+                Error::UnsafeEdit(format!(
+                    "external-name index {index} is outside the external-link collection"
+                ))
+            })
+    }
+
+    pub(crate) fn cache_record(
+        &self,
+        book_index: usize,
+        sheet_index: usize,
+    ) -> Result<CacheRecord> {
+        let mut matches = self
+            .caches
+            .iter()
+            .copied()
+            .filter(|cache| cache.book_index == book_index && cache.sheet_index == sheet_index);
+        let cache = matches.next().ok_or_else(|| {
+            Error::UnsafeEdit(format!(
+                "external cache for supporting book {book_index}, sheet {sheet_index} is not declared"
+            ))
+        })?;
+        if matches.next().is_some() {
+            return Err(Error::UnsafeEdit(format!(
+                "external cache for supporting book {book_index}, sheet {sheet_index} is ambiguous"
+            )));
+        }
+        Ok(cache)
+    }
+
+    pub(crate) fn replace_record(
+        &self,
+        bytes: &[u8],
+        record: RecordSpan,
+        payload: &[u8],
+    ) -> Result<Vec<u8>> {
+        if !self.records.iter().any(|candidate| {
+            candidate.record_start == record.record_start
+                && candidate.record_type == record.record_type
+                && candidate.payload_end == record.payload_end
+        }) {
+            return Err(Error::UnsafeEdit(
+                "external-link edit does not own the selected BIFF record".into(),
+            ));
+        }
+        replace_record(bytes, record, payload)
+    }
 }
 
 impl ExternalLinkCollector {
