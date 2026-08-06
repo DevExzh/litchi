@@ -6359,6 +6359,44 @@ The focused leaf tests, four Keynote image CRUD tests, five image examples,
 and strict Keynote Clippy passed. Table-lock ownership was intentionally
 outside this audit scope.
 
+This turn completes the next ADR 0001–0004 migration slice on the isolated
+`feat/office-format-completeness` branch. `litchi-iwa-common::table::lock`
+now owns the compact table-lock state consumed by the Pages, Numbers, and
+Keynote facades. The neutral object index now stores each record once and
+lets its format adapter borrow the record while retaining only source-local
+position metadata. `litchi-iwa-text` owns the date-time, storage, and
+paragraph drop-cap semantic values; `litchi-iwa-common::chart::error_bar`
+owns checked error-bar values and bounded custom arrays. The Keynote image
+options leaf, archive source retention, and `NumbersSheetInfo::id` complete
+the corresponding public API handoffs without compatibility aliases.
+
+`litchi-iwa-archive` now also has bounded physical ZIP reassembly for the
+supported Store/Deflate edited entries, preserving untouched records and
+metadata; unsupported legacy, ZIP64, and compression cases remain explicit
+errors. Its 24 tests, detector's 10 tests, common's 118 tests, text's 40
+tests, and the integrated IWA library's 1,489 tests passed. The crate
+boundary checker reports 49 packages and 138 internal declarations, its
+Python suite passes 15 tests, and the scoped leaf checks remain green. The
+library-target Clippy checks for detector and Keynote also pass; all-target
+`-D warnings` remains blocked only by pre-existing test-module unwrap, float,
+and shadowing lints in those packages. The exhaustive detector mapping for
+the new reassembly error and the date-time example's typed sheet-ID call are
+included in the integration commit.
+
+Computer Use verified native files through the real iWork applications.
+Numbers opened `/private/tmp/litchi-native-table-lock-20260806d/table-lock.numbers`
+and exposed `Locked Table` plus the disabled locked-table cells; the
+date-time Numbers file exposed `Created: Friday, July 17, 2026`. Pages opened
+the date-time fixture and exposed the same marker, while Keynote opened its
+fixture and exposed the marker in a text box. These files were saved and
+Numbers, Pages, and Keynote were closed afterward. The Pages table-lock
+fixture at `/private/tmp/litchi-native-table-lock-20260806d/table-lock.pages`
+was rejected by Pages as damaged, so it is recorded as a native-open gap,
+not a pass. Remaining ADR debt includes raw `IWorkTextEditor` IDs/storage,
+eager package materialization, fully source-backed lazy object access,
+remaining monolithic adapters, and the intentionally unsupported archive
+member classes above.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

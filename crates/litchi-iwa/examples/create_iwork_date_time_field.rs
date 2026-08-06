@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         Some("numbers") => {
             let mut editor = NumbersDocumentBuilder::new().build()?;
-            let sheet_id = editor.sheets()?[0].object_id;
+            let sheet_id = editor.sheets()?[0].id();
             let text_box = editor.add_sheet_text_box(sheet_id, PREFIX, POSITION, SIZE)?;
             editor.insert_sheet_text_box_date_time_field(
                 sheet_id,

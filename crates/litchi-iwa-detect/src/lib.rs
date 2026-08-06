@@ -310,6 +310,9 @@ fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
         litchi_iwa_archive::Error::SourceChanged { expected, observed } => Error::Archive(format!(
             "iWork archive source changed during read: expected {expected:?}, observed {observed:?}"
         )),
+        litchi_iwa_archive::Error::Reassembly(message) => {
+            Error::Archive(format!("iWork archive reassembly: {message}"))
+        },
     }
 }
 

@@ -36,6 +36,12 @@ impl NumbersTableInfo {
 }
 
 impl NumbersSheetInfo {
+    /// Return the stable native sheet identifier accepted by sheet-scoped APIs.
+    #[must_use]
+    pub const fn id(&self) -> u64 {
+        self.object_id
+    }
+
     pub(crate) const fn native_id(&self) -> u64 {
         self.object_id
     }
