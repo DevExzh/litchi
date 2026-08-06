@@ -125,6 +125,8 @@
 //! - `pyiwa` - Python iWork format reader
 //! - `iWorkFileFormat` - Reverse-engineered format documentation
 
+#![forbid(unsafe_code)]
+
 use std::sync::Arc;
 
 // Core parsing modules
