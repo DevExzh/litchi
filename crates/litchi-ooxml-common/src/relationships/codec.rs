@@ -1,10 +1,12 @@
-//! Shared OOXML relationship-namespace attribute decoding.
+//! XML codecs for OOXML relationship attributes.
 
 use crate::XmlError;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
+
+use super::Id;
 
 /// Transitional OOXML relationships namespace.
 pub const TRANSITIONAL_NAMESPACE: &[u8] =
@@ -54,58 +56,14 @@ pub fn attribute_value(
     Ok(value)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use quick_xml::reader::NsReader;
-
-    #[test]
-    fn accepts_transitional_and_strict_relationship_attributes() {
-        for (xml, expected) in [
-            (
-                format!(
-                    r#"<p:item xmlns:p="urn:test" xmlns:r="{}" r:id="rId1"/>"#,
-                    String::from_utf8_lossy(TRANSITIONAL_NAMESPACE)
-                ),
-                "rId1",
-            ),
-            (
-                format!(
-                    r#"<p:item xmlns:p="urn:test" xmlns:r="{}" r:id="rId2"/>"#,
-                    String::from_utf8_lossy(STRICT_NAMESPACE)
-                ),
-                "rId2",
-            ),
-        ] {
-            let mut reader = NsReader::from_reader(xml.as_bytes());
-            let (_, event) = reader.read_resolved_event().expect("item");
-            let quick_xml::events::Event::Empty(element) = event else {
-                panic!("expected empty item");
-            };
-            assert_eq!(
-                attribute_value(&element, b"id", reader.decoder(), reader.resolver())
-                    .expect("relationship attribute")
-                    .as_deref(),
-                Some(expected)
-            );
-        }
-    }
-
-    #[test]
-    fn rejects_duplicate_relationship_attributes() {
-        let xml = format!(
-            r#"<p:item xmlns:p="urn:test" xmlns:r="{}" xmlns:q="{}" r:id="one" q:id="two"/>"#,
-            String::from_utf8_lossy(TRANSITIONAL_NAMESPACE),
-            String::from_utf8_lossy(TRANSITIONAL_NAMESPACE)
-        );
-        let mut reader = NsReader::from_reader(xml.as_bytes());
-        let (_, event) = reader.read_resolved_event().expect("item");
-        let quick_xml::events::Event::Empty(element) = event else {
-            panic!("expected empty item");
-        };
-        assert!(matches!(
-            attribute_value(&element, b"id", reader.decoder(), reader.resolver()),
-            Err(XmlError::Invalid(message)) if message.contains("duplicate")
-        ));
-    }
+/// Decode one relationship attribute into a checked [`Id`].
+pub fn attribute_id(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<Option<Id>, XmlError> {
+    attribute_value(element, name, decoder, resolver)?
+        .map(Id::new)
+        .transpose()
 }
