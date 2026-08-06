@@ -25,6 +25,7 @@ const PROPERTY_ID_MASK: u16 = 0x3FFF;
 
 mod codec;
 pub mod geometry;
+pub mod gradient;
 mod model;
 mod package;
 #[cfg(test)]

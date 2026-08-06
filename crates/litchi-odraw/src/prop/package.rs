@@ -212,6 +212,15 @@ impl<'data> Props<'data> {
     pub fn geometry(&self) -> Result<Option<Geometry<'data>>> {
         super::geometry::parse(self)
     }
+
+    /// Decodes the optional `[MS-ODRAW]` `fillShadeColors` gradient stops.
+    ///
+    /// The returned view borrows the original property array and retains
+    /// indirect color references exactly; it never resolves colors or renders
+    /// the gradient.
+    pub fn gradient_stops(&self) -> Result<Option<super::gradient::Stops<'data>>> {
+        super::gradient::parse(self)
+    }
 }
 fn boolean_group_terminal(id: u16) -> Option<u16> {
     match id {
