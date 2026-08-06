@@ -15,7 +15,7 @@ mod date_time_object;
 mod date_time_types;
 mod drop_cap;
 pub mod editor;
-pub mod extractor;
+pub(crate) mod extractor;
 mod font;
 mod highlight;
 mod highlight_object;
@@ -131,7 +131,7 @@ pub use text_comment_types::{
     TextCommentReplyId,
 };
 
-pub use extractor::TextExtractor;
+pub(crate) use extractor::TextExtractor;
 pub use litchi_iwa_text::storage::{Error as StorageError, Fragment, Run, Storage};
 pub use style::{
     CharacterError, ParagraphBackground, ParagraphBorder, ParagraphBorderOffset,

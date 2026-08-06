@@ -19,7 +19,7 @@ mod properties;
 mod shadow;
 mod stroke;
 mod text_columns;
-pub mod text_extractor;
+mod text_extractor;
 mod text_layout;
 
 pub use caption::DrawableTitleCaption;
@@ -92,7 +92,6 @@ pub(crate) use stroke::{
 pub(crate) use text_columns::{
     reset_shape_text_columns, set_shape_text_columns, shape_text_columns,
 };
-pub use text_extractor::ShapeTextExtractor;
 pub(crate) use text_layout::{reset_shape_text_layout, set_shape_text_layout, shape_text_layout};
 
 impl From<litchi_iwa_common::shape::fill::Error> for crate::Error {

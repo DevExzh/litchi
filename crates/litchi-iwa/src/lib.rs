@@ -155,7 +155,7 @@ pub mod table_appearance;
 mod table_hidden_axes;
 /// Typed native table lock controls shared by Pages, Numbers, and Keynote.
 pub mod table_lock;
-pub mod theme;
+mod theme;
 pub(crate) mod wire;
 mod zip_utils;
 
@@ -194,6 +194,11 @@ pub mod raw {
     pub mod package {
         pub use crate::package::*;
     }
+
+    /// Native theme/protobuf extension codec.
+    pub mod theme {
+        pub use crate::theme::*;
+    }
 }
 
 // Internal modules use a short alias while the public API keeps this native
@@ -207,10 +212,10 @@ pub(crate) use package::IWorkPackage;
 pub use shapes::DrawableTitleCaption;
 pub use structured::StructuredData;
 pub use text::{
-    Fragment, ParagraphStyle, Run, Storage, TextDecorations, TextExtractor, TextPointSize,
+    Fragment, ParagraphStyle, Run, Storage, TextDecorations, TextPointSize,
     TextStrikethrough, TextStyle, TextUnderline,
 };
-pub use theme::{IWorkThemeArchive, IWorkThemeExtensions};
+pub(crate) use theme::{IWorkThemeArchive, IWorkThemeExtensions};
 
 /// Error types for iWork parsing
 #[derive(Debug, Clone)]

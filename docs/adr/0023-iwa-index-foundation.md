@@ -51,14 +51,19 @@ of archives or package state.
 
 ## Adapter boundary
 
-The IWA integration is intentionally deferred as a private follow-up. A future
-`litchi-iwa` adapter will validate each archive object, assign private
-`FragmentId` ordinals, translate checked locations into `ObjectRecord`, and
-translate native references into `Reference` values. Package traversal,
+The IWA integration is implemented as a private adapter in
+`litchi-iwa::object_index`. It validates each archive object, assigns private
+`FragmentId` ordinals, translates checked locations into `ObjectRecord`, and
+translates native references into `Reference` values. Package traversal,
 protobuf decoding, fallback reference extraction, resource budgets, unknown
 field preservation, and transactional publication remain below the public
 semantic API. No native identifier or archive type is added to this crate to
-make that adapter convenient.
+make the adapter convenient.
+
+The adapter retains only the archive name and validated source position needed
+to resolve an already-parsed object. Public entry metadata exposes typed
+`FragmentId` and `ByteSpan` values; native archive names, source positions, and
+raw numeric compatibility queries remain private to the adapter.
 
 ## Consequences
 
