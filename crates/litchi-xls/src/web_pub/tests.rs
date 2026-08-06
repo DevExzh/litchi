@@ -345,6 +345,11 @@ fn snapshot_noop_and_edits_preserve_opaque_wire_bytes() {
     let applied = commit.patch().apply(&snapshot).expect("apply");
     let reverted = commit.patch().inverse().apply(&applied).expect("inverse");
     assert_eq!(reverted.finish(), bytes);
+    let reverted_directly = commit
+        .patch()
+        .revert(commit.snapshot())
+        .expect("direct revert");
+    assert_eq!(reverted_directly.finish(), bytes);
 }
 
 #[test]
