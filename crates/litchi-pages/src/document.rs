@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use thiserror::Error;
 
 use crate::{Section, SectionType};
@@ -156,9 +158,12 @@ impl Root {
 }
 
 /// Immutable, archive-free Pages document snapshot.
+///
+/// Cloning a document shares its immutable section allocation instead of
+/// cloning every semantic section.
 #[derive(Debug, Clone, Default)]
 pub struct Document {
-    sections: Box<[Section]>,
+    sections: Arc<[Section]>,
     text_len: usize,
 }
 
@@ -200,6 +205,9 @@ impl Document {
 
     /// Build an immutable document under an explicit text budget.
     ///
+    /// The input vector is validated against the section, index, and text
+    /// bounds before it is consumed into one shared immutable allocation.
+    ///
     /// # Errors
     ///
     /// Returns a typed error when the section count, indexes, or text budget is
@@ -238,7 +246,7 @@ impl Document {
         }
 
         Ok(Self {
-            sections: sections.into_boxed_slice(),
+            sections: Arc::from(sections.into_boxed_slice()),
             text_len,
         })
     }
@@ -257,7 +265,7 @@ impl Document {
 
     /// Return the number of semantic sections.
     #[must_use]
-    pub const fn section_count(&self) -> usize {
+    pub fn section_count(&self) -> usize {
         self.sections.len()
     }
 
@@ -269,7 +277,7 @@ impl Document {
 
     /// Return whether the document has no semantic sections.
     #[must_use]
-    pub const fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.sections.is_empty()
     }
 
@@ -336,5 +344,15 @@ mod tests {
         assert!(document.is_empty());
         assert_eq!(document.text_len(), 0);
         assert_eq!(document.plain_text(), "");
+    }
+
+    #[test]
+    fn cloned_documents_share_immutable_sections() {
+        let document = Document::from_root(Root::with_body(body("Pages body")))
+            .unwrap_or_else(|error| panic!("document should be valid: {error}"));
+        let snapshot = document.clone();
+
+        assert!(Arc::ptr_eq(&document.sections, &snapshot.sections));
+        assert_eq!(snapshot.plain_text(), "Pages body");
     }
 }
