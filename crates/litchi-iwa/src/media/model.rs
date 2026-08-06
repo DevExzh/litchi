@@ -5,6 +5,7 @@ use std::num::NonZeroU64;
 use std::path::PathBuf;
 
 use crate::{Error, Result};
+use litchi_iwa_graph::ObjectId;
 pub use litchi_iwa_common::media::Type as MediaType;
 
 const DEFAULT_MAX_MEDIA_ASSETS: usize = 100_000;
@@ -157,7 +158,7 @@ impl MediaAssetId {
 
     /// Return the native identifier used at the archive boundary.
     #[must_use]
-    pub const fn get(self) -> u64 {
+    pub(crate) const fn get(self) -> u64 {
         self.0.get()
     }
 
@@ -208,7 +209,7 @@ pub struct EmbeddedMediaAsset {
     /// Whether the package's `DataMetadataMap` contains this identifier.
     pub has_data_metadata: bool,
     /// Object identifiers whose MessageInfo/component records reference this data.
-    pub referencing_object_ids: Vec<u64>,
+    pub referencing_object_ids: Vec<ObjectId>,
 }
 
 impl EmbeddedMediaAsset {

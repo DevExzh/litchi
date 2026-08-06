@@ -10,6 +10,7 @@ use prost::Message;
 use crate::package::IWorkPackage;
 use crate::protobuf;
 use litchi_iwa_common::varint::{decode_varint_from_bytes, encode_varint_into};
+use litchi_iwa_graph::ObjectId;
 use crate::{Error, Result};
 
 use super::model::{EmbeddedMediaAsset, MediaAsset, MediaAssetId, MediaLimits, MediaType};
@@ -163,16 +164,15 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
     let metadata = decode_package_metadata(package)?;
     let mut component_counts = HashMap::<u64, u64>::new();
     let mut component_record_counts = HashMap::<u64, usize>::new();
-    let mut referencing_objects = HashMap::<u64, HashSet<u64>>::new();
+    let mut referencing_objects = HashMap::<u64, HashSet<ObjectId>>::new();
     for component in metadata
         .components
         .iter()
         .chain(metadata.versioned_components.iter())
     {
         for reference in &component.data_references {
-            let record_count = component_record_counts
-                .entry(reference.data_identifier)
-                .or_default();
+            let data_identifier = MediaAssetId::try_from(reference.data_identifier)?.get();
+            let record_count = component_record_counts.entry(data_identifier).or_default();
             *record_count = record_count.checked_add(1).ok_or_else(|| {
                 Error::Bundle("Component data reference record count overflow".to_owned())
             })?;
@@ -183,17 +183,22 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
                 .ok_or_else(|| {
                     Error::Bundle("Component data reference count overflow".to_owned())
                 })?;
-            let current = component_counts
-                .entry(reference.data_identifier)
-                .or_default();
+            let current = component_counts.entry(data_identifier).or_default();
             *current = current.checked_add(count).ok_or_else(|| {
                 Error::Bundle("Component data reference count overflow".to_owned())
             })?;
             for object in &reference.object_reference_list {
+                let object_identifier = ObjectId::try_from(object.object_identifier).map_err(
+                    |_| {
+                        Error::InvalidFormat(format!(
+                            "Component data reference for media {data_identifier} contains a zero object identifier"
+                        ))
+                    },
+                )?;
                 referencing_objects
-                    .entry(reference.data_identifier)
+                    .entry(data_identifier)
                     .or_default()
-                    .insert(object.object_identifier);
+                    .insert(object_identifier);
             }
         }
     }
@@ -202,7 +207,14 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
     let metadata_map_identifier = metadata
         .data_metadata_map
         .as_ref()
-        .map(|reference| reference.identifier);
+        .map(|reference| {
+            ObjectId::try_from(reference.identifier).map_err(|_| {
+                Error::InvalidFormat(
+                    "DataMetadataMap reference contains a zero object identifier".to_owned(),
+                )
+            })
+        })
+        .transpose()?;
     let mut data_metadata_ids = HashSet::new();
     let mut metadata_map_payloads = 0usize;
     let iwa_names = package
@@ -215,7 +227,10 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
             let object_identifier = object.archive_info.identifier.ok_or_else(|| {
                 Error::InvalidFormat(format!("Object in {name} has no identifier"))
             })?;
-            if object.archive_info.identifier == metadata_map_identifier {
+            let object_identifier = ObjectId::try_from(object_identifier).map_err(|_| {
+                Error::InvalidFormat(format!("Object in {name} has a zero archive identifier"))
+            })?;
+            if Some(object_identifier) == metadata_map_identifier {
                 for message in &object.messages {
                     if message.type_ == DATA_METADATA_MAP_MESSAGE_TYPE {
                         metadata_map_payloads =
@@ -224,19 +239,21 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
                             })?;
                         let map = protobuf::tsp::DataMetadataMap::decode(message.data.as_slice())?;
                         for entry in map.data_metadata_entries {
-                            data_metadata_ids.insert(entry.data_identifier);
+                            let data_identifier = MediaAssetId::try_from(entry.data_identifier)?;
+                            data_metadata_ids.insert(data_identifier.get());
                         }
                     }
                 }
             }
             for info in object.archive_info.message_infos {
                 for identifier in info.data_references {
-                    let count = message_counts.entry(identifier).or_default();
+                    let data_identifier = MediaAssetId::try_from(identifier)?.get();
+                    let count = message_counts.entry(data_identifier).or_default();
                     *count = count.checked_add(1).ok_or_else(|| {
                         Error::Bundle("Message data reference count overflow".to_owned())
                     })?;
                     referencing_objects
-                        .entry(identifier)
+                        .entry(data_identifier)
                         .or_default()
                         .insert(object_identifier);
                 }
@@ -317,16 +334,25 @@ pub(crate) fn reachable_embedded_assets(
     roots: impl IntoIterator<Item = u64>,
 ) -> Result<Vec<EmbeddedMediaAsset>> {
     let assets = embedded_assets(package)?;
-    let mut outgoing = HashMap::<u64, Vec<u64>>::new();
+    let mut outgoing = HashMap::<ObjectId, Vec<ObjectId>>::new();
     for name in package.iwa_entry_names() {
         let archive = package.archive(name)?;
         for object in archive.objects {
             let identifier = object.archive_info.identifier.ok_or_else(|| {
                 Error::InvalidFormat(format!("Object in {name} has no identifier"))
             })?;
+            let identifier = ObjectId::try_from(identifier).map_err(|_| {
+                Error::InvalidFormat(format!("Object in {name} has a zero archive identifier"))
+            })?;
             let references = outgoing.entry(identifier).or_default();
             for info in object.archive_info.message_infos {
                 for reference in info.object_references {
+                    let reference = ObjectId::try_from(reference).map_err(|_| {
+                        Error::InvalidFormat(format!(
+                            "Object {} in {name} contains a zero object reference",
+                            identifier.get()
+                        ))
+                    })?;
                     if !references.contains(&reference) {
                         references.push(reference);
                     }
@@ -335,8 +361,15 @@ pub(crate) fn reachable_embedded_assets(
         }
     }
 
-    let mut reachable = HashSet::new();
-    let mut queue = roots.into_iter().collect::<VecDeque<_>>();
+    let mut reachable = HashSet::<ObjectId>::new();
+    let mut queue = roots
+        .into_iter()
+        .map(|root| {
+            ObjectId::try_from(root).map_err(|_| {
+                Error::InvalidFormat("Media reachability root must be non-zero".to_owned())
+            })
+        })
+        .collect::<Result<VecDeque<_>>>()?;
     while let Some(identifier) = queue.pop_front() {
         if !reachable.insert(identifier) {
             continue;
