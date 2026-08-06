@@ -7,6 +7,7 @@
 pub mod authoring;
 pub mod charts;
 pub mod codec;
+pub mod data_pilot;
 pub mod drawing;
 pub mod embedded;
 pub mod facade;

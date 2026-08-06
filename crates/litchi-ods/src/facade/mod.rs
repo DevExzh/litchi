@@ -74,6 +74,11 @@ impl Spreadsheet {
         self.settings()
     }
 
+    /// Discover the typed DataPilot catalog owned by this spreadsheet.
+    pub fn data_pilots(&self) -> Result<crate::data_pilot::Catalog<'_>> {
+        crate::data_pilot::Catalog::load(&self.package)
+    }
+
     /// Return the typed worksheet graph in document order.
     pub fn sheets(&self) -> &[crate::worksheet::Sheet] {
         &self.sheets

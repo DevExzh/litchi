@@ -121,6 +121,31 @@ impl MutableSpreadsheet {
         Ok(())
     }
 
+    /// Discover the typed DataPilot catalog in the current package snapshot.
+    pub fn data_pilots(&self) -> Result<crate::data_pilot::Catalog<'_>> {
+        self.spreadsheet.data_pilots()
+    }
+
+    /// Clone-stage DataPilot CRUD and publish it as one package edit.
+    ///
+    /// Unknown markup in the owned XML is retained by no-op transactions and
+    /// causes a changed transaction to fail before package bytes are rebuilt.
+    pub fn edit_data_pilots<F>(&mut self, edit: F) -> Result<()>
+    where
+        F: for<'source> FnOnce(&mut crate::data_pilot::Editor<'_, 'source>) -> Result<()>,
+    {
+        let commit = {
+            let catalog = self.spreadsheet.data_pilots()?;
+            let mut transaction = catalog.transaction();
+            edit(&mut transaction.editor())?;
+            transaction.commit()?
+        };
+        if commit.changed() {
+            self.spreadsheet = Spreadsheet::from_bytes(commit.into_owned_bytes())?;
+        }
+        Ok(())
+    }
+
     /// Find a worksheet by its exact ODF name.
     pub fn sheet(&self, name: &str) -> Option<&Sheet> {
         self.spreadsheet.sheet(name)
