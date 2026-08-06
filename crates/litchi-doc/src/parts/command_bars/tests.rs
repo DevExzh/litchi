@@ -409,16 +409,16 @@ fn rejects_invalid_command_string_and_macro_name_boundaries() {
     let value = sample();
     let mut bytes = to_bytes(&value).expect("serialize");
     let strings_tag = bytes
-        .iter()
-        .position(|byte| *byte == 0x10)
+        .windows(5)
+        .position(|window| window == [0x10, 0xFF, 0xFF, 6, 0])
         .expect("TcgSttbf tag");
     bytes[strings_tag + 3..strings_tag + 5].copy_from_slice(&3u16.to_le_bytes());
     assert!(parse_bytes(&bytes).is_err());
 
     let mut bytes = to_bytes(&value).expect("serialize");
     let names_tag = bytes
-        .iter()
-        .position(|byte| *byte == 0x11)
+        .windows(5)
+        .position(|window| window == [0x11, 1, 0, 4, 0])
         .expect("MacroNames tag");
     let name_terminator = names_tag + 1 + 2 + 2 + 2 + "AutoMacro".encode_utf16().count() * 2;
     bytes[name_terminator..name_terminator + 2].copy_from_slice(&[1, 0]);
