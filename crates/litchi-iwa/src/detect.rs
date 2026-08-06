@@ -387,9 +387,9 @@ fn root_format_archive(archive: &Archive, _limits: Limits) -> crate::Result<Opti
             Application::Numbers => Format::Numbers,
             Application::Common => continue,
         };
-        if detected.is_some_and(|previous| previous != format) {
+        if detected.is_some() {
             return Err(crate::Error::InvalidFormat(
-                "Document.iwa contains conflicting application roots".to_owned(),
+                "Document.iwa contains multiple application roots".to_owned(),
             ));
         }
         detected = Some(format);
@@ -512,6 +512,7 @@ fn directory_outcome(index: &Path, limits: Limits) -> crate::Result<Outcome> {
     let mut marks = Marks::default();
     let mut document = None;
     let mut entry_count = 0usize;
+    let mut total_size = 0u64;
     for entry in fs::read_dir(index)? {
         let entry = entry?;
         entry_count = entry_count.checked_add(1).ok_or_else(|| {
@@ -531,6 +532,16 @@ fn directory_outcome(index: &Path, limits: Limits) -> crate::Result<Outcome> {
             )));
         }
         if kind.is_file() {
+            let entry_size = entry.metadata()?.len();
+            total_size = total_size.checked_add(entry_size).ok_or_else(|| {
+                crate::Error::InvalidFormat("iWork index byte count overflow".to_owned())
+            })?;
+            if total_size > limits.max_total_size {
+                return Err(crate::Error::InvalidFormat(format!(
+                    "iWork index directory contains {total_size} bytes, exceeding the {} byte limit",
+                    limits.max_total_size
+                )));
+            }
             let name = entry.file_name();
             let name = name.to_str().ok_or_else(|| {
                 crate::Error::InvalidFormat(format!(
@@ -890,6 +901,28 @@ mod tests {
             bytes(&package(&[("Data/image.png", b"iwa")])).unwrap(),
             None
         );
+
+        let duplicate_root = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 10_000,
+                        data: document_payload(Application::Pages),
+                    }],
+                )
+                .unwrap(),
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 10_000,
+                        data: document_payload(Application::Pages),
+                    }],
+                )
+                .unwrap(),
+            ],
+        };
+        assert!(root_format_archive(&duplicate_root, Limits::default()).is_err());
     }
 
     #[test]
@@ -898,6 +931,12 @@ mod tests {
         let index = package(&[("Document.iwa", &root)]);
         let outer = package(&[("legacy.pages/Index.zip", &index)]);
         assert_eq!(bytes(&outer).unwrap(), Some(Format::Pages));
+
+        let mixed = package(&[
+            ("legacy.pages/Index.zip", &index),
+            ("Index/CalculationEngine.iwa", b"iwa"),
+        ]);
+        assert!(bytes(&mixed).is_err());
 
         let ambiguous = package(&[("a/Index.zip", &index), ("b/Index.zip", &index)]);
         assert!(bytes(&ambiguous).is_err());
@@ -1031,6 +1070,29 @@ mod tests {
         .unwrap();
         let error = path_with_limits(&unpacked, limits).unwrap_err();
         assert!(error.to_string().contains("more than the 1 entry limit"));
+        Ok(())
+    }
+
+    #[test]
+    fn unpacked_index_total_size_is_bounded() -> std::io::Result<()> {
+        let temp = Temp::new()?;
+        let unpacked = temp.0.join("total-size.pages");
+        fs::create_dir_all(unpacked.join("Index"))?;
+        fs::write(unpacked.join("Index/Document.iwa"), document(Format::Pages))?;
+        fs::write(unpacked.join("Index/Extra.iwa"), b"extra bytes")?;
+        let total = fs::metadata(unpacked.join("Index/Document.iwa"))?.len()
+            + fs::metadata(unpacked.join("Index/Extra.iwa"))?.len();
+        let limits = Limits::new(
+            Limits::HARD_MAX_INPUT_BYTES,
+            Limits::HARD_MAX_FILES,
+            Limits::HARD_MAX_ENTRY_SIZE,
+            total - 1,
+            Limits::HARD_MAX_IWA_STREAM_SIZE,
+        )
+        .unwrap();
+        let error = path_with_limits(&unpacked, limits).unwrap_err();
+        assert!(error.to_string().contains("iWork index directory contains"));
+        assert!(error.to_string().contains("byte limit"));
         Ok(())
     }
 

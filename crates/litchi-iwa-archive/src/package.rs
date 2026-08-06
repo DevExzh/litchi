@@ -69,11 +69,18 @@ impl Catalog {
             return Err(Error::Encrypted);
         }
 
-        if archive.file_names().any(crate::zip::is_iwa_name) {
+        let has_direct_iwa = archive.file_names().any(crate::zip::is_iwa_name);
+        let index_name = crate::zip::nested_index_name(&archive)?;
+        if has_direct_iwa && index_name.is_some() {
+            return Err(Error::InvalidBundle(
+                "iWork package mixes direct IWA members with a legacy Index.zip".to_owned(),
+            ));
+        }
+        if has_direct_iwa {
             return collect_flat(&archive);
         }
 
-        let Some(index_name) = crate::zip::nested_index_name(&archive)? else {
+        let Some(index_name) = index_name else {
             return collect_flat(&archive);
         };
         collect_legacy(&archive, &index_name, limits)
@@ -226,6 +233,20 @@ mod tests {
         assert!(matches!(
             Catalog::from_bytes(&bytes),
             Err(Error::InvalidBundle(message)) if message.contains("non-IWA")
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_mixed_direct_and_legacy_representations() -> Result<()> {
+        let index = zip(&[("Index/Document.iwa", b"iwa")])?;
+        let bytes = zip(&[
+            ("legacy.pages/Index.zip", &index),
+            ("Index/CalculationEngine.iwa", b"iwa"),
+        ])?;
+        assert!(matches!(
+            Catalog::from_bytes(&bytes),
+            Err(Error::InvalidBundle(message)) if message.contains("mixes direct IWA")
         ));
         Ok(())
     }

@@ -30,7 +30,7 @@ use soapberry_zip::office::ArchiveReader;
 /// This projection deliberately contains no ZIP implementation types. The
 /// facade inspects the physical bundle and parses only `Document.iwa`, while
 /// leaving unrelated `.iwa` members opaque to format detection.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DetectionRoot {
     has_iwa_components: bool,
     has_keynote_components: bool,
@@ -86,14 +86,21 @@ fn inspect_zip(
         return Err(Error::Encrypted);
     }
 
-    if archive.file_names().any(is_index_iwa_name) {
+    let has_direct_iwa = archive.file_names().any(is_iwa_name);
+    let index_name = nested_index_name(archive)?;
+    if has_direct_iwa && index_name.is_some() {
+        return Err(Error::InvalidBundle(
+            "iWork package mixes direct IWA members with a legacy Index.zip".to_owned(),
+        ));
+    }
+    if has_direct_iwa {
         return inspect_direct_zip(archive, limits);
     }
 
     if !allow_nested {
         return Ok(empty_detection_root());
     }
-    let Some(index_name) = nested_index_name(archive)? else {
+    let Some(index_name) = index_name else {
         return Ok(empty_detection_root());
     };
     let index_data = archive.read(&index_name)?;
@@ -171,10 +178,6 @@ fn nested_index_name(archive: &ArchiveReader<'_>) -> Result<Option<String>> {
 fn index_name(name: &str) -> Option<&str> {
     name.strip_prefix("Index/")
         .or_else(|| (!name.contains('/')).then_some(name))
-}
-
-fn is_index_iwa_name(name: &str) -> bool {
-    index_name(name).is_some_and(is_iwa_name)
 }
 
 fn is_iwa_name(name: &str) -> bool {

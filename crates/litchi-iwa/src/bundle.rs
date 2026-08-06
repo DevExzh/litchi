@@ -14,10 +14,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits, ArchiveObject, extract_text};
-use crate::snappy::{SnappyLimits, SnappyStream};
+use crate::snappy::SnappyStream;
 use crate::{Error, Result};
 use plist::Value;
-use soapberry_zip::office::ArchiveLimits as ZipArchiveLimits;
 
 /// Represents an iWork document bundle
 #[derive(Debug, Clone)]
@@ -141,14 +140,6 @@ impl BundleLimits {
         self.iwa_archive_limits
     }
 
-    pub(crate) fn zip_archive_limits(self) -> ZipArchiveLimits {
-        ZipArchiveLimits {
-            max_files: self.max_entries,
-            max_entry_size: self.max_entry_bytes,
-            max_total_size: self.max_total_bytes,
-        }
-    }
-
     /// Set the checked resource budget applied to every parsed IWA archive in
     /// this bundle, including archives inside a nested `Index.zip`.
     pub fn with_archive_limits(mut self, limits: IwaArchiveLimits) -> Result<Self> {
@@ -161,14 +152,6 @@ impl BundleLimits {
         Ok(self.iwa_archive_limits.with_archive_bytes(
             self.max_iwa_stream_bytes
                 .min(self.iwa_archive_limits.max_archive_bytes()),
-        )?)
-    }
-
-    pub(crate) fn snappy_limits(self) -> Result<SnappyLimits> {
-        let max_stream_bytes = self.effective_archive_limits()?.max_archive_bytes();
-        Ok(SnappyLimits::new(
-            max_stream_bytes.min(SnappyStream::MAX_UNCOMPRESSED_CHUNK),
-            max_stream_bytes,
         )?)
     }
 

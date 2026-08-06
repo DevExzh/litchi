@@ -157,7 +157,6 @@ mod table_hidden_axes;
 pub mod table_lock;
 mod theme;
 pub(crate) mod wire;
-mod zip_utils;
 
 /// Shared text extraction utilities
 pub mod text;

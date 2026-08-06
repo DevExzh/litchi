@@ -4,7 +4,7 @@ use crate::zip::{ZipArchive, parse_iwa_components};
 use crate::{Limits, Result};
 
 /// One parsed `.iwa` component in deterministic member-name order.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Component {
     name: Box<str>,
     archive: Archive,
@@ -42,7 +42,7 @@ impl Component {
 /// This catalog owns only ZIP/IWA ingress. Metadata, media, package
 /// transactions, object indexing, and application-specific message decoding
 /// remain in their respective adapter crates.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ComponentCatalog {
     components: Box<[Component]>,
 }

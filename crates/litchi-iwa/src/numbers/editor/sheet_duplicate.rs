@@ -56,7 +56,7 @@ impl NumbersEditor {
             .iter()
             .map(|sheet| sheet.name.as_str())
             .collect::<HashSet<_>>();
-        let name = duplicate_sheet_name(&source.name, &existing_names)?;
+        let new_sheet_name = duplicate_sheet_name(&source.name, &existing_names)?;
         let (archive_name, message_index, sheet) = numbers_sheet(&self.package, sheet_id)?;
         let drawables = classify_sheet_drawables(self, sheet_id, &sheet)?;
         for drawable in &drawables {
@@ -81,7 +81,7 @@ impl NumbersEditor {
                 source_object,
                 message_index,
                 new_sheet_id,
-                &name,
+                &new_sheet_name,
                 &sheet.drawable_infos,
             )?
         };
@@ -125,13 +125,17 @@ impl NumbersEditor {
         let mut cloned_drawable_ids = Vec::with_capacity(drawables.len());
         for drawable in drawables {
             match drawable {
-                SheetDrawableClone::Table { model_id, name, .. } => {
+                SheetDrawableClone::Table {
+                    model_id,
+                    name: table_name,
+                    ..
+                } => {
                     let cloned = working.duplicate_table(model_id)?;
                     working.move_table(
                         TableSelector::name(&cloned.name),
-                        SheetSelector::name(&name),
+                        SheetSelector::name(&new_sheet_name),
                     )?;
-                    working.rename_table(cloned.object_id, &name)?;
+                    working.rename_table(cloned.object_id, &table_name)?;
                     restore_table_geometry(&mut working.package, model_id, cloned.object_id)?;
                     cloned_drawable_ids
                         .push(find_table_owner(working.package(), cloned.object_id)?.table_info_id);
@@ -187,7 +191,7 @@ impl NumbersEditor {
             .iter()
             .map(|reference| reference.identifier)
             .collect::<Vec<_>>();
-        if verified_sheet.name != name || verified_drawables != cloned_drawable_ids {
+        if verified_sheet.name != new_sheet_name || verified_drawables != cloned_drawable_ids {
             return Err(Error::InvalidFormat(
                 "Numbers sheet duplication failed structural validation".to_owned(),
             ));

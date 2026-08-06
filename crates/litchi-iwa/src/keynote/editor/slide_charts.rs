@@ -256,27 +256,34 @@ impl KeynoteEditor {
     {
         let drawable_object_id = checked_chart_selector(selector)?.get();
         require_creatable_kind(kind)?;
-        self.update_slide_chart(slide_index, drawable_object_id, |chart| {
-            chart
-                .chart
-                .as_mut()
-                .ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Keynote chart {drawable_object_id} has no chart payload"
-                    ))
-                })?
-                .chart_type = Some(kind.native_value());
-            Ok(())
-        })?;
-        if chart_graph(self, slide_index, drawable_object_id)?
-            .info
-            .kind
-            != kind
-        {
-            return Err(Error::InvalidFormat(
-                "Keynote chart kind update failed validation".to_owned(),
-            ));
-        }
+        self.update_slide_chart(
+            slide_index,
+            drawable_object_id,
+            |chart| {
+                chart
+                    .chart
+                    .as_mut()
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Keynote chart {drawable_object_id} has no chart payload"
+                        ))
+                    })?
+                    .chart_type = Some(kind.native_value());
+                Ok(())
+            },
+            |verified| {
+                if chart_graph(verified, slide_index, drawable_object_id)?
+                    .info
+                    .kind
+                    != kind
+                {
+                    return Err(Error::InvalidFormat(
+                        "Keynote chart kind update failed validation".to_owned(),
+                    ));
+                }
+                Ok(())
+            },
+        )?;
         Ok(())
     }
 
@@ -292,25 +299,32 @@ impl KeynoteEditor {
         Selector::Error: std::fmt::Debug,
     {
         let drawable_object_id = checked_chart_selector(selector)?.get();
-        self.update_slide_chart(slide_index, drawable_object_id, |chart| {
-            let payload = chart.chart.as_mut().ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Keynote chart {drawable_object_id} has no chart payload"
-                ))
-            })?;
-            payload.grid = Some(chart_grid(drawable_object_id, data.clone())?);
-            payload.is_dirty = Some(false);
-            Ok(())
-        })?;
-        if chart_graph(self, slide_index, drawable_object_id)?
-            .info
-            .data
-            != data
-        {
-            return Err(Error::InvalidFormat(
-                "Keynote chart data update failed validation".to_owned(),
-            ));
-        }
+        self.update_slide_chart(
+            slide_index,
+            drawable_object_id,
+            |chart| {
+                let payload = chart.chart.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote chart {drawable_object_id} has no chart payload"
+                    ))
+                })?;
+                payload.grid = Some(chart_grid(drawable_object_id, data.clone())?);
+                payload.is_dirty = Some(false);
+                Ok(())
+            },
+            |verified| {
+                if chart_graph(verified, slide_index, drawable_object_id)?
+                    .info
+                    .data
+                    != data
+                {
+                    return Err(Error::InvalidFormat(
+                        "Keynote chart data update failed validation".to_owned(),
+                    ));
+                }
+                Ok(())
+            },
+        )?;
         Ok(())
     }
 
@@ -331,27 +345,34 @@ impl KeynoteEditor {
                 "cannot assign an unsupported chart series direction".to_owned(),
             ));
         }
-        self.update_slide_chart(slide_index, drawable_object_id, |chart| {
-            chart
-                .chart
-                .as_mut()
-                .ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Keynote chart {drawable_object_id} has no chart payload"
-                    ))
-                })?
-                .series_direction = Some(direction.native_value());
-            Ok(())
-        })?;
-        if chart_graph(self, slide_index, drawable_object_id)?
-            .info
-            .direction
-            != direction
-        {
-            return Err(Error::InvalidFormat(
-                "Keynote chart direction update failed validation".to_owned(),
-            ));
-        }
+        self.update_slide_chart(
+            slide_index,
+            drawable_object_id,
+            |chart| {
+                chart
+                    .chart
+                    .as_mut()
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Keynote chart {drawable_object_id} has no chart payload"
+                        ))
+                    })?
+                    .series_direction = Some(direction.native_value());
+                Ok(())
+            },
+            |verified| {
+                if chart_graph(verified, slide_index, drawable_object_id)?
+                    .info
+                    .direction
+                    != direction
+                {
+                    return Err(Error::InvalidFormat(
+                        "Keynote chart direction update failed validation".to_owned(),
+                    ));
+                }
+                Ok(())
+            },
+        )?;
         Ok(())
     }
 
@@ -368,24 +389,31 @@ impl KeynoteEditor {
     {
         let drawable_object_id = checked_chart_selector(selector)?.get();
         geometry.validate()?;
-        self.update_slide_chart(slide_index, drawable_object_id, |chart| {
-            let drawable = chart.drawable.super_.as_mut().ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Keynote chart {drawable_object_id} has no drawable payload"
-                ))
-            })?;
-            drawable.geometry = Some(geometry_archive(geometry)?);
-            Ok(())
-        })?;
-        if chart_graph(self, slide_index, drawable_object_id)?
-            .info
-            .geometry
-            != geometry
-        {
-            return Err(Error::InvalidFormat(
-                "Keynote chart geometry update failed validation".to_owned(),
-            ));
-        }
+        self.update_slide_chart(
+            slide_index,
+            drawable_object_id,
+            |chart| {
+                let drawable = chart.drawable.super_.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote chart {drawable_object_id} has no drawable payload"
+                    ))
+                })?;
+                drawable.geometry = Some(geometry_archive(geometry)?);
+                Ok(())
+            },
+            |verified| {
+                if chart_graph(verified, slide_index, drawable_object_id)?
+                    .info
+                    .geometry
+                    != geometry
+                {
+                    return Err(Error::InvalidFormat(
+                        "Keynote chart geometry update failed validation".to_owned(),
+                    ));
+                }
+                Ok(())
+            },
+        )?;
         Ok(())
     }
 
@@ -632,6 +660,7 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
         update: impl FnOnce(&mut IWorkChartArchive) -> Result<()>,
+        verify: impl FnOnce(&Self) -> Result<()>,
     ) -> Result<()> {
         let source = chart_graph(self, slide_index, drawable_object_id)?;
         let mut staged = self.package().clone();
@@ -641,7 +670,9 @@ impl KeynoteEditor {
             drawable_object_id,
             update,
         )?;
-        *self = Self::from_bytes(&staged.to_bytes()?)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verify(&verified)?;
+        *self = verified;
         Ok(())
     }
 }
