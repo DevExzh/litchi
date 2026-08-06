@@ -29,6 +29,12 @@ impl Component {
     pub const fn archive(&self) -> &Archive {
         &self.archive
     }
+
+    /// Consume the component and return its owned name and archive.
+    #[must_use]
+    pub fn into_parts(self) -> (String, Archive) {
+        (self.name.into(), self.archive)
+    }
 }
 
 /// Deterministic parsed `.iwa` components from one physical iWork ZIP input.
@@ -92,6 +98,15 @@ impl ComponentCatalog {
     }
 }
 
+impl IntoIterator for ComponentCatalog {
+    type Item = Component;
+    type IntoIter = std::vec::IntoIter<Component>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.components.into_vec().into_iter()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
@@ -131,6 +146,25 @@ mod tests {
         })?;
         assert_eq!(component.name(), "Index/Document.iwa");
         assert_eq!(component.archive().objects[0].messages[0].type_, 6000);
+        Ok(())
+    }
+
+    #[test]
+    fn consumes_component_name_and_archive() -> Result<()> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
+        let bytes = writer.finish_to_bytes()?;
+
+        let component = ComponentCatalog::from_bytes(&bytes)?
+            .into_iter()
+            .next()
+            .ok_or_else(|| {
+                crate::Error::InvalidBundle("component catalog unexpectedly empty".to_owned())
+            })?;
+        let (name, archive) = component.into_parts();
+
+        assert_eq!(name, "Index/Document.iwa");
+        assert_eq!(archive.objects[0].messages[0].type_, 6000);
         Ok(())
     }
 

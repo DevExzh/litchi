@@ -13,11 +13,11 @@ use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use plist::Value;
-use soapberry_zip::office::ArchiveLimits as ZipArchiveLimits;
 use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits, ArchiveObject, extract_text};
 use crate::snappy::{SnappyLimits, SnappyStream};
 use crate::{Error, Result};
+use plist::Value;
+use soapberry_zip::office::ArchiveLimits as ZipArchiveLimits;
 
 /// Represents an iWork document bundle
 #[derive(Debug, Clone)]
@@ -690,13 +690,11 @@ impl Bundle {
     /// Parse a ZIP archive from raw bytes and extract all IWA files
     fn parse_zip_bytes(bytes: &[u8], limits: BundleLimits) -> Result<HashMap<String, Archive>> {
         let ingress_limits = limits.archive_ingress_limits()?;
-        let catalog = litchi_iwa_archive::ComponentCatalog::from_bytes_with_limits(
-            bytes,
-            ingress_limits,
-        )?;
+        let catalog =
+            litchi_iwa_archive::ComponentCatalog::from_bytes_with_limits(bytes, ingress_limits)?;
         Ok(catalog
-            .iter()
-            .map(|component| (component.name().to_owned(), component.archive().clone()))
+            .into_iter()
+            .map(litchi_iwa_archive::Component::into_parts)
             .collect())
     }
 
