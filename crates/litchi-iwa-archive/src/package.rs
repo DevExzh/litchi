@@ -724,6 +724,16 @@ impl Catalog {
         mut sink: W,
         limits: Limits,
     ) -> Result<()> {
+        if edits.is_empty() {
+            let checked_limits = limits.validate()?;
+            let source_size = u64::try_from(self.source.len()).map_err(|_error| {
+                Error::InvalidBundle("catalog source length does not fit u64".to_owned())
+            })?;
+            checked_limits.check_input_size(source_size, "catalog source")?;
+            checked_limits.check_output_size(source_size)?;
+            self.write_to(&mut sink)?;
+            return Ok(());
+        }
         let bytes = self.reassemble_to_bytes(edits, limits)?;
         sink.write_all(&bytes)?;
         Ok(())
@@ -2140,6 +2150,20 @@ mod tests {
         let mut streamed = Vec::new();
         catalog.write_reassembled_to(&[], &mut streamed, Limits::default())?;
         assert_eq!(streamed, bytes);
+
+        let source_size = u64::try_from(bytes.len()).map_err(|_error| {
+            Error::InvalidBundle("test ZIP length does not fit u64".to_owned())
+        })?;
+        let limits = Limits::new(source_size - 1, 10, 4096, 4096, 1024)?;
+        let mut limited_sink = vec![0xde, 0xad, 0xbe, 0xef];
+        assert!(matches!(
+            catalog.write_reassembled_to(&[], &mut limited_sink, limits),
+            Err(Error::Limit {
+                kind: crate::LimitKind::InputBytes,
+                ..
+            })
+        ));
+        assert_eq!(limited_sink, [0xde, 0xad, 0xbe, 0xef]);
         Ok(())
     }
 
