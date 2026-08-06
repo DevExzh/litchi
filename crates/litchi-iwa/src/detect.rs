@@ -7,19 +7,12 @@
 use crate::application::Application;
 use crate::archive::Archive;
 use crate::snappy::SnappyStream;
-use crate::zip_utils::{is_encrypted_iwork_archive, nested_index_zip_name};
-use soapberry_zip::office::{ArchiveLimits, ArchiveReader};
+use litchi_iwa_archive::{self, DetectionRoot};
 use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024 * 1024;
-const ARCHIVE_LIMITS: ArchiveLimits = ArchiveLimits {
-    max_files: 100_000,
-    max_entry_size: 512 * 1024 * 1024,
-    max_total_size: 2 * 1024 * 1024 * 1024,
-};
-
 /// The application family of a detected iWork document.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Format {
@@ -50,11 +43,11 @@ impl Limits {
     /// Maximum input size accepted by the default safety profile.
     pub const HARD_MAX_INPUT_BYTES: u64 = MAX_INPUT_BYTES;
     /// Maximum ZIP member count accepted by the default safety profile.
-    pub const HARD_MAX_FILES: usize = ARCHIVE_LIMITS.max_files;
+    pub const HARD_MAX_FILES: usize = litchi_iwa_archive::Limits::MAX_ENTRIES;
     /// Maximum uncompressed ZIP member size accepted by the default profile.
-    pub const HARD_MAX_ENTRY_SIZE: u64 = ARCHIVE_LIMITS.max_entry_size;
+    pub const HARD_MAX_ENTRY_SIZE: u64 = litchi_iwa_archive::Limits::MAX_ENTRY_BYTES;
     /// Maximum aggregate uncompressed ZIP size accepted by the default profile.
-    pub const HARD_MAX_TOTAL_SIZE: u64 = ARCHIVE_LIMITS.max_total_size;
+    pub const HARD_MAX_TOTAL_SIZE: u64 = litchi_iwa_archive::Limits::MAX_TOTAL_BYTES;
     /// Maximum decompressed size of one IWA component.
     pub const HARD_MAX_IWA_STREAM_SIZE: usize = SnappyStream::MAX_DECOMPRESSED_STREAM;
 
@@ -141,14 +134,6 @@ impl Limits {
         self.max_iwa_stream_size
     }
 
-    fn archive_limits(self) -> ArchiveLimits {
-        ArchiveLimits {
-            max_files: self.max_files,
-            max_entry_size: self.max_entry_size,
-            max_total_size: self.max_total_size,
-        }
-    }
-
     fn snappy_limits(self) -> crate::Result<crate::snappy::SnappyLimits> {
         Ok(crate::snappy::SnappyLimits::new(
             self.max_iwa_stream_size
@@ -162,9 +147,9 @@ impl Default for Limits {
     fn default() -> Self {
         Self {
             max_input_bytes: MAX_INPUT_BYTES,
-            max_files: ARCHIVE_LIMITS.max_files,
-            max_entry_size: ARCHIVE_LIMITS.max_entry_size,
-            max_total_size: ARCHIVE_LIMITS.max_total_size,
+            max_files: litchi_iwa_archive::Limits::MAX_ENTRIES,
+            max_entry_size: litchi_iwa_archive::Limits::MAX_ENTRY_BYTES,
+            max_total_size: litchi_iwa_archive::Limits::MAX_TOTAL_BYTES,
             max_iwa_stream_size: SnappyStream::MAX_DECOMPRESSED_STREAM,
         }
     }
@@ -193,14 +178,69 @@ pub fn bytes_with_limits(value: &[u8], limits: Limits) -> crate::Result<Option<F
     if !is_zip_signature(value) {
         return Ok(None);
     }
-    let archive = ArchiveReader::new_with_limits(value, limits.archive_limits())
-        .map_err(|error| crate::Error::Archive(format!("failed to open iWork package: {error}")))?;
-    match classify_archive(&archive, true, limits)? {
-        Outcome::Found(format) => Ok(Some(format)),
-        Outcome::None => Ok(None),
-        Outcome::Conflict => Err(crate::Error::InvalidFormat(
-            "iWork package contains conflicting application evidence".to_owned(),
+    let root = litchi_iwa_archive::inspect_detection_root(value, archive_limits(limits)?)
+        .map_err(map_archive_error)?;
+    classify_root(&root, limits)
+}
+
+fn archive_limits(limits: Limits) -> crate::Result<litchi_iwa_archive::Limits> {
+    litchi_iwa_archive::Limits::new(
+        limits.max_input_bytes,
+        limits.max_files,
+        limits.max_entry_size,
+        limits.max_total_size,
+        limits.max_iwa_stream_size,
+    )
+    .map_err(map_archive_error)
+}
+
+fn map_archive_error(error: litchi_iwa_archive::Error) -> crate::Error {
+    match error {
+        litchi_iwa_archive::Error::Io(error) => crate::Error::Io(error),
+        litchi_iwa_archive::Error::Iwa(error) => crate::Error::from(error),
+        litchi_iwa_archive::Error::Encrypted => crate::Error::InvalidFormat(
+            "password-protected iWork documents are not supported".to_owned(),
+        ),
+        litchi_iwa_archive::Error::InvalidLimits(message) => crate::Error::InvalidFormat(message),
+        litchi_iwa_archive::Error::Zip { message }
+        | litchi_iwa_archive::Error::InvalidBundle(message) => {
+            crate::Error::Archive(format!("iWork archive ingress: {message}"))
+        },
+        litchi_iwa_archive::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => crate::Error::InvalidFormat(format!(
+            "iWork archive {kind} limit exceeded: observed {observed}, maximum {maximum}"
         )),
+        litchi_iwa_archive::Error::Allocation { resource, amount } => {
+            crate::Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
+        },
+    }
+}
+
+fn classify_root(root: &DetectionRoot, limits: Limits) -> crate::Result<Option<Format>> {
+    if !root.has_iwa_components() {
+        return Ok(None);
+    }
+    let marks = Marks {
+        iwa: true,
+        keynote: root.has_keynote_components(),
+    };
+    let Some(document) = root.document() else {
+        return Ok(None);
+    };
+    let Some(format) = root_format_archive(document, limits)? else {
+        return Err(crate::Error::InvalidFormat(
+            "Document.iwa has no recognized iWork application root".to_owned(),
+        ));
+    };
+    if marks.accepts(format) {
+        Ok(Some(format))
+    } else {
+        Err(crate::Error::InvalidFormat(
+            "iWork component markers conflict with the Document.iwa application root".to_owned(),
+        ))
     }
 }
 
@@ -208,76 +248,6 @@ fn is_zip_signature(value: &[u8]) -> bool {
     value.starts_with(b"PK\x03\x04")
         || value.starts_with(b"PK\x05\x06")
         || value.starts_with(b"PK\x07\x08")
-}
-
-fn classify_archive(
-    archive: &ArchiveReader<'_>,
-    allow_nested: bool,
-    limits: Limits,
-) -> crate::Result<Outcome> {
-    if is_encrypted_iwork_archive(archive) {
-        return Err(crate::Error::InvalidFormat(
-            "password-protected iWork documents are not supported".to_owned(),
-        ));
-    }
-
-    let marks = marks(archive.file_names());
-    if marks.iwa {
-        return classify_direct_archive(archive, marks, limits);
-    }
-    if !allow_nested {
-        return Ok(Outcome::None);
-    }
-
-    let Some(index_name) = nested_index_zip_name(archive)? else {
-        return Ok(Outcome::None);
-    };
-    let index_data = archive.read(&index_name).map_err(|error| {
-        crate::Error::Archive(format!(
-            "failed to read legacy package index {index_name}: {error}"
-        ))
-    })?;
-    let index =
-        ArchiveReader::new_with_limits(&index_data, limits.archive_limits()).map_err(|error| {
-            crate::Error::Archive(format!(
-                "failed to open legacy package index {index_name}: {error}"
-            ))
-        })?;
-    classify_archive(&index, false, limits)
-}
-
-fn classify_direct_archive(
-    archive: &ArchiveReader<'_>,
-    marks: Marks,
-    limits: Limits,
-) -> crate::Result<Outcome> {
-    let mut documents = archive
-        .file_names()
-        .filter(|name| index_name(name) == Some("Document.iwa"));
-    let Some(document_name) = documents.next() else {
-        return Ok(Outcome::None);
-    };
-    if documents.next().is_some() {
-        return Err(crate::Error::InvalidFormat(
-            "iWork package contains multiple Document.iwa components".to_owned(),
-        ));
-    }
-
-    let data = archive.read(document_name).map_err(|error| {
-        crate::Error::Archive(format!("failed to read {document_name}: {error}"))
-    })?;
-    let Some(format) = root_format(&data, limits)? else {
-        return Err(crate::Error::InvalidFormat(
-            "Document.iwa has no recognized iWork application root".to_owned(),
-        ));
-    };
-    if marks.accepts(format) {
-        Ok(Outcome::Found(format))
-    } else {
-        Err(crate::Error::InvalidFormat(
-            "iWork component markers conflict with the Document.iwa application root".to_owned(),
-        ))
-    }
 }
 
 /// Detect the owning iWork application from the root `DocumentArchive` payload.
@@ -398,6 +368,10 @@ fn read_varint(payload: &[u8], position: &mut usize) -> Option<u64> {
 fn root_format(data: &[u8], limits: Limits) -> crate::Result<Option<Format>> {
     let stream = SnappyStream::decompress_with_limits(data, limits.snappy_limits()?)?;
     let archive = Archive::parse(stream.as_bytes())?;
+    root_format_archive(&archive, limits)
+}
+
+fn root_format_archive(archive: &Archive, _limits: Limits) -> crate::Result<Option<Format>> {
     let mut detected = None;
 
     for application in archive
@@ -597,14 +571,6 @@ fn directory_outcome(index: &Path, limits: Limits) -> crate::Result<Outcome> {
     })
 }
 
-fn marks<'a>(names: impl IntoIterator<Item = &'a str>) -> Marks {
-    let mut marks = Marks::default();
-    for name in names {
-        marks.see(name);
-    }
-    marks
-}
-
 #[derive(Debug, Default, Clone, Copy)]
 struct Marks {
     iwa: bool,
@@ -612,13 +578,6 @@ struct Marks {
 }
 
 impl Marks {
-    fn see(&mut self, name: &str) {
-        let Some(name) = index_name(name) else {
-            return;
-        };
-        self.see_index(name);
-    }
-
     fn see_index(&mut self, name: &str) {
         if !name.ends_with(".iwa") {
             return;
@@ -632,11 +591,6 @@ impl Marks {
     fn accepts(self, format: Format) -> bool {
         !self.keynote || format == Format::Keynote
     }
-}
-
-fn index_name(name: &str) -> Option<&str> {
-    name.strip_prefix("Index/")
-        .or_else(|| (!name.contains('/')).then_some(name))
 }
 
 fn is_component(name: &str, stem: &str) -> bool {
