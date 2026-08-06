@@ -11,6 +11,13 @@ mod tests;
 pub use editor::Editor;
 pub use package::PropertySetReader;
 
+use super::model::Section;
+use litchi_cfb::OleError;
+
+pub(crate) fn validate_section(section: &Section, version: u16) -> Result<(), OleError> {
+    semantic::validate_section(section, version)
+}
+
 // Keep the existing private property_set::codec test seam available to the
 // parent module without exposing binary implementation details to consumers.
 #[cfg(test)]

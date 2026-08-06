@@ -223,6 +223,43 @@ impl Package {
         self.edit_typed(move |opc| crate::shape::classification::remove(opc, &slide_name, shape))
     }
 
+    /// Read the optional `p15:designElem` value attached to one semantic
+    /// shape. The selector is name-first, with checked source-order indices
+    /// retained for repair workflows.
+    pub fn shape_design_element<'s, 'k>(
+        &self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<Option<crate::shape::designer::Snapshot>> {
+        self.ensure_graph_current("shape_design_element")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        crate::shape::designer::load(&self.opc, &slide_name, shape)
+    }
+
+    /// Create or replace one shape's typed `p15:designElem` boolean
+    /// transactionally while retaining unrelated extension entries.
+    pub fn put_shape_design_element<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+        value: bool,
+    ) -> Result<Option<crate::shape::designer::Snapshot>> {
+        self.ensure_graph_current("put_shape_design_element")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        self.edit_typed(move |opc| crate::shape::designer::put(opc, &slide_name, shape, value))
+    }
+
+    /// Remove one shape's typed `p15:designElem` value transactionally.
+    pub fn remove_shape_design_element<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<Option<crate::shape::designer::Snapshot>> {
+        self.ensure_graph_current("remove_shape_design_element")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        self.edit_typed(move |opc| crate::shape::designer::remove(opc, &slide_name, shape))
+    }
+
     /// Read all contextual 3D-model owners on one slide in source order.
     pub fn model3ds<'a>(
         &self,

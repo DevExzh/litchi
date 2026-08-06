@@ -1,6 +1,6 @@
 //! Minimal PPTX test - just one slide with title only
 
-use litchi::ooxml::pptx::Package;
+use litchi::pptx::Package;
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

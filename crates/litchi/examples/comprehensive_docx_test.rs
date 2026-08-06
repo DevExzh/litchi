@@ -12,12 +12,12 @@
 //! 2. Regression test baseline
 //! 3. Visual reference for all capabilities
 
-use litchi::ooxml::common::Props;
-use litchi::ooxml::docx::{
+use litchi::docx::{
     Border, Borders, Color, EndnotePos, Endnotes, FootnotePos, Footnotes, ListType,
     MutableDocument, MutableTheme, Package, PageNumberFormat, PageOrientation, ParagraphAlignment,
     Style, TableOfContents, UnderlineStyle, Watermark,
 };
+use litchi::ooxml_common::Props;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("╔════════════════════════════════════════════════════════════╗");

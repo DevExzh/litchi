@@ -1,3 +1,4 @@
+pub mod annotation_bookmarks;
 pub mod associated_strings;
 pub mod auto_summary;
 pub mod bookmarks;

@@ -104,7 +104,7 @@ struct CellData {
     grid_span: usize,
     /// Vertical merge state (OOXML only)
     #[cfg(feature = "ooxml")]
-    v_merge: Option<crate::ooxml::docx::VMergeState>,
+    v_merge: Option<crate::docx::VMergeState>,
 }
 
 /// Analyze a table to compute cell spans (colspan/rowspan) for proper HTML rendering.
@@ -208,7 +208,7 @@ fn analyze_table_spans(table: &Table, use_parallel: bool) -> Result<Vec<Vec<Cell
             // Get vertical merge state (vMerge)
             #[cfg(feature = "ooxml")]
             {
-                use crate::ooxml::docx::VMergeState;
+                use crate::docx::VMergeState;
 
                 if let Some(v_merge_state) = &cell.v_merge {
                     match v_merge_state {
@@ -320,7 +320,7 @@ impl MarkdownWriter {
             if let Paragraph::Docx(docx_para) = para {
                 let display_formulas = docx_para
                     .paragraph_level_formulas()
-                    .map_err(crate::ooxml::map_ooxml_error)?;
+                    .map_err(crate::map_ooxml_error)?;
                 if !display_formulas.is_empty() {
                     // This paragraph contains display formulas
                     // Process runs and formulas together in order
@@ -590,7 +590,7 @@ impl MarkdownWriter {
             if let crate::document::Run::Docx(docx_run) = run {
                 let (text, props) = docx_run
                     .get_text_and_properties()
-                    .map_err(crate::ooxml::map_ooxml_error)?;
+                    .map_err(crate::map_ooxml_error)?;
                 if text.is_empty() {
                     return Ok(());
                 }
@@ -1393,9 +1393,7 @@ impl MarkdownWriter {
         // Try OOXML OMML formulas first
         #[cfg(feature = "ooxml")]
         if let crate::document::Run::Docx(docx_run) = _run
-            && let Some(omml_xml) = docx_run
-                .omml_formula()
-                .map_err(crate::ooxml::map_ooxml_error)?
+            && let Some(omml_xml) = docx_run.omml_formula().map_err(crate::map_ooxml_error)?
         {
             // Parse OMML and convert to LaTeX
             #[cfg(feature = "formula")]

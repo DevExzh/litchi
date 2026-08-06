@@ -8,10 +8,10 @@
 //! cargo run --example office_crud_demo
 //! ```
 
-use litchi::ooxml::common::Props;
-use litchi::ooxml::docx::Package as DocxPackage;
-use litchi::ooxml::pptx::Package as PptxPackage;
-use litchi::ooxml::xlsx::{Formula, Workbook};
+use litchi::docx::Package as DocxPackage;
+use litchi::ooxml_common::Props;
+use litchi::pptx::Package as PptxPackage;
+use litchi::xlsx::{Formula, Workbook};
 
 type ExampleResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 

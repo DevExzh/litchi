@@ -56,7 +56,7 @@ formula results are recalculated or that external, macro, or embedded content is
 | Page setup and print metadata | 🟡 | ✅ | 🟡 | Supported worksheet and chart-sheet page setup, margins, paper, scale/fit, orientation, print flags, and relationships are bounded; printer-driver/rendering behavior is not implemented. |
 | Sheet protection | 🟡 | ✅ | 🟡 | Worksheet and chart-sheet protection flags and the supported strong-protection metadata are typed. Protection is not a cryptographic authorization boundary. |
 | Scenarios and what-if analysis | 🟡 | ✅ | ✅ | `litchi_xlsb::scenarios` exposes bounded `BrtBeginScenMan`/`BrtBeginSct`/`BrtSlc` snapshots and transactional worksheet replacement. Known metadata is typed; unknown records and source order are retained, unsafe or ambiguous edits are refused, and scenario values are never substituted or recalculated. |
-| Cell watches and phonetic metadata | ❌ | ❌ | ❌ | No public typed BIFF12 cell-watch or phonetic-properties model is provided. |
+| Cell watches and phonetic metadata | ✅ | ✅ | ✅ | `[MS-XLSB]` 2.4.21, 2.4.331, 2.4.378, and 2.4.744 are exposed as typed worksheet cell-watch collections and worksheet-wide phonetic defaults with bounded, source-checked transactional edits; watch-window monitoring, phonetic rendering, and language conversion are not performed. |
 | Shared-workbook revision records | ❌ | ❌ | ❌ | BIFF12 workbook collaboration/revision behavior is not implemented as a typed API. |
 
 ## Charts, drawings, pivots, and package objects

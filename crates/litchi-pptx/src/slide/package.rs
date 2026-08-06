@@ -38,6 +38,14 @@ pub(crate) fn slide_shape_classification<'a, 'k>(
     crate::shape::classification::load(package, part.part().partname(), shape)
 }
 
+pub(crate) fn slide_shape_design_element<'a, 'k>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+    shape: impl Into<crate::shape::Key<'k>>,
+) -> Result<Option<crate::shape::designer::Snapshot>> {
+    crate::shape::designer::load(package, part.part().partname(), shape)
+}
+
 pub(crate) fn slide_tag_inventory<'a>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,

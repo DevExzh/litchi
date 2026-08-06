@@ -8,14 +8,17 @@
 
 mod codec;
 mod model;
+mod transaction;
 mod validation;
 
 pub use model::{
-    DiffFlags, DiffNode, DiffRecordHeaders, DiffTree10, DiffType, DocDiffFlags, ElementType,
-    MainMasterDiffFlags, POWERPOINT_DIFF_MAX_DEPTH, POWERPOINT_DIFF_MAX_RECORDS,
+    DiffFlags, DiffNode, DiffRecordHeaders, DiffTree10, DiffType, DocDiffFlags, ElementType, Entry,
+    Limits, MainMasterDiffFlags, POWERPOINT_DIFF_MAX_DEPTH, POWERPOINT_DIFF_MAX_RECORDS, Review,
     ReviewingToolbarStates, ShapeDiffFlags, SlideCreationEntry, SlideDiffFlags, SlideListTable10,
-    TableDiffFlags, TextDiffFlags,
+    TableDiffFlags, TextDiffFlags, Unknown,
 };
+
+pub use transaction::{Change, Commit, Editor, Patch, Revision, Snapshot};
 
 #[cfg(test)]
 mod tests;

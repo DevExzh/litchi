@@ -5,8 +5,9 @@ use crate::package::{Error, Result};
 use crate::records::Record;
 
 use super::model::{
-    DiffFlags, DiffNode, DiffRecordHeaders, DiffTree10, DiffType, POWERPOINT_DIFF_MAX_DEPTH,
-    POWERPOINT_DIFF_MAX_RECORDS, ReviewingToolbarStates, SlideCreationEntry, SlideListTable10,
+    DiffFlags, DiffNode, DiffRecordHeaders, DiffTree10, DiffType, Entry, Limits,
+    POWERPOINT_DIFF_MAX_DEPTH, POWERPOINT_DIFF_MAX_RECORDS, Review, ReviewingToolbarStates,
+    SlideCreationEntry, SlideListTable10, Unknown,
 };
 use super::validation::{
     MAX_REVIEWER_NAME_BYTES, corrupted, validate_atom, validate_count, validate_reviewer_name,
@@ -348,6 +349,249 @@ impl SlideListTable10 {
             &payload,
         ))
     }
+}
+
+/// Read the review-owned records from the document's `___PPT10` payload.
+pub(crate) fn read_review(root: &Record, limits: Limits) -> Result<Review> {
+    let Some(path) = find_pp10_blob(root)? else {
+        return Ok(Review::default());
+    };
+    let blob = record_at(root, &path)?;
+    parse_payload(&blob.data, limits)
+}
+
+/// Replace the inert PP10 payload represented by a review view.
+pub(crate) fn write_review(root: &mut Record, review: &Review, limits: Limits) -> Result<()> {
+    let path = find_pp10_blob(root)?
+        .ok_or_else(|| Error::InvalidFormat("document has no ___PPT10 review payload".into()))?;
+    let payload = encode_payload(review, limits)?;
+    let blob = record_at_mut(root, &path)?;
+    blob.data_length = u32::try_from(payload.len())
+        .map_err(|_| Error::InvalidFormat("review payload exceeds u32".into()))?;
+    blob.data = payload;
+    Ok(())
+}
+
+fn parse_payload(data: &[u8], limits: Limits) -> Result<Review> {
+    if data.len() > limits.max_bytes {
+        return Err(Error::InvalidFormat(
+            "review payload exceeds the snapshot byte limit".into(),
+        ));
+    }
+    let mut entries = Vec::new();
+    let mut offset = 0usize;
+    let mut count = 0usize;
+    let mut last_rank = 0usize;
+    let mut seen_toolbar = false;
+    let mut seen_slide_list = false;
+    while offset < data.len() {
+        count = count
+            .checked_add(1)
+            .ok_or_else(|| Error::Corrupted("review record count overflow".into()))?;
+        if count > limits.max_review_records {
+            return Err(Error::InvalidFormat(
+                "review payload exceeds the record limit".into(),
+            ));
+        }
+        let header_end = offset
+            .checked_add(RECORD_HEADER_SIZE)
+            .ok_or_else(|| Error::Corrupted("review record offset overflow".into()))?;
+        if header_end > data.len() {
+            return corrupted("review payload ends with a truncated record header");
+        }
+        let length = usize::try_from(read_u32(data, offset + 4)?)
+            .map_err(|_| Error::Corrupted("review record length overflow".into()))?;
+        let end = header_end
+            .checked_add(length)
+            .ok_or_else(|| Error::Corrupted("review record length overflow".into()))?;
+        if end > data.len() {
+            return corrupted("review record extends beyond its payload");
+        }
+        let (record, consumed) = Record::parse(&data[offset..end], 0)?;
+        if consumed != end - offset {
+            return corrupted("review record was only partially parsed");
+        }
+        let raw = data[offset..end].to_vec();
+        let (entry, rank) = match record.record_type {
+            RecordType::DocToolbarStates10Atom => {
+                if seen_toolbar {
+                    return corrupted("review payload contains duplicate toolbar state atoms");
+                }
+                seen_toolbar = true;
+                (Entry::Toolbar(ReviewingToolbarStates::parse(&record)?), 0)
+            },
+            RecordType::SlideListTable10 => {
+                if seen_slide_list {
+                    return corrupted("review payload contains duplicate slide-list tables");
+                }
+                seen_slide_list = true;
+                (Entry::SlideList(SlideListTable10::parse(&record)?), 1)
+            },
+            RecordType::DiffTree10 => (Entry::Diff(DiffTree10::parse(&record)?), 2),
+            _ => (
+                Entry::Unknown(Unknown::new(
+                    record.record_type_raw,
+                    record.version,
+                    record.instance,
+                    raw,
+                )),
+                last_rank,
+            ),
+        };
+        if !matches!(entry, Entry::Unknown(_)) {
+            if rank < last_rank {
+                return corrupted("review records are out of order");
+            }
+            last_rank = rank;
+        }
+        entries.push(entry);
+        offset = end;
+    }
+    Ok(Review { entries })
+}
+
+fn encode_payload(review: &Review, limits: Limits) -> Result<Vec<u8>> {
+    if review.entries.len() > limits.max_review_records {
+        return Err(Error::InvalidFormat(
+            "review payload exceeds the record limit".into(),
+        ));
+    }
+    let mut payload = Vec::new();
+    let mut toolbar = false;
+    let mut slide_list = false;
+    let mut last_rank = 0usize;
+    for entry in &review.entries {
+        let (bytes, rank) = match entry {
+            Entry::Toolbar(value) => {
+                if toolbar {
+                    return corrupted("review payload contains duplicate toolbar state atoms");
+                }
+                toolbar = true;
+                (value.to_record_bytes(), 0)
+            },
+            Entry::SlideList(value) => {
+                if slide_list {
+                    return corrupted("review payload contains duplicate slide-list tables");
+                }
+                slide_list = true;
+                (value.to_record_bytes()?, 1)
+            },
+            Entry::Diff(value) => (value.to_record_bytes()?, 2),
+            Entry::Unknown(value) => (value.bytes().to_vec(), last_rank),
+        };
+        if !matches!(entry, Entry::Unknown(_)) {
+            if rank < last_rank {
+                return corrupted("review records are out of order");
+            }
+            last_rank = rank;
+        }
+        payload.extend_from_slice(&bytes);
+        if payload.len() > limits.max_bytes {
+            return Err(Error::InvalidFormat(
+                "review payload exceeds the snapshot byte limit".into(),
+            ));
+        }
+    }
+    Ok(payload)
+}
+
+pub(crate) fn encode_document(root: &Record) -> Result<Vec<u8>> {
+    let payload = if root.children.is_empty() {
+        root.data.clone()
+    } else {
+        let mut payload = Vec::new();
+        for child in &root.children {
+            payload.extend_from_slice(&encode_document(child)?);
+        }
+        payload
+    };
+    if root.version > 0x0f || root.instance > 0x0fff {
+        return Err(Error::InvalidFormat(
+            "document-comparison record header fields exceed their wire widths".into(),
+        ));
+    }
+    let length = u32::try_from(payload.len())
+        .map_err(|_| Error::InvalidFormat("document-comparison record exceeds u32".into()))?;
+    let mut bytes = Vec::with_capacity(RECORD_HEADER_SIZE + payload.len());
+    bytes.extend_from_slice(&(root.version | (root.instance << 4)).to_le_bytes());
+    bytes.extend_from_slice(&root.record_type_raw.to_le_bytes());
+    bytes.extend_from_slice(&length.to_le_bytes());
+    bytes.extend_from_slice(&payload);
+    Ok(bytes)
+}
+
+fn find_pp10_blob(root: &Record) -> Result<Option<Vec<usize>>> {
+    let mut matches = Vec::new();
+    find_pp10(root, &mut Vec::new(), &mut matches)?;
+    if matches.len() > 1 {
+        return corrupted("document contains duplicate ___PPT10 review payloads");
+    }
+    Ok(matches.pop())
+}
+
+fn find_pp10(record: &Record, path: &mut Vec<usize>, matches: &mut Vec<Vec<usize>>) -> Result<()> {
+    if record.record_type == RecordType::ProgBinaryTag && is_pp10_tag(record)? {
+        let mut blob = None;
+        for (index, child) in record.children.iter().enumerate() {
+            if child.record_type == RecordType::BinaryTagData {
+                if blob.replace(index).is_some() {
+                    return corrupted("___PPT10 tag contains duplicate BinaryTagData records");
+                }
+            }
+        }
+        let blob =
+            blob.ok_or_else(|| Error::Corrupted("___PPT10 tag is missing BinaryTagData".into()))?;
+        let mut blob_path = path.clone();
+        blob_path.push(blob);
+        matches.push(blob_path);
+    }
+    for (index, child) in record.children.iter().enumerate() {
+        path.push(index);
+        find_pp10(child, path, matches)?;
+        path.pop();
+    }
+    Ok(())
+}
+
+fn is_pp10_tag(record: &Record) -> Result<bool> {
+    let Some(name) = record
+        .children
+        .iter()
+        .find(|child| child.record_type == RecordType::CString)
+    else {
+        return Ok(false);
+    };
+    if name.version != 0 || name.instance != 0 || name.data.len() % 2 != 0 {
+        return corrupted("ProgBinaryTag has an invalid tag-name record");
+    }
+    let units = name
+        .data
+        .chunks_exact(2)
+        .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+        .collect::<Vec<_>>();
+    Ok(String::from_utf16(&units).ok().as_deref() == Some("___PPT10"))
+}
+
+fn record_at<'a>(root: &'a Record, path: &[usize]) -> Result<&'a Record> {
+    let mut record = root;
+    for index in path {
+        record = record
+            .children
+            .get(*index)
+            .ok_or_else(|| Error::Corrupted("review record path is out of range".into()))?;
+    }
+    Ok(record)
+}
+
+fn record_at_mut<'a>(root: &'a mut Record, path: &[usize]) -> Result<&'a mut Record> {
+    let mut record = root;
+    for index in path {
+        record = record
+            .children
+            .get_mut(*index)
+            .ok_or_else(|| Error::InvalidFormat("review record path is out of range".into()))?;
+    }
+    Ok(record)
 }
 
 fn parse_reviewer_name(data: &[u8]) -> Result<(String, usize)> {

@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi::ooxml::{common::Props, docx, pptx, xlsx};
+use litchi::{docx, ooxml_common::Props, pptx, xlsx};
 use litchi_ooxml_common::properties;
 use litchi_opc::OpcPackage;
 

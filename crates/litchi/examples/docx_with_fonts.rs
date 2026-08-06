@@ -4,7 +4,7 @@
 //! font embedding and subsetting. Open the generated file in Microsoft Word
 //! to verify that fonts are properly embedded.
 
-use litchi::ooxml::docx::{FontEmbedding, Package};
+use litchi::docx::{FontEmbedding, Package};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {

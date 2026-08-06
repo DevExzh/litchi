@@ -432,8 +432,8 @@ mod tests {
 
     #[cfg(feature = "ooxml")]
     fn create_minimal_ooxml_zip(part_name: &str, content_type: &str) -> Vec<u8> {
-        use crate::ooxml::opc::PackURI;
-        use crate::ooxml::opc::phys_pkg::PhysPkgWriter;
+        use crate::opc::PackURI;
+        use crate::opc::phys_pkg::PhysPkgWriter;
 
         let mut writer = PhysPkgWriter::new();
         let content_types = format!(

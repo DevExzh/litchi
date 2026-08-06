@@ -48,6 +48,7 @@ impl<R: Read + Seek> Workbook<R> {
             formatting: Arc::new(Formatting::default()),
             protection: crate::protection::WorkbookProtection::default(),
             calculation: crate::calculation::WorkbookCalculation::default(),
+            picture_compression: None,
             vba_metadata: crate::vba::VbaMetadata::default(),
             environment: crate::environment::WorkbookEnvironment::default(),
             book_ext: None,

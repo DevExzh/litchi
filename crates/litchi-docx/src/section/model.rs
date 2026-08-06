@@ -382,6 +382,7 @@ impl Section {
     /// Construct a section from a bounded `w:sectPr` fragment.
     pub fn from_xml_bytes(xml_bytes: Vec<u8>) -> Result<Self> {
         codec::validate(&xml_bytes)?;
+        super::footnote_columns::Snapshot::from_xml(xml_bytes.clone())?;
         Ok(Self {
             xml_bytes,
             snapshot: None,
@@ -518,6 +519,18 @@ impl Section {
         Ok(self.snapshot_mut()?.state.columns.clone())
     }
 
+    /// Return the direct Word 2012 footnote-area layout, if present.
+    pub fn footnote_columns(&mut self) -> Result<Option<super::footnote_columns::Layout>> {
+        Ok(self.footnote_columns_snapshot()?.layout())
+    }
+
+    /// Return a detached, lossless snapshot for the section's Word 2012
+    /// footnote-column extension.
+    pub fn footnote_columns_snapshot(&mut self) -> Result<super::footnote_columns::Snapshot> {
+        let xml = self.to_xml_bytes()?;
+        super::footnote_columns::Snapshot::from_xml(xml)
+    }
+
     /// Return local header references.
     pub fn headers(&mut self) -> Result<Vec<Reference>> {
         Ok(self.snapshot_mut()?.state.headers.clone())
@@ -563,6 +576,37 @@ impl Section {
             codec::validate_columns(columns)?;
         }
         self.update(|state| state.columns = columns)
+    }
+
+    /// Set or remove the direct Word 2012 footnote-area layout atomically.
+    pub fn set_footnote_columns(
+        &mut self,
+        value: Option<super::footnote_columns::Layout>,
+    ) -> Result<()> {
+        let snapshot = self.footnote_columns_snapshot()?;
+        let mut edit = snapshot.edit();
+        edit.set_layout(value)?;
+        let commit = edit.commit()?;
+        self.xml_bytes = commit.snapshot().xml_bytes().to_vec();
+        self.snapshot = None;
+        Ok(())
+    }
+
+    /// Remove the direct Word 2012 footnote-area layout marker.
+    pub fn clear_footnote_columns(&mut self) -> Result<()> {
+        self.set_footnote_columns(None)
+    }
+
+    /// Apply a preconditioned footnote-layout patch atomically.
+    pub fn apply_footnote_columns_patch(
+        &mut self,
+        patch: &super::footnote_columns::Patch,
+    ) -> Result<()> {
+        let snapshot = self.footnote_columns_snapshot()?;
+        let next = patch.apply(&snapshot)?;
+        self.xml_bytes = next.xml_bytes().to_vec();
+        self.snapshot = None;
+        Ok(())
     }
 
     fn snapshot_mut(&mut self) -> Result<&mut Snapshot> {

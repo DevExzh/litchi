@@ -82,7 +82,7 @@ fn main() -> Result<()> {
         ],
         table: vec![
             vec!["Format".to_owned(), "Crate".to_owned()],
-            vec!["DOCX".to_owned(), "litchi-ooxml".to_owned()],
+            vec!["DOCX".to_owned(), "litchi-docx".to_owned()],
             vec!["ODT".to_owned(), "litchi-odf".to_owned()],
             vec!["RTF".to_owned(), "litchi-rtf".to_owned()],
         ],

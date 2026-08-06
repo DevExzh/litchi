@@ -5,7 +5,7 @@
 //! that ownership boundary explicit and converts only at the high-level
 //! facade seam.
 
-use crate::ooxml::xlsx::{self, Address, Rect};
+use crate::xlsx::{self, Address, Rect};
 use litchi_core::sheet::{
     Cell as CoreCell, CellIterator, CellValue, Result as SheetResult, RowIterator, WorkbookTrait,
     Worksheet as CoreWorksheet, WorksheetIterator,

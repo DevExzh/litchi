@@ -84,6 +84,7 @@ pub mod vba;
 
 pub mod embedded_object;
 pub mod equation;
+pub use parts::annotation_bookmarks;
 /// DOC file writing
 pub mod writer;
 

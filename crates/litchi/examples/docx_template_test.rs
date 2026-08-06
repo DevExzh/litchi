@@ -1,4 +1,4 @@
-use litchi::ooxml::docx::Package;
+use litchi::docx::Package;
 use std::error::Error;
 
 type ExampleResult<T> = Result<T, Box<dyn Error + Send + Sync>>;

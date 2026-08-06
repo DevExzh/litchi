@@ -8,9 +8,6 @@ use std::io::{Read, Seek};
 #[cfg(feature = "doc")]
 use litchi_doc as doc;
 
-#[cfg(feature = "ooxml")]
-use crate::ooxml;
-
 /// A Word document implementation that can be .doc, .docx, .pages, .rtf, or .odt format.
 ///
 /// This enum wraps the format-specific implementations and provides
@@ -23,7 +20,7 @@ pub(super) enum DocumentImpl {
     Doc(doc::Document, litchi_core::Metadata),
     /// Modern .docx format
     #[cfg(feature = "ooxml")]
-    Docx(Box<ooxml::docx::Package>, litchi_core::Metadata),
+    Docx(Box<crate::docx::Package>, litchi_core::Metadata),
     /// Apple Pages format
     #[cfg(feature = "iwa")]
     Pages(crate::iwa::pages::PagesDocument),

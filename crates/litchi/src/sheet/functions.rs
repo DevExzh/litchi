@@ -8,11 +8,11 @@ use super::types::Result;
 /// **Note**: This requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
 pub fn open_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn WorkbookTrait>> {
-    let package = crate::ooxml::opc::OpcPackage::open(path)?;
-    let workbook = crate::ooxml::xlsx::Package::from_opc(package)
-        .map_err(crate::ooxml::map_ooxml_error)?
+    let package = crate::opc::OpcPackage::open(path)?;
+    let workbook = crate::xlsx::Package::from_opc(package)
+        .map_err(crate::map_ooxml_error)?
         .into_workbook()
-        .map_err(crate::ooxml::map_ooxml_error)?;
+        .map_err(crate::map_ooxml_error)?;
     Ok(Box::new(super::adapters::Workbook::new(workbook)))
 }
 
@@ -23,11 +23,11 @@ pub fn open_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workb
 pub fn open_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes);
-    let package = crate::ooxml::opc::OpcPackage::from_reader(cursor)?;
-    let workbook = crate::ooxml::xlsx::Package::from_opc(package)
-        .map_err(crate::ooxml::map_ooxml_error)?
+    let package = crate::opc::OpcPackage::from_reader(cursor)?;
+    let workbook = crate::xlsx::Package::from_opc(package)
+        .map_err(crate::map_ooxml_error)?
         .into_workbook()
-        .map_err(crate::ooxml::map_ooxml_error)?;
+        .map_err(crate::map_ooxml_error)?;
     Ok(Box::new(super::adapters::Workbook::new(workbook)))
 }
 
@@ -81,13 +81,11 @@ pub fn open_xls_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn Workbook
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
-pub fn open_xlsb_workbook<P: AsRef<std::path::Path>>(
-    path: P,
-) -> Result<crate::ooxml::xlsb::Workbook> {
-    let workbook = crate::ooxml::xlsb::Package::open(path)
-        .map_err(crate::ooxml::map_ooxml_error)?
+pub fn open_xlsb_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<crate::xlsb::Workbook> {
+    let workbook = crate::xlsb::Package::open(path)
+        .map_err(crate::map_ooxml_error)?
         .into_workbook()
-        .map_err(crate::ooxml::map_ooxml_error)?;
+        .map_err(crate::map_ooxml_error)?;
     Ok(workbook)
 }
 
@@ -95,13 +93,13 @@ pub fn open_xlsb_workbook<P: AsRef<std::path::Path>>(
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
 #[cfg(feature = "ooxml")]
-pub fn open_xlsb_workbook_from_bytes(bytes: &[u8]) -> Result<crate::ooxml::xlsb::Workbook> {
+pub fn open_xlsb_workbook_from_bytes(bytes: &[u8]) -> Result<crate::xlsb::Workbook> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes);
-    let workbook = crate::ooxml::xlsb::Package::from_reader(cursor)
-        .map_err(crate::ooxml::map_ooxml_error)?
+    let workbook = crate::xlsb::Package::from_reader(cursor)
+        .map_err(crate::map_ooxml_error)?
         .into_workbook()
-        .map_err(crate::ooxml::map_ooxml_error)?;
+        .map_err(crate::map_ooxml_error)?;
     Ok(workbook)
 }
 
@@ -123,10 +121,10 @@ pub fn open_xlsb_workbook_dyn<P: AsRef<std::path::Path>>(
 pub fn open_xlsb_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes.to_vec());
-    let workbook = crate::ooxml::xlsb::Package::from_reader(cursor)
-        .map_err(crate::ooxml::map_ooxml_error)?
+    let workbook = crate::xlsb::Package::from_reader(cursor)
+        .map_err(crate::map_ooxml_error)?
         .into_workbook()
-        .map_err(crate::ooxml::map_ooxml_error)?;
+        .map_err(crate::map_ooxml_error)?;
     Ok(Box::new(workbook))
 }
 

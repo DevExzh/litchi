@@ -20,13 +20,13 @@
 pub enum DetectedFormat {
     // OOXML formats with parsed OPC package
     #[cfg(feature = "ooxml")]
-    Docx(crate::ooxml::opc::OpcPackage),
+    Docx(crate::opc::OpcPackage),
     #[cfg(feature = "ooxml")]
-    Pptx(crate::ooxml::opc::OpcPackage),
+    Pptx(crate::opc::OpcPackage),
     #[cfg(feature = "ooxml")]
-    Xlsx(crate::ooxml::opc::OpcPackage),
+    Xlsx(crate::opc::OpcPackage),
     #[cfg(feature = "ooxml")]
-    Xlsb(crate::ooxml::opc::OpcPackage),
+    Xlsb(crate::opc::OpcPackage),
 
     // OLE2 formats with parsed OleFile
     #[cfg(feature = "doc")]
@@ -129,7 +129,7 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
         // A successful OOXML probe returns the parsed OPC owner directly.
         #[cfg(feature = "ooxml")]
         {
-            if let Ok(package) = crate::ooxml::opc::OpcPackage::from_bytes(&bytes) {
+            if let Ok(package) = crate::opc::OpcPackage::from_bytes(&bytes) {
                 // Use existing OOXML detection logic
                 if let Some(format) =
                     crate::detection_smart::ooxml::detect_ooxml_format_from_package(&package)

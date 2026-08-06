@@ -182,6 +182,9 @@ pub mod layout;
 /// BIFF8 `BookExt` record: workbook extension flags.
 mod book_ext;
 
+/// Typed BIFF8 `CompressPictures` recommendation and lossless snapshots.
+pub mod picture_compression;
+
 /// BIFF8 `Table` record: what-if data tables.
 mod data_table;
 

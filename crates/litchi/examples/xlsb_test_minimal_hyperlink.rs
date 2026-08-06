@@ -2,9 +2,9 @@
 
 #![allow(clippy::all)]
 
-use litchi::ooxml::xlsb::hyperlinks::Hyperlink;
-use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi::sheet::CellValue;
+use litchi::xlsb::hyperlinks::Hyperlink;
+use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

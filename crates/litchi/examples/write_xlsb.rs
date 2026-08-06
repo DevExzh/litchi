@@ -1,4 +1,4 @@
-use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

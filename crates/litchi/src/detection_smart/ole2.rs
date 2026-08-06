@@ -63,12 +63,8 @@ pub fn detect_ole2_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<
         return Some(FileFormat::Xls);
     }
 
-    // If we can open it as OLE but don't recognize specific streams,
-    // preserve the historical DOC fallback only when DOC support is enabled.
-    #[cfg(feature = "doc")]
-    return Some(FileFormat::Doc);
-
-    #[cfg(not(feature = "doc"))]
+    // A valid OLE container without a recognized host stream is not enough
+    // evidence to classify the file as DOC, PPT, or XLS.
     None
 }
 

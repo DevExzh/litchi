@@ -9,6 +9,7 @@
 
 pub mod annotation;
 pub mod authoring;
+pub mod charts;
 pub mod codec;
 pub mod facade;
 pub mod handout_master;

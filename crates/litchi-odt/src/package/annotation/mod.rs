@@ -10,7 +10,6 @@ pub(crate) use model::AnnotationHost;
 pub use model::{
     Annotation, AnnotationAnchor, AnnotationInfo, AnnotationPosition, AnnotationUpdate,
 };
-pub(crate) use mutation::{add_xml, remove_xml, replace_xml};
 pub(crate) use package::{add, remove, reorder, replace, update};
 
 use litchi_core::{Error, Result};

@@ -354,6 +354,19 @@ semantic values, bounded codecs, package integration, validation, and focused
 tests in nested modules; edits are clone-staged and source-checked, while
 unknown XML, BIFF12 records, and OLE wire tails remain opaque and inactive.
 
+This turn extends the same topology with typed OLE Document Summary
+Information (`property_set::document_summary`) over the shared PIDDSI codec;
+DOC `parts/annotation_bookmarks`; DOCX `section/footnote_columns`; PPT
+`document_comparison`; PPTX shape `designer` metadata; XLS
+`picture_compression`; and ODP embedded-chart package transactions. OOXML
+common now also owns bounded MCE `AlternateContent` choices, while
+`litchi-drawingml::color` owns checked color choices and ordered transforms.
+The top-level `litchi` facade exposes standalone OOXML and ODF owners directly,
+and `litchi-odf` remains a thin feature-gated detector/family umbrella. Every
+new edit path retains opaque source material, uses bounded validation, and
+publishes only source-checked snapshots or package transactions; no macro,
+link, rendering, collaboration, or external-code behavior is activated.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

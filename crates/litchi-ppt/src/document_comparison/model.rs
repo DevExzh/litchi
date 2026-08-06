@@ -1,6 +1,7 @@
 //! Typed semantic models for PowerPoint 10 document-comparison records.
 
 use crate::package::{Error, Result};
+use std::sync::Arc;
 
 use super::validation::{validate_count, validate_reviewer_name};
 
@@ -433,5 +434,134 @@ impl SlideListTable10 {
         validate_count(self.entries.len().saturating_add(1))?;
         self.entries.push(entry);
         Ok(())
+    }
+}
+
+/// Resource limits for one document-comparison snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    /// Maximum number of records in the captured document tree.
+    pub max_records: usize,
+    /// Maximum serialized document size.
+    pub max_bytes: usize,
+    /// Maximum number of records in the inert PP10 review payload.
+    pub max_review_records: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            max_records: 65_536,
+            max_bytes: 16 * 1024 * 1024,
+            max_review_records: 65_536,
+        }
+    }
+}
+
+impl Limits {
+    pub(crate) fn validate(self) -> Result<Self> {
+        if self.max_records == 0 || self.max_bytes < 8 || self.max_review_records == 0 {
+            return super::validation::corrupted("document-comparison limits allow no records");
+        }
+        Ok(self)
+    }
+}
+
+/// An opaque record retained from the PP10 review payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unknown {
+    record_type: u16,
+    version: u16,
+    instance: u16,
+    bytes: Arc<[u8]>,
+}
+
+impl Unknown {
+    pub(crate) fn new(record_type: u16, version: u16, instance: u16, bytes: Vec<u8>) -> Self {
+        Self {
+            record_type,
+            version,
+            instance,
+            bytes: Arc::from(bytes.into_boxed_slice()),
+        }
+    }
+
+    /// Raw record type, including vendor-defined values.
+    pub const fn record_type(&self) -> u16 {
+        self.record_type
+    }
+    /// Record version nibble as represented by the source record.
+    pub const fn version(&self) -> u16 {
+        self.version
+    }
+    /// Record instance as represented by the source record.
+    pub const fn instance(&self) -> u16 {
+        self.instance
+    }
+    /// Exact serialized record bytes.
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+}
+
+/// One ordered typed or opaque record in the document review payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Entry {
+    /// Reviewing toolbar/gallery state.
+    Toolbar(ReviewingToolbarStates),
+    /// Slide creation-time table.
+    SlideList(SlideListTable10),
+    /// One inert recursive document-difference tree.
+    Diff(DiffTree10),
+    /// Opaque record not owned by this focused review facade.
+    Unknown(Unknown),
+}
+
+/// A lossless semantic view of the bounded document review payload.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Review {
+    pub(crate) entries: Vec<Entry>,
+}
+
+impl Review {
+    /// Borrow ordered typed and opaque entries.
+    pub fn entries(&self) -> &[Entry] {
+        &self.entries
+    }
+
+    /// Return the typed reviewing-toolbar state, if present.
+    pub fn toolbar(&self) -> Option<ReviewingToolbarStates> {
+        self.entries.iter().find_map(|entry| match entry {
+            Entry::Toolbar(value) => Some(*value),
+            Entry::SlideList(_) | Entry::Diff(_) | Entry::Unknown(_) => None,
+        })
+    }
+
+    /// Return the typed slide-list table, if present.
+    pub fn slide_list(&self) -> Option<&SlideListTable10> {
+        self.entries.iter().find_map(|entry| match entry {
+            Entry::SlideList(value) => Some(value),
+            Entry::Toolbar(_) | Entry::Diff(_) | Entry::Unknown(_) => None,
+        })
+    }
+
+    /// Return all typed difference trees in source order.
+    pub fn diff_trees(&self) -> impl Iterator<Item = &DiffTree10> {
+        self.entries.iter().filter_map(|entry| match entry {
+            Entry::Diff(value) => Some(value),
+            Entry::Toolbar(_) | Entry::SlideList(_) | Entry::Unknown(_) => None,
+        })
+    }
+
+    /// Whether this PP10 payload has no records.
+    pub const fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub(crate) fn unknown_records(&self) -> impl Iterator<Item = &Unknown> {
+        self.entries.iter().filter_map(|entry| match entry {
+            Entry::Unknown(value) => Some(value),
+            Entry::Toolbar(_) | Entry::SlideList(_) | Entry::Diff(_) => None,
+        })
     }
 }

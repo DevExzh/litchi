@@ -7,9 +7,9 @@
 //! cargo run --example read_office_files
 //! ```
 
-use litchi::ooxml::pptx::shape::Shape;
-use litchi::ooxml::xlsx::Package as XlsxPackage;
-use litchi::ooxml::{docx::Package as DocxPackage, pptx::Package as PptxPackage};
+use litchi::pptx::shape::Shape;
+use litchi::xlsx::Package as XlsxPackage;
+use litchi::{docx::Package as DocxPackage, pptx::Package as PptxPackage};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Office File Reading Demo ===\n");
@@ -81,7 +81,7 @@ fn demo_unified_api() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn print_props(prefix: &str, props: Option<&litchi::ooxml::common::Props>) {
+fn print_props(prefix: &str, props: Option<&litchi::ooxml_common::Props>) {
     if let Some(props) = props {
         if let Some(title) = &props.title {
             println!("{prefix}Title: {title}");
@@ -95,7 +95,7 @@ fn print_props(prefix: &str, props: Option<&litchi::ooxml::common::Props>) {
 }
 
 fn print_pptx_props(prefix: &str, package: &PptxPackage) -> Result<(), Box<dyn std::error::Error>> {
-    let props = litchi::ooxml::common::properties::read(package.opc()?)
+    let props = litchi::ooxml_common::properties::read(package.opc()?)
         .map_err(|error| format!("could not read PPTX core properties: {error}"))?;
     print_props(prefix, props.as_ref());
     Ok(())

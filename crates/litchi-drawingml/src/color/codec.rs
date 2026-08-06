@@ -5,18 +5,59 @@ use quick_xml::events::{BytesStart, Event};
 
 use crate::{Error, Result};
 
-use super::model::{Rgb, Scheme, Unknown, Value, write_hex};
+use super::model::{
+    Angle, Base, FixedPercentage, Hsl, PositiveAngle, PositiveFixedPercentage, PositivePercentage,
+    Preset, Rgb, ScRgb, Scheme, System, Transform, Transformed, Unknown, Value, write_hex,
+};
+use super::validation;
 
-/// Maximum accepted color-fragment size.
-pub const MAX_XML_BYTES: usize = 64 * 1024;
-/// Maximum accepted nesting depth for an opaque fragment.
-pub const MAX_DEPTH: usize = 32;
-/// Maximum accepted element count for an opaque fragment.
-pub const MAX_NODES: usize = 256;
+pub use super::validation::{MAX_DEPTH, MAX_NODES, MAX_TRANSFORMS, MAX_XML_BYTES};
+
+const VAL: &[u8] = b"val";
+const LAST_CLR: &[u8] = b"lastClr";
+const RED: &[u8] = b"r";
+const GREEN: &[u8] = b"g";
+const BLUE: &[u8] = b"b";
+const HUE: &[u8] = b"hue";
+const SATURATION: &[u8] = b"sat";
+const LUMINANCE: &[u8] = b"lum";
+
+#[derive(Debug, Clone, Copy)]
+enum ChoiceKind {
+    Rgb,
+    Scheme,
+    ScRgb,
+    Hsl,
+    System,
+    Preset,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum BaseRef<'a> {
+    Rgb(Rgb),
+    Scheme(Scheme),
+    ScRgb(ScRgb),
+    Hsl(Hsl),
+    System(&'a System),
+    Preset(&'a Preset),
+}
+
+impl<'a> From<&'a Base> for BaseRef<'a> {
+    fn from(value: &'a Base) -> Self {
+        match value {
+            Base::Rgb(value) => Self::Rgb(*value),
+            Base::Scheme(value) => Self::Scheme(*value),
+            Base::ScRgb(value) => Self::ScRgb(*value),
+            Base::Hsl(value) => Self::Hsl(*value),
+            Base::System(value) => Self::System(value),
+            Base::Preset(value) => Self::Preset(value),
+        }
+    }
+}
 
 /// Read one DrawingML color-choice fragment.
 pub fn read(xml: &[u8]) -> Result<Value> {
-    let validated = validated_fragment(xml)?;
+    let validated = validation::validated_fragment(xml)?;
     let mut reader = Reader::from_reader(validated);
 
     loop {
@@ -26,33 +67,12 @@ pub fn read(xml: &[u8]) -> Result<Value> {
         {
             Event::Text(text) if text.decode().map_err(xml_error)?.trim().is_empty() => {},
             Event::Start(element) => {
-                let Some(value) = typed_value(&element, reader.decoder())? else {
-                    return Ok(Value::Unknown(Unknown::from_validated(validated)));
-                };
-                let root_name = element.name().as_ref().to_vec();
-                match reader
-                    .read_event()
-                    .map_err(|error| Error::Xml(error.to_string()))?
-                {
-                    Event::End(end) if end.name().as_ref() == root_name.as_slice() => {
-                        return if tail_is_empty(&mut reader)? {
-                            Ok(value)
-                        } else {
-                            Ok(Value::Unknown(Unknown::from_validated(validated)))
-                        };
-                    },
-                    _ => return Ok(Value::Unknown(Unknown::from_validated(validated))),
-                }
+                return Ok(read_choice(&mut reader, &element)?
+                    .unwrap_or_else(|| Value::Unknown(Unknown::from_validated(validated))));
             },
             Event::Empty(element) => {
-                let Some(value) = typed_value(&element, reader.decoder())? else {
-                    return Ok(Value::Unknown(Unknown::from_validated(validated)));
-                };
-                return if tail_is_empty(&mut reader)? {
-                    Ok(value)
-                } else {
-                    Ok(Value::Unknown(Unknown::from_validated(validated)))
-                };
+                return Ok(parse_empty_choice(&mut reader, &element)?
+                    .unwrap_or_else(|| Value::Unknown(Unknown::from_validated(validated))));
             },
             _ => return Ok(Value::Unknown(Unknown::from_validated(validated))),
         }
@@ -63,79 +83,421 @@ pub fn read(xml: &[u8]) -> Result<Value> {
 /// prefix. The result is a fragment and intentionally has no namespace
 /// declaration so the host can retain its own namespace spelling.
 pub fn write(value: &Value) -> Result<Vec<u8>> {
+    let mut output = String::new();
     match value {
-        Value::Rgb(rgb) => {
-            let mut output = String::with_capacity(29);
-            output.push_str("<a:srgbClr val=\"");
-            write_hex(&mut output, *rgb);
-            output.push_str("\"/>");
-            Ok(output.into_bytes())
+        Value::Rgb(rgb) => write_base(&mut output, BaseRef::Rgb(*rgb), false),
+        Value::Scheme(scheme) => write_base(&mut output, BaseRef::Scheme(*scheme), false),
+        Value::ScRgb(color) => write_base(&mut output, BaseRef::ScRgb(*color), false),
+        Value::Hsl(color) => write_base(&mut output, BaseRef::Hsl(*color), false),
+        Value::System(color) => write_base(&mut output, BaseRef::System(color), false),
+        Value::Preset(color) => write_base(&mut output, BaseRef::Preset(color), false),
+        Value::Transformed(value) => {
+            write_base(&mut output, BaseRef::from(value.base()), true);
+            for transform in value.transforms() {
+                write_transform(&mut output, *transform);
+            }
+            output.push_str("</a:");
+            output.push_str(base_name(value.base()));
+            output.push('>');
         },
-        Value::Scheme(scheme) => {
-            let mut output = String::with_capacity(31);
-            output.push_str("<a:schemeClr val=\"");
-            output.push_str(scheme.token());
-            output.push_str("\"/>");
-            Ok(output.into_bytes())
-        },
-        Value::Unknown(value) => Ok(value.as_xml().to_vec()),
+        Value::Unknown(value) => return Ok(value.as_xml().to_vec()),
     }
+
+    if output.len() > MAX_XML_BYTES {
+        return Err(Error::Limit {
+            resource: "DrawingML color XML",
+            limit: MAX_XML_BYTES,
+        });
+    }
+    Ok(output.into_bytes())
 }
 
-fn typed_value(
+fn read_choice(reader: &mut Reader<&[u8]>, element: &BytesStart<'_>) -> Result<Option<Value>> {
+    let Some(base) = parse_base(element, reader.decoder())? else {
+        return Ok(None);
+    };
+    let root_name = element.name().as_ref().to_vec();
+    let mut transforms = Vec::new();
+
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+        {
+            Event::Text(text) if text.decode().map_err(xml_error)?.trim().is_empty() => {},
+            Event::Empty(element) => {
+                let Some(transform) = parse_transform(&element, reader.decoder())? else {
+                    return Ok(None);
+                };
+                push_transform(&mut transforms, transform)?;
+            },
+            Event::Start(element) => {
+                let Some(transform) = parse_started_transform(reader, &element)? else {
+                    return Ok(None);
+                };
+                push_transform(&mut transforms, transform)?;
+            },
+            Event::End(element) if element.name().as_ref() == root_name.as_slice() => break,
+            Event::Eof => {
+                return Err(Error::Invalid(
+                    "DrawingML color choice ended before its root element".into(),
+                ));
+            },
+            _ => return Ok(None),
+        }
+    }
+
+    if !tail_is_empty(reader)? {
+        return Ok(None);
+    }
+    if transforms.is_empty() {
+        return Ok(Some(Value::from_base(base)));
+    }
+    Ok(Some(Value::Transformed(Transformed::new(
+        base, transforms,
+    )?)))
+}
+
+fn parse_empty_choice(
+    reader: &mut Reader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<Option<Value>> {
+    let decoder = reader.decoder();
+    let Some(base) = parse_base(element, decoder)? else {
+        return Ok(None);
+    };
+    if !tail_is_empty(reader)? {
+        return Ok(None);
+    }
+    Ok(Some(Value::from_base(base)))
+}
+
+fn parse_base(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
-) -> Result<Option<Value>> {
-    let local = element.local_name();
-    let kind = match local.as_ref() {
-        b"srgbClr" => 0_u8,
-        b"schemeClr" => 1_u8,
+) -> Result<Option<Base>> {
+    let kind = match element.local_name().as_ref() {
+        b"srgbClr" => ChoiceKind::Rgb,
+        b"schemeClr" => ChoiceKind::Scheme,
+        b"scrgbClr" => ChoiceKind::ScRgb,
+        b"hslClr" => ChoiceKind::Hsl,
+        b"sysClr" => ChoiceKind::System,
+        b"prstClr" => ChoiceKind::Preset,
         _ => return Ok(None),
     };
-
-    let Some(value) = attribute(element, b"val", decoder)? else {
-        return Err(Error::Invalid(format!(
-            "DrawingML {} color is missing val",
-            String::from_utf8_lossy(local.as_ref())
-        )));
+    let allowed = match kind {
+        ChoiceKind::Rgb | ChoiceKind::Scheme | ChoiceKind::Preset => &[VAL][..],
+        ChoiceKind::ScRgb => &[RED, GREEN, BLUE][..],
+        ChoiceKind::Hsl => &[HUE, SATURATION, LUMINANCE][..],
+        ChoiceKind::System => &[VAL, LAST_CLR][..],
+    };
+    let Some(attributes) = attributes(element, decoder, allowed)? else {
+        return Ok(None);
     };
 
     match kind {
-        0 => Ok(Some(Value::Rgb(Rgb::parse(&value)?))),
-        1 => Ok(Scheme::from_token(&value).map(Value::Scheme)),
-        _ => unreachable!("typed DrawingML color kind is closed"),
+        ChoiceKind::Rgb => {
+            let value = required(&attributes, VAL, "srgbClr")?;
+            Ok(Some(Base::Rgb(Rgb::parse(value)?)))
+        },
+        ChoiceKind::Scheme => {
+            Ok(Scheme::from_token(required(&attributes, VAL, "schemeClr")?).map(Base::Scheme))
+        },
+        ChoiceKind::ScRgb => {
+            let red = PositiveFixedPercentage::parse(required(&attributes, RED, "scrgbClr")?)?;
+            let green = PositiveFixedPercentage::parse(required(&attributes, GREEN, "scrgbClr")?)?;
+            let blue = PositiveFixedPercentage::parse(required(&attributes, BLUE, "scrgbClr")?)?;
+            Ok(Some(Base::ScRgb(ScRgb::from_values(red, green, blue))))
+        },
+        ChoiceKind::Hsl => {
+            let hue = PositiveAngle::parse(required(&attributes, HUE, "hslClr")?)?;
+            let saturation =
+                super::model::Percentage::parse(required(&attributes, SATURATION, "hslClr")?)?;
+            let luminance =
+                super::model::Percentage::parse(required(&attributes, LUMINANCE, "hslClr")?)?;
+            Ok(Some(Base::Hsl(Hsl::from_values(
+                hue, saturation, luminance,
+            ))))
+        },
+        ChoiceKind::System => {
+            let last = optional(&attributes, LAST_CLR)
+                .map(Rgb::parse)
+                .transpose()?;
+            Ok(System::new(required(&attributes, VAL, "sysClr")?, last)
+                .ok()
+                .map(Base::System))
+        },
+        ChoiceKind::Preset => Ok(Preset::new(required(&attributes, VAL, "prstClr")?)
+            .ok()
+            .map(Base::Preset)),
     }
 }
 
-fn attribute(
+fn parse_started_transform(
+    reader: &mut Reader<&[u8]>,
     element: &BytesStart<'_>,
-    expected: &[u8],
+) -> Result<Option<Transform>> {
+    let Some(transform) = parse_transform(element, reader.decoder())? else {
+        return Ok(None);
+    };
+    let name = element.name().as_ref().to_vec();
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+        {
+            Event::Text(text) if text.decode().map_err(xml_error)?.trim().is_empty() => {},
+            Event::End(end) if end.name().as_ref() == name.as_slice() => {
+                return Ok(Some(transform));
+            },
+            _ => return Ok(None),
+        }
+    }
+}
+
+fn parse_transform(
+    element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
-) -> Result<Option<String>> {
-    let mut value = None;
+) -> Result<Option<Transform>> {
+    let local = element.local_name().as_ref().to_vec();
+    let (kind, allowed) = match local.as_slice() {
+        b"alpha" => (0_u8, &[VAL][..]),
+        b"alphaMod" => (1, &[VAL][..]),
+        b"alphaOff" => (2, &[VAL][..]),
+        b"blue" => (3, &[VAL][..]),
+        b"blueMod" => (4, &[VAL][..]),
+        b"blueOff" => (5, &[VAL][..]),
+        b"comp" => (6, &[][..]),
+        b"gamma" => (7, &[][..]),
+        b"gray" => (8, &[][..]),
+        b"green" => (9, &[VAL][..]),
+        b"greenMod" => (10, &[VAL][..]),
+        b"greenOff" => (11, &[VAL][..]),
+        b"hue" => (12, &[VAL][..]),
+        b"hueMod" => (13, &[VAL][..]),
+        b"hueOff" => (14, &[VAL][..]),
+        b"inv" => (15, &[][..]),
+        b"invGamma" => (16, &[][..]),
+        b"lum" => (17, &[VAL][..]),
+        b"lumMod" => (18, &[VAL][..]),
+        b"lumOff" => (19, &[VAL][..]),
+        b"red" => (20, &[VAL][..]),
+        b"redMod" => (21, &[VAL][..]),
+        b"redOff" => (22, &[VAL][..]),
+        b"sat" => (23, &[VAL][..]),
+        b"satMod" => (24, &[VAL][..]),
+        b"satOff" => (25, &[VAL][..]),
+        b"shade" => (26, &[VAL][..]),
+        b"tint" => (27, &[VAL][..]),
+        _ => return Ok(None),
+    };
+    let Some(attributes) = attributes(element, decoder, allowed)? else {
+        return Ok(None);
+    };
+    let value = || required(&attributes, VAL, &String::from_utf8_lossy(&local));
+    Ok(Some(match kind {
+        0 => Transform::Alpha(PositiveFixedPercentage::parse(value()?)?),
+        1 => Transform::AlphaMod(PositivePercentage::parse(value()?)?),
+        2 => Transform::AlphaOff(FixedPercentage::parse(value()?)?),
+        3 => Transform::Blue(super::model::Percentage::parse(value()?)?),
+        4 => Transform::BlueMod(super::model::Percentage::parse(value()?)?),
+        5 => Transform::BlueOff(super::model::Percentage::parse(value()?)?),
+        6 => Transform::Complement,
+        7 => Transform::Gamma,
+        8 => Transform::Gray,
+        9 => Transform::Green(super::model::Percentage::parse(value()?)?),
+        10 => Transform::GreenMod(super::model::Percentage::parse(value()?)?),
+        11 => Transform::GreenOff(super::model::Percentage::parse(value()?)?),
+        12 => Transform::Hue(PositiveAngle::parse(value()?)?),
+        13 => Transform::HueMod(PositivePercentage::parse(value()?)?),
+        14 => Transform::HueOff(Angle::parse(value()?)?),
+        15 => Transform::Inverse,
+        16 => Transform::InverseGamma,
+        17 => Transform::Lum(super::model::Percentage::parse(value()?)?),
+        18 => Transform::LumMod(super::model::Percentage::parse(value()?)?),
+        19 => Transform::LumOff(super::model::Percentage::parse(value()?)?),
+        20 => Transform::Red(super::model::Percentage::parse(value()?)?),
+        21 => Transform::RedMod(super::model::Percentage::parse(value()?)?),
+        22 => Transform::RedOff(super::model::Percentage::parse(value()?)?),
+        23 => Transform::Sat(super::model::Percentage::parse(value()?)?),
+        24 => Transform::SatMod(super::model::Percentage::parse(value()?)?),
+        25 => Transform::SatOff(super::model::Percentage::parse(value()?)?),
+        26 => Transform::Shade(PositiveFixedPercentage::parse(value()?)?),
+        27 => Transform::Tint(PositiveFixedPercentage::parse(value()?)?),
+        _ => unreachable!("known color transform kind is closed"),
+    }))
+}
+
+fn push_transform(transforms: &mut Vec<Transform>, transform: Transform) -> Result<()> {
+    if transforms.len() >= MAX_TRANSFORMS {
+        return Err(Error::Limit {
+            resource: "DrawingML color transforms",
+            limit: MAX_TRANSFORMS,
+        });
+    }
+    transforms.push(transform);
+    Ok(())
+}
+
+fn attributes(
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    allowed: &[&[u8]],
+) -> Result<Option<Vec<(Vec<u8>, String)>>> {
+    let mut values: Vec<(Vec<u8>, String)> = Vec::new();
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let key = attribute.key.as_ref();
         if key == b"xmlns" || key.starts_with(b"xmlns:") {
             continue;
         }
-        if attribute.key.prefix().is_some() || attribute.key.local_name().as_ref() != expected {
+        if attribute.key.prefix().is_some() || !allowed.iter().any(|expected| *expected == key) {
             return Ok(None);
         }
-        if value.is_some() {
+        if values.iter().any(|(name, _)| name.as_slice() == key) {
             return Err(Error::Invalid(format!(
                 "duplicate DrawingML color attribute '{}'",
-                String::from_utf8_lossy(expected)
+                String::from_utf8_lossy(key)
             )));
         }
-        value = Some(
-            attribute
-                .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
-                .map_err(|error| Error::Xml(error.to_string()))?
-                .into_owned(),
-        );
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .into_owned();
+        values.push((key.to_vec(), value));
     }
-    Ok(value)
+    Ok(Some(values))
+}
+
+fn required<'a>(
+    attributes: &'a [(Vec<u8>, String)],
+    name: &[u8],
+    element: &str,
+) -> Result<&'a str> {
+    optional(attributes, name).ok_or_else(|| {
+        Error::Invalid(format!(
+            "DrawingML {element} color is missing {}",
+            String::from_utf8_lossy(name)
+        ))
+    })
+}
+
+fn optional<'a>(attributes: &'a [(Vec<u8>, String)], name: &[u8]) -> Option<&'a str> {
+    attributes
+        .iter()
+        .find(|(key, _)| key.as_slice() == name)
+        .map(|(_, value)| value.as_str())
+}
+
+fn write_base(output: &mut String, base: BaseRef<'_>, transformed: bool) {
+    match base {
+        BaseRef::Rgb(rgb) => {
+            output.push_str("<a:srgbClr val=\"");
+            write_hex(output, rgb);
+            output.push('"');
+        },
+        BaseRef::Scheme(scheme) => {
+            output.push_str("<a:schemeClr val=\"");
+            output.push_str(scheme.token());
+            output.push('"');
+        },
+        BaseRef::ScRgb(color) => {
+            output.push_str("<a:scrgbClr r=\"");
+            output.push_str(&color.red().value().to_string());
+            output.push_str("\" g=\"");
+            output.push_str(&color.green().value().to_string());
+            output.push_str("\" b=\"");
+            output.push_str(&color.blue().value().to_string());
+            output.push('"');
+        },
+        BaseRef::Hsl(color) => {
+            output.push_str("<a:hslClr hue=\"");
+            output.push_str(&color.hue().value().to_string());
+            output.push_str("\" sat=\"");
+            output.push_str(&color.saturation().value().to_string());
+            output.push_str("\" lum=\"");
+            output.push_str(&color.luminance().value().to_string());
+            output.push('"');
+        },
+        BaseRef::System(color) => {
+            output.push_str("<a:sysClr val=\"");
+            output.push_str(color.token());
+            output.push('"');
+            if let Some(last) = color.last_rgb() {
+                output.push_str(" lastClr=\"");
+                write_hex(output, last);
+                output.push('"');
+            }
+        },
+        BaseRef::Preset(color) => {
+            output.push_str("<a:prstClr val=\"");
+            output.push_str(color.token());
+            output.push('"');
+        },
+    }
+    if transformed {
+        output.push('>');
+    } else {
+        output.push_str("/>");
+    }
+}
+
+fn base_name(base: &Base) -> &'static str {
+    match base {
+        Base::Rgb(_) => "srgbClr",
+        Base::Scheme(_) => "schemeClr",
+        Base::ScRgb(_) => "scrgbClr",
+        Base::Hsl(_) => "hslClr",
+        Base::System(_) => "sysClr",
+        Base::Preset(_) => "prstClr",
+    }
+}
+
+fn write_transform(output: &mut String, transform: Transform) {
+    match transform {
+        Transform::Alpha(value) => write_value(output, "alpha", value.value()),
+        Transform::AlphaMod(value) => write_value(output, "alphaMod", value.value()),
+        Transform::AlphaOff(value) => write_value(output, "alphaOff", value.value()),
+        Transform::Blue(value) => write_value(output, "blue", value.value()),
+        Transform::BlueMod(value) => write_value(output, "blueMod", value.value()),
+        Transform::BlueOff(value) => write_value(output, "blueOff", value.value()),
+        Transform::Complement => write_empty(output, "comp"),
+        Transform::Gamma => write_empty(output, "gamma"),
+        Transform::Gray => write_empty(output, "gray"),
+        Transform::Green(value) => write_value(output, "green", value.value()),
+        Transform::GreenMod(value) => write_value(output, "greenMod", value.value()),
+        Transform::GreenOff(value) => write_value(output, "greenOff", value.value()),
+        Transform::Hue(value) => write_value(output, "hue", value.value()),
+        Transform::HueMod(value) => write_value(output, "hueMod", value.value()),
+        Transform::HueOff(value) => write_value(output, "hueOff", value.value()),
+        Transform::Inverse => write_empty(output, "inv"),
+        Transform::InverseGamma => write_empty(output, "invGamma"),
+        Transform::Lum(value) => write_value(output, "lum", value.value()),
+        Transform::LumMod(value) => write_value(output, "lumMod", value.value()),
+        Transform::LumOff(value) => write_value(output, "lumOff", value.value()),
+        Transform::Red(value) => write_value(output, "red", value.value()),
+        Transform::RedMod(value) => write_value(output, "redMod", value.value()),
+        Transform::RedOff(value) => write_value(output, "redOff", value.value()),
+        Transform::Sat(value) => write_value(output, "sat", value.value()),
+        Transform::SatMod(value) => write_value(output, "satMod", value.value()),
+        Transform::SatOff(value) => write_value(output, "satOff", value.value()),
+        Transform::Shade(value) => write_value(output, "shade", value.value()),
+        Transform::Tint(value) => write_value(output, "tint", value.value()),
+    }
+}
+
+fn write_value(output: &mut String, name: &str, value: impl ToString) {
+    output.push_str("<a:");
+    output.push_str(name);
+    output.push_str(" val=\"");
+    output.push_str(&value.to_string());
+    output.push_str("\"/>");
+}
+
+fn write_empty(output: &mut String, name: &str) {
+    output.push_str("<a:");
+    output.push_str(name);
+    output.push_str("/>");
 }
 
 fn tail_is_empty(reader: &mut Reader<&[u8]>) -> Result<bool> {
@@ -149,117 +511,6 @@ fn tail_is_empty(reader: &mut Reader<&[u8]>) -> Result<bool> {
             _ => return Ok(false),
         }
     }
-}
-
-/// Validate and return the original fragment without allocating a copy.
-pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(Error::Limit {
-            resource: "DrawingML color XML",
-            limit: MAX_XML_BYTES,
-        });
-    }
-
-    let mut reader = Reader::from_reader(xml);
-    let mut stack: Vec<Vec<u8>> = Vec::new();
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut nodes = 0usize;
-
-    loop {
-        let event = reader
-            .read_event()
-            .map_err(|error| Error::Xml(error.to_string()))?;
-        match event {
-            Event::Start(element) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| Error::Invalid("DrawingML color node count overflow".into()))?;
-                if nodes > MAX_NODES {
-                    return Err(Error::Limit {
-                        resource: "DrawingML color nodes",
-                        limit: MAX_NODES,
-                    });
-                }
-                if stack.is_empty() {
-                    if root_seen {
-                        return Err(Error::Invalid(
-                            "DrawingML color fragment contains multiple roots".into(),
-                        ));
-                    }
-                    root_seen = true;
-                }
-                if stack.len() >= MAX_DEPTH {
-                    return Err(Error::Limit {
-                        resource: "DrawingML color depth",
-                        limit: MAX_DEPTH,
-                    });
-                }
-                stack.push(element.name().as_ref().to_vec());
-            },
-            Event::Empty(_) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| Error::Invalid("DrawingML color node count overflow".into()))?;
-                if nodes > MAX_NODES {
-                    return Err(Error::Limit {
-                        resource: "DrawingML color nodes",
-                        limit: MAX_NODES,
-                    });
-                }
-                if stack.is_empty() {
-                    if root_seen {
-                        return Err(Error::Invalid(
-                            "DrawingML color fragment contains multiple roots".into(),
-                        ));
-                    }
-                    root_seen = true;
-                    root_closed = true;
-                }
-            },
-            Event::End(element) => {
-                let Some(expected) = stack.pop() else {
-                    return Err(Error::Invalid(
-                        "DrawingML color fragment has an unmatched closing element".into(),
-                    ));
-                };
-                if expected.as_slice() != element.name().as_ref() {
-                    return Err(Error::Invalid(
-                        "DrawingML color fragment has mismatched closing elements".into(),
-                    ));
-                }
-                if stack.is_empty() {
-                    root_closed = true;
-                }
-            },
-            Event::Text(text) if stack.is_empty() => {
-                if !text.decode().map_err(xml_error)?.trim().is_empty() {
-                    return Err(Error::Invalid(
-                        "DrawingML color fragment contains text outside its root".into(),
-                    ));
-                }
-            },
-            Event::CData(_) | Event::GeneralRef(_) if stack.is_empty() => {
-                return Err(Error::Invalid(
-                    "DrawingML color fragment contains data outside its root".into(),
-                ));
-            },
-            Event::Decl(_) | Event::DocType(_) => {
-                return Err(Error::Invalid(
-                    "DrawingML color fragment cannot contain an XML declaration or doctype".into(),
-                ));
-            },
-            Event::Eof => break,
-            _ => {},
-        }
-    }
-
-    if !root_seen || !root_closed || !stack.is_empty() {
-        return Err(Error::Invalid(
-            "DrawingML color fragment must contain one complete root".into(),
-        ));
-    }
-    Ok(xml)
 }
 
 fn xml_error(error: quick_xml::encoding::EncodingError) -> Error {

@@ -8,9 +8,6 @@ use std::io::{Read, Seek};
 #[cfg(feature = "ppt")]
 use crate::ppt;
 
-#[cfg(feature = "ooxml")]
-use crate::ooxml;
-
 /// Extracted data from a modern presentation slide (to avoid lifetime issues).
 #[derive(Debug, Clone)]
 pub struct SlideData {
@@ -38,7 +35,7 @@ pub(super) enum PresentationImpl {
     Ppt(ppt::Presentation),
     /// Modern .pptx format
     #[cfg(feature = "ooxml")]
-    Pptx(Box<ooxml::pptx::Package>),
+    Pptx(Box<crate::pptx::Package>),
     /// Apple Keynote format
     #[cfg(feature = "iwa")]
     Keynote(crate::iwa::keynote::KeynoteDocument),

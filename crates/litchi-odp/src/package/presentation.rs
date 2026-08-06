@@ -116,6 +116,27 @@ impl Presentation {
         self.package.content_xml()
     }
 
+    /// Discover embedded charts in presentation drawing order.
+    pub fn charts(&self) -> Result<crate::charts::Inventory<'_>> {
+        self.charts_with(crate::charts::Limits::default())
+    }
+
+    /// Discover embedded charts with an explicit resource budget.
+    pub fn charts_with(
+        &self,
+        limits: crate::charts::Limits,
+    ) -> Result<crate::charts::Inventory<'_>> {
+        crate::charts::inventory(&self.package, limits)
+    }
+
+    /// Select one embedded chart by exact frame name or checked position.
+    pub fn chart<'a, S>(&self, selector: S) -> Result<Option<crate::charts::Chart>>
+    where
+        S: Into<crate::charts::Selector<'a>>,
+    {
+        self.charts()?.get(selector).map(|chart| chart.cloned())
+    }
+
     /// Borrow the optional validated `styles.xml` snapshot without reparsing it.
     pub fn styles_xml(&self) -> Option<&str> {
         self.package.styles_xml()

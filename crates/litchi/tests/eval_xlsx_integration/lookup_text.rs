@@ -1,5 +1,5 @@
-use litchi::ooxml::xlsx::{Formula, Workbook};
 use litchi::sheet::{CellValue, FormulaEvaluator, functions::open_workbook};
+use litchi::xlsx::{Formula, Workbook};
 use tempfile::tempdir;
 
 #[tokio::test]

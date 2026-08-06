@@ -5,8 +5,8 @@
 //! cargo run --example xlsb_test_two_cells --features ooxml --no-default-features
 //! ```
 
-use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi::sheet::CellValue;
+use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -11,6 +11,7 @@
 
 mod binding;
 mod codec;
+pub mod document_summary;
 mod model;
 
 #[cfg(test)]

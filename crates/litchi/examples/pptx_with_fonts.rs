@@ -4,7 +4,7 @@
 //! font embedding and subsetting. Open the generated file in Microsoft PowerPoint
 //! to verify that fonts are properly embedded.
 
-use litchi::ooxml::pptx::{FontEmbedding, Package};
+use litchi::pptx::{FontEmbedding, Package};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {

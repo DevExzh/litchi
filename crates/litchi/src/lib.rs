@@ -54,7 +54,7 @@
 //! # Quick Start - Word Documents (Write)
 //!
 //! ```no_run
-//! use litchi::ooxml::docx::Package;
+//! use litchi::docx::Package;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create a new empty document
@@ -98,7 +98,7 @@
 //! # Quick Start - PowerPoint Presentations (Write)
 //!
 //! ```no_run
-//! use litchi::ooxml::pptx::Package;
+//! use litchi::pptx::Package;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 //! // Create a new empty presentation
@@ -118,7 +118,7 @@
 //! # Quick Start - Excel Workbooks (Write)
 //!
 //! ```no_run
-//! use litchi::ooxml::xlsx::Workbook;
+//! use litchi::xlsx::Workbook;
 //! use litchi::sheet::WorkbookTrait;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -156,10 +156,9 @@
 //!
 //! ## Low-Level Modules (Advanced Use)
 //!
-//! - `litchi_doc` - Direct access to the independently owned legacy Word parser and writer
 //! - `ppt` - Direct access to the legacy PowerPoint parser and writer
 //! - `xls` - Direct access to legacy Excel BIFF parsers and writers
-//! - `ooxml` - Direct access to OOXML format parsers
+//! - `docx`, `pptx`, `xlsx`, and `xlsb` - Direct access to standalone OOXML owners
 //!
 //! Most users should use the high-level API and only access low-level modules
 //! when format-specific features are needed.
@@ -168,16 +167,15 @@
 
 /// Common types, traits, and utilities shared across formats.
 ///
-/// Re-export of the `litchi-core` crate under the historical `common` path.
+/// Re-export of the `litchi-core` crate under the concise `common` path.
 ///
 /// Smart-detection items (`DetectedFormat`, `detect_format_smart`) live in
-/// the umbrella's `detection_smart` module; this shim re-exports them
-/// under `common::detection` to preserve API compat.
+/// the umbrella's `detection_smart` module; this facade also exposes them
+/// under `common::detection` beside the core detection vocabulary.
 pub mod common {
     pub use litchi_core::*;
 
-    // Re-export top-level smart-detection entry points so legacy callers like
-    // `litchi::common::detect_file_format(...)` keep working.
+    // Re-export the smart-detection entry points beside the core vocabulary.
     #[cfg(any(
         feature = "doc",
         feature = "ppt",
@@ -307,35 +305,48 @@ pub mod drawing {
     pub use litchi_drawingml::*;
 }
 
-/// OOXML format parser (modern .docx, .pptx files)
-///
-/// This module provides direct access to OOXML parsing functionality.
-/// Most users should use the high-level [`Document`] and [`Presentation`]
-/// APIs instead, which automatically handle format detection.
-///
-/// **Note**: This requires the `ooxml` feature to be enabled.
+/// WordprocessingML (`.docx`) package and semantic APIs.
 #[cfg(feature = "ooxml")]
-pub mod ooxml {
-    pub(crate) fn map_ooxml_error<E: std::fmt::Display>(error: E) -> litchi_core::Error {
-        // The unified facade has no concrete OOXML error variant, but these
-        // failures are format/graph validation failures rather than generic
-        // application errors. Preserve that distinction for callers.
-        litchi_core::Error::InvalidFormat(error.to_string())
-    }
+pub mod docx {
+    pub use litchi_docx::*;
+}
 
-    pub use common::{custom, custom_xml, embedded, ribbon, web};
-    /// WordprocessingML (`.docx`) package and semantic APIs.
-    pub use litchi_docx as docx;
-    /// Host-neutral OOXML vocabulary and package services.
-    pub use litchi_ooxml_common as common;
-    /// Open Packaging Conventions package graph.
-    pub use litchi_opc as opc;
-    /// PresentationML (`.pptx`) package and semantic APIs.
-    pub use litchi_pptx as pptx;
-    /// Binary SpreadsheetML (`.xlsb`) package and semantic APIs.
-    pub use litchi_xlsb as xlsb;
-    /// SpreadsheetML (`.xlsx`) package and semantic APIs.
-    pub use litchi_xlsx as xlsx;
+/// PresentationML (`.pptx`) package and semantic APIs.
+#[cfg(feature = "ooxml")]
+pub mod pptx {
+    pub use litchi_pptx::*;
+}
+
+/// SpreadsheetML (`.xlsx`) package and semantic APIs.
+#[cfg(feature = "ooxml")]
+pub mod xlsx {
+    pub use litchi_xlsx::*;
+}
+
+/// Binary SpreadsheetML (`.xlsb`) package and semantic APIs.
+#[cfg(feature = "ooxml")]
+pub mod xlsb {
+    pub use litchi_xlsb::*;
+}
+
+/// Open Packaging Conventions package graph used by the standalone OOXML owners.
+#[cfg(feature = "ooxml")]
+pub mod opc {
+    pub use litchi_opc::*;
+}
+
+/// Shared OOXML vocabulary and package services.
+#[cfg(feature = "ooxml")]
+pub mod ooxml_common {
+    pub use litchi_ooxml_common::*;
+}
+
+#[cfg(feature = "ooxml")]
+pub(crate) fn map_ooxml_error<E: std::fmt::Display>(error: E) -> litchi_core::Error {
+    // The unified facade has no concrete OOXML error variant, but these
+    // failures are format/graph validation failures rather than generic
+    // application errors. Preserve that distinction for callers.
+    litchi_core::Error::InvalidFormat(error.to_string())
 }
 
 /// Runtime-neutral Microsoft Office cryptography.
@@ -380,21 +391,28 @@ pub mod iwa {
     pub use litchi_iwa::*;
 }
 
-/// OpenDocument Format (ODF) Support
-///
-/// Provides the layered OpenDocument family facades for `.odt`, `.ods`, and
-/// `.odp`. Use [`odf::odt`], [`odf::ods`], or [`odf::odp`] to access the
-/// format-specific APIs; the high-level [`Document`], [`Workbook`], and
-/// [`Presentation`] facades auto-detect packaged files.
-///
-/// **Note**: This requires the `odf` feature to be enabled.
+/// OpenDocument Presentation (`.odp`) package and semantic APIs.
 #[cfg(feature = "odf")]
-pub mod odf {
-    pub use litchi_odf_common as common;
-    pub use litchi_odf_common::detect;
-    pub use litchi_odp as odp;
-    pub use litchi_ods as ods;
-    pub use litchi_odt as odt;
+pub mod odp {
+    pub use litchi_odp::*;
+}
+
+/// OpenDocument Spreadsheet (`.ods`) package and semantic APIs.
+#[cfg(feature = "odf")]
+pub mod ods {
+    pub use litchi_ods::*;
+}
+
+/// OpenDocument Text (`.odt`) package and semantic APIs.
+#[cfg(feature = "odf")]
+pub mod odt {
+    pub use litchi_odt::*;
+}
+
+/// Shared OpenDocument vocabulary and detection services.
+#[cfg(feature = "odf")]
+pub mod odf_common {
+    pub use litchi_odf_common::*;
 }
 
 /// RTF (Rich Text Format) Support
@@ -451,3 +469,27 @@ pub use common::{FileFormat, Length, PlaceholderType, RGBColor, ShapeType};
     feature = "rtf"
 ))]
 pub use common::{detect_file_format, detect_file_format_from_bytes};
+
+#[cfg(all(test, feature = "ooxml"))]
+mod standalone_ooxml_facade_tests {
+    #[test]
+    fn exposes_each_standalone_owner_without_an_outer_namespace() {
+        let _: Option<super::docx::Package> = None;
+        let _: Option<super::pptx::Package> = None;
+        let _: Option<super::xlsx::Workbook> = None;
+        let _: Option<super::xlsb::Workbook> = None;
+        let _: Option<super::opc::OpcPackage> = None;
+        let _: Option<super::ooxml_common::custom::Props> = None;
+    }
+}
+
+#[cfg(all(test, feature = "odf"))]
+mod standalone_odf_facade_tests {
+    #[test]
+    fn exposes_each_standalone_owner_without_an_outer_namespace() {
+        let _: Option<super::odp::Presentation> = None;
+        let _: Option<super::ods::Spreadsheet> = None;
+        let _: Option<super::odt::Document> = None;
+        let _: Option<super::odf_common::detect::Format> = None;
+    }
+}

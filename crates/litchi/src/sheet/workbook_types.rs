@@ -20,7 +20,7 @@ pub(super) enum WorkbookImpl {
     #[cfg(feature = "ooxml")]
     Xlsx(super::adapters::Workbook),
     #[cfg(feature = "ooxml")]
-    Xlsb(crate::ooxml::xlsb::Workbook),
+    Xlsb(crate::xlsb::Workbook),
 
     // Legacy OLE-based Excel
     #[cfg(feature = "xls")]

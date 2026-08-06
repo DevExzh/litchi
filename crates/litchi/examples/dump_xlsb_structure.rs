@@ -4,7 +4,7 @@ use std::error::Error;
 use std::ffi::OsString;
 use std::fs::File;
 
-use litchi::ooxml::opc::OpcPackage;
+use litchi::opc::OpcPackage;
 use litchi_xlsb::raw::Records;
 
 fn dump_records(label: &str, bytes: &[u8]) -> Result<(), litchi_xlsb::Error> {

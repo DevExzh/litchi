@@ -6,7 +6,7 @@
 //! cargo run --example pptx_minimal_test
 //! ```
 
-use litchi::ooxml::pptx::*;
+use litchi::pptx::*;
 use std::error::Error;
 
 fn main() -> std::result::Result<(), Box<dyn Error>> {

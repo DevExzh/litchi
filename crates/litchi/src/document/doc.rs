@@ -11,9 +11,6 @@ use litchi_doc as doc;
 #[cfg(feature = "doc")]
 use litchi_ole_common::property_set::PropertySetReader;
 
-#[cfg(feature = "ooxml")]
-use crate::ooxml;
-
 use std::path::Path;
 
 #[cfg(feature = "rtf")]
@@ -236,12 +233,12 @@ impl Document {
             DetectedFormat::Docx(opc_package) => {
                 // OPC package already parsed - reuse it!
                 let package = Box::new(
-                    ooxml::docx::Package::from_opc_package(opc_package)
-                        .map_err(crate::ooxml::map_ooxml_error)?,
+                    crate::docx::Package::from_opc_package(opc_package)
+                        .map_err(crate::map_ooxml_error)?,
                 );
 
                 // Validate the read view before retaining the owned package.
-                package.document().map_err(crate::ooxml::map_ooxml_error)?;
+                package.document().map_err(crate::map_ooxml_error)?;
 
                 // Move a clone of the already validated semantic cache across the facade seam.
                 let metadata = package
@@ -312,7 +309,7 @@ impl Document {
             DocumentImpl::Docx(package, _) => package
                 .document()
                 .and_then(|document| document.text())
-                .map_err(crate::ooxml::map_ooxml_error),
+                .map_err(crate::map_ooxml_error),
             #[cfg(feature = "iwa")]
             DocumentImpl::Pages(doc) => doc.text().map_err(|e| {
                 Error::ParseError(format!("Failed to extract text from Pages: {}", e))
@@ -346,7 +343,7 @@ impl Document {
             DocumentImpl::Docx(package, _) => package
                 .document()
                 .and_then(|document| document.paragraph_count())
-                .map_err(crate::ooxml::map_ooxml_error),
+                .map_err(crate::map_ooxml_error),
             #[cfg(feature = "iwa")]
             DocumentImpl::Pages(doc) => {
                 // Pages documents are organized by sections
@@ -389,7 +386,7 @@ impl Document {
                 let paras = package
                     .document()
                     .and_then(|document| document.paragraphs())
-                    .map_err(crate::ooxml::map_ooxml_error)?;
+                    .map_err(crate::map_ooxml_error)?;
                 Ok(paras.into_iter().map(Paragraph::Docx).collect())
             },
             #[cfg(feature = "iwa")]
@@ -471,7 +468,7 @@ impl Document {
                 let tables = package
                     .document()
                     .and_then(|document| document.tables())
-                    .map_err(crate::ooxml::map_ooxml_error)?;
+                    .map_err(crate::map_ooxml_error)?;
                 Ok(tables
                     .into_iter()
                     .map(|t| Table::Docx(Box::new(t)))
@@ -548,11 +545,11 @@ impl Document {
             #[cfg(feature = "ooxml")]
             DocumentImpl::Docx(package, _) => {
                 use super::DocumentElement;
-                use crate::ooxml::docx::Element;
+                use crate::docx::Element;
                 let raw = package
                     .document()
                     .and_then(|document| document.elements())
-                    .map_err(crate::ooxml::map_ooxml_error)?;
+                    .map_err(crate::map_ooxml_error)?;
                 Ok(raw
                     .into_iter()
                     .map(|el| match el {

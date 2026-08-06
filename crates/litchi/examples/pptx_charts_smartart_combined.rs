@@ -7,9 +7,9 @@
 //!
 //! Run with: cargo run --example pptx_charts_smartart_combined --features ooxml
 
-use litchi::ooxml::pptx::chart::encode as encode_chart;
-use litchi::ooxml::pptx::shape::diagram::{Builder, Graphic, Kind, Node, data_xml};
-use litchi::ooxml::pptx::{Chart, ChartSeries, ChartType, Package};
+use litchi::pptx::chart::encode as encode_chart;
+use litchi::pptx::shape::diagram::{Builder, Graphic, Kind, Node, data_xml};
+use litchi::pptx::{Chart, ChartSeries, ChartType, Package};
 
 const X: i64 = 914_400;
 const Y: i64 = 1_600_000;

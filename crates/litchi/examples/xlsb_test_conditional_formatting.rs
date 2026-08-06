@@ -8,9 +8,9 @@
 //! cargo run --example xlsb_test_conditional_formatting --features ooxml --no-default-features
 //! ```
 
-use litchi::ooxml::xlsb::conditional_formatting::{Formatting, Rule, RuleType};
-use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi::sheet::CellValue;
+use litchi::xlsb::conditional_formatting::{Formatting, Rule, RuleType};
+use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

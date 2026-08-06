@@ -10,8 +10,8 @@
 //! cargo run --example sheet_eval_arithmetic --features ooxml -- sheet_eval_arithmetic.xlsx
 //! ```
 
-use litchi::ooxml::xlsx::{Formula, Workbook};
 use litchi::sheet::{FormulaEvaluator, functions::open_workbook};
+use litchi::xlsx::{Formula, Workbook};
 use std::env;
 use std::error::Error;
 

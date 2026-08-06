@@ -2,9 +2,9 @@
 
 #![allow(clippy::all)]
 
-use litchi::ooxml::xlsb::named_ranges::Definition;
-use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi::sheet::CellValue;
+use litchi::xlsb::named_ranges::Definition;
+use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

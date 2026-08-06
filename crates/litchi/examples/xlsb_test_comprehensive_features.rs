@@ -12,13 +12,13 @@
 //! cargo run --example xlsb_test_comprehensive_features --features ooxml --no-default-features
 //! ```
 
-use litchi::ooxml::xlsb::conditional_formatting::{Formatting, Rule, RuleType, Scale, Value};
-use litchi::ooxml::xlsb::data_validation::Validation;
-use litchi::ooxml::xlsb::hyperlinks::Hyperlink;
-use litchi::ooxml::xlsb::merged_cells::MergedCell;
-use litchi::ooxml::xlsb::named_ranges::{Definition, area3d_formula};
-use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi::sheet::CellValue;
+use litchi::xlsb::conditional_formatting::{Formatting, Rule, RuleType, Scale, Value};
+use litchi::xlsb::data_validation::Validation;
+use litchi::xlsb::hyperlinks::Hyperlink;
+use litchi::xlsb::merged_cells::MergedCell;
+use litchi::xlsb::named_ranges::{Definition, area3d_formula};
+use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

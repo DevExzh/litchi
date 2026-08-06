@@ -22,6 +22,7 @@
 //! ```
 
 pub mod classification;
+pub mod designer;
 pub mod diagram;
 pub mod text;
 pub mod theme;

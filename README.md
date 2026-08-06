@@ -28,7 +28,7 @@ OOXML ownership is split by responsibility: `litchi-opc` owns the package graph,
 `litchi-ooxml-common` owns shared OOXML vocabulary and package services,
 `litchi-docx`, `litchi-pptx`, `litchi-xlsx`, and `litchi-xlsb` own their format
 semantics, and `litchi-fonts` owns font discovery, subsetting, embedding, and
-obfuscation. The `litchi::ooxml` facade exposes these namespaces when the
+obfuscation. The `litchi` facade exposes these standalone namespaces when the
 `ooxml` feature is enabled.
 
 ## Quick Start
@@ -54,9 +54,9 @@ let worksheet = workbook.worksheet_by_name("Sheet1")?;
 ### Creating and Writing Documents
 
 ```rust
-use litchi::ooxml::docx::Package;
-use litchi::ooxml::xlsx::Workbook;
-use litchi::ooxml::pptx::Package as PptxPackage;
+use litchi::docx::Package;
+use litchi::xlsx::Workbook;
+use litchi::pptx::Package as PptxPackage;
 
 // Create Word document
 let mut pkg = Package::new()?;

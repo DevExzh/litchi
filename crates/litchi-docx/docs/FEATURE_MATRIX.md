@@ -135,7 +135,7 @@ family has no typed model even if an untouched part can remain in a package-pres
 | anchorId on object and pict | ✅ | ✅ | ✅ | `[MS-DOCX]` 2.2.6 legacy-anchor inventories distinguish `w:object` and `w:pict` and validate the Word 2010 `AnchorId` range shared with `[MS-DOCX]` 2.6.2.1 and `[MS-ODRAWXML]` 2.18.2.1; `MutableOleObject` and `MutableVmlShape` author checked `w14:anchorId` values with a local `mc:Ignorable` declaration. OLE, VML, image payloads, layout, and rendering remain inert |
 | Um Al-Qura umalqura calendar extension | ❌ | ❌ | ❌ | [MS-DOCX] 2.2.7 is not a typed calendar or date-rendering model |
 | sectPr footnoteColumns | ❌ | ❌ | ❌ | The Word 2012 multi-column footnote layout extension is not exposed; ordinary note numbering and placement remain supported |
-| pPr collapsed | ❌ | ❌ | ❌ | Collapsed paragraph display state is not modeled |
+| pPr collapsed | ✅ | ✅ | ✅ | `[MS-DOCX]` 2.5.1.3 `w12:collapsed` is exposed as the typed `Collapsed` value with paragraph read/replace, authoring helpers, and atomic body-paragraph edits; explicit true/false remains distinct from absence, unknown `pPr` content is preserved, and display/layout behavior is not implemented |
 | Numbering restartNumberingAfterBreak | ❌ | ❌ | ❌ | The extension attribute is not emitted or interpreted by the numbering model |
 | Run symEx symbol extension | ❌ | ❌ | ❌ | The Word 2015 font/Unicode symbol extension is not a typed run model |
 | Data-binding storeItemChecksum | ❌ | ❌ | ❌ | Custom XML bindings and integrity relationships are typed, but the Word 2020 checksum extension is not calculated or validated |

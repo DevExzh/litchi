@@ -1,5 +1,7 @@
 //! Shared markup-compatibility preprocessing for OOXML parts.
 
+pub mod alternative;
+
 mod codec;
 mod model;
 

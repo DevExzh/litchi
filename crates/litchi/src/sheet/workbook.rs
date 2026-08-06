@@ -47,7 +47,7 @@ fn append_cell_text(out: &mut String, cell: &litchi_core::sheet::CellValue) {
 /// - `.numbers` - Apple Numbers (iWork Archive)
 ///
 /// **Note**: For Excel formats (.xls, .xlsx, .xlsb), use the format-specific
-/// APIs directly from `crate::xls` or `crate::ooxml::xlsx`.
+/// APIs directly from `crate::xls` or `crate::xlsx`.
 ///
 /// # Examples
 ///
@@ -161,14 +161,14 @@ impl Workbook {
             #[cfg(feature = "ooxml")]
             DetectedFormat::Xlsx(opc_package) => {
                 // OPC package already parsed - reuse it!
-                let metadata = crate::ooxml::common::properties::read(&opc_package)
-                    .map_err(crate::ooxml::map_ooxml_error)?
+                let metadata = crate::ooxml_common::properties::read(&opc_package)
+                    .map_err(crate::map_ooxml_error)?
                     .map(litchi_core::Metadata::from)
                     .unwrap_or_default();
-                let xlsx = crate::ooxml::xlsx::Package::from_opc(opc_package)
-                    .map_err(crate::ooxml::map_ooxml_error)?
+                let xlsx = crate::xlsx::Package::from_opc(opc_package)
+                    .map_err(crate::map_ooxml_error)?
                     .into_workbook()
-                    .map_err(crate::ooxml::map_ooxml_error)?;
+                    .map_err(crate::map_ooxml_error)?;
                 (
                     WorkbookImpl::Xlsx(super::adapters::Workbook::new(xlsx)),
                     metadata,
@@ -178,16 +178,16 @@ impl Workbook {
             #[cfg(feature = "ooxml")]
             DetectedFormat::Xlsb(opc_package) => {
                 // OPC package already parsed - reuse it!
-                let metadata = crate::ooxml::common::properties::read(&opc_package)
+                let metadata = crate::ooxml_common::properties::read(&opc_package)
                     .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)?
                     .map(litchi_core::Metadata::from)
                     .unwrap_or_default();
 
                 // Create XLSB workbook directly from the parsed OPC package
-                let xlsb = crate::ooxml::xlsb::Package::from_opc(opc_package)
-                    .map_err(crate::ooxml::map_ooxml_error)?
+                let xlsb = crate::xlsb::Package::from_opc(opc_package)
+                    .map_err(crate::map_ooxml_error)?
                     .into_workbook()
-                    .map_err(crate::ooxml::map_ooxml_error)?;
+                    .map_err(crate::map_ooxml_error)?;
                 (WorkbookImpl::Xlsb(xlsb), metadata)
             },
 

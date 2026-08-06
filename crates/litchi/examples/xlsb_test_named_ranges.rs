@@ -8,9 +8,9 @@
 //! cargo run --example xlsb_test_named_ranges --features ooxml --no-default-features
 //! ```
 
-use litchi::ooxml::xlsb::named_ranges::{Definition, area3d_formula};
-use litchi::ooxml::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use litchi::sheet::CellValue;
+use litchi::xlsb::named_ranges::{Definition, area3d_formula};
+use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

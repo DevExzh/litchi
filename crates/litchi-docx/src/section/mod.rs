@@ -7,6 +7,7 @@
 //! not duplicate or depend on that editor's orchestration state.
 
 mod codec;
+pub mod footnote_columns;
 mod model;
 
 #[cfg(test)]

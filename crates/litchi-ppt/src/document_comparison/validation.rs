@@ -2,7 +2,7 @@
 
 use crate::package::{Error, Result};
 
-use super::model::{DiffNode, DiffType};
+use super::model::{DiffNode, DiffType, POWERPOINT_DIFF_MAX_DEPTH};
 
 pub(super) const MAX_SLIDE_LIST_ENTRIES: usize = 1_000_000;
 pub(super) const MAX_REVIEWER_NAME_BYTES: usize = 104;
@@ -154,4 +154,41 @@ impl DiffNode {
 
 pub(super) fn corrupted<T>(message: &str) -> Result<T> {
     Err(Error::Corrupted(message.to_string()))
+}
+
+/// Validate the outer owner used by the document-comparison snapshot.
+pub(super) fn validate_document(
+    root: &crate::records::Record,
+    limits: super::model::Limits,
+) -> Result<()> {
+    if root.record_type != crate::consts::RecordType::Document
+        || root.record_type_raw != crate::consts::RecordType::Document.as_u16()
+        || root.version != 0x0f
+        || root.instance != 0
+    {
+        return corrupted("document-comparison owner requires a DocumentContainer root");
+    }
+    let mut count = 0usize;
+    walk(root, 1, &mut count, limits.max_records)
+}
+
+fn walk(
+    record: &crate::records::Record,
+    depth: usize,
+    count: &mut usize,
+    max_records: usize,
+) -> Result<()> {
+    if depth > POWERPOINT_DIFF_MAX_DEPTH.saturating_mul(4) {
+        return corrupted("document-comparison document tree exceeds the depth limit");
+    }
+    *count = count
+        .checked_add(1)
+        .ok_or_else(|| Error::Corrupted("document-comparison record count overflow".into()))?;
+    if *count > max_records {
+        return corrupted("document-comparison document tree exceeds the record limit");
+    }
+    for child in &record.children {
+        walk(child, depth + 1, count, max_records)?;
+    }
+    Ok(())
 }

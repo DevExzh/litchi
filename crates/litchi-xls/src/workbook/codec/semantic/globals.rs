@@ -178,6 +178,18 @@ impl<R: Read + Seek> Workbook<R> {
                     }
                     self.book_ext = Some(crate::book_ext::BookExt::parse(record.payload())?);
                 },
+                crate::picture_compression::RECORD_TYPE => {
+                    if self.picture_compression.is_some() {
+                        return Err(Error::InvalidRecord {
+                            record_type: crate::picture_compression::RECORD_TYPE,
+                            message: "workbook contains more than one CompressPictures record"
+                                .to_string(),
+                        });
+                    }
+                    self.picture_compression = Some(
+                        crate::picture_compression::Settings::parse(record.payload())?,
+                    );
+                },
                 0x0809 => {
                     // BOF
                     let bof = BofRecord::parse(record.payload())?;

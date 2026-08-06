@@ -11,7 +11,7 @@
 //! - Selecting C2 shows an array/dynamic array formula in the formula bar
 //!   (e.g., `{=A2:A4*B2:B4}` in older Excel, or a spilled formula in newer Excel).
 
-use litchi::ooxml::xlsx::{Formula, Workbook};
+use litchi::xlsx::{Formula, Workbook};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

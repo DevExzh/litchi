@@ -1,5 +1,5 @@
-use litchi::ooxml::xlsb::Workbook;
 use litchi::sheet::WorkbookTrait;
+use litchi::xlsb::Workbook;
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

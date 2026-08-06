@@ -6,9 +6,6 @@ use litchi_core::Result;
 #[cfg(feature = "doc")]
 use litchi_doc as doc;
 
-#[cfg(feature = "ooxml")]
-use crate::ooxml;
-
 use super::CellMerge;
 
 /// The column span of a cell that participates in no horizontal merge.
@@ -20,7 +17,7 @@ pub enum Table {
     #[cfg(feature = "doc")]
     Doc(Box<doc::Table>),
     #[cfg(feature = "ooxml")]
-    Docx(Box<ooxml::docx::Table>),
+    Docx(Box<crate::docx::Table>),
     #[cfg(feature = "rtf")]
     Rtf(Box<litchi_rtf::Table<'static>>),
     #[cfg(feature = "odf")]
@@ -34,7 +31,7 @@ impl Table {
             #[cfg(feature = "doc")]
             Table::Doc(t) => t.row_count().map_err(Error::from),
             #[cfg(feature = "ooxml")]
-            Table::Docx(t) => t.row_count().map_err(crate::ooxml::map_ooxml_error),
+            Table::Docx(t) => t.row_count().map_err(crate::map_ooxml_error),
             #[cfg(feature = "rtf")]
             Table::Rtf(t) => Ok(t.row_count()),
             #[cfg(feature = "odf")]
@@ -60,7 +57,7 @@ impl Table {
             },
             #[cfg(feature = "ooxml")]
             Table::Docx(t) => {
-                let rows = t.rows().map_err(crate::ooxml::map_ooxml_error)?;
+                let rows = t.rows().map_err(crate::map_ooxml_error)?;
                 Ok(rows.into_iter().map(|r| Row::Docx(Box::new(r))).collect())
             },
             #[cfg(feature = "rtf")]
@@ -100,7 +97,7 @@ impl Table {
             },
             #[cfg(feature = "ooxml")]
             Table::Docx(t) => {
-                let rows = t.rows().map_err(crate::ooxml::map_ooxml_error)?;
+                let rows = t.rows().map_err(crate::map_ooxml_error)?;
                 Ok(rows.get(index).cloned().map(|r| Row::Docx(Box::new(r))))
             },
             #[cfg(feature = "rtf")]
@@ -125,7 +122,7 @@ pub enum Row {
     #[cfg(feature = "doc")]
     Doc(Box<doc::Row>),
     #[cfg(feature = "ooxml")]
-    Docx(Box<ooxml::docx::Row>),
+    Docx(Box<crate::docx::Row>),
     #[cfg(feature = "rtf")]
     Rtf(Box<litchi_rtf::Row<'static>>),
     #[cfg(feature = "odf")]
@@ -139,7 +136,7 @@ impl Row {
             #[cfg(feature = "doc")]
             Row::Doc(r) => r.cell_count().map_err(Error::from),
             #[cfg(feature = "ooxml")]
-            Row::Docx(r) => r.cell_count().map_err(crate::ooxml::map_ooxml_error),
+            Row::Docx(r) => r.cell_count().map_err(crate::map_ooxml_error),
             #[cfg(feature = "rtf")]
             Row::Rtf(r) => Ok(r.cell_count()),
             #[cfg(feature = "odf")]
@@ -162,7 +159,7 @@ impl Row {
             },
             #[cfg(feature = "ooxml")]
             Row::Docx(r) => {
-                let cells = r.cells().map_err(crate::ooxml::map_ooxml_error)?;
+                let cells = r.cells().map_err(crate::map_ooxml_error)?;
                 Ok(cells.into_iter().map(Cell::Docx).collect())
             },
             #[cfg(feature = "rtf")]
@@ -195,7 +192,7 @@ impl Row {
             },
             #[cfg(feature = "ooxml")]
             Row::Docx(r) => {
-                let cells = r.cells().map_err(crate::ooxml::map_ooxml_error)?;
+                let cells = r.cells().map_err(crate::map_ooxml_error)?;
                 Ok(cells.get(index).cloned().map(Cell::Docx))
             },
             #[cfg(feature = "rtf")]
@@ -258,7 +255,7 @@ pub enum Cell {
     #[cfg(feature = "doc")]
     Doc(doc::Cell),
     #[cfg(feature = "ooxml")]
-    Docx(ooxml::docx::Cell),
+    Docx(crate::docx::Cell),
     #[cfg(feature = "rtf")]
     Rtf(Box<litchi_rtf::Cell<'static>>),
     #[cfg(feature = "odf")]
@@ -275,7 +272,7 @@ impl Cell {
             Cell::Docx(c) => c
                 .text()
                 .map(|s| s.to_string())
-                .map_err(crate::ooxml::map_ooxml_error),
+                .map_err(crate::map_ooxml_error),
             #[cfg(feature = "rtf")]
             Cell::Rtf(c) => Ok(c.text().to_string()),
             #[cfg(feature = "odf")]
@@ -303,7 +300,7 @@ impl Cell {
             #[cfg(feature = "doc")]
             Cell::Doc(_) => Ok(1),
             #[cfg(feature = "ooxml")]
-            Cell::Docx(c) => c.grid_span().map_err(crate::ooxml::map_ooxml_error),
+            Cell::Docx(c) => c.grid_span().map_err(crate::map_ooxml_error),
             // RTF `\clmgf`/`\clmrg` are roles, not counts; see `Row::grid_span_at`.
             #[cfg(feature = "rtf")]
             Cell::Rtf(_) => Ok(1),
@@ -346,9 +343,7 @@ impl Cell {
             // A `w:gridSpan` above 1 absorbs the covered columns outright, so a
             // DOCX cell is either the owner of a range or unmerged.
             #[cfg(feature = "ooxml")]
-            Cell::Docx(c) => Ok(span_merge(
-                c.grid_span().map_err(crate::ooxml::map_ooxml_error)?,
-            )),
+            Cell::Docx(c) => Ok(span_merge(c.grid_span().map_err(crate::map_ooxml_error)?)),
             #[cfg(feature = "rtf")]
             Cell::Rtf(c) => Ok(rtf_merge(c.merge().horizontal)),
             // ODF covered cells are `table:covered-table-cell` elements, which
@@ -370,10 +365,10 @@ impl Cell {
                 .map(vertical_doc_merge)
                 .unwrap_or_default()),
             #[cfg(feature = "ooxml")]
-            Cell::Docx(c) => Ok(match c.v_merge().map_err(crate::ooxml::map_ooxml_error)? {
+            Cell::Docx(c) => Ok(match c.v_merge().map_err(crate::map_ooxml_error)? {
                 None => CellMerge::None,
-                Some(crate::ooxml::docx::VMergeState::Restart) => CellMerge::Start,
-                Some(crate::ooxml::docx::VMergeState::Continue) => CellMerge::Continuation,
+                Some(crate::docx::VMergeState::Restart) => CellMerge::Start,
+                Some(crate::docx::VMergeState::Continue) => CellMerge::Continuation,
             }),
             #[cfg(feature = "rtf")]
             Cell::Rtf(c) => Ok(rtf_merge(c.merge().vertical)),
@@ -388,11 +383,11 @@ impl Cell {
     /// require the `ooxml` feature. Formats other than DOCX always return `None`
     /// here because they have no `w:vMerge` equivalent to report.
     #[cfg(feature = "ooxml")]
-    pub fn v_merge(&self) -> Result<Option<crate::ooxml::docx::VMergeState>> {
+    pub fn v_merge(&self) -> Result<Option<crate::docx::VMergeState>> {
         match self {
             #[cfg(feature = "doc")]
             Cell::Doc(_) => Ok(None),
-            Cell::Docx(c) => c.v_merge().map_err(crate::ooxml::map_ooxml_error),
+            Cell::Docx(c) => c.v_merge().map_err(crate::map_ooxml_error),
             #[cfg(feature = "rtf")]
             Cell::Rtf(_) => Ok(None),
             #[cfg(feature = "odf")]
@@ -818,7 +813,7 @@ mod tests {
     #[test]
     #[cfg(feature = "ooxml")]
     fn docx_vertical_merge_matches_the_format_specific_accessor() {
-        use crate::ooxml::docx::VMergeState;
+        use crate::docx::VMergeState;
 
         let path = test_data_path().join("ooxml/docx/drawing.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");

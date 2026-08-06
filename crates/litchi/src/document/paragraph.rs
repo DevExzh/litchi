@@ -8,9 +8,6 @@ use litchi_core::Result;
 #[cfg(feature = "doc")]
 use litchi_doc as doc;
 
-#[cfg(feature = "ooxml")]
-use crate::ooxml;
-
 /// A paragraph in a Word document.
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)] // public facade enum; boxing would break the API
@@ -18,7 +15,7 @@ pub enum Paragraph {
     #[cfg(feature = "doc")]
     Doc(doc::Paragraph),
     #[cfg(feature = "ooxml")]
-    Docx(ooxml::docx::Paragraph),
+    Docx(crate::docx::Paragraph),
     #[cfg(feature = "iwa")]
     Pages(String),
     #[cfg(feature = "rtf")]
@@ -37,7 +34,7 @@ impl Paragraph {
             Paragraph::Docx(p) => p
                 .text()
                 .map(|s| s.to_string())
-                .map_err(crate::ooxml::map_ooxml_error),
+                .map_err(crate::map_ooxml_error),
             #[cfg(feature = "iwa")]
             Paragraph::Pages(text) => Ok(text.clone()),
             #[cfg(feature = "rtf")]
@@ -59,7 +56,7 @@ impl Paragraph {
             },
             #[cfg(feature = "ooxml")]
             Paragraph::Docx(p) => {
-                let runs = p.runs().map_err(crate::ooxml::map_ooxml_error)?;
+                let runs = p.runs().map_err(crate::map_ooxml_error)?;
                 Ok(runs.into_iter().map(Run::Docx).collect())
             },
             #[cfg(feature = "iwa")]

@@ -1,5 +1,5 @@
-use litchi::ooxml::xlsx::{Formula, Number, Workbook};
 use litchi::sheet::{CellValue, FormulaEvaluator, functions::open_workbook};
+use litchi::xlsx::{Formula, Number, Workbook};
 use tempfile::tempdir;
 
 const TOL: f64 = 1e-9;

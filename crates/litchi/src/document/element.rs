@@ -109,15 +109,15 @@ mod tests {
     use super::*;
 
     fn paragraph_element() -> DocumentElement {
-        DocumentElement::Paragraph(Box::new(Paragraph::Docx(
-            crate::ooxml::docx::Paragraph::new(Vec::new()),
-        )))
+        DocumentElement::Paragraph(Box::new(Paragraph::Docx(crate::docx::Paragraph::new(
+            Vec::new(),
+        ))))
     }
 
     fn table_element() -> DocumentElement {
-        DocumentElement::Table(Box::new(Table::Docx(Box::new(
-            crate::ooxml::docx::Table::new(Vec::new()),
-        ))))
+        DocumentElement::Table(Box::new(Table::Docx(Box::new(crate::docx::Table::new(
+            Vec::new(),
+        )))))
     }
 
     #[test]

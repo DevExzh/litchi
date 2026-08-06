@@ -9,8 +9,8 @@
 //! cargo run --example xlsb_test_sheet_protection --features ooxml --no-default-features
 //! ```
 
-use litchi::ooxml::xlsb::writer::{MutableWorksheet, SheetProtection, WorkbookWriter};
 use litchi::sheet::CellValue;
+use litchi::xlsb::writer::{MutableWorksheet, SheetProtection, WorkbookWriter};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

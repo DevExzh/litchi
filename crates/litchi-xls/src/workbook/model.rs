@@ -44,6 +44,7 @@ pub struct Workbook<R: Read + Seek> {
     pub(super) formatting: Arc<Formatting>,
     pub(super) protection: protection::WorkbookProtection,
     pub(super) calculation: crate::calculation::WorkbookCalculation,
+    pub(super) picture_compression: Option<crate::picture_compression::Settings>,
     pub(super) vba_metadata: crate::vba::VbaMetadata,
     pub(super) environment: crate::environment::WorkbookEnvironment,
     pub(super) book_ext: Option<crate::book_ext::BookExt>,
@@ -255,6 +256,11 @@ impl<R: Read + Seek> Workbook<R> {
 
     pub fn calculation(&self) -> &crate::calculation::WorkbookCalculation {
         &self.calculation
+    }
+
+    /// Workbook-global `CompressPictures` recommendation, when present.
+    pub fn picture_compression(&self) -> Option<&crate::picture_compression::Settings> {
+        self.picture_compression.as_ref()
     }
 
     pub fn environment(&self) -> &crate::environment::WorkbookEnvironment {

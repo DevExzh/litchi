@@ -9,9 +9,6 @@ use crate::ppt;
 #[cfg(feature = "ppt")]
 use litchi_ole_common::property_set::PropertySetReader;
 
-#[cfg(feature = "ooxml")]
-use crate::ooxml;
-
 use std::path::Path;
 
 /// A PowerPoint presentation.
@@ -178,13 +175,13 @@ impl Presentation {
             #[cfg(feature = "ooxml")]
             DetectedFormat::Pptx(opc_package) => {
                 // OPC package already parsed - reuse it!
-                let cached_metadata = crate::ooxml::common::properties::read(&opc_package)
-                    .map_err(crate::ooxml::map_ooxml_error)?
+                let cached_metadata = crate::ooxml_common::properties::read(&opc_package)
+                    .map_err(crate::map_ooxml_error)?
                     .map(litchi_core::Metadata::from)
                     .filter(|metadata| metadata.has_data());
                 let package = Box::new(
-                    ooxml::pptx::Package::from_opc_package(opc_package)
-                        .map_err(crate::ooxml::map_ooxml_error)?,
+                    crate::pptx::Package::from_opc_package(opc_package)
+                        .map_err(crate::map_ooxml_error)?,
                 );
 
                 Ok(Self {
@@ -261,13 +258,11 @@ impl Presentation {
             #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(package) => {
                 // PPTX presentations need to extract text from all slides
-                let pres = package
-                    .presentation()
-                    .map_err(crate::ooxml::map_ooxml_error)?;
-                let slides = pres.slides().map_err(crate::ooxml::map_ooxml_error)?;
+                let pres = package.presentation().map_err(crate::map_ooxml_error)?;
+                let slides = pres.slides().map_err(crate::map_ooxml_error)?;
                 let mut texts = Vec::new();
                 for slide in slides {
-                    let text = slide.text().map_err(crate::ooxml::map_ooxml_error)?;
+                    let text = slide.text().map_err(crate::map_ooxml_error)?;
                     if !text.is_empty() {
                         texts.push(text);
                     }
@@ -304,9 +299,9 @@ impl Presentation {
             #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(package) => package
                 .presentation()
-                .map_err(crate::ooxml::map_ooxml_error)?
+                .map_err(crate::map_ooxml_error)?
                 .slide_count()
-                .map_err(crate::ooxml::map_ooxml_error),
+                .map_err(crate::map_ooxml_error),
             #[cfg(feature = "iwa")]
             PresentationImpl::Keynote(doc) => {
                 let slides = doc
@@ -358,16 +353,14 @@ impl Presentation {
             #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(package) => {
                 use super::types::SlideData;
-                let pres = package
-                    .presentation()
-                    .map_err(crate::ooxml::map_ooxml_error)?;
-                let slides = pres.slides().map_err(crate::ooxml::map_ooxml_error)?;
+                let pres = package.presentation().map_err(crate::map_ooxml_error)?;
+                let slides = pres.slides().map_err(crate::map_ooxml_error)?;
                 // Extract slide data immediately to avoid lifetime issues
                 slides
                     .iter()
                     .map(|s| {
-                        let text = s.text().map_err(crate::ooxml::map_ooxml_error)?;
-                        let name = Some(s.name().map_err(crate::ooxml::map_ooxml_error)?);
+                        let text = s.text().map_err(crate::map_ooxml_error)?;
+                        let name = Some(s.name().map_err(crate::map_ooxml_error)?);
                         Ok(Slide::Pptx(SlideData { text, name }))
                     })
                     .collect()
@@ -411,10 +404,10 @@ impl Presentation {
             #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(package) => package
                 .presentation()
-                .map_err(crate::ooxml::map_ooxml_error)?
+                .map_err(crate::map_ooxml_error)?
                 .slide_size()
                 .map(|(width, _)| Some(width))
-                .map_err(crate::ooxml::map_ooxml_error),
+                .map_err(crate::map_ooxml_error),
             #[cfg(feature = "iwa")]
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
             #[cfg(feature = "odf")]
@@ -444,10 +437,10 @@ impl Presentation {
             #[cfg(feature = "ooxml")]
             PresentationImpl::Pptx(package) => package
                 .presentation()
-                .map_err(crate::ooxml::map_ooxml_error)?
+                .map_err(crate::map_ooxml_error)?
                 .slide_size()
                 .map(|(_, height)| Some(height))
-                .map_err(crate::ooxml::map_ooxml_error),
+                .map_err(crate::map_ooxml_error),
             #[cfg(feature = "iwa")]
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
             #[cfg(feature = "odf")]

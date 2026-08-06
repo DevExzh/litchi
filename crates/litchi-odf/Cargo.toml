@@ -37,3 +37,18 @@ litchi-oth = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+
+[[example]]
+name = "read_odp"
+required-features = ["odp"]
+
+[[example]]
+name = "read_odt"
+required-features = ["odt"]
+
+[[test]]
+name = "rdf_package_mutation"
+required-features = ["odp", "ods", "odt"]
+
+[lints]
+workspace = true

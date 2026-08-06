@@ -1,4 +1,4 @@
-use litchi::ooxml::docx::{FontEmbedding, Package};
+use litchi::docx::{FontEmbedding, Package};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating minimal DOCX with single embedded font...");

@@ -1,10 +1,10 @@
-//! Typed DrawingML color choices.
+//! Typed DrawingML color choices and transforms.
 //!
-//! The `color` owner is intentionally limited to the two color choices shared
-//! by the WordprocessingML, PresentationML, SpreadsheetML, and SpreadsheetML
-//! binary drawing projections: `srgbClr` and `schemeClr`. Other valid
-//! DrawingML color choices, extensions, and color transforms are retained as
-//! bounded [`Unknown`] values instead of being silently discarded.
+//! The `color` owner models the ECMA-376 `EG_ColorChoice` and
+//! `EG_ColorTransform` groups shared by the WordprocessingML, PresentationML,
+//! SpreadsheetML, and SpreadsheetML binary drawing projections. Unsupported
+//! choices and extensions remain bounded [`Unknown`] values instead of being
+//! silently discarded.
 //!
 //! The semantic values live in [`model`], the fragment codec and structural
 //! limits live in [`codec`], and the focused conformance checks live in
@@ -13,9 +13,13 @@
 
 mod codec;
 mod model;
+mod validation;
 
 #[cfg(test)]
 mod tests;
 
-pub use codec::{MAX_DEPTH, MAX_NODES, MAX_XML_BYTES, read, write};
-pub use model::{Rgb, Scheme, Unknown, Value};
+pub use codec::{MAX_DEPTH, MAX_NODES, MAX_TRANSFORMS, MAX_XML_BYTES, read, write};
+pub use model::{
+    Angle, Base, FixedPercentage, Hsl, Percentage, PositiveAngle, PositiveFixedPercentage,
+    PositivePercentage, Preset, Rgb, ScRgb, Scheme, System, Transform, Transformed, Unknown, Value,
+};

@@ -8,13 +8,13 @@
 //! the current facade yet.
 
 use litchi::drawing::geom::Preset;
-use litchi::ooxml::xlsx::conditional_formatting::{IconSet, Kind, Operator};
-use litchi::ooxml::xlsx::shapes::{Anchor, CellMarker, EditAs, Emu};
-use litchi::ooxml::xlsx::style::format::{CellFont, CellFormat};
-use litchi::ooxml::xlsx::style::stylesheet::{Scheme, Underline};
-use litchi::ooxml::xlsx::writer::shape::ShapeSpec;
-use litchi::ooxml::xlsx::{Fit, Formula, Orientation, Paper, Setup};
-use litchi::ooxml::xlsx::{Number, Value, Workbook};
+use litchi::xlsx::conditional_formatting::{IconSet, Kind, Operator};
+use litchi::xlsx::shapes::{Anchor, CellMarker, EditAs, Emu};
+use litchi::xlsx::style::format::{CellFont, CellFormat};
+use litchi::xlsx::style::stylesheet::{Scheme, Underline};
+use litchi::xlsx::writer::shape::ShapeSpec;
+use litchi::xlsx::{Fit, Formula, Orientation, Paper, Setup};
+use litchi::xlsx::{Number, Value, Workbook};
 use std::path::PathBuf;
 
 fn marker(column: u32, row: u32) -> CellMarker {

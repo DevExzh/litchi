@@ -1,5 +1,5 @@
 use litchi::crypto::ooxml::{self, Mode};
-use litchi::ooxml::pptx::Package;
+use litchi::pptx::Package;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     const PASSWORD: &str = "Secret123";

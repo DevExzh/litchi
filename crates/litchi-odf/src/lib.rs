@@ -6,7 +6,15 @@
 
 #![forbid(unsafe_code)]
 
-pub use litchi_odf_common::detect;
+/// Inert packaged and flat-document detection.
+///
+/// The implementation remains in the common ODF detection owner; this
+/// explicit facade keeps the umbrella surface limited to the canonical
+/// detector vocabulary and prevents unrelated common modules from leaking
+/// through a broad module re-export.
+pub mod detect {
+    pub use litchi_odf_common::detect::{Format, bytes, flat, flat_mime, mime, reader};
+}
 
 /// Dedicated OpenDocument Database implementation.
 #[cfg(feature = "odb")]
