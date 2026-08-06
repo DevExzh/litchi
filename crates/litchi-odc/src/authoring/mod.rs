@@ -1,17 +1,18 @@
 //! Layered typed authoring for standalone and embedded ODF charts.
-
-pub mod data;
-pub mod extensions;
-pub mod model;
-pub mod writer;
+//!
+//! The content model and XML writer are owned by the common chart owner. This
+//! facade keeps standalone-package construction local to ODC without
+//! duplicating or re-owning chart semantics.
 
 mod builder;
 
 pub use builder::Builder;
-pub use data::{CachedCell, CachedRow, CachedTable, CachedValue};
-pub use extensions::{ExtensionAttribute, ExtensionElement, Extensions};
-pub use model::{
-    AxisSpec, DataLabelSpec, DataPointSpec, Definition, DomainSpec, EquationSpec, GridSpec,
-    LegendSpec, PlotAreaSpec, RegressionSpec, SeriesSpec, StyleElement, Text,
+pub use litchi_odf_common::chart::authoring::{
+    AxisSpec, CachedCell, CachedRow, CachedTable, CachedValue, DataLabelSpec, DataPointSpec,
+    Definition, DomainSpec, EquationSpec, ExtensionAttribute, ExtensionElement, Extensions,
+    GridSpec, LegendSpec, PlotAreaSpec, RegressionSpec, SeriesSpec, StyleElement, Text, data,
+    extensions, model, writer,
 };
-pub use writer::{serialize_axis_fragment, serialize_content, serialize_series_fragment};
+pub use litchi_odf_common::chart::authoring::{
+    serialize_axis_fragment, serialize_content, serialize_series_fragment,
+};

@@ -323,6 +323,14 @@ indirect property names, bounded code-page strings, and inert version GUIDs.
 The referenced CFB stream remains host/package data and is never opened or
 executed by the common semantic layer.
 
+The ODF chart-content authoring owner now lives under
+`litchi-odf-common::chart::authoring`. It owns the typed definition, cached
+table, extension, validation, and deterministic XML writer layers shared by
+standalone ODC and embedded ODT charts. `litchi-odc` retains only its
+standalone package builder/facade, and ODT no longer depends on the peer ODC
+family crate; package topology and embedded-object mutation remain in their
+owning family crates.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

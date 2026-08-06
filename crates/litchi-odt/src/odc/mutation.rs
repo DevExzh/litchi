@@ -2,7 +2,7 @@
 
 use super::{Axis, AxisSpec, Dimension, Document, Series, SeriesSpec};
 use litchi_core::{Error, Result, xml::escape_xml};
-use litchi_odc::authoring::{serialize_axis_fragment, serialize_series_fragment};
+use litchi_odf_common::chart::authoring::{serialize_axis_fragment, serialize_series_fragment};
 use litchi_odf_common::chart::read;
 use quick_xml::{
     Reader,

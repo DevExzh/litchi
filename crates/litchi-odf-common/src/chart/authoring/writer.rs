@@ -6,9 +6,9 @@ use super::model::{
     AxisSpec, DataLabelSpec, DataPointSpec, Definition, LegendSpec, PlotAreaSpec, RegressionSpec,
     SeriesSpec, StyleElement, Text,
 };
+use crate::calculation::write;
+use crate::chart::{Class, Dimension, Labels, Position};
 use litchi_core::{Error, Result};
-use litchi_odf_common::calculation::write;
-use litchi_odf_common::chart::{Class, Dimension, Labels, Position};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 pub(crate) const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -1132,8 +1132,8 @@ fn legend_position(value: Position) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::authoring::model::{EquationSpec, GridSpec};
-    use litchi_odf_common::chart::read;
+    use crate::chart::authoring::model::{EquationSpec, GridSpec};
+    use crate::chart::read;
 
     fn sample() -> Definition {
         let mut chart = Definition::new("chart:line");

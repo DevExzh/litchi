@@ -1,6 +1,6 @@
 //! Retained vendor extensions for typed ODF chart authoring.
 
-use litchi_odf_common::chart::Element;
+use crate::chart::Element;
 
 /// An extension attribute retained by expanded XML name.
 #[derive(Debug, Clone, PartialEq, Eq)]

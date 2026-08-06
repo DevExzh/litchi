@@ -2,8 +2,8 @@
 
 use crate::{Family, Package, constants, core::PackageWriter};
 use litchi_core::{Error, Metadata, Result};
-use litchi_odc::{Definition, serialize_content};
 use litchi_odf_common::calculation::{Settings, parse};
+use litchi_odf_common::chart::authoring::{Definition, serialize_content};
 use litchi_odf_common::chart::{Element, read};
 use std::io::Read;
 use std::path::Path;

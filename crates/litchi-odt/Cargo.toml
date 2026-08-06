@@ -22,7 +22,6 @@ fast-float2 = { workspace = true }
 flate2 = { workspace = true }
 hmac = { workspace = true }
 litchi-core = { workspace = true }
-litchi-odc = { workspace = true }
 litchi-odf-common = { workspace = true }
 memchr = { workspace = true }
 p256 = { workspace = true }

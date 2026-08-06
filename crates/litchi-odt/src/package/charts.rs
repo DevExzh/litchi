@@ -5,7 +5,7 @@ use crate::core::{OwnedPackage, PackageWriter};
 use crate::elements::xml::namespaced_attribute;
 use crate::odc::{Definition, Document};
 use litchi_core::{Error, Result};
-use litchi_odc::serialize_content;
+use litchi_odf_common::chart::authoring::serialize_content;
 use litchi_odf_common::drawing::Part;
 use litchi_odf_common::embedded::{Kind, Object, Source, scan_package};
 pub(crate) use litchi_odf_common::package::{Addition, rebuild_package, splice};

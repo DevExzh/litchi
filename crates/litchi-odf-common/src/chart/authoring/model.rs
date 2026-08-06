@@ -2,8 +2,8 @@
 
 use super::data::CachedTable;
 use super::extensions::Extensions;
-use litchi_odf_common::calculation::Settings;
-use litchi_odf_common::chart::{Class, Dimension, Labels, Position};
+use crate::calculation::Settings;
+use crate::chart::{Class, Dimension, Labels, Position};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Text {

@@ -3,8 +3,11 @@
 //! The chart reader retains the complete `chart:chart` subtree, including
 //! unknown namespaces and extension elements, while the view layer interprets
 //! only the small set of standard semantic values needed by all ODF families.
-//! Package ownership and chart authoring remain in the concrete family crates.
+//! Package ownership remains in the concrete family crates; the validated
+//! chart-content authoring owner is shared so host families do not depend on
+//! the standalone chart family as a peer.
 
+pub mod authoring;
 pub mod axis;
 pub mod grid;
 pub mod legend;
