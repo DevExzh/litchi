@@ -1141,6 +1141,796 @@ pub fn parse_external_link(xml: &[u8]) -> Result<Link> {
     }
 }
 
+/// Patch known external-link fields in their original XML spans.
+///
+/// The typed parser deliberately ignores future and producer-specific
+/// children. When the edit keeps the known tree topology, this routine only
+/// replaces the affected attribute/text spans, so those opaque children and
+/// the source's formatting remain byte-identical. Structural CRUD falls back
+/// to the bounded canonical writer for the changed part; package callers keep
+/// every unaffected part and relationship untouched.
+pub(super) fn patch_source(
+    source: &[u8],
+    before: &Link,
+    after: &Link,
+    conformance: Conformance,
+) -> Result<Vec<u8>> {
+    if before == after {
+        return Ok(source.to_vec());
+    }
+    if !compatible_topology(before, after) {
+        return after.to_xml_with_conformance(conformance);
+    }
+    let tree = XmlTree::parse(source)?;
+    let mut edits = Vec::new();
+    let kind = tree.kind_node()?;
+    match (before, after) {
+        (Link::Workbook(before), Link::Workbook(after)) => {
+            patch_workbook(&tree, kind, before, after, &mut edits)?;
+        },
+        (Link::Dde(before), Link::Dde(after)) => {
+            patch_dde(&tree, kind, before, after, &mut edits)?;
+        },
+        (Link::Ole(before), Link::Ole(after)) => {
+            patch_ole(&tree, kind, before, after, &mut edits)?;
+        },
+        _ => return after.to_xml_with_conformance(conformance),
+    }
+    apply_source_edits(source, edits)
+}
+
+#[derive(Debug)]
+struct XmlTree {
+    nodes: Vec<XmlNode>,
+    root: usize,
+}
+
+#[derive(Debug)]
+struct XmlNode {
+    local: String,
+    start_end: usize,
+    end_start: usize,
+    end: usize,
+    close_pos: usize,
+    attrs: Vec<XmlAttr>,
+    children: Vec<usize>,
+}
+
+#[derive(Debug)]
+struct XmlAttr {
+    name: String,
+    start: usize,
+    value_start: usize,
+    value_end: usize,
+}
+
+impl XmlTree {
+    fn parse(source: &[u8]) -> Result<Self> {
+        let mut nodes: Vec<XmlNode> = Vec::new();
+        let mut stack: Vec<usize> = Vec::new();
+        let mut root: Option<usize> = None;
+        let mut position = 0usize;
+        while position < source.len() {
+            if source[position] != b'<' {
+                position += 1;
+                continue;
+            }
+            if source[position..].starts_with(b"<?") {
+                position = find_bytes(source, position + 2, b"?>")? + 2;
+                continue;
+            }
+            if source[position..].starts_with(b"<!--") {
+                position = find_bytes(source, position + 4, b"-->")? + 3;
+                continue;
+            }
+            if source[position..].starts_with(b"<![CDATA[") {
+                position = find_bytes(source, position + 9, b"]]>")? + 3;
+                continue;
+            }
+            if source[position..].starts_with(b"<!") {
+                position = find_tag_end(source, position)? + 1;
+                continue;
+            }
+            if source[position..].starts_with(b"</") {
+                let end = find_tag_end(source, position)?;
+                let name_start = position + 2;
+                let name_end = skip_name(source, name_start);
+                let local = local_name(&source[name_start..name_end])?;
+                let node_index = stack
+                    .pop()
+                    .ok_or_else(|| invalid("external-link XML has an unmatched closing tag"))?;
+                if nodes[node_index].local != local {
+                    return Err(invalid("external-link XML has mismatched tags"));
+                }
+                nodes[node_index].end_start = position;
+                nodes[node_index].end = end + 1;
+                position = end + 1;
+                continue;
+            }
+
+            let end = find_tag_end(source, position)?;
+            let (local, _name_end, attrs, close_pos, self_closing) =
+                parse_start_tag(source, position, end)?;
+            let node_index = nodes.len();
+            nodes.push(XmlNode {
+                local,
+                start_end: end + 1,
+                end_start: end + 1,
+                end: end + 1,
+                close_pos,
+                attrs,
+                children: Vec::new(),
+            });
+            if let Some(parent) = stack.last().copied() {
+                nodes[parent].children.push(node_index);
+            } else if root.replace(node_index).is_some() {
+                return Err(invalid("external-link XML has multiple roots"));
+            }
+            if !self_closing {
+                stack.push(node_index);
+            }
+            position = end + 1;
+        }
+        if !stack.is_empty() || root.is_none() {
+            return Err(invalid("external-link XML has an incomplete source tree"));
+        }
+        Ok(Self {
+            nodes,
+            root: root.expect("checked above"),
+        })
+    }
+
+    fn kind_node(&self) -> Result<usize> {
+        let root = &self.nodes[self.root];
+        root.children
+            .iter()
+            .copied()
+            .find(|index| {
+                matches!(
+                    self.nodes[*index].local.as_str(),
+                    "externalBook" | "ddeLink" | "oleLink"
+                )
+            })
+            .ok_or_else(|| invalid("external-link source has no known link kind"))
+    }
+
+    fn child(&self, parent: usize, name: &str) -> Result<Option<usize>> {
+        let mut found = None;
+        for child in &self.nodes[parent].children {
+            if self.nodes[*child].local != name {
+                continue;
+            }
+            if found.replace(*child).is_some() {
+                return Err(invalid(format!(
+                    "external-link source has duplicate '{name}'"
+                )));
+            }
+        }
+        Ok(found)
+    }
+
+    fn required_child(&self, parent: usize, name: &str) -> Result<usize> {
+        self.child(parent, name)?
+            .ok_or_else(|| invalid(format!("external-link source is missing '{name}'")))
+    }
+
+    fn children(&self, parent: usize, name: &str) -> Vec<usize> {
+        self.nodes[parent]
+            .children
+            .iter()
+            .copied()
+            .filter(|child| self.nodes[*child].local == name)
+            .collect()
+    }
+}
+
+fn patch_workbook(
+    tree: &XmlTree,
+    book: usize,
+    before: &Workbook,
+    after: &Workbook,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    patch_attr(
+        tree,
+        book,
+        "r:id",
+        &before.target.relationship_id,
+        &after.target.relationship_id,
+        edits,
+    )?;
+    if !before.sheet_names.is_empty() {
+        let wrapper = tree.required_child(book, "sheetNames")?;
+        for (node, (before, after)) in tree
+            .children(wrapper, "sheetName")
+            .into_iter()
+            .zip(before.sheet_names.iter().zip(&after.sheet_names))
+        {
+            patch_attr(tree, node, "val", before, after, edits)?;
+        }
+    }
+    if !before.defined_names.is_empty() {
+        let wrapper = tree.required_child(book, "definedNames")?;
+        for (node, (before, after)) in tree
+            .children(wrapper, "definedName")
+            .into_iter()
+            .zip(before.defined_names.iter().zip(&after.defined_names))
+        {
+            patch_attr(tree, node, "name", &before.name, &after.name, edits)?;
+            patch_optional_attr(
+                tree,
+                node,
+                "refersTo",
+                before.refers_to.as_deref(),
+                after.refers_to.as_deref(),
+                edits,
+            )?;
+            patch_optional_u32(
+                tree,
+                node,
+                "sheetId",
+                before.sheet_id,
+                after.sheet_id,
+                edits,
+            )?;
+        }
+    }
+    if !before.cached_sheets.is_empty() {
+        let wrapper = tree.required_child(book, "sheetDataSet")?;
+        for (sheet_node, (before, after)) in tree
+            .children(wrapper, "sheetData")
+            .into_iter()
+            .zip(before.cached_sheets.iter().zip(&after.cached_sheets))
+        {
+            patch_optional_bool(
+                tree,
+                sheet_node,
+                "refreshError",
+                before.refresh_error,
+                after.refresh_error,
+                edits,
+            )?;
+            for (row_node, (before, after)) in tree
+                .children(sheet_node, "row")
+                .into_iter()
+                .zip(before.rows.iter().zip(&after.rows))
+            {
+                for (cell_node, (before, after)) in tree
+                    .children(row_node, "cell")
+                    .into_iter()
+                    .zip(before.cells.iter().zip(&after.cells))
+                {
+                    patch_optional_attr(
+                        tree,
+                        cell_node,
+                        "r",
+                        before.reference.as_deref(),
+                        after.reference.as_deref(),
+                        edits,
+                    )?;
+                    patch_optional_attr(
+                        tree,
+                        cell_node,
+                        "t",
+                        cell_type_token(before.cell_type),
+                        cell_type_token(after.cell_type),
+                        edits,
+                    )?;
+                    patch_optional_u32(
+                        tree,
+                        cell_node,
+                        "vm",
+                        nonzero(before.value_metadata_index),
+                        nonzero(after.value_metadata_index),
+                        edits,
+                    )?;
+                    if before.raw_value != after.raw_value {
+                        let value_node = tree.required_child(cell_node, "v")?;
+                        patch_text(
+                            tree,
+                            value_node,
+                            before.raw_value.as_deref(),
+                            after.raw_value.as_deref(),
+                            edits,
+                        )?;
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn patch_dde(
+    tree: &XmlTree,
+    link: usize,
+    before: &Dde,
+    after: &Dde,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    patch_attr(
+        tree,
+        link,
+        "ddeService",
+        &before.service,
+        &after.service,
+        edits,
+    )?;
+    patch_attr(tree, link, "ddeTopic", &before.topic, &after.topic, edits)?;
+    if !before.items.is_empty() {
+        let wrapper = tree.required_child(link, "ddeItems")?;
+        for (node, (before, after)) in tree
+            .children(wrapper, "ddeItem")
+            .into_iter()
+            .zip(before.items.iter().zip(&after.items))
+        {
+            patch_optional_attr(
+                tree,
+                node,
+                "name",
+                before.name.as_deref(),
+                after.name.as_deref(),
+                edits,
+            )?;
+            patch_optional_bool(tree, node, "ole", before.use_ole, after.use_ole, edits)?;
+            patch_optional_bool(tree, node, "advise", before.advise, after.advise, edits)?;
+            patch_optional_bool(
+                tree,
+                node,
+                "preferPic",
+                before.prefer_picture,
+                after.prefer_picture,
+                edits,
+            )?;
+            if let (Some(before), Some(after)) = (&before.values, &after.values) {
+                patch_values(tree, node, before, after, "values", edits)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn patch_ole(
+    tree: &XmlTree,
+    link: usize,
+    before: &Ole,
+    after: &Ole,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    patch_attr(
+        tree,
+        link,
+        "r:id",
+        &before.target.relationship_id,
+        &after.target.relationship_id,
+        edits,
+    )?;
+    patch_attr(
+        tree,
+        link,
+        "progId",
+        &before.program_id,
+        &after.program_id,
+        edits,
+    )?;
+    if !before.items.is_empty() {
+        let wrapper = tree.required_child(link, "oleItems")?;
+        let nodes = tree.nodes[wrapper]
+            .children
+            .iter()
+            .copied()
+            .filter(|node| tree.nodes[*node].local == "oleItem")
+            .collect::<Vec<_>>();
+        for (node, (before, after)) in nodes.into_iter().zip(before.items.iter().zip(&after.items))
+        {
+            patch_attr(tree, node, "name", &before.name, &after.name, edits)?;
+            patch_optional_bool(tree, node, "icon", before.icon, after.icon, edits)?;
+            patch_optional_bool(tree, node, "advise", before.advise, after.advise, edits)?;
+            patch_optional_bool(
+                tree,
+                node,
+                "preferPic",
+                before.prefer_picture,
+                after.prefer_picture,
+                edits,
+            )?;
+            if let (Some(before), Some(after)) = (&before.values, &after.values) {
+                patch_values(tree, node, before, after, "values", edits)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn patch_values(
+    tree: &XmlTree,
+    parent: usize,
+    before: &DdeValues,
+    after: &DdeValues,
+    name: &str,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    let node = if name == "values" {
+        tree.nodes[parent]
+            .children
+            .iter()
+            .copied()
+            .find(|node| tree.nodes[*node].local == "values")
+            .or_else(|| {
+                tree.nodes[parent]
+                    .children
+                    .iter()
+                    .copied()
+                    .find(|node| tree.nodes[*node].local == "values")
+            })
+    } else {
+        None
+    }
+    .ok_or_else(|| invalid("external-link source is missing cached values"))?;
+    patch_attr(
+        tree,
+        node,
+        "rows",
+        &before.rows.to_string(),
+        &after.rows.to_string(),
+        edits,
+    )?;
+    patch_attr(
+        tree,
+        node,
+        "cols",
+        &before.columns.to_string(),
+        &after.columns.to_string(),
+        edits,
+    )?;
+    for (value_node, (before, after)) in tree
+        .children(node, "value")
+        .into_iter()
+        .zip(before.values.iter().zip(&after.values))
+    {
+        patch_optional_attr(
+            tree,
+            value_node,
+            "t",
+            dde_value_type_attr(before.value_type),
+            dde_value_type_attr(after.value_type),
+            edits,
+        )?;
+        let text_node = tree.required_child(value_node, "val")?;
+        patch_text(
+            tree,
+            text_node,
+            Some(&before.raw_value),
+            Some(&after.raw_value),
+            edits,
+        )?;
+    }
+    Ok(())
+}
+
+fn compatible_topology(before: &Link, after: &Link) -> bool {
+    match (before, after) {
+        (Link::Workbook(before), Link::Workbook(after)) => {
+            before.sheet_names.len() == after.sheet_names.len()
+                && before.defined_names.len() == after.defined_names.len()
+                && before.cached_sheets.len() == after.cached_sheets.len()
+                && before
+                    .cached_sheets
+                    .iter()
+                    .zip(&after.cached_sheets)
+                    .all(|(before, after)| {
+                        before.rows.len() == after.rows.len()
+                            && before.rows.iter().zip(&after.rows).all(|(before, after)| {
+                                before.cells.len() == after.cells.len()
+                                    && before.cells.iter().zip(&after.cells).all(
+                                        |(before, after)| {
+                                            before.raw_value.is_some() == after.raw_value.is_some()
+                                        },
+                                    )
+                            })
+                    })
+        },
+        (Link::Dde(before), Link::Dde(after)) => {
+            before.items.len() == after.items.len()
+                && before
+                    .items
+                    .iter()
+                    .zip(&after.items)
+                    .all(|(before, after)| {
+                        before.values.as_ref().map(|value| value.values.len())
+                            == after.values.as_ref().map(|value| value.values.len())
+                    })
+                && before
+                    .items
+                    .iter()
+                    .zip(&after.items)
+                    .all(|(before, after)| before.values.is_some() == after.values.is_some())
+        },
+        (Link::Ole(before), Link::Ole(after)) => {
+            before.items.len() == after.items.len()
+                && before
+                    .items
+                    .iter()
+                    .zip(&after.items)
+                    .all(|(before, after)| {
+                        before.source == after.source
+                            && before.values.as_ref().map(|value| value.values.len())
+                                == after.values.as_ref().map(|value| value.values.len())
+                            && before.values.is_some() == after.values.is_some()
+                    })
+        },
+        _ => false,
+    }
+}
+
+#[derive(Debug)]
+struct SourceEdit {
+    range: std::ops::Range<usize>,
+    replacement: Vec<u8>,
+}
+
+fn patch_attr(
+    tree: &XmlTree,
+    node: usize,
+    name: &str,
+    before: &str,
+    after: &str,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    if before == after {
+        return Ok(());
+    }
+    patch_optional_attr(tree, node, name, Some(before), Some(after), edits)
+}
+
+fn patch_optional_attr(
+    tree: &XmlTree,
+    node: usize,
+    name: &str,
+    before: Option<&str>,
+    after: Option<&str>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    if before == after {
+        return Ok(());
+    }
+    let attr = tree.nodes[node]
+        .attrs
+        .iter()
+        .find(|attr| attr_matches(&attr.name, name));
+    match (attr, after) {
+        (Some(attr), Some(after)) => {
+            let replacement = escaped(after)?;
+            edits.push(SourceEdit {
+                range: attr.value_start..attr.value_end,
+                replacement,
+            });
+        },
+        (Some(attr), None) => {
+            // Leave the original separator whitespace in place. This keeps
+            // the edit span local and avoids touching neighboring attributes.
+            let start = attr.start;
+            edits.push(SourceEdit {
+                range: start..attr.value_end + 1,
+                replacement: Vec::new(),
+            });
+        },
+        (None, Some(after)) => {
+            let mut replacement = Vec::new();
+            replacement.extend_from_slice(b" ");
+            replacement.extend_from_slice(name.as_bytes());
+            replacement.extend_from_slice(b"=\"");
+            replacement.extend_from_slice(&escaped(after)?);
+            replacement.extend_from_slice(b"\"");
+            edits.push(SourceEdit {
+                range: tree.nodes[node].close_pos..tree.nodes[node].close_pos,
+                replacement,
+            });
+        },
+        (None, None) => {},
+    }
+    Ok(())
+}
+
+fn patch_optional_bool(
+    tree: &XmlTree,
+    node: usize,
+    name: &str,
+    before: bool,
+    after: bool,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    patch_optional_attr(
+        tree,
+        node,
+        name,
+        if before { Some("1") } else { None },
+        if after { Some("1") } else { None },
+        edits,
+    )
+}
+
+fn patch_optional_u32(
+    tree: &XmlTree,
+    node: usize,
+    name: &str,
+    before: Option<u32>,
+    after: Option<u32>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    let before = before.map(|value| value.to_string());
+    let after = after.map(|value| value.to_string());
+    patch_optional_attr(tree, node, name, before.as_deref(), after.as_deref(), edits)
+}
+
+fn patch_text(
+    tree: &XmlTree,
+    node: usize,
+    before: Option<&str>,
+    after: Option<&str>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    if before == after {
+        return Ok(());
+    }
+    let replacement = after.map(escaped).transpose()?.unwrap_or_default();
+    edits.push(SourceEdit {
+        range: tree.nodes[node].start_end..tree.nodes[node].end_start,
+        replacement,
+    });
+    Ok(())
+}
+
+fn apply_source_edits(source: &[u8], mut edits: Vec<SourceEdit>) -> Result<Vec<u8>> {
+    edits.sort_by(|left, right| right.range.start.cmp(&left.range.start));
+    for pair in edits.windows(2) {
+        if pair[0].range.start < pair[1].range.end {
+            return Err(invalid("external-link source edits overlap"));
+        }
+    }
+    let mut result = source.to_vec();
+    for edit in edits {
+        if edit.range.end > result.len() {
+            return Err(invalid("external-link source edit is out of bounds"));
+        }
+        result.splice(edit.range, edit.replacement);
+    }
+    Ok(result)
+}
+
+fn parse_start_tag(
+    source: &[u8],
+    start: usize,
+    end: usize,
+) -> Result<(String, usize, Vec<XmlAttr>, usize, bool)> {
+    let name_start = start + 1;
+    let name_end = skip_name(source, name_start);
+    if name_end == name_start {
+        return Err(invalid("external-link source has an empty element name"));
+    }
+    let local = local_name(&source[name_start..name_end])?;
+    let mut attrs = Vec::new();
+    let mut position = name_end;
+    let mut self_closing = false;
+    let mut close_pos = end;
+    while position < end {
+        while position < end && source[position].is_ascii_whitespace() {
+            position += 1;
+        }
+        if position >= end {
+            break;
+        }
+        if source[position] == b'/' {
+            self_closing = true;
+            close_pos = position;
+            break;
+        }
+        let attr_start = position;
+        let attr_name_end = skip_name(source, position);
+        if attr_name_end == position {
+            return Err(invalid("external-link source has an invalid attribute"));
+        }
+        let name = std::str::from_utf8(&source[position..attr_name_end])
+            .map_err(|error| invalid(format!("external-link source name is not UTF-8: {error}")))?
+            .to_owned();
+        position = attr_name_end;
+        while position < end && source[position].is_ascii_whitespace() {
+            position += 1;
+        }
+        if position >= end || source[position] != b'=' {
+            return Err(invalid("external-link source attribute is missing '='"));
+        }
+        position += 1;
+        while position < end && source[position].is_ascii_whitespace() {
+            position += 1;
+        }
+        if position >= end || !matches!(source[position], b'\'' | b'\"') {
+            return Err(invalid("external-link source attribute is missing quotes"));
+        }
+        let quote = source[position];
+        position += 1;
+        let value_start = position;
+        while position < end && source[position] != quote {
+            position += 1;
+        }
+        if position >= end {
+            return Err(invalid("external-link source attribute is unterminated"));
+        }
+        attrs.push(XmlAttr {
+            name,
+            start: attr_start,
+            value_start,
+            value_end: position,
+        });
+        position += 1;
+    }
+    Ok((local, name_end, attrs, close_pos, self_closing))
+}
+
+fn find_tag_end(source: &[u8], start: usize) -> Result<usize> {
+    let mut quote = None;
+    for (offset, byte) in source[start + 1..].iter().enumerate() {
+        let position = start + 1 + offset;
+        match (quote, *byte) {
+            (None, b'\'' | b'\"') => quote = Some(*byte),
+            (Some(value), byte) if value == byte => quote = None,
+            (None, b'>') => return Ok(position),
+            _ => {},
+        }
+    }
+    Err(invalid("external-link source has an unterminated tag"))
+}
+
+fn find_bytes(source: &[u8], start: usize, needle: &[u8]) -> Result<usize> {
+    source[start..]
+        .windows(needle.len())
+        .position(|window| window == needle)
+        .map(|position| start + position)
+        .ok_or_else(|| invalid("external-link source has an unterminated declaration"))
+}
+
+fn skip_name(source: &[u8], mut position: usize) -> usize {
+    while position < source.len()
+        && !source[position].is_ascii_whitespace()
+        && !matches!(source[position], b'/' | b'>' | b'=')
+    {
+        position += 1;
+    }
+    position
+}
+
+fn local_name(name: &[u8]) -> Result<String> {
+    let name = std::str::from_utf8(name)
+        .map_err(|error| invalid(format!("external-link XML name is not UTF-8: {error}")))?;
+    Ok(name.rsplit(':').next().unwrap_or(name).to_owned())
+}
+
+fn attr_matches(actual: &str, expected: &str) -> bool {
+    if expected == "r:id" {
+        actual == expected || actual.rsplit(':').next() == Some("id")
+    } else {
+        actual == expected
+    }
+}
+
+fn escaped(value: &str) -> Result<Vec<u8>> {
+    let mut output = String::new();
+    push_xml_text(&mut output, value)?;
+    Ok(output.into_bytes())
+}
+
+fn cell_type_token(value: CellType) -> Option<&'static str> {
+    (value != CellType::Number).then(|| external_cell_type_token(value))
+}
+
+fn dde_value_type_attr(value: DdeValueType) -> Option<&'static str> {
+    (value != DdeValueType::Nil).then(|| dde_value_type_token(value))
+}
+
+fn nonzero(value: u32) -> Option<u32> {
+    (value != 0).then_some(value)
+}
+
 fn push_context_text(parser: &mut Parser, context: Option<Context>, text: &str) -> Result<()> {
     match context {
         Some(Context::Value(sheet, row, cell)) => parser.push_value(sheet, row, cell, text),
