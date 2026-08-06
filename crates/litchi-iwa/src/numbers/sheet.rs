@@ -89,6 +89,10 @@ mod tests {
     use super::*;
     use crate::numbers::cell::CellValue;
 
+    fn cell_number(value: f64) -> CellValue {
+        CellValue::number(value).expect("finite test number")
+    }
+
     #[test]
     fn adapter_is_not_a_public_semantic_model() {
         let sheet = NumbersSheet::new("Sheet1".to_owned(), 0);
@@ -102,7 +106,7 @@ mod tests {
     fn adapter_collects_native_tables() {
         let mut sheet = NumbersSheet::new("Sheet1".to_owned(), 0);
         let mut table = NumbersTable::new("Table1");
-        assert!(table.set_cell(0, 0, CellValue::Number(1.0)).is_ok());
+        assert!(table.set_cell(0, 0, cell_number(1.0)).is_ok());
 
         sheet.add_table(table);
 
@@ -114,7 +118,7 @@ mod tests {
     fn semantic_sheet_consumes_tables_without_rebuilding_cell_maps() {
         let mut sheet = NumbersSheet::new("Sheet1".to_owned(), 0);
         let mut table = NumbersTable::new("Table1");
-        assert!(table.set_cell(1, 2, CellValue::Number(42.0)).is_ok());
+        assert!(table.set_cell(1, 2, cell_number(42.0)).is_ok());
         assert!(table.set_column_headers(["A", "B", "C"]).is_ok());
         sheet.add_table(table);
 
@@ -131,7 +135,7 @@ mod tests {
         assert_eq!(table.dimensions(), litchi_numbers::Dimensions::new(2, 3));
         assert_eq!(
             table.get(litchi_numbers::Position::new(1, 2)),
-            Some(&litchi_numbers::cell::Value::Number(42.0))
+            Some(&cell_number(42.0))
         );
         assert_eq!(table.column_headers().collect::<Vec<_>>(), ["A", "B", "C"]);
     }

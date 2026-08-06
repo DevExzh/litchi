@@ -337,6 +337,10 @@ impl NumbersTable {
 mod tests {
     use super::*;
 
+    fn cell_number(value: f64) -> CellValue {
+        CellValue::number(value).expect("finite test number")
+    }
+
     #[test]
     fn test_table_creation() {
         let mut table = NumbersTable::new("Test Table".to_string());
@@ -355,7 +359,7 @@ mod tests {
                 .set_cell(0, 1, CellValue::Text("B1".to_string()))
                 .is_ok()
         );
-        assert!(table.set_cell(1, 0, CellValue::Number(42.0)).is_ok());
+        assert!(table.set_cell(1, 0, cell_number(42.0)).is_ok());
 
         assert_eq!(table.row_count(), 2);
         assert_eq!(table.column_count(), 2);
@@ -365,10 +369,10 @@ mod tests {
     #[test]
     fn test_table_get_row_column() {
         let mut table = NumbersTable::new("Test".to_string());
-        assert!(table.set_cell(0, 0, CellValue::Number(1.0)).is_ok());
-        assert!(table.set_cell(0, 1, CellValue::Number(2.0)).is_ok());
-        assert!(table.set_cell(1, 0, CellValue::Number(3.0)).is_ok());
-        assert!(table.set_cell(1, 1, CellValue::Number(4.0)).is_ok());
+        assert!(table.set_cell(0, 0, cell_number(1.0)).is_ok());
+        assert!(table.set_cell(0, 1, cell_number(2.0)).is_ok());
+        assert!(table.set_cell(1, 0, cell_number(3.0)).is_ok());
+        assert!(table.set_cell(1, 1, cell_number(4.0)).is_ok());
 
         let row0 = table.get_row(0);
         assert_eq!(row0.len(), 2);
@@ -390,13 +394,13 @@ mod tests {
                 .set_cell(0, 0, CellValue::Text("Alice".to_string()))
                 .is_ok()
         );
-        assert!(table.set_cell(0, 1, CellValue::Number(30.0)).is_ok());
+        assert!(table.set_cell(0, 1, cell_number(30.0)).is_ok());
         assert!(
             table
                 .set_cell(1, 0, CellValue::Text("Bob".to_string()))
                 .is_ok()
         );
-        assert!(table.set_cell(1, 1, CellValue::Number(25.0)).is_ok());
+        assert!(table.set_cell(1, 1, cell_number(25.0)).is_ok());
 
         let csv = table.to_csv();
         assert!(csv.contains("Name,Age"));
@@ -407,7 +411,7 @@ mod tests {
     #[test]
     fn test_table_dimensions() {
         let mut table = NumbersTable::new("Test".to_string());
-        assert!(table.set_cell(5, 10, CellValue::Number(1.0)).is_ok());
+        assert!(table.set_cell(5, 10, cell_number(1.0)).is_ok());
 
         let (rows, cols) = table.dimensions();
         assert_eq!(rows, 6); // 0-5 inclusive
@@ -417,7 +421,7 @@ mod tests {
     #[test]
     fn materialized_views_borrow_without_exposing_storage() {
         let mut table = NumbersTable::new("Test");
-        assert!(table.set_cell(2, 3, CellValue::Number(42.0)).is_ok());
+        assert!(table.set_cell(2, 3, cell_number(42.0)).is_ok());
         assert!(table.set_column_headers(["A", "B"]).is_ok());
         assert!(table.set_row_headers(["Row 1"]).is_ok());
 
