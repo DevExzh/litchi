@@ -5,7 +5,7 @@
 //!
 //! Reference: [MS-PPT] Section 2.8 - Interactive Information
 
-use zerocopy::IntoBytes;
+use zerocopy::IntoBytes as _;
 use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
 
 // =============================================================================

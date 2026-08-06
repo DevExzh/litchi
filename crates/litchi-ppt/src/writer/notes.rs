@@ -6,7 +6,7 @@
 //! Reference: [MS-PPT] Section 2.5.5 - NotesContainer
 
 use std::io::Write;
-use zerocopy::IntoBytes;
+use zerocopy::IntoBytes as _;
 use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
 
 use litchi_core::unit::ppt_master_i64_to_emu_i32;

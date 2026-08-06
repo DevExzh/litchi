@@ -5,7 +5,7 @@
 //! litchi-odraw substrate exposed through the facade.
 
 use std::io::Write;
-use zerocopy::IntoBytes;
+use zerocopy::IntoBytes as _;
 use zerocopy_derive::{Immutable, IntoBytes, KnownLayout};
 
 use crate::shapes::geometry::{GeometryRect, ShapePathType};
