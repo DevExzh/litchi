@@ -6,6 +6,7 @@
 
 mod codec;
 mod model;
+pub mod open_type;
 mod package;
 #[cfg(test)]
 mod tests;
@@ -14,5 +15,9 @@ pub use codec::{parse, write};
 pub use model::{
     Charset, Conformance, Embed, Family, Font, FontKey, Key, License, Pitch, Resource, Signature,
     Style, Table, deobfuscate, obfuscate, raw,
+};
+pub use open_type::{
+    Commit, Ligatures, NumForm, NumSpacing, OnOff, OpenType, Patch, Snapshot, StyleSet, StyleSetId,
+    Transaction,
 };
 pub use package::{put, read, remove, validate_usage};

@@ -2,6 +2,7 @@
 
 use crate::UnderlineStyle;
 use crate::error::{Error, Result};
+use crate::font::{OpenType, Snapshot as OpenTypeSnapshot};
 use crate::run_effects::Effects;
 use litchi_core::VerticalPosition;
 use litchi_ooxml_common::xml::{decode_xml_reference, extract_omml_formulas};
@@ -161,6 +162,26 @@ impl Run {
         Effects::parse(self.xml_bytes())
     }
 
+    /// Read the typed Word 2010 OpenType features attached directly to this run.
+    pub fn open_type(&self) -> Result<OpenType> {
+        OpenType::parse(self.xml_bytes())
+    }
+
+    /// Capture a source-preserving OpenType snapshot for an isolated edit.
+    pub fn open_type_snapshot(&self) -> Result<OpenTypeSnapshot> {
+        OpenTypeSnapshot::from_xml(self.xml_bytes().to_vec())
+    }
+
+    /// Replace the modeled OpenType features while preserving every other run
+    /// child and unknown extension byte.
+    pub fn set_open_type(&mut self, value: OpenType) -> Result<&mut Self> {
+        let rewritten = crate::font::open_type::rewrite(self.xml_bytes(), &value)?;
+        if rewritten.as_slice() != self.xml_bytes() {
+            self.replace_xml(rewritten);
+        }
+        Ok(self)
+    }
+
     /// Check if this run is strikethrough.
     ///
     /// Returns `Some(true)` if strikethrough is present,
@@ -268,6 +289,7 @@ impl Run {
         }
 
         props.effects = Effects::parse(self.xml_bytes())?;
+        props.open_type = OpenType::parse(self.xml_bytes())?;
         Ok((text, props))
     }
 
@@ -327,6 +349,7 @@ impl Run {
         }
 
         props.effects = Effects::parse(self.xml_bytes())?;
+        props.open_type = OpenType::parse(self.xml_bytes())?;
         Ok(props)
     }
 

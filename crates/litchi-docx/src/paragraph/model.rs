@@ -2,6 +2,7 @@
 
 use crate::UnderlineStyle;
 use crate::color::Theme;
+use crate::font::OpenType;
 use crate::run_effects::Effects;
 use litchi_core::{VerticalPosition, XmlSlice};
 use std::sync::Arc;
@@ -179,6 +180,8 @@ pub struct RunProperties {
     pub vertical_position: Option<VerticalPosition>,
     /// Typed Word 2010 visual effects attached directly to the run.
     pub effects: Effects,
+    /// Typed Word 2010 OpenType features attached directly to the run.
+    pub open_type: OpenType,
 }
 
 /// A direct color applied to a WordprocessingML underline.
