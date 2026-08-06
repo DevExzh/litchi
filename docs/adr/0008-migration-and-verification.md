@@ -6266,6 +6266,28 @@ closed after verification. This is structural/API and native-open evidence, not
 a claim that the remaining monolithic semantic adapters or lazy physical catalog
 have been completed.
 
+The next 2026-08-06 migration slice adds three bounded ADR handoffs. The
+archive leaf now retains immutable physical ZIP provenance (local and central
+headers, timestamps, extras, comments, CRC, compressed ranges, and opaque
+compression state) and exposes an exact byte-for-byte no-op write path; edited
+entry reassembly remains an explicit follow-up. Format detection moved into the
+archive-free `litchi-iwa-detect` leaf with typed limits/errors and a thin facade
+adapter. `litchi-iwa-text` now owns checked UTF-16 positions/ranges and language
+values, while native storage and protobuf traversal remain in the IWA adapter.
+The bundle ingress path also preserves the catalog's lexical component order
+without the former HashMap-to-Vec-to-sort allocation. The archive, detector, and
+text leaves passed 14, 10, and 21 tests respectively; the full IWA library passed
+1,489 tests; the bundle filter passed 20 tests; no-dependency leaf Clippy and the
+boundary checker passed. Computer Use created and saved native Pages, Numbers,
+and Keynote fixtures containing the migration markers, each opened natively
+without a repair prompt, and all three applications were closed afterward.
+The physical files are `/Users/ryker/CodeProjects/litchi/test-data/images/png/:tmp:litchi-native-archive-detect-20260806.pages`,
+`/private/tmp/:tmp:litchi-native-archive-detect-20260806.numbers`, and
+`/private/tmp/:tmp:litchi-native-archive-detect-20260806.key`. This remains a
+bounded provenance/detection/value extraction slice; source-backed lazy object
+access, weighted caches, edited-entry reassembly, paragraph-list extraction,
+and full monolith removal remain open.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

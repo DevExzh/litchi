@@ -6,7 +6,7 @@
 //! - `Metadata/`: Document metadata and properties
 //! - Preview images at root level
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 use std::fs;
 use std::io::{Cursor, Read};
@@ -568,11 +568,12 @@ impl Bundle {
 
     fn from_parts(
         bundle_path: PathBuf,
-        archives: HashMap<String, Archive>,
+        // ComponentCatalog emits its normalized names in lexical order. Test
+        // fixtures must provide the same invariant because this constructor is
+        // intentionally allocation-free at the bundle boundary.
+        archives: Vec<(String, Archive)>,
         metadata: BundleMetadata,
     ) -> Self {
-        let mut archives: Vec<_> = archives.into_iter().collect();
-        archives.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
         Self {
             state: Arc::new(BundleState {
                 bundle_path,
@@ -650,10 +651,7 @@ impl Bundle {
     }
 
     /// Parse Index.zip and extract all IWA files
-    fn parse_index_zip(
-        bundle_path: &Path,
-        limits: BundleLimits,
-    ) -> Result<HashMap<String, Archive>> {
+    fn parse_index_zip(bundle_path: &Path, limits: BundleLimits) -> Result<Vec<(String, Archive)>> {
         let index_zip_path = bundle_path.join("Index.zip");
         let data = read_bounded_file(&index_zip_path, limits, "iWork Index.zip")?;
 
@@ -664,14 +662,14 @@ impl Bundle {
     fn parse_zip_bundle(
         bundle_path: &Path,
         limits: BundleLimits,
-    ) -> Result<HashMap<String, Archive>> {
+    ) -> Result<Vec<(String, Archive)>> {
         let data = read_bounded_file(bundle_path, limits, "iWork bundle")?;
 
         Self::parse_zip_bytes(&data, limits)
     }
 
     /// Parse a ZIP archive from raw bytes and extract all IWA files
-    fn parse_zip_bytes(bytes: &[u8], limits: BundleLimits) -> Result<HashMap<String, Archive>> {
+    fn parse_zip_bytes(bytes: &[u8], limits: BundleLimits) -> Result<Vec<(String, Archive)>> {
         let ingress_limits = limits.archive_ingress_limits()?;
         let catalog =
             litchi_iwa_archive::ComponentCatalog::from_bytes_with_limits(bytes, ingress_limits)
@@ -1731,7 +1729,7 @@ mod tests {
     fn snapshots_share_immutable_bundle_state() {
         let bundle = Bundle::from_parts(
             PathBuf::from("<test>"),
-            HashMap::new(),
+            Vec::new(),
             BundleMetadata::default(),
         );
         let snapshot = bundle.snapshot();
@@ -1745,7 +1743,7 @@ mod tests {
     }
 
     #[test]
-    fn bundle_queries_are_deterministic_across_archive_hash_map_order() -> Result<()> {
+    fn bundle_queries_preserve_sorted_archive_order() -> Result<()> {
         let archive_a = Archive {
             objects: vec![
                 ArchiveObject::new(
@@ -1784,10 +1782,10 @@ mod tests {
         };
         let bundle = Bundle::from_parts(
             PathBuf::from("<test>"),
-            HashMap::from([
-                ("Index/Z.iwa".to_owned(), archive_z),
+            vec![
                 ("Index/A.iwa".to_owned(), archive_a),
-            ]),
+                ("Index/Z.iwa".to_owned(), archive_z),
+            ],
             BundleMetadata::default(),
         );
 
@@ -1859,13 +1857,7 @@ mod tests {
 
         let bundle = Bundle::from_parts(
             PathBuf::from("<test>"),
-            HashMap::from([
-                (
-                    "Index/C.iwa".to_owned(),
-                    Archive {
-                        objects: vec![duplicate],
-                    },
-                ),
+            vec![
                 ("Index/A.iwa".to_owned(), empty),
                 (
                     "Index/B.iwa".to_owned(),
@@ -1873,7 +1865,13 @@ mod tests {
                         objects: vec![length_mismatch],
                     },
                 ),
-            ]),
+                (
+                    "Index/C.iwa".to_owned(),
+                    Archive {
+                        objects: vec![duplicate],
+                    },
+                ),
+            ],
             BundleMetadata::default(),
         );
 
