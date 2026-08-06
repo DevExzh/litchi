@@ -126,6 +126,70 @@ pub enum DocumentId {
     Source(Option<Guid>),
 }
 
+/// The authored state of a Word `CT_OnOff` settings extension.
+///
+/// `None` means that the `val` attribute was omitted from a present element;
+/// it is therefore distinct from an absent element (`Option<OnOff>::None`)
+/// and from an explicit `true` or `false` value.  The schema default for a
+/// present element without `val` is on.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct OnOff {
+    authored: Option<bool>,
+}
+
+impl OnOff {
+    /// Construct an authored `CT_OnOff` value.
+    #[must_use]
+    pub const fn new(authored: Option<bool>) -> Self {
+        Self { authored }
+    }
+
+    /// Construct a present element with the schema-default on value.
+    #[must_use]
+    pub const fn default_on() -> Self {
+        Self::new(None)
+    }
+
+    /// Construct a present element with an explicit on value.
+    #[must_use]
+    pub const fn on() -> Self {
+        Self::new(Some(true))
+    }
+
+    /// Construct a present element with an explicit off value.
+    #[must_use]
+    pub const fn off() -> Self {
+        Self::new(Some(false))
+    }
+
+    /// Return the authored `val` state; omission is `None`.
+    #[must_use]
+    pub const fn authored(self) -> Option<bool> {
+        self.authored
+    }
+
+    /// Return the effective value of this present element.
+    #[must_use]
+    pub const fn effective(self) -> bool {
+        match self.authored {
+            Some(value) => value,
+            None => true,
+        }
+    }
+}
+
+impl From<bool> for OnOff {
+    fn from(value: bool) -> Self {
+        if value { Self::on() } else { Self::off() }
+    }
+}
+
+impl From<OnOff> for bool {
+    fn from(value: OnOff) -> Self {
+        value.effective()
+    }
+}
+
 impl DocumentId {
     /// Construct a checked Word 2010 paragraph-ID context.
     pub fn paragraph_context(value: u32) -> Result<Self> {
@@ -181,13 +245,13 @@ impl OpaqueExtension {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Extension {
     /// `w15:chartTrackingRefBased`.
-    ChartTrackingRefBased(bool),
+    ChartTrackingRefBased(OnOff),
     /// Either `w14:docId` or `w15:docId`.
     DocumentId(DocumentId),
     /// `w14:conflictMode`.
-    ConflictMode(bool),
+    ConflictMode(OnOff),
     /// `w14:discardImageEditingData`.
-    DiscardImageEditingData(bool),
+    DiscardImageEditingData(OnOff),
     /// `w14:defaultImageDpi` (`ST_DecimalNumber`).
     DefaultImageDpi(i32),
     /// A direct child whose namespace or local name is not modeled.
@@ -268,7 +332,7 @@ impl Extensions {
     }
 
     /// Return the first chart-reference tracking value.
-    pub fn chart_tracking_ref_based(&self) -> Option<bool> {
+    pub fn chart_tracking_ref_based(&self) -> Option<OnOff> {
         self.values.iter().find_map(|value| match value {
             Extension::ChartTrackingRefBased(value) => Some(*value),
             _ => None,
@@ -276,7 +340,7 @@ impl Extensions {
     }
 
     /// Set or remove the chart-reference tracking extension.
-    pub fn set_chart_tracking_ref_based(&mut self, value: Option<bool>) -> Result<&mut Self> {
+    pub fn set_chart_tracking_ref_based(&mut self, value: Option<OnOff>) -> Result<&mut Self> {
         self.replace_unique(value.map(Extension::ChartTrackingRefBased), |value| {
             matches!(value, Extension::ChartTrackingRefBased(_))
         })
@@ -340,7 +404,7 @@ impl Extensions {
     }
 
     /// Return the conflict-resolution save marker.
-    pub fn conflict_mode(&self) -> Option<bool> {
+    pub fn conflict_mode(&self) -> Option<OnOff> {
         self.values.iter().find_map(|value| match value {
             Extension::ConflictMode(value) => Some(*value),
             _ => None,
@@ -348,14 +412,14 @@ impl Extensions {
     }
 
     /// Set or remove the conflict-resolution save marker.
-    pub fn set_conflict_mode(&mut self, value: Option<bool>) -> Result<&mut Self> {
+    pub fn set_conflict_mode(&mut self, value: Option<OnOff>) -> Result<&mut Self> {
         self.replace_unique(value.map(Extension::ConflictMode), |value| {
             matches!(value, Extension::ConflictMode(_))
         })
     }
 
     /// Return the image-editing-data discard marker.
-    pub fn discard_image_editing_data(&self) -> Option<bool> {
+    pub fn discard_image_editing_data(&self) -> Option<OnOff> {
         self.values.iter().find_map(|value| match value {
             Extension::DiscardImageEditingData(value) => Some(*value),
             _ => None,
@@ -363,7 +427,7 @@ impl Extensions {
     }
 
     /// Set or remove the image-editing-data discard marker.
-    pub fn set_discard_image_editing_data(&mut self, value: Option<bool>) -> Result<&mut Self> {
+    pub fn set_discard_image_editing_data(&mut self, value: Option<OnOff>) -> Result<&mut Self> {
         self.replace_unique(value.map(Extension::DiscardImageEditingData), |value| {
             matches!(value, Extension::DiscardImageEditingData(_))
         })

@@ -6,7 +6,7 @@ use super::super::{
     TRANSITIONAL_WORD_NAMESPACE,
 };
 use super::model::{
-    DocumentId, Extension, Extensions, Guid, OpaqueExtension, WORD_2010_NAMESPACE,
+    DocumentId, Extension, Extensions, Guid, OnOff, OpaqueExtension, WORD_2010_NAMESPACE,
     WORD_2012_NAMESPACE,
 };
 use super::validation::validate_opaque_xml;
@@ -19,7 +19,10 @@ use quick_xml::reader::NsReader;
 use std::collections::HashSet;
 use std::str;
 
-#[derive(Clone, Copy)]
+const TRANSITIONAL_WORD_NAMESPACE_TEXT: &str =
+    "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Kind {
     ChartTrackingRefBased,
     ParagraphContextId,
@@ -27,6 +30,25 @@ enum Kind {
     ConflictMode,
     DiscardImageEditingData,
     DefaultImageDpi,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ByteRange {
+    start: usize,
+    end: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct KnownRange {
+    kind: Kind,
+    range: ByteRange,
+}
+
+#[derive(Debug, Default)]
+struct Layout {
+    root_empty: Option<ByteRange>,
+    root_close_start: Option<usize>,
+    known: Vec<KnownRange>,
 }
 
 impl OpaqueExtension {
@@ -227,6 +249,7 @@ impl Extensions {
         let mut output = String::new();
         let mut wrote_word_2010_namespace = false;
         let mut wrote_word_2012_namespace = false;
+        let mut wrote_word_namespace = false;
 
         for extension in &self.values {
             match extension {
@@ -238,6 +261,7 @@ impl Extensions {
                     word_prefix,
                     *value,
                     &mut wrote_word_2012_namespace,
+                    &mut wrote_word_namespace,
                 ),
                 Extension::DocumentId(DocumentId::ParagraphContext(value)) => {
                     let value = format_hex(*value);
@@ -285,6 +309,410 @@ impl Extensions {
         }
         output
     }
+}
+
+/// Rewrite only the modeled direct settings extensions.
+///
+/// The source ranges of every unchanged child, including unknown extension
+/// XML and ordinary Word settings, are copied verbatim.  Changed typed
+/// children use deterministic canonical XML; additions are appended at the
+/// settings-root boundary so the source ordering of existing children remains
+/// stable.
+pub(crate) fn rewrite(xml: &[u8], next: &Extensions) -> Result<Vec<u8>> {
+    if xml.len() > MAX_SETTINGS_XML_BYTES {
+        return Err(invalid(format!(
+            "settings XML exceeds {MAX_SETTINGS_XML_BYTES} bytes"
+        )));
+    }
+    next.validate()?;
+    let current = Extensions::parse(xml)?;
+    if current == *next {
+        return Ok(xml.to_vec());
+    }
+
+    let layout = locate_layout(xml)?;
+    let mut replacements = Vec::new();
+    for entry in &layout.known {
+        let before = find_kind(&current, entry.kind).ok_or_else(|| {
+            invalid("settings extension layout does not match its semantic projection")
+        })?;
+        let after = find_kind(next, entry.kind);
+        let replacement = match after {
+            None => None,
+            Some(after) if after == before => Some(None),
+            Some(after) => Some(Some(render_extension(after)?)),
+        };
+        replacements.push((entry.range, replacement));
+    }
+
+    let mut additions = Vec::new();
+    for extension in &next.values {
+        let Some(kind) = extension_kind_value(extension) else {
+            continue;
+        };
+        if !layout.known.iter().any(|entry| entry.kind == kind) {
+            additions.push(render_extension(extension)?);
+        }
+    }
+
+    let additions_len = additions.iter().try_fold(0usize, |total, value| {
+        total
+            .checked_add(value.len())
+            .ok_or_else(|| invalid("settings extension rewrite size overflows usize"))
+    })?;
+    let mut output_len = xml.len();
+    for (range, replacement) in &replacements {
+        match replacement {
+            None => {
+                output_len = output_len
+                    .checked_sub(
+                        range.end.checked_sub(range.start).ok_or_else(|| {
+                            invalid("settings extension range has an invalid length")
+                        })?,
+                    )
+                    .ok_or_else(|| invalid("settings extension rewrite size underflows usize"))?;
+            },
+            Some(Some(replacement)) => {
+                output_len = output_len
+                    .checked_sub(
+                        range.end.checked_sub(range.start).ok_or_else(|| {
+                            invalid("settings extension range has an invalid length")
+                        })?,
+                    )
+                    .and_then(|value| value.checked_add(replacement.len()))
+                    .ok_or_else(|| invalid("settings extension rewrite size overflows usize"))?;
+            },
+            Some(None) => {},
+        }
+    }
+    output_len = output_len
+        .checked_add(additions_len)
+        .ok_or_else(|| invalid("settings extension rewrite size overflows usize"))?;
+    if !additions.is_empty() && layout.root_close_start.is_none() {
+        let root_empty = layout
+            .root_empty
+            .ok_or_else(|| invalid("settings root has no extension insertion point"))?;
+        let root = xml
+            .get(root_empty.start..root_empty.end)
+            .ok_or_else(|| invalid("settings root empty range is outside the source"))?;
+        let name_end = root
+            .iter()
+            .position(|byte| matches!(*byte, b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'>'))
+            .ok_or_else(|| invalid("settings root empty element has no qualified name"))?;
+        let name_len = name_end
+            .checked_sub(1)
+            .ok_or_else(|| invalid("settings root empty element has no qualified name"))?;
+        output_len = output_len
+            .checked_add(
+                name_len
+                    .checked_add(3)
+                    .ok_or_else(|| invalid("settings extension rewrite size overflows usize"))?,
+            )
+            .ok_or_else(|| invalid("settings extension rewrite size overflows usize"))?;
+    }
+    if output_len > MAX_SETTINGS_XML_BYTES {
+        return Err(invalid(format!(
+            "settings XML exceeds {MAX_SETTINGS_XML_BYTES} bytes after extension edit"
+        )));
+    }
+
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "Word settings extension rewrite",
+            source,
+        })?;
+
+    let mut cursor = 0usize;
+    for (range, replacement) in replacements {
+        output.extend_from_slice(
+            xml.get(cursor..range.start)
+                .ok_or_else(|| invalid("settings extension range starts outside the source"))?,
+        );
+        match replacement {
+            None => {},
+            Some(None) => output.extend_from_slice(
+                xml.get(range.start..range.end)
+                    .ok_or_else(|| invalid("settings extension range ends outside the source"))?,
+            ),
+            Some(Some(replacement)) => output.extend_from_slice(&replacement),
+        }
+        cursor = range.end;
+    }
+
+    if additions.is_empty() {
+        output
+            .extend_from_slice(xml.get(cursor..).ok_or_else(|| {
+                invalid("settings extension source cursor is outside the source")
+            })?);
+        return Ok(output);
+    }
+
+    if let Some(close_start) = layout.root_close_start {
+        output.extend_from_slice(
+            xml.get(cursor..close_start)
+                .ok_or_else(|| invalid("settings root close range is outside the source"))?,
+        );
+        for addition in additions {
+            output.extend_from_slice(&addition);
+        }
+        output.extend_from_slice(
+            xml.get(close_start..)
+                .ok_or_else(|| invalid("settings root close range is outside the source"))?,
+        );
+        return Ok(output);
+    }
+
+    let root_empty = layout
+        .root_empty
+        .ok_or_else(|| invalid("settings root has no extension insertion point"))?;
+    if cursor != root_empty.start {
+        return Err(invalid(
+            "settings root empty range does not match source cursor",
+        ));
+    }
+    let root = xml
+        .get(root_empty.start..root_empty.end)
+        .ok_or_else(|| invalid("settings root empty range is outside the source"))?;
+    let slash = root
+        .iter()
+        .rposition(|byte| *byte == b'/')
+        .ok_or_else(|| invalid("settings root empty element has no closing slash"))?;
+    let name_end = root
+        .iter()
+        .position(|byte| matches!(*byte, b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'>'))
+        .ok_or_else(|| invalid("settings root empty element has no qualified name"))?;
+    let name = root
+        .get(1..name_end)
+        .ok_or_else(|| invalid("settings root empty element name is outside the source"))?;
+    output.extend_from_slice(&root[..slash]);
+    output.push(b'>');
+    for addition in additions {
+        output.extend_from_slice(&addition);
+    }
+    output.extend_from_slice(b"</");
+    output.extend_from_slice(name);
+    output.push(b'>');
+    output.extend_from_slice(
+        xml.get(root_empty.end..)
+            .ok_or_else(|| invalid("settings root suffix is outside the source"))?,
+    );
+    Ok(output)
+}
+
+fn locate_layout(xml: &[u8]) -> Result<Layout> {
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().check_comments = true;
+    reader.config_mut().trim_text(false);
+
+    let mut layout = Layout::default();
+    let mut stack = Vec::<Option<(Kind, usize)>>::new();
+    let mut depth = 0usize;
+    let mut root_seen = false;
+    let mut root_closed = false;
+
+    loop {
+        let event_start = position(&reader)?;
+        let event = reader
+            .read_event()
+            .map_err(|error| xml_error(error.to_string()))?
+            .into_owned();
+        let event_end = position(&reader)?;
+        let resolver = reader.resolver().clone();
+
+        match event {
+            Event::Start(element) => {
+                if depth == 0 {
+                    validate_root(
+                        &resolver.resolve_element(element.name()).0,
+                        &element,
+                        root_seen,
+                    )?;
+                    root_seen = true;
+                }
+                let kind = if depth == 1 {
+                    let (namespace, _) = resolver.resolve_element(element.name());
+                    extension_kind(&namespace, element.local_name().as_ref())
+                } else {
+                    None
+                };
+                stack.push(kind.map(|kind| (kind, event_start)));
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("settings XML nesting is too deep"))?;
+                if depth > MAX_SETTINGS_XML_DEPTH {
+                    return Err(invalid(format!(
+                        "settings XML exceeds depth {MAX_SETTINGS_XML_DEPTH}"
+                    )));
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("settings XML nesting is too deep"))?;
+                if child_depth > MAX_SETTINGS_XML_DEPTH {
+                    return Err(invalid(format!(
+                        "settings XML exceeds depth {MAX_SETTINGS_XML_DEPTH}"
+                    )));
+                }
+                if depth == 0 {
+                    validate_root(
+                        &resolver.resolve_element(element.name()).0,
+                        &element,
+                        root_seen,
+                    )?;
+                    root_seen = true;
+                    root_closed = true;
+                    layout.root_empty = Some(ByteRange {
+                        start: event_start,
+                        end: event_end,
+                    });
+                } else if depth == 1 {
+                    let (namespace, _) = resolver.resolve_element(element.name());
+                    if let Some(kind) = extension_kind(&namespace, element.local_name().as_ref()) {
+                        layout.known.push(KnownRange {
+                            kind,
+                            range: ByteRange {
+                                start: event_start,
+                                end: event_end,
+                            },
+                        });
+                    }
+                }
+            },
+            Event::End(_) => {
+                if depth == 0 {
+                    return Err(invalid("settings XML has an unexpected end element"));
+                }
+                let frame = stack
+                    .pop()
+                    .ok_or_else(|| invalid("settings XML has an unexpected end element"))?;
+                if let Some((kind, start)) = frame {
+                    layout.known.push(KnownRange {
+                        kind,
+                        range: ByteRange {
+                            start,
+                            end: event_end,
+                        },
+                    });
+                }
+                if depth == 1 {
+                    layout.root_close_start = Some(event_start);
+                    root_closed = true;
+                }
+                depth -= 1;
+            },
+            Event::Text(text) if depth == 0 => {
+                if !text
+                    .decode()
+                    .map_err(|error| xml_error(error.to_string()))?
+                    .trim()
+                    .is_empty()
+                {
+                    return Err(invalid("settings XML has text outside its root"));
+                }
+            },
+            Event::CData(_) | Event::GeneralRef(_) if depth == 0 => {
+                return Err(invalid("settings XML has content outside its root"));
+            },
+            Event::Decl(_) if !root_seen => {},
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid(
+                    "settings XML cannot contain a DTD or processing instruction",
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+
+    if !root_seen || !root_closed || depth != 0 || !stack.is_empty() {
+        return Err(invalid("settings XML is not one complete root element"));
+    }
+    layout.known.sort_by_key(|entry| entry.range.start);
+    Ok(layout)
+}
+
+fn extension_kind_value(extension: &Extension) -> Option<Kind> {
+    match extension {
+        Extension::ChartTrackingRefBased(_) => Some(Kind::ChartTrackingRefBased),
+        Extension::DocumentId(DocumentId::ParagraphContext(_)) => Some(Kind::ParagraphContextId),
+        Extension::DocumentId(DocumentId::Source(_)) => Some(Kind::SourceDocumentId),
+        Extension::ConflictMode(_) => Some(Kind::ConflictMode),
+        Extension::DiscardImageEditingData(_) => Some(Kind::DiscardImageEditingData),
+        Extension::DefaultImageDpi(_) => Some(Kind::DefaultImageDpi),
+        Extension::Unknown(_) => None,
+    }
+}
+
+fn find_kind<'a>(extensions: &'a Extensions, kind: Kind) -> Option<&'a Extension> {
+    extensions
+        .values
+        .iter()
+        .find(|extension| extension_kind_value(extension) == Some(kind))
+}
+
+fn render_extension(extension: &Extension) -> Result<Vec<u8>> {
+    let mut output = String::new();
+    let mut wrote_word_2010_namespace = false;
+    let mut wrote_word_2012_namespace = false;
+    let mut wrote_word_namespace = false;
+    match extension {
+        Extension::ChartTrackingRefBased(value) => write_on_off(
+            &mut output,
+            "w15",
+            WORD_2012_NAMESPACE,
+            "chartTrackingRefBased",
+            "w",
+            *value,
+            &mut wrote_word_2012_namespace,
+            &mut wrote_word_namespace,
+        ),
+        Extension::DocumentId(DocumentId::ParagraphContext(value)) => {
+            let value = format_hex(*value);
+            write_w14_element(
+                &mut output,
+                "docId",
+                Some(("w14:val", value.as_str())),
+                &mut wrote_word_2010_namespace,
+            );
+        },
+        Extension::DocumentId(DocumentId::Source(value)) => {
+            let value = value.as_ref().map(ToString::to_string);
+            write_w15_element(
+                &mut output,
+                "docId",
+                value.as_deref(),
+                &mut wrote_word_2012_namespace,
+            );
+        },
+        Extension::ConflictMode(value) => write_w14_on_off(
+            &mut output,
+            "conflictMode",
+            *value,
+            &mut wrote_word_2010_namespace,
+        ),
+        Extension::DiscardImageEditingData(value) => write_w14_on_off(
+            &mut output,
+            "discardImageEditingData",
+            *value,
+            &mut wrote_word_2010_namespace,
+        ),
+        Extension::DefaultImageDpi(value) => {
+            let value = value.to_string();
+            write_w14_element(
+                &mut output,
+                "defaultImageDpi",
+                Some(("w14:val", value.as_str())),
+                &mut wrote_word_2010_namespace,
+            );
+        },
+        Extension::Unknown(value) => output
+            .push_str(str::from_utf8(&value.xml).map_err(|_| invalid("opaque XML is not UTF-8"))?),
+    }
+    Ok(output.into_bytes())
 }
 
 fn extension_kind(namespace: &ResolveResult<'_>, local_name: &[u8]) -> Option<Kind> {
@@ -369,7 +797,7 @@ fn parse_on_off(
     decoder: Decoder,
     resolver: &NamespaceResolver,
     namespaces: &[&[u8]],
-) -> Result<bool> {
+) -> Result<OnOff> {
     optional_attribute(
         element,
         decoder,
@@ -378,14 +806,14 @@ fn parse_on_off(
         "settings on/off val",
     )?
     .map(|value| match value.as_str() {
-        "true" | "1" => Ok(true),
-        "false" | "0" => Ok(false),
+        "true" | "on" | "1" => Ok(true),
+        "false" | "off" | "0" => Ok(false),
         _ => Err(invalid(format!(
             "invalid Word settings on/off value '{value}'"
         ))),
     })
     .transpose()
-    .map(|value| value.unwrap_or(true))
+    .map(OnOff::new)
 }
 
 fn required_attribute(
@@ -660,8 +1088,9 @@ fn write_on_off(
     namespace: &str,
     local_name: &str,
     word_prefix: &str,
-    value: bool,
+    value: OnOff,
     wrote_namespace: &mut bool,
+    wrote_word_namespace: &mut bool,
 ) {
     let word_prefix = if word_prefix.is_empty() {
         "w"
@@ -673,20 +1102,30 @@ fn write_on_off(
     output.push(':');
     output.push_str(local_name);
     write_namespace(output, prefix, namespace, wrote_namespace);
-    if !value {
+    if let Some(value) = value.authored() {
+        write_namespace(
+            output,
+            word_prefix,
+            TRANSITIONAL_WORD_NAMESPACE_TEXT,
+            wrote_word_namespace,
+        );
         output.push(' ');
         output.push_str(word_prefix);
-        output.push_str(":val=\"0\"");
+        output.push_str(":val=\"");
+        output.push_str(if value { "true" } else { "false" });
+        output.push('"');
     }
     output.push_str("/>");
 }
 
-fn write_w14_on_off(output: &mut String, local_name: &str, value: bool, wrote: &mut bool) {
+fn write_w14_on_off(output: &mut String, local_name: &str, value: OnOff, wrote: &mut bool) {
     output.push_str("<w14:");
     output.push_str(local_name);
     write_namespace(output, "w14", WORD_2010_NAMESPACE, wrote);
-    if !value {
-        output.push_str(" w14:val=\"0\"");
+    if let Some(value) = value.authored() {
+        output.push_str(" w14:val=\"");
+        output.push_str(if value { "true" } else { "false" });
+        output.push('"');
     }
     output.push_str("/>");
 }
