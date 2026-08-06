@@ -466,6 +466,14 @@ pub struct Patch {
 }
 
 impl Patch {
+    pub(crate) fn new(before: Snapshot, after: Snapshot) -> Self {
+        Self {
+            table: TablePatch::new(before.wire.clone(), after.wire.clone()),
+            before,
+            after,
+        }
+    }
+
     /// The exact semantic source snapshot.
     #[must_use]
     pub fn before(&self) -> &Snapshot {

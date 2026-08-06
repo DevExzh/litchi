@@ -12,6 +12,7 @@
 
 mod codec;
 mod model;
+mod package;
 mod patch;
 mod transaction;
 mod validation;
@@ -22,6 +23,7 @@ mod tests;
 pub use model::{
     Collection, FileNameKey, FileNameKeyError, FileNameMetadata, Kind, Name, Reference,
 };
+pub use package::{Editor, PackageCommit, PackageSnapshot};
 pub use patch::{PatchError, SourceContext, SourceRanges, TablePatch, TableRange};
 pub use transaction::{
     Commit, FileNameSelector, Patch, ReferenceSelector, SelectionError, Snapshot, Transaction,

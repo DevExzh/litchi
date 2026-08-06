@@ -3,10 +3,12 @@ use super::codec::{
     WKB_FLAGS_REQUIRED, WKB_FN, WKB_OUTLINE_LEVEL, parse_plcf_wkb, parse_sttb_fnm,
 };
 use super::model::Collection;
-use super::{FileNameMetadata, FileNameSelector, Kind, ReferenceSelector, Snapshot};
+use super::{Editor, FileNameMetadata, FileNameSelector, Kind, ReferenceSelector, Snapshot};
 use crate::package::Result;
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::mail_merge::Fnpi;
+use litchi_cfb::{OleFile, OleWriter};
+use std::io::Cursor;
 
 /// Build a minimal FIB whose table-pointer array covers indexes 0..73,
 /// with a main-document length of `document_end` characters.
@@ -318,13 +320,40 @@ fn source_snapshot(tables: &Tables) -> (FileInformationBlock, Vec<u8>, Snapshot)
     (parsed_fib, table, snapshot)
 }
 
+fn package_bytes(tables: &Tables, tail: &[u8]) -> Vec<u8> {
+    let (fib, mut table) = tables.assemble();
+    table.extend_from_slice(tail);
+    let mut writer = OleWriter::new();
+    writer.set_root_clsid([
+        0x06, 0x09, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x46,
+    ]);
+    writer.create_storage(&["Metadata"]).unwrap();
+    writer
+        .set_storage_clsid(
+            &["Metadata"],
+            [
+                0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE,
+                0xFF, 0x00,
+            ],
+        )
+        .unwrap();
+    writer.create_stream(&["WordDocument"], &fib).unwrap();
+    writer.create_stream(&["0Table"], &table).unwrap();
+    writer
+        .create_stream(&["Metadata", "Opaque"], b"unchanged")
+        .unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
 #[test]
 fn no_op_snapshot_round_trip_preserves_ignored_and_unused_bytes() {
     let mut tables = Tables::typical();
-    let fnif_unused = tables.fnm.len() - 4;
-    tables.fnm[fnif_unused..].copy_from_slice(&[0xA1, 0xB2, 0xC3, 0xD4]);
     let first_path_units = "C:\\docs\\intro.doc".encode_utf16().count();
     let first_fnif = 6 + 2 + first_path_units * 2;
+    tables.fnm[first_fnif + 4..first_fnif + 8].copy_from_slice(&[0xA1, 0xB2, 0xC3, 0xD4]);
     tables.fnm[first_fnif + 3] |= 0x02;
     // The first WKB starts after two CPs and the terminal CP; retain both
     // undefined WKB flag bits in its exact source record.
@@ -345,6 +374,14 @@ fn no_op_snapshot_round_trip_preserves_ignored_and_unused_bytes() {
         commit.patch().table_patch().apply(&table, 10).unwrap(),
         table
     );
+}
+
+#[test]
+fn relative_path_uses_utf16_code_unit_offsets() {
+    let path = "C:\\文档\\intro.doc";
+    let files = parse_sttb_fnm(&sttb_fnm(&[(path, 5, 0, 6, FNFB_NTFS)])).unwrap();
+    assert_eq!(files[0].relative_path_offset(), Some(6));
+    assert_eq!(files[0].relative_path(), Some("intro.doc"));
 }
 
 #[test]
@@ -490,4 +527,102 @@ fn table_patch_is_source_checked_preserves_unrelated_bytes_and_inverts() {
     conflict[0] ^= 1;
     assert!(commit.patch().table_patch().apply(&conflict, 10).is_err());
     assert!(commit.patch().table_patch().apply(&table, 11).is_err());
+}
+
+#[test]
+fn package_noop_returns_exact_cfb_source() {
+    let source = package_bytes(&Tables::typical(), &[0xDE, 0xAD, 0xBE, 0xEF]);
+    let mut editor = Editor::open(source.clone()).unwrap();
+    let transaction = editor.edit();
+    let commit = editor.apply(transaction).unwrap();
+    assert!(commit.patch().is_noop());
+    assert!(commit.package_patch().is_noop());
+    assert_eq!(commit.package_patch().before(), source.as_slice());
+    assert_eq!(commit.package_patch().after(), source.as_slice());
+    assert_eq!(commit.snapshot().finish().unwrap(), source);
+}
+
+#[test]
+fn package_publication_appends_tables_and_relocates_only_owned_pointers() {
+    let tables = Tables::typical();
+    let (source_word, source_table) = tables.assemble();
+    let source_fib = FileInformationBlock::parse(&source_word).unwrap();
+    let source_wkb_pointer = source_fib.get_table_pointer(PLCF_WKB).unwrap();
+    let tail = [0xDE, 0xAD, 0xBE, 0xEF];
+    let source = package_bytes(&tables, &tail);
+    let mut editor = Editor::open(source).unwrap();
+    let mut transaction = editor.edit();
+    transaction
+        .update_file_path(
+            FileNameSelector::Index(0),
+            "C:\\docs\\a much longer intro.doc",
+        )
+        .unwrap();
+    let commit = editor.apply(transaction).unwrap();
+    let output = commit.snapshot().finish().unwrap();
+    let mut ole = OleFile::open(Cursor::new(output)).unwrap();
+    let word = ole.open_stream(&["WordDocument"]).unwrap();
+    let table = ole.open_stream(&["0Table"]).unwrap();
+    let fib = FileInformationBlock::parse(&word).unwrap();
+    let fnm_pointer = fib.get_table_pointer(STTB_FNM).unwrap();
+    let wkb_pointer = fib.get_table_pointer(PLCF_WKB).unwrap();
+    assert!(fnm_pointer.0 as usize >= source_table.len() + tail.len());
+    assert_eq!(wkb_pointer, source_wkb_pointer);
+    assert_eq!(
+        &table[source_table.len()..source_table.len() + tail.len()],
+        &tail
+    );
+    let reparsed = Snapshot::parse(&fib, &table).unwrap().unwrap();
+    assert_eq!(
+        reparsed.collection().referenced_files()[0].path(),
+        "C:\\docs\\a much longer intro.doc"
+    );
+}
+
+#[test]
+fn package_publication_preserves_undefined_fields_and_rejects_source_conflicts() {
+    let mut tables = Tables::typical();
+    let first_path_units = "C:\\docs\\intro.doc".encode_utf16().count();
+    let first_fnif = 6 + 2 + first_path_units * 2;
+    tables.fnm[first_fnif + 4..first_fnif + 8].copy_from_slice(&[0xA1, 0xB2, 0xC3, 0xD4]);
+    tables.fnm[first_fnif + 3] |= 0x02;
+    tables.wkb[14] |= 0x84;
+    let source = package_bytes(&tables, &[]);
+    let mut editor = Editor::open(source).unwrap();
+    assert_eq!(
+        editor.subdocuments().collection().referenced_files()[0].fnif_unused(),
+        [0xA1, 0xB2, 0xC3, 0xD4]
+    );
+    let mut transaction = editor.edit();
+    transaction
+        .update_file_path(FileNameSelector::Index(0), "C:\\docs\\changed.doc")
+        .unwrap();
+    let commit = editor.apply(transaction).unwrap();
+    let mut ole = OleFile::open(Cursor::new(commit.snapshot().finish().unwrap())).unwrap();
+    let word = ole.open_stream(&["WordDocument"]).unwrap();
+    let table = ole.open_stream(&["0Table"]).unwrap();
+    let fib = FileInformationBlock::parse(&word).unwrap();
+    let reparsed = Snapshot::parse(&fib, &table).unwrap().unwrap();
+    let file = &reparsed.collection().referenced_files()[0];
+    assert_eq!(file.fnif_unused(), [0xA1, 0xB2, 0xC3, 0xD4]);
+    assert_eq!(file.file_system_flags() & 0x02, 0x02);
+    assert_eq!(
+        reparsed.collection().subdocuments()[0].raw_flags & 0x84,
+        0x84
+    );
+
+    let mut conflict = commit.package_patch().before().to_vec();
+    conflict[0] ^= 1;
+    assert!(commit.package_patch().apply(&conflict).is_err());
+}
+
+#[test]
+fn failed_package_publication_keeps_editor_unchanged() {
+    let source = package_bytes(&Tables::typical(), &[]);
+    let mut editor = Editor::open(source.clone()).unwrap();
+    let mut transaction = editor.edit();
+    transaction.set_main_document_chars(1);
+    assert!(editor.apply(transaction).is_err());
+    assert!(!editor.is_changed());
+    assert_eq!(editor.finish().unwrap(), source);
 }

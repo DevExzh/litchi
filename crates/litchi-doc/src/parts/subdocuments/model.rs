@@ -176,7 +176,7 @@ impl Name {
     /// the file name carries one. Never resolved against the file system.
     pub fn relative_path(&self) -> Option<&str> {
         self.relative_path_offset
-            .and_then(|offset| self.path.get(offset..))
+            .and_then(|offset| utf16_suffix(&self.path, offset))
     }
 
     pub(crate) fn metadata(&self) -> FileNameMetadata {
@@ -187,6 +187,23 @@ impl Name {
             is_non_file_system_path: self.is_non_file_system_path,
         }
     }
+}
+
+/// Convert the UTF-16 code-unit offset carried by `FNIF.ichRelative` into a
+/// UTF-8 boundary without changing the source offset. An offset inside a
+/// surrogate pair is malformed semantic state and is reported as absent.
+fn utf16_suffix(path: &str, offset: usize) -> Option<&str> {
+    let mut units = 0usize;
+    for (byte, character) in path.char_indices() {
+        if units == offset {
+            return path.get(byte..);
+        }
+        units = units.checked_add(character.len_utf16())?;
+        if units > offset {
+            return None;
+        }
+    }
+    (units == offset).then_some("")
 }
 
 /// One subdocument of a master document (`WKB`, MS-DOC 2.9.346).
