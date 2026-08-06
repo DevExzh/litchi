@@ -501,7 +501,10 @@ fn exposes_inert_slide_library_synchronization_metadata() {
     let atom = record_bytes(0, 0, 0x3715, &times);
     let container = record_bytes(0x0f, 0, 0x3714, &[server, url, atom].concat());
     let sync = Record::parse(&container, 0).unwrap().0;
-    let slide_record = create_test_record(RecordType::Slide, Vec::new(), vec![sync]);
+    let mut slide_record = create_test_record(RecordType::Slide, Vec::new(), vec![sync]);
+    // The owner validates a real SlideContainer root (MS-PPT: container
+    // records carry recVer 0xF).
+    slide_record.version = 0x0f;
     let doc_data = vec![0u8; 32];
     let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
 

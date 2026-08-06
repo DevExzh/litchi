@@ -71,7 +71,11 @@ fn typed_values_validate_and_preserve_url_text() {
     assert_eq!(value.server_modified().year(), 2024);
     assert!(ServerId::new("bad\u{0}").is_err());
     assert!(LibraryUrl::new("https://example.com").is_err());
-    assert!(SystemTime::new(2024, 2, 0, 29, 0, 0, 0, 0).is_err());
+    // 2023 is not a leap year, so February 29 does not exist.
+    assert!(SystemTime::new(2023, 2, 0, 29, 0, 0, 0, 0).is_err());
+    // 2024 is a leap year: February 29 is valid and the weekday is retained
+    // verbatim (SYSTEMTIME weekdays are informational, not recomputed).
+    assert!(SystemTime::new(2024, 2, 4, 29, 0, 0, 0, 0).is_ok());
 }
 
 #[test]
@@ -116,6 +120,7 @@ fn rejects_duplicate_or_malformed_sync_records_before_mutation() {
     let value = synchronization();
     let first = codec::encode_sync(&value).unwrap();
     let mut duplicate = source().record().clone();
+    duplicate.children.push(first.clone());
     duplicate.children.push(first.clone());
     duplicate.data = duplicate.children.iter().flat_map(wire).collect();
     duplicate.data_length = duplicate.data.len() as u32;
