@@ -222,3 +222,435 @@ required-features = ["rtf"]
 [[example]]
 name = "rtf_new_features_writer"
 required-features = ["rtf"]
+
+[[example]]
+name = "check_section_table"
+required-features = ["doc"]
+
+[[example]]
+name = "compare_ppt"
+required-features = ["ppt"]
+
+[[example]]
+name = "complete_structures"
+required-features = ["doc"]
+
+[[example]]
+name = "complete_word_file"
+required-features = ["doc"]
+
+[[example]]
+name = "comprehensive_doc_test"
+required-features = ["doc"]
+
+[[example]]
+name = "comprehensive_docx_test"
+required-features = ["ooxml"]
+
+[[example]]
+name = "debug_fat"
+required-features = ["doc"]
+
+[[example]]
+name = "debug_fat_detailed"
+required-features = ["doc"]
+
+[[example]]
+name = "debug_full_structure"
+required-features = ["doc"]
+
+[[example]]
+name = "debug_parse_concat"
+required-features = ["ooxml", "eval_engine"]
+
+[[example]]
+name = "doc_headers_footers"
+required-features = ["doc"]
+
+[[example]]
+name = "doc_paragraph_format"
+required-features = ["doc"]
+
+[[example]]
+name = "doc_rich_text"
+required-features = ["doc"]
+
+[[example]]
+name = "doc_shapes_showcase"
+required-features = ["doc"]
+
+[[example]]
+name = "doc_write_example"
+required-features = ["doc"]
+
+[[example]]
+name = "doc_writer_all_features"
+required-features = ["doc"]
+
+[[example]]
+name = "doc_writer_footnotes"
+required-features = ["doc"]
+
+[[example]]
+name = "doc_writer_headers_footers"
+required-features = ["doc"]
+
+[[example]]
+name = "doc_writer_hyperlinks"
+required-features = ["doc"]
+
+[[example]]
+name = "doc_writer_images"
+required-features = ["doc"]
+
+[[example]]
+name = "doc_writer_minimal"
+required-features = ["doc"]
+
+[[example]]
+name = "doc_writer_numbering"
+required-features = ["doc"]
+
+[[example]]
+name = "docx_template_test"
+required-features = ["ooxml"]
+
+[[example]]
+name = "dump_xlsb_structure"
+required-features = ["ooxml"]
+
+[[example]]
+name = "minimal_doc_mre"
+required-features = ["doc"]
+
+[[example]]
+name = "office_crud_demo"
+required-features = ["ooxml"]
+
+[[example]]
+name = "ppt_shapes_showcase_advanced"
+required-features = ["ppt"]
+
+[[example]]
+name = "ppt_shapes_showcase_temp"
+required-features = ["ppt"]
+
+[[example]]
+name = "pptx_advanced_features"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_animations"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_charts_comprehensive"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_charts_demo"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_charts_smartart_combined"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_comprehensive_test"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_customshow"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_customshow_comprehensive"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_debug"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_feature_test"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_features_demo"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_handout"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_handout_comprehensive"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_isolate_issue"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_media_only"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_minimal_only"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_minimal_test"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_protection"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_simple_demo"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_smartart"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_smartart_comprehensive"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_smartart_demo"
+required-features = ["ooxml"]
+
+[[example]]
+name = "pptx_writer_showcase"
+required-features = ["ooxml"]
+
+[[example]]
+name = "profile_all_formats"
+required-features = ["full"]
+
+[[example]]
+name = "profile_test1"
+required-features = ["ooxml", "formula"]
+
+[[example]]
+name = "read_office_files"
+required-features = ["ooxml"]
+
+[[example]]
+name = "read_xlsb"
+required-features = ["ooxml"]
+
+[[example]]
+name = "sheet_eval_arithmetic"
+required-features = ["ooxml", "eval_engine"]
+
+[[example]]
+name = "sheet_eval_complex_chains"
+required-features = ["ooxml", "eval_engine"]
+
+[[example]]
+name = "sheet_eval_criteria_aggregates"
+required-features = ["ooxml", "eval_engine"]
+
+[[example]]
+name = "sheet_eval_datetime"
+required-features = ["ooxml", "eval_engine"]
+
+[[example]]
+name = "sheet_eval_functions_basic"
+required-features = ["ooxml", "eval_engine"]
+
+[[example]]
+name = "sheet_eval_lookups"
+required-features = ["ooxml", "eval_engine"]
+
+[[example]]
+name = "sheet_eval_mvp"
+required-features = ["ooxml", "eval_engine"]
+
+[[example]]
+name = "sheet_eval_stat_financial"
+required-features = ["ooxml", "eval_engine"]
+
+[[example]]
+name = "text_formats_api_demo"
+required-features = ["ooxml"]
+
+[[example]]
+name = "text_formats_demo"
+required-features = ["ooxml"]
+
+[[example]]
+name = "text_formats_roundtrip"
+required-features = ["ooxml"]
+
+[[example]]
+name = "text_formats_simple"
+required-features = ["ooxml"]
+
+[[example]]
+name = "to_markdown"
+required-features = ["full"]
+
+[[example]]
+name = "write_xlsb"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_reader"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_all_three"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_autofilter"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_col_row_sizes"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_comprehensive_features"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_conditional_formatting"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_data_validation"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_empty"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_hyperlinks"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_internal_hyperlinks"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_merge_cells"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_merged_and_hyperlinks"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_merged_hyperlinks"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_minimal"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_minimal_hyperlink"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_minimal_merged"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_named_ranges"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_nr_hyperlink"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_nr_merged"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_one_cell"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_one_named_range"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_one_number"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_sheet_protection"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_two_cells"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_test_two_rows"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsb_writer"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsx_array_formulas"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsx_charts"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsx_charts_comprehensive"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsx_comprehensive_features"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsx_page_breaks_views"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsx_pivot_test"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsx_print_setup"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsx_rich_text"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsx_sparklines"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsx_tables"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsx_threaded_comments_test"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsx_typed_page_and_shapes"
+required-features = ["ooxml"]
+
+[[example]]
+name = "xlsx_writer"
+required-features = ["ooxml"]

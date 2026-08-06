@@ -1,7 +1,9 @@
 #[cfg(feature = "odf")]
 use litchi::Result;
 #[cfg(feature = "odf")]
-use litchi::odt::{Builder, Document, MutableDocument};
+use litchi::odt::mutable::MutableDocument;
+#[cfg(feature = "odf")]
+use litchi::odt::{Builder, Document};
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {
