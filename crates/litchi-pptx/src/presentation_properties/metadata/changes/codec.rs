@@ -158,6 +158,7 @@ pub fn load(package: &OpcPackage) -> Result<Option<Part>> {
             "package contains an orphan Changes Information part",
         ));
     }
+    validate_inbound_relationships(package, &presentation_name, relationship, &target)?;
     Ok(Some(Part {
         relationship_id: relationship.r_id().to_string(),
         part_name: target.to_string(),
@@ -1015,6 +1016,41 @@ fn require_presentation_content_type(value: &str) -> Result<()> {
     } else {
         Err(invalid("main document is not a Presentation part"))
     }
+}
+
+fn validate_inbound_relationships(
+    package: &OpcPackage,
+    presentation_name: &str,
+    owner: &litchi_opc::Relationship,
+    target: &PackURI,
+) -> Result<()> {
+    for relationship in package.rels().iter() {
+        if !relationship.is_external()
+            && relationship.target_partname()?.as_str() == target.as_str()
+        {
+            return Err(invalid(
+                "Changes Information part has an unexpected package relationship",
+            ));
+        }
+    }
+    for source in package.iter_parts() {
+        for relationship in source.rels().iter() {
+            if relationship.is_external()
+                || relationship.target_partname()?.as_str() != target.as_str()
+            {
+                continue;
+            }
+            let expected = source.partname().as_str() == presentation_name
+                && relationship.r_id() == owner.r_id()
+                && relationship.reltype() == RELATIONSHIP_TYPE;
+            if !expected {
+                return Err(invalid(
+                    "Changes Information part has an unexpected inbound relationship",
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn bounded(value: &str) -> Result<()> {
