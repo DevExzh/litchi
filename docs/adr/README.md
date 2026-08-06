@@ -37,6 +37,8 @@ Office round trips.
 | [0022](0022-pptx-embedded-font-ownership.md) | Typed PPTX embedded-font ownership |
 | [0023](0023-odf-family-crate-split.md) | Dedicated ODF family crates and umbrella facade |
 | [0024](0024-current-topology.md) | Current post-migration workspace topology |
+| [0025](0025-xls-sheet-anchor-ownership.md) | Typed XLS sheet-anchor ownership |
+| [0026](0026-ole-directory-metadata-binding.md) | Typed shared OLE CFB directory metadata |
 
 ## Decision hierarchy
 

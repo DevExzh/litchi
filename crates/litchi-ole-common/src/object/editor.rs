@@ -297,8 +297,10 @@ impl Editor {
         let rendered = self.package.render()?;
         let mut check = OleFile::open(Cursor::new(rendered))?;
         codec::open(&check)?;
-        let parsed = Package::capture(&mut check, self.limits)?;
-        self.objects = discovery::from_package(&parsed, &self.targets, self.limits)?;
+        let mut parsed = Package::capture(&mut check, self.limits)?;
+        parsed.reuse_stream_allocations(&self.package)?;
+        self.package = parsed;
+        self.objects = discovery::from_package(&self.package, &self.targets, self.limits)?;
         self.changed = true;
         Ok(self)
     }

@@ -1,6 +1,8 @@
 //! Host-neutral object and captured-stream views.
 
+use super::directory::{self, Metadata};
 use super::target::Target;
+use crate::property_set::Guid;
 use litchi_cfb::OleError;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -60,12 +62,18 @@ impl Limits {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Storage {
     path: Vec<String>,
+    directory: Metadata,
     clsid: Option<String>,
 }
 
 impl Storage {
-    pub(crate) fn new(path: Vec<String>, clsid: Option<String>) -> Self {
-        Self { path, clsid }
+    pub(crate) fn new(path: Vec<String>, directory: Metadata) -> Self {
+        let clsid = directory.class_id().map(directory::format_class_id);
+        Self {
+            path,
+            directory,
+            clsid,
+        }
     }
 
     /// Exact path relative to the selected object's storage.
@@ -74,7 +82,20 @@ impl Storage {
         &self.path
     }
 
+    /// Typed CFB directory metadata for this storage.
+    #[must_use]
+    pub fn directory(&self) -> &Metadata {
+        &self.directory
+    }
+
     /// CFB class identifier, when the directory entry contained one.
+    #[must_use]
+    pub fn class_id(&self) -> Option<Guid> {
+        self.directory.class_id()
+    }
+
+    /// Canonical CFB CLSID text retained for existing host diagnostics.
+    /// Prefer [`Self::class_id`] for typed comparisons.
     #[must_use]
     pub fn clsid(&self) -> Option<&str> {
         self.clsid.as_deref()
@@ -86,11 +107,16 @@ impl Storage {
 pub struct Stream {
     path: Vec<String>,
     data: Arc<[u8]>,
+    directory: Option<Metadata>,
 }
 
 impl Stream {
-    pub(crate) fn new(path: Vec<String>, data: Arc<[u8]>) -> Self {
-        Self { path, data }
+    pub(crate) fn new(path: Vec<String>, data: Arc<[u8]>, directory: Option<Metadata>) -> Self {
+        Self {
+            path,
+            data,
+            directory,
+        }
     }
 
     /// Exact path relative to the selected object's storage.
@@ -115,6 +141,18 @@ impl Stream {
     #[must_use]
     pub fn bytes_shared(&self) -> Arc<[u8]> {
         Arc::clone(&self.data)
+    }
+
+    /// Typed physical CFB directory metadata, when this stream came from a
+    /// parsed directory entry.  Newly staged streams receive their metadata
+    /// after the next atomic CFB publication.
+    #[must_use]
+    pub fn directory(&self) -> Option<&Metadata> {
+        self.directory.as_ref()
+    }
+
+    pub(crate) fn replace_data(&mut self, data: Arc<[u8]>) {
+        self.data = data;
     }
 }
 

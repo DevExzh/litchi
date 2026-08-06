@@ -1,18 +1,18 @@
 //! CFB capture and deterministic rendering for the object owner.
 
+use super::directory::{self, EntryKind};
 use super::model::{Limits, Object, Storage, Stream};
 use super::target::Target;
+use crate::property_set::Guid;
 use litchi_cfb::{OleError, OleFile, OleWriter};
+use std::collections::HashMap;
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
-
-const STORAGE: u8 = 1;
-const STREAM: u8 = 2;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Package {
     sector_size: usize,
-    root_clsid: Option<[u8; 16]>,
+    root_clsid: Option<Guid>,
     storages: Vec<Storage>,
     streams: Vec<Stream>,
 }
@@ -26,7 +26,9 @@ impl Package {
             sector_size: ole.sector_size(),
             root_clsid: ole
                 .root_entry()
-                .and_then(|entry| parse_clsid_string(&entry.clsid)),
+                .map(directory::decode)
+                .transpose()?
+                .and_then(|metadata| metadata.class_id()),
             storages: Vec::new(),
             streams: Vec::new(),
         };
@@ -49,7 +51,7 @@ impl Package {
         let storage = find_storage(ole, target.path())?;
         let mut package = Self {
             sector_size: ole.sector_size(),
-            root_clsid: storage.clsid().and_then(parse_clsid_string),
+            root_clsid: storage.class_id(),
             storages: Vec::new(),
             streams: Vec::new(),
         };
@@ -69,7 +71,7 @@ impl Package {
             })?;
         let object_package = Self {
             sector_size: self.sector_size,
-            root_clsid: parse_clsid_string(storage.clsid().unwrap_or_default()),
+            root_clsid: storage.class_id(),
             storages: self
                 .storages
                 .iter()
@@ -80,7 +82,7 @@ impl Package {
                 .map(|value| {
                     Storage::new(
                         value.path()[target.path().len()..].to_vec(),
-                        value.clsid().map(str::to_owned),
+                        *value.directory(),
                     )
                 })
                 .collect(),
@@ -95,6 +97,7 @@ impl Package {
                     Stream::new(
                         value.path()[target.path().len()..].to_vec(),
                         value.bytes_shared(),
+                        value.directory().copied(),
                     )
                 })
                 .collect(),
@@ -118,7 +121,7 @@ impl Package {
             .iter_mut()
             .find(|stream| stream.path() == path)
             .ok_or(OleError::StreamNotFound)?;
-        *stream = Stream::new(path.to_vec(), data);
+        *stream = Stream::new(path.to_vec(), data, None);
         self.check(limits)
     }
 
@@ -134,6 +137,27 @@ impl Package {
             .iter()
             .find(|stream| stream.path() == path)
             .map(Stream::bytes_shared)
+    }
+
+    pub(crate) fn reuse_stream_allocations(&mut self, previous: &Self) -> Result<(), OleError> {
+        let mut by_path = HashMap::new();
+        by_path
+            .try_reserve(previous.streams.len())
+            .map_err(|source| OleError::Allocation {
+                resource: "CFB stream allocation index",
+                source,
+            })?;
+        for stream in &previous.streams {
+            by_path.insert(stream.path(), stream);
+        }
+        for stream in &mut self.streams {
+            if let Some(previous) = by_path.get(stream.path())
+                && previous.bytes() == stream.bytes()
+            {
+                stream.replace_data(previous.bytes_shared());
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn add_stream(
@@ -167,7 +191,7 @@ impl Package {
                 "new package stream parent storage is missing".into(),
             ));
         }
-        self.streams.push(Stream::new(path, data));
+        self.streams.push(Stream::new(path, data, None));
         self.check(limits)
     }
 
@@ -182,8 +206,8 @@ impl Package {
             .iter_mut()
             .find(|storage| storage.path() == path)
             .ok_or_else(|| OleError::InvalidFormat(format!("object storage {path:?} not found")))?;
-        let root_clsid = replacement.root_clsid.map(format_clsid);
-        *root = Storage::new(path.to_vec(), root_clsid);
+        let root_directory = root.directory().with_class_id(replacement.root_clsid);
+        *root = Storage::new(path.to_vec(), root_directory);
         self.storages.retain(|storage| {
             storage.path() == path
                 || !(storage.path().len() > path.len() && storage.path().starts_with(path))
@@ -193,13 +217,14 @@ impl Package {
         for storage in &replacement.storages {
             self.storages.push(Storage::new(
                 join(path, storage.path()),
-                storage.clsid().map(str::to_owned),
+                *storage.directory(),
             ));
         }
         for stream in &replacement.streams {
             self.streams.push(Stream::new(
                 join(path, stream.path()),
                 stream.bytes_shared(),
+                stream.directory().copied(),
             ));
         }
         self.check(limits)
@@ -233,18 +258,19 @@ impl Package {
         }
         self.storages.push(Storage::new(
             target.path().to_vec(),
-            replacement.root_clsid.map(format_clsid),
+            directory::Metadata::staged_storage(replacement.root_clsid),
         ));
         for storage in &replacement.storages {
             self.storages.push(Storage::new(
                 join(target.path(), storage.path()),
-                storage.clsid().map(str::to_owned),
+                *storage.directory(),
             ));
         }
         for stream in &replacement.streams {
             self.streams.push(Stream::new(
                 join(target.path(), stream.path()),
                 stream.bytes_shared(),
+                stream.directory().copied(),
             ));
         }
         self.check(limits)
@@ -271,7 +297,7 @@ impl Package {
     pub(crate) fn render(&self) -> Result<Vec<u8>, OleError> {
         let mut writer = OleWriter::with_sector_size(self.sector_size)?;
         if let Some(clsid) = self.root_clsid {
-            writer.set_root_clsid(clsid);
+            writer.set_root_clsid(*clsid.as_bytes());
         }
         let mut storages = self.storages.clone();
         storages.sort_by(|left, right| {
@@ -283,8 +309,8 @@ impl Package {
         for storage in &storages {
             let refs = path_refs(storage.path());
             writer.create_storage(&refs)?;
-            if let Some(bytes) = storage.clsid().and_then(parse_clsid_string) {
-                writer.set_storage_clsid(&refs, bytes)?;
+            if let Some(clsid) = storage.class_id() {
+                writer.set_storage_clsid(&refs, *clsid.as_bytes())?;
             }
         }
         for stream in &self.streams {
@@ -403,22 +429,20 @@ fn capture_container<R: Read + Seek>(
         .cloned()
         .collect::<Vec<_>>();
     for entry in entries {
+        let metadata = directory::decode(&entry)?;
         let mut child = path.to_vec();
         child.push(entry.name);
-        match entry.entry_type {
-            STORAGE => {
+        match metadata.kind() {
+            EntryKind::Storage => {
                 if child.len() > limits.max_storage_depth {
                     return Err(OleError::InvalidFormat(
                         "CFB storage nesting limit exceeded".into(),
                     ));
                 }
-                package.storages.push(Storage::new(
-                    child.clone(),
-                    parse_clsid_string(&entry.clsid).map(format_clsid),
-                ));
+                package.storages.push(Storage::new(child.clone(), metadata));
                 capture_container(ole, &child, package, budget, limits)?;
             },
-            STREAM => {
+            EntryKind::Stream => {
                 if entry.size > limits.max_stream_size {
                     return Err(OleError::InvalidFormat(format!(
                         "stream {child:?} exceeds size limit"
@@ -433,9 +457,9 @@ fn capture_container<R: Read + Seek>(
                 }
                 package
                     .streams
-                    .push(Stream::new(child, Arc::<[u8]>::from(data)));
+                    .push(Stream::new(child, Arc::<[u8]>::from(data), Some(metadata)));
             },
-            _ => {},
+            EntryKind::Root => {},
         }
     }
     Ok(())
@@ -461,22 +485,20 @@ fn capture_subtree<R: Read + Seek>(
         .cloned()
         .collect::<Vec<_>>();
     for entry in entries {
+        let metadata = directory::decode(&entry)?;
         let mut child = relative.to_vec();
         child.push(entry.name);
-        match entry.entry_type {
-            STORAGE => {
+        match metadata.kind() {
+            EntryKind::Storage => {
                 if child.len() > limits.max_storage_depth {
                     return Err(OleError::InvalidFormat(
                         "object storage nesting limit exceeded".into(),
                     ));
                 }
-                package.storages.push(Storage::new(
-                    child.clone(),
-                    parse_clsid_string(&entry.clsid).map(format_clsid),
-                ));
+                package.storages.push(Storage::new(child.clone(), metadata));
                 capture_subtree(ole, absolute, &child, package, budget, limits)?;
             },
-            STREAM => {
+            EntryKind::Stream => {
                 if entry.size > limits.max_stream_size {
                     return Err(OleError::InvalidFormat(
                         "object stream size exceeds limit".into(),
@@ -491,9 +513,9 @@ fn capture_subtree<R: Read + Seek>(
                 }
                 package
                     .streams
-                    .push(Stream::new(child, Arc::<[u8]>::from(data)));
+                    .push(Stream::new(child, Arc::<[u8]>::from(data), Some(metadata)));
             },
-            _ => {},
+            EntryKind::Root => {},
         }
     }
     Ok(())
@@ -506,12 +528,16 @@ fn find_storage<R: Read + Seek>(ole: &OleFile<R>, path: &[String]) -> Result<Sto
     let entry = ole
         .list_directory_entries(&path_refs(parent))?
         .into_iter()
-        .find(|entry| entry.entry_type == STORAGE && entry.name == *name)
+        .find(|entry| entry.entry_type == EntryKind::Storage.raw() && entry.name == *name)
         .ok_or_else(|| OleError::InvalidFormat(format!("object storage {path:?} not found")))?;
-    Ok(Storage::new(
-        path.to_vec(),
-        parse_clsid_string(&entry.clsid).map(format_clsid),
-    ))
+    let metadata = directory::decode(entry)?;
+    if metadata.kind() != EntryKind::Storage {
+        return Err(OleError::InvalidFormat(format!(
+            "object target path {:?} is not a storage",
+            path
+        )));
+    }
+    Ok(Storage::new(path.to_vec(), metadata))
 }
 
 fn reject_protected_package<R: Read + Seek>(ole: &OleFile<R>) -> Result<(), OleError> {
@@ -546,69 +572,4 @@ fn path_refs(path: &[String]) -> Vec<&str> {
 
 fn join(left: &[String], right: &[String]) -> Vec<String> {
     left.iter().chain(right).cloned().collect()
-}
-
-fn parse_clsid_string(input: &str) -> Option<[u8; 16]> {
-    let value = input
-        .trim_matches(|c| c == '{' || c == '}')
-        .replace('-', "");
-    let bytes = value.as_bytes();
-    if bytes.len() != 32 || !bytes.iter().all(u8::is_ascii_hexdigit) {
-        return None;
-    }
-    let mut canonical = [0u8; 16];
-    for (index, byte) in canonical.iter_mut().enumerate() {
-        let high = hex(bytes[index * 2])?;
-        let low = hex(bytes[index * 2 + 1])?;
-        *byte = (high << 4) | low;
-    }
-    Some([
-        canonical[3],
-        canonical[2],
-        canonical[1],
-        canonical[0],
-        canonical[5],
-        canonical[4],
-        canonical[7],
-        canonical[6],
-        canonical[8],
-        canonical[9],
-        canonical[10],
-        canonical[11],
-        canonical[12],
-        canonical[13],
-        canonical[14],
-        canonical[15],
-    ])
-}
-
-fn format_clsid(bytes: [u8; 16]) -> String {
-    format!(
-        "{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}",
-        bytes[3],
-        bytes[2],
-        bytes[1],
-        bytes[0],
-        bytes[5],
-        bytes[4],
-        bytes[7],
-        bytes[6],
-        bytes[8],
-        bytes[9],
-        bytes[10],
-        bytes[11],
-        bytes[12],
-        bytes[13],
-        bytes[14],
-        bytes[15]
-    )
-}
-
-fn hex(value: u8) -> Option<u8> {
-    match value {
-        b'0'..=b'9' => Some(value - b'0'),
-        b'a'..=b'f' => Some(value - b'a' + 10),
-        b'A'..=b'F' => Some(value - b'A' + 10),
-        _ => None,
-    }
 }

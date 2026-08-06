@@ -9,6 +9,7 @@
 
 mod cfb_path;
 mod codec;
+pub mod directory;
 mod discovery;
 mod editor;
 mod model;
@@ -16,6 +17,7 @@ mod patch;
 mod snapshot;
 pub mod target;
 
+pub use directory::{EntryKind, Links, Metadata, Sid};
 pub use discovery::discover;
 pub use editor::Editor;
 pub use model::{Limits, Object, Objects, Storage, Stream};

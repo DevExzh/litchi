@@ -1,5 +1,5 @@
 use litchi_cfb::{OleFile, OleWriter};
-use litchi_ole_common::object::{Editor, Limits, Snapshot, Target, Targets, discover};
+use litchi_ole_common::object::{Editor, EntryKind, Limits, Snapshot, Target, Targets, discover};
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -95,8 +95,24 @@ fn discovers_only_host_selected_storage_and_keeps_metadata_opaque() {
         object.stream(&["\u{3}ObjInfo"]),
         Some(&[0x40, 0x00, 0x02, 0x00][..])
     );
+    assert_eq!(object.storage().directory().kind(), EntryKind::Storage);
+    assert!(object.storage().directory().sid().raw() > 0);
     assert_eq!(object.streams().len(), 4);
     assert!(object.stream(&["\u{1}Ole10Native"]).is_some());
+    let preview = object
+        .streams()
+        .iter()
+        .find(|stream| stream.name() == Some("\u{3}PRINT"))
+        .expect("preview stream metadata should be captured");
+    let preview_directory = preview
+        .directory()
+        .expect("preview should retain directory metadata");
+    assert_eq!(preview_directory.kind(), EntryKind::Stream);
+    assert_eq!(
+        preview_directory.stream_size(),
+        preview.bytes().len() as u64
+    );
+    assert!(preview_directory.links().child().is_none());
     assert!(object.compound().starts_with(&[0xD0, 0xCF, 0x11, 0xE0]));
     assert_eq!(objects.at(0).map(|value| value.key()), Some("host-object"));
 }
@@ -291,7 +307,11 @@ fn shared_stream_replacement_reuses_validated_allocation() {
         Limits::default(),
     )
     .expect("editor should open");
-    let path = vec!["WordDocument".to_string()];
+    let path = vec![
+        "ObjectPool".to_string(),
+        "_42".to_string(),
+        "\u{3}PRINT".to_string(),
+    ];
     let replacement: Arc<[u8]> = Arc::from(&b"shared-word-stream"[..]);
     editor
         .put_stream_shared(&path, Arc::clone(&replacement))
@@ -301,6 +321,20 @@ fn shared_stream_replacement_reuses_validated_allocation() {
         .expect("stream should remain available");
     assert!(Arc::ptr_eq(&replacement, &installed));
     assert_eq!(editor.stream(&path), Some(&b"shared-word-stream"[..]));
+    let metadata = editor
+        .objects()
+        .get("object")
+        .and_then(|object| {
+            object
+                .streams()
+                .iter()
+                .find(|stream| stream.path() == &path[2..])
+        })
+        .and_then(|stream| stream.directory())
+        .expect("edited stream should be reparsed before publication");
+    assert_eq!(metadata.kind(), EntryKind::Stream);
+    assert_eq!(metadata.stream_size(), replacement.len() as u64);
+    assert!(metadata.uses_mini_stream());
 }
 
 #[test]
