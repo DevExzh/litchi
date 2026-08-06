@@ -17,6 +17,7 @@ use crate::charts::style::{
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media::MediaAssetId;
 use crate::package_metadata::component_identifier_for_entry;
 use crate::protobuf::tsch;
 use crate::shapes::{
@@ -86,8 +87,12 @@ pub(crate) fn set_chart_background_fill(
         return Ok(());
     }
     validate_image_asset(package, fill)?;
-    let old_data_identifier = image_data_identifier(&current);
-    let new_data_identifier = image_data_identifier(fill);
+    let old_data_identifier = image_data_identifier(&current)
+        .map(MediaAssetId::try_from)
+        .transpose()?;
+    let new_data_identifier = image_data_identifier(fill)
+        .map(MediaAssetId::try_from)
+        .transpose()?;
     slot.ensure_exclusive(package, drawable_object_id, drawable_label)?;
     slot.update(package, |data| patch_chart_background_fill(data, fill))?;
     adjust_chart_style_data_reference(package, &slot, old_data_identifier, new_data_identifier)?;
@@ -96,7 +101,7 @@ pub(crate) fn set_chart_background_fill(
             "{drawable_label} chart {drawable_object_id} background fill update failed validation"
         )));
     }
-    remove_orphaned_image_asset(package, old_data_identifier)?;
+    remove_orphaned_image_asset(package, old_data_identifier.map(MediaAssetId::get))?;
     Ok(())
 }
 
@@ -122,7 +127,7 @@ pub(crate) fn set_chart_background_image_fill_data(
     }
     let mut staged = media.into_package();
     let mut image = ShapeImageFill::embedded(
-        ShapeImageDataIdentifier::new(asset.data_identifier)?,
+        ShapeImageDataIdentifier::new(asset.data_identifier.get())?,
         technique,
         fill_size,
     )?;
@@ -203,8 +208,8 @@ fn patch_chart_background_fill(data: &[u8], fill: &ShapeFill) -> Result<Vec<u8>>
 fn adjust_chart_style_data_reference(
     package: &mut IWorkPackage,
     slot: &ChartStyleSlot,
-    old_data_identifier: Option<u64>,
-    new_data_identifier: Option<u64>,
+    old_data_identifier: Option<MediaAssetId>,
+    new_data_identifier: Option<MediaAssetId>,
 ) -> Result<()> {
     if old_data_identifier == new_data_identifier {
         return Ok(());
@@ -212,10 +217,10 @@ fn adjust_chart_style_data_reference(
     let component_id = component_identifier_for_entry(package, slot.archive_name())?
         .ok_or_else(|| Error::InvalidFormat("Chart style has no owning component".to_owned()))?;
     if let Some(identifier) = old_data_identifier {
-        remove_component_data_reference(package, component_id, identifier, slot.object_id())?;
+        remove_component_data_reference(package, component_id, identifier.get(), slot.object_id())?;
     }
     if let Some(identifier) = new_data_identifier {
-        add_component_data_reference(package, component_id, identifier, slot.object_id())?;
+        add_component_data_reference(package, component_id, identifier.get(), slot.object_id())?;
     }
     Ok(())
 }

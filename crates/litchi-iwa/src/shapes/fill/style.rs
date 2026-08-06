@@ -9,6 +9,7 @@ use litchi_iwa_common::media::Type as MediaType;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media::MediaAssetId;
 use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
     next_object_identifier, set_package_last_object_identifier,
@@ -53,7 +54,9 @@ pub(crate) fn set_shape_fill(
     if &current_fill == fill {
         return Ok(());
     }
-    let old_data_identifier = image_data_identifier(&current_fill);
+    let old_data_identifier = image_data_identifier(&current_fill)
+        .map(MediaAssetId::try_from)
+        .transpose()?;
     validate_image_asset(package, fill)?;
     let shape = shape_payload(package, archive_name, drawable_id)?;
     let old_style_id = shape
@@ -69,6 +72,9 @@ pub(crate) fn set_shape_fill(
     let direct = direct_shape_style_overrides(&old_style, &old_style_message.data)?;
     let exclusive = direct.is_some() && shape_style_is_exclusive(package, old_style_id)?;
     let native = fill_to_native(fill);
+    let new_data_identifier = image_data_identifier(fill)
+        .map(MediaAssetId::try_from)
+        .transpose()?;
 
     if exclusive {
         let parent_style_id = parent_style_id(old_style_id, &old_style)?;
@@ -87,10 +93,10 @@ pub(crate) fn set_shape_fill(
             &style_archive_name,
             old_style_id,
             old_data_identifier,
-            image_data_identifier(fill),
+            new_data_identifier,
         )?;
         validate_fill(&staged, archive_name, drawable_id, fill)?;
-        remove_orphaned_image_asset(&mut staged, old_data_identifier)?;
+        remove_orphaned_image_asset(&mut staged, old_data_identifier.map(MediaAssetId::get))?;
         *package = staged;
         return Ok(());
     }
@@ -131,7 +137,7 @@ pub(crate) fn set_shape_image_fill_data(
     }
     let mut staged = media.into_package();
     let mut image = ShapeImageFill::embedded(
-        ShapeImageDataIdentifier::new(asset.data_identifier)?,
+        ShapeImageDataIdentifier::new(asset.data_identifier.get())?,
         technique,
         fill_size,
     )?;
@@ -180,7 +186,9 @@ pub(crate) fn reset_shape_fill(
     else {
         return Ok(false);
     };
-    let direct_data_identifier = image_data_identifier(&fill_from_native(direct_native_fill)?);
+    let direct_data_identifier = image_data_identifier(&fill_from_native(direct_native_fill)?)
+        .map(MediaAssetId::try_from)
+        .transpose()?;
     let mut direct = direct_shape_style_overrides(&old_style, &old_style_message.data)?
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -224,7 +232,7 @@ pub(crate) fn reset_shape_fill(
             )?;
         }
         validate_fill(&staged, archive_name, drawable_id, &inherited)?;
-        remove_orphaned_image_asset(&mut staged, direct_data_identifier)?;
+        remove_orphaned_image_asset(&mut staged, direct_data_identifier.map(MediaAssetId::get))?;
         *package = staged;
         return Ok(true);
     }
@@ -277,14 +285,16 @@ fn insert_fill_variation(
         new_style_id,
         new_style,
     )?;
-    let expected_data_identifier = image_data_identifier(expected);
+    let expected_data_identifier = image_data_identifier(expected)
+        .map(MediaAssetId::try_from)
+        .transpose()?;
     if let Some(style_component) = component_identifier_for_entry(&staged, style_archive_name)? {
         add_component_object_uuids(&mut staged, style_component, &[new_style_id])?;
         if let Some(data_identifier) = expected_data_identifier {
             add_component_data_reference(
                 &mut staged,
                 style_component,
-                data_identifier,
+                data_identifier.get(),
                 new_style_id,
             )?;
         }
@@ -311,7 +321,10 @@ fn insert_fill_variation(
 }
 
 pub(crate) fn validate_image_asset(package: &IWorkPackage, fill: &ShapeFill) -> Result<()> {
-    let Some(data_identifier) = image_data_identifier(fill) else {
+    let Some(data_identifier) = image_data_identifier(fill)
+        .map(MediaAssetId::try_from)
+        .transpose()?
+    else {
         return Ok(());
     };
     let assets = crate::media::embedded_assets(package)?;
@@ -335,8 +348,8 @@ fn adjust_style_data_reference(
     package: &mut IWorkPackage,
     style_archive_name: &str,
     style_id: u64,
-    old_data_identifier: Option<u64>,
-    new_data_identifier: Option<u64>,
+    old_data_identifier: Option<MediaAssetId>,
+    new_data_identifier: Option<MediaAssetId>,
 ) -> Result<()> {
     if old_data_identifier == new_data_identifier {
         return Ok(());
@@ -344,10 +357,10 @@ fn adjust_style_data_reference(
     let style_component = component_identifier_for_entry(package, style_archive_name)?
         .ok_or_else(|| Error::InvalidFormat("iWork stylesheet has no component".to_owned()))?;
     if let Some(identifier) = old_data_identifier {
-        remove_component_data_reference(package, style_component, identifier, style_id)?;
+        remove_component_data_reference(package, style_component, identifier.get(), style_id)?;
     }
     if let Some(identifier) = new_data_identifier {
-        add_component_data_reference(package, style_component, identifier, style_id)?;
+        add_component_data_reference(package, style_component, identifier.get(), style_id)?;
     }
     Ok(())
 }
@@ -356,21 +369,21 @@ fn remove_style_data_reference(
     package: &mut IWorkPackage,
     style_archive_name: &str,
     style_id: u64,
-    data_identifier: Option<u64>,
+    data_identifier: Option<MediaAssetId>,
 ) -> Result<()> {
     let Some(data_identifier) = data_identifier else {
         return Ok(());
     };
     let style_component = component_identifier_for_entry(package, style_archive_name)?
         .ok_or_else(|| Error::InvalidFormat("iWork stylesheet has no component".to_owned()))?;
-    remove_component_data_reference(package, style_component, data_identifier, style_id)
+    remove_component_data_reference(package, style_component, data_identifier.get(), style_id)
 }
 
 pub(crate) fn remove_orphaned_image_asset(
     package: &mut IWorkPackage,
     data_identifier: Option<u64>,
 ) -> Result<()> {
-    let Some(data_identifier) = data_identifier else {
+    let Some(data_identifier) = data_identifier.map(MediaAssetId::try_from).transpose()? else {
         return Ok(());
     };
     let mut media = IWorkMediaEditor::from_package(package.clone())?;
