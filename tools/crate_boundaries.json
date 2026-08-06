@@ -121,7 +121,9 @@
       "litchi-numbers",
       "litchi-pages"
     ],
-    "litchi-iwa-text": [],
+    "litchi-iwa-text": [
+      "litchi-iwa-common"
+    ],
     "litchi-keynote": [
       "litchi-iwa-common",
       "litchi-iwa-text",

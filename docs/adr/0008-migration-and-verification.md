@@ -6288,6 +6288,39 @@ bounded provenance/detection/value extraction slice; source-backed lazy object
 access, weighted caches, edited-entry reassembly, paragraph-list extraction,
 and full monolith removal remain open.
 
+The following 2026-08-06 slice advances the crate split and typed text boundary.
+`litchi-iwa-cache` is now a dependency-free leaf with weighted deterministic LRU
+eviction, explicit invalidation, and generation-safe single-flight parsing; its
+six concurrency, retry, weight, and eviction tests pass. It is deliberately a
+standalone seam until package-state cache wiring can replace the current
+single-entry adapter without mixing cache policy with archive ownership.
+`litchi-iwa-text::paragraph::list` now owns checked list presets, bullets,
+number formats, geometry, indentation, UTF-16 paragraph placement, and typed
+errors; the IWA, Pages, Keynote, and Numbers adapters use `TextPosition` and
+the leaf's semantic values. The former paragraph-level facade reexports were
+removed so the module hierarchy is explicit and incremental-build friendly.
+The text leaf passed 27 tests and production Clippy, while the migrated IWA
+paragraph-list suite passed 51 tests and the IWA test-target check passed.
+Stale resolved edges were removed from the boundary policy, a regression test
+now rejects reintroducing them, and the checker reports 49 packages, 136
+internal declarations, and 13 explicitly ordered debt items; its Python suite
+passes 15 tests.
+
+Computer Use created and saved fresh native fixtures through the real iWork
+applications. Pages applied text bullets with a 110% bullet scale and saved
+`/private/tmp/litchi-native-paragraph-list-20260806.pages`; Numbers saved a
+table-cell marker to
+`/private/tmp/litchi-native-paragraph-list-20260806.numbers`; and Keynote saved
+the title/subtitle marker pair to
+`/private/tmp/litchi-native-paragraph-list-20260806.key`. Each native window
+displayed its saved file URL and expected semantic content without a repair
+prompt, and all three applications were closed after verification. This is a
+bounded leaf/topology and native-open slice; the remaining ADR debt includes
+raw `IWorkTextEditor` object IDs and storage message exposure, eager
+`Bundle`/`Document` materialization and missing `ReadAt` source identity,
+weighted-cache integration into package state, edited ZIP-entry reassembly,
+and the remaining monolithic semantic adapters.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

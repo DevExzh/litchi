@@ -6,6 +6,21 @@ use std::thread;
 
 use litchi_iwa_cache::{CacheError, GetOrInsertError, ParseError, WeightError, WeightedCache};
 
+#[derive(Debug)]
+struct TestError(&'static str);
+
+impl fmt::Display for TestError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.0)
+    }
+}
+
+impl Error for TestError {}
+
+fn boxed_error(message: &'static str) -> ParseError {
+    Box::new(TestError(message))
+}
+
 #[test]
 fn rejects_invalid_capacity_and_weights() {
     assert!(matches!(
@@ -77,15 +92,15 @@ fn concurrent_callers_share_one_arc_and_one_parse() {
     let parse_count = Arc::new(AtomicUsize::new(0));
     let handles = (0..CALLERS)
         .map(|_| {
-            let cache = Arc::clone(&cache);
-            let ready = Arc::clone(&ready);
-            let parser_started = Arc::clone(&parser_started);
-            let parse_count = Arc::clone(&parse_count);
+            let cache_handle = Arc::clone(&cache);
+            let ready_barrier = Arc::clone(&ready);
+            let parser_started_barrier = Arc::clone(&parser_started);
+            let parse_count_ref = Arc::clone(&parse_count);
             thread::spawn(move || {
-                ready.wait();
-                cache.get_or_insert_with("key", 2, || {
-                    if parse_count.fetch_add(1, Ordering::SeqCst) == 0 {
-                        parser_started.wait();
+                ready_barrier.wait();
+                cache_handle.get_or_insert_with("key", 2, || {
+                    if parse_count_ref.fetch_add(1, Ordering::SeqCst) == 0 {
+                        parser_started_barrier.wait();
                     }
                     42
                 })
@@ -95,10 +110,7 @@ fn concurrent_callers_share_one_arc_and_one_parse() {
     parser_started.wait();
 
     let results = handles.into_iter().map(join_success).collect::<Vec<_>>();
-    let first = results
-        .first()
-        .map(Arc::clone)
-        .unwrap_or_else(|| Arc::new(0));
+    let first = results.first().map_or_else(|| Arc::new(0), Arc::clone);
     assert!(results.iter().all(|value| Arc::ptr_eq(&first, value)));
     assert!(results.iter().all(|value| **value == 42));
     assert_eq!(parse_count.load(Ordering::SeqCst), 1);
@@ -184,21 +196,9 @@ fn join_success<T>(handle: thread::JoinHandle<Result<Arc<T>, GetOrInsertError>>)
     match handle.join() {
         Ok(Ok(value)) => value,
         Ok(Err(error)) => panic!("thread returned cache error: {error}"),
-        Err(_) => panic!("cache worker panicked"),
+        Err(payload) => {
+            drop(payload);
+            panic!("cache worker panicked");
+        },
     }
 }
-
-fn boxed_error(message: &'static str) -> ParseError {
-    Box::new(TestError(message))
-}
-
-#[derive(Debug)]
-struct TestError(&'static str);
-
-impl fmt::Display for TestError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(self.0)
-    }
-}
-
-impl Error for TestError {}

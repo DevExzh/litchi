@@ -54,10 +54,9 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::LevelTooHigh { maximum, .. } => write!(
-                formatter,
-                "paragraph list level must not exceed {maximum}"
-            ),
+            Self::LevelTooHigh { maximum, .. } => {
+                write!(formatter, "paragraph list level must not exceed {maximum}")
+            },
             Self::StartNumberZero => {
                 formatter.write_str("paragraph list starting number must be positive")
             },
@@ -69,25 +68,22 @@ impl std::fmt::Display for Error {
             Self::BulletControlCharacter => {
                 formatter.write_str("paragraph list bullet must not contain control characters")
             },
-            Self::BulletScaleNonFinite => {
-                formatter.write_str("paragraph list bullet scale must be positive and finite")
-            },
-            Self::BulletScaleNonPositive => {
+            Self::BulletScaleNonFinite | Self::BulletScaleNonPositive => {
                 formatter.write_str("paragraph list bullet scale must be positive and finite")
             },
             Self::NumberScaleNonFinite | Self::NumberScaleOutOfRange => write!(
                 formatter,
                 "paragraph list number scale must be between {MIN_NUMBER_SCALE_PERCENT}% and {MAX_NUMBER_SCALE_PERCENT}%"
             ),
-            Self::BulletBaselineOffsetNonFinite => formatter.write_str(
-                "paragraph list bullet baseline offset must be finite",
-            ),
-            Self::LabelIndentNonFinite | Self::LabelIndentNegative => formatter.write_str(
-                "paragraph list label indent must be finite and nonnegative",
-            ),
-            Self::TextGapNonFinite | Self::TextGapNegative => formatter.write_str(
-                "paragraph list text gap must be finite and nonnegative",
-            ),
+            Self::BulletBaselineOffsetNonFinite => {
+                formatter.write_str("paragraph list bullet baseline offset must be finite")
+            },
+            Self::LabelIndentNonFinite | Self::LabelIndentNegative => {
+                formatter.write_str("paragraph list label indent must be finite and nonnegative")
+            },
+            Self::TextGapNonFinite | Self::TextGapNegative => {
+                formatter.write_str("paragraph list text gap must be finite and nonnegative")
+            },
             Self::IndentationUnavailable => {
                 formatter.write_str("ordinary paragraphs do not have list indentation")
             },
@@ -104,6 +100,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 ///
 /// The presets describe the complete nine-level native list style rather than
 /// exposing unvalidated protobuf integers or partial per-level state.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "The explicit ParagraphList name remains unambiguous when this value is re-exported by format facades."
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ParagraphList {
     /// Ordinary paragraphs without labels.
@@ -126,6 +126,7 @@ pub struct ParagraphListPlacement {
 }
 
 impl ParagraphListPlacement {
+    #[must_use]
     pub const fn new(paragraph: TextPosition, list: ParagraphList) -> Self {
         Self { paragraph, list }
     }
@@ -144,6 +145,11 @@ impl ParagraphListLevel {
     pub const MAX: Self = Self(MAX_PARAGRAPH_LIST_LEVEL);
 
     /// Construct a validated zero-based nesting level.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::LevelTooHigh`] when `level` exceeds the native
+    /// nine-level style model.
     pub fn new(level: u8) -> Result<Self> {
         if level > MAX_PARAGRAPH_LIST_LEVEL {
             return Err(Error::LevelTooHigh {
@@ -155,10 +161,10 @@ impl ParagraphListLevel {
     }
 
     /// Return the zero-based native nesting level.
+    #[must_use]
     pub const fn get(self) -> u8 {
         self.0
     }
-
 }
 
 /// One effective list-level boundary at a UTF-16 paragraph start.
@@ -169,6 +175,7 @@ pub struct ParagraphListLevelPlacement {
 }
 
 impl ParagraphListLevelPlacement {
+    #[must_use]
     pub const fn new(paragraph: TextPosition, level: ParagraphListLevel) -> Self {
         Self { paragraph, level }
     }
@@ -183,6 +190,10 @@ impl ParagraphListStart {
     pub const ONE: Self = Self(1);
 
     /// Construct a validated positive starting number.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::StartNumberZero`] when `number` is zero.
     pub fn new(number: u32) -> Result<Self> {
         if number == 0 {
             return Err(Error::StartNumberZero);
@@ -191,10 +202,10 @@ impl ParagraphListStart {
     }
 
     /// Return the native positive starting number.
+    #[must_use]
     pub const fn get(self) -> u32 {
         self.0
     }
-
 }
 
 /// How one numbered-list paragraph participates in the current sequence.
@@ -207,8 +218,7 @@ pub enum ParagraphListNumbering {
     StartAt(ParagraphListStart),
 }
 
-impl ParagraphListNumbering {
-}
+impl ParagraphListNumbering {}
 
 /// A validated text marker used by one bullet-list level.
 ///
@@ -223,8 +233,13 @@ impl ParagraphListBullet {
     pub const STANDARD: &'static str = "•";
 
     /// Construct a validated custom text bullet.
-    pub fn new(value: impl Into<Box<str>>) -> Result<Self> {
-        let value = value.into();
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed validation error when `bullet` is empty, too long, or
+    /// contains a control character.
+    pub fn new(bullet: impl Into<Box<str>>) -> Result<Self> {
+        let value = bullet.into();
         let character_count = value.chars().count();
         if character_count == 0 {
             return Err(Error::BulletEmpty);
@@ -242,6 +257,7 @@ impl ParagraphListBullet {
     }
 
     /// Borrow the marker exactly as iWork displays it.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -271,11 +287,21 @@ impl ParagraphListBulletScale {
     pub const ONE: Self = Self(1.0);
 
     /// Construct a scale from the percentage displayed by iWork.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed validation error when `percent` is not finite or is
+    /// not positive.
     pub fn from_percent(percent: f32) -> Result<Self> {
         Self::from_ratio(percent / PERCENT_PER_SCALE_UNIT)
     }
 
     /// Construct a scale from its native text-relative ratio.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed validation error when `ratio` is not finite or is not
+    /// positive.
     pub fn from_ratio(ratio: f32) -> Result<Self> {
         if !ratio.is_finite() {
             return Err(Error::BulletScaleNonFinite);
@@ -287,11 +313,13 @@ impl ParagraphListBulletScale {
     }
 
     /// Return the percentage displayed by iWork.
+    #[must_use]
     pub fn percent(self) -> f32 {
         self.0 * PERCENT_PER_SCALE_UNIT
     }
 
     /// Return the native text-relative scale ratio.
+    #[must_use]
     pub const fn ratio(self) -> f32 {
         self.0
     }
@@ -318,6 +346,12 @@ impl ParagraphListNumberScale {
     pub const MAX_PERCENT: f32 = MAX_NUMBER_SCALE_PERCENT;
 
     /// Construct a scale from the percentage displayed by iWork.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NumberScaleNonFinite`] when `percent` is not finite,
+    /// or [`Error::NumberScaleOutOfRange`] when it is outside the native
+    /// inspector range.
     pub fn from_percent(percent: f32) -> Result<Self> {
         if !percent.is_finite() {
             return Err(Error::NumberScaleNonFinite);
@@ -329,16 +363,23 @@ impl ParagraphListNumberScale {
     }
 
     /// Construct a scale from its native text-relative ratio.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed validation error when `ratio` is outside the native
+    /// inspector range.
     pub fn from_ratio(ratio: f32) -> Result<Self> {
         Self::from_percent(ratio * PERCENT_PER_SCALE_UNIT)
     }
 
     /// Return the percentage displayed by iWork.
+    #[must_use]
     pub fn percent(self) -> f32 {
         self.0 * PERCENT_PER_SCALE_UNIT
     }
 
     /// Return the native text-relative scale ratio.
+    #[must_use]
     pub const fn ratio(self) -> f32 {
         self.0
     }
@@ -359,6 +400,11 @@ impl ParagraphListBulletBaselineOffset {
     pub const ZERO: Self = Self(0.0);
 
     /// Construct a validated vertical offset in points.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::BulletBaselineOffsetNonFinite`] when `points` is not
+    /// finite.
     pub fn from_points(points: f32) -> Result<Self> {
         if !points.is_finite() {
             return Err(Error::BulletBaselineOffsetNonFinite);
@@ -367,6 +413,7 @@ impl ParagraphListBulletBaselineOffset {
     }
 
     /// Return the vertical offset in points.
+    #[must_use]
     pub const fn points(self) -> f32 {
         self.0
     }
@@ -381,6 +428,7 @@ pub struct ParagraphListBulletGeometry {
 
 impl ParagraphListBulletGeometry {
     /// Construct a bullet geometry from validated components.
+    #[must_use]
     pub const fn new(
         scale: ParagraphListBulletScale,
         baseline_offset: ParagraphListBulletBaselineOffset,
@@ -392,6 +440,7 @@ impl ParagraphListBulletGeometry {
     }
 
     /// Apple's standard geometry for a particular list nesting level.
+    #[must_use]
     pub fn standard(level: ParagraphListLevel) -> Self {
         let baseline_points = if level == ParagraphListLevel::ZERO {
             STANDARD_TOP_LEVEL_BULLET_BASELINE_POINTS
@@ -414,6 +463,11 @@ impl ParagraphListLabelIndent {
     pub const ZERO: Self = Self(0.0);
 
     /// Construct an absolute label indent in typographic points.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed validation error when `points` is not finite or is
+    /// negative.
     pub fn from_points(points: f32) -> Result<Self> {
         if !points.is_finite() {
             return Err(Error::LabelIndentNonFinite);
@@ -425,6 +479,7 @@ impl ParagraphListLabelIndent {
     }
 
     /// Return the absolute label indent in typographic points.
+    #[must_use]
     pub const fn points(self) -> f32 {
         self.0
     }
@@ -441,6 +496,11 @@ impl ParagraphListTextGap {
     pub const ZERO: Self = Self(0.0);
 
     /// Construct a font-relative gap in em units.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed validation error when `em` is not finite or is
+    /// negative.
     pub fn from_em(em: f32) -> Result<Self> {
         if !em.is_finite() {
             return Err(Error::TextGapNonFinite);
@@ -452,16 +512,23 @@ impl ParagraphListTextGap {
     }
 
     /// Construct a gap from its displayed point size and paragraph font size.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed validation error when the derived em value is not
+    /// finite or is negative.
     pub fn from_points(points: f32, font_size: TextPointSize) -> Result<Self> {
         Self::from_em(points / font_size.points())
     }
 
     /// Return the native font-relative gap in em units.
+    #[must_use]
     pub const fn em(self) -> f32 {
         self.0
     }
 
     /// Return the point size iWork displays for the supplied paragraph font.
+    #[must_use]
     pub fn points_at(self, font_size: TextPointSize) -> f32 {
         self.0 * font_size.points()
     }
@@ -582,6 +649,7 @@ impl ParagraphListNumberFormat {
     };
 
     /// Construct an affixed locale-aware number format.
+    #[must_use]
     pub const fn affixed(
         sequence: ParagraphListNumberSequence,
         punctuation: ParagraphListNumberPunctuation,
@@ -606,6 +674,7 @@ pub enum ParagraphListNumberTiering {
 
 impl ParagraphListIndentation {
     /// Construct list indentation from validated components.
+    #[must_use]
     pub const fn new(
         label_from_margin: ParagraphListLabelIndent,
         text_from_label: ParagraphListTextGap,
@@ -617,6 +686,11 @@ impl ParagraphListIndentation {
     }
 
     /// Apple's standard indentation for a list preset and nesting level.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::IndentationUnavailable`] for ordinary paragraphs,
+    /// which have no list label indentation.
     pub fn standard(list: ParagraphList, level: ParagraphListLevel) -> Result<Self> {
         let step = match list {
             ParagraphList::Bullet => STANDARD_BULLET_INDENT_STEP_POINTS,
@@ -649,10 +723,7 @@ mod tests {
 
     #[test]
     fn list_start_numbers_are_positive_and_numbering_is_typed() {
-        assert_eq!(
-            ParagraphListStart::new(0),
-            Err(Error::StartNumberZero)
-        );
+        assert_eq!(ParagraphListStart::new(0), Err(Error::StartNumberZero));
         let seven = ParagraphListStart::new(7).unwrap();
         assert_eq!(seven.get(), 7);
         assert_eq!(

@@ -9,12 +9,12 @@ use crate::text::style_registry::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use litchi_iwa_text::paragraph::list::{ParagraphList, ParagraphListNumberScale};
-use litchi_iwa_text::position::TextPosition;
 use super::variation::{
     effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
 };
 use super::{levels, native, storage};
+use litchi_iwa_text::paragraph::list::{ParagraphList, ParagraphListNumberScale};
+use litchi_iwa_text::position::TextPosition;
 
 pub(crate) fn paragraph_list_number_scale(
     package: &IWorkPackage,
@@ -26,11 +26,11 @@ pub(crate) fn paragraph_list_number_scale(
     let style_id = effective_style_id(&boundaries, paragraph)?;
     require_numbered(package, storage_id, paragraph, style_id)?;
     let geometries = native::effective_label_geometries(package, style_id)?;
-    ParagraphListNumberScale::from_ratio(
+    Ok(ParagraphListNumberScale::from_ratio(
         geometries[usize::from(level.get())]
             .scale
             .unwrap_or(ParagraphListNumberScale::ONE.ratio()),
-    )
+    )?)
 }
 
 pub(in crate::text) fn set_paragraph_list_number_scale(

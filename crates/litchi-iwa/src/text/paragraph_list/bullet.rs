@@ -8,12 +8,12 @@ use crate::text::style_registry::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use litchi_iwa_text::paragraph::list::{ParagraphList, ParagraphListBullet};
-use litchi_iwa_text::position::TextPosition;
 use super::variation::{
     effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
 };
 use super::{levels, native, storage};
+use litchi_iwa_text::paragraph::list::{ParagraphList, ParagraphListBullet};
+use litchi_iwa_text::position::TextPosition;
 
 pub(crate) fn paragraph_list_bullet(
     package: &IWorkPackage,
@@ -30,7 +30,9 @@ pub(crate) fn paragraph_list_bullet(
         )));
     }
     let strings = native::effective_bullet_strings(package, style_id)?;
-    ParagraphListBullet::new(strings[usize::from(level.get())].clone())
+    Ok(ParagraphListBullet::new(
+        strings[usize::from(level.get())].clone(),
+    )?)
 }
 
 pub(in crate::text) fn set_paragraph_list_bullet(
