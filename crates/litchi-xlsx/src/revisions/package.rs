@@ -620,6 +620,10 @@ fn validate_physical_value(value: &Revisions) -> Result<()> {
     Ok(())
 }
 
+pub(super) fn validate_value(value: &Revisions) -> Result<()> {
+    validate_physical_value(value)
+}
+
 fn incoming_references(package: &OpcPackage, target: &PackURI) -> Result<usize> {
     let mut count = 0;
     for relationship in package.rels().iter() {

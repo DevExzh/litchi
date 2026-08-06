@@ -6,7 +6,7 @@ use super::model::{RevisionHeaders, RevisionLog, RevisionUsers, Revisions};
 
 /// Validate one complete revision package model before publication.
 pub fn revisions(value: &Revisions) -> Result<()> {
-    super::model::validate_package(value)
+    super::package::validate_value(value)
 }
 
 /// Validate the typed user catalog independently.

@@ -120,6 +120,8 @@ impl SourceState {
             .filter(|relationship| super::package::is_revision_relationship(relationship.reltype()))
             .map(SourceRelationship::from_relationship)
             .collect::<Vec<_>>();
+        let mut workbook_relationships = workbook_relationships;
+        workbook_relationships.sort_by(|left, right| left.id.cmp(&right.id));
         let mut parts = Vec::new();
         if let Some(revisions) = revisions {
             let mut names = Vec::with_capacity(revisions.logs.len().saturating_add(2));
