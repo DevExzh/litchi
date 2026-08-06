@@ -7,25 +7,20 @@ use crate::wire::{
 };
 
 use super::*;
-use crate::text::date_time_types::{
-    TextDateTimeFieldSettings, TextDateTimeFormat, TextDateTimeFormatterStyle, TextDateTimeInstant,
-    TextDateTimeLocaleIdentifier,
-};
 use crate::text::hyperlink_storage::SMART_FIELD_TABLE_FIELD;
+use litchi_iwa_text::date_time::{Format, FormatterStyle, Instant, LocaleIdentifier, Settings};
 use prost::Message;
 
 const DATE_FIELD: u32 = 8;
 
-fn settings(seconds: f64) -> TextDateTimeFieldSettings {
-    TextDateTimeFieldSettings::fixed(
-        TextDateTimeFormat::new("EEEE, MMMM d, y").unwrap(),
-        TextDateTimeLocaleIdentifier::new("en_US").unwrap(),
-        TextDateTimeInstant::from_reference_date_seconds(seconds).unwrap(),
+fn settings(seconds: f64) -> Settings {
+    Settings::fixed(
+        Format::new("EEEE, MMMM d, y").unwrap(),
+        LocaleIdentifier::new("en_US").unwrap(),
+        Instant::from_reference_date_seconds(seconds).unwrap(),
     )
-    .with_styles(
-        TextDateTimeFormatterStyle::Full,
-        TextDateTimeFormatterStyle::None,
-    )
+    .with_styles(FormatterStyle::Full, FormatterStyle::None)
+    .unwrap()
 }
 
 fn fixture() -> (super::super::IWorkTextEditor, u64) {

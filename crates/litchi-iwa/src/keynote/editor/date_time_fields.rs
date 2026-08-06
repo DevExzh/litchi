@@ -2,10 +2,8 @@
 
 use super::KeynoteEditor;
 use crate::Result;
-use crate::text::{
-    TextDateTimeDisplayText, TextDateTimeField, TextDateTimeFieldId, TextDateTimeFieldSettings,
-    TextPosition, TextRange,
-};
+use crate::text::{TextDateTimeField, TextDateTimeFieldId, TextPosition, TextRange};
+use litchi_iwa_text::date_time::{DisplayText, Settings};
 
 impl KeynoteEditor {
     /// Read every native Date & Time field in one Keynote text box.
@@ -24,7 +22,7 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
         range: TextRange,
-        settings: TextDateTimeFieldSettings,
+        settings: Settings,
     ) -> Result<TextDateTimeField> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -39,8 +37,8 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
         position: TextPosition,
-        display_text: TextDateTimeDisplayText,
-        settings: TextDateTimeFieldSettings,
+        display_text: DisplayText,
+        settings: Settings,
     ) -> Result<TextDateTimeField> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -61,7 +59,7 @@ impl KeynoteEditor {
         drawable_object_id: u64,
         id: TextDateTimeFieldId,
         range: TextRange,
-        settings: TextDateTimeFieldSettings,
+        settings: Settings,
     ) -> Result<TextDateTimeField> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();

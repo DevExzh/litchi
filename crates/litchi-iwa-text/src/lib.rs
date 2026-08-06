@@ -10,6 +10,7 @@
 pub mod bookmark;
 pub mod character;
 pub mod columns;
+pub mod date_time;
 pub mod font;
 pub mod language;
 pub mod paragraph;

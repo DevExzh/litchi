@@ -2,10 +2,8 @@
 
 use super::PagesEditor;
 use crate::Result;
-use crate::text::{
-    TextDateTimeDisplayText, TextDateTimeField, TextDateTimeFieldId, TextDateTimeFieldSettings,
-    TextPosition, TextRange,
-};
+use crate::text::{TextDateTimeField, TextDateTimeFieldId, TextPosition, TextRange};
+use litchi_iwa_text::date_time::{DisplayText, Settings};
 
 impl PagesEditor {
     /// Read every native Date & Time field in one Pages text box.
@@ -22,7 +20,7 @@ impl PagesEditor {
         &mut self,
         drawable_object_id: u64,
         range: TextRange,
-        settings: TextDateTimeFieldSettings,
+        settings: Settings,
     ) -> Result<TextDateTimeField> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -36,8 +34,8 @@ impl PagesEditor {
         &mut self,
         drawable_object_id: u64,
         position: TextPosition,
-        display_text: TextDateTimeDisplayText,
-        settings: TextDateTimeFieldSettings,
+        display_text: DisplayText,
+        settings: Settings,
     ) -> Result<TextDateTimeField> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -57,7 +55,7 @@ impl PagesEditor {
         drawable_object_id: u64,
         id: TextDateTimeFieldId,
         range: TextRange,
-        settings: TextDateTimeFieldSettings,
+        settings: Settings,
     ) -> Result<TextDateTimeField> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();

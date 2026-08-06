@@ -11,8 +11,8 @@ mod bookmark_types;
 mod character;
 pub(crate) mod columns;
 mod date_time;
+mod date_time_field;
 mod date_time_object;
-mod date_time_types;
 mod drop_cap;
 pub mod editor;
 pub(crate) mod extractor;
@@ -66,11 +66,7 @@ mod text_comment_tests;
 pub use bookmark_types::{
     TextBookmark, TextBookmarkId, TextBookmarkName, TextBookmarkSettings, TextBookmarkVisibility,
 };
-pub use date_time_types::{
-    TextDateTimeDisplayText, TextDateTimeField, TextDateTimeFieldId, TextDateTimeFieldSettings,
-    TextDateTimeFormat, TextDateTimeFormatterStyle, TextDateTimeInstant,
-    TextDateTimeLocaleIdentifier, TextDateTimeUpdatePlan,
-};
+pub use date_time_field::{TextDateTimeField, TextDateTimeFieldId};
 pub use drop_cap::{
     DropCapCharacterCount, DropCapCharacterScale, DropCapCornerRadius, DropCapLineCount,
     DropCapOutdent, DropCapPadding, DropCapRaisedLines, DropCapWrap, ParagraphDropCap,
@@ -144,6 +140,12 @@ pub use style::{
 
 impl From<litchi_iwa_text::NameError> for crate::Error {
     fn from(error: litchi_iwa_text::NameError) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_text::date_time::Error> for crate::Error {
+    fn from(error: litchi_iwa_text::date_time::Error) -> Self {
         Self::InvalidFormat(error.to_string())
     }
 }

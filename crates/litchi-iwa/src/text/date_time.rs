@@ -10,11 +10,9 @@ use crate::package_metadata::{
 };
 use crate::{Error, IWorkPackage, Result};
 
+use super::date_time_field::{TextDateTimeField, TextDateTimeFieldId};
 use super::date_time_object::{
     new_date_time_object, patch_date_time_settings, validate_date_time_object,
-};
-use super::date_time_types::{
-    TextDateTimeDisplayText, TextDateTimeField, TextDateTimeFieldId, TextDateTimeFieldSettings,
 };
 use super::editor::replace_storage_text;
 use super::hyperlink_storage::{
@@ -26,6 +24,7 @@ use super::smart_field_object::{
     ensure_no_metadata_reference, require_exclusive_storage_reference,
 };
 use super::storage_wire::{StorageLocation, text_utf16_len};
+use litchi_iwa_text::date_time::{DisplayText, Settings};
 use litchi_iwa_text::position::{TextPosition, TextRange};
 
 const SMART_FIELD_TABLE: RangedObjectTable = RangedObjectTable::SmartField;
@@ -44,7 +43,7 @@ pub(crate) fn add_text_date_time_field(
     package: &mut IWorkPackage,
     storage_id: u64,
     range: TextRange,
-    settings: &TextDateTimeFieldSettings,
+    settings: &Settings,
 ) -> Result<TextDateTimeField> {
     let mut staged = package.clone();
     let id = add_date_time_field_in_place(&mut staged, storage_id, range, settings)?;
@@ -63,8 +62,8 @@ pub(crate) fn insert_text_date_time_field(
     package: &mut IWorkPackage,
     storage_id: u64,
     position: TextPosition,
-    display_text: &TextDateTimeDisplayText,
-    settings: &TextDateTimeFieldSettings,
+    display_text: &DisplayText,
+    settings: &Settings,
 ) -> Result<TextDateTimeField> {
     let start = usize::try_from(position.utf16_index())
         .map_err(|_| Error::ParseError("Date & Time position exceeds usize".to_owned()))?;
@@ -94,7 +93,7 @@ fn add_date_time_field_in_place(
     package: &mut IWorkPackage,
     storage_id: u64,
     range: TextRange,
-    settings: &TextDateTimeFieldSettings,
+    settings: &Settings,
 ) -> Result<TextDateTimeFieldId> {
     let located = locate_storage_with_archive(package, storage_id, SMART_FIELD_TABLE)?;
     let location = &located.location;
@@ -140,7 +139,7 @@ pub(crate) fn update_text_date_time_field(
     storage_id: u64,
     id: TextDateTimeFieldId,
     range: TextRange,
-    settings: &TextDateTimeFieldSettings,
+    settings: &Settings,
 ) -> Result<TextDateTimeField> {
     let current = date_time_field_by_id(package, storage_id, id)?;
     if current.range == range && current.settings == *settings {

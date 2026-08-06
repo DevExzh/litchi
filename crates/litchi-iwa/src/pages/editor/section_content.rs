@@ -4,10 +4,11 @@ use std::ops::Range;
 
 use super::PagesEditor;
 use crate::text::{
-    TextBookmark, TextBookmarkId, TextBookmarkSettings, TextDateTimeDisplayText, TextDateTimeField,
-    TextDateTimeFieldId, TextDateTimeFieldSettings, TextPosition, TextRange,
+    TextBookmark, TextBookmarkId, TextBookmarkSettings, TextDateTimeField, TextDateTimeFieldId,
+    TextPosition, TextRange,
 };
 use crate::{Error, Result};
+use litchi_iwa_text::date_time::{DisplayText, Settings};
 
 impl PagesEditor {
     /// Read every native ranged bookmark in the main body.
@@ -50,7 +51,7 @@ impl PagesEditor {
     pub fn add_body_date_time_field(
         &mut self,
         range: TextRange,
-        settings: TextDateTimeFieldSettings,
+        settings: Settings,
     ) -> Result<TextDateTimeField> {
         self.text
             .add_text_date_time_field(self.body_storage_id, range, settings)
@@ -60,8 +61,8 @@ impl PagesEditor {
     pub fn insert_body_date_time_field(
         &mut self,
         position: TextPosition,
-        display_text: TextDateTimeDisplayText,
-        settings: TextDateTimeFieldSettings,
+        display_text: DisplayText,
+        settings: Settings,
     ) -> Result<TextDateTimeField> {
         self.text.insert_text_date_time_field(
             self.body_storage_id,
@@ -76,7 +77,7 @@ impl PagesEditor {
         &mut self,
         id: TextDateTimeFieldId,
         range: TextRange,
-        settings: TextDateTimeFieldSettings,
+        settings: Settings,
     ) -> Result<TextDateTimeField> {
         self.text
             .update_text_date_time_field(self.body_storage_id, id, range, settings)

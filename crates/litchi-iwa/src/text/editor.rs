@@ -27,9 +27,7 @@ use super::date_time::{
     add_text_date_time_field, insert_text_date_time_field, remove_text_date_time_field,
     remove_unreferenced_date_time_objects, text_date_time_fields, update_text_date_time_field,
 };
-use super::date_time_types::{
-    TextDateTimeDisplayText, TextDateTimeField, TextDateTimeFieldId, TextDateTimeFieldSettings,
-};
+use super::date_time_field::{TextDateTimeField, TextDateTimeFieldId};
 use super::drop_cap::{
     ParagraphDropCap, ParagraphDropCapPlacement, ParagraphStart, paragraph_drop_cap,
     paragraph_drop_caps, remove_paragraph_drop_cap, set_paragraph_drop_cap,
@@ -127,6 +125,7 @@ use super::text_comment_types::{
     TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
     TextCommentReplyId,
 };
+use litchi_iwa_text::date_time::{DisplayText, Settings};
 use litchi_iwa_text::position::{TextPosition, TextRange};
 use litchi_iwa_text::{TextLanguage, TextLanguageRun};
 
@@ -436,7 +435,7 @@ impl IWorkTextEditor {
         &mut self,
         object_id: u64,
         range: TextRange,
-        settings: TextDateTimeFieldSettings,
+        settings: Settings,
     ) -> Result<TextDateTimeField> {
         add_text_date_time_field(&mut self.package, object_id, range, &settings)
     }
@@ -446,8 +445,8 @@ impl IWorkTextEditor {
         &mut self,
         object_id: u64,
         position: TextPosition,
-        display_text: TextDateTimeDisplayText,
-        settings: TextDateTimeFieldSettings,
+        display_text: DisplayText,
+        settings: Settings,
     ) -> Result<TextDateTimeField> {
         insert_text_date_time_field(
             &mut self.package,
@@ -464,7 +463,7 @@ impl IWorkTextEditor {
         object_id: u64,
         id: TextDateTimeFieldId,
         range: TextRange,
-        settings: TextDateTimeFieldSettings,
+        settings: Settings,
     ) -> Result<TextDateTimeField> {
         update_text_date_time_field(&mut self.package, object_id, id, range, &settings)
     }
