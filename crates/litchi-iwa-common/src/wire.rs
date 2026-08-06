@@ -34,7 +34,9 @@ impl<'a> WireView<'a> {
     /// Parse one borrowed wire message under an explicit finite resource
     /// profile.
     pub fn parse_with_limits(source: &'a [u8], limits: WireLimits) -> Result<Self> {
-        let spans = parse_wire_items_with_limits(source, limits, "wire view spans", Ok)?;
+        let spans = parse_wire_items_with_limits(source, limits, "wire view spans", |field| {
+            span_from_field(field)
+        })?;
         Ok(Self { source, spans })
     }
 
@@ -178,7 +180,7 @@ impl<'a> WireFieldView<'a> {
 /// Compact private field metadata retained by [`WireView`].
 ///
 /// The configured input ceiling is below `u32::MAX`, so four-byte offsets are
-/// sufficient while keeping the parsed representation free of per-field slice
+/// sufficient while keeping the parsed representation free of per-field byte
 /// references.
 #[derive(Debug, Clone, Copy)]
 struct WireSpan {
@@ -241,6 +243,20 @@ impl WireField {
         self.end
     }
 
+    /// Return the complete encoded field through checked slice boundaries.
+    ///
+    /// The field does not retain a source lifetime, so the caller must supply
+    /// the exact bytes from which it was parsed. A mismatched or truncated
+    /// source is rejected instead of being sliced unchecked.
+    pub fn raw(self, data: &[u8]) -> Result<&[u8]> {
+        checked_wire_range(data, self.start, self.end, "field")
+    }
+
+    /// Return the encoded field key through checked slice boundaries.
+    pub fn key(self, data: &[u8]) -> Result<&[u8]> {
+        checked_wire_range(data, self.start, self.key_end, "field key")
+    }
+
     /// Return this field's payload through checked slice boundaries.
     ///
     /// For a length-delimited field, the returned slice excludes the encoded
@@ -270,6 +286,11 @@ impl WireField {
                 self.number
             ))
         })
+    }
+
+    /// Return the field payload through checked slice boundaries.
+    pub fn payload(self, data: &[u8]) -> Result<&[u8]> {
+        self.checked_payload(data)
     }
 
     /// Require the encoded field key to use its canonical varint form.
@@ -347,6 +368,20 @@ impl WireField {
         }
         Ok(())
     }
+
+    /// Require the complete key and length framing for this field to be
+    /// canonical.
+    ///
+    /// The parser remains permissive so unknown fields can be retained
+    /// byte-for-byte. Callers can use this helper when a schema-recognized
+    /// field is about to be interpreted or rewritten.
+    pub fn validate_canonical_framing(self, data: &[u8]) -> Result<()> {
+        self.validate_canonical_key(data)?;
+        if self.wire_type == 2 {
+            self.validate_canonical_length(data)?;
+        }
+        Ok(())
+    }
 }
 
 fn checked_wire_range<'a>(
@@ -410,27 +445,6 @@ pub fn parse_wire_fields(data: &[u8]) -> Result<Vec<WireField>> {
 
 /// Parse protobuf wire fields under an explicit finite resource profile.
 pub fn parse_wire_fields_with_limits(data: &[u8], limits: WireLimits) -> Result<Vec<WireField>> {
-    parse_wire_items_with_limits(data, limits, "wire fields", |span| {
-        Ok(WireField {
-            number: span.number,
-            wire_type: span.wire_type,
-            start: span.start as usize,
-            key_end: span.key_end as usize,
-            payload_start: span.payload_start as usize,
-            end: span.end as usize,
-        })
-    })
-}
-
-fn parse_wire_items_with_limits<T, F>(
-    data: &[u8],
-    limits: WireLimits,
-    resource: &'static str,
-    mut map: F,
-) -> Result<Vec<T>>
-where
-    F: FnMut(WireSpan) -> Result<T>,
-{
     if data.len() > limits.max_input_bytes() {
         return Err(Error::LimitExceeded {
             kind: LimitKind::InputBytes,
@@ -441,8 +455,8 @@ where
     let mut items = Vec::new();
     let mut offset = 0usize;
     while offset < data.len() {
-        let span = parse_wire_span(data, offset)?;
-        offset = span.end as usize;
+        let field = parse_wire_field(data, offset)?;
+        offset = field.end;
         if items.len() >= limits.max_fields() {
             return Err(Error::LimitExceeded {
                 kind: LimitKind::Fields,
@@ -453,15 +467,15 @@ where
         items
             .try_reserve(1)
             .map_err(|_allocation| Error::Allocation {
-                resource,
+                resource: "wire fields",
                 amount: items.len() + 1,
             })?;
-        items.push(map(span)?);
+        items.push(field);
     }
     Ok(items)
 }
 
-fn parse_wire_span(data: &[u8], start: usize) -> Result<WireSpan> {
+fn parse_wire_field(data: &[u8], start: usize) -> Result<WireField> {
     let (key, key_length) = crate::varint::decode_varint_from_bytes(&data[start..])
         .map_err(|error| Error::InvalidFormat(format!("invalid protobuf key: {error}")))?;
     let key_end = start
@@ -525,19 +539,69 @@ fn parse_wire_span(data: &[u8], start: usize) -> Result<WireSpan> {
     if end > data.len() {
         return Err(Error::InvalidFormat("truncated protobuf field".to_owned()));
     }
-    Ok(WireSpan {
+    Ok(WireField {
         number,
         wire_type,
-        start: u32::try_from(start).map_err(|_conversion| {
+        start,
+        key_end,
+        payload_start,
+        end,
+    })
+}
+
+fn parse_wire_items_with_limits<T, F>(
+    data: &[u8],
+    limits: WireLimits,
+    resource: &'static str,
+    mut map: F,
+) -> Result<Vec<T>>
+where
+    F: FnMut(WireField) -> Result<T>,
+{
+    if data.len() > limits.max_input_bytes() {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed: data.len(),
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let mut items = Vec::new();
+    let mut offset = 0usize;
+    while offset < data.len() {
+        let field = parse_wire_field(data, offset)?;
+        offset = field.end;
+        if items.len() >= limits.max_fields() {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed: items.len() + 1,
+                limit: limits.max_fields(),
+            });
+        }
+        items
+            .try_reserve(1)
+            .map_err(|_allocation| Error::Allocation {
+                resource,
+                amount: items.len() + 1,
+            })?;
+        items.push(map(field)?);
+    }
+    Ok(items)
+}
+
+fn span_from_field(field: WireField) -> Result<WireSpan> {
+    Ok(WireSpan {
+        number: field.number,
+        wire_type: field.wire_type,
+        start: u32::try_from(field.start).map_err(|_conversion| {
             Error::InvalidFormat("protobuf offset exceeds u32".to_owned())
         })?,
-        key_end: u32::try_from(key_end).map_err(|_conversion| {
+        key_end: u32::try_from(field.key_end).map_err(|_conversion| {
             Error::InvalidFormat("protobuf offset exceeds u32".to_owned())
         })?,
-        payload_start: u32::try_from(payload_start).map_err(|_conversion| {
+        payload_start: u32::try_from(field.payload_start).map_err(|_conversion| {
             Error::InvalidFormat("protobuf offset exceeds u32".to_owned())
         })?,
-        end: u32::try_from(end).map_err(|_conversion| {
+        end: u32::try_from(field.end).map_err(|_conversion| {
             Error::InvalidFormat("protobuf offset exceeds u32".to_owned())
         })?,
     })
@@ -959,6 +1023,20 @@ pub fn rewrite_repeated_length_delimited_fields(
         return Ok(output);
     }
 
+    // A semantic no-op must remain byte-exact, including overlong length
+    // prefixes and noncanonical keys on otherwise unknown-to-this-helper
+    // fields. Re-encoding equal payloads would silently normalize them.
+    if replacements.len() == matches.len()
+        && matches
+            .iter()
+            .zip(replacements)
+            .all(|(field, replacement)| {
+                &data[field.payload_start..field.end] == replacement.as_slice()
+            })
+    {
+        return clone_output(data, limits);
+    }
+
     if !replacements.is_empty() {
         validate_field_number(field_number)?;
     }
@@ -1087,6 +1165,17 @@ pub fn rewrite_repeated_varint_fields(
             append_varint_field_unchecked(&mut output, field_number, replacement, limits)?;
         }
         return Ok(output);
+    }
+
+    if replacements.len() == matches.len()
+        && matches
+            .iter()
+            .zip(replacements)
+            .all(|(field, replacement)| {
+                is_same_varint_value(*replacement, &data[field.key_end..field.end])
+            })
+    {
+        return clone_output(data, limits);
     }
 
     if !replacements.is_empty() {
@@ -1225,6 +1314,17 @@ pub fn rewrite_repeated_fixed32_fields(
         return Ok(output);
     }
 
+    if replacements.len() == matches.len()
+        && matches
+            .iter()
+            .zip(replacements)
+            .all(|(field, replacement)| {
+                data[field.payload_start..field.end] == replacement.to_le_bytes()
+            })
+    {
+        return clone_output(data, limits);
+    }
+
     if !replacements.is_empty() {
         validate_field_number(field_number)?;
     }
@@ -1307,6 +1407,17 @@ pub fn rewrite_repeated_fixed64_fields(
             )?;
         }
         return Ok(output);
+    }
+
+    if replacements.len() == matches.len()
+        && matches
+            .iter()
+            .zip(replacements)
+            .all(|(field, replacement)| {
+                data[field.payload_start..field.end] == replacement.to_le_bytes()
+            })
+    {
+        return clone_output(data, limits);
     }
 
     if !replacements.is_empty() {
@@ -1807,6 +1918,11 @@ fn encoded_length_size(length_bytes: usize) -> Result<usize> {
     Ok(crate::varint::encoded_len(length))
 }
 
+fn is_same_varint_value(value: u64, encoded: &[u8]) -> bool {
+    crate::varint::decode_varint_from_bytes(encoded)
+        .is_ok_and(|(decoded, length)| decoded == value && length == encoded.len())
+}
+
 fn field_key_size(field_number: u32, wire_type: u8) -> Result<usize> {
     validate_field_number(field_number)?;
     validate_wire_type(wire_type)?;
@@ -1863,6 +1979,9 @@ fn replace_existing_scalar_field(
     field: &WireField,
     replacement: &[u8],
 ) -> Result<Vec<u8>> {
+    if &data[field.key_end..field.end] == replacement {
+        return clone_output(data, WireLimits::default());
+    }
     let old_payload_length = field.end - field.key_end;
     let capacity = data
         .len()
@@ -1910,6 +2029,7 @@ fn remove_fields(data: &[u8], mut fields: Vec<WireField>) -> Result<Vec<u8>> {
 )]
 mod tests {
     use super::*;
+    use std::mem::size_of;
 
     #[derive(Debug, PartialEq, Eq)]
     enum CallbackError {
@@ -2051,6 +2171,32 @@ mod tests {
         )
         .unwrap();
         assert_eq!(removed, original);
+    }
+
+    #[test]
+    fn repeated_noops_preserve_noncanonical_framing_and_nested_absence() {
+        let length_delimited = [0x12, 0x81, 0x00, b'x'];
+        assert_eq!(
+            rewrite_repeated_length_delimited_fields(&length_delimited, 2, &[b"x".to_vec()])
+                .unwrap(),
+            length_delimited
+        );
+
+        let varint = [0x10, 0x80, 0x00];
+        assert_eq!(
+            rewrite_repeated_varint_fields(&varint, 2, &[0]).unwrap(),
+            varint
+        );
+
+        let nested = [0x1a, 0x82, 0x00, 0x08, 0x01];
+        let calls = Cell::new(0usize);
+        let unchanged = transform_length_delimited_fields_at_path(&nested, &[3, 2], |_| {
+            calls.set(calls.get() + 1);
+            Ok::<Vec<u8>, Error>(Vec::new())
+        })
+        .unwrap();
+        assert_eq!(unchanged, nested);
+        assert_eq!(calls.get(), 0);
     }
 
     #[test]
@@ -2212,7 +2358,7 @@ mod tests {
     }
 
     #[test]
-    fn wire_field_offsets_are_exposed_through_checked_views() {
+    fn wire_field_offsets_are_exposed_through_checked_slices() {
         let data = varint_field(7, 42);
         let field = parse_wire_fields(&data).unwrap().pop().unwrap();
         assert_eq!(field.number(), 7);
@@ -2221,6 +2367,10 @@ mod tests {
         assert_eq!(field.key_end(), 1);
         assert_eq!(field.payload_start(), 1);
         assert_eq!(field.end(), data.len());
+        assert_eq!(field.raw(&data).unwrap(), data);
+        assert_eq!(field.key(&data).unwrap(), &data[..1]);
+        assert_eq!(field.payload(&data).unwrap(), &data[1..]);
+        assert!(field.raw(&[]).is_err());
     }
 
     #[test]

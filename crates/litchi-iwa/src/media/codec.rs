@@ -2,7 +2,6 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::Write;
-use std::ops::Range;
 use std::path::{Component, Path};
 
 use prost::Message;
@@ -10,6 +9,7 @@ use prost::Message;
 use crate::package::IWorkPackage;
 use crate::protobuf;
 use litchi_iwa_common::varint::{decode_varint_from_bytes, encode_varint_into};
+use litchi_iwa_common::wire::{parse_wire_fields, WireField};
 use litchi_iwa_graph::ObjectId;
 use crate::{Error, Result};
 
@@ -428,123 +428,24 @@ pub(crate) fn data_entry_name(file_name: &str) -> Result<String> {
     Ok(format!("Data/{file_name}"))
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct WireField {
-    pub(crate) number: u32,
-    pub(crate) wire_type: u8,
-    pub(crate) start: usize,
-    pub(crate) key_end: usize,
-    pub(crate) end: usize,
-    pub(crate) payload: Option<Range<usize>>,
-}
-
-pub(crate) fn parse_wire_fields(data: &[u8]) -> Result<Vec<WireField>> {
-    let mut fields = Vec::new();
-    let mut offset = 0usize;
-    while offset < data.len() {
-        let start = offset;
-        let (key, key_length) = decode_varint_from_bytes(&data[offset..])
-            .map_err(|error| Error::InvalidFormat(format!("Invalid protobuf key: {error}")))?;
-        offset = offset
-            .checked_add(key_length)
-            .ok_or_else(|| Error::InvalidFormat("Protobuf key offset overflow".to_owned()))?;
-        let number = key >> 3;
-        if number == 0 || number > 0x1fff_ffff {
-            return Err(Error::InvalidFormat(format!(
-                "Invalid protobuf field number {number}"
-            )));
-        }
-        let wire_type = (key & 7) as u8;
-        let key_end = offset;
-        let payload = match wire_type {
-            0 => {
-                let (_, length) = decode_varint_from_bytes(&data[offset..]).map_err(|error| {
-                    Error::InvalidFormat(format!("Invalid protobuf varint value: {error}"))
-                })?;
-                offset = offset.checked_add(length).ok_or_else(|| {
-                    Error::InvalidFormat("Protobuf varint offset overflow".to_owned())
-                })?;
-                None
-            },
-            1 => {
-                offset = offset.checked_add(8).ok_or_else(|| {
-                    Error::InvalidFormat("Protobuf fixed64 offset overflow".to_owned())
-                })?;
-                None
-            },
-            2 => {
-                let (length, prefix_length) =
-                    decode_varint_from_bytes(&data[offset..]).map_err(|error| {
-                        Error::InvalidFormat(format!("Invalid protobuf length: {error}"))
-                    })?;
-                offset = offset.checked_add(prefix_length).ok_or_else(|| {
-                    Error::InvalidFormat("Protobuf length prefix overflow".to_owned())
-                })?;
-                let payload_start = offset;
-                let length = usize::try_from(length).map_err(|_| {
-                    Error::InvalidFormat("Protobuf field length exceeds usize".to_owned())
-                })?;
-                offset = offset.checked_add(length).ok_or_else(|| {
-                    Error::InvalidFormat("Protobuf field range overflow".to_owned())
-                })?;
-                Some(payload_start..offset)
-            },
-            5 => {
-                offset = offset.checked_add(4).ok_or_else(|| {
-                    Error::InvalidFormat("Protobuf fixed32 offset overflow".to_owned())
-                })?;
-                None
-            },
-            3 | 4 => {
-                return Err(Error::InvalidFormat(
-                    "Deprecated protobuf groups are not supported in PackageMetadata".to_owned(),
-                ));
-            },
-            _ => {
-                return Err(Error::InvalidFormat(format!(
-                    "Invalid protobuf wire type {wire_type}"
-                )));
-            },
-        };
-        if offset > data.len() {
-            return Err(Error::InvalidFormat(
-                "Truncated protobuf field in PackageMetadata".to_owned(),
-            ));
-        }
-        fields.push(WireField {
-            number: number as u32,
-            wire_type,
-            start,
-            key_end,
-            end: offset,
-            payload,
-        });
-    }
-    Ok(fields)
-}
-
 pub(crate) fn field_payload<'a>(data: &'a [u8], field: &WireField) -> Result<&'a [u8]> {
-    let range = field.payload.clone().ok_or_else(|| {
-        Error::InvalidFormat(format!(
+    if field.wire_type() != 2 {
+        return Err(Error::InvalidFormat(format!(
             "Protobuf field {} is not length-delimited",
-            field.number
-        ))
-    })?;
-    data.get(range)
-        .ok_or_else(|| Error::InvalidFormat("Protobuf payload range is invalid".to_owned()))
+            field.number()
+        )));
+    }
+    field.checked_payload(data)
 }
 
 fn field_varint(data: &[u8], field: &WireField) -> Result<u64> {
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "Protobuf field {} is not a varint",
-            field.number
+            field.number()
         )));
     }
-    decode_varint_from_bytes(
-        data.get(field.key_end..field.end)
-            .ok_or_else(|| Error::InvalidFormat("Protobuf varint range is invalid".to_owned()))?,
-    )
+    decode_varint_from_bytes(field.checked_payload(data)?)
     .map(|(value, _)| value)
     .map_err(|error| Error::InvalidFormat(format!("Invalid protobuf varint: {error}")))
 }
@@ -553,7 +454,7 @@ fn data_info_identifier(data: &[u8]) -> Result<u64> {
     let fields = parse_wire_fields(data)?;
     let identifiers = fields
         .iter()
-        .filter(|field| field.number == 1)
+        .filter(|field| field.number() == 1)
         .map(|field| field_varint(data, field))
         .collect::<Result<Vec<_>>>()?;
     match identifiers.as_slice() {
@@ -583,8 +484,8 @@ pub(crate) fn patch_package_metadata(
     let mut output = Vec::with_capacity(metadata.len());
     let mut patched_count = 0usize;
     for field in fields {
-        if field.number == 4 {
-            if field.wire_type != 2 {
+        if field.number() == 4 {
+            if field.wire_type() != 2 {
                 return Err(Error::InvalidFormat(
                     "PackageMetadata.datas has an invalid wire type".to_owned(),
                 ));
@@ -595,13 +496,13 @@ pub(crate) fn patch_package_metadata(
                     Error::InvalidFormat("Patched DataInfo count overflow".to_owned())
                 })?;
                 let patched = patch_data_info(data_info, digest, materialized_length)?;
-                output.extend_from_slice(&metadata[field.start..field.key_end]);
+                output.extend_from_slice(&metadata[field.start()..field.key_end()]);
                 encode_varint_into(&mut output, patched.len() as u64);
                 output.extend_from_slice(&patched);
                 continue;
             }
         }
-        output.extend_from_slice(&metadata[field.start..field.end]);
+        output.extend_from_slice(&metadata[field.start()..field.end()]);
     }
     match patched_count {
         1 => {},
@@ -705,8 +606,8 @@ pub(crate) fn remove_data_info(metadata: &[u8], data_identifier: u64) -> Result<
     let mut output = Vec::with_capacity(metadata.len());
     let mut removed_count = 0usize;
     for field in fields {
-        if field.number == 4 {
-            if field.wire_type != 2 {
+        if field.number() == 4 {
+            if field.wire_type() != 2 {
                 return Err(Error::InvalidFormat(
                     "PackageMetadata.datas has an invalid wire type".to_owned(),
                 ));
@@ -718,7 +619,7 @@ pub(crate) fn remove_data_info(metadata: &[u8], data_identifier: u64) -> Result<
                 continue;
             }
         }
-        output.extend_from_slice(&metadata[field.start..field.end]);
+        output.extend_from_slice(&metadata[field.start()..field.end()]);
     }
     match removed_count {
         1 => {},
@@ -752,9 +653,9 @@ fn patch_data_info(data: &[u8], digest: &[u8], materialized_length: u64) -> Resu
     let mut digest_count = 0usize;
     let mut length_count = 0usize;
     for field in fields {
-        match field.number {
+        match field.number() {
             2 => {
-                if field.wire_type != 2 {
+                if field.wire_type() != 2 {
                     return Err(Error::InvalidFormat(
                         "DataInfo.digest has an invalid wire type".to_owned(),
                     ));
@@ -765,12 +666,12 @@ fn patch_data_info(data: &[u8], digest: &[u8], materialized_length: u64) -> Resu
                         "DataInfo contains duplicate digests".to_owned(),
                     ));
                 }
-                output.extend_from_slice(&data[field.start..field.key_end]);
+                output.extend_from_slice(&data[field.start()..field.key_end()]);
                 encode_varint_into(&mut output, digest.len() as u64);
                 output.extend_from_slice(digest);
             },
             18 => {
-                if field.wire_type != 0 {
+                if field.wire_type() != 0 {
                     return Err(Error::InvalidFormat(
                         "DataInfo.materialized_length has an invalid wire type".to_owned(),
                     ));
@@ -781,10 +682,10 @@ fn patch_data_info(data: &[u8], digest: &[u8], materialized_length: u64) -> Resu
                         "DataInfo contains duplicate materialized lengths".to_owned(),
                     ));
                 }
-                output.extend_from_slice(&data[field.start..field.key_end]);
+                output.extend_from_slice(&data[field.start()..field.key_end()]);
                 encode_varint_into(&mut output, materialized_length);
             },
-            _ => output.extend_from_slice(&data[field.start..field.end]),
+            _ => output.extend_from_slice(&data[field.start()..field.end()]),
         }
     }
     if digest_count == 0 {

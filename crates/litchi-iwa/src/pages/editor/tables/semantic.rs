@@ -1,18 +1,3 @@
-// Warning: truncated output (original token count: 30142)
-// Total output lines: 3536
-
-// Warning: truncated output (original token count: 30027)
-// Total output lines: 3526
-
-// Warning: truncated output (original token count: 30027)
-// Total output lines: 3524
-
-// Warning: truncated output (original token count: 30030)
-// Total output lines: 3527
-
-// Warning: truncated output (original token count: 31422)
-// Total output lines: 3697
-
 //! Semantic table models and transactional Pages table editing.
 
 use super::*;
@@ -1789,6 +1774,24 @@ impl PagesEditor {
         }
         *self = verified;
         Ok(())
+    }
+
+    /// Read one body-table paragraph's effective bullet size and baseline.
+    pub fn table_cell_paragraph_list_bullet_geometry(
+        &self,
+        model_object_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<PagesTableCellParagraphListBulletGeometry> {
+        self.require_body_table(model_object_id)?;
+        crate::numbers::editor::table_cell_paragraph_list_bullet_geometry_in_package(
+            self.package(),
+            model_object_id,
+            row,
+            column,
+            paragraph,
+        )
     }
 
     /// Set one body-table paragraph's bullet size and baseline.

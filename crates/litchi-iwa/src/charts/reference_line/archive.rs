@@ -7,6 +7,7 @@
 use std::collections::{HashMap, HashSet};
 
 use litchi_iwa_common::chart::reference_line::{Kind, Line, Value};
+use litchi_iwa_common::wire::parse_wire_view;
 use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
@@ -19,9 +20,7 @@ use crate::package_metadata::{
     set_package_last_object_identifier,
 };
 use crate::protobuf::{tsch, tsp, tss};
-use crate::wire::{
-    parse_wire_view, patch_fixed64_field, patch_length_delimited_field, patch_varint_field,
-};
+use crate::wire::{patch_fixed64_field, patch_length_delimited_field, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
 
 pub(crate) const REFERENCE_LINE_STYLE_MESSAGE_TYPE: u32 = 5_030;
@@ -1076,8 +1075,8 @@ fn strict_optional_bool(data: &[u8], field_number: u32) -> Result<Option<bool>> 
 }
 
 fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>> {
-    let fields = parse_wire_view(data)?;
-    let mut matches = fields.iter().filter(|field| field.number() == field_number);
+    let view = parse_wire_view(data)?;
+    let mut matches = view.fields().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -1108,8 +1107,8 @@ fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>>
 }
 
 fn strict_optional_message(data: &[u8], field_number: u32) -> Result<Option<&[u8]>> {
-    let fields = parse_wire_view(data)?;
-    let mut matches = fields.iter().filter(|field| field.number() == field_number);
+    let view = parse_wire_view(data)?;
+    let mut matches = view.fields().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -1136,8 +1135,8 @@ fn read_custom_value(data: &[u8]) -> Result<Value> {
 }
 
 fn strict_optional_fixed64(data: &[u8], field_number: u32) -> Result<Option<u64>> {
-    let fields = parse_wire_view(data)?;
-    let mut matches = fields.iter().filter(|field| field.number() == field_number);
+    let view = parse_wire_view(data)?;
+    let mut matches = view.fields().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };

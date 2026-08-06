@@ -8,6 +8,7 @@ use crate::application::Application;
 use crate::archive::Archive;
 use crate::snappy::SnappyStream;
 use litchi_iwa_archive::{self, DetectionRoot};
+use litchi_iwa_common::wire::{WireField, parse_wire_fields};
 use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
@@ -260,13 +261,13 @@ fn is_zip_signature(value: &[u8]) -> bool {
 /// document at field 3. Malformed or multiply matching payloads fail closed.
 pub(crate) fn detect_application_from_document(payload: &[u8]) -> Option<Application> {
     let fields = wire_fields(payload)?;
-    let pages = unique_field(&fields, 15, 2).is_some_and(valid_shared_document);
+    let pages = unique_field(payload, &fields, 15, 2).is_some_and(valid_shared_document);
     let numbers = [4, 5, 6]
         .into_iter()
-        .all(|field| unique_field(&fields, field, 2).is_some_and(valid_reference))
-        && unique_field(&fields, 8, 2).is_some_and(valid_shared_document);
-    let keynote = unique_field(&fields, 2, 2).is_some_and(valid_reference)
-        && unique_field(&fields, 3, 2).is_some_and(valid_shared_document);
+        .all(|field| unique_field(payload, &fields, field, 2).is_some_and(valid_reference))
+        && unique_field(payload, &fields, 8, 2).is_some_and(valid_shared_document);
+    let keynote = unique_field(payload, &fields, 2, 2).is_some_and(valid_reference)
+        && unique_field(payload, &fields, 3, 2).is_some_and(valid_shared_document);
 
     match (pages, numbers, keynote) {
         (true, false, false) => Some(Application::Pages),
@@ -276,93 +277,35 @@ pub(crate) fn detect_application_from_document(payload: &[u8]) -> Option<Applica
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct WireField<'a> {
+fn wire_fields(payload: &[u8]) -> Option<Vec<WireField>> {
+    parse_wire_fields(payload).ok()
+}
+
+fn unique_field<'a>(
+    payload: &'a [u8],
+    fields: &[WireField],
     number: u32,
     wire_type: u8,
-    value: &'a [u8],
-}
-
-fn wire_fields(payload: &[u8]) -> Option<Vec<WireField<'_>>> {
-    let mut fields = Vec::new();
-    let mut position = 0;
-
-    while position < payload.len() {
-        let tag = read_varint(payload, &mut position)?;
-        let number = u32::try_from(tag >> 3).ok()?;
-        let wire_type = (tag & 0x07) as u8;
-        if number == 0 {
-            return None;
-        }
-
-        let value = match wire_type {
-            0 => {
-                let start = position;
-                read_varint(payload, &mut position)?;
-                payload.get(start..position)?
-            },
-            1 => take(payload, &mut position, 8)?,
-            2 => {
-                let length = usize::try_from(read_varint(payload, &mut position)?).ok()?;
-                take(payload, &mut position, length)?
-            },
-            5 => take(payload, &mut position, 4)?,
-            _ => return None,
-        };
-
-        fields.push(WireField {
-            number,
-            wire_type,
-            value,
-        });
-    }
-
-    Some(fields)
-}
-
-fn take<'a>(payload: &'a [u8], position: &mut usize, length: usize) -> Option<&'a [u8]> {
-    let end = position.checked_add(length)?;
-    let value = payload.get(*position..end)?;
-    *position = end;
-    Some(value)
-}
-
-fn unique_field<'a>(fields: &[WireField<'a>], number: u32, wire_type: u8) -> Option<&'a [u8]> {
-    let mut matches = fields.iter().filter(|field| field.number == number);
+) -> Option<&'a [u8]> {
+    let mut matches = fields.iter().filter(|field| field.number() == number);
     let field = matches.next()?;
-    if matches.next().is_some() || field.wire_type != wire_type {
+    if matches.next().is_some() || field.wire_type() != wire_type {
         return None;
     }
-    Some(field.value)
+    field.checked_payload(payload).ok()
 }
 
 fn valid_reference(payload: &[u8]) -> bool {
     wire_fields(payload)
-        .and_then(|fields| unique_field(&fields, 1, 0))
+        .and_then(|fields| unique_field(payload, &fields, 1, 0))
         .is_some()
 }
 
 fn valid_shared_document(payload: &[u8]) -> bool {
     wire_fields(payload)
-        .and_then(|fields| unique_field(&fields, 1, 2))
+        .and_then(|fields| unique_field(payload, &fields, 1, 2))
         .and_then(wire_fields)
         .is_some()
-}
-
-fn read_varint(payload: &[u8], position: &mut usize) -> Option<u64> {
-    let mut value = 0u64;
-    for shift in (0..=63).step_by(7) {
-        let byte = *payload.get(*position)?;
-        *position += 1;
-        if shift == 63 && byte > 1 {
-            return None;
-        }
-        value |= u64::from(byte & 0x7f) << shift;
-        if byte & 0x80 == 0 {
-            return Some(value);
-        }
-    }
-    None
 }
 
 fn root_format(data: &[u8], limits: Limits) -> crate::Result<Option<Format>> {
