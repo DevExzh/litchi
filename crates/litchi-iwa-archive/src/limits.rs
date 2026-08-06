@@ -148,6 +148,22 @@ impl Limits {
         Ok(())
     }
 
+    /// Reject an output artifact before its complete byte buffer is allocated.
+    ///
+    /// The physical input ceiling is also the maximum in-memory artifact size
+    /// for this bounded reassembly API. Callers that need a larger artifact
+    /// must choose a larger profile, still subject to the format hard ceiling.
+    pub(crate) fn check_output_size(self, size: u64) -> Result<()> {
+        if size > self.max_input_bytes {
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
+                observed: size,
+                maximum: self.max_input_bytes,
+            });
+        }
+        Ok(())
+    }
+
     pub(crate) fn validate(self) -> Result<Self> {
         if self.max_input_bytes == 0
             || self.max_entries == 0

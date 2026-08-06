@@ -5,16 +5,80 @@
 //! validate format-specific paths or decode IWA messages; those policies stay
 //! with the facade and the neutral component catalog respectively.
 
-use std::collections::HashSet;
-use std::io::Write;
+use std::collections::{HashMap, HashSet};
+use std::io::{self, Write};
 use std::ops::Range;
 use std::sync::Arc;
 
+use flate2::Compression;
+use flate2::write::DeflateEncoder;
 use litchi_core::ReadAt;
 
 use crate::zip::{PhysicalEntry, PhysicalHeader, ZipArchive};
 use crate::{Error, Limits, Result};
 use soapberry_zip::office::StreamingArchiveWriter;
+
+#[derive(Debug)]
+struct PreparedEdit {
+    compressed: Vec<u8>,
+    crc32: u32,
+    uncompressed_size: u64,
+    descriptor_start: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ReassemblyShape {
+    base_offset: u64,
+    central_directory_size: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct MatchedEdit<'a> {
+    index: usize,
+    edit: EntryEdit<'a>,
+    descriptor_start: Option<usize>,
+}
+
+#[derive(Debug)]
+struct BoundedBuffer {
+    bytes: Vec<u8>,
+    maximum: usize,
+}
+
+impl BoundedBuffer {
+    const fn new(maximum: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            maximum,
+        }
+    }
+
+    fn into_inner(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+impl Write for BoundedBuffer {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let new_len = self
+            .bytes
+            .len()
+            .checked_add(bytes.len())
+            .ok_or_else(|| io::Error::other("bounded ZIP buffer length overflows usize"))?;
+        if new_len > self.maximum {
+            return Err(io::Error::other("bounded ZIP output limit exceeded"));
+        }
+        self.bytes
+            .try_reserve(bytes.len())
+            .map_err(|error| io::Error::other(format!("could not allocate ZIP output: {error}")))?;
+        self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 /// A raw ZIP entry record retained for an exact preserve-mode write.
 ///
@@ -196,6 +260,40 @@ pub enum EntryPayload<'a> {
     Decoded(&'a [u8]),
     /// The member's compression method is unsupported; use its raw record.
     Opaque(&'a RawEntryRecord),
+}
+
+/// Replace the decoded payload of one existing ZIP member during a bounded
+/// physical reassembly.
+///
+/// An edit is addressed by the catalog's normalized member name. It cannot
+/// add, remove, rename, or reorder members. Store and Deflate members are
+/// re-encoded with their original compression method; unsupported methods are
+/// rejected when selected for editing and remain byte-for-byte untouched when
+/// not selected.
+#[derive(Debug, Clone, Copy)]
+pub struct EntryEdit<'a> {
+    name: &'a str,
+    data: &'a [u8],
+}
+
+impl<'a> EntryEdit<'a> {
+    /// Build an edit for one existing normalized member name.
+    #[must_use]
+    pub const fn new(name: &'a str, data: &'a [u8]) -> Self {
+        Self { name, data }
+    }
+
+    /// Return the normalized member name used for lookup.
+    #[must_use]
+    pub const fn name(self) -> &'a str {
+        self.name
+    }
+
+    /// Borrow the replacement decoded payload.
+    #[must_use]
+    pub const fn data(self) -> &'a [u8] {
+        self.data
+    }
 }
 
 /// One ordered package member with its physical ZIP provenance.
@@ -487,6 +585,149 @@ impl Catalog {
         bytes.extend_from_slice(&self.source);
         Ok(bytes)
     }
+
+    /// Reassemble a flat package after replacing existing decoded member
+    /// payloads.
+    ///
+    /// This is a deliberately narrow physical-fidelity transaction:
+    /// directory and member order, raw names, local and central extra fields,
+    /// comments, attributes, archive comments, and untouched compressed data
+    /// are retained. Only CRCs, sizes, local offsets, and the central-directory
+    /// offset are changed when required by an edit. Store and Deflate members
+    /// are supported; unsupported compression methods may remain opaque but
+    /// cannot be selected for editing. Legacy nested `Index.zip` catalogs and
+    /// ZIP64 layouts are rejected for edits rather than silently normalized.
+    ///
+    /// All validation and replacement compression completes before the output
+    /// buffer is allocated. The complete output is bounded by
+    /// [`Limits::max_input_bytes`], then returned as one committed artifact.
+    /// An empty edit list uses the existing exact source path, including for
+    /// legacy catalogs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an edit is ambiguous, exceeds a physical limit,
+    /// selects an unsupported method, or the source layout cannot be safely
+    /// patched without losing physical metadata.
+    pub fn reassemble_to_bytes(&self, edits: &[EntryEdit<'_>], limits: Limits) -> Result<Vec<u8>> {
+        let checked_limits = limits.validate()?;
+        let source_size = u64::try_from(self.source.len()).map_err(|_error| {
+            Error::InvalidBundle("catalog source length does not fit u64".to_owned())
+        })?;
+        checked_limits.check_input_size(source_size, "catalog source")?;
+
+        if edits.is_empty() {
+            checked_limits.check_output_size(source_size)?;
+            return self.to_bytes();
+        }
+        if !self.source_is_exact {
+            return Err(Error::Reassembly(
+                "legacy nested Index.zip catalogs have normalized logical entries".to_owned(),
+            ));
+        }
+
+        let archive = ZipArchive::new_with_limits(self.source.as_ref(), checked_limits)?;
+        let shape = validate_reassembly_shape(&archive)?;
+        let prepared = prepare_edits(&archive, edits, checked_limits)?;
+        let output_size = reassembled_output_size(&archive, &prepared)?;
+        checked_limits.check_output_size(output_size)?;
+        let output_len = usize::try_from(output_size).map_err(|_error| {
+            Error::InvalidBundle("reassembled ZIP length does not fit usize".to_owned())
+        })?;
+
+        let physical_count = archive.physical_entries().count();
+        let mut local_offsets = Vec::new();
+        local_offsets
+            .try_reserve_exact(physical_count)
+            .map_err(|_error| Error::Allocation {
+                resource: "reassembled ZIP local offsets",
+                amount: physical_count,
+            })?;
+
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(output_len)
+            .map_err(|_error| Error::Allocation {
+                resource: "reassembled ZIP output",
+                amount: output_len,
+            })?;
+
+        let prelude_end = archive
+            .physical_entries()
+            .next()
+            .map_or(archive.directory_offset(), |entry| {
+                entry.local_record().start
+            });
+        output.extend_from_slice(&self.source[..prelude_end]);
+
+        for (index, physical) in archive.physical_entries().enumerate() {
+            let local_offset = u64::try_from(output.len()).map_err(|_error| {
+                Error::InvalidBundle("reassembled local offset does not fit u64".to_owned())
+            })?;
+            local_offsets.push(local_offset);
+            if let Some(edit) = prepared.get(&index) {
+                append_edited_local(&mut output, self.source.as_ref(), physical, edit)?;
+            } else {
+                output.extend_from_slice(&self.source[physical.local_record()]);
+            }
+        }
+
+        let new_directory_offset = u64::try_from(output.len()).map_err(|_error| {
+            Error::InvalidBundle("reassembled central directory offset does not fit u64".to_owned())
+        })?;
+        for physical_index in archive.physical_indices_in_central_order() {
+            let physical = archive.physical_entry(physical_index).ok_or_else(|| {
+                Error::Reassembly("central order references a missing ZIP entry".to_owned())
+            })?;
+            let start = output.len();
+            output.extend_from_slice(&self.source[physical.central_record()]);
+            patch_central_record(
+                &mut output[start..],
+                local_offsets[physical_index],
+                prepared.get(&physical_index),
+                shape.base_offset,
+            )?;
+        }
+
+        let tail_start = output.len();
+        output.extend_from_slice(&self.source[archive.eocd_offset()..]);
+        patch_end_of_central_directory(
+            &mut output[tail_start..],
+            new_directory_offset,
+            shape.base_offset,
+            shape.central_directory_size,
+        )?;
+
+        if output.len() != output_len {
+            return Err(Error::Reassembly(format!(
+                "reassembled ZIP size changed during publication (planned {output_len}, wrote {})",
+                output.len()
+            )));
+        }
+        Ok(output)
+    }
+
+    /// Transactionally prepare an edited package and write its committed ZIP
+    /// artifact to a caller-owned sink.
+    ///
+    /// The complete artifact is materialized and validated before the sink is
+    /// touched. A sink can still fail while accepting bytes; callers that need
+    /// filesystem atomicity should use their own atomic replacement boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same validation, allocation, and sink errors as
+    /// [`Self::reassemble_to_bytes`].
+    pub fn write_reassembled_to<W: Write>(
+        &self,
+        edits: &[EntryEdit<'_>],
+        mut sink: W,
+        limits: Limits,
+    ) -> Result<()> {
+        let bytes = self.reassemble_to_bytes(edits, limits)?;
+        sink.write_all(&bytes)?;
+        Ok(())
+    }
 }
 
 impl IntoIterator for Catalog {
@@ -642,6 +883,550 @@ where
         }
     }
     Ok(())
+}
+
+fn validate_reassembly_shape(archive: &ZipArchive<'_>) -> Result<ReassemblyShape> {
+    let source = archive.source();
+    let directory_offset = archive.directory_offset();
+    let eocd_offset = archive.eocd_offset();
+    if directory_offset > eocd_offset || eocd_offset > source.len() {
+        return Err(Error::Reassembly(
+            "ZIP central directory range is invalid".to_owned(),
+        ));
+    }
+    let central_directory_size = eocd_offset - directory_offset;
+    let tail = source
+        .get(eocd_offset..)
+        .ok_or_else(|| Error::Reassembly("ZIP end of central directory is truncated".to_owned()))?;
+    if tail.len() < 22 || raw_u32(tail, 0) != Some(0x0605_4b50) {
+        return Err(Error::Reassembly(
+            "ZIP end of central directory is malformed".to_owned(),
+        ));
+    }
+    let comment_len = usize::from(raw_u16(tail, 20).ok_or_else(|| {
+        Error::Reassembly("ZIP end of central directory comment length is truncated".to_owned())
+    })?);
+    let tail_end = 22usize.checked_add(comment_len).ok_or_else(|| {
+        Error::Reassembly("ZIP end of central directory comment length overflows".to_owned())
+    })?;
+    if tail.len() < tail_end {
+        return Err(Error::Reassembly(
+            "ZIP archive comment is truncated".to_owned(),
+        ));
+    }
+    if raw_u16(tail, 4) != Some(0)
+        || raw_u16(tail, 6) != Some(0)
+        || raw_u16(tail, 8) != raw_u16(tail, 10)
+        || raw_u32(tail, 12) != u32::try_from(central_directory_size).ok()
+    {
+        return Err(Error::Reassembly(
+            "ZIP uses a multi-disk or ZIP64 central-directory layout".to_owned(),
+        ));
+    }
+
+    let physical_count = archive.physical_entries().count();
+    if physical_count > usize::from(u16::MAX)
+        || raw_u16(tail, 10) != u16::try_from(physical_count).ok()
+    {
+        return Err(Error::Reassembly(
+            "ZIP entry count requires ZIP64 or is inconsistent".to_owned(),
+        ));
+    }
+    let raw_directory_offset = raw_u32(tail, 16)
+        .ok_or_else(|| Error::Reassembly("ZIP central-directory offset is truncated".to_owned()))?;
+    let actual_directory_offset = u64::try_from(directory_offset)
+        .map_err(|_error| Error::Reassembly("ZIP central offset does not fit u64".to_owned()))?;
+    if raw_directory_offset == u32::MAX
+        || archive.base_offset() > actual_directory_offset
+        || actual_directory_offset - archive.base_offset() != u64::from(raw_directory_offset)
+    {
+        return Err(Error::Reassembly(
+            "ZIP central-directory offset has an unsupported base".to_owned(),
+        ));
+    }
+    if eocd_offset >= 20 && raw_u32(&source[eocd_offset - 20..eocd_offset], 0) == Some(0x0706_4b50)
+    {
+        return Err(Error::Reassembly(
+            "ZIP64 end-of-central-directory locator is not supported by this slice".to_owned(),
+        ));
+    }
+    if eocd_offset >= 76
+        && raw_u32(&source[eocd_offset - 76..eocd_offset - 20], 0) == Some(0x0606_4b50)
+    {
+        return Err(Error::Reassembly(
+            "ZIP64 end-of-central-directory record is not supported by this slice".to_owned(),
+        ));
+    }
+
+    for physical in archive.physical_entries() {
+        let local_range = physical.local_record();
+        let central_range = physical.central_record();
+        let local = source
+            .get(local_range.clone())
+            .ok_or_else(|| Error::Reassembly("ZIP local record range is truncated".to_owned()))?;
+        let central = source
+            .get(central_range.clone())
+            .ok_or_else(|| Error::Reassembly("ZIP central record range is truncated".to_owned()))?;
+        if local.len() < 30
+            || central.len() < 46
+            || local_range.end > directory_offset
+            || central_range.start < directory_offset
+            || central_range.end > eocd_offset
+        {
+            return Err(Error::Reassembly(
+                "ZIP member record crosses a structural boundary".to_owned(),
+            ));
+        }
+        if raw_u32(local, 0) != Some(0x0403_4b50)
+            || raw_u32(central, 0) != Some(0x0201_4b50)
+            || [18usize, 22]
+                .into_iter()
+                .any(|offset| raw_u32(local, offset) == Some(u32::MAX))
+            || [20usize, 24, 42]
+                .into_iter()
+                .any(|offset| raw_u32(central, offset) == Some(u32::MAX))
+        {
+            return Err(Error::Reassembly(
+                "ZIP member uses ZIP64 fields or has malformed fixed headers".to_owned(),
+            ));
+        }
+
+        let central_compressed = raw_u32(central, 20).ok_or_else(|| {
+            Error::Reassembly("ZIP central compressed size is truncated".to_owned())
+        })?;
+        let central_uncompressed = raw_u32(central, 24).ok_or_else(|| {
+            Error::Reassembly("ZIP central uncompressed size is truncated".to_owned())
+        })?;
+        if u64::from(central_compressed) != physical.compressed_size()
+            || u64::from(central_uncompressed) != physical.uncompressed_size()
+        {
+            return Err(Error::Reassembly(
+                "ZIP central size fields disagree with the parsed entry".to_owned(),
+            ));
+        }
+        let local_offset = raw_u32(central, 42)
+            .ok_or_else(|| Error::Reassembly("ZIP local-header offset is truncated".to_owned()))?;
+        let expected_offset = u64::try_from(local_range.start)
+            .map_err(|_error| Error::Reassembly("ZIP local offset does not fit u64".to_owned()))?
+            .checked_sub(archive.base_offset())
+            .ok_or_else(|| Error::Reassembly("ZIP local offset has an invalid base".to_owned()))?;
+        if u64::from(local_offset) != expected_offset {
+            return Err(Error::Reassembly(
+                "ZIP central local-header offset is inconsistent".to_owned(),
+            ));
+        }
+    }
+
+    Ok(ReassemblyShape {
+        base_offset: archive.base_offset(),
+        central_directory_size,
+    })
+}
+
+fn prepare_edits(
+    archive: &ZipArchive<'_>,
+    edits: &[EntryEdit<'_>],
+    limits: Limits,
+) -> Result<HashMap<usize, PreparedEdit>> {
+    let mut requested = HashMap::new();
+    requested
+        .try_reserve(edits.len())
+        .map_err(|_error| Error::Allocation {
+            resource: "reassembly edit index",
+            amount: edits.len(),
+        })?;
+    for &edit in edits {
+        if requested.insert(edit.name(), edit).is_some() {
+            return Err(Error::Reassembly(format!(
+                "member is edited more than once: {}",
+                edit.name()
+            )));
+        }
+    }
+
+    let mut matched = Vec::new();
+    matched
+        .try_reserve_exact(edits.len())
+        .map_err(|_error| Error::Allocation {
+            resource: "matched reassembly edits",
+            amount: edits.len(),
+        })?;
+    let mut total_uncompressed = 0u64;
+    for physical in archive.physical_entries() {
+        total_uncompressed = total_uncompressed
+            .checked_add(physical.uncompressed_size())
+            .ok_or_else(|| Error::Reassembly("ZIP uncompressed size overflows u64".to_owned()))?;
+    }
+
+    for (index, physical) in archive.physical_entries().enumerate() {
+        let Some(edit) = (!physical.is_directory())
+            .then(|| requested.remove(physical.name()))
+            .flatten()
+        else {
+            continue;
+        };
+        let data_size = u64::try_from(edit.data().len()).map_err(|_error| {
+            Error::InvalidBundle("edited member length does not fit u64".to_owned())
+        })?;
+        if data_size > limits.max_entry_bytes() {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::EntryBytes,
+                observed: data_size,
+                maximum: limits.max_entry_bytes(),
+            });
+        }
+        if physical.local_header().flags != physical.central_header().flags
+            || physical.local_header().compression_method
+                != physical.central_header().compression_method
+        {
+            return Err(Error::Reassembly(format!(
+                "edited member has inconsistent local and central metadata: {}",
+                physical.name()
+            )));
+        }
+        let method = physical.central_header().compression_method;
+        if !matches!(method, 0 | 8) {
+            return Err(Error::Reassembly(format!(
+                "edited member uses unsupported compression method {method}: {}",
+                physical.name()
+            )));
+        }
+        let compressed_range = physical.compressed_data_range();
+        let local_range = physical.local_record();
+        let suffix = &archive.source()[compressed_range.end..local_range.end];
+        let descriptor_start = descriptor_start(physical, suffix)?;
+        total_uncompressed = total_uncompressed
+            .checked_sub(physical.uncompressed_size())
+            .and_then(|value| value.checked_add(data_size))
+            .ok_or_else(|| Error::Reassembly("ZIP uncompressed size overflows u64".to_owned()))?;
+        matched.push(MatchedEdit {
+            index,
+            edit,
+            descriptor_start,
+        });
+    }
+    if let Some(name) = requested.keys().next() {
+        return Err(Error::Reassembly(format!(
+            "edited member does not exist in the flat catalog: {name}"
+        )));
+    }
+    if total_uncompressed > limits.max_total_bytes() {
+        return Err(Error::Limit {
+            kind: crate::LimitKind::TotalBytes,
+            observed: total_uncompressed,
+            maximum: limits.max_total_bytes(),
+        });
+    }
+
+    let mut prepared = HashMap::new();
+    prepared
+        .try_reserve(matched.len())
+        .map_err(|_error| Error::Allocation {
+            resource: "prepared reassembly edits",
+            amount: matched.len(),
+        })?;
+    for matched_edit in matched {
+        let physical = archive.physical_entry(matched_edit.index).ok_or_else(|| {
+            Error::Reassembly("matched edit references a missing ZIP entry".to_owned())
+        })?;
+        let data = matched_edit.edit.data();
+        let compressed =
+            encode_replacement(physical.central_header().compression_method, data, limits)?;
+        let compressed_size = u64::try_from(compressed.len()).map_err(|_error| {
+            Error::InvalidBundle("edited compressed member length does not fit u64".to_owned())
+        })?;
+        if compressed_size > u64::from(u32::MAX) {
+            return Err(Error::Reassembly(format!(
+                "edited member is too large for non-ZIP64 reassembly: {}",
+                physical.name()
+            )));
+        }
+        prepared.insert(
+            matched_edit.index,
+            PreparedEdit {
+                compressed,
+                crc32: soapberry_zip::crc32(data),
+                uncompressed_size: u64::try_from(data.len()).map_err(|_error| {
+                    Error::InvalidBundle("edited member length does not fit u64".to_owned())
+                })?,
+                descriptor_start: matched_edit.descriptor_start,
+            },
+        );
+    }
+    Ok(prepared)
+}
+
+fn descriptor_start(physical: &PhysicalEntry, suffix: &[u8]) -> Result<Option<usize>> {
+    if physical.central_header().flags & 0x0008 == 0 {
+        return Ok(None);
+    }
+    let signed = raw_u32(suffix, 0) == Some(0x0807_4b50);
+    let start = if signed { 4 } else { 0 };
+    let Some(crc32) = raw_u32(suffix, start) else {
+        return Err(Error::Reassembly(format!(
+            "edited member has a truncated data descriptor: {}",
+            physical.name()
+        )));
+    };
+    let Some(compressed_size) = raw_u32(suffix, start + 4) else {
+        return Err(Error::Reassembly(format!(
+            "edited member has a truncated data descriptor size: {}",
+            physical.name()
+        )));
+    };
+    let Some(uncompressed_size) = raw_u32(suffix, start + 8) else {
+        return Err(Error::Reassembly(format!(
+            "edited member has a truncated data descriptor length: {}",
+            physical.name()
+        )));
+    };
+    if crc32 != physical.crc32()
+        || u64::from(compressed_size) != physical.compressed_size()
+        || u64::from(uncompressed_size) != physical.uncompressed_size()
+    {
+        return Err(Error::Reassembly(format!(
+            "edited member data descriptor disagrees with its central record: {}",
+            physical.name()
+        )));
+    }
+    Ok(Some(start))
+}
+
+fn encode_replacement(method: u16, data: &[u8], limits: Limits) -> Result<Vec<u8>> {
+    match method {
+        0 => {
+            let mut compressed = Vec::new();
+            compressed
+                .try_reserve_exact(data.len())
+                .map_err(|_error| Error::Allocation {
+                    resource: "edited stored member",
+                    amount: data.len(),
+                })?;
+            compressed.extend_from_slice(data);
+            Ok(compressed)
+        },
+        8 => {
+            let max = usize::try_from(limits.max_input_bytes()).map_err(|_error| {
+                Error::InvalidBundle("reassembly output limit does not fit usize".to_owned())
+            })?;
+            let bounded = BoundedBuffer::new(max);
+            let mut encoder = DeflateEncoder::new(bounded, Compression::default());
+            encoder.write_all(data)?;
+            Ok(encoder.finish()?.into_inner())
+        },
+        other => Err(Error::Reassembly(format!(
+            "compression method {other} cannot be edited"
+        ))),
+    }
+}
+
+fn reassembled_output_size(
+    archive: &ZipArchive<'_>,
+    prepared: &HashMap<usize, PreparedEdit>,
+) -> Result<u64> {
+    let source = archive.source();
+    let prelude_end = archive
+        .physical_entries()
+        .next()
+        .map_or(archive.directory_offset(), |entry| {
+            entry.local_record().start
+        });
+    let mut size = u64::try_from(prelude_end)
+        .map_err(|_error| Error::Reassembly("ZIP prelude length does not fit u64".to_owned()))?;
+    for (index, physical) in archive.physical_entries().enumerate() {
+        let local_len = if let Some(edit) = prepared.get(&index) {
+            let header_len = physical
+                .compressed_data_range()
+                .start
+                .checked_sub(physical.local_record().start)
+                .ok_or_else(|| Error::Reassembly("ZIP local header range is invalid".to_owned()))?;
+            let suffix_len = physical
+                .local_record()
+                .end
+                .checked_sub(physical.compressed_data_range().end)
+                .ok_or_else(|| Error::Reassembly("ZIP descriptor range is invalid".to_owned()))?;
+            header_len
+                .checked_add(edit.compressed.len())
+                .and_then(|value| value.checked_add(suffix_len))
+                .ok_or_else(|| {
+                    Error::Reassembly("reassembled local record overflows usize".to_owned())
+                })?
+        } else {
+            source[physical.local_record()].len()
+        };
+        size = size
+            .checked_add(u64::try_from(local_len).map_err(|_error| {
+                Error::Reassembly("reassembled local record length does not fit u64".to_owned())
+            })?)
+            .ok_or_else(|| Error::Reassembly("reassembled ZIP length overflows u64".to_owned()))?;
+    }
+    let central_size = archive
+        .eocd_offset()
+        .checked_sub(archive.directory_offset())
+        .ok_or_else(|| Error::Reassembly("central directory range is invalid".to_owned()))?;
+    let tail_size = source
+        .len()
+        .checked_sub(archive.eocd_offset())
+        .ok_or_else(|| Error::Reassembly("ZIP tail range is invalid".to_owned()))?;
+    size = size
+        .checked_add(u64::try_from(central_size).map_err(|_error| {
+            Error::Reassembly("central directory length does not fit u64".to_owned())
+        })?)
+        .and_then(|value| value.checked_add(u64::try_from(tail_size).ok()?))
+        .ok_or_else(|| Error::Reassembly("reassembled ZIP length overflows u64".to_owned()))?;
+    Ok(size)
+}
+
+fn append_edited_local(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    physical: &PhysicalEntry,
+    edit: &PreparedEdit,
+) -> Result<()> {
+    let local = physical.local_record();
+    let compressed = physical.compressed_data_range();
+    let header_len = compressed
+        .start
+        .checked_sub(local.start)
+        .ok_or_else(|| Error::Reassembly("ZIP local header range is invalid".to_owned()))?;
+    let header_start = output.len();
+    output.extend_from_slice(&source[local.start..compressed.start]);
+    if edit.descriptor_start.is_none() {
+        patch_u32_at(output, header_start + 14, edit.crc32, "local CRC-32")?;
+        patch_u32_at(
+            output,
+            header_start + 18,
+            u32::try_from(edit.compressed.len()).map_err(|_error| {
+                Error::Reassembly("edited compressed size does not fit u32".to_owned())
+            })?,
+            "local compressed size",
+        )?;
+        patch_u32_at(
+            output,
+            header_start + 22,
+            u32::try_from(edit.uncompressed_size).map_err(|_error| {
+                Error::Reassembly("edited uncompressed size does not fit u32".to_owned())
+            })?,
+            "local uncompressed size",
+        )?;
+    }
+    output.extend_from_slice(&edit.compressed);
+    let suffix_start = output.len();
+    output.extend_from_slice(&source[compressed.end..local.end]);
+    if let Some(descriptor_start) = edit.descriptor_start {
+        let descriptor = suffix_start.checked_add(descriptor_start).ok_or_else(|| {
+            Error::Reassembly("data descriptor offset overflows usize".to_owned())
+        })?;
+        patch_u32_at(output, descriptor, edit.crc32, "descriptor CRC-32")?;
+        patch_u32_at(
+            output,
+            descriptor + 4,
+            u32::try_from(edit.compressed.len()).map_err(|_error| {
+                Error::Reassembly("edited descriptor compressed size does not fit u32".to_owned())
+            })?,
+            "descriptor compressed size",
+        )?;
+        patch_u32_at(
+            output,
+            descriptor + 8,
+            u32::try_from(edit.uncompressed_size).map_err(|_error| {
+                Error::Reassembly("edited descriptor uncompressed size does not fit u32".to_owned())
+            })?,
+            "descriptor uncompressed size",
+        )?;
+    }
+    debug_assert_eq!(
+        header_len + edit.compressed.len() + (local.end - compressed.end),
+        output.len() - header_start
+    );
+    Ok(())
+}
+
+fn patch_central_record(
+    record: &mut [u8],
+    local_offset: u64,
+    prepared_edit: Option<&PreparedEdit>,
+    base_offset: u64,
+) -> Result<()> {
+    let relative_offset = local_offset.checked_sub(base_offset).ok_or_else(|| {
+        Error::Reassembly("reassembled local offset has an invalid base".to_owned())
+    })?;
+    patch_u32_at(
+        record,
+        42,
+        u32::try_from(relative_offset).map_err(|_error| {
+            Error::Reassembly("reassembled local offset does not fit u32".to_owned())
+        })?,
+        "central local-header offset",
+    )?;
+    if let Some(edit) = prepared_edit {
+        patch_u32_at(record, 16, edit.crc32, "central CRC-32")?;
+        patch_u32_at(
+            record,
+            20,
+            u32::try_from(edit.compressed.len()).map_err(|_error| {
+                Error::Reassembly("central compressed size does not fit u32".to_owned())
+            })?,
+            "central compressed size",
+        )?;
+        patch_u32_at(
+            record,
+            24,
+            u32::try_from(edit.uncompressed_size).map_err(|_error| {
+                Error::Reassembly("central uncompressed size does not fit u32".to_owned())
+            })?,
+            "central uncompressed size",
+        )?;
+    }
+    Ok(())
+}
+
+fn patch_end_of_central_directory(
+    tail: &mut [u8],
+    directory_offset: u64,
+    base_offset: u64,
+    central_directory_size: usize,
+) -> Result<()> {
+    let relative_offset = directory_offset.checked_sub(base_offset).ok_or_else(|| {
+        Error::Reassembly("reassembled central offset has an invalid base".to_owned())
+    })?;
+    patch_u32_at(
+        tail,
+        16,
+        u32::try_from(relative_offset).map_err(|_error| {
+            Error::Reassembly("reassembled central directory offset does not fit u32".to_owned())
+        })?,
+        "end-of-central-directory offset",
+    )?;
+    if raw_u32(tail, 12) != u32::try_from(central_directory_size).ok() {
+        return Err(Error::Reassembly(
+            "central directory size changed unexpectedly during reassembly".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn patch_u32_at(bytes: &mut [u8], start: usize, value: u32, label: &str) -> Result<()> {
+    let end = start
+        .checked_add(4)
+        .ok_or_else(|| Error::Reassembly(format!("{label} offset overflows usize")))?;
+    let target = bytes
+        .get_mut(start..end)
+        .ok_or_else(|| Error::Reassembly(format!("{label} is truncated")))?;
+    target.copy_from_slice(&value.to_le_bytes());
+    Ok(())
+}
+
+fn raw_u16(bytes: &[u8], start: usize) -> Option<u16> {
+    bytes
+        .get(start..start.checked_add(2)?)
+        .map(|value| u16::from_le_bytes([value[0], value[1]]))
+}
+
+fn raw_u32(bytes: &[u8], start: usize) -> Option<u32> {
+    bytes
+        .get(start..start.checked_add(4)?)
+        .map(|value| u32::from_le_bytes([value[0], value[1], value[2], value[3]]))
 }
 
 fn collect_flat(archive: &ZipArchive<'_>, source: &Arc<[u8]>) -> Result<Vec<Entry>> {
@@ -919,6 +1704,86 @@ mod tests {
         (bytes, central_offset, central_end)
     }
 
+    fn physical_two_entry_zip() -> Vec<u8> {
+        let entries = [
+            (
+                b"Untouched/a".as_slice(),
+                b"keep this payload".as_slice(),
+                b"".as_slice(),
+                b"".as_slice(),
+                b"".as_slice(),
+            ),
+            (
+                b"Opaque/entry.bin".as_slice(),
+                b"old payload".as_slice(),
+                b"\xaa\xbb\x03\0xyz".as_slice(),
+                b"\xcc\xdd\x02\0\xfe\xed".as_slice(),
+                b"entry-comment\0\xff".as_slice(),
+            ),
+        ];
+        let archive_comment = b"archive-comment\0\xfe";
+        let mut bytes = Vec::new();
+        let mut local_offsets = [0usize; 2];
+        for (index, (name, data, local_extra, _central_extra, _comment)) in
+            entries.iter().enumerate()
+        {
+            local_offsets[index] = bytes.len();
+            let crc32 = soapberry_zip::crc32(data);
+            push_u32(&mut bytes, 0x0403_4b50);
+            push_u16(&mut bytes, 20);
+            push_u16(&mut bytes, 0x0800);
+            push_u16(&mut bytes, 0);
+            push_u16(&mut bytes, 0x1234 + u16::try_from(index).unwrap_or(0));
+            push_u16(&mut bytes, 0x5678);
+            push_u32(&mut bytes, crc32);
+            push_u32(&mut bytes, checked_u32(data.len()));
+            push_u32(&mut bytes, checked_u32(data.len()));
+            push_u16(&mut bytes, checked_u16(name.len()));
+            push_u16(&mut bytes, checked_u16(local_extra.len()));
+            bytes.extend_from_slice(name);
+            bytes.extend_from_slice(local_extra);
+            bytes.extend_from_slice(data);
+        }
+
+        let central_offset = bytes.len();
+        for (index, (name, data, _local_extra, central_extra, comment)) in
+            entries.iter().enumerate()
+        {
+            let crc32 = soapberry_zip::crc32(data);
+            push_u32(&mut bytes, 0x0201_4b50);
+            push_u16(&mut bytes, 0x0314);
+            push_u16(&mut bytes, 20);
+            push_u16(&mut bytes, 0x0800);
+            push_u16(&mut bytes, 0);
+            push_u16(&mut bytes, 0x9abc);
+            push_u16(&mut bytes, 0xdef0);
+            push_u32(&mut bytes, crc32);
+            push_u32(&mut bytes, checked_u32(data.len()));
+            push_u32(&mut bytes, checked_u32(data.len()));
+            push_u16(&mut bytes, checked_u16(name.len()));
+            push_u16(&mut bytes, checked_u16(central_extra.len()));
+            push_u16(&mut bytes, checked_u16(comment.len()));
+            push_u16(&mut bytes, 0);
+            push_u16(&mut bytes, 0);
+            push_u32(&mut bytes, 0);
+            push_u32(&mut bytes, checked_u32(local_offsets[index]));
+            bytes.extend_from_slice(name);
+            bytes.extend_from_slice(central_extra);
+            bytes.extend_from_slice(comment);
+        }
+        let central_size = bytes.len() - central_offset;
+        push_u32(&mut bytes, 0x0605_4b50);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 2);
+        push_u16(&mut bytes, 2);
+        push_u32(&mut bytes, checked_u32(central_size));
+        push_u32(&mut bytes, checked_u32(central_offset));
+        push_u16(&mut bytes, checked_u16(archive_comment.len()));
+        bytes.extend_from_slice(archive_comment);
+        bytes
+    }
+
     #[test]
     fn preserves_flat_entry_order_and_payloads() -> Result<()> {
         let bytes = zip(&[("Metadata/a", b"a"), ("Index/Document.iwa", b"iwa")])?;
@@ -1169,6 +2034,167 @@ mod tests {
             Catalog::from_bytes(&bytes),
             Err(Error::InvalidBundle(message)) if message.contains("mixes direct IWA")
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn reassembles_stored_edit_while_preserving_physical_provenance() -> Result<()> {
+        let bytes = physical_two_entry_zip();
+        let catalog = Catalog::from_bytes(&bytes)?;
+        let before = catalog.iter().collect::<Vec<_>>();
+        let edited = catalog.reassemble_to_bytes(
+            &[EntryEdit::new(
+                "Opaque/entry.bin",
+                b"new payload with a different size",
+            )],
+            Limits::default(),
+        )?;
+        let after_catalog = Catalog::from_bytes(&edited)?;
+        let after = after_catalog.iter().collect::<Vec<_>>();
+
+        assert_eq!(
+            after.iter().map(|entry| entry.name()).collect::<Vec<_>>(),
+            ["Untouched/a", "Opaque/entry.bin"]
+        );
+        assert_eq!(after[0].data(), before[0].data());
+        assert_eq!(
+            after[0].raw_record().local_record(),
+            before[0].raw_record().local_record()
+        );
+        assert_eq!(
+            after[0].raw_record().central_directory_record(),
+            before[0].raw_record().central_directory_record()
+        );
+        assert_eq!(after[1].data(), b"new payload with a different size");
+        assert_eq!(after[1].raw_name(), before[1].raw_name());
+        assert_eq!(after[1].metadata().local(), before[1].metadata().local());
+        assert_eq!(
+            after[1].metadata().central().name(),
+            before[1].metadata().central().name()
+        );
+        assert_eq!(
+            after[1].metadata().central().extra(),
+            before[1].metadata().central().extra()
+        );
+        assert_eq!(
+            after[1].metadata().central().comment(),
+            before[1].metadata().central().comment()
+        );
+        let archive = soapberry_zip::ZipArchive::from_slice(&edited)?;
+        assert_eq!(archive.comment().as_bytes(), b"archive-comment\0\xfe");
+        Ok(())
+    }
+
+    #[test]
+    fn reassembles_deflate_edit_and_round_trips_metadata() -> Result<()> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_deflated("Compressed/data", b"old deflate payload")?;
+        writer.write_stored("Untouched/data", b"keep")?;
+        let bytes = writer.finish_to_bytes()?;
+        let catalog = Catalog::from_bytes(&bytes)?;
+        let before = catalog
+            .iter()
+            .next()
+            .ok_or_else(|| Error::InvalidBundle("deflate fixture has no first entry".to_owned()))?;
+        assert_eq!(before.metadata().central().compression_method(), 8);
+
+        let edited = catalog.reassemble_to_bytes(
+            &[EntryEdit::new(
+                "Compressed/data",
+                b"replacement deflate payload with more bytes",
+            )],
+            Limits::default(),
+        )?;
+        let after_catalog = Catalog::from_bytes(&edited)?;
+        let after = after_catalog.iter().next().ok_or_else(|| {
+            Error::InvalidBundle("reassembled deflate fixture has no first entry".to_owned())
+        })?;
+
+        assert_eq!(after.data(), b"replacement deflate payload with more bytes");
+        assert_eq!(after.metadata().central().compression_method(), 8);
+        assert_eq!(after.metadata().local(), before.metadata().local());
+        assert_eq!(
+            after.metadata().central().name(),
+            before.metadata().central().name()
+        );
+        assert_eq!(
+            after.metadata().central().extra(),
+            before.metadata().central().extra()
+        );
+        assert_eq!(
+            after.metadata().central().comment(),
+            before.metadata().central().comment()
+        );
+        assert_eq!(
+            after.metadata().crc32(),
+            soapberry_zip::crc32(b"replacement deflate payload with more bytes")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn empty_reassembly_uses_the_exact_noop_source_path() -> Result<()> {
+        let bytes = physical_two_entry_zip();
+        let catalog = Catalog::from_bytes(&bytes)?;
+        assert_eq!(catalog.reassemble_to_bytes(&[], Limits::default())?, bytes);
+        let mut streamed = Vec::new();
+        catalog.write_reassembled_to(&[], &mut streamed, Limits::default())?;
+        assert_eq!(streamed, bytes);
+        Ok(())
+    }
+
+    #[test]
+    fn rejected_edits_leave_the_sink_untouched() -> Result<()> {
+        let bytes = physical_two_entry_zip();
+        let catalog = Catalog::from_bytes(&bytes)?;
+        let original_sink = vec![0xde, 0xad, 0xbe, 0xef];
+
+        let cases = [
+            vec![
+                EntryEdit::new("Opaque/entry.bin", b"one"),
+                EntryEdit::new("Opaque/entry.bin", b"two"),
+            ],
+            vec![EntryEdit::new("Missing/entry", b"missing")],
+        ];
+        for edits in cases {
+            let mut sink = original_sink.clone();
+            assert!(matches!(
+                catalog.write_reassembled_to(&edits, &mut sink, Limits::default()),
+                Err(Error::Reassembly(_))
+            ));
+            assert_eq!(sink, original_sink);
+        }
+
+        let (opaque_bytes, _central_offset, _central_end) = physical_zip(99);
+        let opaque_catalog = Catalog::from_bytes(&opaque_bytes)?;
+        let mut opaque_sink = original_sink.clone();
+        assert!(matches!(
+            opaque_catalog.write_reassembled_to(
+                &[EntryEdit::new("Opaque/entry.bin", b"cannot edit")],
+                &mut opaque_sink,
+                Limits::default()
+            ),
+            Err(Error::Reassembly(_))
+        ));
+        assert_eq!(opaque_sink, original_sink);
+
+        let input_limit = u64::try_from(bytes.len()).map_err(|_error| {
+            Error::InvalidBundle("test ZIP length does not fit u64".to_owned())
+        })?;
+        let limits = Limits::new(input_limit, 10, 4096, 4096, 1024)?;
+        let mut limited_sink = original_sink.clone();
+        assert!(matches!(
+            catalog.write_reassembled_to(
+                &[EntryEdit::new("Opaque/entry.bin", &[b'x'; 1024])],
+                &mut limited_sink,
+                limits
+            ),
+            Err(Error::Limit {
+                kind: crate::LimitKind::OutputBytes,
+                ..
+            })
+        ));
+        assert_eq!(limited_sink, original_sink);
         Ok(())
     }
 }

@@ -7,6 +7,8 @@ use litchi_core::SourceVersion;
 pub enum LimitKind {
     /// Complete bytes read from one path or in-memory package.
     InputBytes,
+    /// Complete bytes materialized by one edited-package reassembly.
+    OutputBytes,
     /// Non-directory ZIP members in one central directory.
     Entries,
     /// Declared uncompressed size of one ZIP member.
@@ -21,6 +23,7 @@ impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
+            Self::OutputBytes => "output bytes",
             Self::Entries => "ZIP entries",
             Self::EntryBytes => "ZIP entry bytes",
             Self::TotalBytes => "ZIP total bytes",
@@ -82,6 +85,11 @@ pub enum Error {
         /// Source identity and revision observed after reading.
         observed: SourceVersion,
     },
+
+    /// The bounded reassembler cannot safely preserve this physical ZIP
+    /// layout or edit this member without changing semantics.
+    #[error("iWork archive reassembly is unsupported: {0}")]
+    Reassembly(String),
 
     /// The input is a ZIP container but not a valid iWork bundle shape.
     #[error("invalid iWork bundle: {0}")]

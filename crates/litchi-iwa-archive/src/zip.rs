@@ -11,7 +11,11 @@ use crate::{Error, Limits, Result};
 pub(crate) struct ZipArchive<'data> {
     reader: ArchiveReader<'data>,
     physical_entries: Vec<PhysicalEntry>,
+    central_order: Vec<usize>,
     data: &'data [u8],
+    directory_offset: usize,
+    eocd_offset: usize,
+    base_offset: u64,
 }
 
 /// The fields of one physical ZIP header retained independently of the
@@ -109,10 +113,38 @@ impl<'data> ZipArchive<'data> {
         validated_limits.check_input_size(input_size, "ZIP input")?;
         let raw_archive = RawZipArchive::from_slice(data)?;
         let physical_entries = parse_physical_entries(data, &raw_archive)?;
+        let mut central_order = Vec::new();
+        central_order
+            .try_reserve_exact(physical_entries.len())
+            .map_err(|_error| Error::Allocation {
+                resource: "physical ZIP central order",
+                amount: physical_entries.len(),
+            })?;
+        central_order.extend(0..physical_entries.len());
+        central_order.sort_unstable_by_key(|&index| physical_entries[index].central_record.start);
+
+        let directory_offset = checked_offset(raw_archive.directory_offset(), "central directory")?;
+        let eocd_offset = checked_offset(raw_archive.eocd_offset(), "end of central directory")?;
+        let tail = data.get(eocd_offset..).ok_or_else(|| {
+            Error::InvalidBundle("ZIP end of central directory is truncated".to_owned())
+        })?;
+        let raw_central_offset = read_u32(tail, 16, "end of central directory offset")?;
+        let base_offset = u64::try_from(directory_offset)
+            .map_err(|_error| {
+                Error::InvalidBundle("ZIP central directory offset does not fit u64".to_owned())
+            })?
+            .checked_sub(u64::from(raw_central_offset))
+            .ok_or_else(|| {
+                Error::InvalidBundle("ZIP central directory offset has an invalid base".to_owned())
+            })?;
         Ok(Self {
             reader: ArchiveReader::new_with_limits(data, validated_limits.zip_limits())?,
             physical_entries,
+            central_order,
             data,
+            directory_offset,
+            eocd_offset,
+            base_offset,
         })
     }
 
@@ -134,6 +166,26 @@ impl<'data> ZipArchive<'data> {
 
     pub(crate) fn physical_entries(&self) -> impl Iterator<Item = &PhysicalEntry> {
         self.physical_entries.iter()
+    }
+
+    pub(crate) fn physical_entry(&self, index: usize) -> Option<&PhysicalEntry> {
+        self.physical_entries.get(index)
+    }
+
+    pub(crate) fn physical_indices_in_central_order(&self) -> impl Iterator<Item = usize> + '_ {
+        self.central_order.iter().copied()
+    }
+
+    pub(crate) const fn directory_offset(&self) -> usize {
+        self.directory_offset
+    }
+
+    pub(crate) const fn eocd_offset(&self) -> usize {
+        self.eocd_offset
+    }
+
+    pub(crate) const fn base_offset(&self) -> u64 {
+        self.base_offset
     }
 }
 
