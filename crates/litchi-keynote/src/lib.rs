@@ -11,6 +11,7 @@ mod time;
 
 pub mod background;
 pub mod build;
+pub mod chart;
 pub mod document;
 pub mod show;
 pub mod slide;
@@ -19,6 +20,7 @@ pub mod transition;
 
 pub use background::{Angle, Background, Gradient, Kind, Opaque, Stop};
 pub use build::{AnimationType, Build};
+pub use chart::ChartSelector;
 pub use document::Document;
 pub use error::{Error, Result};
 pub use show::{Mode, Settings, Show, Size};
