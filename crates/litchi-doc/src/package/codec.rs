@@ -5,7 +5,7 @@ use litchi_ole_common::property_set::{
     PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
 use std::fs::File;
-use std::io::{Read, Seek};
+use std::io::{Read, Seek, Write};
 use std::path::Path;
 
 impl Package<File> {
@@ -127,6 +127,32 @@ impl<R: Read + Seek> Package<R> {
     ) -> std::result::Result<Option<litchi_crypto::spaces::Graph>, litchi_crypto::spaces::Error>
     {
         litchi_crypto::spaces::inspect(&mut self.ole)
+    }
+
+    /// Capture a source-preserving, validated DataSpaces edit owner.
+    ///
+    /// The returned snapshot retains only DataSpaces stream bytes. Its patch
+    /// can later be written to a fresh destination with
+    /// [`Self::write_data_spaces_patch`]; the current package is never
+    /// mutated in place and no protected payload is decrypted or evaluated.
+    pub fn data_spaces_snapshot(
+        &mut self,
+    ) -> std::result::Result<Option<litchi_crypto::spaces::Snapshot>, litchi_crypto::spaces::Error>
+    {
+        litchi_crypto::spaces::Snapshot::from_ole(&mut self.ole)
+    }
+
+    /// Rebuild the package after source-checking a DataSpaces patch.
+    ///
+    /// All logical OLE streams and storages are copied, while only the patch's
+    /// DataSpaces stream replacements are applied. The output must be a fresh
+    /// seekable destination; the generic `Package<R>` reader remains intact.
+    pub fn write_data_spaces_patch<W: Write + Seek>(
+        &mut self,
+        patch: &litchi_crypto::spaces::Patch,
+        output: &mut W,
+    ) -> std::result::Result<(), litchi_crypto::spaces::Error> {
+        patch.write_to(&mut self.ole, output)
     }
 
     /// Get the underlying OLE file.

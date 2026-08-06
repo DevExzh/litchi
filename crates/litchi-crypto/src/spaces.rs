@@ -15,9 +15,11 @@
 //! ```
 
 use std::fmt;
-use std::io::{Read, Seek};
+use std::io::{Read, Seek, Write};
+use std::sync::Arc;
 
-use litchi_cfb::{OleError, OleFile};
+use litchi_cfb::consts::{STGTY_STORAGE, STGTY_STREAM};
+use litchi_cfb::{OleError, OleFile, OleWriter};
 
 use super::integrity::{
     self, DOCUMENT_SUMMARY_HASH_STREAM, DOCUMENT_SUMMARY_STREAM, Info, SUMMARY_HASH_STREAM,
@@ -31,6 +33,7 @@ const TRANSFORM_TYPE: u32 = 1;
 const EXTENSIBILITY_HEADER_LENGTH: u32 = 4;
 const MAX_STREAM_BYTES: usize = 16 * 1024 * 1024;
 const MAX_ENTRIES: usize = 65_536;
+const MAX_COMPONENTS: usize = MAX_ENTRIES * 8;
 const MAX_STRING_BYTES: usize = 1_048_576;
 const MAX_XML_DEPTH: usize = 256;
 
@@ -220,6 +223,1154 @@ pub struct Integrity {
     pub info: Info,
     /// `None` means a future info-stream version that readers must ignore.
     pub valid: Option<bool>,
+}
+
+/// A deterministic identity for the DataSpaces streams captured by a snapshot.
+///
+/// This is intentionally scoped to the DataSpaces graph rather than to the
+/// physical CFB allocation. Package patches therefore remain applicable when
+/// unrelated streams are rewritten, while exact DataSpaces source bytes are
+/// still required before a patch can be applied.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Revision(u64);
+
+impl Revision {
+    /// Returns the compact source fingerprint.
+    #[must_use]
+    pub const fn value(self) -> u64 {
+        self.0
+    }
+
+    /// Alias for [`Self::value`].
+    #[must_use]
+    pub const fn fingerprint(self) -> u64 {
+        self.value()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Component {
+    path: Vec<String>,
+    kind: ReferenceKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SourceStream {
+    path: Vec<String>,
+    bytes: Arc<[u8]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Source {
+    streams: Vec<SourceStream>,
+    components: Vec<Component>,
+    revision: Revision,
+}
+
+/// An immutable, source-preserving DataSpaces graph snapshot.
+///
+/// The snapshot owns the exact bytes of every DataSpaces stream that it
+/// exposes. An unchanged transaction therefore replays producer bytes exactly
+/// and never canonicalizes IRM, license, encryption, label, or opaque payloads.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Snapshot {
+    graph: Graph,
+    source: Arc<Source>,
+}
+
+impl Snapshot {
+    /// Parses and captures a validated DataSpaces graph from an OLE package.
+    ///
+    /// `None` means the package has no `\x06DataSpaces` storage.
+    pub fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Self>, Error> {
+        let Some(graph) = inspect(ole)? else {
+            return Ok(None);
+        };
+        let source = Source::capture(ole, &graph)?;
+        Ok(Some(Self {
+            graph,
+            source: Arc::new(source),
+        }))
+    }
+
+    /// Borrows the validated semantic graph.
+    #[must_use]
+    pub const fn graph(&self) -> &Graph {
+        &self.graph
+    }
+
+    /// Returns the exact DataSpaces source revision.
+    #[must_use]
+    pub fn revision(&self) -> Revision {
+        self.source.revision
+    }
+
+    /// Returns the exact DataSpaces source fingerprint.
+    #[must_use]
+    pub fn fingerprint(&self) -> u64 {
+        self.revision().value()
+    }
+
+    /// Starts an isolated typed edit.
+    #[must_use]
+    pub fn edit(&self) -> Transaction {
+        Transaction {
+            source: self.clone(),
+            candidate: self.graph.clone(),
+        }
+    }
+
+    fn patch_to(&self, after: Snapshot) -> Result<Patch, Error> {
+        if self.source.components != after.source.components
+            || self
+                .source
+                .streams
+                .iter()
+                .map(|stream| &stream.path)
+                .ne(after.source.streams.iter().map(|stream| &stream.path))
+        {
+            return Err(invalid(
+                "DataSpaces edit changed the package graph or stream paths",
+            ));
+        }
+        let changes = self
+            .source
+            .streams
+            .iter()
+            .zip(&after.source.streams)
+            .filter(|(before, after)| before.bytes != after.bytes)
+            .map(|(before, after)| StreamChange {
+                path: before.path.clone(),
+                before: Arc::clone(&before.bytes),
+                after: Arc::clone(&after.bytes),
+            })
+            .collect();
+        Ok(Patch {
+            base: self.revision(),
+            target: after.revision(),
+            before: Arc::clone(&self.source),
+            after: Arc::clone(&after.source),
+            before_graph: self.graph.clone(),
+            after_graph: after.graph.clone(),
+            changes,
+        })
+    }
+}
+
+/// A failure-atomic typed DataSpaces edit.
+#[derive(Debug, Clone)]
+pub struct Transaction {
+    source: Snapshot,
+    candidate: Graph,
+}
+
+impl Transaction {
+    /// Borrows the source snapshot used by this transaction.
+    #[must_use]
+    pub const fn source(&self) -> &Snapshot {
+        &self.source
+    }
+
+    /// Borrows the working semantic graph.
+    #[must_use]
+    pub const fn graph(&self) -> &Graph {
+        &self.candidate
+    }
+
+    /// Replaces the checked DataSpaceVersionInfo value.
+    pub fn set_version_info(&mut self, value: VersionInfo) -> Result<&mut Self, Error> {
+        validate_version_info(&value)?;
+        self.candidate.version = value;
+        Ok(self)
+    }
+
+    /// Replaces and checks the DataSpaceMap value.
+    pub fn set_map(&mut self, value: Map) -> Result<&mut Self, Error> {
+        validate_map(&value)?;
+        self.candidate.map = value;
+        Ok(self)
+    }
+
+    /// Replaces an existing named DataSpaceDefinition.
+    pub fn set_definition(&mut self, name: &str, value: Definition) -> Result<&mut Self, Error> {
+        validate_name(name, "data space name")?;
+        validate_definition(&value)?;
+        let definition = self
+            .candidate
+            .definitions
+            .iter_mut()
+            .find(|definition| definition.name == name)
+            .ok_or_else(|| invalid(format!("unknown data space definition '{name}'")))?;
+        definition.definition = value;
+        Ok(self)
+    }
+
+    /// Replaces the non-payload header of an existing transform.
+    ///
+    /// The identity of a known IRM or encryption transform is immutable here;
+    /// changing it would reinterpret its inert payload. Version fields are
+    /// still validated by the transform-specific MS-OFFCRYPTO rules.
+    pub fn set_transform_header(&mut self, name: &str, value: Header) -> Result<&mut Self, Error> {
+        validate_name(name, "transform name")?;
+        validate_transform_header(&value)?;
+        let transform = self
+            .candidate
+            .transforms
+            .iter_mut()
+            .find(|transform| transform.name == name)
+            .ok_or_else(|| invalid(format!("unknown transform '{name}'")))?;
+        let mut candidate = transform.clone();
+        if candidate.irm.is_some() || candidate.encryption.is_some() {
+            if candidate.header.transform_id != value.transform_id
+                || candidate.header.transform_name != value.transform_name
+            {
+                return Err(invalid(
+                    "known transform identity cannot be changed while its payload is inert",
+                ));
+            }
+        }
+        candidate.header = value.clone();
+        if let Some(irm) = candidate.irm.as_mut() {
+            irm.header = value.clone();
+        }
+        if let Some(encryption) = candidate.encryption.as_mut() {
+            encryption.header = value.clone();
+        }
+        validate_transform_model(&candidate)?;
+        *transform = candidate;
+        Ok(self)
+    }
+
+    /// Replaces checked algorithm metadata for a known encryption transform.
+    ///
+    /// This never touches `EncryptedPackage`, `EncryptionInfo`, or any other
+    /// encrypted payload. The transform metadata remains advisory when the
+    /// authoritative encryption information says otherwise.
+    pub fn set_encryption_info(
+        &mut self,
+        name: &str,
+        encryption_name: Option<String>,
+        encryption_block_size: u32,
+        cipher_mode: u32,
+    ) -> Result<&mut Self, Error> {
+        let transform = self
+            .candidate
+            .transforms
+            .iter_mut()
+            .find(|transform| transform.name == name)
+            .ok_or_else(|| invalid(format!("unknown transform '{name}'")))?;
+        let mut candidate = transform.clone();
+        let encryption = candidate
+            .encryption
+            .as_mut()
+            .ok_or_else(|| invalid(format!("transform '{name}' is not an encryption transform")))?;
+        encryption.encryption_name = encryption_name;
+        encryption.encryption_block_size = encryption_block_size;
+        encryption.cipher_mode = cipher_mode;
+        validate_transform_model(&candidate)?;
+        *transform = candidate;
+        Ok(self)
+    }
+
+    /// Replaces the opaque tail of an unknown transform header.
+    ///
+    /// Known IRM and encryption payloads cannot be edited by this owner.
+    pub fn set_transform_opaque_tail(
+        &mut self,
+        name: &str,
+        value: Vec<u8>,
+    ) -> Result<&mut Self, Error> {
+        if value.len() > MAX_STREAM_BYTES {
+            return Err(invalid("transform opaque tail exceeds parser limit"));
+        }
+        let transform = self
+            .candidate
+            .transforms
+            .iter_mut()
+            .find(|transform| transform.name == name)
+            .ok_or_else(|| invalid(format!("unknown transform '{name}'")))?;
+        if transform.irm.is_some() || transform.encryption.is_some() {
+            return Err(invalid(
+                "known transform payloads are inert and cannot be replaced",
+            ));
+        }
+        transform.opaque_tail = value;
+        Ok(self)
+    }
+
+    /// Whether a semantic field differs from the source graph.
+    #[must_use]
+    pub fn is_changed(&self) -> bool {
+        self.candidate != self.source.graph
+    }
+
+    /// Validates and materializes the current candidate snapshot.
+    pub fn snapshot(&self) -> Result<Snapshot, Error> {
+        self.materialize()
+    }
+
+    /// Abandons the edit and returns the original snapshot.
+    #[must_use]
+    pub fn rollback(self) -> Snapshot {
+        self.source
+    }
+
+    /// Validates and publishes the candidate with a reversible patch.
+    pub fn commit(self) -> Result<Commit, Error> {
+        let snapshot = self.materialize()?;
+        let patch = self.source.patch_to(snapshot.clone())?;
+        Ok(Commit { snapshot, patch })
+    }
+
+    fn materialize(&self) -> Result<Snapshot, Error> {
+        if !self.is_changed() {
+            return Ok(self.source.clone());
+        }
+        let mut graph = self.candidate.clone();
+        validate_graph_model(&graph.map, &graph.definitions, &graph.transforms)?;
+        validate_component_references(&graph.map, &self.source.source.components)?;
+        graph.irm = classify_irm(&graph.map, &graph.definitions, &graph.transforms)?;
+        validate_derived_graph(&graph)?;
+        let streams = encode_graph_streams(&graph, &self.source.source)?;
+        let source = Source::new(streams, self.source.source.components.clone())?;
+        Ok(Snapshot {
+            graph,
+            source: Arc::new(source),
+        })
+    }
+}
+
+/// A successful DataSpaces publication.
+#[derive(Debug, Clone)]
+pub struct Commit {
+    snapshot: Snapshot,
+    patch: Patch,
+}
+
+impl Commit {
+    /// Whether any DataSpaces stream changed.
+    #[must_use]
+    pub fn changed(&self) -> bool {
+        !self.patch.is_noop()
+    }
+
+    /// Borrows the published snapshot.
+    #[must_use]
+    pub const fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+
+    /// Borrows the reversible patch.
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    /// Moves the published snapshot out of the commit.
+    #[must_use]
+    pub fn into_snapshot(self) -> Snapshot {
+        self.snapshot
+    }
+
+    /// Moves the patch out of the commit.
+    #[must_use]
+    pub fn into_patch(self) -> Patch {
+        self.patch
+    }
+}
+
+/// One source-checked replacement of a DataSpaces stream.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StreamChange {
+    path: Vec<String>,
+    before: Arc<[u8]>,
+    after: Arc<[u8]>,
+}
+
+impl StreamChange {
+    /// Borrows the changed stream path.
+    #[must_use]
+    pub fn path(&self) -> &[String] {
+        &self.path
+    }
+
+    /// Borrows the exact source bytes required by this replacement.
+    #[must_use]
+    pub fn before(&self) -> &[u8] {
+        &self.before
+    }
+
+    /// Borrows the exact bytes produced by this replacement.
+    #[must_use]
+    pub fn after(&self) -> &[u8] {
+        &self.after
+    }
+}
+
+/// A reversible, source-checked DataSpaces graph patch.
+#[derive(Debug, Clone)]
+pub struct Patch {
+    base: Revision,
+    target: Revision,
+    before: Arc<Source>,
+    after: Arc<Source>,
+    before_graph: Graph,
+    after_graph: Graph,
+    changes: Vec<StreamChange>,
+}
+
+impl Patch {
+    /// Returns the expected source revision.
+    #[must_use]
+    pub const fn base(&self) -> Revision {
+        self.base
+    }
+
+    /// Returns the revision produced by this patch.
+    #[must_use]
+    pub const fn target(&self) -> Revision {
+        self.target
+    }
+
+    /// Returns the source fingerprint required by this patch.
+    #[must_use]
+    pub const fn source_fingerprint(&self) -> u64 {
+        self.base.value()
+    }
+
+    /// Returns the resulting source fingerprint.
+    #[must_use]
+    pub const fn target_fingerprint(&self) -> u64 {
+        self.target.value()
+    }
+
+    /// Borrows the semantic graph required before the patch.
+    #[must_use]
+    pub const fn before(&self) -> &Graph {
+        &self.before_graph
+    }
+
+    /// Borrows the semantic graph produced by the patch.
+    #[must_use]
+    pub const fn after(&self) -> &Graph {
+        &self.after_graph
+    }
+
+    /// Borrows the changed DataSpaces stream replacements.
+    #[must_use]
+    pub fn changes(&self) -> &[StreamChange] {
+        &self.changes
+    }
+
+    /// Whether this patch is an exact DataSpaces no-op.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.changes.is_empty()
+    }
+
+    /// Alias for [`Self::is_noop`].
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.is_noop()
+    }
+
+    /// Applies the patch only to its exact source snapshot.
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
+        if source.revision() != self.base || source.source.as_ref() != self.before.as_ref() {
+            return Err(invalid(
+                "DataSpaces patch source does not match its base snapshot",
+            ));
+        }
+        Ok(Snapshot {
+            graph: self.after_graph.clone(),
+            source: Arc::clone(&self.after),
+        })
+    }
+
+    /// Returns the exact inverse replacement.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        let changes = self
+            .changes
+            .iter()
+            .map(|change| StreamChange {
+                path: change.path.clone(),
+                before: Arc::clone(&change.after),
+                after: Arc::clone(&change.before),
+            })
+            .collect();
+        Self {
+            base: self.target,
+            target: self.base,
+            before: Arc::clone(&self.after),
+            after: Arc::clone(&self.before),
+            before_graph: self.after_graph.clone(),
+            after_graph: self.before_graph.clone(),
+            changes,
+        }
+    }
+
+    /// Rebuilds an OLE package after validating the exact DataSpaces source.
+    ///
+    /// All current streams and storages are copied into a fresh CFB writer;
+    /// only the streams listed by [`Self::changes`] are replaced. IRM/license,
+    /// encryption, and unrelated payloads are copied as inert bytes. The
+    /// physical CFB allocation is intentionally rebuilt, while logical
+    /// storage names, stream contents, and storage CLSIDs are retained.
+    pub fn write_to<R: Read + Seek, W: Write + Seek>(
+        &self,
+        ole: &mut OleFile<R>,
+        output: &mut W,
+    ) -> Result<(), Error> {
+        let current =
+            Snapshot::from_ole(ole)?.ok_or_else(|| invalid("package has no DataSpaces graph"))?;
+        self.apply(&current)?;
+        rebuild_ole(ole, &self.changes, output)
+    }
+}
+
+/// Runs one checked DataSpaces edit and publishes it atomically.
+pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, Error>
+where
+    F: FnOnce(&mut Transaction) -> Result<(), Error>,
+{
+    let mut transaction = snapshot.edit();
+    edit(&mut transaction)?;
+    transaction.commit()
+}
+
+impl Source {
+    fn capture<R: Read + Seek>(ole: &mut OleFile<R>, graph: &Graph) -> Result<Self, Error> {
+        let components = collect_components(ole)?;
+        let known_paths = graph_stream_paths(graph)?;
+        let mut paths = ole
+            .list_streams()
+            .into_iter()
+            .filter(|path| path.first().is_some_and(|name| name == STORAGE))
+            .collect::<Vec<_>>();
+        paths.sort();
+        for path in &known_paths {
+            let references = path.iter().map(String::as_str).collect::<Vec<_>>();
+            if !ole.exists(&references) {
+                return Err(invalid(format!(
+                    "DataSpaces source stream '{}' is missing",
+                    path.join("/")
+                )));
+            }
+        }
+        let mut streams = Vec::new();
+        for path in paths {
+            let references = path.iter().map(String::as_str).collect::<Vec<_>>();
+            let bytes = read_stream(ole, &references)?;
+            streams.push(SourceStream {
+                path,
+                bytes: Arc::from(bytes.into_boxed_slice()),
+            });
+        }
+        Self::new(streams, components)
+    }
+
+    fn new(streams: Vec<SourceStream>, components: Vec<Component>) -> Result<Self, Error> {
+        if streams.is_empty() {
+            return Err(invalid("DataSpaces source contains no streams"));
+        }
+        if streams.len() > MAX_ENTRIES {
+            return Err(invalid("DataSpaces source contains too many streams"));
+        }
+        if components.len() > MAX_COMPONENTS {
+            return Err(invalid(
+                "OLE package contains too many directory components",
+            ));
+        }
+        let mut stream_paths = std::collections::HashSet::with_capacity(streams.len());
+        for stream in &streams {
+            if stream.path.is_empty() || !stream_paths.insert(stream.path.clone()) {
+                return Err(invalid("duplicate DataSpaces source stream path"));
+            }
+            if stream.bytes.len() > MAX_STREAM_BYTES {
+                return Err(invalid("DataSpaces source stream exceeds parser limit"));
+            }
+        }
+        let mut component_paths = std::collections::HashSet::with_capacity(components.len());
+        for component in &components {
+            if component.path.is_empty() || !component_paths.insert(component.path.clone()) {
+                return Err(invalid("duplicate OLE directory component path"));
+            }
+        }
+        Ok(Self {
+            revision: Revision::of_streams(&streams),
+            streams,
+            components,
+        })
+    }
+}
+
+impl Revision {
+    fn of_streams(streams: &[SourceStream]) -> Self {
+        let mut value = 0xcbf2_9ce4_8422_2325u64;
+        for stream in streams {
+            for component in &stream.path {
+                for byte in component.as_bytes() {
+                    value ^= u64::from(*byte);
+                    value = value.wrapping_mul(0x0000_0100_0000_01b3);
+                }
+                value ^= 0xff;
+                value = value.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+            value ^= 0xfe;
+            value = value.wrapping_mul(0x0000_0100_0000_01b3);
+            for byte in stream.bytes.iter() {
+                value ^= u64::from(*byte);
+                value = value.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+            value ^= 0xfd;
+            value = value.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        Self(value)
+    }
+}
+
+fn graph_stream_paths(graph: &Graph) -> Result<Vec<Vec<String>>, Error> {
+    let mut paths = Vec::with_capacity(
+        2 + graph.definitions.len() + graph.transforms.len() + graph.end_user_license_count(),
+    );
+    paths.push(vec![STORAGE.to_string(), "Version".to_string()]);
+    paths.push(vec![STORAGE.to_string(), "DataSpaceMap".to_string()]);
+    for definition in &graph.definitions {
+        validate_name(&definition.name, "data space name")?;
+        paths.push(vec![
+            STORAGE.to_string(),
+            "DataSpaceInfo".to_string(),
+            definition.name.clone(),
+        ]);
+    }
+    for transform in &graph.transforms {
+        validate_name(&transform.name, "transform name")?;
+        paths.push(vec![
+            STORAGE.to_string(),
+            "TransformInfo".to_string(),
+            transform.name.clone(),
+            PRIMARY.to_string(),
+        ]);
+        for license in &transform.end_user_licenses {
+            validate_eul_stream_name(&license.stream_name)?;
+            paths.push(vec![
+                STORAGE.to_string(),
+                "TransformInfo".to_string(),
+                transform.name.clone(),
+                license.stream_name.clone(),
+            ]);
+        }
+    }
+    if graph.label_info.is_some() {
+        paths.push(vec![
+            STORAGE.to_string(),
+            "TransformInfo".to_string(),
+            "LabelInfo".to_string(),
+        ]);
+    }
+    Ok(paths)
+}
+
+impl Graph {
+    fn end_user_license_count(&self) -> usize {
+        self.transforms
+            .iter()
+            .map(|transform| transform.end_user_licenses.len())
+            .sum()
+    }
+}
+
+fn collect_components<R: Read + Seek>(ole: &OleFile<R>) -> Result<Vec<Component>, Error> {
+    let mut components = Vec::new();
+    let mut path = Vec::new();
+    collect_directory_components(ole, &mut path, &mut components, 0)?;
+    Ok(components)
+}
+
+fn collect_directory_components<R: Read + Seek>(
+    ole: &OleFile<R>,
+    path: &mut Vec<String>,
+    components: &mut Vec<Component>,
+    depth: usize,
+) -> Result<(), Error> {
+    if depth > MAX_XML_DEPTH {
+        return Err(invalid("OLE directory nesting exceeds parser limit"));
+    }
+    let references = path.iter().map(String::as_str).collect::<Vec<_>>();
+    let entries = ole.list_directory_entries(&references)?;
+    let entries = entries
+        .into_iter()
+        .map(|entry| (entry.name.clone(), entry.entry_type))
+        .collect::<Vec<_>>();
+    for (name, kind) in entries {
+        if name.is_empty() {
+            return Err(invalid("OLE directory entry has an empty name"));
+        }
+        path.push(name);
+        match kind {
+            STGTY_STORAGE => {
+                components.push(Component {
+                    path: path.clone(),
+                    kind: ReferenceKind::Storage,
+                });
+                if components.len() > MAX_COMPONENTS {
+                    return Err(invalid(
+                        "OLE package contains too many directory components",
+                    ));
+                }
+                collect_directory_components(ole, path, components, depth + 1)?;
+            },
+            STGTY_STREAM => {
+                components.push(Component {
+                    path: path.clone(),
+                    kind: ReferenceKind::Stream,
+                });
+                if components.len() > MAX_COMPONENTS {
+                    return Err(invalid(
+                        "OLE package contains too many directory components",
+                    ));
+                }
+            },
+            _ => {
+                return Err(invalid(format!(
+                    "unsupported OLE directory entry type {kind} at '{}'",
+                    path.join("/")
+                )));
+            },
+        }
+        path.pop();
+    }
+    Ok(())
+}
+
+fn validate_graph_model(
+    map: &Map,
+    definitions: &[NamedDefinition],
+    transforms: &[Transform],
+) -> Result<(), Error> {
+    validate_map(map)?;
+    if definitions.len() != map.entries.len() {
+        return Err(invalid(
+            "DataSpaceInfo streams do not correspond one-to-one with map entries",
+        ));
+    }
+    let mut definition_names = std::collections::HashSet::with_capacity(definitions.len());
+    for definition in definitions {
+        validate_name(&definition.name, "data space name")?;
+        if !definition_names.insert(definition.name.as_str()) {
+            return Err(invalid("duplicate data space definition name"));
+        }
+        validate_definition(&definition.definition)?;
+        if !map
+            .entries
+            .iter()
+            .any(|entry| entry.data_space_name == definition.name)
+        {
+            return Err(invalid(format!(
+                "data space definition '{}' is not present in the map",
+                definition.name
+            )));
+        }
+    }
+
+    let mut transform_names = std::collections::HashSet::with_capacity(transforms.len());
+    for transform in transforms {
+        validate_name(&transform.name, "transform name")?;
+        if !transform_names.insert(transform.name.as_str()) {
+            return Err(invalid("duplicate transform name"));
+        }
+        validate_transform_model(transform)?;
+    }
+    for definition in definitions {
+        for transform_name in &definition.definition.transforms {
+            if !transform_names.contains(transform_name.as_str()) {
+                return Err(invalid(format!(
+                    "data space '{}' references missing transform '{}'",
+                    definition.name, transform_name
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_transform_model(transform: &Transform) -> Result<(), Error> {
+    validate_transform_header(&transform.header)?;
+    if transform.opaque_tail.len() > MAX_STREAM_BYTES {
+        return Err(invalid("transform opaque tail exceeds parser limit"));
+    }
+    match (&transform.irm, &transform.encryption) {
+        (Some(_), Some(_)) => {
+            return Err(invalid(
+                "a transform cannot contain both IRM and encryption metadata",
+            ));
+        },
+        (Some(irm), None) => {
+            if irm.header != transform.header || !transform.opaque_tail.is_empty() {
+                return Err(invalid("IRM transform metadata is inconsistent"));
+            }
+            validate_drm_header(&irm.header)?;
+            let license = irm
+                .publishing_license
+                .as_deref()
+                .filter(|license| !license.is_empty())
+                .ok_or_else(|| invalid("IRM publishing license cannot be null or empty"))?;
+            validate_inert_xml(license, "IRM publishing license")?;
+        },
+        (None, Some(encryption)) => {
+            if encryption.header != transform.header || !transform.opaque_tail.is_empty() {
+                return Err(invalid("encryption transform metadata is inconsistent"));
+            }
+            validate_encryption_transform(encryption)?;
+        },
+        (None, None) => {},
+    }
+    for license in &transform.end_user_licenses {
+        validate_eul_stream_name(&license.stream_name)?;
+        if license.encoded_license_id.is_empty() {
+            return Err(invalid("EndUserLicenseHeader.ID_String cannot be empty"));
+        }
+        let chain = license
+            .certificate_chain
+            .as_deref()
+            .filter(|chain| !chain.is_empty())
+            .ok_or_else(|| invalid("end-user license certificate chain cannot be null or empty"))?;
+        validate_inert_xml(chain, "end-user license certificate chain")?;
+    }
+    if transform.irm.is_some() && transform.end_user_licenses.is_empty() {
+        return Err(invalid(format!(
+            "IRM transform '{}' has no end-user license stream",
+            transform.name
+        )));
+    }
+    Ok(())
+}
+
+fn validate_component_references(map: &Map, components: &[Component]) -> Result<(), Error> {
+    let mut protected_paths = std::collections::HashSet::with_capacity(map.entries.len());
+    for entry in &map.entries {
+        let mut path = Vec::with_capacity(entry.references.len());
+        for reference in &entry.references {
+            path.push(reference.component.clone());
+            let component = components
+                .iter()
+                .find(|component| same_path(&component.path, &path))
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "map references missing component '{}'",
+                        path.join("/")
+                    ))
+                })?;
+            if component.kind != reference.kind {
+                return Err(invalid(format!(
+                    "map component '{}' has the wrong reference kind",
+                    path.join("/")
+                )));
+            }
+        }
+        let protected_path = path
+            .iter()
+            .map(|component| component.to_ascii_lowercase())
+            .collect::<Vec<_>>();
+        if !protected_paths.insert(protected_path) {
+            return Err(invalid(
+                "a protected content component is mapped by more than one data space",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn same_path(left: &[String], right: &[String]) -> bool {
+    left.len() == right.len()
+        && left
+            .iter()
+            .zip(right)
+            .all(|(left, right)| left.eq_ignore_ascii_case(right))
+}
+
+fn validate_derived_graph(graph: &Graph) -> Result<(), Error> {
+    let expected_irm = classify_irm(&graph.map, &graph.definitions, &graph.transforms)?;
+    if graph.irm != expected_irm {
+        return Err(invalid(
+            "derived IRM profile does not match the DataSpaces graph",
+        ));
+    }
+    if graph.label_info.is_some() != graph.labels.is_some() {
+        return Err(invalid(
+            "LabelInfo bytes and its typed sensitivity-label view disagree",
+        ));
+    }
+    if graph.labels.is_some()
+        && !graph.irm.as_ref().is_some_and(|profile| {
+            graph.transforms.iter().any(|transform| {
+                transform.name == profile.transform_name
+                    && transform
+                        .irm
+                        .as_ref()
+                        .is_some_and(|metadata| metadata.publishing_license.is_some())
+            })
+        })
+    {
+        return Err(invalid(
+            "LabelInfo requires an IRM transform with a publishing license",
+        ));
+    }
+    if (graph.summary_information_integrity.is_some()
+        || graph.document_summary_information_integrity.is_some())
+        && graph.irm.is_none()
+        && !graph
+            .transforms
+            .iter()
+            .any(|transform| transform.encryption.is_some())
+    {
+        return Err(invalid(
+            "encrypted property hash stream is present without an encryption or IRM transform",
+        ));
+    }
+    validate_custom_xml_promotion(graph.custom_xml_data_store.as_ref(), graph.irm.as_ref())
+}
+
+fn encode_graph_streams(graph: &Graph, source: &Source) -> Result<Vec<SourceStream>, Error> {
+    validate_version_info(&graph.version)?;
+    validate_graph_model(&graph.map, &graph.definitions, &graph.transforms)?;
+    let mut known = Vec::new();
+    known.push(SourceStream {
+        path: vec![STORAGE.to_string(), "Version".to_string()],
+        bytes: Arc::from(write_version_info(&graph.version)?.into_boxed_slice()),
+    });
+    known.push(SourceStream {
+        path: vec![STORAGE.to_string(), "DataSpaceMap".to_string()],
+        bytes: Arc::from(write_map(&graph.map)?.into_boxed_slice()),
+    });
+    for definition in &graph.definitions {
+        known.push(SourceStream {
+            path: vec![
+                STORAGE.to_string(),
+                "DataSpaceInfo".to_string(),
+                definition.name.clone(),
+            ],
+            bytes: Arc::from(write_definition(&definition.definition)?.into_boxed_slice()),
+        });
+    }
+    for transform in &graph.transforms {
+        known.push(SourceStream {
+            path: vec![
+                STORAGE.to_string(),
+                "TransformInfo".to_string(),
+                transform.name.clone(),
+                PRIMARY.to_string(),
+            ],
+            bytes: Arc::from(encode_transform_primary(transform)?.into_boxed_slice()),
+        });
+        for license in &transform.end_user_licenses {
+            known.push(SourceStream {
+                path: vec![
+                    STORAGE.to_string(),
+                    "TransformInfo".to_string(),
+                    transform.name.clone(),
+                    license.stream_name.clone(),
+                ],
+                bytes: Arc::from(write_license(license)?.into_boxed_slice()),
+            });
+        }
+    }
+    if let Some(label_info) = &graph.label_info {
+        known.push(SourceStream {
+            path: vec![
+                STORAGE.to_string(),
+                "TransformInfo".to_string(),
+                "LabelInfo".to_string(),
+            ],
+            bytes: Arc::from(label_info.clone().into_boxed_slice()),
+        });
+    }
+    let mut encoded = known
+        .into_iter()
+        .map(|stream| (stream.path.clone(), stream))
+        .collect::<std::collections::HashMap<_, _>>();
+    let mut streams = Vec::with_capacity(source.streams.len());
+    for original in &source.streams {
+        if let Some(replacement) = encoded.remove(&original.path) {
+            streams.push(replacement);
+        } else {
+            streams.push(original.clone());
+        }
+    }
+    if !encoded.is_empty() {
+        return Err(invalid(
+            "DataSpaces edit changed the set of known metadata streams",
+        ));
+    }
+    Ok(streams)
+}
+
+fn encode_transform_primary(transform: &Transform) -> Result<Vec<u8>, Error> {
+    match (&transform.irm, &transform.encryption) {
+        (Some(irm), None) => write_irm_transform(irm),
+        (None, Some(encryption)) => write_encryption_transform(encryption),
+        (None, None) => {
+            let mut bytes = write_transform_header(&transform.header)?;
+            bytes.extend_from_slice(&transform.opaque_tail);
+            Ok(bytes)
+        },
+        (Some(_), Some(_)) => Err(invalid(
+            "a transform cannot contain both IRM and encryption metadata",
+        )),
+    }
+}
+
+#[derive(Debug)]
+struct StorageCopy {
+    path: Vec<String>,
+    clsid: Option<[u8; 16]>,
+}
+
+#[derive(Debug)]
+struct StreamCopy {
+    path: Vec<String>,
+}
+
+fn rebuild_ole<R: Read + Seek, W: Write + Seek>(
+    ole: &mut OleFile<R>,
+    changes: &[StreamChange],
+    output: &mut W,
+) -> Result<(), Error> {
+    let (storages, mut streams) = collect_ole_layout(ole)?;
+    let mut writer = OleWriter::with_sector_size(ole.sector_size())?;
+    if let Some(root) = ole.root_entry() {
+        if let Some(clsid) = parse_clsid(&root.clsid)? {
+            writer.set_root_clsid(clsid);
+        }
+    }
+    for storage in &storages {
+        let path = storage.path.iter().map(String::as_str).collect::<Vec<_>>();
+        writer.create_storage(&path)?;
+        if let Some(clsid) = storage.clsid {
+            writer.set_storage_clsid(&path, clsid)?;
+        }
+    }
+
+    // Word's legacy writer requires WordDocument to receive the first large
+    // stream allocation. Keep that format-specific invariant while preserving
+    // the source traversal order for every other stream.
+    streams.sort_by_key(|stream| {
+        if stream.path.as_slice() == ["WordDocument"] {
+            0u8
+        } else {
+            1u8
+        }
+    });
+    for stream in streams {
+        let path = stream.path.iter().map(String::as_str).collect::<Vec<_>>();
+        let data = if let Some(change) = changes
+            .iter()
+            .find(|change| same_path(&change.path, &stream.path))
+        {
+            change.after.to_vec()
+        } else {
+            ole.open_stream(&path)?
+        };
+        writer.create_stream_owned(&path, data)?;
+    }
+    writer.write_to(output)?;
+    Ok(())
+}
+
+fn collect_ole_layout<R: Read + Seek>(
+    ole: &OleFile<R>,
+) -> Result<(Vec<StorageCopy>, Vec<StreamCopy>), Error> {
+    let mut storages = Vec::new();
+    let mut streams = Vec::new();
+    let mut path = Vec::new();
+    collect_ole_layout_directory(ole, &mut path, &mut storages, &mut streams, 0)?;
+    Ok((storages, streams))
+}
+
+fn collect_ole_layout_directory<R: Read + Seek>(
+    ole: &OleFile<R>,
+    path: &mut Vec<String>,
+    storages: &mut Vec<StorageCopy>,
+    streams: &mut Vec<StreamCopy>,
+    depth: usize,
+) -> Result<(), Error> {
+    if depth > MAX_XML_DEPTH {
+        return Err(invalid("OLE directory nesting exceeds parser limit"));
+    }
+    let references = path.iter().map(String::as_str).collect::<Vec<_>>();
+    let entries = ole.list_directory_entries(&references)?;
+    let entries = entries
+        .into_iter()
+        .map(|entry| (entry.name.clone(), entry.entry_type, entry.clsid.clone()))
+        .collect::<Vec<_>>();
+    for (name, entry_type, clsid) in entries {
+        if name.is_empty() {
+            return Err(invalid("OLE directory entry has an empty name"));
+        }
+        path.push(name);
+        match entry_type {
+            STGTY_STORAGE => {
+                storages.push(StorageCopy {
+                    path: path.clone(),
+                    clsid: parse_clsid(&clsid)?,
+                });
+                collect_ole_layout_directory(ole, path, storages, streams, depth + 1)?;
+            },
+            STGTY_STREAM => streams.push(StreamCopy { path: path.clone() }),
+            _ => {
+                return Err(invalid(format!(
+                    "unsupported OLE directory entry type {entry_type} at '{}'",
+                    path.join("/")
+                )));
+            },
+        }
+        path.pop();
+    }
+    Ok(())
+}
+
+fn parse_clsid(value: &str) -> Result<Option<[u8; 16]>, Error> {
+    if value.is_empty() {
+        return Ok(None);
+    }
+    let fields = value.split('-').collect::<Vec<_>>();
+    if fields.len() != 5
+        || fields[0].len() != 8
+        || fields[1].len() != 4
+        || fields[2].len() != 4
+        || fields[3].len() != 4
+        || fields[4].len() != 12
+    {
+        return Err(invalid(format!("invalid CFB CLSID '{value}'")));
+    }
+    let data1 = u32::from_str_radix(fields[0], 16)
+        .map_err(|_| invalid(format!("invalid CFB CLSID '{value}'")))?;
+    let data2 = u16::from_str_radix(fields[1], 16)
+        .map_err(|_| invalid(format!("invalid CFB CLSID '{value}'")))?;
+    let data3 = u16::from_str_radix(fields[2], 16)
+        .map_err(|_| invalid(format!("invalid CFB CLSID '{value}'")))?;
+    let mut bytes = [0u8; 16];
+    bytes[..4].copy_from_slice(&data1.to_le_bytes());
+    bytes[4..6].copy_from_slice(&data2.to_le_bytes());
+    bytes[6..8].copy_from_slice(&data3.to_le_bytes());
+    for (index, pair) in fields[3].as_bytes().chunks_exact(2).enumerate() {
+        bytes[8 + index] = u8::from_str_radix(
+            std::str::from_utf8(pair)
+                .map_err(|_| invalid(format!("invalid CFB CLSID '{value}'")))?,
+            16,
+        )
+        .map_err(|_| invalid(format!("invalid CFB CLSID '{value}'")))?;
+    }
+    for (index, pair) in fields[4].as_bytes().chunks_exact(2).enumerate() {
+        bytes[10 + index] = u8::from_str_radix(
+            std::str::from_utf8(pair)
+                .map_err(|_| invalid(format!("invalid CFB CLSID '{value}'")))?,
+            16,
+        )
+        .map_err(|_| invalid(format!("invalid CFB CLSID '{value}'")))?;
+    }
+    Ok(Some(bytes))
 }
 
 pub fn parse_version_info(data: &[u8]) -> Result<VersionInfo, Error> {
@@ -607,9 +1758,9 @@ pub fn inspect<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Graph>, Er
                     &child_name,
                     &read_stream(ole, &[STORAGE, "TransformInfo", &name, &child_name])?,
                 )?);
-            } else {
+            } else if entry_type != STGTY_STREAM && entry_type != STGTY_STORAGE {
                 return Err(invalid(format!(
-                    "unexpected transform-storage entry '{child_name}'"
+                    "unsupported transform-storage entry '{child_name}'"
                 )));
             }
         }
@@ -726,65 +1877,9 @@ fn validate_graph<R: Read + Seek>(
     definitions: &[NamedDefinition],
     transforms: &[Transform],
 ) -> Result<(), Error> {
-    if definitions.len() != map.entries.len()
-        || definitions.iter().any(|definition| {
-            !map.entries
-                .iter()
-                .any(|entry| entry.data_space_name == definition.name)
-        })
-    {
-        return Err(invalid(
-            "DataSpaceInfo streams do not correspond one-to-one with map entries",
-        ));
-    }
-    let root_entries = ole.list_directory_entries(&[])?;
-    let root_types = root_entries
-        .iter()
-        .map(|entry| (entry.name.as_str(), entry.entry_type))
-        .collect::<std::collections::HashMap<_, _>>();
-    for entry in &map.entries {
-        let definition = definitions
-            .iter()
-            .find(|definition| definition.name == entry.data_space_name)
-            .ok_or_else(|| {
-                invalid(format!(
-                    "map references missing data space '{}'",
-                    entry.data_space_name
-                ))
-            })?;
-        for reference in &entry.references {
-            let component_type = root_types
-                .get(reference.component.as_str())
-                .ok_or_else(|| {
-                    invalid(format!(
-                        "map references missing root component '{}'",
-                        reference.component
-                    ))
-                })?;
-            let expected_type = match reference.kind {
-                ReferenceKind::Stream => 2,
-                ReferenceKind::Storage => 1,
-            };
-            if *component_type != expected_type {
-                return Err(invalid(format!(
-                    "root component '{}' has the wrong reference kind",
-                    reference.component
-                )));
-            }
-        }
-        for transform_name in &definition.definition.transforms {
-            if !transforms
-                .iter()
-                .any(|transform| transform.name == *transform_name)
-            {
-                return Err(invalid(format!(
-                    "data space '{}' references missing transform '{}'",
-                    definition.name, transform_name
-                )));
-            }
-        }
-    }
-    Ok(())
+    let components = collect_components(ole)?;
+    validate_graph_model(map, definitions, transforms)?;
+    validate_component_references(map, &components)
 }
 
 fn classify_irm(
@@ -1329,6 +2424,164 @@ mod tests {
         }
     }
 
+    fn editable_package() -> Vec<u8> {
+        let map = write_map(&Map {
+            entries: vec![MapEntry {
+                references: vec![Reference {
+                    kind: ReferenceKind::Stream,
+                    component: "Payload".to_string(),
+                }],
+                data_space_name: "DataSpace".to_string(),
+            }],
+        })
+        .unwrap();
+        let definition = write_definition(&Definition {
+            transforms: vec!["FirstTransform".to_string()],
+        })
+        .unwrap();
+        let first = Header {
+            transform_id: "{11111111-1111-1111-1111-111111111111}".to_string(),
+            transform_name: "FirstTransform".to_string(),
+            reader: Version::V1_0,
+            updater: Version::V1_0,
+            writer: Version::V1_0,
+        };
+        let second = Header {
+            transform_id: "{22222222-2222-2222-2222-222222222222}".to_string(),
+            transform_name: "SecondTransform".to_string(),
+            reader: Version::V1_0,
+            updater: Version::V1_0,
+            writer: Version::V1_0,
+        };
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["Payload"], b"protected-but-inert")
+            .unwrap();
+        writer
+            .create_stream(&["Unrelated"], b"preserve-me-byte-for-byte")
+            .unwrap();
+        writer.create_storage(&["EmptyStorage"]).unwrap();
+        writer.create_storage(&[STORAGE]).unwrap();
+        writer.create_storage(&[STORAGE, "DataSpaceInfo"]).unwrap();
+        writer.create_storage(&[STORAGE, "TransformInfo"]).unwrap();
+        writer
+            .create_storage(&[STORAGE, "TransformInfo", "FirstTransform"])
+            .unwrap();
+        writer
+            .create_storage(&[STORAGE, "TransformInfo", "SecondTransform"])
+            .unwrap();
+        writer
+            .create_storage(&[STORAGE, "TransformInfo", "FirstTransform", "OpaqueStorage"])
+            .unwrap();
+        writer
+            .create_stream(
+                &[
+                    STORAGE,
+                    "TransformInfo",
+                    "FirstTransform",
+                    "OpaqueStorage",
+                    "OpaqueStream",
+                ],
+                b"opaque-transform-child",
+            )
+            .unwrap();
+        writer
+            .create_stream(
+                &[STORAGE, "Version"],
+                &write_version_info(&VersionInfo::default()).unwrap(),
+            )
+            .unwrap();
+        writer
+            .create_stream(&[STORAGE, "DataSpaceMap"], &map)
+            .unwrap();
+        writer
+            .create_stream(&[STORAGE, "DataSpaceInfo", "DataSpace"], &definition)
+            .unwrap();
+        writer
+            .create_stream(
+                &[STORAGE, "TransformInfo", "FirstTransform", PRIMARY],
+                &write_transform_header(&first).unwrap(),
+            )
+            .unwrap();
+        writer
+            .create_stream(
+                &[STORAGE, "TransformInfo", "SecondTransform", PRIMARY],
+                &write_transform_header(&second).unwrap(),
+            )
+            .unwrap();
+        let mut bytes = Cursor::new(Vec::new());
+        writer.write_to(&mut bytes).unwrap();
+        bytes.into_inner()
+    }
+
+    fn encryption_package() -> Vec<u8> {
+        let map = write_map(&Map {
+            entries: vec![MapEntry {
+                references: vec![Reference {
+                    kind: ReferenceKind::Stream,
+                    component: "EncryptedPackage".to_string(),
+                }],
+                data_space_name: "StrongEncryptionDataSpace".to_string(),
+            }],
+        })
+        .unwrap();
+        let definition = write_definition(&Definition {
+            transforms: vec!["StrongEncryptionTransform".to_string()],
+        })
+        .unwrap();
+        let encryption = EncryptionTransform {
+            header: Header {
+                transform_id: ENCRYPTION_ID.to_string(),
+                transform_name: ENCRYPTION_NAME.to_string(),
+                reader: Version::V1_0,
+                updater: Version::V1_0,
+                writer: Version::V1_0,
+            },
+            encryption_name: None,
+            encryption_block_size: 16,
+            cipher_mode: 0,
+        };
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["EncryptedPackage"], b"encrypted-payload")
+            .unwrap();
+        writer.create_storage(&[STORAGE]).unwrap();
+        writer.create_storage(&[STORAGE, "DataSpaceInfo"]).unwrap();
+        writer.create_storage(&[STORAGE, "TransformInfo"]).unwrap();
+        writer
+            .create_storage(&[STORAGE, "TransformInfo", "StrongEncryptionTransform"])
+            .unwrap();
+        writer
+            .create_stream(
+                &[STORAGE, "Version"],
+                &write_version_info(&VersionInfo::default()).unwrap(),
+            )
+            .unwrap();
+        writer
+            .create_stream(&[STORAGE, "DataSpaceMap"], &map)
+            .unwrap();
+        writer
+            .create_stream(
+                &[STORAGE, "DataSpaceInfo", "StrongEncryptionDataSpace"],
+                &definition,
+            )
+            .unwrap();
+        writer
+            .create_stream(
+                &[
+                    STORAGE,
+                    "TransformInfo",
+                    "StrongEncryptionTransform",
+                    PRIMARY,
+                ],
+                &write_encryption_transform(&encryption).unwrap(),
+            )
+            .unwrap();
+        let mut bytes = Cursor::new(Vec::new());
+        writer.write_to(&mut bytes).unwrap();
+        bytes.into_inner()
+    }
+
     #[test]
     fn core_streams_round_trip() {
         let version = VersionInfo::default();
@@ -1636,5 +2889,130 @@ mod tests {
 
         let unspecified = Store::default();
         assert!(validate_custom_xml_promotion(Some(&unspecified), None).is_ok());
+    }
+
+    #[test]
+    fn snapshot_noop_replays_exact_dataspaces_source() {
+        let mut ole = OleFile::open(Cursor::new(editable_package())).unwrap();
+        let snapshot = Snapshot::from_ole(&mut ole).unwrap().unwrap();
+        let commit = snapshot.edit().commit().unwrap();
+
+        assert!(!commit.changed());
+        assert!(commit.patch().is_noop());
+        assert_eq!(commit.snapshot(), &snapshot);
+        assert_eq!(commit.patch().apply(&snapshot).unwrap(), snapshot);
+    }
+
+    #[test]
+    fn transaction_changes_definition_and_rejects_stale_patch_sources() {
+        let mut ole = OleFile::open(Cursor::new(editable_package())).unwrap();
+        let snapshot = Snapshot::from_ole(&mut ole).unwrap().unwrap();
+        let mut transaction = snapshot.edit();
+        transaction
+            .set_definition(
+                "DataSpace",
+                Definition {
+                    transforms: vec!["SecondTransform".to_string()],
+                },
+            )
+            .unwrap();
+        let commit = transaction.commit().unwrap();
+
+        assert!(commit.changed());
+        assert_eq!(commit.patch().changes().len(), 1);
+        assert_eq!(
+            commit.patch().changes()[0].path(),
+            [
+                STORAGE.to_string(),
+                "DataSpaceInfo".to_string(),
+                "DataSpace".to_string()
+            ]
+        );
+        assert_eq!(commit.patch().apply(&snapshot).unwrap(), *commit.snapshot());
+        assert!(commit.patch().apply(commit.snapshot()).is_err());
+    }
+
+    #[test]
+    fn package_rebuild_preserves_unrelated_streams_and_empty_storages() {
+        let mut ole = OleFile::open(Cursor::new(editable_package())).unwrap();
+        let snapshot = Snapshot::from_ole(&mut ole).unwrap().unwrap();
+        let mut transaction = snapshot.edit();
+        transaction
+            .set_definition(
+                "DataSpace",
+                Definition {
+                    transforms: vec!["SecondTransform".to_string()],
+                },
+            )
+            .unwrap();
+        let commit = transaction.commit().unwrap();
+        let mut rebuilt = Cursor::new(Vec::new());
+        commit.patch().write_to(&mut ole, &mut rebuilt).unwrap();
+
+        let mut output = OleFile::open(Cursor::new(rebuilt.into_inner())).unwrap();
+        assert_eq!(
+            output.open_stream(&["Payload"]).unwrap(),
+            b"protected-but-inert"
+        );
+        assert_eq!(
+            output.open_stream(&["Unrelated"]).unwrap(),
+            b"preserve-me-byte-for-byte"
+        );
+        assert_eq!(
+            output
+                .open_stream(&[
+                    STORAGE,
+                    "TransformInfo",
+                    "FirstTransform",
+                    "OpaqueStorage",
+                    "OpaqueStream",
+                ])
+                .unwrap(),
+            b"opaque-transform-child"
+        );
+        assert!(output.directory_exists(&["EmptyStorage"]));
+        let graph = inspect(&mut output).unwrap().unwrap();
+        assert_eq!(
+            graph.definitions[0].definition.transforms,
+            ["SecondTransform".to_string()]
+        );
+    }
+
+    #[test]
+    fn encryption_metadata_edit_does_not_touch_encrypted_payload() {
+        let mut ole = OleFile::open(Cursor::new(encryption_package())).unwrap();
+        let snapshot = Snapshot::from_ole(&mut ole).unwrap().unwrap();
+        let mut transaction = snapshot.edit();
+        transaction
+            .set_encryption_info("StrongEncryptionTransform", Some("AES".to_string()), 16, 0)
+            .unwrap();
+        let commit = transaction.commit().unwrap();
+        assert_eq!(commit.patch().changes().len(), 1);
+        assert_eq!(
+            commit.patch().changes()[0].path(),
+            [
+                STORAGE.to_string(),
+                "TransformInfo".to_string(),
+                "StrongEncryptionTransform".to_string(),
+                PRIMARY.to_string()
+            ]
+        );
+        let mut rebuilt = Cursor::new(Vec::new());
+        commit.patch().write_to(&mut ole, &mut rebuilt).unwrap();
+        let mut output = OleFile::open(Cursor::new(rebuilt.into_inner())).unwrap();
+        assert_eq!(
+            output.open_stream(&["EncryptedPackage"]).unwrap(),
+            b"encrypted-payload"
+        );
+        let graph = inspect(&mut output).unwrap().unwrap();
+        assert_eq!(
+            graph.transforms[0]
+                .encryption
+                .as_ref()
+                .unwrap()
+                .encryption_name
+                .as_deref(),
+            Some("AES")
+        );
     }
 }
