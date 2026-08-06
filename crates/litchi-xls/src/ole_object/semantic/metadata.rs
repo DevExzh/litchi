@@ -56,6 +56,21 @@ impl ObjectMetadataEdit {
     }
 
     pub(crate) fn apply(self, object: &mut OleObjectRecord) -> Result<()> {
+        if let Some(picture_flags) = self.picture_flags {
+            let current = object
+                .subrecords
+                .iter()
+                .find_map(|value| match value {
+                    super::ObjSubrecord::PictureFlags(value) => Some(*value),
+                    _ => None,
+                })
+                .ok_or_else(|| invalid("OLE Obj has no FtPioGrbit"))?;
+            if current.is_dde() != picture_flags.is_dde() {
+                return Err(invalid(
+                    "FtPioGrbit fDde cannot change without migrating the OLE storage reference",
+                ));
+            }
+        }
         if let Some(object_id) = self.object_id {
             common_mut(object)?.object_id = object_id;
         }

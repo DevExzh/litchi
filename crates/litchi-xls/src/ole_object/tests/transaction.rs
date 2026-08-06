@@ -271,6 +271,30 @@ fn metadata_edit_rejects_stale_identity_and_invalid_flags_atomically() {
 }
 
 #[test]
+fn metadata_edit_rejects_storage_class_transition_atomically() {
+    let source = ole_object(7, 0x2A, 0xB1);
+    let input = object_workbook_cfb(&source, b"raw embedded payload");
+    let snapshot = Snapshot::open(input, Limits::default()).unwrap();
+    let mut transaction = snapshot.edit();
+    let before = transaction.snapshot().unwrap().finish();
+
+    assert!(
+        transaction
+            .update_object_metadata(
+                0,
+                7,
+                ObjectMetadataEdit::new().with_picture_flags(FtPioGrbit { raw: 0x020A }),
+            )
+            .is_err()
+    );
+    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+    assert_eq!(
+        transaction.objects(0).unwrap()[0].storage_name().as_deref(),
+        Some("MBD0000002A")
+    );
+}
+
+#[test]
 fn metadata_patch_rejects_stale_snapshot_without_mutation() {
     let source = ole_object(7, 0x2A, 0xB1);
     let input = object_workbook_cfb(&source, b"raw embedded payload");
