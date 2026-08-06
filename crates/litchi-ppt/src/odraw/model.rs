@@ -1,6 +1,42 @@
 use crate::package::Result;
+use litchi_odraw::Record;
+use litchi_odraw::shape::Shape;
 
 use super::package::corrupted;
+
+/// A parsed PowerPoint drawing with both its typed shapes and root records.
+///
+/// The shape projection intentionally omits records that do not describe
+/// visible shapes. The root records remain available here so callers can
+/// inspect unknown or future OfficeArt children without losing their borrowed
+/// bytes. Use [`litchi_odraw::Container::try_new`] on a record when its direct
+/// children are needed.
+#[derive(Debug)]
+pub struct Drawing<'data> {
+    records: Vec<Record<'data>>,
+    shapes: Vec<Shape<'data>>,
+}
+
+impl<'data> Drawing<'data> {
+    pub(super) fn new(records: Vec<Record<'data>>, shapes: Vec<Shape<'data>>) -> Self {
+        Self { records, shapes }
+    }
+
+    /// Returns one validated OfficeArt root record for each drawing in the
+    /// source stream, in source order.
+    pub fn records(&self) -> &[Record<'data>] {
+        &self.records
+    }
+
+    /// Returns the typed, visible shape tree projected from the root records.
+    pub fn shapes(&self) -> &[Shape<'data>] {
+        &self.shapes
+    }
+
+    pub(super) fn into_shapes(self) -> Vec<Shape<'data>> {
+        self.shapes
+    }
+}
 
 /// Placeholder metadata embedded in a PowerPoint shape's client data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -3,6 +3,7 @@
 //! Nested edit descriptors are retained as bounded XML. They are never
 //! executed and relationship-looking content inside them is never resolved.
 
+use super::model::*;
 use crate::{Error, Result};
 use chrono::{DateTime, NaiveDateTime};
 use litchi_ooxml_common::mce::process_ooxml;
@@ -29,43 +30,6 @@ const MAX_CHANGES: usize = 100_000;
 const MAX_EXTENSIONS: usize = 4_096;
 const MAX_STRING_BYTES: usize = 1024 * 1024;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Namespace {
-    /// Empty means the default namespace.
-    pub prefix: String,
-    pub uri: String,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Data {
-    pub name: Option<String>,
-    pub user_id: Option<String>,
-    pub provider_id: Option<String>,
-    pub client_id: Option<String>,
-    pub email: Option<String>,
-    pub date_time: Option<String>,
-    pub version: Option<u32>,
-    pub change_id: Option<String>,
-    pub action_id: Option<i32>,
-    /// Optional complete DrawingML `a:extLst` fragment.
-    pub extension_xml: Option<Vec<u8>>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Kind {
-    CustomSelection,
-    AddSlide,
-    DeleteSlide,
-    ModifySlide,
-    SlideOrder,
-    ModifyMainMaster,
-    ModifyNotesMaster,
-    ModifyHandoutMaster,
-    AddSection,
-    DeleteSection,
-    ModifySection,
-}
-
 impl Kind {
     fn parse(value: &str) -> Result<Self> {
         match value {
@@ -83,45 +47,6 @@ impl Kind {
             _ => Err(invalid(format!("unknown document change bit '{value}'"))),
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Descriptor {
-    pub change_kinds: Vec<Kind>,
-    /// Complete `pc:docChg` fragment with nested commands kept inert.
-    pub xml: Vec<u8>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct List {
-    pub author: Option<Data>,
-    pub changes: Vec<Descriptor>,
-    /// Optional complete PresentationML `p:extLst` fragment.
-    pub extension_xml: Option<Vec<u8>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Info {
-    pub command_prefix: String,
-    pub namespace_declarations: Vec<Namespace>,
-    pub change_lists: Vec<List>,
-}
-
-impl Default for Info {
-    fn default() -> Self {
-        Self {
-            command_prefix: "pc".into(),
-            namespace_declarations: Vec::new(),
-            change_lists: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Part {
-    pub relationship_id: String,
-    pub part_name: String,
-    pub changes_information: Info,
 }
 
 impl Info {

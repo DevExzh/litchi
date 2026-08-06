@@ -85,6 +85,12 @@ fn clean_commit_preserves_the_original_package_bytes() {
     assert!(!snapshot.is_dirty());
     assert_eq!(snapshot.chart().kind(), litchi_ograph::chart::Kind::Graph);
     assert_eq!(snapshot.chart().as_bytes(), chart.as_slice());
+    let semantic = snapshot.semantic_chart().expect("semantic chart");
+    assert!(semantic.is_pristine());
+    assert_eq!(
+        semantic.encode().expect("lossless replay").as_bytes(),
+        chart
+    );
 
     assert_eq!(editor.commit().expect("clean commit"), original);
 }
@@ -141,5 +147,29 @@ fn rejecting_an_excel_stream_leaves_the_transaction_untouched() {
     assert!(!editor.is_dirty());
     let after = editor.snapshot().expect("after snapshot");
     assert_eq!(after.workbook(), before_workbook.as_slice());
+    assert_eq!(editor.commit().expect("clean commit"), original);
+}
+
+#[test]
+fn semantic_replacement_refuses_unproven_authoring_atomically() {
+    let original = package(&chart_stream(11, &[12]));
+    let mut editor = PackageEditor::open(original.clone()).expect("open package");
+    let before = editor.snapshot().expect("before snapshot");
+    let before_workbook = before.workbook().to_vec();
+
+    let candidate = litchi_ograph::chart::Chart::new(litchi_ograph::chart::Context::graph())
+        .expect("fresh semantic chart");
+    let error = editor
+        .replace_semantic_chart(candidate)
+        .expect_err("fresh chart authoring is not proven");
+    assert!(matches!(
+        error,
+        crate::package::Error::Graph(litchi_ograph::Error::UnsupportedAuthoring { .. })
+    ));
+    assert!(!editor.is_dirty());
+    assert_eq!(
+        editor.snapshot().expect("after snapshot").workbook(),
+        before_workbook
+    );
     assert_eq!(editor.commit().expect("clean commit"), original);
 }

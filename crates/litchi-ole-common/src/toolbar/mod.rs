@@ -11,6 +11,8 @@ mod model;
 #[cfg(test)]
 mod tests;
 
+// Keep the public surface contextual and prefix-free even though the model is
+// split into semantic modules internally.
 pub use self::model::{
     ButtonFlags, ButtonState, ControlFlags, ControlHeader, ControlType, Data, Dimensions, Error,
     ExtraInfo, Flags, GeneralFlags, GeneralInfo, Header, HyperlinkType, MenuMerge, MergeMode,

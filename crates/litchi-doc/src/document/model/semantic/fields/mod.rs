@@ -6,4 +6,5 @@ mod document;
 mod expressions;
 mod indexing;
 mod mail_merge;
+mod navigation;
 mod references;

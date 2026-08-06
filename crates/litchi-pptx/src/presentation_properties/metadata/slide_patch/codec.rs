@@ -49,7 +49,13 @@ pub(crate) fn slide_dialect(xml: &[u8]) -> Result<&'static str> {
                     {
                         "http://purl.oclc.org/ooxml/presentationml/main"
                     },
-                    _ => "http://schemas.openxmlformats.org/presentationml/2006/main",
+                    ResolveResult::Bound(Namespace(value))
+                        if value
+                            == b"http://schemas.openxmlformats.org/presentationml/2006/main" =>
+                    {
+                        "http://schemas.openxmlformats.org/presentationml/2006/main"
+                    },
+                    _ => return Err(invalid("slide root has no PresentationML namespace")),
                 });
             },
             Event::Eof => return Err(invalid("slide XML has no root element")),
@@ -238,5 +244,11 @@ mod tests {
             Error::Invalid(message)
                 if message == "updated slide XML bytes exceeds the supported safety limit"
         ));
+    }
+
+    #[test]
+    fn rejects_an_unbound_presentation_prefix() {
+        let xml = b"<p:sld><p:extLst/></p:sld>";
+        assert!(insert_extension_fragment(xml, "<p:ext uri=\"urn:test\"/>").is_err());
     }
 }

@@ -17,8 +17,9 @@ mod tests;
 
 pub use codec::{Editor, PropertySetReader};
 pub use model::{
-    CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Guid, Metadata, SUMMARY_INFORMATION_FMTID,
-    Section, Standard, Stream, USER_DEFINED_PROPERTIES_FMTID, Value,
+    Array, CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Dimension, Guid, Metadata,
+    SUMMARY_INFORMATION_FMTID, Scalar, Section, Standard, Stream, USER_DEFINED_PROPERTIES_FMTID,
+    Value, Vector,
 };
 #[cfg(test)]
 pub(crate) use model::{DEFAULT_CODEPAGE, PID_BEHAVIOR, PID_CODEPAGE};

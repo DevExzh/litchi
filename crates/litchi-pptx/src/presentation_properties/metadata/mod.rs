@@ -69,7 +69,11 @@ pub(crate) fn is_presentationml_name(
             *value == b"http://schemas.openxmlformats.org/presentationml/2006/main"
                 || *value == b"http://purl.oclc.org/ooxml/presentationml/main"
         },
-        quick_xml::name::ResolveResult::Unknown(prefix) => prefix.as_slice() == b"p",
-        quick_xml::name::ResolveResult::Unbound => false,
+        // Element identity is determined by the resolved namespace URI, never
+        // by the producer's chosen prefix. An unresolved conventional prefix
+        // is malformed context for a PresentationML element.
+        quick_xml::name::ResolveResult::Unknown(_) | quick_xml::name::ResolveResult::Unbound => {
+            false
+        },
     }
 }

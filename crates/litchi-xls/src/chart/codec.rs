@@ -164,13 +164,13 @@ pub(super) fn parse_chart(input: &[u8], limits: Limits) -> Result<Chart> {
                 current_series = Some(chart.series.len() - 1);
                 series_depth = Some(depth + 1);
             },
-            0x1051 => {
+            BRAI => {
                 if let Some(series) = current_series {
                     let link = parse_link(data, limits)?;
                     chart
                         .series
                         .get_mut(series)
-                        .ok_or_else(|| invalid_error(0x1051, "Series index is invalid"))?
+                        .ok_or_else(|| invalid_error(BRAI, "Series index is invalid"))?
                         .links
                         .push(link);
                 } else {
@@ -556,14 +556,14 @@ pub(super) fn parse_chart(input: &[u8], limits: Limits) -> Result<Chart> {
 
 pub(super) fn validate_link(link: &DataLink, limits: Limits) -> Result<()> {
     if link.formula_tokens.len() > limits.max_formula_bytes {
-        return invalid(0x1051, "BRAI formula length exceeds the configured limit");
+        return invalid(BRAI, "BRAI formula length exceeds the configured limit");
     }
     if link.source == Source::Automatic && !link.formula_tokens.is_empty() {
-        return invalid(0x1051, "automatic BRAI must have an empty formula");
+        return invalid(BRAI, "automatic BRAI must have an empty formula");
     }
     if parse_chart_references(&link.formula_tokens)? != link.references {
         return invalid(
-            0x1051,
+            BRAI,
             "BRAI references do not match its inert formula tokens",
         );
     }
@@ -573,7 +573,7 @@ pub(super) fn validate_link(link: &DataLink, limits: Limits) -> Result<()> {
             || value.last_column > 255
         {
             return invalid(
-                0x1051,
+                BRAI,
                 "chart formula reference is outside workbook or BIFF8 grid bounds",
             );
         }
@@ -583,15 +583,15 @@ pub(super) fn validate_link(link: &DataLink, limits: Limits) -> Result<()> {
 
 pub(crate) fn parse_link(data: &[u8], limits: Limits) -> Result<DataLink> {
     if data.len() < 8 {
-        return invalid(0x1051, "BRAI is truncated");
+        return invalid(BRAI, "BRAI is truncated");
     }
     let flags = u16_at(data, 2)?;
     if flags & !1 != 0 {
-        return invalid(0x1051, "BRAI reserved flags are nonzero");
+        return invalid(BRAI, "BRAI reserved flags are nonzero");
     }
     let len = usize::from(u16_at(data, 6)?);
     if data.len() != 8 + len {
-        return invalid(0x1051, "BRAI formula length mismatch");
+        return invalid(BRAI, "BRAI formula length mismatch");
     }
     let formula_tokens = data[8..].to_vec();
     let references = parse_chart_references(&formula_tokens)?;
@@ -601,13 +601,13 @@ pub(crate) fn parse_link(data: &[u8], limits: Limits) -> Result<DataLink> {
             1 => Role::Values,
             2 => Role::Categories,
             3 => Role::Bubbles,
-            _ => return invalid(0x1051, "BRAI role is invalid"),
+            _ => return invalid(BRAI, "BRAI role is invalid"),
         },
         source: match data[1] {
             0 => Source::Automatic,
             1 => Source::Literal,
             2 => Source::Cells,
-            _ => return invalid(0x1051, "BRAI source kind is invalid"),
+            _ => return invalid(BRAI, "BRAI source kind is invalid"),
         },
         unlinked_number_format: flags & 1 != 0,
         number_format: u16_at(data, 4)?,
@@ -744,7 +744,7 @@ pub(super) fn serialize_chart(chart: &Chart, limits: Limits) -> Result<Vec<u8>> 
                     .to_le_bytes(),
             );
             data.extend(&link.formula_tokens);
-            push_record(&mut out, 0x1051, &data)?;
+            push_record(&mut out, BRAI, &data)?;
         }
         if let Some(name) = &series.name {
             push_record(&mut out, SERIES_TEXT, &short_text(name)?)?;

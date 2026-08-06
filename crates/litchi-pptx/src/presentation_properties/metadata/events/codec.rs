@@ -4,6 +4,7 @@
 //! module never replays, renders, seeks, pauses, resumes, stops, or otherwise
 //! executes a recorded action.
 
+use super::model::*;
 use crate::presentation_properties::metadata::is_presentationml_name;
 use crate::time::{Offset, ParseError as TimeParseError};
 use crate::{Error, Result};
@@ -26,92 +27,6 @@ const MAX_TOTAL_SLIDE_XML_BYTES: usize = 256 * 1024 * 1024;
 const MAX_SHOW_EVENTS: usize = 65_536;
 const MAX_XML_NODES: usize = 250_000;
 const MAX_XML_DEPTH: usize = 128;
-
-/// A trigger type recorded by a PowerPoint slide show.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Trigger {
-    /// Office extension accepted by PowerPoint 2007 through 2007 SP2; see
-    /// `[MS-OE376]` section 2.1.1237.
-    None,
-    OnBegin,
-    OnEnd,
-    Begin,
-    End,
-    OnClick,
-    OnDoubleClick,
-    OnMouseOver,
-    OnMouseOut,
-    OnNext,
-    OnPrevious,
-    OnStopAudio,
-}
-
-/// The recorded action represented by a PowerPoint slide-show event.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Kind {
-    Trigger(Trigger),
-    Play,
-    Stop,
-    Pause,
-    Resume,
-    /// Seek the targeted media object to an exact stream offset.
-    Seek {
-        at: Offset,
-    },
-    /// A reserved unknown event record for future PowerPoint extensions.
-    Null,
-}
-
-/// A bounded, inert event record persisted for a PowerPoint slide show.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Event {
-    slide_index: usize,
-    event_index: usize,
-    kind: Kind,
-    time: Offset,
-    object_id: u32,
-}
-
-impl Event {
-    /// Return the zero-based index of the slide that owns this event.
-    #[inline]
-    pub fn slide_index(&self) -> usize {
-        self.slide_index
-    }
-
-    /// Return the zero-based source-order index of this event on its slide.
-    #[inline]
-    pub fn event_index(&self) -> usize {
-        self.event_index
-    }
-
-    /// Return the recorded event kind.
-    #[inline]
-    pub fn kind(&self) -> &Kind {
-        &self.kind
-    }
-
-    /// Return the exact normalized time offset in the slide timeline.
-    #[inline]
-    pub fn time(&self) -> &Offset {
-        &self.time
-    }
-
-    /// Return the DrawingML object identifier targeted by this event.
-    #[inline]
-    pub fn object_id(&self) -> u32 {
-        self.object_id
-    }
-
-    /// Return the exact normalized media-stream offset for a seek event.
-    #[inline]
-    pub fn seek_time(&self) -> Option<&Offset> {
-        match &self.kind {
-            Kind::Seek { at } => Some(at),
-            _ => None,
-        }
-    }
-}
 
 #[derive(Default)]
 pub(crate) struct ShowEventLoadLimits {
@@ -551,103 +466,6 @@ fn limit(what: &str) -> Error {
     invalid(format!("{what} exceeds the supported safety limit"))
 }
 
-/// A slide-show event ready for storage onto a slide.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Draft {
-    kind: Kind,
-    time: Offset,
-    object_id: u32,
-}
-
-impl Draft {
-    /// Create an event from its complete, typed action state.
-    #[must_use]
-    pub fn new(kind: Kind, time: Offset, object_id: u32) -> Self {
-        Self {
-            kind,
-            time,
-            object_id,
-        }
-    }
-
-    /// Create a trigger event.
-    #[must_use]
-    pub fn trigger(trigger: Trigger, time: Offset, object_id: u32) -> Self {
-        Self::new(Kind::Trigger(trigger), time, object_id)
-    }
-
-    /// Create a play event.
-    #[must_use]
-    pub fn play(time: Offset, object_id: u32) -> Self {
-        Self::new(Kind::Play, time, object_id)
-    }
-
-    /// Create a stop event.
-    #[must_use]
-    pub fn stop(time: Offset, object_id: u32) -> Self {
-        Self::new(Kind::Stop, time, object_id)
-    }
-
-    /// Create a pause event.
-    #[must_use]
-    pub fn pause(time: Offset, object_id: u32) -> Self {
-        Self::new(Kind::Pause, time, object_id)
-    }
-
-    /// Create a resume event.
-    #[must_use]
-    pub fn resume(time: Offset, object_id: u32) -> Self {
-        Self::new(Kind::Resume, time, object_id)
-    }
-
-    /// Create a seek event with a media-stream offset.
-    #[must_use]
-    pub fn seek(time: Offset, object_id: u32, seek_time: Offset) -> Self {
-        Self::new(Kind::Seek { at: seek_time }, time, object_id)
-    }
-
-    /// Create a reserved null event.
-    #[must_use]
-    pub fn null(time: Offset, object_id: u32) -> Self {
-        Self::new(Kind::Null, time, object_id)
-    }
-
-    /// Return the recorded event kind.
-    pub fn kind(&self) -> &Kind {
-        &self.kind
-    }
-
-    /// Return the exact normalized universal time offset.
-    pub fn time(&self) -> &Offset {
-        &self.time
-    }
-
-    /// Return the DrawingML object identifier targeted by this event.
-    pub fn object_id(&self) -> u32 {
-        self.object_id
-    }
-
-    /// Return the exact normalized media-stream offset for a seek event.
-    pub fn seek_time(&self) -> Option<&Offset> {
-        match &self.kind {
-            Kind::Seek { at } => Some(at),
-            _ => None,
-        }
-    }
-
-    fn element_name(&self) -> &'static str {
-        match &self.kind {
-            Kind::Trigger(_) => "triggerEvt",
-            Kind::Play => "playEvt",
-            Kind::Stop => "stopEvt",
-            Kind::Pause => "pauseEvt",
-            Kind::Resume => "resumeEvt",
-            Kind::Seek { .. } => "seekEvt",
-            Kind::Null => "nullEvt",
-        }
-    }
-}
-
 fn trigger_token(trigger: Trigger) -> &'static str {
     match trigger {
         Trigger::None => "none",
@@ -662,6 +480,20 @@ fn trigger_token(trigger: Trigger) -> &'static str {
         Trigger::OnNext => "onNext",
         Trigger::OnPrevious => "onPrev",
         Trigger::OnStopAudio => "onStopAudio",
+    }
+}
+
+impl Draft {
+    fn element_name(&self) -> &'static str {
+        match &self.kind {
+            Kind::Trigger(_) => "triggerEvt",
+            Kind::Play => "playEvt",
+            Kind::Stop => "stopEvt",
+            Kind::Pause => "pauseEvt",
+            Kind::Resume => "resumeEvt",
+            Kind::Seek { .. } => "seekEvt",
+            Kind::Null => "nullEvt",
+        }
     }
 }
 

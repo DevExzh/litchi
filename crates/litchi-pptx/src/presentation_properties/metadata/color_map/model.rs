@@ -1,3 +1,119 @@
-//! Contextual color-map model facade.
+//! Package-independent PresentationML color-map values.
 
-pub use super::codec::{Map, Override, Role, Slot};
+use crate::shape::theme::{Color as ThemeColor, Palette, Slot as ThemeSlot};
+
+/// A role that can be mapped by a PresentationML color map.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Slot {
+    Background1,
+    Text1,
+    Background2,
+    Text2,
+    Accent1,
+    Accent2,
+    Accent3,
+    Accent4,
+    Accent5,
+    Accent6,
+    Hyperlink,
+    FollowedHyperlink,
+}
+
+/// A color role defined by a DrawingML theme.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Role {
+    Dark1,
+    Light1,
+    Dark2,
+    Light2,
+    Accent1,
+    Accent2,
+    Accent3,
+    Accent4,
+    Accent5,
+    Accent6,
+    Hyperlink,
+    FollowedHyperlink,
+}
+
+impl Role {
+    /// Return the DrawingML theme color name.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Dark1 => "dk1",
+            Self::Light1 => "lt1",
+            Self::Dark2 => "dk2",
+            Self::Light2 => "lt2",
+            Self::Accent1 => "accent1",
+            Self::Accent2 => "accent2",
+            Self::Accent3 => "accent3",
+            Self::Accent4 => "accent4",
+            Self::Accent5 => "accent5",
+            Self::Accent6 => "accent6",
+            Self::Hyperlink => "hlink",
+            Self::FollowedHyperlink => "folHlink",
+        }
+    }
+}
+
+/// A complete PresentationML color map.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Map {
+    pub(crate) background1: Role,
+    pub(crate) text1: Role,
+    pub(crate) background2: Role,
+    pub(crate) text2: Role,
+    pub(crate) accent1: Role,
+    pub(crate) accent2: Role,
+    pub(crate) accent3: Role,
+    pub(crate) accent4: Role,
+    pub(crate) accent5: Role,
+    pub(crate) accent6: Role,
+    pub(crate) hyperlink: Role,
+    pub(crate) followed_hyperlink: Role,
+}
+
+impl Map {
+    /// Return the theme color role mapped from a PresentationML color slot.
+    pub const fn color(&self, slot: Slot) -> Role {
+        match slot {
+            Slot::Background1 => self.background1,
+            Slot::Text1 => self.text1,
+            Slot::Background2 => self.background2,
+            Slot::Text2 => self.text2,
+            Slot::Accent1 => self.accent1,
+            Slot::Accent2 => self.accent2,
+            Slot::Accent3 => self.accent3,
+            Slot::Accent4 => self.accent4,
+            Slot::Accent5 => self.accent5,
+            Slot::Accent6 => self.accent6,
+            Slot::Hyperlink => self.hyperlink,
+            Slot::FollowedHyperlink => self.followed_hyperlink,
+        }
+    }
+
+    /// Resolve a mapped presentation slot against a typed DrawingML palette.
+    pub fn resolve<'a>(&self, palette: &'a Palette, slot: Slot) -> Option<&'a ThemeColor> {
+        palette.color(match self.color(slot) {
+            Role::Dark1 => ThemeSlot::Dark1,
+            Role::Light1 => ThemeSlot::Light1,
+            Role::Dark2 => ThemeSlot::Dark2,
+            Role::Light2 => ThemeSlot::Light2,
+            Role::Accent1 => ThemeSlot::Accent1,
+            Role::Accent2 => ThemeSlot::Accent2,
+            Role::Accent3 => ThemeSlot::Accent3,
+            Role::Accent4 => ThemeSlot::Accent4,
+            Role::Accent5 => ThemeSlot::Accent5,
+            Role::Accent6 => ThemeSlot::Accent6,
+            Role::Hyperlink => ThemeSlot::Hyperlink,
+            Role::FollowedHyperlink => ThemeSlot::FollowedHyperlink,
+        })
+    }
+}
+
+/// The color-map selection declared by a slide or slide layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Override {
+    Master,
+    Override(Map),
+}

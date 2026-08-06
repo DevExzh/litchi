@@ -14,6 +14,149 @@ use crate::Error;
 mod tests {
     use super::*;
 
+    fn area_link(role: Role, first_row: u16, last_row: u16) -> DataLink {
+        let mut formula_tokens = vec![0x3b];
+        formula_tokens.extend(0u16.to_le_bytes());
+        formula_tokens.extend(first_row.to_le_bytes());
+        formula_tokens.extend(last_row.to_le_bytes());
+        formula_tokens.extend(0u16.to_le_bytes());
+        formula_tokens.extend(0u16.to_le_bytes());
+        DataLink {
+            role,
+            source: Source::Cells,
+            unlinked_number_format: false,
+            number_format: 0,
+            formula_tokens,
+            references: vec![CellRef {
+                extern_sheet_index: 0,
+                first_row,
+                last_row,
+                first_column: 0,
+                last_column: 0,
+            }],
+        }
+    }
+
+    fn complete_series() -> Series {
+        Series {
+            category_count: 2,
+            value_count: 2,
+            links: vec![
+                DataLink {
+                    role: Role::Name,
+                    source: Source::Automatic,
+                    unlinked_number_format: false,
+                    number_format: 0,
+                    formula_tokens: Vec::new(),
+                    references: Vec::new(),
+                },
+                area_link(Role::Values, 0, 1),
+                area_link(Role::Categories, 0, 1),
+                DataLink {
+                    role: Role::Bubbles,
+                    source: Source::Automatic,
+                    unlinked_number_format: false,
+                    number_format: 0,
+                    formula_tokens: Vec::new(),
+                    references: Vec::new(),
+                },
+            ],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn typed_inventory_reports_data_sources_without_rendering() {
+        let mut chart = Chart::default();
+        chart.series.push(complete_series());
+        chart.cached_values.push(Cache {
+            cache_index: 1,
+            row: 0,
+            column: 0,
+            format: 0,
+            value: Value::Number(42.0),
+        });
+        chart.unknown_records.extend([
+            Raw {
+                record_type: 0x7777,
+                data: vec![1],
+            },
+            Raw {
+                record_type: 0x7777,
+                data: vec![2],
+            },
+            Raw {
+                record_type: 0x7778,
+                data: vec![3],
+            },
+        ]);
+
+        let inventory = chart.inventory(Limits::default()).unwrap();
+        assert_eq!(inventory.kind, Kind::Line);
+        assert_eq!(inventory.series_count, 1);
+        assert_eq!(inventory.group_count, 1);
+        assert_eq!(inventory.axis_count, 0);
+        assert_eq!(inventory.data_link_count, 4);
+        assert_eq!(inventory.cell_reference_count, 2);
+        assert_eq!(inventory.opaque_formula_count, 0);
+        assert_eq!(inventory.cached_value_count, 1);
+        assert_eq!(inventory.unknown_record_count, 3);
+        assert_eq!(inventory.unknown_record_types, [0x7777, 0x7778]);
+        assert_eq!(
+            inventory.semantic_completeness,
+            SemanticCompleteness::Partial
+        );
+    }
+
+    #[test]
+    fn semantic_validation_checks_ordered_ai_links_and_cache_identity() {
+        let mut chart = Chart::default();
+        chart.series.push(complete_series());
+        chart
+            .validate_semantics(Limits::default())
+            .expect("complete MS-XLS series links are valid");
+
+        chart.series[0].links.swap(1, 2);
+        assert!(chart.validate_semantics(Limits::default()).is_err());
+
+        let mut chart = Chart::default();
+        chart.series.push(complete_series());
+        chart.cached_values.extend([
+            Cache {
+                cache_index: 1,
+                row: 0,
+                column: 0,
+                format: 0,
+                value: Value::Blank,
+            },
+            Cache {
+                cache_index: 1,
+                row: 0,
+                column: 0,
+                format: 0,
+                value: Value::Blank,
+            },
+        ]);
+        assert!(chart.validate_semantics(Limits::default()).is_err());
+    }
+
+    #[test]
+    fn semantic_validation_checks_reference_cardinality_and_scatter_types() {
+        let mut chart = Chart::default();
+        chart.series.push(complete_series());
+        chart.series[0].value_count = 3;
+        assert!(chart.validate_semantics(Limits::default()).is_err());
+
+        let mut chart = Chart::default();
+        chart.groups[0].kind = GroupKind::Scatter {
+            bubble_size_percent: 100,
+            bubble_size_type: 1,
+            flags: 0,
+        };
+        chart.series.push(complete_series());
+        assert!(chart.validate_semantics(Limits::default()).is_err());
+    }
+
     #[test]
     fn abbreviated_test_fixture_exercises_chart_parser() {
         let mut chart = Chart {

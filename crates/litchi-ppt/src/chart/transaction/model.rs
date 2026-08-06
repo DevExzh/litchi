@@ -1,6 +1,7 @@
 //! Semantic chart-package transaction and immutable snapshots.
 
 use litchi_ograph::Limits;
+use litchi_ograph::chart::{Chart as SemanticChart, Context};
 
 use super::codec;
 use crate::package::{Error, Result};
@@ -27,6 +28,16 @@ impl Snapshot<'_> {
     /// The one typed Graph chart substream in the workbook.
     pub const fn chart(&self) -> litchi_ograph::chart::Ref<'_> {
         self.chart
+    }
+
+    /// Validate and own the current chart through the MS-OGRAPH semantic
+    /// model.
+    ///
+    /// The returned chart retains its exact source stream. Encoding it
+    /// without mutation is therefore lossless; an attempted parsed mutation
+    /// reports the neutral model's typed unsafe-edit error.
+    pub fn semantic_chart(&self) -> Result<SemanticChart> {
+        SemanticChart::parse(self.chart, Context::graph()).map_err(Into::into)
     }
 
     /// Whether an edit has been applied since the transaction was opened.
@@ -90,6 +101,13 @@ impl PackageEditor {
     /// Borrow the current typed, Graph-framed chart stream.
     pub fn chart(&self) -> Result<litchi_ograph::chart::Ref<'_>> {
         self.chart_ref()
+    }
+
+    /// Validate and own the current chart through the MS-OGRAPH semantic
+    /// model without changing transaction state.
+    pub fn semantic_chart(&self) -> Result<SemanticChart> {
+        SemanticChart::parse_with(self.chart_ref()?, Context::graph(), self.limits)
+            .map_err(Into::into)
     }
 
     /// Capture the current state without copying its bounded buffers.
@@ -176,6 +194,23 @@ impl PackageEditor {
         self.original.take();
         self.dirty = true;
         Ok(())
+    }
+
+    /// Replace the current chart with a semantically validated MS-OGRAPH
+    /// chart.
+    ///
+    /// This keeps the existing raw [`Self::replace_chart`] API intact while
+    /// making the stronger semantic path explicit. Untouched parsed charts
+    /// replay byte-for-byte; parsed mutations and fresh charts are rejected by
+    /// `litchi-ograph` until their opaque-record placement is proven.
+    pub fn replace_semantic_chart(&mut self, chart: SemanticChart) -> Result<()> {
+        if chart.context().kind() != litchi_ograph::chart::Kind::Graph {
+            return Err(Error::InvalidFormat(
+                "standalone Graph packages require a Graph semantic chart".to_string(),
+            ));
+        }
+        let stream = chart.encode_with(self.limits)?;
+        self.replace_chart(stream)
     }
 
     /// Commit the current transaction into a standalone OLE2 package.

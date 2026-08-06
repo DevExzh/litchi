@@ -2,6 +2,7 @@
 
 use chrono::{DateTime, Duration, Utc};
 use litchi_cfb::OleError;
+use litchi_cfb::consts::*;
 use litchi_codepage::Mbcs;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
@@ -17,6 +18,7 @@ pub(crate) const PID_CODEPAGE: u32 = 1;
 pub(crate) const PID_LOCALE: u32 = 0x8000_0000;
 pub(crate) const PID_BEHAVIOR: u32 = 0x8000_0003;
 pub(crate) const MAX_NAMED_PROPERTY_ID: u32 = 0x7fff_ffff;
+pub(crate) const VT_ARRAY: u16 = 0x2000;
 
 pub(crate) fn try_vec_with_capacity<T>(
     capacity: usize,
@@ -519,6 +521,325 @@ pub struct Metadata {
     pub custom_properties: HashMap<String, Value>,
 }
 
+/// Scalar type carried by an OLE `VT_ARRAY` property.
+///
+/// The variants are the scalar types permitted by [MS-OLEPS] 2.14.1 for
+/// multi-dimensional arrays. `Variant` retains the per-element type headers
+/// required by `VT_ARRAY | VT_VARIANT`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Scalar {
+    I2,
+    I4,
+    R4,
+    R8,
+    Currency,
+    Date,
+    Bstr,
+    Error,
+    Bool,
+    Decimal,
+    I1,
+    UI1,
+    UI2,
+    UI4,
+    I8,
+    UI8,
+    Int,
+    UInt,
+    Clsid,
+    Lpstr,
+    Lpwstr,
+    Filetime,
+    Clipboard,
+    Variant,
+}
+
+impl Scalar {
+    pub const fn raw(self) -> u16 {
+        match self {
+            Self::I2 => VT_I2,
+            Self::I4 => VT_I4,
+            Self::R4 => VT_R4,
+            Self::R8 => VT_R8,
+            Self::Currency => VT_CY,
+            Self::Date => VT_DATE,
+            Self::Bstr => VT_BSTR,
+            Self::Error => VT_ERROR,
+            Self::Bool => VT_BOOL,
+            Self::Decimal => VT_DECIMAL,
+            Self::I1 => VT_I1,
+            Self::UI1 => VT_UI1,
+            Self::UI2 => VT_UI2,
+            Self::UI4 => VT_UI4,
+            Self::I8 => VT_I8,
+            Self::UI8 => VT_UI8,
+            Self::Int => VT_INT,
+            Self::UInt => VT_UINT,
+            Self::Clsid => VT_CLSID,
+            Self::Lpstr => VT_LPSTR,
+            Self::Lpwstr => VT_LPWSTR,
+            Self::Filetime => VT_FILETIME,
+            Self::Clipboard => VT_CF,
+            Self::Variant => VT_VARIANT,
+        }
+    }
+
+    pub(crate) const fn from_raw(raw: u16) -> Option<Self> {
+        Some(match raw {
+            VT_I2 => Self::I2,
+            VT_I4 => Self::I4,
+            VT_R4 => Self::R4,
+            VT_R8 => Self::R8,
+            VT_CY => Self::Currency,
+            VT_DATE => Self::Date,
+            VT_BSTR => Self::Bstr,
+            VT_ERROR => Self::Error,
+            VT_BOOL => Self::Bool,
+            VT_DECIMAL => Self::Decimal,
+            VT_I1 => Self::I1,
+            VT_UI1 => Self::UI1,
+            VT_UI2 => Self::UI2,
+            VT_UI4 => Self::UI4,
+            VT_I8 => Self::I8,
+            VT_UI8 => Self::UI8,
+            VT_INT => Self::Int,
+            VT_UINT => Self::UInt,
+            VT_CLSID => Self::Clsid,
+            VT_LPSTR => Self::Lpstr,
+            VT_LPWSTR => Self::Lpwstr,
+            VT_FILETIME => Self::Filetime,
+            VT_CF => Self::Clipboard,
+            VT_VARIANT => Self::Variant,
+            _ => return None,
+        })
+    }
+
+    pub(crate) const fn allows_array(self) -> bool {
+        !matches!(
+            self,
+            Self::I8
+                | Self::UI8
+                | Self::Lpstr
+                | Self::Lpwstr
+                | Self::Filetime
+                | Self::Clipboard
+                | Self::Clsid
+        )
+    }
+
+    pub(crate) const fn allows_vector(self) -> bool {
+        !matches!(self, Self::Decimal | Self::Int | Self::UInt)
+    }
+
+    pub(crate) fn matches_value(self, value: &Value) -> bool {
+        match self {
+            Self::Variant => scalar_of(value).is_some_and(Self::allows_array_variant_element),
+            _ => scalar_of(value) == Some(self),
+        }
+    }
+
+    pub(crate) fn matches_vector_value(self, value: &Value) -> bool {
+        match self {
+            Self::Variant => scalar_of(value).is_some_and(Self::allows_vector_variant_element),
+            _ => scalar_of(value) == Some(self),
+        }
+    }
+
+    const fn allows_array_variant_element(self) -> bool {
+        !matches!(
+            self,
+            Self::I8
+                | Self::UI8
+                | Self::Lpstr
+                | Self::Lpwstr
+                | Self::Filetime
+                | Self::Clipboard
+                | Self::Clsid
+        )
+    }
+
+    const fn allows_vector_variant_element(self) -> bool {
+        !matches!(self, Self::Decimal | Self::Int | Self::UInt)
+    }
+}
+
+/// One dimension of an OLE `VT_ARRAY` value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Dimension {
+    size: u32,
+    index_offset: i32,
+}
+
+impl Dimension {
+    /// Creates a dimension with an explicit element count and lower bound.
+    pub const fn new(size: u32, index_offset: i32) -> Self {
+        Self { size, index_offset }
+    }
+
+    /// Number of elements along this dimension.
+    pub const fn size(self) -> u32 {
+        self.size
+    }
+
+    /// Lower-bound index offset for this dimension.
+    pub const fn index_offset(self) -> i32 {
+        self.index_offset
+    }
+}
+
+const MAX_ARRAY_ELEMENTS: usize = 1_000_000;
+const MAX_ARRAY_DIMENSIONS: usize = 31;
+
+/// A checked, row-major multi-dimensional OLE property array.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Array {
+    scalar: Scalar,
+    dimensions: Vec<Dimension>,
+    values: Vec<Value>,
+}
+
+impl Array {
+    /// Creates an array after checking scalar type, dimensions, and element count.
+    pub fn new(
+        scalar: Scalar,
+        dimensions: Vec<Dimension>,
+        values: Vec<Value>,
+    ) -> Result<Self, OleError> {
+        validate_array_parts(scalar, &dimensions, &values)?;
+        Ok(Self {
+            scalar,
+            dimensions,
+            values,
+        })
+    }
+
+    /// Creates a variable-typed array whose elements carry their own VARIANT types.
+    pub fn variant(dimensions: Vec<Dimension>, values: Vec<Value>) -> Result<Self, OleError> {
+        Self::new(Scalar::Variant, dimensions, values)
+    }
+
+    /// Returns the array scalar type.
+    pub const fn scalar(&self) -> Scalar {
+        self.scalar
+    }
+
+    /// Returns dimensions in wire order; the final dimension varies fastest.
+    pub fn dimensions(&self) -> &[Dimension] {
+        &self.dimensions
+    }
+
+    /// Returns row-major values without materializing nested vectors.
+    pub fn values(&self) -> &[Value] {
+        &self.values
+    }
+
+    /// Returns one row-major value by checked zero-based offset.
+    pub fn value(&self, index: usize) -> Option<&Value> {
+        self.values.get(index)
+    }
+
+    pub(crate) fn validate(&self) -> Result<(), OleError> {
+        validate_array_parts(self.scalar, &self.dimensions, &self.values)
+    }
+}
+
+/// A checked one-dimensional OLE `VT_VECTOR` value.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Vector {
+    scalar: Scalar,
+    values: Vec<Value>,
+}
+
+impl Vector {
+    /// Creates a vector after checking scalar type and element values.
+    pub fn new(scalar: Scalar, values: Vec<Value>) -> Result<Self, OleError> {
+        validate_vector_parts(scalar, &values)?;
+        Ok(Self { scalar, values })
+    }
+
+    /// Creates a variable-typed vector whose elements carry their own VARIANT types.
+    pub fn variant(values: Vec<Value>) -> Result<Self, OleError> {
+        Self::new(Scalar::Variant, values)
+    }
+
+    /// Returns the vector scalar type.
+    pub const fn scalar(&self) -> Scalar {
+        self.scalar
+    }
+
+    /// Returns vector values without materializing another collection.
+    pub fn values(&self) -> &[Value] {
+        &self.values
+    }
+
+    /// Returns one vector value by checked zero-based offset.
+    pub fn value(&self, index: usize) -> Option<&Value> {
+        self.values.get(index)
+    }
+
+    pub(crate) fn validate(&self) -> Result<(), OleError> {
+        validate_vector_parts(self.scalar, &self.values)
+    }
+}
+
+fn validate_vector_parts(scalar: Scalar, values: &[Value]) -> Result<(), OleError> {
+    if !scalar.allows_vector() {
+        return Err(invalid(
+            "DECIMAL, INT, and UINT are not supported OLE vector scalar types",
+        ));
+    }
+    if values.len() > MAX_ARRAY_ELEMENTS {
+        return Err(invalid("OLE vector exceeds the element safety limit"));
+    }
+    if values
+        .iter()
+        .any(|value| !scalar.matches_vector_value(value))
+    {
+        return Err(invalid(
+            "OLE vector contains a value with the wrong scalar type",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_array_parts(
+    scalar: Scalar,
+    dimensions: &[Dimension],
+    values: &[Value],
+) -> Result<(), OleError> {
+    if !scalar.allows_array() {
+        return Err(invalid(
+            "I8, UI8, LPSTR, LPWSTR, FILETIME, CF, and CLSID are not supported OLE array scalar types",
+        ));
+    }
+    if dimensions.is_empty() || dimensions.len() > MAX_ARRAY_DIMENSIONS {
+        return Err(invalid("OLE array dimensions must contain 1..=31 entries"));
+    }
+    let expected = dimensions.iter().try_fold(1usize, |count, dimension| {
+        count
+            .checked_mul(
+                usize::try_from(dimension.size)
+                    .map_err(|_| invalid("OLE array dimension is too large"))?,
+            )
+            .ok_or_else(|| invalid("OLE array element count overflows usize"))
+    })?;
+    if expected > MAX_ARRAY_ELEMENTS || values.len() > MAX_ARRAY_ELEMENTS {
+        return Err(invalid("OLE array exceeds the element safety limit"));
+    }
+    if expected != values.len() {
+        return Err(invalid(format!(
+            "OLE array dimensions require {expected} values, got {}",
+            values.len()
+        )));
+    }
+    if values.iter().any(|value| !scalar.matches_value(value)) {
+        return Err(invalid(
+            "OLE array contains a value with the wrong scalar type",
+        ));
+    }
+    Ok(())
+}
+
 /// A typed OLE property value. Unsupported variants retain their bounded raw bytes.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -548,8 +869,38 @@ pub enum Value {
     Blob(Vec<u8>),
     Clipboard { format: i32, data: Vec<u8> },
     Clsid(Guid),
-    Vector(Vec<Value>),
+    Vector(Vector),
+    Array(Array),
     Unknown { variant_type: u16, data: Vec<u8> },
+}
+
+fn scalar_of(value: &Value) -> Option<Scalar> {
+    Some(match value {
+        Value::I2(_) => Scalar::I2,
+        Value::I4(_) => Scalar::I4,
+        Value::R4(_) => Scalar::R4,
+        Value::R8(_) => Scalar::R8,
+        Value::Currency(_) => Scalar::Currency,
+        Value::Date(_) => Scalar::Date,
+        Value::Bstr(_) => Scalar::Bstr,
+        Value::Error(_) => Scalar::Error,
+        Value::Bool(_) => Scalar::Bool,
+        Value::Decimal(_) => Scalar::Decimal,
+        Value::I1(_) => Scalar::I1,
+        Value::UI1(_) => Scalar::UI1,
+        Value::UI2(_) => Scalar::UI2,
+        Value::UI4(_) => Scalar::UI4,
+        Value::I8(_) => Scalar::I8,
+        Value::UI8(_) => Scalar::UI8,
+        Value::Int(_) => Scalar::Int,
+        Value::UInt(_) => Scalar::UInt,
+        Value::Clsid(_) => Scalar::Clsid,
+        Value::Lpstr(_) => Scalar::Lpstr,
+        Value::Lpwstr(_) => Scalar::Lpwstr,
+        Value::Filetime(_) => Scalar::Filetime,
+        Value::Clipboard { .. } => Scalar::Clipboard,
+        _ => return None,
+    })
 }
 
 pub(crate) fn try_clone_property_value(value: &Value) -> Result<Value, OleError> {
@@ -583,13 +934,25 @@ pub(crate) fn try_clone_property_value(value: &Value) -> Result<Value, OleError>
             data: try_copy_bytes(data, "property value clipboard data")?,
         },
         Value::Clsid(value) => Value::Clsid(*value),
-        Value::Vector(values) => {
-            let mut cloned = try_vec_with_capacity(values.len(), "property value vector")?;
-            for value in values {
+        Value::Vector(vector) => {
+            let mut cloned = try_vec_with_capacity(vector.values.len(), "property value vector")?;
+            for value in &vector.values {
                 cloned.push(try_clone_property_value(value)?);
             }
-            Value::Vector(cloned)
+            Value::Vector(Vector::new(vector.scalar, cloned)?)
         },
+        Value::Array(array) => Value::Array(Array::new(
+            array.scalar,
+            try_clone_vec(&array.dimensions, "property array dimensions")?,
+            {
+                let mut values =
+                    try_vec_with_capacity(array.values.len(), "property array values")?;
+                for value in &array.values {
+                    values.push(try_clone_property_value(value)?);
+                }
+                values
+            },
+        )?),
         Value::Unknown { variant_type, data } => Value::Unknown {
             variant_type: *variant_type,
             data: try_copy_bytes(data, "unknown property value")?,

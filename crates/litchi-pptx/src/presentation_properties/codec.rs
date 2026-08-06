@@ -934,18 +934,7 @@ fn write_opaque(x: &mut String, v: &[u8], strict: bool) -> Result<()> {
 }
 
 fn validate(v: &Properties) -> Result<()> {
-    if v.recent_colors.len() > 10 {
-        return Err(invalid("clrMru permits at most ten colors"));
-    }
-    if v.extensions.len() > MAX_EXTENSIONS {
-        return Err(invalid("presentation extension count exceeds limit"));
-    }
-    if v.show
-        .as_ref()
-        .is_some_and(|show| show.extensions.len() > MAX_EXTENSIONS)
-    {
-        return Err(invalid("slide-show extension count exceeds limit"));
-    }
+    v.validate()?;
     for c in v
         .recent_colors
         .iter()
@@ -1304,6 +1293,41 @@ mod tests {
             Some(SlideSelection::Range { start: 2, end: 4 })
         );
     }
+    #[test]
+    fn accepts_bound_namespace_context_without_conventional_prefixes() {
+        let xml = format!(
+            r#"<q:presentationPr xmlns:q="{P_NS}" xmlns:z="{R_NS}"><q:htmlPubPr z:id="rIdHtml"><q:sldAll/></q:htmlPubPr><q:webPr showAnimation="1"/></q:presentationPr>"#
+        );
+        let value = Properties::parse(xml.as_bytes()).unwrap();
+        assert_eq!(value.web.unwrap().show_animation, Some(true));
+        assert_eq!(
+            value.html_publish.unwrap().target.relationship_id,
+            "rIdHtml"
+        );
+    }
+
+    #[test]
+    fn typed_snapshot_validation_rejects_invalid_edits() {
+        let invalid_range = Properties {
+            show: Some(Show {
+                slides: Some(SlideSelection::Range { start: 8, end: 3 }),
+                ..Show::default()
+            }),
+            ..Properties::default()
+        };
+        assert!(invalid_range.validate().is_err());
+        assert!(invalid_range.to_xml(false).is_err());
+
+        let duplicate_extension = Properties {
+            extensions: vec![
+                Extension::DiscardImageEditData(true),
+                Extension::DiscardImageEditData(false),
+            ],
+            ..Properties::default()
+        };
+        assert!(duplicate_extension.validate().is_err());
+    }
+
     #[test]
     fn typed_extensions_preserve_unknown_entries_without_resolving_relationships() {
         let xml = format!(

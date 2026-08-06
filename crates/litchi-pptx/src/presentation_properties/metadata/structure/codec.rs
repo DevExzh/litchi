@@ -7,6 +7,7 @@
 
 use super::super::custom_show::{List as ShowList, Show};
 use super::super::sections::{List as SectionList, Section};
+use super::model::*;
 use crate::presentation_properties::metadata::{escape_xml, new_guid};
 use crate::{Error, Result};
 use litchi_opc::OpcPackage;
@@ -24,22 +25,6 @@ const SECTION_URI: &str = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}";
 const MAX_BYTES: usize = 8 * 1024 * 1024;
 const MAX_NODES: usize = 100_000;
 const MAX_DEPTH: usize = 128;
-
-/// One entry in `p:sldIdLst`, resolved through the presentation relationship set.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Reference {
-    pub slide_id: u32,
-    pub relationship_id: String,
-    pub part_name: String,
-}
-
-/// Validated presentation ordering, custom shows, and modern sections.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Graph {
-    pub slides: Vec<Reference>,
-    pub custom_shows: ShowList,
-    pub sections: SectionList,
-}
 
 /// Load and validate the presentation structure graph.
 pub fn load(package: &OpcPackage) -> Result<Graph> {

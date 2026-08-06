@@ -204,7 +204,9 @@ fn parse_lbs_data(body: &[u8], control_type: Option<u16>) -> Option<FtLbsData> {
         edit_box_id: u16_at(body, formula_end + 6)?,
         ..FtLbsData::default()
     };
-    data.validate().ok()?;
+    if data.entry_count > 0x7FFF || data.selected_index > data.entry_count {
+        return None;
+    }
     let mut offset = header_end;
     if control_type.and_then(ObjectType::from_code) == Some(ObjectType::DropDown) {
         let drop_header_end = offset.checked_add(6)?;
@@ -232,21 +234,23 @@ fn parse_lbs_data(body: &[u8], control_type: Option<u16>) -> Option<FtLbsData> {
             text,
             padding,
         });
-        data.validate().ok()?;
     }
     // rgLines: parse up to `entry_count` item strings. A record continued into
     // Continue records holds fewer strings here; a defective string stops the
     // walk and its bytes are preserved verbatim as trailing data.
     let mut items = Vec::new();
-    while items.len() < usize::from(data.entry_count) && offset < body.len() {
-        match xl_unicode_string_size(&body[offset..]) {
-            Some(size) if offset + size <= body.len() => {
-                items.push(parse_lbs_item(body[offset..offset + size].to_vec())?);
-                offset += size;
-            },
-            _ => break,
+    if data.has_item_strings() {
+        while items.len() < usize::from(data.entry_count) && offset < body.len() {
+            match xl_unicode_string_size(&body[offset..]) {
+                Some(size) if offset + size <= body.len() => {
+                    items.push(parse_lbs_item(body[offset..offset + size].to_vec())?);
+                    offset += size;
+                },
+                _ => break,
+            }
         }
     }
+    let mut partial = data.has_item_strings() && items.len() < usize::from(data.entry_count);
     if offset < body.len() {
         // bsels: one selection byte per entry for multiple-selection lists.
         let multiple = (data.flags >> LBS_SELECTION_TYPE_SHIFT) & LBS_SELECTION_TYPE_MASK != 0;
@@ -256,11 +260,20 @@ fn parse_lbs_data(body: &[u8], control_type: Option<u16>) -> Option<FtLbsData> {
             if selection.iter().all(|value| *value <= 1) {
                 data.multi_selection = selection.iter().map(|value| *value != 0).collect();
                 offset += count;
+            } else {
+                partial = true;
             }
         }
         data.trailing = body[offset..].to_vec();
+    } else if data.selection_type() != ListSelectionType::Single && data.entry_count != 0 {
+        partial = true;
     }
-    data.set_items(items);
+    if data.selection_type() != ListSelectionType::Single
+        && data.multi_selection.len() < usize::from(data.entry_count)
+    {
+        partial = true;
+    }
+    data.set_wire_items(items, partial);
     data.validate().ok()?;
     Some(data)
 }

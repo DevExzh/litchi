@@ -155,10 +155,18 @@ impl<'a> FormulaParser<'a> {
         let original = String::from_utf8_lossy(self.input).to_string();
         let mut tokens = Vec::new();
 
-        // Skip leading '=' if present (ODF formulas often start with =)
-        if self.peek() == Some(b'=') {
-            self.advance();
-        }
+        // ODF stores formulas as `of:=...`, while the public codec also accepts
+        // the shorter `=...` spelling.  Keep the original text in `Formula`,
+        // but parse the body directly so stripping the prefix does not require
+        // a normalized temporary string.
+        let input = std::str::from_utf8(self.input)
+            .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in formula".to_string()))?;
+        let body = input.trim();
+        let body = body
+            .strip_prefix('=')
+            .or_else(|| strip_open_formula_prefix(body))
+            .unwrap_or(body);
+        self.input = body.as_bytes();
 
         while !self.is_at_end() {
             self.skip_whitespace();
@@ -205,7 +213,8 @@ impl<'a> FormulaParser<'a> {
             },
             b'"' => self.parse_string(),
             b'0'..=b'9' => self.parse_number(),
-            b'.' | b'$' | b'A'..=b'Z' | b'a'..=b'z' | b'[' => {
+            b'[' => self.parse_bracket_reference(),
+            b'.' | b'$' | b'A'..=b'Z' | b'a'..=b'z' => {
                 // Could be cell reference, range, or function
                 self.parse_identifier_or_ref()
             },
@@ -348,6 +357,37 @@ impl<'a> FormulaParser<'a> {
         }
     }
 
+    /// Parse an ODF bracketed cell or range reference, such as `[.A1]` or
+    /// `[$Inputs.$A$1:.$B$2]`.
+    fn parse_bracket_reference(&mut self) -> Result<Token> {
+        self.advance(); // Skip the opening bracket.
+        let start = self.position;
+        let mut quoted = false;
+
+        while let Some(ch) = self.peek() {
+            match ch {
+                b'\'' => {
+                    quoted = !quoted;
+                    self.advance();
+                },
+                b']' if !quoted => break,
+                _ => self.advance(),
+            }
+        }
+
+        let end = self.position;
+        if self.peek() != Some(b']') {
+            return Err(Error::InvalidFormat(
+                "Unterminated ODF bracketed reference".to_string(),
+            ));
+        }
+        self.advance(); // Skip the closing bracket.
+
+        let reference = std::str::from_utf8(&self.input[start..end])
+            .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in cell reference".to_string()))?;
+        parse_open_formula_reference(reference)
+    }
+
     /// Try to parse a cell reference
     fn try_parse_cell_ref(&mut self) -> Result<CellRef> {
         let mut sheet = None;
@@ -479,6 +519,168 @@ impl<'a> FormulaParser<'a> {
     }
 }
 
+fn strip_open_formula_prefix(value: &str) -> Option<&str> {
+    let bytes = value.as_bytes();
+    (bytes.len() >= 4 && bytes[..3].eq_ignore_ascii_case(b"of:") && bytes[3] == b'=')
+        .then(|| &value[4..])
+}
+
+fn parse_open_formula_reference(value: &str) -> Result<Token> {
+    let value = value.trim();
+    let (start, end) = split_open_formula_range(value)
+        .ok_or_else(|| Error::InvalidFormat("Invalid ODF bracketed reference range".to_string()))?;
+    let start = parse_open_formula_cell_ref(start)?;
+    let Some(end) = end else {
+        return Ok(Token::CellRef(start));
+    };
+
+    Ok(Token::RangeRef(RangeRef {
+        start,
+        end: parse_open_formula_cell_ref(end)?,
+    }))
+}
+
+fn split_open_formula_range(value: &str) -> Option<(&str, Option<&str>)> {
+    if value.is_empty() {
+        return None;
+    }
+
+    let mut quoted = false;
+    for (index, character) in value.char_indices() {
+        match character {
+            '\'' => quoted = !quoted,
+            ':' if !quoted => return Some((&value[..index], Some(&value[index + 1..]))),
+            _ => {},
+        }
+    }
+    (!quoted).then_some((value, None))
+}
+
+fn parse_open_formula_cell_ref(value: &str) -> Result<CellRef> {
+    let value = value.trim();
+    let (sheet, cell) = if let Some(cell) = value.strip_prefix('.') {
+        (None, cell)
+    } else {
+        let separator = value
+            .char_indices()
+            .rev()
+            .find_map(|(index, character)| (character == '.').then_some(index))
+            .ok_or_else(|| {
+                Error::InvalidFormat("ODF reference is missing its sheet separator".to_string())
+            })?;
+        let sheet = parse_open_formula_sheet_name(&value[..separator])?;
+        (Some(sheet), &value[separator + 1..])
+    };
+
+    let (column, row, column_absolute, row_absolute) = parse_a1_cell_ref(cell)?;
+    Ok(CellRef {
+        sheet,
+        column,
+        row,
+        column_absolute,
+        row_absolute,
+    })
+}
+
+fn parse_open_formula_sheet_name(value: &str) -> Result<String> {
+    let value = value.trim().strip_prefix('$').unwrap_or(value.trim());
+    if value.is_empty() {
+        return Err(Error::InvalidFormat(
+            "ODF reference has an empty sheet name".to_string(),
+        ));
+    }
+
+    if value.starts_with('\'') || value.ends_with('\'') {
+        let value = value
+            .strip_prefix('\'')
+            .and_then(|value| value.strip_suffix('\''))
+            .ok_or_else(|| {
+                Error::InvalidFormat("ODF reference has an unterminated sheet name".to_string())
+            })?;
+        let mut sheet = String::with_capacity(value.len());
+        let mut characters = value.chars().peekable();
+        while let Some(character) = characters.next() {
+            if character == '\'' {
+                if characters.next() != Some('\'') {
+                    return Err(Error::InvalidFormat(
+                        "ODF reference has an invalid escaped sheet name".to_string(),
+                    ));
+                }
+            }
+            sheet.push(character);
+        }
+        if sheet.is_empty() {
+            return Err(Error::InvalidFormat(
+                "ODF reference has an empty sheet name".to_string(),
+            ));
+        }
+        Ok(sheet)
+    } else if value.contains('\'') {
+        Err(Error::InvalidFormat(
+            "ODF reference has an invalid sheet name".to_string(),
+        ))
+    } else {
+        Ok(value.to_string())
+    }
+}
+
+fn parse_a1_cell_ref(value: &str) -> Result<(String, u32, bool, bool)> {
+    let value = value.trim();
+    let bytes = value.as_bytes();
+    let mut position = 0;
+    let column_absolute = if bytes.get(position) == Some(&b'$') {
+        position += 1;
+        true
+    } else {
+        false
+    };
+    let column_start = position;
+    while bytes
+        .get(position)
+        .is_some_and(|character| character.is_ascii_alphabetic())
+    {
+        position += 1;
+    }
+    if column_start == position {
+        return Err(Error::InvalidFormat(
+            "ODF reference is missing its column".to_string(),
+        ));
+    }
+    let column = std::str::from_utf8(&bytes[column_start..position])
+        .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in ODF column".to_string()))?
+        .to_ascii_uppercase();
+
+    let row_absolute = if bytes.get(position) == Some(&b'$') {
+        position += 1;
+        true
+    } else {
+        false
+    };
+    let row_start = position;
+    while bytes
+        .get(position)
+        .is_some_and(|character| character.is_ascii_digit())
+    {
+        position += 1;
+    }
+    if row_start == position || position != bytes.len() {
+        return Err(Error::InvalidFormat(
+            "ODF reference has an invalid row".to_string(),
+        ));
+    }
+    let row = std::str::from_utf8(&bytes[row_start..position])
+        .map_err(|_| Error::InvalidFormat("Invalid UTF-8 in ODF row".to_string()))?
+        .parse::<u32>()
+        .map_err(|_| Error::InvalidFormat("Invalid ODF row number".to_string()))?;
+    if row == 0 {
+        return Err(Error::InvalidFormat(
+            "ODF references must use 1-based rows".to_string(),
+        ));
+    }
+
+    Ok((column, row, column_absolute, row_absolute))
+}
+
 // ============================================================================
 // FORMULA UTILITIES
 // ============================================================================
@@ -535,6 +737,41 @@ mod tests {
         let parser = FormulaParser::new("=SUM(A1:A10)");
         let formula = parser.parse().unwrap();
         assert!(matches!(formula.tokens[0], Token::Function(_)));
+    }
+
+    #[test]
+    fn test_parse_canonical_odf_formula_without_normalizing_the_input() {
+        let formula = FormulaParser::new("of:=SUM([$Inputs.$A$1:.$B$2])")
+            .parse()
+            .unwrap();
+
+        assert_eq!(formula.text, "of:=SUM([$Inputs.$A$1:.$B$2])");
+        assert!(matches!(&formula.tokens[0], Token::Function(name) if name == "SUM"));
+        assert!(matches!(
+            &formula.tokens[2],
+            Token::RangeRef(RangeRef { start, end })
+                if start.sheet.as_deref() == Some("Inputs")
+                    && start.column == "A"
+                    && start.row == 1
+                    && start.column_absolute
+                    && start.row_absolute
+                    && end.sheet.is_none()
+                    && end.column == "B"
+                    && end.row == 2
+                    && end.column_absolute
+                    && end.row_absolute
+        ));
+    }
+
+    #[test]
+    fn test_parse_odf_formula_with_quoted_sheet_reference() {
+        let formula = FormulaParser::new("OF:=['Bob''s'.$A$1]").parse().unwrap();
+
+        assert!(matches!(
+            &formula.tokens[0],
+            Token::CellRef(CellRef { sheet: Some(sheet), column, row, .. })
+                if sheet == "Bob's" && column == "A" && *row == 1
+        ));
     }
 
     #[test]

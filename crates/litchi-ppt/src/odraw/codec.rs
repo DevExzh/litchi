@@ -4,7 +4,7 @@ use litchi_odraw::{Container, Record, RecordKind};
 use crate::embedded::reference::Reference;
 use crate::package::Result;
 
-use super::model::{Anchor, Frame, FrameKind, Placeholder, ShapeExt};
+use super::model::{Anchor, Drawing, Frame, FrameKind, Placeholder, ShapeExt};
 use super::package::{
     CLIENT_DATA_RAW_KIND, CLIENT_TEXTBOX_RAW_KIND, RawRecords, advance, corrupted, host_record,
     validate_host_record, visit_host_record,
@@ -267,17 +267,30 @@ impl ShapeExt for Shape<'_> {
 /// still parsed exactly: malformed records and trailing partial records are
 /// returned as errors instead of being ignored.
 pub fn parse(data: &[u8]) -> Result<Vec<Shape<'_>>> {
+    parse_drawing(data).map(Drawing::into_shapes)
+}
+
+/// Parse a PowerPoint OfficeArt stream while retaining its validated root
+/// records beside the typed shape projection.
+///
+/// A `PPDrawing` payload may concatenate drawing containers. Every complete
+/// root is retained in source order, including direct records that the typed
+/// shape view does not model. The existing resource ceilings still apply to
+/// root traversal and shape parsing.
+pub fn parse_drawing(data: &[u8]) -> Result<Drawing<'_>> {
+    let mut roots = Vec::new();
     let mut shapes = Vec::new();
     let mut offset = 0usize;
-    let mut records = 0u32;
+    let mut visited = 0u32;
     while offset < data.len() {
-        visit_host_record(&mut records)?;
-        let (_, consumed) = Record::parse(data, offset)?;
+        visit_host_record(&mut visited)?;
+        let (record, consumed) = Record::parse(data, offset)?;
         let end = advance(offset, consumed, "PowerPoint OfficeArt drawing stream")?;
         shapes.extend(litchi_odraw::shape::parse(&data[offset..end])?);
+        roots.push(record);
         offset = end;
     }
-    Ok(shapes)
+    Ok(Drawing::new(roots, shapes))
 }
 
 /// Project a shape's group-relative or PPT client anchor into checked bounds.

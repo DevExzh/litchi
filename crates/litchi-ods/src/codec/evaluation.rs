@@ -217,7 +217,10 @@ impl Worksheet for WorksheetView<'_> {
         Ok(Box::new(CellView {
             row,
             column,
-            value: self.sheet.value_at(row, column).unwrap_or(EvaluatedValue::EMPTY),
+            value: self
+                .sheet
+                .value_at(row, column)
+                .unwrap_or(EvaluatedValue::EMPTY),
         }))
     }
 
@@ -248,7 +251,9 @@ impl Worksheet for WorksheetView<'_> {
         validate_one_based(row, "row")?;
         validate_one_based(column, "column")?;
         Ok(Cow::Borrowed(
-            self.sheet.value_at(row, column).unwrap_or(EvaluatedValue::EMPTY),
+            self.sheet
+                .value_at(row, column)
+                .unwrap_or(EvaluatedValue::EMPTY),
         ))
     }
 }
@@ -340,8 +345,9 @@ fn convert_cell(cell: Cell) -> EvaluatedValue {
     };
 
     EvaluatedValue::Formula {
-        formula: normalize_open_formula(&formula),
-        cached_value: (!matches!(cached_value, EvaluatedValue::Empty)).then(|| Box::new(cached_value)),
+        formula: normalize_open_formula(&formula).into_owned(),
+        cached_value: (!matches!(cached_value, EvaluatedValue::Empty))
+            .then(|| Box::new(cached_value)),
         is_array: matrix_span.is_some(),
         array_range: matrix_span.and_then(|span| matrix_range(row, col, span)),
     }
@@ -350,16 +356,31 @@ fn convert_cell(cell: Cell) -> EvaluatedValue {
 fn convert_value(value: CellValue) -> EvaluatedValue {
     match value {
         CellValue::Empty => EvaluatedValue::Empty,
+        // ODF stores calculated errors as text (`office:string-value`).  The
+        // evaluator needs its typed error variant so that errors propagate and
+        // predicates such as ISNA() keep their meaning.  The owned string is
+        // moved across without an additional allocation.
+        CellValue::Text(value) if is_odf_error_name(&value) => EvaluatedValue::Error(value),
         CellValue::Text(value) => EvaluatedValue::String(value),
-        CellValue::Number(value)
-        | CellValue::Currency(value, _)
-        | CellValue::Percentage(value) => EvaluatedValue::Float(value),
+        CellValue::Number(value) | CellValue::Currency(value, _) | CellValue::Percentage(value) => {
+            EvaluatedValue::Float(value)
+        },
         // The shared value model has an Excel-style serial datetime only.  An
         // ODF date can use an arbitrary null-date setting, so retaining its
         // ISO 8601 lexical representation is safer than inventing a serial.
         CellValue::Date(value) | CellValue::Time(value) => EvaluatedValue::String(value),
         CellValue::Boolean(value) => EvaluatedValue::Bool(value),
     }
+}
+
+fn is_odf_error_name(value: &str) -> bool {
+    value.eq_ignore_ascii_case("#NULL!")
+        || value.eq_ignore_ascii_case("#DIV/0!")
+        || value.eq_ignore_ascii_case("#VALUE!")
+        || value.eq_ignore_ascii_case("#REF!")
+        || value.eq_ignore_ascii_case("#NAME?")
+        || value.eq_ignore_ascii_case("#NUM!")
+        || value.eq_ignore_ascii_case("#N/A")
 }
 
 fn matrix_range(row: usize, col: usize, span: CellMatrixSpan) -> Option<String> {
@@ -383,7 +404,7 @@ fn matrix_range(row: usize, col: usize, span: CellMatrixSpan) -> Option<String> 
 /// unrecognized bracket contents are retained verbatim, causing the evaluator
 /// to report an ordinary unsupported-formula result instead of resolving an
 /// external target.
-pub fn normalize_open_formula(input: &str) -> String {
+pub fn normalize_open_formula(input: &str) -> Cow<'_, str> {
     let formula = input.trim();
     let body = formula
         .get(..4)
@@ -392,18 +413,17 @@ pub fn normalize_open_formula(input: &str) -> String {
         .or_else(|| formula.strip_prefix('='))
         .unwrap_or(formula);
 
-    let mut output = String::with_capacity(body.len());
     let bytes = body.as_bytes();
     let mut index = 0;
     let mut quoted = false;
+    let mut copied_until = 0;
+    let mut output = None;
 
     while index < bytes.len() {
         match bytes[index] {
             b'"' => {
-                output.push('"');
                 index += 1;
                 if quoted && bytes.get(index) == Some(&b'"') {
-                    output.push('"');
                     index += 1;
                 } else {
                     quoted = !quoted;
@@ -412,37 +432,45 @@ pub fn normalize_open_formula(input: &str) -> String {
             b'[' if !quoted => {
                 let Some(end_offset) = bytes[index + 1..].iter().position(|byte| *byte == b']')
                 else {
-                    output.push('[');
                     index += 1;
                     continue;
                 };
                 let end = index + 1 + end_offset;
                 let reference = &body[index + 1..end];
-                if let Some(normalized) = normalize_bracket_reference(reference) {
-                    output.push_str(&normalized);
-                } else {
-                    output.push('[');
-                    output.push_str(reference);
-                    output.push(']');
-                }
-                index = end + 1;
+                let Some(normalized) = normalize_bracket_reference(reference) else {
+                    index = end + 1;
+                    continue;
+                };
+                let output = output.get_or_insert_with(|| String::with_capacity(body.len()));
+                output.push_str(&body[copied_until..index]);
+                output.push_str(normalized.as_ref());
+                copied_until = end + 1;
+                index = copied_until;
             },
             b';' if !quoted => {
+                let output = output.get_or_insert_with(|| String::with_capacity(body.len()));
+                output.push_str(&body[copied_until..index]);
                 output.push(',');
-                index += 1;
+                copied_until = index + 1;
+                index = copied_until;
             },
             _ => {
                 let character = body[index..]
                     .chars()
                     .next()
                     .expect("index is within a UTF-8 string");
-                output.push(character);
                 index += character.len_utf8();
             },
         }
     }
 
-    output
+    match output {
+        Some(mut output) => {
+            output.push_str(&body[copied_until..]);
+            Cow::Owned(output)
+        },
+        None => Cow::Borrowed(body),
+    }
 }
 
 #[derive(Debug)]
@@ -451,7 +479,7 @@ struct OpenFormulaReference<'a> {
     cell: &'a str,
 }
 
-fn normalize_bracket_reference(value: &str) -> Option<String> {
+fn normalize_bracket_reference(value: &str) -> Option<Cow<'_, str>> {
     let (start, end) = split_reference_range(value)?;
     let start = parse_open_formula_reference(start)?;
     let end = match end {
@@ -468,6 +496,10 @@ fn normalize_bracket_reference(value: &str) -> Option<String> {
         (None, None) => None,
     };
 
+    if sheet.is_none() && end.is_none() {
+        return Some(Cow::Borrowed(start.cell));
+    }
+
     let mut output = String::new();
     if let Some(sheet) = sheet {
         output.push_str(&normalize_sheet_name(sheet)?);
@@ -478,7 +510,7 @@ fn normalize_bracket_reference(value: &str) -> Option<String> {
         output.push(':');
         output.push_str(end.cell);
     }
-    Some(output)
+    Some(Cow::Owned(output))
 }
 
 fn split_reference_range(value: &str) -> Option<(&str, Option<&str>)> {
@@ -687,6 +719,24 @@ mod tests {
         assert_eq!(
             normalize_open_formula("of:=SUM([.NamedRange])"),
             "SUM([.NamedRange])"
+        );
+    }
+
+    #[test]
+    fn borrows_formula_text_when_no_open_formula_rewrite_is_needed() {
+        let normalized = normalize_open_formula("SUM(A1:B1)");
+        assert!(matches!(normalized, Cow::Borrowed("SUM(A1:B1)")));
+    }
+
+    #[test]
+    fn maps_cached_odf_error_text_to_the_evaluators_typed_error() {
+        assert_eq!(
+            convert_value(CellValue::Text("#N/A".to_string())),
+            EvaluatedValue::Error("#N/A".to_string())
+        );
+        assert_eq!(
+            convert_value(CellValue::Text("ordinary text".to_string())),
+            EvaluatedValue::String("ordinary text".to_string())
         );
     }
 

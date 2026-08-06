@@ -225,6 +225,19 @@ impl Default for Series {
     }
 }
 
+impl Series {
+    /// Returns the first data link for a semantic series role.
+    ///
+    /// Parsed charts can retain incomplete or duplicated links for
+    /// compatibility; callers that require the MS-XLS four-link invariant
+    /// should use [`Chart::validate_semantics`](Chart::validate_semantics)
+    /// before relying on this lookup as a complete view.
+    #[must_use]
+    pub fn link(&self, role: Role) -> Option<&DataLink> {
+        self.links.iter().find(|link| link.role == role)
+    }
+}
+
 /// Rendering family and family-specific BIFF settings for one chart group.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GroupKind {
@@ -585,8 +598,19 @@ impl Chart {
             || self.groups.len() > limits.max_groups
             || self.axes.len() > limits.max_axes
             || self.cached_values.len() > limits.max_cached_values
+            || self.unknown_records.len() > limits.max_records_per_chart
         {
             return invalid(CHART, "chart resource limit exceeded");
+        }
+        let data_link_count = self
+            .series
+            .iter()
+            .try_fold(0usize, |count, series| {
+                count.checked_add(series.links.len())
+            })
+            .ok_or_else(|| Error::InvalidData("chart data-link count overflow".into()))?;
+        if data_link_count > limits.max_records_per_chart {
+            return invalid(BRAI, "chart data-link count exceeds the record limit");
         }
         if self.groups.len() > 10 {
             return invalid(CHART_FORMAT, "BIFF8 permits at most ten chart groups");

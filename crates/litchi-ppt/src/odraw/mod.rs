@@ -12,7 +12,9 @@ mod package;
 #[cfg(test)]
 mod tests;
 
-pub use codec::{anchor, parse, text_from_drawing, text_from_textbox};
-pub use model::{Anchor, FrameKind, Placeholder, ShapeExt};
+pub use codec::{anchor, parse, parse_drawing, text_from_drawing, text_from_textbox};
+pub use litchi_odraw::shape::{Bounds, Flags, Kind, Native, Shape};
+pub use litchi_odraw::{Container, Record, RecordKind};
+pub use model::{Anchor, Drawing, FrameKind, Placeholder, ShapeExt};
 
 pub(crate) use codec::textbox;

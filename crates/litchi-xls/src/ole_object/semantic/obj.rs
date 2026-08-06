@@ -101,6 +101,34 @@ impl ObjectType {
         )
     }
 
+    /// Returns the MS-XLS `cmo.ot` code for this object type.
+    pub const fn code(self) -> u16 {
+        match self {
+            Self::Group => 0x0000,
+            Self::Line => 0x0001,
+            Self::Rectangle => 0x0002,
+            Self::Oval => 0x0003,
+            Self::Arc => 0x0004,
+            Self::Chart => 0x0005,
+            Self::Text => 0x0006,
+            Self::Button => 0x0007,
+            Self::Picture => 0x0008,
+            Self::Polygon => 0x0009,
+            Self::CheckBox => 0x000B,
+            Self::RadioButton => 0x000C,
+            Self::EditBox => 0x000D,
+            Self::Label => 0x000E,
+            Self::DialogBox => 0x000F,
+            Self::SpinControl => 0x0010,
+            Self::ScrollBar => 0x0011,
+            Self::List => 0x0012,
+            Self::GroupBox => 0x0013,
+            Self::DropDown => 0x0014,
+            Self::Note => 0x0019,
+            Self::OfficeArt => 0x001E,
+        }
+    }
+
     pub(crate) fn from_code(value: u16) -> Option<Self> {
         Some(match value {
             0x0000 => Self::Group,

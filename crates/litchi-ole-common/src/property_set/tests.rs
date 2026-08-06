@@ -125,7 +125,10 @@ fn parses_variant_vectors_and_preserves_unknown_values() {
     vector.extend_from_slice(&0u16.to_le_bytes());
     assert_eq!(
         parse_typed_property(&vector, DEFAULT_CODEPAGE, 0).unwrap(),
-        Value::Vector(vec![Value::I4(42), Value::Bool(true)])
+        Value::Vector(
+            Vector::variant(vec![Value::I4(42), Value::Bool(true)])
+                .expect("variant vector should validate"),
+        )
     );
 
     let unknown = [0x34, 0x12, 0, 0, 1, 2, 3, 4];

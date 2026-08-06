@@ -1,10 +1,13 @@
 use super::codec::decode;
-use super::model::{Frame, Kind};
+use super::model::{Chart, Frame, Graph, Info, Kind};
 use super::package::{classify, collect_frames, program_base};
 use crate::embedded::object::ObjectSubtype;
 use crate::embedded::storage::{Compression, Kind as StorageKind, Storage};
 use crate::shapes::{PictureFrameKind, PictureShape, ShapeEnum};
+use litchi_cfb::OleWriter;
 use litchi_ograph::Limits;
+use litchi_ograph::chart::Book;
+use std::io::Cursor;
 use std::io::Write;
 
 #[test]
@@ -114,5 +117,72 @@ fn ole_frames_are_semantically_attributed_and_first_wins() {
             (42, Frame::new(3, 7).expect("valid frame")),
             (77, Frame::new(3, 9).expect("valid frame"))
         ]
+    );
+}
+
+fn graph_workbook(chart: &[u8]) -> Vec<u8> {
+    let mut workbook = Vec::new();
+    let mut globals = [0u8; 16];
+    globals[0..2].copy_from_slice(&0x0680_u16.to_le_bytes());
+    globals[2..4].copy_from_slice(&0x0005_u16.to_le_bytes());
+    globals[4..6].copy_from_slice(&0x0DBB_u16.to_le_bytes());
+    globals[6..8].copy_from_slice(&0x07CD_u16.to_le_bytes());
+    globals[8..12].copy_from_slice(&(0x0000_0009_u32 | (6 << 14)).to_le_bytes());
+    globals[12..16].copy_from_slice(&(0x06_u32 | (6 << 8)).to_le_bytes());
+    push_record(&mut workbook, 0x0809, &globals);
+    push_record(&mut workbook, 0x7777, &[1]);
+    push_record(&mut workbook, 0x000A, &[]);
+    workbook.extend_from_slice(chart);
+    workbook
+}
+
+fn push_record(output: &mut Vec<u8>, kind: u16, payload: &[u8]) {
+    output.extend_from_slice(&kind.to_le_bytes());
+    output.extend_from_slice(
+        &(u16::try_from(payload.len()).expect("small test record")).to_le_bytes(),
+    );
+    output.extend_from_slice(payload);
+}
+
+#[test]
+fn semantic_validation_is_opt_in_without_changing_raw_inventory() {
+    let mut chart_bytes = Vec::new();
+    let mut chart_bof = [0u8; 16];
+    chart_bof[0..2].copy_from_slice(&0x0680_u16.to_le_bytes());
+    chart_bof[2..4].copy_from_slice(&0x8000_u16.to_le_bytes());
+    chart_bof[4..6].copy_from_slice(&0x0DBB_u16.to_le_bytes());
+    chart_bof[6..8].copy_from_slice(&0x07CD_u16.to_le_bytes());
+    chart_bof[8..12].copy_from_slice(&(0x0000_0009_u32 | (6 << 14)).to_le_bytes());
+    chart_bof[12..16].copy_from_slice(&(0x06_u32 | (6 << 8)).to_le_bytes());
+    push_record(&mut chart_bytes, 0x0809, &chart_bof);
+    push_record(&mut chart_bytes, 0x7777, &[2, 3]);
+    push_record(&mut chart_bytes, 0x000A, &[]);
+
+    let workbook = graph_workbook(&chart_bytes);
+    let mut writer = OleWriter::new();
+    writer
+        .create_stream(&["Workbook"], &workbook)
+        .expect("Workbook stream");
+    let mut package_bytes = Cursor::new(Vec::new());
+    writer.write_to(&mut package_bytes).expect("Graph package");
+
+    let package = litchi_ograph::Package::open(package_bytes.into_inner()).expect("Graph package");
+    let book = Book::open(workbook).expect("framed Graph Workbook");
+    let chart = Chart::Graph(Graph::new(
+        Info::new(1, 1, Some("MSGraph.Chart.8".into()), None),
+        Box::new(package),
+        book,
+    ));
+
+    assert!(chart.charts().next().expect("raw chart").is_ok());
+    let semantic = chart
+        .semantic_chart(0)
+        .expect("semantic chart validation")
+        .expect("one semantic chart");
+    assert!(semantic.is_pristine());
+    assert_eq!(semantic.unknown().len(), 1);
+    assert_eq!(
+        semantic.encode().expect("lossless replay").as_bytes(),
+        chart_bytes
     );
 }

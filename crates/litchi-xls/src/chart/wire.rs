@@ -23,6 +23,7 @@ pub(crate) const NUMBER: u16 = 0x0203;
 pub(crate) const LABEL: u16 = 0x0204;
 pub(crate) const CHART: u16 = 0x1002;
 pub(crate) const SERIES: u16 = 0x1003;
+pub(crate) const BRAI: u16 = 0x1051;
 pub(crate) const DATA_FORMAT: u16 = 0x1006;
 pub(crate) const LINE_FORMAT: u16 = 0x1007;
 pub(crate) const MARKER_FORMAT: u16 = 0x1009;
@@ -257,7 +258,7 @@ pub(crate) fn known_record(kind: u16) -> bool {
         BOF | EOF
             | CHART
             | SERIES
-            | 0x1051
+            | BRAI
             | SER_TO_CRT
             | SERIES_TEXT
             | CHART_FORMAT

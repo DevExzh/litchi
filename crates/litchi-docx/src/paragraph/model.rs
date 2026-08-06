@@ -96,6 +96,70 @@ impl Paragraph {
     }
 }
 
+/// The `w:lineRule` interpretation for a paragraph's `w:line` value.
+///
+/// These tokens are defined by the WordprocessingML `ST_LineSpacingRule`
+/// simple type. `None` on [`ParagraphSpacing::line_rule`] means that the
+/// source omitted the optional attribute; consumers use their normal default.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineSpacingRule {
+    /// Interpret `w:line` in 240ths of a line.
+    Auto,
+    /// Interpret `w:line` as twentieths of a point and clip if necessary.
+    Exact,
+    /// Interpret `w:line` as a minimum height in twentieths of a point.
+    AtLeast,
+}
+
+impl LineSpacingRule {
+    /// Parse the exact WordprocessingML token for `w:lineRule`.
+    pub fn from_xml(value: &str) -> Option<Self> {
+        match value {
+            "auto" => Some(Self::Auto),
+            "exact" => Some(Self::Exact),
+            "atLeast" => Some(Self::AtLeast),
+            _ => None,
+        }
+    }
+
+    /// Return the exact WordprocessingML token for `w:lineRule`.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Exact => "exact",
+            Self::AtLeast => "atLeast",
+        }
+    }
+}
+
+/// Typed direct spacing attributes from a paragraph's `<w:spacing>` element.
+///
+/// `before` and `after` use non-negative twips (`ST_TwipsMeasure`), while
+/// `line` uses the signed `ST_SignedTwipsMeasure` value. The latter is in
+/// 240ths of a line for [`LineSpacingRule::Auto`] and twentieths of a point
+/// for [`LineSpacingRule::Exact`] or [`LineSpacingRule::AtLeast`]. The line
+/// unit and automatic before/after fields mirror the other optional
+/// `CT_Spacing` attributes instead of being discarded during an edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ParagraphSpacing {
+    /// Explicit spacing before the paragraph, in twips.
+    pub before: Option<u64>,
+    /// Spacing before the paragraph, in hundredths of a line.
+    pub before_lines: Option<i32>,
+    /// Whether the consumer should determine spacing before automatically.
+    pub before_auto_spacing: Option<bool>,
+    /// Explicit spacing after the paragraph, in twips.
+    pub after: Option<u64>,
+    /// Spacing after the paragraph, in hundredths of a line.
+    pub after_lines: Option<i32>,
+    /// Whether the consumer should determine spacing after automatically.
+    pub after_auto_spacing: Option<bool>,
+    /// Vertical line spacing value, interpreted according to `line_rule`.
+    pub line: Option<i32>,
+    /// Optional interpretation of `line`.
+    pub line_rule: Option<LineSpacingRule>,
+}
+
 /// Cached formatting properties for a Run.
 ///
 /// This struct stores all commonly accessed formatting properties

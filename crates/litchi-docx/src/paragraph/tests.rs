@@ -460,3 +460,81 @@ fn reads_direct_paragraph_division_ids_namespace_aware() {
     );
     assert!(invalid.division_id().is_err());
 }
+
+#[test]
+fn parses_typed_paragraph_spacing_attributes() {
+    let paragraph = Paragraph::new(
+        br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:spacing w:before="240" w:beforeLines="100" w:beforeAutospacing="off" w:after="120" w:afterLines="-25" w:afterAutospacing="on" w:line="-20" w:lineRule="exact"/></w:pPr><w:r><w:t>body</w:t></w:r></w:p>"#.to_vec(),
+    );
+
+    assert_eq!(
+        paragraph.spacing().unwrap(),
+        Some(ParagraphSpacing {
+            before: Some(240),
+            before_lines: Some(100),
+            before_auto_spacing: Some(false),
+            after: Some(120),
+            after_lines: Some(-25),
+            after_auto_spacing: Some(true),
+            line: Some(-20),
+            line_rule: Some(LineSpacingRule::Exact),
+        })
+    );
+}
+
+#[test]
+fn rejects_invalid_paragraph_spacing_tokens_and_measurements() {
+    for xml in [
+        br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:spacing w:before="-1"/></w:pPr></w:p>"#.as_slice(),
+        br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:spacing w:line="2147483648"/></w:pPr></w:p>"#.as_slice(),
+        br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:spacing w:lineRule="exactly"/></w:pPr></w:p>"#.as_slice(),
+        br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:spacing w:beforeAutospacing="maybe"/></w:pPr></w:p>"#.as_slice(),
+        br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:spacing/><w:spacing/></w:pPr></w:p>"#.as_slice(),
+    ] {
+        assert!(Paragraph::new(xml.to_vec()).spacing().is_err());
+    }
+}
+
+#[test]
+fn edits_typed_spacing_preserving_runs_and_paragraph_properties() {
+    let mut paragraph = Paragraph::new(
+        br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr><w:pStyle w:val="Heading1"/><w:keepNext/></w:pPr><w:r><w:t>body</w:t></w:r></w:p>"#.to_vec(),
+    );
+
+    paragraph
+        .set_spacing(Some(ParagraphSpacing {
+            before: Some(240),
+            line: Some(276),
+            line_rule: Some(LineSpacingRule::Auto),
+            ..ParagraphSpacing::default()
+        }))
+        .unwrap();
+    assert_eq!(paragraph.spacing().unwrap().unwrap().before, Some(240));
+    assert_eq!(paragraph.spacing().unwrap().unwrap().line, Some(276));
+    assert_eq!(paragraph.style_id().unwrap().as_deref(), Some("Heading1"));
+    assert_eq!(paragraph.text().unwrap(), "body");
+    assert_eq!(paragraph.runs().unwrap().len(), 1);
+
+    paragraph.set_spacing(None).unwrap();
+    assert_eq!(paragraph.spacing().unwrap(), None);
+    assert_eq!(paragraph.style_id().unwrap().as_deref(), Some("Heading1"));
+    assert_eq!(paragraph.text().unwrap(), "body");
+}
+
+#[test]
+fn edits_spacing_in_inherited_namespace_fragments_without_copying_runs() {
+    let mut paragraph = Paragraph::new(br#"<q:p><q:r><q:t>body</q:t></q:r></q:p>"#.to_vec());
+
+    paragraph
+        .set_spacing(Some(ParagraphSpacing {
+            after: Some(120),
+            ..ParagraphSpacing::default()
+        }))
+        .unwrap();
+    assert_eq!(paragraph.spacing().unwrap().unwrap().after, Some(120));
+    assert_eq!(paragraph.text().unwrap(), "body");
+
+    paragraph.set_spacing(None).unwrap();
+    assert_eq!(paragraph.spacing().unwrap(), None);
+    assert_eq!(paragraph.text().unwrap(), "body");
+}

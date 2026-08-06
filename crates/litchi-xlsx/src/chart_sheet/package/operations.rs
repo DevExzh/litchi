@@ -714,6 +714,23 @@ pub fn store_chartsheet(
     Ok(())
 }
 
+/// Validates a typed chartsheet package graph without mutating an OPC package.
+///
+/// This is the in-memory counterpart to [`store_chartsheet`]. It checks the
+/// `CT_Chartsheet` shape and the relationship/part closure required by the
+/// SpreadsheetML chartsheet profile (ISO/IEC 29500-1, §18.3.1 and §12.3),
+/// including the drawing, chart, media, VML, Printer Settings, and extension
+/// resources represented by [`Package`].
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Invalid`] when the typed graph violates the
+/// chartsheet schema, relationship vocabulary, resource bounds, or reference
+/// closure rules.
+pub fn validate_package(value: &Package, conformance: Conformance) -> Result<()> {
+    validate_package_value(value, conformance)
+}
+
 pub(super) fn store_chartsheet_inner(
     package: &mut OpcPackage,
     workbook_name: &PackURI,

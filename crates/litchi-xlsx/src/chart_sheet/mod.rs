@@ -10,5 +10,8 @@ mod model;
 /// Chartsheet package/resource graph and bounded load/store operations.
 pub mod package;
 
+#[cfg(test)]
+mod tests;
+
 pub use codec::{parse_chartsheet, validate_chartsheet, write_chartsheet};
 pub use model::*;

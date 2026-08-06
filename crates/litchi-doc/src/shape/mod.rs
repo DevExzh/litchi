@@ -1,8 +1,8 @@
 //! Semantic Word shape facade.
 //!
-//! [`model`] owns the typed, owned DOC-facing shape tree and lossless unknown
-//! records. [`codec`] owns the FIB/table-stream and textbox-story decoding
-//! required to populate it.
+//! [`model`] owns the typed, owned DOC-facing shape tree, lossless unknown
+//! records, and exact OfficeArt container snapshots. [`codec`] owns the
+//! FIB/table-stream and textbox-story decoding required to populate it.
 
 mod codec;
 mod model;

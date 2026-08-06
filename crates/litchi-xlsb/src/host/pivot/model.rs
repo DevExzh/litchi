@@ -63,6 +63,29 @@ pub struct PivotCacheDefinition {
     pub ext14: Option<PivotCacheDefinitionExt14>,
 }
 
+/// A typed snapshot of one `pivotCacheRecords*.bin` part (MS-XLSB 2.1.7.39).
+///
+/// The `record_count` value is retained from `BrtBeginPivotCacheRecords` so a
+/// caller can distinguish the wire declaration from the number of records
+/// materialized in `records`. For the valid, fully parsed representation the
+/// two values are equal. The same snapshot corresponds to the OOXML
+/// `pivotCacheRecords` part and its `count` attribute.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PivotCacheRecords {
+    /// Declared number of cache records (`crecords`).
+    pub record_count: u32,
+    /// Cache records in source-row order.
+    pub records: Vec<PivotCacheRecord>,
+}
+
+/// One source row from a PivotCache records part.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PivotCacheRecord {
+    /// Values in the order of source cache fields (`fSrcField = 1`).
+    /// `Index` values reference the corresponding field's shared items.
+    pub values: Vec<PivotCacheItemValue>,
+}
+
 /// PivotCache source data type (`iSrcType`, MS-XLSB 2.4.166).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]

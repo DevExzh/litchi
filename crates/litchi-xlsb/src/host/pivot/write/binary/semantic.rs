@@ -163,7 +163,9 @@ fn write_consolidation<W: std::io::Write>(
     )?;
     writer.write_record(rt::BEGIN_PCDSC_PAGES, &payload)?;
     for page in &consolidation.pages {
-        writer.write_record(rt::BEGIN_PCDSC_PAGE, &[])?;
+        let mut payload = Vec::with_capacity(4);
+        validation::write_count(&mut payload, page.item_names.len(), "BrtBeginPCDSCPage")?;
+        writer.write_record(rt::BEGIN_PCDSC_PAGE, &payload)?;
         for item_name in &page.item_names {
             let mut payload = Vec::with_capacity(item_name.len() * 2 + 4);
             wire::write_wide_string(&mut payload, item_name);
@@ -322,14 +324,22 @@ fn write_grouping<W: std::io::Write>(
         writer.write_record(rt::END_PCDFG_RANGE, &[])?;
     }
     if let Some(discrete) = &grouping.discrete {
-        writer.write_record(rt::BEGIN_PCDFG_DISCRETE, &[])?;
+        let mut payload = Vec::with_capacity(4);
+        validation::write_count(
+            &mut payload,
+            discrete.item_indexes.len(),
+            "BrtBeginPCDFGDiscrete",
+        )?;
+        writer.write_record(rt::BEGIN_PCDFG_DISCRETE, &payload)?;
         for index in &discrete.item_indexes {
             writer.write_record(rt::PCDI_INDEX, &index.to_le_bytes())?;
         }
         writer.write_record(rt::END_PCDFG_DISCRETE, &[])?;
     }
     if !grouping.items.is_empty() {
-        writer.write_record(rt::BEGIN_PCDFG_ITEMS, &[])?;
+        let mut payload = Vec::with_capacity(4);
+        validation::write_count(&mut payload, grouping.items.len(), "BrtBeginPCDFGItems")?;
+        writer.write_record(rt::BEGIN_PCDFG_ITEMS, &payload)?;
         for item in &grouping.items {
             write_cache_item(
                 writer,

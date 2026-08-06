@@ -93,6 +93,24 @@ impl Editor {
         self.charts.iter().map(|value| &value.entry)
     }
 
+    /// Validates the known MS-XLS chart semantics in every discovered chart.
+    ///
+    /// This read-only pass does not evaluate formulas, inspect a renderer, or
+    /// rewrite the `OfficeArt` drawing graph that hosts embedded charts. The
+    /// ordinary [`Self::open`] path remains compatible with partial chart
+    /// projections; callers opt into this stricter data-relationship check.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first semantic validation error found in the discovered
+    /// chart entries.
+    pub fn validate_semantics(&self) -> Result<()> {
+        for value in &self.charts {
+            value.entry.chart.validate_semantics(self.limits)?;
+        }
+        Ok(())
+    }
+
     /// Consume the editor and return the parsed chart inventory without persisting.
     pub fn into_charts(self) -> Vec<Entry> {
         self.charts.into_iter().map(|value| value.entry).collect()

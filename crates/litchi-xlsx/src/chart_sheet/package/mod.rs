@@ -3,11 +3,13 @@
 //! This package boundary owns the inert OPC graph around one chartsheet:
 //! drawings, classic and extended charts, companion parts, media, VML,
 //! Printer Settings, and extension relationships. The semantic chartsheet
-//! grammar remains in [`super`].
+//! grammar remains in [`super`]. Its `model`, `codec`, and `operations`
+//! children keep graph values, bounded leaf XML, and package mutation/query
+//! orchestration separate.
 
 mod codec;
 mod model;
-mod package;
+mod operations;
 
 #[cfg(test)]
 mod tests;
@@ -19,7 +21,7 @@ pub use model::{
     DrawingResource, Entry, ExtensionRelationship, ExtensionRelationshipTarget, ImageContentType,
     ImageResource, Package, PrinterSettings, VmlDrawingResource,
 };
-pub use package::{load_chartsheet, store_chartsheet};
+pub use operations::{load_chartsheet, store_chartsheet, validate_package};
 
 use crate::error::Error;
 

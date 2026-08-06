@@ -2,7 +2,9 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_cfb::{OleFile, OleWriter};
-use litchi_ole_common::property_set::{CodePage, Editor, Guid, PropertySetReader, Standard, Value};
+use litchi_ole_common::property_set::{
+    CodePage, Editor, Guid, PropertySetReader, Standard, Value, Vector,
+};
 
 fn ole_with_streams(streams: &[(&str, &[u8])]) -> Vec<u8> {
     let mut writer = OleWriter::new();
@@ -37,7 +39,10 @@ fn generated_property_sets_round_trip_all_office_value_families() {
             )?;
             section.add(
                 10,
-                Value::Vector(vec![Value::I4(1), Value::Lpwstr("two".into())]),
+                Value::Vector(
+                    Vector::variant(vec![Value::I4(1), Value::Lpwstr("two".into())])
+                        .expect("variant vector should validate"),
+                ),
             )?;
             section.add(
                 11,
@@ -70,10 +75,10 @@ fn generated_property_sets_round_trip_all_office_value_families() {
     );
     assert_eq!(
         summary.sections[0].property(10),
-        Some(&Value::Vector(vec![
-            Value::I4(1),
-            Value::Lpwstr("two".into())
-        ]))
+        Some(&Value::Vector(
+            Vector::variant(vec![Value::I4(1), Value::Lpwstr("two".into())])
+                .expect("variant vector should validate"),
+        ))
     );
     assert_eq!(
         summary.sections[0].property(11),

@@ -5560,6 +5560,35 @@ suites, ODP authoring/parser tests, ODT and OOXML owner suites, and DOC/PPT/XLS
 integration tests. This is bounded topology and regression evidence, not a
 claim of complete ODF, OOXML, or `[MS-DOC]`/`[MS-PPT]`/`[MS-XLS]` conformance.
 
+## Typed OLE arrays and the next owner migration wave
+
+`litchi-ole-common::property_set` now models `[MS-OLEPS]` `VT_ARRAY` values as
+typed, bounded multidimensional arrays with row-major dimensions and checked
+element cardinality. The same owner replaces untyped vectors with a scalar
+typed `Vector`, while retaining the per-element headers required by
+`VT_ARRAY|VT_VARIANT` and `VT_VECTOR|VT_VARIANT`. Unsupported array/vector
+base types, malformed bounds, reserved fields, and unsafe nesting are rejected
+or preserved as inert unknown values; no format crate owns a duplicate
+Property Set grammar.
+
+The shared `[MS-OSHARED]` toolbar model is split into contextual controls,
+flags, headers, merge, restriction, and text/icon owners. DOC field navigation
+and OfficeArt group snapshots, PPT chart/ODraw owners, XLS chart and inert OLE
+control metadata, and XLSB pivot-cache definition/record validation now sit
+behind semantic, wire/BIFF, validation, package, and test layers. ODT mutable
+editing, ODS authoring/formula evaluation, and ODP authoring receive the same
+ODF treatment. Standalone DOCX paragraph codecs, PPTX presentation properties,
+and XLSX chart-sheet owners continue the OOXML migration without restoring the
+former `litchi-ooxml` package.
+
+The affected library matrix passes with DOC 869 (two ignored), DOCX 648, ODP
+104, ODS 75, ODT 525, PPT 907 (one ignored), PPTX 312, XLS 863, XLSB 413,
+XLSX 655, and 40 shared OLE tests; all affected targets also pass `cargo
+check`. This is specification-backed ownership and round-trip evidence for
+the touched `[MS-OLEPS]`, `[MS-OSHARED]`, `[MS-DOC]`, `[MS-ODRAW]`,
+`[MS-OGRAPH]`, `[MS-PPT]`, `[MS-XLS]`, `[MS-XLSB]`, ODF, and DrawingML paths,
+not a claim of complete format conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

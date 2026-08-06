@@ -16,10 +16,13 @@
 
 mod model;
 mod parse;
+mod records;
+mod semantic;
+mod validation;
 pub(crate) mod write;
 
 pub use model::*;
-pub use parse::parse_pivot_cache_definition;
+pub use semantic::{parse_pivot_cache_definition, parse_pivot_cache_records};
 
 #[cfg(test)]
 mod tests;

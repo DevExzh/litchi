@@ -1,7 +1,7 @@
 //! Synthetic Brt-record stream tests for the PivotCache definition parser.
 
 use super::model::*;
-use super::parse::parse_pivot_cache_definition;
+use super::parse_pivot_cache_definition;
 use crate::package::error::{Error, Result};
 use crate::raw::{Error as WireError, Kind, Stage, Writer, kind as rt};
 

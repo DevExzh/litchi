@@ -158,7 +158,7 @@ const CONSOL_AUTO_PAGE: u16 = 1 << 0;
 /// The stream must start with `BrtBeginPivotCacheDef`. Records after
 /// `BrtEndPivotCacheDef` are ignored. Unknown record types anywhere in the
 /// stream are skipped without failing.
-pub fn parse_pivot_cache_definition(data: &[u8]) -> Result<PivotCacheDefinition> {
+pub(super) fn parse_pivot_cache_definition_binary(data: &[u8]) -> Result<PivotCacheDefinition> {
     let mut walker = RecordWalker::new(data);
     let first = walker.required_begin(rt::BEGIN_PIVOT_CACHE_DEF, "BrtBeginPivotCacheDef")?;
     let mut definition = parse_definition_payload(first.payload())?;
@@ -213,6 +213,25 @@ impl CursorExt for Cursor<'_> {
             last_column,
         })
     }
+}
+
+/// Read the count carried by a PivotCache collection begin record.
+fn parse_collection_count(data: &[u8], context: &'static str) -> Result<u32> {
+    let mut cursor = Cursor::new(data, context);
+    let count = cursor.read_u32()?;
+    cursor.finish()?;
+    Ok(count)
+}
+
+/// Check a collection's declared count after its children have been parsed.
+fn validate_collection_count(declared: u32, actual: usize, context: &'static str) -> Result<()> {
+    if u64::from(declared) != actual as u64 {
+        return Err(malformed(
+            context,
+            format!("declared {declared} records, found {actual}"),
+        ));
+    }
+    Ok(())
 }
 
 /// `BrtBeginPivotCacheDef` payload (MS-XLSB 2.4.168).
@@ -341,8 +360,12 @@ fn parse_consolidation(
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_PCDS_CONSOL => return Ok(consolidation),
-            rt::BEGIN_PCDSC_SETS => parse_consolidation_sets(walker, &mut consolidation)?,
-            rt::BEGIN_PCDSC_PAGES => parse_consolidation_pages(walker, &mut consolidation)?,
+            rt::BEGIN_PCDSC_SETS => {
+                parse_consolidation_sets(walker, record.payload(), &mut consolidation)?
+            },
+            rt::BEGIN_PCDSC_PAGES => {
+                parse_consolidation_pages(walker, record.payload(), &mut consolidation)?
+            },
             other => walker.skip_unhandled(other, "BrtBeginPCDSConsol collection")?,
         }
     }
@@ -352,11 +375,20 @@ fn parse_consolidation(
 /// `BrtBeginPCDSCSets` collection (MS-XLSB 2.4.155).
 fn parse_consolidation_sets(
     walker: &mut RecordWalker<'_>,
+    data: &[u8],
     consolidation: &mut PivotCacheConsolidationSource,
 ) -> Result<()> {
+    let declared = parse_collection_count(data, "BrtBeginPCDSCSets")?;
+    let first_set = consolidation.sets.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PCDSC_SETS => return Ok(()),
+            rt::END_PCDSC_SETS => {
+                return validate_collection_count(
+                    declared,
+                    consolidation.sets.len() - first_set,
+                    "BrtBeginPCDSCSets",
+                );
+            },
             rt::BEGIN_PCDSC_SET => {
                 consolidation
                     .sets
@@ -410,13 +442,22 @@ fn parse_consolidation_set(data: &[u8]) -> Result<PivotCacheConsolidationSet> {
 /// `BrtBeginPCDSCPages` collection (MS-XLSB 2.4.152).
 fn parse_consolidation_pages(
     walker: &mut RecordWalker<'_>,
+    data: &[u8],
     consolidation: &mut PivotCacheConsolidationSource,
 ) -> Result<()> {
+    let declared = parse_collection_count(data, "BrtBeginPCDSCPages")?;
+    let first_page = consolidation.pages.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PCDSC_PAGES => return Ok(()),
+            rt::END_PCDSC_PAGES => {
+                return validate_collection_count(
+                    declared,
+                    consolidation.pages.len() - first_page,
+                    "BrtBeginPCDSCPages",
+                );
+            },
             rt::BEGIN_PCDSC_PAGE => {
-                let page = parse_consolidation_page(walker)?;
+                let page = parse_consolidation_page(walker, record.payload())?;
                 consolidation.pages.push(page);
             },
             other => walker.skip_unhandled(other, "BrtBeginPCDSCPages collection")?,
@@ -426,13 +467,20 @@ fn parse_consolidation_pages(
 }
 
 /// `BrtBeginPCDSCPage` collection (MS-XLSB 2.4.151).
-fn parse_consolidation_page(walker: &mut RecordWalker<'_>) -> Result<PivotCacheConsolidationPage> {
+fn parse_consolidation_page(
+    walker: &mut RecordWalker<'_>,
+    data: &[u8],
+) -> Result<PivotCacheConsolidationPage> {
+    let declared = parse_collection_count(data, "BrtBeginPCDSCPage")?;
     let mut page = PivotCacheConsolidationPage {
         item_names: Vec::new(),
     };
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PCDSC_PAGE => return Ok(page),
+            rt::END_PCDSC_PAGE => {
+                validate_collection_count(declared, page.item_names.len(), "BrtBeginPCDSCPage")?;
+                return Ok(page);
+            },
             rt::BEGIN_PCDSCP_ITEM => {
                 let mut cursor = Cursor::new(record.payload(), "BrtBeginPCDSCPItem");
                 page.item_names.push(cursor.read_wide_string()?);
@@ -451,13 +499,18 @@ fn parse_fields(
     data: &[u8],
     definition: &mut PivotCacheDefinition,
 ) -> Result<()> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDFields");
-    // `cFields` declares the field count; the actual records define the model.
-    let _declared_fields = cursor.read_u32()?;
-    cursor.finish()?;
+    let declared_fields = parse_collection_count(data, "BrtBeginPCDFields")?;
+    let first_field = definition.fields.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PCD_FIELDS => return Ok(()),
+            rt::END_PCD_FIELDS => {
+                validate_collection_count(
+                    declared_fields,
+                    definition.fields.len() - first_field,
+                    "BrtBeginPCDFields",
+                )?;
+                return Ok(());
+            },
             rt::BEGIN_PCD_FIELD => {
                 let field = parse_field(walker, record.payload())?;
                 definition.fields.push(field);
@@ -674,7 +727,7 @@ fn parse_cache_item(
 }
 
 /// `PCDIDateTime` (MS-XLSB 2.5.101).
-fn read_date_time(cursor: &mut Cursor<'_>) -> Result<PivotCacheDateTime> {
+pub(super) fn read_date_time(cursor: &mut Cursor<'_>) -> Result<PivotCacheDateTime> {
     Ok(PivotCacheDateTime {
         year: cursor.read_u16()?,
         month: cursor.read_u16()?,
@@ -756,10 +809,10 @@ fn parse_grouping(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<PivotCac
                 walker.expect_end(rt::END_PCDFG_RANGE, "BrtBeginPCDFGRange")?;
             },
             rt::BEGIN_PCDFG_DISCRETE => {
-                grouping.discrete = Some(parse_discrete_grouping(walker)?);
+                grouping.discrete = Some(parse_discrete_grouping(walker, record.payload())?);
             },
             rt::BEGIN_PCDFG_ITEMS => {
-                parse_grouping_items(walker, &mut grouping.items)?;
+                parse_grouping_items(walker, record.payload(), &mut grouping.items)?;
             },
             other => walker.skip_unhandled(other, "BrtBeginPCDFGroup collection")?,
         }
@@ -793,13 +846,24 @@ fn parse_range_grouping(data: &[u8]) -> Result<PivotCacheRangeGrouping> {
 }
 
 /// `BrtBeginPCDFGDiscrete` collection (MS-XLSB 2.4.132).
-fn parse_discrete_grouping(walker: &mut RecordWalker<'_>) -> Result<PivotCacheDiscreteGrouping> {
+fn parse_discrete_grouping(
+    walker: &mut RecordWalker<'_>,
+    data: &[u8],
+) -> Result<PivotCacheDiscreteGrouping> {
+    let declared = parse_collection_count(data, "BrtBeginPCDFGDiscrete")?;
     let mut grouping = PivotCacheDiscreteGrouping {
         item_indexes: Vec::new(),
     };
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PCDFG_DISCRETE => return Ok(grouping),
+            rt::END_PCDFG_DISCRETE => {
+                validate_collection_count(
+                    declared,
+                    grouping.item_indexes.len(),
+                    "BrtBeginPCDFGDiscrete",
+                )?;
+                return Ok(grouping);
+            },
             rt::PCDI_INDEX => {
                 let mut cursor = Cursor::new(record.payload(), "BrtPCDIIndex");
                 grouping.item_indexes.push(cursor.read_u32()?);
@@ -816,11 +880,21 @@ fn parse_discrete_grouping(walker: &mut RecordWalker<'_>) -> Result<PivotCacheDi
 /// `BrtBeginPCDFGItems` collection (MS-XLSB 2.4.133): grouping cache items.
 fn parse_grouping_items(
     walker: &mut RecordWalker<'_>,
+    data: &[u8],
     items: &mut Vec<PivotCacheItem>,
 ) -> Result<()> {
+    let declared = parse_collection_count(data, "BrtBeginPCDFGItems")?;
+    let first_item = items.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PCDFG_ITEMS => return Ok(()),
+            rt::END_PCDFG_ITEMS => {
+                validate_collection_count(
+                    declared,
+                    items.len() - first_item,
+                    "BrtBeginPCDFGItems",
+                )?;
+                return Ok(());
+            },
             rt::BEGIN_PCDI_RUN => {
                 parse_item_run(record.payload(), items)?;
                 walker.expect_end(rt::END_PCDI_RUN, "BrtBeginPCDIRun")?;
@@ -851,12 +925,17 @@ fn parse_hierarchies(
     data: &[u8],
     definition: &mut PivotCacheDefinition,
 ) -> Result<()> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDHierarchies");
-    let _declared_hierarchies = cursor.read_u32()?;
-    cursor.finish()?;
+    let declared = parse_collection_count(data, "BrtBeginPCDHierarchies")?;
+    let first_hierarchy = definition.hierarchies.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PCD_HIERARCHIES => return Ok(()),
+            rt::END_PCD_HIERARCHIES => {
+                return validate_collection_count(
+                    declared,
+                    definition.hierarchies.len() - first_hierarchy,
+                    "BrtBeginPCDHierarchies",
+                );
+            },
             rt::BEGIN_PCD_HIERARCHY => {
                 let hierarchy = parse_hierarchy(walker, record.payload())?;
                 definition.hierarchies.push(hierarchy);
@@ -880,10 +959,10 @@ fn parse_hierarchy(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<PivotCa
                 walker.expect_end(rt::END_PCDH_FIELDS_USAGE, "BrtBeginPCDHFieldsUsage")?;
             },
             rt::BEGIN_PCDHG_LEVELS => {
-                parse_grouping_levels(walker, &mut hierarchy.grouping_levels)?;
+                parse_grouping_levels(walker, record.payload(), &mut hierarchy.grouping_levels)?;
             },
             rt::BEGIN_PCDHGL_GROUPS => {
-                parse_grouping_groups(walker, &mut hierarchy.grouping_groups)?;
+                parse_grouping_groups(walker, record.payload(), &mut hierarchy.grouping_groups)?;
             },
             PCD_H14 => {
                 hierarchy.ext14 = Some(parse_hierarchy_ext14(record.payload())?);
@@ -971,11 +1050,20 @@ fn parse_fields_usage(data: &[u8]) -> Result<Vec<i32>> {
 /// `BrtBeginPCDHGLevels` collection (MS-XLSB 2.4.140).
 fn parse_grouping_levels(
     walker: &mut RecordWalker<'_>,
+    data: &[u8],
     levels: &mut Vec<PivotCacheGroupingLevel>,
 ) -> Result<()> {
+    let declared = parse_collection_count(data, "BrtBeginPCDHGLevels")?;
+    let first_level = levels.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PCDHG_LEVELS => return Ok(()),
+            rt::END_PCDHG_LEVELS => {
+                return validate_collection_count(
+                    declared,
+                    levels.len() - first_level,
+                    "BrtBeginPCDHGLevels",
+                );
+            },
             rt::BEGIN_PCDHG_LEVEL => {
                 let mut cursor = Cursor::new(record.payload(), "BrtBeginPCDHGLevel");
                 let flags = cursor.read_u8()?;
@@ -1000,11 +1088,20 @@ fn parse_grouping_levels(
 /// `BrtBeginPCDHGLGroups` collection (MS-XLSB 2.4.144).
 fn parse_grouping_groups(
     walker: &mut RecordWalker<'_>,
+    data: &[u8],
     groups: &mut Vec<PivotCacheGroupingGroup>,
 ) -> Result<()> {
+    let declared = parse_collection_count(data, "BrtBeginPCDHGLGroups")?;
+    let first_group = groups.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PCDHGL_GROUPS => return Ok(()),
+            rt::END_PCDHGL_GROUPS => {
+                return validate_collection_count(
+                    declared,
+                    groups.len() - first_group,
+                    "BrtBeginPCDHGLGroups",
+                );
+            },
             rt::BEGIN_PCDHGL_GROUP => {
                 let group = parse_grouping_group(walker, record.payload())?;
                 groups.push(group);
@@ -1043,7 +1140,7 @@ fn parse_grouping_group(
         match record.kind() {
             rt::END_PCDHGL_GROUP => return Ok(group),
             rt::BEGIN_PCDHGLG_MEMBERS => {
-                parse_grouping_group_members(walker, &mut group.members)?;
+                parse_grouping_group_members(walker, record.payload(), &mut group.members)?;
             },
             other => walker.skip_unhandled(other, "BrtBeginPCDHGLGroup collection")?,
         }
@@ -1056,11 +1153,20 @@ fn parse_grouping_group(
 /// `BrtBeginPCDHGLGMembers` collection (MS-XLSB 2.4.142).
 fn parse_grouping_group_members(
     walker: &mut RecordWalker<'_>,
+    data: &[u8],
     members: &mut Vec<PivotCacheGroupingGroupMember>,
 ) -> Result<()> {
+    let declared = parse_collection_count(data, "BrtBeginPCDHGLGMembers")?;
+    let first_member = members.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PCDHGLG_MEMBERS => return Ok(()),
+            rt::END_PCDHGLG_MEMBERS => {
+                return validate_collection_count(
+                    declared,
+                    members.len() - first_member,
+                    "BrtBeginPCDHGLGMembers",
+                );
+            },
             rt::BEGIN_PCDHGLG_MEMBER => {
                 let mut cursor = Cursor::new(record.payload(), "BrtBeginPCDHGLGMember");
                 let is_group = cursor.read_u32()? != 0;
@@ -1109,13 +1215,13 @@ fn parse_tuple_cache(walker: &mut RecordWalker<'_>) -> Result<PivotCacheTupleCac
         match record.kind() {
             rt::END_PCDSD_TUPLE_CACHE => return Ok(cache),
             rt::BEGIN_PCDSDTC_ENTRIES => {
-                parse_tuple_cache_entries(walker, &mut cache.entries)?;
+                parse_tuple_cache_entries(walker, record.payload(), &mut cache.entries)?;
             },
             rt::BEGIN_PCDSDTC_QUERIES => {
-                parse_tuple_cache_queries(walker, &mut cache.queries)?;
+                parse_tuple_cache_queries(walker, record.payload(), &mut cache.queries)?;
             },
             rt::BEGIN_PCDSDTC_SETS => {
-                parse_tuple_cache_sets(walker, &mut cache.sets)?;
+                parse_tuple_cache_sets(walker, record.payload(), &mut cache.sets)?;
             },
             other => walker.skip_unhandled(other, "BrtBeginPCDSDTupleCache collection")?,
         }
@@ -1128,11 +1234,20 @@ fn parse_tuple_cache(walker: &mut RecordWalker<'_>) -> Result<PivotCacheTupleCac
 /// `BrtBeginPCDSDTCEntries` collection (MS-XLSB 2.4.159).
 fn parse_tuple_cache_entries(
     walker: &mut RecordWalker<'_>,
+    data: &[u8],
     entries: &mut Vec<PivotCacheItemValue>,
 ) -> Result<()> {
+    let declared = parse_collection_count(data, "BrtBeginPCDSDTCEntries")?;
+    let first_entry = entries.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PCDSDTC_ENTRIES => return Ok(()),
+            rt::END_PCDSDTC_ENTRIES => {
+                return validate_collection_count(
+                    declared,
+                    entries.len() - first_entry,
+                    "BrtBeginPCDSDTCEntries",
+                );
+            },
             // Tuple-cache entries may trail a PCDISrvFmt (sxvcellextra), so
             // parse non-strictly and drop the additional formatting bytes.
             item_type @ (rt::PCDI_MISSING
@@ -1154,11 +1269,20 @@ fn parse_tuple_cache_entries(
 /// `BrtBeginPCDSDTCQueries` collection (MS-XLSB 2.4.160).
 fn parse_tuple_cache_queries(
     walker: &mut RecordWalker<'_>,
+    data: &[u8],
     queries: &mut Vec<String>,
 ) -> Result<()> {
+    let declared = parse_collection_count(data, "BrtBeginPCDSDTCQueries")?;
+    let first_query = queries.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PCDSDTC_QUERIES => return Ok(()),
+            rt::END_PCDSDTC_QUERIES => {
+                return validate_collection_count(
+                    declared,
+                    queries.len() - first_query,
+                    "BrtBeginPCDSDTCQueries",
+                );
+            },
             rt::BEGIN_PCDSDTC_QUERY => {
                 let mut cursor = Cursor::new(record.payload(), "BrtBeginPCDSDTCQuery");
                 queries.push(cursor.read_wide_string()?);
@@ -1176,11 +1300,20 @@ fn parse_tuple_cache_queries(
 /// `BrtBeginPCDSDTCSets` collection (MS-XLSB 2.4.163).
 fn parse_tuple_cache_sets(
     walker: &mut RecordWalker<'_>,
+    data: &[u8],
     sets: &mut Vec<PivotCacheTupleCacheSet>,
 ) -> Result<()> {
+    let declared = parse_collection_count(data, "BrtBeginPCDSDTC Sets")?;
+    let first_set = sets.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PCDSDTC_SETS => return Ok(()),
+            rt::END_PCDSDTC_SETS => {
+                return validate_collection_count(
+                    declared,
+                    sets.len() - first_set,
+                    "BrtBeginPCDSDTCSets",
+                );
+            },
             rt::BEGIN_PCDSDTC_SET => {
                 sets.push(parse_tuple_cache_set(record.payload())?);
                 walker.expect_end(rt::END_PCDSDTC_SET, "BrtBeginPCDSDTCSet")?;
@@ -1220,12 +1353,17 @@ fn parse_calculated_items(
     data: &[u8],
     definition: &mut PivotCacheDefinition,
 ) -> Result<()> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDCalcItems");
-    let _declared_items = cursor.read_u32()?;
-    cursor.finish()?;
+    let declared = parse_collection_count(data, "BrtBeginPCDCalcItems")?;
+    let first_item = definition.calculated_items.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PCD_CALC_ITEMS => return Ok(()),
+            rt::END_PCD_CALC_ITEMS => {
+                return validate_collection_count(
+                    declared,
+                    definition.calculated_items.len() - first_item,
+                    "BrtBeginPCDCalcItems",
+                );
+            },
             rt::BEGIN_PCD_CALC_ITEM => {
                 let item = parse_calculated_item(walker, record.payload())?;
                 definition.calculated_items.push(item);
@@ -1254,8 +1392,10 @@ fn parse_calculated_item(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<C
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_PCD_CALC_ITEM => return Ok(item),
-            rt::BEGIN_P_NAMES => parse_names(walker, &mut item.names)?,
-            rt::BEGIN_PR_FILTERS => parse_rule_filters(walker, &mut item.filters)?,
+            rt::BEGIN_P_NAMES => parse_names(walker, record.payload(), &mut item.names)?,
+            rt::BEGIN_PR_FILTERS => {
+                parse_rule_filters(walker, record.payload(), &mut item.filters)?
+            },
             other => walker.skip_unhandled(other, "BrtBeginPCDCalcItem collection")?,
         }
     }
@@ -1265,10 +1405,22 @@ fn parse_calculated_item(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<C
 }
 
 /// `BrtBeginPNames` collection (MS-XLSB 2.4.177).
-fn parse_names(walker: &mut RecordWalker<'_>, names: &mut Vec<PivotName>) -> Result<()> {
+fn parse_names(
+    walker: &mut RecordWalker<'_>,
+    data: &[u8],
+    names: &mut Vec<PivotName>,
+) -> Result<()> {
+    let declared = parse_collection_count(data, "BrtBeginPNames")?;
+    let first_name = names.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_P_NAMES => return Ok(()),
+            rt::END_P_NAMES => {
+                return validate_collection_count(
+                    declared,
+                    names.len() - first_name,
+                    "BrtBeginPNames",
+                );
+            },
             rt::BEGIN_P_NAME => {
                 names.push(parse_name(walker, record.payload())?);
             },
@@ -1297,7 +1449,7 @@ fn parse_name(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<PivotName> {
     while let Some(record) = walker.next()? {
         match record.kind() {
             rt::END_P_NAME => return Ok(name),
-            rt::BEGIN_PN_PAIRS => parse_name_pairs(walker, &mut name.pairs)?,
+            rt::BEGIN_PN_PAIRS => parse_name_pairs(walker, record.payload(), &mut name.pairs)?,
             other => walker.skip_unhandled(other, "BrtBeginPName collection")?,
         }
     }
@@ -1305,10 +1457,22 @@ fn parse_name(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<PivotName> {
 }
 
 /// `BrtBeginPNPairs` collection (MS-XLSB 2.4.179).
-fn parse_name_pairs(walker: &mut RecordWalker<'_>, pairs: &mut Vec<PivotNamePair>) -> Result<()> {
+fn parse_name_pairs(
+    walker: &mut RecordWalker<'_>,
+    data: &[u8],
+    pairs: &mut Vec<PivotNamePair>,
+) -> Result<()> {
+    let declared = parse_collection_count(data, "BrtBeginPNPairs")?;
+    let first_pair = pairs.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PN_PAIRS => return Ok(()),
+            rt::END_PN_PAIRS => {
+                return validate_collection_count(
+                    declared,
+                    pairs.len() - first_pair,
+                    "BrtBeginPNPairs",
+                );
+            },
             rt::BEGIN_PN_PAIR => {
                 let mut cursor = Cursor::new(record.payload(), "BrtBeginPNPair");
                 let flags = cursor.read_u8()?;
@@ -1335,11 +1499,20 @@ fn parse_name_pairs(walker: &mut RecordWalker<'_>, pairs: &mut Vec<PivotNamePair
 /// `BrtBeginPRFilters` collection (MS-XLSB 2.4.182).
 fn parse_rule_filters(
     walker: &mut RecordWalker<'_>,
+    data: &[u8],
     filters: &mut Vec<PivotRuleFilter>,
 ) -> Result<()> {
+    let declared = parse_collection_count(data, "BrtBeginPRFilters")?;
+    let first_filter = filters.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PR_FILTERS => return Ok(()),
+            rt::END_PR_FILTERS => {
+                return validate_collection_count(
+                    declared,
+                    filters.len() - first_filter,
+                    "BrtBeginPRFilters",
+                );
+            },
             rt::BEGIN_PR_FILTER => {
                 filters.push(parse_rule_filter(walker, record.payload())?);
             },
@@ -1353,7 +1526,7 @@ fn parse_rule_filters(
 fn parse_rule_filter(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<PivotRuleFilter> {
     let mut cursor = Cursor::new(data, "BrtBeginPRFilter");
     let field = cursor.read_i32()?;
-    let _declared_items = cursor.read_u32()?;
+    let declared_items = cursor.read_u32()?;
     let flags = cursor.read_u8()? as u32
         | (cursor.read_u8()? as u32) << 8
         | (cursor.read_u8()? as u32) << 16;
@@ -1366,7 +1539,10 @@ fn parse_rule_filter(walker: &mut RecordWalker<'_>, data: &[u8]) -> Result<Pivot
     };
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PR_FILTER => return Ok(filter),
+            rt::END_PR_FILTER => {
+                validate_collection_count(declared_items, filter.items.len(), "BrtBeginPRFilter")?;
+                return Ok(filter);
+            },
             rt::BEGIN_PRF_ITEM => {
                 let mut cursor = Cursor::new(record.payload(), "BrtBeginPRFItem");
                 filter.items.push(cursor.read_u32()?);
@@ -1385,12 +1561,17 @@ fn parse_calculated_members(
     data: &[u8],
     definition: &mut PivotCacheDefinition,
 ) -> Result<()> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDCalcMems");
-    let _declared_members = cursor.read_u32()?;
-    cursor.finish()?;
+    let declared = parse_collection_count(data, "BrtBeginPCDCalcMems")?;
+    let first_member = definition.calculated_members.len();
     while let Some(record) = walker.next()? {
         match record.kind() {
-            rt::END_PCD_CALC_MEMS => return Ok(()),
+            rt::END_PCD_CALC_MEMS => {
+                return validate_collection_count(
+                    declared,
+                    definition.calculated_members.len() - first_member,
+                    "BrtBeginPCDCalcMems",
+                );
+            },
             rt::BEGIN_PCD_CALC_MEM => {
                 let member = parse_calculated_member(walker, record.payload())?;
                 definition.calculated_members.push(member);

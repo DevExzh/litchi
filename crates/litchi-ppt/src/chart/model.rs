@@ -1,12 +1,65 @@
 //! Contextual chart views and the read-only semantic inventory.
 
+use std::iter::FusedIterator;
 use std::num::{NonZeroU32, NonZeroUsize};
 
-use litchi_ograph::chart::{Book, Refs};
+use litchi_ograph::chart::{Book, Context, Refs};
 use litchi_ograph::{Package as GraphPackage, PackageRef};
 
 use super::transaction::PackageEditor;
 use crate::package::{Error, Result as PackageResult};
+
+/// Owned host-neutral semantic view of one validated chart substream.
+///
+/// This is the MS-OGRAPH model from `litchi-ograph`, exposed from the PPT
+/// chart host with the producer context selected from [`Kind`]. Parsed values
+/// retain an exact bounded source stream and can replay it unchanged; parsed
+/// mutation and fresh emission remain subject to the neutral model's explicit
+/// safety errors.
+pub type SemanticChart = litchi_ograph::chart::Chart;
+
+/// Fallible semantic views over every chart substream in one PPT chart object.
+///
+/// Raw chart discovery remains allocation-free. Each successful item owns a
+/// bounded semantic copy because the neutral semantic model must retain the
+/// source stream for lossless pristine replay.
+#[derive(Debug)]
+pub struct SemanticCharts<'a> {
+    charts: Refs<'a>,
+    context: Context,
+    limits: litchi_ograph::Limits,
+}
+
+impl Iterator for SemanticCharts<'_> {
+    type Item = PackageResult<SemanticChart>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let chart = self.charts.next()?;
+        Some(match chart {
+            Ok(chart) => {
+                SemanticChart::parse_with(chart, self.context, self.limits).map_err(Into::into)
+            },
+            Err(error) => Err(error.into()),
+        })
+    }
+}
+
+impl FusedIterator for SemanticCharts<'_> {}
+
+fn semantic_context(kind: Kind) -> Context {
+    match kind {
+        Kind::Graph => Context::graph(),
+        Kind::Excel => Context::excel(),
+    }
+}
+
+fn semantic_charts(book: &Book, kind: Kind) -> SemanticCharts<'_> {
+    SemanticCharts {
+        charts: book.charts(),
+        context: semantic_context(kind),
+        limits: book.limits(),
+    }
+}
 
 /// The producer grammar and host topology behind a chart object.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -113,6 +166,31 @@ impl Graph {
         &self.book
     }
 
+    /// Iterate the single chart-sheet substream through the bounded semantic
+    /// model, retaining source bytes for exact pristine replay.
+    pub fn semantic_charts(&self) -> SemanticCharts<'_> {
+        semantic_charts(&self.book, Kind::Graph)
+    }
+
+    /// Parse the single chart-sheet substream into the bounded semantic model.
+    ///
+    /// The raw [`Self::book`] view remains available for zero-copy traversal.
+    /// This method is the opt-in semantic validation boundary and does not
+    /// change the inventory's lossless raw parsing behavior.
+    pub fn semantic_chart(&self) -> PackageResult<SemanticChart> {
+        let mut charts = self.semantic_charts();
+        let chart = charts
+            .next()
+            .ok_or_else(|| Error::Corrupted("Graph Workbook has no chart stream".to_string()))??;
+        if let Some(chart) = charts.next() {
+            let _ = chart?;
+            return Err(Error::Corrupted(
+                "Graph Workbook has more than one chart stream".to_string(),
+            ));
+        }
+        Ok(chart)
+    }
+
     /// Open a copy-on-write transaction over this chart's standalone OLE2
     /// package.
     ///
@@ -160,6 +238,17 @@ impl Excel {
         &self.book
     }
 
+    /// Iterate the Workbook's chart substreams through the bounded semantic
+    /// model, retaining source bytes for exact pristine replay.
+    pub fn semantic_charts(&self) -> SemanticCharts<'_> {
+        semantic_charts(&self.book, Kind::Excel)
+    }
+
+    /// Parse one Excel-hosted chart by its zero-based Workbook order.
+    pub fn semantic_chart(&self, index: usize) -> PackageResult<Option<SemanticChart>> {
+        self.semantic_charts().nth(index).transpose()
+    }
+
     pub(super) fn new(info: Info, book: Book) -> Self {
         Self { info, book }
     }
@@ -197,6 +286,24 @@ impl Chart {
             Self::Graph(chart) => chart.book.charts(),
             Self::Excel(chart) => chart.book.charts(),
         }
+    }
+
+    /// Iterate every chart substream through the bounded semantic model.
+    ///
+    /// This is opt-in; [`Self::charts`] continues to expose the allocation-free
+    /// raw view and therefore preserves the existing permissive inventory
+    /// contract for callers that only need framed records.
+    pub fn semantic_charts(&self) -> SemanticCharts<'_> {
+        match self {
+            Self::Graph(chart) => semantic_charts(&chart.book, Kind::Graph),
+            Self::Excel(chart) => semantic_charts(&chart.book, Kind::Excel),
+        }
+    }
+
+    /// Parse one chart substream through the semantic model by its zero-based
+    /// chart order.
+    pub fn semantic_chart(&self, index: usize) -> PackageResult<Option<SemanticChart>> {
+        self.semantic_charts().nth(index).transpose()
     }
 
     /// Typed standalone Graph view, when applicable.

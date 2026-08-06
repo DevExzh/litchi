@@ -1,6 +1,5 @@
 use super::codec::text_from_ppt_records;
-use super::{anchor, parse, text_from_drawing};
-use litchi_odraw::RecordKind;
+use super::{Container, RecordKind, anchor, parse, parse_drawing, text_from_drawing};
 
 fn record(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::new();
@@ -48,6 +47,40 @@ fn concatenated_drawing_roots_are_complete_and_strict() {
     let malformed = [stream.as_slice(), &[0]].concat();
     assert!(parse(&malformed).is_err());
     assert!(text_from_drawing(&malformed).is_err());
+}
+
+#[test]
+fn drawing_retains_root_records_alongside_typed_shapes() {
+    let mut shape_atom = Vec::new();
+    shape_atom.extend_from_slice(&42u32.to_le_bytes());
+    shape_atom.extend_from_slice(&0x0800u32.to_le_bytes());
+    let shape = record(
+        0x0f,
+        0,
+        RecordKind::SpContainer.raw(),
+        &record(2, 1, RecordKind::Sp.raw(), &shape_atom),
+    );
+    let future = record(2, 7, 0xf123, &[0xaa, 0xbb]);
+    let dg = record(0, 0, RecordKind::Dg.raw(), &[0; 8]);
+    let drawing = record(
+        0x0f,
+        0,
+        RecordKind::DgContainer.raw(),
+        &[dg, future, shape].concat(),
+    );
+
+    let parsed = parse_drawing(&drawing).unwrap();
+    assert_eq!(parsed.records().len(), 1);
+    assert_eq!(parsed.records()[0].kind(), RecordKind::DgContainer);
+    assert_eq!(parsed.shapes().len(), 1);
+    assert_eq!(parsed.shapes()[0].id(), 42);
+
+    let root = Container::try_new(parsed.records()[0].clone()).unwrap();
+    let future = root.find(RecordKind::Unknown(0xf123)).unwrap().unwrap();
+    assert_eq!(future.version(), 2);
+    assert_eq!(future.instance(), 7);
+    assert_eq!(future.data(), &[0xaa, 0xbb]);
+    assert!(future.data_offset(&drawing).is_some());
 }
 
 #[test]

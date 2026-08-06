@@ -301,6 +301,14 @@ pub struct Shape {
     /// Unknown property entries from the shape's primary, secondary, and
     /// tertiary OfficeArt property tables.
     pub unknown_properties: Vec<UnknownProperty>,
+    /// Exact wire representation of this shape's OfficeArt container.
+    ///
+    /// For a regular shape this is an `OfficeArtSpContainer`; for a group it
+    /// is the enclosing `OfficeArtSpgrContainer`, including its group header
+    /// and child records. Keeping the complete container makes replay safe
+    /// even when known host records or their original ordering are not part of
+    /// the semantic projection.
+    pub(crate) office_art: Box<[u8]>,
     pub(crate) text_link: bool,
 }
 
@@ -333,6 +341,12 @@ impl<'a> Group<'a> {
     /// Returns direct children in OfficeArt source order.
     pub fn children(self) -> &'a [Shape] {
         &self.shape.children
+    }
+
+    /// Returns the exact OfficeArt group container snapshot, including its
+    /// group header and complete child subtree.
+    pub fn office_art_bytes(self) -> &'a [u8] {
+        self.shape.office_art_bytes()
     }
 
     /// Finds the first descendant with the requested identity in source order.
@@ -378,6 +392,7 @@ impl Shape {
             flags: shape.flags(),
             unknown_records: collect_unknown_records(shape)?,
             unknown_properties: collect_unknown_properties(shape)?,
+            office_art: record_bytes(shape.container().record()),
             text_link,
         })
     }
@@ -416,6 +431,15 @@ impl Shape {
     #[inline]
     pub const fn client_anchor(&self) -> Option<&ClientAnchor> {
         self.client_anchor.as_ref()
+    }
+
+    /// Returns the exact OfficeArt container used to project this shape.
+    ///
+    /// The returned bytes are an owned snapshot and can be replayed without
+    /// reconstructing the container from the lossy semantic fields. Group
+    /// snapshots include their complete child subtree.
+    pub fn office_art_bytes(&self) -> &[u8] {
+        &self.office_art
     }
 
     /// Returns a typed group view when this shape is a group.

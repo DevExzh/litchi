@@ -11,7 +11,7 @@ use super::model::{
     DrawingResource, Entry, ExtensionRelationship, ExtensionRelationshipTarget, ImageContentType,
     ImageResource, Package, PrinterSettings, VmlDrawingResource,
 };
-use super::package::{load_chartsheet, store_chartsheet};
+use super::operations::{load_chartsheet, store_chartsheet, validate_package};
 use super::{
     CHART, CHART_COLOR_STYLE_CT, CHART_CT, CHART_EX, CHART_EX_CHOICE, CHART_EX_CT, CHART_EX_REL,
     CHART_STYLE, CHART_STYLE_CT, CHART_USER_SHAPES_CT, CHARTSHEET_REL, DRAWING_CT, DRAWING_MAIN,
@@ -192,6 +192,18 @@ fn value(conformance: Conformance) -> Package {
         extension_relationships: vec![],
     }
 }
+
+#[test]
+fn validates_typed_package_graph_without_store_side_effects() {
+    let conformance = Conformance::Transitional;
+    let expected = value(conformance);
+    validate_package(&expected, conformance).unwrap();
+
+    let mut invalid = expected.clone();
+    invalid.chartsheet.drawing_relationship_id = "rId drawing".into();
+    assert!(validate_package(&invalid, conformance).is_err());
+}
+
 pub(super) fn base_package(conformance: Conformance) -> (OpcPackage, PackURI) {
     let mut package = OpcPackage::new();
     let uri = PackURI::new("/xl/workbook.xml").unwrap();

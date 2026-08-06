@@ -234,6 +234,7 @@ mod tests {
             flags: Flags::empty(),
             unknown_records: Vec::new(),
             unknown_properties: Vec::new(),
+            office_art: Vec::new().into_boxed_slice(),
             text_link,
         }
     }
@@ -429,6 +430,54 @@ mod tests {
         assert_eq!(child.anchor(), Some(&Anchor::new(10, 20, 110, 70)));
         assert!(child.client_anchor().is_none());
         assert_eq!(group.find(ShapeId::from_raw(4)).map(Shape::id), Some(4));
+
+        let (drawing_record, _) = Record::parse(&bytes, 0).expect("parse drawing record");
+        let drawing = litchi_odraw::Container::try_new(drawing_record).expect("drawing container");
+        let root_record = drawing
+            .find(RecordKind::SpgrContainer)
+            .expect("scan drawing records")
+            .expect("root group record");
+        let root = litchi_odraw::Container::try_new(root_record).expect("root group container");
+        let group_record = root
+            .find(RecordKind::SpgrContainer)
+            .expect("scan nested group records")
+            .expect("nested group record");
+        let root_start = group_record
+            .data_offset(&bytes)
+            .expect("root group belongs to source bytes")
+            .checked_sub(RECORD_HEADER_LEN)
+            .expect("root group has a header");
+        let root_end = root_start
+            .checked_add(RECORD_HEADER_LEN)
+            .and_then(|offset| {
+                offset.checked_add(usize::try_from(group_record.len()).expect("record length fits"))
+            })
+            .expect("root group extent");
+        assert_eq!(group.office_art_bytes(), &bytes[root_start..root_end]);
+    }
+
+    #[test]
+    fn projection_retains_exact_standalone_container_bytes() {
+        let mut body = Vec::new();
+        ShapeBuilder::new(litchi_odraw::shape::Native::RECTANGLE, 9)
+            .with_flags(Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
+            .write(&mut body)
+            .expect("write shape atom");
+        let extension = Atom::unknown(0xF123, 0).expect("unknown record kind");
+        write::atom(&mut body, 0, extension, &[0xAA, 0xBB, 0xCC]).expect("write unknown record");
+        write::atom(&mut body, 0, Atom::ClientAnchor, &[7, 0, 0, 0]).expect("write host anchor");
+
+        let mut source = Vec::new();
+        write::container(&mut source, 0, OutContainer::Sp, &body).expect("write shape container");
+        let office_shapes = litchi_odraw::shape::parse(&source).expect("parse shape");
+        let shape = Shape::from_office_art(&office_shapes[0]).expect("project shape");
+
+        assert_eq!(shape.office_art_bytes(), source.as_slice());
+        let (record, consumed) =
+            Record::parse(shape.office_art_bytes(), 0).expect("reparse retained shape container");
+        assert_eq!(record.kind(), RecordKind::SpContainer);
+        assert_eq!(consumed, source.len());
+        assert_eq!(shape.unknown_records[0].data(), &[0xAA, 0xBB, 0xCC]);
     }
 
     #[test]

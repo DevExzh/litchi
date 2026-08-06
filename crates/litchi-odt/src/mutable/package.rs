@@ -20,7 +20,8 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::{Document, MutableDocument};
+    /// use litchi_odt::Document;
+    /// use litchi_odt::mutable::MutableDocument;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let doc = Document::open("document.odt")?;
@@ -92,7 +93,8 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::{MutableDocument, frame::{Anchor, Length}};
+    /// use litchi_odt::frame::{Anchor, Length};
+    /// use litchi_odt::mutable::MutableDocument;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
@@ -348,7 +350,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::MutableDocument;
+    /// use litchi_odt::mutable::MutableDocument;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();
@@ -368,7 +370,7 @@ impl MutableDocument {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::MutableDocument;
+    /// use litchi_odt::mutable::MutableDocument;
     ///
     /// # fn main() -> litchi_core::Result<()> {
     /// let mut doc = MutableDocument::new();

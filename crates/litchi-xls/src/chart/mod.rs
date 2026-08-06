@@ -8,6 +8,7 @@
 pub mod frt;
 
 mod codec;
+mod inventory;
 mod model;
 mod package;
 mod wire;
@@ -18,6 +19,7 @@ mod tests;
 pub use litchi_ograph::chart::{format, group};
 pub use litchi_ograph::record::{chart3d, frame, line, marker, pie, series};
 
+pub use inventory::{ChartInventory, SemanticCompleteness};
 pub use model::*;
 pub use package::build_workbook;
 pub use package::{Editor, Entry};

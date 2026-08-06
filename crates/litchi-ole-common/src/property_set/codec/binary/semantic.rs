@@ -51,7 +51,8 @@ fn variant_type(value: &Value) -> u16 {
         Value::Blob(_) => VT_BLOB,
         Value::Clipboard { .. } => VT_CF,
         Value::Clsid(_) => VT_CLSID,
-        Value::Vector(_) => VT_VECTOR | VT_VARIANT,
+        Value::Vector(vector) => VT_VECTOR | vector.scalar().raw(),
+        Value::Array(array) => VT_ARRAY | array.scalar().raw(),
         Value::Unknown { variant_type, .. } => *variant_type,
     }
 }
@@ -116,19 +117,52 @@ fn append_body(out: &mut Vec<u8>, value: &Value, codepage: u16) -> Result<(), Ol
             pad4(out)?;
         },
         Value::Clsid(v) => append_bytes(out, v.as_bytes(), "serialized property value")?,
-        Value::Vector(values) => {
-            if values.len() > MAX_VECTOR_ELEMENTS {
-                return Err(invalid("Vector exceeds safety limit"));
-            }
+        Value::Vector(vector) => {
+            vector.validate()?;
             append_u32(
                 out,
-                checked_u32(values.len(), "Vector element count")?,
+                checked_u32(vector.values().len(), "Vector element count")?,
                 "serialized property value",
             )?;
-            for value in values {
-                append_typed(out, value, codepage)?;
-                pad4(out)?;
+            for value in vector.values() {
+                if vector.scalar() == Scalar::Variant {
+                    append_typed(out, value, codepage)?;
+                    pad4(out)?;
+                } else {
+                    append_body(out, value, codepage)?;
+                }
             }
+            pad4(out)?;
+        },
+        Value::Array(array) => {
+            array.validate()?;
+            append_u32(
+                out,
+                u32::from(array.scalar().raw()),
+                "serialized array scalar type",
+            )?;
+            append_u32(
+                out,
+                checked_u32(array.dimensions().len(), "Array dimension count")?,
+                "serialized array dimension count",
+            )?;
+            for dimension in array.dimensions() {
+                append_u32(out, dimension.size(), "serialized array dimension")?;
+                append_bytes(
+                    out,
+                    &dimension.index_offset().to_le_bytes(),
+                    "serialized array dimension",
+                )?;
+            }
+            for value in array.values() {
+                if array.scalar() == Scalar::Variant {
+                    append_typed(out, value, codepage)?;
+                    pad4(out)?;
+                } else {
+                    append_body(out, value, codepage)?;
+                }
+            }
+            pad4(out)?;
         },
         Value::Unknown { data, .. } => append_bytes(out, data, "serialized property value")?,
     }
@@ -213,7 +247,18 @@ fn parse_value_body(
     }
     if variant_type & VT_VECTOR != 0 {
         let base_type = variant_type & !VT_VECTOR;
-        if !is_supported_vector_base(base_type) {
+        let Some(scalar) = Scalar::from_raw(base_type) else {
+            if depth != 0 {
+                return Err(invalid(format!(
+                    "Unsupported nested vector type 0x{variant_type:04x}"
+                )));
+            }
+            return Ok(Value::Unknown {
+                variant_type,
+                data: try_copy_bytes(reader.take_remaining(), "unknown vector property")?,
+            });
+        };
+        if !scalar.allows_vector() {
             if depth != 0 {
                 return Err(invalid(format!(
                     "Unsupported nested vector type 0x{variant_type:04x}"
@@ -224,7 +269,33 @@ fn parse_value_body(
                 data: try_copy_bytes(reader.take_remaining(), "unknown vector property")?,
             });
         }
-        return parse_vector(reader, base_type, codepage, depth + 1);
+        return parse_vector(reader, scalar, codepage, depth + 1);
+    }
+    if variant_type & VT_ARRAY != 0 {
+        let base_type = variant_type & !VT_ARRAY;
+        let Some(scalar) = Scalar::from_raw(base_type) else {
+            if depth != 0 {
+                return Err(invalid(format!(
+                    "Unsupported nested array type 0x{variant_type:04x}"
+                )));
+            }
+            return Ok(Value::Unknown {
+                variant_type,
+                data: try_copy_bytes(reader.take_remaining(), "unknown array property")?,
+            });
+        };
+        if !scalar.allows_array() {
+            if depth != 0 {
+                return Err(invalid(format!(
+                    "Unsupported nested array type 0x{variant_type:04x}"
+                )));
+            }
+            return Ok(Value::Unknown {
+                variant_type,
+                data: try_copy_bytes(reader.take_remaining(), "unknown array property")?,
+            });
+        }
+        return parse_array(reader, scalar, codepage, depth + 1);
     }
     match variant_type {
         VT_EMPTY => Ok(Value::Empty),
@@ -311,7 +382,7 @@ fn parse_value_body(
 
 fn parse_vector(
     reader: &mut ValueReader<'_>,
-    base_type: u16,
+    scalar: Scalar,
     codepage: u16,
     depth: usize,
 ) -> Result<Value, OleError> {
@@ -322,7 +393,7 @@ fn parse_vector(
             "Vector element count {count} exceeds the safety limit"
         )));
     }
-    let minimum = minimum_value_size(base_type).unwrap_or(0);
+    let minimum = minimum_value_size(scalar.raw()).unwrap_or(0);
     if minimum != 0
         && count
             .checked_mul(minimum)
@@ -330,12 +401,12 @@ fn parse_vector(
     {
         return Err(invalid("Vector element count exceeds its property range"));
     }
-    if base_type == VT_VARIANT && count > reader.remaining_len() / 4 {
+    if scalar == Scalar::Variant && count > reader.remaining_len() / 4 {
         return Err(invalid("Variant vector count exceeds its property range"));
     }
     let mut values = try_vec_with_capacity(count, "property vector")?;
     for _ in 0..count {
-        let value = if base_type == VT_VARIANT {
+        let value = if scalar == Scalar::Variant {
             let nested_type = reader.read_u16("variant vector element type")?;
             if reader.read_u16("variant vector reserved field")? != 0 {
                 return Err(invalid("Variant vector reserved field must be zero"));
@@ -344,38 +415,67 @@ fn parse_vector(
             reader.align4(false, "variant vector element padding")?;
             value
         } else {
-            parse_value_body(reader, base_type, codepage, depth + 1)?
+            parse_value_body(reader, scalar.raw(), codepage, depth + 1)?
         };
         values.push(value);
     }
-    Ok(Value::Vector(values))
+    if scalar != Scalar::Variant {
+        reader.align4(false, "vector element padding")?;
+    }
+    Ok(Value::Vector(Vector::new(scalar, values)?))
 }
 
-fn is_supported_vector_base(variant_type: u16) -> bool {
-    matches!(
-        variant_type,
-        VT_I1
-            | VT_UI1
-            | VT_I2
-            | VT_UI2
-            | VT_I4
-            | VT_UI4
-            | VT_I8
-            | VT_UI8
-            | VT_R4
-            | VT_R8
-            | VT_CY
-            | VT_DATE
-            | VT_BSTR
-            | VT_ERROR
-            | VT_BOOL
-            | VT_VARIANT
-            | VT_LPSTR
-            | VT_LPWSTR
-            | VT_FILETIME
-            | VT_CF
-            | VT_CLSID
-    )
+fn parse_array(
+    reader: &mut ValueReader<'_>,
+    scalar: Scalar,
+    codepage: u16,
+    depth: usize,
+) -> Result<Value, OleError> {
+    let declared_type = reader.read_u32("array scalar type")?;
+    if declared_type != u32::from(scalar.raw()) {
+        return Err(invalid(
+            "Array header scalar type does not match its VARIANT type",
+        ));
+    }
+    let dimensions = usize::try_from(reader.read_u32("array dimension count")?)
+        .map_err(|_| invalid("Array dimension count is too large"))?;
+    if !(1..=31).contains(&dimensions) {
+        return Err(invalid("Array dimension count must be between 1 and 31"));
+    }
+    let mut shape = try_vec_with_capacity(dimensions, "property array dimensions")?;
+    let mut count = 1usize;
+    for _ in 0..dimensions {
+        let size = reader.read_u32("array dimension size")?;
+        let index_offset = reader.read_i32("array dimension index offset")?;
+        count = count
+            .checked_mul(
+                usize::try_from(size).map_err(|_| invalid("Array dimension is too large"))?,
+            )
+            .ok_or_else(|| invalid("Array element count overflows usize"))?;
+        if count > MAX_VECTOR_ELEMENTS {
+            return Err(invalid("Array exceeds the element safety limit"));
+        }
+        shape.push(Dimension::new(size, index_offset));
+    }
+    let mut values = try_vec_with_capacity(count, "property array values")?;
+    for _ in 0..count {
+        let value = if scalar == Scalar::Variant {
+            let nested_type = reader.read_u16("array variant element type")?;
+            if reader.read_u16("array variant reserved field")? != 0 {
+                return Err(invalid("Array variant reserved field must be zero"));
+            }
+            let value = parse_value_body(reader, nested_type, codepage, depth + 1)?;
+            reader.align4(false, "array variant element padding")?;
+            value
+        } else {
+            parse_value_body(reader, scalar.raw(), codepage, depth + 1)?
+        };
+        values.push(value);
+    }
+    if scalar != Scalar::Variant {
+        reader.align4(false, "array element padding")?;
+    }
+    Ok(Value::Array(Array::new(scalar, shape, values)?))
 }
 
 fn minimum_value_size(variant_type: u16) -> Option<usize> {

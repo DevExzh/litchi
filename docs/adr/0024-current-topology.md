@@ -241,6 +241,22 @@ read facade. It shares captured stream buffers across clones and creates
 independent transactional editors, keeping large OLE payloads out of format
 neutral copies while leaving DOC/PPT/XLS interpretation in their owners.
 
+The current continuation adds typed multidimensional `property_set::Array` and
+scalar-typed `property_set::Vector` models, including checked
+`VT_ARRAY|VT_VARIANT` and `VT_VECTOR|VT_VARIANT` element headers. Their binary
+codec and validation remain solely in `litchi-ole-common`; unsupported or
+malformed OLE Property Set types are inert or rejected at that boundary. The
+common toolbar owner is split into semantic subdomains, while DOC field and
+OfficeArt snapshots, PPT chart/ODraw, XLS chart/OLE controls, and XLSB pivot
+definition/record validation stay in their contextual owners.
+
+ODT mutable editing, ODS authoring and formula evaluation, ODP authoring,
+DOCX paragraph codecs, PPTX presentation properties, and XLSX chart-sheet
+package operations now use nested model, codec, package/transaction,
+validation, and test folders. These changes preserve the prefix-free facade
+rule and the standalone OOXML/ODF crate topology; no compatibility wrapper or
+duplicate shared-format grammar was introduced.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

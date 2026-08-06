@@ -91,6 +91,17 @@ pub enum DropDownStyle {
     Reserved,
 }
 
+impl DropDownStyle {
+    pub const fn code(self) -> u16 {
+        match self {
+            Self::Combo => 0,
+            Self::ComboEdit => 1,
+            Self::Simple => 2,
+            Self::Reserved => 3,
+        }
+    }
+}
+
 /// Checkbox or radio-button properties (`FtCblsData`, MS-XLS 2.5.141).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FtCblsData {
@@ -205,6 +216,16 @@ impl LbsItem {
         })
     }
 
+    /// Creates an item or reports the MS-XLS XLUnicodeString size limit.
+    pub fn try_new(text: &str) -> crate::error::Result<Self> {
+        Self::new(text).ok_or_else(|| {
+            super::super::invalid(
+                super::super::FT_LBS_DATA,
+                "list item exceeds the MS-XLS XLUnicodeString limit",
+            )
+        })
+    }
+
     pub fn text(&self) -> &str {
         &self.text
     }
@@ -225,6 +246,47 @@ pub struct LbsDropData {
 }
 
 impl LbsDropData {
+    /// Creates dropdown metadata from a typed style and display string.
+    pub fn new(style: DropDownStyle, line_count: u16, min_width: u16, text: &str) -> Option<Self> {
+        Self::try_new(style, line_count, min_width, text).ok()
+    }
+
+    /// Fallible form of [`LbsDropData::new`], with MS-XLS validation errors.
+    pub fn try_new(
+        style: DropDownStyle,
+        line_count: u16,
+        min_width: u16,
+        text: &str,
+    ) -> crate::error::Result<Self> {
+        let item = LbsItem::try_new(text)?;
+        Self::from_item(style, line_count, min_width, item).ok_or_else(|| {
+            super::super::invalid(
+                super::super::FT_LBS_DATA,
+                "dropdown metadata uses a reserved style or exceeds its dimensions",
+            )
+        })
+    }
+
+    /// Creates dropdown metadata while retaining a pre-encoded list item.
+    pub fn from_item(
+        style: DropDownStyle,
+        line_count: u16,
+        min_width: u16,
+        text: LbsItem,
+    ) -> Option<Self> {
+        if style == DropDownStyle::Reserved || line_count > 0x7FFF || min_width > 0x7FFF {
+            return None;
+        }
+        let padding = (text.encoded.len() % 2 == 1).then_some(0);
+        Some(Self {
+            flags: style.code(),
+            line_count,
+            min_width,
+            text,
+            padding,
+        })
+    }
+
     pub fn style(&self) -> DropDownStyle {
         match self.flags & super::super::DROP_STYLE_MASK {
             0 => DropDownStyle::Combo,
@@ -255,9 +317,48 @@ pub struct FtLbsData {
     pub(crate) items: Vec<LbsItem>,
     pub multi_selection: Vec<bool>,
     pub trailing: Vec<u8>,
+    /// A source payload ended before all continued list fields were present.
+    /// This is deliberately not public: authored values must be complete, but
+    /// parsed values retain enough state to round-trip a partial wire payload.
+    pub(crate) partial: bool,
 }
 
 impl FtLbsData {
+    /// Creates complete list metadata from already encoded item values.
+    pub fn from_items(items: Vec<LbsItem>) -> crate::error::Result<Self> {
+        let entry_count = u16::try_from(items.len()).map_err(|_| {
+            super::super::invalid(
+                super::super::FT_LBS_DATA,
+                "list item count exceeds the u16 representation",
+            )
+        })?;
+        if entry_count > 0x7FFF {
+            return Err(super::super::invalid(
+                super::super::FT_LBS_DATA,
+                "list item count exceeds the MS-XLS limit",
+            ));
+        }
+        Ok(Self {
+            entry_count,
+            flags: super::super::LBS_VALID_PLEX,
+            items,
+            ..Self::default()
+        })
+    }
+
+    /// Creates complete list metadata from display strings.
+    pub fn from_texts<I, T>(texts: I) -> crate::error::Result<Self>
+    where
+        I: IntoIterator<Item = T>,
+        T: AsRef<str>,
+    {
+        let items = texts
+            .into_iter()
+            .map(|text| LbsItem::try_new(text.as_ref()))
+            .collect::<crate::error::Result<Vec<_>>>()?;
+        Self::from_items(items)
+    }
+
     pub fn has_behavior_class(&self) -> bool {
         self.flags & super::super::LBS_USE_CB != 0
     }
@@ -302,8 +403,37 @@ impl FtLbsData {
         &self.items
     }
 
+    /// Replaces authored items and synchronizes `cLines` and `fValidPlex`.
+    pub fn set_items_checked(&mut self, items: Vec<LbsItem>) -> crate::error::Result<()> {
+        let replacement = Self::from_items(items)?;
+        self.entry_count = replacement.entry_count;
+        self.flags |= super::super::LBS_VALID_PLEX;
+        self.items = replacement.items;
+        self.partial = false;
+        self.trailing.clear();
+        if self.selection_type() == ListSelectionType::Single {
+            self.multi_selection.clear();
+        } else {
+            self.multi_selection = vec![false; usize::from(self.entry_count)];
+        }
+        if self.selected_index > self.entry_count {
+            self.selected_index = 0;
+        }
+        Ok(())
+    }
+
+    /// Replaces the item slice without changing other raw fields.
+    ///
+    /// This is useful while decoding or deliberately preserving a partially
+    /// continued source value. New authored values should use
+    /// [`FtLbsData::from_items`] or [`FtLbsData::set_items_checked`].
     pub fn set_items(&mut self, items: Vec<LbsItem>) {
         self.items = items;
+    }
+
+    pub(crate) fn set_wire_items(&mut self, items: Vec<LbsItem>, partial: bool) {
+        self.items = items;
+        self.partial = partial;
     }
 
     pub(crate) fn is_vacant(&self) -> bool {
@@ -316,6 +446,7 @@ impl FtLbsData {
             && self.items.is_empty()
             && self.multi_selection.is_empty()
             && self.trailing.is_empty()
+            && !self.partial
     }
 }
 
@@ -327,6 +458,38 @@ pub struct FormControl {
 }
 
 impl FormControl {
+    /// Creates a form-control Obj from typed payload subrecords.
+    ///
+    /// The common metadata and terminator are supplied by this constructor;
+    /// type-specific requirements are checked by [`FormControl::validate`].
+    pub fn new(
+        object_type: super::obj::ObjectType,
+        object_id: u16,
+        payload: impl IntoIterator<Item = super::obj::ObjSubrecord>,
+    ) -> Self {
+        let mut subrecords = Vec::new();
+        subrecords.push(super::obj::ObjSubrecord::Common(super::obj::FtCmo {
+            object_type: object_type.code(),
+            object_id,
+            flags: 0,
+            reserved: [0; 12],
+        }));
+        subrecords.extend(payload);
+        if !matches!(subrecords.last(), Some(super::obj::ObjSubrecord::End)) {
+            subrecords.push(super::obj::ObjSubrecord::End);
+        }
+        Self {
+            subrecords,
+            text_object: None,
+        }
+    }
+
+    /// Attaches an already framed TxO object to this control.
+    pub fn with_text_object(mut self, text_object: Vec<u8>) -> Self {
+        self.text_object = Some(text_object);
+        self
+    }
+
     pub fn object_id(&self) -> u16 {
         self.common().map_or(0, |value| value.object_id)
     }

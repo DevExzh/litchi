@@ -1,8 +1,16 @@
 use crate::model::names::{Definition, Expression, Range};
-use litchi_core::Result;
+use litchi_core::{Error, Result};
 use litchi_odf_common::core::PackageWriter;
+use quick_xml::{
+    events::Event,
+    name::{Namespace, ResolveResult},
+    reader::NsReader,
+};
 
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
+const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+const MAX_CONTENT_XML_BYTES: usize = 256 * 1024 * 1024;
+const MAX_CONTENT_XML_DEPTH: usize = 1024;
 
 /// Minimal package builder; richer sheet authoring is migrated independently.
 #[derive(Clone, Debug)]
@@ -60,6 +68,7 @@ impl Builder {
         } else {
             crate::codec::names::replace(&self.content_xml, &self.definitions)?
         };
+        validate_content_xml(&content_xml)?;
         let mut writer = PackageWriter::new();
         writer.set_mimetype(MIMETYPE)?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
@@ -67,6 +76,253 @@ impl Builder {
     }
 }
 
+/// Validate the minimal ODF package-content hierarchy required by an ODS.
+///
+/// This is intentionally a structural boundary check rather than a complete
+/// schema validator. The reader borrows `xml`, so authoring does not create a
+/// second content buffer or an intermediate DOM.
+fn validate_content_xml(xml: &str) -> Result<()> {
+    if xml.len() > MAX_CONTENT_XML_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "ODS content.xml exceeds {MAX_CONTENT_XML_BYTES} bytes"
+        )));
+    }
+
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut root_closed = false;
+    let mut body_open = false;
+    let mut body_seen = false;
+    let mut spreadsheet_seen = false;
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid ODS content.xml: {error}")))?;
+
+        match event {
+            Event::Start(element) => {
+                if depth == 0 {
+                    if root_closed {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one root element".to_string(),
+                        ));
+                    }
+                    if !is_office_element(
+                        &namespace,
+                        element.local_name().as_ref(),
+                        b"document-content",
+                    ) {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml root must be office:document-content".to_string(),
+                        ));
+                    }
+                } else if depth == 1
+                    && is_office_element(&namespace, element.local_name().as_ref(), b"body")
+                {
+                    if body_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:body".to_string(),
+                        ));
+                    }
+                    body_seen = true;
+                    body_open = true;
+                } else if is_office_element(&namespace, element.local_name().as_ref(), b"body") {
+                    return Err(Error::InvalidFormat(
+                        "office:body must be a direct child of office:document-content".to_string(),
+                    ));
+                } else if depth == 2
+                    && body_open
+                    && is_office_element(&namespace, element.local_name().as_ref(), b"spreadsheet")
+                {
+                    if spreadsheet_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:spreadsheet".to_string(),
+                        ));
+                    }
+                    spreadsheet_seen = true;
+                } else if is_office_element(
+                    &namespace,
+                    element.local_name().as_ref(),
+                    b"spreadsheet",
+                ) {
+                    return Err(Error::InvalidFormat(
+                        "office:spreadsheet must be a direct child of office:body".to_string(),
+                    ));
+                }
+
+                if depth == MAX_CONTENT_XML_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODS content.xml nesting exceeds {MAX_CONTENT_XML_DEPTH} elements"
+                    )));
+                }
+                depth += 1;
+            },
+            Event::Empty(element) => {
+                if depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml must contain office:body and office:spreadsheet"
+                            .to_string(),
+                    ));
+                }
+
+                if depth == 1
+                    && is_office_element(&namespace, element.local_name().as_ref(), b"body")
+                {
+                    if body_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:body".to_string(),
+                        ));
+                    }
+                    body_seen = true;
+                } else if is_office_element(&namespace, element.local_name().as_ref(), b"body") {
+                    return Err(Error::InvalidFormat(
+                        "office:body must be a direct child of office:document-content".to_string(),
+                    ));
+                } else if depth == 2
+                    && body_open
+                    && is_office_element(&namespace, element.local_name().as_ref(), b"spreadsheet")
+                {
+                    if spreadsheet_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:spreadsheet".to_string(),
+                        ));
+                    }
+                    spreadsheet_seen = true;
+                } else if is_office_element(
+                    &namespace,
+                    element.local_name().as_ref(),
+                    b"spreadsheet",
+                ) {
+                    return Err(Error::InvalidFormat(
+                        "office:spreadsheet must be a direct child of office:body".to_string(),
+                    ));
+                }
+            },
+            Event::End(element) => {
+                if depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml has an unexpected closing element".to_string(),
+                    ));
+                }
+
+                if depth == 1 {
+                    if !is_office_element(
+                        &namespace,
+                        element.local_name().as_ref(),
+                        b"document-content",
+                    ) {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml root must close with office:document-content"
+                                .to_string(),
+                        ));
+                    }
+                    if body_open {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml closes its root before office:body".to_string(),
+                        ));
+                    }
+                    depth = 0;
+                    root_closed = true;
+                } else {
+                    if depth == 2
+                        && body_open
+                        && is_office_element(&namespace, element.local_name().as_ref(), b"body")
+                    {
+                        body_open = false;
+                        if !spreadsheet_seen {
+                            return Err(Error::InvalidFormat(
+                                "office:body must contain office:spreadsheet".to_string(),
+                            ));
+                        }
+                    }
+                    depth -= 1;
+                }
+            },
+            Event::Text(text) if depth == 0 && has_non_whitespace(text.as_ref()) => {
+                return Err(Error::InvalidFormat(
+                    "ODS content.xml has non-whitespace text outside its root".to_string(),
+                ));
+            },
+            Event::CData(text) if depth == 0 && has_non_whitespace(text.as_ref()) => {
+                return Err(Error::InvalidFormat(
+                    "ODS content.xml has non-whitespace text outside its root".to_string(),
+                ));
+            },
+            Event::Eof => {
+                if !root_closed || depth != 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml ended before its root element was closed".to_string(),
+                    ));
+                }
+                if !body_seen || !spreadsheet_seen {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml must contain office:body with office:spreadsheet"
+                            .to_string(),
+                    ));
+                }
+                return Ok(());
+            },
+            Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_)
+            | Event::Text(_)
+            | Event::CData(_) => {},
+        }
+        buffer.clear();
+    }
+}
+
+fn is_office_element(namespace: &ResolveResult<'_>, local_name: &[u8], expected: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE_NAMESPACE)
+        && local_name == expected
+}
+
+fn has_non_whitespace(value: &[u8]) -> bool {
+    !value.iter().all(u8::is_ascii_whitespace)
+}
+
 fn empty_content() -> &'static str {
     r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" office:version="1.3"><office:body><office:spreadsheet/></office:body></office:document-content>"#
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Builder;
+
+    const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+
+    #[test]
+    fn build_accepts_namespace_aliases_and_empty_spreadsheet() {
+        let content = format!(
+            r#"<o:document-content xmlns:o="{OFFICE}"><o:body><o:spreadsheet/></o:body></o:document-content>"#
+        );
+
+        assert!(Builder::new().content_xml(content).build().is_ok());
+    }
+
+    #[test]
+    fn build_rejects_malformed_or_incomplete_ods_content() {
+        let malformed = Builder::new()
+            .content_xml(format!(
+                r#"<office:document-content xmlns:office="{OFFICE}"><office:body>"#
+            ))
+            .build()
+            .unwrap_err()
+            .to_string();
+        assert!(malformed.contains("ended before its root element was closed"));
+
+        let incomplete = Builder::new()
+            .content_xml(format!(
+                r#"<office:document-content xmlns:office="{OFFICE}"><office:body/></office:document-content>"#
+            ))
+            .build()
+            .unwrap_err()
+            .to_string();
+        assert!(incomplete.contains("office:spreadsheet"));
+    }
 }

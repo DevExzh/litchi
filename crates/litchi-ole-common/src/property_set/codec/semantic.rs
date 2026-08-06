@@ -8,7 +8,14 @@ pub(super) const MAX_PROPERTY_COUNT: usize = 16_384;
 fn minimum_property_set_version(value: &Value) -> u16 {
     match value {
         Value::I1(_) | Value::Int(_) | Value::UInt(_) => 1,
-        Value::Vector(values) => values
+        Value::Vector(vector) => vector
+            .values()
+            .iter()
+            .map(minimum_property_set_version)
+            .max()
+            .unwrap_or(Stream::VERSION_0),
+        Value::Array(array) => array
+            .values()
             .iter()
             .map(minimum_property_set_version)
             .max()

@@ -1,5 +1,6 @@
 //! Typed, bounded PowerPoint 2013 extended presentation guides.
 
+use super::model::*;
 use crate::{Error, Result};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -20,54 +21,6 @@ const MAX_NODES: usize = 100_000;
 const MAX_GUIDES: usize = 16_384;
 const MAX_EXTENSIONS: usize = 1_024;
 const MAX_STRING_BYTES: usize = 1024 * 1024;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Orientation {
-    Horizontal,
-    Vertical,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ColorKind {
-    ScRgb,
-    Srgb,
-    Hsl,
-    System,
-    Scheme,
-    Preset,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Color {
-    pub kind: ColorKind,
-    /// Inert DrawingML color XML, including transforms.
-    pub xml: Vec<u8>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Guide {
-    pub id: u32,
-    pub name: Option<String>,
-    pub orientation: Option<Orientation>,
-    pub position: Option<i32>,
-    pub user_drawn: Option<bool>,
-    pub color: Color,
-    /// Optional, inert `p:extLst` permitted by `CT_ExtendedGuide`.
-    pub extension_xml: Option<Vec<u8>>,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct List {
-    pub guides: Vec<Guide>,
-    /// Optional, inert `p:extLst` permitted by `CT_ExtendedGuideList`.
-    pub extension_xml: Option<Vec<u8>>,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Guides {
-    pub slide: Option<List>,
-    pub notes: Option<List>,
-}
 
 impl Guides {
     /// Parse guide extensions from a complete `p:presentation` document.

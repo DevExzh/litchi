@@ -1,90 +1,14 @@
 //! PresentationML color-map parsing and resolution.
 
+use super::model::*;
 use crate::presentation_properties::metadata::is_presentationml_name;
-use crate::shape::theme::{Color as ThemeColor, Palette, Slot as ThemeSlot};
 use crate::{Error, Result};
 use litchi_ooxml_common::mce::process_ooxml;
 use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
 
-/// A role that can be mapped by a PresentationML color map.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Slot {
-    /// Background color one.
-    Background1,
-    /// Text color one.
-    Text1,
-    /// Background color two.
-    Background2,
-    /// Text color two.
-    Text2,
-    /// Accent color one.
-    Accent1,
-    /// Accent color two.
-    Accent2,
-    /// Accent color three.
-    Accent3,
-    /// Accent color four.
-    Accent4,
-    /// Accent color five.
-    Accent5,
-    /// Accent color six.
-    Accent6,
-    /// Hyperlink color.
-    Hyperlink,
-    /// Followed-hyperlink color.
-    FollowedHyperlink,
-}
-
-/// A color role defined by a DrawingML theme.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Role {
-    /// Dark color one.
-    Dark1,
-    /// Light color one.
-    Light1,
-    /// Dark color two.
-    Dark2,
-    /// Light color two.
-    Light2,
-    /// Accent color one.
-    Accent1,
-    /// Accent color two.
-    Accent2,
-    /// Accent color three.
-    Accent3,
-    /// Accent color four.
-    Accent4,
-    /// Accent color five.
-    Accent5,
-    /// Accent color six.
-    Accent6,
-    /// Hyperlink color.
-    Hyperlink,
-    /// Followed-hyperlink color.
-    FollowedHyperlink,
-}
-
 impl Role {
-    /// Return the DrawingML theme color name.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Dark1 => "dk1",
-            Self::Light1 => "lt1",
-            Self::Dark2 => "dk2",
-            Self::Light2 => "lt2",
-            Self::Accent1 => "accent1",
-            Self::Accent2 => "accent2",
-            Self::Accent3 => "accent3",
-            Self::Accent4 => "accent4",
-            Self::Accent5 => "accent5",
-            Self::Accent6 => "accent6",
-            Self::Hyperlink => "hlink",
-            Self::FollowedHyperlink => "folHlink",
-        }
-    }
-
     fn from_str(value: &str) -> Option<Self> {
         match value {
             "dk1" => Some(Self::Dark1),
@@ -104,64 +28,7 @@ impl Role {
     }
 }
 
-/// A complete PresentationML color map.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Map {
-    background1: Role,
-    text1: Role,
-    background2: Role,
-    text2: Role,
-    accent1: Role,
-    accent2: Role,
-    accent3: Role,
-    accent4: Role,
-    accent5: Role,
-    accent6: Role,
-    hyperlink: Role,
-    followed_hyperlink: Role,
-}
-
 impl Map {
-    /// Return the theme color role mapped from a PresentationML color slot.
-    pub const fn color(&self, slot: Slot) -> Role {
-        match slot {
-            Slot::Background1 => self.background1,
-            Slot::Text1 => self.text1,
-            Slot::Background2 => self.background2,
-            Slot::Text2 => self.text2,
-            Slot::Accent1 => self.accent1,
-            Slot::Accent2 => self.accent2,
-            Slot::Accent3 => self.accent3,
-            Slot::Accent4 => self.accent4,
-            Slot::Accent5 => self.accent5,
-            Slot::Accent6 => self.accent6,
-            Slot::Hyperlink => self.hyperlink,
-            Slot::FollowedHyperlink => self.followed_hyperlink,
-        }
-    }
-
-    /// Resolve a mapped presentation slot against a typed DrawingML palette.
-    ///
-    /// The map and palette remain separate immutable values, so callers can
-    /// reuse one parsed theme for every slide or layout without copying color
-    /// payloads.
-    pub fn resolve<'a>(&self, palette: &'a Palette, slot: Slot) -> Option<&'a ThemeColor> {
-        palette.color(match self.color(slot) {
-            Role::Dark1 => ThemeSlot::Dark1,
-            Role::Light1 => ThemeSlot::Light1,
-            Role::Dark2 => ThemeSlot::Dark2,
-            Role::Light2 => ThemeSlot::Light2,
-            Role::Accent1 => ThemeSlot::Accent1,
-            Role::Accent2 => ThemeSlot::Accent2,
-            Role::Accent3 => ThemeSlot::Accent3,
-            Role::Accent4 => ThemeSlot::Accent4,
-            Role::Accent5 => ThemeSlot::Accent5,
-            Role::Accent6 => ThemeSlot::Accent6,
-            Role::Hyperlink => ThemeSlot::Hyperlink,
-            Role::FollowedHyperlink => ThemeSlot::FollowedHyperlink,
-        })
-    }
-
     fn from_element(
         element: &BytesStart<'_>,
         decoder: quick_xml::encoding::Decoder,
@@ -182,15 +49,6 @@ impl Map {
             followed_hyperlink: required_role(element, b"folHlink", decoder, label)?,
         })
     }
-}
-
-/// The color-map selection declared by a slide or slide layout.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Override {
-    /// Use the color map defined by the owning slide master.
-    Master,
-    /// Use a color map declared directly by the slide or layout.
-    Override(Map),
 }
 
 pub fn parse_master(xml: &[u8]) -> Result<Map> {
@@ -423,6 +281,7 @@ fn required_role(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::shape::theme::{Color as ThemeColor, Palette, Slot as ThemeSlot};
 
     const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
     const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";

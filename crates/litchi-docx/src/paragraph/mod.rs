@@ -13,8 +13,8 @@ mod package;
 mod tests;
 
 pub use model::{
-    Paragraph, Run, RunBreak, RunBreakClear, RunBreakType, RunProperties, RunUnderline,
-    RunUnderlineColor,
+    LineSpacingRule, Paragraph, ParagraphSpacing, Run, RunBreak, RunBreakClear, RunBreakType,
+    RunProperties, RunUnderline, RunUnderlineColor,
 };
 
 pub(crate) use codec::extract_word_text;
