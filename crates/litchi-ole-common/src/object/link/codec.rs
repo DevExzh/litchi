@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 pub(crate) const LINKED_FLAG: u32 = 0x0000_0001;
 pub(crate) const CACHE_HINT_FLAG: u32 = 0x0000_1000;
-const MAX_BYTES: usize = 16 * 1024 * 1024;
+pub(crate) const MAX_BYTES: usize = 16 * 1024 * 1024;
 
 struct Parsed {
     kind: Kind,

@@ -1,4 +1,4 @@
-use super::{Kind, Link, Times};
+use super::{Kind, Link, Snapshot, Times};
 use crate::property_set::Guid;
 use std::sync::Arc;
 
@@ -126,4 +126,103 @@ fn malformed_known_fields_are_rejected() {
         .expect("test indicator");
     invalid_indicator[indicator] = 0;
     assert!(Link::parse(&invalid_indicator).is_err());
+}
+
+#[test]
+fn snapshot_no_op_commit_replays_exact_source_bytes() {
+    let bytes = linked_wire();
+    let shared: Arc<[u8]> = Arc::from(bytes.clone());
+    let source = Snapshot::parse_shared(Arc::clone(&shared)).expect("link snapshot should parse");
+    let commit = source.edit().commit().expect("no-op should commit");
+
+    assert_eq!(commit.snapshot().bytes(), bytes);
+    assert_eq!(commit.snapshot().fingerprint(), source.fingerprint());
+    assert!(Arc::ptr_eq(
+        &source.bytes_shared(),
+        &commit.snapshot().bytes_shared()
+    ));
+    assert!(commit.patch().is_noop());
+    assert!(commit.patch().change().is_none());
+}
+
+#[test]
+fn transaction_publishes_typed_edits_and_preserves_unknown_tail() {
+    let source = Snapshot::parse(&linked_wire()).expect("linked snapshot should parse");
+    let mut transaction = source.edit();
+    transaction.set_cache_hint(false).set_link_update_option(19);
+    transaction
+        .set_class_id(Guid::from_bytes([0x44; 16]))
+        .expect("linked class identifier should be editable")
+        .set_times(Times::new(101, 202, 303))
+        .expect("linked timestamps should be editable");
+
+    let commit = transaction.commit().expect("typed link edit should commit");
+    let edited = commit.snapshot();
+    assert!(!edited.cache_hint());
+    assert_eq!(edited.link_update_option(), 19);
+    assert_eq!(edited.class_id(), Some(Guid::from_bytes([0x44; 16])));
+    assert_eq!(edited.times(), Some(Times::new(101, 202, 303)));
+    assert_eq!(edited.unknown_tail(), &[0xAA, 0xBB, 0xCC]);
+    assert_eq!(commit.patch().change().unwrap().before(), source.link());
+    assert_eq!(commit.patch().change().unwrap().after(), edited.link());
+    assert_eq!(
+        commit.patch().apply(&source).unwrap().bytes(),
+        edited.bytes()
+    );
+    assert_eq!(commit.patch().inverse().apply(edited).unwrap(), source);
+}
+
+#[test]
+fn patch_checks_fingerprint_and_exact_source_range() {
+    let source = Snapshot::parse(&linked_wire()).expect("linked snapshot should parse");
+    let mut transaction = source.edit();
+    transaction.set_link_update_option(19);
+    let commit = transaction.commit().expect("typed link edit should commit");
+
+    let mut same_length = linked_wire();
+    same_length[8] ^= 1;
+    let unrelated = Snapshot::parse(&same_length).expect("same-length link should parse");
+    assert_ne!(unrelated.fingerprint(), source.fingerprint());
+    assert!(commit.patch().apply(&unrelated).is_err());
+    assert_eq!(commit.patch().source_fingerprint(), source.fingerprint());
+    assert_eq!(
+        commit.patch().target_fingerprint(),
+        commit.snapshot().fingerprint()
+    );
+}
+
+#[test]
+fn invalid_typed_edits_leave_the_transaction_unchanged() {
+    let embedded = Snapshot::parse(&[
+        0x01, 0x00, 0x00, 0x02, // version
+        0, 0, 0, 0, // embedded
+        0, 0, 0, 0, // update option
+        0, 0, 0, 0, // reserved
+    ])
+    .expect("embedded snapshot should parse");
+    let original = embedded.bytes().to_vec();
+    let mut transaction = embedded.edit();
+
+    assert!(
+        transaction
+            .set_class_id(Guid::from_bytes([0x55; 16]))
+            .is_err()
+    );
+    assert!(transaction.set_flags(1).is_err());
+    assert!(!transaction.is_changed());
+    assert_eq!(transaction.link().bytes(), original);
+    assert_eq!(transaction.commit().unwrap().snapshot().bytes(), original);
+
+    let linked = Snapshot::parse(&linked_wire()).expect("linked snapshot should parse");
+    let mut linked_transaction = linked.edit();
+    let before = linked_transaction.link().clone();
+    assert!(
+        linked_transaction
+            .update(|link| {
+                link.set_link_update_option(99);
+                Err(litchi_cfb::OleError::InvalidFormat("reject edit".into()))
+            })
+            .is_err()
+    );
+    assert_eq!(linked_transaction.link(), &before);
 }

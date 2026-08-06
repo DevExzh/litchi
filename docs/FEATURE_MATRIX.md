@@ -54,7 +54,7 @@ give the authoritative status and limitations for each concrete format.
 |--------------------|---------------|----------------|
 | Format detection and unified facades | Office, ODF, RTF, iWork, and tabular APIs where exposed; facade authoring is not implied | `litchi`, `litchi-core`, detailed format crates |
 | OOXML OPC package editing | Parts, relationships, content types, strict/transitional XML, and graph validation | `litchi-opc`, `litchi-ooxml-common`, DOCX/XLSX/XLSB/PPTX matrices |
-| OLE/CFB package editing | Streams, storages, property sets, and package-preserving editors | `litchi-cfb`, `litchi-ole-common`, DOC/XLS/PPT matrices |
+| OLE/CFB package editing | Streams, storages, property sets, inert OLEDS links, and package-preserving editors | `litchi-cfb`, `litchi-ole-common`, DOC/XLS/PPT matrices; `object::link::Snapshot` provides bounded source-checked OLEDS `\x01Ole` transactions with reversible patches and opaque-tail preservation |
 | ODF package and flat XML editing | ZIP package, manifest, metadata, styles, settings, resources, and bounded flat-document handling | `litchi-odf` and ODF matrices |
 | Encryption and integrity | Format-specific Office and ODF profiles; bounded password and integrity handling | `litchi-crypto`, `litchi-sign`, format matrices |
 | Properties and metadata | Core, extended, custom, document, and package metadata according to each format | Shared package/property crates and format matrices |
