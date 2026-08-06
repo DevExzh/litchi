@@ -12,8 +12,18 @@
 
 mod codec;
 mod model;
+mod patch;
+mod transaction;
+mod validation;
 
 #[cfg(test)]
 mod tests;
 
-pub use model::{Collection, Kind, Name, Reference};
+pub use model::{
+    Collection, FileNameKey, FileNameKeyError, FileNameMetadata, Kind, Name, Reference,
+};
+pub use patch::{PatchError, SourceContext, SourceRanges, TablePatch, TableRange};
+pub use transaction::{
+    Commit, FileNameSelector, Patch, ReferenceSelector, SelectionError, Snapshot, Transaction,
+    TransactionError,
+};

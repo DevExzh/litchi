@@ -249,7 +249,16 @@ pub use parts::styles::{
     StyleDefinition, StyleFlags, StyleKind, StylePost2000, StyleRevisionMark, StyleSheet,
     StyleSheetHeader,
 };
-pub use parts::subdocuments::{Collection, Kind, Name, Reference};
+pub use parts::subdocuments::{
+    Collection, Commit as SubdocumentCommit, FileNameKey, FileNameKeyError, FileNameMetadata,
+    FileNameSelector as SubdocumentFileNameSelector, Kind, Name, Patch as SubdocumentPatch,
+    PatchError as SubdocumentPatchError, Reference,
+    ReferenceSelector as SubdocumentReferenceSelector, SelectionError as SubdocumentSelectionError,
+    Snapshot as SubdocumentSnapshot, SourceContext as SubdocumentSourceContext,
+    SourceRanges as SubdocumentSourceRanges, TablePatch as SubdocumentTablePatch,
+    TableRange as SubdocumentTableRange, Transaction as SubdocumentTransaction,
+    TransactionError as SubdocumentTransactionError,
+};
 pub use parts::table_char_cache::{TableCharEntry, TableCharInfo, TableCharacterCache};
 pub use parts::tap::TableStyleCondition;
 pub use parts::text_services::{TextServicesTables, Uim, UimEntry, UimGuidTable, UimTable};

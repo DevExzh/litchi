@@ -2,7 +2,8 @@ use super::codec::{
     FNFB_FAT, FNFB_NON_FILE_SYS, FNFB_NTFS, PLCF_WKB, STTB_F_EXTEND, STTB_FNM, STTB_FNM_CB_EXTRA,
     WKB_FLAGS_REQUIRED, WKB_FN, WKB_OUTLINE_LEVEL, parse_plcf_wkb, parse_sttb_fnm,
 };
-use super::model::{Collection, Kind};
+use super::model::Collection;
+use super::{FileNameMetadata, FileNameSelector, Kind, ReferenceSelector, Snapshot};
 use crate::package::Result;
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::mail_merge::Fnpi;
@@ -308,4 +309,185 @@ fn rejects_pre_word97_fibs() {
     fib[2..4].copy_from_slice(&0x0065u16.to_le_bytes());
     let fib = FileInformationBlock::parse(&fib).unwrap();
     assert!(Collection::parse(&fib, &table).unwrap().is_none());
+}
+
+fn source_snapshot(tables: &Tables) -> (FileInformationBlock, Vec<u8>, Snapshot) {
+    let (fib, table) = tables.assemble();
+    let parsed_fib = FileInformationBlock::parse(&fib).unwrap();
+    let snapshot = Snapshot::parse(&parsed_fib, &table).unwrap().unwrap();
+    (parsed_fib, table, snapshot)
+}
+
+#[test]
+fn no_op_snapshot_round_trip_preserves_ignored_and_unused_bytes() {
+    let mut tables = Tables::typical();
+    let fnif_unused = tables.fnm.len() - 4;
+    tables.fnm[fnif_unused..].copy_from_slice(&[0xA1, 0xB2, 0xC3, 0xD4]);
+    let first_path_units = "C:\\docs\\intro.doc".encode_utf16().count();
+    let first_fnif = 6 + 2 + first_path_units * 2;
+    tables.fnm[first_fnif + 3] |= 0x02;
+    // The first WKB starts after two CPs and the terminal CP; retain both
+    // undefined WKB flag bits in its exact source record.
+    tables.wkb[14] |= 0x84;
+
+    let (_, table, snapshot) = source_snapshot(&tables);
+    let commit = snapshot.edit().commit().unwrap();
+    assert!(commit.patch().is_noop());
+    assert_eq!(
+        commit.snapshot().referenced_files_bytes(),
+        Some(tables.fnm.as_slice())
+    );
+    assert_eq!(
+        commit.snapshot().subdocuments_bytes(),
+        Some(tables.wkb.as_slice())
+    );
+    assert_eq!(
+        commit.patch().table_patch().apply(&table, 10).unwrap(),
+        table
+    );
+}
+
+#[test]
+fn candidate_adds_renumbers_updates_and_moves_subdocuments() {
+    let (_, table, snapshot) = source_snapshot(&Tables::typical());
+    let mut transaction = snapshot.edit();
+    let old_key = transaction
+        .add_subdocument(
+            8,
+            "C:\\docs\\new.doc",
+            FileNameMetadata {
+                relative_path_offset: Some(8),
+                valid_on_ntfs: true,
+                ..FileNameMetadata::default()
+            },
+        )
+        .unwrap();
+    let new_key = transaction
+        .renumber_file_name(FileNameSelector::Key(old_key), 7)
+        .unwrap();
+    transaction
+        .update_file_path(FileNameSelector::Key(new_key), "C:\\docs\\renamed.doc")
+        .unwrap();
+    transaction
+        .set_subdocument_start(ReferenceSelector::index(2), 7)
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+
+    let files = commit.snapshot().collection().referenced_files();
+    assert_eq!(files.len(), 4);
+    assert_eq!(files[3].key(), new_key);
+    assert_eq!(files[3].path(), "C:\\docs\\renamed.doc");
+    assert_eq!(files[3].relative_path(), Some("renamed.doc"));
+    let references = commit.snapshot().collection().subdocuments();
+    assert_eq!(
+        references
+            .iter()
+            .map(|reference| reference.start())
+            .collect::<Vec<_>>(),
+        [2, 5, 7]
+    );
+    assert_eq!(references[2].file_name_key(), new_key);
+
+    let patched = commit.patch().table_patch().apply(&table, 10).unwrap();
+    let encoded_files = commit
+        .patch()
+        .table_patch()
+        .after_referenced_files()
+        .unwrap();
+    let encoded_references = commit.patch().table_patch().after_subdocuments().unwrap();
+    assert_eq!(parse_sttb_fnm(encoded_files).unwrap().len(), 4);
+    assert_eq!(
+        parse_plcf_wkb(
+            encoded_references,
+            10,
+            &parse_sttb_fnm(encoded_files).unwrap()
+        )
+        .unwrap()
+        .len(),
+        3
+    );
+    assert!(!patched.is_empty());
+}
+
+#[test]
+fn terminal_cp_and_independent_wire_lengths_follow_candidate_context() {
+    let (_, _, snapshot) = source_snapshot(&Tables::typical());
+    let mut transaction = snapshot.edit();
+    transaction.set_main_document_chars(20);
+    let commit = transaction.commit().unwrap();
+    let wkb = commit.patch().table_patch().after_subdocuments().unwrap();
+    assert_eq!(u32::from_le_bytes(wkb[8..12].try_into().unwrap()), 22);
+    assert_eq!(
+        commit
+            .snapshot()
+            .encode_referenced_files()
+            .unwrap()
+            .unwrap()
+            .len(),
+        commit
+            .patch()
+            .table_patch()
+            .after_referenced_files()
+            .unwrap()
+            .len()
+    );
+    assert_eq!(
+        commit.snapshot().encode_subdocuments().unwrap().unwrap(),
+        wkb
+    );
+}
+
+#[test]
+fn invalid_candidates_are_rejected_without_partial_publish() {
+    let (_, _, snapshot) = source_snapshot(&Tables::typical());
+    let mut transaction = snapshot.edit();
+    assert!(
+        transaction
+            .set_subdocument_start(ReferenceSelector::index(0), 10)
+            .is_err()
+    );
+    assert!(!transaction.is_changed());
+    assert!(
+        transaction
+            .update_file_name(
+                FileNameSelector::Index(0),
+                "a.doc",
+                FileNameMetadata {
+                    relative_path_offset: Some(100),
+                    ..FileNameMetadata::default()
+                },
+            )
+            .is_err()
+    );
+    assert!(!transaction.is_changed());
+    assert!(
+        transaction
+            .renumber_file_name(FileNameSelector::Index(0), 0x0FFF)
+            .is_err()
+    );
+}
+
+#[test]
+fn table_patch_is_source_checked_preserves_unrelated_bytes_and_inverts() {
+    let (fib, mut table) = Tables::typical().assemble();
+    table.extend_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]);
+    let parsed_fib = FileInformationBlock::parse(&fib).unwrap();
+    let snapshot = Snapshot::parse(&parsed_fib, &table).unwrap().unwrap();
+    let mut transaction = snapshot.edit();
+    transaction
+        .update_file_path(FileNameSelector::Index(0), "C:\\x\\intro.doc")
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    let patched = commit.patch().table_patch().apply(&table, 10).unwrap();
+    assert_eq!(&patched[patched.len() - 4..], &[0xDE, 0xAD, 0xBE, 0xEF]);
+    let inverse_patch = commit.patch().inverse();
+    assert_eq!(
+        inverse_patch.table_patch().apply(&patched, 10).unwrap(),
+        table
+    );
+
+    let mut conflict = table.clone();
+    conflict[0] ^= 1;
+    assert!(commit.patch().table_patch().apply(&conflict, 10).is_err());
+    assert!(commit.patch().table_patch().apply(&table, 11).is_err());
 }
