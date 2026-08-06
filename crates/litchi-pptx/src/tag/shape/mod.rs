@@ -14,6 +14,7 @@
 //! workflows. Relationship IDs and tag-part names never participate in the
 //! safe selector.
 
+mod anchor;
 mod codec;
 mod model;
 mod validation;

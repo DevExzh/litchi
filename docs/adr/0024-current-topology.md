@@ -202,6 +202,17 @@ codecs. The XLS toolbar owner is now package-integrated: its `Workbook` and
 model owns borrowed-to-owned lifetime conversion. All control and command
 behavior remains inert.
 
+The latest continuation also adds the typed DOC `ObjInfo`/`ODTPersist2`
+metadata layer and a bounded PPT `animation::diagram_build` owner for
+`DiagramBuildContainer`/`DiagramBuildAtom` records. Both retain fixed-width
+unknown values and reserved bytes where safe, reject malformed boundaries,
+and expose no activation or playback runtime. DOC document semantics,
+sections, and form fields; PPT writer records and animation editing; ODraw
+property groups; OGraph chart aggregates; XLS list-object semantics and pivot
+writing; XLSB pivot writing; XLSX package metadata; DOCX package tests; and
+PPTX shape anchors now follow the same nested facade/model/codec/validation/
+test organization.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

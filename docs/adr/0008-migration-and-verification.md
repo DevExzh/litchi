@@ -5451,6 +5451,37 @@ XCB integration tests pass 2/2. Formatting, diff, and the 46-package boundary
 check pass. This remains bounded owner and feature evidence, not a claim of
 complete OLE2, OOXML, or ODF conformance.
 
+## Typed OLE2 metadata and deeper owner continuation
+
+This continuation adds bounded typed behavior alongside the ongoing topology
+migration. DOC `embedded_object::Info` now preserves the optional
+`ODTPersist2` presence bit, defined and undefined persistence fields, and
+deterministically serializes passive `ObjInfo` metadata under the `[MS-DOC]`
+ODT grammar. Required-zero bits are validated and malformed lengths fail; no
+OLE payload is opened, instantiated, or executed.
+
+PPT now exposes inert `DiagramBuildContainer`/`DiagramBuildAtom` metadata from
+`[MS-PPT]` §§2.8.13–2.8.14 and 2.13.7. Fixed-width unknown enum values and
+reserved bytes round-trip, while diagram rendering, SmartArt authoring, and
+animation playback remain outside the API. The same wave layers DOC document
+semantics, sections, form fields, PPT writer records and animation editing,
+ODraw properties, OGraph chart aggregates, XLS List12 and PivotTable writing,
+XLSB pivot writing, XLSX package metadata, DOCX package tests, and PPTX shape
+anchor mutation under contextual facades.
+
+Strict all-target checks pass for DOC, DOCX, ODraw, OGraph, PPT, PPTX, XLS,
+XLSB, and XLSX. With lint caps, the library matrix passes DOC (849 with two
+ignored), DOCX (644), ODraw (59), OGraph (43), PPT (888 with one ignored),
+PPTX (309), XLS (858), XLSB (413), and XLSX (648). Focused additions include
+the DOC ODT persistence tests, six PPT diagram-build tests, 17 DOC section
+tests, 25 PPT writer-record tests, 10 XLS PivotTable-writer tests, 15 ODraw
+property tests, three OGraph aggregate tests, nine XLSB pivot-writer tests,
+four XLSX metadata tests, and the preserved DOCX package-test families.
+Formatting, diff, and the 46-package boundary check pass. This remains
+bounded implementation evidence, not a claim of complete `[MS-DOC]`,
+`[MS-ODRAW]`, `[MS-OGRAPH]`, `[MS-PPT]`, `[MS-XLS]`, OOXML, or ODF
+conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

@@ -9,6 +9,7 @@ mod tests;
 mod time_node;
 mod timeline;
 
+pub use super::diagram_build::parse_record as parse_diagram_build_record;
 pub use animation::{parse_animation_info, parse_animation_info_atom};
 pub use behavior::{
     parse_time_animate_behavior, parse_time_animate_behavior_atom, parse_time_animation_value_atom,

@@ -61,6 +61,7 @@ compound files, OfficeArt, OLE activation metadata, native charts, encryption, a
 | Legacy color schemes and theme-like round-trip metadata | 🟡 | ✅ | ✅ | Eight-color scheme atoms, per-slide and master scheme inventory, and bounded PowerPoint 12 theme records; this is not a full OOXML theme model |
 | Native Graph and Excel charts | 🟡 | ✅ | ❌ | Typed inert chart inventory over Graph and Excel-hosted OGraph books, persist mapping, frame/slide selectors, bounded decompression, and per-object failures; PptWriter::add_chart validates then refuses authoring because a complete Office-compatible binary chart grammar is not implemented |
 | Diagram and SmartArt objects | ❌ | ❌ | ❌ | MS-PPT exposes diagram build records in the animation family, but this crate has no native diagram or SmartArt object model or authoring surface |
+| Diagram build records | 🟡 | ✅ | ✅ | Bounded `DiagramBuildContainer`/`DiagramBuildAtom` metadata follows [MS-PPT] §§2.8.13–2.8.14 and 2.13.7, retaining fixed-width unknown enum values and reserved bytes; it does not render, author, or play SmartArt diagrams |
 
 ## Interaction, notes, review, and slide show
 

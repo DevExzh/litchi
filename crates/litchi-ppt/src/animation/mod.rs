@@ -8,6 +8,7 @@
 //! - Sound support
 //! - Build animations (chart, diagram, paragraph)
 
+pub mod diagram_build;
 mod editor;
 pub mod hash;
 mod linked_slide;
@@ -25,18 +26,18 @@ pub use hash::{Hash10, Hash10Limits};
 pub use linked_slide::{LinkedShape, LinkedSlide, LinkedSlideLimits};
 pub use motion_path::{MotionPath, MotionPathBuilder, MotionPathType, PathCommand, PathEditMode};
 pub use parser::{
-    parse_animation_info, parse_animation_info_atom, parse_build_list, parse_extended_time_node,
-    parse_slide_animation_extension, parse_time_animate_behavior, parse_time_animate_behavior_atom,
-    parse_time_animation_value_atom, parse_time_animation_value_list, parse_time_behavior,
-    parse_time_behavior_atom, parse_time_behavior_property_list, parse_time_color_behavior,
-    parse_time_color_behavior_atom, parse_time_command_behavior, parse_time_command_behavior_atom,
-    parse_time_condition, parse_time_condition_atom, parse_time_effect_behavior,
-    parse_time_effect_behavior_atom, parse_time_iterate_data, parse_time_modifier,
-    parse_time_motion_behavior, parse_time_motion_behavior_atom, parse_time_node_atom,
-    parse_time_node_property_list, parse_time_rotation_behavior, parse_time_rotation_behavior_atom,
-    parse_time_scale_behavior, parse_time_scale_behavior_atom, parse_time_sequence_data,
-    parse_time_set_behavior, parse_time_set_behavior_atom, parse_time_sub_effect,
-    parse_time_visual_element,
+    parse_animation_info, parse_animation_info_atom, parse_build_list, parse_diagram_build_record,
+    parse_extended_time_node, parse_slide_animation_extension, parse_time_animate_behavior,
+    parse_time_animate_behavior_atom, parse_time_animation_value_atom,
+    parse_time_animation_value_list, parse_time_behavior, parse_time_behavior_atom,
+    parse_time_behavior_property_list, parse_time_color_behavior, parse_time_color_behavior_atom,
+    parse_time_command_behavior, parse_time_command_behavior_atom, parse_time_condition,
+    parse_time_condition_atom, parse_time_effect_behavior, parse_time_effect_behavior_atom,
+    parse_time_iterate_data, parse_time_modifier, parse_time_motion_behavior,
+    parse_time_motion_behavior_atom, parse_time_node_atom, parse_time_node_property_list,
+    parse_time_rotation_behavior, parse_time_rotation_behavior_atom, parse_time_scale_behavior,
+    parse_time_scale_behavior_atom, parse_time_sequence_data, parse_time_set_behavior,
+    parse_time_set_behavior_atom, parse_time_sub_effect, parse_time_visual_element,
 };
 pub use slide_metadata::{SlideMetadataLimits, SlideTime};
 pub use sound::{AnimationSound, BuiltinSound, SoundType};

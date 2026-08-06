@@ -27,6 +27,10 @@ const MAX_FIELDS: usize = 65_536;
 const MAX_PICF: usize = 128 * 1024 * 1024;
 pub(super) const OBJECT_POOL: &str = "ObjectPool";
 const OBJ_INFO_STREAM: &str = "\u{3}ObjInfo";
+const ODTPERSIST1_MUST_BE_ZERO: u16 = (1 << 10) | (1 << 11);
+const ODTPERSIST1_RESERVED: u16 = (1 << 0) | (1 << 2) | (1 << 3) | (1 << 5) | (1 << 14);
+const ODTPERSIST2_MUST_BE_ZERO: u16 = 1 << 1;
+const ODTPERSIST2_RESERVED: u16 = 0xFFF0;
 
 impl Info {
     pub fn read(data: &[u8]) -> Result<Self> {
@@ -34,8 +38,8 @@ impl Info {
             return Err(corrupted("ObjInfo ODT must be 4 or 6 bytes"));
         }
         let first = word(data, 0)?;
-        if first & ((1 << 10) | (1 << 11)) != 0 {
-            return Err(corrupted("ObjInfo reserved bits are set"));
+        if first & ODTPERSIST1_MUST_BE_ZERO != 0 {
+            return Err(corrupted("ObjInfo ODTPersist1 MUST-be-zero bits are set"));
         }
         let activex = first & (1 << 12) != 0;
         let stream_control = first & (1 << 13) != 0;
@@ -43,10 +47,11 @@ impl Info {
             return Err(corrupted("ObjInfo stream control requires ActiveX"));
         }
         let second = if data.len() == 6 { word(data, 4)? } else { 0 };
-        if second & 2 != 0 {
-            return Err(corrupted("ObjInfo reserved extension bit is set"));
+        if second & ODTPERSIST2_MUST_BE_ZERO != 0 {
+            return Err(corrupted("ObjInfo ODTPersist2 MUST-be-zero bit is set"));
         }
         Ok(Self {
+            persist2_present: data.len() == 6,
             default_handler: first & (1 << 1) != 0,
             linked: first & (1 << 4) != 0,
             display_as_icon: first & (1 << 6) != 0,
@@ -60,7 +65,58 @@ impl Info {
             queried_enhanced_metafile: second & 4 != 0,
             stored_as_enhanced_metafile: second & 8 != 0,
             clipboard_format: word(data, 2)?,
+            reserved_persist1: first & ODTPERSIST1_RESERVED,
+            reserved_persist2: second & ODTPERSIST2_RESERVED,
         })
+    }
+
+    /// Serialize this ODT deterministically, retaining the supported
+    /// undefined bits and the presence of an all-zero optional `ODTPersist2`.
+    ///
+    /// This only writes the passive `ObjInfo` metadata bytes. It never opens,
+    /// instantiates, or otherwise activates the referenced OLE object.
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        if self.reserved_persist1 & !ODTPERSIST1_RESERVED != 0 {
+            return Err(corrupted(
+                "ObjInfo reserved_persist1 contains defined or MUST-be-zero bits",
+            ));
+        }
+        if self.reserved_persist2 & !ODTPERSIST2_RESERVED != 0 {
+            return Err(corrupted(
+                "ObjInfo reserved_persist2 contains defined or MUST-be-zero bits",
+            ));
+        }
+        if self.stream_control && !self.activex {
+            return Err(corrupted("ObjInfo stream control requires ActiveX"));
+        }
+
+        let mut first = self.reserved_persist1;
+        first |= bit(self.default_handler, 1);
+        first |= bit(self.linked, 4);
+        first |= bit(self.display_as_icon, 6);
+        first |= bit(self.ole1, 7);
+        first |= bit(self.manual_update, 8);
+        first |= bit(self.recompose_on_resize, 9);
+        first |= bit(self.activex, 12);
+        first |= bit(self.stream_control, 13);
+        first |= bit(self.view_object, 15);
+
+        let mut second = self.reserved_persist2;
+        second |= bit(self.enhanced_metafile, 0);
+        second |= bit(self.queried_enhanced_metafile, 2);
+        second |= bit(self.stored_as_enhanced_metafile, 3);
+
+        // Inferring presence from non-zero fields keeps construction through
+        // the original flattened API ergonomic while preserving an explicit
+        // six-byte, all-zero optional member when it was read from a stream.
+        let persist2_present = self.persist2_present || second != 0;
+        let mut output = Vec::with_capacity(if persist2_present { 6 } else { 4 });
+        output.extend_from_slice(&first.to_le_bytes());
+        output.extend_from_slice(&self.clipboard_format.to_le_bytes());
+        if persist2_present {
+            output.extend_from_slice(&second.to_le_bytes());
+        }
+        Ok(output)
     }
 
     /// Reads this metadata from the opaque DOC `ObjInfo` stream of an object.
@@ -70,6 +126,11 @@ impl Info {
             .map(Self::read)
             .transpose()
     }
+}
+
+#[inline]
+const fn bit(value: bool, position: u16) -> u16 {
+    if value { 1 << position } else { 0 }
 }
 
 fn word(data: &[u8], offset: usize) -> Result<u16> {
