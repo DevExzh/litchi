@@ -1826,3 +1826,119 @@ fn aggregate_auxiliary_payload_limit_rejects_before_mutation() {
     assert!(raw::put(&mut package, &graph).is_err());
     assert!(load(&package).unwrap().is_none());
 }
+
+#[test]
+fn transaction_creates_catalog_and_auxiliary_graph_atomically() {
+    let mut package = package();
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    transaction.add_entry(entry("Authored")).unwrap();
+    transaction
+        .add_part(
+            raw::Part::new("/word/glossary/media/image.png", "image/png", vec![1, 2, 3]).unwrap(),
+        )
+        .unwrap();
+    transaction
+        .add_relationship(raw::Rel {
+            id: "rIdImage".to_owned(),
+            kind: format!("{R}/image"),
+            target: "media/image.png".to_owned(),
+            external: false,
+        })
+        .unwrap();
+
+    let commit = transaction.commit().unwrap();
+    assert!(commit.changed());
+    assert_eq!(commit.snapshot().entries()[0].name(), Some("Authored"));
+    assert_eq!(commit.snapshot().auxiliary_parts()[0].data(), [1, 2, 3]);
+    assert!(raw::load(&package).unwrap().is_some());
+
+    let patch = commit.patch().clone();
+    patch.undo(&mut package).unwrap();
+    assert!(Snapshot::load(&package).unwrap().is_empty());
+}
+
+#[test]
+fn transaction_noop_preserves_signature_and_patch_rejects_stale_source() {
+    let mut package = package();
+    let mut catalog = Catalog::new();
+    catalog.add(entry("Keep")).unwrap();
+    raw::put(
+        &mut package,
+        &raw::Graph::new(catalog, Conformance::Transitional),
+    )
+    .unwrap();
+    let source = Snapshot::load(&package).unwrap();
+
+    mark_signed(&mut package);
+    let transaction = Transaction::new(&mut package).unwrap();
+    let commit = transaction.commit().unwrap();
+    assert!(!commit.changed());
+    assert!(package.is_signed());
+
+    let mut changed_package = package.clone();
+    changed_package
+        .get_part_mut(&PackURI::new("/word/glossary/document.xml").unwrap())
+        .unwrap()
+        .set_blob(b"<stale/>".to_vec());
+    let mut target = package.clone();
+    let mut editing = Transaction::new(&mut target).unwrap();
+    editing.add_entry(entry("New")).unwrap();
+    let changed = editing.commit().unwrap();
+    assert!(changed.changed());
+    assert!(changed.patch().apply(&mut changed_package).is_err());
+    assert_eq!(source.entries()[0].name(), Some("Keep"));
+}
+
+#[test]
+fn transaction_rejects_orphaned_auxiliary_removal_without_mutating_package() {
+    let mut package = package();
+    let mut graph = raw::Graph::new(Catalog::new(), Conformance::Transitional);
+    graph.rels.push(raw::Rel {
+        id: "rIdImage".to_owned(),
+        kind: format!("{R}/image"),
+        target: "media/image.png".to_owned(),
+        external: false,
+    });
+    graph.parts.push(
+        raw::Part::new("/word/glossary/media/image.png", "image/png", vec![4, 5, 6]).unwrap(),
+    );
+    raw::put(&mut package, &graph).unwrap();
+    let before = Snapshot::load(&package).unwrap();
+
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    transaction
+        .remove_part("/word/glossary/media/image.png")
+        .unwrap();
+    assert!(transaction.commit().is_err());
+    assert_eq!(Snapshot::load(&package).unwrap(), before);
+}
+
+#[test]
+fn transaction_catalog_crud_preserves_opaque_entry_xml() {
+    let mut package = package();
+    let body = format!(
+        r#"<w:docPartBody xmlns:w="{W}" xmlns:u="urn:producer"><w:p><u:opaque u:value="keep"/></w:p></w:docPartBody>"#
+    );
+    let mut catalog = Catalog::new();
+    catalog
+        .add(Entry::new("Keep", body.into_bytes()).unwrap())
+        .unwrap();
+    raw::put(
+        &mut package,
+        &raw::Graph::new(catalog, Conformance::Transitional),
+    )
+    .unwrap();
+
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    transaction.add_entry(entry("Added")).unwrap();
+    transaction.commit().unwrap();
+    let root = std::str::from_utf8(
+        package
+            .get_part(&PackURI::new("/word/glossary/document.xml").unwrap())
+            .unwrap()
+            .blob(),
+    )
+    .unwrap();
+    assert!(root.contains("u:opaque"), "{root}");
+    assert!(root.contains("u:value=\"keep\""), "{root}");
+}

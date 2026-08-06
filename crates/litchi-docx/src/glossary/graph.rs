@@ -46,6 +46,48 @@ pub mod raw {
             self.data.as_slice()
         }
 
+        /// Absolute OPC part name.
+        pub fn name(&self) -> &str {
+            &self.name
+        }
+
+        /// OPC content type retained for this opaque part.
+        pub fn content_type(&self) -> &str {
+            &self.content_type
+        }
+
+        /// Relationships owned by this opaque part.
+        pub fn relationships(&self) -> &[Rel] {
+            &self.rels
+        }
+
+        /// Replace the opaque payload after checking its physical bounds.
+        pub fn replace_data(&mut self, data: Vec<u8>) -> super::Result<()> {
+            super::validate_raw_part(&self.name, &self.content_type, data.len())?;
+            self.data = Arc::new(data);
+            Ok(())
+        }
+
+        /// Replace the opaque relationship list after bounded metadata checks.
+        pub fn set_relationships(&mut self, relationships: Vec<Rel>) -> super::Result<()> {
+            if relationships.len() > super::MAX_VALUES {
+                return Err(super::invalid("glossary relationship limit exceeded"));
+            }
+            let mut ids = std::collections::HashSet::new();
+            for relationship in &relationships {
+                super::validate_relationship_metadata(
+                    &relationship.id,
+                    &relationship.kind,
+                    &relationship.target,
+                )?;
+                if !ids.insert(&relationship.id) {
+                    return Err(super::invalid("duplicate glossary relationship ID"));
+                }
+            }
+            self.rels = relationships;
+            Ok(())
+        }
+
         /// Consume the part and retain shared ownership of its payload.
         pub fn into_data(self) -> Arc<Vec<u8>> {
             self.data

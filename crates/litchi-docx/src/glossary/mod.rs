@@ -4,6 +4,7 @@ mod codec;
 mod graph;
 mod model;
 mod package;
+mod transaction;
 
 #[cfg(test)]
 mod tests;
@@ -84,3 +85,4 @@ pub use codec::{read, write};
 pub use graph::raw;
 pub use model::{Catalog, Category, Conformance, Entry, Gallery, Id, Insert, Kind, Name, Props};
 pub use package::{load, put, remove};
+pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
