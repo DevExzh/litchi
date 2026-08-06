@@ -6,6 +6,10 @@
 mod codec;
 mod model;
 mod package;
+pub mod patch;
+pub mod snapshot;
+pub mod transaction;
+pub mod validation;
 
 use crate::error::Error;
 
@@ -28,6 +32,10 @@ pub use model::{
     OleObjectUpdate, OleObjects,
 };
 pub use package::{load_ole_objects, store_ole_objects};
+pub use patch::{Commit, Patch};
+pub use snapshot::Snapshot;
+pub use transaction::Transaction;
+pub use validation::{graph as validate_graph, objects as validate};
 
 #[cfg(test)]
 mod tests;

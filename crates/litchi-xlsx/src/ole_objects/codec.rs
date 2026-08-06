@@ -6,6 +6,7 @@ use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::cmp::Reverse;
 
 use super::model::*;
 use super::{invalid, limit, xml_error};
@@ -45,8 +46,9 @@ pub fn parse_ole_objects(xml: &[u8]) -> Result<Option<OleObjects>> {
     }
     let mut objects = Vec::with_capacity(list.children.len());
     for child in &list.children {
-        require(child, conformance.sml(), "oleObject")?;
-        objects.push(parse_object(child, conformance)?);
+        if child.namespace == conformance.sml() && child.name == "oleObject" {
+            objects.push(parse_object(child, conformance)?);
+        }
     }
     let value = OleObjects { objects };
     validate_value(&value, false)?;
@@ -55,7 +57,12 @@ pub fn parse_ole_objects(xml: &[u8]) -> Result<Option<OleObjects>> {
 
 fn parse_object(node: &Node, conformance: OleObjectConformance) -> Result<OleObject> {
     whitespace(node)?;
-    if node.children.len() > 1 {
+    let object_properties = node
+        .children
+        .iter()
+        .filter(|child| child.namespace == conformance.sml() && child.name == "objectPr")
+        .collect::<Vec<_>>();
+    if object_properties.len() > 1 {
         return Err(invalid("oleObject has multiple child elements"));
     }
     let program_id = optional(node, "", "progId").map(str::to_owned);
@@ -85,8 +92,7 @@ fn parse_object(node: &Node, conformance: OleObjectConformance) -> Result<OleObj
             (conformance.rel(), "id"),
         ],
     )?;
-    let properties = node
-        .children
+    let properties = object_properties
         .first()
         .map(|child| parse_properties(child, conformance))
         .transpose()?;
@@ -107,7 +113,12 @@ fn parse_object(node: &Node, conformance: OleObjectConformance) -> Result<OleObj
 fn parse_properties(node: &Node, conformance: OleObjectConformance) -> Result<OleObjectProperties> {
     require(node, conformance.sml(), "objectPr")?;
     whitespace(node)?;
-    if node.children.len() != 1 {
+    let anchors = node
+        .children
+        .iter()
+        .filter(|child| child.namespace == conformance.sml() && child.name == "anchor")
+        .collect::<Vec<_>>();
+    if anchors.len() != 1 {
         return Err(invalid("objectPr must contain exactly one anchor"));
     }
     let preview_relationship_id = required(node, conformance.rel(), "id")?.to_owned();
@@ -129,7 +140,7 @@ fn parse_properties(node: &Node, conformance: OleObjectConformance) -> Result<Ol
         dde: boolean("dde")?,
         macro_name: optional(node, "", "macro").map(str::to_owned),
         alt_text: optional(node, "", "altText").map(str::to_owned),
-        anchor: parse_anchor(&node.children[0], conformance)?,
+        anchor: parse_anchor(anchors[0], conformance)?,
     };
     no_attributes(
         node,
@@ -154,11 +165,15 @@ fn parse_anchor(node: &Node, conformance: OleObjectConformance) -> Result<OleObj
     require(node, conformance.sml(), "anchor")?;
     whitespace(node)?;
     no_attributes(node, &[("", "moveWithCells"), ("", "sizeWithCells")])?;
-    if node.children.len() != 2 {
+    let markers = ["from", "to"].map(|name| {
+        node.children
+            .iter()
+            .filter(|child| child.namespace == conformance.sml() && child.name == name)
+            .collect::<Vec<_>>()
+    });
+    if markers.iter().any(|markers| markers.len() != 1) {
         return Err(invalid("object anchor requires from and to markers"));
     }
-    require(&node.children[0], conformance.sml(), "from")?;
-    require(&node.children[1], conformance.sml(), "to")?;
     Ok(OleObjectAnchor {
         move_with_cells: optional(node, "", "moveWithCells")
             .map(|value| parse_bool(value, "moveWithCells"))
@@ -166,8 +181,8 @@ fn parse_anchor(node: &Node, conformance: OleObjectConformance) -> Result<OleObj
         size_with_cells: optional(node, "", "sizeWithCells")
             .map(|value| parse_bool(value, "sizeWithCells"))
             .transpose()?,
-        from: parse_marker(&node.children[0], conformance)?,
-        to: parse_marker(&node.children[1], conformance)?,
+        from: parse_marker(markers[0][0], conformance)?,
+        to: parse_marker(markers[1][0], conformance)?,
     })
 }
 
@@ -175,23 +190,32 @@ fn parse_marker(node: &Node, conformance: OleObjectConformance) -> Result<OleObj
     whitespace(node)?;
     no_attributes(node, &[])?;
     let expected = ["col", "colOff", "row", "rowOff"];
-    if node.children.len() != expected.len() {
+    let coordinates = expected
+        .iter()
+        .map(|name| {
+            node.children
+                .iter()
+                .filter(|child| child.namespace == conformance.xdr() && child.name == *name)
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    if coordinates.iter().any(|coordinates| coordinates.len() != 1) {
         return Err(invalid(
             "object marker requires col, colOff, row, and rowOff",
         ));
     }
-    for (child, name) in node.children.iter().zip(expected) {
-        require(child, conformance.xdr(), name)?;
+    for coordinate in &coordinates {
+        let child = coordinate[0];
         no_attributes(child, &[])?;
         if !child.children.is_empty() {
             return Err(invalid("object marker coordinate must be text-only"));
         }
     }
     Ok(OleObjectMarker {
-        column: coordinate(&node.children[0], "column")?,
-        column_offset: signed_coordinate(&node.children[1], "column offset")?,
-        row: coordinate(&node.children[2], "row")?,
-        row_offset: signed_coordinate(&node.children[3], "row offset")?,
+        column: coordinate(coordinates[0][0], "column")?,
+        column_offset: signed_coordinate(coordinates[1][0], "column offset")?,
+        row: coordinate(coordinates[2][0], "row")?,
+        row_offset: signed_coordinate(coordinates[3][0], "row offset")?,
     })
 }
 
@@ -272,6 +296,794 @@ pub fn write_ole_objects(value: &OleObjects, conformance: OleObjectConformance) 
         return Err(limit("serialized XML bytes"));
     }
     Ok(output)
+}
+
+/// Patch typed OLE metadata into an existing worksheet without rebuilding its
+/// `oleObjects` subtree. Only known attributes and marker text are replaced;
+/// extension attributes, unknown children, comments, namespace choices, and
+/// fallback branches stay in their original byte representation.
+pub(super) fn patch_ole_objects_source(
+    source: &[u8],
+    before: &OleObjects,
+    after: &OleObjects,
+    conformance: OleObjectConformance,
+) -> Result<Vec<u8>> {
+    if before == after {
+        return Ok(source.to_vec());
+    }
+    validate_value(after, false)?;
+    compatible_source_edit(before, after)?;
+    let raw = collect_raw_source(source, conformance)?;
+    let mut edits = Vec::new();
+
+    for (before_object, after_object) in before.objects.iter().zip(&after.objects) {
+        let key = RawObjectKey {
+            shape_id: before_object.shape_id,
+            relationship_id: before_object.relationship_id.clone(),
+        };
+        let object_elements = raw
+            .elements
+            .iter()
+            .filter(|element| {
+                element.namespace == conformance.sml()
+                    && element.name == "oleObject"
+                    && element.object.as_ref() == Some(&key)
+            })
+            .collect::<Vec<_>>();
+        if object_elements.is_empty() {
+            return Err(invalid(format!(
+                "OLE object shapeId {} is absent from worksheet source",
+                key.shape_id
+            )));
+        }
+
+        patch_optional_attribute(
+            source,
+            &mut edits,
+            object_elements.as_slice(),
+            "progId",
+            before_object.program_id.as_deref(),
+            after_object.program_id.as_deref(),
+        )?;
+        patch_optional_attribute(
+            source,
+            &mut edits,
+            object_elements.as_slice(),
+            "dvAspect",
+            before_object
+                .data_or_view_aspect
+                .map(OleObjectAspect::as_str),
+            after_object
+                .data_or_view_aspect
+                .map(OleObjectAspect::as_str),
+        )?;
+        patch_optional_attribute(
+            source,
+            &mut edits,
+            object_elements.as_slice(),
+            "link",
+            before_object.link.as_deref(),
+            after_object.link.as_deref(),
+        )?;
+        patch_optional_attribute(
+            source,
+            &mut edits,
+            object_elements.as_slice(),
+            "oleUpdate",
+            before_object.update.map(OleObjectUpdate::as_str),
+            after_object.update.map(OleObjectUpdate::as_str),
+        )?;
+        patch_optional_bool_attribute(
+            source,
+            &mut edits,
+            object_elements.as_slice(),
+            "autoLoad",
+            before_object.auto_load,
+            after_object.auto_load,
+        )?;
+
+        let Some(before_properties) = before_object.properties.as_ref() else {
+            continue;
+        };
+        let after_properties = after_object
+            .properties
+            .as_ref()
+            .ok_or_else(|| invalid("OLE object properties cannot be removed by a source edit"))?;
+        let property_elements = raw
+            .elements
+            .iter()
+            .filter(|element| {
+                element.namespace == conformance.sml()
+                    && element.name == "objectPr"
+                    && element.object.as_ref() == Some(&key)
+                    && element
+                        .parent
+                        .is_some_and(|parent| raw.elements[parent].object.as_ref() == Some(&key))
+            })
+            .collect::<Vec<_>>();
+        for property in property_elements {
+            patch_optional_bool_attribute(
+                source,
+                &mut edits,
+                std::slice::from_ref(&property),
+                "defaultSize",
+                before_properties.default_size,
+                after_properties.default_size,
+            )?;
+            patch_optional_bool_attribute(
+                source,
+                &mut edits,
+                std::slice::from_ref(&property),
+                "print",
+                before_properties.print,
+                after_properties.print,
+            )?;
+            patch_optional_bool_attribute(
+                source,
+                &mut edits,
+                std::slice::from_ref(&property),
+                "disabled",
+                before_properties.disabled,
+                after_properties.disabled,
+            )?;
+            patch_optional_bool_attribute(
+                source,
+                &mut edits,
+                std::slice::from_ref(&property),
+                "uiObject",
+                before_properties.ui_object,
+                after_properties.ui_object,
+            )?;
+            patch_optional_bool_attribute(
+                source,
+                &mut edits,
+                std::slice::from_ref(&property),
+                "autoFill",
+                before_properties.auto_fill,
+                after_properties.auto_fill,
+            )?;
+            patch_optional_bool_attribute(
+                source,
+                &mut edits,
+                std::slice::from_ref(&property),
+                "autoLine",
+                before_properties.auto_line,
+                after_properties.auto_line,
+            )?;
+            patch_optional_bool_attribute(
+                source,
+                &mut edits,
+                std::slice::from_ref(&property),
+                "autoPict",
+                before_properties.auto_pict,
+                after_properties.auto_pict,
+            )?;
+            patch_optional_bool_attribute(
+                source,
+                &mut edits,
+                std::slice::from_ref(&property),
+                "dde",
+                before_properties.dde,
+                after_properties.dde,
+            )?;
+            patch_optional_attribute(
+                source,
+                &mut edits,
+                std::slice::from_ref(&property),
+                "macro",
+                before_properties.macro_name.as_deref(),
+                after_properties.macro_name.as_deref(),
+            )?;
+            patch_optional_attribute(
+                source,
+                &mut edits,
+                std::slice::from_ref(&property),
+                "altText",
+                before_properties.alt_text.as_deref(),
+                after_properties.alt_text.as_deref(),
+            )?;
+
+            let property_id = property_id(&raw, property)?;
+            let anchors = raw
+                .elements
+                .iter()
+                .filter(|element| {
+                    element.namespace == conformance.sml()
+                        && element.name == "anchor"
+                        && element.parent == Some(property_id)
+                })
+                .collect::<Vec<_>>();
+            for anchor in anchors {
+                patch_optional_bool_attribute(
+                    source,
+                    &mut edits,
+                    std::slice::from_ref(&anchor),
+                    "moveWithCells",
+                    before_properties.anchor.move_with_cells,
+                    after_properties.anchor.move_with_cells,
+                )?;
+                patch_optional_bool_attribute(
+                    source,
+                    &mut edits,
+                    std::slice::from_ref(&anchor),
+                    "sizeWithCells",
+                    before_properties.anchor.size_with_cells,
+                    after_properties.anchor.size_with_cells,
+                )?;
+                patch_anchor_marker(
+                    source,
+                    &mut edits,
+                    &raw,
+                    anchor,
+                    "from",
+                    &before_properties.anchor.from,
+                    &after_properties.anchor.from,
+                    conformance,
+                )?;
+                patch_anchor_marker(
+                    source,
+                    &mut edits,
+                    &raw,
+                    anchor,
+                    "to",
+                    &before_properties.anchor.to,
+                    &after_properties.anchor.to,
+                    conformance,
+                )?;
+            }
+        }
+    }
+
+    apply_edits(source, edits)
+}
+
+fn compatible_source_edit(before: &OleObjects, after: &OleObjects) -> Result<()> {
+    if before.objects.len() != after.objects.len() {
+        return Err(invalid(
+            "OLE source edits cannot add or remove objects; use package storage for topology changes",
+        ));
+    }
+    for (before_object, after_object) in before.objects.iter().zip(&after.objects) {
+        if before_object.shape_id != after_object.shape_id
+            || before_object.relationship_id != after_object.relationship_id
+            || before_object.relationship_kind != after_object.relationship_kind
+            || before_object.target != after_object.target
+        {
+            return Err(invalid(
+                "OLE source edits cannot change shape, relationship, or opaque payload identity",
+            ));
+        }
+        match (&before_object.properties, &after_object.properties) {
+            (None, None) => {},
+            (Some(before), Some(after))
+                if before.preview_relationship_id == after.preview_relationship_id
+                    && before.preview == after.preview => {},
+            (Some(_), Some(_)) => {
+                return Err(invalid(
+                    "OLE source edits cannot change preview relationship or opaque preview data",
+                ));
+            },
+            _ => {
+                return Err(invalid(
+                    "OLE source edits cannot add or remove object properties",
+                ));
+            },
+        }
+    }
+    Ok(())
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct RawObjectKey {
+    shape_id: u32,
+    relationship_id: String,
+}
+
+#[derive(Clone, Debug)]
+struct RawAttribute {
+    namespace: String,
+    name: String,
+    value_start: usize,
+    value_end: usize,
+    remove_start: usize,
+    end: usize,
+}
+
+#[derive(Clone, Debug)]
+struct RawElement {
+    namespace: String,
+    name: String,
+    parent: Option<usize>,
+    object: Option<RawObjectKey>,
+    start_end: usize,
+    end_start: Option<usize>,
+    empty: bool,
+    attributes: Vec<RawAttribute>,
+}
+
+#[derive(Clone, Debug)]
+struct RawSource {
+    elements: Vec<RawElement>,
+}
+
+fn collect_raw_source(source: &[u8], conformance: OleObjectConformance) -> Result<RawSource> {
+    if source.len() > MAX_XML_BYTES {
+        return Err(limit("input XML bytes"));
+    }
+    let mut reader = NsReader::from_reader(source);
+    reader.config_mut().trim_text(false);
+    let mut stack: Vec<usize> = Vec::new();
+    let mut elements: Vec<RawElement> = Vec::new();
+    let mut nodes = 0usize;
+    loop {
+        let start = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid("worksheet XML offset overflow"))?;
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
+        match event {
+            Event::Start(ref element) | Event::Empty(ref element) => {
+                nodes += 1;
+                if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
+                    return Err(limit("XML structure"));
+                }
+                let empty = matches!(&event, Event::Empty(_));
+                let namespace = resolved(namespace)?;
+                let local_name = element.local_name();
+                let name = std::str::from_utf8(local_name.as_ref())
+                    .map_err(xml_error)?
+                    .to_owned();
+                let object = if namespace == conformance.sml() && name == "oleObject" {
+                    Some(raw_object_key(&reader, &element, conformance)?)
+                } else {
+                    stack.last().and_then(|id| elements[*id].object.clone())
+                };
+                let parent = stack.last().copied();
+                let end = usize::try_from(reader.buffer_position())
+                    .map_err(|_| invalid("worksheet XML offset overflow"))?;
+                let attributes = raw_attributes(source, start, end, &reader, &element)?;
+                let id = elements.len();
+                elements.push(RawElement {
+                    namespace,
+                    name,
+                    parent,
+                    object,
+                    start_end: usize::try_from(reader.buffer_position())
+                        .map_err(|_| invalid("worksheet XML offset overflow"))?,
+                    end_start: None,
+                    empty,
+                    attributes,
+                });
+                if !empty {
+                    stack.push(id);
+                }
+            },
+            Event::End(element) => {
+                let id = stack
+                    .pop()
+                    .ok_or_else(|| invalid("unexpected worksheet closing element"))?;
+                let local_name = element.local_name();
+                let name = std::str::from_utf8(local_name.as_ref()).map_err(xml_error)?;
+                if elements[id].name != name {
+                    return Err(invalid("worksheet XML element nesting changed during scan"));
+                }
+                elements[id].end_start = Some(start);
+            },
+            Event::DocType(_) | Event::PI(_) | Event::CData(_) => {
+                return Err(invalid("unsafe XML construct in worksheet OLE source"));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if !stack.is_empty() {
+        return Err(invalid("unterminated worksheet XML"));
+    }
+    Ok(RawSource { elements })
+}
+
+fn raw_object_key(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    conformance: OleObjectConformance,
+) -> Result<RawObjectKey> {
+    let shape_id = raw_attribute_value(reader, element, "", "shapeId")?
+        .ok_or_else(|| invalid("OLE source object is missing shapeId"))?
+        .parse()
+        .map_err(|_| invalid("invalid OLE source shapeId"))?;
+    let relationship_id = raw_attribute_value(reader, element, conformance.rel(), "id")?
+        .ok_or_else(|| invalid("OLE source object is missing relationship ID"))?;
+    Ok(RawObjectKey {
+        shape_id,
+        relationship_id,
+    })
+}
+
+fn raw_attribute_value(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    namespace: &str,
+    name: &str,
+) -> Result<Option<String>> {
+    for item in element.attributes().with_checks(true) {
+        let item = item.map_err(xml_error)?;
+        if item.key.as_ref() == b"xmlns" || item.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
+        let (attribute_namespace, local) = reader.resolver().resolve_attribute(item.key);
+        let attribute_namespace = resolved(attribute_namespace)?;
+        let local = std::str::from_utf8(local.as_ref()).map_err(xml_error)?;
+        if attribute_namespace == namespace && local == name {
+            return Ok(Some(
+                item.decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                    .map_err(xml_error)?
+                    .into_owned(),
+            ));
+        }
+    }
+    Ok(None)
+}
+
+fn raw_attributes(
+    source: &[u8],
+    start: usize,
+    end: usize,
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<Vec<RawAttribute>> {
+    let mut expanded = Vec::new();
+    for item in element.attributes().with_checks(true) {
+        let item = item.map_err(xml_error)?;
+        let qname = item.key.as_ref();
+        if qname == b"xmlns" || qname.starts_with(b"xmlns:") {
+            continue;
+        }
+        let (namespace, local) = reader.resolver().resolve_attribute(item.key);
+        expanded.push((
+            qname.to_vec(),
+            resolved(namespace)?,
+            std::str::from_utf8(local.as_ref())
+                .map_err(xml_error)?
+                .to_owned(),
+        ));
+    }
+
+    let mut cursor = start
+        .checked_add(1)
+        .ok_or_else(|| invalid("worksheet XML offset overflow"))?;
+    while cursor < end && source[cursor].is_ascii_whitespace() {
+        cursor += 1;
+    }
+    while cursor < end
+        && !source[cursor].is_ascii_whitespace()
+        && source[cursor] != b'>'
+        && source[cursor] != b'/'
+    {
+        cursor += 1;
+    }
+    let mut result = Vec::with_capacity(expanded.len());
+    let tag_end = end
+        .checked_sub(1)
+        .ok_or_else(|| invalid("empty worksheet XML element"))?;
+    let tag_end = if source.get(tag_end.wrapping_sub(1)) == Some(&b'/') {
+        tag_end - 1
+    } else {
+        tag_end
+    };
+    while cursor < tag_end {
+        while cursor < tag_end && source[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= tag_end || source[cursor] == b'/' {
+            break;
+        }
+        let attribute_start = cursor;
+        while cursor < tag_end
+            && !source[cursor].is_ascii_whitespace()
+            && source[cursor] != b'='
+            && source[cursor] != b'/'
+            && source[cursor] != b'>'
+        {
+            cursor += 1;
+        }
+        let qname = &source[attribute_start..cursor];
+        while cursor < tag_end && source[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= tag_end || source[cursor] != b'=' {
+            return Err(invalid("malformed worksheet XML attribute"));
+        }
+        cursor += 1;
+        while cursor < tag_end && source[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        let quote = *source
+            .get(cursor)
+            .ok_or_else(|| invalid("worksheet XML attribute has no value"))?;
+        if quote != b'\'' && quote != b'"' {
+            return Err(invalid("worksheet XML attribute value is not quoted"));
+        }
+        cursor += 1;
+        let value_start = cursor;
+        while cursor < end && source[cursor] != quote {
+            cursor += 1;
+        }
+        let value_end = cursor;
+        if cursor >= end {
+            return Err(invalid("unterminated worksheet XML attribute"));
+        }
+        cursor += 1;
+        if qname == b"xmlns" || qname.starts_with(b"xmlns:") {
+            continue;
+        }
+        let Some((_, namespace, name)) = expanded.iter().find(|(name, _, _)| name == qname) else {
+            return Err(invalid(
+                "worksheet XML attribute scan disagrees with parser",
+            ));
+        };
+        let remove_start =
+            if attribute_start > start + 1 && source[attribute_start - 1].is_ascii_whitespace() {
+                attribute_start - 1
+            } else {
+                attribute_start
+            };
+        result.push(RawAttribute {
+            namespace: namespace.clone(),
+            name: name.clone(),
+            value_start,
+            value_end,
+            remove_start,
+            end: cursor,
+        });
+    }
+    if result.len() != expanded.len() {
+        return Err(invalid("worksheet XML attribute count changed during scan"));
+    }
+    Ok(result)
+}
+
+fn property_id(raw: &RawSource, property: &RawElement) -> Result<usize> {
+    raw.elements
+        .iter()
+        .position(|candidate| std::ptr::eq(candidate, property))
+        .ok_or_else(|| invalid("OLE source element is not owned by its scan"))
+}
+
+fn patch_anchor_marker(
+    source: &[u8],
+    edits: &mut Vec<Edit>,
+    raw: &RawSource,
+    anchor: &RawElement,
+    name: &str,
+    before: &OleObjectMarker,
+    after: &OleObjectMarker,
+    conformance: OleObjectConformance,
+) -> Result<()> {
+    let anchor_id = property_id(raw, anchor)?;
+    let marker = raw
+        .elements
+        .iter()
+        .find(|element| {
+            element.namespace == conformance.sml()
+                && element.name == name
+                && element.parent == Some(anchor_id)
+        })
+        .ok_or_else(|| invalid(format!("OLE source anchor is missing {name} marker")))?;
+    let marker_id = property_id(raw, marker)?;
+    for (coordinate_name, before_value, after_value) in [
+        ("col", before.column as i128, after.column as i128),
+        (
+            "colOff",
+            before.column_offset as i128,
+            after.column_offset as i128,
+        ),
+        ("row", before.row as i128, after.row as i128),
+        (
+            "rowOff",
+            before.row_offset as i128,
+            after.row_offset as i128,
+        ),
+    ] {
+        if before_value == after_value {
+            continue;
+        }
+        let coordinate = raw
+            .elements
+            .iter()
+            .find(|element| {
+                element.namespace == conformance.xdr()
+                    && element.name == coordinate_name
+                    && element.parent == Some(marker_id)
+            })
+            .ok_or_else(|| {
+                invalid(format!(
+                    "OLE source anchor is missing {name}/{coordinate_name}"
+                ))
+            })?;
+        let start = coordinate.start_end;
+        let end = coordinate
+            .end_start
+            .ok_or_else(|| invalid("OLE source coordinate is not a text element"))?;
+        let (text_start, text_end) = trimmed_text_span(source, start, end)?;
+        add_edit(
+            edits,
+            text_start,
+            text_end,
+            after_value.to_string().into_bytes(),
+        )?;
+    }
+    Ok(())
+}
+
+fn patch_optional_bool_attribute(
+    source: &[u8],
+    edits: &mut Vec<Edit>,
+    elements: &[&RawElement],
+    name: &str,
+    before: Option<bool>,
+    after: Option<bool>,
+) -> Result<()> {
+    let before = before.map(|value| if value { "1" } else { "0" });
+    let after = after.map(|value| if value { "1" } else { "0" });
+    patch_optional_attribute(source, edits, elements, name, before, after)
+}
+
+fn patch_optional_attribute(
+    source: &[u8],
+    edits: &mut Vec<Edit>,
+    elements: &[&RawElement],
+    name: &str,
+    before: Option<&str>,
+    after: Option<&str>,
+) -> Result<()> {
+    if before == after {
+        return Ok(());
+    }
+    for element in elements {
+        let attribute = element
+            .attributes
+            .iter()
+            .find(|attribute| attribute.namespace.is_empty() && attribute.name == name);
+        match (attribute, after) {
+            (Some(attribute), Some(value)) => {
+                let quote = source
+                    .get(attribute.value_start.wrapping_sub(1))
+                    .copied()
+                    .ok_or_else(|| invalid("OLE source attribute quote is missing"))?;
+                let mut replacement = Vec::new();
+                escape_for_quote(&mut replacement, value, quote);
+                add_edit(
+                    edits,
+                    attribute.value_start,
+                    attribute.value_end,
+                    replacement,
+                )?;
+            },
+            (Some(attribute), None) => {
+                add_edit(edits, attribute.remove_start, attribute.end, Vec::new())?;
+            },
+            (None, Some(value)) => {
+                let position = element
+                    .start_end
+                    .checked_sub(1)
+                    .and_then(|position| {
+                        if element.empty && source.get(position.wrapping_sub(1)) == Some(&b'/') {
+                            position.checked_sub(1)
+                        } else {
+                            Some(position)
+                        }
+                    })
+                    .ok_or_else(|| invalid("OLE source attribute insertion offset overflow"))?;
+                let mut replacement = Vec::new();
+                replacement.push(b' ');
+                replacement.extend_from_slice(name.as_bytes());
+                replacement.extend_from_slice(b"=\"");
+                escape_for_quote(&mut replacement, value, b'"');
+                replacement.push(b'"');
+                add_edit(edits, position, position, replacement)?;
+            },
+            (None, None) => {},
+        }
+    }
+    Ok(())
+}
+
+fn trimmed_text_span(source: &[u8], start: usize, end: usize) -> Result<(usize, usize)> {
+    if end < start || end > source.len() {
+        return Err(invalid("OLE source text span is outside worksheet XML"));
+    }
+    let mut start = start;
+    let mut end = end;
+    while start < end && source[start].is_ascii_whitespace() {
+        start += 1;
+    }
+    while end > start && source[end - 1].is_ascii_whitespace() {
+        end -= 1;
+    }
+    if start == end {
+        return Err(invalid("OLE source coordinate has no text"));
+    }
+    Ok((start, end))
+}
+
+#[derive(Debug)]
+struct Edit {
+    start: usize,
+    end: usize,
+    replacement: Vec<u8>,
+}
+
+fn add_edit(edits: &mut Vec<Edit>, start: usize, end: usize, replacement: Vec<u8>) -> Result<()> {
+    if start > end {
+        return Err(invalid("OLE source edit range is inverted"));
+    }
+    edits.push(Edit {
+        start,
+        end,
+        replacement,
+    });
+    Ok(())
+}
+
+fn apply_edits(source: &[u8], mut edits: Vec<Edit>) -> Result<Vec<u8>> {
+    edits.sort_by_key(|edit| Reverse(edit.start));
+    let mut next_start = source.len();
+    for edit in &edits {
+        if edit.start > edit.end || edit.end > next_start || edit.end > source.len() {
+            return Err(invalid("overlapping OLE source edits"));
+        }
+        next_start = edit.start;
+    }
+    let mut delta = 0isize;
+    for edit in &edits {
+        let replacement =
+            isize::try_from(edit.replacement.len()).map_err(|_| limit("updated XML bytes"))?;
+        let removed =
+            isize::try_from(edit.end - edit.start).map_err(|_| limit("updated XML bytes"))?;
+        delta = delta
+            .checked_add(replacement - removed)
+            .ok_or_else(|| limit("updated XML bytes"))?;
+    }
+    let size = if delta >= 0 {
+        source
+            .len()
+            .checked_add(usize::try_from(delta).map_err(|_| limit("updated XML bytes"))?)
+    } else {
+        source
+            .len()
+            .checked_sub(usize::try_from(-delta).map_err(|_| limit("updated XML bytes"))?)
+    }
+    .ok_or_else(|| limit("updated XML bytes"))?;
+    if size > MAX_XML_BYTES {
+        return Err(limit("updated XML bytes"));
+    }
+
+    let mut output = Vec::with_capacity(size);
+    let mut cursor = 0usize;
+    for edit in edits.into_iter().rev() {
+        output.extend_from_slice(&source[cursor..edit.start]);
+        output.extend_from_slice(&edit.replacement);
+        cursor = edit.end;
+    }
+    output.extend_from_slice(&source[cursor..]);
+    Ok(output)
+}
+
+fn escape_for_quote(output: &mut Vec<u8>, value: &str, quote: u8) {
+    for character in value.chars() {
+        match character {
+            '&' => output.extend_from_slice(b"&amp;"),
+            '<' => output.extend_from_slice(b"&lt;"),
+            '>' => output.extend_from_slice(b"&gt;"),
+            '"' if quote == b'"' => output.extend_from_slice(b"&quot;"),
+            '\'' if quote == b'\'' => output.extend_from_slice(b"&apos;"),
+            '\t' => output.extend_from_slice(b"&#x9;"),
+            '\n' => output.extend_from_slice(b"&#xA;"),
+            '\r' => output.extend_from_slice(b"&#xD;"),
+            _ => {
+                let mut bytes = [0; 4];
+                output.extend_from_slice(character.encode_utf8(&mut bytes).as_bytes());
+            },
+        }
+    }
 }
 
 fn write_marker(output: &mut Vec<u8>, name: &str, marker: &OleObjectMarker) {
@@ -396,7 +1208,8 @@ fn make_node(
     strings: &mut usize,
 ) -> Result<Node> {
     let namespace = resolved(reader.resolver().resolve_element(element.name()).0)?;
-    let name = std::str::from_utf8(element.local_name().as_ref())
+    let local_name = element.local_name();
+    let name = std::str::from_utf8(local_name.as_ref())
         .map_err(xml_error)?
         .to_owned();
     add_strings(strings, namespace.len() + name.len())?;
@@ -553,17 +1366,11 @@ fn required<'a>(node: &'a Node, namespace: &str, name: &str) -> Result<&'a str> 
         .filter(|value| !value.is_empty())
         .ok_or_else(|| invalid(format!("{} is missing attribute '{name}'", node.name)))
 }
-fn no_attributes(node: &Node, allowed: &[(&str, &str)]) -> Result<()> {
-    if let Some(attribute) = node.attributes.iter().find(|attribute| {
-        !allowed.contains(&(attribute.namespace.as_str(), attribute.name.as_str()))
-    }) {
-        Err(invalid(format!(
-            "unexpected attribute '{}' on {}",
-            attribute.name, node.name
-        )))
-    } else {
-        Ok(())
-    }
+fn no_attributes(_node: &Node, _allowed: &[(&str, &str)]) -> Result<()> {
+    // Unknown attributes are retained by source-bound transactions. The
+    // semantic loader intentionally ignores them so extension producers can
+    // coexist with the typed core without forcing a lossy rewrite.
+    Ok(())
 }
 fn whitespace(node: &Node) -> Result<()> {
     if node.text.trim().is_empty() {

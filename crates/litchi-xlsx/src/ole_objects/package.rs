@@ -11,6 +11,56 @@ use super::codec::{
 use super::invalid;
 use super::model::*;
 
+/// Validate every worksheet OLE owner and reject orphan embedded payloads.
+pub(super) fn validate_graph(
+    package: &OpcPackage,
+    worksheet_name: &PackURI,
+) -> Result<Option<OleObjects>> {
+    if package
+        .rels()
+        .iter()
+        .any(|relationship| embedded_kind(relationship.reltype()).is_some())
+    {
+        return Err(invalid(
+            "package root cannot source embedded-object relationships",
+        ));
+    }
+
+    let worksheet_names = package
+        .iter_parts()
+        .filter(|part| part.content_type() == ct::SML_WORKSHEET)
+        .map(|part| part.partname().clone())
+        .collect::<Vec<_>>();
+    let mut embedded_targets = HashSet::new();
+    for worksheet in &worksheet_names {
+        let _ = load_ole_objects(package, worksheet)?;
+        let part = package.get_part(worksheet)?;
+        for relationship in part
+            .rels()
+            .iter()
+            .filter(|relationship| embedded_kind(relationship.reltype()).is_some())
+        {
+            if relationship.is_external() {
+                continue;
+            }
+            embedded_targets.insert(relationship.target_partname()?.to_string());
+        }
+    }
+    for part in package.iter_parts().filter(|part| {
+        part.partname().as_str().starts_with("/xl/embeddings/")
+            && (part.content_type() == ct::OFC_OLE_OBJECT
+                || embedded_targets.contains(part.partname().as_str()))
+    }) {
+        if !embedded_targets.contains(part.partname().as_str()) {
+            return Err(invalid(format!(
+                "embedded payload '{}' has no owning relationship",
+                part.partname()
+            )));
+        }
+    }
+    load_ole_objects(package, worksheet_name)
+}
+
 pub fn load_ole_objects(
     package: &OpcPackage,
     worksheet_name: &PackURI,
