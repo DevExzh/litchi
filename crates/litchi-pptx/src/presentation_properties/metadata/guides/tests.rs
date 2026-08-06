@@ -162,3 +162,25 @@ fn stale_publication_is_atomic_and_inverse_restores_the_source() {
         source().as_slice()
     );
 }
+
+#[test]
+fn absent_extension_lists_are_created_and_xml_inverse_is_exact() {
+    let source = format!(r#"<p:presentation xmlns:p="{P}" xmlns:a="{A}"/>"#).into_bytes();
+    let snapshot = Snapshot::from_xml(&source).expect("empty presentation parses");
+    let mut edit = snapshot.edit();
+    edit.push(ListKind::Slide, guide(3))
+        .expect("slide guide insertion is valid");
+    let patch = edit.commit().expect("guide insertion commit").into_patch();
+
+    let mut updated = source.clone();
+    patch.apply_xml(&mut updated).expect("forward XML patch");
+    let parsed = Guides::from_xml(&updated).expect("created guide extension parses");
+    assert_eq!(parsed.slide.as_ref().unwrap().guides[0].id, 3);
+    assert!(String::from_utf8_lossy(&updated).contains("sldGuideLst"));
+
+    patch
+        .inverse()
+        .apply_xml(&mut updated)
+        .expect("inverse XML patch");
+    assert_eq!(updated, source);
+}
