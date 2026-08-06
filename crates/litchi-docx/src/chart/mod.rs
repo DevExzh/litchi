@@ -6,6 +6,7 @@
 mod codec;
 mod model;
 mod package;
+mod transaction;
 
 #[cfg(test)]
 mod tests;
@@ -14,3 +15,4 @@ pub use model::{
     Companion, Conformance, EmbeddedWorkbook, EmbeddedWorkbookContentType, Graph, Resource,
 };
 pub use package::{load, store};
+pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};

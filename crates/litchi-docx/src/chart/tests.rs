@@ -2,7 +2,7 @@ use super::model::{
     A, C, CHART_CT, COLOR_STYLE_CT, COLOR_STYLE_REL, Conformance, DOCUMENT_CT, MAX_WORKBOOK_BYTES,
     STYLE_CT, STYLE_REL, WORKBOOK_CT,
 };
-use super::{load, store};
+use super::{Patch, Snapshot, Transaction, load, store};
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI};
@@ -18,6 +18,28 @@ const LO_EXTERNAL: &[u8] = include_bytes!(
 
 fn document() -> PackURI {
     PackURI::new("/word/document.xml").unwrap()
+}
+
+fn relationship_signature(
+    package: &OpcPackage,
+    part_name: &PackURI,
+) -> Vec<(String, String, String, litchi_opc::TargetMode)> {
+    let mut relationships: Vec<_> = package
+        .get_part(part_name)
+        .unwrap()
+        .rels()
+        .iter()
+        .map(|relationship| {
+            (
+                relationship.r_id().to_owned(),
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.target_mode(),
+            )
+        })
+        .collect();
+    relationships.sort_unstable_by(|left, right| left.0.cmp(&right.0));
+    relationships
 }
 
 fn style_entry(name: &str) -> String {
@@ -205,4 +227,189 @@ fn rejects_external_ole_malformed_orphan_unsupported_and_caps_before_mutation() 
     let before = package.get_part(&name).unwrap().blob().to_vec();
     assert!(store(&mut package, &name, &graph).is_err());
     assert_eq!(package.get_part(&name).unwrap().blob(), before);
+}
+
+#[test]
+fn transaction_noop_keeps_exact_source_bytes_and_relationship_topology() {
+    let (mut package, name) = synthetic(Conformance::Transitional);
+    let graph = Snapshot::load(&package, &name).unwrap();
+    let document_before = package.get_part(&name).unwrap().blob().to_vec();
+    let chart_name = PackURI::new("/word/charts/chart1.xml").unwrap();
+    let chart_before = package.get_part(&chart_name).unwrap().blob().to_vec();
+    let chart_relationships_before = package
+        .get_part(&chart_name)
+        .unwrap()
+        .rels()
+        .iter()
+        .map(|relationship| {
+            (
+                relationship.r_id().to_owned(),
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.target_mode(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let commit = Transaction::new(&mut package, &name)
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(!commit.changed());
+    assert!(commit.patch().is_empty());
+    assert_eq!(commit.snapshot().revision(), graph.revision());
+    assert_eq!(package.get_part(&name).unwrap().blob(), document_before);
+    assert_eq!(package.get_part(&chart_name).unwrap().blob(), chart_before);
+    let chart_relationships_after = package
+        .get_part(&chart_name)
+        .unwrap()
+        .rels()
+        .iter()
+        .map(|relationship| {
+            (
+                relationship.r_id().to_owned(),
+                relationship.reltype().to_owned(),
+                relationship.target_ref().to_owned(),
+                relationship.target_mode(),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(chart_relationships_after, chart_relationships_before);
+}
+
+#[test]
+fn transaction_publishes_opaque_workbook_edits_and_inverse_patch() {
+    let (mut package, name) = synthetic(Conformance::Transitional);
+    let source = Snapshot::load(&package, &name).unwrap();
+    let mut transaction = Transaction::new(&mut package, &name).unwrap();
+    transaction
+        .edit_graph(|graph| {
+            graph.charts[0].workbook.as_mut().unwrap().data = b"changed workbook".to_vec();
+            Ok(())
+        })
+        .unwrap();
+
+    let commit = transaction.commit().unwrap();
+    assert!(commit.changed());
+    assert!(commit.patch().is_changed());
+    assert_eq!(
+        commit.snapshot().charts()[0]
+            .workbook
+            .as_ref()
+            .unwrap()
+            .data,
+        b"changed workbook"
+    );
+    assert_eq!(
+        load(&package, &name).unwrap(),
+        commit.snapshot().graph().clone()
+    );
+    let workbook_name = PackURI::new("/word/embeddings/data1.xlsx").unwrap();
+    assert_eq!(
+        package.get_part(&workbook_name).unwrap().blob(),
+        b"changed workbook"
+    );
+
+    let restored = commit.patch().inverse().apply(&mut package).unwrap();
+    assert_eq!(restored.graph(), source.graph());
+    assert_eq!(restored.source_xml(), source.source_xml());
+    assert_eq!(
+        package.get_part(&workbook_name).unwrap().blob(),
+        b"PK opaque workbook"
+    );
+}
+
+#[test]
+fn chart_patches_reject_stale_sources_and_invalid_graphs_atomically() {
+    let (mut package, name) = synthetic(Conformance::Transitional);
+    let mut transaction = Transaction::new(&mut package, &name).unwrap();
+    transaction
+        .edit_graph(|graph| {
+            graph.charts[0].workbook.as_mut().unwrap().data = b"next workbook".to_vec();
+            Ok(())
+        })
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+
+    let mut stale = package.clone();
+    stale
+        .get_part_mut(&PackURI::new("/word/embeddings/data1.xlsx").unwrap())
+        .unwrap()
+        .set_blob(b"stale workbook".to_vec());
+    let workbook_name = PackURI::new("/word/embeddings/data1.xlsx").unwrap();
+    let stale_before = stale.get_part(&workbook_name).unwrap().blob().to_vec();
+    assert!(commit.patch().apply(&mut stale).is_err());
+    assert_eq!(stale.get_part(&workbook_name).unwrap().blob(), stale_before);
+
+    let (mut package, name) = synthetic(Conformance::Transitional);
+    let before = package
+        .get_part(&PackURI::new("/word/embeddings/data1.xlsx").unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    let mut transaction = Transaction::new(&mut package, &name).unwrap();
+    assert!(
+        transaction
+            .edit_graph(|graph| {
+                graph.charts[0].data = b"not chart XML".to_vec();
+                Ok(())
+            })
+            .is_err()
+    );
+    assert!(!transaction.is_changed());
+    let _ = transaction.rollback();
+    assert_eq!(
+        package
+            .get_part(&PackURI::new("/word/embeddings/data1.xlsx").unwrap())
+            .unwrap()
+            .blob(),
+        before
+    );
+}
+
+#[test]
+fn patch_round_trip_keeps_style_color_and_workbook_relationship_edges() {
+    let (mut package, name) = synthetic(Conformance::Strict);
+    let document_relationships = relationship_signature(&package, &name);
+    let chart_name = PackURI::new("/word/charts/chart1.xml").unwrap();
+    let chart_relationships = relationship_signature(&package, &chart_name);
+    let source_package = package.clone();
+    let mut transaction = Transaction::new(&mut package, &name).unwrap();
+    transaction
+        .edit_graph(|graph| {
+            graph.charts[0].styles[0].data = style_xml().replace("FF0000", "00FF00").into_bytes();
+            graph.charts[0].color_styles[0].data =
+                color_style_xml().replace("FF0000", "0000FF").into_bytes();
+            Ok(())
+        })
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    let patch: Patch = commit.patch().clone();
+    let before = patch.before().graph().clone();
+    let mut replay = source_package;
+    let after = patch.apply(&mut replay).unwrap();
+    assert_eq!(after.graph(), patch.after().graph());
+    assert_ne!(after.graph(), &before);
+    assert_eq!(
+        replay
+            .get_part(&PackURI::new("/word/charts/style1.xml").unwrap())
+            .unwrap()
+            .blob(),
+        patch.after().charts()[0].styles[0].data
+    );
+    assert_eq!(
+        replay
+            .get_part(&PackURI::new("/word/charts/colors1.xml").unwrap())
+            .unwrap()
+            .blob(),
+        patch.after().charts()[0].color_styles[0].data
+    );
+    assert_eq!(
+        relationship_signature(&replay, &name),
+        document_relationships
+    );
+    assert_eq!(
+        relationship_signature(&replay, &chart_name),
+        chart_relationships
+    );
 }
