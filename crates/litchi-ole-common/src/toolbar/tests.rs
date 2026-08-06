@@ -277,3 +277,137 @@ fn general_info_rejects_fields_without_their_presence_flags() {
     );
     assert!(GeneralInfo::parse(&[GeneralFlags::default().with_save_text(true).raw()]).is_err());
 }
+
+fn button_control() -> Control<'static> {
+    let general_flags = GeneralFlags::default()
+        .with_save_text(true)
+        .with_save_misc_ui_strings(true)
+        .with_disabled(true);
+    let general = ok(GeneralInfo::new(
+        general_flags,
+        Some(text("Caption")),
+        Some(text("Description")),
+        Some(text("Tooltip")),
+        None,
+    ));
+    let data = ok(Data::new(general, vec![0xA5, 0x5A, 0xFE]));
+    let header = ok(ControlHeader::new(
+        ControlType::Button,
+        0x0071,
+        ControlFlags::default(),
+        SpecificFlags::default()
+            .with_save_ui_strings(true)
+            .with_text_icon(TextIcon::TextAndIcon),
+        2,
+        None,
+    ));
+    ok(Control::from_parts(
+        header,
+        vec![0xCC, 0xDD],
+        Body::data(data),
+    ))
+}
+
+#[test]
+fn control_snapshot_edits_text_icon_and_flags_without_losing_opaque_bytes() {
+    let source = ok(Snapshot::from_control(button_control()));
+    let source_bytes = source.bytes().to_vec();
+    let mut transaction = source.edit();
+    ok(transaction.set_custom_text(Some("Renamed")));
+    ok(transaction.set_text_icon(TextIcon::TextOnly));
+    ok(transaction.set_control_flags(ControlFlags::default().with_hidden(true)));
+
+    let commit = ok(transaction.commit());
+    assert!(commit.changed());
+    assert_eq!(source.bytes(), source_bytes.as_slice());
+    assert_eq!(commit.snapshot().control().prefix(), &[0xCC, 0xDD]);
+    assert_eq!(
+        commit.snapshot().control().data().unwrap().specific(),
+        &[0xA5, 0x5A, 0xFE]
+    );
+    assert_eq!(
+        commit
+            .snapshot()
+            .control()
+            .data()
+            .unwrap()
+            .general()
+            .custom_text()
+            .unwrap()
+            .text(),
+        "Renamed"
+    );
+    assert_eq!(
+        commit.snapshot().header().specifics().text_icon(),
+        TextIcon::TextOnly
+    );
+    assert!(commit.snapshot().header().flags().hidden());
+
+    let applied = ok(commit.patch().apply(&source));
+    assert_eq!(applied, *commit.snapshot());
+    let reverted = ok(commit.patch().revert(commit.snapshot()));
+    assert_eq!(reverted, source);
+}
+
+#[test]
+fn toolbar_control_no_op_is_exact_and_stale_sources_are_rejected() {
+    let source = ok(Snapshot::from_control(button_control()));
+    let commit = ok(source.edit().commit());
+    assert!(!commit.changed());
+    assert!(commit.patch().is_noop());
+    assert!(commit.patch().change().is_none());
+    assert_eq!(commit.snapshot().bytes(), source.bytes());
+
+    let other = {
+        let mut transaction = source.edit();
+        ok(transaction.set_custom_text(Some("Other")));
+        ok(transaction.commit()).into_parts().0
+    };
+    let mut transaction = source.edit();
+    ok(transaction.set_text_icon(TextIcon::IconOnly));
+    let patch = ok(transaction.commit()).into_parts().1;
+    assert!(patch.apply(&other).is_err());
+}
+
+#[test]
+fn toolbar_control_edits_fail_atomically_and_opaque_payloads_stay_inert() {
+    let source = ok(Snapshot::from_control(button_control()));
+    let mut transaction = source.edit();
+    assert!(
+        transaction
+            .set_ui_strings(Some("description"), None)
+            .is_err()
+    );
+    assert_eq!(transaction.control(), source.control());
+    assert!(
+        transaction
+            .set_specific_flags(SpecificFlags::from_raw(0x8000_0000))
+            .is_err()
+    );
+    assert_eq!(transaction.control(), source.control());
+    let too_long = "x".repeat(256);
+    assert!(transaction.set_custom_text(Some(&too_long)).is_err());
+    assert_eq!(transaction.control(), source.control());
+
+    let header = ok(ControlHeader::new(
+        ControlType::Button,
+        1,
+        ControlFlags::default(),
+        SpecificFlags::default().with_text_icon(TextIcon::IconOnly),
+        0,
+        None,
+    ));
+    let mut bytes = header.to_bytes();
+    bytes.extend_from_slice(&[0xFE, 0xED, 0xFA, 0xCE]);
+    let opaque = ok(Snapshot::parse_with_prefix(&bytes, 2));
+    assert_eq!(opaque.body().opaque_bytes(), Some(&[0xFA, 0xCE][..]));
+    let mut opaque_edit = opaque.edit();
+    assert!(opaque_edit.set_custom_text(Some("not decoded")).is_err());
+    ok(opaque_edit.set_text_icon(TextIcon::TextAndIcon));
+    let opaque_commit = ok(opaque_edit.commit());
+    assert_eq!(opaque_commit.snapshot().control().prefix(), &[0xFE, 0xED]);
+    assert_eq!(
+        opaque_commit.snapshot().body().opaque_bytes(),
+        Some(&[0xFA, 0xCE][..])
+    );
+}

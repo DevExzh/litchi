@@ -2,6 +2,7 @@ use super::model::{
     ButtonFlags, ControlFlags, ControlHeader, Data, Error, ExtraInfo, Flags, GeneralFlags,
     GeneralInfo, Header, Restrictions, SpecificFlags, WString,
 };
+use super::{Body, ControlType};
 
 const TOOLBAR_SIGNATURE: u8 = 0x02;
 const CONTROL_SIGNATURE: u8 = 0x03;
@@ -377,7 +378,7 @@ impl ControlHeader {
             "TBCHeader version",
         )?;
         let flags = ControlFlags::from_raw(cursor.u8("TBCFlags")?);
-        let control_type = super::model::ControlType::from_raw(cursor.u8("TBCHeader type")?);
+        let control_type = ControlType::from_raw(cursor.u8("TBCHeader type")?);
         let control_id = cursor.u16("TBCHeader control id")?;
         let specifics = SpecificFlags::from_raw(cursor.u32("TBCSFlags")?);
         let priority = cursor.u8("TBCHeader priority")?;
@@ -429,6 +430,22 @@ impl ControlHeader {
             output.extend_from_slice(&dimensions.height().to_le_bytes());
         }
         output
+    }
+}
+
+pub(crate) fn parse_body<'a>(header: &ControlHeader, data: &'a [u8]) -> Body<'a> {
+    if data.is_empty() {
+        return Body::Empty;
+    }
+    if matches!(
+        header.control_type(),
+        ControlType::ActiveX | ControlType::Unknown(_)
+    ) {
+        return Body::Opaque(data.into());
+    }
+    match Data::parse(data) {
+        Ok(value) => Body::Data(value),
+        Err(_) => Body::Opaque(data.into()),
     }
 }
 
