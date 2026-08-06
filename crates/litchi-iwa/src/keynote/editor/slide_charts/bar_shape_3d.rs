@@ -1,7 +1,7 @@
 //! Native 3D bar-shape CRUD for Keynote slide charts.
 
 use super::*;
-use crate::charts::Chart3dBarShape;
+use crate::charts::BarShape;
 use crate::charts::bar_shape_3d::{
     chart_3d_bar_shape as read_native_chart_3d_bar_shape,
     set_chart_3d_bar_shape as set_native_chart_3d_bar_shape,
@@ -13,7 +13,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<Chart3dBarShape> {
+    ) -> Result<BarShape> {
         let graph = chart_graph(self, slide_index, drawable_object_id)?;
         require_3d_bar_shape(graph.info.kind, drawable_object_id)?;
         read_native_chart_3d_bar_shape(
@@ -29,7 +29,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        shape: Chart3dBarShape,
+        shape: BarShape,
     ) -> Result<()> {
         let graph = chart_graph(self, slide_index, drawable_object_id)?;
         require_3d_bar_shape(graph.info.kind, drawable_object_id)?;
@@ -92,7 +92,7 @@ mod tests {
             )
             .unwrap();
         editor
-            .set_slide_chart_3d_bar_shape(0, chart.drawable_object_id, Chart3dBarShape::Cylinder)
+            .set_slide_chart_3d_bar_shape(0, chart.drawable_object_id, BarShape::Cylinder)
             .unwrap();
         let duplicate = editor
             .duplicate_slide_chart(0, chart_selector(&editor, &chart))
@@ -102,13 +102,13 @@ mod tests {
             reopened
                 .slide_chart_3d_bar_shape(0, chart.drawable_object_id)
                 .unwrap(),
-            Chart3dBarShape::Cylinder
+            BarShape::Cylinder
         );
         assert_eq!(
             reopened
                 .slide_chart_3d_bar_shape(0, duplicate.drawable_object_id)
                 .unwrap(),
-            Chart3dBarShape::Cylinder
+            BarShape::Cylinder
         );
     }
 

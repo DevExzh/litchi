@@ -1,7 +1,7 @@
 //! Native 3D bar-shape CRUD for Pages body charts.
 
 use super::*;
-use crate::charts::Chart3dBarShape;
+use crate::charts::BarShape;
 use crate::charts::bar_shape_3d::{
     chart_3d_bar_shape as read_native_chart_3d_bar_shape,
     set_chart_3d_bar_shape as set_native_chart_3d_bar_shape,
@@ -9,7 +9,7 @@ use crate::charts::bar_shape_3d::{
 
 impl PagesEditor {
     /// Read the rectangular/cylindrical geometry of one 3D bar or column chart.
-    pub fn body_chart_3d_bar_shape(&self, drawable_object_id: u64) -> Result<Chart3dBarShape> {
+    pub fn body_chart_3d_bar_shape(&self, drawable_object_id: u64) -> Result<BarShape> {
         let graph = body_chart_graph(self, drawable_object_id)?;
         require_3d_bar_shape(graph.info.kind, drawable_object_id)?;
         read_native_chart_3d_bar_shape(
@@ -24,7 +24,7 @@ impl PagesEditor {
     pub fn set_body_chart_3d_bar_shape(
         &mut self,
         drawable_object_id: u64,
-        shape: Chart3dBarShape,
+        shape: BarShape,
     ) -> Result<()> {
         let graph = body_chart_graph(self, drawable_object_id)?;
         require_3d_bar_shape(graph.info.kind, drawable_object_id)?;
@@ -90,10 +90,10 @@ mod tests {
             editor
                 .body_chart_3d_bar_shape(chart.drawable_object_id)
                 .unwrap(),
-            Chart3dBarShape::Rectangle
+            BarShape::Rectangle
         );
         editor
-            .set_body_chart_3d_bar_shape(chart.drawable_object_id, Chart3dBarShape::Cylinder)
+            .set_body_chart_3d_bar_shape(chart.drawable_object_id, BarShape::Cylinder)
             .unwrap();
         let duplicate = editor
             .duplicate_body_chart(chart.drawable_object_id, 1)
@@ -103,13 +103,13 @@ mod tests {
             reopened
                 .body_chart_3d_bar_shape(chart.drawable_object_id)
                 .unwrap(),
-            Chart3dBarShape::Cylinder
+            BarShape::Cylinder
         );
         assert_eq!(
             reopened
                 .body_chart_3d_bar_shape(duplicate.drawable_object_id)
                 .unwrap(),
-            Chart3dBarShape::Cylinder
+            BarShape::Cylinder
         );
     }
 

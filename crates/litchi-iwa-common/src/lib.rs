@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 pub mod chart;
+pub mod chart3d;
 pub mod color;
 pub mod comment;
 /// Dependency-free formula vocabulary shared by iWork table owners.

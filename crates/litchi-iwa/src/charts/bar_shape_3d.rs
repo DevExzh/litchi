@@ -1,10 +1,10 @@
-//! Lossless native 3D bar-shape storage and mutation.
+//! Native 3D bar-shape storage and mutation.
 //!
 //! Column and bar charts expose `Rectangle` and `Cylinder` in the 3D Scene
 //! inspector. iWork stores that selection as a generated chart non-style
-//! integer while this module exposes a closed enum and preserves unrelated
-//! protobuf fields byte-for-byte.
+//! integer while this module preserves unrelated protobuf fields byte-for-byte.
 
+use litchi_iwa_common::chart3d::BarShape;
 use prost::Message;
 
 use crate::charts::non_style::{
@@ -17,37 +17,6 @@ use crate::{Error, IWorkPackage, Result};
 
 /// `tschchartinfodefault3dbarshape` in the generated chart non-style archive.
 const CHART_3D_BAR_SHAPE_FIELD: u32 = 1;
-const RECTANGLE_NATIVE_VALUE: i32 = 0;
-const CYLINDER_NATIVE_VALUE: i32 = 1;
-
-/// Geometry used for bars or columns in a native 3D chart.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Chart3dBarShape {
-    /// Rectangular prisms, the native default.
-    #[default]
-    Rectangle,
-    /// Circular cylinders.
-    Cylinder,
-}
-
-impl Chart3dBarShape {
-    const fn native(self) -> i32 {
-        match self {
-            Self::Rectangle => RECTANGLE_NATIVE_VALUE,
-            Self::Cylinder => CYLINDER_NATIVE_VALUE,
-        }
-    }
-
-    fn from_native(value: i32) -> Result<Self> {
-        match value {
-            RECTANGLE_NATIVE_VALUE => Ok(Self::Rectangle),
-            CYLINDER_NATIVE_VALUE => Ok(Self::Cylinder),
-            _ => Err(Error::InvalidFormat(format!(
-                "unsupported native chart 3D bar shape {value}"
-            ))),
-        }
-    }
-}
 
 /// Read one chart's effective native 3D bar shape.
 pub(crate) fn chart_3d_bar_shape(
@@ -55,7 +24,7 @@ pub(crate) fn chart_3d_bar_shape(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-) -> Result<Chart3dBarShape> {
+) -> Result<BarShape> {
     chart_non_style_slot(
         package,
         chart_archive_name,
@@ -71,7 +40,7 @@ pub(crate) fn set_chart_3d_bar_shape(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    shape: Chart3dBarShape,
+    shape: BarShape,
 ) -> Result<()> {
     let slot = chart_non_style_slot(
         package,
@@ -92,25 +61,24 @@ pub(crate) fn set_chart_3d_bar_shape(
     Ok(())
 }
 
-fn read_chart_3d_bar_shape(data: &[u8]) -> Result<Chart3dBarShape> {
+fn read_chart_3d_bar_shape(data: &[u8]) -> Result<BarShape> {
     let Some(extension) = generated_chart_non_style_extension(data)? else {
-        return Ok(Chart3dBarShape::Rectangle);
+        return Ok(BarShape::Rectangle);
     };
     let generated = tsch::generated::ChartNonStyleArchive::decode(extension)?;
-    generated
+    Ok(generated
         .tschchartinfodefault3dbarshape
-        .map(Chart3dBarShape::from_native)
-        .transpose()
-        .map(|shape| shape.unwrap_or_default())
+        .map(BarShape::from_native)
+        .unwrap_or_default())
 }
 
-fn patch_chart_3d_bar_shape(data: &[u8], shape: Chart3dBarShape) -> Result<Vec<u8>> {
+fn patch_chart_3d_bar_shape(data: &[u8], shape: BarShape) -> Result<Vec<u8>> {
     let Some(extension) = generated_chart_non_style_extension(data)? else {
-        if shape == Chart3dBarShape::Rectangle {
+        if shape == BarShape::Rectangle {
             return Ok(data.to_vec());
         }
         let generated = tsch::generated::ChartNonStyleArchive {
-            tschchartinfodefault3dbarshape: Some(shape.native()),
+            tschchartinfodefault3dbarshape: Some(shape.native_value()),
             ..Default::default()
         };
         let encoded = generated.encode_to_vec();
@@ -126,8 +94,8 @@ fn patch_chart_3d_bar_shape(data: &[u8], shape: Chart3dBarShape) -> Result<Vec<u
 
     let generated = tsch::generated::ChartNonStyleArchive::decode(extension)?;
     let present = generated.tschchartinfodefault3dbarshape.is_some();
-    let native = (shape != Chart3dBarShape::Rectangle)
-        .then_some(u64::from(shape == Chart3dBarShape::Cylinder));
+    let native =
+        (shape != BarShape::Rectangle).then_some(i64::from(shape.native_value()).cast_unsigned());
     let extension = patch_varint_field(extension, CHART_3D_BAR_SHAPE_FIELD, present, native)?;
     let patched = patch_length_delimited_field(
         data,
@@ -139,7 +107,7 @@ fn patch_chart_3d_bar_shape(data: &[u8], shape: Chart3dBarShape) -> Result<Vec<u
     Ok(patched)
 }
 
-fn validate_patched_chart_3d_bar_shape(data: &[u8], expected: Chart3dBarShape) -> Result<()> {
+fn validate_patched_chart_3d_bar_shape(data: &[u8], expected: BarShape) -> Result<()> {
     if read_chart_3d_bar_shape(data)? != expected {
         return Err(Error::InvalidFormat(
             "chart 3D bar-shape wire patch failed validation".to_owned(),
@@ -159,30 +127,31 @@ mod tests {
     const UNKNOWN_VALUE: u64 = 42;
 
     #[test]
-    fn bar_shapes_are_closed_and_rectangle_is_the_native_default() {
-        assert_eq!(Chart3dBarShape::default(), Chart3dBarShape::Rectangle);
+    fn bar_shapes_use_known_values_and_preserve_unknown_values() {
+        assert_eq!(BarShape::default(), BarShape::Rectangle);
         assert_eq!(
-            Chart3dBarShape::from_native(RECTANGLE_NATIVE_VALUE).unwrap(),
-            Chart3dBarShape::Rectangle
+            BarShape::from_native(BarShape::Rectangle.native_value()),
+            BarShape::Rectangle
         );
         assert_eq!(
-            Chart3dBarShape::from_native(CYLINDER_NATIVE_VALUE).unwrap(),
-            Chart3dBarShape::Cylinder
+            BarShape::from_native(BarShape::Cylinder.native_value()),
+            BarShape::Cylinder
         );
-        assert!(Chart3dBarShape::from_native(-1).is_err());
-        assert!(Chart3dBarShape::from_native(2).is_err());
+        assert!(BarShape::from_native(-1).is_unsupported());
+        assert!(BarShape::from_native(2).is_unsupported());
     }
 
     #[test]
     fn bar_shape_patch_preserves_other_fields_and_unknown_data() {
         let mut extension = tsch::generated::ChartNonStyleArchive {
-            tschchartinfodefault3dbarshape: Some(RECTANGLE_NATIVE_VALUE),
+            tschchartinfodefault3dbarshape: Some(BarShape::Rectangle.native_value()),
             tschchartinfodefault3dbeveledges: Some(true),
             tschchartinfodefaultshowlegend: Some(true),
             ..Default::default()
         }
         .encode_to_vec();
         append_varint_field(&mut extension, UNKNOWN_EXTENSION_FIELD, UNKNOWN_VALUE).unwrap();
+        let original_extension = extension.clone();
         let mut original = tsch::ChartNonStyleArchive {
             super_: Some(tss::StyleArchive::default()),
         }
@@ -195,24 +164,28 @@ mod tests {
         .unwrap();
         append_varint_field(&mut original, UNKNOWN_OUTER_FIELD, UNKNOWN_VALUE).unwrap();
 
-        let cylinder = patch_chart_3d_bar_shape(&original, Chart3dBarShape::Cylinder).unwrap();
+        let unknown = BarShape::from_native(9_001);
+        let patched = patch_chart_3d_bar_shape(&original, unknown).unwrap();
+        assert_eq!(read_chart_3d_bar_shape(&patched).unwrap(), unknown);
         assert_eq!(
-            read_chart_3d_bar_shape(&cylinder).unwrap(),
-            Chart3dBarShape::Cylinder
+            field_raw(&patched, UNKNOWN_OUTER_FIELD),
+            field_raw(&original, UNKNOWN_OUTER_FIELD)
         );
-        assert!(has_field(&cylinder, UNKNOWN_OUTER_FIELD));
-        let extension = generated_chart_non_style_extension(&cylinder)
+        let extension = generated_chart_non_style_extension(&patched)
             .unwrap()
             .unwrap();
-        assert!(has_field(extension, UNKNOWN_EXTENSION_FIELD));
+        assert_eq!(
+            field_raw(extension, UNKNOWN_EXTENSION_FIELD),
+            field_raw(&original_extension, UNKNOWN_EXTENSION_FIELD)
+        );
         let decoded = tsch::generated::ChartNonStyleArchive::decode(extension).unwrap();
         assert_eq!(decoded.tschchartinfodefault3dbeveledges, Some(true));
         assert_eq!(decoded.tschchartinfodefaultshowlegend, Some(true));
 
-        let rectangle = patch_chart_3d_bar_shape(&cylinder, Chart3dBarShape::Rectangle).unwrap();
+        let rectangle = patch_chart_3d_bar_shape(&patched, BarShape::Rectangle).unwrap();
         assert_eq!(
             read_chart_3d_bar_shape(&rectangle).unwrap(),
-            Chart3dBarShape::Rectangle
+            BarShape::Rectangle
         );
         assert_eq!(
             tsch::generated::ChartNonStyleArchive::decode(
@@ -227,9 +200,9 @@ mod tests {
     }
 
     #[test]
-    fn malformed_native_bar_shape_is_rejected() {
+    fn unknown_native_bar_shape_is_preserved() {
         let generated = tsch::generated::ChartNonStyleArchive {
-            tschchartinfodefault3dbarshape: Some(2),
+            tschchartinfodefault3dbarshape: Some(-7),
             ..Default::default()
         };
         let mut outer = tsch::ChartNonStyleArchive {
@@ -242,13 +215,25 @@ mod tests {
             &generated.encode_to_vec(),
         )
         .unwrap();
-        assert!(read_chart_3d_bar_shape(&outer).is_err());
+        assert_eq!(
+            read_chart_3d_bar_shape(&outer).unwrap(),
+            BarShape::from_native(-7)
+        );
+        let patched = patch_chart_3d_bar_shape(&outer, BarShape::from_native(-7)).unwrap();
+        assert_eq!(
+            read_chart_3d_bar_shape(&patched).unwrap(),
+            BarShape::from_native(-7)
+        );
     }
 
-    fn has_field(data: &[u8], field_number: u32) -> bool {
+    fn field_raw(data: &[u8], field_number: u32) -> Vec<u8> {
         parse_wire_fields(data)
             .unwrap()
-            .iter()
-            .any(|field| field.number() == field_number)
+            .into_iter()
+            .find(|field| field.number() == field_number)
+            .unwrap()
+            .raw(data)
+            .unwrap()
+            .to_vec()
     }
 }

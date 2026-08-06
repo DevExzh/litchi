@@ -98,7 +98,6 @@ pub use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
 pub(crate) use archive::IWorkChartArchive;
 pub use arrangement::ChartArrangement;
 pub use axis_gridline_stroke::{ChartAxisGridline, ChartAxisGridlineStroke};
-pub use bar_shape_3d::Chart3dBarShape;
 pub use data::ChartData;
 pub use depth_3d::Chart3dDepth;
 pub use donut_inner_radius::ChartDonutInnerRadius;
@@ -123,6 +122,7 @@ pub use litchi_iwa_common::chart::pie::{
 };
 pub use litchi_iwa_common::chart::series_labels::{Index, Visibility};
 pub use litchi_iwa_common::chart::{Direction, DirectionKind};
+pub use litchi_iwa_common::chart3d::BarShape;
 pub use metadata_extractor::ChartMetadata;
 pub use pie_label_distance::ChartPieLabelDistance;
 pub use pie_start_angle::ChartPieStartAngle;
