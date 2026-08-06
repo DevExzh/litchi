@@ -42,13 +42,13 @@ fn ordinary_text_box_crud_is_guarded_and_byte_exact() {
     assert_eq!(text_boxes.len(), 1);
     assert_eq!(text_boxes[0].drawable_object_id, 50);
     assert_eq!(text_boxes[0].storage.object_id, 53);
-    assert_eq!(text_boxes[0].storage.text, "Source");
+    assert_eq!(text_boxes[0].storage.storage.text(), "Source");
 
     editor
         .replace_sheet_text_box_text(2, 50, 0..6, "Edited 🚀")
         .unwrap();
     assert_eq!(
-        editor.sheet_text_boxes(2).unwrap()[0].storage.text,
+        editor.sheet_text_boxes(2).unwrap()[0].storage.storage.text(),
         "Edited 🚀"
     );
     editor.set_sheet_text_box_text(2, 50, "Source").unwrap();
@@ -134,7 +134,7 @@ fn sheet_owned_drawable_comment_crud_is_guarded_and_byte_exact() {
     assert_eq!(comment.drawable_id.get(), 50);
     assert_eq!(comment.comment.text, "Sheet annotation");
     assert_eq!(
-        editor.sheet_text_boxes(2).unwrap()[0].storage.text,
+        editor.sheet_text_boxes(2).unwrap()[0].storage.storage.text(),
         "Source"
     );
     let bytes = editor.to_bytes().unwrap();
@@ -240,10 +240,10 @@ fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
         .unwrap();
     assert_ne!(created.drawable_object_id, 50);
     assert_ne!(created.storage.object_id, 53);
-    assert_eq!(created.storage.text, "Independent clone");
+    assert_eq!(created.storage.storage.text(), "Independent clone");
     assert_eq!(editor.sheet_text_boxes(2).unwrap().len(), 2);
     assert_eq!(
-        editor.sheet_text_boxes(2).unwrap()[0].storage.text,
+        editor.sheet_text_boxes(2).unwrap()[0].storage.storage.text(),
         "Source"
     );
     let clone_geometry = editor
@@ -260,7 +260,7 @@ fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
     let removed = editor
         .remove_sheet_text_box(2, created.drawable_object_id)
         .unwrap();
-    assert_eq!(removed.text_box.storage.text, "Independent clone");
+    assert_eq!(removed.text_box.storage.storage.text(), "Independent clone");
     assert_eq!(editor.sheet_text_boxes(2).unwrap().len(), 1);
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
@@ -321,7 +321,7 @@ fn populated_sheet_duplicate_is_ordered_and_independent() {
         .unwrap()
         .remove(0);
     assert_ne!(copied_text_box.drawable_object_id, SOURCE_TEXT_BOX_ID);
-    assert_eq!(copied_text_box.storage.text, "Source");
+    assert_eq!(copied_text_box.storage.storage.text(), "Source");
 
     editor
         .set_cell(
@@ -341,7 +341,8 @@ fn populated_sheet_duplicate_is_ordered_and_independent() {
     assert_eq!(
         editor.sheet_text_boxes(SOURCE_SHEET_ID).unwrap()[0]
             .storage
-            .text,
+            .storage
+            .text(),
         "Source"
     );
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -8869,7 +8870,7 @@ fn numbers_object_catalog_is_bounded_and_measured() {
     let archive_count = package.iwa_entry_names().count();
     let mut catalog = NumbersObjectCatalog::build(&package).unwrap();
     let storage = catalog.text_storage_info(&package, 53).unwrap();
-    assert_eq!(storage.text, "Source");
+    assert_eq!(storage.storage.text(), "Source");
     let stats = catalog.stats();
 
     assert_eq!(stats.archives_scanned, archive_count);

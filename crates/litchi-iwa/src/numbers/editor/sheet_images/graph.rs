@@ -454,11 +454,19 @@ pub(super) fn image_title_caption(
     Ok(DrawableTitleCaption {
         title: title
             .storage_id
-            .map(|storage_id| text_editor.storage(storage_id).map(|storage| storage.text))
+            .map(|storage_id| {
+                text_editor
+                    .storage(storage_id)
+                    .map(|storage| storage.storage.into_text())
+            })
             .transpose()?,
         caption: caption
             .storage_id
-            .map(|storage_id| text_editor.storage(storage_id).map(|storage| storage.text))
+            .map(|storage_id| {
+                text_editor
+                    .storage(storage_id)
+                    .map(|storage| storage.storage.into_text())
+            })
             .transpose()?,
     })
 }

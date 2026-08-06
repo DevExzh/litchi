@@ -3874,7 +3874,7 @@ impl KeynoteEditor {
         let created_graph = verified.text_box_graph(slide_index, new_drawable_id)?;
         if created.role != KeynoteSlideTextRole::TextBox
             || created.storage.object_id != new_storage_id
-            || created.storage.text != text
+            || created.storage.storage.text() != text
             || created_graph.object_ids.len() != source.object_ids.len()
         {
             return Err(Error::InvalidFormat(

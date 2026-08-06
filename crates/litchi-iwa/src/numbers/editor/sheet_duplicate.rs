@@ -230,7 +230,12 @@ fn classify_sheet_drawables(
     let text_boxes = editor
         .sheet_text_boxes(sheet_id)?
         .into_iter()
-        .map(|text_box| (text_box.drawable_object_id, text_box.storage.text))
+        .map(|text_box| {
+            (
+                text_box.drawable_object_id,
+                text_box.storage.storage.into_text(),
+            )
+        })
         .collect::<HashMap<_, _>>();
     let images = editor
         .sheet_images(sheet_id)?
@@ -684,7 +689,7 @@ mod tests {
         assert_ne!(copied.drawable_object_id, source.drawable_object_id);
         assert_ne!(copied.storage.object_id, source.storage.object_id);
         assert_eq!(copied.sheet_id, duplicate.object_id);
-        assert_eq!(copied.storage.text, source.storage.text);
+        assert_eq!(copied.storage.storage, source.storage.storage);
         assert_eq!(copied.preset, source.preset);
         assert_eq!(copied.geometry, source.geometry);
         assert_eq!(
@@ -723,7 +728,7 @@ mod tests {
             .sheet_shapes(source_sheet.object_id)
             .unwrap()
             .remove(0);
-        assert_eq!(original.storage.text, "Native-style shape");
+        assert_eq!(original.storage.storage.text(), "Native-style shape");
         assert_eq!(original.geometry, source.geometry);
         assert_eq!(
             editor
@@ -741,8 +746,8 @@ mod tests {
             .sheet_shapes(duplicate.object_id)
             .unwrap()
             .remove(0);
-        assert_eq!(reopened_source.storage.text, "Native-style shape");
-        assert_eq!(reopened_copy.storage.text, "Independent copy");
+        assert_eq!(reopened_source.storage.storage.text(), "Native-style shape");
+        assert_eq!(reopened_copy.storage.storage.text(), "Independent copy");
         assert_ne!(
             reopened_source.storage.object_id,
             reopened_copy.storage.object_id

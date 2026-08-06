@@ -127,6 +127,7 @@ use super::text_comment_types::{
 };
 use litchi_iwa_text::date_time::{DisplayText, Settings};
 use litchi_iwa_text::position::{TextPosition, TextRange};
+use litchi_iwa_text::storage::Storage;
 use litchi_iwa_text::{TextLanguage, TextLanguageRun};
 
 /// A discoverable text storage within an iWork package.
@@ -135,7 +136,7 @@ pub struct TextStorageInfo {
     pub object_id: u64,
     pub message_type: u32,
     pub kind: Option<i32>,
-    pub text: String,
+    pub storage: Storage,
 }
 
 /// Mutable editor for the TSWP text layer shared by Pages, Numbers, and Keynote.
@@ -168,7 +169,7 @@ impl IWorkTextEditor {
                 object_id: location.object_id,
                 message_type: location.message_type,
                 kind: location.storage.kind,
-                text: location.storage.text.concat(),
+                storage: Storage::from_text(location.storage.text.concat()),
             })
             .collect::<Vec<_>>();
         storages.sort_by_key(|storage| storage.object_id);
@@ -181,7 +182,7 @@ impl IWorkTextEditor {
             object_id,
             message_type: location.message_type,
             kind: location.storage.kind,
-            text: location.storage.text.concat(),
+            storage: Storage::from_text(location.storage.text.concat()),
         })
     }
 
@@ -209,7 +210,7 @@ impl IWorkTextEditor {
         let storage = self.storage(object_id)?;
         self.replace_text(
             object_id,
-            0..storage.text.encode_utf16().count(),
+            0..storage.storage.text().encode_utf16().count(),
             replacement,
         )
     }
@@ -2959,7 +2960,7 @@ mod tests {
             },
         ]));
 
-        assert_eq!(editor.storage(42).unwrap().text, "Source");
+        assert_eq!(editor.storage(42).unwrap().storage.text(), "Source");
         editor.set_text(42, "Updated").unwrap();
         let archive = editor.package().archive("Index/Document.iwa").unwrap();
         let object = archive.object(42).unwrap();

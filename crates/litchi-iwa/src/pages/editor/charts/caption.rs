@@ -38,7 +38,7 @@ fn body_chart_caption(editor: &PagesEditor, drawable_object_id: u64) -> Result<O
         .map(|storage_id| {
             IWorkTextEditor::from_package(editor.package().clone())
                 .storage(storage_id)
-                .map(|storage| storage.text)
+                .map(|storage| storage.storage.into_text())
         })
         .transpose()
 }

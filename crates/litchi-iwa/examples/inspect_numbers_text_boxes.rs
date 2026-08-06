@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "  text_box_index={index} drawable={} storage={} text={:?} geometry={geometry:?} properties={properties:?} columns={columns:?} text_layout={text_layout:?} comment={:?}",
                 text_box.drawable_object_id,
                 text_box.storage.object_id,
-                text_box.storage.text,
+                text_box.storage.storage.text(),
                 comment.as_ref().map(|value| value.comment.text.as_str())
             );
         }

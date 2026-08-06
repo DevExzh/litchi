@@ -184,7 +184,7 @@ impl PagesEditor {
         let expected_anchor = u32::try_from(anchor_character_index)
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
         if created.storage.object_id != ids.storage
-            || created.storage.text != text
+            || created.storage.storage.text() != text
             || graph.anchor_character_index != expected_anchor
             || verified.text_box_geometry(ids.drawable)? != geometry
         {
@@ -535,7 +535,7 @@ mod tests {
             .add_text_box(4, "Typed from scratch", FIRST_POSITION, FIRST_SIZE)
             .unwrap();
         let drawable_id = created.drawable_object_id;
-        assert_eq!(created.storage.text, "Typed from scratch");
+        assert_eq!(created.storage.storage.text(), "Typed from scratch");
         assert_eq!(editor.body_text().unwrap(), "Body\u{fffc}");
         assert_eq!(
             editor.text_box_geometry(drawable_id).unwrap(),
@@ -559,9 +559,9 @@ mod tests {
         let removed_copy = editor
             .remove_text_box(duplicate.drawable_object_id)
             .unwrap();
-        assert_eq!(removed_copy.text.storage.text, "Independent copy");
+        assert_eq!(removed_copy.text.storage.storage.text(), "Independent copy");
         let removed = editor.remove_text_box(drawable_id).unwrap();
-        assert_eq!(removed.text.storage.text, "Updated independently");
+        assert_eq!(removed.text.storage.storage.text(), "Updated independently");
         assert_eq!(editor.body_text().unwrap(), "Body");
         assert!(editor.drawables().unwrap().is_empty());
     }

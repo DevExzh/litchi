@@ -131,7 +131,7 @@ impl NumbersEditor {
             })?;
         let created_graph = numbers_text_box_graph(verified.package(), sheet_id, ids.drawable)?;
         if created.storage.object_id != ids.storage
-            || created.storage.text != text
+            || created.storage.storage.text() != text
             || created_graph.object_ids != ids.all()
             || verified.sheet_text_box_geometry(sheet_id, ids.drawable)? != geometry
         {
@@ -449,7 +449,7 @@ mod tests {
                 FIRST_SIZE,
             )
             .unwrap();
-        assert_eq!(created.storage.text, "Built from typed objects");
+        assert_eq!(created.storage.storage.text(), "Built from typed objects");
         assert_eq!(
             editor
                 .sheet_text_box_geometry(sheet_id, created.drawable_object_id)
@@ -477,8 +477,8 @@ mod tests {
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let text_boxes = reopened.sheet_text_boxes(sheet_id).unwrap();
         assert_eq!(text_boxes.len(), 2);
-        assert_eq!(text_boxes[0].storage.text, "Updated independently");
-        assert_eq!(text_boxes[1].storage.text, "Independent copy");
+        assert_eq!(text_boxes[0].storage.storage.text(), "Updated independently");
+        assert_eq!(text_boxes[1].storage.storage.text(), "Independent copy");
 
         editor
             .remove_sheet_text_box(sheet_id, duplicate.drawable_object_id)
@@ -486,7 +486,7 @@ mod tests {
         let removed = editor
             .remove_sheet_text_box(sheet_id, created.drawable_object_id)
             .unwrap();
-        assert_eq!(removed.text_box.storage.text, "Updated independently");
+        assert_eq!(removed.text_box.storage.storage.text(), "Updated independently");
         assert_eq!(editor.to_bytes().unwrap(), baseline);
     }
 

@@ -56,7 +56,7 @@ fn slide_chart_caption(
         .map(|storage_id| {
             IWorkTextEditor::from_package(editor.package().clone())
                 .storage(storage_id)
-                .map(|storage| storage.text)
+                .map(|storage| storage.storage.into_text())
         })
         .transpose()
 }

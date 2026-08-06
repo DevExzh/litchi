@@ -2700,22 +2700,22 @@ fn slide_owned_text_storage_crud_covers_placeholders_and_text_boxes() {
     );
     assert_eq!(text[2].drawable_object_id, 17);
     assert_eq!(text[2].storage.object_id, 18);
-    assert_eq!(text[2].storage.text, "Independent text box");
+    assert_eq!(text[2].storage.storage.text(), "Independent text box");
 
     editor
         .replace_slide_text_storage(0, 17, 12..16, "shape 🚀")
         .unwrap();
     assert_eq!(
-        editor.slide_text_storages(0).unwrap()[2].storage.text,
+        editor.slide_text_storages(0).unwrap()[2].storage.storage.text(),
         "Independent shape 🚀 box"
     );
     editor.set_slide_text_storage(0, 17, "Replacement").unwrap();
     assert_eq!(
-        editor.slide_text_storages(0).unwrap()[2].storage.text,
+        editor.slide_text_storages(0).unwrap()[2].storage.storage.text(),
         "Replacement"
     );
     editor.clear_slide_text_storage(0, 17).unwrap();
-    assert_eq!(editor.slide_text_storages(0).unwrap()[2].storage.text, "");
+    assert!(editor.slide_text_storages(0).unwrap()[2].storage.storage.is_empty());
 
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_slide_text_storage(0, 11, "wrong slide").is_err());
@@ -2821,7 +2821,7 @@ fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
     let created = editor.duplicate_slide_text_box(0, 17, "Clone 🚀").unwrap();
     assert_eq!(created.drawable_object_id, 23);
     assert_eq!(created.storage.object_id, 26);
-    assert_eq!(created.storage.text, "Clone 🚀");
+    assert_eq!(created.storage.storage.text(), "Clone 🚀");
     assert_eq!(
         editor.text_box_graph(0, 23).unwrap().object_ids,
         [23, 24, 25, 26]
@@ -2861,11 +2861,12 @@ fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
             .find(|item| item.drawable_object_id == 17)
             .unwrap()
             .storage
-            .text,
+            .storage
+            .text(),
         "Independent text box"
     );
     let removed = editor.remove_slide_text_box(0, 23).unwrap();
-    assert_eq!(removed.text.storage.text, "Changed");
+    assert_eq!(removed.text.storage.storage.text(), "Changed");
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     let before = editor.to_bytes().unwrap();
@@ -2917,7 +2918,8 @@ fn ordinary_text_box_geometry_updates_are_guarded_and_byte_exact() {
             .find(|text| text.drawable_object_id == 17)
             .unwrap()
             .storage
-            .text,
+            .storage
+            .text(),
         "Independent text box"
     );
     editor.set_slide_text_box_geometry(0, 17, original).unwrap();
@@ -2957,7 +2959,8 @@ fn ordinary_text_box_properties_updates_are_guarded_and_byte_exact() {
             .find(|text| text.drawable_object_id == 17)
             .unwrap()
             .storage
-            .text,
+            .storage
+            .text(),
         "Independent text box"
     );
     editor

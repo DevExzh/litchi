@@ -158,6 +158,17 @@ impl Storage {
         &self.text
     }
 
+    /// Consume the storage and return its owned UTF-8 text.
+    ///
+    /// The semantic range metadata is intentionally dropped at this boundary;
+    /// callers that need it should borrow [`Self::runs`] before consuming the
+    /// value. Moving the string avoids a second allocation when an adapter
+    /// needs to hand plain text to another owner.
+    #[must_use]
+    pub fn into_text(self) -> String {
+        self.text
+    }
+
     /// Return the UTF-8 byte length of the text.
     #[must_use]
     pub const fn len(&self) -> usize {
@@ -187,6 +198,12 @@ impl Storage {
                 .get(run.start..end)
                 .map(|text| Fragment { text, run })
         })
+    }
+}
+
+impl AsRef<str> for Storage {
+    fn as_ref(&self) -> &str {
+        self.text()
     }
 }
 

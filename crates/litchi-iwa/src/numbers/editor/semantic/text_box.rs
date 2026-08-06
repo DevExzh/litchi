@@ -65,7 +65,7 @@ impl NumbersEditor {
             .ok_or_else(|| {
                 Error::InvalidFormat("Numbers text-box update lost its drawable".to_owned())
             })?;
-        if updated.storage.text != replacement {
+        if updated.storage.storage.text() != replacement {
             return Err(Error::InvalidFormat(
                 "Numbers text-box update failed validation".to_owned(),
             ));

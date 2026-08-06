@@ -126,7 +126,7 @@ impl NumbersEditor {
         let created_graph =
             numbers_text_box_graph(verified.package(), target_sheet_id, new_drawable_id)?;
         if created.storage.object_id != new_storage_id
-            || created.storage.text != text
+            || created.storage.storage.text() != text
             || created_graph.object_ids.len() != source.object_ids.len()
         {
             return Err(Error::InvalidFormat(

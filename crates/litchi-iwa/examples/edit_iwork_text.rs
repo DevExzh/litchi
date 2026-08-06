@@ -12,8 +12,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = IWorkTextEditor::open(&input)?;
     let Some(output) = arguments.next() else {
         for storage in editor.storages()? {
-            if !storage.text.is_empty() {
-                println!("{}\t{:?}", storage.object_id, storage.text);
+            if !storage.storage.is_empty() {
+                println!("{}\t{:?}", storage.object_id, storage.storage.text());
             }
         }
         return Ok(());

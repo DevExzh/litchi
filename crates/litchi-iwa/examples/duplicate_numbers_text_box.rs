@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         source.drawable_object_id,
         created.drawable_object_id,
         created.storage.object_id,
-        created.storage.text
+        created.storage.storage.text()
     );
     Ok(())
 }

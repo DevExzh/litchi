@@ -896,7 +896,7 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
     assert_eq!(regions[0].section_name.as_deref(), Some("Chapter"));
     assert_eq!(regions[0].template, Template::Odd);
     assert_eq!(regions[0].kind, Kind::Header);
-    assert_eq!(regions[0].storage.text, "A🚀B");
+    assert_eq!(regions[0].storage.storage.text(), "A🚀B");
     assert_eq!(regions[1].kind, Kind::Footer);
 
     let before = editor.to_bytes().unwrap();
@@ -911,8 +911,8 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
         .unwrap();
     editor.clear_header_footer(footer_id).unwrap();
     let regions = editor.header_footers().unwrap();
-    assert_eq!(regions[0].storage.text, "A東京B");
-    assert_eq!(regions[1].storage.text, "");
+    assert_eq!(regions[0].storage.storage.text(), "A東京B");
+    assert!(regions[1].storage.storage.is_empty());
     assert!(editor.set_header_footer_text(body_id, "no").is_err());
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_section_name(999, Some("no")).is_err());
@@ -958,8 +958,8 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
     assert_eq!(regions[0].kind, Kind::Header);
     assert_eq!(regions[1].template, Template::Odd);
     assert_eq!(regions[1].kind, Kind::Footer);
-    assert_eq!(regions[0].storage.text, "A東京B");
-    assert_eq!(regions[1].storage.text, "");
+    assert_eq!(regions[0].storage.storage.text(), "A東京B");
+    assert!(regions[1].storage.storage.is_empty());
     assert_eq!(reparsed.sections()[0].name.as_deref(), Some("Renamed"));
     assert_eq!(reparsed.page_layout().unwrap(), layout);
 }
@@ -1302,10 +1302,10 @@ fn reachable_drawable_text_crud_covers_placeholders_and_text_boxes() {
     assert_eq!(text.len(), 2);
     assert_eq!(text[0].drawable_object_id, 60);
     assert_eq!(text[0].storage.object_id, 62);
-    assert_eq!(text[0].storage.text, "A🚀B");
+    assert_eq!(text[0].storage.storage.text(), "A🚀B");
     assert_eq!(text[1].drawable_object_id, 64);
     assert_eq!(text[1].storage.object_id, 65);
-    assert_eq!(text[1].storage.text, "Independent text box");
+    assert_eq!(text[1].storage.storage.text(), "Independent text box");
 
     let before = editor.to_bytes().unwrap();
     assert!(editor.replace_drawable_text(60, 2..3, "x").is_err());
@@ -1314,18 +1314,18 @@ fn reachable_drawable_text_crud_covers_placeholders_and_text_boxes() {
 
     editor.replace_drawable_text(60, 1..3, "東京").unwrap();
     assert_eq!(
-        editor.drawable_text_storages().unwrap()[0].storage.text,
+        editor.drawable_text_storages().unwrap()[0].storage.storage.text(),
         "A東京B"
     );
     editor
         .set_drawable_text(64, "Replacement shape 🚀")
         .unwrap();
     assert_eq!(
-        editor.drawable_text_storages().unwrap()[1].storage.text,
+        editor.drawable_text_storages().unwrap()[1].storage.storage.text(),
         "Replacement shape 🚀"
     );
     editor.clear_drawable_text(64).unwrap();
-    assert_eq!(editor.drawable_text_storages().unwrap()[1].storage.text, "");
+    assert!(editor.drawable_text_storages().unwrap()[1].storage.storage.is_empty());
     assert_eq!(editor.body_text().unwrap(), "Body");
 }
 
@@ -1418,7 +1418,7 @@ fn text_box_geometry_updates_are_guarded_and_byte_exact() {
     editor.set_text_box_geometry(64, changed).unwrap();
     assert_eq!(editor.text_box_geometry(64).unwrap(), changed);
     assert_eq!(
-        editor.drawable_text_storages().unwrap()[0].storage.text,
+        editor.drawable_text_storages().unwrap()[0].storage.storage.text(),
         "Source"
     );
     editor.set_text_box_geometry(64, original).unwrap();
@@ -1448,7 +1448,7 @@ fn text_box_properties_updates_are_guarded_and_byte_exact() {
     editor.set_text_box_properties(64, changed.clone()).unwrap();
     assert_eq!(editor.text_box_properties(64).unwrap(), changed);
     assert_eq!(
-        editor.drawable_text_storages().unwrap()[0].storage.text,
+        editor.drawable_text_storages().unwrap()[0].storage.storage.text(),
         "Source"
     );
     editor.set_text_box_properties(64, original).unwrap();
@@ -1474,7 +1474,7 @@ fn body_anchored_text_box_duplicate_delete_is_independent_and_exact() {
     let created = editor.duplicate_text_box(64, 0, "Clone 🚀").unwrap();
     assert_ne!(created.drawable_object_id, source.drawable_object_id);
     assert_ne!(created.storage.object_id, source.storage.object_id);
-    assert_eq!(created.storage.text, "Clone 🚀");
+    assert_eq!(created.storage.storage.text(), "Clone 🚀");
     assert_eq!(editor.body_text().unwrap(), "￼Before￼After");
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
@@ -1511,7 +1511,8 @@ fn body_anchored_text_box_duplicate_delete_is_independent_and_exact() {
             .find(|item| item.drawable_object_id == 64)
             .unwrap()
             .storage
-            .text,
+            .storage
+            .text(),
         "Source"
     );
     let removed = editor.remove_text_box(created.drawable_object_id).unwrap();
@@ -1520,7 +1521,7 @@ fn body_anchored_text_box_duplicate_delete_is_independent_and_exact() {
 
     let removed = editor.remove_text_box(64).unwrap();
     assert_eq!(removed.anchor_character_index, 6);
-    assert_eq!(removed.text.storage.text, "Source");
+    assert_eq!(removed.text.storage.storage.text(), "Source");
     assert_eq!(editor.body_text().unwrap(), "BeforeAfter");
     assert!(editor.drawable_text_storages().unwrap().is_empty());
 }

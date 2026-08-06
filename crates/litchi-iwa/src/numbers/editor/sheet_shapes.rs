@@ -267,7 +267,7 @@ impl NumbersEditor {
         if created.preset != expected_preset
             || !line_matches
             || created.storage.object_id != ids.storage
-            || created.storage.text != text
+            || created.storage.storage.text() != text
             || created.geometry != geometry
             || created_graph.object_ids != ids.all()
         {
@@ -828,7 +828,7 @@ impl NumbersEditor {
         text.set_text(source.info.storage.object_id, replacement)?;
         let verified = Self::from_package(text.into_package())?;
         let updated = shape_graph(&verified, sheet_id, drawable_object_id)?;
-        if updated.info.storage.text != replacement {
+        if updated.info.storage.storage.text() != replacement {
             return Err(Error::InvalidFormat(
                 "Numbers shape text update failed validation".to_owned(),
             ));
@@ -958,7 +958,7 @@ impl NumbersEditor {
             })?;
         let created_graph = shape_graph(&verified, target_sheet_id, new_drawable_id)?;
         if created.storage.object_id != new_storage_id
-            || created.storage.text != source.info.storage.text
+            || created.storage.storage != source.info.storage.storage
             || created.kind != source.info.kind
             || created.preset != source.info.preset
             || created.line_segment != source.info.line_segment
@@ -1405,7 +1405,7 @@ mod tests {
             .unwrap();
         assert_eq!(created.kind, ShapePathKind::Rectangle);
         assert_eq!(created.preset, Some(Preset::Rectangle));
-        assert_eq!(created.storage.text, "Built from typed objects");
+        assert_eq!(created.storage.storage.text(), "Built from typed objects");
         let horizontally_flipped = editor
             .flip_sheet_shape(
                 sheet_id,
@@ -1461,7 +1461,7 @@ mod tests {
 
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let shape = &reopened.sheet_shapes(sheet_id).unwrap()[0];
-        assert_eq!(shape.storage.text, "Made from typed objects");
+        assert_eq!(shape.storage.storage.text(), "Made from typed objects");
         assert_eq!(shape.geometry, geometry);
         assert_eq!(shape.properties, properties);
 
@@ -1516,7 +1516,7 @@ mod tests {
             .unwrap();
         assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
         assert_ne!(duplicate.storage.object_id, source.storage.object_id);
-        assert_eq!(duplicate.storage.text, source.storage.text);
+        assert_eq!(duplicate.storage.storage, source.storage.storage);
         assert_eq!(duplicate.kind, source.kind);
         assert_eq!(duplicate.preset, source.preset);
         assert_eq!(duplicate.properties, properties);
@@ -1545,7 +1545,8 @@ mod tests {
                 .find(|shape| shape.drawable_object_id == source.drawable_object_id)
                 .unwrap()
                 .storage
-                .text,
+                .storage
+                .text(),
             "Source shape"
         );
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -1557,7 +1558,8 @@ mod tests {
                 .find(|shape| shape.drawable_object_id == duplicate.drawable_object_id)
                 .unwrap()
                 .storage
-                .text,
+            .storage
+            .text(),
             "Independent copy"
         );
         assert_eq!(reopened.sheet_shapes(sheet_id).unwrap().len(), 2);
@@ -1565,7 +1567,7 @@ mod tests {
         let removed = editor
             .remove_sheet_shape(sheet_id, duplicate.drawable_object_id)
             .unwrap();
-        assert_eq!(removed.shape.storage.text, "Independent copy");
+        assert_eq!(removed.shape.storage.storage.text(), "Independent copy");
         assert_eq!(editor.sheet_shapes(sheet_id).unwrap().len(), 1);
     }
 
@@ -1583,7 +1585,7 @@ mod tests {
             .unwrap();
         assert_eq!(created.kind, ShapePathKind::Line);
         assert_eq!(created.preset, None);
-        assert_eq!(created.storage.text, "");
+        assert!(created.storage.storage.is_empty());
         assert!(line_segments_match(
             created.line_segment.unwrap(),
             LineSegment::new(LINE_START, LINE_END).unwrap()
@@ -2030,7 +2032,7 @@ mod tests {
             let shape = &editor.sheet_shapes(sheet_id).unwrap()[0];
             assert_eq!(shape.kind, kind);
             assert_eq!(shape.preset, Some(preset));
-            assert_eq!(shape.storage.text, "Rounded");
+            assert_eq!(shape.storage.storage.text(), "Rounded");
         }
 
         editor

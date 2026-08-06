@@ -243,7 +243,7 @@ impl KeynoteEditor {
             || verified
                 .slide_text_storages(index)?
                 .iter()
-                .any(|storage| !storage.storage.text.is_empty())
+                .any(|storage| !storage.storage.storage.is_empty())
         {
             return Err(Error::InvalidFormat(
                 "Keynote slide creation did not initialize empty layout text".to_owned(),

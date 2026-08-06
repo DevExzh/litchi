@@ -156,7 +156,7 @@ impl PagesEditor {
     }
 
     pub fn body_text(&self) -> Result<String> {
-        Ok(self.body_storage()?.text)
+        Ok(self.body_storage()?.storage.into_text())
     }
 
     /// List supported direct-comment drawables reachable from the Pages root.
@@ -2219,7 +2219,7 @@ impl PagesEditor {
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
         if created_graph.anchor_character_index != expected_anchor
             || created.storage.object_id != new_storage_id
-            || created.storage.text != text
+            || created.storage.storage.text() != text
         {
             return Err(Error::InvalidFormat(
                 "Pages text-box duplication produced an inconsistent graph".to_owned(),

@@ -732,7 +732,7 @@ impl NumbersObjectCatalog {
                 object_id: storage_id,
                 message_type,
                 kind: storage.kind,
-                text: storage.text.concat(),
+                storage: litchi_iwa_text::storage::Storage::from_text(storage.text.concat()),
             })
         })
     }

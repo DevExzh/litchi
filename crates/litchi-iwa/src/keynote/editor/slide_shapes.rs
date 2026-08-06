@@ -263,7 +263,7 @@ impl KeynoteEditor {
         if created.preset != expected_preset
             || !line_matches
             || created.storage.object_id != ids.storage
-            || created.storage.text != text
+            || created.storage.storage.text() != text
             || created.geometry != geometry
             || created_graph.object_ids != ids.all()
         {
@@ -918,7 +918,7 @@ impl KeynoteEditor {
             })?;
         let created_graph = shape_graph(&verified, slide_index, new_drawable_id)?;
         if created.storage.object_id != new_storage_id
-            || created.storage.text != source.info.storage.text
+            || created.storage.storage != source.info.storage.storage
             || created.kind != source.info.kind
             || created.preset != source.info.preset
             || created.line_segment != source.info.line_segment
@@ -1291,7 +1291,7 @@ mod tests {
             .unwrap();
         assert_eq!(created.kind, ShapePathKind::Rectangle);
         assert_eq!(created.preset, Some(Preset::Rectangle));
-        assert_eq!(created.storage.text, "Built from typed objects");
+        assert_eq!(created.storage.storage.text(), "Built from typed objects");
         assert_eq!(
             editor
                 .slide_text_storages(0)
@@ -1350,7 +1350,7 @@ mod tests {
 
         let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let shape = &reopened.slide_shapes(0).unwrap()[0];
-        assert_eq!(shape.storage.text, "Made from typed objects");
+        assert_eq!(shape.storage.storage.text(), "Made from typed objects");
         assert_eq!(shape.geometry, geometry);
         assert_eq!(shape.properties, properties);
 
@@ -1395,7 +1395,7 @@ mod tests {
             .unwrap();
         assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
         assert_ne!(duplicate.storage.object_id, source.storage.object_id);
-        assert_eq!(duplicate.storage.text, source.storage.text);
+        assert_eq!(duplicate.storage.storage, source.storage.storage);
         assert_eq!(duplicate.kind, source.kind);
         assert_eq!(duplicate.preset, source.preset);
         assert_eq!(duplicate.properties, properties);
@@ -1424,7 +1424,8 @@ mod tests {
                 .find(|shape| shape.drawable_object_id == source.drawable_object_id)
                 .unwrap()
                 .storage
-                .text,
+                .storage
+                .text(),
             "Source shape"
         );
         let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -1436,7 +1437,8 @@ mod tests {
                 .find(|shape| shape.drawable_object_id == duplicate.drawable_object_id)
                 .unwrap()
                 .storage
-                .text,
+                .storage
+                .text(),
             "Independent copy"
         );
         assert_eq!(reopened.slide_shapes(0).unwrap().len(), 2);
@@ -1444,7 +1446,7 @@ mod tests {
         let removed = editor
             .remove_slide_shape(0, duplicate.drawable_object_id)
             .unwrap();
-        assert_eq!(removed.shape.storage.text, "Independent copy");
+        assert_eq!(removed.shape.storage.storage.text(), "Independent copy");
         assert_eq!(editor.slide_shapes(0).unwrap().len(), 1);
     }
 
@@ -1459,7 +1461,7 @@ mod tests {
         let created = editor.add_slide_line(0, LINE_START, LINE_END).unwrap();
         assert_eq!(created.kind, ShapePathKind::Line);
         assert_eq!(created.preset, None);
-        assert_eq!(created.storage.text, "");
+        assert!(created.storage.storage.is_empty());
         assert!(line_segments_match(
             created.line_segment.unwrap(),
             LineSegment::new(LINE_START, LINE_END).unwrap()
@@ -1904,7 +1906,7 @@ mod tests {
             let shape = &editor.slide_shapes(0).unwrap()[0];
             assert_eq!(shape.kind, kind);
             assert_eq!(shape.preset, Some(preset));
-            assert_eq!(shape.storage.text, "Rounded");
+            assert_eq!(shape.storage.storage.text(), "Rounded");
         }
 
         editor

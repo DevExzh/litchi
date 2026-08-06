@@ -113,7 +113,8 @@ fn pages_header_footer_ownership_is_enforced() {
             .find(|item| item.storage.object_id == header)
             .unwrap()
             .storage
-            .text,
+            .storage
+            .text(),
         PREFIX
     );
 }

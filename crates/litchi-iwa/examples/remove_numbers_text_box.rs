@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "sheet={sheet_index} removed_drawable={} removed_storage={} text={:?}",
         removed.text_box.drawable_object_id,
         removed.text_box.storage.object_id,
-        removed.text_box.storage.text
+        removed.text_box.storage.storage.text()
     );
     Ok(())
 }

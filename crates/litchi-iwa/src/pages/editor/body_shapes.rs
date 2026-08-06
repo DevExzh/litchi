@@ -269,7 +269,7 @@ impl PagesEditor {
             || created.preset != expected_preset
             || !line_matches
             || created.storage.object_id != ids.storage
-            || created.storage.text != text
+            || created.storage.storage.text() != text
             || created.geometry != geometry
             || created_graph.object_ids != ids.all()
         {
@@ -742,7 +742,7 @@ impl PagesEditor {
         text.set_text(source.info.storage.object_id, replacement)?;
         let verified = Self::from_package(text.into_package())?;
         let updated = body_shape_graph(&verified, drawable_object_id)?;
-        if updated.info.storage.text != replacement {
+        if updated.info.storage.storage.text() != replacement {
             return Err(Error::InvalidFormat(
                 "Pages shape text update failed validation".to_owned(),
             ));
@@ -840,7 +840,7 @@ impl PagesEditor {
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
         if created.anchor_character_index != expected_anchor
             || created.storage.object_id != new_storage_id
-            || created.storage.text != source.info.storage.text
+            || created.storage.storage != source.info.storage.storage
             || created.kind != source.info.kind
             || created.preset != source.info.preset
             || created.line_segment != source.info.line_segment
@@ -951,7 +951,7 @@ mod tests {
             .unwrap();
         assert_eq!(created.kind, ShapePathKind::Rectangle);
         assert_eq!(created.preset, Some(Preset::Rectangle));
-        assert_eq!(created.storage.text, "Built from typed objects");
+        assert_eq!(created.storage.storage.text(), "Built from typed objects");
         let horizontally_flipped = editor
             .flip_body_shape(created.drawable_object_id, DrawableFlipAxis::Horizontal)
             .unwrap();
@@ -1007,7 +1007,7 @@ mod tests {
 
         let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let shape = &reopened.body_shapes().unwrap()[0];
-        assert_eq!(shape.storage.text, "Made from typed objects");
+        assert_eq!(shape.storage.storage.text(), "Made from typed objects");
         assert_eq!(shape.geometry, geometry);
         assert_eq!(shape.properties, properties);
         assert_eq!(
@@ -1095,7 +1095,7 @@ mod tests {
         assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
         assert_ne!(duplicate.storage.object_id, source.storage.object_id);
         assert_eq!(duplicate.anchor_character_index, duplicate_anchor as u32);
-        assert_eq!(duplicate.storage.text, source.storage.text);
+        assert_eq!(duplicate.storage.storage, source.storage.storage);
         assert_eq!(duplicate.kind, source.kind);
         assert_eq!(duplicate.preset, source.preset);
         assert_eq!(duplicate.properties, properties);
@@ -1124,7 +1124,8 @@ mod tests {
                 .find(|shape| shape.drawable_object_id == source.drawable_object_id)
                 .unwrap()
                 .storage
-                .text,
+                .storage
+                .text(),
             "Source shape"
         );
         let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -1136,7 +1137,8 @@ mod tests {
                 .find(|shape| shape.drawable_object_id == duplicate.drawable_object_id)
                 .unwrap()
                 .storage
-                .text,
+                .storage
+                .text(),
             "Independent copy"
         );
         assert_eq!(reopened.body_shapes().unwrap().len(), 2);
@@ -1144,7 +1146,7 @@ mod tests {
         let removed = editor
             .remove_body_shape(duplicate.drawable_object_id)
             .unwrap();
-        assert_eq!(removed.shape.storage.text, "Independent copy");
+        assert_eq!(removed.shape.storage.storage.text(), "Independent copy");
         assert_eq!(editor.body_shapes().unwrap().len(), 1);
     }
 
@@ -1155,7 +1157,7 @@ mod tests {
         let created = editor.add_body_line(4, LINE_START, LINE_END).unwrap();
         assert_eq!(created.kind, ShapePathKind::Line);
         assert_eq!(created.preset, None);
-        assert_eq!(created.storage.text, "");
+        assert!(created.storage.storage.is_empty());
         assert!(line_segments_match(
             created.line_segment.unwrap(),
             LineSegment::new(LINE_START, LINE_END).unwrap()
@@ -1757,7 +1759,7 @@ mod tests {
             let shape = &editor.body_shapes().unwrap()[0];
             assert_eq!(shape.kind, kind);
             assert_eq!(shape.preset, Some(preset));
-            assert_eq!(shape.storage.text, "Rounded");
+            assert_eq!(shape.storage.storage.text(), "Rounded");
             assert_eq!(shape.anchor_character_index, 4);
         }
 
