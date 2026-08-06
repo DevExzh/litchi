@@ -148,25 +148,30 @@ impl Info {
         } else {
             None
         };
-        Ok(Self::new(
+        let mut value = Self::new(
             Location::from_raw((flags & 0x3) as u8)?,
             numbering,
             flags & 0x8000 != 0,
             parse_format(read_u16(data, 2, "CAPI nfc")?)?,
-        ))
+        );
+        value.raw_flags = flags;
+        value.raw_separator = read_u16(data, 4, "CAPI xchSeparator")?;
+        Ok(value)
     }
 
-    /// Serialize with undefined CAPI bits and ignored chapter fields cleared.
+    /// Serialize while retaining undefined CAPI bits and ignored fields.
     pub fn to_bytes(self) -> [u8; Self::SIZE] {
-        let flags = self.location() as u16
-            | u16::from(self.numbering().is_some()) << 2
-            | self
-                .numbering()
-                .map_or(0, |numbering| (numbering.heading() as u16) << 3)
-            | u16::from(self.omit_label()) << 15;
+        let mut flags = self.raw_flags;
+        flags = (flags & !0x0003) | self.location() as u16;
+        flags = (flags & !0x8000) | u16::from(self.omit_label()) << 15;
+        if let Some(numbering) = self.numbering() {
+            flags = (flags & !0x007C) | 0x0004 | (numbering.heading() as u16) << 3;
+        } else {
+            flags &= !0x0004;
+        }
         let separator = self
             .numbering()
-            .map_or(0, |numbering| numbering.separator() as u16);
+            .map_or(self.raw_separator, |numbering| numbering.separator() as u16);
         let mut data = [0u8; Self::SIZE];
         data[0..2].copy_from_slice(&flags.to_le_bytes());
         data[2..4].copy_from_slice(&(self.number_format() as u8 as u16).to_le_bytes());
@@ -217,6 +222,9 @@ impl LabelTable {
                 .checked_add(serialized_string_len(definition.label(), "SttbfCaption")?)
                 .and_then(|value| value.checked_add(CAPI_SIZE))
                 .ok_or_else(|| corrupted("SttbfCaption serialized length overflows"))?;
+        }
+        if capacity > super::validation::MAX_TABLE_BYTES {
+            return Err(corrupted("SttbfCaption exceeds the table size cap"));
         }
         let mut data = Vec::with_capacity(capacity);
         data.extend_from_slice(&u16::MAX.to_le_bytes());
@@ -273,6 +281,9 @@ impl AutoTable {
                 .checked_add(serialized_string_len(entry.prog_id(), "SttbfAutoCaption")?)
                 .and_then(|value| value.checked_add(usize::from(AUTO_CAPTION_EXTRA_SIZE)))
                 .ok_or_else(|| corrupted("SttbfAutoCaption serialized length overflows"))?;
+        }
+        if capacity > super::validation::MAX_TABLE_BYTES {
+            return Err(corrupted("SttbfAutoCaption exceeds the table size cap"));
         }
         let mut data = Vec::with_capacity(capacity);
         data.extend_from_slice(&u16::MAX.to_le_bytes());

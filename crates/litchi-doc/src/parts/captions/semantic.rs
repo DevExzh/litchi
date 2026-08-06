@@ -67,4 +67,19 @@ impl Tables {
     pub fn auto_captions(&self) -> Option<&AutoTable> {
         self.auto()
     }
+
+    /// Whether either optional caption range is present.
+    #[must_use]
+    pub fn is_present(&self) -> bool {
+        self.labels.is_some() || self.auto.is_some()
+    }
+
+    /// Creates an empty pair of absent caption ranges.
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self {
+            labels: None,
+            auto: None,
+        }
+    }
 }

@@ -2,6 +2,7 @@
 
 use super::model::{AutoEntry, AutoTable, Definition, Heading, LabelTable, Location, Separator};
 use crate::package::{Error as PackageError, Result};
+use crate::parts::fib::{FileInformationBlock, WORD_97_NFIB};
 
 /// Word limits one caption label to 40 UTF-16 code units.
 pub(crate) const MAX_LABEL_UNITS: usize = 40;
@@ -11,6 +12,7 @@ pub(crate) const MAX_STRING_UNITS: usize = u16::MAX as usize;
 pub(crate) const MAX_TABLE_BYTES: usize = 16 * 1024 * 1024;
 /// Both caption STTB variants use a two-byte cData count.
 pub(crate) const MAX_ENTRIES: usize = u16::MAX as usize;
+pub(crate) const CAPTION_POINTER_BASE: usize = 154;
 
 pub(crate) fn corrupted(message: impl Into<String>) -> PackageError {
     PackageError::Corrupted(message.into())
@@ -107,4 +109,56 @@ pub(crate) fn validate_table_size(data: &[u8], name: &str) -> Result<()> {
         return Err(corrupted(format!("{name} exceeds the table size cap")));
     }
     Ok(())
+}
+
+/// Validate the FIB/profile assumptions required by package edits.
+pub(crate) fn package_fib(fib: &FileInformationBlock) -> Result<()> {
+    if fib.version() < WORD_97_NFIB {
+        return Err(PackageError::UnsupportedVersion {
+            nfib: fib.version(),
+            name: fib.version_name(),
+        });
+    }
+    if fib.is_encrypted() {
+        return Err(corrupted(
+            "encrypted DOC packages cannot be edited by the caption owner",
+        ));
+    }
+    if !fib.is_template() {
+        return Err(corrupted(
+            "caption tables are only writable in a Normal template",
+        ));
+    }
+    if fib.table_pointer_count().is_none() {
+        return Err(corrupted(
+            "WordDocument FIB table-pointer array is truncated",
+        ));
+    }
+    if fib.table_pointer_count().unwrap_or(0) <= super::codec::AUTO_CAPTION_FIB_INDEX {
+        return Err(corrupted(
+            "WordDocument FIB does not expose the caption table pointers",
+        ));
+    }
+    Ok(())
+}
+
+/// Locate one caption FIB pointer pair in the WordDocument stream.
+pub(crate) fn pointer_location(fib: &FileInformationBlock, index: usize) -> Result<usize> {
+    package_fib(fib)?;
+    let offset = CAPTION_POINTER_BASE
+        .checked_add(
+            index
+                .checked_mul(8)
+                .ok_or_else(|| corrupted("caption FIB pointer index multiplication overflows"))?,
+        )
+        .ok_or_else(|| corrupted("caption FIB pointer offset overflows"))?;
+    let end = offset
+        .checked_add(8)
+        .ok_or_else(|| corrupted("caption FIB pointer range overflows"))?;
+    if end > fib.raw_data().len() {
+        return Err(corrupted(
+            "WordDocument FIB does not contain the caption table pointer",
+        ));
+    }
+    Ok(offset)
 }

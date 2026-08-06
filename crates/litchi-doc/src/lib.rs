@@ -54,8 +54,9 @@ pub mod bookmark;
 /// Contextual Word caption and AutoCaption metadata.
 pub mod captions {
     pub use crate::parts::captions::{
-        AutoEntry, AutoTable, Definition, Format, Heading, Info, LabelTable, Location, Numbering,
-        Separator, Tables,
+        AutoEntry, AutoTable, Commit, Definition, Editor, Format, Heading, Info, LabelTable,
+        Location, Numbering, PackageCommit, PackageSnapshot, Separator, Snapshot, Tables,
+        Transaction, TransactionError,
     };
 }
 pub mod comment;

@@ -84,12 +84,17 @@ impl Numbering {
 }
 
 /// Caption insertion and numbering metadata (`CAPI`, MS-DOC 2.9.24).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub struct Info {
     location: Location,
     numbering: Option<Numbering>,
     omit_label: bool,
     number_format: Format,
+    /// Undefined CAPI flag bits retained for lossless round-trips.
+    pub(crate) raw_flags: u16,
+    /// The separator is ignored when chapter numbering is disabled, but its
+    /// source value is retained so editing a neighboring field is lossless.
+    pub(crate) raw_separator: u16,
 }
 
 impl Info {
@@ -106,6 +111,8 @@ impl Info {
             numbering,
             omit_label,
             number_format,
+            raw_flags: 0,
+            raw_separator: 0,
         }
     }
 
@@ -134,6 +141,17 @@ impl Info {
         self.number_format
     }
 }
+
+impl PartialEq for Info {
+    fn eq(&self, other: &Self) -> bool {
+        self.location == other.location
+            && self.numbering == other.numbering
+            && self.omit_label == other.omit_label
+            && self.number_format == other.number_format
+    }
+}
+
+impl Eq for Info {}
 
 /// One caption label and its insertion metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]

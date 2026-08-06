@@ -161,6 +161,13 @@ opaque bytes. `Document::envelope()` is read-only and inert; no mail transport,
 recipient resolution, attachment activation, or package-writer emission is
 part of this owner.
 
+DOC captions now add the matching `parts/captions/{model,codec,validation,
+transaction,package,tests}` boundary. The `captions::Editor` owns atomic CRUD
+over the `[MS-DOC]` `SttbfCaption`/`SttbfAutoCaption` FIB ranges and publishes
+reversible semantic and CFB byte patches; new payloads are appended and clear
+operations only clear pointers, so unrelated table-stream bytes remain opaque.
+Caption fields and host automation remain inert.
+
 ## ODF
 
 [`litchi-odf-common`](../../crates/litchi-odf-common/Cargo.toml) is the shared
@@ -322,6 +329,13 @@ owner additionally types `[MS-OLEPS]` `VT_VERSIONED_STREAM` values with checked
 indirect property names, bounded code-page strings, and inert version GUIDs.
 The referenced CFB stream remains host/package data and is never opened or
 executed by the common semantic layer.
+
+The ODraw picture-property owner now layers `[MS-ODRAW]` `pibName` and
+`pibFlags` into `prop::picture::{Metadata, Snapshot, Edit}`. Picture names are
+checked, bounded UTF-16LE views; valid flag dependencies are typed while
+undefined producer bits remain exact. A committed edit returns an owned
+snapshot and reversible patch, rewrites only the modeled descriptors, and
+preserves source order plus every untouched opaque property payload.
 
 The ODF chart-content authoring owner now lives under
 `litchi-odf-common::chart::authoring`. It owns the typed definition, cached

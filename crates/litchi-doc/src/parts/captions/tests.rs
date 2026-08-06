@@ -38,7 +38,7 @@ fn fib_with_pointers(pairs: &[(usize, usize, usize)]) -> FileInformationBlock {
 }
 
 #[test]
-fn capi_round_trips_and_canonicalizes_ignored_bits() {
+fn capi_round_trips_and_preserves_ignored_bits() {
     let value = chapter_info();
     let bytes = value.to_bytes();
     assert_eq!(bytes.len(), Info::SIZE);
@@ -53,7 +53,7 @@ fn capi_round_trips_and_canonicalizes_ignored_bits() {
     noncanonical[4..6].copy_from_slice(&0xFFFFu16.to_le_bytes());
     let parsed = Info::from_bytes(&noncanonical).expect("ignored CAPI fields parse");
     assert_eq!(parsed, info());
-    assert_eq!(parsed.to_bytes(), info().to_bytes());
+    assert_eq!(parsed.to_bytes(), noncanonical);
 }
 
 #[test]
