@@ -7,16 +7,29 @@
 //! exactly as declared and are never resolved, opened, contacted,
 //! refreshed, or executed.
 
-mod model;
-pub(crate) mod package;
+pub mod codec;
+pub mod model;
+pub mod package;
 mod parse;
 #[cfg(test)]
 mod tests;
+pub mod transaction;
+pub mod validation;
 pub(crate) mod write;
 
 pub use model::{
     CommandType, Connection, Connections, CredentialMethod, DbProperties, HtmlFormat,
     OlapProperties, Parameter, ParameterType, ParameterValue, PasswordState, Properties,
-    ReconnectionType, SourceType, WebProperties, WebTableItem,
+    ReconnectionType, SourceType, UnknownRecord, WebProperties, WebTableItem,
 };
 pub use parse::parse_connections_part;
+pub use transaction::{Commit, Patch, Snapshot, Transaction, apply, read};
+
+pub type Result<T> = crate::package::error::Result<T>;
+
+pub(crate) fn invalid(detail: impl Into<String>) -> crate::package::error::Error {
+    crate::package::error::Error::Unrecognized {
+        typ: "XLSB External Data Connections".to_string(),
+        val: detail.into(),
+    }
+}

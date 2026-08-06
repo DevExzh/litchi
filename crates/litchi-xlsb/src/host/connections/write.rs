@@ -17,7 +17,9 @@ pub(crate) const MAX_WEB_TABLE_ITEMS: usize = 1_024;
 const MAX_SHORT_STRING_UTF16_UNITS: usize = 255;
 const MAX_STRING_UTF16_UNITS: usize = 1_048_576;
 const MAX_FORMULA_TOKEN_BYTES: usize = 16 * 1024 * 1024;
-const MAX_CONNECTIONS_PART_BYTES: usize = 32 * 1024 * 1024;
+pub(crate) const MAX_CONNECTIONS_PART_BYTES: usize = 32 * 1024 * 1024;
+pub(crate) const MAX_UNKNOWN_RECORDS: usize = 65_535;
+pub(crate) const MAX_UNKNOWN_BYTES: usize = 8 * 1024 * 1024;
 
 /// `BrtPCDIMissing` / `BrtPCDIString` / `BrtPCDIIndex` record types.
 // `BrtBeginExtConnection` flags word 1 (MS-XLSB 2.4.80).
@@ -492,7 +494,26 @@ fn param_payload(parameter: &Parameter) -> Result<Vec<u8>> {
 
 /// Serialize the complete External Data Connections part.
 pub(crate) fn write_connections_part(connections: &Connections) -> Result<Vec<u8>> {
+    write_connections_part_with_unknown(connections, &[])
+}
+
+/// Serialize a connections part while retaining source-owned opaque records.
+pub(crate) fn write_connections_part_with_unknown(
+    connections: &Connections,
+    unknown_records: &[UnknownRecord],
+) -> Result<Vec<u8>> {
     validate_connections(connections)?;
+    let connection_ids: HashSet<u32> = connections
+        .connections
+        .iter()
+        .map(|connection| connection.connection_id)
+        .collect();
+    if unknown_records.len() > MAX_UNKNOWN_RECORDS {
+        return Err(malformed(
+            "ExternalDataConnections",
+            "opaque record count limit exceeded",
+        ));
+    }
     let mut data = Vec::with_capacity(512);
     let mut writer = Writer::new(&mut data);
     writer.write_record(rt::BEGIN_EXT_CONNECTIONS, &[])?;
@@ -550,6 +571,44 @@ pub(crate) fn write_connections_part(connections: &Connections) -> Result<Vec<u8
         writer.write_record(rt::END_EXT_CONNECTION, &[])?;
     }
     writer.write_record(rt::END_EXT_CONNECTIONS, &[])?;
+    if data.len() > MAX_CONNECTIONS_PART_BYTES {
+        return Err(malformed(
+            "ExternalDataConnections",
+            "serialized part size limit exceeded",
+        ));
+    }
+    let mut opaque_bytes = 0usize;
+    for record in unknown_records {
+        if record
+            .connection_id()
+            .is_some_and(|connection_id| !connection_ids.contains(&connection_id))
+        {
+            continue;
+        }
+        let (header, header_len) = crate::raw::Header::parse(
+            record.bytes(),
+            crate::raw::Limits::new(MAX_CONNECTIONS_PART_BYTES, MAX_STRING_UTF16_UNITS),
+        )?;
+        if header_len.checked_add(header.len()) != Some(record.bytes().len())
+            || u16::from(header.kind()) != record.kind()
+            || super::codec::is_modeled_record(header.kind())
+        {
+            return Err(malformed(
+                "ExternalDataConnections",
+                "invalid opaque record envelope",
+            ));
+        }
+        opaque_bytes = opaque_bytes
+            .checked_add(record.bytes().len())
+            .ok_or_else(|| malformed("ExternalDataConnections", "opaque byte count overflow"))?;
+        if opaque_bytes > MAX_UNKNOWN_BYTES {
+            return Err(malformed(
+                "ExternalDataConnections",
+                "opaque byte limit exceeded",
+            ));
+        }
+        data.extend_from_slice(record.bytes());
+    }
     if data.len() > MAX_CONNECTIONS_PART_BYTES {
         return Err(malformed(
             "ExternalDataConnections",

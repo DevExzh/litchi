@@ -5,6 +5,8 @@
 //! are stored exactly as declared and are never resolved, opened, contacted,
 //! refreshed, or executed.
 
+use std::sync::Arc;
+
 /// `DBType` (MS-XLSB 2.5.31): the data source type of a connection.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[repr(u32)]
@@ -340,6 +342,70 @@ pub struct Connection {
 pub struct Connections {
     /// The declared external connections, in part order.
     pub connections: Vec<Connection>,
+}
+
+/// One unmodeled BIFF12 record retained by a source-bound connection
+/// snapshot.
+///
+/// The complete wire image, including its original variable-length record
+/// header, is retained.  The record is never interpreted, contacted, or
+/// executed; it is re-emitted only when its owning connection still exists.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownRecord {
+    kind: u16,
+    connection_id: Option<u32>,
+    after_known: usize,
+    bytes: Arc<[u8]>,
+    payload_start: usize,
+}
+
+impl UnknownRecord {
+    pub(crate) fn new(
+        kind: u16,
+        connection_id: Option<u32>,
+        after_known: usize,
+        bytes: Arc<[u8]>,
+        payload_start: usize,
+    ) -> Self {
+        Self {
+            kind,
+            connection_id,
+            after_known,
+            bytes,
+            payload_start,
+        }
+    }
+
+    /// Numeric BIFF12 record kind.
+    #[must_use]
+    pub const fn kind(&self) -> u16 {
+        self.kind
+    }
+
+    /// Connection identifier owning this record, or `None` for a part-level
+    /// record.
+    #[must_use]
+    pub const fn connection_id(&self) -> Option<u32> {
+        self.connection_id
+    }
+
+    /// Number of modeled records preceding this record in its owner scope.
+    #[must_use]
+    pub const fn after_known(&self) -> usize {
+        self.after_known
+    }
+
+    /// Complete source wire image, including the record header.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Borrow the opaque record payload without reconstructing its header.
+    #[must_use]
+    pub fn payload(&self) -> &[u8] {
+        &self.bytes[self.payload_start..]
+    }
 }
 
 impl Connections {

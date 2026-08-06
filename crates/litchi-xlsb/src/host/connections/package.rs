@@ -4,15 +4,18 @@
 //! the one relationship graph permitted by MS-XLSB 2.1.7.24.
 
 use super::{Connections, parse_connections_part};
-use crate::package::connections::write::write_connections_part;
+use crate::package::connections::write::{
+    write_connections_part, write_connections_part_with_unknown,
+};
 use crate::package::error::{Error, Result};
 use litchi_opc::constants::content_type;
-use litchi_opc::{BlobPart, OpcPackage, PackURI};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+use std::sync::Arc;
 
-pub(crate) const CONNECTIONS_CONTENT_TYPE: &str = "application/vnd.ms-excel.connections";
-pub(crate) const CONNECTIONS_RELATIONSHIP_TYPE: &str =
+pub const CONNECTIONS_CONTENT_TYPE: &str = "application/vnd.ms-excel.connections";
+pub const CONNECTIONS_RELATIONSHIP_TYPE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections";
-const CONNECTIONS_PART_NAME: &str = "/xl/connections.bin";
+pub const CONNECTIONS_PART_NAME: &str = "/xl/connections.bin";
 
 #[derive(Debug)]
 struct ConnectionsGraph {
@@ -39,15 +42,31 @@ pub(crate) fn load_from_workbook(
     )?))
 }
 
+/// Load and validate the workbook-level connections owner.
+pub fn load(package: &OpcPackage) -> Result<Option<Connections>> {
+    let workbook = package.main_document_part()?;
+    load_from_workbook(package, workbook.partname())
+}
+
+/// Validate the complete OPC connections graph and return its typed model.
+pub fn validate_graph(package: &OpcPackage) -> Result<Option<Connections>> {
+    load(package)
+}
+
 pub(crate) fn store_on_workbook(
     package: &mut OpcPackage,
     workbook_uri: &PackURI,
     connections: &Connections,
 ) -> Result<Connections> {
-    let payload = write_connections_part(connections)?;
+    let existing = discover_graph(package, workbook_uri)?;
+    let payload = if let Some(graph) = existing.as_ref() {
+        let source = super::codec::parse_source(package.get_part(&graph.part_name)?.blob())?;
+        write_connections_part_with_unknown(connections, &source.unknown_records)?
+    } else {
+        write_connections_part(connections)?
+    };
     // Treat the reader as a post-serialization grammar oracle before mutation.
     let canonical_model = parse_connections_part(&payload)?;
-    let existing = discover_graph(package, workbook_uri)?;
     let canonical_part = PackURI::new(CONNECTIONS_PART_NAME).map_err(Error::Encoding)?;
     if existing
         .as_ref()
@@ -94,6 +113,128 @@ pub(crate) fn remove_from_workbook(
         .remove(&graph.relationship_id);
     package.remove_part(&graph.part_name);
     Ok(true)
+}
+
+/// Exact source relationship metadata used by source-checked patches.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RelationshipImage {
+    pub(crate) id: String,
+    pub(crate) relationship_type: String,
+    pub(crate) target: String,
+    pub(crate) external: bool,
+}
+
+/// Exact connections-part source image used by source-checked patches.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PartImage {
+    pub(crate) part_name: PackURI,
+    pub(crate) content_type: String,
+    pub(crate) bytes: Arc<Vec<u8>>,
+}
+
+/// Exact owner graph source image used by source-checked patches.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SourceImage {
+    pub(crate) workbook_name: PackURI,
+    pub(crate) workbook_bytes: Arc<Vec<u8>>,
+    pub(crate) workbook_relationships: Vec<RelationshipImage>,
+    pub(crate) root_relationships: Vec<RelationshipImage>,
+    pub(crate) connection: Option<PartImage>,
+    pub(crate) connection_relationship: Option<RelationshipImage>,
+}
+
+pub(crate) fn capture_source(package: &OpcPackage) -> Result<SourceImage> {
+    let workbook = package.main_document_part()?;
+    let graph = discover_graph(package, workbook.partname())?;
+    let connection_relationship = workbook
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == CONNECTIONS_RELATIONSHIP_TYPE)
+        .map(|relationship| RelationshipImage {
+            id: relationship.r_id().to_string(),
+            relationship_type: relationship.reltype().to_string(),
+            target: relationship.target_ref().to_string(),
+            external: relationship.is_external(),
+        });
+    let connection = graph
+        .as_ref()
+        .map(|graph| package.get_part(&graph.part_name))
+        .transpose()?
+        .map(|part| PartImage {
+            part_name: part.partname().clone(),
+            content_type: part.content_type().to_string(),
+            bytes: part.blob_arc(),
+        });
+    Ok(SourceImage {
+        workbook_name: workbook.partname().clone(),
+        workbook_bytes: workbook.blob_arc(),
+        workbook_relationships: relationship_images(workbook),
+        root_relationships: relationship_images_root(package),
+        connection,
+        connection_relationship,
+    })
+}
+
+pub(crate) fn restore_source(package: &mut OpcPackage, source: &SourceImage) -> Result<()> {
+    let workbook_name = package.main_document_part()?.partname().clone();
+    if workbook_name != source.workbook_name {
+        return Err(invalid("workbook part identity changed"));
+    }
+    if let Some(graph) = discover_graph(package, &workbook_name)? {
+        package
+            .get_part_mut(&workbook_name)?
+            .rels_mut()
+            .remove(&graph.relationship_id);
+        package.remove_part(&graph.part_name);
+    }
+    if let (Some(part), Some(relationship)) = (&source.connection, &source.connection_relationship)
+    {
+        package.try_add_part(Box::new(BlobPart::new(
+            part.part_name.clone(),
+            part.content_type.clone(),
+            part.bytes.as_ref().clone(),
+        )))?;
+        package
+            .get_part_mut(&workbook_name)?
+            .rels_mut()
+            .add_relationship(
+                relationship.relationship_type.clone(),
+                relationship.target.clone(),
+                relationship.id.clone(),
+                relationship.external,
+            );
+    }
+    validate_graph(package).map(|_| ())
+}
+
+fn relationship_images(part: &dyn Part) -> Vec<RelationshipImage> {
+    let mut values = part
+        .rels()
+        .iter()
+        .map(|relationship| RelationshipImage {
+            id: relationship.r_id().to_string(),
+            relationship_type: relationship.reltype().to_string(),
+            target: relationship.target_ref().to_string(),
+            external: relationship.is_external(),
+        })
+        .collect::<Vec<_>>();
+    values.sort_by(|left, right| left.id.cmp(&right.id));
+    values
+}
+
+fn relationship_images_root(package: &OpcPackage) -> Vec<RelationshipImage> {
+    let mut values = package
+        .rels()
+        .iter()
+        .map(|relationship| RelationshipImage {
+            id: relationship.r_id().to_string(),
+            relationship_type: relationship.reltype().to_string(),
+            target: relationship.target_ref().to_string(),
+            external: relationship.is_external(),
+        })
+        .collect::<Vec<_>>();
+    values.sort_by(|left, right| left.id.cmp(&right.id));
+    values
 }
 
 fn discover_graph(

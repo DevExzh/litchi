@@ -2,7 +2,11 @@
 
 use super::model::*;
 use super::parse::parse_connections_part;
+use crate::package::Workbook;
 use crate::raw::{Kind, Writer, kind as rt};
+use crate::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_opc::PackURI;
+use std::io::Cursor;
 
 fn wide(value: &str) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(4 + value.len() * 2);
@@ -362,4 +366,104 @@ fn rejects_malformed_parts() {
         record(rt::END_EXT_CONNECTIONS, &[]),
     ];
     assert!(parse_connections_part(&build(&records)).is_err());
+}
+
+fn generated_workbook() -> Workbook {
+    let mut writer = WorkbookWriter::new();
+    writer.add_worksheet(MutableWorksheet::new("Sheet1"));
+    let mut bytes = Cursor::new(Vec::new());
+    writer.save(&mut bytes).unwrap();
+    Workbook::new(Cursor::new(bytes.into_inner())).unwrap()
+}
+
+fn sample_connection(name: &str) -> Connections {
+    Connections {
+        connections: vec![Connection {
+            connection_id: 42,
+            source_type: SourceType::Odbc,
+            name: name.to_string(),
+            properties: Properties::Database(DbProperties {
+                command_type: CommandType::Sql,
+                connection_string: "Driver={Generated};Server=example.invalid".to_string(),
+                command: Some("SELECT 1".to_string()),
+                server_command: None,
+            }),
+            ..Connection::default()
+        }],
+    }
+}
+
+#[test]
+fn source_checked_transaction_preserves_opaque_records_and_inverse() {
+    let mut workbook = generated_workbook();
+    workbook
+        .set_connections(sample_connection("Before"))
+        .unwrap();
+    let uri = PackURI::new(super::package::CONNECTIONS_PART_NAME).unwrap();
+    let opaque = build(&[record(
+        Kind::new(0x3ffd).unwrap(),
+        &[0xDE, 0xAD, 0xBE, 0xEF],
+    )]);
+    let source = {
+        let part = workbook.opc_package().get_part(&uri).unwrap();
+        let mut bytes = part.blob().to_vec();
+        bytes.extend_from_slice(&opaque);
+        bytes
+    };
+    workbook
+        .opc_package_mut()
+        .get_part_mut(&uri)
+        .unwrap()
+        .set_blob(source.clone());
+
+    let commit = {
+        let package = workbook.opc_package_mut();
+        let mut transaction = super::transaction::Transaction::new(package).unwrap();
+        assert!(
+            transaction
+                .edit(42, |connection| {
+                    connection.name = "After".to_string();
+                    Ok(())
+                })
+                .unwrap()
+        );
+        transaction.commit().unwrap()
+    };
+    assert!(commit.changed());
+    let package = workbook.opc_package();
+    let edited = package.get_part(&uri).unwrap().blob();
+    assert!(
+        edited
+            .windows(opaque.len())
+            .any(|window| window == opaque.as_slice())
+    );
+    assert_eq!(
+        parse_connections_part(edited).unwrap().connections[0].name,
+        "After"
+    );
+
+    let mut restored = package.clone();
+    commit.patch().inverse().apply(&mut restored).unwrap();
+    assert_eq!(restored.get_part(&uri).unwrap().blob(), source);
+}
+
+#[test]
+fn source_checked_transaction_rejects_stale_patch_and_supports_noop() {
+    let mut workbook = generated_workbook();
+    workbook
+        .set_connections(sample_connection("Stable"))
+        .unwrap();
+    let noop = {
+        let transaction = super::transaction::Transaction::new(workbook.opc_package_mut()).unwrap();
+        transaction.commit().unwrap()
+    };
+    assert!(!noop.changed());
+    assert!(noop.patch().is_empty());
+
+    let mut changed = workbook.opc_package().clone();
+    let uri = PackURI::new(super::package::CONNECTIONS_PART_NAME).unwrap();
+    let mut bytes = changed.get_part(&uri).unwrap().blob().to_vec();
+    bytes.push(0);
+    changed.get_part_mut(&uri).unwrap().set_blob(bytes);
+    assert!(noop.patch().apply(&mut changed).is_err());
 }
