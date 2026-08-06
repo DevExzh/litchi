@@ -7,12 +7,14 @@
 
 mod codec;
 mod model;
+pub mod shared;
 mod validation;
 
 #[cfg(test)]
 mod tests;
 
 pub use model::Metadata;
+pub use shared::{Cell, Owner, Range};
 
 pub(crate) use codec::parse_record;
 pub(crate) use validation::{encode_flags, validate_for_write};

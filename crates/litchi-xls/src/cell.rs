@@ -66,7 +66,7 @@ impl Cell {
             _ => None,
         };
         let formula_metadata = match record {
-            CellRecord::Formula { metadata, .. } => Some(*metadata),
+            CellRecord::Formula { metadata, .. } => Some(metadata.clone()),
             _ => None,
         };
         let (row, col, value, formula, formula_bytes) = match record {

@@ -9,7 +9,12 @@ use super::{
     DataValidationOptions, DataValidationRange, DataValidationTableOptions, PageSetupOptions,
 };
 use crate::writer::biff::AutoFilterConditionWrite;
+use crate::writer::formula::{FormulaTokenizer, encode_ptg_tokens};
 use crate::{Error, Result};
+
+use super::model::Writer;
+
+use crate::formula_metadata::{Cell as FormulaCell, Owner, Range as FormulaRange};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum PivotCellXfRole {
@@ -72,7 +77,7 @@ impl WritableCell {
         }
     }
 
-    pub(super) const fn with_formula_metadata(
+    pub(super) fn with_formula_metadata(
         mut self,
         formula_metadata: Option<crate::FormulaMetadata>,
     ) -> Self {
@@ -536,6 +541,101 @@ impl WritableWorksheet {
         }
 
         self.pivot_tables.push(pt);
+    }
+}
+
+impl Writer {
+    /// Write one inert BIFF8 shared formula and its participating cells.
+    ///
+    /// `range` becomes the ShrFmla `RefU`. `participants` is the complete
+    /// participating-cell set when non-empty and therefore must include
+    /// `anchor`; an empty slice means that only the anchor participates. The
+    /// anchor must not follow any participating cell in worksheet row-major
+    /// order because the CELLTABLE grammar requires the anchor Formula and its
+    /// ShrFmla to precede the other Formula records.
+    pub fn write_shared_formula(
+        &mut self,
+        sheet: usize,
+        range: FormulaRange,
+        anchor: FormulaCell,
+        formula: &str,
+        participants: &[FormulaCell],
+    ) -> Result<()> {
+        self.write_shared_formula_with_format(sheet, range, anchor, formula, 0, participants)
+    }
+
+    /// Write a formatted BIFF8 shared formula.
+    pub fn write_shared_formula_with_format(
+        &mut self,
+        sheet: usize,
+        range: FormulaRange,
+        anchor: FormulaCell,
+        formula: &str,
+        format_id: u16,
+        participants: &[FormulaCell],
+    ) -> Result<()> {
+        if self.fmt.get_format(format_id).is_none() {
+            return Err(Error::InvalidFormat(format_id));
+        }
+
+        let mut participant_cells = if participants.is_empty() {
+            vec![anchor]
+        } else {
+            participants.to_vec()
+        };
+        participant_cells.sort_unstable();
+
+        let expression = formula.strip_prefix('=').unwrap_or(formula);
+        let tokens = FormulaTokenizer::new().tokenize(expression)?;
+        let encoded = encode_ptg_tokens(&tokens);
+        let mut owner = Owner::new(range, anchor, &encoded)?;
+        if !participants.is_empty() {
+            owner = owner.with_participants(&participant_cells)?;
+        }
+        let metadata = crate::FormulaMetadata::new()
+            .with_always_calculate(true)
+            .with_shared(owner);
+
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
+
+        for participant in &participant_cells {
+            let key = (u32::from(participant.row()), u16::from(participant.col()));
+            if worksheet.cells.contains_key(&key) {
+                return Err(Error::InvalidData(format!(
+                    "shared-formula participant cell ({}, {}) is already occupied",
+                    participant.row(),
+                    participant.col()
+                )));
+            }
+            if worksheet
+                .data_tables
+                .iter()
+                .any(|(row, col, _)| (*row, *col) == key)
+            {
+                return Err(Error::InvalidData(format!(
+                    "shared-formula participant cell ({}, {}) overlaps a data-table anchor",
+                    participant.row(),
+                    participant.col()
+                )));
+            }
+        }
+
+        for participant in &participant_cells {
+            let pos = CellPos::try_new(u32::from(participant.row()), u16::from(participant.col()))?;
+            // The BIFF writer replaces participating-cell tokens with
+            // PtgExp, but retaining the expression keeps staging valid and
+            // lets the existing tokenizer validate the formula.
+            let value = CellValue::Formula(formula.to_string());
+            worksheet.add_cell(
+                WritableCell::new(pos, value, format_id, None)
+                    .with_formula_metadata(Some(metadata.clone())),
+            );
+        }
+
+        Ok(())
     }
 }
 

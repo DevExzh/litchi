@@ -4,6 +4,8 @@ use crate::{Error, Result};
 use litchi_core::sheet::Cell;
 use std::io::Cursor;
 
+use crate::formula_metadata::{Cell as FormulaCell, Range as FormulaRange};
+
 #[test]
 fn test_create_writer() {
     let writer = Writer::new();
@@ -543,7 +545,7 @@ fn test_write_formula() {
         .with_clear_errors(true)
         .with_calculation_cache(0xCAFE_BABE);
     writer
-        .write_formula_with_metadata(sheet, 0, 1, "A1+1", metadata)
+        .write_formula_with_metadata(sheet, 0, 1, "A1+1", metadata.clone())
         .unwrap();
 
     let cell = writer.worksheets[0].cells.get(&(0, 0)).unwrap();
@@ -552,7 +554,7 @@ fn test_write_formula() {
         writer.worksheets[0]
             .cells
             .get(&(0, 1))
-            .and_then(|cell| cell.formula_metadata),
+            .and_then(|cell| cell.formula_metadata.clone()),
         Some(metadata)
     );
 }
@@ -584,7 +586,7 @@ fn test_formula_round_trips_through_xls_reader() {
         .with_clear_errors(true)
         .with_calculation_cache(0x1020_3040);
     writer
-        .write_formula_with_metadata(sheet, 0, 4, "A1+1", metadata)
+        .write_formula_with_metadata(sheet, 0, 4, "A1+1", metadata.clone())
         .unwrap();
     writer
         .write_formula(sheet, 0, 3, "IF(TRUE,\"a\"\"b\",FALSE)")
@@ -614,6 +616,38 @@ fn test_formula_round_trips_through_xls_reader() {
             .formula(),
         Some("=IF(TRUE,\"a\"\"b\",FALSE)")
     );
+}
+
+#[test]
+fn shared_formula_round_trips_with_inert_relative_references() {
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    let anchor = FormulaCell::new(0, 0);
+    let participants = [anchor, FormulaCell::new(1, 0)];
+    writer
+        .write_shared_formula(
+            sheet,
+            FormulaRange::try_new(0, 0, 1, 0).unwrap(),
+            anchor,
+            "A1*2",
+            &participants,
+        )
+        .unwrap();
+
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.set_position(0);
+    let workbook = crate::Workbook::new(output).unwrap();
+    let worksheet = workbook.xls_worksheet(0).unwrap();
+    let first = worksheet.get_cell(0, 0).unwrap();
+    let second = worksheet.get_cell(1, 0).unwrap();
+
+    assert_eq!(first.formula(), Some("=(A1*2)"));
+    assert_eq!(second.formula(), Some("=(A2*2)"));
+    assert_eq!(first.formula_bytes(), Some(&[0x01, 0, 0, 0, 0][..]));
+    assert_eq!(second.formula_bytes(), Some(&[0x01, 0, 0, 0, 0][..]));
+    assert!(first.formula_metadata().unwrap().shared_formula());
+    assert!(second.formula_metadata().unwrap().shared_formula());
 }
 
 #[test]

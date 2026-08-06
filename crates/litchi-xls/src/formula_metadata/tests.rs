@@ -60,7 +60,7 @@ fn shared_flag_requires_ptg_exp_and_writer_refuses_orphaned_shared_state() {
     assert!(decode_flags(0x0008, &[0x16]).is_err());
     assert!(
         encode_flags(
-            Metadata::new().with_shared_formula(true),
+            &Metadata::new().with_shared_formula(true),
             &[0x01, 0, 0, 0, 0]
         )
         .is_err()
@@ -68,12 +68,12 @@ fn shared_flag_requires_ptg_exp_and_writer_refuses_orphaned_shared_state() {
 }
 
 #[test]
-fn metadata_builders_are_copyable_and_wire_stable() {
+fn metadata_builders_are_cloneable_and_wire_stable() {
     let metadata = Metadata::new()
         .with_always_calculate(true)
         .with_fill_alignment(true)
         .with_clear_errors(true)
         .with_calculation_cache(17);
     assert_eq!(metadata, metadata);
-    assert_eq!(encode_flags(metadata, &[0x16]).unwrap(), 0x0025);
+    assert_eq!(encode_flags(&metadata, &[0x16]).unwrap(), 0x0025);
 }

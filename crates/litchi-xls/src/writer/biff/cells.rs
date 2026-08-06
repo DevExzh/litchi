@@ -216,15 +216,29 @@ pub(crate) fn write_formula_with_metadata<W: Write>(
             "Row index {row} exceeds BIFF8 limit 65535 for FORMULA record"
         ))
     })?;
-    let flags = crate::formula_metadata::encode_flags(metadata, tokens)?;
+    crate::formula_metadata::validate_for_write(&metadata)?;
+    let shared_owner = metadata.shared_owner();
+    let shared_tokens = match shared_owner {
+        Some(owner) => Some(
+            owner
+                .validate_cell(row_u16, col)
+                .map(|_| owner.anchor_tokens())?,
+        ),
+        None => None,
+    };
+    let formula_tokens = match shared_tokens.as_ref() {
+        Some(tokens) => tokens.as_slice(),
+        None => tokens,
+    };
+    let flags = crate::formula_metadata::encode_flags(&metadata, formula_tokens)?;
     // A BIFF record payload is limited to 8,224 bytes. FORMULA contributes
     // 22 fixed bytes before the token stream.
-    if tokens.len() > 8_202 {
+    if formula_tokens.len() > 8_202 {
         return Err(Error::InvalidFormula(
             "Formula token stream exceeds BIFF8 record limit".to_string(),
         ));
     }
-    let token_len = u16::try_from(tokens.len())
+    let token_len = u16::try_from(formula_tokens.len())
         .map_err(|_| Error::InvalidFormula("Formula token length exceeds u16".to_string()))?;
     let data_len = 22u16
         .checked_add(token_len)
@@ -238,6 +252,56 @@ pub(crate) fn write_formula_with_metadata<W: Write>(
     writer.write_all(&[3, 0, 0, 0, 0, 0, 0xff, 0xff])?;
     writer.write_all(&flags.to_le_bytes())?;
     writer.write_all(&metadata.calculation_cache().to_le_bytes())?;
+    writer.write_all(&token_len.to_le_bytes())?;
+    writer.write_all(formula_tokens)?;
+
+    if let Some(owner) = shared_owner
+        && owner.anchor().row() == row_u16
+        && u16::from(owner.anchor().col()) == col
+    {
+        write_shared_formula(writer, owner)?;
+    }
+    Ok(())
+}
+
+/// Write the ShrFmla record owned by an anchor Formula record.
+fn write_shared_formula<W: Write>(
+    writer: &mut W,
+    owner: &crate::formula_metadata::Owner,
+) -> Result<()> {
+    const FIXED_PAYLOAD_SIZE: usize = crate::formula_metadata::shared::FIXED_PAYLOAD_SIZE;
+    const MAX_FORMULA_BYTES: usize = crate::formula_metadata::shared::MAX_FORMULA_BYTES;
+    let tokens = owner.tokens();
+    if tokens.is_empty() {
+        return Err(Error::InvalidFormula(
+            "ShrFmla shared parsed formula cannot be empty".to_string(),
+        ));
+    }
+    if tokens.len() > MAX_FORMULA_BYTES {
+        return Err(Error::InvalidFormula(format!(
+            "ShrFmla shared parsed formula exceeds the BIFF8 limit of {MAX_FORMULA_BYTES} bytes"
+        )));
+    }
+    if tokens.first().is_some_and(|opcode| opcode & 0x7F == 0x01) {
+        return Err(Error::UnsupportedFeature(
+            "array/PtgExp formulas cannot be used as a shared ShrFmla owner".to_string(),
+        ));
+    }
+    let payload_len = FIXED_PAYLOAD_SIZE
+        .checked_add(tokens.len())
+        .ok_or_else(|| Error::InvalidFormula("ShrFmla payload length overflow".to_string()))?;
+    let payload_len = u16::try_from(payload_len)
+        .map_err(|_| Error::InvalidFormula("ShrFmla payload exceeds u16".to_string()))?;
+    let c_use = owner.c_use()?;
+
+    write_record_header(writer, 0x04BC, payload_len)?;
+    let range = owner.range();
+    writer.write_all(&range.first().row().to_le_bytes())?;
+    writer.write_all(&range.last().row().to_le_bytes())?;
+    writer.write_all(&[range.first().col(), range.last().col()])?;
+    writer.write_all(&[0, c_use])?;
+    let token_len = u16::try_from(tokens.len())
+        .map_err(|_| Error::InvalidFormula("ShrFmla token length exceeds u16".to_string()))?;
     writer.write_all(&token_len.to_le_bytes())?;
     writer.write_all(tokens)?;
     Ok(())
@@ -254,6 +318,7 @@ pub(crate) fn write_table<W: Write>(writer: &mut W, table: &crate::DataTable) ->
 #[cfg(test)]
 mod tests {
     use super::write_formula;
+    use crate::formula_metadata::shared::{Cell, Owner, Range, parse};
     use crate::records::{CellRecord, Encoding, FormulaValue};
 
     #[test]
@@ -273,13 +338,55 @@ mod tests {
                     col: 5,
                     xf_index: 15,
                     value: FormulaValue::Empty,
-                    metadata,
+                    ref metadata,
                     ref formula,
                 } if formula == &tokens
-                    && metadata
+                    && *metadata
                         == crate::FormulaMetadata::new().with_always_calculate(true)
             ),
             "{record:?}"
         );
+    }
+
+    #[test]
+    fn writes_anchor_formula_then_one_shrfmla_with_ptg_exp_and_refu() {
+        let anchor = Cell::new(0, 0);
+        let owner = Owner::new(Range::try_new(0, 0, 1, 1).unwrap(), anchor, &[0x1E, 99, 0])
+            .unwrap()
+            .with_participants(&[anchor, Cell::new(1, 0)])
+            .unwrap();
+        let metadata = crate::FormulaMetadata::new().with_shared(owner);
+        let mut bytes = Vec::new();
+
+        super::write_formula_with_metadata(&mut bytes, 0, 0, 15, &[0x1E, 99, 0], metadata).unwrap();
+
+        assert_eq!(&bytes[..4], &[0x06, 0, 27, 0]);
+        assert_eq!(&bytes[4 + 22..4 + 27], &[0x01, 0, 0, 0, 0]);
+        assert_eq!(u16::from_le_bytes([bytes[4 + 14], bytes[4 + 15]]), 0x0008);
+
+        let shared_offset = 4 + 27;
+        assert_eq!(
+            &bytes[shared_offset..shared_offset + 4],
+            &[0xBC, 0x04, 13, 0]
+        );
+        let parsed = parse(&bytes[shared_offset + 4..]).unwrap();
+        assert_eq!(parsed.range, Range::try_new(0, 0, 1, 1).unwrap());
+        assert_eq!(parsed.count, 2);
+        assert_eq!(parsed.tokens, [0x1E, 99, 0]);
+    }
+
+    #[test]
+    fn participating_formula_emits_ptg_exp_without_a_duplicate_shrfmla() {
+        let anchor = Cell::new(0, 0);
+        let owner = Owner::new(Range::try_new(0, 0, 1, 0).unwrap(), anchor, &[0x1E, 99, 0])
+            .unwrap()
+            .with_participants(&[anchor, Cell::new(1, 0)])
+            .unwrap();
+        let metadata = crate::FormulaMetadata::new().with_shared(owner);
+        let mut bytes = Vec::new();
+
+        super::write_formula_with_metadata(&mut bytes, 1, 0, 15, &[], metadata).unwrap();
+        assert_eq!(bytes.len(), 4 + 22 + 5);
+        assert_eq!(&bytes[4 + 22..], &[0x01, 0, 0, 0, 0]);
     }
 }

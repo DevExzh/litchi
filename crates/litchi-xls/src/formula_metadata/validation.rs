@@ -22,7 +22,7 @@ pub(crate) fn decode_flags(flags: u16, tokens: &[u8]) -> Result<Metadata> {
     Ok(metadata)
 }
 
-pub(crate) fn encode_flags(metadata: Metadata, tokens: &[u8]) -> Result<u16> {
+pub(crate) fn encode_flags(metadata: &Metadata, tokens: &[u8]) -> Result<u16> {
     if tokens.is_empty() {
         return Err(Error::InvalidFormula(
             "Formula token stream cannot be empty".to_string(),
@@ -32,17 +32,21 @@ pub(crate) fn encode_flags(metadata: Metadata, tokens: &[u8]) -> Result<u16> {
     Ok(metadata.wire_flags())
 }
 
-pub(crate) fn validate_for_write(metadata: Metadata) -> Result<()> {
-    if metadata.shared_formula() {
-        return Err(Error::UnsupportedFeature(
+pub(crate) fn validate_for_write(metadata: &Metadata) -> Result<()> {
+    match (metadata.shared_formula(), metadata.shared_owner()) {
+        (true, Some(owner)) => owner.validate(),
+        (true, None) => Err(Error::UnsupportedFeature(
             "shared Formula authoring requires a ShrFmla owner".to_string(),
-        ));
+        )),
+        (false, Some(_)) => Err(Error::InvalidData(
+            "a shared-formula owner requires fShrFmla metadata".to_string(),
+        )),
+        (false, None) => Ok(()),
     }
-    Ok(())
 }
 
 pub(crate) const fn is_ptg_exp(tokens: &[u8]) -> bool {
-    tokens.len() >= 5 && tokens[0] & 0x7F == 0x01
+    tokens.len() == 5 && tokens[0] & 0x7F == 0x01
 }
 
 pub(crate) fn invalid(message: impl Into<String>) -> Error {

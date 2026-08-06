@@ -139,7 +139,7 @@ impl Writer {
         format_id: u16,
         metadata: crate::FormulaMetadata,
     ) -> Result<()> {
-        crate::formula_metadata::validate_for_write(metadata)?;
+        crate::formula_metadata::validate_for_write(&metadata)?;
         let pos = CellPos::try_new(row, col)?;
         self.write_cell_with_formula_metadata(
             sheet,

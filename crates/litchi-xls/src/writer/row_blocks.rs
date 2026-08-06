@@ -3,6 +3,7 @@ use std::io::{self, ErrorKind};
 const INDEX_RECORD_TYPE: u16 = 0x020b;
 const ROW_RECORD_TYPE: u16 = 0x0208;
 const TABLE_RECORD_TYPE: u16 = 0x0236;
+const SHARED_FORMULA_RECORD_TYPE: u16 = 0x04BC;
 const DBCELL_RECORD_TYPE: u16 = 0x00d7;
 const MAX_ROWS_PER_BLOCK: usize = 32;
 const MAX_ROW_BLOCKS: usize = 2048;
@@ -200,13 +201,12 @@ fn decode_staged_rows(bytes: &[u8]) -> io::Result<Vec<RowBlockLayoutRow>> {
                 bytes[offset..record_end].to_vec(),
                 Vec::new(),
             ));
-        } else if record_type == TABLE_RECORD_TYPE {
-            // A Table record follows its anchor Formula and shares that
-            // cell's layout row; its own payload does not start with the
-            // row coordinate of the anchor cell.
+        } else if matches!(record_type, TABLE_RECORD_TYPE | SHARED_FORMULA_RECORD_TYPE) {
+            // Table and ShrFmla records follow their anchor Formula and share
+            // its layout row; their payloads do not start with the row.
             reached_cells = true;
             let row_index = last_cell_row
-                .ok_or_else(|| invalid("staged Table record has no preceding cell record"))?;
+                .ok_or_else(|| invalid("staged continuation has no preceding cell record"))?;
             rows[row_index]
                 .cell_records
                 .extend_from_slice(&bytes[offset..record_end]);
@@ -318,8 +318,9 @@ fn validate_cell_records(row: &RowBlockLayoutRow) -> io::Result<()> {
         if record_end > row.cell_records.len() {
             return Err(invalid("cell record buffer ends inside a BIFF payload"));
         }
-        if record_type == TABLE_RECORD_TYPE {
-            // Table records carry the table range, not the anchor cell's row.
+        if matches!(record_type, TABLE_RECORD_TYPE | SHARED_FORMULA_RECORD_TYPE) {
+            // Table and ShrFmla records carry continuation metadata rather
+            // than the anchor cell's row.
             offset = record_end;
             continue;
         }

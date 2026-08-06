@@ -884,7 +884,7 @@ pub(crate) fn generate_workbook_stream(
                     let expression = formula.strip_prefix('=').unwrap_or(formula);
                     let tokens = FormulaTokenizer::new().tokenize(expression)?;
                     let encoded = encode_ptg_tokens(&tokens);
-                    let metadata = cell.formula_metadata.unwrap_or_else(|| {
+                    let metadata = cell.formula_metadata.clone().unwrap_or_else(|| {
                         crate::FormulaMetadata::new().with_always_calculate(true)
                     });
                     biff::write_formula_with_metadata(
