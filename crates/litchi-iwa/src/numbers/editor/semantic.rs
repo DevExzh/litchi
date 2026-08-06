@@ -46,7 +46,7 @@ use crate::shapes::{
 };
 use crate::table_appearance::TableAppearance;
 use litchi_iwa_common::table::cell::conditional_highlight::Rule;
-use crate::table_lock::TableLockState;
+use litchi_iwa_common::table::lock::State as TableLockState;
 use crate::text::{
     IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,
     ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphFlow,

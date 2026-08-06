@@ -3,5 +3,6 @@
 pub mod appearance;
 pub mod axis;
 pub mod cell;
+pub mod lock;
 /// Checked, archive-free table sort semantics.
 pub mod sort;

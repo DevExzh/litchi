@@ -156,7 +156,7 @@ mod structured;
 pub mod table_appearance;
 mod table_hidden_axes;
 /// Typed native table lock controls shared by Pages, Numbers, and Keynote.
-pub mod table_lock;
+mod table_lock;
 mod theme;
 pub(crate) mod wire;
 

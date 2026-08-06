@@ -2,9 +2,9 @@
 
 use super::*;
 use crate::table_lock::{
-    TableLockState, set_table_lock_state as set_native_table_lock_state,
-    table_lock_state as read_native_table_lock_state,
+    set_table_lock_state as set_native_table_lock_state, table_lock_state as read_native_table_lock_state,
 };
+use litchi_iwa_common::table::lock::State as TableLockState;
 
 impl PagesEditor {
     /// Read one body table's interactive lock state.

@@ -2,9 +2,10 @@
 
 use super::*;
 use crate::table_lock::{
-    TableLockState, set_table_lock_state_for_model as set_native_table_lock_state,
+    set_table_lock_state_for_model as set_native_table_lock_state,
     table_lock_state_for_model as read_native_table_lock_state,
 };
+use litchi_iwa_common::table::lock::State as TableLockState;
 use litchi_numbers::TableSelector;
 
 impl NumbersEditor {

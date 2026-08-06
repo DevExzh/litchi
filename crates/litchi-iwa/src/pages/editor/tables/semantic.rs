@@ -3,6 +3,7 @@
 use super::*;
 use crate::numbers::editor::table::cell::Borders;
 use litchi_iwa_common::comment::Comment;
+use litchi_iwa_common::table::lock::State as TableLockState;
 use litchi_iwa_common::table::cell::BorderSide;
 use litchi_numbers::cell::data_format::{
     Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,

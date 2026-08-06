@@ -57,7 +57,7 @@ use crate::shapes::{
 };
 use crate::table_appearance::TableAppearance;
 use litchi_iwa_common::table::cell::conditional_highlight::Rule;
-use crate::table_lock::TableLockState;
+use crate::text::layout::Layout;
 use crate::text::{
     IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,
     ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphFlow,
@@ -73,6 +73,7 @@ use crate::text::{
     TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
     TextShadow, TextStorageInfo, TextStyle,
 };
+use litchi_iwa_common::table::lock::State as TableLockState;
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
     patch_nested_varint_field, patch_varint_field, repeated_length_delimited_payloads,

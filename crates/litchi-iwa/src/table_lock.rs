@@ -4,33 +4,12 @@ use crate::archive::RawMessage;
 use crate::protobuf::tst::TableInfoArchive;
 use crate::wire::{parse_wire_fields, patch_varint_field, transform_length_delimited_field};
 use crate::{Error, IWorkPackage, Result};
+use litchi_iwa_common::table::lock::State as TableLockState;
 use prost::Message;
 
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_DRAWABLE_SUPER_FIELD: u32 = 1;
 const DRAWABLE_LOCKED_FIELD: u32 = 5;
-
-/// Interactive editing state of a native iWork table.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum TableLockState {
-    /// The table can be selected and edited interactively.
-    #[default]
-    Unlocked,
-    /// The table is protected from interactive editing.
-    Locked,
-}
-
-impl TableLockState {
-    /// Construct a lock state from its native boolean representation.
-    pub const fn from_locked(locked: bool) -> Self {
-        if locked { Self::Locked } else { Self::Unlocked }
-    }
-
-    /// Return whether the table is protected from interactive editing.
-    pub const fn is_locked(self) -> bool {
-        matches!(self, Self::Locked)
-    }
-}
 
 /// Read one table's effective interactive lock state.
 pub(crate) fn table_lock_state(
