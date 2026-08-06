@@ -6,7 +6,7 @@
 use super::fib::FileInformationBlock;
 use crate::package::{Error as PackageError, Result};
 use litchi_codepage::Ansi;
-use litchi_ole_common::smart_tags::{Limits, PropertyBag, PropertyBagStore, Type};
+use litchi_ole_common::smart_tags::{PropertyBag, PropertyBagStore, Type};
 use std::collections::{BTreeMap, HashSet};
 
 const STTBF_BKMK_FACTOID: usize = 114;
@@ -14,6 +14,22 @@ const PLCF_BKF_FACTOID: usize = 115;
 const PLCF_BKL_FACTOID: usize = 117;
 const FACTOID_DATA: usize = 118;
 const PLCF_FACTOID: usize = 132;
+
+#[path = "smart_tags/codec.rs"]
+mod codec;
+#[path = "smart_tags/package.rs"]
+mod package;
+#[path = "smart_tags/semantic.rs"]
+mod semantic;
+#[path = "smart_tags/transaction.rs"]
+mod transaction;
+#[path = "smart_tags/validation.rs"]
+mod validation;
+
+pub use litchi_ole_common::smart_tags::Limits;
+pub use package::Editor;
+pub use semantic::{TableKind, TableRange, Topology};
+pub use transaction::{Commit, Patch, Snapshot, Transaction, TransactionError};
 
 /// Producer that originally created a smart-tag factoid.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -584,6 +600,10 @@ fn ansi_for_lcid(lcid: u16) -> Option<Ansi> {
     };
     Ansi::new(page)
 }
+
+#[cfg(test)]
+#[path = "smart_tags/tests.rs"]
+mod transaction_tests;
 
 #[cfg(test)]
 mod tests {
