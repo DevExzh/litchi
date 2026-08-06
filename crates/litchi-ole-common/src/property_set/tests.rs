@@ -142,6 +142,36 @@ fn parses_variant_vectors_and_preserves_unknown_values() {
 }
 
 #[test]
+fn versioned_stream_name_must_match_its_property_identifier() {
+    let value = VersionedStream::new(Guid::from_bytes([0x11; 16]), 42).unwrap();
+    let mut section = Section::new(SUMMARY_INFORMATION_FMTID);
+    section.add(42, Value::VersionedStream(value)).unwrap();
+    let mut bytes = Stream::new(section).to_bytes().unwrap();
+    let name = bytes
+        .windows(b"prop42".len())
+        .position(|window| window == b"prop42")
+        .expect("serialized indirect property name");
+    bytes[name + 4] = b'3';
+    assert!(Stream::parse(&bytes).is_err());
+}
+
+#[test]
+fn unsupported_indirect_stream_properties_remain_inert_and_opaque() {
+    let mut raw = Vec::new();
+    raw.extend_from_slice(&VT_STREAM.to_le_bytes());
+    raw.extend_from_slice(&0u16.to_le_bytes());
+    raw.extend_from_slice(b"opaque-stream-selector");
+    let value = parse_typed_property(&raw, DEFAULT_CODEPAGE, 0).unwrap();
+    assert_eq!(
+        value,
+        Value::Unknown {
+            variant_type: VT_STREAM,
+            data: b"opaque-stream-selector".to_vec(),
+        }
+    );
+}
+
+#[test]
 fn reads_apache_poi_named_custom_properties() {
     let bytes = fixture("test-data/poi/test-data/hpsf/TestMickey.doc");
     let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();

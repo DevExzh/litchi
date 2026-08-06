@@ -2,7 +2,7 @@
 //!
 //! `Document` owns the parsed OLE2-backed state in [`state`], exposes the
 //! contextual reading API from [`semantic`], and keeps table-shape invariants
-//! in [`validation`]. The parent `document` module re-exports the facade so
+//! in [`validation`]. The crate root re-exports the facade directly, so
 //! callers never need to know this internal topology.
 
 mod semantic;

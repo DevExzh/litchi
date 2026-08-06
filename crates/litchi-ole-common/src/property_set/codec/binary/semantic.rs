@@ -51,6 +51,7 @@ fn variant_type(value: &Value) -> u16 {
         Value::Blob(_) => VT_BLOB,
         Value::Clipboard { .. } => VT_CF,
         Value::Clsid(_) => VT_CLSID,
+        Value::VersionedStream(_) => VT_VERSIONED_STREAM,
         Value::Vector(vector) => VT_VECTOR | vector.scalar().raw(),
         Value::Array(array) => VT_ARRAY | array.scalar().raw(),
         Value::Unknown { variant_type, .. } => *variant_type,
@@ -117,6 +118,14 @@ fn append_body(out: &mut Vec<u8>, value: &Value, codepage: u16) -> Result<(), Ol
             pad4(out)?;
         },
         Value::Clsid(v) => append_bytes(out, v.as_bytes(), "serialized property value")?,
+        Value::VersionedStream(value) => {
+            append_bytes(
+                out,
+                value.version_guid().as_bytes(),
+                "serialized versioned stream value",
+            )?;
+            append_codepage_string(out, value.stream_name(), codepage)?;
+        },
         Value::Vector(vector) => {
             vector.validate()?;
             append_u32(
@@ -369,6 +378,15 @@ fn parse_value_body(
             let mut value = [0u8; 16];
             value.copy_from_slice(raw);
             Ok(Value::Clsid(Guid::from_bytes(value)))
+        },
+        VT_VERSIONED_STREAM => {
+            let raw = reader.take(16, "versioned stream GUID")?;
+            let mut version_guid = [0u8; 16];
+            version_guid.copy_from_slice(raw);
+            let stream_name =
+                read_codepage_string(reader, codepage, "versioned stream name", depth == 0)?;
+            VersionedStream::from_wire(Guid::from_bytes(version_guid), stream_name)
+                .map(Value::VersionedStream)
         },
         _ if depth == 0 => Ok(Value::Unknown {
             variant_type,

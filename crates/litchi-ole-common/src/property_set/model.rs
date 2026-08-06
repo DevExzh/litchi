@@ -5,6 +5,7 @@ use litchi_cfb::OleError;
 use litchi_cfb::consts::*;
 use litchi_codepage::Mbcs;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write as _;
 use std::hash::{Hash, Hasher};
 
 fn allocation(resource: &'static str, source: std::collections::TryReserveError) -> OleError {
@@ -19,6 +20,7 @@ pub(crate) const PID_LOCALE: u32 = 0x8000_0000;
 pub(crate) const PID_BEHAVIOR: u32 = 0x8000_0003;
 pub(crate) const MAX_NAMED_PROPERTY_ID: u32 = 0x7fff_ffff;
 pub(crate) const VT_ARRAY: u16 = 0x2000;
+pub(crate) const VT_VERSIONED_STREAM: u16 = 0x0049;
 
 pub(crate) fn try_vec_with_capacity<T>(
     capacity: usize,
@@ -130,6 +132,40 @@ pub(crate) fn validate_property_name(name: &str) -> Result<(), OleError> {
     }
 }
 
+fn indirect_property_identifier(name: &str) -> Result<u32, OleError> {
+    let digits = name
+        .strip_prefix("prop")
+        .ok_or_else(|| invalid("Indirect property name must start with 'prop'"))?;
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(invalid(
+            "Indirect property name must contain a decimal property identifier",
+        ));
+    }
+    let identifier = digits
+        .parse::<u32>()
+        .map_err(|_| invalid("Indirect property identifier is too large"))?;
+    if !valid_named_property_identifier(identifier) {
+        return Err(invalid(
+            "Indirect property name cannot reference a special property",
+        ));
+    }
+    Ok(identifier)
+}
+
+fn make_indirect_property_name(identifier: u32) -> Result<String, OleError> {
+    if !valid_named_property_identifier(identifier) {
+        return Err(invalid(
+            "Versioned stream property identifier must be a non-special property",
+        ));
+    }
+    let mut name = String::new();
+    name.try_reserve_exact(14)
+        .map_err(|source| allocation("indirect property name", source))?;
+    name.write_fmt(format_args!("prop{identifier}"))
+        .map_err(|_| invalid("Could not construct indirect property name"))?;
+    Ok(name)
+}
+
 pub(crate) fn invalid(message: impl Into<String>) -> OleError {
     OleError::InvalidFormat(message.into())
 }
@@ -196,6 +232,55 @@ impl CodePage {
             Self::Utf16Le => UNICODE_CODEPAGE,
             Self::Mbcs(page) => page.id16(),
         }
+    }
+}
+
+/// A typed `[MS-OLEPS]` `VT_VERSIONED_STREAM` value.
+///
+/// The stream payload itself belongs to the non-simple Property Set storage
+/// layer. This common owner keeps only the version GUID and the inert,
+/// specification-derived stream selector; it never opens or executes the
+/// referenced CFB stream.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VersionedStream {
+    version_guid: Guid,
+    stream_name: String,
+}
+
+impl VersionedStream {
+    /// Create a versioned-stream value for a property identifier.
+    pub fn new(version_guid: Guid, property_identifier: u32) -> Result<Self, OleError> {
+        Ok(Self {
+            version_guid,
+            stream_name: make_indirect_property_name(property_identifier)?,
+        })
+    }
+
+    /// The application-specific version GUID stored in the packet.
+    pub const fn version_guid(&self) -> Guid {
+        self.version_guid
+    }
+
+    /// The inert CFB stream selector (`prop` followed by the property ID).
+    pub fn stream_name(&self) -> &str {
+        &self.stream_name
+    }
+
+    pub(crate) fn from_wire(version_guid: Guid, stream_name: String) -> Result<Self, OleError> {
+        indirect_property_identifier(&stream_name)?;
+        Ok(Self {
+            version_guid,
+            stream_name,
+        })
+    }
+
+    pub(crate) fn validate_for_property(&self, property_identifier: u32) -> Result<(), OleError> {
+        if indirect_property_identifier(&self.stream_name)? != property_identifier {
+            return Err(invalid(
+                "Versioned stream name does not match its property identifier",
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -869,6 +954,7 @@ pub enum Value {
     Blob(Vec<u8>),
     Clipboard { format: i32, data: Vec<u8> },
     Clsid(Guid),
+    VersionedStream(VersionedStream),
     Vector(Vector),
     Array(Array),
     Unknown { variant_type: u16, data: Vec<u8> },
@@ -934,6 +1020,10 @@ pub(crate) fn try_clone_property_value(value: &Value) -> Result<Value, OleError>
             data: try_copy_bytes(data, "property value clipboard data")?,
         },
         Value::Clsid(value) => Value::Clsid(*value),
+        Value::VersionedStream(value) => Value::VersionedStream(VersionedStream {
+            version_guid: value.version_guid,
+            stream_name: try_clone_string(&value.stream_name, "indirect property name")?,
+        }),
         Value::Vector(vector) => {
             let mut cloned = try_vec_with_capacity(vector.values.len(), "property value vector")?;
             for value in &vector.values {

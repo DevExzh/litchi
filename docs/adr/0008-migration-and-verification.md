@@ -5606,6 +5606,14 @@ relationship/dependency guards, malformed input, and source-checked OLE patch
 application. This remains incremental specification coverage, not a claim of
 complete Office or ODF conformance.
 
+This continuation also removes the public outer `litchi_doc::document` module,
+leaving the typed `Document` facade at the crate root, and adds the bounded
+`litchi-ole-common::property_set::VersionedStream` model and binary codec for
+`[MS-OLEPS]` 2.13. Its indirect stream selector is validated against the
+owning property identifier; the referenced non-simple CFB stream remains
+inert package data. Focused tests cover UTF-16/code-page round trips,
+identifier mismatch rejection, and opaque unsupported stream variants.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

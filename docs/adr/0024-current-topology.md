@@ -286,6 +286,14 @@ test seams nested behind a concise prefix-free facade; unknown records remain
 opaque where the specification requires preservation, and no runtime activates
 macros, controls, links, collaboration, rendering, or external code.
 
+The current boundary cleanup makes DOC's parsed `document` owner private and
+exports `Document` only from the `litchi_doc` root facade; no public
+`litchi_doc::document` compatibility path remains. The shared OLE Property Set
+owner additionally types `[MS-OLEPS]` `VT_VERSIONED_STREAM` values with checked
+indirect property names, bounded code-page strings, and inert version GUIDs.
+The referenced CFB stream remains host/package data and is never opened or
+executed by the common semantic layer.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

@@ -47,6 +47,9 @@ pub(super) fn validate_section(section: &Section, version: u16) -> Result<(), Ol
                 "Property {identifier} requires Property Set version {required_version}"
             )));
         }
+        if let Value::VersionedStream(value) = value {
+            value.validate_for_property(*identifier)?;
+        }
     }
     if let Some(value) = section.properties.get(&PID_BEHAVIOR) {
         if version == Stream::VERSION_0 {

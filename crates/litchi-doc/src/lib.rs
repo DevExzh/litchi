@@ -59,7 +59,9 @@ pub mod captions {
     };
 }
 pub mod comment;
-pub mod document;
+// The parsed document owner is intentionally private; `Document` is exposed
+// directly at the crate facade instead of behind an outer `document` module.
+mod document;
 mod encryption;
 pub mod footnote;
 pub mod header_footer;

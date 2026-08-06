@@ -1,7 +1,8 @@
 //! Focused invariants for the binary Property Set facade.
 
 use super::super::super::model::{
-    Array, Dimension, SUMMARY_INFORMATION_FMTID, Scalar, Section, Stream, Value, Vector,
+    Array, CodePage, Dimension, Guid, SUMMARY_INFORMATION_FMTID, Scalar, Section, Stream, Value,
+    Vector, VersionedStream,
 };
 
 #[test]
@@ -15,6 +16,39 @@ fn facade_round_trips_typed_property_values() {
     let parsed = Stream::parse(&bytes).expect("parseable property set");
 
     assert_eq!(parsed.sections[0].property(2), Some(&Value::I4(42)));
+}
+
+#[test]
+fn versioned_stream_round_trip_uses_the_typed_inert_selector() {
+    let version_guid = Guid::from_bytes([
+        0x10, 0x32, 0x54, 0x76, 0x98, 0xba, 0xdc, 0xfe, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd,
+        0xef,
+    ]);
+    let value = VersionedStream::new(version_guid, 42).expect("normal property identifier");
+    assert_eq!(value.stream_name(), "prop42");
+
+    let mut section = Section::new(SUMMARY_INFORMATION_FMTID);
+    section.set_page(CodePage::Utf16Le);
+    section
+        .add(42, Value::VersionedStream(value))
+        .expect("versioned stream property should be accepted");
+
+    let bytes = Stream::new(section)
+        .to_bytes()
+        .expect("versioned stream property should serialize");
+    let parsed = Stream::parse(&bytes).expect("versioned stream property should parse");
+    let Some(Value::VersionedStream(parsed)) = parsed.sections[0].property(42) else {
+        panic!("expected typed versioned stream property");
+    };
+    assert_eq!(parsed.version_guid(), version_guid);
+    assert_eq!(parsed.stream_name(), "prop42");
+}
+
+#[test]
+fn versioned_stream_rejects_special_property_identifiers() {
+    let version_guid = Guid::from_bytes([0xabu8; 16]);
+    assert!(VersionedStream::new(version_guid, 0).is_err());
+    assert!(VersionedStream::new(version_guid, 1).is_err());
 }
 
 #[test]
