@@ -221,6 +221,16 @@ impl<'data> Props<'data> {
     pub fn gradient_stops(&self) -> Result<Option<super::gradient::Stops<'data>>> {
         super::gradient::parse(self)
     }
+
+    /// Decodes the optional `[MS-ODRAW]` picture-name and BLIP-flag family.
+    ///
+    /// The returned projection borrows a valid UTF-16 name and retains the
+    /// exact raw flags, including undefined producer bits.  Use
+    /// [`super::picture::Snapshot`] when an immutable record snapshot and
+    /// lossless edit transaction are required.
+    pub fn picture(&self) -> Result<Option<super::picture::Metadata<'data>>> {
+        super::picture::parse_properties(self)
+    }
 }
 fn boolean_group_terminal(id: u16) -> Option<u16> {
     match id {

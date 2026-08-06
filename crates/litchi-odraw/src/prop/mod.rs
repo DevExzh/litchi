@@ -28,6 +28,7 @@ pub mod geometry;
 pub mod gradient;
 mod model;
 mod package;
+pub mod picture;
 #[cfg(test)]
 mod tests;
 
