@@ -39,11 +39,12 @@ use crate::text::{
     ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
     ParagraphListNumbering, ParagraphSpacing, ParagraphTabStops, ParagraphWritingDirection,
-    TextAlignment, TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
+    TextAlignment, Background as TextAppearanceBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing,
     TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
     TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
     TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
-    TextOutline, TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
+    Outline, TextRange, TextScript, Shadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -3092,7 +3093,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<TextOutline> {
+    ) -> Result<Outline> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.text_outline(graph.storage_id)
     }
@@ -3102,7 +3103,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        outline: TextOutline,
+        outline: Outline,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -3137,7 +3138,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<TextShadow> {
+    ) -> Result<Shadow> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.text_shadow(graph.storage_id)
     }
@@ -3147,7 +3148,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        shadow: TextShadow,
+        shadow: Shadow,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -3182,7 +3183,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<TextBackground> {
+    ) -> Result<TextAppearanceBackground> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.text_background(graph.storage_id)
     }
@@ -3192,7 +3193,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        background: TextBackground,
+        background: TextAppearanceBackground,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();

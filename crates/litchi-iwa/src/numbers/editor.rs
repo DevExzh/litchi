@@ -66,12 +66,12 @@ use crate::text::{
     ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
     ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing, ParagraphTabStops,
-    ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    ParagraphWritingDirection, TextAlignment, Background, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextComment, TextCommentBody,
     TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
     TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextRange, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    TextLanguage, TextLanguageRun, TextLigatures, Outline, TextRange, TextScript,
+    Shadow, TextStorageInfo, TextStyle,
 };
 use litchi_iwa_common::table::lock::State as TableLockState;
 use crate::wire::{

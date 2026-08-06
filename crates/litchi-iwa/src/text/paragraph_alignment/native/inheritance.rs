@@ -15,9 +15,9 @@ use crate::text::paragraph_tabs::{
 };
 use crate::text::style::{
     ParagraphBackground, ParagraphBorders, ParagraphIndentPoints, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment, TextBackground,
+    ParagraphLineSpacing, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment, Background,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
-    TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle,
+    Outline, TextPointSize, TextScript, Shadow, TextStrikethrough, TextStyle,
     TextUnderline,
 };
 use crate::{Error, IWorkPackage, Result};
@@ -220,7 +220,7 @@ pub(super) fn text_ligatures(package: &IWorkPackage, first_style_id: u64) -> Res
     Ok(value.unwrap_or_default())
 }
 
-pub(super) fn text_outline(package: &IWorkPackage, first_style_id: u64) -> Result<TextOutline> {
+pub(super) fn text_outline(package: &IWorkPackage, first_style_id: u64) -> Result<Outline> {
     let value = walk(package, first_style_id, None, |value, style| {
         let Some(properties) = style.char_properties.as_ref() else {
             return Ok(InheritanceControl::Continue);
@@ -234,7 +234,7 @@ pub(super) fn text_outline(package: &IWorkPackage, first_style_id: u64) -> Resul
     Ok(value.unwrap_or_default())
 }
 
-pub(super) fn text_shadow(package: &IWorkPackage, first_style_id: u64) -> Result<TextShadow> {
+pub(super) fn text_shadow(package: &IWorkPackage, first_style_id: u64) -> Result<Shadow> {
     let value = walk(package, first_style_id, None, |value, style| {
         let Some(properties) = style.char_properties.as_ref() else {
             return Ok(InheritanceControl::Continue);
@@ -251,7 +251,7 @@ pub(super) fn text_shadow(package: &IWorkPackage, first_style_id: u64) -> Result
 pub(super) fn text_background(
     package: &IWorkPackage,
     first_style_id: u64,
-) -> Result<TextBackground> {
+) -> Result<Background> {
     let value = walk(package, first_style_id, None, |value, style| {
         let Some(properties) = style.char_properties.as_ref() else {
             return Ok(InheritanceControl::Continue);

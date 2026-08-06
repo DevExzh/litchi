@@ -6460,6 +6460,41 @@ the CLI confirmed `TextHighlight { id: 131, range: 0..3 }`. Pages, Numbers, and
 Keynote were closed after verification. Remaining text debt includes raw
 `IWorkTextEditor` storage selectors and the broader monolithic adapter split.
 
+This follow-up completes the text-appearance ownership handoff required by ADRs
+0001–0004. The archive-free `litchi-iwa-text::appearance` module now owns the
+focused `Outline`, `Shadow`, `Background`, and `ParagraphBackground` values.
+They compose only the neutral `litchi-iwa-common` color, stroke, and shadow
+primitives; no protobuf, archive, graph, package, or facade error state enters
+the leaf. Text shadows retain the native text-inspector restriction to drop
+shadows through a typed `UnsupportedShadowFamily` error. The IWA adapter keeps
+all native color/stroke/shadow conversion, inheritance, null-marker validation,
+style lookup, and transactional publication. The former flat `TextOutline`,
+`TextShadow`, and `TextBackground` owners were removed rather than aliased, and
+the internal property discriminants now distinguish character appearance from
+paragraph background explicitly.
+
+The appearance leaf passed 60 focused tests, the integrated IWA library suite
+passed 1,484 tests, strict no-dependency Clippy passed for both
+`litchi-iwa-text` and the IWA library target (with the three existing IWA
+dead-code groups allowed), and the six appearance-related text examples
+compiled. Independent ADR, common-API, migration-risk, and native-verification
+audits agreed on the downward-only `litchi-iwa -> litchi-iwa-text ->
+litchi-iwa-common` boundary and found no archive dependency in the new leaf.
+
+The CLI text-style inspector read the migrated values from the known-good
+native fixtures: Pages storage 147, Numbers storage 130, and Keynote storage
+155 each reported a one-point `Stroke`, the standard one-point/five-point
+opaque `Drop` shadow at 45 degrees, and the fixture's non-default solid
+background. Computer Use opened `/private/tmp/adr-highlight-pages.pages`,
+`/private/tmp/litchi-adr-numbers-text.numbers`, and
+`/private/tmp/adr-highlight-keynote.key` in the real iWork applications. Pages
+and Keynote accessibility trees exposed their marker text and screenshots
+showed the native turquoise highlighted ranges; Numbers exposed the expected
+text-box marker without a repair prompt. Pages, Numbers, and Keynote were
+closed after verification. This remains a bounded semantic/API and native-open
+slice; raw `IWorkTextEditor` storage selectors and the wider monolithic adapter
+split remain open.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

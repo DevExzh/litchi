@@ -119,13 +119,20 @@ pub use paragraph_tabs::{
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
 };
 pub use style::{
-    CharacterError, ParagraphBackground, ParagraphBorder, ParagraphBorders, ParagraphIndentPoints,
+    Background, CharacterError, Outline, ParagraphBackground, ParagraphBorder, ParagraphBorders,
+    ParagraphIndentPoints,
     ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyle,
-    TextAlignment, TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
-    TextDecorations, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow,
-    TextStrikethrough, TextStyle, TextUnderline,
+    Shadow, TextAlignment, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
+    TextDecorations, TextLigatures, TextPointSize, TextScript, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
+
+impl From<litchi_iwa_text::appearance::Error> for crate::Error {
+    fn from(error: litchi_iwa_text::appearance::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
 
 impl From<litchi_iwa_text::NameError> for crate::Error {
     fn from(error: litchi_iwa_text::NameError) -> Self {

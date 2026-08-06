@@ -7,115 +7,15 @@ pub use litchi_iwa_text::character::{
     TextDecorations, TextLigatures, TextPointSize, TextScript, TextStrikethrough, TextStyle,
     TextUnderline,
 };
+pub use litchi_iwa_text::appearance::{Background, Outline, ParagraphBackground, Shadow};
 
 use super::paragraph_direction::ParagraphWritingDirection;
 use super::paragraph_flow::ParagraphFlow;
 use super::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
 };
-use crate::shapes::{
-    Appearance, BlurRadius, Cap, Drop, Join, Offset, Pattern, RgbaColor, Shadow, Stroke, Width,
-};
-use litchi_iwa_common::shape::shadow::{Angle, Opacity};
+use crate::shapes::{Cap, Join, Pattern, RgbaColor, Stroke, Width};
 use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
-
-/// Effective outline applied to uniformly styled text.
-///
-/// Current iWork applications store text outlines as the same typed TSD
-/// strokes used by drawing shapes. [`TextOutline::standard`] reproduces the
-/// one-point outline written by the Outline checkbox in Pages, Numbers, and
-/// Keynote.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub enum TextOutline {
-    /// Render text without an outline.
-    #[default]
-    None,
-    /// Render text using a standard native stroke.
-    Stroke(Stroke),
-}
-
-impl TextOutline {
-    /// Construct the exact outline written by current iWork applications.
-    pub fn standard() -> Self {
-        Self::Stroke(Stroke::new(
-            RgbaColor::transparent_black(),
-            Width::ONE,
-            Pattern::Solid,
-        ))
-    }
-}
-
-/// Effective drop shadow applied to uniformly styled text.
-///
-/// Text shadows use iWork's native drawing-shadow archive, but the text
-/// inspector supports only drop shadows. [`TextShadow::standard`] reproduces
-/// the checkbox-authored value in Pages, Numbers, and Keynote.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub enum TextShadow {
-    /// Render text without a shadow.
-    #[default]
-    None,
-    /// Render text with a typed native drop shadow.
-    Drop(Drop),
-}
-
-impl TextShadow {
-    /// Construct the exact shadow written by current iWork applications.
-    pub const fn standard() -> Self {
-        Self::Drop(Drop::new(
-            Appearance::new(
-                RgbaColor::black(),
-                BlurRadius::ONE_POINT,
-                Offset::FIVE_POINTS,
-                Opacity::OPAQUE,
-            ),
-            Angle::FORTY_FIVE_DEGREES,
-        ))
-    }
-
-    pub(crate) const fn into_shape_shadow(self) -> Shadow {
-        match self {
-            Self::None => Shadow::Disabled,
-            Self::Drop(shadow) => Shadow::Drop(shadow),
-        }
-    }
-
-    pub(crate) fn from_shape_shadow(shadow: Shadow) -> crate::Result<Self> {
-        match shadow {
-            Shadow::Disabled => Ok(Self::None),
-            Shadow::Drop(shadow) => Ok(Self::Drop(shadow)),
-            Shadow::Contact(_) | Shadow::Curved(_) => Err(crate::Error::InvalidFormat(
-                "native iWork text uses a non-drop shadow".to_owned(),
-            )),
-        }
-    }
-}
-
-/// Effective solid background painted behind uniformly styled text.
-///
-/// Pages, Numbers, and Keynote store this independently from both the text
-/// foreground fill and the enclosing text-box fill.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub enum TextBackground {
-    /// Do not paint a background behind the text glyph run.
-    #[default]
-    None,
-    /// Paint a solid native color behind the text glyph run.
-    Color(RgbaColor),
-}
-
-/// Effective solid fill painted across a paragraph's layout box.
-///
-/// This is the “Paragraph Background” control in the iWork Text → Layout
-/// inspector. It is independent from character-level [`TextBackground`].
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub enum ParagraphBackground {
-    /// Leave the paragraph layout box unfilled.
-    #[default]
-    None,
-    /// Paint the paragraph layout box with a solid native color.
-    Color(RgbaColor),
-}
 
 /// One uniform native paragraph-border appearance.
 #[derive(Debug, Clone, Copy, PartialEq)]

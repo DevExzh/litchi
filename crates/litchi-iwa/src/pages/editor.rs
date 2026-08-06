@@ -48,11 +48,12 @@ use crate::text::{
     ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
     ParagraphListNumbering, ParagraphSpacing, ParagraphTabStops, ParagraphWritingDirection,
-    TextAlignment, TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
+    TextAlignment, Background as TextAppearanceBackground, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing,
     TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
     TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
     TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
-    TextOutline, TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
+    Outline, TextRange, TextScript, Shadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -1342,7 +1343,7 @@ impl PagesEditor {
     }
 
     /// Read the effective outline of a reachable ordinary text box.
-    pub fn text_box_text_outline(&self, drawable_object_id: u64) -> Result<TextOutline> {
+    pub fn text_box_text_outline(&self, drawable_object_id: u64) -> Result<Outline> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.text_outline(graph.storage_id)
     }
@@ -1351,7 +1352,7 @@ impl PagesEditor {
     pub fn set_text_box_text_outline(
         &mut self,
         drawable_object_id: u64,
-        outline: TextOutline,
+        outline: Outline,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1378,7 +1379,7 @@ impl PagesEditor {
     }
 
     /// Read the effective shadow of a reachable ordinary text box.
-    pub fn text_box_text_shadow(&self, drawable_object_id: u64) -> Result<TextShadow> {
+    pub fn text_box_text_shadow(&self, drawable_object_id: u64) -> Result<Shadow> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.text_shadow(graph.storage_id)
     }
@@ -1387,7 +1388,7 @@ impl PagesEditor {
     pub fn set_text_box_text_shadow(
         &mut self,
         drawable_object_id: u64,
-        shadow: TextShadow,
+        shadow: Shadow,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1414,7 +1415,10 @@ impl PagesEditor {
     }
 
     /// Read the effective solid background of a reachable ordinary text box.
-    pub fn text_box_text_background(&self, drawable_object_id: u64) -> Result<TextBackground> {
+    pub fn text_box_text_background(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<TextAppearanceBackground> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.text_background(graph.storage_id)
     }
@@ -1423,7 +1427,7 @@ impl PagesEditor {
     pub fn set_text_box_text_background(
         &mut self,
         drawable_object_id: u64,
-        background: TextBackground,
+        background: TextAppearanceBackground,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();

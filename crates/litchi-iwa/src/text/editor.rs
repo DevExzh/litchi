@@ -105,8 +105,8 @@ use super::storage_wire::{
 };
 use super::style::{
     ParagraphBackground, ParagraphBorders, ParagraphIndents, ParagraphLineSpacing,
-    ParagraphSpacing, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextDecorations, TextLigatures, TextOutline, TextScript, TextShadow,
+    ParagraphSpacing, TextAlignment, Background, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextDecorations, TextLigatures, Outline, TextScript, Shadow,
     TextStyle,
 };
 use super::text_comment::{
@@ -1425,7 +1425,7 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective uniform text outline.
-    pub fn text_outline(&self, object_id: u64) -> Result<TextOutline> {
+    pub fn text_outline(&self, object_id: u64) -> Result<Outline> {
         text_outline(&self.package, object_id)
     }
 
@@ -1433,7 +1433,7 @@ impl IWorkTextEditor {
     ///
     /// Rich text containing multiple paragraph-style boundaries is rejected so
     /// the operation cannot flatten independently formatted paragraphs.
-    pub fn set_text_outline(&mut self, object_id: u64, outline: TextOutline) -> Result<()> {
+    pub fn set_text_outline(&mut self, object_id: u64, outline: Outline) -> Result<()> {
         let mut staged = self.package.clone();
         set_text_outline(&mut staged, object_id, outline)?;
         let bytes = staged.to_bytes()?;
@@ -1460,7 +1460,7 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective uniform text shadow.
-    pub fn text_shadow(&self, object_id: u64) -> Result<TextShadow> {
+    pub fn text_shadow(&self, object_id: u64) -> Result<Shadow> {
         text_shadow(&self.package, object_id)
     }
 
@@ -1468,7 +1468,7 @@ impl IWorkTextEditor {
     ///
     /// Rich text containing multiple paragraph-style boundaries is rejected so
     /// the operation cannot flatten independently formatted paragraphs.
-    pub fn set_text_shadow(&mut self, object_id: u64, shadow: TextShadow) -> Result<()> {
+    pub fn set_text_shadow(&mut self, object_id: u64, shadow: Shadow) -> Result<()> {
         let mut staged = self.package.clone();
         set_text_shadow(&mut staged, object_id, shadow)?;
         let bytes = staged.to_bytes()?;
@@ -1495,7 +1495,7 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective solid background behind uniformly styled text.
-    pub fn text_background(&self, object_id: u64) -> Result<TextBackground> {
+    pub fn text_background(&self, object_id: u64) -> Result<Background> {
         text_background(&self.package, object_id)
     }
 
@@ -1506,7 +1506,7 @@ impl IWorkTextEditor {
     pub fn set_text_background(
         &mut self,
         object_id: u64,
-        background: TextBackground,
+        background: Background,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         set_text_background(&mut staged, object_id, background)?;

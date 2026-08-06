@@ -11,10 +11,10 @@ use litchi_iwa::text::{
     ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList,
     ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyleName,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, Background, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextCommentBody, TextCommentReplyBody,
-    TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage, TextLigatures, TextOutline,
-    TextPointSize, TextRange, TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage, TextLigatures, Outline,
+    TextPointSize, TextRange, TextScript, Shadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 use litchi_iwa_text::columns::{Columns, Count, Gap};
 use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
@@ -111,17 +111,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_text_box_text_outline(
         sheet_id,
         created.drawable_object_id,
-        TextOutline::standard(),
+        Outline::standard(),
     )?;
     editor.set_sheet_text_box_text_shadow(
         sheet_id,
         created.drawable_object_id,
-        TextShadow::standard(),
+        Shadow::standard(),
     )?;
     editor.set_sheet_text_box_text_background(
         sheet_id,
         created.drawable_object_id,
-        TextBackground::Color(RgbaColor::new(0.74, 0.95, 0.78, 1.0, RgbColorSpace::Srgb)?),
+        Background::Color(RgbaColor::new(0.74, 0.95, 0.78, 1.0, RgbColorSpace::Srgb)?),
     )?;
     editor.set_sheet_text_box_paragraph_background(
         sheet_id,

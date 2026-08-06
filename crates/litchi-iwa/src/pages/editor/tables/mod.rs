@@ -69,10 +69,9 @@ pub use crate::shapes::RgbaColor as PagesTableCellTextColor;
 pub use crate::table_cell_border::{
     TableCellBorderSide as PagesTableCellBorderSide, TableCellBorders as PagesTableCellBorders,
 };
-pub use crate::table_cell_layout::{
-    TableCellInset as PagesTableCellInset, TableCellInsets as PagesTableCellInsets,
-    TableCellLayout as PagesTableCellLayout, TableCellTextWrap as PagesTableCellTextWrap,
-    TableCellVerticalAlignment as PagesTableCellVerticalAlignment,
+pub use litchi_iwa_common::table::cell::layout::{
+    Inset as PagesTableCellInset, Insets as PagesTableCellInsets, Layout as PagesTableCellLayout,
+    TextWrap as PagesTableCellTextWrap, VerticalAlignment as PagesTableCellVerticalAlignment,
 };
 pub use crate::text::ParagraphIndents as PagesTableCellParagraphIndents;
 pub use crate::text::ParagraphLineSpacing as PagesTableCellParagraphLineSpacing;
@@ -91,16 +90,16 @@ pub use crate::text::ParagraphListPlacement as PagesTableCellParagraphListPlacem
 pub use crate::text::ParagraphSpacing as PagesTableCellParagraphSpacing;
 pub use crate::text::ParagraphTabStops as PagesTableCellParagraphTabStops;
 pub use crate::text::TextAlignment as PagesTableCellTextAlignment;
-pub use crate::text::TextBackground as PagesTableCellTextBackground;
+pub use crate::text::Background as PagesTableCellTextBackground;
 pub use crate::text::TextBaselineShift as PagesTableCellTextBaselineShift;
 pub use crate::text::TextCapitalization as PagesTableCellTextCapitalization;
 pub use crate::text::TextCharacterSpacing as PagesTableCellTextCharacterSpacing;
 pub use crate::text::TextDecorations as PagesTableCellTextDecorations;
 pub use crate::text::TextFont as PagesTableCellTextFont;
 pub use crate::text::TextLigatures as PagesTableCellTextLigatures;
-pub use crate::text::TextOutline as PagesTableCellTextOutline;
+pub use crate::text::Outline as PagesTableCellTextOutline;
 pub use crate::text::TextScript as PagesTableCellTextScript;
-pub use crate::text::TextShadow as PagesTableCellTextShadow;
+pub use crate::text::Shadow as PagesTableCellTextShadow;
 pub use crate::text::TextStyle as PagesTableCellTextStyle;
 
 pub use semantic::{PagesTable, PagesTableInfo};

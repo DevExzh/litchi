@@ -7,6 +7,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod appearance;
 pub mod bookmark;
 pub mod character;
 pub mod columns;
@@ -21,6 +22,7 @@ pub mod paragraph;
 pub mod position;
 pub mod storage;
 
+pub use appearance::{Background, Outline, ParagraphBackground, Shadow};
 pub use bookmark::{
     Bookmark, Error as BookmarkError, Id as BookmarkId, Name as BookmarkName,
     Settings as BookmarkSettings, Visibility as BookmarkVisibility,

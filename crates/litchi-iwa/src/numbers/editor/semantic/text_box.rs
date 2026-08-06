@@ -1375,7 +1375,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<TextOutline> {
+    ) -> Result<Outline> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).text_outline(graph.storage_id)
     }
@@ -1385,7 +1385,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        outline: TextOutline,
+        outline: Outline,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -1420,7 +1420,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<TextShadow> {
+    ) -> Result<Shadow> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).text_shadow(graph.storage_id)
     }
@@ -1430,7 +1430,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        shadow: TextShadow,
+        shadow: Shadow,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -1465,7 +1465,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<TextBackground> {
+    ) -> Result<Background> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).text_background(graph.storage_id)
     }
@@ -1475,7 +1475,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        background: TextBackground,
+        background: Background,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());

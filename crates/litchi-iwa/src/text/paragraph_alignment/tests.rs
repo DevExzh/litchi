@@ -15,11 +15,11 @@ use crate::text::{
     IWorkTextEditor, ParagraphBorder, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval,
     ParagraphFollowingStyle, ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents,
     ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints, ParagraphSpacing,
-    ParagraphSpacingPoints, ParagraphStyleId, ParagraphStyleName, ParagraphTabAlignment,
+    ParagraphSpacingPoints, ParagraphStyleName, ParagraphTabAlignment,
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
-    ParagraphWritingDirection, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize,
-    TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphWritingDirection, Background, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, Outline, TextPointSize,
+    TextScript, Shadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 use litchi_iwa_text::columns::{Columns, Count};
 use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
@@ -1184,7 +1184,7 @@ fn native_ligature_values_are_strict_canonical_and_reversible() {
 
 #[test]
 fn native_text_outline_overrides_are_canonical_strict_and_reversible() {
-    for outline in [TextOutline::None, TextOutline::standard()] {
+    for outline in [Outline::None, Outline::standard()] {
         let overrides = ParagraphStyleOverrides {
             outline: Some(outline),
             ..Default::default()
@@ -1195,11 +1195,11 @@ fn native_text_outline_overrides_are_canonical_strict_and_reversible() {
         let properties = archive.char_properties.as_ref().unwrap();
         assert_eq!(archive.override_count, Some(1));
         match outline {
-            TextOutline::None => {
+            Outline::None => {
                 assert_eq!(properties.tsd_stroke_null, Some(true));
                 assert!(properties.tsd_stroke.is_none());
             },
-            TextOutline::Stroke(_) => {
+            Outline::Stroke(_) => {
                 assert!(properties.tsd_stroke_null.is_none());
                 assert!(properties.tsd_stroke.is_some());
                 assert!(
@@ -1219,9 +1219,9 @@ fn native_text_outline_overrides_are_canonical_strict_and_reversible() {
     let malformed = tswp::CharacterStylePropertiesArchive {
         tsd_stroke_null: Some(true),
         tsd_stroke: Some(crate::shapes::stroke_to_native(
-            match TextOutline::standard() {
-                TextOutline::Stroke(stroke) => stroke,
-                TextOutline::None => unreachable!(),
+            match Outline::standard() {
+                Outline::Stroke(stroke) => stroke,
+                Outline::None => unreachable!(),
             },
         )),
         ..Default::default()
@@ -1231,7 +1231,7 @@ fn native_text_outline_overrides_are_canonical_strict_and_reversible() {
 
 #[test]
 fn native_text_shadow_overrides_are_canonical_strict_and_reversible() {
-    let custom = TextShadow::Drop(ShapeDropShadow::new(
+    let custom = Shadow::Drop(ShapeDropShadow::new(
         ShapeShadowAppearance::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::DisplayP3).unwrap(),
             ShapeShadowBlurRadius::from_points(7).unwrap(),
@@ -1240,7 +1240,7 @@ fn native_text_shadow_overrides_are_canonical_strict_and_reversible() {
         ),
         ShapeShadowAngle::from_degrees(135.0).unwrap(),
     ));
-    for shadow in [TextShadow::None, TextShadow::standard(), custom] {
+    for shadow in [Shadow::None, Shadow::standard(), custom] {
         let overrides = ParagraphStyleOverrides {
             shadow: Some(shadow),
             ..Default::default()
@@ -1251,11 +1251,11 @@ fn native_text_shadow_overrides_are_canonical_strict_and_reversible() {
         let properties = archive.char_properties.as_ref().unwrap();
         assert_eq!(archive.override_count, Some(1));
         match shadow {
-            TextShadow::None => {
+            Shadow::None => {
                 assert_eq!(properties.shadow_null, Some(true));
                 assert!(properties.shadow.is_none());
             },
-            TextShadow::Drop(_) => {
+            Shadow::Drop(_) => {
                 assert!(properties.shadow_null.is_none());
                 assert!(properties.shadow.is_some());
                 assert!(
@@ -1275,7 +1275,7 @@ fn native_text_shadow_overrides_are_canonical_strict_and_reversible() {
     let malformed = tswp::CharacterStylePropertiesArchive {
         shadow_null: Some(true),
         shadow: Some(crate::shapes::shadow_to_native(
-            TextShadow::standard().into_shape_shadow(),
+            Shadow::standard().into_shape_shadow(),
         )),
         ..Default::default()
     };
@@ -1290,15 +1290,15 @@ fn native_text_shadow_overrides_are_canonical_strict_and_reversible() {
         ),
         ShapeShadowPerspective::LEVEL,
     ));
-    assert!(TextShadow::from_shape_shadow(contact).is_err());
+    assert!(Shadow::from_shape_shadow(contact).is_err());
 }
 
 #[test]
 fn native_text_background_overrides_are_canonical_strict_and_reversible() {
-    let custom = TextBackground::Color(
+    let custom = Background::Color(
         RgbaColor::new(0.18, 0.72, 0.32, 0.65, RgbColorSpace::DisplayP3).unwrap(),
     );
-    for background in [TextBackground::None, custom] {
+    for background in [Background::None, custom] {
         let overrides = ParagraphStyleOverrides {
             background: Some(background),
             ..Default::default()
@@ -1309,11 +1309,11 @@ fn native_text_background_overrides_are_canonical_strict_and_reversible() {
         let properties = archive.char_properties.as_ref().unwrap();
         assert_eq!(archive.override_count, Some(1));
         match background {
-            TextBackground::None => {
+            Background::None => {
                 assert_eq!(properties.background_color_null, Some(true));
                 assert!(properties.background_color.is_none());
             },
-            TextBackground::Color(_) => {
+            Background::Color(_) => {
                 assert!(properties.background_color_null.is_none());
                 assert!(properties.background_color.is_some());
                 assert!(
@@ -2196,20 +2196,20 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
         .set_text_box_text_character_spacing(pages_box.drawable_object_id, pages_spacing)
         .unwrap();
     pages
-        .set_text_box_text_outline(pages_box.drawable_object_id, TextOutline::standard())
+        .set_text_box_text_outline(pages_box.drawable_object_id, Outline::standard())
         .unwrap();
     assert_eq!(
         pages
             .text_box_text_outline(pages_sibling.drawable_object_id)
             .unwrap(),
-        TextOutline::None
+        Outline::None
     );
     let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_outline(pages_box.drawable_object_id)
             .unwrap(),
-        TextOutline::standard()
+        Outline::standard()
     );
     assert!(
         pages
@@ -2248,7 +2248,7 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
         .set_sheet_text_box_text_outline(
             sheet_id,
             numbers_box.drawable_object_id,
-            TextOutline::standard(),
+            Outline::standard(),
         )
         .unwrap();
     let mut numbers =
@@ -2257,7 +2257,7 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
         numbers
             .sheet_text_box_text_outline(sheet_id, numbers_box.drawable_object_id)
             .unwrap(),
-        TextOutline::standard()
+        Outline::standard()
     );
     assert!(
         numbers
@@ -2291,7 +2291,7 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
         )
         .unwrap();
     keynote
-        .set_slide_text_box_text_outline(0, keynote_box.drawable_object_id, TextOutline::standard())
+        .set_slide_text_box_text_outline(0, keynote_box.drawable_object_id, Outline::standard())
         .unwrap();
     let mut keynote =
         crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
@@ -2299,7 +2299,7 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
         keynote
             .slide_text_box_text_outline(0, keynote_box.drawable_object_id)
             .unwrap(),
-        TextOutline::standard()
+        Outline::standard()
     );
     assert!(
         keynote
@@ -2344,20 +2344,20 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
         .set_text_box_text_character_spacing(pages_box.drawable_object_id, pages_spacing)
         .unwrap();
     pages
-        .set_text_box_text_shadow(pages_box.drawable_object_id, TextShadow::standard())
+        .set_text_box_text_shadow(pages_box.drawable_object_id, Shadow::standard())
         .unwrap();
     assert_eq!(
         pages
             .text_box_text_shadow(pages_sibling.drawable_object_id)
             .unwrap(),
-        TextShadow::None
+        Shadow::None
     );
     let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_shadow(pages_box.drawable_object_id)
             .unwrap(),
-        TextShadow::standard()
+        Shadow::standard()
     );
     assert!(
         pages
@@ -2396,7 +2396,7 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
         .set_sheet_text_box_text_shadow(
             sheet_id,
             numbers_box.drawable_object_id,
-            TextShadow::standard(),
+            Shadow::standard(),
         )
         .unwrap();
     let mut numbers =
@@ -2405,7 +2405,7 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
         numbers
             .sheet_text_box_text_shadow(sheet_id, numbers_box.drawable_object_id)
             .unwrap(),
-        TextShadow::standard()
+        Shadow::standard()
     );
     assert!(
         numbers
@@ -2439,7 +2439,7 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
         )
         .unwrap();
     keynote
-        .set_slide_text_box_text_shadow(0, keynote_box.drawable_object_id, TextShadow::standard())
+        .set_slide_text_box_text_shadow(0, keynote_box.drawable_object_id, Shadow::standard())
         .unwrap();
     let mut keynote =
         crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
@@ -2447,7 +2447,7 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
         keynote
             .slide_text_box_text_shadow(0, keynote_box.drawable_object_id)
             .unwrap(),
-        TextShadow::standard()
+        Shadow::standard()
     );
     assert!(
         keynote
@@ -2464,7 +2464,7 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
 
 #[test]
 fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
-    let pages_background = TextBackground::Color(
+    let pages_background = Background::Color(
         RgbaColor::new(0.95, 0.42, 0.17, 0.72, RgbColorSpace::DisplayP3).unwrap(),
     );
     let pages_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
@@ -2501,7 +2501,7 @@ fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
         pages
             .text_box_text_background(pages_sibling.drawable_object_id)
             .unwrap(),
-        TextBackground::None
+        Background::None
     );
     let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -2523,7 +2523,7 @@ fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
     );
 
     let numbers_background =
-        TextBackground::Color(RgbaColor::new(0.22, 0.82, 0.38, 1.0, RgbColorSpace::Srgb).unwrap());
+        Background::Color(RgbaColor::new(0.22, 0.82, 0.38, 1.0, RgbColorSpace::Srgb).unwrap());
     let numbers_shift = TextBaselineShift::from_points(-3.0).unwrap();
     let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
@@ -2572,7 +2572,7 @@ fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
         numbers_shift
     );
 
-    let keynote_background = TextBackground::Color(
+    let keynote_background = Background::Color(
         RgbaColor::new(0.18, 0.44, 0.92, 0.84, RgbColorSpace::DisplayP3).unwrap(),
     );
     let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
@@ -3275,7 +3275,7 @@ fn paragraph_tab_defaults_round_trip_compose_and_reset_in_every_suite() {
 fn uniform_text_font_round_trips_isolates_and_resets_in_every_suite() {
     let pages_font = TextFont::named("Georgia-Bold").unwrap();
     let pages_background =
-        TextBackground::Color(RgbaColor::new(0.95, 0.72, 0.52, 1.0, RgbColorSpace::Srgb).unwrap());
+        Background::Color(RgbaColor::new(0.95, 0.72, 0.52, 1.0, RgbColorSpace::Srgb).unwrap());
     let mut pages = PagesEditor::create_with_text("Fonts").unwrap();
     let pages_box = pages
         .add_text_box(
@@ -4614,19 +4614,19 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
     );
     assert!(
         editor
-            .set_text_outline(storage_id, TextOutline::standard())
+            .set_text_outline(storage_id, Outline::standard())
             .is_err()
     );
     assert!(
         editor
-            .set_text_shadow(storage_id, TextShadow::standard())
+            .set_text_shadow(storage_id, Shadow::standard())
             .is_err()
     );
     assert!(
         editor
             .set_text_background(
                 storage_id,
-                TextBackground::Color(
+                Background::Color(
                     RgbaColor::new(0.2, 0.6, 0.9, 1.0, RgbColorSpace::Srgb).unwrap(),
                 ),
             )

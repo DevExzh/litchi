@@ -77,16 +77,16 @@ pub use crate::text::ParagraphListPlacement as KeynoteTableCellParagraphListPlac
 pub use crate::text::ParagraphSpacing as KeynoteTableCellParagraphSpacing;
 pub use crate::text::ParagraphTabStops as KeynoteTableCellParagraphTabStops;
 pub use crate::text::TextAlignment as KeynoteTableCellTextAlignment;
-pub use crate::text::TextBackground as KeynoteTableCellTextBackground;
+pub use crate::text::Background as KeynoteTableCellTextBackground;
 pub use crate::text::TextBaselineShift as KeynoteTableCellTextBaselineShift;
 pub use crate::text::TextCapitalization as KeynoteTableCellTextCapitalization;
 pub use crate::text::TextCharacterSpacing as KeynoteTableCellTextCharacterSpacing;
 pub use crate::text::TextDecorations as KeynoteTableCellTextDecorations;
 pub use crate::text::TextFont as KeynoteTableCellTextFont;
 pub use crate::text::TextLigatures as KeynoteTableCellTextLigatures;
-pub use crate::text::TextOutline as KeynoteTableCellTextOutline;
+pub use crate::text::Outline as KeynoteTableCellTextOutline;
 pub use crate::text::TextScript as KeynoteTableCellTextScript;
-pub use crate::text::TextShadow as KeynoteTableCellTextShadow;
+pub use crate::text::Shadow as KeynoteTableCellTextShadow;
 pub use crate::text::TextStyle as KeynoteTableCellTextStyle;
 pub use litchi_iwa_common::table::cell::layout::{
     Inset as KeynoteTableCellInset, Insets as KeynoteTableCellInsets,

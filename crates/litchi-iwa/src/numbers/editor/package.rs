@@ -534,7 +534,7 @@ pub(crate) fn table_cell_text_background_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TextBackground> {
+) -> Result<Background> {
     cell_paragraph_style::background(package, table_id, row, column)
 }
 
@@ -543,7 +543,7 @@ pub(crate) fn set_table_cell_text_background_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    background: TextBackground,
+    background: Background,
 ) -> Result<()> {
     cell_paragraph_style::set_background(package, table_id, row, column, background)
 }
@@ -758,7 +758,7 @@ pub(crate) fn table_cell_text_outline_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TextOutline> {
+) -> Result<Outline> {
     cell_paragraph_style::outline(package, table_id, row, column)
 }
 
@@ -767,7 +767,7 @@ pub(crate) fn set_table_cell_text_outline_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    outline: TextOutline,
+    outline: Outline,
 ) -> Result<()> {
     cell_paragraph_style::set_outline(package, table_id, row, column, outline)
 }
@@ -814,7 +814,7 @@ pub(crate) fn table_cell_text_shadow_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TextShadow> {
+) -> Result<Shadow> {
     cell_paragraph_style::shadow(package, table_id, row, column)
 }
 
@@ -823,7 +823,7 @@ pub(crate) fn set_table_cell_text_shadow_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    shadow: TextShadow,
+    shadow: Shadow,
 ) -> Result<()> {
     cell_paragraph_style::set_shadow(package, table_id, row, column, shadow)
 }

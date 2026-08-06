@@ -11,10 +11,10 @@ use litchi_iwa::text::{
     ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList,
     ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyleName,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, Background, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextCommentBody, TextCommentReplyBody,
-    TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage, TextLigatures, TextOutline,
-    TextPointSize, TextRange, TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage, TextLigatures, Outline,
+    TextPointSize, TextRange, TextScript, Shadow, TextStrikethrough, TextStyle, TextUnderline,
 };
 use litchi_iwa_text::columns::{Columns, Count};
 use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
@@ -113,13 +113,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_text_box_text_outline(
         0,
         created.drawable_object_id,
-        TextOutline::standard(),
+        Outline::standard(),
     )?;
-    editor.set_slide_text_box_text_shadow(0, created.drawable_object_id, TextShadow::standard())?;
+    editor.set_slide_text_box_text_shadow(0, created.drawable_object_id, Shadow::standard())?;
     editor.set_slide_text_box_text_background(
         0,
         created.drawable_object_id,
-        TextBackground::Color(RgbaColor::new(0.72, 0.84, 1.0, 1.0, RgbColorSpace::Srgb)?),
+        Background::Color(RgbaColor::new(0.72, 0.84, 1.0, 1.0, RgbColorSpace::Srgb)?),
     )?;
     editor.set_slide_text_box_paragraph_background(
         0,

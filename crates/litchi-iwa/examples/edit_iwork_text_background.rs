@@ -3,7 +3,7 @@
 use std::env;
 
 use litchi_iwa::shapes::{RgbColorSpace, RgbaColor};
-use litchi_iwa::text::{IWorkTextEditor, TextBackground};
+use litchi_iwa::text::{IWorkTextEditor, Background};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = arguments.next().ok_or("missing output path")?;
     let storage_id = arguments.next().ok_or("missing storage ID")?.parse()?;
     let background = match arguments.next().as_deref() {
-        Some("none") => TextBackground::None,
+        Some("none") => Background::None,
         Some(color_space @ ("srgb" | "display-p3")) => {
             let red = arguments.next().ok_or("missing red component")?.parse()?;
             let green = arguments.next().ok_or("missing green component")?.parse()?;
@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "display-p3" => RgbColorSpace::DisplayP3,
                 _ => unreachable!("guarded color space"),
             };
-            TextBackground::Color(RgbaColor::new(red, green, blue, alpha, color_space)?)
+            Background::Color(RgbaColor::new(red, green, blue, alpha, color_space)?)
         },
         Some(_) => return Err("background must be none, srgb, or display-p3".into()),
         None => return Err("missing background".into()),

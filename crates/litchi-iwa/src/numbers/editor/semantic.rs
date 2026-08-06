@@ -55,12 +55,12 @@ use crate::text::{
     ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
     ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering,
     ParagraphListPlacement, ParagraphSpacing, ParagraphStart, ParagraphTabStops,
-    ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
+    ParagraphWritingDirection, TextAlignment, Background, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
     TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
     TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    TextLanguage, TextLanguageRun, TextLigatures, Outline, TextPosition, TextRange, TextScript,
+    Shadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{patch_length_delimited_field, patch_nested_length_delimited_field};
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};

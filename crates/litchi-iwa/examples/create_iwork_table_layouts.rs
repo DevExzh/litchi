@@ -16,8 +16,8 @@ use litchi_iwa::text::{
     ParagraphListNumberTiering, ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart,
     ParagraphListTextGap, ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment,
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment,
-    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
-    TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
+    Background, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
+    TextFont, TextLigatures, Outline, TextPointSize, TextScript, Shadow, TextStrikethrough,
     TextStyle, TextUnderline,
 };
 use litchi_iwa_common::table::cell::layout::{Inset, Insets, Layout, TextWrap, VerticalAlignment};
@@ -98,7 +98,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         numbers.table_cell_text_outline(numbers_table.object_id, ROW, COLUMN)?,
-        TextOutline::standard()
+        Outline::standard()
     );
     assert_eq!(
         numbers.table_cell_text_script(numbers_table.object_id, ROW, COLUMN)?,
@@ -106,7 +106,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         numbers.table_cell_text_shadow(numbers_table.object_id, ROW, COLUMN)?,
-        TextShadow::standard()
+        Shadow::standard()
     );
     assert_eq!(
         numbers.table_cell_paragraph_line_spacing(numbers_table.object_id, ROW, COLUMN)?,
@@ -249,7 +249,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         pages.table_cell_text_outline(pages_table.model_object_id, ROW, COLUMN)?,
-        TextOutline::standard()
+        Outline::standard()
     );
     assert_eq!(
         pages.table_cell_text_script(pages_table.model_object_id, ROW, COLUMN)?,
@@ -257,7 +257,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         pages.table_cell_text_shadow(pages_table.model_object_id, ROW, COLUMN)?,
-        TextShadow::standard()
+        Shadow::standard()
     );
     assert_eq!(
         pages.table_cell_paragraph_line_spacing(pages_table.model_object_id, ROW, COLUMN)?,
@@ -415,7 +415,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         keynote.slide_table_cell_text_outline(0, keynote_table.model_object_id, ROW, COLUMN)?,
-        TextOutline::standard()
+        Outline::standard()
     );
     assert_eq!(
         keynote.slide_table_cell_text_script(0, keynote_table.model_object_id, ROW, COLUMN)?,
@@ -423,7 +423,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         keynote.slide_table_cell_text_shadow(0, keynote_table.model_object_id, ROW, COLUMN)?,
-        TextShadow::standard()
+        Shadow::standard()
     );
     assert_eq!(
         keynote.slide_table_cell_paragraph_line_spacing(
@@ -704,11 +704,11 @@ fn keynote_text_color() -> Result<RgbaColor, litchi_iwa::Error> {
     )?)
 }
 
-fn numbers_text_background() -> Result<TextBackground, litchi_iwa::Error> {
+fn numbers_text_background() -> Result<Background, litchi_iwa::Error> {
     const RED: f32 = 0.96;
     const GREEN: f32 = 0.86;
     const BLUE: f32 = 0.25;
-    Ok(TextBackground::Color(RgbaColor::new(
+    Ok(Background::Color(RgbaColor::new(
         RED,
         GREEN,
         BLUE,
@@ -717,11 +717,11 @@ fn numbers_text_background() -> Result<TextBackground, litchi_iwa::Error> {
     )?))
 }
 
-fn pages_text_background() -> Result<TextBackground, litchi_iwa::Error> {
+fn pages_text_background() -> Result<Background, litchi_iwa::Error> {
     const RED: f32 = 0.70;
     const GREEN: f32 = 0.92;
     const BLUE: f32 = 0.96;
-    Ok(TextBackground::Color(RgbaColor::new(
+    Ok(Background::Color(RgbaColor::new(
         RED,
         GREEN,
         BLUE,
@@ -730,11 +730,11 @@ fn pages_text_background() -> Result<TextBackground, litchi_iwa::Error> {
     )?))
 }
 
-fn keynote_text_background() -> Result<TextBackground, litchi_iwa::Error> {
+fn keynote_text_background() -> Result<Background, litchi_iwa::Error> {
     const RED: f32 = 0.98;
     const GREEN: f32 = 0.70;
     const BLUE: f32 = 0.28;
-    Ok(TextBackground::Color(RgbaColor::new(
+    Ok(Background::Color(RgbaColor::new(
         RED,
         GREEN,
         BLUE,
@@ -939,9 +939,9 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_table_cell_text_ligatures(table_id, ROW, COLUMN, TextLigatures::RequiredOnly)?;
     editor.set_table_cell_text_background(table_id, ROW, COLUMN, numbers_text_background()?)?;
-    editor.set_table_cell_text_outline(table_id, ROW, COLUMN, TextOutline::standard())?;
+    editor.set_table_cell_text_outline(table_id, ROW, COLUMN, Outline::standard())?;
     editor.set_table_cell_text_script(table_id, ROW, COLUMN, TextScript::Superscript)?;
-    editor.set_table_cell_text_shadow(table_id, ROW, COLUMN, TextShadow::standard())?;
+    editor.set_table_cell_text_shadow(table_id, ROW, COLUMN, Shadow::standard())?;
     editor.set_table_cell_paragraph_line_spacing(
         table_id,
         ROW,
@@ -1052,9 +1052,9 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_table_cell_text_ligatures(table_id, ROW, COLUMN, TextLigatures::All)?;
     editor.set_table_cell_text_background(table_id, ROW, COLUMN, pages_text_background()?)?;
-    editor.set_table_cell_text_outline(table_id, ROW, COLUMN, TextOutline::standard())?;
+    editor.set_table_cell_text_outline(table_id, ROW, COLUMN, Outline::standard())?;
     editor.set_table_cell_text_script(table_id, ROW, COLUMN, TextScript::Subscript)?;
-    editor.set_table_cell_text_shadow(table_id, ROW, COLUMN, TextShadow::standard())?;
+    editor.set_table_cell_text_shadow(table_id, ROW, COLUMN, Shadow::standard())?;
     editor.set_table_cell_paragraph_line_spacing(
         table_id,
         ROW,
@@ -1241,7 +1241,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         COLUMN,
-        TextOutline::standard(),
+        Outline::standard(),
     )?;
     editor.set_slide_table_cell_text_script(
         0,
@@ -1255,7 +1255,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         COLUMN,
-        TextShadow::standard(),
+        Shadow::standard(),
     )?;
     editor.set_slide_table_cell_paragraph_line_spacing(
         0,

@@ -102,7 +102,7 @@ pub type NumbersTableCellParagraphListPlacement = ParagraphListPlacement;
 /// Ordered explicit ruler tab stops for a Numbers table cell.
 pub type NumbersTableCellParagraphTabStops = ParagraphTabStops;
 /// Typed solid background painted behind a whole Numbers table cell's text.
-pub type NumbersTableCellTextBackground = TextBackground;
+pub type NumbersTableCellTextBackground = Background;
 /// Validated custom baseline displacement applied to a whole Numbers cell.
 pub type NumbersTableCellTextBaselineShift = TextBaselineShift;
 /// Typed capitalization applied to a whole Numbers table cell.
@@ -118,11 +118,11 @@ pub type NumbersTableCellTextFont = TextFont;
 /// Typed ligature policy applied to a whole Numbers table cell.
 pub type NumbersTableCellTextLigatures = TextLigatures;
 /// Typed outline applied to a whole Numbers table cell's text.
-pub type NumbersTableCellTextOutline = TextOutline;
+pub type NumbersTableCellTextOutline = Outline;
 /// Typed normal, superscript, or subscript formatting for a whole Numbers cell.
 pub type NumbersTableCellTextScript = TextScript;
 /// Typed drop shadow applied to a whole Numbers table cell's text.
-pub type NumbersTableCellTextShadow = TextShadow;
+pub type NumbersTableCellTextShadow = Shadow;
 /// Whole-cell point size, bold, and italic formatting.
 pub type NumbersTableCellTextStyle = TextStyle;
 

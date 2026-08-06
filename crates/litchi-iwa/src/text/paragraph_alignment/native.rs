@@ -34,8 +34,8 @@ use super::super::style::{
     ParagraphBackground, ParagraphBorder, ParagraphBorders, ParagraphIndentPoints,
     ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment,
-    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
-    TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
+    Background, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
+    TextLigatures, Outline, TextPointSize, TextScript, Shadow, TextStrikethrough,
     TextStyle, TextUnderline,
 };
 use super::super::style_registry::object_archive;
@@ -159,9 +159,9 @@ pub(crate) struct ParagraphStyleOverrides {
     pub(crate) baseline_shift: Option<TextBaselineShift>,
     pub(crate) character_spacing: Option<TextCharacterSpacing>,
     pub(crate) ligatures: Option<TextLigatures>,
-    pub(crate) outline: Option<TextOutline>,
-    pub(crate) shadow: Option<TextShadow>,
-    pub(crate) background: Option<TextBackground>,
+    pub(crate) outline: Option<Outline>,
+    pub(crate) shadow: Option<Shadow>,
+    pub(crate) background: Option<Background>,
     pub(crate) paragraph_background: Option<ParagraphBackground>,
     pub(crate) paragraph_borders: Option<ParagraphBorders>,
     pub(crate) hyphenation: Option<ParagraphHyphenation>,
@@ -410,21 +410,21 @@ pub(crate) fn inherited_text_ligatures(
 pub(crate) fn inherited_text_outline(
     package: &IWorkPackage,
     first_style_id: u64,
-) -> Result<TextOutline> {
+) -> Result<Outline> {
     inheritance::text_outline(package, first_style_id)
 }
 
 pub(crate) fn inherited_text_shadow(
     package: &IWorkPackage,
     first_style_id: u64,
-) -> Result<TextShadow> {
+) -> Result<Shadow> {
     inheritance::text_shadow(package, first_style_id)
 }
 
 pub(crate) fn inherited_text_background(
     package: &IWorkPackage,
     first_style_id: u64,
-) -> Result<TextBackground> {
+) -> Result<Background> {
     inheritance::text_background(package, first_style_id)
 }
 
@@ -960,23 +960,23 @@ pub(crate) fn direct_overrides(
     }
     if let Some(outline) = outline {
         character_fields.push(match outline {
-            TextOutline::None => CHARACTER_DRAWING_STROKE_NULL_FIELD,
-            TextOutline::Stroke(_) => CHARACTER_DRAWING_STROKE_FIELD,
+            Outline::None => CHARACTER_DRAWING_STROKE_NULL_FIELD,
+            Outline::Stroke(_) => CHARACTER_DRAWING_STROKE_FIELD,
         });
     }
     if let Some(shadow) = shadow {
         character_fields.push(match shadow {
-            TextShadow::None => CHARACTER_SHADOW_NULL_FIELD,
-            TextShadow::Drop(_) => CHARACTER_SHADOW_FIELD,
+            Shadow::None => CHARACTER_SHADOW_NULL_FIELD,
+            Shadow::Drop(_) => CHARACTER_SHADOW_FIELD,
         });
     }
     if let Some(background) = background {
         let field = match background {
-            TextBackground::None => CHARACTER_BACKGROUND_COLOR_NULL_FIELD,
-            TextBackground::Color(_) => CHARACTER_BACKGROUND_COLOR_FIELD,
+            Background::None => CHARACTER_BACKGROUND_COLOR_NULL_FIELD,
+            Background::Color(_) => CHARACTER_BACKGROUND_COLOR_FIELD,
         };
         character_fields.push(field);
-        if matches!(background, TextBackground::Color(_)) {
+        if matches!(background, Background::Color(_)) {
             let color_raw = required_payload(character_raw, field, "paragraph text background")?;
             if !has_canonical_color_wire(color_raw)? {
                 return Ok(None);
@@ -1184,26 +1184,26 @@ pub(crate) fn variation_object(
                 .character_spacing
                 .map(TextCharacterSpacing::native_ratio),
             ligatures: overrides.ligatures.map(TextLigatures::native_value),
-            tsd_stroke_null: matches!(overrides.outline, Some(TextOutline::None)).then_some(true),
+            tsd_stroke_null: matches!(overrides.outline, Some(Outline::None)).then_some(true),
             tsd_stroke: overrides.outline.and_then(|outline| match outline {
-                TextOutline::None => None,
-                TextOutline::Stroke(stroke) => Some(stroke_to_native(stroke)),
+                Outline::None => None,
+                Outline::Stroke(stroke) => Some(stroke_to_native(stroke)),
             }),
-            shadow_null: matches!(overrides.shadow, Some(TextShadow::None)).then_some(true),
+            shadow_null: matches!(overrides.shadow, Some(Shadow::None)).then_some(true),
             shadow: overrides
                 .shadow
-                .map(TextShadow::into_shape_shadow)
+                .map(Shadow::into_shape_shadow)
                 .and_then(|shadow| match shadow {
                     crate::shapes::Shadow::Disabled => None,
                     enabled => Some(shadow_to_native(enabled)),
                 }),
-            background_color_null: matches!(overrides.background, Some(TextBackground::None))
+            background_color_null: matches!(overrides.background, Some(Background::None))
                 .then_some(true),
             background_color: overrides
                 .background
                 .and_then(|background| match background {
-                    TextBackground::None => None,
-                    TextBackground::Color(color) => Some(color_to_native(color)),
+                    Background::None => None,
+                    Background::Color(color) => Some(color_to_native(color)),
                 }),
             underline: overrides.underline.map(TextUnderline::native_value),
             strikethru: overrides.strikethrough.map(TextStrikethrough::native_value),
@@ -1295,17 +1295,17 @@ pub(crate) fn variation_object(
             .field_infos
             .push(text_fill_field_info());
     }
-    if matches!(overrides.outline, Some(TextOutline::Stroke(_))) {
+    if matches!(overrides.outline, Some(Outline::Stroke(_))) {
         object.archive_info.message_infos[0]
             .field_infos
             .push(text_stroke_field_info());
     }
-    if matches!(overrides.shadow, Some(TextShadow::Drop(_))) {
+    if matches!(overrides.shadow, Some(Shadow::Drop(_))) {
         object.archive_info.message_infos[0]
             .field_infos
             .push(text_shadow_field_info());
     }
-    if matches!(overrides.background, Some(TextBackground::Color(_))) {
+    if matches!(overrides.background, Some(Background::Color(_))) {
         object.archive_info.message_infos[0]
             .field_infos
             .push(text_background_field_info());
@@ -1852,14 +1852,14 @@ pub(super) fn text_font_from_character(
 
 pub(super) fn text_outline_from_character(
     properties: &tswp::CharacterStylePropertiesArchive,
-) -> Result<Option<TextOutline>> {
+) -> Result<Option<Outline>> {
     if properties.tsd_stroke_null == Some(true) {
         if properties.tsd_stroke.is_some() {
             return Err(Error::InvalidFormat(
                 "native iWork text outline is both null and populated".to_owned(),
             ));
         }
-        return Ok(Some(TextOutline::None));
+        return Ok(Some(Outline::None));
     }
     if properties.tsd_stroke_null == Some(false) && properties.tsd_stroke.is_none() {
         return Err(Error::InvalidFormat(
@@ -1871,21 +1871,21 @@ pub(super) fn text_outline_from_character(
         .as_ref()
         .map(|stroke| {
             stroke_from_native(stroke)
-                .map(|outline| outline.map_or(TextOutline::None, TextOutline::Stroke))
+                .map(|outline| outline.map_or(Outline::None, Outline::Stroke))
         })
         .transpose()
 }
 
 pub(super) fn text_shadow_from_character(
     properties: &tswp::CharacterStylePropertiesArchive,
-) -> Result<Option<TextShadow>> {
+) -> Result<Option<Shadow>> {
     if properties.shadow_null == Some(true) {
         if properties.shadow.is_some() {
             return Err(Error::InvalidFormat(
                 "native iWork text shadow is both null and populated".to_owned(),
             ));
         }
-        return Ok(Some(TextShadow::None));
+        return Ok(Some(Shadow::None));
     }
     if properties.shadow_null == Some(false) && properties.shadow.is_none() {
         return Err(Error::InvalidFormat(
@@ -1895,20 +1895,23 @@ pub(super) fn text_shadow_from_character(
     properties
         .shadow
         .as_ref()
-        .map(|shadow| shadow_from_native(shadow).and_then(TextShadow::from_shape_shadow))
+        .map(|shadow| {
+            shadow_from_native(shadow)
+                .and_then(|shadow| Shadow::from_shape_shadow(shadow).map_err(crate::Error::from))
+        })
         .transpose()
 }
 
 pub(super) fn text_background_from_character(
     properties: &tswp::CharacterStylePropertiesArchive,
-) -> Result<Option<TextBackground>> {
+) -> Result<Option<Background>> {
     if properties.background_color_null == Some(true) {
         if properties.background_color.is_some() {
             return Err(Error::InvalidFormat(
                 "native iWork text background is both null and populated".to_owned(),
             ));
         }
-        return Ok(Some(TextBackground::None));
+        return Ok(Some(Background::None));
     }
     if properties.background_color_null == Some(false) && properties.background_color.is_none() {
         return Err(Error::InvalidFormat(
@@ -1918,7 +1921,7 @@ pub(super) fn text_background_from_character(
     properties
         .background_color
         .as_ref()
-        .map(|color| color_from_native(color).map(TextBackground::Color))
+        .map(|color| color_from_native(color).map(Background::Color))
         .transpose()
 }
 

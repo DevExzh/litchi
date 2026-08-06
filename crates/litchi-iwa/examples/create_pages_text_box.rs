@@ -11,10 +11,10 @@ use litchi_iwa::text::{
     ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
     ParagraphList, ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints,
     ParagraphStyleName, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
-    ParagraphTabStop, ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground,
+    ParagraphTabStop, ParagraphTabStops, ParagraphWritingDirection, TextAlignment, Background,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextCommentBody,
     TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage,
-    TextLigatures, TextOutline, TextPointSize, TextRange, TextScript, TextShadow,
+    TextLigatures, Outline, TextPointSize, TextRange, TextScript, Shadow,
     TextStrikethrough, TextStyle, TextUnderline,
 };
 use litchi_iwa_text::columns::{Columns, Count, Gap};
@@ -86,11 +86,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         TextCharacterSpacing::from_percent(12.0)?,
     )?;
     editor.set_text_box_text_ligatures(created.drawable_object_id, TextLigatures::RequiredOnly)?;
-    editor.set_text_box_text_outline(created.drawable_object_id, TextOutline::standard())?;
-    editor.set_text_box_text_shadow(created.drawable_object_id, TextShadow::standard())?;
+    editor.set_text_box_text_outline(created.drawable_object_id, Outline::standard())?;
+    editor.set_text_box_text_shadow(created.drawable_object_id, Shadow::standard())?;
     editor.set_text_box_text_background(
         created.drawable_object_id,
-        TextBackground::Color(RgbaColor::new(1.0, 0.82, 0.72, 1.0, RgbColorSpace::Srgb)?),
+        Background::Color(RgbaColor::new(1.0, 0.82, 0.72, 1.0, RgbColorSpace::Srgb)?),
     )?;
     editor.set_text_box_paragraph_background(
         created.drawable_object_id,

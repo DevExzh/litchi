@@ -293,7 +293,7 @@ pub(super) fn background(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TextBackground> {
+) -> Result<Background> {
     match property(
         package,
         table_id,
@@ -313,7 +313,7 @@ pub(super) fn set_background(
     table_id: u64,
     row: usize,
     column: usize,
-    value: TextBackground,
+    value: Background,
 ) -> Result<()> {
     set_property(
         package,
@@ -701,7 +701,7 @@ pub(super) fn outline(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TextOutline> {
+) -> Result<Outline> {
     match property(
         package,
         table_id,
@@ -721,7 +721,7 @@ pub(super) fn set_outline(
     table_id: u64,
     row: usize,
     column: usize,
-    value: TextOutline,
+    value: Outline,
 ) -> Result<()> {
     set_property(
         package,
@@ -803,7 +803,7 @@ pub(super) fn shadow(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TextShadow> {
+) -> Result<Shadow> {
     match property(
         package,
         table_id,
@@ -823,7 +823,7 @@ pub(super) fn set_shadow(
     table_id: u64,
     row: usize,
     column: usize,
-    value: TextShadow,
+    value: Shadow,
 ) -> Result<()> {
     set_property(
         package,
@@ -1530,9 +1530,9 @@ mod tests {
         ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
         ParagraphLineSpacingMultiple, ParagraphSpacing, ParagraphSpacingPoints,
         ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-        ParagraphTabStops, TextBackground, TextBaselineShift, TextCapitalization,
-        TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize,
-        TextScript, TextShadow, TextStrikethrough, TextUnderline,
+        ParagraphTabStops, Background, TextBaselineShift, TextCapitalization,
+        TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, Outline, TextPointSize,
+        TextScript, Shadow, TextStrikethrough, TextUnderline,
     };
 
     fn test_color() -> RgbaColor {
@@ -1543,12 +1543,12 @@ mod tests {
         RgbaColor::new(RED, GREEN, BLUE, ALPHA, RgbColorSpace::Srgb).unwrap()
     }
 
-    fn test_background() -> TextBackground {
+    fn test_background() -> Background {
         const RED: f32 = 0.95;
         const GREEN: f32 = 0.82;
         const BLUE: f32 = 0.20;
         const ALPHA: f32 = 1.0;
-        TextBackground::Color(RgbaColor::new(RED, GREEN, BLUE, ALPHA, RgbColorSpace::Srgb).unwrap())
+        Background::Color(RgbaColor::new(RED, GREEN, BLUE, ALPHA, RgbColorSpace::Srgb).unwrap())
     }
 
     fn test_line_spacing() -> ParagraphLineSpacing {
@@ -1777,9 +1777,9 @@ mod tests {
         let character_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
         let ligatures = TextLigatures::RequiredOnly;
         let background = test_background();
-        let outline = TextOutline::standard();
+        let outline = Outline::standard();
         let script = TextScript::Superscript;
-        let shadow = TextShadow::standard();
+        let shadow = Shadow::standard();
         let line_spacing = test_line_spacing();
         let paragraph_spacing = test_paragraph_spacing();
         let indents = test_indents();
@@ -2224,7 +2224,7 @@ mod tests {
         );
         assert_eq!(
             editor.table_cell_text_background(table_id, 1, 2).unwrap(),
-            TextBackground::None
+            Background::None
         );
         assert!(
             editor
@@ -2362,8 +2362,8 @@ mod tests {
         let pages_baseline_shift = TextBaselineShift::from_points(-1.5).unwrap();
         let pages_spacing = TextCharacterSpacing::from_percent(8.0).unwrap();
         let pages_background = test_background();
-        let pages_outline = TextOutline::standard();
-        let pages_shadow = TextShadow::standard();
+        let pages_outline = Outline::standard();
+        let pages_shadow = Shadow::standard();
         let pages_line_spacing = test_line_spacing();
         let pages_paragraph_spacing = test_paragraph_spacing();
         let pages_indents = test_indents();
@@ -2595,8 +2595,8 @@ mod tests {
         let keynote_baseline_shift = TextBaselineShift::from_points(2.0).unwrap();
         let keynote_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
         let keynote_background = test_background();
-        let keynote_outline = TextOutline::standard();
-        let keynote_shadow = TextShadow::standard();
+        let keynote_outline = Outline::standard();
+        let keynote_shadow = Shadow::standard();
         let keynote_line_spacing = test_line_spacing();
         let keynote_paragraph_spacing = test_paragraph_spacing();
         let keynote_indents = test_indents();
@@ -3016,7 +3016,7 @@ mod tests {
         );
         assert!(
             editor
-                .set_table_cell_text_outline(table_id, 1, 2, TextOutline::standard())
+                .set_table_cell_text_outline(table_id, 1, 2, Outline::standard())
                 .is_err()
         );
         assert!(
@@ -3026,7 +3026,7 @@ mod tests {
         );
         assert!(
             editor
-                .set_table_cell_text_shadow(table_id, 1, 2, TextShadow::standard())
+                .set_table_cell_text_shadow(table_id, 1, 2, Shadow::standard())
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);
