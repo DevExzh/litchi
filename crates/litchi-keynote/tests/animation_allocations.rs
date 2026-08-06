@@ -45,5 +45,11 @@ fn known_animation_identifier_classification_does_not_allocate() -> Result<()> {
     let after_unknown = ALLOCATIONS.load(Ordering::Relaxed);
     assert!(matches!(unknown, Ok(AnimationType::Unknown(_))));
     assert_eq!(after_unknown - before_unknown, 1);
+
+    let oversized = "x".repeat(litchi_keynote::build::MAX_IDENTIFIER_BYTES + 1);
+    assert_eq!(
+        AnimationType::from_identifier(&oversized),
+        Err(litchi_keynote::Error::IdentifierTooLarge)
+    );
     Ok(())
 }

@@ -138,7 +138,7 @@ pub enum AnimationType {
     /// An object fades and scales into view.
     FadeAndScale,
     /// A producer-specific effect not yet modeled by this crate.
-    Unknown(String),
+    Unknown(UnknownText),
 }
 
 impl AnimationType {
@@ -146,7 +146,10 @@ impl AnimationType {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::EmptyIdentifier`] when `identifier` is empty.
+    /// Returns [`Error::EmptyIdentifier`] when `identifier` is empty,
+    /// [`Error::IdentifierTooLarge`] when an unknown value exceeds the
+    /// semantic byte budget, or [`Error::NulString`] when an unknown value
+    /// contains a NUL byte.
     pub fn from_identifier(identifier: &str) -> Result<Self> {
         if identifier.is_empty() {
             return Err(Error::EmptyIdentifier);
@@ -165,7 +168,7 @@ impl AnimationType {
         } else if contains_ascii_case_insensitive(identifier, b"scale") {
             Self::Scale
         } else {
-            Self::Unknown(identifier.to_owned())
+            Self::Unknown(UnknownText::new(identifier)?)
         };
         Ok(effect)
     }
@@ -179,7 +182,7 @@ impl AnimationType {
             Self::MoveIn => "move",
             Self::Scale => "scale",
             Self::FadeAndScale => "fade-scale",
-            Self::Unknown(identifier) => identifier,
+            Self::Unknown(identifier) => identifier.as_str(),
         }
     }
 
@@ -192,7 +195,7 @@ impl AnimationType {
             Self::MoveIn => "Move In",
             Self::Scale => "Scale",
             Self::FadeAndScale => "Fade and Scale",
-            Self::Unknown(identifier) => identifier,
+            Self::Unknown(identifier) => identifier.as_str(),
         }
     }
 }
@@ -288,7 +291,7 @@ mod tests {
 
         let unknown = "Future-Éffect";
         let parsed = AnimationType::from_identifier(unknown)?;
-        assert_eq!(parsed, AnimationType::Unknown(unknown.to_owned()));
+        assert_eq!(parsed, AnimationType::Unknown(UnknownText::new(unknown)?));
         assert_eq!(parsed.identifier(), unknown);
         Ok(())
     }
@@ -299,6 +302,14 @@ mod tests {
         assert_eq!(
             AnimationType::from_identifier(""),
             Err(Error::EmptyIdentifier)
+        );
+        assert_eq!(
+            AnimationType::from_identifier("future\0effect"),
+            Err(Error::NulString)
+        );
+        assert_eq!(
+            AnimationType::from_identifier(&"x".repeat(MAX_IDENTIFIER_BYTES + 1)),
+            Err(Error::IdentifierTooLarge)
         );
     }
 }
