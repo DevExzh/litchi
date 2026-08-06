@@ -305,6 +305,22 @@ impl Catalog {
         Self::from_bytes_with_limits(bytes, Limits::default())
     }
 
+    /// Parse an immutable, already-owned package source with the default
+    /// physical limits.
+    ///
+    /// The catalog retains this exact [`Arc`] allocation for preserve-mode
+    /// writes and does not copy the source bytes. The shared byte slice is
+    /// immutable, so entries and raw ZIP records can safely borrow from it
+    /// for the lifetime of the catalog.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the ZIP envelope or any configured physical
+    /// limit is invalid.
+    pub fn from_shared_bytes(source: Arc<[u8]>) -> Result<Self> {
+        Self::from_shared_bytes_with_limits(source, Limits::default())
+    }
+
     /// Parse a package under caller-selected physical limits.
     ///
     /// A legacy package containing `.../Index.zip` is flattened into the
@@ -319,6 +335,29 @@ impl Catalog {
     pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
         let checked_limits = limits.validate()?;
         let source: Arc<[u8]> = bytes.to_vec().into();
+        Self::from_source_with_checked_limits(source, checked_limits)
+    }
+
+    /// Parse an immutable, already-owned package source under caller-selected
+    /// physical limits.
+    ///
+    /// The catalog retains the supplied [`Arc`] allocation for preserve-mode
+    /// writes and does not copy the source bytes. A legacy package containing
+    /// `.../Index.zip` is flattened into the modern entry order used by the
+    /// mutable facade: nested IWA members are emitted first, followed by outer
+    /// entries with the legacy prefix removed. The nested archive must contain
+    /// only IWA members.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the ZIP envelope, nested index, duplicate entry,
+    /// or configured physical limit is invalid.
+    pub fn from_shared_bytes_with_limits(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
+        let checked_limits = limits.validate()?;
+        Self::from_source_with_checked_limits(source, checked_limits)
+    }
+
+    fn from_source_with_checked_limits(source: Arc<[u8]>, checked_limits: Limits) -> Result<Self> {
         let archive = ZipArchive::new_with_limits(source.as_ref(), checked_limits)?;
         if crate::zip::is_encrypted(&archive) {
             return Err(Error::Encrypted);
@@ -331,14 +370,14 @@ impl Catalog {
                 "iWork package mixes direct IWA members with a legacy Index.zip".to_owned(),
             ));
         }
-        if has_direct_iwa {
-            return collect_flat(&archive, source.clone());
-        }
-
-        let Some(index_name) = nested_name else {
-            return collect_flat(&archive, source.clone());
+        let entries = if has_direct_iwa {
+            collect_flat(&archive, &source)?
+        } else if let Some(index_name) = nested_name {
+            collect_legacy(&archive, &index_name, checked_limits, &source)?
+        } else {
+            collect_flat(&archive, &source)?
         };
-        collect_legacy(&archive, &index_name, checked_limits, source.clone())
+        Ok(Catalog { entries, source })
     }
 
     /// Return the number of extracted entries.
@@ -516,7 +555,7 @@ where
     Ok(())
 }
 
-fn collect_flat(archive: &ZipArchive<'_>, source: Arc<[u8]>) -> Result<Catalog> {
+fn collect_flat(archive: &ZipArchive<'_>, source: &Arc<[u8]>) -> Result<Vec<Entry>> {
     let mut entries = Vec::new();
     let mut seen = HashSet::new();
     for entry in archive
@@ -532,15 +571,15 @@ fn collect_flat(archive: &ZipArchive<'_>, source: Arc<[u8]>) -> Result<Catalog> 
             &mut seen,
         )?;
     }
-    Ok(Catalog { entries, source })
+    Ok(entries)
 }
 
 fn collect_legacy(
     archive: &ZipArchive<'_>,
     index_name: &str,
     limits: Limits,
-    source: Arc<[u8]>,
-) -> Result<Catalog> {
+    source: &Arc<[u8]>,
+) -> Result<Vec<Entry>> {
     let prefix = index_name.strip_suffix("Index.zip").ok_or_else(|| {
         Error::InvalidBundle(format!("invalid legacy package index name: {index_name}"))
     })?;
@@ -599,7 +638,7 @@ fn collect_legacy(
             &mut seen,
         )?;
     }
-    Ok(Catalog { entries, source })
+    Ok(entries)
 }
 
 fn push_entry(
@@ -802,6 +841,51 @@ mod tests {
         let mut streamed = Vec::new();
         catalog.write_to(&mut streamed)?;
         assert_eq!(streamed, bytes);
+        Ok(())
+    }
+
+    #[test]
+    fn accepts_shared_source_without_copying_input() -> Result<()> {
+        let (bytes, _central_offset, _central_end) = physical_zip(0);
+        let source: Arc<[u8]> = bytes.into();
+        let catalog = Catalog::from_shared_bytes(source.clone())?;
+
+        assert!(Arc::ptr_eq(&source, &catalog.source));
+        assert_eq!(catalog.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn shared_source_respects_input_limits() -> Result<()> {
+        let (bytes, _central_offset, _central_end) = physical_zip(0);
+        let source: Arc<[u8]> = bytes.into();
+        let limits = Limits::new(1, 10, 100, 100, 100)?;
+
+        assert!(matches!(
+            Catalog::from_shared_bytes_with_limits(source, limits),
+            Err(Error::Limit {
+                kind: crate::LimitKind::InputBytes,
+                ..
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn shared_source_preserves_opaque_zip_bytes_exactly() -> Result<()> {
+        let (bytes, _central_offset, _central_end) = physical_zip(99);
+        let source: Arc<[u8]> = bytes.into();
+        let catalog = Catalog::from_shared_bytes(source.clone())?;
+        let entry = catalog.iter().next().ok_or_else(|| {
+            Error::InvalidBundle("shared source test produced no entry".to_owned())
+        })?;
+
+        assert!(entry.is_opaque());
+        assert_eq!(entry.raw_record().compressed_data(), b"opaque payload");
+        assert_eq!(catalog.to_bytes()?.as_slice(), source.as_ref());
+        let mut streamed = Vec::new();
+        catalog.write_to(&mut streamed)?;
+        assert_eq!(streamed.as_slice(), source.as_ref());
         Ok(())
     }
 
