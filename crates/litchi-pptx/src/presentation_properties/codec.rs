@@ -2,9 +2,9 @@
 
 use super::model::*;
 use super::{
-    A_NS, A_STRICT, BROWSE_MODE_URI, CHART_TRACKING_REF_BASED_URI, DEFAULT_IMAGE_DPI_URI,
-    DISCARD_IMAGE_EDIT_DATA_URI, LASER_COLOR_URI, MAX_BYTES, MAX_DEPTH, MAX_EXTENSIONS, MAX_NODES,
-    MAX_STRING, P_NS, P_STRICT, P14_NS, P15_NS, R_NS, R_STRICT, SHOW_MEDIA_CONTROLS_URI,
+    A_NS, A_STRICT, A14_NS, BROWSE_MODE_URI, CHART_TRACKING_REF_BASED_URI, DEFAULT_IMAGE_DPI_URI,
+    DISCARD_IMAGE_EDIT_DATA_URI, LASER_COLOR_URI, MATH_URI, MAX_BYTES, MAX_DEPTH, MAX_EXTENSIONS,
+    MAX_NODES, MAX_STRING, P_NS, P_STRICT, P14_NS, P15_NS, R_NS, R_STRICT, SHOW_MEDIA_CONTROLS_URI,
 };
 use crate::{Error, Result};
 use quick_xml::{
@@ -547,6 +547,7 @@ fn parse_presentation_extensions(n: &Node) -> Result<Vec<Extension>> {
     let mut discard = false;
     let mut dpi = false;
     let mut tracking = false;
+    let mut math_seen = false;
     for ext in extensions {
         let uri = extension_uri(ext)?;
         let value = match uri.as_str() {
@@ -578,6 +579,16 @@ fn parse_presentation_extensions(n: &Node) -> Result<Vec<Extension>> {
                     P15_NS,
                     "chartTrackingRefBased",
                 )?)
+            },
+            MATH_URI => {
+                if math_seen {
+                    return Err(invalid("duplicate presentation math extension"));
+                }
+                math_seen = true;
+                let payload = extension_payload(ext, A14_NS, "m")?;
+                Extension::Math(crate::presentation_properties::math::parse(&node_xml(
+                    payload, false,
+                )?)?)
             },
             _ => Extension::Unknown(OpaqueExtension {
                 uri,
@@ -835,6 +846,13 @@ fn write_presentation_extensions(x: &mut String, v: &[Extension], strict: bool) 
                 "chartTrackingRefBased",
                 *value,
             ),
+            Extension::Math(value) => {
+                x.push_str("<p:ext uri=\"");
+                x.push_str(MATH_URI);
+                x.push_str("\">");
+                crate::presentation_properties::math::write(x, value, strict)?;
+                x.push_str("</p:ext>");
+            },
             Extension::Unknown(value) => write_unknown_extension(x, value, strict)?,
         }
     }
@@ -910,6 +928,7 @@ fn known_extension_uri(uri: &str) -> bool {
         DISCARD_IMAGE_EDIT_DATA_URI
             | DEFAULT_IMAGE_DPI_URI
             | CHART_TRACKING_REF_BASED_URI
+            | MATH_URI
             | BROWSE_MODE_URI
             | LASER_COLOR_URI
             | SHOW_MEDIA_CONTROLS_URI

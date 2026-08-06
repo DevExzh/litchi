@@ -108,7 +108,7 @@ for DrawingML, charts, diagrams, ink, math, and 3D extensions, [MS-OWEXML] for w
 
 | Feature family exposed by the specifications | Status | Read | Write | Notes |
 |-----------------------------------------------|--------|------|-------|-------|
-| PowerPoint math extension (a14:m) | ❌ | ❌ | ❌ | The package exposes ordinary DrawingML text extraction and common equation tooling elsewhere, but no typed PresentationML math-extension object or authoring API is claimed here |
+| PowerPoint math extension (a14:m) | 🟡 | ✅ | ✅ | Typed bounded presentation-level `a14:m` math defaults (`brkBin`/`brkBinSub`), strict/transitional OMML validation, opaque unrelated-extension preservation, and transactional package CRUD; equation content and rendering remain outside the owner |
 | Section, slide, and summary zoom objects | 🟡 | 🟡 | 🟡 | [MS-PPTX] 2.2.15 is covered by the contextual `shape::zoom::Owner`: typed target/property metadata, lossless fallbacks and unknown choices, package target/relationship validation, and transactional CRUD are implemented; rendering/layout is intentionally out of scope |
 | 3D models and animated model3d content | 🟡 | ✅ | ✅ | Contextual `model3d::{Model, Scene, Asset, Preview}` owns bounded graphic-frame discovery, shared DrawingML scene metadata, inert GLB/preview resources, relationship validation, and atomic replace/remove operations; model3d animation semantics and rendering remain outside the owner |
 | Designer/design-element/designer-tag metadata | ❌ | ❌ | ❌ | [MS-PPTX] design element, designer property, and designer tag extensions are not exposed as typed fields or CRUD |

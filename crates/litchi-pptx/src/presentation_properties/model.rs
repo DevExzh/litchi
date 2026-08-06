@@ -123,6 +123,7 @@ pub enum Extension {
     DiscardImageEditData(bool),
     DefaultImageDpi(u32),
     ChartTrackingReferenceBased(bool),
+    Math(crate::presentation_properties::math::Properties),
     Unknown(OpaqueExtension),
 }
 
@@ -229,15 +230,62 @@ impl Properties {
         }
         Ok(())
     }
+
+    /// Borrow the typed document-level math defaults, if present.
+    pub fn math(&self) -> Option<&crate::presentation_properties::math::Properties> {
+        self.extensions
+            .iter()
+            .find_map(|extension| match extension {
+                Extension::Math(value) => Some(value),
+                _ => None,
+            })
+    }
+
+    /// Replace the typed document-level math defaults and return the prior snapshot.
+    pub fn replace_math(
+        &mut self,
+        value: crate::presentation_properties::math::Properties,
+    ) -> Option<crate::presentation_properties::math::Properties> {
+        if let Some(extension) = self
+            .extensions
+            .iter_mut()
+            .find(|extension| matches!(extension, Extension::Math(_)))
+        {
+            let Extension::Math(previous) = std::mem::replace(extension, Extension::Math(value))
+            else {
+                unreachable!("math extension selector changed during replacement")
+            };
+            Some(previous)
+        } else {
+            self.extensions.push(Extension::Math(value));
+            None
+        }
+    }
+
+    /// Remove the typed document-level math defaults, if present.
+    pub fn remove_math(&mut self) -> Option<crate::presentation_properties::math::Properties> {
+        let index = self
+            .extensions
+            .iter()
+            .position(|extension| matches!(extension, Extension::Math(_)))?;
+        match self.extensions.remove(index) {
+            Extension::Math(value) => Some(value),
+            _ => unreachable!("math extension selector changed during removal"),
+        }
+    }
 }
 
 fn validate_extension_uris(values: &[Extension]) -> Result<()> {
-    let mut seen = [false; 3];
+    let mut seen = [false; 4];
     for value in values {
         let Some(slot) = (match value {
             Extension::DiscardImageEditData(_) => Some(0),
             Extension::DefaultImageDpi(_) => Some(1),
             Extension::ChartTrackingReferenceBased(_) => Some(2),
+            Extension::Math(value) => {
+                value.validate()?;
+                Some(3)
+            },
             Extension::Unknown(value) => {
                 if value.uri.is_empty() || value.uri.len() > MAX_STRING {
                     return Err(invalid("opaque presentation extension URI is invalid"));

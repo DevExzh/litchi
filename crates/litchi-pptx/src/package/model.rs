@@ -92,6 +92,31 @@ impl Package {
         self.edit_typed(move |opc| crate::tag::remove(opc, &slide_name))
     }
 
+    /// Read the typed document-level math defaults from presentation properties.
+    pub fn math_properties(
+        &self,
+    ) -> Result<Option<crate::presentation_properties::math::Properties>> {
+        self.ensure_graph_current("math_properties")?;
+        crate::presentation_properties::load_math_from_package(&self.opc)
+    }
+
+    /// Replace the document-level math defaults transactionally.
+    pub fn put_math_properties(
+        &mut self,
+        value: crate::presentation_properties::math::Properties,
+    ) -> Result<Option<crate::presentation_properties::math::Properties>> {
+        self.ensure_graph_current("put_math_properties")?;
+        self.edit_typed(move |opc| crate::presentation_properties::put_math_to_package(opc, value))
+    }
+
+    /// Remove the document-level math defaults transactionally.
+    pub fn remove_math_properties(
+        &mut self,
+    ) -> Result<Option<crate::presentation_properties::math::Properties>> {
+        self.ensure_graph_current("remove_math_properties")?;
+        self.edit_typed(crate::presentation_properties::remove_math_from_package)
+    }
+
     /// Read the lossless zoom owner of one slide.
     pub fn zooms<'a>(
         &self,
