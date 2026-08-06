@@ -41,6 +41,20 @@ fn rejects_reserved_flags_empty_tokens_and_trailing_payload() {
 }
 
 #[test]
+fn string_cached_values_allow_an_empty_formula_token_stream() {
+    let mut data = payload(0, 0, &[]);
+    data[6] = 0;
+    data[12..14].copy_from_slice(&[0xFF, 0xFF]);
+
+    let parsed = parse_record(&data).unwrap();
+    assert!(matches!(
+        parsed.value,
+        crate::records::FormulaValue::StringPending
+    ));
+    assert!(parsed.formula.is_empty());
+}
+
+#[test]
 fn shared_flag_requires_ptg_exp_and_writer_refuses_orphaned_shared_state() {
     assert!(!is_ptg_exp(&[0x16, 0, 0, 0, 0]));
     assert!(decode_flags(0x0008, &[0x16]).is_err());

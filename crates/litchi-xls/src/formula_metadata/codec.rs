@@ -39,9 +39,6 @@ pub(crate) fn parse_record(data: &[u8]) -> Result<Parsed> {
     let flags = read_u16(data, 14);
     let calculation_cache = read_u32(data, 16);
     let token_len = usize::from(read_u16(data, 20));
-    if token_len == 0 {
-        return Err(invalid("Formula token stream cannot be empty"));
-    }
     let formula_end = FORMULA_FIXED_SIZE
         .checked_add(token_len)
         .ok_or_else(|| invalid("Formula token length overflows"))?;
@@ -52,6 +49,12 @@ pub(crate) fn parse_record(data: &[u8]) -> Result<Parsed> {
         });
     }
     let formula = data[FORMULA_FIXED_SIZE..formula_end].to_vec();
+    // A string-valued Formula deliberately carries no Rgce bytes: its
+    // cached result is supplied by the immediately following String record.
+    // All other FormulaValue variants require an actual token stream.
+    if formula.is_empty() && !matches!(value, FormulaValue::StringPending) {
+        return Err(invalid("Formula token stream cannot be empty"));
+    }
     let mut metadata = decode_flags(flags, &formula)?;
     metadata = metadata.with_calculation_cache(calculation_cache);
 

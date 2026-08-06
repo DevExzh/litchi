@@ -1430,7 +1430,7 @@ mod packed_cell_tests {
         data.extend_from_slice(&0u16.to_le_bytes());
         data.extend_from_slice(&0u32.to_le_bytes());
         data.extend_from_slice(&3u16.to_le_bytes());
-        data.extend_from_slice(&[0x1E, 0x2A, 0x00, 0xFF]);
+        data.extend_from_slice(&[0x1E, 0x2A, 0x00]);
 
         let formula = CellRecord::parse(0x0006, &data, &Encoding::Utf16Le).unwrap();
 
