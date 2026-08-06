@@ -6,6 +6,7 @@
 mod codec;
 mod model;
 mod package;
+mod transaction;
 
 #[cfg(test)]
 mod tests;
@@ -13,3 +14,4 @@ mod tests;
 pub use litchi_ole_common::object::Limits;
 pub use model::{Revision, RevisionKind, RevisionMetadata};
 pub use package::RevisionEditor;
+pub use transaction::{Commit, Patch, Snapshot, Transaction, TransactionError};
