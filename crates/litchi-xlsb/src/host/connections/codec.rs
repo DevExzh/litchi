@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use super::model::{Connections, UnknownRecord};
+use super::model::UnknownRecord;
 use super::{parse_connections_part, write};
 use crate::package::error::Result;
 
@@ -10,14 +10,12 @@ use crate::package::error::Result;
 /// the semantic parser.
 #[derive(Debug, Clone)]
 pub(crate) struct Source {
-    pub(crate) connections: Connections,
-    pub(crate) bytes: Arc<[u8]>,
     pub(crate) unknown_records: Vec<UnknownRecord>,
 }
 
 /// Parse a complete connections stream while retaining future records.
 pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
-    let connections = parse_connections_part(data)?;
+    parse_connections_part(data)?;
     let mut unknown_records = Vec::new();
     let mut owner = None;
     let mut root_known = 0usize;
@@ -84,11 +82,7 @@ pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
         ));
     }
 
-    Ok(Source {
-        connections,
-        bytes: Arc::from(data.to_vec()),
-        unknown_records,
-    })
+    Ok(Source { unknown_records })
 }
 
 pub(crate) fn is_modeled_record(kind: crate::raw::Kind) -> bool {
