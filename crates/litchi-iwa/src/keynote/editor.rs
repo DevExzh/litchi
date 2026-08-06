@@ -13,6 +13,7 @@ use prost::Message;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::comments::IWorkDrawableCommentEditor;
+use crate::media::MediaAssetId;
 use crate::media::reachable_embedded_assets;
 use crate::package_metadata::{
     add_component_external_reference, add_component_link, add_component_object_uuids,
@@ -5142,6 +5143,7 @@ impl KeynoteEditor {
     }
 
     pub fn extract_media(&self, data_identifier: u64) -> Result<Vec<u8>> {
+        let data_identifier = MediaAssetId::try_from(data_identifier)?;
         if !self
             .media_assets()?
             .iter()
@@ -5156,6 +5158,7 @@ impl KeynoteEditor {
 
     /// Replace a referenced materialized asset without changing its data identifier.
     pub fn replace_media(&mut self, data_identifier: u64, replacement: &[u8]) -> Result<Vec<u8>> {
+        let data_identifier = MediaAssetId::try_from(data_identifier)?;
         if !self
             .media_assets()?
             .iter()

@@ -10,6 +10,7 @@ use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media::MediaAssetId;
 
 const DOCUMENT_ARCHIVE: &str = "Index/Document.iwa";
 
@@ -37,7 +38,10 @@ impl KeynoteEditor {
         let Some(record) = read_soundtrack(&graph)? else {
             return Ok(Vec::new());
         };
-        let identifiers = soundtrack_media_identifiers(record.data)?;
+        let identifiers = soundtrack_media_identifiers(record.data)?
+            .into_iter()
+            .map(MediaAssetId::try_from)
+            .collect::<Result<Vec<_>>>()?;
         let media = IWorkMediaEditor::from_package(self.package().clone())?;
         identifiers
             .into_iter()
@@ -79,15 +83,16 @@ impl KeynoteEditor {
 
         let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
         let inserted = media.insert_unreferenced(preferred_filename, data)?;
-        context
-            .payloads
-            .insert(index, encoded_media_reference(inserted.data_identifier)?);
+        context.payloads.insert(
+            index,
+            encoded_media_reference(inserted.data_identifier.get())?,
+        );
         let mut staged = media.into_package();
         apply_soundtrack_payloads(&mut staged, &context)?;
         add_component_data_reference(
             &mut staged,
             context.component_id,
-            inserted.data_identifier,
+            inserted.data_identifier.get(),
             context.object_id,
         )?;
         self.commit_soundtrack_items(staged, &context.payloads)?;
@@ -113,19 +118,19 @@ impl KeynoteEditor {
 
         let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
         let inserted = media.insert_unreferenced(preferred_filename, data)?;
-        context.payloads[index] = encoded_media_reference(inserted.data_identifier)?;
+        context.payloads[index] = encoded_media_reference(inserted.data_identifier.get())?;
         let mut staged = media.into_package();
         apply_soundtrack_payloads(&mut staged, &context)?;
         add_component_data_reference(
             &mut staged,
             context.component_id,
-            inserted.data_identifier,
+            inserted.data_identifier.get(),
             context.object_id,
         )?;
         remove_component_data_reference(
             &mut staged,
             context.component_id,
-            old_identifier,
+            old_identifier.get(),
             context.object_id,
         )?;
         remove_asset_if_unreferenced(&mut staged, old_identifier)?;
@@ -172,7 +177,7 @@ impl KeynoteEditor {
         remove_component_data_reference(
             &mut staged,
             context.component_id,
-            identifier,
+            identifier.get(),
             context.object_id,
         )?;
         remove_asset_if_unreferenced(&mut staged, identifier)?;
@@ -232,7 +237,10 @@ fn apply_soundtrack_payloads(
     })
 }
 
-fn remove_asset_if_unreferenced(package: &mut IWorkPackage, identifier: u64) -> Result<()> {
+fn remove_asset_if_unreferenced(
+    package: &mut IWorkPackage,
+    identifier: MediaAssetId,
+) -> Result<()> {
     let mut media = IWorkMediaEditor::from_package(package.clone())?;
     let asset = media.asset(identifier).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -246,11 +254,11 @@ fn remove_asset_if_unreferenced(package: &mut IWorkPackage, identifier: u64) -> 
     Ok(())
 }
 
-fn identifier_at(payloads: &[Vec<u8>], index: usize) -> Result<u64> {
+fn identifier_at(payloads: &[Vec<u8>], index: usize) -> Result<MediaAssetId> {
     let payload = payloads
         .get(index)
         .ok_or_else(|| index_error(index, payloads.len(), false))?;
-    Ok(tsp::DataReference::decode(payload.as_slice())?.identifier)
+    MediaAssetId::try_from(tsp::DataReference::decode(payload.as_slice())?.identifier)
 }
 
 fn validate_soundtrack_asset(asset: &EmbeddedMediaAsset) -> Result<()> {

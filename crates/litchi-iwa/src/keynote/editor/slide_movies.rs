@@ -8,6 +8,7 @@ use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media::MediaAssetId;
 use crate::media_playback::media_playback_settings;
 use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
@@ -149,8 +150,8 @@ impl KeynoteEditor {
             ids,
             context.slide_id,
             context.style_id,
-            movie_asset.data_identifier,
-            poster_asset.data_identifier,
+            movie_asset.data_identifier.get(),
+            poster_asset.data_identifier.get(),
             geometry,
             options.natural_size(),
             duration_seconds,
@@ -173,7 +174,7 @@ impl KeynoteEditor {
             add_component_data_reference(
                 &mut staged,
                 context.component_id,
-                data_identifier,
+                data_identifier.get(),
                 ids.drawable,
             )?;
         }
@@ -194,15 +195,15 @@ impl KeynoteEditor {
                 Error::InvalidFormat("Keynote movie creation failed validation".to_owned())
             })?;
         let created_graph = verified.slide_movie_graph(slide_index, ids.drawable)?;
-        if created.kind != MovieKind::File
-            || created.movie_data_identifier != Some(movie_asset.data_identifier)
-            || created.poster_image_data_identifier != Some(poster_asset.data_identifier)
+        if created.kind != KeynoteSlideMovieKind::File
+            || created.movie_data_identifier != Some(movie_asset.data_identifier.get())
+            || created.poster_image_data_identifier != Some(poster_asset.data_identifier.get())
             || created.geometry != geometry
             || created.original_size != Some(options.natural_size())
             || created.natural_size != Some(options.natural_size())
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(movie_asset.data_identifier)? != movie_data
-            || verified.extract_media(poster_asset.data_identifier)? != poster_data
+            || verified.extract_media(movie_asset.data_identifier.get())? != movie_data
+            || verified.extract_media(poster_asset.data_identifier.get())? != poster_data
         {
             return Err(Error::InvalidFormat(
                 "Keynote movie creation produced an inconsistent graph".to_owned(),
@@ -725,12 +726,13 @@ impl KeynoteEditor {
             .map(|(data, _)| *data)
             .collect::<HashSet<_>>();
         for identifier in data_identifiers {
+            let identifier = MediaAssetId::try_from(identifier)?;
             if media
                 .asset(identifier)
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier);
+                removed_data_identifiers.push(identifier.get());
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -748,7 +750,7 @@ impl KeynoteEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_media
                     .iter()
-                    .any(|asset| asset.data_identifier == *identifier)
+                    .any(|asset| asset.data_identifier.get() == *identifier)
             })
         {
             return Err(Error::InvalidFormat(

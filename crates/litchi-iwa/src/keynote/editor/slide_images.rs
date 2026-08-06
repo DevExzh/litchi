@@ -10,6 +10,7 @@ use crate::data_reference_registry::{
 };
 use crate::image_adjustments::replace_image_adjustments;
 use crate::image_caption::{CaptionObjectIds, DrawableCaptionKind};
+use crate::media::MediaAssetId;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
     flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
@@ -118,7 +119,7 @@ impl KeynoteEditor {
             ids,
             context.slide_id,
             context.style_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             geometry,
             options.natural_size,
         )?;
@@ -139,7 +140,7 @@ impl KeynoteEditor {
         add_component_data_reference(
             &mut staged,
             context.component_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             ids.drawable,
         )?;
         add_component_external_reference(
@@ -160,12 +161,12 @@ impl KeynoteEditor {
             })?;
         let created_graph = image_graph(&verified, slide_index, ids.drawable)?;
         if created.kind != KeynoteSlideImageKind::File
-            || created.image_data_identifier != asset.data_identifier
+            || created.image_data_identifier != asset.data_identifier.get()
             || created.geometry != geometry
             || created.original_size != Some(options.natural_size)
             || created.natural_size != Some(options.natural_size)
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(asset.data_identifier)? != data
+            || verified.extract_media(asset.data_identifier.get())? != data
         {
             return Err(Error::InvalidFormat(
                 "Keynote image creation produced an inconsistent graph".to_owned(),
@@ -608,12 +609,13 @@ impl KeynoteEditor {
             .map(|(data, _)| *data)
             .collect::<HashSet<_>>();
         for identifier in data_identifiers {
+            let identifier = MediaAssetId::try_from(identifier)?;
             if media
                 .asset(identifier)
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier);
+                removed_data_identifiers.push(identifier.get());
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -627,7 +629,7 @@ impl KeynoteEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_assets
                     .iter()
-                    .any(|asset| asset.data_identifier == *identifier)
+                    .any(|asset| asset.data_identifier.get() == *identifier)
             })
         {
             return Err(Error::InvalidFormat(

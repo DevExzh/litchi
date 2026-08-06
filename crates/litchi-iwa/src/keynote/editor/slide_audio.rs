@@ -83,7 +83,7 @@ impl KeynoteEditor {
             ids,
             context.slide_id,
             context.style_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             geometry,
             duration_seconds,
         )?;
@@ -104,7 +104,7 @@ impl KeynoteEditor {
         add_component_data_reference(
             &mut staged,
             context.component_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             ids.drawable,
         )?;
         add_component_external_reference(
@@ -120,12 +120,12 @@ impl KeynoteEditor {
         let created_graph = verified.slide_movie_graph(slide_index, ids.drawable)?;
         let expected_duration = Duration::try_from_secs_f64(f64::from(duration_seconds))
             .map_err(|error| Error::ParseError(error.to_string()))?;
-        if created.audio_data_identifier != asset.data_identifier
+        if created.audio_data_identifier != asset.data_identifier.get()
             || created.position != options.position()
             || created.duration != expected_duration
             || created_graph.info.kind != MovieKind::Audio
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(asset.data_identifier)? != data
+            || verified.extract_media(asset.data_identifier.get())? != data
         {
             return Err(Error::InvalidFormat(
                 "Keynote audio creation produced an inconsistent graph".to_owned(),
