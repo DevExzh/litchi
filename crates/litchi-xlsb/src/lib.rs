@@ -21,6 +21,7 @@ pub mod named_ranges;
 pub mod package;
 pub mod pivot_view;
 pub mod raw;
+pub mod shared_workbook;
 pub mod sheet;
 pub mod slicer;
 pub mod styles;
