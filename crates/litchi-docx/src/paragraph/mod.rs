@@ -16,6 +16,7 @@ mod tests;
 
 pub use crate::run_effects;
 pub use crate::run_effects::Effects;
+pub use crate::run_symbols::{Symbol, Symbols};
 pub use collapsed::{Collapsed, Commit, Patch, Snapshot, Transaction};
 pub use extensions::{Extensions, Id, Ids};
 pub use model::{
@@ -23,4 +24,4 @@ pub use model::{
     RunProperties, RunUnderline, RunUnderlineColor,
 };
 
-pub(crate) use codec::extract_word_text;
+pub(crate) use codec::{extract_word_text, is_fragment_word_name};

@@ -36,6 +36,7 @@ pub mod paragraph;
 pub mod parts;
 pub mod revision;
 pub mod run_effects;
+pub mod run_symbols;
 pub mod section;
 pub mod settings;
 pub mod smart_tag;

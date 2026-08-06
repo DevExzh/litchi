@@ -2,6 +2,7 @@
 use crate::OfficeMath;
 use crate::error::{Error, Result};
 use crate::run_effects::Effects;
+use crate::run_symbols::Symbol;
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
@@ -18,6 +19,8 @@ pub enum RunContent {
     Text(String),
     /// Inline Office Math equation
     OfficeMath(OfficeMath),
+    /// Word 2015 extended Unicode symbol
+    Symbol(Symbol),
     /// Page number field
     PageNumber(PageNumberFormat),
     /// Page count field (total pages)
@@ -297,6 +300,7 @@ impl MutableRun {
         // Write content based on type
         match &self.content {
             RunContent::OfficeMath(math) => xml.push_str(math.xml()),
+            RunContent::Symbol(symbol) => crate::run_symbols::codec::write_symbol(symbol, xml)?,
             RunContent::Text(text) if !text.is_empty() => {
                 let name = if mode == RevisionTextMode::Deleted {
                     "delText"
