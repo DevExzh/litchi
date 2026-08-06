@@ -10,8 +10,8 @@ use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 
 /// Table-pointer index of `fcMsoEnvelope`/`lcbMsoEnvelope` in
-/// `FibRgFcLcb2002` (`[MS-DOC]` 2.5.8).
-pub(super) const FIB_INDEX: usize = 128;
+/// `FibRgFcLcb2000` (`[MS-DOC]` 2.5.7).
+pub(super) const FIB_INDEX: usize = validation::FIB_INDEX;
 const RECIPIENT_COLLECTION_TAG: u32 = 0xDCCA_0123;
 const RECIPIENT_COLLECTION_VERSION: u32 = 1;
 
@@ -26,19 +26,7 @@ pub(super) fn parse_fib(
     if length == 0 {
         return Ok(None);
     }
-    let start = usize::try_from(offset)
-        .map_err(|_| corrupted("MsoEnvelope offset exceeds the platform size"))?;
-    let length = usize::try_from(length)
-        .map_err(|_| corrupted("MsoEnvelope length exceeds the platform size"))?;
-    if length > MAX_ENVELOPE_BYTES {
-        return Err(corrupted("MsoEnvelope exceeds the resource cap"));
-    }
-    let end = start
-        .checked_add(length)
-        .ok_or_else(|| corrupted("MsoEnvelope range overflows"))?;
-    let data = table_stream
-        .get(start..end)
-        .ok_or_else(|| corrupted("MsoEnvelope extends beyond the table stream"))?;
+    let data = validation::table_range(table_stream, offset, length)?;
     parse(data).map(Some)
 }
 
@@ -83,8 +71,8 @@ fn parse_message(data: &[u8]) -> Result<Message> {
     let last_sent_time = input.u32()?;
     let flag_status = match input.u32()? {
         0 => FollowUpStatus::None,
-        1 => FollowUpStatus::Complete,
-        2 => FollowUpStatus::Flagged,
+        1 => FollowUpStatus::Flagged,
+        2 => FollowUpStatus::Complete,
         _ => return Err(corrupted("MsoEnvelope has an invalid follow-up status")),
     };
     let reply_time = input.u32()?;
@@ -137,7 +125,7 @@ fn parse_message(data: &[u8]) -> Result<Message> {
     } else {
         None
     };
-    input.finish("MsoEnvelope")?;
+    let tail = input.take_remaining();
     let value = Message {
         version,
         last_sent_time,
@@ -164,6 +152,7 @@ fn parse_message(data: &[u8]) -> Result<Message> {
         recipients,
         attachments,
         intro_text,
+        tail,
     };
     validation::validate(&Envelope::from_parts(
         MSO_ENVELOPE_CLSID,
@@ -225,6 +214,7 @@ fn write_message(output: &mut Vec<u8>, message: &Message) -> Result<()> {
         (Version::Office6, None) => {},
         _ => return Err(corrupted("intro text does not match envelope version")),
     }
+    output.extend_from_slice(&message.tail);
     Ok(())
 }
 
@@ -549,12 +539,10 @@ impl<'a> Cursor<'a> {
         self.utf16_bytes(bytes, "intro text")
     }
 
-    fn finish(&self, name: &str) -> Result<()> {
-        if self.position == self.data.len() {
-            Ok(())
-        } else {
-            Err(corrupted(format!("{name} has trailing bytes")))
-        }
+    fn take_remaining(&mut self) -> Box<[u8]> {
+        let tail = self.data[self.position..].to_vec().into_boxed_slice();
+        self.position = self.data.len();
+        tail
     }
 }
 

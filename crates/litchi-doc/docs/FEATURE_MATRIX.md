@@ -34,7 +34,7 @@ shared Office codecs are counted only where the DOC API exposes them.
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| `MsoEnvelopeCLSID` / `MsoEnvelope` metadata | 🟡 | ✅ | 🟡 | `parts::envelope` owns the `[MS-DOC]` `fcMsoEnvelope` FIB range and the documented `[MS-OSHARED]` Office 6/8 body, recipient property bags, and attachments. Unknown CLSIDs are preserved as bounded opaque payloads; `Document::envelope()` is inert and the detached codec does not deliver mail, resolve recipients, activate attachments, or emit package mutations. |
+| `MsoEnvelopeCLSID` / `MsoEnvelope` metadata | ✅ | ✅ | ✅ | `parts::envelope` owns the `[MS-DOC]` `fcMsoEnvelope` FIB range and the documented `[MS-OSHARED]` Office 6/8 body, recipient property bags, and attachments. Unknown CLSIDs and supported-body tail bytes are preserved as bounded opaque data; `Editor` stages clone-first package/FIB edits and publishes source-checked reversible semantic/CFB patches. `Document::envelope()` remains inert: no mail transport, recipient resolution, attachment activation, or external behavior. |
 
 
 ## [MS-DOC] file structure and version audit

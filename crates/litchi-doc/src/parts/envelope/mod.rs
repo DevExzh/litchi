@@ -2,6 +2,8 @@
 
 mod codec;
 mod model;
+mod package;
+mod transaction;
 mod validation;
 
 pub use model::{
@@ -9,6 +11,11 @@ pub use model::{
     PropertyValue, RecipientCollection, RecipientProperties, RecipientProperty, SecurityFlags,
     Sensitivity, Text, Version,
 };
+pub use package::{Editor, PackageCommit, PackageSnapshot};
+pub use transaction::{Commit, Patch, Snapshot, Transaction, TransactionError};
+
+/// FIB index of `fcMsoEnvelope`/`lcbMsoEnvelope` in `FibRgFcLcb2000`.
+pub const FIB_INDEX: usize = validation::FIB_INDEX;
 
 #[cfg(test)]
 mod tests;

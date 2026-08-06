@@ -151,8 +151,8 @@ impl Text {
 #[repr(u32)]
 pub enum FollowUpStatus {
     None = 0,
-    Complete = 1,
-    Flagged = 2,
+    Flagged = 1,
+    Complete = 2,
 }
 
 /// Message sensitivity stored in `Sensitivity`.
@@ -211,6 +211,9 @@ pub struct Message {
     pub attachments: Vec<Attachment>,
     /// Present exactly when `version` is [`Version::Office8`].
     pub intro_text: Option<Box<[u16]>>,
+    /// Bytes following the documented body, retained for forward-compatible
+    /// producers and emitted verbatim after a typed edit.
+    pub tail: Box<[u8]>,
 }
 
 impl Default for Message {
@@ -242,6 +245,7 @@ impl Default for Message {
             recipients: RecipientCollection::default(),
             attachments: Vec::new(),
             intro_text: Some(Box::default()),
+            tail: Box::default(),
         }
     }
 }

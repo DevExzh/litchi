@@ -135,9 +135,12 @@ pub use parts::document_properties_2003::{
 };
 pub use parts::embedded_fonts::{DocumentEmbeddedFonts, EmbeddedFont};
 pub use parts::envelope::{
-    Attachment, Envelope, FollowUpStatus, Importance, MSO_ENVELOPE_CLSID, Message, Payload,
-    PropertyValue, RecipientCollection, RecipientProperties, RecipientProperty, SecurityFlags,
-    Sensitivity, Text, Version,
+    Attachment, Commit as EnvelopeCommit, Editor as EnvelopeEditor, Envelope,
+    FIB_INDEX as MSO_ENVELOPE_FIB_INDEX, FollowUpStatus, Importance, MSO_ENVELOPE_CLSID, Message,
+    PackageCommit as EnvelopePackageCommit, PackageSnapshot as EnvelopePackageSnapshot,
+    Patch as EnvelopePatch, Payload, PropertyValue, RecipientCollection, RecipientProperties,
+    RecipientProperty, SecurityFlags, Sensitivity, Snapshot as EnvelopeSnapshot, Text,
+    Transaction as EnvelopeTransaction, TransactionError as EnvelopeTransactionError, Version,
 };
 pub use parts::fields::BarcodeField;
 pub use parts::fields::BidiOutlineField;

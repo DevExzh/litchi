@@ -6,10 +6,16 @@ use super::model::{
     Text, Version,
 };
 use crate::package::{Error as PackageError, Result};
+use crate::parts::fib::{FileInformationBlock, WORD_97_NFIB};
 
 /// Maximum serialized `MsoEnvelopeCLSID` size accepted from a DOC table
 /// stream or produced by the detached codec.
 pub(super) const MAX_ENVELOPE_BYTES: usize = 16 * 1024 * 1024;
+/// Table-pointer index of `fcMsoEnvelope`/`lcbMsoEnvelope` in
+/// `FibRgFcLcb2000` (`[MS-DOC]` 2.5.7).
+pub(crate) const FIB_INDEX: usize = 97;
+/// Byte offset of the selected FIB pair in `WordDocument`.
+pub(crate) const POINTER_OFFSET: usize = 154 + FIB_INDEX * 8;
 /// Maximum value of the minute-based envelope timestamps from `[MS-OSHARED]`.
 pub(super) const MAX_MINUTE_TIME: u32 = 0x5AE9_80E0;
 const MAX_COLLECTION_ITEMS: usize = 65_536;
@@ -164,6 +170,7 @@ fn message_length(message: &Message) -> Result<usize> {
             return Err(corrupted("Office 8 envelopes must contain intro text"));
         },
     }
+    length = add(length, message.tail.len(), "message tail")?;
     if length > MAX_ENVELOPE_BYTES.saturating_sub(16) {
         return Err(corrupted("MsoEnvelope exceeds the resource cap"));
     }
@@ -287,7 +294,16 @@ fn validate_text(value: &Text, version: Version, name: &str) -> Result<()> {
 fn text_length(value: &Text) -> Result<usize> {
     match value {
         Text::Ansi(bytes) => short_blob_length(bytes, "envelope string"),
-        Text::Unicode(units) => short_utf16_length(units, "envelope string"),
+        Text::Unicode(units) => {
+            let bytes = units
+                .len()
+                .checked_mul(2)
+                .ok_or_else(|| corrupted("envelope string size overflows"))?;
+            if bytes > MAX_BLOB_BYTES {
+                return Err(corrupted("envelope string exceeds the resource cap"));
+            }
+            add(2, bytes, "envelope string")
+        },
     }
 }
 
@@ -344,4 +360,61 @@ fn add(left: usize, right: usize, name: &str) -> Result<usize> {
 
 fn corrupted(message: impl Into<String>) -> PackageError {
     PackageError::Corrupted(message.into())
+}
+
+/// Validate the FIB and package assumptions required for envelope edits.
+pub(crate) fn package_fib(fib: &FileInformationBlock) -> Result<()> {
+    if fib.version() < WORD_97_NFIB {
+        return Err(PackageError::UnsupportedVersion {
+            nfib: fib.version(),
+            name: fib.version_name(),
+        });
+    }
+    if fib.is_encrypted() {
+        return Err(corrupted(
+            "encrypted DOC packages cannot be edited by the envelope owner",
+        ));
+    }
+    if fib.table_pointer_count().is_none() {
+        return Err(corrupted(
+            "WordDocument FIB table-pointer array is truncated",
+        ));
+    }
+    if fib.table_pointer_count().unwrap_or(0) <= FIB_INDEX {
+        return Err(corrupted(
+            "WordDocument FIB does not expose fcMsoEnvelope/lcbMsoEnvelope",
+        ));
+    }
+    Ok(())
+}
+
+/// Locate the `fcMsoEnvelope`/`lcbMsoEnvelope` pair in `WordDocument`.
+pub(crate) fn pointer_location(fib: &FileInformationBlock) -> Result<usize> {
+    package_fib(fib)?;
+    let end = POINTER_OFFSET
+        .checked_add(8)
+        .ok_or_else(|| corrupted("MsoEnvelope pointer range overflows"))?;
+    if end > fib.raw_data().len() {
+        return Err(corrupted(
+            "WordDocument FIB does not contain fcMsoEnvelope/lcbMsoEnvelope",
+        ));
+    }
+    Ok(POINTER_OFFSET)
+}
+
+/// Resolve one bounded FIB range in a DOC table stream.
+pub(crate) fn table_range(table: &[u8], offset: u32, length: u32) -> Result<&[u8]> {
+    let start = usize::try_from(offset)
+        .map_err(|_| corrupted("fcMsoEnvelope offset exceeds the platform size"))?;
+    let length = usize::try_from(length)
+        .map_err(|_| corrupted("lcbMsoEnvelope length exceeds the platform size"))?;
+    if length > MAX_ENVELOPE_BYTES {
+        return Err(corrupted("MsoEnvelope exceeds the resource cap"));
+    }
+    let end = start
+        .checked_add(length)
+        .ok_or_else(|| corrupted("MsoEnvelope range overflows"))?;
+    table
+        .get(start..end)
+        .ok_or_else(|| corrupted("MsoEnvelope extends beyond the table stream"))
 }
