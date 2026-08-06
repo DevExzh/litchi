@@ -407,7 +407,7 @@ impl KeynoteDocumentBuilder {
     }
 
     /// Build the underlying package for lower-level IWA manipulation.
-    pub fn build_package(self) -> Result<IWorkPackage> {
+    pub(crate) fn build_package(self) -> Result<IWorkPackage> {
         self.validate()?;
         let identity = IWorkDocumentIdentity::generate();
         let template_identifier = fresh_tsp_uuid();
