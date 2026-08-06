@@ -1,6 +1,7 @@
 //! Typed transaction values and reversible change metadata.
 
 use super::super::{Cache, Chart, RowCol, Value, XlValue, cache};
+use super::chart_area;
 use crate::{Error, Result};
 
 /// Producer-specific value accepted by the bounded cache patcher.
@@ -134,16 +135,18 @@ impl Change {
     }
 }
 
-/// Reversible, deterministic semantic patch for existing cache cells.
+/// Reversible, deterministic semantic patch for chart snapshot edits.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Patch {
     pub(super) changes: Box<[Change]>,
+    pub(super) chart_area: Option<chart_area::Change>,
 }
 
 impl Patch {
-    pub(crate) fn new(changes: Vec<Change>) -> Self {
+    pub(crate) fn new(changes: Vec<Change>, chart_area: Option<chart_area::Change>) -> Self {
         Self {
             changes: changes.into_boxed_slice(),
+            chart_area,
         }
     }
 
@@ -152,14 +155,21 @@ impl Patch {
         &self.changes
     }
 
-    /// Number of effective cache changes.
+    /// Number of effective semantic changes, including the optional chart area.
     pub fn len(&self) -> usize {
-        self.changes.len()
+        self.changes
+            .len()
+            .saturating_add(usize::from(self.chart_area.is_some()))
     }
 
     /// Whether the transaction was a semantic no-op.
     pub fn is_empty(&self) -> bool {
-        self.changes.is_empty()
+        self.changes.is_empty() && self.chart_area.is_none()
+    }
+
+    /// One reversible change to the fixed-size `[MS-OGRAPH]` `Chart` record.
+    pub const fn chart_area(&self) -> Option<&chart_area::Change> {
+        self.chart_area.as_ref()
     }
 
     /// Returns the source-checked inverse patch.
@@ -179,11 +189,12 @@ impl Patch {
                 })
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
+            chart_area: self.chart_area.map(chart_area::Change::inverse),
         }
     }
 }
 
-/// Published result of a successful chart cache transaction.
+/// Published result of a successful chart transaction.
 #[derive(Debug)]
 pub struct Commit {
     chart: Chart,
