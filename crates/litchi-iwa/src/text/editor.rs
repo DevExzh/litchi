@@ -158,7 +158,7 @@ impl IWorkTextEditor {
         })
     }
 
-    pub fn from_package(package: IWorkPackage) -> Self {
+    pub(crate) fn from_package(package: IWorkPackage) -> Self {
         Self { package }
     }
 
@@ -2192,11 +2192,11 @@ impl IWorkTextEditor {
         Ok(changed)
     }
 
-    pub fn package(&self) -> &IWorkPackage {
+    pub(crate) fn package(&self) -> &IWorkPackage {
         &self.package
     }
 
-    pub fn into_package(self) -> IWorkPackage {
+    pub(crate) fn into_package(self) -> IWorkPackage {
         self.package
     }
 
