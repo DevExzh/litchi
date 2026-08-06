@@ -186,7 +186,7 @@ pub use persist::{PersistMapping, PersistPtrHolder};
 pub use shapes::{AutoShape, Placeholder, PlaceholderSize, PlaceholderType, Shape, TextBox};
 
 // Re-export legacy types
-pub use bookmark_summary::{Bookmark, BookmarkSummary};
+pub use bookmark_summary::{Bookmark, Summary};
 pub use broadcast::{Broadcast, BroadcastProperties, Broadcasts};
 pub use client_anchor::{
     ClientAnchor, ClientAnchorData, ClientAnchorEncoding, ClientAnchorLimits,

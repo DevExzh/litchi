@@ -45,7 +45,7 @@ compound files, OfficeArt, OLE activation metadata, native charts, encryption, a
 | Slide list, ordering, IDs, and visibility | ✅ | ✅ | ✅ | Slide records, list-with-text containers, stable identifiers, hidden state, and writer-created slide graphs |
 | Main masters and master text styles | ✅ | ✅ | ✅ | Typed main-master records, placeholder drawing, master text-style levels, color schemes, and PowerPoint 12 round-trip metadata |
 | Title, notes, and handout master records | 🟡 | ✅ | 🟡 | Master contexts and references are parsed, including placeholder and color-scheme metadata; the dedicated writer builds a main master and notes pages but does not provide general title-, notes-, or handout-master authoring |
-| Presentation metadata and summary information | ✅ | ✅ | ✅ | Document properties, summary information, document-summary information, bookmarks, privacy, print options, and related bounded records |
+| Presentation metadata and summary information | ✅ | ✅ | ✅ | Document properties, summary information, document-summary information, bookmarks, privacy, print options, and related bounded records; bookmark-summary semantics are exposed through the layered `bookmark_summary::Summary` owner |
 | View state, guides, and print settings | ✅ | ✅ | ✅ | Normal/slide/notes view state, pane splitters, zoom metadata, guides, notes-view scale, handout targets, and display preferences are typed metadata and do not drive layout |
 
 ## Slides, text, drawing, and themes

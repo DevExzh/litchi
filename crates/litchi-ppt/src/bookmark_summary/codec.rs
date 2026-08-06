@@ -1,33 +1,17 @@
-//! Strict, inert PowerPoint document bookmark-summary metadata.
+//! Binary record codec for bookmark summaries.
 
-use super::package::{Error, Result};
-use super::records::Record;
+use super::model::{Bookmark, Summary};
+use super::validation::{
+    ENTITY_BYTES, MAX_BOOKMARKS, MAX_VALUE_BYTES, NAME_BYTES, corrupted, require_header,
+    validate_bookmark, validate_summary,
+};
 use crate::consts::RecordType;
+use crate::package::{Error, Result};
+use crate::records::Record;
 use std::collections::HashSet;
 
-const NAME_BYTES: usize = 64;
-const ENTITY_BYTES: usize = 68;
-const MAX_VALUE_BYTES: usize = 510;
-const MAX_BOOKMARKS: usize = 4_096;
-
-/// One summary bookmark and its link to a text bookmark.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Bookmark {
-    /// Source `BookmarkEntityAtomContainer` record instance.
-    pub container_instance: u16,
-    pub id: u32,
-    pub name: String,
-    pub value: String,
-}
-
-/// The bookmark collection in the optional document `SummaryContainer`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BookmarkSummary {
-    pub id_seed: u32,
-    pub bookmarks: Vec<Bookmark>,
-}
-
-impl BookmarkSummary {
+impl Summary {
+    /// Parse the optional document `SummaryContainer`.
     pub fn parse(document: &Record) -> Result<Option<Self>> {
         let summaries = document
             .children
@@ -67,7 +51,12 @@ impl BookmarkSummary {
                 "bookmark collection exceeds {MAX_BOOKMARKS} entries"
             ));
         }
-        let id_seed = u32::from_le_bytes(seed.data.as_slice().try_into().expect("four bytes"));
+        let id_seed = u32::from_le_bytes(
+            seed.data
+                .as_slice()
+                .try_into()
+                .map_err(|_| Error::Corrupted("BookmarkSeedAtom is truncated".to_string()))?,
+        );
         let mut bookmarks = Vec::with_capacity(children.len().saturating_sub(1));
         let mut ids = HashSet::with_capacity(children.len().saturating_sub(1));
         for child in &children[1..] {
@@ -78,10 +67,11 @@ impl BookmarkSummary {
             bookmarks.push(bookmark);
         }
         let parsed = Self { id_seed, bookmarks };
-        parsed.validate_seed(std::iter::empty())?;
+        validate_summary(&parsed)?;
         Ok(Some(parsed))
     }
 
+    /// Serialize the summary into a validated `SummaryContainer` record.
     pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes()?;
         let (record, end) = Record::parse(&bytes, 0)?;
@@ -91,27 +81,16 @@ impl BookmarkSummary {
         Ok(record)
     }
 
+    /// Serialize the summary into canonical PowerPoint record bytes.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
-        self.validate_seed(std::iter::empty())?;
-        if self.bookmarks.len() > MAX_BOOKMARKS {
-            return corrupted(format!(
-                "bookmark collection exceeds {MAX_BOOKMARKS} entries"
-            ));
-        }
+        validate_summary(self)?;
         let mut collection = record_bytes(
             0,
             2,
             RecordType::BookmarkSeedAtom.as_u16(),
             &self.id_seed.to_le_bytes(),
         )?;
-        let mut ids = HashSet::with_capacity(self.bookmarks.len());
         for bookmark in &self.bookmarks {
-            if bookmark.container_instance > 0x0fff {
-                return corrupted("bookmark container instance exceeds 12 bits");
-            }
-            if !ids.insert(bookmark.id) {
-                return corrupted(format!("duplicate PowerPoint bookmark ID {}", bookmark.id));
-            }
             let mut entity_data = Vec::with_capacity(ENTITY_BYTES);
             entity_data.extend_from_slice(&bookmark.id.to_le_bytes());
             entity_data.extend_from_slice(&encode_name(&bookmark.name)?);
@@ -138,49 +117,6 @@ impl BookmarkSummary {
         )?;
         record_bytes(0x0f, 0, RecordType::Summary.as_u16(), &collection)
     }
-
-    /// Validate summary IDs against document `TextBookMarkAtom` identifiers.
-    pub fn validate_text_bookmark_ids(
-        &self,
-        text_bookmark_ids: impl IntoIterator<Item = u32>,
-    ) -> Result<()> {
-        let mut text_ids = HashSet::new();
-        for id in text_bookmark_ids {
-            if text_ids.len() >= MAX_BOOKMARKS {
-                return corrupted(format!(
-                    "text bookmark collection exceeds {MAX_BOOKMARKS} entries"
-                ));
-            }
-            if !text_ids.insert(id) {
-                return corrupted(format!("duplicate TextBookMarkAtom ID {id}"));
-            }
-        }
-        for bookmark in &self.bookmarks {
-            if !text_ids.contains(&bookmark.id) {
-                return corrupted(format!(
-                    "summary bookmark ID {} has no TextBookMarkAtom",
-                    bookmark.id
-                ));
-            }
-        }
-        if text_ids.len() != self.bookmarks.len() {
-            return corrupted("a TextBookMarkAtom has no summary bookmark entity");
-        }
-        self.validate_seed(text_ids)
-    }
-
-    fn validate_seed(&self, other_ids: impl IntoIterator<Item = u32>) -> Result<()> {
-        let max_id = self
-            .bookmarks
-            .iter()
-            .map(|bookmark| bookmark.id)
-            .chain(other_ids)
-            .max();
-        if max_id.is_some_and(|id| self.id_seed <= id) {
-            return corrupted("bookmark ID seed must exceed every existing bookmark ID");
-        }
-        Ok(())
-    }
 }
 
 fn parse_bookmark(container: &Record) -> Result<Bookmark> {
@@ -204,7 +140,11 @@ fn parse_bookmark(container: &Record) -> Result<Bookmark> {
     if entity.data.len() != ENTITY_BYTES || entity.data_length != ENTITY_BYTES as u32 {
         return corrupted("BookmarkEntityAtom must contain 68 bytes");
     }
-    let id = u32::from_le_bytes(entity.data[..4].try_into().expect("four bytes"));
+    let id = u32::from_le_bytes(
+        entity.data[..4]
+            .try_into()
+            .map_err(|_| Error::Corrupted("BookmarkEntityAtom is truncated".to_string()))?,
+    );
     let name = parse_name(&entity.data[4..])?;
     let value_atom = &children[1];
     require_header(value_atom, 0, 1, RecordType::CString, "BookmarkValueAtom")?;
@@ -215,12 +155,14 @@ fn parse_bookmark(container: &Record) -> Result<Bookmark> {
         return corrupted("BookmarkValueAtom length must be even and between 2 and 510 bytes");
     }
     let value = parse_printable(&value_atom.data, "BookmarkValueAtom")?;
-    Ok(Bookmark {
+    let bookmark = Bookmark {
         container_instance: container.instance,
         id,
         name,
         value,
-    })
+    };
+    validate_bookmark(&bookmark)?;
+    Ok(bookmark)
 }
 
 fn parse_name(data: &[u8]) -> Result<String> {
@@ -289,23 +231,10 @@ fn encode_value(value: &str) -> Result<Vec<u8>> {
     Ok(units.into_iter().flat_map(u16::to_le_bytes).collect())
 }
 
-fn require_header(
-    record: &Record,
-    version: u16,
-    instance: u16,
-    record_type: RecordType,
-    context: &str,
-) -> Result<()> {
-    if record.version != version
-        || record.instance != instance
-        || record.record_type_raw != record_type.as_u16()
-    {
-        return corrupted(format!("invalid {context} record header"));
-    }
-    Ok(())
-}
-
 fn record_bytes(version: u16, instance: u16, record_type: u16, data: &[u8]) -> Result<Vec<u8>> {
+    if version > 0x0f || instance > 0x0fff {
+        return corrupted("PowerPoint record header fields exceed their wire widths");
+    }
     let length = u32::try_from(data.len())
         .map_err(|_| Error::Corrupted("PowerPoint record payload exceeds u32".to_string()))?;
     let mut bytes = Vec::with_capacity(8usize.saturating_add(data.len()));
@@ -314,80 +243,4 @@ fn record_bytes(version: u16, instance: u16, record_type: u16, data: &[u8]) -> R
     bytes.extend_from_slice(&length.to_le_bytes());
     bytes.extend_from_slice(data);
     Ok(bytes)
-}
-
-fn corrupted<T>(message: impl Into<String>) -> Result<T> {
-    Err(Error::Corrupted(message.into()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn root(children: Vec<Record>) -> Record {
-        Record {
-            version: 0x0f,
-            instance: 0,
-            record_type: RecordType::Document,
-            record_type_raw: RecordType::Document.as_u16(),
-            data_length: 0,
-            data: Vec::new(),
-            children,
-        }
-    }
-
-    fn summary() -> BookmarkSummary {
-        BookmarkSummary {
-            id_seed: 43,
-            bookmarks: vec![
-                Bookmark {
-                    container_instance: 7,
-                    id: 41,
-                    name: "Revenue".into(),
-                    value: "FY 2026".into(),
-                },
-                Bookmark {
-                    container_instance: 0,
-                    id: 42,
-                    name: "EmptyValue".into(),
-                    value: String::new(),
-                },
-            ],
-        }
-    }
-
-    #[test]
-    fn protocol_shaped_bookmark_summary_roundtrips() {
-        let expected = summary();
-        let parsed = BookmarkSummary::parse(&root(vec![expected.to_record().unwrap()]))
-            .unwrap()
-            .unwrap();
-        assert_eq!(parsed, expected);
-        assert_eq!(
-            parsed.to_record_bytes().unwrap(),
-            expected.to_record_bytes().unwrap()
-        );
-        parsed.validate_text_bookmark_ids([41, 42]).unwrap();
-    }
-
-    #[test]
-    fn rejects_hostile_ids_names_values_and_seed() {
-        let record = summary().to_record().unwrap();
-        assert!(BookmarkSummary::parse(&root(vec![record.clone(), record])).is_err());
-        let mut value = summary();
-        value.id_seed = 42;
-        assert!(value.to_record_bytes().is_err());
-        value = summary();
-        value.bookmarks[1].id = 41;
-        assert!(value.to_record_bytes().is_err());
-        value = summary();
-        value.bookmarks[0].name.clear();
-        assert!(value.to_record_bytes().is_err());
-        value = summary();
-        value.bookmarks[0].value = "bad\nvalue".into();
-        assert!(value.to_record_bytes().is_err());
-        value = summary();
-        assert!(value.validate_text_bookmark_ids([41]).is_err());
-        assert!(value.validate_text_bookmark_ids([41, 42, 99]).is_err());
-    }
 }

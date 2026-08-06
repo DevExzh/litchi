@@ -100,6 +100,13 @@ animation parser/types/writer, XLS list objects, and ODraw properties expose
 facades over model/codec/package/test seams. These are source-organization and
 ownership boundaries; they do not imply a broader compatibility promise.
 
+The PPT bookmark-summary owner is now layered as
+`bookmark_summary/{model,codec,validation,tests}.rs`. Its canonical semantic
+collection is `bookmark_summary::Summary`; the former module-prefixed
+`BookmarkSummary` spelling is removed rather than retained as an alias. The
+record codec remains inert and bounded, while summary-to-text-bookmark identity
+checks stay in the validation layer.
+
 The latest owner pass adds nested `parts/chp`, `parts/fields/codec`, and
 `writer/core/package` seams to DOC; moves the shared OfficeArt wire model into
 ODraw; and layers RTF lexer/parser/writer, IWA media and Numbers editor,

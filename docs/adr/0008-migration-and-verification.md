@@ -5712,6 +5712,23 @@ order, read-only serialization stability, and concurrent first access. These
 are read-path regression gates, not performance evidence; allocation, latency,
 contention, and scaling claims still require the measurement work in ADR 0005.
 
+## PPT bookmark-summary owner layering
+
+The flat legacy PPT `bookmark_summary` owner is now physically layered into
+`model`, `codec`, `validation`, and focused `tests` modules. The public
+`BookmarkSummary` type is replaced by the contextual `bookmark_summary::Summary`
+name, with no prefix-expanded alias. Record framing and UTF-16 conversion stay
+in the codec; entry-count, ID-seed, text-bookmark identity, and bounded string
+invariants stay in validation; the owner remains inert and does not resolve or
+activate bookmark targets.
+
+The focused verification command was attempted with a single Cargo build job,
+but the current workspace stops earlier in the unrelated `litchi-odraw` crate:
+its `prop::gradient::Stops` `const fn`s call non-const `Array` accessors. This
+slice therefore has formatting and diff evidence, but no new passing Cargo
+test claim until that pre-existing dependency error is repaired in its own
+bounded owner slice.
+
 ## Quality gates
 
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
