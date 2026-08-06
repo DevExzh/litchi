@@ -269,6 +269,22 @@ impl ObjectIndex {
             .and_then(|position| self.objects.get(position))
     }
 
+    /// Find one object together with its stable position in this snapshot.
+    ///
+    /// The position is an ordinal in the immutable, object-ID-sorted record
+    /// slice. It is not a source/archive position and must not be used to
+    /// address native payload storage. Adapter-owned sidecar metadata can use
+    /// it to borrow the record without copying neutral identity or location
+    /// fields into a second owner.
+    #[must_use]
+    pub fn object_with_position(&self, id: ObjectId) -> Option<(usize, &ObjectRecord)> {
+        let position = self
+            .objects
+            .binary_search_by_key(&id, ObjectRecord::id)
+            .ok()?;
+        self.objects.get(position).map(|record| (position, record))
+    }
+
     /// Borrow registered fragments in deterministic ordinal order.
     #[must_use]
     pub fn fragments(&self) -> impl ExactSizeIterator<Item = FragmentId> + '_ {
@@ -369,13 +385,26 @@ mod tests {
 
         let index = builder.build().expect("valid index");
         assert_eq!(
-            index
-                .objects()
-                .map(|record| record.id())
-                .collect::<Vec<_>>(),
+            index.objects().map(ObjectRecord::id).collect::<Vec<_>>(),
             [one, two, three, four]
         );
         assert_eq!(index.fragments().collect::<Vec<_>>(), [first, second]);
+        assert_eq!(
+            index.object_with_position(one).map(|(position, record)| (
+                position,
+                record.id(),
+                record.span()
+            )),
+            Some((0, one, span(10, 1)))
+        );
+        assert_eq!(
+            index.object_with_position(four).map(|(position, record)| (
+                position,
+                record.id(),
+                record.span()
+            )),
+            Some((3, four, span(40, 4)))
+        );
         assert_eq!(
             index.fragment_object_ids(first),
             Some([two, three].as_slice())
@@ -385,15 +414,15 @@ mod tests {
             Some([one, four].as_slice())
         );
         assert_eq!(
-            index.outgoing(two).map(|ids| ids.collect::<Vec<_>>()),
+            index.outgoing(two).map(Iterator::collect::<Vec<_>>),
             Some(vec![three])
         );
         assert_eq!(
-            index.outgoing(three).map(|ids| ids.collect::<Vec<_>>()),
+            index.outgoing(three).map(Iterator::collect::<Vec<_>>),
             Some(vec![one, four])
         );
         assert_eq!(
-            index.incoming(one).map(|ids| ids.collect::<Vec<_>>()),
+            index.incoming(one).map(Iterator::collect::<Vec<_>>),
             Some(vec![three])
         );
         assert_eq!(index.reachable(two), [two, three, one, four]);
@@ -535,11 +564,11 @@ mod tests {
         assert_eq!(index.object(source).map(ObjectRecord::id), Some(source));
         assert_eq!(index.object(dangling), None);
         assert_eq!(
-            index.outgoing(source).map(|ids| ids.collect::<Vec<_>>()),
+            index.outgoing(source).map(Iterator::collect::<Vec<_>>),
             Some(vec![dangling])
         );
         assert_eq!(
-            index.incoming(dangling).map(|ids| ids.collect::<Vec<_>>()),
+            index.incoming(dangling).map(Iterator::collect::<Vec<_>>),
             Some(vec![source])
         );
         assert_eq!(index.reachable(source), [source, dangling]);

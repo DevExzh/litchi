@@ -4,7 +4,7 @@
 //! locations in IWA files. This allows objects to reference each other
 //! across different archive files.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
@@ -17,52 +17,85 @@ use litchi_iwa_index::{
 
 mod reference_extraction;
 
-/// Typed adapter metadata for one indexed object.
+/// Adapter-only source metadata for one neutral object record.
 ///
-/// The neutral location snapshot owns the immutable object record and graph;
-/// this record retains only the archive adapter metadata needed to resolve a
-/// validated source position back into parsed IWA storage. Physical archive
-/// names and source positions are deliberately not part of the public record.
-#[derive(Debug, Clone)]
-pub struct ObjectIndexEntry {
-    /// Unique, validated object identifier.
-    id: ObjectId,
-    /// Which adapter-local fragment contains this object.
-    fragment_id: FragmentId,
-    /// Checked byte location within the fragment.
-    span: ByteSpan,
-    /// Which IWA file contains this object.
-    fragment_name: Arc<str>,
+/// The metadata is stored in the same object-ID order as the neutral index.
+/// It deliberately contains no object identity, fragment identity, or byte
+/// span: those values have one owner in [`litchi_iwa_index::ObjectRecord`].
+#[derive(Debug, Clone, Copy)]
+struct ArchiveObjectMetadata {
     /// Position of the object within its parsed archive.
-    ///
-    /// This is an internal source-position hint. Resolution validates the
-    /// identifier at the position and fails closed when a caller supplies a
-    /// stale bundle with a different object order.
-    object_position: usize,
+    source_position: ArchiveObjectPosition,
     /// Native primary message type retained by the format adapter.
     object_type: u32,
 }
 
-impl ObjectIndexEntry {
+/// A private, typed source position for an already-parsed native archive.
+///
+/// This is intentionally distinct from the neutral index's object-slice
+/// position and from [`ByteSpan`]. It is never exposed through the public
+/// object-index API.
+#[derive(Debug, Clone, Copy)]
+struct ArchiveObjectPosition(usize);
+
+impl ArchiveObjectPosition {
+    const fn new(position: usize) -> Self {
+        Self(position)
+    }
+
+    const fn get(self) -> usize {
+        self.0
+    }
+}
+
+/// Temporary adapter metadata collected while native archives are traversed.
+///
+/// The object identity is used only to align the sidecar with the sorted
+/// neutral records during snapshot construction, then is dropped.
+#[derive(Debug, Clone, Copy)]
+struct PendingObjectMetadata {
+    id: ObjectId,
+    fragment_id: FragmentId,
+    source_position: ArchiveObjectPosition,
+    object_type: u32,
+}
+
+/// Typed borrowed metadata for one indexed object.
+///
+/// The neutral location snapshot owns the immutable object record and graph;
+/// this view borrows that record and combines it with only the archive adapter
+/// metadata needed to resolve a validated source position. No neutral
+/// identity, fragment, or byte-span value is duplicated in the adapter.
+#[derive(Debug, Clone, Copy)]
+pub struct ObjectIndexEntry<'a> {
+    record: &'a ObjectRecord,
+    metadata: &'a ArchiveObjectMetadata,
+}
+
+impl ObjectIndexEntry<'_> {
     /// Return the validated object identity.
     pub const fn id(&self) -> ObjectId {
-        self.id
+        self.record.id()
     }
 
     /// Return the adapter-local fragment identity.
     pub const fn fragment_id(&self) -> FragmentId {
-        self.fragment_id
+        self.record.fragment()
     }
 
     /// Return the checked byte location within the fragment.
     pub const fn span(&self) -> ByteSpan {
-        self.span
+        self.record.span()
     }
 
     /// Return the native primary message type, or zero when the object has no
     /// messages.
     pub const fn object_type(&self) -> u32 {
-        self.object_type
+        self.metadata.object_type
+    }
+
+    const fn source_position(&self) -> ArchiveObjectPosition {
+        self.metadata.source_position
     }
 }
 
@@ -75,7 +108,7 @@ struct FragmentIndexEntry {
 #[derive(Debug, Clone)]
 struct IndexSnapshot {
     locations: Arc<NeutralObjectIndex>,
-    entries: Arc<[ObjectIndexEntry]>,
+    metadata: Arc<[ArchiveObjectMetadata]>,
     fragments: Arc<[FragmentIndexEntry]>,
 }
 
@@ -102,7 +135,7 @@ impl ObjectIndex {
         Self {
             snapshot: Arc::new(IndexSnapshot {
                 locations: Arc::new(NeutralObjectIndex::default()),
-                entries: Arc::default(),
+                metadata: Arc::default(),
                 fragments: Arc::default(),
             }),
         }
@@ -111,7 +144,7 @@ impl ObjectIndex {
     /// Build object index from a bundle
     pub fn from_bundle(bundle: &Bundle) -> Result<Self> {
         let mut builder = IndexBuilder::new();
-        let mut entries = Vec::new();
+        let mut metadata = Vec::new();
         let mut fragments = Vec::new();
 
         // Bundle traversal is already sorted at ingress, so assigning private
@@ -128,14 +161,14 @@ impl ObjectIndex {
                 archive_name,
                 archive,
                 fragment_id,
-                Arc::clone(&name),
                 &mut builder,
-                &mut entries,
+                &mut metadata,
+                &fragments,
             )?;
         }
 
         Ok(Self {
-            snapshot: finish_snapshot(builder, entries, fragments)?,
+            snapshot: finish_snapshot(builder, metadata, fragments)?,
         })
     }
 
@@ -183,31 +216,42 @@ impl ObjectIndex {
         let fragment_id = fragment_id(self.snapshot.fragments.len())?;
         builder.add_fragment(fragment_id).map_err(index_error)?;
         let name: Arc<str> = Arc::from(archive_name);
-        let mut entries = self.snapshot.entries.to_vec();
+        let mut metadata = self
+            .snapshot
+            .locations
+            .objects()
+            .zip(self.snapshot.metadata.iter())
+            .map(|(record, metadata)| PendingObjectMetadata {
+                id: record.id(),
+                fragment_id: record.fragment(),
+                source_position: metadata.source_position,
+                object_type: metadata.object_type,
+            })
+            .collect::<Vec<_>>();
         let mut fragments = self.snapshot.fragments.to_vec();
         fragments.push(FragmentIndexEntry {
             id: fragment_id,
-            name: Arc::clone(&name),
+            name,
         });
         append_archive(
             archive_name,
             archive,
             fragment_id,
-            name,
             &mut builder,
-            &mut entries,
+            &mut metadata,
+            &fragments,
         )?;
-        self.snapshot = finish_snapshot(builder, entries, fragments)?;
+        self.snapshot = finish_snapshot(builder, metadata, fragments)?;
         Ok(())
     }
 
     /// Get an object entry through the validated identity API.
-    pub fn entry(&self, object_id: ObjectId) -> Option<&ObjectIndexEntry> {
+    pub fn entry(&self, object_id: ObjectId) -> Option<ObjectIndexEntry<'_>> {
+        let (position, record) = self.snapshot.locations.object_with_position(object_id)?;
         self.snapshot
-            .entries
-            .binary_search_by_key(&object_id, ObjectIndexEntry::id)
-            .ok()
-            .and_then(|position| self.snapshot.entries.get(position))
+            .metadata
+            .get(position)
+            .map(|metadata| ObjectIndexEntry { record, metadata })
     }
 
     /// Borrow all validated object identities in deterministic numeric order.
@@ -242,27 +286,44 @@ impl ObjectIndex {
         self.snapshot.locations.fragment_object_ids(fragment.id)
     }
 
+    fn fragment_name(&self, fragment_id: FragmentId) -> Result<&str> {
+        self.snapshot
+            .fragments
+            .iter()
+            .find(|fragment| fragment.id == fragment_id)
+            .map(|fragment| fragment.name.as_ref())
+            .ok_or_else(|| {
+                Error::Archive(format!(
+                    "object index references unregistered fragment {fragment_id:?}"
+                ))
+            })
+    }
+
     /// Borrow all entries in deterministic numeric object-ID order.
-    pub fn iter_entries(&self) -> impl Iterator<Item = &ObjectIndexEntry> {
-        self.snapshot.entries.iter()
+    pub fn iter_entries(&self) -> impl Iterator<Item = ObjectIndexEntry<'_>> {
+        self.snapshot
+            .locations
+            .objects()
+            .zip(self.snapshot.metadata.iter())
+            .map(|(record, metadata)| ObjectIndexEntry { record, metadata })
     }
 
     /// Get entries of one type in deterministic numeric object-ID order.
     pub fn iter_entries_by_type(
         &self,
         object_type: u32,
-    ) -> impl Iterator<Item = &ObjectIndexEntry> {
+    ) -> impl Iterator<Item = ObjectIndexEntry<'_>> {
         self.iter_entries()
             .filter(move |entry| entry.object_type() == object_type)
     }
 
     /// Collect all entries in deterministic numeric object-ID order.
-    pub fn all_entries(&self) -> Vec<&ObjectIndexEntry> {
+    pub fn all_entries(&self) -> Vec<ObjectIndexEntry<'_>> {
         self.iter_entries().collect()
     }
 
     /// Find objects by type in deterministic numeric object-ID order.
-    pub fn find_objects_by_type(&self, object_type: u32) -> Vec<&ObjectIndexEntry> {
+    pub fn find_objects_by_type(&self, object_type: u32) -> Vec<ObjectIndexEntry<'_>> {
         self.iter_entries_by_type(object_type).collect()
     }
 
@@ -360,27 +421,13 @@ impl ObjectIndex {
             return Ok(None);
         };
 
-        let Some(record) = self.snapshot.locations.object(object_id) else {
-            return Err(Error::Archive(format!(
-                "object {} is missing from the neutral index",
-                object_id.get()
-            )));
-        };
-        if record.fragment() != entry.fragment_id || record.span() != entry.span {
-            return Err(Error::Archive(format!(
-                "object {} has inconsistent neutral location metadata",
-                object_id.get()
-            )));
-        }
+        let fragment_name = self.fragment_name(entry.fragment_id())?;
 
-        let Some(archive) = bundle.get_archive(entry.fragment_name.as_ref()) else {
-            return Err(Error::Bundle(format!(
-                "Archive {} not found",
-                entry.fragment_name
-            )));
+        let Some(archive) = bundle.get_archive(fragment_name) else {
+            return Err(Error::Bundle(format!("Archive {fragment_name} not found")));
         };
 
-        let object = indexed_object(archive, entry, object_id)?;
+        let object = indexed_object(archive, &entry, object_id, fragment_name)?;
 
         Ok(Some(ResolvedObjectRef {
             id: object_id,
@@ -458,31 +505,40 @@ impl ObjectIndex {
         bundle: &'a Bundle,
         object_ids: &[ObjectId],
     ) -> Result<Vec<ResolvedObjectRef<'a>>> {
-        // Group object IDs by their archive to minimize archive lookups
-        let mut objects_by_archive: std::collections::HashMap<&str, HashSet<ObjectId>> =
-            std::collections::HashMap::new();
+        // Group typed IDs by their neutral fragment to minimize archive
+        // lookups. BTreeMap keeps archive traversal and error ordering
+        // deterministic, and the caller has already rejected duplicate IDs,
+        // so a Vec is sufficient for each group.
+        let mut objects_by_fragment: BTreeMap<FragmentId, Vec<ObjectId>> = BTreeMap::new();
 
         for &object_id in object_ids {
-            if let Some(entry) = self.entry(object_id) {
-                objects_by_archive
-                    .entry(entry.fragment_name.as_ref())
-                    .or_default()
-                    .insert(object_id);
-            }
+            let entry = self.entry(object_id).ok_or_else(|| {
+                Error::Archive(format!(
+                    "object {} is missing from the neutral index",
+                    object_id.get()
+                ))
+            })?;
+            objects_by_fragment
+                .entry(entry.fragment_id())
+                .or_default()
+                .push(object_id);
         }
 
         let mut resolved_by_id = HashMap::with_capacity(object_ids.len());
 
         // Resolve objects archive by archive. The indexed source position
-        // avoids rescanning each archive for sparse batches; the helper keeps
-        // the compatibility fallback for a bundle with a different order.
-        for (archive_name, ids) in objects_by_archive {
-            if let Some(archive) = bundle.get_archive(archive_name) {
+        // avoids rescanning each archive for sparse batches.
+        for (fragment_id, ids) in objects_by_fragment {
+            let fragment_name = self.fragment_name(fragment_id)?;
+            if let Some(archive) = bundle.get_archive(fragment_name) {
                 for object_id in ids {
-                    let Some(entry) = self.entry(object_id) else {
-                        continue;
-                    };
-                    let object = indexed_object(archive, entry, object_id)?;
+                    let entry = self.entry(object_id).ok_or_else(|| {
+                        Error::Archive(format!(
+                            "object {} is missing from the neutral index",
+                            object_id.get()
+                        ))
+                    })?;
+                    let object = indexed_object(archive, &entry, object_id, fragment_name)?;
                     let resolved = ResolvedObjectRef {
                         id: object_id,
                         archive_info: &object.archive_info,
@@ -576,9 +632,9 @@ fn append_archive(
     archive_name: &str,
     archive: &Archive,
     fragment_id: FragmentId,
-    fragment_name: Arc<str>,
     builder: &mut IndexBuilder,
-    entries: &mut Vec<ObjectIndexEntry>,
+    metadata: &mut Vec<PendingObjectMetadata>,
+    fragments: &[FragmentIndexEntry],
 ) -> Result<()> {
     for (object_position, object) in archive.objects.iter().enumerate() {
         let identifier = object.archive_info.identifier.ok_or_else(|| {
@@ -600,21 +656,22 @@ fn append_archive(
         })?;
         if let Err(error) = builder.add_object(ObjectRecord::new(object_id, fragment_id, span)) {
             if matches!(error, IndexError::DuplicateObject(_))
-                && let Some(existing) = entries.iter().find(|entry| entry.id() == object_id)
+                && let Some(existing) = metadata.iter().find(|entry| entry.id == object_id)
+                && let Some(existing_fragment) = fragments
+                    .iter()
+                    .find(|fragment| fragment.id == existing.fragment_id)
             {
                 return Err(Error::Archive(format!(
                     "object {identifier} occurs in archives {} and {archive_name}",
-                    existing.fragment_name
+                    existing_fragment.name
                 )));
             }
             return Err(index_error(error));
         }
-        entries.push(ObjectIndexEntry {
+        metadata.push(PendingObjectMetadata {
             id: object_id,
             fragment_id,
-            span,
-            fragment_name: Arc::clone(&fragment_name),
-            object_position,
+            source_position: ArchiveObjectPosition::new(object_position),
             object_type,
         });
 
@@ -654,15 +711,38 @@ fn add_reference(builder: &mut IndexBuilder, source: ObjectId, target: ObjectId)
 
 fn finish_snapshot(
     builder: IndexBuilder,
-    mut entries: Vec<ObjectIndexEntry>,
+    mut metadata: Vec<PendingObjectMetadata>,
     mut fragments: Vec<FragmentIndexEntry>,
 ) -> Result<Arc<IndexSnapshot>> {
-    entries.sort_unstable_by_key(ObjectIndexEntry::id);
+    metadata.sort_unstable_by_key(|entry| entry.id);
     fragments.sort_unstable_by(|left, right| left.name.cmp(&right.name));
     let locations = builder.build_allow_missing_targets().map_err(index_error)?;
+
+    if metadata.len() != locations.len() {
+        return Err(Error::Archive(format!(
+            "object index metadata count {} does not match neutral record count {}",
+            metadata.len(),
+            locations.len()
+        )));
+    }
+
+    let mut adapter_metadata = Vec::new();
+    adapter_metadata
+        .try_reserve_exact(metadata.len())
+        .map_err(|_| {
+            Error::Archive(format!(
+                "could not reserve object index adapter metadata for {} objects",
+                metadata.len()
+            ))
+        })?;
+    adapter_metadata.extend(metadata.into_iter().map(|entry| ArchiveObjectMetadata {
+        source_position: entry.source_position,
+        object_type: entry.object_type,
+    }));
+
     Ok(Arc::new(IndexSnapshot {
         locations: Arc::new(locations),
-        entries: Arc::from(entries.into_boxed_slice()),
+        metadata: Arc::from(adapter_metadata.into_boxed_slice()),
         fragments: Arc::from(fragments.into_boxed_slice()),
     }))
 }
@@ -680,15 +760,17 @@ fn index_error(error: IndexError) -> Error {
 /// contextual archive error.
 fn indexed_object<'a>(
     archive: &'a Archive,
-    entry: &ObjectIndexEntry,
+    entry: &ObjectIndexEntry<'_>,
     object_id: ObjectId,
+    fragment_name: &str,
 ) -> Result<&'a ArchiveObject> {
-    let object = archive.objects.get(entry.object_position).ok_or_else(|| {
+    let source_position = entry.source_position().get();
+    let object = archive.objects.get(source_position).ok_or_else(|| {
         Error::Archive(format!(
             "object {} in archive {} has stale source position {}",
             object_id.get(),
-            entry.fragment_name,
-            entry.object_position
+            fragment_name,
+            source_position
         ))
     })?;
 
@@ -696,9 +778,28 @@ fn indexed_object<'a>(
         return Err(Error::Archive(format!(
             "object {} in archive {} has stale source position {} (found identifier {:?})",
             object_id.get(),
-            entry.fragment_name,
-            entry.object_position,
+            fragment_name,
+            source_position,
             object.archive_info.identifier
+        )));
+    }
+
+    let observed_span = ByteSpan::new(object.data_offset, object.data_length).map_err(|error| {
+        Error::Archive(format!(
+            "object {} in archive {} has invalid source span at position {}: {error}",
+            object_id.get(),
+            fragment_name,
+            source_position
+        ))
+    })?;
+    if observed_span != entry.span() {
+        return Err(Error::Archive(format!(
+            "object {} in archive {} has stale source span at position {} (expected {:?}, found {:?})",
+            object_id.get(),
+            fragment_name,
+            source_position,
+            entry.span(),
+            observed_span
         )));
     }
 
@@ -812,7 +913,7 @@ mod tests {
     fn test_object_index_creation() {
         let index = ObjectIndex::new();
         assert!(index.snapshot.locations.is_empty());
-        assert!(index.snapshot.entries.is_empty());
+        assert!(index.snapshot.metadata.is_empty());
         assert!(index.snapshot.fragments.is_empty());
     }
 
@@ -871,21 +972,62 @@ mod tests {
 
     #[test]
     fn test_object_index_entry() {
-        let fragment_id = FragmentId::try_from(1).unwrap();
-        let span = ByteSpan::new(100, 200).unwrap();
-        let entry = ObjectIndexEntry {
-            id: ObjectId::try_from(123).unwrap(),
-            fragment_id,
-            span,
-            fragment_name: Arc::from("Document.iwa"),
-            object_position: 0,
-            object_type: 42,
-        };
+        let object = ArchiveObject::new(
+            123,
+            vec![RawMessage {
+                type_: 42,
+                data: Vec::new(),
+            }],
+        )
+        .unwrap();
+        let mut index = ObjectIndex::new();
+        index
+            .parse_archive(
+                "Document.iwa",
+                &Archive {
+                    objects: vec![object],
+                },
+            )
+            .unwrap();
 
+        let entry = index.entry(ObjectId::try_from(123).unwrap()).unwrap();
         assert_eq!(entry.id().get(), 123);
-        assert_eq!(entry.fragment_id(), fragment_id);
-        assert_eq!(entry.span(), span);
+        assert_eq!(entry.fragment_id(), FragmentId::try_from(1).unwrap());
+        assert_eq!(entry.span(), ByteSpan::new(0, 0).unwrap());
         assert_eq!(entry.object_type(), 42);
+    }
+
+    #[test]
+    fn borrowed_entries_align_adapter_metadata_with_neutral_records() {
+        let object = |identifier| {
+            ArchiveObject::new(
+                identifier,
+                vec![RawMessage {
+                    type_: u32::try_from(identifier).unwrap(),
+                    data: Vec::new(),
+                }],
+            )
+            .unwrap()
+        };
+        let archive = Archive {
+            objects: vec![object(30), object(10)],
+        };
+        let mut index = ObjectIndex::new();
+        index.parse_archive("Document.iwa", &archive).unwrap();
+
+        let entries = index
+            .iter_entries()
+            .map(|entry| {
+                let object = indexed_object(&archive, &entry, entry.id(), "Document.iwa").unwrap();
+                (
+                    entry.id().get(),
+                    entry.object_type(),
+                    object.archive_info.identifier,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(entries, [(10, 10, Some(10)), (30, 30, Some(30))]);
     }
 
     #[test]
@@ -909,17 +1051,25 @@ mod tests {
         let object_id = ObjectId::try_from(10).unwrap();
         let entry = index.entry(object_id).unwrap();
         assert_eq!(
-            indexed_object(&original, entry, object_id)
+            indexed_object(&original, &entry, object_id, "Index/Test.iwa")
                 .unwrap()
                 .archive_info
                 .identifier,
             Some(10)
         );
 
+        let mut changed_span = original.clone();
+        changed_span.objects[0].data_offset = 1;
+        let error = indexed_object(&changed_span, &entry, object_id, "Index/Test.iwa").unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Archive(message) if message.contains("stale source span")
+        ));
+
         let reordered = Archive {
             objects: vec![object(20), object(10)],
         };
-        let error = indexed_object(&reordered, entry, object_id).unwrap_err();
+        let error = indexed_object(&reordered, &entry, object_id, "Index/Test.iwa").unwrap_err();
         assert!(matches!(
             error,
             Error::Archive(message) if message.contains("stale source position")
@@ -930,7 +1080,7 @@ mod tests {
         };
         let object_id = ObjectId::try_from(20).unwrap();
         let entry = index.entry(object_id).unwrap();
-        let error = indexed_object(&truncated, entry, object_id).unwrap_err();
+        let error = indexed_object(&truncated, &entry, object_id, "Index/Test.iwa").unwrap_err();
         assert!(matches!(
             error,
             Error::Archive(message) if message.contains("stale source position")
@@ -964,7 +1114,7 @@ mod tests {
         let (count, last_id) = index
             .iter_entries()
             .try_fold((0usize, 0u64), |(count, previous_id), entry| {
-                let object = indexed_object(&archive, entry, entry.id())?;
+                let object = indexed_object(&archive, &entry, entry.id(), "Index/Benchmark.iwa")?;
                 let id = entry.id().get();
                 assert!(id > previous_id);
                 assert_eq!(object.archive_info.identifier, Some(id));
@@ -1077,7 +1227,7 @@ mod tests {
         let source = ObjectId::try_from(10).unwrap();
         let target = ObjectId::try_from(20).unwrap();
 
-        assert_eq!(index.entry(source).map(ObjectIndexEntry::id), Some(source));
+        assert_eq!(index.entry(source).map(|entry| entry.id()), Some(source));
         let entry = index.entry(source).unwrap();
         assert_eq!(entry.fragment_id(), FragmentId::try_from(1).unwrap());
         assert_eq!(entry.span(), ByteSpan::new(0, 0).unwrap());
@@ -1247,6 +1397,59 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![2, 1]
         );
+    }
+
+    #[test]
+    fn batch_resolution_reports_stale_fragments_in_deterministic_order() {
+        let object = |identifier| {
+            ArchiveObject::new(
+                identifier,
+                vec![RawMessage {
+                    type_: 42,
+                    data: Vec::new(),
+                }],
+            )
+            .unwrap()
+        };
+        let archive = |first, second| Archive {
+            objects: vec![object(first), object(second)],
+        };
+
+        let mut source_package = crate::IWorkPackage::new();
+        source_package
+            .replace_archive("Index/B.iwa", &archive(20, 21))
+            .unwrap();
+        source_package
+            .replace_archive("Index/A.iwa", &archive(10, 11))
+            .unwrap();
+        let source_bundle = Bundle::from_bytes(&source_package.to_bytes().unwrap()).unwrap();
+        let index = ObjectIndex::from_bundle(&source_bundle).unwrap();
+
+        let mut stale_package = crate::IWorkPackage::new();
+        stale_package
+            .replace_archive("Index/B.iwa", &archive(21, 20))
+            .unwrap();
+        stale_package
+            .replace_archive("Index/A.iwa", &archive(11, 10))
+            .unwrap();
+        let stale_bundle = Bundle::from_bytes(&stale_package.to_bytes().unwrap()).unwrap();
+
+        let error = index
+            .resolve_many_refs(
+                &stale_bundle,
+                &[
+                    ObjectId::try_from(21).unwrap(),
+                    ObjectId::try_from(10).unwrap(),
+                ],
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Archive(message)
+                if message.contains("Index/A.iwa")
+                    && message.contains("stale source position")
+                    && !message.contains("Index/B.iwa")
+        ));
     }
 
     #[test]
