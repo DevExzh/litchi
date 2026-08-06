@@ -1,6 +1,7 @@
 //! Paragraph types and implementation for DOCX documents.
 use crate::error::{Error, Result};
 use crate::namespace::normalize_xml_integer;
+use crate::paragraph::extensions::Extensions;
 use crate::{OfficeMath, OfficeMathParagraph};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
@@ -292,6 +293,8 @@ pub struct MutableParagraph {
     pub(crate) style: Option<String>,
     /// Paragraph properties
     pub(crate) properties: ParagraphProperties,
+    /// Word 2010 paragraph-level extension attributes.
+    pub(crate) extension_values: Extensions,
     pub(crate) property_change: Option<ParagraphPropertyChange>,
 }
 
@@ -301,6 +304,7 @@ impl MutableParagraph {
             elements: Vec::new(),
             style: None,
             properties: ParagraphProperties::default(),
+            extension_values: Extensions::new(),
             property_change: None,
         }
     }
@@ -673,7 +677,9 @@ impl MutableParagraph {
     }
 
     pub(crate) fn to_xml(&self, xml: &mut String) -> Result<()> {
-        xml.push_str("<w:p>");
+        xml.push_str("<w:p");
+        crate::paragraph::extensions::append_paragraph_attributes(&self.extension_values, xml)?;
+        xml.push('>');
 
         // Write paragraph properties
         if self.style.is_some()
@@ -830,7 +836,9 @@ impl MutableParagraph {
         hyperlink_counter: &mut usize,
         image_counter: &mut usize,
     ) -> Result<()> {
-        xml.push_str("<w:p>");
+        xml.push_str("<w:p");
+        crate::paragraph::extensions::append_paragraph_attributes(&self.extension_values, xml)?;
+        xml.push('>');
 
         // Write paragraph properties (same as to_xml)
         if self.style.is_some()

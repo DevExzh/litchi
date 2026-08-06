@@ -304,7 +304,7 @@ impl Row {
     }
 
     #[inline]
-    fn xml_bytes(&self) -> &[u8] {
+    pub(crate) fn xml_bytes(&self) -> &[u8] {
         self.xml_data.as_bytes()
     }
 

@@ -1,6 +1,7 @@
 //! Table types and implementation for DOCX documents.
 use crate::error::{Error, Result};
 use crate::namespace::normalize_xml_integer;
+use crate::paragraph::extensions::Ids;
 use crate::table::VMergeState;
 use litchi_core::xml::escape_xml;
 use std::collections::HashSet;
@@ -337,6 +338,8 @@ pub struct MutableRow {
     pub(crate) cells: Vec<MutableCell>,
     /// HTML division ID referenced by this row
     pub(crate) division_id: Option<String>,
+    /// Word 2010 row-level extension identifiers.
+    pub(crate) extension_ids: Ids,
     revision: Option<(RowRevisionKind, RevisionMetadata)>,
     property_change: Option<PropertyChange<Option<String>>>,
 }
@@ -346,6 +349,7 @@ impl MutableRow {
         let mut row = Self {
             cells: Vec::with_capacity(cols),
             division_id: None,
+            extension_ids: Ids::new(),
             revision: None,
             property_change: None,
         };
@@ -454,7 +458,9 @@ impl MutableRow {
     }
 
     pub(crate) fn to_xml(&self, xml: &mut String) -> Result<()> {
-        xml.push_str("<w:tr>");
+        xml.push_str("<w:tr");
+        crate::paragraph::extensions::append_row_attributes(&self.extension_ids, xml)?;
+        xml.push('>');
 
         if self.division_id.is_some() || self.revision.is_some() || self.property_change.is_some() {
             xml.push_str("<w:trPr>");
