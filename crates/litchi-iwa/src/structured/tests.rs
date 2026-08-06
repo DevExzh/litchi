@@ -98,6 +98,43 @@ fn empty_pages_root_is_a_valid_empty_section() {
 }
 
 #[test]
+fn pages_structured_adapter_transfers_text_storage_without_flattening() {
+    let root = object(
+        1,
+        10_000,
+        tp::DocumentArchive {
+            body_storage: Some(reference(42)),
+            ..Default::default()
+        },
+    );
+    let body = object(
+        42,
+        2_001,
+        tswp::StorageArchive {
+            text: vec!["first".to_owned(), " second".to_owned()],
+            ..Default::default()
+        },
+    );
+    let (bundle, object_index) = bundle_with_archives([(
+        "Index/Document.iwa",
+        Archive {
+            objects: vec![root, body],
+        },
+    )]);
+
+    let sections = extract_sections(&bundle, &object_index).unwrap();
+    assert!(sections[0].paragraphs().is_empty());
+    assert_eq!(
+        sections[0]
+            .text_storages()
+            .iter()
+            .map(|storage| storage.text())
+            .collect::<Vec<_>>(),
+        ["first second"]
+    );
+}
+
+#[test]
 fn pages_root_and_referenced_storage_fail_closed() {
     let (bundle, object_index) = bundle_with_archives([(
         "Index/Document.iwa",
@@ -203,6 +240,81 @@ fn keynote_required_chain_does_not_return_partial_slides() {
         extract_slides(&bundle, &object_index),
         Err(crate::Error::InvalidFormat(message)) if message.contains("slide-tree node object 3 is missing")
     ));
+}
+
+#[test]
+fn keynote_structured_adapter_transfers_drawable_text_storage() {
+    let root = object(
+        1,
+        1,
+        kn::DocumentArchive {
+            show: reference(2),
+            ..Default::default()
+        },
+    );
+    let show = object(
+        2,
+        2,
+        kn::ShowArchive {
+            slide_tree: kn::SlideTreeArchive {
+                slides: vec![reference(3)],
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    );
+    let node = object(
+        3,
+        4,
+        kn::SlideNodeArchive {
+            slide: Some(reference(4)),
+            ..Default::default()
+        },
+    );
+    let slide = object(
+        4,
+        5,
+        kn::SlideArchive {
+            body_placeholder: Some(reference(7)),
+            ..Default::default()
+        },
+    );
+    let placeholder = object(
+        7,
+        7,
+        kn::PlaceholderArchive {
+            super_: tswp::ShapeInfoArchive {
+                owned_storage: Some(reference(8)),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    );
+    let storage = object(
+        8,
+        2_001,
+        tswp::StorageArchive {
+            text: vec!["body".to_owned(), " text".to_owned()],
+            ..Default::default()
+        },
+    );
+    let (bundle, object_index) = bundle_with_archives([(
+        "Index/Document.iwa",
+        Archive {
+            objects: vec![root, show, node, slide, placeholder, storage],
+        },
+    )]);
+
+    let slides = extract_slides(&bundle, &object_index).unwrap();
+    assert!(slides[0].text_content().is_empty());
+    assert_eq!(
+        slides[0]
+            .text_storages()
+            .iter()
+            .map(|storage| storage.text())
+            .collect::<Vec<_>>(),
+        ["body text"]
+    );
 }
 
 #[test]

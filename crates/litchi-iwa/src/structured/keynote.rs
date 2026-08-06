@@ -3,6 +3,7 @@
 use crate::Result;
 use crate::bundle::Bundle;
 use crate::object_index::{ObjectIndex, ResolvedObjectRef};
+use litchi_iwa_text::storage::Storage;
 use litchi_keynote::Slide;
 use prost::Message;
 
@@ -124,7 +125,7 @@ pub(super) fn extract(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
             slide.set_title(Some(text));
         }
         if let Some(identifier) = body_placeholder
-            && let Some(text) = drawable_text(
+            && let Some(storage) = drawable_storage(
                 bundle,
                 object_index,
                 identifier,
@@ -132,7 +133,7 @@ pub(super) fn extract(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
                 true,
             )?
         {
-            slide.push_text(text);
+            slide.push_text_storage(storage);
         }
         for drawable in archive.owned_drawables {
             if Some(drawable.identifier) == title_placeholder
@@ -140,14 +141,14 @@ pub(super) fn extract(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
             {
                 continue;
             }
-            if let Some(text) = drawable_text(
+            if let Some(storage) = drawable_storage(
                 bundle,
                 object_index,
                 drawable.identifier,
                 "Keynote slide drawable",
                 false,
             )? {
-                slide.push_text(text);
+                slide.push_text_storage(storage);
             }
         }
         if let Some(note) = archive.note {
@@ -169,8 +170,10 @@ pub(super) fn extract(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
                 note.contained_storage.identifier,
                 "Keynote speaker-note storage",
             )?;
-            let text = decode_storage(storage.messages, "Keynote speaker-note storage")?;
+            let text = decode_storage_text(storage.messages, "Keynote speaker-note storage")?;
             if !text.is_empty() {
+                // Speaker notes currently have a plain-string semantic slot;
+                // keep the conversion at this archive/leaf boundary.
                 slide.set_notes(Some(text));
             }
         }
@@ -200,6 +203,41 @@ fn drawable_text(
     context: &str,
     required: bool,
 ) -> Result<Option<String>> {
+    drawable_value(
+        bundle,
+        object_index,
+        identifier,
+        context,
+        required,
+        std::convert::identity,
+    )
+}
+
+fn drawable_storage(
+    bundle: &Bundle,
+    object_index: &ObjectIndex,
+    identifier: u64,
+    context: &str,
+    required: bool,
+) -> Result<Option<Storage>> {
+    drawable_value(
+        bundle,
+        object_index,
+        identifier,
+        context,
+        required,
+        Storage::from_text,
+    )
+}
+
+fn drawable_value<T>(
+    bundle: &Bundle,
+    object_index: &ObjectIndex,
+    identifier: u64,
+    context: &str,
+    required: bool,
+    materialize: impl FnOnce(String) -> T,
+) -> Result<Option<T>> {
     let drawable = required_object(bundle, object_index, identifier, context)?;
     let has_placeholder = drawable
         .messages
@@ -248,11 +286,11 @@ fn drawable_text(
         return Ok(None);
     };
     let storage_object = required_object(bundle, object_index, storage_id, context)?;
-    let text = decode_storage(storage_object.messages, context)?;
-    Ok((!text.is_empty()).then_some(text))
+    let text = decode_storage_text(storage_object.messages, context)?;
+    Ok((!text.is_empty()).then(|| materialize(text)))
 }
 
-fn decode_storage(messages: &[crate::archive::RawMessage], context: &str) -> Result<String> {
+fn decode_storage_text(messages: &[crate::archive::RawMessage], context: &str) -> Result<String> {
     let payload = unique_payload(messages, STORAGE_MESSAGE_TYPES, context)?;
     let storage = crate::protobuf::tswp::StorageArchive::decode(payload).map_err(|error| {
         crate::Error::InvalidFormat(format!(
