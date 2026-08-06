@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "none" => None,
         "dissolve" => Some(Effect::Dissolve),
         "magic-move" => Some(Effect::MagicMove),
-        identifier => Some(Effect::from_identifier(identifier)),
+        identifier => Some(Effect::from_identifier(identifier)?),
     };
     if arguments.next().is_some() {
         return Err("unexpected extra argument".into());
@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut settings = editor
         .slide_transition(slide_index)?
         .ok_or("slide has no modern transition attributes")?;
-    settings.effect = effect;
+    settings.set_effect(effect)?;
     editor.set_slide_transition(slide_index, settings)?;
     editor.save(output)?;
     Ok(())

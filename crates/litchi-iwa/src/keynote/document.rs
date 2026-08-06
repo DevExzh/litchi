@@ -425,7 +425,7 @@ impl KeynoteDocument {
         })?;
 
         Ok(Transition::new(
-            transition_effect(&transition.attributes),
+            transition_effect(&transition.attributes)?,
             duration,
         ))
     }
@@ -755,13 +755,19 @@ impl KeynoteDocument {
 }
 
 #[allow(deprecated)]
-fn transition_effect(attributes: &crate::protobuf::kn::TransitionAttributesArchive) -> Effect {
-    attributes
+fn transition_effect(
+    attributes: &crate::protobuf::kn::TransitionAttributesArchive,
+) -> Result<Effect> {
+    let Some(identifier) = attributes
         .animation_attributes
         .as_ref()
         .and_then(|animation| animation.effect.as_deref())
         .or(attributes.database_effect.as_deref())
-        .map_or(Effect::None, Effect::from_identifier)
+    else {
+        return Ok(Effect::None);
+    };
+    Effect::from_identifier(identifier)
+        .map_err(|error| Error::ParseError(format!("invalid Keynote transition effect: {error}")))
 }
 
 fn settings_from_show_archive(show: &crate::protobuf::kn::ShowArchive) -> Result<Settings> {
@@ -862,8 +868,10 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            transition_effect(&attributes),
-            Effect::Unknown("com.example.future-transition".to_owned().into_boxed_str())
+            transition_effect(&attributes).unwrap(),
+            Effect::Unknown {
+                identifier: "com.example.future-transition".to_owned().into_boxed_str()
+            }
         );
     }
 
@@ -873,8 +881,11 @@ mod tests {
             database_effect: Some("apple:dissolve".to_owned()),
             ..Default::default()
         };
-        assert_eq!(transition_effect(&legacy), Effect::Dissolve);
-        assert_eq!(transition_effect(&Default::default()), Effect::None);
+        assert_eq!(transition_effect(&legacy).unwrap(), Effect::Dissolve);
+        assert_eq!(
+            transition_effect(&Default::default()).unwrap(),
+            Effect::None
+        );
     }
 
     #[test]

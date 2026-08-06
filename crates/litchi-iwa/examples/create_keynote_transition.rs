@@ -15,11 +15,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut settings = keynote
         .slide_transition(0)?
         .ok_or("generated slide has no modern transition settings")?;
-    settings.effect = Some(Effect::MagicMove);
-    settings.direction = Some(Direction::from_native(2));
-    settings.custom_parameters.mosaic_type = Some(MosaicType::from_native(7));
-    settings.custom_parameters.acceleration = Some(Acceleration::EaseInOut);
-    settings.custom_parameters.text_delivery = Some(TextDelivery::ByWord);
+    settings.set_effect(Some(Effect::MagicMove))?;
+    settings.set_direction(Some(Direction::from_native(2)));
+    let mut custom_parameters = settings.custom_parameters().clone();
+    custom_parameters.set_mosaic_type(Some(MosaicType::from_native(7)));
+    custom_parameters.set_acceleration(Some(Acceleration::EaseInOut));
+    custom_parameters.set_text_delivery(Some(TextDelivery::ByWord));
+    settings.set_custom_parameters(custom_parameters)?;
     keynote.set_slide_transition(0, settings.clone())?;
 
     let reopened = KeynoteEditor::from_bytes(&keynote.to_bytes()?)?;
