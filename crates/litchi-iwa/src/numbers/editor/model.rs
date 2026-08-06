@@ -3784,7 +3784,7 @@ fn set_cell_with_context(
         },
         CellValue::Number(value) => {
             decrement_old_string(package, object_locations, &descriptor.model, old_string)?;
-            EncodedValue::Number(value)
+            EncodedValue::Number(value.get())
         },
         CellValue::Boolean(value) => {
             decrement_old_string(package, object_locations, &descriptor.model, old_string)?;
@@ -3792,11 +3792,11 @@ fn set_cell_with_context(
         },
         CellValue::Date(value) => {
             decrement_old_string(package, object_locations, &descriptor.model, old_string)?;
-            EncodedValue::Date(value)
+            EncodedValue::Date(value.get())
         },
         CellValue::Duration(value) => {
             decrement_old_string(package, object_locations, &descriptor.model, old_string)?;
-            EncodedValue::Duration(value)
+            EncodedValue::Duration(value.get())
         },
         CellValue::Formula(_) | CellValue::Error(_) => unreachable!("validated above"),
     };
