@@ -262,10 +262,11 @@ impl PagesDocument {
         Ok(self.state.document.plain_text())
     }
 
-    /// Extract sections from the document
+    /// Borrow the immutable semantic sections in source order.
     ///
-    /// Pages documents are organized into sections. This method parses the
-    /// document structure and returns all sections with their content.
+    /// Pages documents are organized into sections. The document structure is
+    /// decoded at ingress, so this method only borrows the retained semantic
+    /// sections and performs no allocation or parsing.
     ///
     /// # Examples
     ///
@@ -273,7 +274,7 @@ impl PagesDocument {
     /// use litchi_iwa::pages::PagesDocument;
     ///
     /// let doc = PagesDocument::open("document.pages")?;
-    /// let sections = doc.sections()?;
+    /// let sections = doc.sections();
     ///
     /// for section in sections {
     ///     println!("Section {}: {}", section.index(), section.section_type().name());
@@ -281,8 +282,9 @@ impl PagesDocument {
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn sections(&self) -> Result<Vec<litchi_pages::Section>> {
-        Ok(self.state.document.sections().to_vec())
+    #[must_use]
+    pub fn sections(&self) -> &[litchi_pages::Section] {
+        self.state.document.sections()
     }
 
     /// Borrow the immutable Pages semantic snapshot without exposing package
@@ -292,19 +294,47 @@ impl PagesDocument {
         &self.state.document
     }
 
-    /// Get the underlying bundle
-    pub fn bundle(&self) -> &Bundle {
-        &self.state.bundle
-    }
+    /// Extract standard document metadata from the Pages package.
+    ///
+    /// The metadata is parsed while the bundle is opened and projected into
+    /// the format-neutral semantic type. Archive entries, plist containers,
+    /// and native identifiers remain private to the decoder.
+    #[must_use]
+    pub fn metadata(&self) -> litchi_core::Metadata {
+        let bundle_metadata = self.state.bundle.metadata();
+        let revision = bundle_metadata
+            .get_property_string("revision")
+            .or_else(|| bundle_metadata.latest_build_version().map(str::to_owned));
+        let content_status = bundle_metadata
+            .get_property_string("fileFormatVersion")
+            .map(|version| format!("Pages Format Version {version}"));
+        let identifier = bundle_metadata.document_identifier().map(str::to_owned);
+        let application = bundle_metadata
+            .detected_application()
+            .map(str::to_owned)
+            .unwrap_or_else(|| "Pages".to_owned());
 
-    /// Return a bounded, deterministic validation report for this snapshot.
-    pub fn validation_report(&self) -> crate::bundle::BundleValidationReport {
-        self.state.bundle.validation_report()
+        litchi_core::Metadata {
+            title: bundle_metadata
+                .get_property_string("Title")
+                .or_else(|| bundle_metadata.get_property_string("kDocumentTitleKey")),
+            author: bundle_metadata
+                .get_property_string("Author")
+                .or_else(|| bundle_metadata.get_property_string("kDocumentAuthorKey"))
+                .or_else(|| bundle_metadata.get_property_string("kSFWPAuthorPropertyKey")),
+            keywords: bundle_metadata.get_property_string("Keywords"),
+            description: bundle_metadata.get_property_string("Comments"),
+            application: Some(application),
+            revision,
+            content_status,
+            identifier,
+            ..Default::default()
+        }
     }
 
     /// Validate this immutable snapshot without mutating it.
     pub fn validate(&self) -> Result<()> {
-        self.validation_report().as_result()
+        self.state.bundle.validate()
     }
 
     /// Get document statistics after resolving the document sections.
@@ -427,29 +457,36 @@ mod tests {
             .unwrap();
 
         let document = PagesDocument::from_bytes(&package.to_bytes().unwrap()).unwrap();
-        let sections = document.sections().unwrap();
+        let sections = document.sections();
         assert_eq!(sections.len(), 1);
         assert_eq!(
-            sections[0].text_storages[0].text(),
+            sections[0].text_storages()[0].text(),
             "Pages body — café 東京 🚀"
         );
         assert_eq!(sections[0].plain_text(), "Pages body — café 東京 🚀");
         assert_eq!(document.text().unwrap(), "Pages body — café 東京 🚀");
+        assert_eq!(document.metadata().application.as_deref(), Some("Pages"));
 
         let snapshot = document.snapshot();
         assert!(std::ptr::eq(
             document.semantic_document(),
             snapshot.semantic_document()
         ));
+        assert!(std::ptr::eq(
+            document.sections().as_ptr(),
+            document.semantic_document().sections().as_ptr()
+        ));
         assert_eq!(
             snapshot.semantic_document().text_len(),
             sections[0].plain_text().len()
         );
 
-        let structured =
-            crate::structured::extract_sections(document.bundle(), &document.state.object_index)
-                .unwrap();
+        let structured = crate::structured::extract_sections(
+            &document.state.bundle,
+            &document.state.object_index,
+        )
+        .unwrap();
         assert_eq!(structured.len(), 1);
-        assert_eq!(structured[0].paragraphs, ["Pages body — café 東京 🚀"]);
+        assert_eq!(structured[0].paragraphs(), ["Pages body — café 東京 🚀"]);
     }
 }

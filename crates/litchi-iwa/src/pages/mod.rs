@@ -18,7 +18,7 @@
 //!
 //! let doc = PagesDocument::open("document.pages")?;
 //! let text = doc.text()?;
-//! let sections = doc.sections()?;
+//! let sections = doc.sections();
 //!
 //! for section in sections {
 //!     println!("Section: {:?}", section.heading());
