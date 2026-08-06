@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use litchi_iwa_common::media::Type as MediaType;
+use litchi_pages::audio::Options as PagesAudioOptions;
 
 use super::*;
 use crate::data_reference_registry::{
@@ -35,21 +36,6 @@ pub struct PagesAudioInfo {
     /// Trim, poster, repeat, and volume settings.
     pub playback: MediaPlaybackSettings,
     pub duration: Duration,
-}
-
-/// Typed placement and playback metadata for a newly created Pages audio clip.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PagesAudioOptions {
-    /// Center point of Pages' zero-size audio control, in document points.
-    pub position: DrawablePoint,
-    /// Playable duration of the source audio.
-    pub duration: Duration,
-}
-
-impl PagesAudioOptions {
-    pub const fn new(position: DrawablePoint, duration: Duration) -> Self {
-        Self { position, duration }
-    }
 }
 
 /// Result of removing one body-anchored Pages audio clip and its private graph.
@@ -169,7 +155,7 @@ impl PagesEditor {
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
         if created.anchor_character_index != expected_anchor
             || created.audio_data_identifier != asset.data_identifier
-            || created.position != options.position
+            || created.position != options.position()
             || created.duration.as_secs_f32() != duration_seconds
             || created_graph.object_ids != ids.all()
             || verified.extract_media(asset.data_identifier)? != data
@@ -533,7 +519,7 @@ mod tests {
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
 
     fn options() -> PagesAudioOptions {
-        PagesAudioOptions::new(POSITION, Duration::from_millis(1_375))
+        PagesAudioOptions::new(POSITION, Duration::from_millis(1_375)).unwrap()
     }
 
     fn properties(description: &str) -> DrawableProperties {
@@ -756,17 +742,22 @@ mod tests {
         assert_eq!(editor.to_bytes().unwrap(), baseline);
         for result in [
             editor.add_body_audio(4, "payload.bin", b"not audio", options()),
-            editor.add_body_audio(
-                4,
-                "audio.aiff",
-                AUDIO,
-                PagesAudioOptions::new(POSITION, Duration::ZERO),
-            ),
             editor.add_body_audio(5, "audio.aiff", AUDIO, options()),
         ] {
             assert!(result.is_err());
             assert_eq!(editor.to_bytes().unwrap(), baseline);
         }
+        assert!(PagesAudioOptions::new(POSITION, Duration::ZERO).is_err());
+        assert!(
+            PagesAudioOptions::new(
+                DrawablePoint {
+                    x: f32::NAN,
+                    y: 10.0,
+                },
+                Duration::from_secs(1),
+            )
+            .is_err()
+        );
 
         let movie = editor
             .add_body_movie(
@@ -775,14 +766,15 @@ mod tests {
                 b"\0\0\0\x18ftypqt  source-built-pages-movie",
                 "poster.png",
                 b"\x89PNG\r\n\x1a\nsource-built-pages-poster",
-                crate::pages::PagesMovieOptions::new(
+                litchi_pages::movie::Options::new(
                     POSITION,
                     crate::shapes::DrawableSize {
                         width: 320.0,
                         height: 180.0,
                     },
                     Duration::from_secs(1),
-                ),
+                )
+                .unwrap(),
             )
             .unwrap();
         let before = editor.to_bytes().unwrap();

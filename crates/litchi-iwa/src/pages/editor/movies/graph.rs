@@ -7,6 +7,7 @@ use crate::shapes::{
     DrawableProperties, drawable_properties, geometry_from_drawable, patch_drawable_geometry,
     patch_wrapped_drawable_properties,
 };
+use litchi_pages::movie::Options as PagesMovieOptions;
 
 const THEME_MESSAGE_TYPE: u32 = 10_001;
 const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
@@ -100,29 +101,14 @@ pub(super) struct BodyMovieGraph {
 }
 
 pub(super) fn movie_creation_values(options: PagesMovieOptions) -> Result<(DrawableGeometry, f32)> {
-    if !options.natural_size.width.is_finite()
-        || !options.natural_size.height.is_finite()
-        || options.natural_size.width <= 0.0
-        || options.natural_size.height <= 0.0
-    {
-        return Err(Error::ParseError(
-            "Pages movie natural size must be finite and greater than zero".to_owned(),
-        ));
-    }
-    let duration_seconds = options.duration.as_secs_f64();
-    if duration_seconds == 0.0 || duration_seconds > f64::from(f32::MAX) {
-        return Err(Error::ParseError(
-            "Pages movie duration must be greater than zero and fit in f32 seconds".to_owned(),
-        ));
-    }
     let geometry = DrawableGeometry {
-        position: Some(options.position),
-        size: Some(options.size),
+        position: Some(options.position()),
+        size: Some(options.size()),
         flags: Some(DEFAULT_DRAWABLE_FLAGS),
         angle: Some(DEFAULT_MOVIE_ROTATION_DEGREES),
     }
     .validate()?;
-    Ok((geometry, duration_seconds as f32))
+    Ok((geometry, options.duration_seconds()))
 }
 
 pub(super) fn movie_style_id(package: &IWorkPackage, root: &DocumentArchive) -> Result<u64> {

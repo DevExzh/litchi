@@ -5,9 +5,10 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::pages::{PagesAudioOptions, PagesEditor};
-use litchi_iwa::shapes::DrawablePoint;
+use litchi_iwa::pages::PagesEditor;
 use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
+use litchi_iwa_common::shape::geometry::Point;
+use litchi_pages::audio::Options as PagesAudioOptions;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -37,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         anchor,
         preferred_filename,
         &audio,
-        PagesAudioOptions::new(DrawablePoint { x: 180.0, y: 240.0 }, duration),
+        PagesAudioOptions::new(Point { x: 180.0, y: 240.0 }, duration)?,
     )?;
     let mut properties = editor.body_audio_properties(created.drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded audio: {preferred_filename}"));

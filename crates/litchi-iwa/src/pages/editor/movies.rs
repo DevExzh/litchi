@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use litchi_iwa_common::media::Type as MediaType;
+use litchi_pages::movie::Options as PagesMovieOptions;
 
 use super::*;
 use crate::data_reference_registry::{
@@ -39,38 +40,6 @@ pub struct PagesMovieInfo {
     pub original_size: Option<DrawableSize>,
     pub natural_size: Option<DrawableSize>,
     pub duration: Duration,
-}
-
-/// Typed layout and playback metadata for a newly created Pages movie.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PagesMovieOptions {
-    /// Top-left position on the page, in points.
-    pub position: DrawablePoint,
-    /// Displayed movie size, in points.
-    pub size: DrawableSize,
-    /// Untransformed media dimensions reported to Pages, in points.
-    pub natural_size: DrawableSize,
-    /// Playable duration of the source movie.
-    pub duration: Duration,
-}
-
-impl PagesMovieOptions {
-    /// Create options whose displayed and natural dimensions are identical.
-    pub const fn new(position: DrawablePoint, size: DrawableSize, duration: Duration) -> Self {
-        Self {
-            position,
-            size,
-            natural_size: size,
-            duration,
-        }
-    }
-
-    /// Set media dimensions independently of the displayed size.
-    #[must_use]
-    pub const fn with_natural_size(mut self, natural_size: DrawableSize) -> Self {
-        self.natural_size = natural_size;
-        self
-    }
 }
 
 /// Result of removing one body-anchored Pages movie and its private graph.
@@ -143,7 +112,7 @@ impl PagesEditor {
             movie_asset.data_identifier,
             poster_asset.data_identifier,
             geometry,
-            options.natural_size,
+            options.natural_size(),
             duration_seconds,
             root.left_margin.unwrap_or_default(),
         )?;
@@ -205,8 +174,8 @@ impl PagesEditor {
             || created.movie_data_identifier != movie_asset.data_identifier
             || created.poster_image_data_identifier != poster_asset.data_identifier
             || created.geometry != geometry
-            || created.original_size != Some(options.natural_size)
-            || created.natural_size != Some(options.natural_size)
+            || created.original_size != Some(options.natural_size())
+            || created.natural_size != Some(options.natural_size())
             || created.duration.as_secs_f32() != duration_seconds
             || created_graph.object_ids != ids.all()
             || verified.extract_media(movie_asset.data_identifier)? != movie_data
@@ -657,7 +626,9 @@ mod tests {
 
     fn options() -> PagesMovieOptions {
         PagesMovieOptions::new(POSITION, SIZE, Duration::from_secs(8))
+            .unwrap()
             .with_natural_size(NATURAL_SIZE)
+            .unwrap()
     }
 
     fn properties(description: &str) -> DrawableProperties {
@@ -1071,13 +1042,25 @@ mod tests {
                 MOVIE,
                 "poster.png",
                 POSTER,
-                PagesMovieOptions::new(POSITION, SIZE, Duration::ZERO),
+                options(),
             ),
             editor.add_body_movie(5, "movie.mov", MOVIE, "poster.png", POSTER, options()),
         ] {
             assert!(result.is_err());
             assert_eq!(editor.to_bytes().unwrap(), baseline);
         }
+        assert!(PagesMovieOptions::new(POSITION, SIZE, Duration::ZERO).is_err());
+        assert!(
+            PagesMovieOptions::new(
+                POSITION,
+                DrawableSize {
+                    width: f32::NAN,
+                    height: 180.0,
+                },
+                Duration::from_secs(1),
+            )
+            .is_err()
+        );
 
         let image = editor
             .add_body_image(

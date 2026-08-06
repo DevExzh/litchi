@@ -4,17 +4,18 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::pages::{PagesEditor, PagesMovieOptions};
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::pages::PagesEditor;
+use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_pages::movie::Options as PagesMovieOptions;
 
 const BODY_TEXT: &str = "This movie was restored to its original size by litchi-iwa.";
 const MOVIE_DURATION: Duration = Duration::from_secs(8);
-const MOVIE_POSITION: DrawablePoint = DrawablePoint { x: 64.0, y: 128.0 };
-const DISPLAYED_MOVIE_SIZE: DrawableSize = DrawableSize {
+const MOVIE_POSITION: Point = Point { x: 64.0, y: 128.0 };
+const DISPLAYED_MOVIE_SIZE: Size = Size {
     width: 240.0,
     height: 135.0,
 };
-const ORIGINAL_MOVIE_SIZE: DrawableSize = DrawableSize {
+const ORIGINAL_MOVIE_SIZE: Size = Size {
     width: 480.0,
     height: 270.0,
 };
@@ -46,8 +47,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &movie,
         poster_filename,
         &poster,
-        PagesMovieOptions::new(MOVIE_POSITION, DISPLAYED_MOVIE_SIZE, MOVIE_DURATION)
-            .with_natural_size(ORIGINAL_MOVIE_SIZE),
+        PagesMovieOptions::new(MOVIE_POSITION, DISPLAYED_MOVIE_SIZE, MOVIE_DURATION)?
+            .with_natural_size(ORIGINAL_MOVIE_SIZE)?,
     )?;
     editor.restore_body_movie_original_size(created.drawable_object_id)?;
     editor.save(output)?;

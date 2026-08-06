@@ -425,8 +425,9 @@ without an input package:
 ```rust
 use std::fs;
 use std::time::Duration;
-use litchi_iwa::pages::{PagesEditor, PagesMovieOptions};
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::pages::PagesEditor;
+use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_pages::movie::Options as PagesMovieOptions;
 
 let body = "Quarterly report";
 let movie = fs::read("demo.mov")?;
@@ -439,10 +440,10 @@ let source = pages.add_body_movie(
     "demo-poster.png",
     &poster,
     PagesMovieOptions::new(
-        DrawablePoint { x: 96.0, y: 144.0 },
-        DrawableSize { width: 320.0, height: 180.0 },
+        Point { x: 96.0, y: 144.0 },
+        Size { width: 320.0, height: 180.0 },
         Duration::from_secs(8),
-    ),
+    )?,
 )?;
 let duplicate_anchor = pages.body_text()?.encode_utf16().count();
 let duplicate = pages.duplicate_body_movie(source.drawable_object_id, duplicate_anchor)?;
@@ -467,8 +468,9 @@ created directly from typed objects:
 ```rust
 use std::fs;
 use std::time::Duration;
-use litchi_iwa::pages::{PagesAudioOptions, PagesEditor};
-use litchi_iwa::shapes::DrawablePoint;
+use litchi_iwa::pages::PagesEditor;
+use litchi_iwa_common::shape::geometry::Point;
+use litchi_pages::audio::Options as PagesAudioOptions;
 
 let body = "Interview notes";
 let audio = fs::read("interview.aiff")?;
@@ -477,10 +479,7 @@ let source = pages.add_body_audio(
     body.encode_utf16().count(),
     "interview.aiff",
     &audio,
-    PagesAudioOptions::new(
-        DrawablePoint { x: 180.0, y: 240.0 },
-        Duration::from_secs(30),
-    ),
+    PagesAudioOptions::new(Point { x: 180.0, y: 240.0 }, Duration::from_secs(30))?,
 )?;
 let duplicate_anchor = pages.body_text()?.encode_utf16().count();
 let duplicate = pages.duplicate_body_audio(source.drawable_object_id, duplicate_anchor)?;

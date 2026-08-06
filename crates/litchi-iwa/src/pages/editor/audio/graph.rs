@@ -7,6 +7,7 @@ use crate::shapes::{
     DrawableGeometry, DrawableProperties, DrawableSize, drawable_properties,
     geometry_from_drawable, patch_drawable_geometry, patch_wrapped_drawable_properties,
 };
+use litchi_pages::audio::Options as PagesAudioOptions;
 
 const THEME_MESSAGE_TYPE: u32 = 10_001;
 const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
@@ -105,20 +106,14 @@ pub(super) struct BodyAudioGraph {
 }
 
 pub(super) fn audio_creation_values(options: PagesAudioOptions) -> Result<(DrawableGeometry, f32)> {
-    let duration_seconds = options.duration.as_secs_f64();
-    if duration_seconds == 0.0 || duration_seconds > f64::from(f32::MAX) {
-        return Err(Error::ParseError(
-            "Pages audio duration must be greater than zero and fit in f32 seconds".to_owned(),
-        ));
-    }
     let geometry = DrawableGeometry {
-        position: Some(options.position),
+        position: Some(options.position()),
         size: Some(ZERO_SIZE),
         flags: Some(DEFAULT_DRAWABLE_FLAGS),
         angle: Some(DEFAULT_AUDIO_ROTATION_DEGREES),
     }
     .validate()?;
-    Ok((geometry, duration_seconds as f32))
+    Ok((geometry, options.duration_seconds()))
 }
 
 pub(super) fn audio_style_id(package: &IWorkPackage, root: &DocumentArchive) -> Result<u64> {

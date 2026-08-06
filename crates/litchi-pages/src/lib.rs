@@ -7,10 +7,12 @@
 
 #![forbid(unsafe_code)]
 
+pub mod audio;
 mod document;
 pub mod document_options;
 pub mod footnote;
 pub mod header_footer;
+pub mod movie;
 pub mod page_layout;
 pub mod section;
 

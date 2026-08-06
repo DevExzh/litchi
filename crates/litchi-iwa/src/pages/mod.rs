@@ -36,9 +36,9 @@ pub mod editor;
 pub use creation::PagesDocumentBuilder;
 pub use document::PagesDocument;
 pub use editor::{
-    PagesAudioInfo, PagesAudioOptions, PagesBodyChartInfo, PagesBodyShapeInfo, PagesBodyShapeKind,
+    PagesAudioInfo, PagesBodyChartInfo, PagesBodyShapeInfo, PagesBodyShapeKind,
     PagesCellValue, PagesDrawableTextInfo, PagesEditor, PagesHeaderFooterInfo, PagesImageInfo,
-    PagesImageOptions, PagesMovieInfo, PagesMovieOptions, PagesSectionInfo, PagesTable,
+    PagesImageOptions, PagesMovieInfo, PagesSectionInfo, PagesTable,
     PagesTableCellParagraphIndents, PagesTableCellParagraphLineSpacing,
     PagesTableCellParagraphList, PagesTableCellParagraphListBullet,
     PagesTableCellParagraphListBulletGeometry, PagesTableCellParagraphListIndentation,
