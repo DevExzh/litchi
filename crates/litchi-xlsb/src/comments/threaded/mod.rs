@@ -5,6 +5,7 @@
 //! XML conversion, package CRUD, and graph validation in distinct layers.
 
 pub mod codec;
+pub mod edit;
 pub mod package;
 pub mod semantic;
 pub mod validation;
@@ -13,6 +14,7 @@ pub mod validation;
 mod tests;
 
 pub use codec::{parse_comments, parse_persons, write_comments, write_persons};
+pub use edit::{Commit, Patch, Snapshot, SourcePart, SourceRelationship, Transaction, apply, read};
 pub use package::{
     load_from_worksheet, load_graph, load_people, remove_from_worksheet, remove_graph,
     remove_people, store_graph, store_on_worksheet, store_people,

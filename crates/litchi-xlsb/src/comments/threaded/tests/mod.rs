@@ -3,9 +3,9 @@ use super::package::{
     PERSONS_RELATIONSHIP_TYPE, WORKSHEET_CONTENT_TYPE,
 };
 use super::{
-    Comment, Comments, CommentsPart, Graph, Mention, People, PeoplePart, Person, Thread,
-    load_graph, parse_comments, parse_persons, remove_graph, store_graph, validate_comments,
-    validate_graph as validate_model_graph, write_comments, write_persons,
+    Comment, Comments, CommentsPart, Graph, Mention, People, PeoplePart, Person, RawXml, Thread,
+    apply, load_graph, parse_comments, parse_persons, read, remove_graph, store_graph,
+    validate_comments, validate_graph as validate_model_graph, write_comments, write_persons,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, TargetMode};
@@ -229,6 +229,164 @@ fn rejects_external_or_misowned_relationships() {
         .unwrap();
     assert!(super::package::validate_graph(&package).is_err());
     let _ = worksheet;
+}
+
+#[test]
+fn snapshot_noop_preserves_exact_owner_bytes() {
+    let (mut package, _workbook, worksheet) = fixture();
+    store_graph(&mut package, &graph_fixture(&worksheet)).unwrap();
+    let before = owner_image(&package);
+    let snapshot = read(&package).unwrap();
+    assert!(snapshot.source_parts().iter().any(|part| part.has_bytes()));
+
+    let commit = snapshot.edit().commit().unwrap();
+    assert!(commit.patch().is_empty());
+    let after = apply(&mut package, commit.patch()).unwrap();
+
+    assert_eq!(after, snapshot);
+    assert_eq!(owner_image(&package), before);
+}
+
+#[test]
+fn changed_edit_validates_and_preserves_unknown_xml() {
+    let (mut package, _workbook, worksheet) = fixture();
+    store_graph(&mut package, &graph_fixture(&worksheet)).unwrap();
+    let snapshot = read(&package).unwrap();
+    let mut edit = snapshot.edit();
+    let mut alice = snapshot.people().unwrap().persons[0].clone();
+    alice.display_name = "Alicia".into();
+    edit.upsert_person(alice).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(!commit.patch().is_empty());
+    assert!(!commit.snapshot().is_source_bound());
+    assert!(commit.snapshot().source_parts().is_empty());
+
+    let committed = apply(&mut package, commit.patch()).unwrap();
+    assert_eq!(
+        committed.people().unwrap().persons[0].display_name,
+        "Alicia"
+    );
+    let person_part = package
+        .iter_parts()
+        .find(|part| part.content_type() == PERSONS_CONTENT_TYPE)
+        .unwrap();
+    let comments_part = package
+        .iter_parts()
+        .find(|part| part.content_type() == COMMENTS_CONTENT_TYPE)
+        .unwrap();
+    assert!(String::from_utf8_lossy(person_part.blob()).contains("personExt"));
+    assert!(String::from_utf8_lossy(comments_part.blob()).contains("commentExt"));
+}
+
+#[test]
+fn invalid_edits_and_source_conflicts_are_atomic() {
+    let (mut package, _workbook, worksheet) = fixture();
+    store_graph(&mut package, &graph_fixture(&worksheet)).unwrap();
+    let snapshot = read(&package).unwrap();
+
+    let mut invalid = snapshot.edit();
+    let before_graph = invalid.graph().clone();
+    assert!(invalid.set_people(People::default()).is_err());
+    assert_eq!(invalid.graph(), &before_graph);
+
+    let mut changed = snapshot.edit();
+    let mut alice = snapshot.people().unwrap().persons[0].clone();
+    alice.display_name = "Other writer".into();
+    changed.upsert_person(alice).unwrap();
+    let commit = changed.commit().unwrap();
+
+    let mut conflict = package.clone();
+    let mut other = snapshot.graph().clone();
+    other.persons.as_mut().unwrap().persons.persons[0].display_name = "Conflict".into();
+    store_graph(&mut conflict, &other).unwrap();
+    let before = owner_image(&conflict);
+    assert!(apply(&mut conflict, commit.patch()).is_err());
+    assert_eq!(owner_image(&conflict), before);
+}
+
+#[test]
+fn removing_threads_and_people_cleans_owner_parts_and_relationships() {
+    let (mut package, workbook, worksheet) = fixture();
+    store_graph(&mut package, &graph_fixture(&worksheet)).unwrap();
+    let snapshot = read(&package).unwrap();
+    let mut edit = snapshot.edit();
+    let removed = edit.remove_thread(worksheet.as_str(), ROOT).unwrap();
+    assert!(removed.is_some());
+    assert!(edit.remove_worksheet(worksheet.as_str()).unwrap());
+    assert!(edit.remove_person(ALICE).unwrap().is_some());
+    let commit = edit.commit().unwrap();
+    apply(&mut package, commit.patch()).unwrap();
+
+    assert!(
+        package
+            .iter_parts()
+            .all(|part| part.content_type() != COMMENTS_CONTENT_TYPE
+                && part.content_type() != PERSONS_CONTENT_TYPE)
+    );
+    assert!(
+        !package
+            .get_part(&workbook)
+            .unwrap()
+            .rels()
+            .iter()
+            .any(|rel| rel.reltype() == PERSONS_RELATIONSHIP_TYPE)
+    );
+    assert!(
+        !package
+            .get_part(&worksheet)
+            .unwrap()
+            .rels()
+            .iter()
+            .any(|rel| rel.reltype() == COMMENTS_RELATIONSHIP_TYPE)
+    );
+}
+
+fn graph_fixture(worksheet: &PackURI) -> Graph {
+    let mut alice = Person::new(ALICE, "Alice");
+    alice.extensions.push(RawXml::new(
+        br#"<f:personExt xmlns:f="urn:future"/>"#.to_vec(),
+    ));
+    Graph {
+        persons: Some(PeoplePart {
+            relationship_id: String::new(),
+            part_name: String::new(),
+            persons: People {
+                persons: vec![alice],
+                ..People::default()
+            },
+        }),
+        worksheets: vec![CommentsPart {
+            worksheet_part_name: worksheet.to_string(),
+            relationship_id: String::new(),
+            part_name: String::new(),
+            comments: Comments {
+                comments: vec![Comment {
+                    cell_ref: Some("A1".into()),
+                    id: ROOT.into(),
+                    person_id: ALICE.into(),
+                    text: Some("hello".into()),
+                    extensions: vec![RawXml::new(
+                        br#"<f:commentExt xmlns:f="urn:future"/>"#.to_vec(),
+                    )],
+                    ..Comment::default()
+                }],
+                ..Comments::default()
+            },
+        }],
+    }
+}
+
+fn owner_image(package: &OpcPackage) -> Vec<(String, Vec<u8>)> {
+    let mut image: Vec<_> = package
+        .iter_parts()
+        .filter(|part| {
+            part.content_type() == PERSONS_CONTENT_TYPE
+                || part.content_type() == COMMENTS_CONTENT_TYPE
+        })
+        .map(|part| (part.partname().to_string(), part.blob().to_vec()))
+        .collect();
+    image.sort_by(|left, right| left.0.cmp(&right.0));
+    image
 }
 
 fn fixture() -> (OpcPackage, PackURI, PackURI) {
