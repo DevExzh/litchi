@@ -1,5 +1,7 @@
 //! PresentationML color-map parsing and resolution.
 
+use std::ops::Range;
+
 use super::model::*;
 use crate::presentation_properties::metadata::is_presentationml_name;
 use crate::{Error, Result};
@@ -7,6 +9,418 @@ use litchi_ooxml_common::mce::process_ooxml;
 use litchi_ooxml_common::xml::{is_drawingml_name, unqualified_attribute_value};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
+
+/// The XML owner context needed to resolve a typed color-map value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Source {
+    Master,
+    Override {
+        root_name: Vec<u8>,
+        root_label: String,
+    },
+}
+
+/// A parsed color-map value together with source spans for bounded edits.
+#[derive(Debug, Clone)]
+pub(crate) struct Located {
+    pub(crate) source: Source,
+    pub(crate) value: Value,
+    pub(crate) map_attributes: Option<[Range<usize>; 12]>,
+}
+
+pub(crate) fn locate_master(xml: &[u8]) -> Result<Located> {
+    locate_source(xml, &Source::Master)
+}
+
+pub(crate) fn locate_override(xml: &[u8], root_name: &[u8], root_label: &str) -> Result<Located> {
+    locate_source(
+        xml,
+        &Source::Override {
+            root_name: root_name.to_vec(),
+            root_label: root_label.to_owned(),
+        },
+    )
+}
+
+pub(crate) fn locate_source(xml: &[u8], source: &Source) -> Result<Located> {
+    let value = match source {
+        Source::Master => Value::Master(parse_master(xml)?),
+        Source::Override {
+            root_name,
+            root_label,
+        } => Value::Override(parse_override(xml, root_name, root_label)?),
+    };
+    locate(xml, source.clone(), value)
+}
+
+fn locate(xml: &[u8], source: Source, value: Value) -> Result<Located> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut state = ScanState::default();
+
+    loop {
+        let start = position(&reader)?;
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) => {
+                scan_start(&mut state, &namespace, &element, &source, start)?;
+            },
+            Event::Empty(element) => {
+                scan_empty(&mut state, &namespace, &element, &source, start)?;
+            },
+            Event::End(element) => scan_end(&mut state, &namespace, &element)?,
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+
+    state.finish(source, value)
+}
+
+#[derive(Default)]
+struct ScanState {
+    depth: usize,
+    saw_root: bool,
+    override_depth: Option<usize>,
+    map_attributes: Option<[Range<usize>; 12]>,
+}
+
+impl ScanState {
+    fn finish(self, source: Source, value: Value) -> Result<Located> {
+        if self.depth != 0 || !self.saw_root || self.override_depth.is_some() {
+            return Err(Error::Invalid("unterminated color-map XML".to_string()));
+        }
+        if matches!(&source, Source::Master) && self.map_attributes.is_none() {
+            return Err(Error::Invalid(
+                "slide master is missing its color map".to_string(),
+            ));
+        }
+        Ok(Located {
+            source,
+            value,
+            map_attributes: self.map_attributes,
+        })
+    }
+}
+
+fn scan_start(
+    state: &mut ScanState,
+    namespace: &quick_xml::name::ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    source: &Source,
+    start: usize,
+) -> Result<()> {
+    state.depth = state
+        .depth
+        .checked_add(1)
+        .ok_or_else(|| Error::Invalid("color-map XML nesting is too deep".to_string()))?;
+    if state.depth == 1 {
+        if state.saw_root {
+            return Err(Error::Invalid(
+                "color-map XML has multiple roots".to_string(),
+            ));
+        }
+        require_source_root(namespace, element, source)?;
+        state.saw_root = true;
+    } else if is_master_map(source, state.depth, namespace, element) {
+        store_map_attributes(
+            &mut state.map_attributes,
+            map_attribute_spans(element, start)?,
+        )?;
+    } else if is_override_container(source, state.depth, namespace, element) {
+        if state.override_depth.is_some() {
+            return Err(Error::Invalid(
+                "color-map XML has multiple color-map overrides".to_string(),
+            ));
+        }
+        state.override_depth = Some(state.depth);
+    } else if state.override_depth == Some(state.depth - 1)
+        && is_override_mapping(namespace, element)
+    {
+        store_map_attributes(
+            &mut state.map_attributes,
+            map_attribute_spans(element, start)?,
+        )?;
+    }
+    Ok(())
+}
+
+fn scan_empty(
+    state: &mut ScanState,
+    namespace: &quick_xml::name::ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    source: &Source,
+    start: usize,
+) -> Result<()> {
+    if state.depth == 0 {
+        if state.saw_root {
+            return Err(Error::Invalid(
+                "color-map XML has multiple roots".to_string(),
+            ));
+        }
+        require_source_root(namespace, element, source)?;
+        state.saw_root = true;
+    } else if is_master_map(
+        source,
+        state
+            .depth
+            .checked_add(1)
+            .ok_or_else(|| Error::Invalid("color-map XML nesting is too deep".to_string()))?,
+        namespace,
+        element,
+    ) {
+        store_map_attributes(
+            &mut state.map_attributes,
+            map_attribute_spans(element, start)?,
+        )?;
+    } else if state.override_depth == Some(state.depth) && is_override_mapping(namespace, element) {
+        store_map_attributes(
+            &mut state.map_attributes,
+            map_attribute_spans(element, start)?,
+        )?;
+    }
+    Ok(())
+}
+
+fn scan_end(
+    state: &mut ScanState,
+    namespace: &quick_xml::name::ResolveResult<'_>,
+    element: &quick_xml::events::BytesEnd<'_>,
+) -> Result<()> {
+    if state.override_depth == Some(state.depth)
+        && is_presentationml_name(namespace, element.name(), b"clrMapOvr")
+    {
+        state.override_depth = None;
+    }
+    state.depth = state
+        .depth
+        .checked_sub(1)
+        .ok_or_else(|| Error::Invalid("invalid color-map XML nesting".to_string()))?;
+    Ok(())
+}
+
+pub(crate) fn rewrite(source: &[u8], located: &Located, desired: Value) -> Result<Vec<u8>> {
+    if located.value == desired {
+        return Ok(source.to_vec());
+    }
+    let before = mapped_value(&located.value).ok_or_else(|| {
+        Error::Invalid("cannot edit a color-map without an explicit mapping".to_string())
+    })?;
+    let after = mapped_value(&desired).ok_or_else(|| {
+        Error::Invalid("cannot create or remove a color-map in a bounded edit".to_string())
+    })?;
+    let attributes = located.map_attributes.as_ref().ok_or_else(|| {
+        Error::Invalid("color-map source has no editable mapping attributes".to_string())
+    })?;
+
+    let mut replacements = Vec::new();
+    for (index, slot) in Slot::ALL.into_iter().enumerate() {
+        let old = before.color(slot);
+        let new = after.color(slot);
+        if old != new {
+            replacements.push(Replacement {
+                range: attributes[index].clone(),
+                value: new.as_str().as_bytes().to_vec(),
+            });
+        }
+    }
+    apply_replacements(source, replacements)
+}
+
+fn mapped_value(value: &Value) -> Option<Map> {
+    match value {
+        Value::Master(map) => Some(*map),
+        Value::Override(Some(Override::Override(map))) => Some(*map),
+        Value::Override(None) | Value::Override(Some(Override::Master)) => None,
+    }
+}
+
+fn require_source_root(
+    namespace: &quick_xml::name::ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    source: &Source,
+) -> Result<()> {
+    let (expected_name, label) = match source {
+        Source::Master => (b"sldMaster".as_slice(), "slide master"),
+        Source::Override {
+            root_name,
+            root_label,
+        } => (root_name.as_slice(), root_label.as_str()),
+    };
+    require_root(namespace, element, expected_name, label)
+}
+
+fn is_master_map(
+    source: &Source,
+    depth: usize,
+    namespace: &quick_xml::name::ResolveResult<'_>,
+    element: &BytesStart<'_>,
+) -> bool {
+    matches!(source, Source::Master)
+        && depth == 2
+        && is_presentationml_name(namespace, element.name(), b"clrMap")
+}
+
+fn is_override_container(
+    source: &Source,
+    depth: usize,
+    namespace: &quick_xml::name::ResolveResult<'_>,
+    element: &BytesStart<'_>,
+) -> bool {
+    matches!(source, Source::Override { .. })
+        && depth == 2
+        && is_presentationml_name(namespace, element.name(), b"clrMapOvr")
+}
+
+fn is_override_mapping(
+    namespace: &quick_xml::name::ResolveResult<'_>,
+    element: &BytesStart<'_>,
+) -> bool {
+    is_drawingml_name(namespace, element.name(), b"overrideClrMapping")
+}
+
+fn store_map_attributes(
+    target: &mut Option<[Range<usize>; 12]>,
+    value: [Range<usize>; 12],
+) -> Result<()> {
+    if target.replace(value).is_some() {
+        return Err(Error::Invalid(
+            "color-map XML has multiple editable mappings".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn map_attribute_spans(element: &BytesStart<'_>, start: usize) -> Result<[Range<usize>; 12]> {
+    let span = |slot: Slot| -> Result<Range<usize>> {
+        let span = attribute_span(element.as_ref(), slot.as_str().as_bytes())?;
+        let value_start = start
+            .checked_add(1)
+            .and_then(|value| value.checked_add(span.value_start))
+            .ok_or_else(|| Error::Invalid("color-map attribute offset overflow".to_string()))?;
+        let value_end = start
+            .checked_add(1)
+            .and_then(|value| value.checked_add(span.value_end))
+            .ok_or_else(|| Error::Invalid("color-map attribute offset overflow".to_string()))?;
+        Ok(value_start..value_end)
+    };
+    Ok([
+        span(Slot::Background1)?,
+        span(Slot::Text1)?,
+        span(Slot::Background2)?,
+        span(Slot::Text2)?,
+        span(Slot::Accent1)?,
+        span(Slot::Accent2)?,
+        span(Slot::Accent3)?,
+        span(Slot::Accent4)?,
+        span(Slot::Accent5)?,
+        span(Slot::Accent6)?,
+        span(Slot::Hyperlink)?,
+        span(Slot::FollowedHyperlink)?,
+    ])
+}
+
+struct AttributeSpan {
+    value_start: usize,
+    value_end: usize,
+}
+
+fn attribute_span(raw: &[u8], key: &[u8]) -> Result<AttributeSpan> {
+    let mut index = 0usize;
+    while index < raw.len()
+        && !raw[index].is_ascii_whitespace()
+        && !matches!(raw[index], b'>' | b'/')
+    {
+        index += 1;
+    }
+    while index < raw.len() {
+        while index < raw.len() && raw[index].is_ascii_whitespace() {
+            index += 1;
+        }
+        if index >= raw.len() || raw[index] == b'>' || raw[index] == b'/' {
+            break;
+        }
+        let name_start = index;
+        while index < raw.len()
+            && !raw[index].is_ascii_whitespace()
+            && !matches!(raw[index], b'=' | b'>' | b'/')
+        {
+            index += 1;
+        }
+        let name = &raw[name_start..index];
+        while index < raw.len() && raw[index].is_ascii_whitespace() {
+            index += 1;
+        }
+        if index >= raw.len() || raw[index] != b'=' {
+            return Err(Error::Invalid(
+                "color-map attribute has no value".to_string(),
+            ));
+        }
+        index += 1;
+        while index < raw.len() && raw[index].is_ascii_whitespace() {
+            index += 1;
+        }
+        let quote = *raw.get(index).ok_or_else(|| {
+            Error::Invalid("color-map attribute value is unterminated".to_string())
+        })?;
+        if quote != b'"' && quote != b'\'' {
+            return Err(Error::Invalid(
+                "color-map attribute value is not quoted".to_string(),
+            ));
+        }
+        index += 1;
+        let value_start = index;
+        while index < raw.len() && raw[index] != quote {
+            index += 1;
+        }
+        if index >= raw.len() {
+            return Err(Error::Invalid(
+                "color-map attribute value is unterminated".to_string(),
+            ));
+        }
+        if name == key {
+            return Ok(AttributeSpan {
+                value_start,
+                value_end: index,
+            });
+        }
+        index += 1;
+    }
+    Err(Error::Invalid(format!(
+        "color-map attribute '{}' has no source span",
+        String::from_utf8_lossy(key)
+    )))
+}
+
+struct Replacement {
+    range: Range<usize>,
+    value: Vec<u8>,
+}
+
+fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Result<Vec<u8>> {
+    replacements.sort_by(|left, right| right.range.start.cmp(&left.range.start));
+    let mut output = source.to_vec();
+    let mut upper = source.len();
+    for replacement in replacements {
+        if replacement.range.start > replacement.range.end
+            || replacement.range.end > source.len()
+            || replacement.range.end > upper
+        {
+            return Err(Error::Invalid(
+                "color-map patch ranges overlap or escape the source".to_string(),
+            ));
+        }
+        output.splice(replacement.range.clone(), replacement.value);
+        upper = replacement.range.start;
+    }
+    Ok(output)
+}
+
+fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
+    usize::try_from(reader.buffer_position())
+        .map_err(|_| Error::Invalid("color-map XML offset does not fit usize".to_string()))
+}
 
 impl Role {
     fn from_str(value: &str) -> Option<Self> {
