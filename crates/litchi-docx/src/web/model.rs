@@ -210,6 +210,27 @@ pub struct Borders {
     pub(super) right: Option<Border>,
 }
 
+/// One side of an HTML division border.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BorderSide {
+    Top,
+    Left,
+    Bottom,
+    Right,
+}
+
+impl BorderSide {
+    /// Return the WordprocessingML element name for this side.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Top => "top",
+            Self::Left => "left",
+            Self::Bottom => "bottom",
+            Self::Right => "right",
+        }
+    }
+}
+
 /// One border around an HTML division.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Border {

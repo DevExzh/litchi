@@ -5,16 +5,18 @@
 mod codec;
 mod model;
 mod package;
+mod transaction;
 
 #[cfg(test)]
 mod tests;
 
 pub use codec::{parse, read, write};
 pub use model::{
-    Border, Borders, Child, Color, Conformance, Div, Frame, Frameset, Id, Key, Layout, Screen,
-    Scrollbar, Settings, SplitBar, Twips,
+    Border, BorderSide, Borders, Child, Color, Conformance, Div, Frame, Frameset, Id, Key, Layout,
+    Screen, Scrollbar, Settings, SplitBar, Twips,
 };
-pub use package::{load, put, remove};
+pub use package::{apply_commit, apply_patch, load, load_snapshot, put, remove};
+pub use transaction::{Commit, Patch, Snapshot, Transaction};
 
 pub(super) use crate::{Error, Result};
 use quick_xml::XmlVersion;

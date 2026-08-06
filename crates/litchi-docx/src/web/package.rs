@@ -2,6 +2,7 @@
 
 use super::codec::{read, write};
 use super::model::{Conformance, Settings};
+use super::transaction::{Commit, Patch, Snapshot};
 use super::{
     CONTENT_TYPE, STRICT_OFFICE_DOCUMENT_RELATIONSHIP, invalid, is_web_settings_relationship,
 };
@@ -29,6 +30,51 @@ pub fn load(package: &OpcPackage) -> Result<Option<(Settings, Conformance)>> {
         ));
     }
     Ok(Some((settings, conformance)))
+}
+
+/// Load the document-owned source-preserving web-settings snapshot.
+///
+/// The relationship owner, content type, conformance family, and every
+/// frame-source relationship are checked before the snapshot is returned.
+pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
+    let Some(owner) = locate(package)? else {
+        return Ok(None);
+    };
+    let part = package.get_part(&owner.target)?;
+    let (_, conformance) = read(part)?;
+    Snapshot::from_xml_with_conformance(part.blob().to_vec(), conformance).map(Some)
+}
+
+/// Apply a source-checked web-settings patch to its owning OPC part.
+///
+/// The candidate is published only after a cloned package passes ownership,
+/// content-type, conformance, relationship, and semantic validation. A
+/// failure leaves the caller's package and signatures untouched.
+pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+    let owner = locate(package)?.ok_or_else(|| Error::PartNotFound("web-settings part".into()))?;
+    let part = package.get_part(&owner.target)?;
+    let (_, conformance) = read(part)?;
+    let current = Snapshot::from_xml_with_conformance(part.blob().to_vec(), conformance)?;
+    let candidate = patch.apply(&current)?;
+    if candidate.xml_bytes() == current.xml_bytes() {
+        return Ok(current);
+    }
+
+    let mut staged = package.clone();
+    staged
+        .get_part_mut(&owner.target)?
+        .set_blob(candidate.xml_bytes().to_vec());
+    validate_internal_targets(&staged)?;
+    let published = load_snapshot(&staged)?
+        .ok_or_else(|| invalid("staged web-settings ownership disappeared"))?;
+    staged.unsign();
+    *package = staged;
+    Ok(published)
+}
+
+/// Apply a committed web-settings edit to its owning OPC part.
+pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+    apply_patch(package, &commit.into_patch())
 }
 
 /// Move a complete model into package ownership.

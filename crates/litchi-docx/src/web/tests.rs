@@ -263,6 +263,111 @@ fn adversarial_xml_never_unwinds() {
 }
 
 #[test]
+fn source_checked_web_edits_preserve_opaque_markup_and_round_trip_inverse() {
+    let source = br#"<?xml version="1.0"?>
+<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:future">
+  <x:future w:val="untouched"/>
+  <w:frameset>
+    <w:sz w:val="1*"/><x:insideFrameset/><w:frameLayout w:val="rows"/>
+  </w:frameset>
+  <w:divs>
+    <w:div w:id="7">
+      <w:blockQuote w:val="1"/><w:bodyDiv w:val="0"/>
+      <w:marLeft w:val="0"/><w:marRight w:val="0"/><w:marTop w:val="0"/><w:marBottom w:val="0"/>
+      <w:divBdr><x:opaqueBorder/><w:top w:val="single" w:color="FF0000"/></w:divBdr>
+    </w:div>
+  </w:divs>
+  <w:targetScreenSz w:val="800x600"/>
+  <x:trailing>keep me</x:trailing>
+</w:webSettings>"#;
+    let snapshot = Snapshot::from_xml(source.to_vec()).unwrap();
+    assert_eq!(
+        snapshot.settings().target_screen_size(),
+        Some(Screen::Pixels800x600)
+    );
+
+    let mut edit = snapshot.edit();
+    edit.set_target_screen_size(Some(Screen::Pixels1920x1200));
+    edit.set_frameset_layout(Some(Layout::Columns)).unwrap();
+    let border = Border::new("double").unwrap();
+    edit.set_div_border(id(7), BorderSide::Top, Some(border))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let updated = commit.snapshot();
+    assert_ne!(updated.xml_bytes(), source);
+    for needle in [
+        "x:future",
+        "x:insideFrameset",
+        "x:opaqueBorder",
+        "x:trailing",
+        "targetScreenSz w:val=\"1920x1200\"",
+        "frameLayout w:val=\"cols\"",
+        "top w:val=\"double\"",
+    ] {
+        assert!(
+            contains_xml(updated.xml_bytes(), needle),
+            "missing {needle}"
+        );
+    }
+
+    let restored = commit.patch().inverse().apply(updated).unwrap();
+    assert_eq!(restored.xml_bytes(), source);
+    assert_eq!(restored.settings(), snapshot.settings());
+
+    let mut no_op = snapshot.edit();
+    no_op.set_target_screen_size(Some(Screen::Pixels800x600));
+    let no_op = no_op.commit().unwrap();
+    assert_eq!(no_op.snapshot().xml_bytes(), source);
+    assert_eq!(no_op.patch().apply(&snapshot).unwrap().xml_bytes(), source);
+
+    let mut cancelled = snapshot.edit();
+    cancelled
+        .set_frameset_layout(Some(Layout::Columns))
+        .unwrap();
+    cancelled.set_frameset_layout(Some(Layout::Rows)).unwrap();
+    let cancelled = cancelled.commit().unwrap();
+    assert_eq!(cancelled.snapshot().xml_bytes(), source);
+
+    let stale_source = br#"<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:targetScreenSz w:val="1024x768"/></w:webSettings>"#;
+    let stale = Snapshot::from_xml(stale_source.to_vec()).unwrap();
+    assert!(commit.patch().apply(&stale).is_err());
+}
+
+#[test]
+fn package_web_patch_is_graph_checked_and_failure_atomic() {
+    let source = br#"<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:targetScreenSz w:val="800x600"/></w:webSettings>"#;
+    let mut package = package(Conformance::Transitional);
+    let target = add_raw_web(&mut package, source, Conformance::Transitional);
+    let snapshot = load_snapshot(&package).unwrap().unwrap();
+    let mut edit = snapshot.edit();
+    edit.set_target_screen_size(Some(Screen::Pixels1024x768));
+    let commit = edit.commit().unwrap();
+    let before = package.get_part(&target).unwrap().blob().to_vec();
+    assert!(apply_patch(&mut package, commit.patch()).is_ok());
+    assert_ne!(package.get_part(&target).unwrap().blob(), before);
+    assert!(contains_xml(
+        package.get_part(&target).unwrap().blob(),
+        "targetScreenSz w:val=\"1024x768\""
+    ));
+
+    let mut stale_edit = snapshot.edit();
+    stale_edit.set_target_screen_size(Some(Screen::Pixels1152x900));
+    let stale_patch = stale_edit.commit().unwrap().into_patch();
+    let unchanged = package.get_part(&target).unwrap().blob().to_vec();
+    assert!(apply_patch(&mut package, &stale_patch).is_err());
+    assert_eq!(package.get_part(&target).unwrap().blob(), unchanged);
+
+    package
+        .get_part_mut(&target)
+        .unwrap()
+        .set_blob(b"<broken/>".to_vec());
+    let unchanged_broken = package.get_part(&target).unwrap().blob().to_vec();
+    let inverse = stale_patch.inverse();
+    assert!(apply_patch(&mut package, &inverse).is_err());
+    assert_eq!(package.get_part(&target).unwrap().blob(), unchanged_broken);
+}
+
+#[test]
 fn parser_budget_covers_nested_readers() {
     let mut xml = String::from(
         r#"<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:frameset>"#,
