@@ -117,13 +117,14 @@ impl Chart {
         Ok(chart)
     }
 
-    /// Starts the bounded, lossless cache-value transaction.
+    /// Starts the bounded, lossless chart transaction.
     ///
-    /// The transaction consumes this immutable chart snapshot. Only existing
-    /// cache cells may be changed, and only when the replacement keeps the
-    /// producer-specific record kind and physical payload length. Unknown
-    /// records, series identities, coordinates, formatting indices, and
-    /// record order therefore remain untouched.
+    /// The transaction consumes this immutable chart snapshot. It changes
+    /// only existing fixed-size cache, chart-area, or `ShtProps` records and
+    /// keeps their producer-specific wire class, payload length, source
+    /// identity, and record position. Unknown records, series identities,
+    /// coordinates, formatting indices, and structural `PlotArea` presence
+    /// therefore remain untouched.
     pub fn edit(self) -> Result<crate::chart::transaction::Editor> {
         crate::chart::transaction::Editor::new(self)
     }

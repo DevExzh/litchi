@@ -296,8 +296,8 @@ pub(super) fn check_xl_string(value: &str, limits: Limits) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn valid_props(flags: u32) -> bool {
-    let reserved_clear = flags & 0x0000_FFE0 == 0 && flags & 0xFF00_0000 == 0;
+pub(crate) fn valid_props(flags: u32) -> bool {
+    let reserved_clear = flags & 0x0000_FFE4 == 0 && flags & 0xFF00_0000 == 0;
     let blank = (flags >> 16) & 0xFF;
     let auto_plot = flags & (1 << 4) != 0;
     let manual_plot = flags & (1 << 3) != 0;

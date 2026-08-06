@@ -230,13 +230,16 @@ fn rejects_context_mismatch_tighter_replay_limit_and_invalid_properties() {
     valid_blank_mode.authoring_proven = true;
     assert!(valid_blank_mode.encode().is_ok());
 
-    let mut defined = Chart::new(Context::excel()).expect("chart");
-    defined.set_props(Props {
+    let mut reserved_bit = Chart::new(Context::excel()).expect("chart");
+    reserved_bit.set_props(Props {
         flags: 1 << 2,
         plot_area: true,
     });
-    defined.authoring_proven = true;
-    assert!(defined.encode().is_ok());
+    reserved_bit.authoring_proven = true;
+    assert!(matches!(
+        reserved_bit.encode(),
+        Err(Error::InvalidModel { .. })
+    ));
 
     let mut reserved = Chart::new(Context::excel()).expect("chart");
     reserved.set_props(Props {

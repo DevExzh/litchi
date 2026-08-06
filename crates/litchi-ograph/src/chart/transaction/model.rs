@@ -2,6 +2,7 @@
 
 use super::super::{Cache, Chart, RowCol, Value, XlValue, cache};
 use super::chart_area;
+use super::sheet_props;
 use crate::{Error, Result};
 
 /// Producer-specific value accepted by the bounded cache patcher.
@@ -140,13 +141,19 @@ impl Change {
 pub struct Patch {
     pub(super) changes: Box<[Change]>,
     pub(super) chart_area: Option<chart_area::Change>,
+    pub(super) sheet_props: Option<sheet_props::Change>,
 }
 
 impl Patch {
-    pub(crate) fn new(changes: Vec<Change>, chart_area: Option<chart_area::Change>) -> Self {
+    pub(crate) fn new(
+        changes: Vec<Change>,
+        chart_area: Option<chart_area::Change>,
+        sheet_props: Option<sheet_props::Change>,
+    ) -> Self {
         Self {
             changes: changes.into_boxed_slice(),
             chart_area,
+            sheet_props,
         }
     }
 
@@ -160,16 +167,23 @@ impl Patch {
         self.changes
             .len()
             .saturating_add(usize::from(self.chart_area.is_some()))
+            .saturating_add(usize::from(self.sheet_props.is_some()))
     }
 
     /// Whether the transaction was a semantic no-op.
     pub fn is_empty(&self) -> bool {
-        self.changes.is_empty() && self.chart_area.is_none()
+        self.changes.is_empty() && self.chart_area.is_none() && self.sheet_props.is_none()
     }
 
     /// One reversible change to the fixed-size `[MS-OGRAPH]` `Chart` record.
     pub const fn chart_area(&self) -> Option<&chart_area::Change> {
         self.chart_area.as_ref()
+    }
+
+    /// One reversible change to the fixed-size `[MS-OGRAPH]` `ShtProps`
+    /// record.
+    pub const fn sheet_props(&self) -> Option<&sheet_props::Change> {
+        self.sheet_props.as_ref()
     }
 
     /// Returns the source-checked inverse patch.
@@ -190,6 +204,7 @@ impl Patch {
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
             chart_area: self.chart_area.map(chart_area::Change::inverse),
+            sheet_props: self.sheet_props.map(sheet_props::Change::inverse),
         }
     }
 }

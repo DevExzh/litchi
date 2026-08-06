@@ -12,3 +12,5 @@ mod wire;
 pub(crate) use encode::encode;
 pub(crate) use parse::parse;
 pub(crate) use patch::patch;
+pub(crate) use validate::valid_props;
+pub(crate) use wire::{PLOT_AREA, SHT_PROPS};
