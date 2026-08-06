@@ -642,8 +642,8 @@ fn applied_rule_for_cell(
                 ConditionalCellValue::Text(value)
             },
             _ => match cell.cached_scalar()? {
-                Some(CachedScalar::Number(value)) => ConditionalCellValue::Number(value),
-                Some(CachedScalar::Date(value)) => ConditionalCellValue::Date(value),
+                Some(CachedScalar::Number(value)) => ConditionalCellValue::Number(value.get()),
+                Some(CachedScalar::Date(value)) => ConditionalCellValue::Date(value.get()),
                 Some(CachedScalar::Boolean(value))
                     if cell.cell_format_kind()
                         == Some(crate::numbers::bnc::CHECKBOX_CELL_FORMAT_KIND)
