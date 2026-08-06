@@ -21,11 +21,11 @@ impl<'data> ZipArchive<'data> {
         })
     }
 
-    fn file_names(&self) -> impl Iterator<Item = &str> {
+    pub(crate) fn file_names(&self) -> impl Iterator<Item = &str> {
         self.reader.file_names()
     }
 
-    fn read(&self, name: &str) -> Result<Vec<u8>> {
+    pub(crate) fn read(&self, name: &str) -> Result<Vec<u8>> {
         Ok(self.reader.read(name)?)
     }
 }
@@ -90,13 +90,13 @@ fn parse_direct_iwa_components(archive: &ZipArchive<'_>, limits: Limits) -> Resu
     Ok(components)
 }
 
-fn is_encrypted(archive: &ZipArchive<'_>) -> bool {
+pub(crate) fn is_encrypted(archive: &ZipArchive<'_>) -> bool {
     archive
         .file_names()
         .any(|name| matches!(name.rsplit('/').next(), Some(".iwpv2" | ".iwph")))
 }
 
-fn nested_index_name(archive: &ZipArchive<'_>) -> Result<Option<String>> {
+pub(crate) fn nested_index_name(archive: &ZipArchive<'_>) -> Result<Option<String>> {
     let mut candidates = archive
         .file_names()
         .filter(|name| name.rsplit('/').next() == Some("Index.zip"));
@@ -110,7 +110,7 @@ fn nested_index_name(archive: &ZipArchive<'_>) -> Result<Option<String>> {
     Ok(first)
 }
 
-fn is_iwa_name(name: &str) -> bool {
+pub(crate) fn is_iwa_name(name: &str) -> bool {
     #[allow(
         clippy::case_sensitive_file_extension_comparisons,
         reason = "IWA member names are case-sensitive protocol names."

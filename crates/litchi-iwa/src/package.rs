@@ -1,19 +1,15 @@
 //! Mutable iWork ZIP package with entry-order preservation.
 
-use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Component, Path};
 use std::sync::Arc;
 
-use soapberry_zip::office::{
-    ArchiveLimits as ZipArchiveLimits, ArchiveReader, StreamingArchiveWriter,
-};
+use soapberry_zip::office::StreamingArchiveWriter;
 use tempfile::NamedTempFile;
 
 use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits};
 use crate::snappy::{SnappyLimits, SnappyStream};
-use crate::zip_utils::{is_encrypted_iwork_archive, nested_index_zip_name};
 use crate::{Error, Result};
 use litchi_iwa_package::{Entry, Patch};
 
@@ -243,14 +239,6 @@ impl PackageLimits {
         self.iwa_archive_limits
     }
 
-    pub(crate) fn zip_archive_limits(self) -> ZipArchiveLimits {
-        ZipArchiveLimits {
-            max_files: self.max_entries,
-            max_entry_size: self.max_entry_bytes,
-            max_total_size: self.max_total_bytes,
-        }
-    }
-
     pub(crate) fn effective_archive_limits(self) -> Result<IwaArchiveLimits> {
         Ok(self.iwa_archive_limits.with_archive_bytes(
             self.max_iwa_stream_bytes
@@ -285,6 +273,17 @@ impl PackageLimits {
             )));
         }
         Ok(())
+    }
+
+    fn archive_ingress_limits(self) -> Result<litchi_iwa_archive::Limits> {
+        let limits = litchi_iwa_archive::Limits::new(
+            self.max_input_bytes,
+            self.max_entries,
+            self.max_entry_bytes,
+            self.max_total_bytes,
+            self.max_iwa_stream_bytes,
+        )?;
+        Ok(limits.with_archive_limits(self.effective_archive_limits()?)?)
     }
 }
 
@@ -331,106 +330,21 @@ impl IWorkPackage {
             Error::InvalidFormat("iWork package input length does not fit u64".to_owned())
         })?;
         limits.check_input_size(input_size, "iWork package input")?;
-        let archive = ArchiveReader::new_with_limits(bytes, limits.zip_archive_limits())
-            .map_err(|error| Error::Bundle(format!("Failed to open iWork ZIP: {error}")))?;
-        if is_encrypted_iwork_archive(&archive) {
-            return Err(Error::InvalidFormat(
-                "password-protected iWork documents are not supported".to_owned(),
-            ));
-        }
-        if !archive.file_names().any(|name| name.ends_with(".iwa"))
-            && let Some(index_name) = nested_index_zip_name(&archive)?
-        {
-            return Self::from_legacy_bundle(&archive, &index_name, limits);
-        }
-        Self::from_flat_archive(&archive, limits)
-    }
-
-    fn from_flat_archive(archive: &ArchiveReader<'_>, limits: PackageLimits) -> Result<Self> {
+        let catalog = litchi_iwa_archive::package::Catalog::from_bytes_with_limits(
+            bytes,
+            limits.archive_ingress_limits()?,
+        )?;
         let mut entries = Vec::new();
-        let mut seen = HashSet::new();
-        for name in archive.file_names() {
-            validate_entry_name(name)?;
-            if !seen.insert(name.to_owned()) {
-                return Err(Error::Bundle(format!(
-                    "Duplicate package entry is ambiguous: {name}"
-                )));
-            }
-            let data = archive.read(name).map_err(|error| {
-                Error::Bundle(format!("Failed to read package entry {name}: {error}"))
-            })?;
-            entries.push(Entry::new(name.to_owned(), data));
-        }
-        let archive_limits = limits.effective_archive_limits()?;
-        Ok(Self {
-            state: Arc::new(PackageState::from_entries(entries, archive_limits)?),
-            limits,
-            mutation_revision: 0,
-        })
-    }
-
-    /// Expand the pre-iWork '13 nested bundle representation into the modern,
-    /// flat package representation used by the rest of the mutable API. The
-    /// IWA members come first and all non-directory assets are retained with
-    /// the legacy bundle prefix removed.
-    fn from_legacy_bundle(
-        archive: &ArchiveReader<'_>,
-        index_name: &str,
-        limits: PackageLimits,
-    ) -> Result<Self> {
-        let prefix = index_name.strip_suffix("Index.zip").ok_or_else(|| {
-            Error::InvalidFormat(format!("invalid legacy package index name: {index_name}"))
+        entries.try_reserve(catalog.len()).map_err(|_error| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "package entries",
+                amount: catalog.len(),
+            })
         })?;
-        let index_data = archive.read(index_name).map_err(|error| {
-            Error::Bundle(format!(
-                "Failed to read legacy package index {index_name}: {error}"
-            ))
-        })?;
-        let index_size = u64::try_from(index_data.len()).map_err(|_| {
-            Error::InvalidFormat("legacy package index length does not fit u64".to_owned())
-        })?;
-        limits.check_input_size(index_size, "legacy iWork Index.zip")?;
-        let index = ArchiveReader::new_with_limits(&index_data, limits.zip_archive_limits())
-            .map_err(|error| {
-                Error::Bundle(format!(
-                    "Failed to open legacy package index {index_name}: {error}"
-                ))
-            })?;
-
-        let mut entries = Vec::new();
-        let mut seen = HashSet::new();
-        for name in index.file_names().filter(|name| !name.ends_with('/')) {
-            validate_entry_name(name)?;
-            if !name.ends_with(".iwa") {
-                return Err(Error::InvalidFormat(format!(
-                    "legacy package index contains a non-IWA member: {name}"
-                )));
-            }
-            insert_unique_archive_entry(&index, name, &mut entries, &mut seen)?;
-        }
-        if entries.is_empty() {
-            return Err(Error::InvalidFormat(format!(
-                "legacy package index {index_name} contains no IWA components"
-            )));
-        }
-
-        for outer_name in archive
-            .file_names()
-            .filter(|name| *name != index_name && !name.ends_with('/'))
-        {
-            let name = outer_name.strip_prefix(prefix).unwrap_or(outer_name);
-            validate_entry_name(name)?;
-            if !seen.insert(name.to_owned()) {
-                return Err(Error::InvalidFormat(format!(
-                    "legacy package entries normalize to the same name: {name}"
-                )));
-            }
-            let data = archive.read(outer_name).map_err(|error| {
-                Error::Bundle(format!(
-                    "Failed to read legacy package entry {outer_name}: {error}"
-                ))
-            })?;
-            entries.push(Entry::new(name.to_owned(), data));
+        for entry in catalog {
+            let (name, data) = entry.into_parts();
+            validate_entry_name(&name)?;
+            entries.push(Entry::new(name, data));
         }
         let archive_limits = limits.effective_archive_limits()?;
         Ok(Self {
@@ -1010,24 +924,6 @@ impl Snapshot {
     pub fn archive(&self, name: &str) -> Result<Archive> {
         self.edit().archive(name)
     }
-}
-
-fn insert_unique_archive_entry(
-    archive: &ArchiveReader<'_>,
-    name: &str,
-    entries: &mut Vec<Entry>,
-    seen: &mut HashSet<String>,
-) -> Result<()> {
-    if !seen.insert(name.to_owned()) {
-        return Err(Error::Bundle(format!(
-            "Duplicate package entry is ambiguous: {name}"
-        )));
-    }
-    let data = archive
-        .read(name)
-        .map_err(|error| Error::Bundle(format!("Failed to read package entry {name}: {error}")))?;
-    entries.push(Entry::new(name.to_owned(), data));
-    Ok(())
 }
 
 fn normalize_entry_name(name: &str) -> &str {

@@ -57,6 +57,15 @@ pub enum Error {
         maximum: u64,
     },
 
+    /// A bounded collection could not reserve its next entry.
+    #[error("iWork archive allocation failed for {resource}: {amount}")]
+    Allocation {
+        /// Collection or buffer being allocated.
+        resource: &'static str,
+        /// Number of entries or bytes requested.
+        amount: usize,
+    },
+
     /// The package uses an encrypted iWork container marker.
     #[error("password-protected iWork documents are not supported")]
     Encrypted,

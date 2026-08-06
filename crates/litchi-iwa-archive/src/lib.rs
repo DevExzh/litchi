@@ -15,6 +15,7 @@
 mod catalog;
 mod error;
 mod limits;
+pub mod package;
 mod zip;
 
 pub use catalog::{Component, ComponentCatalog};
