@@ -88,6 +88,26 @@ fn rejects_invalid_story_and_fifld() {
 }
 
 #[test]
+fn skips_unwritten_array_slots_left_by_real_producers() {
+    // Some Word-produced documents pad the `RgxOcxInfo` array with an
+    // unwritten slot (all-ones `dwCookie`/`ifld`, zero elsewhere); readers
+    // ignore the marker instead of rejecting the document.
+    let real = to_bytes(&RgxOcxInfo::try_new(vec![sample()]).unwrap()).unwrap();
+
+    let mut trailing = 2u32.to_le_bytes().to_vec();
+    trailing.extend_from_slice(&real[4..]);
+    trailing.extend_from_slice(&[0xFF; 8]);
+    trailing.extend_from_slice(&[0; 12]);
+    assert_eq!(parse_bytes(&trailing).unwrap().infos(), [sample()]);
+
+    let mut leading = 2u32.to_le_bytes().to_vec();
+    leading.extend_from_slice(&[0xFF; 8]);
+    leading.extend_from_slice(&[0; 12]);
+    leading.extend_from_slice(&real[4..]);
+    assert_eq!(parse_bytes(&leading).unwrap().infos(), [sample()]);
+}
+
+#[test]
 fn reads_the_fc_plcocx_table_pointer() {
     let payload = to_bytes(&RgxOcxInfo::try_new(vec![sample()]).unwrap()).unwrap();
     let mut table_stream = vec![0xCC; 5];

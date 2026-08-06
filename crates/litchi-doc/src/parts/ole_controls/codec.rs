@@ -22,7 +22,9 @@ pub fn parse_bytes(data: &[u8]) -> Result<RgxOcxInfo> {
             .checked_mul(OCX_INFO_SIZE)
             .and_then(|value| value.checked_add(ARRAY_HEADER_SIZE))
             .ok_or_else(|| corrupted("OcxInfo offset overflows"))?;
-        infos.push(decode_info(data, offset)?);
+        if let Some(info) = decode_info(data, offset)? {
+            infos.push(info);
+        }
     }
     validation::infos(&infos)?;
     Ok(RgxOcxInfo::from_infos(infos))
@@ -97,7 +99,16 @@ impl Metadata {
     }
 }
 
-fn decode_info(data: &[u8], offset: usize) -> Result<OcxInfo> {
+/// Whether one serialized record is an unwritten array slot: some producers
+/// pad the `RgxOcxInfo` array with a marker whose `dwCookie`/`ifld` are all
+/// ones and every remaining byte is zero. The slot references no control and
+/// cannot satisfy MS-DOC 2.9.161 (`fifld` MUST be 1, `idoc` MUST be a story),
+/// so readers skip it the way Word and other implementations do.
+fn is_unwritten_slot(record: &[u8]) -> bool {
+    record[..8].iter().all(|byte| *byte == 0xFF) && record[8..].iter().all(|byte| *byte == 0)
+}
+
+fn decode_info(data: &[u8], offset: usize) -> Result<Option<OcxInfo>> {
     let record = data
         .get(
             offset
@@ -106,9 +117,12 @@ fn decode_info(data: &[u8], offset: usize) -> Result<OcxInfo> {
                     .ok_or_else(|| corrupted("OcxInfo record range overflows"))?,
         )
         .ok_or_else(|| corrupted("OcxInfo record is truncated"))?;
+    if is_unwritten_slot(record) {
+        return Ok(None);
+    }
     let flags = super::model::Flags::from_raw(read_u16(record, 14, "OcxInfo flags")?)?;
     let story = Story::from_raw(read_u16(record, 16, "OcxInfo idoc")?)?;
-    Ok(OcxInfo::new(
+    Ok(Some(OcxInfo::new(
         read_u32(record, 0, "OcxInfo dwCookie")?,
         read_u32(record, 4, "OcxInfo ifld")?,
         read_u32(record, 8, "OcxInfo hAccel")?,
@@ -116,7 +130,7 @@ fn decode_info(data: &[u8], offset: usize) -> Result<OcxInfo> {
         flags,
         story,
         read_u16(record, 18, "OcxInfo reserved2")?,
-    ))
+    )))
 }
 
 fn encode_info(data: &mut Vec<u8>, info: OcxInfo) {
