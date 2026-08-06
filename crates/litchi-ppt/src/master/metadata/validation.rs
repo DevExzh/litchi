@@ -45,7 +45,7 @@ pub(super) fn name_insertion_index(context: Context, root: &Record) -> usize {
         .unwrap_or(root.children.len())
 }
 
-pub(super) const fn is_name_record(record: &Record) -> bool {
+pub(super) fn is_name_record(record: &Record) -> bool {
     record.record_type == RecordType::CString
         && record.record_type_raw == RecordType::CString.as_u16()
         && record.instance == 3
