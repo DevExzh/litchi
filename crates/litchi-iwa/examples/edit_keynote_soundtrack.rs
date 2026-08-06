@@ -23,10 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _current = editor
         .soundtrack_settings()?
         .ok_or("presentation has no soundtrack object")?;
-    editor.set_soundtrack_settings(Settings {
-        mode: Some(mode),
-        volume: Some(volume),
-    })?;
+    editor.set_soundtrack_settings(Settings::new(Some(volume), Some(mode))?)?;
     editor.save(output)?;
     Ok(())
 }
