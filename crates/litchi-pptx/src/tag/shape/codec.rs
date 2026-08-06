@@ -287,7 +287,7 @@ fn selected_layout<'k>(owner: &dyn OpcPart, key: crate::shape::Key<'k>) -> Resul
     scan_layout(owner.blob(), span)
 }
 
-pub(super) fn selected_raw_span<'k>(
+pub(crate) fn selected_raw_span<'k>(
     xml: &[u8],
     key: crate::shape::Key<'k>,
 ) -> Result<Range<usize>> {

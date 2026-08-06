@@ -183,6 +183,46 @@ impl Package {
         self.edit_typed(move |opc| crate::tag::shape::remove(opc, &slide_name, shape))
     }
 
+    /// Read the optional classification outcome attached to one semantic
+    /// shape. The shape selector uses its exact producer name by default and
+    /// retains checked source-order indices for repair workflows.
+    pub fn shape_classification<'s, 'k>(
+        &self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<Option<crate::shape::classification::Snapshot>> {
+        self.ensure_graph_current("shape_classification")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        crate::shape::classification::load(&self.opc, &slide_name, shape)
+    }
+
+    /// Create or replace one semantic shape's typed classification outcome
+    /// transactionally while retaining unrelated extension markup.
+    pub fn put_shape_classification<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+        outcome: crate::shape::classification::Outcome,
+    ) -> Result<Option<crate::shape::classification::Snapshot>> {
+        self.ensure_graph_current("put_shape_classification")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        self.edit_typed(move |opc| {
+            crate::shape::classification::put(opc, &slide_name, shape, outcome)
+        })
+    }
+
+    /// Remove one semantic shape's typed classification element
+    /// transactionally. Unknown extension entries remain intact.
+    pub fn remove_shape_classification<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<Option<crate::shape::classification::Snapshot>> {
+        self.ensure_graph_current("remove_shape_classification")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        self.edit_typed(move |opc| crate::shape::classification::remove(opc, &slide_name, shape))
+    }
+
     /// Read all contextual 3D-model owners on one slide in source order.
     pub fn model3ds<'a>(
         &self,

@@ -24,6 +24,12 @@ mod tests;
 
 pub use codec::{load, put, remove};
 
+// Classification and other shape-owned semantic owners need the same
+// selector-to-byte-span mapping as programmable tags. Keep the scanner
+// implementation private while exposing this crate-internal seam to sibling
+// shape owners.
+pub(crate) use codec::selected_raw_span;
+
 // `tag::package` uses this narrow lexical seam while discovering package-level
 // tag anchors. The implementation remains private to the tag subsystem.
 pub(crate) use codec::attribute_value_span;

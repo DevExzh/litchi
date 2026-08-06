@@ -85,6 +85,14 @@ impl<'a> Slide<'a> {
         package::slide_shape_tags(self.package, &self.part, shape)
     }
 
+    /// Read the optional typed classification outcome attached to one shape.
+    pub fn shape_classification<'k>(
+        &self,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<Option<crate::shape::classification::Snapshot>> {
+        package::slide_shape_classification(self.package, &self.part, shape)
+    }
+
     /// Read all contextual 3D-model owners on this slide in source order.
     pub fn model3ds(&self) -> Result<Vec<crate::model3d::Model>> {
         crate::model3d::package::load_all(self.package, self.part.part().partname())

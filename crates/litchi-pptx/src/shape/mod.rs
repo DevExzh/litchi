@@ -21,6 +21,7 @@
 //! # }
 //! ```
 
+pub mod classification;
 pub mod diagram;
 pub mod text;
 pub mod theme;
