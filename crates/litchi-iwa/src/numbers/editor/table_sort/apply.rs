@@ -557,17 +557,10 @@ fn sort_scalar(cell: &BncCell, row: usize, column: usize) -> Result<SortScalar> 
         return Ok(SortScalar::Text(identifier));
     }
     let scalar = match cell.cached_scalar()? {
-        Some(CachedScalar::Number(value)) if value.is_finite() => SortScalar::Number(value),
+        Some(CachedScalar::Number(value)) => SortScalar::Number(value.get()),
         Some(CachedScalar::Boolean(value)) => SortScalar::Boolean(value),
-        Some(CachedScalar::Date(value)) if value.is_finite() => SortScalar::Date(value),
-        Some(CachedScalar::Duration(value)) if value.is_finite() => SortScalar::Duration(value),
-        Some(CachedScalar::Number(_))
-        | Some(CachedScalar::Date(_))
-        | Some(CachedScalar::Duration(_)) => {
-            return Err(Error::ParseError(format!(
-                "Numbers sort key in body cell ({row}, {column}) is not finite"
-            )));
-        },
+        Some(CachedScalar::Date(value)) => SortScalar::Date(value.get()),
+        Some(CachedScalar::Duration(value)) => SortScalar::Duration(value.get()),
         Some(CachedScalar::Unsupported(kind)) => {
             return Err(Error::ParseError(format!(
                 "Numbers sort key in body cell ({row}, {column}) has unsupported cell type {kind}"

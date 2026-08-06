@@ -75,7 +75,12 @@ pub(super) fn set_attached_table_formula(
                 &[],
             )?;
         } else {
-            set_attached_cell_in_package(package, table_id, row, column, CellValue::Number(0.0))?;
+            let empty_value = CellValue::number(0.0).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "Numbers formula placeholder value is not finite: {error}"
+                ))
+            })?;
+            set_attached_cell_in_package(package, table_id, row, column, empty_value)?;
         }
     }
 
