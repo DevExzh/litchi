@@ -100,13 +100,13 @@ impl PagesEditor {
     pub fn replace_body_text(&mut self, range: Range<usize>, replacement: &str) -> Result<()> {
         self.validate_body_edit(&range, replacement)?;
         let footnotes =
-            super::footnotes::body_footnote_graphs(self.package(), self.body_storage_id)?;
+            super::footnotes::body_footnote_graphs(self.package(), self.body_storage_id.get())?;
         let mut staged = self.text.clone();
         staged.replace_text(self.body_storage_id, range, replacement)?;
         let mut package = staged.into_package();
         super::footnotes::cleanup_removed_body_footnotes(
             &mut package,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             &footnotes,
         )?;
         *self = Self::from_package(package)?;

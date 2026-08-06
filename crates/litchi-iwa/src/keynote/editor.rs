@@ -33,18 +33,18 @@ use crate::shapes::{
 };
 use crate::text::layout::Layout;
 use crate::text::{
-    IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,
-    ParagraphDefaultTabInterval, ParagraphFlow, ParagraphIndents, ParagraphLineSpacing,
-    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
-    ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
-    ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
-    ParagraphListNumbering, ParagraphSpacing, ParagraphTabStops, ParagraphWritingDirection,
-    TextAlignment, Background as TextAppearanceBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing,
-    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
-    TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
-    TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
-    Outline, TextRange, TextScript, Shadow, TextStorageInfo, TextStyle,
+    Background as TextAppearanceBackground, IWorkTextEditor, Outline, ParagraphBackground,
+    ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
+    ParagraphIndents, ParagraphLineSpacing, ParagraphList, ParagraphListBullet,
+    ParagraphListBulletGeometry, ParagraphListIndentation, ParagraphListLabelColor,
+    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
+    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering, ParagraphSpacing,
+    ParagraphTabStops, ParagraphWritingDirection, Shadow, TextAlignment, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextComment, TextCommentBody, TextCommentId,
+    TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations, TextFont,
+    TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    TextLanguage, TextLanguageRun, TextLigatures, TextRange, TextScript, TextStorageId,
+    TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -114,11 +114,11 @@ pub struct KeynoteSlideInfo {
     /// placeholders retain their storage, so [`Self::body`] remains readable.
     pub is_body_visible: Option<bool>,
     pub transition: Option<TransitionSettings>,
-    pub title_storage_id: Option<u64>,
+    pub title_storage_id: Option<TextStorageId>,
     pub title: Option<String>,
-    pub body_storage_id: Option<u64>,
+    pub body_storage_id: Option<TextStorageId>,
     pub body: Option<String>,
-    pub notes_storage_id: Option<u64>,
+    pub notes_storage_id: Option<TextStorageId>,
     pub notes: Option<String>,
 }
 
@@ -185,7 +185,7 @@ struct KeynoteTextBoxGraph {
     slide_id: u64,
     archive_name: String,
     drawable_id: u64,
-    storage_id: u64,
+    storage_id: TextStorageId,
     object_ids: Vec<u64>,
     uuid_object_ids: Vec<u64>,
 }
@@ -1626,16 +1626,22 @@ impl KeynoteEditor {
                 .map(|reference| operation.drawable_storage(reference.identifier))
                 .transpose()?
                 .flatten();
+            let title_storage_id = title_storage_id
+                .map(crate::text::native_storage_id)
+                .transpose()?;
             let body_storage_id = slide
                 .body_placeholder
                 .map(|reference| operation.drawable_storage(reference.identifier))
                 .transpose()?
                 .flatten();
+            let body_storage_id = body_storage_id
+                .map(crate::text::native_storage_id)
+                .transpose()?;
             let title = title_storage_id
-                .map(|identifier| operation.graph.storage_text(identifier))
+                .map(|identifier| operation.graph.storage_text(identifier.get()))
                 .transpose()?;
             let body = body_storage_id
-                .map(|identifier| operation.graph.storage_text(identifier))
+                .map(|identifier| operation.graph.storage_text(identifier.get()))
                 .transpose()?;
             let notes_storage_id = slide
                 .note
@@ -1646,8 +1652,11 @@ impl KeynoteEditor {
                         .map(|note| note.contained_storage.identifier)
                 })
                 .transpose()?;
+            let notes_storage_id = notes_storage_id
+                .map(crate::text::native_storage_id)
+                .transpose()?;
             let notes = notes_storage_id
-                .map(|identifier| operation.graph.storage_text(identifier))
+                .map(|identifier| operation.graph.storage_text(identifier.get()))
                 .transpose()?;
             let transition = if slide.transition.attributes.animation_attributes.is_some() {
                 let original = operation.graph.message_data_type(
@@ -1715,8 +1724,9 @@ impl KeynoteEditor {
                 let Some(storage_id) = operation.drawable_storage(drawable_id)? else {
                     continue;
                 };
+                let storage_id = crate::text::native_storage_id(storage_id)?;
                 if let Some((previous_slide, previous_drawable)) =
-                    storage_owners.insert(storage_id, (owner_slide_index, drawable_id))
+                    storage_owners.insert(storage_id.get(), (owner_slide_index, drawable_id))
                 {
                     return Err(Error::InvalidFormat(format!(
                         "Keynote slide {previous_slide} drawable {previous_drawable} and slide {owner_slide_index} drawable {drawable_id} share owned text storage {storage_id}"
@@ -3833,7 +3843,7 @@ impl KeynoteEditor {
         }
 
         let new_drawable_id = remap[&source.drawable_id];
-        let new_storage_id = remap[&source.storage_id];
+        let new_storage_id = crate::text::native_storage_id(remap[&source.storage_id.get()])?;
         offset_keynote_drawable_clone(
             &mut staged,
             &source.archive_name,
@@ -3871,7 +3881,7 @@ impl KeynoteEditor {
             })?;
         let created_graph = verified.text_box_graph(slide_index, new_drawable_id)?;
         if created.role != KeynoteSlideTextRole::TextBox
-            || created.storage.object_id != new_storage_id
+            || created.storage.id != new_storage_id
             || created.storage.storage.text() != text
             || created_graph.object_ids.len() != source.object_ids.len()
         {
@@ -5192,11 +5202,11 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<u64> {
+    ) -> Result<TextStorageId> {
         self.slide_text_storages(slide_index)?
             .into_iter()
             .find(|text| text.drawable_object_id == drawable_object_id)
-            .map(|text| text.storage.object_id)
+            .map(|text| text.storage.id)
             .ok_or_else(|| {
                 Error::ParseError(format!(
                     "drawable object {drawable_object_id} does not own writable text on Keynote slide {slide_index}"
@@ -5292,7 +5302,7 @@ impl KeynoteEditor {
             .as_ref()
             .map(|reference| reference.identifier)
             != Some(storage_id)
-            || storage_id != text.storage.object_id
+            || storage_id != text.storage.id.get()
         {
             return Err(Error::InvalidFormat(format!(
                 "Keynote text box {drawable_object_id} has inconsistent storage ownership"
@@ -5422,13 +5432,13 @@ impl KeynoteEditor {
             slide_id: slide_info.slide_id,
             archive_name,
             drawable_id: drawable_object_id,
-            storage_id,
+            storage_id: crate::text::native_storage_id(storage_id)?,
             object_ids,
             uuid_object_ids,
         })
     }
 
-    fn slide_storage(&self, slide_index: usize, title: bool) -> Result<u64> {
+    fn slide_storage(&self, slide_index: usize, title: bool) -> Result<TextStorageId> {
         let slides = self.slides()?;
         let slide = slides.get(slide_index).ok_or_else(|| {
             Error::ParseError(format!(
@@ -5448,7 +5458,7 @@ impl KeynoteEditor {
         })
     }
 
-    fn slide_notes_storage(&self, slide_index: usize) -> Result<u64> {
+    fn slide_notes_storage(&self, slide_index: usize) -> Result<TextStorageId> {
         let slides = self.slides()?;
         let slide = slides.get(slide_index).ok_or_else(|| {
             Error::ParseError(format!(
@@ -5551,9 +5561,7 @@ pub use litchi_keynote::{Mode, Seconds, Settings, Size};
 pub use slide_audio::{KeynoteSlideAudioInfo, RemovedKeynoteSlideAudio};
 pub use slide_charts::{KeynoteSlideChartInfo, RemovedKeynoteSlideChart};
 use slide_graph::*;
-pub use slide_images::{
-    KeynoteSlideImageInfo, KeynoteSlideImageKind, RemovedKeynoteSlideImage,
-};
+pub use slide_images::{KeynoteSlideImageInfo, KeynoteSlideImageKind, RemovedKeynoteSlideImage};
 pub use slide_movies::{KeynoteSlideMovieInfo, RemovedKeynoteSlideMovie};
 pub use slide_shapes::{KeynoteSlideShapeInfo, RemovedKeynoteSlideShape};
 pub use slide_tables::{

@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "drawable={} storage={} anchor={} kind={:?}",
         removed.shape.drawable_object_id,
-        removed.shape.storage.object_id,
+        removed.shape.storage.id,
         removed.shape.anchor_character_index,
         removed.shape.kind
     );

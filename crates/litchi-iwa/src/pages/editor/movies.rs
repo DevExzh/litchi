@@ -85,7 +85,7 @@ impl PagesEditor {
             .checked_add(u64::from(creates_z_order))
             .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
         let ids = MovieObjectIds::allocate(graph_first_identifier)?;
-        let archive_name = find_object_archive(self.package(), self.body_storage_id)?;
+        let archive_name = find_object_archive(self.package(), self.body_storage_id.get())?;
 
         let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
         let movie_asset = media.insert_unreferenced(preferred_movie_filename, movie_data)?;
@@ -108,7 +108,7 @@ impl PagesEditor {
         }
         let objects = movie_objects(
             ids,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             style_id,
             movie_asset.data_identifier.get(),
             poster_asset.data_identifier.get(),
@@ -133,7 +133,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             ids.attachment,
         )?;
@@ -422,7 +422,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             new_attachment_id,
         )?;
@@ -612,8 +612,8 @@ impl PagesEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use litchi_pages::image::Options as PagesImageOptions;
     use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
+    use litchi_pages::image::Options as PagesImageOptions;
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-pages-movie";
     const REPLACEMENT_MOVIE: &[u8] = b"\0\0\0\x18ftypqt  replacement-pages-movie";
@@ -1038,36 +1038,17 @@ mod tests {
         let baseline = editor.to_bytes().unwrap();
         assert!(editor.duplicate_body_movie(999, 0).is_err());
         assert_eq!(editor.to_bytes().unwrap(), baseline);
-        let result = editor.add_body_movie(
-            4,
-            "poster.png",
-            POSTER,
-            "poster.png",
-            POSTER,
-            options(),
-        );
+        let result =
+            editor.add_body_movie(4, "poster.png", POSTER, "poster.png", POSTER, options());
         assert!(result.is_err());
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-        let result = editor.add_body_movie(
-            4,
-            "movie.mov",
-            MOVIE,
-            "movie.mov",
-            MOVIE,
-            options(),
-        );
+        let result = editor.add_body_movie(4, "movie.mov", MOVIE, "movie.mov", MOVIE, options());
         assert!(result.is_err());
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-        let result = editor.add_body_movie(
-            4,
-            "../movie.mov",
-            MOVIE,
-            "poster.png",
-            POSTER,
-            options(),
-        );
+        let result =
+            editor.add_body_movie(4, "../movie.mov", MOVIE, "poster.png", POSTER, options());
         assert!(result.is_err());
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 

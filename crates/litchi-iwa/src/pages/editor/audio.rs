@@ -79,7 +79,7 @@ impl PagesEditor {
             .checked_add(u64::from(creates_z_order))
             .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
         let ids = AudioObjectIds::allocate(graph_first_identifier)?;
-        let archive_name = find_object_archive(self.package(), self.body_storage_id)?;
+        let archive_name = find_object_archive(self.package(), self.body_storage_id.get())?;
 
         let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
         let asset = media.insert_unreferenced(preferred_filename, data)?;
@@ -95,7 +95,7 @@ impl PagesEditor {
         }
         let objects = audio_objects(
             ids,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             style_id,
             asset.data_identifier.get(),
             geometry,
@@ -118,7 +118,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             ids.attachment,
         )?;
@@ -340,7 +340,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             new_attachment_id,
         )?;

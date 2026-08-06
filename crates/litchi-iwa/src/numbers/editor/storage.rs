@@ -1418,7 +1418,10 @@ pub(super) fn set_rich_text(
             return Ok(identifier);
         }
         let mut text = IWorkTextEditor::from_package(package.clone());
-        text.set_text(entry.storage_id, replacement)?;
+        text.set_text(
+            crate::text::native_storage_id(entry.storage_id)?,
+            replacement,
+        )?;
         *package = text.into_package();
         return Ok(identifier);
     }
@@ -1560,7 +1563,7 @@ pub(super) fn set_rich_text(
 
     if !text_is_unchanged {
         let mut text = IWorkTextEditor::from_package(package.clone());
-        text.set_text(new_storage_id, replacement)?;
+        text.set_text(crate::text::native_storage_id(new_storage_id)?, replacement)?;
         *package = text.into_package();
     }
     Ok(key)

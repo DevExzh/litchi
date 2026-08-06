@@ -11,13 +11,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .table_name("Sparse inventory")
         .table_dimensions(257, 2)
         .build()?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor.tables()?.remove(0).id();
     editor.set_cells(
         table_id,
         [
             TableCellUpdate::new(0, 0, CellValue::Text("First tile".to_owned())),
             TableCellUpdate::new(256, 0, CellValue::Text("Boundary".to_owned())),
-            TableCellUpdate::new(256, 1, CellValue::Number(257.0)),
+            TableCellUpdate::new(256, 1, CellValue::number(257.0)?),
         ],
     )?;
     editor.save(output)?;

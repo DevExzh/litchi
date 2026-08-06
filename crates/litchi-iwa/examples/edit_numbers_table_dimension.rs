@@ -2,6 +2,7 @@ use std::env;
 use std::path::PathBuf;
 
 use litchi_iwa::numbers::{Dimension, NumbersEditor, Size};
+use litchi_numbers::TableSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -9,7 +10,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "usage: edit_numbers_table_dimension <input.numbers> <output.numbers> <table-id> <row|column> <index> <default|points>",
     )?);
     let output = PathBuf::from(arguments.next().ok_or("missing output path")?);
-    let table_id = arguments.next().ok_or("missing table ID")?.parse::<u64>()?;
+    let table_index = arguments
+        .next()
+        .ok_or("missing table index")?
+        .parse::<usize>()?;
     let axis = arguments.next().ok_or("missing dimension axis")?;
     let index = arguments
         .next()
@@ -31,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let mut editor = NumbersEditor::open(input)?;
-    editor.set_table_dimension_size(table_id, dimension, size)?;
+    editor.set_table_dimension_size(TableSelector::index(table_index), dimension, size)?;
     editor.save(output)?;
     Ok(())
 }

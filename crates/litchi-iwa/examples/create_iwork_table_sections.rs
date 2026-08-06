@@ -48,7 +48,7 @@ fn create_numbers(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
         .table_name("Section CRUD")
         .table_dimensions(TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor.tables()?.remove(0).id();
     editor.set_table_header_settings(
         table_id,
         NumbersTableHeaderSettings {

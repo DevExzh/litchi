@@ -32,7 +32,7 @@ pub(super) fn set_paragraph_list(
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
     let mut text = IWorkTextEditor::from_package(staged);
-    text.set_paragraph_list(storage_id, list)?;
+    text.set_paragraph_list(crate::text::native_storage_id(storage_id)?, list)?;
     staged = text.into_package();
     if paragraph_list(&staged, table_id, row, column)? != list {
         return Err(Error::InvalidFormat(
@@ -81,9 +81,10 @@ pub(super) fn set_paragraph_lists(
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
     let mut text = IWorkTextEditor::from_package(staged);
-    text.set_paragraph_lists(storage_id, placements)?;
+    text.set_paragraph_lists(crate::text::native_storage_id(storage_id)?, placements)?;
     staged = text.into_package();
-    let expected = IWorkTextEditor::from_package(staged.clone()).paragraph_lists(storage_id)?;
+    let expected = IWorkTextEditor::from_package(staged.clone())
+        .paragraph_lists(crate::text::native_storage_id(storage_id)?)?;
     if paragraph_lists(&staged, table_id, row, column)? != expected {
         return Err(Error::InvalidFormat(
             "iWork table-cell paragraph-list placements failed validation".to_owned(),
@@ -138,7 +139,11 @@ pub(super) fn set_paragraph_list_level(
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
     let mut text = IWorkTextEditor::from_package(staged);
-    text.set_paragraph_list_level(storage_id, paragraph, level)?;
+    text.set_paragraph_list_level(
+        crate::text::native_storage_id(storage_id)?,
+        paragraph,
+        level,
+    )?;
     staged = text.into_package();
     if crate::text::paragraph_list_level_in_storage(&staged, storage_id, paragraph)? != level {
         return Err(Error::InvalidFormat(
@@ -168,7 +173,8 @@ pub(super) fn reset_paragraph_list_level(
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
     let mut text = IWorkTextEditor::from_package(staged);
-    let changed = text.reset_paragraph_list_level(storage_id, paragraph)?;
+    let changed =
+        text.reset_paragraph_list_level(crate::text::native_storage_id(storage_id)?, paragraph)?;
     staged = text.into_package();
     let actual = crate::text::paragraph_list_level_in_storage(&staged, storage_id, paragraph)?;
     if !changed || actual != ParagraphListLevel::ZERO {
@@ -210,7 +216,11 @@ pub(super) fn set_paragraph_list_numbering(
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
     let mut text = IWorkTextEditor::from_package(staged);
-    text.set_paragraph_list_numbering(storage_id, paragraph, numbering)?;
+    text.set_paragraph_list_numbering(
+        crate::text::native_storage_id(storage_id)?,
+        paragraph,
+        numbering,
+    )?;
     staged = text.into_package();
     if crate::text::paragraph_list_numbering_in_storage(&staged, storage_id, paragraph)?
         != numbering
@@ -250,7 +260,11 @@ pub(super) fn set_paragraph_list_number_format(
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
     let mut text = IWorkTextEditor::from_package(staged);
-    text.set_paragraph_list_number_format(storage_id, paragraph, format)?;
+    text.set_paragraph_list_number_format(
+        crate::text::native_storage_id(storage_id)?,
+        paragraph,
+        format,
+    )?;
     staged = text.into_package();
     if crate::text::paragraph_list_number_format_in_storage(&staged, storage_id, paragraph)?
         != format
@@ -275,7 +289,10 @@ pub(super) fn reset_paragraph_list_number_format(
         return Ok(false);
     };
     let mut text = IWorkTextEditor::from_package(package.clone());
-    let changed = text.reset_paragraph_list_number_format(storage_id, paragraph)?;
+    let changed = text.reset_paragraph_list_number_format(
+        crate::text::native_storage_id(storage_id)?,
+        paragraph,
+    )?;
     if changed {
         *package = text.into_package();
     }
@@ -309,7 +326,11 @@ pub(super) fn set_paragraph_list_number_tiering(
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
     let mut text = IWorkTextEditor::from_package(staged);
-    text.set_paragraph_list_number_tiering(storage_id, paragraph, tiering)?;
+    text.set_paragraph_list_number_tiering(
+        crate::text::native_storage_id(storage_id)?,
+        paragraph,
+        tiering,
+    )?;
     staged = text.into_package();
     if crate::text::paragraph_list_number_tiering_in_storage(&staged, storage_id, paragraph)?
         != tiering
@@ -334,7 +355,10 @@ pub(super) fn reset_paragraph_list_number_tiering(
         return Ok(false);
     };
     let mut text = IWorkTextEditor::from_package(package.clone());
-    let changed = text.reset_paragraph_list_number_tiering(storage_id, paragraph)?;
+    let changed = text.reset_paragraph_list_number_tiering(
+        crate::text::native_storage_id(storage_id)?,
+        paragraph,
+    )?;
     if changed {
         *package = text.into_package();
     }
@@ -368,7 +392,11 @@ pub(super) fn set_paragraph_list_number_scale(
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
     let mut text = IWorkTextEditor::from_package(staged);
-    text.set_paragraph_list_number_scale(storage_id, paragraph, scale)?;
+    text.set_paragraph_list_number_scale(
+        crate::text::native_storage_id(storage_id)?,
+        paragraph,
+        scale,
+    )?;
     staged = text.into_package();
     if crate::text::paragraph_list_number_scale_in_storage(&staged, storage_id, paragraph)? != scale
     {
@@ -392,7 +420,10 @@ pub(super) fn reset_paragraph_list_number_scale(
         return Ok(false);
     };
     let mut text = IWorkTextEditor::from_package(package.clone());
-    let changed = text.reset_paragraph_list_number_scale(storage_id, paragraph)?;
+    let changed = text.reset_paragraph_list_number_scale(
+        crate::text::native_storage_id(storage_id)?,
+        paragraph,
+    )?;
     if changed {
         *package = text.into_package();
     }
@@ -426,7 +457,11 @@ pub(super) fn set_paragraph_list_bullet(
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
     let mut text = IWorkTextEditor::from_package(staged);
-    text.set_paragraph_list_bullet(storage_id, paragraph, bullet)?;
+    text.set_paragraph_list_bullet(
+        crate::text::native_storage_id(storage_id)?,
+        paragraph,
+        bullet,
+    )?;
     staged = text.into_package();
     if crate::text::paragraph_list_bullet_in_storage(&staged, storage_id, paragraph)? != *bullet {
         return Err(Error::InvalidFormat(
@@ -449,7 +484,8 @@ pub(super) fn reset_paragraph_list_bullet(
         return Ok(false);
     };
     let mut text = IWorkTextEditor::from_package(package.clone());
-    let changed = text.reset_paragraph_list_bullet(storage_id, paragraph)?;
+    let changed =
+        text.reset_paragraph_list_bullet(crate::text::native_storage_id(storage_id)?, paragraph)?;
     if changed {
         *package = text.into_package();
     }
@@ -483,7 +519,11 @@ pub(super) fn set_paragraph_list_bullet_geometry(
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
     let mut text = IWorkTextEditor::from_package(staged);
-    text.set_paragraph_list_bullet_geometry(storage_id, paragraph, geometry)?;
+    text.set_paragraph_list_bullet_geometry(
+        crate::text::native_storage_id(storage_id)?,
+        paragraph,
+        geometry,
+    )?;
     staged = text.into_package();
     if crate::text::paragraph_list_bullet_geometry_in_storage(&staged, storage_id, paragraph)?
         != geometry
@@ -508,7 +548,10 @@ pub(super) fn reset_paragraph_list_bullet_geometry(
         return Ok(false);
     };
     let mut text = IWorkTextEditor::from_package(package.clone());
-    let changed = text.reset_paragraph_list_bullet_geometry(storage_id, paragraph)?;
+    let changed = text.reset_paragraph_list_bullet_geometry(
+        crate::text::native_storage_id(storage_id)?,
+        paragraph,
+    )?;
     if changed {
         *package = text.into_package();
     }
@@ -542,7 +585,11 @@ pub(super) fn set_paragraph_list_indentation(
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
     let mut text = IWorkTextEditor::from_package(staged);
-    text.set_paragraph_list_indentation(storage_id, paragraph, indentation)?;
+    text.set_paragraph_list_indentation(
+        crate::text::native_storage_id(storage_id)?,
+        paragraph,
+        indentation,
+    )?;
     staged = text.into_package();
     if crate::text::paragraph_list_indentation_in_storage(&staged, storage_id, paragraph)?
         != indentation
@@ -567,7 +614,8 @@ pub(super) fn reset_paragraph_list_indentation(
         return Ok(false);
     };
     let mut text = IWorkTextEditor::from_package(package.clone());
-    let changed = text.reset_paragraph_list_indentation(storage_id, paragraph)?;
+    let changed = text
+        .reset_paragraph_list_indentation(crate::text::native_storage_id(storage_id)?, paragraph)?;
     if changed {
         *package = text.into_package();
     }
@@ -601,7 +649,11 @@ pub(super) fn set_paragraph_list_label_color(
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
     let mut text = IWorkTextEditor::from_package(staged);
-    text.set_paragraph_list_label_color(storage_id, paragraph, color)?;
+    text.set_paragraph_list_label_color(
+        crate::text::native_storage_id(storage_id)?,
+        paragraph,
+        color,
+    )?;
     staged = text.into_package();
     if crate::text::paragraph_list_label_color_in_storage(&staged, storage_id, paragraph)? != color
     {
@@ -625,7 +677,8 @@ pub(super) fn reset_paragraph_list_label_color(
         return Ok(false);
     };
     let mut text = IWorkTextEditor::from_package(package.clone());
-    let changed = text.reset_paragraph_list_label_color(storage_id, paragraph)?;
+    let changed = text
+        .reset_paragraph_list_label_color(crate::text::native_storage_id(storage_id)?, paragraph)?;
     if changed {
         *package = text.into_package();
     }

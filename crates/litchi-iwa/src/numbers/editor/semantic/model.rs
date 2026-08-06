@@ -30,6 +30,12 @@ pub struct NumbersSheetInfo {
 }
 
 impl NumbersTableInfo {
+    /// Return the stable native table identifier accepted by cell-level APIs.
+    #[must_use]
+    pub const fn id(&self) -> u64 {
+        self.object_id
+    }
+
     pub(crate) const fn native_id(&self) -> u64 {
         self.object_id
     }

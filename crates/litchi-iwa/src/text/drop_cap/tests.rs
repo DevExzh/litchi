@@ -267,7 +267,7 @@ fn create_remove_restores_storage_object_exactly() {
     let created = pages
         .add_text_box(4, "Storage preservation", position, size)
         .unwrap();
-    let storage_id = created.storage.object_id;
+    let storage_id = created.storage.id;
     let archive_name = super::storage::locate(pages.package(), storage_id)
         .unwrap()
         .archive_name;
@@ -295,7 +295,7 @@ fn mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
     let created = pages
         .add_text_box(4, "Storage preservation", position, size)
         .unwrap();
-    let storage_id = created.storage.object_id;
+    let storage_id = created.storage.id;
     let mut package = pages.into_package();
     let location = super::storage::locate(&package, storage_id).unwrap();
     let style_data = tswp::ParagraphStyleArchive {

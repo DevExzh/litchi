@@ -197,7 +197,7 @@ pub(super) fn image_caption_theme(
 pub(super) fn body_image_infos(editor: &PagesEditor) -> Result<Vec<PagesImageInfo>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -263,7 +263,7 @@ pub(super) fn body_image_graph(
         })?;
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -317,7 +317,7 @@ pub(super) fn body_image_graph(
         IMAGE_MESSAGE_TYPE,
         "TSD.ImageArchive",
     )?;
-    if image.super_.parent.map(|parent| parent.identifier) != Some(editor.body_storage_id) {
+    if image.super_.parent.map(|parent| parent.identifier) != Some(editor.body_storage_id.get()) {
         return Err(Error::InvalidFormat(format!(
             "Pages image {drawable_object_id} is not owned by the body storage"
         )));
@@ -435,7 +435,7 @@ pub(super) fn image_title_caption(
             .storage_id
             .map(|storage_id| {
                 text_editor
-                    .storage(storage_id)
+                    .storage(crate::text::native_storage_id(storage_id)?)
                     .map(|storage| storage.storage.into_text())
             })
             .transpose()?,
@@ -443,7 +443,7 @@ pub(super) fn image_title_caption(
             .storage_id
             .map(|storage_id| {
                 text_editor
-                    .storage(storage_id)
+                    .storage(crate::text::native_storage_id(storage_id)?)
                     .map(|storage| storage.storage.into_text())
             })
             .transpose()?,

@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.save(output)?;
     println!(
         "slide={slide_index} drawable={} storage={} source={}",
-        created.drawable_object_id, created.storage.object_id, source.drawable_object_id
+        created.drawable_object_id, created.storage.id, source.drawable_object_id
     );
     Ok(())
 }

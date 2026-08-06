@@ -8,13 +8,13 @@ use crate::image_caption::DrawableCaptionKind;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, Endpoints,
     LineSegment, LineStyle, RgbaColor, Shadow, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
-    Stroke, flip_drawable_geometry, line_geometry, line_path_source,
+    ShapePathKind, Stroke, flip_drawable_geometry, line_geometry, line_path_source,
     line_segments_match, reset_shape_effects, reset_shape_fill, reset_shape_shadow,
     reset_shape_stroke, reset_shape_text_layout, set_shape_effects, set_shape_fill,
     set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
     set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
     set_shape_text_layout, shape_effects, shape_fill, shape_line_endpoints, shape_line_segment,
-    shape_path_kind, shape_path_source, shape_preset, shape_shadow, shape_stroke, ShapePathKind,
+    shape_path_kind, shape_path_source, shape_preset, shape_shadow, shape_stroke,
     shape_text_layout,
 };
 use crate::text::layout::Layout;
@@ -266,7 +266,7 @@ impl NumbersEditor {
         };
         if created.preset != expected_preset
             || !line_matches
-            || created.storage.object_id != ids.storage
+            || created.storage.id.get() != ids.storage
             || created.storage.storage.text() != text
             || created.geometry != geometry
             || created_graph.object_ids != ids.all()
@@ -809,7 +809,7 @@ impl NumbersEditor {
     ) -> Result<()> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
-        text.replace_text(source.info.storage.object_id, range, replacement)?;
+        text.replace_text(source.info.storage.id, range, replacement)?;
         let verified = Self::from_package(text.into_package())?;
         shape_graph(&verified, sheet_id, drawable_object_id)?;
         *self = verified;
@@ -825,7 +825,7 @@ impl NumbersEditor {
     ) -> Result<()> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
-        text.set_text(source.info.storage.object_id, replacement)?;
+        text.set_text(source.info.storage.id, replacement)?;
         let verified = Self::from_package(text.into_package())?;
         let updated = shape_graph(&verified, sheet_id, drawable_object_id)?;
         if updated.info.storage.storage.text() != replacement {
@@ -916,7 +916,7 @@ impl NumbersEditor {
         }
 
         let new_drawable_id = remap[&source_drawable_object_id];
-        let new_storage_id = remap[&source.info.storage.object_id];
+        let new_storage_id = remap[&source.info.storage.id.get()];
         if placement == ShapeClonePlacement::Offset {
             offset_numbers_drawable_clone(
                 &mut staged,
@@ -957,7 +957,7 @@ impl NumbersEditor {
                 Error::InvalidFormat("Numbers shape duplication failed validation".to_owned())
             })?;
         let created_graph = shape_graph(&verified, target_sheet_id, new_drawable_id)?;
-        if created.storage.object_id != new_storage_id
+        if created.storage.id.get() != new_storage_id
             || created.storage.storage != source.info.storage.storage
             || created.kind != source.info.kind
             || created.preset != source.info.preset
@@ -1351,7 +1351,7 @@ fn shape_info(
         preset: shape_preset(shape)?,
         line_segment,
         line_endpoints,
-        storage: text.storage(storage_id)?,
+        storage: text.storage(crate::text::native_storage_id(storage_id)?)?,
         geometry: shape_geometry(editor.package(), archive_name, drawable_object_id)?,
         properties: shape_properties(editor.package(), archive_name, drawable_object_id)?,
     })
@@ -1364,15 +1364,15 @@ mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
-        Appearance, BlurRadius, Contact, Endpoint, Offset, Pattern, RgbColorSpace, RgbaColor,
-        Width,
+        Appearance, BlurRadius, Contact, Endpoint, Offset, Pattern, RgbColorSpace, RgbaColor, Width,
     };
     use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
-    use litchi_iwa_common::shape::effects::{Effects, Opacity as EffectsOpacity, Reflection,
-        ReflectionOpacity};
+    use litchi_iwa_common::shape::effects::{
+        Effects, Opacity as EffectsOpacity, Reflection, ReflectionOpacity,
+    };
     use litchi_iwa_common::shape::fill::{Angle, Gradient};
-    use litchi_iwa_common::shape::shadow::{Opacity as ShadowOpacity, Perspective};
     use litchi_iwa_common::shape::path::CornerRadius;
+    use litchi_iwa_common::shape::shadow::{Opacity as ShadowOpacity, Perspective};
 
     const POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 300.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -1515,7 +1515,7 @@ mod tests {
             .duplicate_sheet_shape(sheet_id, source.drawable_object_id)
             .unwrap();
         assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
-        assert_ne!(duplicate.storage.object_id, source.storage.object_id);
+        assert_ne!(duplicate.storage.id, source.storage.id);
         assert_eq!(duplicate.storage.storage, source.storage.storage);
         assert_eq!(duplicate.kind, source.kind);
         assert_eq!(duplicate.preset, source.preset);
@@ -1558,8 +1558,8 @@ mod tests {
                 .find(|shape| shape.drawable_object_id == duplicate.drawable_object_id)
                 .unwrap()
                 .storage
-            .storage
-            .text(),
+                .storage
+                .text(),
             "Independent copy"
         );
         assert_eq!(reopened.sheet_shapes(sheet_id).unwrap().len(), 2);

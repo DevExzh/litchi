@@ -627,7 +627,7 @@ fn set_slide_image_caption(
     let slot = image_caption_slot(editor, slide_index, drawable_object_id, kind)?;
     let staged = if let Some(storage_id) = slot.storage_id {
         let mut text_editor = IWorkTextEditor::from_package(editor.package().clone());
-        text_editor.set_text(storage_id, text)?;
+        text_editor.set_text(crate::text::native_storage_id(storage_id)?, text)?;
         text_editor.into_package()
     } else {
         let context = image_creation_context(editor, slide_index)?;

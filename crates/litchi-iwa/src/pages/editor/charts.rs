@@ -136,7 +136,7 @@ impl PagesEditor {
             .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?
             .identifier;
         let theme = chart_theme_context(self.package(), theme_id)?;
-        let archive_name = find_object_archive(self.package(), self.body_storage_id)?;
+        let archive_name = find_object_archive(self.package(), self.body_storage_id.get())?;
         let component_id = component_identifier_for_entry(self.package(), &archive_name)?
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
@@ -170,7 +170,7 @@ impl PagesEditor {
             .ok_or_else(|| Error::ParseError("iWork object identifier overflow".into()))?;
         let mut objects = source_chart_objects(
             ids,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             kind,
             data.clone(),
             geometry,
@@ -210,7 +210,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             attachment_id,
         )?;
@@ -504,7 +504,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             new_attachment_id,
         )?;

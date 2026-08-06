@@ -24,7 +24,7 @@ fn fixture() -> (super::super::IWorkTextEditor, u64, Vec<u8>) {
     let baseline = pages.to_bytes().unwrap();
     (
         super::super::IWorkTextEditor::from_package(pages.into_package()),
-        text_box.storage.object_id,
+        text_box.storage.id,
         baseline,
     )
 }

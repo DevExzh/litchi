@@ -116,7 +116,7 @@ impl PagesEditor {
         let root = root_document(self.package())?;
         let body: StorageArchive = decode_typed_package_object(
             self.package(),
-            self.body_storage_id,
+            self.body_storage_id.get(),
             self.body_storage()?.message_type,
             "TSWP.StorageArchive",
         )?;
@@ -132,7 +132,7 @@ impl PagesEditor {
             .checked_add(u64::from(creates_z_order))
             .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
         let ids = BodyTextShapeObjectIds::allocate(graph_first_identifier)?;
-        let archive_name = find_object_archive(self.package(), self.body_storage_id)?;
+        let archive_name = find_object_archive(self.package(), self.body_storage_id.get())?;
 
         let mut staged = self.package().clone();
         if creates_z_order {
@@ -140,7 +140,7 @@ impl PagesEditor {
         }
         let objects = body_text_shape_objects(
             ids,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             style_id,
             geometry,
             storage,
@@ -164,7 +164,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             ids.attachment,
         )?;
@@ -183,7 +183,7 @@ impl PagesEditor {
         let graph = verified.text_box_graph(ids.drawable)?;
         let expected_anchor = u32::try_from(anchor_character_index)
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
-        if created.storage.object_id != ids.storage
+        if created.storage.id.get() != ids.storage
             || created.storage.storage.text() != text
             || graph.anchor_character_index != expected_anchor
             || verified.text_box_geometry(ids.drawable)? != geometry
@@ -553,7 +553,7 @@ mod tests {
         let duplicate = editor
             .duplicate_text_box(drawable_id, 0, "Independent copy")
             .unwrap();
-        assert_ne!(duplicate.storage.object_id, created.storage.object_id);
+        assert_ne!(duplicate.storage.id, created.storage.id);
         assert_eq!(editor.body_text().unwrap(), "\u{fffc}Body\u{fffc}");
 
         let removed_copy = editor

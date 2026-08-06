@@ -71,7 +71,7 @@ use crate::text::{
     TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
     TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
     TextLanguage, TextLanguageRun, TextLigatures, Outline, TextRange, TextScript,
-    Shadow, TextStorageInfo, TextStyle,
+    Shadow, TextStorageId, TextStorageInfo, TextStyle,
 };
 use litchi_iwa_common::table::lock::State as TableLockState;
 use crate::wire::{
@@ -149,7 +149,7 @@ struct NumbersTextBoxGraph {
     sheet_id: u64,
     archive_name: String,
     drawable_id: u64,
-    storage_id: u64,
+    storage_id: TextStorageId,
     object_ids: Vec<u64>,
     uuid_object_ids: Vec<u64>,
 }

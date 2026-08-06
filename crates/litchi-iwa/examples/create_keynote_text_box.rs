@@ -6,15 +6,16 @@ use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Width};
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 use litchi_iwa::text::{
-    ParagraphBackground, ParagraphBorder, ParagraphBorders, ParagraphDecimalTabCharacter,
-    ParagraphDefaultTabInterval, ParagraphFlow, ParagraphHyphenation, ParagraphIndentPoints,
-    ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList,
-    ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyleName,
-    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, Background, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextCommentBody, TextCommentReplyBody,
-    TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage, TextLigatures, Outline,
-    TextPointSize, TextRange, TextScript, Shadow, TextStrikethrough, TextStyle, TextUnderline,
+    Background, Outline, ParagraphBackground, ParagraphBorder, ParagraphBorders,
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow, ParagraphHyphenation,
+    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingPoints,
+    ParagraphList, ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints,
+    ParagraphStyleName, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
+    ParagraphTabStop, ParagraphTabStops, ParagraphWritingDirection, Shadow, TextAlignment,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextCommentBody,
+    TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage,
+    TextLigatures, TextPointSize, TextRange, TextScript, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
 use litchi_iwa_text::columns::{Columns, Count};
 use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
@@ -110,11 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         created.drawable_object_id,
         TextLigatures::Standard,
     )?;
-    editor.set_slide_text_box_text_outline(
-        0,
-        created.drawable_object_id,
-        Outline::standard(),
-    )?;
+    editor.set_slide_text_box_text_outline(0, created.drawable_object_id, Outline::standard())?;
     editor.set_slide_text_box_text_shadow(0, created.drawable_object_id, Shadow::standard())?;
     editor.set_slide_text_box_text_background(
         0,
@@ -341,7 +338,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.save(output)?;
     println!(
         "created four-column Keynote text box {} with storage {}",
-        created.drawable_object_id, created.storage.object_id
+        created.drawable_object_id, created.storage.id
     );
     Ok(())
 }

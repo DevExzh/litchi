@@ -12,14 +12,14 @@ use crate::shapes::{
     ShapeShadowOpacity, ShapeShadowPerspective, StrokePattern, StrokeWidth,
 };
 use crate::text::{
-    IWorkTextEditor, ParagraphBorder, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval,
-    ParagraphFollowingStyle, ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents,
-    ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints, ParagraphSpacing,
-    ParagraphSpacingPoints, ParagraphStyleName, ParagraphTabAlignment,
-    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
-    ParagraphWritingDirection, Background, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, Outline, TextPointSize,
-    TextScript, Shadow, TextStrikethrough, TextStyle, TextUnderline,
+    Background, IWorkTextEditor, Outline, ParagraphBorder, ParagraphDecimalTabCharacter,
+    ParagraphDefaultTabInterval, ParagraphFollowingStyle, ParagraphHyphenation,
+    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
+    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyleName,
+    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
+    ParagraphTabStops, ParagraphWritingDirection, Shadow, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextPointSize, TextScript,
+    TextStrikethrough, TextStyle, TextUnderline,
 };
 use litchi_iwa_text::columns::{Columns, Count};
 use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
@@ -112,7 +112,7 @@ fn source_theme_paragraph_presets_are_deduplicated_across_suite_wrappers() {
     let numbers_text = IWorkTextEditor::from_package(numbers.into_package());
     assert_eq!(
         numbers_text
-            .named_paragraph_styles(numbers_box.storage.object_id)
+            .named_paragraph_styles(numbers_box.storage.id)
             .unwrap()
             .iter()
             .map(|style| style.name())
@@ -142,7 +142,7 @@ fn source_theme_paragraph_presets_are_deduplicated_across_suite_wrappers() {
     let keynote_text = IWorkTextEditor::from_package(keynote.into_package());
     assert_eq!(
         keynote_text
-            .named_paragraph_styles(keynote_box.storage.object_id)
+            .named_paragraph_styles(keynote_box.storage.id)
             .unwrap()
             .iter()
             .map(|style| style.name())
@@ -298,19 +298,19 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
     let mut numbers_text = IWorkTextEditor::from_package(numbers.into_package());
     let initial_numbers = numbers_text.package().to_bytes().unwrap();
     let body = numbers_text
-        .named_paragraph_styles(numbers_box.storage.object_id)
+        .named_paragraph_styles(numbers_box.storage.id)
         .unwrap()[0]
         .id();
     let numbers_created = numbers_text
         .create_named_paragraph_style(
-            numbers_box.storage.object_id,
+            numbers_box.storage.id,
             body,
             ParagraphStyleName::new("Numbers Detail").unwrap(),
         )
         .unwrap();
     let numbers_renamed = numbers_text
         .rename_named_paragraph_style(
-            numbers_box.storage.object_id,
+            numbers_box.storage.id,
             numbers_created.id(),
             ParagraphStyleName::new("Numbers Summary").unwrap(),
         )
@@ -320,7 +320,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
         IWorkTextEditor::from_package(IWorkPackage::from_bytes(&numbers_bytes).unwrap());
     assert_eq!(
         numbers_text
-            .named_paragraph_styles(numbers_box.storage.object_id)
+            .named_paragraph_styles(numbers_box.storage.id)
             .unwrap()
             .last()
             .unwrap()
@@ -330,7 +330,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
     let mut numbers_text = numbers_text;
     assert_eq!(
         numbers_text
-            .delete_named_paragraph_style(numbers_box.storage.object_id, numbers_created.id(),)
+            .delete_named_paragraph_style(numbers_box.storage.id, numbers_created.id(),)
             .unwrap(),
         numbers_renamed
     );
@@ -351,19 +351,19 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
     let mut keynote_text = IWorkTextEditor::from_package(keynote.into_package());
     let initial_keynote = keynote_text.package().to_bytes().unwrap();
     let body = keynote_text
-        .named_paragraph_styles(keynote_box.storage.object_id)
+        .named_paragraph_styles(keynote_box.storage.id)
         .unwrap()[0]
         .id();
     let keynote_created = keynote_text
         .create_named_paragraph_style(
-            keynote_box.storage.object_id,
+            keynote_box.storage.id,
             body,
             ParagraphStyleName::new("Keynote Detail").unwrap(),
         )
         .unwrap();
     let keynote_renamed = keynote_text
         .rename_named_paragraph_style(
-            keynote_box.storage.object_id,
+            keynote_box.storage.id,
             keynote_created.id(),
             ParagraphStyleName::new("Keynote Summary").unwrap(),
         )
@@ -373,7 +373,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
         IWorkTextEditor::from_package(IWorkPackage::from_bytes(&keynote_bytes).unwrap());
     assert_eq!(
         keynote_text
-            .named_paragraph_styles(keynote_box.storage.object_id)
+            .named_paragraph_styles(keynote_box.storage.id)
             .unwrap()
             .last()
             .unwrap()
@@ -383,7 +383,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
     let mut keynote_text = keynote_text;
     assert_eq!(
         keynote_text
-            .delete_named_paragraph_style(keynote_box.storage.object_id, keynote_created.id(),)
+            .delete_named_paragraph_style(keynote_box.storage.id, keynote_created.id(),)
             .unwrap(),
         keynote_renamed
     );
@@ -1218,12 +1218,10 @@ fn native_text_outline_overrides_are_canonical_strict_and_reversible() {
 
     let malformed = tswp::CharacterStylePropertiesArchive {
         tsd_stroke_null: Some(true),
-        tsd_stroke: Some(crate::shapes::stroke_to_native(
-            match Outline::standard() {
-                Outline::Stroke(stroke) => stroke,
-                Outline::None => unreachable!(),
-            },
-        )),
+        tsd_stroke: Some(crate::shapes::stroke_to_native(match Outline::standard() {
+            Outline::Stroke(stroke) => stroke,
+            Outline::None => unreachable!(),
+        })),
         ..Default::default()
     };
     assert!(native::text_outline_from_character(&malformed).is_err());
@@ -4474,7 +4472,7 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
             },
         )
         .unwrap();
-    let storage_id = created.storage.object_id;
+    let storage_id = created.storage.id;
     let mut package = pages.into_package();
     let location = storage::locate(&package, storage_id).unwrap();
     let archive_name = location.wire.archive_name.clone();
@@ -4649,7 +4647,7 @@ fn paragraph_style_mutations_use_the_resolved_storage_with_a_2022_style_sibling(
             },
         )
         .unwrap();
-    let storage_id = created.storage.object_id;
+    let storage_id = created.storage.id;
     let mut package = pages.into_package();
     let location = storage::locate(&package, storage_id).unwrap();
     let style_data = tswp::ParagraphStyleArchive {
@@ -4709,7 +4707,7 @@ fn paragraph_style_anchor_rejects_a_stale_message_type_transactionally() {
             },
         )
         .unwrap();
-    let storage_id = created.storage.object_id;
+    let storage_id = created.storage.id;
     let mut package = pages.into_package();
     let location = storage::locate(&package, storage_id).unwrap();
     let archive_name = location.wire.archive_name.clone();
@@ -4757,7 +4755,7 @@ fn paragraph_style_mutation_uses_exact_native_style_anchor_with_sibling_payload(
     pages
         .set_text_box_paragraph_alignment(created.drawable_object_id, TextAlignment::Center)
         .unwrap();
-    let storage_id = created.storage.object_id;
+    let storage_id = created.storage.id;
     let mut package = pages.into_package();
     let storage = storage::locate(&package, storage_id).unwrap();
     let style = native::locate_style(&package, storage.style_id).unwrap();
@@ -4859,7 +4857,7 @@ fn named_paragraph_style_rename_uses_exact_native_anchor_with_sibling_payload() 
             ParagraphStyleName::new("Rename source").unwrap(),
         )
         .unwrap();
-    let storage_id = text_box.storage.object_id;
+    let storage_id = text_box.storage.id;
     let mut package = pages.into_package();
     let location = native::locate_style(&package, native_id(created.id())).unwrap();
     let sibling_data = vec![0x98, 0x06, 0x09];

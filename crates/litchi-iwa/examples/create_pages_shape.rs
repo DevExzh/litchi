@@ -8,8 +8,9 @@ use litchi_iwa::shapes::{
     Shadow, ShapeFill, ShapeImageFillTechnique,
 };
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
-use litchi_iwa_common::shape::effects::{Effects, Opacity as EffectsOpacity, Reflection,
-    ReflectionOpacity};
+use litchi_iwa_common::shape::effects::{
+    Effects, Opacity as EffectsOpacity, Reflection, ReflectionOpacity,
+};
 use litchi_iwa_common::shape::fill::{Angle, Gradient};
 use litchi_iwa_common::shape::path::Preset;
 use litchi_iwa_common::shape::shadow::{Angle as ShadowAngle, Opacity as ShadowOpacity};
@@ -92,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         created.kind,
         created.preset,
         created.drawable_object_id,
-        created.storage.object_id,
+        created.storage.id,
         created.anchor_character_index
     );
     Ok(())

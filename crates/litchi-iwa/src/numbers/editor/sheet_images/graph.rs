@@ -456,7 +456,7 @@ pub(super) fn image_title_caption(
             .storage_id
             .map(|storage_id| {
                 text_editor
-                    .storage(storage_id)
+                    .storage(crate::text::native_storage_id(storage_id)?)
                     .map(|storage| storage.storage.into_text())
             })
             .transpose()?,
@@ -464,7 +464,7 @@ pub(super) fn image_title_caption(
             .storage_id
             .map(|storage_id| {
                 text_editor
-                    .storage(storage_id)
+                    .storage(crate::text::native_storage_id(storage_id)?)
                     .map(|storage| storage.storage.into_text())
             })
             .transpose()?,

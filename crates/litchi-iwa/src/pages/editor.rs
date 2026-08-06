@@ -41,19 +41,19 @@ use crate::shapes::{
 };
 use crate::text::layout::Layout;
 use crate::text::{
-    AppliedParagraphStyle, IWorkTextEditor, NamedParagraphStyle, ParagraphBackground,
-    ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
+    AppliedParagraphStyle, Background as TextAppearanceBackground, IWorkTextEditor,
+    NamedParagraphStyle, Outline, ParagraphBackground, ParagraphBorders,
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
     ParagraphFollowingStyle, ParagraphIndents, ParagraphLineSpacing, ParagraphList,
     ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
     ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
-    ParagraphListNumbering, ParagraphSpacing, ParagraphTabStops, ParagraphWritingDirection,
-    TextAlignment, Background as TextAppearanceBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing,
-    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
-    TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
-    TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
-    Outline, TextRange, TextScript, Shadow, TextStorageInfo, TextStyle,
+    ParagraphListNumbering, ParagraphSpacing, ParagraphTabStops, ParagraphWritingDirection, Shadow,
+    TextAlignment, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextComment,
+    TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId,
+    TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId,
+    TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextRange, TextScript,
+    TextStorageId, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -95,14 +95,14 @@ struct HeaderFooterLocation {
     template: Template,
     kind: Kind,
     slot: usize,
-    storage_id: u64,
+    storage_id: TextStorageId,
 }
 
 /// Transactional editor for a Pages package.
 #[derive(Debug, Clone)]
 pub struct PagesEditor {
     text: IWorkTextEditor,
-    body_storage_id: u64,
+    body_storage_id: TextStorageId,
     sections: Vec<PagesSectionInfo>,
     header_footers: Vec<HeaderFooterLocation>,
 }
@@ -133,7 +133,7 @@ impl PagesEditor {
 
     pub fn from_package(package: IWorkPackage) -> Result<Self> {
         let body_storage_id = body_storage_id(&package)?;
-        let (sections, header_footers) = discover_structure(&package, body_storage_id)?;
+        let (sections, header_footers) = discover_structure(&package, body_storage_id.get())?;
         let text = IWorkTextEditor::from_package(package);
         if text.storage(body_storage_id).is_err() {
             return Err(Error::InvalidFormat(format!(
@@ -191,12 +191,15 @@ impl PagesEditor {
                     drawable.id
                 )));
             }
-            let storage = self.text.storage(storage_id).map_err(|error| {
-                Error::InvalidFormat(format!(
-                    "Pages drawable {} owns invalid text storage {storage_id}: {error}",
-                    drawable.id
-                ))
-            })?;
+            let storage = self
+                .text
+                .storage(crate::text::native_storage_id(storage_id)?)
+                .map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "Pages drawable {} owns invalid text storage {storage_id}: {error}",
+                        drawable.id
+                    ))
+                })?;
             result.push(PagesDrawableTextInfo {
                 drawable_object_id: drawable.id.get(),
                 storage,
@@ -2171,7 +2174,7 @@ impl PagesEditor {
         }
 
         let new_drawable_id = remap[&source.drawable_id];
-        let new_storage_id = remap[&source.storage_id];
+        let new_storage_id = crate::text::native_storage_id(remap[&source.storage_id.get()])?;
         let new_attachment_id = remap[&source.attachment_id];
         offset_pages_body_drawable_clone(
             &mut staged,
@@ -2189,7 +2192,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             new_attachment_id,
         )?;
@@ -2217,7 +2220,7 @@ impl PagesEditor {
         let expected_anchor = u32::try_from(anchor_character_index)
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
         if created_graph.anchor_character_index != expected_anchor
-            || created.storage.object_id != new_storage_id
+            || created.storage.id != new_storage_id
             || created.storage.storage.text() != text
         {
             return Err(Error::InvalidFormat(
@@ -2489,7 +2492,7 @@ impl PagesEditor {
         };
         patch_body_section_table(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             None,
             Some(new_section_id),
             |table| insert_section_table_entry(table, entry),
@@ -2566,7 +2569,7 @@ impl PagesEditor {
         let mut staged = self.package().clone();
         patch_body_section_table(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             Some(section_id),
             None,
             |table| {
@@ -2654,7 +2657,7 @@ impl PagesEditor {
     /// Replace a UTF-16 range in a reachable header/footer storage.
     pub fn replace_header_footer_text(
         &mut self,
-        storage_id: u64,
+        storage_id: TextStorageId,
         range: Range<usize>,
         replacement: &str,
     ) -> Result<()> {
@@ -2663,13 +2666,17 @@ impl PagesEditor {
     }
 
     /// Set the complete text of a reachable header/footer storage.
-    pub fn set_header_footer_text(&mut self, storage_id: u64, replacement: &str) -> Result<()> {
+    pub fn set_header_footer_text(
+        &mut self,
+        storage_id: TextStorageId,
+        replacement: &str,
+    ) -> Result<()> {
         self.require_header_footer(storage_id)?;
         self.text.set_text(storage_id, replacement)
     }
 
     /// Clear a reachable header/footer storage without deleting its styled slot.
-    pub fn clear_header_footer(&mut self, storage_id: u64) -> Result<()> {
+    pub fn clear_header_footer(&mut self, storage_id: TextStorageId) -> Result<()> {
         self.set_header_footer_text(storage_id, "")
     }
 
@@ -2744,7 +2751,7 @@ impl PagesEditor {
         self.text.save(path)
     }
 
-    fn require_header_footer(&self, storage_id: u64) -> Result<()> {
+    fn require_header_footer(&self, storage_id: TextStorageId) -> Result<()> {
         if self
             .header_footers
             .iter()
@@ -2760,7 +2767,8 @@ impl PagesEditor {
 
     fn reachable_drawable_ids(&self) -> Result<HashSet<u64>> {
         let document = root_document(self.package())?;
-        let mut reachable = metadata_reachable_objects(self.package(), [1, self.body_storage_id])?;
+        let mut reachable =
+            metadata_reachable_objects(self.package(), [1, self.body_storage_id.get()])?;
 
         if let Some(reference) = document.floating_drawables {
             reachable.insert(reference.identifier);
@@ -2863,11 +2871,11 @@ impl PagesEditor {
         Ok(())
     }
 
-    fn require_drawable_text_storage(&self, drawable_object_id: u64) -> Result<u64> {
+    fn require_drawable_text_storage(&self, drawable_object_id: u64) -> Result<TextStorageId> {
         self.drawable_text_storages()?
             .into_iter()
             .find(|text| text.drawable_object_id == drawable_object_id)
-            .map(|text| text.storage.object_id)
+            .map(|text| text.storage.id)
             .ok_or_else(|| {
                 Error::ParseError(format!(
                     "drawable object {drawable_object_id} does not own writable text reachable from the Pages document"
@@ -2897,10 +2905,10 @@ impl PagesEditor {
                 "Pages drawable {drawable_object_id} is not an ordinary text box"
             )));
         }
-        if shape.owned_storage.map(|item| item.identifier) != Some(text.storage.object_id)
+        if shape.owned_storage.map(|item| item.identifier) != Some(text.storage.id.get())
             || shape
                 .deprecated_storage
-                .is_some_and(|item| item.identifier != text.storage.object_id)
+                .is_some_and(|item| item.identifier != text.storage.id.get())
         {
             return Err(Error::InvalidFormat(format!(
                 "Pages text box {drawable_object_id} has inconsistent storage ownership"
@@ -2914,7 +2922,7 @@ impl PagesEditor {
 
         let body: StorageArchive = decode_typed_package_object(
             self.package(),
-            self.body_storage_id,
+            self.body_storage_id.get(),
             self.body_storage()?.message_type,
             "TSWP.StorageArchive",
         )?;
@@ -2978,7 +2986,7 @@ impl PagesEditor {
             )));
         }
 
-        let mut object_ids = vec![drawable_object_id, text.storage.object_id, attachment_id];
+        let mut object_ids = vec![drawable_object_id, text.storage.id.get(), attachment_id];
         for reference in [shape.super_.super_.title, shape.super_.super_.caption]
             .into_iter()
             .flatten()
@@ -3008,7 +3016,7 @@ impl PagesEditor {
             .unwrap_or_default();
         Ok(PagesTextBoxGraph {
             drawable_id: drawable_object_id,
-            storage_id: text.storage.object_id,
+            storage_id: text.storage.id,
             attachment_id,
             anchor_character_index,
             object_ids,
@@ -3020,7 +3028,7 @@ impl PagesEditor {
 #[derive(Debug, Clone)]
 struct PagesTextBoxGraph {
     drawable_id: u64,
-    storage_id: u64,
+    storage_id: TextStorageId,
     attachment_id: u64,
     anchor_character_index: u32,
     object_ids: Vec<u64>,
@@ -4394,10 +4402,12 @@ fn package_references_object(package: &IWorkPackage, identifier: u64) -> Result<
     Ok(false)
 }
 
-fn body_storage_id(package: &IWorkPackage) -> Result<u64> {
+fn body_storage_id(package: &IWorkPackage) -> Result<TextStorageId> {
     root_document(package)?
         .body_storage
         .map(|reference| reference.identifier)
+        .map(crate::text::native_storage_id)
+        .transpose()?
         .ok_or_else(|| Error::InvalidFormat("Pages document has no body storage".to_owned()))
 }
 
@@ -4601,7 +4611,7 @@ fn discover_structure(
                         template: template_kind,
                         kind,
                         slot,
-                        storage_id: reference.identifier,
+                        storage_id: crate::text::native_storage_id(reference.identifier)?,
                     });
                 }
             }

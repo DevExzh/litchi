@@ -141,7 +141,7 @@ impl KeynoteEditor {
             })?;
         let created_graph = verified.text_box_graph(slide_index, ids.drawable)?;
         if created.role != KeynoteSlideTextRole::TextBox
-            || created.storage.object_id != ids.storage
+            || created.storage.id.get() != ids.storage
             || created.storage.storage.text() != text
             || created_graph.object_ids != ids.all()
             || verified.slide_text_box_geometry(slide_index, ids.drawable)? != geometry
@@ -507,7 +507,7 @@ mod tests {
         let duplicate = editor
             .duplicate_slide_text_box(0, created.drawable_object_id, "Independent copy")
             .unwrap();
-        assert_ne!(duplicate.storage.object_id, created.storage.object_id);
+        assert_ne!(duplicate.storage.id, created.storage.id);
 
         let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let text_boxes = reopened
@@ -517,7 +517,10 @@ mod tests {
             .filter(|text| text.role == KeynoteSlideTextRole::TextBox)
             .collect::<Vec<_>>();
         assert_eq!(text_boxes.len(), 2);
-        assert_eq!(text_boxes[0].storage.storage.text(), "Updated independently");
+        assert_eq!(
+            text_boxes[0].storage.storage.text(),
+            "Updated independently"
+        );
         assert_eq!(text_boxes[1].storage.storage.text(), "Independent copy");
 
         editor
@@ -615,6 +618,6 @@ mod tests {
         assert_eq!(graph.object_ids.len(), 4);
         assert_eq!(graph.uuid_object_ids, graph.object_ids);
         assert_eq!(graph.drawable_id, created.drawable_object_id);
-        assert_eq!(graph.storage_id, created.storage.object_id);
+        assert_eq!(graph.storage_id, created.storage.id);
     }
 }

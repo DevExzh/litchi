@@ -26,7 +26,7 @@ fn fixture() -> (super::super::IWorkTextEditor, u64) {
     let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
     (
         super::super::IWorkTextEditor::from_package(pages.into_package()),
-        text_box.storage.object_id,
+        text_box.storage.id,
     )
 }
 
@@ -233,7 +233,7 @@ fn highlight_with_an_additional_owner_cannot_be_updated_or_deleted() {
 fn comment_backed_annotations_are_classified_without_mutation() {
     let mut pages = PagesEditor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
-    let storage_id = text_box.storage.object_id;
+    let storage_id = text_box.storage.id;
     let mut package = pages.into_package();
     let created = add_text_highlight(
         &mut package,

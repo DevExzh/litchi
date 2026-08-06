@@ -2699,23 +2699,34 @@ fn slide_owned_text_storage_crud_covers_placeholders_and_text_boxes() {
         ]
     );
     assert_eq!(text[2].drawable_object_id, 17);
-    assert_eq!(text[2].storage.object_id, 18);
+    assert_eq!(text[2].storage.id, 18);
     assert_eq!(text[2].storage.storage.text(), "Independent text box");
 
     editor
         .replace_slide_text_storage(0, 17, 12..16, "shape 🚀")
         .unwrap();
     assert_eq!(
-        editor.slide_text_storages(0).unwrap()[2].storage.storage.text(),
+        editor.slide_text_storages(0).unwrap()[2]
+            .storage
+            .storage
+            .text(),
         "Independent shape 🚀 box"
     );
     editor.set_slide_text_storage(0, 17, "Replacement").unwrap();
     assert_eq!(
-        editor.slide_text_storages(0).unwrap()[2].storage.storage.text(),
+        editor.slide_text_storages(0).unwrap()[2]
+            .storage
+            .storage
+            .text(),
         "Replacement"
     );
     editor.clear_slide_text_storage(0, 17).unwrap();
-    assert!(editor.slide_text_storages(0).unwrap()[2].storage.storage.is_empty());
+    assert!(
+        editor.slide_text_storages(0).unwrap()[2]
+            .storage
+            .storage
+            .is_empty()
+    );
 
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_slide_text_storage(0, 11, "wrong slide").is_err());
@@ -2820,7 +2831,7 @@ fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
 
     let created = editor.duplicate_slide_text_box(0, 17, "Clone 🚀").unwrap();
     assert_eq!(created.drawable_object_id, 23);
-    assert_eq!(created.storage.object_id, 26);
+    assert_eq!(created.storage.id, 26);
     assert_eq!(created.storage.storage.text(), "Clone 🚀");
     assert_eq!(
         editor.text_box_graph(0, 23).unwrap().object_ids,

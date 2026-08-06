@@ -8,8 +8,9 @@ use litchi_iwa::shapes::{
     RgbColorSpace, RgbaColor, Shadow, ShapeFill, ShapeImageFillTechnique,
 };
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
-use litchi_iwa_common::shape::effects::{Effects, Opacity as EffectsOpacity, Reflection,
-    ReflectionOpacity};
+use litchi_iwa_common::shape::effects::{
+    Effects, Opacity as EffectsOpacity, Reflection, ReflectionOpacity,
+};
 use litchi_iwa_common::shape::fill::{Angle, Gradient};
 use litchi_iwa_common::shape::path::Preset;
 use litchi_iwa_common::shape::shadow::Opacity as ShadowOpacity;
@@ -97,11 +98,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.save(output)?;
     println!(
         "created Numbers {:?} {:?} {} with storage {} on sheet {}",
-        created.kind,
-        created.preset,
-        created.drawable_object_id,
-        created.storage.object_id,
-        sheet_id
+        created.kind, created.preset, created.drawable_object_id, created.storage.id, sheet_id
     );
     Ok(())
 }

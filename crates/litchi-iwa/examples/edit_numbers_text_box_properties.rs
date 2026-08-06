@@ -34,12 +34,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into_iter()
         .nth(sheet_index)
         .ok_or("sheet index out of range")?;
-    let mut properties = editor.sheet_text_box_properties(sheet.object_id, drawable_id)?;
+    let mut properties = editor.sheet_text_box_properties(sheet.id(), drawable_id)?;
     properties.locked = locked;
     properties.aspect_ratio_locked = aspect_ratio_locked;
     properties.hyperlink_url = hyperlink_url;
     properties.accessibility_description = accessibility_description;
-    editor.set_sheet_text_box_properties(sheet.object_id, drawable_id, properties.clone())?;
+    editor.set_sheet_text_box_properties(sheet.id(), drawable_id, properties.clone())?;
     editor.save(output)?;
     println!("sheet={sheet_index} drawable={drawable_id} properties={properties:?}");
     Ok(())

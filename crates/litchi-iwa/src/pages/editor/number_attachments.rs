@@ -6,6 +6,7 @@ use super::PagesEditor;
 use crate::Result;
 use crate::text::{
     TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings, TextPosition,
+    TextStorageId,
 };
 use litchi_iwa_common::comment::DrawableId;
 
@@ -47,7 +48,7 @@ impl PagesEditor {
     /// Read every number attachment in a reachable header/footer storage.
     pub fn header_footer_number_attachments(
         &self,
-        storage_id: u64,
+        storage_id: TextStorageId,
     ) -> Result<Vec<TextNumberAttachment>> {
         self.require_header_footer(storage_id)?;
         self.text.text_number_attachments(storage_id)
@@ -56,7 +57,7 @@ impl PagesEditor {
     /// Atomically insert a native page number or page count in a header/footer.
     pub fn insert_header_footer_number_attachment(
         &mut self,
-        storage_id: u64,
+        storage_id: TextStorageId,
         position: TextPosition,
         settings: TextNumberAttachmentSettings,
     ) -> Result<TextNumberAttachment> {
@@ -68,7 +69,7 @@ impl PagesEditor {
     /// Atomically update a reachable header/footer number attachment.
     pub fn update_header_footer_number_attachment(
         &mut self,
-        storage_id: u64,
+        storage_id: TextStorageId,
         id: TextNumberAttachmentId,
         settings: TextNumberAttachmentSettings,
     ) -> Result<TextNumberAttachment> {
@@ -80,7 +81,7 @@ impl PagesEditor {
     /// Delete a header/footer number attachment and its U+FFFC placeholder.
     pub fn remove_header_footer_number_attachment(
         &mut self,
-        storage_id: u64,
+        storage_id: TextStorageId,
         id: TextNumberAttachmentId,
     ) -> Result<TextNumberAttachment> {
         self.require_header_footer(storage_id)?;

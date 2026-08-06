@@ -6,15 +6,15 @@ use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Width};
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 use litchi_iwa::text::{
-    ParagraphBackground, ParagraphBorder, ParagraphBorders, ParagraphDecimalTabCharacter,
-    ParagraphDefaultTabInterval, ParagraphFlow, ParagraphFollowingStyle, ParagraphHyphenation,
-    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
-    ParagraphList, ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints,
-    ParagraphStyleName, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
-    ParagraphTabStop, ParagraphTabStops, ParagraphWritingDirection, TextAlignment, Background,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextCommentBody,
-    TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage,
-    TextLigatures, Outline, TextPointSize, TextRange, TextScript, Shadow,
+    Background, Outline, ParagraphBackground, ParagraphBorder, ParagraphBorders,
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
+    ParagraphFollowingStyle, ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents,
+    ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphList, ParagraphListLevel,
+    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyleName, ParagraphTabAlignment,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
+    ParagraphWritingDirection, Shadow, TextAlignment, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont,
+    TextHyperlinkTarget, TextLanguage, TextLigatures, TextPointSize, TextRange, TextScript,
     TextStrikethrough, TextStyle, TextUnderline,
 };
 use litchi_iwa_text::columns::{Columns, Count, Gap};
@@ -287,7 +287,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.save(output)?;
     println!(
         "created two-column Pages text box {} with storage {}",
-        created.drawable_object_id, created.storage.object_id
+        created.drawable_object_id, created.storage.id
     );
     Ok(())
 }

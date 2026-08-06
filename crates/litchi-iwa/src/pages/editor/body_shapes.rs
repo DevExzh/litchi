@@ -10,13 +10,13 @@ use crate::package_metadata::{
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, Endpoints,
     LineSegment, LineStyle, RgbaColor, Shadow, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
-    Stroke, flip_drawable_geometry, line_geometry, line_path_source,
+    ShapePathKind, Stroke, flip_drawable_geometry, line_geometry, line_path_source,
     line_segments_match, reset_shape_effects, reset_shape_fill, reset_shape_shadow,
     reset_shape_stroke, reset_shape_text_layout, set_shape_effects, set_shape_fill,
     set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
     set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
     set_shape_text_layout, shape_effects, shape_fill, shape_line_endpoints, shape_path_source,
-    shape_shadow, shape_stroke, shape_text_layout, ShapePathKind,
+    shape_shadow, shape_stroke, shape_text_layout,
 };
 use crate::text::layout::Layout;
 use litchi_iwa_common::shape::effects::Effects;
@@ -183,7 +183,7 @@ impl PagesEditor {
         let root = root_document(self.package())?;
         let body: StorageArchive = decode_typed_package_object(
             self.package(),
-            self.body_storage_id,
+            self.body_storage_id.get(),
             self.body_storage()?.message_type,
             "TSWP.StorageArchive",
         )?;
@@ -199,10 +199,10 @@ impl PagesEditor {
             .checked_add(u64::from(creates_z_order))
             .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
         let ids = BodyTextShapeObjectIds::allocate(graph_first_identifier)?;
-        let archive_name = find_object_archive(self.package(), self.body_storage_id)?;
+        let archive_name = find_object_archive(self.package(), self.body_storage_id.get())?;
         let objects = body_text_shape_objects(
             ids,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             style_id,
             geometry,
             storage,
@@ -230,7 +230,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             ids.attachment,
         )?;
@@ -268,7 +268,7 @@ impl PagesEditor {
         if created.anchor_character_index != expected_anchor
             || created.preset != expected_preset
             || !line_matches
-            || created.storage.object_id != ids.storage
+            || created.storage.id.get() != ids.storage
             || created.storage.storage.text() != text
             || created.geometry != geometry
             || created_graph.object_ids != ids.all()
@@ -724,7 +724,7 @@ impl PagesEditor {
     ) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package().clone());
-        text.replace_text(source.info.storage.object_id, range, replacement)?;
+        text.replace_text(source.info.storage.id, range, replacement)?;
         let verified = Self::from_package(text.into_package())?;
         body_shape_graph(&verified, drawable_object_id)?;
         *self = verified;
@@ -739,7 +739,7 @@ impl PagesEditor {
     ) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package().clone());
-        text.set_text(source.info.storage.object_id, replacement)?;
+        text.set_text(source.info.storage.id, replacement)?;
         let verified = Self::from_package(text.into_package())?;
         let updated = body_shape_graph(&verified, drawable_object_id)?;
         if updated.info.storage.storage.text() != replacement {
@@ -794,7 +794,7 @@ impl PagesEditor {
         }
 
         let new_drawable_id = remap[&source_drawable_object_id];
-        let new_storage_id = remap[&source.info.storage.object_id];
+        let new_storage_id = remap[&source.info.storage.id.get()];
         let new_attachment_id = remap[&source.attachment_id];
         offset_pages_body_drawable_clone(
             &mut staged,
@@ -811,7 +811,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             new_attachment_id,
         )?;
@@ -839,7 +839,7 @@ impl PagesEditor {
         let expected_anchor = u32::try_from(anchor_character_index)
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
         if created.anchor_character_index != expected_anchor
-            || created.storage.object_id != new_storage_id
+            || created.storage.id.get() != new_storage_id
             || created.storage.storage != source.info.storage.storage
             || created.kind != source.info.kind
             || created.preset != source.info.preset
@@ -916,14 +916,16 @@ mod tests {
     use std::{fs, path::PathBuf};
 
     use super::*;
-    use crate::shapes::{Appearance, BlurRadius, Drop, Endpoint, Offset, Pattern, RgbColorSpace,
-        RgbaColor, Width};
+    use crate::shapes::{
+        Appearance, BlurRadius, Drop, Endpoint, Offset, Pattern, RgbColorSpace, RgbaColor, Width,
+    };
     use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
-    use litchi_iwa_common::shape::effects::{Effects, Opacity as EffectsOpacity, Reflection,
-        ReflectionOpacity};
+    use litchi_iwa_common::shape::effects::{
+        Effects, Opacity as EffectsOpacity, Reflection, ReflectionOpacity,
+    };
     use litchi_iwa_common::shape::fill::{Angle, Gradient};
-    use litchi_iwa_common::shape::shadow::{Angle as ShadowAngle, Opacity as ShadowOpacity};
     use litchi_iwa_common::shape::path::CornerRadius;
+    use litchi_iwa_common::shape::shadow::{Angle as ShadowAngle, Opacity as ShadowOpacity};
 
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -1093,7 +1095,7 @@ mod tests {
             .duplicate_body_shape(source.drawable_object_id, duplicate_anchor)
             .unwrap();
         assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
-        assert_ne!(duplicate.storage.object_id, source.storage.object_id);
+        assert_ne!(duplicate.storage.id, source.storage.id);
         assert_eq!(duplicate.anchor_character_index, duplicate_anchor as u32);
         assert_eq!(duplicate.storage.storage, source.storage.storage);
         assert_eq!(duplicate.kind, source.kind);

@@ -41,14 +41,17 @@ fn ordinary_text_box_crud_is_guarded_and_byte_exact() {
     let text_boxes = editor.sheet_text_boxes(2).unwrap();
     assert_eq!(text_boxes.len(), 1);
     assert_eq!(text_boxes[0].drawable_object_id, 50);
-    assert_eq!(text_boxes[0].storage.object_id, 53);
+    assert_eq!(text_boxes[0].storage.id, 53);
     assert_eq!(text_boxes[0].storage.storage.text(), "Source");
 
     editor
         .replace_sheet_text_box_text(2, 50, 0..6, "Edited 🚀")
         .unwrap();
     assert_eq!(
-        editor.sheet_text_boxes(2).unwrap()[0].storage.storage.text(),
+        editor.sheet_text_boxes(2).unwrap()[0]
+            .storage
+            .storage
+            .text(),
         "Edited 🚀"
     );
     editor.set_sheet_text_box_text(2, 50, "Source").unwrap();
@@ -134,7 +137,10 @@ fn sheet_owned_drawable_comment_crud_is_guarded_and_byte_exact() {
     assert_eq!(comment.drawable_id.get(), 50);
     assert_eq!(comment.comment.text, "Sheet annotation");
     assert_eq!(
-        editor.sheet_text_boxes(2).unwrap()[0].storage.storage.text(),
+        editor.sheet_text_boxes(2).unwrap()[0]
+            .storage
+            .storage
+            .text(),
         "Source"
     );
     let bytes = editor.to_bytes().unwrap();
@@ -239,11 +245,14 @@ fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
         .duplicate_sheet_text_box(2, 50, "Independent clone")
         .unwrap();
     assert_ne!(created.drawable_object_id, 50);
-    assert_ne!(created.storage.object_id, 53);
+    assert_ne!(created.storage.id, 53);
     assert_eq!(created.storage.storage.text(), "Independent clone");
     assert_eq!(editor.sheet_text_boxes(2).unwrap().len(), 2);
     assert_eq!(
-        editor.sheet_text_boxes(2).unwrap()[0].storage.storage.text(),
+        editor.sheet_text_boxes(2).unwrap()[0]
+            .storage
+            .storage
+            .text(),
         "Source"
     );
     let clone_geometry = editor

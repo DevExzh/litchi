@@ -38,6 +38,7 @@ mod paragraph_style_redefine;
 mod paragraph_style_rename;
 mod paragraph_tabs;
 mod smart_field_object;
+mod storage_id;
 mod storage_wire;
 pub mod style;
 pub(crate) mod style_registry;
@@ -63,14 +64,20 @@ pub use bookmark_types::{
 };
 pub use date_time_field::{TextDateTimeField, TextDateTimeFieldId};
 pub use editor::{IWorkTextEditor, TextStorageInfo};
+pub use storage_id::{TextStorageId, TextStorageIdError};
+
+/// Validate a native storage reference at the IWA adapter boundary.
+pub(crate) fn native_storage_id(raw: u64) -> crate::Result<TextStorageId> {
+    TextStorageId::try_from(raw).map_err(|error| crate::Error::InvalidFormat(error.to_string()))
+}
 pub(crate) use extractor::TextExtractor;
 pub use font::{Font, Name, NameError, TextFont, TextFontName};
-pub use litchi_iwa_text::highlight::{TextHighlight, TextHighlightId};
 pub use litchi_iwa_common::text::layout;
 pub use litchi_iwa_text::comment::{
     TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
     TextCommentReplyId,
 };
+pub use litchi_iwa_text::highlight::{TextHighlight, TextHighlightId};
 pub use litchi_iwa_text::hyperlink::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
 pub use litchi_iwa_text::language::{
     Error as TextLanguageError, TextLanguage, TextLanguageRun, TextLanguageTag,
@@ -120,12 +127,10 @@ pub use paragraph_tabs::{
 };
 pub use style::{
     Background, CharacterError, Outline, ParagraphBackground, ParagraphBorder, ParagraphBorders,
-    ParagraphIndentPoints,
-    ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
-    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyle,
-    Shadow, TextAlignment, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
-    TextDecorations, TextLigatures, TextPointSize, TextScript, TextStrikethrough, TextStyle,
-    TextUnderline,
+    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
+    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyle, Shadow,
+    TextAlignment, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
+    TextLigatures, TextPointSize, TextScript, TextStrikethrough, TextStyle, TextUnderline,
 };
 
 impl From<litchi_iwa_text::appearance::Error> for crate::Error {

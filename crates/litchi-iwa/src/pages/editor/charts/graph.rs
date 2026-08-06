@@ -42,7 +42,7 @@ pub(super) struct BodyChartArchiveGroup {
 pub(super) fn body_chart_infos(editor: &PagesEditor) -> Result<Vec<PagesBodyChartInfo>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -93,7 +93,7 @@ pub(super) fn body_chart_graph(
 ) -> Result<BodyChartGraph> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -192,7 +192,7 @@ pub(super) fn body_chart_graph(
         .parent
         .as_ref()
         .map(|reference| reference.identifier)
-        != Some(editor.body_storage_id)
+        != Some(editor.body_storage_id.get())
     {
         return Err(Error::InvalidFormat(format!(
             "Pages chart {drawable_object_id} does not name body storage {} as its parent",

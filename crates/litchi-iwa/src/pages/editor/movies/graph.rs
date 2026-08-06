@@ -143,7 +143,7 @@ pub(super) fn movie_style_id(package: &IWorkPackage, root: &DocumentArchive) -> 
 pub(super) fn body_movie_infos(editor: &PagesEditor) -> Result<Vec<PagesMovieInfo>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -198,7 +198,7 @@ pub(super) fn body_movie_infos(editor: &PagesEditor) -> Result<Vec<PagesMovieInf
         }
         movies.push(movie_info(
             editor.package(),
-            editor.body_storage_id,
+            editor.body_storage_id.get(),
             drawable.identifier,
             entry.character_index,
         )?);
@@ -231,7 +231,7 @@ pub(super) fn body_movie_graph(
         })?;
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -290,7 +290,7 @@ pub(super) fn body_movie_graph(
             "Pages drawable {drawable_object_id} is not an ordinary file-backed movie"
         )));
     }
-    if movie.super_.parent.map(|parent| parent.identifier) != Some(editor.body_storage_id) {
+    if movie.super_.parent.map(|parent| parent.identifier) != Some(editor.body_storage_id.get()) {
         return Err(Error::InvalidFormat(format!(
             "Pages movie {drawable_object_id} is not owned by the body storage"
         )));
@@ -385,7 +385,7 @@ pub(super) fn body_movie_graph(
         Error::InvalidFormat(format!("Pages movie {drawable_object_id} is missing"))
     })?;
     let mut allowed_references = [
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         title.reference_id,
         caption.reference_id,
         style_id,

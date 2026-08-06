@@ -85,7 +85,7 @@ fn invalid_positions_and_text_replacement_are_transactional() {
 #[test]
 fn pages_header_footer_ownership_is_enforced() {
     let mut pages = PagesEditor::create_with_text("Body").unwrap();
-    let header = pages.header_footers().unwrap()[0].storage.object_id;
+    let header = pages.header_footers().unwrap()[0].storage.id;
     pages.set_header_footer_text(header, PREFIX).unwrap();
     let attachment = pages
         .insert_header_footer_number_attachment(
@@ -111,7 +111,7 @@ fn pages_header_footer_ownership_is_enforced() {
             .header_footers()
             .unwrap()
             .into_iter()
-            .find(|item| item.storage.object_id == header)
+            .find(|item| item.storage.id == header)
             .unwrap()
             .storage
             .storage

@@ -52,10 +52,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let columns = editor.text_box_columns(text.drawable_object_id).ok();
         let text_layout = editor.text_box_text_layout(text.drawable_object_id).ok();
         println!(
-            "drawable={} storage={} kind={:?} text={:?} geometry={geometry:?} properties={properties:?} columns={columns:?} text_layout={text_layout:?}",
+            "drawable={} storage={} text={:?} geometry={geometry:?} properties={properties:?} columns={columns:?} text_layout={text_layout:?}",
             text.drawable_object_id,
-            text.storage.object_id,
-            text.storage.kind,
+            text.storage.id,
             text.storage.storage.text(),
         );
         for name in package.iwa_entry_names() {
@@ -72,12 +71,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        print_decoded::<StorageArchive>(
-            &package,
-            text.storage.object_id,
-            text.storage.message_type,
-            "storage",
-        )?;
     }
     Ok(())
 }

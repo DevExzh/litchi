@@ -7,7 +7,6 @@ use litchi_iwa_common::shape::image::ImageAdjustments;
 use litchi_pages::image::Options as PagesImageOptions;
 
 use super::*;
-use litchi_iwa_common::comment::DrawableId;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
@@ -16,9 +15,10 @@ use crate::image_caption::{CaptionObjectIds, DrawableCaptionKind};
 use crate::media::MediaAssetId;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{
-    DrawableFlipAxis, DrawableGeometry, DrawableProperties, DrawableSize,
-    flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
+    DrawableFlipAxis, DrawableGeometry, DrawableProperties, DrawableSize, flip_drawable_geometry,
+    offset_drawable_geometry, restore_drawable_original_size,
 };
+use litchi_iwa_common::comment::DrawableId;
 
 mod graph;
 
@@ -80,7 +80,7 @@ impl PagesEditor {
             .checked_add(u64::from(creates_z_order))
             .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
         let ids = ImageObjectIds::allocate(graph_first_identifier)?;
-        let archive_name = find_object_archive(self.package(), self.body_storage_id)?;
+        let archive_name = find_object_archive(self.package(), self.body_storage_id.get())?;
 
         let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
         let asset = media.insert_unreferenced(preferred_filename, data)?;
@@ -96,7 +96,7 @@ impl PagesEditor {
         }
         let objects = image_objects(
             ids,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             style_id,
             asset.data_identifier.get(),
             geometry,
@@ -119,7 +119,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             ids.attachment,
         )?;
@@ -172,10 +172,7 @@ impl PagesEditor {
     }
 
     /// Read geometry for one body-anchored image.
-    pub fn body_image_geometry(
-        &self,
-        drawable_object_id: DrawableId,
-    ) -> Result<DrawableGeometry> {
+    pub fn body_image_geometry(&self, drawable_object_id: DrawableId) -> Result<DrawableGeometry> {
         Ok(body_image_graph(self, drawable_object_id.get())?
             .info
             .geometry)
@@ -328,10 +325,7 @@ impl PagesEditor {
     ///
     /// Returns whether a title was present. Native iWork removal preserves the
     /// prior title graph for undo history and attaches a fresh empty stand-in.
-    pub fn remove_body_image_title(
-        &mut self,
-        drawable_object_id: DrawableId,
-    ) -> Result<bool> {
+    pub fn remove_body_image_title(&mut self, drawable_object_id: DrawableId) -> Result<bool> {
         remove_body_image_caption(self, drawable_object_id, DrawableCaptionKind::Title)
     }
 
@@ -354,10 +348,7 @@ impl PagesEditor {
     /// Returns whether a caption was present. Native iWork removal preserves
     /// the prior caption graph for undo history and attaches a fresh empty
     /// stand-in.
-    pub fn remove_body_image_caption(
-        &mut self,
-        drawable_object_id: DrawableId,
-    ) -> Result<bool> {
+    pub fn remove_body_image_caption(&mut self, drawable_object_id: DrawableId) -> Result<bool> {
         remove_body_image_caption(self, drawable_object_id, DrawableCaptionKind::Caption)
     }
 
@@ -460,7 +451,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             new_attachment_id,
         )?;
@@ -647,7 +638,7 @@ fn set_body_image_caption(
     let before = image_title_caption(editor, raw_drawable_object_id)?;
     let staged = if let Some(storage_id) = slot.storage_id {
         let mut text_editor = IWorkTextEditor::from_package(editor.package().clone());
-        text_editor.set_text(storage_id, text)?;
+        text_editor.set_text(crate::text::native_storage_id(storage_id)?, text)?;
         text_editor.into_package()
     } else {
         let root = root_document(editor.package())?;
@@ -748,8 +739,8 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
     use crate::shapes::DrawablePoint;
+    use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
     const IMAGE_SIZE: DrawableSize = DrawableSize {
@@ -783,11 +774,8 @@ mod tests {
             PagesEditor::body_image_geometry;
         let _: fn(&mut PagesEditor, DrawableId) -> Result<DrawableGeometry> =
             PagesEditor::restore_body_image_original_size;
-        let _: fn(
-            &mut PagesEditor,
-            DrawableId,
-            DrawableFlipAxis,
-        ) -> Result<DrawableGeometry> = PagesEditor::flip_body_image;
+        let _: fn(&mut PagesEditor, DrawableId, DrawableFlipAxis) -> Result<DrawableGeometry> =
+            PagesEditor::flip_body_image;
         let _: fn(&mut PagesEditor, DrawableId, DrawableGeometry) -> Result<()> =
             PagesEditor::set_body_image_geometry;
         let _: fn(&PagesEditor, DrawableId) -> Result<DrawableProperties> =

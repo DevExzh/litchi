@@ -122,7 +122,7 @@ pub(super) fn movie_title_caption(
             .storage_id
             .map(|storage_id| {
                 text_editor
-                    .storage(storage_id)
+                    .storage(crate::text::native_storage_id(storage_id)?)
                     .map(|storage| storage.storage.into_text())
             })
             .transpose()?,
@@ -130,7 +130,7 @@ pub(super) fn movie_title_caption(
             .storage_id
             .map(|storage_id| {
                 text_editor
-                    .storage(storage_id)
+                    .storage(crate::text::native_storage_id(storage_id)?)
                     .map(|storage| storage.storage.into_text())
             })
             .transpose()?,
@@ -321,7 +321,7 @@ fn set_sheet_movie_caption(
     }
     let staged = if let Some(storage_id) = slot.storage_id {
         let mut text_editor = IWorkTextEditor::from_package(editor.package.clone());
-        text_editor.set_text(storage_id, text)?;
+        text_editor.set_text(crate::text::native_storage_id(storage_id)?, text)?;
         text_editor.into_package()
     } else {
         let context = movie_creation_context(editor, sheet_id)?;

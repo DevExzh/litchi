@@ -148,7 +148,7 @@ pub(super) fn audio_style_id(package: &IWorkPackage, root: &DocumentArchive) -> 
 pub(super) fn body_audio_infos(editor: &PagesEditor) -> Result<Vec<PagesAudioInfo>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -203,7 +203,7 @@ pub(super) fn body_audio_infos(editor: &PagesEditor) -> Result<Vec<PagesAudioInf
         }
         audio.push(audio_info(
             editor.package(),
-            editor.body_storage_id,
+            editor.body_storage_id.get(),
             drawable.identifier,
             entry.character_index,
         )?);
@@ -236,7 +236,7 @@ pub(super) fn body_audio_graph(
         })?;
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -295,7 +295,7 @@ pub(super) fn body_audio_graph(
             "Pages drawable {drawable_object_id} is not ordinary file-backed audio"
         )));
     }
-    if audio.super_.parent.map(|parent| parent.identifier) != Some(editor.body_storage_id) {
+    if audio.super_.parent.map(|parent| parent.identifier) != Some(editor.body_storage_id.get()) {
         return Err(Error::InvalidFormat(format!(
             "Pages audio {drawable_object_id} is not owned by the body storage"
         )));
@@ -392,7 +392,7 @@ pub(super) fn body_audio_graph(
     let drawable = archive.object(drawable_object_id).ok_or_else(|| {
         Error::InvalidFormat(format!("Pages audio {drawable_object_id} is missing"))
     })?;
-    let mut allowed_references = [editor.body_storage_id, title_id, caption_id, style_id]
+    let mut allowed_references = [editor.body_storage_id.get(), title_id, caption_id, style_id]
         .into_iter()
         .collect::<HashSet<_>>();
     allowed_references.extend(audio.super_.comment.map(|reference| reference.identifier));

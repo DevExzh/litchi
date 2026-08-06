@@ -81,10 +81,12 @@ impl FootnoteObjectIds {
 impl PagesEditor {
     /// Read every native footnote attached to the main Pages body.
     pub fn body_footnotes(&self) -> Result<Vec<Footnote>> {
-        Ok(body_footnote_graphs(self.package(), self.body_storage_id)?
-            .into_iter()
-            .map(|graph| graph.footnote)
-            .collect())
+        Ok(
+            body_footnote_graphs(self.package(), self.body_storage_id.get())?
+                .into_iter()
+                .map(|graph| graph.footnote)
+                .collect(),
+        )
     }
 
     /// Insert a native Pages footnote at a UTF-16 body position.
@@ -102,7 +104,7 @@ impl PagesEditor {
         let position_index = usize::try_from(position_u32).map_err(|_| {
             Error::ParseError("Pages footnote position exceeds the platform index range".to_owned())
         })?;
-        body_footnote_graphs(self.package(), self.body_storage_id)?;
+        body_footnote_graphs(self.package(), self.body_storage_id.get())?;
 
         let mut text_editor = IWorkTextEditor::from_package(self.package().clone());
         text_editor.replace_text(
@@ -112,14 +114,14 @@ impl PagesEditor {
         )?;
         let mut staged = text_editor.into_package();
         let ids = FootnoteObjectIds::allocate(next_object_identifier(&staged)?)?;
-        let body = storage_at(&staged, self.body_storage_id, "Pages body")?.1;
-        let archive_name = find_object_archive(&staged, self.body_storage_id)?;
+        let body = storage_at(&staged, self.body_storage_id.get(), "Pages body")?.1;
+        let archive_name = find_object_archive(&staged, self.body_storage_id.get())?;
         let objects = new_footnote_objects(ids, text, &body)?;
 
         insert_footnote_reference(
             &mut staged,
             &archive_name,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             position_u32,
             ids.reference,
         )?;
@@ -170,7 +172,11 @@ impl PagesEditor {
         }
 
         let mut text_editor = IWorkTextEditor::from_package(self.package().clone());
-        text_editor.replace_text(current.storage_id, prefix_units..content_units, text)?;
+        text_editor.replace_text(
+            crate::text::native_storage_id(current.storage_id)?,
+            prefix_units..content_units,
+            text,
+        )?;
         let verified = Self::from_bytes(&text_editor.into_package().to_bytes()?)?;
         let updated = body_footnote_by_selector(&verified, selector)?.footnote;
         if updated.position != current.footnote.position
@@ -268,7 +274,7 @@ fn body_footnote_by_selector(
     editor: &PagesEditor,
     selector: Selector,
 ) -> Result<BodyFootnoteGraph> {
-    let footnotes = body_footnote_graphs(editor.package(), editor.body_storage_id)?;
+    let footnotes = body_footnote_graphs(editor.package(), editor.body_storage_id.get())?;
     match selector {
         Selector::Index(index) => footnotes.into_iter().nth(index).ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -884,7 +890,8 @@ mod tests {
             .insert_body_footnote(Position::from_utf16_index(1).unwrap(), "First")
             .unwrap();
         let first_reference_id =
-            body_footnote_graphs(editor.package(), editor.body_storage_id).unwrap()[0].reference_id;
+            body_footnote_graphs(editor.package(), editor.body_storage_id.get()).unwrap()[0]
+                .reference_id;
         let second = editor
             .insert_body_footnote(Position::from_utf16_index(3).unwrap(), "Second")
             .unwrap();
@@ -927,8 +934,9 @@ mod tests {
         let footnote = editor
             .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
             .unwrap();
-        let reference_id =
-            body_footnote_graphs(editor.package(), editor.body_storage_id).unwrap()[0].reference_id;
+        let reference_id = body_footnote_graphs(editor.package(), editor.body_storage_id.get())
+            .unwrap()[0]
+            .reference_id;
         let mut package = editor.package().clone();
         let archive_name = find_object_archive(&package, reference_id).unwrap();
         package

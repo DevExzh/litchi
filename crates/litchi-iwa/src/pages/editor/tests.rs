@@ -1301,10 +1301,10 @@ fn reachable_drawable_text_crud_covers_placeholders_and_text_boxes() {
     let text = editor.drawable_text_storages().unwrap();
     assert_eq!(text.len(), 2);
     assert_eq!(text[0].drawable_object_id, 60);
-    assert_eq!(text[0].storage.object_id, 62);
+    assert_eq!(text[0].storage.id, 62);
     assert_eq!(text[0].storage.storage.text(), "A🚀B");
     assert_eq!(text[1].drawable_object_id, 64);
-    assert_eq!(text[1].storage.object_id, 65);
+    assert_eq!(text[1].storage.id, 65);
     assert_eq!(text[1].storage.storage.text(), "Independent text box");
 
     let before = editor.to_bytes().unwrap();
@@ -1314,18 +1314,29 @@ fn reachable_drawable_text_crud_covers_placeholders_and_text_boxes() {
 
     editor.replace_drawable_text(60, 1..3, "東京").unwrap();
     assert_eq!(
-        editor.drawable_text_storages().unwrap()[0].storage.storage.text(),
+        editor.drawable_text_storages().unwrap()[0]
+            .storage
+            .storage
+            .text(),
         "A東京B"
     );
     editor
         .set_drawable_text(64, "Replacement shape 🚀")
         .unwrap();
     assert_eq!(
-        editor.drawable_text_storages().unwrap()[1].storage.storage.text(),
+        editor.drawable_text_storages().unwrap()[1]
+            .storage
+            .storage
+            .text(),
         "Replacement shape 🚀"
     );
     editor.clear_drawable_text(64).unwrap();
-    assert!(editor.drawable_text_storages().unwrap()[1].storage.storage.is_empty());
+    assert!(
+        editor.drawable_text_storages().unwrap()[1]
+            .storage
+            .storage
+            .is_empty()
+    );
     assert_eq!(editor.body_text().unwrap(), "Body");
 }
 
@@ -1418,7 +1429,10 @@ fn text_box_geometry_updates_are_guarded_and_byte_exact() {
     editor.set_text_box_geometry(64, changed).unwrap();
     assert_eq!(editor.text_box_geometry(64).unwrap(), changed);
     assert_eq!(
-        editor.drawable_text_storages().unwrap()[0].storage.storage.text(),
+        editor.drawable_text_storages().unwrap()[0]
+            .storage
+            .storage
+            .text(),
         "Source"
     );
     editor.set_text_box_geometry(64, original).unwrap();
@@ -1448,7 +1462,10 @@ fn text_box_properties_updates_are_guarded_and_byte_exact() {
     editor.set_text_box_properties(64, changed.clone()).unwrap();
     assert_eq!(editor.text_box_properties(64).unwrap(), changed);
     assert_eq!(
-        editor.drawable_text_storages().unwrap()[0].storage.storage.text(),
+        editor.drawable_text_storages().unwrap()[0]
+            .storage
+            .storage
+            .text(),
         "Source"
     );
     editor.set_text_box_properties(64, original).unwrap();
@@ -1473,7 +1490,7 @@ fn body_anchored_text_box_duplicate_delete_is_independent_and_exact() {
 
     let created = editor.duplicate_text_box(64, 0, "Clone 🚀").unwrap();
     assert_ne!(created.drawable_object_id, source.drawable_object_id);
-    assert_ne!(created.storage.object_id, source.storage.object_id);
+    assert_ne!(created.storage.id, source.storage.id);
     assert_eq!(created.storage.storage.text(), "Clone 🚀");
     assert_eq!(editor.body_text().unwrap(), "￼Before￼After");
     let body: StorageArchive = decode_typed_package_object(

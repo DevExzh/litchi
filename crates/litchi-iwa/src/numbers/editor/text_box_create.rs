@@ -130,7 +130,7 @@ impl NumbersEditor {
                 Error::InvalidFormat("Numbers text-box creation failed validation".to_owned())
             })?;
         let created_graph = numbers_text_box_graph(verified.package(), sheet_id, ids.drawable)?;
-        if created.storage.object_id != ids.storage
+        if created.storage.id.get() != ids.storage
             || created.storage.storage.text() != text
             || created_graph.object_ids != ids.all()
             || verified.sheet_text_box_geometry(sheet_id, ids.drawable)? != geometry
@@ -472,12 +472,15 @@ mod tests {
         let duplicate = editor
             .duplicate_sheet_text_box(sheet_id, created.drawable_object_id, "Independent copy")
             .unwrap();
-        assert_ne!(duplicate.storage.object_id, created.storage.object_id);
+        assert_ne!(duplicate.storage.id, created.storage.id);
 
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let text_boxes = reopened.sheet_text_boxes(sheet_id).unwrap();
         assert_eq!(text_boxes.len(), 2);
-        assert_eq!(text_boxes[0].storage.storage.text(), "Updated independently");
+        assert_eq!(
+            text_boxes[0].storage.storage.text(),
+            "Updated independently"
+        );
         assert_eq!(text_boxes[1].storage.storage.text(), "Independent copy");
 
         editor
@@ -486,7 +489,10 @@ mod tests {
         let removed = editor
             .remove_sheet_text_box(sheet_id, created.drawable_object_id)
             .unwrap();
-        assert_eq!(removed.text_box.storage.storage.text(), "Updated independently");
+        assert_eq!(
+            removed.text_box.storage.storage.text(),
+            "Updated independently"
+        );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
     }
 
@@ -536,7 +542,7 @@ mod tests {
         assert_eq!(graph.object_ids.len(), 4);
         assert_eq!(graph.uuid_object_ids, graph.object_ids);
         assert_eq!(graph.drawable_id, created.drawable_object_id);
-        assert_eq!(graph.storage_id, created.storage.object_id);
+        assert_eq!(graph.storage_id, created.storage.id);
 
         let archive = editor.package().archive(&graph.archive_name).unwrap();
         let storage = tswp::StorageArchive::decode(

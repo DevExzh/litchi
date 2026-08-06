@@ -124,7 +124,7 @@ fn body_shape_graph_from_text(
         .parent
         .as_ref()
         .map(|reference| reference.identifier)
-        != Some(editor.body_storage_id)
+        != Some(editor.body_storage_id.get())
     {
         return Err(Error::InvalidFormat(format!(
             "Pages shape {drawable_object_id} is not owned by the body storage"
@@ -134,12 +134,12 @@ fn body_shape_graph_from_text(
         .owned_storage
         .as_ref()
         .map(|reference| reference.identifier)
-        != Some(text.storage.object_id)
+        != Some(text.storage.id.get())
         || shape
             .deprecated_storage
             .as_ref()
             .map(|reference| reference.identifier)
-            != Some(text.storage.object_id)
+            != Some(text.storage.id.get())
     {
         return Err(Error::InvalidFormat(format!(
             "Pages shape {drawable_object_id} has inconsistent storage ownership"
@@ -150,16 +150,16 @@ fn body_shape_graph_from_text(
             "Pages shape {drawable_object_id} has unsupported pencil annotations"
         )));
     }
-    if shape_storage_owner_count(editor.package(), text.storage.object_id)? != 1 {
+    if shape_storage_owner_count(editor.package(), text.storage.id.get())? != 1 {
         return Err(Error::InvalidFormat(format!(
             "Pages shape storage {} is not owned by exactly one shape",
-            text.storage.object_id
+            text.storage.id
         )));
     }
 
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -252,7 +252,7 @@ fn body_shape_graph_from_text(
     let mut object_ids = vec![drawable_object_id];
     object_ids.extend(caption_object_ids.iter().copied());
     object_ids.extend(title_object_ids.iter().copied());
-    object_ids.extend([text.storage.object_id, *attachment_id]);
+    object_ids.extend([text.storage.id.get(), *attachment_id]);
     if object_ids.iter().copied().collect::<HashSet<_>>().len() != object_ids.len() {
         return Err(Error::InvalidFormat(format!(
             "Pages shape {drawable_object_id} reuses private graph identifiers"
@@ -268,7 +268,7 @@ fn body_shape_graph_from_text(
         }
     }
     for (identifier, message_types, label) in [
-        (text.storage.object_id, STORAGE_MESSAGE_TYPES, "storage"),
+        (text.storage.id.get(), STORAGE_MESSAGE_TYPES, "storage"),
         (
             *attachment_id,
             &[DRAWABLE_ATTACHMENT_MESSAGE_TYPE][..],
@@ -297,7 +297,7 @@ fn body_shape_graph_from_text(
     let mut expected_uuid_ids = vec![drawable_object_id];
     expected_uuid_ids.extend(caption_object_ids);
     expected_uuid_ids.extend(title_object_ids);
-    expected_uuid_ids.push(text.storage.object_id);
+    expected_uuid_ids.push(text.storage.id.get());
     let uuid_object_ids = expected_uuid_ids
         .iter()
         .copied()

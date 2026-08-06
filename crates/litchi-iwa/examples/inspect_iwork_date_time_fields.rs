@@ -6,10 +6,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("usage: inspect_iwork_date_time_fields <input.pages|input.numbers|input.key>")?;
     let editor = IWorkTextEditor::open(input)?;
     for storage in editor.storages()? {
-        for field in editor.text_date_time_fields(storage.object_id)? {
+        for field in editor.text_date_time_fields(storage.id)? {
             println!(
                 "storage={} id={} range={}..{} settings={:?}",
-                storage.object_id,
+                storage.id,
                 field.id.object_id(),
                 field.range.start().utf16_index(),
                 field.range.end().utf16_index(),

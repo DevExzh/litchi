@@ -3410,7 +3410,7 @@ impl PagesEditor {
                     &mut staged,
                     template.info.drawable_object_id,
                     template.info.model_object_id,
-                    self.body_storage_id,
+                    self.body_storage_id.get(),
                     name,
                     rows,
                     columns,
@@ -3427,7 +3427,7 @@ impl PagesEditor {
         } else {
             let graph = crate::pages::creation::bootstrap_first_table_graph(
                 &mut staged,
-                self.body_storage_id,
+                self.body_storage_id.get(),
                 name,
                 rows,
                 columns,
@@ -3448,7 +3448,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             new_attachment_id,
         )?;
@@ -3536,7 +3536,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             attachment_id,
         )?;

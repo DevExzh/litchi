@@ -687,7 +687,7 @@ mod tests {
         assert_eq!(duplicate.name, "Shapes-1");
         let copied = editor.sheet_shapes(duplicate.object_id).unwrap().remove(0);
         assert_ne!(copied.drawable_object_id, source.drawable_object_id);
-        assert_ne!(copied.storage.object_id, source.storage.object_id);
+        assert_ne!(copied.storage.id, source.storage.id);
         assert_eq!(copied.sheet_id, duplicate.object_id);
         assert_eq!(copied.storage.storage, source.storage.storage);
         assert_eq!(copied.preset, source.preset);
@@ -748,10 +748,7 @@ mod tests {
             .remove(0);
         assert_eq!(reopened_source.storage.storage.text(), "Native-style shape");
         assert_eq!(reopened_copy.storage.storage.text(), "Independent copy");
-        assert_ne!(
-            reopened_source.storage.object_id,
-            reopened_copy.storage.object_id
-        );
+        assert_ne!(reopened_source.storage.id, reopened_copy.storage.id);
         assert_eq!(
             reopened
                 .sheet_shape_fill(source_sheet.object_id, source.drawable_object_id)

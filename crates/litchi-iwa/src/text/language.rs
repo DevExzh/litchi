@@ -395,7 +395,7 @@ mod tests {
                 },
             )
             .unwrap();
-        let storage_id = text_box.storage.object_id;
+        let storage_id = text_box.storage.id;
         let archive_name = locate_storage(pages.package(), storage_id)
             .unwrap()
             .archive_name;

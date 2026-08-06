@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let Some(output) = arguments.next() else {
         for storage in editor.storages()? {
             if !storage.storage.is_empty() {
-                println!("{}\t{:?}", storage.object_id, storage.storage.text());
+                println!("{}\t{:?}", storage.id, storage.storage.text());
             }
         }
         return Ok(());

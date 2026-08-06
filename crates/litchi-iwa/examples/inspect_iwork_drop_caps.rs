@@ -15,10 +15,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let editor = IWorkTextEditor::open(input)?;
     for storage in editor.storages()? {
-        for placement in editor.paragraph_drop_caps(storage.object_id)? {
+        for placement in editor.paragraph_drop_caps(storage.id)? {
             println!(
                 "storage={} paragraph_utf16={} {:?}",
-                storage.object_id,
+                storage.id,
                 placement.paragraph.utf16_index(),
                 placement.drop_cap
             );

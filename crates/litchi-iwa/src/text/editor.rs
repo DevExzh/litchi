@@ -18,6 +18,7 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
+use super::TextStorageId;
 use super::bookmark::{
     add_text_bookmark, remove_text_bookmark, remove_unreferenced_bookmark_objects, text_bookmarks,
     update_text_bookmark,
@@ -36,7 +37,6 @@ use super::highlight::{
     add_text_highlight, remove_text_highlight, remove_unreferenced_highlight_objects,
     text_highlights, update_text_highlight,
 };
-use litchi_iwa_text::highlight::{TextHighlight, TextHighlightId};
 use super::hyperlink::{
     add_text_hyperlink, remove_text_hyperlink, remove_unreferenced_hyperlink_objects,
     text_hyperlinks, update_text_hyperlink,
@@ -104,9 +104,9 @@ use super::storage_wire::{
     update_parsed_archive,
 };
 use super::style::{
-    ParagraphBackground, ParagraphBorders, ParagraphIndents, ParagraphLineSpacing,
-    ParagraphSpacing, TextAlignment, Background, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextDecorations, TextLigatures, Outline, TextScript, Shadow,
+    Background, Outline, ParagraphBackground, ParagraphBorders, ParagraphIndents,
+    ParagraphLineSpacing, ParagraphSpacing, Shadow, TextAlignment, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures, TextScript,
     TextStyle,
 };
 use super::text_comment::{
@@ -118,6 +118,7 @@ use litchi_iwa_text::comment::{
     TextCommentReplyId,
 };
 use litchi_iwa_text::date_time::{DisplayText, Settings};
+use litchi_iwa_text::highlight::{TextHighlight, TextHighlightId};
 use litchi_iwa_text::hyperlink::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
 use litchi_iwa_text::number_attachment::{
     TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings,
@@ -134,9 +135,13 @@ use litchi_iwa_text::{TextLanguage, TextLanguageRun};
 /// A discoverable text storage within an iWork package.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextStorageInfo {
-    pub object_id: u64,
-    pub message_type: u32,
-    pub kind: Option<i32>,
+    /// Stable identity for this writable text storage.
+    pub id: TextStorageId,
+    /// Native message type retained inside the IWA adapter for wire writes.
+    pub(crate) message_type: u32,
+    /// Native storage kind retained inside the IWA adapter for format-specific
+    /// structural decoding.
+    pub(crate) kind: Option<i32>,
     pub storage: Storage,
 }
 
@@ -166,21 +171,25 @@ impl IWorkTextEditor {
     pub fn storages(&self) -> Result<Vec<TextStorageInfo>> {
         let mut storages = locate_text_storages(&self.package)?
             .into_iter()
-            .map(|location| TextStorageInfo {
-                object_id: location.object_id,
-                message_type: location.message_type,
-                kind: location.storage.kind,
-                storage: Storage::from_text(location.storage.text.concat()),
+            .map(|location| {
+                let id = TextStorageId::try_from(location.object_id)
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+                Ok(TextStorageInfo {
+                    id,
+                    message_type: location.message_type,
+                    kind: location.storage.kind,
+                    storage: Storage::from_text(location.storage.text.concat()),
+                })
             })
-            .collect::<Vec<_>>();
-        storages.sort_by_key(|storage| storage.object_id);
+            .collect::<Result<Vec<_>>>()?;
+        storages.sort_by_key(|storage| storage.id);
         Ok(storages)
     }
 
-    pub fn storage(&self, object_id: u64) -> Result<TextStorageInfo> {
-        let location = locate_text_storage(&self.package, object_id)?;
+    pub fn storage(&self, id: TextStorageId) -> Result<TextStorageInfo> {
+        let location = locate_text_storage(&self.package, id.get())?;
         Ok(TextStorageInfo {
-            object_id,
+            id,
             message_type: location.message_type,
             kind: location.storage.kind,
             storage: Storage::from_text(location.storage.text.concat()),
@@ -190,10 +199,11 @@ impl IWorkTextEditor {
     /// Replace a UTF-16 range, matching the indexing used by iWork attributes.
     pub fn replace_text(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         range: Range<usize>,
         replacement: &str,
     ) -> Result<()> {
+        let object_id = object_id.get();
         if range.start > range.end {
             return Err(Error::ParseError(
                 "Text replacement range starts after it ends".to_string(),
@@ -207,7 +217,7 @@ impl IWorkTextEditor {
         Ok(())
     }
 
-    pub fn set_text(&mut self, object_id: u64, replacement: &str) -> Result<()> {
+    pub fn set_text(&mut self, object_id: TextStorageId, replacement: &str) -> Result<()> {
         let storage = self.storage(object_id)?;
         self.replace_text(
             object_id,
@@ -217,7 +227,8 @@ impl IWorkTextEditor {
     }
 
     /// Read effective uniform font size, bold, and italic formatting.
-    pub fn text_style(&self, object_id: u64) -> Result<TextStyle> {
+    pub fn text_style(&self, object_id: TextStorageId) -> Result<TextStyle> {
+        let object_id = object_id.get();
         text_style(&self.package, object_id)
     }
 
@@ -225,7 +236,8 @@ impl IWorkTextEditor {
     ///
     /// Rich text containing multiple paragraph-style boundaries is rejected so
     /// the operation cannot flatten independently formatted paragraphs.
-    pub fn set_text_style(&mut self, object_id: u64, style: TextStyle) -> Result<()> {
+    pub fn set_text_style(&mut self, object_id: TextStorageId, style: TextStyle) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_text_style(&mut staged, object_id, style)?;
         let bytes = staged.to_bytes()?;
@@ -240,7 +252,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore inherited character formatting while preserving paragraph overrides.
-    pub fn reset_text_style(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_text_style(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_text_style(&mut staged, object_id)?;
         if changed {
@@ -252,7 +265,8 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective PostScript font identity of uniformly styled text.
-    pub fn text_font(&self, object_id: u64) -> Result<TextFont> {
+    pub fn text_font(&self, object_id: TextStorageId) -> Result<TextFont> {
+        let object_id = object_id.get();
         text_font(&self.package, object_id)
     }
 
@@ -260,7 +274,8 @@ impl IWorkTextEditor {
     ///
     /// Rich text containing multiple paragraph-style boundaries is rejected so
     /// the operation cannot flatten independently formatted paragraphs.
-    pub fn set_text_font(&mut self, object_id: u64, font: TextFont) -> Result<()> {
+    pub fn set_text_font(&mut self, object_id: TextStorageId, font: TextFont) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_text_font(&mut staged, object_id, font.clone())?;
         let bytes = staged.to_bytes()?;
@@ -275,7 +290,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore the inherited font while preserving sibling overrides.
-    pub fn reset_text_font(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_text_font(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_text_font(&mut staged, object_id)?;
         if changed {
@@ -287,22 +303,29 @@ impl IWorkTextEditor {
     }
 
     /// Read every explicit native language boundary in a text storage.
-    pub fn text_languages(&self, object_id: u64) -> Result<Vec<TextLanguageRun>> {
+    pub fn text_languages(&self, object_id: TextStorageId) -> Result<Vec<TextLanguageRun>> {
+        let object_id = object_id.get();
         text_languages(&self.package, object_id)
     }
 
     /// Read the effective language at one validated UTF-16 text boundary.
-    pub fn text_language(&self, object_id: u64, position: TextPosition) -> Result<TextLanguage> {
+    pub fn text_language(
+        &self,
+        object_id: TextStorageId,
+        position: TextPosition,
+    ) -> Result<TextLanguage> {
+        let object_id = object_id.get();
         text_language(&self.package, object_id, position)
     }
 
     /// Atomically create or update a language boundary.
     pub fn set_text_language(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         position: TextPosition,
         language: TextLanguage,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_text_language(&mut staged, object_id, position, &language)?;
         let bytes = staged.to_bytes()?;
@@ -319,9 +342,10 @@ impl IWorkTextEditor {
     /// Delete one nonzero language boundary so it inherits the preceding run.
     pub fn remove_text_language_boundary(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         position: TextPosition,
     ) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = remove_text_language_boundary(&mut staged, object_id, position)?;
         if changed {
@@ -341,7 +365,8 @@ impl IWorkTextEditor {
     }
 
     /// Remove all explicit language boundaries and restore automatic selection.
-    pub fn reset_text_languages(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_text_languages(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_text_languages(&mut staged, object_id)?;
         if changed {
@@ -358,98 +383,112 @@ impl IWorkTextEditor {
     }
 
     /// Read every native hyperlink in a text storage.
-    pub fn text_hyperlinks(&self, object_id: u64) -> Result<Vec<TextHyperlink>> {
+    pub fn text_hyperlinks(&self, object_id: TextStorageId) -> Result<Vec<TextHyperlink>> {
+        let object_id = object_id.get();
         text_hyperlinks(&self.package, object_id)
     }
 
     /// Create a native hyperlink over a nonempty, unoccupied UTF-16 range.
     pub fn add_text_hyperlink(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         range: TextRange,
         target: TextHyperlinkTarget,
     ) -> Result<TextHyperlink> {
+        let object_id = object_id.get();
         add_text_hyperlink(&mut self.package, object_id, range, &target)
     }
 
     /// Atomically update a hyperlink's range and target while retaining its ID.
     pub fn update_text_hyperlink(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         id: TextHyperlinkId,
         range: TextRange,
         target: TextHyperlinkTarget,
     ) -> Result<TextHyperlink> {
+        let object_id = object_id.get();
         update_text_hyperlink(&mut self.package, object_id, id, range, &target)
     }
 
     /// Delete one native hyperlink and reclaim its owned smart-field object.
     pub fn remove_text_hyperlink(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         id: TextHyperlinkId,
     ) -> Result<TextHyperlink> {
+        let object_id = object_id.get();
         remove_text_hyperlink(&mut self.package, object_id, id)
     }
 
     /// Read every native ranged bookmark in a text storage.
-    pub fn text_bookmarks(&self, object_id: u64) -> Result<Vec<TextBookmark>> {
+    pub fn text_bookmarks(&self, object_id: TextStorageId) -> Result<Vec<TextBookmark>> {
+        let object_id = object_id.get();
         text_bookmarks(&self.package, object_id)
     }
 
     /// Create a native bookmark over a nonempty, unoccupied UTF-16 range.
     pub fn add_text_bookmark(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         range: TextRange,
         settings: TextBookmarkSettings,
     ) -> Result<TextBookmark> {
+        let object_id = object_id.get();
         add_text_bookmark(&mut self.package, object_id, range, &settings)
     }
 
     /// Atomically update a bookmark's range and settings while retaining its ID.
     pub fn update_text_bookmark(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         id: TextBookmarkId,
         range: TextRange,
         settings: TextBookmarkSettings,
     ) -> Result<TextBookmark> {
+        let object_id = object_id.get();
         update_text_bookmark(&mut self.package, object_id, id, range, &settings)
     }
 
     /// Delete one native bookmark and reclaim its owned bookmark-field object.
     pub fn remove_text_bookmark(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         id: TextBookmarkId,
     ) -> Result<TextBookmark> {
+        let object_id = object_id.get();
         remove_text_bookmark(&mut self.package, object_id, id)
     }
 
     /// Read every native Date & Time smart field in a text storage.
-    pub fn text_date_time_fields(&self, object_id: u64) -> Result<Vec<TextDateTimeField>> {
+    pub fn text_date_time_fields(
+        &self,
+        object_id: TextStorageId,
+    ) -> Result<Vec<TextDateTimeField>> {
+        let object_id = object_id.get();
         text_date_time_fields(&self.package, object_id)
     }
 
     /// Attach a Date & Time field to existing nonempty text.
     pub fn add_text_date_time_field(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         range: TextRange,
         settings: Settings,
     ) -> Result<TextDateTimeField> {
+        let object_id = object_id.get();
         add_text_date_time_field(&mut self.package, object_id, range, &settings)
     }
 
     /// Atomically insert exact display text and attach a Date & Time field.
     pub fn insert_text_date_time_field(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         position: TextPosition,
         display_text: DisplayText,
         settings: Settings,
     ) -> Result<TextDateTimeField> {
+        let object_id = object_id.get();
         insert_text_date_time_field(
             &mut self.package,
             object_id,
@@ -462,25 +501,31 @@ impl IWorkTextEditor {
     /// Atomically update a Date & Time field's range and formatter payload.
     pub fn update_text_date_time_field(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         id: TextDateTimeFieldId,
         range: TextRange,
         settings: Settings,
     ) -> Result<TextDateTimeField> {
+        let object_id = object_id.get();
         update_text_date_time_field(&mut self.package, object_id, id, range, &settings)
     }
 
     /// Delete one Date & Time field while retaining its visible text.
     pub fn remove_text_date_time_field(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         id: TextDateTimeFieldId,
     ) -> Result<TextDateTimeField> {
+        let object_id = object_id.get();
         remove_text_date_time_field(&mut self.package, object_id, id)
     }
 
     /// Read every native page/slide-number attachment in a text storage.
-    pub fn text_number_attachments(&self, object_id: u64) -> Result<Vec<TextNumberAttachment>> {
+    pub fn text_number_attachments(
+        &self,
+        object_id: TextStorageId,
+    ) -> Result<Vec<TextNumberAttachment>> {
+        let object_id = object_id.get();
         text_number_attachments(&self.package, object_id)
     }
 
@@ -490,142 +535,158 @@ impl IWorkTextEditor {
     /// high-level wrappers when creating page numbers or page counts.
     pub fn insert_text_number_attachment(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         position: TextPosition,
         settings: TextNumberAttachmentSettings,
     ) -> Result<TextNumberAttachment> {
+        let object_id = object_id.get();
         insert_text_number_attachment(&mut self.package, object_id, position, &settings)
     }
 
     /// Atomically update the lossless payload of a number attachment.
     pub fn update_text_number_attachment(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         id: TextNumberAttachmentId,
         settings: TextNumberAttachmentSettings,
     ) -> Result<TextNumberAttachment> {
+        let object_id = object_id.get();
         update_text_number_attachment(&mut self.package, object_id, id, &settings)
     }
 
     /// Delete one number attachment together with its U+FFFC placeholder.
     pub fn remove_text_number_attachment(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         id: TextNumberAttachmentId,
     ) -> Result<TextNumberAttachment> {
+        let object_id = object_id.get();
         remove_text_number_attachment(&mut self.package, object_id, id)
     }
 
     /// Read every native plain highlight in a text storage.
-    pub fn text_highlights(&self, object_id: u64) -> Result<Vec<TextHighlight>> {
+    pub fn text_highlights(&self, object_id: TextStorageId) -> Result<Vec<TextHighlight>> {
+        let object_id = object_id.get();
         text_highlights(&self.package, object_id)
     }
 
     /// Create a native plain highlight over a nonempty, unoccupied UTF-16 range.
     pub fn add_text_highlight(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         range: TextRange,
     ) -> Result<TextHighlight> {
+        let object_id = object_id.get();
         add_text_highlight(&mut self.package, object_id, range)
     }
 
     /// Atomically move a plain highlight while retaining its native identity.
     pub fn update_text_highlight(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         id: TextHighlightId,
         range: TextRange,
     ) -> Result<TextHighlight> {
+        let object_id = object_id.get();
         update_text_highlight(&mut self.package, object_id, id, range)
     }
 
     /// Delete one plain highlight and its owned empty annotation graph.
     pub fn remove_text_highlight(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         id: TextHighlightId,
     ) -> Result<TextHighlight> {
+        let object_id = object_id.get();
         remove_text_highlight(&mut self.package, object_id, id)
     }
 
     /// Read every native ranged comment in a text storage.
-    pub fn text_comments(&self, object_id: u64) -> Result<Vec<TextComment>> {
+    pub fn text_comments(&self, object_id: TextStorageId) -> Result<Vec<TextComment>> {
+        let object_id = object_id.get();
         text_comments(&self.package, object_id)
     }
 
     /// Create a native comment over a nonempty, unoccupied UTF-16 range.
     pub fn add_text_comment(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         range: TextRange,
         body: TextCommentBody,
     ) -> Result<TextComment> {
+        let object_id = object_id.get();
         add_text_comment(&mut self.package, object_id, range, body)
     }
 
     /// Atomically update a comment's range and body while retaining its ID.
     pub fn update_text_comment(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         id: TextCommentId,
         range: TextRange,
         body: TextCommentBody,
     ) -> Result<TextComment> {
+        let object_id = object_id.get();
         update_text_comment(&mut self.package, object_id, id, range, body)
     }
 
     /// Delete one ranged comment and its owned root/reply annotation graph.
     pub fn remove_text_comment(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         id: TextCommentId,
     ) -> Result<TextComment> {
+        let object_id = object_id.get();
         remove_text_comment(&mut self.package, object_id, id)
     }
 
     /// Read every direct reply to one ranged comment in stored order.
     pub fn text_comment_replies(
         &self,
-        object_id: u64,
+        object_id: TextStorageId,
         comment_id: TextCommentId,
     ) -> Result<Vec<TextCommentReply>> {
+        let object_id = object_id.get();
         text_comment_replies(&self.package, object_id, comment_id)
     }
 
     /// Append a direct reply to one ranged comment.
     pub fn add_text_comment_reply(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         comment_id: TextCommentId,
         body: TextCommentReplyBody,
     ) -> Result<TextCommentReply> {
+        let object_id = object_id.get();
         add_text_comment_reply(&mut self.package, object_id, comment_id, body)
     }
 
     /// Update a direct reply while retaining its ID and native metadata.
     pub fn update_text_comment_reply(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         comment_id: TextCommentId,
         reply_id: TextCommentReplyId,
         body: TextCommentReplyBody,
     ) -> Result<TextCommentReply> {
+        let object_id = object_id.get();
         update_text_comment_reply(&mut self.package, object_id, comment_id, reply_id, body)
     }
 
     /// Delete one direct reply and its owned comment storage.
     pub fn remove_text_comment_reply(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         comment_id: TextCommentId,
         reply_id: TextCommentReplyId,
     ) -> Result<TextCommentReply> {
+        let object_id = object_id.get();
         remove_text_comment_reply(&mut self.package, object_id, comment_id, reply_id)
     }
 
     /// Read the canonical list preset applied uniformly to a text storage.
-    pub fn paragraph_list(&self, object_id: u64) -> Result<ParagraphList> {
+    pub fn paragraph_list(&self, object_id: TextStorageId) -> Result<ParagraphList> {
+        let object_id = object_id.get();
         paragraph_list(&self.package, object_id)
     }
 
@@ -633,7 +694,12 @@ impl IWorkTextEditor {
     ///
     /// Storages with multiple list-style boundaries are rejected so the
     /// operation cannot flatten independently formatted paragraphs.
-    pub fn set_paragraph_list(&mut self, object_id: u64, list: ParagraphList) -> Result<()> {
+    pub fn set_paragraph_list(
+        &mut self,
+        object_id: TextStorageId,
+        list: ParagraphList,
+    ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_list(&mut staged, object_id, list)?;
         let bytes = staged.to_bytes()?;
@@ -648,7 +714,8 @@ impl IWorkTextEditor {
     }
 
     /// Remove uniform list formatting by applying the canonical None preset.
-    pub fn reset_paragraph_list(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_paragraph_list(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list(&mut staged, object_id)?;
         if changed {
@@ -665,7 +732,8 @@ impl IWorkTextEditor {
     }
 
     /// Read every canonical list-preset boundary in a text storage.
-    pub fn paragraph_lists(&self, object_id: u64) -> Result<Vec<ParagraphListPlacement>> {
+    pub fn paragraph_lists(&self, object_id: TextStorageId) -> Result<Vec<ParagraphListPlacement>> {
+        let object_id = object_id.get();
         paragraph_lists(&self.package, object_id)
     }
 
@@ -675,9 +743,10 @@ impl IWorkTextEditor {
     /// begin at [`TextPosition::ZERO`]. Adjacent equal presets are coalesced.
     pub fn set_paragraph_lists(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         placements: &[ParagraphListPlacement],
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_lists(&mut staged, object_id, placements)?;
         let expected = paragraph_lists(&staged, object_id)?;
@@ -695,27 +764,30 @@ impl IWorkTextEditor {
     /// Read every effective list-level boundary in a text storage.
     pub fn paragraph_list_levels(
         &self,
-        object_id: u64,
+        object_id: TextStorageId,
     ) -> Result<Vec<ParagraphListLevelPlacement>> {
+        let object_id = object_id.get();
         paragraph_list_levels(&self.package, object_id)
     }
 
     /// Read the effective list level at one validated paragraph start.
     pub fn paragraph_list_level(
         &self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<ParagraphListLevel> {
+        let object_id = object_id.get();
         paragraph_list_level(&self.package, object_id, paragraph)
     }
 
     /// Atomically set one paragraph's zero-based list nesting level.
     pub fn set_paragraph_list_level(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
         level: ParagraphListLevel,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_list_level(&mut staged, object_id, paragraph, level)?;
         let bytes = staged.to_bytes()?;
@@ -732,9 +804,10 @@ impl IWorkTextEditor {
     /// Restore one paragraph to the top-level list nesting level.
     pub fn reset_paragraph_list_level(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_level(&mut staged, object_id, paragraph)?;
         if changed {
@@ -753,19 +826,21 @@ impl IWorkTextEditor {
     /// Read whether one paragraph continues or restarts numbered-list sequencing.
     pub fn paragraph_list_numbering(
         &self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<ParagraphListNumbering> {
+        let object_id = object_id.get();
         paragraph_list_numbering(&self.package, object_id, paragraph)
     }
 
     /// Continue or restart numbered-list sequencing at one paragraph.
     pub fn set_paragraph_list_numbering(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
         numbering: ParagraphListNumbering,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_list_numbering(&mut staged, object_id, paragraph, numbering)?;
         let bytes = staged.to_bytes()?;
@@ -782,19 +857,21 @@ impl IWorkTextEditor {
     /// Read one numbered paragraph's effective locale-aware label format.
     pub fn paragraph_list_number_format(
         &self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<ParagraphListNumberFormat> {
+        let object_id = object_id.get();
         paragraph_list_number_format(&self.package, object_id, paragraph)
     }
 
     /// Atomically set one numbered paragraph's locale-aware label format.
     pub fn set_paragraph_list_number_format(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
         format: ParagraphListNumberFormat,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_list_number_format(&mut staged, object_id, paragraph, format)?;
         let bytes = staged.to_bytes()?;
@@ -811,9 +888,10 @@ impl IWorkTextEditor {
     /// Restore Apple's standard decimal-period format (`1.`, `2.`, `3.`).
     pub fn reset_paragraph_list_number_format(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_number_format(&mut staged, object_id, paragraph)?;
         if changed {
@@ -835,19 +913,21 @@ impl IWorkTextEditor {
     /// Read whether one numbered paragraph displays its full hierarchical number.
     pub fn paragraph_list_number_tiering(
         &self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<ParagraphListNumberTiering> {
+        let object_id = object_id.get();
         paragraph_list_number_tiering(&self.package, object_id, paragraph)
     }
 
     /// Atomically choose flat or hierarchical numbering for one list level.
     pub fn set_paragraph_list_number_tiering(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
         tiering: ParagraphListNumberTiering,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_list_number_tiering(&mut staged, object_id, paragraph, tiering)?;
         let bytes = staged.to_bytes()?;
@@ -865,9 +945,10 @@ impl IWorkTextEditor {
     /// Restore flat numbering for one numbered-list level.
     pub fn reset_paragraph_list_number_tiering(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_number_tiering(&mut staged, object_id, paragraph)?;
         if changed {
@@ -889,19 +970,21 @@ impl IWorkTextEditor {
     /// Read one numbered paragraph's effective number-label size.
     pub fn paragraph_list_number_scale(
         &self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<ParagraphListNumberScale> {
+        let object_id = object_id.get();
         paragraph_list_number_scale(&self.package, object_id, paragraph)
     }
 
     /// Atomically set one numbered paragraph's number-label size.
     pub fn set_paragraph_list_number_scale(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
         scale: ParagraphListNumberScale,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_list_number_scale(&mut staged, object_id, paragraph, scale)?;
         let bytes = staged.to_bytes()?;
@@ -918,9 +1001,10 @@ impl IWorkTextEditor {
     /// Restore the standard 100% number-label size.
     pub fn reset_paragraph_list_number_scale(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_number_scale(&mut staged, object_id, paragraph)?;
         if changed {
@@ -942,19 +1026,21 @@ impl IWorkTextEditor {
     /// Read the effective text-bullet marker at one paragraph's list level.
     pub fn paragraph_list_bullet(
         &self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<ParagraphListBullet> {
+        let object_id = object_id.get();
         paragraph_list_bullet(&self.package, object_id, paragraph)
     }
 
     /// Atomically set one bullet-list paragraph's marker.
     pub fn set_paragraph_list_bullet(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
         bullet: &ParagraphListBullet,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_list_bullet(&mut staged, object_id, paragraph, bullet)?;
         let bytes = staged.to_bytes()?;
@@ -971,9 +1057,10 @@ impl IWorkTextEditor {
     /// Restore Apple's standard `•` marker at one bullet-list paragraph.
     pub fn reset_paragraph_list_bullet(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_bullet(&mut staged, object_id, paragraph)?;
         if changed {
@@ -994,19 +1081,21 @@ impl IWorkTextEditor {
     /// Read one bullet-list paragraph's effective marker size and baseline.
     pub fn paragraph_list_bullet_geometry(
         &self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<ParagraphListBulletGeometry> {
+        let object_id = object_id.get();
         paragraph_list_bullet_geometry(&self.package, object_id, paragraph)
     }
 
     /// Atomically set one bullet-list paragraph's marker size and baseline.
     pub fn set_paragraph_list_bullet_geometry(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
         geometry: ParagraphListBulletGeometry,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_list_bullet_geometry(&mut staged, object_id, paragraph, geometry)?;
         let bytes = staged.to_bytes()?;
@@ -1024,9 +1113,10 @@ impl IWorkTextEditor {
     /// Restore Apple's standard marker size and baseline for this nesting level.
     pub fn reset_paragraph_list_bullet_geometry(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_bullet_geometry(&mut staged, object_id, paragraph)?;
         if changed {
@@ -1049,19 +1139,21 @@ impl IWorkTextEditor {
     /// Read one list paragraph's effective label and text-gap indentation.
     pub fn paragraph_list_indentation(
         &self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<ParagraphListIndentation> {
+        let object_id = object_id.get();
         paragraph_list_indentation(&self.package, object_id, paragraph)
     }
 
     /// Atomically set one list paragraph's label and text-gap indentation.
     pub fn set_paragraph_list_indentation(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
         indentation: ParagraphListIndentation,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_list_indentation(&mut staged, object_id, paragraph, indentation)?;
         let bytes = staged.to_bytes()?;
@@ -1078,9 +1170,10 @@ impl IWorkTextEditor {
     /// Restore Apple's standard indentation for this list preset and level.
     pub fn reset_paragraph_list_indentation(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_indentation(&mut staged, object_id, paragraph)?;
         if changed {
@@ -1113,19 +1206,21 @@ impl IWorkTextEditor {
     /// Read one list paragraph's effective label color.
     pub fn paragraph_list_label_color(
         &self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<ParagraphListLabelColor> {
+        let object_id = object_id.get();
         paragraph_list_label_color(&self.package, object_id, paragraph)
     }
 
     /// Atomically set one list paragraph's bullet or number color.
     pub fn set_paragraph_list_label_color(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
         color: ParagraphListLabelColor,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_list_label_color(&mut staged, object_id, paragraph, color)?;
         let bytes = staged.to_bytes()?;
@@ -1142,9 +1237,10 @@ impl IWorkTextEditor {
     /// Restore the label to the paragraph's automatic text color.
     pub fn reset_paragraph_list_label_color(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_list_label_color(&mut staged, object_id, paragraph)?;
         if changed {
@@ -1164,7 +1260,8 @@ impl IWorkTextEditor {
     }
 
     /// Read effective uniform underline and strikethrough formatting.
-    pub fn text_decorations(&self, object_id: u64) -> Result<TextDecorations> {
+    pub fn text_decorations(&self, object_id: TextStorageId) -> Result<TextDecorations> {
+        let object_id = object_id.get();
         text_decorations(&self.package, object_id)
     }
 
@@ -1174,9 +1271,10 @@ impl IWorkTextEditor {
     /// the operation cannot flatten independently formatted paragraphs.
     pub fn set_text_decorations(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         decorations: TextDecorations,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_text_decorations(&mut staged, object_id, decorations)?;
         let bytes = staged.to_bytes()?;
@@ -1191,7 +1289,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore inherited text decorations while preserving sibling overrides.
-    pub fn reset_text_decorations(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_text_decorations(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_text_decorations(&mut staged, object_id)?;
         if changed {
@@ -1203,7 +1302,8 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective uniform text color.
-    pub fn text_color(&self, object_id: u64) -> Result<RgbaColor> {
+    pub fn text_color(&self, object_id: TextStorageId) -> Result<RgbaColor> {
+        let object_id = object_id.get();
         text_color(&self.package, object_id)
     }
 
@@ -1211,7 +1311,8 @@ impl IWorkTextEditor {
     ///
     /// Rich text containing multiple paragraph-style boundaries is rejected so
     /// the operation cannot flatten independently formatted paragraphs.
-    pub fn set_text_color(&mut self, object_id: u64, color: RgbaColor) -> Result<()> {
+    pub fn set_text_color(&mut self, object_id: TextStorageId, color: RgbaColor) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_text_color(&mut staged, object_id, color)?;
         let bytes = staged.to_bytes()?;
@@ -1226,7 +1327,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore the inherited text color while preserving sibling overrides.
-    pub fn reset_text_color(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_text_color(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_text_color(&mut staged, object_id)?;
         if changed {
@@ -1238,7 +1340,8 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective uniform capitalization mode.
-    pub fn text_capitalization(&self, object_id: u64) -> Result<TextCapitalization> {
+    pub fn text_capitalization(&self, object_id: TextStorageId) -> Result<TextCapitalization> {
+        let object_id = object_id.get();
         text_capitalization(&self.package, object_id)
     }
 
@@ -1248,9 +1351,10 @@ impl IWorkTextEditor {
     /// the operation cannot flatten independently formatted paragraphs.
     pub fn set_text_capitalization(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         capitalization: TextCapitalization,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_text_capitalization(&mut staged, object_id, capitalization)?;
         let bytes = staged.to_bytes()?;
@@ -1265,7 +1369,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore inherited capitalization while preserving sibling overrides.
-    pub fn reset_text_capitalization(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_text_capitalization(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_text_capitalization(&mut staged, object_id)?;
         if changed {
@@ -1277,7 +1382,8 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective uniform baseline script.
-    pub fn text_script(&self, object_id: u64) -> Result<TextScript> {
+    pub fn text_script(&self, object_id: TextStorageId) -> Result<TextScript> {
+        let object_id = object_id.get();
         text_script(&self.package, object_id)
     }
 
@@ -1285,7 +1391,8 @@ impl IWorkTextEditor {
     ///
     /// Rich text containing multiple paragraph-style boundaries is rejected so
     /// the operation cannot flatten independently formatted paragraphs.
-    pub fn set_text_script(&mut self, object_id: u64, script: TextScript) -> Result<()> {
+    pub fn set_text_script(&mut self, object_id: TextStorageId, script: TextScript) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_text_script(&mut staged, object_id, script)?;
         let bytes = staged.to_bytes()?;
@@ -1300,7 +1407,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore inherited baseline script while preserving sibling overrides.
-    pub fn reset_text_script(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_text_script(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_text_script(&mut staged, object_id)?;
         if changed {
@@ -1312,7 +1420,8 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective uniform custom baseline displacement.
-    pub fn text_baseline_shift(&self, object_id: u64) -> Result<TextBaselineShift> {
+    pub fn text_baseline_shift(&self, object_id: TextStorageId) -> Result<TextBaselineShift> {
+        let object_id = object_id.get();
         text_baseline_shift(&self.package, object_id)
     }
 
@@ -1322,9 +1431,10 @@ impl IWorkTextEditor {
     /// the operation cannot flatten independently formatted paragraphs.
     pub fn set_text_baseline_shift(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         shift: TextBaselineShift,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_text_baseline_shift(&mut staged, object_id, shift)?;
         let bytes = staged.to_bytes()?;
@@ -1339,7 +1449,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore the inherited baseline displacement while preserving sibling overrides.
-    pub fn reset_text_baseline_shift(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_text_baseline_shift(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_text_baseline_shift(&mut staged, object_id)?;
         if changed {
@@ -1351,7 +1462,8 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective uniform character spacing.
-    pub fn text_character_spacing(&self, object_id: u64) -> Result<TextCharacterSpacing> {
+    pub fn text_character_spacing(&self, object_id: TextStorageId) -> Result<TextCharacterSpacing> {
+        let object_id = object_id.get();
         text_character_spacing(&self.package, object_id)
     }
 
@@ -1361,9 +1473,10 @@ impl IWorkTextEditor {
     /// the operation cannot flatten independently formatted paragraphs.
     pub fn set_text_character_spacing(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         spacing: TextCharacterSpacing,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_text_character_spacing(&mut staged, object_id, spacing)?;
         let bytes = staged.to_bytes()?;
@@ -1378,7 +1491,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore inherited character spacing while preserving sibling overrides.
-    pub fn reset_text_character_spacing(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_text_character_spacing(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_text_character_spacing(&mut staged, object_id)?;
         if changed {
@@ -1390,7 +1504,8 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective uniform ligature policy.
-    pub fn text_ligatures(&self, object_id: u64) -> Result<TextLigatures> {
+    pub fn text_ligatures(&self, object_id: TextStorageId) -> Result<TextLigatures> {
+        let object_id = object_id.get();
         text_ligatures(&self.package, object_id)
     }
 
@@ -1398,7 +1513,12 @@ impl IWorkTextEditor {
     ///
     /// Rich text containing multiple paragraph-style boundaries is rejected so
     /// the operation cannot flatten independently formatted paragraphs.
-    pub fn set_text_ligatures(&mut self, object_id: u64, ligatures: TextLigatures) -> Result<()> {
+    pub fn set_text_ligatures(
+        &mut self,
+        object_id: TextStorageId,
+        ligatures: TextLigatures,
+    ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_text_ligatures(&mut staged, object_id, ligatures)?;
         let bytes = staged.to_bytes()?;
@@ -1413,7 +1533,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore inherited ligatures while preserving sibling overrides.
-    pub fn reset_text_ligatures(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_text_ligatures(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_text_ligatures(&mut staged, object_id)?;
         if changed {
@@ -1425,7 +1546,8 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective uniform text outline.
-    pub fn text_outline(&self, object_id: u64) -> Result<Outline> {
+    pub fn text_outline(&self, object_id: TextStorageId) -> Result<Outline> {
+        let object_id = object_id.get();
         text_outline(&self.package, object_id)
     }
 
@@ -1433,7 +1555,8 @@ impl IWorkTextEditor {
     ///
     /// Rich text containing multiple paragraph-style boundaries is rejected so
     /// the operation cannot flatten independently formatted paragraphs.
-    pub fn set_text_outline(&mut self, object_id: u64, outline: Outline) -> Result<()> {
+    pub fn set_text_outline(&mut self, object_id: TextStorageId, outline: Outline) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_text_outline(&mut staged, object_id, outline)?;
         let bytes = staged.to_bytes()?;
@@ -1448,7 +1571,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore the inherited outline while preserving sibling overrides.
-    pub fn reset_text_outline(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_text_outline(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_text_outline(&mut staged, object_id)?;
         if changed {
@@ -1460,7 +1584,8 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective uniform text shadow.
-    pub fn text_shadow(&self, object_id: u64) -> Result<Shadow> {
+    pub fn text_shadow(&self, object_id: TextStorageId) -> Result<Shadow> {
+        let object_id = object_id.get();
         text_shadow(&self.package, object_id)
     }
 
@@ -1468,7 +1593,8 @@ impl IWorkTextEditor {
     ///
     /// Rich text containing multiple paragraph-style boundaries is rejected so
     /// the operation cannot flatten independently formatted paragraphs.
-    pub fn set_text_shadow(&mut self, object_id: u64, shadow: Shadow) -> Result<()> {
+    pub fn set_text_shadow(&mut self, object_id: TextStorageId, shadow: Shadow) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_text_shadow(&mut staged, object_id, shadow)?;
         let bytes = staged.to_bytes()?;
@@ -1483,7 +1609,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore the inherited shadow while preserving sibling overrides.
-    pub fn reset_text_shadow(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_text_shadow(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_text_shadow(&mut staged, object_id)?;
         if changed {
@@ -1495,7 +1622,8 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective solid background behind uniformly styled text.
-    pub fn text_background(&self, object_id: u64) -> Result<Background> {
+    pub fn text_background(&self, object_id: TextStorageId) -> Result<Background> {
+        let object_id = object_id.get();
         text_background(&self.package, object_id)
     }
 
@@ -1505,9 +1633,10 @@ impl IWorkTextEditor {
     /// the operation cannot flatten independently formatted paragraphs.
     pub fn set_text_background(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         background: Background,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_text_background(&mut staged, object_id, background)?;
         let bytes = staged.to_bytes()?;
@@ -1522,7 +1651,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore the inherited text background while preserving sibling overrides.
-    pub fn reset_text_background(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_text_background(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_text_background(&mut staged, object_id)?;
         if changed {
@@ -1534,7 +1664,8 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective solid fill across a uniform paragraph layout box.
-    pub fn paragraph_background(&self, object_id: u64) -> Result<ParagraphBackground> {
+    pub fn paragraph_background(&self, object_id: TextStorageId) -> Result<ParagraphBackground> {
+        let object_id = object_id.get();
         paragraph_background(&self.package, object_id)
     }
 
@@ -1544,9 +1675,10 @@ impl IWorkTextEditor {
     /// the operation cannot flatten independently formatted paragraphs.
     pub fn set_paragraph_background(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         background: ParagraphBackground,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_background(&mut staged, object_id, background)?;
         let bytes = staged.to_bytes()?;
@@ -1561,7 +1693,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore the inherited paragraph background while preserving sibling overrides.
-    pub fn reset_paragraph_background(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_paragraph_background(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_background(&mut staged, object_id)?;
         if changed {
@@ -1573,16 +1706,18 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective paragraph borders across a uniform paragraph layout box.
-    pub fn paragraph_borders(&self, object_id: u64) -> Result<ParagraphBorders> {
+    pub fn paragraph_borders(&self, object_id: TextStorageId) -> Result<ParagraphBorders> {
+        let object_id = object_id.get();
         paragraph_borders(&self.package, object_id)
     }
 
     /// Atomically set the Text → Layout paragraph borders.
     pub fn set_paragraph_borders(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         borders: ParagraphBorders,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_borders(&mut staged, object_id, borders)?;
         let bytes = staged.to_bytes()?;
@@ -1597,7 +1732,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore the inherited paragraph borders while preserving sibling overrides.
-    pub fn reset_paragraph_borders(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_paragraph_borders(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_borders(&mut staged, object_id)?;
         if changed {
@@ -1609,12 +1745,18 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective paragraph pagination and hyphenation controls.
-    pub fn paragraph_flow(&self, object_id: u64) -> Result<ParagraphFlow> {
+    pub fn paragraph_flow(&self, object_id: TextStorageId) -> Result<ParagraphFlow> {
+        let object_id = object_id.get();
         paragraph_flow(&self.package, object_id)
     }
 
     /// Atomically set the paragraph pagination and hyphenation controls.
-    pub fn set_paragraph_flow(&mut self, object_id: u64, flow: ParagraphFlow) -> Result<()> {
+    pub fn set_paragraph_flow(
+        &mut self,
+        object_id: TextStorageId,
+        flow: ParagraphFlow,
+    ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_flow(&mut staged, object_id, flow)?;
         let bytes = staged.to_bytes()?;
@@ -1629,7 +1771,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore the inherited paragraph flow while preserving sibling overrides.
-    pub fn reset_paragraph_flow(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_paragraph_flow(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_flow(&mut staged, object_id)?;
         if changed {
@@ -1641,16 +1784,21 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective base-writing direction of a text storage.
-    pub fn paragraph_writing_direction(&self, object_id: u64) -> Result<ParagraphWritingDirection> {
+    pub fn paragraph_writing_direction(
+        &self,
+        object_id: TextStorageId,
+    ) -> Result<ParagraphWritingDirection> {
+        let object_id = object_id.get();
         paragraph_writing_direction(&self.package, object_id)
     }
 
     /// Atomically set the base-writing direction for every paragraph.
     pub fn set_paragraph_writing_direction(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         direction: ParagraphWritingDirection,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_writing_direction(&mut staged, object_id, direction)?;
         let bytes = staged.to_bytes()?;
@@ -1665,7 +1813,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore the inherited base-writing direction while preserving sibling overrides.
-    pub fn reset_paragraph_writing_direction(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_paragraph_writing_direction(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_writing_direction(&mut staged, object_id)?;
         if changed {
@@ -1677,12 +1826,20 @@ impl IWorkTextEditor {
     }
 
     /// List the theme paragraph-style presets selectable for this text storage.
-    pub fn named_paragraph_styles(&self, object_id: u64) -> Result<Vec<NamedParagraphStyle>> {
+    pub fn named_paragraph_styles(
+        &self,
+        object_id: TextStorageId,
+    ) -> Result<Vec<NamedParagraphStyle>> {
+        let object_id = object_id.get();
         named_paragraph_styles(&self.package, object_id)
     }
 
     /// Read the named paragraph style selected for one uniform text storage.
-    pub fn applied_named_paragraph_style(&self, object_id: u64) -> Result<AppliedParagraphStyle> {
+    pub fn applied_named_paragraph_style(
+        &self,
+        object_id: TextStorageId,
+    ) -> Result<AppliedParagraphStyle> {
+        let object_id = object_id.get();
         applied_named_paragraph_style(&self.package, object_id)
     }
 
@@ -1692,8 +1849,9 @@ impl IWorkTextEditor {
     /// use of that style, and are cleared from this storage.
     pub fn redefine_applied_named_paragraph_style(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
     ) -> Result<NamedParagraphStyle> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let redefined = redefine_applied_named_paragraph_style(&mut staged, object_id)?;
         let bytes = staged.to_bytes()?;
@@ -1711,9 +1869,10 @@ impl IWorkTextEditor {
     /// Apply one selectable paragraph style and clear direct paragraph overrides.
     pub fn apply_named_paragraph_style(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         target: ParagraphStyleId,
     ) -> Result<NamedParagraphStyle> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let applied = apply_named_paragraph_style(&mut staged, object_id, target)?;
         let bytes = staged.to_bytes()?;
@@ -1731,10 +1890,11 @@ impl IWorkTextEditor {
     /// Clone one theme preset as a new named paragraph style.
     pub fn create_named_paragraph_style(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         source: ParagraphStyleId,
         name: ParagraphStyleName,
     ) -> Result<NamedParagraphStyle> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let created = create_named_paragraph_style(&mut staged, object_id, source, name)?;
         let bytes = staged.to_bytes()?;
@@ -1751,10 +1911,11 @@ impl IWorkTextEditor {
     /// Rename a selectable paragraph style without changing its stable identifier.
     pub fn rename_named_paragraph_style(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         target: ParagraphStyleId,
         name: ParagraphStyleName,
     ) -> Result<NamedParagraphStyle> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let renamed = rename_named_paragraph_style(&mut staged, object_id, target, name)?;
         let bytes = staged.to_bytes()?;
@@ -1775,9 +1936,10 @@ impl IWorkTextEditor {
     /// those references.
     pub fn delete_named_paragraph_style(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         target: ParagraphStyleId,
     ) -> Result<NamedParagraphStyle> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let deleted = delete_named_paragraph_style(&mut staged, object_id, target)?;
         let bytes = staged.to_bytes()?;
@@ -1801,10 +1963,11 @@ impl IWorkTextEditor {
     /// operation fail without changing the package.
     pub fn delete_applied_named_paragraph_style_with_replacement(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         target: ParagraphStyleId,
         replacement: ParagraphStyleId,
     ) -> Result<NamedParagraphStyle> {
+        let object_id = object_id.get();
         if target == replacement {
             return Err(Error::InvalidFormat(
                 "a deleted iWork paragraph style requires a different replacement".to_owned(),
@@ -1840,16 +2003,21 @@ impl IWorkTextEditor {
     }
 
     /// Read the paragraph style selected for the paragraph created by pressing Return.
-    pub fn paragraph_following_style(&self, object_id: u64) -> Result<ParagraphFollowingStyle> {
+    pub fn paragraph_following_style(
+        &self,
+        object_id: TextStorageId,
+    ) -> Result<ParagraphFollowingStyle> {
+        let object_id = object_id.get();
         paragraph_following_style(&self.package, object_id)
     }
 
     /// Atomically select the paragraph style used after pressing Return.
     pub fn set_paragraph_following_style(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         following_style: ParagraphFollowingStyle,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_following_style(&mut staged, object_id, following_style)?;
         let bytes = staged.to_bytes()?;
@@ -1864,7 +2032,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore the inherited following paragraph style while preserving sibling overrides.
-    pub fn reset_paragraph_following_style(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_paragraph_following_style(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_following_style(&mut staged, object_id)?;
         if changed {
@@ -1876,7 +2045,8 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective uniform paragraph alignment of a text storage.
-    pub fn paragraph_alignment(&self, object_id: u64) -> Result<TextAlignment> {
+    pub fn paragraph_alignment(&self, object_id: TextStorageId) -> Result<TextAlignment> {
+        let object_id = object_id.get();
         paragraph_alignment(&self.package, object_id)
     }
 
@@ -1886,9 +2056,10 @@ impl IWorkTextEditor {
     /// this whole-storage operation can never flatten unrelated formatting.
     pub fn set_paragraph_alignment(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         alignment: TextAlignment,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_alignment(&mut staged, object_id, alignment)?;
         let bytes = staged.to_bytes()?;
@@ -1903,7 +2074,8 @@ impl IWorkTextEditor {
     }
 
     /// Remove a private minimal alignment override and restore its parent style.
-    pub fn reset_paragraph_alignment(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_paragraph_alignment(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_alignment(&mut staged, object_id)?;
         if changed {
@@ -1915,16 +2087,18 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective uniform line spacing of a text storage.
-    pub fn paragraph_line_spacing(&self, object_id: u64) -> Result<ParagraphLineSpacing> {
+    pub fn paragraph_line_spacing(&self, object_id: TextStorageId) -> Result<ParagraphLineSpacing> {
+        let object_id = object_id.get();
         paragraph_line_spacing(&self.package, object_id)
     }
 
     /// Set one typed line-spacing mode across a uniformly styled text storage.
     pub fn set_paragraph_line_spacing(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         spacing: ParagraphLineSpacing,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_line_spacing(&mut staged, object_id, spacing)?;
         let bytes = staged.to_bytes()?;
@@ -1939,7 +2113,8 @@ impl IWorkTextEditor {
     }
 
     /// Remove a private line-spacing override while preserving sibling overrides.
-    pub fn reset_paragraph_line_spacing(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_paragraph_line_spacing(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_line_spacing(&mut staged, object_id)?;
         if changed {
@@ -1951,16 +2126,18 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective before/after spacing of a uniformly styled text storage.
-    pub fn paragraph_spacing(&self, object_id: u64) -> Result<ParagraphSpacing> {
+    pub fn paragraph_spacing(&self, object_id: TextStorageId) -> Result<ParagraphSpacing> {
+        let object_id = object_id.get();
         paragraph_spacing(&self.package, object_id)
     }
 
     /// Atomically set before/after paragraph spacing across a uniform text storage.
     pub fn set_paragraph_spacing(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         spacing: ParagraphSpacing,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_spacing(&mut staged, object_id, spacing)?;
         let bytes = staged.to_bytes()?;
@@ -1975,7 +2152,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore inherited before/after spacing while preserving sibling overrides.
-    pub fn reset_paragraph_spacing(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_paragraph_spacing(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_spacing(&mut staged, object_id)?;
         if changed {
@@ -1987,16 +2165,18 @@ impl IWorkTextEditor {
     }
 
     /// Read effective first-line, left, and right indentation of a uniform storage.
-    pub fn paragraph_indents(&self, object_id: u64) -> Result<ParagraphIndents> {
+    pub fn paragraph_indents(&self, object_id: TextStorageId) -> Result<ParagraphIndents> {
+        let object_id = object_id.get();
         paragraph_indents(&self.package, object_id)
     }
 
     /// Atomically set first-line, left, and right paragraph indentation.
     pub fn set_paragraph_indents(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         indents: ParagraphIndents,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_indents(&mut staged, object_id, indents)?;
         let bytes = staged.to_bytes()?;
@@ -2011,7 +2191,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore inherited indentation while preserving sibling paragraph overrides.
-    pub fn reset_paragraph_indents(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_paragraph_indents(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_indents(&mut staged, object_id)?;
         if changed {
@@ -2025,17 +2206,19 @@ impl IWorkTextEditor {
     /// Read the effective character used to align decimal tab stops.
     pub fn paragraph_decimal_tab_character(
         &self,
-        object_id: u64,
+        object_id: TextStorageId,
     ) -> Result<ParagraphDecimalTabCharacter> {
+        let object_id = object_id.get();
         paragraph_decimal_tab_character(&self.package, object_id)
     }
 
     /// Atomically set the character used to align decimal tab stops.
     pub fn set_paragraph_decimal_tab_character(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         character: ParagraphDecimalTabCharacter,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_decimal_tab_character(&mut staged, object_id, character)?;
         let bytes = staged.to_bytes()?;
@@ -2051,7 +2234,11 @@ impl IWorkTextEditor {
     }
 
     /// Restore the inherited decimal-tab character.
-    pub fn reset_paragraph_decimal_tab_character(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_paragraph_decimal_tab_character(
+        &mut self,
+        object_id: TextStorageId,
+    ) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_decimal_tab_character(&mut staged, object_id)?;
         if changed {
@@ -2065,17 +2252,19 @@ impl IWorkTextEditor {
     /// Read the effective distance between implicit paragraph tab stops.
     pub fn paragraph_default_tab_interval(
         &self,
-        object_id: u64,
+        object_id: TextStorageId,
     ) -> Result<ParagraphDefaultTabInterval> {
+        let object_id = object_id.get();
         paragraph_default_tab_interval(&self.package, object_id)
     }
 
     /// Atomically set the distance between implicit paragraph tab stops.
     pub fn set_paragraph_default_tab_interval(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         interval: ParagraphDefaultTabInterval,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_default_tab_interval(&mut staged, object_id, interval)?;
         let bytes = staged.to_bytes()?;
@@ -2091,7 +2280,11 @@ impl IWorkTextEditor {
     }
 
     /// Restore the inherited default-tab interval.
-    pub fn reset_paragraph_default_tab_interval(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_paragraph_default_tab_interval(
+        &mut self,
+        object_id: TextStorageId,
+    ) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_default_tab_interval(&mut staged, object_id)?;
         if changed {
@@ -2103,16 +2296,18 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective ordered ruler tab stops of a uniform text storage.
-    pub fn paragraph_tab_stops(&self, object_id: u64) -> Result<ParagraphTabStops> {
+    pub fn paragraph_tab_stops(&self, object_id: TextStorageId) -> Result<ParagraphTabStops> {
+        let object_id = object_id.get();
         paragraph_tab_stops(&self.package, object_id)
     }
 
     /// Atomically replace every explicit ruler tab stop of a uniform text storage.
     pub fn set_paragraph_tab_stops(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         stops: ParagraphTabStops,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_tab_stops(&mut staged, object_id, &stops)?;
         let bytes = staged.to_bytes()?;
@@ -2127,7 +2322,8 @@ impl IWorkTextEditor {
     }
 
     /// Restore inherited tab stops while preserving sibling paragraph overrides.
-    pub fn reset_paragraph_tab_stops(&mut self, object_id: u64) -> Result<bool> {
+    pub fn reset_paragraph_tab_stops(&mut self, object_id: TextStorageId) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = reset_paragraph_tab_stops(&mut staged, object_id)?;
         if changed {
@@ -2139,26 +2335,29 @@ impl IWorkTextEditor {
     }
 
     /// List plain-text drop caps in paragraph order.
-    pub fn paragraph_drop_caps(&self, object_id: u64) -> Result<Vec<Placement>> {
+    pub fn paragraph_drop_caps(&self, object_id: TextStorageId) -> Result<Vec<Placement>> {
+        let object_id = object_id.get();
         paragraph_drop_caps(&self.package, object_id)
     }
 
     /// Read the drop cap attached to one typed paragraph position.
     pub fn paragraph_drop_cap(
         &self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<Option<DropCap>> {
+        let object_id = object_id.get();
         paragraph_drop_cap(&self.package, object_id, paragraph)
     }
 
     /// Atomically create or replace a plain-text Drop Cap.
     pub fn set_paragraph_drop_cap(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
         drop_cap: DropCap,
     ) -> Result<()> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         set_paragraph_drop_cap(&mut staged, object_id, paragraph, drop_cap)?;
         let bytes = staged.to_bytes()?;
@@ -2175,9 +2374,10 @@ impl IWorkTextEditor {
     /// Atomically remove a drop cap while retaining its paragraph boundary.
     pub fn remove_paragraph_drop_cap(
         &mut self,
-        object_id: u64,
+        object_id: TextStorageId,
         paragraph: TextPosition,
     ) -> Result<bool> {
+        let object_id = object_id.get();
         let mut staged = self.package.clone();
         let changed = remove_paragraph_drop_cap(&mut staged, object_id, paragraph)?;
         if changed {

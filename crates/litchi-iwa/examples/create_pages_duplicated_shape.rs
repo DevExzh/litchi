@@ -32,8 +32,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "source={} clone={} source_storage={} clone_storage={}",
         source.drawable_object_id,
         duplicate.drawable_object_id,
-        source.storage.object_id,
-        duplicate.storage.object_id,
+        source.storage.id,
+        duplicate.storage.id,
     );
     Ok(())
 }

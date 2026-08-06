@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.save(output)?;
     println!(
         "sheet={sheet_index} drawable={} storage={} text={replacement:?}",
-        text_box.drawable_object_id, text_box.storage.object_id
+        text_box.drawable_object_id, text_box.storage.id
     );
     Ok(())
 }

@@ -666,10 +666,11 @@ impl NumbersObjectCatalog {
     pub(super) fn text_storage_info(
         &mut self,
         package: &IWorkPackage,
-        storage_id: u64,
+        storage_id: TextStorageId,
     ) -> Result<TextStorageInfo> {
+        let native_storage_id = storage_id.get();
         self.ensure_current(package)?;
-        let record = *self.objects.get(&storage_id).ok_or_else(|| {
+        let record = *self.objects.get(&native_storage_id).ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "Numbers text storage {storage_id} is missing from the object catalog"
             ))
@@ -688,7 +689,7 @@ impl NumbersObjectCatalog {
                         "Numbers text storage {storage_id} object slot is out of bounds"
                     ))
                 })?;
-            if object.archive_info.identifier != Some(storage_id) {
+            if object.archive_info.identifier != Some(native_storage_id) {
                 return Err(Error::InvalidFormat(format!(
                     "Numbers text storage {storage_id} object slot does not match its identifier"
                 )));
@@ -729,7 +730,7 @@ impl NumbersObjectCatalog {
                 ))
             })?;
             Ok(TextStorageInfo {
-                object_id: storage_id,
+                id: storage_id,
                 message_type,
                 kind: storage.kind,
                 storage: litchi_iwa_text::storage::Storage::from_text(storage.text.concat()),
@@ -881,7 +882,7 @@ impl NumbersObjectCatalog {
             sheet_id,
             archive_name: self.archive_name(sheet.slot.archive_index)?.to_owned(),
             drawable_id,
-            storage_id,
+            storage_id: crate::text::native_storage_id(storage_id)?,
             object_ids,
             uuid_object_ids,
         })
@@ -1271,7 +1272,7 @@ pub(super) fn numbers_text_box_graph(
         sheet_id,
         archive_name,
         drawable_id,
-        storage_id,
+        storage_id: crate::text::native_storage_id(storage_id)?,
         object_ids,
         uuid_object_ids,
     })
@@ -4604,12 +4605,12 @@ fn set_cell_comment_at_location(
         {
             return Ok(());
         }
-        let (author_id, author_component_entry, created_author) =
-            if old_comment.author_id.is_none() {
-                preferred_or_ensure_table_annotation_author(package)?
-            } else {
-                (old_comment.author_id.map(AuthorId::get), None, false)
-            };
+        let (author_id, author_component_entry, created_author) = if old_comment.author_id.is_none()
+        {
+            preferred_or_ensure_table_annotation_author(package)?
+        } else {
+            (old_comment.author_id.map(AuthorId::get), None, false)
+        };
         if entry.refcount == 1 {
             let text_changed = old_comment.text != text;
             if text_changed {

@@ -199,7 +199,7 @@ impl KeynoteEditor {
         let mut text_storage_ids = preview
             .slide_text_storages(index)?
             .into_iter()
-            .map(|storage| storage.storage.object_id)
+            .map(|storage| storage.storage.id)
             .collect::<HashSet<_>>();
         let preview_graph = ObjectGraph::read(preview.package())?;
         let created_slide: kn::SlideArchive =
@@ -210,14 +210,14 @@ impl KeynoteEditor {
             .chain(created_slide.body_placeholder.iter())
         {
             if let Some(storage_id) = preview_graph.drawable_storage(placeholder.identifier)? {
-                text_storage_ids.insert(storage_id);
+                text_storage_ids.insert(crate::text::native_storage_id(storage_id)?);
             }
         }
         let mut text = IWorkTextEditor::from_package(staged);
         for storage_id in text_storage_ids {
             text.set_text(storage_id, "")?;
         }
-        text.set_text(new_note_storage_id, "")?;
+        text.set_text(crate::text::native_storage_id(new_note_storage_id)?, "")?;
         let staged = text.into_package();
         let verified = KeynoteEditor::from_package(staged)?;
         let created = verified.slides()?.get(index).cloned().ok_or_else(|| {

@@ -897,7 +897,7 @@ fn multiple_list_boundaries_are_rejected_transactionally() {
     let text_box = pages
         .add_text_box(5, "First\nSecond", POSITION, SIZE)
         .unwrap();
-    let storage_id = text_box.storage.object_id;
+    let storage_id = text_box.storage.id;
     let mut package = pages.into_package();
     let location = storage::locate(&package, storage_id).unwrap();
     package

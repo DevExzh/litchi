@@ -6524,6 +6524,26 @@ the dedicated IWA-owned `TextStorageId` migration, removal of public storage
 message metadata, and the remaining monolithic adapters are intentionally the
 next API/topology slices.
 
+This follow-up completes the dedicated IWA text-storage identity seam. The
+facade now owns `text::TextStorageId`, a transparent non-zero handle with
+compact `Option` representation, checked parsing, and explicit native
+conversion confined to the adapter. All 153 public `IWorkTextEditor` storage
+selectors accept the typed identity; `TextStorageInfo` exposes only its typed
+`id`, while message type and storage kind remain adapter-private. Pages,
+Numbers, and Keynote text graph storage fields and their public storage
+selectors were migrated accordingly. Raw `u64` remains only in private
+archive/protobuf helpers and application graph IDs that have not crossed this
+text boundary; no compatibility alias was added.
+
+The scoped IWA library check, formatter, diff check, boundary checker, and
+migrated text-inspection examples pass. The full unit-test build still has
+older internal fixtures and older Numbers examples using raw native IDs; that
+follow-on test/example migration is intentionally deferred rather than
+weakening the typed public seam. Computer Use opened the existing known-good
+Pages, Numbers, and Keynote fixtures in their native applications, confirmed
+the expected text markers and highlighted content without repair prompts, and
+closed all three applications afterward.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512
