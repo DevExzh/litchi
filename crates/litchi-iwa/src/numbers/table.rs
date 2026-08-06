@@ -135,7 +135,8 @@ impl NumbersTable {
         col: usize,
         value: CellValue,
     ) -> crate::Result<()> {
-        let position = Position::try_from_usize(row, col).map_err(map_table_error)?;
+        let position =
+            Position::try_from_usize(row, col).map_err(|error| map_table_error(error.into()))?;
         self.ensure_coordinate(row, col)?;
         self.model
             .set(position, value)
