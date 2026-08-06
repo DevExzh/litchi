@@ -125,3 +125,94 @@ pub struct Track {
     pub relationship_id: String,
     pub target: Target,
 }
+
+/// The location where PowerPoint renders a caption track.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DisplayLocation {
+    /// Render the track over the media object.
+    Media,
+    /// Render the track over the slide.
+    Slide,
+}
+
+impl DisplayLocation {
+    pub(crate) fn from_token(value: &str) -> crate::Result<Self> {
+        match value {
+            "media" => Ok(Self::Media),
+            "slide" => Ok(Self::Slide),
+            _ => Err(crate::Error::Invalid(format!(
+                "invalid [MS-PPTX] track display location '{value}'"
+            ))),
+        }
+    }
+
+    pub(crate) const fn token(self) -> &'static str {
+        match self {
+            Self::Media => "media",
+            Self::Slide => "slide",
+        }
+    }
+}
+
+/// The relationship target selected by a typed caption reference.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CaptionTarget {
+    /// An inert internal WebVTT part. Its payload is never decoded by the
+    /// metadata owner and remains owned by the OPC package.
+    Internal {
+        part_name: String,
+        content_type: String,
+    },
+    /// An inert external target. No network access is performed.
+    External { target: String },
+}
+
+/// One `[MS-PPTX]` `p17:track` caption descriptor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Caption {
+    /// Required stable track GUID as authored in `p17:track@id`.
+    pub id: String,
+    /// Required human-readable label.
+    pub label: String,
+    /// Optional DrawingML text-language identifier.
+    pub language: Option<String>,
+    /// Effective relationship target. Both authored relationship attributes
+    /// remain available through the package-bound source state.
+    pub target: CaptionTarget,
+}
+
+/// Typed `[MS-PPTX]` `CT_TracksInfo` metadata for one media object.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TracksInfo {
+    pub display_location: DisplayLocation,
+    pub captions: Vec<Caption>,
+}
+
+impl TracksInfo {
+    /// Construct an empty bounded track list for a new semantic owner.
+    #[must_use]
+    pub const fn new(display_location: DisplayLocation) -> Self {
+        Self {
+            display_location,
+            captions: Vec::new(),
+        }
+    }
+}
+
+/// Stable contextual identity of a media picture in a PresentationML slide.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MediaKey {
+    pub slide_part_name: String,
+    pub shape_id: u32,
+}
+
+/// Media caption and narration metadata attached to one media picture.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MediaMetadata {
+    pub key: MediaKey,
+    /// The inert `p14:media` relationship ID, when present.
+    pub media_relationship_id: Option<String>,
+    pub tracks_info: Option<TracksInfo>,
+    /// Authored `p15:isNarration@val`, preserving absence as `None`.
+    pub narration: Option<bool>,
+}
