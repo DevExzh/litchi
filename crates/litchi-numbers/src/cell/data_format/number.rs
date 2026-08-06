@@ -3,6 +3,69 @@
 use std::fmt;
 use std::str::FromStr;
 
+macro_rules! decimal_format {
+    ($name:ident, $description:literal) => {
+        #[doc = $description]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+        pub struct $name(Decimal);
+
+        impl $name {
+            /// Constructs a complete decimal display format.
+            #[must_use]
+            pub const fn new(
+                decimal_places: DecimalPlaces,
+                negative_style: NegativeStyle,
+                thousands_separator: ThousandsSeparator,
+            ) -> Self {
+                Self(Decimal::new(
+                    decimal_places,
+                    negative_style,
+                    thousands_separator,
+                ))
+            }
+
+            /// Returns the automatic or fixed precision setting.
+            #[must_use]
+            pub const fn decimal_places(self) -> DecimalPlaces {
+                self.0.places
+            }
+
+            /// Returns the negative-value presentation.
+            #[must_use]
+            pub const fn negative_style(self) -> NegativeStyle {
+                self.0.negative_style
+            }
+
+            /// Returns the thousands-separator setting.
+            #[must_use]
+            pub const fn thousands_separator(self) -> ThousandsSeparator {
+                self.0.thousands_separator
+            }
+
+            /// Replaces the precision setting.
+            #[must_use]
+            pub const fn with_decimal_places(mut self, value: DecimalPlaces) -> Self {
+                self.0.places = value;
+                self
+            }
+
+            /// Replaces the negative-value presentation.
+            #[must_use]
+            pub const fn with_negative_style(mut self, value: NegativeStyle) -> Self {
+                self.0.negative_style = value;
+                self
+            }
+
+            /// Replaces the thousands-separator setting.
+            #[must_use]
+            pub const fn with_thousands_separator(mut self, value: ThousandsSeparator) -> Self {
+                self.0.thousands_separator = value;
+                self
+            }
+        }
+    };
+}
+
 /// Largest fixed fractional precision accepted by Numbers cell formats.
 pub const MAX_DECIMAL_PLACES: u8 = 30;
 
@@ -103,7 +166,7 @@ impl DecimalPlaces {
     /// supported precision.
     pub const fn fixed(value: u8) -> Result<Self> {
         match FixedDecimalPlaces::new(value) {
-            Ok(value) => Ok(Self::Fixed(value)),
+            Ok(fixed_places) => Ok(Self::Fixed(fixed_places)),
             Err(error) => Err(error),
         }
     }
@@ -135,7 +198,7 @@ pub enum ThousandsSeparator {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 struct Decimal {
-    decimal_places: DecimalPlaces,
+    places: DecimalPlaces,
     negative_style: NegativeStyle,
     thousands_separator: ThousandsSeparator,
 }
@@ -147,74 +210,11 @@ impl Decimal {
         thousands_separator: ThousandsSeparator,
     ) -> Self {
         Self {
-            decimal_places,
+            places: decimal_places,
             negative_style,
             thousands_separator,
         }
     }
-}
-
-macro_rules! decimal_format {
-    ($name:ident, $description:literal) => {
-        #[doc = $description]
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-        pub struct $name(Decimal);
-
-        impl $name {
-            /// Constructs a complete decimal display format.
-            #[must_use]
-            pub const fn new(
-                decimal_places: DecimalPlaces,
-                negative_style: NegativeStyle,
-                thousands_separator: ThousandsSeparator,
-            ) -> Self {
-                Self(Decimal::new(
-                    decimal_places,
-                    negative_style,
-                    thousands_separator,
-                ))
-            }
-
-            /// Returns the automatic or fixed precision setting.
-            #[must_use]
-            pub const fn decimal_places(self) -> DecimalPlaces {
-                self.0.decimal_places
-            }
-
-            /// Returns the negative-value presentation.
-            #[must_use]
-            pub const fn negative_style(self) -> NegativeStyle {
-                self.0.negative_style
-            }
-
-            /// Returns the thousands-separator setting.
-            #[must_use]
-            pub const fn thousands_separator(self) -> ThousandsSeparator {
-                self.0.thousands_separator
-            }
-
-            /// Replaces the precision setting.
-            #[must_use]
-            pub const fn with_decimal_places(mut self, value: DecimalPlaces) -> Self {
-                self.0.decimal_places = value;
-                self
-            }
-
-            /// Replaces the negative-value presentation.
-            #[must_use]
-            pub const fn with_negative_style(mut self, value: NegativeStyle) -> Self {
-                self.0.negative_style = value;
-                self
-            }
-
-            /// Replaces the thousands-separator setting.
-            #[must_use]
-            pub const fn with_thousands_separator(mut self, value: ThousandsSeparator) -> Self {
-                self.0.thousands_separator = value;
-                self
-            }
-        }
-    };
 }
 
 decimal_format!(Number, "Decimal-number display format.");
@@ -343,7 +343,7 @@ impl Currency {
     /// Returns the automatic or fixed precision setting.
     #[must_use]
     pub const fn decimal_places(self) -> DecimalPlaces {
-        self.decimal.decimal_places
+        self.decimal.places
     }
 
     /// Returns the stored negative-value presentation.
@@ -374,7 +374,7 @@ impl Currency {
     /// Replaces the precision setting.
     #[must_use]
     pub const fn with_decimal_places(mut self, value: DecimalPlaces) -> Self {
-        self.decimal.decimal_places = value;
+        self.decimal.places = value;
         self
     }
 

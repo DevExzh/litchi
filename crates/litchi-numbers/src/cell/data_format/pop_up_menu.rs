@@ -119,16 +119,16 @@ impl PopUpMenu {
         I: IntoIterator<Item = T>,
         T: AsRef<str>,
     {
-        let items = items
+        let collected_items = items
             .into_iter()
             .map(|item| Item::new(item.as_ref()))
             .collect::<Result<Vec<_>>>()?
             .into_boxed_slice();
-        if items.is_empty() {
+        if collected_items.is_empty() {
             return Err(Error::Empty);
         }
         Ok(Self {
-            items,
+            items: collected_items,
             initial_selection: InitialSelection::FirstItem,
         })
     }

@@ -24,6 +24,16 @@ pub use numeral_system::NumeralSystem;
 pub use pop_up_menu::PopUpMenu;
 pub use control::{Slider, Stepper};
 
+macro_rules! data_format_from {
+    ($type:ty, $variant:ident) => {
+        impl From<$type> for DataFormat {
+            fn from(value: $type) -> Self {
+                Self::$variant(value)
+            }
+        }
+    };
+}
+
 /// Explicit display or interaction semantics for one cell.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum DataFormat {
@@ -73,16 +83,6 @@ pub struct Checkbox;
 /// Edit semantics for a fixed five-star rating cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct StarRating;
-
-macro_rules! data_format_from {
-    ($type:ty, $variant:ident) => {
-        impl From<$type> for DataFormat {
-            fn from(value: $type) -> Self {
-                Self::$variant(value)
-            }
-        }
-    };
-}
 
 data_format_from!(Number, Number);
 data_format_from!(Text, Text);

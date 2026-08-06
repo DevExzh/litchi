@@ -5,6 +5,16 @@ use super::numeral_system::NumeralSystem;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
+macro_rules! display_format_from {
+    ($type:ty, $variant:ident) => {
+        impl From<$type> for DisplayFormat {
+            fn from(value: $type) -> Self {
+                Self::$variant(value)
+            }
+        }
+    };
+}
+
 const DEFAULT_MINIMUM: f64 = 1.0;
 const DEFAULT_MAXIMUM: f64 = 100.0;
 const DEFAULT_INCREMENT: f64 = 1.0;
@@ -147,16 +157,6 @@ impl Default for DisplayFormat {
     fn default() -> Self {
         Self::Number(Number::default())
     }
-}
-
-macro_rules! display_format_from {
-    ($type:ty, $variant:ident) => {
-        impl From<$type> for DisplayFormat {
-            fn from(value: $type) -> Self {
-                Self::$variant(value)
-            }
-        }
-    };
 }
 
 display_format_from!(Number, Number);

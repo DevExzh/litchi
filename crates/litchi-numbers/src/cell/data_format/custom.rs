@@ -83,6 +83,11 @@ pub struct Name(String);
 
 impl Name {
     /// Validates a borrowed name before allocating.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when the name is empty, too long, contains a
+    /// control character, or has surrounding whitespace.
     pub fn new(value: &str) -> Result<Self> {
         validate_visible(value, "custom format name", MAX_NAME_BYTES, false)?;
         if value.trim() != value {
@@ -94,6 +99,11 @@ impl Name {
     }
 
     /// Validates and adopts an owned name.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when the name is empty, too long, contains a
+    /// control character, or has surrounding whitespace.
     pub fn from_owned(value: String) -> Result<Self> {
         validate_visible(&value, "custom format name", MAX_NAME_BYTES, false)?;
         if value.trim() != value {
@@ -105,6 +115,11 @@ impl Name {
     }
 
     /// Convenience constructor for callers with an owned or borrowed input.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when the name is empty, too long, contains a
+    /// control character, or has surrounding whitespace.
     pub fn try_new(value: impl Into<String>) -> Result<Self> {
         Self::from_owned(value.into())
     }
@@ -122,6 +137,11 @@ pub struct NumberPattern(String);
 
 impl NumberPattern {
     /// Validates a pattern containing a digit placeholder.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when the pattern is empty, too long, contains a
+    /// control character, or has no `#` or `0` placeholder.
     pub fn new(value: &str) -> Result<Self> {
         validate_visible(value, "custom Number pattern", MAX_PATTERN_BYTES, false)?;
         if !value.chars().any(|character| matches!(character, '#' | '0')) {
@@ -131,6 +151,11 @@ impl NumberPattern {
     }
 
     /// Validates and adopts an owned pattern.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when the pattern is empty, too long, contains a
+    /// control character, or has no `#` or `0` placeholder.
     pub fn from_owned(value: String) -> Result<Self> {
         validate_visible(&value, "custom Number pattern", MAX_PATTERN_BYTES, false)?;
         if !value.chars().any(|character| matches!(character, '#' | '0')) {
@@ -140,6 +165,11 @@ impl NumberPattern {
     }
 
     /// Convenience constructor for an owned or borrowed input.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when the pattern is empty, too long, contains a
+    /// control character, or has no `#` or `0` placeholder.
     pub fn try_new(value: impl Into<String>) -> Result<Self> {
         Self::from_owned(value.into())
     }
@@ -157,6 +187,10 @@ pub struct ConditionValue(u64);
 
 impl ConditionValue {
     /// Validates and stores a finite threshold without preserving a negative zero.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NonFiniteThreshold`] when `value` is not finite.
     pub fn try_new(value: f64) -> Result<Self> {
         if !value.is_finite() {
             return Err(Error::NonFiniteThreshold);
@@ -255,20 +289,26 @@ impl Number {
     }
 
     /// Constructs a custom Number format with checked ordered rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::TooManyRules`] when the input exceeds
+    /// [`MAX_RULES`], or [`Error::DuplicateCondition`] when two rules
+    /// use the same condition.
     pub fn try_with_rules(
         name: Name,
         default_pattern: NumberPattern,
         rules: impl IntoIterator<Item = NumberRule>,
     ) -> Result<Self> {
-        let rules = rules.into_iter().collect::<Vec<_>>();
-        if rules.len() > MAX_RULES {
+        let collected_rules = rules.into_iter().collect::<Vec<_>>();
+        if collected_rules.len() > MAX_RULES {
             return Err(Error::TooManyRules {
-                actual: rules.len(),
+                actual: collected_rules.len(),
                 maximum: MAX_RULES,
             });
         }
-        for (index, rule) in rules.iter().enumerate() {
-            if rules[..index]
+        for (index, rule) in collected_rules.iter().enumerate() {
+            if collected_rules[..index]
                 .iter()
                 .any(|existing| existing.condition == rule.condition)
             {
@@ -278,7 +318,7 @@ impl Number {
         Ok(Self {
             name,
             default_pattern,
-            rules,
+            rules: collected_rules,
         })
     }
 
@@ -307,6 +347,11 @@ pub struct DateTimePattern(String);
 
 impl DateTimePattern {
     /// Validates a pattern containing at least one date or time field.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when the pattern is empty, too long, contains a
+    /// control character, or has no supported date or time field.
     pub fn new(value: &str) -> Result<Self> {
         validate_visible(value, "custom Date & Time pattern", MAX_PATTERN_BYTES, false)?;
         if !value.chars().any(|character| {
@@ -339,6 +384,11 @@ impl DateTimePattern {
     }
 
     /// Validates and adopts an owned pattern.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when the pattern is empty, too long, contains a
+    /// control character, or has no supported date or time field.
     pub fn from_owned(value: String) -> Result<Self> {
         validate_visible(&value, "custom Date & Time pattern", MAX_PATTERN_BYTES, false)?;
         if !value.chars().any(|character| {
@@ -371,6 +421,11 @@ impl DateTimePattern {
     }
 
     /// Convenience constructor for an owned or borrowed input.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when the pattern is empty, too long, contains a
+    /// control character, or has no supported date or time field.
     pub fn try_new(value: impl Into<String>) -> Result<Self> {
         Self::from_owned(value.into())
     }
@@ -415,11 +470,16 @@ pub struct Text {
     name: Name,
     prefix: String,
     suffix: String,
-    includes_cell_text: bool,
+    includes_cell: bool,
 }
 
 impl Text {
     /// Constructs a format placing the cell text between two affixes.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when either affix is too long or contains a
+    /// control character.
     pub fn try_new(
         name: Name,
         prefix: impl Into<String>,
@@ -429,6 +489,11 @@ impl Text {
     }
 
     /// Constructs a literal-only custom Text format.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when the literal is empty, too long, or contains
+    /// a control character.
     pub fn try_literal(name: Name, literal: impl Into<String>) -> Result<Self> {
         Self::try_with_cell_text(name, literal, String::new(), false)
     }
@@ -437,16 +502,16 @@ impl Text {
         name: Name,
         prefix: impl Into<String>,
         suffix: impl Into<String>,
-        includes_cell_text: bool,
+        includes_cell: bool,
     ) -> Result<Self> {
-        let prefix = prefix.into();
-        let suffix = suffix.into();
-        validate_affix(&prefix)?;
-        validate_affix(&suffix)?;
-        let encoded_bytes = prefix
+        let prefix_text = prefix.into();
+        let suffix_text = suffix.into();
+        validate_affix(&prefix_text)?;
+        validate_affix(&suffix_text)?;
+        let encoded_bytes = prefix_text
             .len()
-            .checked_add(suffix.len())
-            .and_then(|length| length.checked_add(usize::from(includes_cell_text)))
+            .checked_add(suffix_text.len())
+            .and_then(|length| length.checked_add(usize::from(includes_cell)))
             .ok_or(Error::TooLong {
                 field: "custom Text pattern",
                 length: usize::MAX,
@@ -459,14 +524,14 @@ impl Text {
                 maximum: MAX_PATTERN_BYTES,
             });
         }
-        if !includes_cell_text && prefix.is_empty() && suffix.is_empty() {
+        if !includes_cell && prefix_text.is_empty() && suffix_text.is_empty() {
             return Err(Error::EmptyLiteral);
         }
         Ok(Self {
             name,
-            prefix,
-            suffix,
-            includes_cell_text,
+            prefix: prefix_text,
+            suffix: suffix_text,
+            includes_cell,
         })
     }
 
@@ -491,7 +556,7 @@ impl Text {
     /// Whether the stored cell text appears in the rendered value.
     #[must_use]
     pub const fn includes_cell_text(&self) -> bool {
-        self.includes_cell_text
+        self.includes_cell
     }
 }
 

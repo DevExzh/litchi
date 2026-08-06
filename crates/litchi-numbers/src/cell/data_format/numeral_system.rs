@@ -164,7 +164,7 @@ impl Places {
     /// Returns [`Error::PlacesOutOfRange`] for an invalid width.
     pub const fn fixed(value: u8) -> Result<Self> {
         match FixedPlaces::new(value) {
-            Ok(value) => Ok(Self::Fixed(value)),
+            Ok(fixed_places) => Ok(Self::Fixed(fixed_places)),
             Err(error) => Err(error),
         }
     }
