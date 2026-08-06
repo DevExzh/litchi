@@ -5173,6 +5173,8 @@ impl KeynoteEditor {
         Ok(old)
     }
 
+    // Used by crate-internal mutation fixtures; ordinary callers publish via `to_bytes`/`save`.
+    #[allow(dead_code)]
     pub(crate) fn into_package(self) -> IWorkPackage {
         self.text.into_package()
     }

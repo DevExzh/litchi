@@ -103,14 +103,6 @@ impl KeynoteDocument {
         Self::from_bytes(bytes)
     }
 
-    /// Crate-internal low-level ingress from archive bytes with caller-selected ceilings.
-    pub(crate) fn from_archive_bytes_with_limits(
-        bytes: &[u8],
-        limits: BundleLimits,
-    ) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, limits)
-    }
-
     fn verify_application(bundle: &Bundle) -> Result<()> {
         Self::root_document(bundle).map(|_| ())
     }
