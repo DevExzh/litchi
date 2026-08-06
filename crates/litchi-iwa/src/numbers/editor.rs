@@ -152,10 +152,5161 @@ struct NumbersTextBoxGraph {
     uuid_object_ids: Vec<u64>,
 }
 
+<<<<<<< HEAD
 #[path = "editor/package.rs"]
 mod package;
 #[path = "editor/semantic.rs"]
 mod semantic;
+=======
+/// A pivot aggregate category that can be used in a formula expression.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NumbersPivotCategoryInfo {
+    pub reference: FormulaPivotCategoryReference,
+    pub label: Option<String>,
+}
+
+/// Horizontal text alignment shared by native Numbers table cells.
+pub type NumbersTableCellTextAlignment = TextAlignment;
+/// Typed first-line, left, and right indents for a Numbers table cell.
+pub type NumbersTableCellParagraphIndents = ParagraphIndents;
+/// Typed native line spacing applied to a whole Numbers table cell.
+pub type NumbersTableCellParagraphLineSpacing = ParagraphLineSpacing;
+/// Typed before/after paragraph spacing applied to a whole Numbers table cell.
+pub type NumbersTableCellParagraphSpacing = ParagraphSpacing;
+/// Canonical native list preset applied uniformly to a Numbers table cell.
+pub type NumbersTableCellParagraphList = ParagraphList;
+/// A validated custom text-bullet marker in a Numbers table cell.
+pub type NumbersTableCellParagraphListBullet = ParagraphListBullet;
+/// Typed marker size and baseline in a Numbers table cell.
+pub type NumbersTableCellParagraphListBulletGeometry = ParagraphListBulletGeometry;
+/// Typed native list-label and text-gap indentation in a Numbers table cell.
+pub type NumbersTableCellParagraphListIndentation = ParagraphListIndentation;
+pub type NumbersTableCellParagraphListLabelColor = ParagraphListLabelColor;
+/// Locale-aware numbered-list label format in a Numbers table cell.
+pub type NumbersTableCellParagraphListNumberFormat = ParagraphListNumberFormat;
+/// Flat or hierarchical numbered-list labels in a Numbers table cell.
+pub type NumbersTableCellParagraphListNumberTiering = ParagraphListNumberTiering;
+/// Number-label size for a numbered paragraph in a Numbers table cell.
+pub type NumbersTableCellParagraphListNumberScale = ParagraphListNumberScale;
+/// A validated zero-based list nesting level in a Numbers table cell.
+pub type NumbersTableCellParagraphListLevel = ParagraphListLevel;
+/// One effective list-level boundary in a Numbers table cell.
+pub type NumbersTableCellParagraphListLevelPlacement = ParagraphListLevelPlacement;
+/// Whether a Numbers table-cell paragraph continues or restarts list numbering.
+pub type NumbersTableCellParagraphListNumbering = ParagraphListNumbering;
+/// One paragraph-scoped list preset boundary in a Numbers table cell.
+pub type NumbersTableCellParagraphListPlacement = ParagraphListPlacement;
+/// Ordered explicit ruler tab stops for a Numbers table cell.
+pub type NumbersTableCellParagraphTabStops = ParagraphTabStops;
+/// Typed solid background painted behind a whole Numbers table cell's text.
+pub type NumbersTableCellTextBackground = TextBackground;
+/// Validated custom baseline displacement applied to a whole Numbers cell.
+pub type NumbersTableCellTextBaselineShift = TextBaselineShift;
+/// Typed capitalization applied to a whole Numbers table cell.
+pub type NumbersTableCellTextCapitalization = TextCapitalization;
+/// Validated tracking applied to a whole Numbers table cell.
+pub type NumbersTableCellTextCharacterSpacing = TextCharacterSpacing;
+/// Validated foreground color applied to a whole Numbers table cell.
+pub type NumbersTableCellTextColor = RgbaColor;
+/// Typed underline and strikethrough formatting for a whole Numbers table cell.
+pub type NumbersTableCellTextDecorations = TextDecorations;
+/// Strict PostScript font identity applied to a whole Numbers table cell.
+pub type NumbersTableCellTextFont = TextFont;
+/// Typed ligature policy applied to a whole Numbers table cell.
+pub type NumbersTableCellTextLigatures = TextLigatures;
+/// Typed outline applied to a whole Numbers table cell's text.
+pub type NumbersTableCellTextOutline = TextOutline;
+/// Typed normal, superscript, or subscript formatting for a whole Numbers cell.
+pub type NumbersTableCellTextScript = TextScript;
+/// Typed drop shadow applied to a whole Numbers table cell's text.
+pub type NumbersTableCellTextShadow = TextShadow;
+/// Whole-cell point size, bold, and italic formatting.
+pub type NumbersTableCellTextStyle = TextStyle;
+
+/// Storage identity and rule count of conditional highlighting attached to one cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableCellConditionalHighlightInfo {
+    pub table_id: u64,
+    pub row: usize,
+    pub column: usize,
+    pub list_identifier: u32,
+    pub style_set_object_id: u64,
+    pub rule_count: u32,
+}
+
+/// Mutable, transactional Numbers package editor.
+///
+/// Each semantic edit is applied to a cloned package and committed only after
+/// all affected IWA components serialize successfully.
+#[derive(Debug, Clone)]
+pub struct NumbersEditor {
+    package: IWorkPackage,
+}
+
+impl NumbersEditor {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_package(IWorkPackage::open(path)?)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_package(IWorkPackage::from_bytes(bytes)?)
+    }
+
+    pub(crate) fn from_package(package: IWorkPackage) -> Result<Self> {
+        numbers_document(&package)?;
+        Ok(Self { package })
+    }
+
+    pub fn sheets(&self) -> Result<Vec<NumbersSheetInfo>> {
+        let document = numbers_document(&self.package)?;
+        let locations = object_locations(&self.package)?;
+        document
+            .sheets
+            .into_iter()
+            .enumerate()
+            .map(|(index, reference)| {
+                let archive_name = locations.get(&reference.identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers sheet object {} is missing",
+                        reference.identifier
+                    ))
+                })?;
+                let archive = self.package.archive(archive_name)?;
+                let object = archive.object(reference.identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers sheet object {} is missing",
+                        reference.identifier
+                    ))
+                })?;
+                let (_, sheet) = decode_sheet(object)?;
+                Ok(NumbersSheetInfo {
+                    object_id: reference.identifier,
+                    index,
+                    name: sheet.name,
+                })
+            })
+            .collect()
+    }
+
+    pub fn tables(&self) -> Result<Vec<NumbersTableInfo>> {
+        let locations = object_locations(&self.package)?;
+        let mut tables = table_models(&self.package)?
+            .into_iter()
+            .map(|descriptor| {
+                let archive_name = locations.get(&descriptor.table_info_id).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Numbers table drawable {} is missing",
+                        descriptor.table_info_id
+                    ))
+                })?;
+                Ok(NumbersTableInfo {
+                    object_id: descriptor.object_id,
+                    name: descriptor.model.table_name,
+                    rows: descriptor.model.number_of_rows as usize,
+                    columns: descriptor.model.number_of_columns as usize,
+                    appearance: crate::table_appearance::table_appearance(
+                        &self.package,
+                        descriptor.object_id,
+                    )?,
+                    lock_state: crate::table_lock::table_lock_state_for_model(
+                        &self.package,
+                        archive_name,
+                        descriptor.table_info_id,
+                        descriptor.object_id,
+                    )?,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        tables.sort_by_key(|table| table.object_id);
+        Ok(tables)
+    }
+
+    /// List supported direct-comment drawables owned by one reachable sheet.
+    pub fn sheet_drawables(&self, sheet_id: u64) -> Result<Vec<DrawableInfo>> {
+        let owned = self.sheet_owned_drawable_ids(sheet_id)?;
+        let mut drawables = IWorkDrawableCommentEditor::from_package(self.package.clone())?
+            .drawables()?
+            .into_iter()
+            .filter(|drawable| owned.contains(&drawable.id.get()))
+            .collect::<Vec<_>>();
+        drawables.sort_by_key(|drawable| drawable.id.get());
+        Ok(drawables)
+    }
+
+    /// Read a comment attached directly to a drawable owned by one sheet.
+    pub fn sheet_drawable_comment(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<Option<DrawableComment>> {
+        self.require_sheet_drawable(sheet_id, drawable_object_id)?;
+        IWorkDrawableCommentEditor::from_package(self.package.clone())?
+            .comment(DrawableId::from_raw(drawable_object_id)?)
+    }
+
+    /// Create or replace a direct comment on a drawable owned by one sheet.
+    pub fn set_sheet_drawable_comment(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        text: impl Into<String>,
+    ) -> Result<()> {
+        self.require_sheet_drawable(sheet_id, drawable_object_id)?;
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        comments.set_comment(DrawableId::from_raw(drawable_object_id)?, text)?;
+        *self = Self::from_package(comments.into_package())?;
+        Ok(())
+    }
+
+    /// Delete a direct comment from a drawable owned by one sheet.
+    pub fn clear_sheet_drawable_comment(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<()> {
+        self.require_sheet_drawable(sheet_id, drawable_object_id)?;
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        comments.clear_comment(DrawableId::from_raw(drawable_object_id)?)?;
+        *self = Self::from_package(comments.into_package())?;
+        Ok(())
+    }
+
+    /// Read direct replies in a comment thread on one sheet drawable.
+    pub fn sheet_drawable_comment_replies(
+        &self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Result<Vec<DrawableReply>> {
+        self.require_sheet_drawable(sheet_id, drawable_object_id)?;
+        IWorkDrawableCommentEditor::from_package(self.package.clone())?
+            .replies(DrawableId::from_raw(drawable_object_id)?)
+    }
+
+    /// Add a reply to a direct comment on one sheet drawable.
+    pub fn add_sheet_drawable_comment_reply(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        text: impl Into<String>,
+    ) -> Result<u64> {
+        self.require_sheet_drawable(sheet_id, drawable_object_id)?;
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        let reply_id = comments.add_reply(DrawableId::from_raw(drawable_object_id)?, text)?;
+        *self = Self::from_package(comments.into_package())?;
+        Ok(reply_id.get())
+    }
+
+    /// Update a direct reply, returning its current storage identifier.
+    pub fn set_sheet_drawable_comment_reply(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        reply_storage_object_id: u64,
+        text: impl Into<String>,
+    ) -> Result<u64> {
+        self.require_sheet_drawable(sheet_id, drawable_object_id)?;
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        let reply_id = comments.set_reply(
+            DrawableId::from_raw(drawable_object_id)?,
+            StorageId::from_raw(reply_storage_object_id)?,
+            text,
+        )?;
+        *self = Self::from_package(comments.into_package())?;
+        Ok(reply_id.get())
+    }
+
+    /// Remove a direct reply from a comment on one sheet drawable.
+    pub fn remove_sheet_drawable_comment_reply(
+        &mut self,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        reply_storage_object_id: u64,
+    ) -> Result<()> {
+        self.require_sheet_drawable(sheet_id, drawable_object_id)?;
+        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        comments.remove_reply(
+            DrawableId::from_raw(drawable_object_id)?,
+            StorageId::from_raw(reply_storage_object_id)?,
+        )?;
+        *self = Self::from_package(comments.into_package())?;
+        Ok(())
+    }
+
+    /// List absolute pivot categories backed by valid calculation-engine
+    /// aggregate coordinates.
+    pub fn pivot_categories(&self) -> Result<Vec<NumbersPivotCategoryInfo>> {
+        let mut categories = formula_pivot_categories(&self.package)?
+            .into_iter()
+            .map(|(key, value)| NumbersPivotCategoryInfo {
+                reference: FormulaPivotCategoryReference::new(
+                    key.group_by_uid,
+                    key.column_uid,
+                    key.group_uid,
+                    value.aggregate_type,
+                    value.group_level,
+                ),
+                label: value.label,
+            })
+            .collect::<Vec<_>>();
+        categories.sort_by(|left, right| {
+            left.reference
+                .group_by_uid
+                .cmp(&right.reference.group_by_uid)
+                .then_with(|| left.reference.column_uid.cmp(&right.reference.column_uid))
+                .then_with(|| left.reference.group_level.cmp(&right.reference.group_level))
+                .then_with(|| left.label.cmp(&right.label))
+                .then_with(|| left.reference.group_uid.cmp(&right.reference.group_uid))
+        });
+        Ok(categories)
+    }
+
+    /// Set or clear a cell in a table identified by its IWA object ID.
+    ///
+    /// Cached results of dependent numeric/Boolean formulas are refreshed in
+    /// dependency order. If an impacted formula is outside the strict local
+    /// evaluator subset, the entire edit is rejected without changing the
+    /// package rather than persisting a stale displayed result.
+    pub fn set_cell(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        value: CellValue,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_cell_in_package(&mut staged, table_id, row, column, value)?;
+        formula_cache::refresh_formula_caches_after_cell_write(&mut staged, table_id, row, column)?;
+        // Exercise every serialization boundary before committing the edit.
+        let bytes = staged.to_bytes()?;
+        IWorkPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Set several cells in one table as one transaction.
+    ///
+    /// The batch must contain unique coordinates. It clones and serializes the
+    /// package once, reuses one table/object lookup context for every cell, and
+    /// refreshes all impacted formula caches from the final batch state in one
+    /// dependency pass. The returned count equals the number of applied cells.
+    pub fn set_cells(
+        &mut self,
+        table_id: u64,
+        updates: impl IntoIterator<Item = TableCellUpdate>,
+    ) -> Result<usize> {
+        let batch = table_cells::TableCellBatch::collect(updates)?;
+        if batch.is_empty() {
+            attached_table_descriptor(&self.package, table_id)?;
+            return Ok(0);
+        }
+        let expected = batch.len();
+        let mut staged = self.package.clone();
+        let applied = batch.apply_numbers(&mut staged, table_id)?;
+        if applied != expected {
+            return Err(Error::InvalidFormat(format!(
+                "Table cell batch applied {applied} updates, expected {expected}"
+            )));
+        }
+        let bytes = staged.to_bytes()?;
+        IWorkPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(applied)
+    }
+
+    pub fn clear_cell(&mut self, table_id: u64, row: usize, column: usize) -> Result<()> {
+        self.set_cell(table_id, row, column, CellValue::Empty)
+    }
+
+    /// Read the explicit data format for one zero-based table cell.
+    pub fn table_cell_data_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<DataFormat> {
+        cell_data_format::cell_data_format(&self.package, table_id, row, column)
+    }
+
+    /// Create, replace, or reset one cell's typed data format transactionally.
+    pub fn set_table_cell_data_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: DataFormat,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_data_format::set_cell_data_format(&mut staged, table_id, row, column, &format)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_data_format(table_id, row, column)? != format {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell data format failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read an explicit decimal-number format for one zero-based table cell.
+    ///
+    /// `None` means the cell uses iWork's automatic data format.
+    pub fn table_cell_number_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<Number>> {
+        cell_data_format::cell_number_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit decimal-number format transactionally.
+    pub fn set_table_cell_number_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: Number,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore iWork's automatic data format for one table cell.
+    pub fn reset_table_cell_number_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_number_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified
+                .table_cell_number_format(table_id, row, column)?
+                .is_some()
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers table-cell number-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit Text format for one zero-based table cell.
+    ///
+    /// `None` means the cell uses iWork's automatic data format.
+    pub fn table_cell_text_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<Text>> {
+        cell_data_format::cell_text_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit Text format transactionally.
+    pub fn set_table_cell_text_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(
+            table_id,
+            row,
+            column,
+            Text.into(),
+        )
+    }
+
+    /// Restore Automatic from an explicit Text cell.
+    pub fn reset_table_cell_text_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_data_format::reset_cell_text_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != DataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers Text-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read a named custom Number, Date & Time, or Text format.
+    ///
+    /// `None` means the cell uses iWork's automatic data format.
+    pub fn table_cell_custom_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<Custom>> {
+        cell_data_format::cell_custom_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a named custom format transactionally.
+    pub fn set_table_cell_custom_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: Custom,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from a named custom format.
+    pub fn reset_table_cell_custom_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_custom_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != DataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers Custom-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit currency format for one zero-based table cell.
+    ///
+    /// `None` means the cell uses iWork's automatic data format.
+    pub fn table_cell_currency_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<Currency>> {
+        cell_data_format::cell_currency_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit currency format transactionally.
+    pub fn set_table_cell_currency_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: Currency,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Currency cell.
+    pub fn reset_table_cell_currency_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_currency_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != DataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers currency-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit percentage format for one zero-based table cell.
+    ///
+    /// `None` means the cell uses iWork's automatic data format.
+    pub fn table_cell_percentage_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<Percentage>> {
+        cell_data_format::cell_percentage_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit percentage format transactionally.
+    pub fn set_table_cell_percentage_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: Percentage,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore iWork's automatic format from an explicit Percentage cell.
+    pub fn reset_table_cell_percentage_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_percentage_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != DataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers percentage-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit scientific-notation format for one table cell.
+    ///
+    /// `None` means the cell uses iWork's automatic data format.
+    pub fn table_cell_scientific_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<Scientific>> {
+        cell_data_format::cell_scientific_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit scientific-notation format transactionally.
+    pub fn set_table_cell_scientific_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: Scientific,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Scientific cell.
+    pub fn reset_table_cell_scientific_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_scientific_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != DataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers scientific-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit mixed-fraction format for one table cell.
+    ///
+    /// `None` means the cell uses iWork's automatic data format.
+    pub fn table_cell_fraction_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<Fraction>> {
+        cell_data_format::cell_fraction_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit mixed-fraction format transactionally.
+    pub fn set_table_cell_fraction_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: Fraction,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Fraction cell.
+    pub fn reset_table_cell_fraction_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_fraction_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != DataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers fraction-format reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit positional numeral-system format for one table cell.
+    ///
+    /// `None` means the cell uses iWork's automatic data format.
+    pub fn table_cell_numeral_system_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<NumeralSystem>> {
+        cell_data_format::cell_numeral_system_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit positional numeral-system format transactionally.
+    pub fn set_table_cell_numeral_system_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: NumeralSystem,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Numeral System cell.
+    pub fn reset_table_cell_numeral_system_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_numeral_system_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != DataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers numeral-system reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit Date & Time format for one table cell.
+    ///
+    /// `None` means the Date value uses iWork's automatic data format.
+    pub fn table_cell_date_time_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<DateTime>> {
+        cell_data_format::cell_date_time_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit Date & Time format transactionally.
+    pub fn set_table_cell_date_time_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: DateTime,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Date & Time cell.
+    pub fn reset_table_cell_date_time_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_date_time_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != DataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers Date & Time reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit Duration format for one table cell.
+    ///
+    /// `None` means the Duration value uses iWork's automatic data format.
+    pub fn table_cell_duration_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<Duration>> {
+        cell_data_format::cell_duration_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit Duration format transactionally.
+    pub fn set_table_cell_duration_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: Duration,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Duration cell.
+    pub fn reset_table_cell_duration_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_duration_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != DataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers Duration reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit Checkbox format for one table cell.
+    pub fn table_cell_checkbox_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<Checkbox>> {
+        cell_data_format::cell_checkbox_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit native Checkbox format transactionally.
+    pub fn set_table_cell_checkbox_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: Checkbox,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Checkbox cell.
+    pub fn reset_table_cell_checkbox_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_checkbox_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != DataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers Checkbox reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit Star Rating format for one table cell.
+    pub fn table_cell_star_rating_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<StarRating>> {
+        cell_data_format::cell_star_rating_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit native five-star rating transactionally.
+    pub fn set_table_cell_star_rating_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: StarRating,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Star Rating cell.
+    pub fn reset_table_cell_star_rating_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_star_rating_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != DataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers Star Rating reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit Slider format for one table cell.
+    pub fn table_cell_slider_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<Slider>> {
+        cell_data_format::cell_slider_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit native Slider format transactionally.
+    pub fn set_table_cell_slider_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: Slider,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Slider cell.
+    pub fn reset_table_cell_slider_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_slider_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != DataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers Slider reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit Stepper format for one table cell.
+    pub fn table_cell_stepper_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<Stepper>> {
+        cell_data_format::cell_stepper_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit native Stepper format transactionally.
+    pub fn set_table_cell_stepper_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: Stepper,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Stepper cell.
+    pub fn reset_table_cell_stepper_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_stepper_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != DataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers Stepper reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read an explicit Pop-Up Menu format for one table cell.
+    pub fn table_cell_pop_up_menu_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<PopUpMenu>> {
+        cell_data_format::cell_pop_up_menu_format(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace an explicit native Pop-Up Menu format transactionally.
+    pub fn set_table_cell_pop_up_menu_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        format: PopUpMenu,
+    ) -> Result<()> {
+        self.set_table_cell_data_format(table_id, row, column, format.into())
+    }
+
+    /// Restore Automatic from an explicit Pop-Up Menu cell.
+    pub fn reset_table_cell_pop_up_menu_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_data_format::reset_cell_pop_up_menu_format(&mut staged, table_id, row, column)?;
+        if changed {
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)?
+                != DataFormat::Automatic
+            {
+                return Err(Error::InvalidFormat(
+                    "Numbers Pop-Up Menu reset failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective text layout for one zero-based table cell.
+    pub fn table_cell_layout(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<litchi_iwa_common::table::cell::layout::Layout> {
+        cell_layout::cell_layout(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace local text-layout overrides for one table cell.
+    pub fn set_table_cell_layout(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        layout: litchi_iwa_common::table::cell::layout::Layout,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_layout::set_cell_layout(&mut staged, table_id, row, column, layout)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_layout(table_id, row, column)? != layout {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell layout failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local text-layout overrides and restore inherited cell values.
+    pub fn reset_table_cell_layout(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_layout::reset_cell_layout(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective horizontal text alignment for one zero-based table cell.
+    pub fn table_cell_text_alignment(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextAlignment> {
+        cell_paragraph_style::alignment(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a local horizontal text-alignment override.
+    pub fn set_table_cell_text_alignment(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        alignment: NumbersTableCellTextAlignment,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_alignment(&mut staged, table_id, row, column, alignment)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_alignment(table_id, row, column)? != alignment {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell text alignment failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local horizontal alignment and restore the inherited table style.
+    pub fn reset_table_cell_text_alignment(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_alignment(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective paragraph line spacing for one table cell.
+    pub fn table_cell_paragraph_line_spacing(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellParagraphLineSpacing> {
+        cell_paragraph_style::line_spacing(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a whole-cell paragraph line-spacing override.
+    pub fn set_table_cell_paragraph_line_spacing(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        spacing: NumbersTableCellParagraphLineSpacing,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_line_spacing(&mut staged, table_id, row, column, spacing)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_line_spacing(table_id, row, column)? != spacing {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph line spacing failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local line spacing and restore the inherited table style.
+    pub fn reset_table_cell_paragraph_line_spacing(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_line_spacing(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective before/after paragraph spacing for one table cell.
+    pub fn table_cell_paragraph_spacing(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellParagraphSpacing> {
+        cell_paragraph_style::spacing(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell before/after paragraph spacing.
+    pub fn set_table_cell_paragraph_spacing(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        spacing: NumbersTableCellParagraphSpacing,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_spacing(&mut staged, table_id, row, column, spacing)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_spacing(table_id, row, column)? != spacing {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph spacing failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local before/after spacing and restore the inherited table style.
+    pub fn reset_table_cell_paragraph_spacing(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_spacing(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the canonical list preset applied uniformly to a table cell.
+    pub fn table_cell_paragraph_list(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellParagraphList> {
+        cell_paragraph_list::paragraph_list(&self.package, table_id, row, column)
+    }
+
+    /// Promote a plain text cell when necessary and apply one native list preset.
+    pub fn set_table_cell_paragraph_list(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        list: NumbersTableCellParagraphList,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list(&mut staged, table_id, row, column, list)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_list(table_id, row, column)? != list {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph list failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the canonical None list preset for a table cell.
+    pub fn reset_table_cell_paragraph_list(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_paragraph_list::reset_paragraph_list(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read all paragraph-scoped list preset boundaries in a table cell.
+    pub fn table_cell_paragraph_lists(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Vec<NumbersTableCellParagraphListPlacement>> {
+        cell_paragraph_list::paragraph_lists(&self.package, table_id, row, column)
+    }
+
+    /// Promote a plain cell when necessary and replace all list preset boundaries.
+    pub fn set_table_cell_paragraph_lists(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        placements: &[NumbersTableCellParagraphListPlacement],
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_lists(&mut staged, table_id, row, column, placements)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let expected = cell_paragraph_list::paragraph_lists(&staged, table_id, row, column)?;
+        if verified.table_cell_paragraph_lists(table_id, row, column)? != expected {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph-list placements failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read every effective list-level boundary in a table cell.
+    pub fn table_cell_paragraph_list_levels(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Vec<NumbersTableCellParagraphListLevelPlacement>> {
+        cell_paragraph_list::paragraph_list_levels(&self.package, table_id, row, column)
+    }
+
+    /// Set one validated paragraph's list level without changing later paragraphs.
+    pub fn set_table_cell_paragraph_list_level(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        level: NumbersTableCellParagraphListLevel,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_level(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            level,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if cell_paragraph_list::paragraph_list_level(
+            &verified.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )? != level
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph list level failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore one paragraph to the top-level list nesting level.
+    pub fn reset_table_cell_paragraph_list_level(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_list::reset_paragraph_list_level(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read whether one table-cell paragraph continues or restarts list numbering.
+    pub fn table_cell_paragraph_list_numbering(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<NumbersTableCellParagraphListNumbering> {
+        cell_paragraph_list::paragraph_list_numbering(
+            &self.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Continue or restart numbered-list sequencing at one table-cell paragraph.
+    pub fn set_table_cell_paragraph_list_numbering(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        numbering: NumbersTableCellParagraphListNumbering,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_numbering(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            numbering,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if cell_paragraph_list::paragraph_list_numbering(
+            &verified.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )? != numbering
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph list numbering failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Read one numbered table-cell paragraph's effective label format.
+    pub fn table_cell_paragraph_list_number_format(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<NumbersTableCellParagraphListNumberFormat> {
+        cell_paragraph_list::paragraph_list_number_format(
+            &self.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one numbered table-cell paragraph's locale-aware label format.
+    pub fn set_table_cell_paragraph_list_number_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        format: NumbersTableCellParagraphListNumberFormat,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_number_format(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            format,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_list_number_format(table_id, row, column, paragraph)?
+            != format
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph list-number format failed package validation"
+                    .to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the standard decimal-period label format.
+    pub fn reset_table_cell_paragraph_list_number_format(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_list::reset_paragraph_list_number_format(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read whether one numbered table-cell paragraph displays hierarchical numbering.
+    pub fn table_cell_paragraph_list_number_tiering(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<NumbersTableCellParagraphListNumberTiering> {
+        cell_paragraph_list::paragraph_list_number_tiering(
+            &self.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Choose flat or hierarchical numbering for one table-cell list level.
+    pub fn set_table_cell_paragraph_list_number_tiering(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        tiering: NumbersTableCellParagraphListNumberTiering,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_number_tiering(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            tiering,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_list_number_tiering(table_id, row, column, paragraph)?
+            != tiering
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph list-number tiering failed package validation"
+                    .to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore flat numbering for one table-cell list level.
+    pub fn reset_table_cell_paragraph_list_number_tiering(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_list::reset_paragraph_list_number_tiering(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read one numbered table-cell paragraph's number-label size.
+    pub fn table_cell_paragraph_list_number_scale(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<NumbersTableCellParagraphListNumberScale> {
+        cell_paragraph_list::paragraph_list_number_scale(
+            &self.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one numbered table-cell paragraph's number-label size.
+    pub fn set_table_cell_paragraph_list_number_scale(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        scale: NumbersTableCellParagraphListNumberScale,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_number_scale(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            scale,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_list_number_scale(table_id, row, column, paragraph)?
+            != scale
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph list-number scale failed package validation"
+                    .to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the standard 100% number-label size.
+    pub fn reset_table_cell_paragraph_list_number_scale(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_list::reset_paragraph_list_number_scale(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read one table-cell paragraph's effective text-bullet marker.
+    pub fn table_cell_paragraph_list_bullet(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<NumbersTableCellParagraphListBullet> {
+        cell_paragraph_list::paragraph_list_bullet(&self.package, table_id, row, column, paragraph)
+    }
+
+    /// Set one table-cell paragraph's text-bullet marker.
+    pub fn set_table_cell_paragraph_list_bullet(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        bullet: &NumbersTableCellParagraphListBullet,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_bullet(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            bullet,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_list_bullet(table_id, row, column, paragraph)? != *bullet {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph text bullet failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore Apple's standard `•` marker for one table-cell paragraph.
+    pub fn reset_table_cell_paragraph_list_bullet(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_list::reset_paragraph_list_bullet(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read one table-cell paragraph's effective bullet size and baseline.
+    pub fn table_cell_paragraph_list_bullet_geometry(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<NumbersTableCellParagraphListBulletGeometry> {
+        cell_paragraph_list::paragraph_list_bullet_geometry(
+            &self.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one table-cell paragraph's bullet size and baseline.
+    pub fn set_table_cell_paragraph_list_bullet_geometry(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        geometry: NumbersTableCellParagraphListBulletGeometry,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_bullet_geometry(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            geometry,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_list_bullet_geometry(table_id, row, column, paragraph)?
+            != geometry
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph bullet geometry failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore Apple's standard bullet size and baseline for this nesting level.
+    pub fn reset_table_cell_paragraph_list_bullet_geometry(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_list::reset_paragraph_list_bullet_geometry(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read one table-cell list paragraph's label and text-gap indentation.
+    pub fn table_cell_paragraph_list_indentation(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<NumbersTableCellParagraphListIndentation> {
+        cell_paragraph_list::paragraph_list_indentation(
+            &self.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one table-cell list paragraph's label and text-gap indentation.
+    pub fn set_table_cell_paragraph_list_indentation(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        indentation: NumbersTableCellParagraphListIndentation,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_indentation(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            indentation,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_list_indentation(table_id, row, column, paragraph)?
+            != indentation
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph list indentation failed package validation"
+                    .to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore Apple's standard indentation for this list preset and level.
+    pub fn reset_table_cell_paragraph_list_indentation(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_list::reset_paragraph_list_indentation(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read one table-cell list paragraph's effective label color.
+    pub fn table_cell_paragraph_list_label_color(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<NumbersTableCellParagraphListLabelColor> {
+        cell_paragraph_list::paragraph_list_label_color(
+            &self.package,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )
+    }
+
+    /// Set one table-cell list paragraph's bullet or number color.
+    pub fn set_table_cell_paragraph_list_label_color(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+        color: NumbersTableCellParagraphListLabelColor,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_list::set_paragraph_list_label_color(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+            color,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_list_label_color(table_id, row, column, paragraph)?
+            != color
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph list-label color failed package validation"
+                    .to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Restore the list label to the paragraph's automatic text color.
+    pub fn reset_table_cell_paragraph_list_label_color(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        paragraph: ParagraphStart,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_list::reset_paragraph_list_label_color(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            paragraph,
+        )?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective first-line, left, and right paragraph indents.
+    pub fn table_cell_paragraph_indents(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellParagraphIndents> {
+        cell_paragraph_style::indents(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell paragraph indents.
+    pub fn set_table_cell_paragraph_indents(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        indents: NumbersTableCellParagraphIndents,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_indents(&mut staged, table_id, row, column, indents)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_indents(table_id, row, column)? != indents {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph indents failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local paragraph indents and restore the inherited table style.
+    pub fn reset_table_cell_paragraph_indents(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_indents(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the ordered explicit ruler tab stops for one table cell.
+    pub fn table_cell_paragraph_tab_stops(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellParagraphTabStops> {
+        cell_paragraph_style::tab_stops(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell ruler tab stops.
+    pub fn set_table_cell_paragraph_tab_stops(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        stops: NumbersTableCellParagraphTabStops,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_tab_stops(&mut staged, table_id, row, column, stops.clone())?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_paragraph_tab_stops(table_id, row, column)? != stops {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell paragraph tab stops failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local ruler tab stops and restore the inherited table style.
+    pub fn reset_table_cell_paragraph_tab_stops(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_tab_stops(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective background painted behind one table cell's text.
+    pub fn table_cell_text_background(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextBackground> {
+        cell_paragraph_style::background(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a whole-cell text-background override.
+    pub fn set_table_cell_text_background(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        background: NumbersTableCellTextBackground,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_background(&mut staged, table_id, row, column, background)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_background(table_id, row, column)? != background {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell text background failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text background and restore the inherited value.
+    pub fn reset_table_cell_text_background(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_background(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective custom baseline displacement of one table cell.
+    pub fn table_cell_text_baseline_shift(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextBaselineShift> {
+        cell_paragraph_style::baseline_shift(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a whole-cell custom baseline displacement.
+    pub fn set_table_cell_text_baseline_shift(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        shift: NumbersTableCellTextBaselineShift,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_baseline_shift(&mut staged, table_id, row, column, shift)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_baseline_shift(table_id, row, column)? != shift {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell baseline shift failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local baseline displacement and restore the inherited value.
+    pub fn reset_table_cell_text_baseline_shift(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_paragraph_style::reset_baseline_shift(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective capitalization of one table cell.
+    pub fn table_cell_text_capitalization(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextCapitalization> {
+        cell_paragraph_style::capitalization(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell capitalization.
+    pub fn set_table_cell_text_capitalization(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        capitalization: NumbersTableCellTextCapitalization,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_capitalization(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            capitalization,
+        )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_capitalization(table_id, row, column)? != capitalization {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell capitalization failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local capitalization and restore the inherited value.
+    pub fn reset_table_cell_text_capitalization(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_paragraph_style::reset_capitalization(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective character spacing of one table cell.
+    pub fn table_cell_text_character_spacing(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextCharacterSpacing> {
+        cell_paragraph_style::character_spacing(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell character spacing.
+    pub fn set_table_cell_text_character_spacing(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        spacing: NumbersTableCellTextCharacterSpacing,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_character_spacing(&mut staged, table_id, row, column, spacing)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_character_spacing(table_id, row, column)? != spacing {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell character spacing failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local character spacing and restore the inherited value.
+    pub fn reset_table_cell_text_character_spacing(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed =
+            cell_paragraph_style::reset_character_spacing(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective foreground text color of one table cell.
+    pub fn table_cell_text_color(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextColor> {
+        cell_paragraph_style::text_color(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a whole-cell foreground text-color override.
+    pub fn set_table_cell_text_color(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        color: NumbersTableCellTextColor,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_text_color(&mut staged, table_id, row, column, color)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_color(table_id, row, column)? != color {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell text color failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text-color override and restore the inherited color.
+    pub fn reset_table_cell_text_color(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_text_color(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective whole-cell underline and strikethrough formatting.
+    pub fn table_cell_text_decorations(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextDecorations> {
+        cell_paragraph_style::decorations(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell underline and strikethrough formatting.
+    pub fn set_table_cell_text_decorations(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        decorations: NumbersTableCellTextDecorations,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_decorations(&mut staged, table_id, row, column, decorations)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_decorations(table_id, row, column)? != decorations {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell text decorations failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local decorations and restore the inherited cell formatting.
+    pub fn reset_table_cell_text_decorations(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_decorations(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective PostScript font identity of one table cell.
+    pub fn table_cell_text_font(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextFont> {
+        cell_paragraph_style::font(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a whole-cell PostScript font override.
+    pub fn set_table_cell_text_font(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        font: NumbersTableCellTextFont,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_font(&mut staged, table_id, row, column, font.clone())?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_font(table_id, row, column)? != font {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell font failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local font override and restore the inherited table font.
+    pub fn reset_table_cell_text_font(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_font(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective ligature policy of one table cell.
+    pub fn table_cell_text_ligatures(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextLigatures> {
+        cell_paragraph_style::ligatures(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace the whole-cell ligature policy.
+    pub fn set_table_cell_text_ligatures(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        ligatures: NumbersTableCellTextLigatures,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_ligatures(&mut staged, table_id, row, column, ligatures)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_ligatures(table_id, row, column)? != ligatures {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell ligatures failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local ligature policy and restore the inherited value.
+    pub fn reset_table_cell_text_ligatures(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_ligatures(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective outline of one table cell's text.
+    pub fn table_cell_text_outline(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextOutline> {
+        cell_paragraph_style::outline(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a whole-cell text outline.
+    pub fn set_table_cell_text_outline(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        outline: NumbersTableCellTextOutline,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_outline(&mut staged, table_id, row, column, outline)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_outline(table_id, row, column)? != outline {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell text outline failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text outline and restore the inherited value.
+    pub fn reset_table_cell_text_outline(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_outline(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective normal, superscript, or subscript formatting.
+    pub fn table_cell_text_script(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextScript> {
+        cell_paragraph_style::script(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell baseline script formatting.
+    pub fn set_table_cell_text_script(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        script: NumbersTableCellTextScript,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_script(&mut staged, table_id, row, column, script)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_script(table_id, row, column)? != script {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell baseline script failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local baseline script formatting and restore the inherited value.
+    pub fn reset_table_cell_text_script(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_script(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective drop shadow of one table cell's text.
+    pub fn table_cell_text_shadow(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextShadow> {
+        cell_paragraph_style::shadow(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a whole-cell text drop shadow.
+    pub fn set_table_cell_text_shadow(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        shadow: NumbersTableCellTextShadow,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_shadow(&mut staged, table_id, row, column, shadow)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_shadow(table_id, row, column)? != shadow {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell text shadow failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a local text shadow and restore the inherited value.
+    pub fn reset_table_cell_text_shadow(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_shadow(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read effective whole-cell point size, bold, and italic formatting.
+    pub fn table_cell_text_style(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<NumbersTableCellTextStyle> {
+        cell_paragraph_style::text_style(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace whole-cell point size, bold, and italic formatting.
+    pub fn set_table_cell_text_style(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        style: NumbersTableCellTextStyle,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_paragraph_style::set_text_style(&mut staged, table_id, row, column, style)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_text_style(table_id, row, column)? != style {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell text style failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove local point size, bold, and italic formatting.
+    pub fn reset_table_cell_text_style(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_paragraph_style::reset_text_style(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective fill for one zero-based table cell.
+    pub fn table_cell_fill(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<crate::shapes::ShapeFill> {
+        cell_fill::cell_fill(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a local table-cell fill transactionally.
+    pub fn set_table_cell_fill(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        fill: &crate::shapes::ShapeFill,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_fill::set_cell_fill(&mut staged, table_id, row, column, fill)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if &verified.table_cell_fill(table_id, row, column)? != fill {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell fill failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove a direct fill override and restore the inherited table style.
+    pub fn reset_table_cell_fill(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_fill::reset_cell_fill(&mut staged, table_id, row, column)?;
+        if changed {
+            *self = Self::from_bytes(&staged.to_bytes()?)?;
+        }
+        Ok(changed)
+    }
+
+    /// Read the effective explicit borders for one zero-based table cell.
+    pub fn table_cell_borders(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<table::cell::Borders> {
+        stroke_layers::cell_borders(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace one explicit table-cell border transactionally.
+    pub fn set_table_cell_border(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        side: BorderSide,
+        stroke: crate::shapes::Stroke,
+    ) -> Result<()> {
+        self.update_table_cell_border(table_id, row, column, side, Some(stroke))
+    }
+
+    /// Explicitly clear one table-cell border transactionally.
+    pub fn clear_table_cell_border(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        side: BorderSide,
+    ) -> Result<()> {
+        self.update_table_cell_border(table_id, row, column, side, None)
+    }
+
+    fn update_table_cell_border(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        side: BorderSide,
+        stroke: Option<crate::shapes::Stroke>,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        stroke_layers::set_cell_border(&mut staged, table_id, row, column, side, stroke)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified
+            .table_cell_borders(table_id, row, column)?
+            .get(side)
+            != stroke
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell border failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// List every native merged-cell rectangle in one attached table.
+    pub fn table_cell_merges(&self, table_id: u64) -> Result<Vec<IWorkTableCellRegion>> {
+        cell_merge::regions_in_package(&self.package, table_id)
+    }
+
+    /// Merge one non-overlapping rectangular cell region transactionally.
+    pub fn merge_cells(&mut self, table_id: u64, region: IWorkTableCellRegion) -> Result<()> {
+        let mut staged = self.package.clone();
+        cell_merge::merge_in_package(&mut staged, table_id, region)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if !verified.table_cell_merges(table_id)?.contains(&region) {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell merge failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Remove one exact merged-cell rectangle, returning whether it existed.
+    pub fn unmerge_cells(&mut self, table_id: u64, region: IWorkTableCellRegion) -> Result<bool> {
+        let mut staged = self.package.clone();
+        let changed = cell_merge::unmerge_in_package(&mut staged, table_id, region)?;
+        if !changed {
+            return Ok(false);
+        }
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified.table_cell_merges(table_id)?.contains(&region) {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell unmerge failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(true)
+    }
+
+    /// Read the comment attached to a writable BNC cell.
+    pub fn cell_comment(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<TableCellComment>> {
+        cell_comment_in_package(&self.package, table_id, row, column)
+    }
+
+    /// Create or replace a cell comment without changing the cell value or style.
+    pub fn set_cell_comment(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        text: impl Into<String>,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        set_cell_comment_in_package(&mut staged, table_id, row, column, text.into())?;
+        let bytes = staged.to_bytes()?;
+        IWorkPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Delete a cell comment without changing the cell value or style.
+    pub fn clear_cell_comment(&mut self, table_id: u64, row: usize, column: usize) -> Result<()> {
+        let mut staged = self.package.clone();
+        clear_cell_comment_in_package(&mut staged, table_id, row, column)?;
+        let bytes = staged.to_bytes()?;
+        IWorkPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Inspect the conditional-highlight style set attached to a writable BNC cell.
+    pub fn cell_conditional_highlighting(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<TableCellConditionalHighlightInfo>> {
+        conditional_highlight::info_in_package(&self.package, table_id, row, column)
+    }
+
+    /// Read the supported ordered conditional-highlight rules attached to a cell.
+    pub fn cell_conditional_highlight_rules(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Option<Vec<Rule>>> {
+        conditional_highlight::rules_in_package(&self.package, table_id, row, column)
+    }
+
+    /// Delete conditional highlighting from one cell without changing its value or base style.
+    pub fn clear_cell_conditional_highlighting(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        conditional_highlight::clear_in_package(&mut staged, table_id, row, column)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if verified
+            .cell_conditional_highlighting(table_id, row, column)?
+            .is_some()
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers conditional-highlight deletion failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(())
+    }
+
+    /// Replace a cell's conditional highlighting and return its storage identity.
+    pub fn set_cell_conditional_highlighting(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        rules: &[Rule],
+    ) -> Result<TableCellConditionalHighlightInfo> {
+        let mut staged = self.package.clone();
+        conditional_highlight::set_in_package(&mut staged, table_id, row, column, rules)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let actual = verified
+            .cell_conditional_highlighting(table_id, row, column)?
+            .ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Numbers conditional-highlight creation failed validation".to_owned(),
+                )
+            })?;
+        if actual.rule_count as usize != rules.len() {
+            return Err(Error::InvalidFormat(
+                "Numbers conditional-highlight rule count failed validation".to_owned(),
+            ));
+        }
+        if verified
+            .cell_conditional_highlight_rules(table_id, row, column)?
+            .as_deref()
+            != Some(rules)
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers conditional-highlight rules failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(actual)
+    }
+
+    /// Read the direct replies attached to a cell comment in stored order.
+    pub fn cell_comment_replies(
+        &self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+    ) -> Result<Vec<TableCellReply>> {
+        cell_comment_replies_in_package(&self.package, table_id, row, column)
+    }
+
+    /// Append a direct reply to an existing cell comment.
+    pub fn add_cell_comment_reply(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        text: impl Into<String>,
+    ) -> Result<u64> {
+        let mut staged = self.package.clone();
+        let reply_id =
+            add_cell_comment_reply_in_package(&mut staged, table_id, row, column, text.into())?;
+        let bytes = staged.to_bytes()?;
+        IWorkPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(reply_id)
+    }
+
+    /// Replace one direct reply and return its new copy-on-write object ID.
+    pub fn set_cell_comment_reply(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        reply_storage_object_id: u64,
+        text: impl Into<String>,
+    ) -> Result<u64> {
+        let mut staged = self.package.clone();
+        let reply_id = set_cell_comment_reply_in_package(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            reply_storage_object_id,
+            text.into(),
+        )?;
+        let bytes = staged.to_bytes()?;
+        IWorkPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(reply_id)
+    }
+
+    /// Remove one direct reply from an existing cell comment.
+    pub fn remove_cell_comment_reply(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        reply_storage_object_id: u64,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        remove_cell_comment_reply_in_package(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            reply_storage_object_id,
+        )?;
+        let bytes = staged.to_bytes()?;
+        IWorkPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Set a cell to a formula expression.
+    ///
+    /// The expression is compiled to Numbers' native postfix AST and interned
+    /// in the table's formula list. Local and cross-table cells, rectangles,
+    /// and whole-row/column references are mirrored into CalculationEngine
+    /// dependency records in lockstep with the formula table. Unsupported volatile, lazy,
+    /// remote-data, and spill expressions fail before the package is changed.
+    pub fn set_formula(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        expression: FormulaExpression,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        table_formula::set_attached_table_formula(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            expression,
+            None,
+        )?;
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Set a formula together with the value displayed before the next recalculation.
+    pub fn set_formula_with_cached_value(
+        &mut self,
+        table_id: u64,
+        row: usize,
+        column: usize,
+        expression: FormulaExpression,
+        cached_value: FormulaCachedValue,
+    ) -> Result<()> {
+        let mut staged = self.package.clone();
+        table_formula::set_attached_table_formula(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            expression,
+            Some(cached_value),
+        )?;
+        self.package = staged;
+        Ok(())
+    }
+
+    pub fn rename_sheet(&mut self, sheet_id: u64, name: &str) -> Result<()> {
+        validate_name(name, "sheet")?;
+        if !numbers_document(&self.package)?
+            .sheets
+            .iter()
+            .any(|reference| reference.identifier == sheet_id)
+        {
+            return Err(Error::ParseError(format!(
+                "Numbers sheet object {sheet_id} is not in the workbook"
+            )));
+        }
+        let locations = object_locations(&self.package)?;
+        let archive_name = locations
+            .get(&sheet_id)
+            .ok_or_else(|| Error::InvalidFormat(format!("Numbers sheet {sheet_id} is missing")))?
+            .to_owned();
+        let mut staged = self.package.clone();
+        staged.update_archive(&archive_name, |archive| {
+            let object = archive.object_mut(sheet_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers sheet {sheet_id} is missing"))
+            })?;
+            let (message_index, _) = decode_sheet(object)?;
+            let message_type = object.messages[message_index].type_;
+            let original = object.messages[message_index].data.as_slice();
+            let data = if message_type == 3 {
+                patch_nested_length_delimited_field(original, &[1, 1], true, Some(name.as_bytes()))?
+            } else {
+                patch_length_delimited_field(original, 1, true, Some(name.as_bytes()))?
+            };
+            let verified_name = if message_type == 3 {
+                tn::FormBasedSheetArchive::decode(data.as_slice())?
+                    .super_
+                    .name
+            } else {
+                tn::SheetArchive::decode(data.as_slice())?.name
+            };
+            if verified_name != name {
+                return Err(Error::InvalidFormat(
+                    "Numbers sheet-name wire patch failed validation".to_owned(),
+                ));
+            }
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: message_type,
+                    data,
+                },
+            )?;
+            Ok(())
+        })?;
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified
+            .sheets()?
+            .iter()
+            .find(|sheet| sheet.object_id == sheet_id)
+            .map(|sheet| sheet.name.as_str())
+            != Some(name)
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers sheet rename failed validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    pub fn rename_table(&mut self, table_id: u64, name: &str) -> Result<()> {
+        if !self
+            .tables()?
+            .iter()
+            .any(|table| table.object_id == table_id)
+        {
+            return Err(Error::ParseError(format!(
+                "Numbers table object {table_id} is not attached to a workbook sheet"
+            )));
+        }
+        let mut staged = self.package.clone();
+        rename_attached_table_in_package(&mut staged, table_id, name)?;
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified
+            .tables()?
+            .iter()
+            .find(|table| table.object_id == table_id)
+            .map(|table| table.name.as_str())
+            != Some(name)
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table rename failed validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Resize a table while preserving existing cells and stable row/column UIDs.
+    ///
+    /// Growth creates blank trailing rows or columns. Shrinkage is accepted only
+    /// when the removed trailing region contains no stored cells; this prevents
+    /// silently orphaning strings, formulas, rich text, comments, or styles.
+    pub fn resize_table(&mut self, table_id: u64, rows: usize, columns: usize) -> Result<()> {
+        let mut staged = self.package.clone();
+        resize_attached_table_in_package(&mut staged, table_id, rows, columns)?;
+
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let resized = verified
+            .tables()?
+            .into_iter()
+            .find(|table| table.object_id == table_id)
+            .ok_or_else(|| Error::InvalidFormat("Numbers resized table disappeared".to_owned()))?;
+        if (resized.rows, resized.columns) != (rows, columns) {
+            return Err(Error::InvalidFormat(
+                "Numbers table resize failed validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Unlink and remove a table model from its owning sheet.
+    ///
+    /// Private storage, formula dependency owners, UUID registrations, and
+    /// now-empty component members are removed. Shared storage and styles are
+    /// retained. Deletion is rejected while another table has a formula edge
+    /// targeting this table.
+    pub fn remove_table(&mut self, table_id: u64) -> Result<NumbersTableInfo> {
+        let table = self
+            .tables()?
+            .into_iter()
+            .find(|table| table.object_id == table_id)
+            .ok_or_else(|| {
+                Error::ParseError(format!("Numbers table object {table_id} not found"))
+            })?;
+        let owner = find_table_owner(&self.package, table_id)?;
+        let locations = object_locations(&self.package)?;
+        let descriptors = table_models(&self.package)?;
+        let descriptor = descriptors
+            .iter()
+            .find(|descriptor| descriptor.object_id == table_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers table model {table_id} is missing"))
+            })?;
+        let owned_graph = table_owned_graph(&self.package, &locations, &descriptor.model)?;
+        let mut shared_owned_ids = HashSet::new();
+        for other in descriptors
+            .iter()
+            .filter(|candidate| candidate.object_id != table_id)
+        {
+            shared_owned_ids
+                .extend(table_owned_graph(&self.package, &locations, &other.model)?.into_keys());
+        }
+        let private_owned_ids = owned_graph
+            .into_keys()
+            .filter(|identifier| !shared_owned_ids.contains(identifier))
+            .collect::<Vec<_>>();
+        let sheet_archive = locations.get(&owner.sheet_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers sheet {} is missing", owner.sheet_id))
+        })?;
+        let mut staged = self.package.clone();
+        let mut removed_identifiers = remove_table_formula_graph(&mut staged, owner.table_info_id)?;
+        staged.update_archive(sheet_archive, |archive| {
+            let object = archive.object_mut(owner.sheet_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers sheet {} is missing", owner.sheet_id))
+            })?;
+            let (message_index, sheet) = decode_sheet(object)?;
+            let previous = sheet
+                .drawable_infos
+                .iter()
+                .map(|reference| reference.identifier)
+                .collect::<Vec<_>>();
+            let current = previous
+                .iter()
+                .copied()
+                .filter(|identifier| *identifier != owner.table_info_id)
+                .collect::<Vec<_>>();
+            if current.len() + 1 != previous.len() {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers sheet {} does not reference table info {} exactly once",
+                    owner.sheet_id, owner.table_info_id
+                )));
+            }
+            replace_sheet_drawable_references(object, message_index, &previous, &current)?;
+            object.archive_info.message_infos[message_index]
+                .object_references
+                .retain(|&identifier| identifier != owner.table_info_id);
+            for field in &mut object.archive_info.message_infos[message_index].field_infos {
+                field
+                    .object_references
+                    .retain(|&identifier| identifier != owner.table_info_id);
+            }
+            Ok(())
+        })?;
+        let info_archive = locations.get(&owner.table_info_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers table info {} is missing",
+                owner.table_info_id
+            ))
+        })?;
+        let model_archive = locations.get(&table_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers table model {table_id} is missing"))
+        })?;
+        let private_owned_locations = private_owned_ids
+            .iter()
+            .map(|identifier| {
+                locations
+                    .get(identifier)
+                    .map(|entry| (entry.as_str(), *identifier))
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Numbers table storage object {identifier} is missing"
+                        ))
+                    })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let mut affected_components = HashMap::<String, u64>::new();
+        for (entry, identifier) in std::iter::once((info_archive.as_str(), owner.table_info_id))
+            .chain(std::iter::once((model_archive.as_str(), table_id)))
+            .chain(private_owned_locations)
+        {
+            let Some(component) = component_identifier_for_entry(&staged, entry)? else {
+                continue;
+            };
+            affected_components.insert(entry.to_owned(), component);
+            remove_component_external_references_to_object(&mut staged, component, identifier)?;
+            if component_uuid_identifiers(&staged, component)?
+                .is_some_and(|identifiers| identifiers.contains(&identifier))
+            {
+                remove_component_object_uuids(&mut staged, component, &[identifier])?;
+            }
+        }
+        let dedicated_component = format!("Index/Tables/Table-{}.iwa", owner.table_info_id);
+        if info_archive == model_archive && info_archive == &dedicated_component {
+            staged.remove_entry(info_archive).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers table component {info_archive} is missing"))
+            })?;
+        } else {
+            remove_object_or_empty_entry(&mut staged, &locations, owner.table_info_id)?;
+            remove_object_or_empty_entry(&mut staged, &locations, table_id)?;
+        }
+        for identifier in &private_owned_ids {
+            remove_object_or_empty_entry(&mut staged, &locations, *identifier)?;
+        }
+        for (entry, component) in affected_components {
+            if !staged.contains_entry(&entry) {
+                remove_component_registration(&mut staged, component)?;
+            }
+        }
+        removed_identifiers.extend([owner.table_info_id, table_id]);
+        removed_identifiers.extend(private_owned_ids);
+        release_package_identifier_suffix(&mut staged, &removed_identifiers)?;
+
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified
+            .tables()?
+            .iter()
+            .any(|candidate| candidate.object_id == table_id)
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table deletion failed validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(table)
+    }
+
+    /// Move a sheet to another zero-based workbook position.
+    pub fn move_sheet(&mut self, from: usize, to: usize) -> Result<()> {
+        let sheets = self.sheets()?;
+        if from >= sheets.len() || to >= sheets.len() {
+            return Err(Error::ParseError(format!(
+                "Numbers sheet move {from} -> {to} is out of range for {} sheets",
+                sheets.len()
+            )));
+        }
+        if from == to {
+            return Ok(());
+        }
+        let moved_id = sheets[from].object_id;
+        let mut staged = self.package.clone();
+        update_numbers_document(&mut staged, |document| {
+            let reference = document.sheets.remove(from);
+            document.sheets.insert(to, reference);
+            Ok(())
+        })?;
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        if verified.sheets()?.get(to).map(|sheet| sheet.object_id) != Some(moved_id) {
+            return Err(Error::InvalidFormat(
+                "Numbers sheet move failed validation".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Append an empty sheet to the workbook and return its allocated object ID.
+    pub fn add_empty_sheet(&mut self, name: &str) -> Result<NumbersSheetInfo> {
+        validate_name(name, "sheet")?;
+        let locations = object_locations(&self.package)?;
+        let identifier = locations
+            .keys()
+            .copied()
+            .max()
+            .unwrap_or(0)
+            .checked_add(1)
+            .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+        let mut staged = self.package.clone();
+        staged.update_archive("Index/Document.iwa", |archive| {
+            archive.insert_object(crate::archive::ArchiveObject::new(
+                identifier,
+                vec![RawMessage {
+                    type_: 2,
+                    data: tn::SheetArchive {
+                        name: name.to_owned(),
+                        ..Default::default()
+                    }
+                    .encode_to_vec(),
+                }],
+            )?)?;
+            Ok(())
+        })?;
+        update_numbers_document(&mut staged, |document| {
+            document.sheets.push(crate::protobuf::tsp::Reference {
+                identifier,
+                ..Default::default()
+            });
+            Ok(())
+        })?;
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let created = verified
+            .sheets()?
+            .into_iter()
+            .find(|sheet| sheet.object_id == identifier)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Numbers sheet creation failed validation".to_owned())
+            })?;
+        self.package = staged;
+        Ok(created)
+    }
+
+    /// Add an independent empty native table to an existing sheet.
+    ///
+    /// An attached table supplies structural templates when one exists. If the
+    /// workbook is table-less, the first table is built from its native theme
+    /// preset instead. Cell stores, data lists, row/column UIDs, headers, stroke
+    /// state, and the CalculationEngine owner are allocated independently;
+    /// workbook styles are shared intentionally.
+    #[allow(deprecated)]
+    pub fn add_empty_table(
+        &mut self,
+        sheet_id: u64,
+        name: &str,
+        rows: usize,
+        columns: usize,
+    ) -> Result<NumbersTableInfo> {
+        let sheets = self.sheets()?;
+        if !sheets.iter().any(|sheet| sheet.object_id == sheet_id) {
+            return Err(Error::ParseError(format!(
+                "Numbers sheet object {sheet_id} is not in the workbook"
+            )));
+        }
+
+        let descriptors = table_models(&self.package)?;
+        let mut staged = self.package.clone();
+        let graph = if let Some(template) = descriptors.first() {
+            let template_owner = find_table_owner(&self.package, template.object_id)?;
+            table_create::create_empty_table_graph(
+                &mut staged,
+                template_owner.table_info_id,
+                template.object_id,
+                template_owner.sheet_id,
+                sheet_id,
+                name,
+                rows,
+                columns,
+                (template_owner.sheet_id == sheet_id).then_some(EMPTY_TABLE_POSITION_OFFSET),
+            )?
+        } else {
+            table_bootstrap::bootstrap_empty_table_graph(
+                &mut staged,
+                sheet_id,
+                name,
+                rows,
+                columns,
+            )?
+        };
+        let new_info_id = graph.info_object_id;
+        let new_model_id = graph.model_object_id;
+        let locations = object_locations(&staged)?;
+        let sheet_archive_name = locations
+            .get(&sheet_id)
+            .ok_or_else(|| Error::InvalidFormat(format!("Numbers sheet {sheet_id} is missing")))?;
+        staged.update_archive(sheet_archive_name, |archive| {
+            let object = archive.object_mut(sheet_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers sheet {sheet_id} is missing"))
+            })?;
+            let (message_index, sheet) = decode_sheet(object)?;
+            let existing_drawables = sheet
+                .drawable_infos
+                .iter()
+                .map(|reference| reference.identifier)
+                .collect::<Vec<_>>();
+            let existing_drawable_set = existing_drawables.iter().copied().collect::<HashSet<_>>();
+            let mut current_drawables = existing_drawables.clone();
+            current_drawables.push(new_info_id);
+            replace_sheet_drawable_references(
+                object,
+                message_index,
+                &existing_drawables,
+                &current_drawables,
+            )?;
+            let references =
+                &mut object.archive_info.message_infos[message_index].object_references;
+            if !references.contains(&new_info_id) {
+                references.push(new_info_id);
+            }
+            for field in &mut object.archive_info.message_infos[message_index].field_infos {
+                if field
+                    .object_references
+                    .iter()
+                    .any(|identifier| existing_drawable_set.contains(identifier))
+                    && !field.object_references.contains(&new_info_id)
+                {
+                    field.object_references.push(new_info_id);
+                }
+            }
+            Ok(())
+        })?;
+
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let created = verified
+            .tables()?
+            .into_iter()
+            .find(|table| table.object_id == new_model_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Numbers table creation failed validation".to_owned())
+            })?;
+        if (created.rows, created.columns, created.name.as_str()) != (rows, columns, name) {
+            return Err(Error::InvalidFormat(
+                "Numbers table creation produced unexpected properties".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(created)
+    }
+
+    /// Duplicate a populated table on its owning sheet.
+    ///
+    /// Cell tiles, headers, data lists, UID maps, stroke state, formulas, and
+    /// CalculationEngine dependency owners are cloned independently. Workbook
+    /// styles and referenced rich-text/comment payloads retain their native
+    /// copy-on-write sharing.
+    #[allow(deprecated)]
+    pub fn duplicate_table(&mut self, table_id: u64) -> Result<NumbersTableInfo> {
+        let descriptors = table_models(&self.package)?;
+        let source = descriptors
+            .iter()
+            .find(|descriptor| descriptor.object_id == table_id)
+            .ok_or_else(|| Error::ParseError(format!("Numbers table {table_id} not found")))?;
+        let owner = find_table_owner(&self.package, table_id)?;
+        let existing_names = descriptors
+            .iter()
+            .filter_map(|descriptor| {
+                find_table_owner(&self.package, descriptor.object_id)
+                    .ok()
+                    .filter(|candidate| candidate.sheet_id == owner.sheet_id)
+                    .map(|_| descriptor.model.table_name.as_str())
+            })
+            .collect::<HashSet<_>>();
+        let name = duplicate_table_name(&source.model.table_name, &existing_names)?;
+        let source_package = &self.package;
+        let locations = object_locations(source_package)?;
+        let sheet_archive_name = locations.get(&owner.sheet_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers sheet {} is missing", owner.sheet_id))
+        })?;
+        let mut staged = source_package.clone();
+        let cloned = duplicate_attached_table_graph_in_package(
+            source_package,
+            &mut staged,
+            owner.table_info_id,
+            table_id,
+            &name,
+            TABLE_DUPLICATE_OFFSET,
+        )?;
+        staged.update_archive(sheet_archive_name, |archive| {
+            let object = archive.object_mut(owner.sheet_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers sheet {} is missing", owner.sheet_id))
+            })?;
+            let (message_index, sheet) = decode_sheet(object)?;
+            let previous = sheet
+                .drawable_infos
+                .iter()
+                .map(|reference| reference.identifier)
+                .collect::<Vec<_>>();
+            let mut current = previous.clone();
+            current.push(cloned.info_object_id);
+            replace_sheet_drawable_references(object, message_index, &previous, &current)?;
+            let info = &mut object.archive_info.message_infos[message_index];
+            info.object_references.push(cloned.info_object_id);
+            for field in &mut info.field_infos {
+                if field
+                    .object_references
+                    .iter()
+                    .any(|identifier| previous.contains(identifier))
+                {
+                    field.object_references.push(cloned.info_object_id);
+                }
+            }
+            Ok(())
+        })?;
+
+        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let created = verified
+            .tables()?
+            .into_iter()
+            .find(|table| table.object_id == cloned.model_object_id)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Numbers table duplication failed validation".to_owned())
+            })?;
+        if (created.name.as_str(), created.rows, created.columns)
+            != (
+                name.as_str(),
+                source.model.number_of_rows as usize,
+                source.model.number_of_columns as usize,
+            )
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers table duplicate has unexpected properties".to_owned(),
+            ));
+        }
+        self.package = staged;
+        Ok(created)
+    }
+
+    pub(crate) fn package(&self) -> &IWorkPackage {
+        &self.package
+    }
+
+    fn sheet_owned_drawable_ids(&self, sheet_id: u64) -> Result<HashSet<u64>> {
+        if !self
+            .sheets()?
+            .iter()
+            .any(|sheet| sheet.object_id == sheet_id)
+        {
+            return Err(Error::ParseError(format!(
+                "Numbers sheet object {sheet_id} is not reachable"
+            )));
+        }
+        Ok(numbers_sheet_drawable_owners(&self.package)?
+            .into_iter()
+            .filter_map(|(drawable_id, owner_id)| (owner_id == sheet_id).then_some(drawable_id))
+            .collect())
+    }
+
+    fn require_sheet_drawable(&self, sheet_id: u64, drawable_object_id: u64) -> Result<()> {
+        if !self
+            .sheet_owned_drawable_ids(sheet_id)?
+            .contains(&drawable_object_id)
+        {
+            return Err(Error::ParseError(format!(
+                "drawable object {drawable_object_id} is not owned by Numbers sheet {sheet_id}"
+            )));
+        }
+        if !self
+            .sheet_drawables(sheet_id)?
+            .iter()
+            .any(|drawable| drawable.id.get() == drawable_object_id)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers sheet drawable {drawable_object_id} has no supported direct drawable payload"
+            )));
+        }
+        Ok(())
+    }
+
+    /// List metadata-backed media reachable from this spreadsheet package.
+    pub fn media_assets(&self) -> Result<Vec<EmbeddedMediaAsset>> {
+        reachable_embedded_assets(&self.package, [1])
+    }
+
+    /// List media reachable from one sheet and its drawable object graph.
+    pub fn sheet_media_assets(&self, sheet_id: u64) -> Result<Vec<EmbeddedMediaAsset>> {
+        if !self
+            .sheets()?
+            .iter()
+            .any(|sheet| sheet.object_id == sheet_id)
+        {
+            return Err(Error::ParseError(format!(
+                "Numbers sheet object {sheet_id} is not reachable"
+            )));
+        }
+        reachable_embedded_assets(&self.package, [sheet_id])
+    }
+
+    pub fn extract_media(&self, data_identifier: u64) -> Result<Vec<u8>> {
+        if !self
+            .media_assets()?
+            .iter()
+            .any(|asset| asset.data_identifier == data_identifier)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Data identifier {data_identifier} is not reachable from the Numbers object graph"
+            )));
+        }
+        IWorkMediaEditor::from_package(self.package.clone())?.extract(data_identifier)
+    }
+
+    /// Replace a referenced materialized asset without changing its data identifier.
+    pub fn replace_media(&mut self, data_identifier: u64, replacement: &[u8]) -> Result<Vec<u8>> {
+        if !self
+            .media_assets()?
+            .iter()
+            .any(|asset| asset.data_identifier == data_identifier)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Data identifier {data_identifier} is not reachable from the Numbers object graph"
+            )));
+        }
+        let mut media = IWorkMediaEditor::from_package(self.package.clone())?;
+        let old = media.replace(data_identifier, replacement)?;
+        let staged = media.into_package();
+        Self::from_package(staged.clone())?;
+        self.package = staged;
+        Ok(old)
+    }
+
+    #[allow(dead_code)]
+    #[allow(dead_code)]
+    pub(crate) fn into_package(self) -> IWorkPackage {
+        self.package
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        self.package.to_bytes()
+    }
+
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
+        self.package.save(path)
+    }
+}
+
+pub(crate) fn set_table_cell_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    value: CellValue,
+) -> Result<()> {
+    model::set_attached_cell_in_package(package, table_id, row, column, value)?;
+    formula_cache::refresh_formula_caches_after_cell_write(package, table_id, row, column)?;
+    Ok(())
+}
+
+pub(crate) fn table_cell_borders_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<table::cell::Borders> {
+    stroke_layers::cell_borders(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_fill_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<crate::shapes::ShapeFill> {
+    cell_fill::cell_fill(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_layout_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<litchi_iwa_common::table::cell::layout::Layout> {
+    cell_layout::cell_layout(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_alignment_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextAlignment> {
+    cell_paragraph_style::alignment(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_alignment_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    alignment: TextAlignment,
+) -> Result<()> {
+    cell_paragraph_style::set_alignment(package, table_id, row, column, alignment)
+}
+
+pub(crate) fn reset_table_cell_text_alignment_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_alignment(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_paragraph_line_spacing_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<ParagraphLineSpacing> {
+    cell_paragraph_style::line_spacing(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_paragraph_line_spacing_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    spacing: ParagraphLineSpacing,
+) -> Result<()> {
+    cell_paragraph_style::set_line_spacing(package, table_id, row, column, spacing)
+}
+
+pub(crate) fn reset_table_cell_paragraph_line_spacing_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_line_spacing(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_paragraph_spacing_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<ParagraphSpacing> {
+    cell_paragraph_style::spacing(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_paragraph_spacing_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    spacing: ParagraphSpacing,
+) -> Result<()> {
+    cell_paragraph_style::set_spacing(package, table_id, row, column, spacing)
+}
+
+pub(crate) fn reset_table_cell_paragraph_spacing_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_spacing(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_paragraph_list_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<ParagraphList> {
+    cell_paragraph_list::paragraph_list(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    list: ParagraphList,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list(package, table_id, row, column, list)
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_paragraph_lists_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Vec<ParagraphListPlacement>> {
+    cell_paragraph_list::paragraph_lists(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_paragraph_lists_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    placements: &[ParagraphListPlacement],
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_lists(package, table_id, row, column, placements)
+}
+
+pub(crate) fn table_cell_paragraph_list_levels_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Vec<ParagraphListLevelPlacement>> {
+    cell_paragraph_list::paragraph_list_levels(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_level_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    level: ParagraphListLevel,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_level(package, table_id, row, column, paragraph, level)
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_level_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list_level(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn table_cell_paragraph_list_numbering_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListNumbering> {
+    cell_paragraph_list::paragraph_list_numbering(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_numbering_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    numbering: ParagraphListNumbering,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_numbering(
+        package, table_id, row, column, paragraph, numbering,
+    )
+}
+
+pub(crate) fn table_cell_paragraph_list_number_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListNumberFormat> {
+    cell_paragraph_list::paragraph_list_number_format(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_number_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    format: ParagraphListNumberFormat,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_number_format(
+        package, table_id, row, column, paragraph, format,
+    )
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_number_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list_number_format(
+        package, table_id, row, column, paragraph,
+    )
+}
+
+pub(crate) fn table_cell_paragraph_list_number_tiering_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListNumberTiering> {
+    cell_paragraph_list::paragraph_list_number_tiering(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_number_tiering_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    tiering: ParagraphListNumberTiering,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_number_tiering(
+        package, table_id, row, column, paragraph, tiering,
+    )
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_number_tiering_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list_number_tiering(
+        package, table_id, row, column, paragraph,
+    )
+}
+
+pub(crate) fn table_cell_paragraph_list_number_scale_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListNumberScale> {
+    cell_paragraph_list::paragraph_list_number_scale(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_number_scale_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    scale: ParagraphListNumberScale,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_number_scale(
+        package, table_id, row, column, paragraph, scale,
+    )
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_number_scale_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list_number_scale(
+        package, table_id, row, column, paragraph,
+    )
+}
+
+pub(crate) fn table_cell_paragraph_list_bullet_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListBullet> {
+    cell_paragraph_list::paragraph_list_bullet(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_bullet_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    bullet: &ParagraphListBullet,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_bullet(
+        package, table_id, row, column, paragraph, bullet,
+    )
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_bullet_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list_bullet(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn table_cell_paragraph_list_bullet_geometry_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListBulletGeometry> {
+    cell_paragraph_list::paragraph_list_bullet_geometry(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_bullet_geometry_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    geometry: ParagraphListBulletGeometry,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_bullet_geometry(
+        package, table_id, row, column, paragraph, geometry,
+    )
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_bullet_geometry_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list_bullet_geometry(
+        package, table_id, row, column, paragraph,
+    )
+}
+
+pub(crate) fn table_cell_paragraph_list_indentation_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListIndentation> {
+    cell_paragraph_list::paragraph_list_indentation(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_indentation_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    indentation: ParagraphListIndentation,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_indentation(
+        package,
+        table_id,
+        row,
+        column,
+        paragraph,
+        indentation,
+    )
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_indentation_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list_indentation(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn table_cell_paragraph_list_label_color_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<ParagraphListLabelColor> {
+    cell_paragraph_list::paragraph_list_label_color(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn set_table_cell_paragraph_list_label_color_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+    color: ParagraphListLabelColor,
+) -> Result<()> {
+    cell_paragraph_list::set_paragraph_list_label_color(
+        package, table_id, row, column, paragraph, color,
+    )
+}
+
+pub(crate) fn reset_table_cell_paragraph_list_label_color_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    paragraph: ParagraphStart,
+) -> Result<bool> {
+    cell_paragraph_list::reset_paragraph_list_label_color(package, table_id, row, column, paragraph)
+}
+
+pub(crate) fn table_cell_paragraph_indents_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<ParagraphIndents> {
+    cell_paragraph_style::indents(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_paragraph_indents_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    indents: ParagraphIndents,
+) -> Result<()> {
+    cell_paragraph_style::set_indents(package, table_id, row, column, indents)
+}
+
+pub(crate) fn reset_table_cell_paragraph_indents_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_indents(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_paragraph_tab_stops_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<ParagraphTabStops> {
+    cell_paragraph_style::tab_stops(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_paragraph_tab_stops_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    stops: ParagraphTabStops,
+) -> Result<()> {
+    cell_paragraph_style::set_tab_stops(package, table_id, row, column, stops)
+}
+
+pub(crate) fn reset_table_cell_paragraph_tab_stops_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_tab_stops(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_background_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextBackground> {
+    cell_paragraph_style::background(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_background_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    background: TextBackground,
+) -> Result<()> {
+    cell_paragraph_style::set_background(package, table_id, row, column, background)
+}
+
+pub(crate) fn reset_table_cell_text_background_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_background(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_baseline_shift_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextBaselineShift> {
+    cell_paragraph_style::baseline_shift(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_baseline_shift_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    shift: TextBaselineShift,
+) -> Result<()> {
+    cell_paragraph_style::set_baseline_shift(package, table_id, row, column, shift)
+}
+
+pub(crate) fn reset_table_cell_text_baseline_shift_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_baseline_shift(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_capitalization_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextCapitalization> {
+    cell_paragraph_style::capitalization(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_capitalization_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    capitalization: TextCapitalization,
+) -> Result<()> {
+    cell_paragraph_style::set_capitalization(package, table_id, row, column, capitalization)
+}
+
+pub(crate) fn reset_table_cell_text_capitalization_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_capitalization(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_character_spacing_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextCharacterSpacing> {
+    cell_paragraph_style::character_spacing(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_character_spacing_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    spacing: TextCharacterSpacing,
+) -> Result<()> {
+    cell_paragraph_style::set_character_spacing(package, table_id, row, column, spacing)
+}
+
+pub(crate) fn reset_table_cell_text_character_spacing_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_character_spacing(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_color_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<RgbaColor> {
+    cell_paragraph_style::text_color(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_color_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    color: RgbaColor,
+) -> Result<()> {
+    cell_paragraph_style::set_text_color(package, table_id, row, column, color)
+}
+
+pub(crate) fn reset_table_cell_text_color_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_text_color(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_decorations_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextDecorations> {
+    cell_paragraph_style::decorations(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_decorations_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    decorations: TextDecorations,
+) -> Result<()> {
+    cell_paragraph_style::set_decorations(package, table_id, row, column, decorations)
+}
+
+pub(crate) fn reset_table_cell_text_decorations_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_decorations(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_font_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextFont> {
+    cell_paragraph_style::font(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_font_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    font: TextFont,
+) -> Result<()> {
+    cell_paragraph_style::set_font(package, table_id, row, column, font)
+}
+
+pub(crate) fn reset_table_cell_text_font_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_font(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_ligatures_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextLigatures> {
+    cell_paragraph_style::ligatures(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_ligatures_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    ligatures: TextLigatures,
+) -> Result<()> {
+    cell_paragraph_style::set_ligatures(package, table_id, row, column, ligatures)
+}
+
+pub(crate) fn reset_table_cell_text_ligatures_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_ligatures(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_outline_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextOutline> {
+    cell_paragraph_style::outline(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_outline_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    outline: TextOutline,
+) -> Result<()> {
+    cell_paragraph_style::set_outline(package, table_id, row, column, outline)
+}
+
+pub(crate) fn reset_table_cell_text_outline_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_outline(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_script_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextScript> {
+    cell_paragraph_style::script(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_script_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    script: TextScript,
+) -> Result<()> {
+    cell_paragraph_style::set_script(package, table_id, row, column, script)
+}
+
+pub(crate) fn reset_table_cell_text_script_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_script(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_shadow_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextShadow> {
+    cell_paragraph_style::shadow(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_shadow_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    shadow: TextShadow,
+) -> Result<()> {
+    cell_paragraph_style::set_shadow(package, table_id, row, column, shadow)
+}
+
+pub(crate) fn reset_table_cell_text_shadow_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_shadow(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_style_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<TextStyle> {
+    cell_paragraph_style::text_style(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_text_style_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    style: TextStyle,
+) -> Result<()> {
+    cell_paragraph_style::set_text_style(package, table_id, row, column, style)
+}
+
+pub(crate) fn reset_table_cell_text_style_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_paragraph_style::reset_text_style(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_number_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Number>> {
+    cell_data_format::cell_number_format(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_number_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: Number,
+) -> Result<()> {
+    cell_data_format::set_cell_number_format(package, table_id, row, column, format)
+}
+
+pub(crate) fn common_table_cell_number_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Number>> {
+    table_cell_number_format_in_package(package, table_id, row, column)
+}
+
+pub(crate) fn set_common_table_cell_number_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: Number,
+) -> Result<()> {
+    set_table_cell_number_format_in_package(package, table_id, row, column, format)
+}
+
+pub(crate) fn reset_table_cell_number_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_number_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_text_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Text>> {
+    cell_data_format::cell_text_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_text_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_text_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_custom_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Custom>> {
+    cell_data_format::cell_custom_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_custom_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_custom_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_currency_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Currency>> {
+    cell_data_format::cell_currency_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_currency_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_currency_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_data_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<DataFormat> {
+    cell_data_format::cell_data_format(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_data_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: &DataFormat,
+) -> Result<()> {
+    cell_data_format::set_cell_data_format(package, table_id, row, column, format)
+}
+
+pub(crate) fn table_cell_percentage_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Percentage>> {
+    cell_data_format::cell_percentage_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_percentage_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_percentage_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_scientific_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Scientific>> {
+    cell_data_format::cell_scientific_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_scientific_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_scientific_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_fraction_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Fraction>> {
+    cell_data_format::cell_fraction_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_fraction_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_fraction_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_numeral_system_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<NumeralSystem>> {
+    cell_data_format::cell_numeral_system_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_numeral_system_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_numeral_system_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_date_time_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<DateTime>> {
+    cell_data_format::cell_date_time_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_date_time_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_date_time_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_duration_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Duration>> {
+    cell_data_format::cell_duration_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_duration_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_duration_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_checkbox_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Checkbox>> {
+    cell_data_format::cell_checkbox_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_checkbox_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_checkbox_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_star_rating_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<StarRating>> {
+    cell_data_format::cell_star_rating_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_star_rating_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_star_rating_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_slider_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Slider>> {
+    cell_data_format::cell_slider_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_slider_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_slider_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_stepper_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Stepper>> {
+    cell_data_format::cell_stepper_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_stepper_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_stepper_format(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_pop_up_menu_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<PopUpMenu>> {
+    cell_data_format::cell_pop_up_menu_format(package, table_id, row, column)
+}
+
+pub(crate) fn reset_table_cell_pop_up_menu_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_pop_up_menu_format(package, table_id, row, column)
+}
+
+
+
+pub(crate) fn set_table_cell_layout_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    layout: litchi_iwa_common::table::cell::layout::Layout,
+) -> Result<()> {
+    cell_layout::set_cell_layout(package, table_id, row, column, layout)
+}
+
+pub(crate) fn reset_table_cell_layout_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_layout::reset_cell_layout(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_fill_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    fill: &crate::shapes::ShapeFill,
+) -> Result<()> {
+    cell_fill::set_cell_fill(package, table_id, row, column, fill)
+}
+
+pub(crate) fn reset_table_cell_fill_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_fill::reset_cell_fill(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_border_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    side: BorderSide,
+    stroke: Option<crate::shapes::Stroke>,
+) -> Result<()> {
+    stroke_layers::set_cell_border(package, table_id, row, column, side, stroke)
+}
+
+pub(crate) fn table_cell_merges_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<Vec<IWorkTableCellRegion>> {
+    cell_merge::regions_in_package(package, table_id)
+}
+
+pub(crate) fn merge_table_cells_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    region: IWorkTableCellRegion,
+) -> Result<()> {
+    cell_merge::merge_in_package(package, table_id, region)
+}
+
+pub(crate) fn unmerge_table_cells_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    region: IWorkTableCellRegion,
+) -> Result<bool> {
+    cell_merge::unmerge_in_package(package, table_id, region)
+}
+
+pub(crate) fn table_cell_comment_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<TableCellComment>> {
+    model::attached_cell_comment_in_package(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_conditional_highlighting_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<TableCellConditionalHighlightInfo>> {
+    conditional_highlight::attached_info_in_package(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_conditional_highlight_rules_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Vec<Rule>>> {
+    conditional_highlight::attached_rules_in_package(package, table_id, row, column)
+}
+
+pub(crate) fn clear_table_cell_conditional_highlighting_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<()> {
+    conditional_highlight::clear_attached_in_package(package, table_id, row, column)
+}
+
+pub(crate) fn set_table_cell_conditional_highlighting_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    rules: &[Rule],
+) -> Result<()> {
+    conditional_highlight::set_attached_in_package(package, table_id, row, column, rules)
+}
+
+pub(crate) fn set_table_cell_comment_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    text: String,
+) -> Result<()> {
+    model::set_attached_cell_comment_in_package(package, table_id, row, column, text)
+}
+
+pub(crate) fn clear_table_cell_comment_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<()> {
+    model::clear_attached_cell_comment_in_package(package, table_id, row, column)
+}
+
+pub(crate) fn table_cell_comment_replies_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Vec<TableCellReply>> {
+    model::attached_cell_comment_replies_in_package(package, table_id, row, column)
+}
+
+pub(crate) fn add_table_cell_comment_reply_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    text: String,
+) -> Result<u64> {
+    model::add_attached_cell_comment_reply_in_package(package, table_id, row, column, text)
+}
+
+pub(crate) fn set_table_cell_comment_reply_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    reply_storage_object_id: u64,
+    text: String,
+) -> Result<u64> {
+    model::set_attached_cell_comment_reply_in_package(
+        package,
+        table_id,
+        row,
+        column,
+        reply_storage_object_id,
+        text,
+    )
+}
+
+pub(crate) fn remove_table_cell_comment_reply_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    reply_storage_object_id: u64,
+) -> Result<()> {
+    model::remove_attached_cell_comment_reply_in_package(
+        package,
+        table_id,
+        row,
+        column,
+        reply_storage_object_id,
+    )
+}
+
+pub(crate) fn set_table_formula_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    expression: FormulaExpression,
+    cached_value: FormulaCachedValue,
+) -> Result<()> {
+    table_formula::set_attached_table_formula(
+        package,
+        table_id,
+        row,
+        column,
+        expression,
+        Some(cached_value),
+    )
+}
+
+pub(crate) fn rename_table_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    name: &str,
+) -> Result<()> {
+    model::rename_attached_table_in_package(package, table_id, name)
+}
+
+pub(crate) fn resize_table_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    rows: usize,
+    columns: usize,
+) -> Result<()> {
+    model::resize_attached_table_in_package(package, table_id, rows, columns)
+}
+
+pub(crate) fn table_dimensions_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<(usize, usize)> {
+    let descriptor = model::attached_table_descriptor(package, table_id)?;
+    Ok((
+        descriptor.model.number_of_rows as usize,
+        descriptor.model.number_of_columns as usize,
+    ))
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TableTopologyMutation {
+    InsertRow(TableRowInsertion),
+    InsertColumn(TableColumnInsertion),
+    RemoveRow(TableRowDeletion),
+    RemoveColumn(TableColumnDeletion),
+}
+
+impl TableTopologyMutation {
+    pub(crate) fn apply(self, package: &mut IWorkPackage, table_id: u64) -> Result<(usize, usize)> {
+        let dimensions = table_dimensions_in_package(package, table_id)?;
+        match self {
+            Self::InsertRow(row) => Ok((
+                insert_table_row_in_package(package, table_id, row)?,
+                dimensions.1,
+            )),
+            Self::InsertColumn(column) => Ok((
+                dimensions.0,
+                insert_table_column_in_package(package, table_id, column)?,
+            )),
+            Self::RemoveRow(row) => remove_table_row_in_package(package, table_id, row),
+            Self::RemoveColumn(column) => remove_table_column_in_package(package, table_id, column),
+        }
+    }
+}
+
+pub(crate) fn insert_table_row_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    insertion: TableRowInsertion,
+) -> Result<usize> {
+    row_insert::insert_attached_table_row(package, table_id, insertion)
+}
+
+pub(crate) fn insert_table_column_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    insertion: TableColumnInsertion,
+) -> Result<usize> {
+    column_insert::insert_attached_table_column(package, table_id, insertion)
+}
+
+pub(crate) fn remove_table_row_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    deletion: TableRowDeletion,
+) -> Result<(usize, usize)> {
+    table_delete::remove_attached_table_row(package, table_id, deletion)
+}
+
+pub(crate) fn remove_table_column_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    deletion: TableColumnDeletion,
+) -> Result<(usize, usize)> {
+    table_delete::remove_attached_table_column(package, table_id, deletion)
+}
+
+pub(crate) fn set_table_dimension_size_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    dimension: Dimension,
+    size: Size,
+) -> Result<()> {
+    table_dimension::set_attached_table_dimension_size(package, table_id, dimension, size)
+}
+
+pub(crate) fn table_dimension_size_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    dimension: Dimension,
+) -> Result<Size> {
+    table_dimension::read_attached_table_dimension_size(package, table_id, dimension)
+}
+
+pub(crate) fn table_size_points_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<(f32, f32)> {
+    table_dimension::attached_table_size_points(package, table_id)
+}
+
+pub(crate) fn table_header_settings_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<NumbersTableHeaderSettings> {
+    table_headers::read_attached_table_header_settings(package, table_id)
+}
+
+pub(crate) fn set_table_header_settings_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    settings: NumbersTableHeaderSettings,
+) -> Result<()> {
+    table_headers::set_attached_table_header_settings(package, table_id, settings)
+}
+
+pub(crate) fn table_owned_object_ids_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+) -> Result<Vec<u64>> {
+    let descriptor = model::attached_table_descriptor(package, table_id)?;
+    let locations = object_locations(package)?;
+    Ok(table_owned_graph(package, &locations, &descriptor.model)?
+        .into_keys()
+        .collect())
+}
+
+pub(crate) fn remove_table_formula_graph_in_package(
+    package: &mut IWorkPackage,
+    table_context_ids: &[u64],
+) -> Result<Vec<u64>> {
+    formula_clone::remove_table_formula_graph_for_contexts(package, table_context_ids)
+}
+
+pub(crate) fn create_empty_table_graph_in_package(
+    package: &mut IWorkPackage,
+    template_info_id: u64,
+    template_model_id: u64,
+    parent_id: u64,
+    name: &str,
+    rows: usize,
+    columns: usize,
+) -> Result<(u64, u64)> {
+    let graph = table_create::create_empty_table_graph(
+        package,
+        template_info_id,
+        template_model_id,
+        parent_id,
+        parent_id,
+        name,
+        rows,
+        columns,
+        None,
+    )?;
+    Ok((graph.info_object_id, graph.model_object_id))
+}
+>>>>>>> fb391901 (chore(iwa): keep internal package bridges warning-free)
 
 mod cell_data_format;
 mod cell_fill;
