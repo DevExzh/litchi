@@ -299,13 +299,13 @@ fn validate_cache(chart: &Chart) -> Result<()> {
         .try_reserve(chart.cached_values.len())
         .map_err(|_allocation_error| Error::Allocation("chart cache validation"))?;
     for cache in &chart.cached_values {
-        if usize::from(cache.column) >= chart.series.len() {
+        if usize::from(cache.series) >= chart.series.len() {
             return invalid(
                 SI_INDEX,
                 "cached chart column does not identify a Series record",
             );
         }
-        if !cells.insert((cache.cache_index, cache.row, cache.column)) {
+        if !cells.insert((cache.kind, cache.point, cache.series)) {
             return invalid(SI_INDEX, "chart data cache contains a duplicate cell");
         }
         match &cache.value {

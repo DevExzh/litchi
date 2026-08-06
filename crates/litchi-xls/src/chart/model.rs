@@ -123,6 +123,150 @@ pub struct CellRef {
     pub last_column: u16,
 }
 
+/// A bounded, inert chart formula.
+///
+/// The XLS owner intentionally exposes only the canonical single-cell and
+/// rectangular `PtgRef3d`/`PtgArea3d` forms here. Other ChartParsedFormula
+/// operands remain readable as raw link bytes, but are not accepted by this
+/// mutation facade because their graph effects cannot yet be proven.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Formula {
+    tokens: Vec<u8>,
+    references: Vec<CellRef>,
+}
+
+impl Formula {
+    /// Constructs an absolute single-cell reference.
+    pub fn cell(reference: CellRef) -> Result<Self> {
+        if reference.first_row != reference.last_row
+            || reference.first_column != reference.last_column
+        {
+            return invalid(
+                BRAI,
+                "single-cell chart formula has a rectangular reference",
+            );
+        }
+        Self::from_reference(reference, false)
+    }
+
+    /// Constructs an absolute rectangular cell-range reference.
+    pub fn range(reference: CellRef) -> Result<Self> {
+        Self::from_reference(reference, true)
+    }
+
+    /// Parses one canonical chart formula under the configured formula bound.
+    ///
+    /// Empty formulas are retained for inspection, but a data-link mutation
+    /// requires a non-empty supported cell reference.
+    pub fn parse(tokens: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
+        let tokens = tokens.into();
+        if tokens.len() > limits.max_formula_bytes {
+            return invalid(BRAI, "chart formula exceeds the configured limit");
+        }
+        let references = super::codec::parse_chart_references(&tokens)?;
+        match tokens.len() {
+            0 => {},
+            7 if tokens[0] == 0x3a && u16_at(&tokens, 5)? & 0xc000 == 0 => {},
+            11 if tokens[0] == 0x3b
+                && u16_at(&tokens, 7)? & 0xc000 == 0
+                && u16_at(&tokens, 9)? & 0xc000 == 0 => {},
+            _ => {
+                return invalid(
+                    BRAI,
+                    "chart formula uses an unsupported or opaque operand sequence",
+                );
+            },
+        }
+        if !tokens.is_empty() && references.is_empty() {
+            return invalid(BRAI, "chart formula has no supported cell reference");
+        }
+        let formula = Self { tokens, references };
+        for reference in &formula.references {
+            validate_reference(reference)?;
+        }
+        Ok(formula)
+    }
+
+    /// Original inert formula tokens.
+    #[must_use]
+    pub fn tokens(&self) -> &[u8] {
+        &self.tokens
+    }
+
+    /// Checked cell references represented by this formula.
+    #[must_use]
+    pub fn references(&self) -> &[CellRef] {
+        &self.references
+    }
+
+    /// Number of cells covered by the represented references.
+    pub fn cell_count(&self) -> Result<usize> {
+        self.references.iter().try_fold(0usize, |count, reference| {
+            let rows = usize::from(
+                reference
+                    .last_row
+                    .checked_sub(reference.first_row)
+                    .ok_or_else(|| {
+                        Error::InvalidData("chart formula row order is invalid".into())
+                    })?,
+            )
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidData("chart formula row count overflow".into()))?;
+            let columns = usize::from(
+                reference
+                    .last_column
+                    .checked_sub(reference.first_column)
+                    .ok_or_else(|| {
+                        Error::InvalidData("chart formula column order is invalid".into())
+                    })?,
+            )
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidData("chart formula column count overflow".into()))?;
+            count
+                .checked_add(rows.checked_mul(columns).ok_or_else(|| {
+                    Error::InvalidData("chart formula cell count overflow".into())
+                })?)
+                .ok_or_else(|| Error::InvalidData("chart formula cell count overflow".into()))
+        })
+    }
+
+    fn from_reference(reference: CellRef, range: bool) -> Result<Self> {
+        validate_reference(&reference)?;
+        let mut tokens = Vec::with_capacity(if range { 11 } else { 7 });
+        tokens.push(if range { 0x3b } else { 0x3a });
+        tokens.extend(reference.extern_sheet_index.to_le_bytes());
+        tokens.extend(reference.first_row.to_le_bytes());
+        if range {
+            tokens.extend(reference.last_row.to_le_bytes());
+        }
+        tokens.extend(reference.first_column.to_le_bytes());
+        if range {
+            tokens.extend(reference.last_column.to_le_bytes());
+        }
+        Ok(Self {
+            tokens,
+            references: vec![reference],
+        })
+    }
+
+    fn into_parts(self) -> (Vec<u8>, Vec<CellRef>) {
+        (self.tokens, self.references)
+    }
+}
+
+fn validate_reference(reference: &CellRef) -> Result<()> {
+    if reference.first_row > reference.last_row
+        || reference.first_column > reference.last_column
+        || reference.last_column > 255
+    {
+        return invalid(
+            BRAI,
+            "chart formula reference is outside the BIFF8 grid or is reversed",
+        );
+    }
+    Ok(())
+}
+
 /// Semantic part of a series referenced by a data link.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
@@ -135,6 +279,49 @@ pub enum Role {
     Categories = 2,
     /// Bubble-size values.
     Bubbles = 3,
+}
+
+impl Role {
+    /// The four roles used by a regular Excel series, in BIFF order.
+    pub const ALL: [Self; 4] = [Self::Name, Self::Values, Self::Categories, Self::Bubbles];
+}
+
+/// Data-cache section selected by an `SIIndex` record.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u16)]
+pub enum CacheKind {
+    /// Series values or vertical values for scatter/bubble charts.
+    Values = 1,
+    /// Category labels or horizontal values for scatter/bubble charts.
+    Categories = 2,
+    /// Bubble-size values.
+    Bubbles = 3,
+}
+
+impl CacheKind {
+    /// Decodes the only three legal BIFF `SIIndex` values.
+    pub const fn from_wire(value: u16) -> Option<Self> {
+        match value {
+            1 => Some(Self::Values),
+            2 => Some(Self::Categories),
+            3 => Some(Self::Bubbles),
+            _ => None,
+        }
+    }
+
+    /// Wire value written to `SIIndex`.
+    pub const fn wire(self) -> u16 {
+        self as u16
+    }
+
+    /// Series role represented by this cache section.
+    pub const fn role(self) -> Role {
+        match self {
+            Self::Values => Role::Values,
+            Self::Categories => Role::Categories,
+            Self::Bubbles => Role::Bubbles,
+        }
+    }
 }
 
 /// Kind of source referenced by a chart data link.
@@ -166,6 +353,38 @@ pub struct DataLink {
     pub references: Vec<CellRef>,
 }
 
+impl DataLink {
+    /// Creates an automatically generated link with no formula payload.
+    pub const fn automatic(role: Role) -> Self {
+        Self {
+            role,
+            source: Source::Automatic,
+            unlinked_number_format: false,
+            number_format: 0,
+            formula_tokens: Vec::new(),
+            references: Vec::new(),
+        }
+    }
+
+    /// Creates a worksheet-cell link from a checked inert formula.
+    pub fn cells(role: Role, formula: Formula) -> Self {
+        let (formula_tokens, references) = formula.into_parts();
+        Self {
+            role,
+            source: Source::Cells,
+            unlinked_number_format: false,
+            number_format: 0,
+            formula_tokens,
+            references,
+        }
+    }
+
+    /// Returns the formula as a checked typed view.
+    pub fn formula(&self, limits: Limits) -> Result<Formula> {
+        Formula::parse(self.formula_tokens.clone(), limits)
+    }
+}
+
 /// One cached chart cell value.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -180,16 +399,42 @@ pub enum Value {
 /// Cached value address and content.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cache {
-    /// `SIIndex` cache identifier.
-    pub cache_index: u16,
-    /// Zero-based cached row.
-    pub row: u16,
-    /// Zero-based cached column.
-    pub column: u8,
+    /// `SIIndex` data section.
+    pub kind: CacheKind,
+    /// Zero-based point index encoded by the cache cell.
+    pub point: u16,
+    /// Zero-based series index encoded by the cache cell.
+    pub series: u8,
     /// BIFF number-format index stored with the cached cell.
     pub format: u16,
     /// Cached cell content.
     pub value: Value,
+}
+
+impl Cache {
+    /// Creates one typed cached chart value.
+    pub fn new(kind: CacheKind, series: u8, point: u16, format: u16, value: Value) -> Result<Self> {
+        validate_cache_value(&value)?;
+        Ok(Self {
+            kind,
+            point,
+            series,
+            format,
+            value,
+        })
+    }
+}
+
+fn validate_cache_value(value: &Value) -> Result<()> {
+    match value {
+        Value::Number(number) if !number.is_finite() => {
+            invalid(NUMBER, "cached chart number must be finite")
+        },
+        Value::Text(text) if text.encode_utf16().count() > 255 => {
+            invalid(LABEL, "cached chart label exceeds 255 UTF-16 code units")
+        },
+        Value::Number(_) | Value::Text(_) | Value::Blank => Ok(()),
+    }
 }
 
 /// One chart data series.
@@ -235,6 +480,76 @@ impl Series {
     #[must_use]
     pub fn link(&self, role: Role) -> Option<&DataLink> {
         self.links.iter().find(|link| link.role == role)
+    }
+
+    /// Replaces the formula of one existing worksheet-cell link.
+    ///
+    /// The link role, source kind, series shape, and declared cell count stay
+    /// fixed. Adding, removing, duplicating, or retargeting a link is outside
+    /// this narrow safe mutation boundary.
+    pub fn set_formula(&mut self, role: Role, formula: Formula) -> Result<()> {
+        let mut link_index = None;
+        for (index, link) in self.links.iter().enumerate() {
+            if link.role == role {
+                if link_index.is_some() {
+                    return Err(Error::UnsafeEdit(
+                        "series formula link is duplicated".into(),
+                    ));
+                }
+                link_index = Some(index);
+            }
+        }
+        if role != Role::Name {
+            let expected = match role {
+                Role::Values => self.value_count,
+                Role::Categories => self.category_count,
+                Role::Bubbles => self.bubble_count,
+                Role::Name => 0,
+            };
+            let actual = u16::try_from(formula.cell_count()?)
+                .map_err(|_| Error::InvalidData("chart formula cell count exceeds u16".into()))?;
+            if actual != expected {
+                return invalid(
+                    BRAI,
+                    "retargeted chart formula changes the declared series cardinality",
+                );
+            }
+        }
+        let link_index =
+            link_index.ok_or_else(|| Error::UnsafeEdit("series formula link is missing".into()))?;
+        let link = self
+            .links
+            .get(link_index)
+            .ok_or_else(|| Error::InvalidData("series formula link disappeared".into()))?;
+        if link.source != Source::Cells {
+            return Err(Error::UnsafeEdit(
+                "only worksheet-cell chart links can be retargeted".into(),
+            ));
+        }
+        if link.references.len() != formula.references().len()
+            || link
+                .references
+                .iter()
+                .zip(formula.references())
+                .any(|(old, new)| {
+                    old.last_row.checked_sub(old.first_row)
+                        != new.last_row.checked_sub(new.first_row)
+                        || old.last_column.checked_sub(old.first_column)
+                            != new.last_column.checked_sub(new.first_column)
+                })
+        {
+            return Err(Error::UnsafeEdit(
+                "retargeted chart formula changes the reference shape".into(),
+            ));
+        }
+        let link = self
+            .links
+            .get_mut(link_index)
+            .ok_or_else(|| Error::InvalidData("series formula link disappeared".into()))?;
+        let (formula_tokens, references) = formula.into_parts();
+        link.formula_tokens = formula_tokens;
+        link.references = references;
+        Ok(())
     }
 }
 
@@ -564,6 +879,77 @@ impl Default for Chart {
 }
 
 impl Chart {
+    /// Replaces one existing series formula without changing chart topology.
+    pub fn set_formula(&mut self, series: usize, role: Role, formula: Formula) -> Result<()> {
+        self.set_formula_with(series, role, formula, Limits::default())
+    }
+
+    pub(crate) fn set_formula_with(
+        &mut self,
+        series: usize,
+        role: Role,
+        formula: Formula,
+        limits: Limits,
+    ) -> Result<()> {
+        let value = self
+            .series
+            .get_mut(series)
+            .ok_or_else(|| Error::InvalidData("chart series index is out of range".into()))?;
+        let previous = value.clone();
+        value.set_formula(role, formula)?;
+        if let Err(error) = self.validate_semantics(limits) {
+            *self
+                .series
+                .get_mut(series)
+                .ok_or_else(|| Error::InvalidData("chart series disappeared".into()))? = previous;
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    /// Replaces one existing cached cell while preserving its section and
+    /// coordinate. Cache insertion, removal, and reclassification are refused.
+    pub fn set_cache(
+        &mut self,
+        kind: CacheKind,
+        series: u8,
+        point: u16,
+        format: u16,
+        value: Value,
+    ) -> Result<()> {
+        self.set_cache_with(kind, series, point, format, value, Limits::default())
+    }
+
+    pub(crate) fn set_cache_with(
+        &mut self,
+        kind: CacheKind,
+        series: u8,
+        point: u16,
+        format: u16,
+        value: Value,
+        limits: Limits,
+    ) -> Result<()> {
+        let mut matches = self.cached_values.iter().enumerate().filter(|(_, cache)| {
+            cache.kind == kind && cache.series == series && cache.point == point
+        });
+        let index = matches
+            .next()
+            .map(|(index, _)| index)
+            .ok_or_else(|| Error::UnsafeEdit("chart cache cell is missing".into()))?;
+        if matches.next().is_some() {
+            return Err(Error::UnsafeEdit("chart cache cell is duplicated".into()));
+        }
+        validate_cache_value(&value)?;
+        let previous = self.cached_values[index].clone();
+        self.cached_values[index].format = format;
+        self.cached_values[index].value = value;
+        if let Err(error) = self.validate_semantics(limits) {
+            self.cached_values[index] = previous;
+            return Err(error);
+        }
+        Ok(())
+    }
+
     /// Derives the concise chart family from the configured groups.
     pub fn kind(&self) -> Kind {
         match self.groups.as_slice() {
@@ -686,6 +1072,9 @@ impl Chart {
             for link in &series.links {
                 validate_link(link, limits)?;
             }
+        }
+        for cache in &self.cached_values {
+            validate_cache_value(&cache.value)?;
         }
         for axis in &self.axes {
             if let Some(scale) = &axis.scale

@@ -9,9 +9,9 @@ use litchi_biff::{Limits as BiffLimits, Records};
 use litchi_ograph::chart::{Kind as GraphChartKind, Ref as GraphChartRef, Refs as GraphCharts};
 use litchi_ole_common::object::{Editor as ObjectEditor, Limits as ObjectLimits, Targets};
 
-use super::codec::parse_chart;
 #[cfg(test)]
 use super::codec::serialize_chart;
+use super::codec::{parse_chart, patch_chart_data};
 use super::model::*;
 use super::wire::*;
 use crate::{Error, Result};
@@ -28,9 +28,7 @@ pub struct Entry {
 #[derive(Clone)]
 struct StoredChart {
     entry: Entry,
-    #[cfg(test)]
     start: usize,
-    #[cfg(test)]
     end: usize,
     #[cfg(test)]
     object: Option<(usize, usize)>,
@@ -109,6 +107,96 @@ impl Editor {
             value.entry.chart.validate_semantics(self.limits)?;
         }
         Ok(())
+    }
+
+    /// Updates one existing series formula on a chart sheet.
+    ///
+    /// The operation patches only the target `BRAI` record and preserves the
+    /// original chart stream allocation, including unknown records. Embedded
+    /// chart edits remain refused because their worksheet OfficeArt graph is
+    /// not owned by this data-only editor.
+    pub fn set_formula(
+        &mut self,
+        selector: Selector<'_>,
+        series: usize,
+        role: Role,
+        formula: Formula,
+    ) -> Result<()> {
+        let location = self
+            .resolve(selector)?
+            .ok_or_else(|| invalid_error(CHART, "chart selector was not found"))?;
+        let index = self
+            .charts
+            .iter()
+            .position(|value| value.entry.location == location)
+            .ok_or_else(|| invalid_error(CHART, "chart location was not found"))?;
+        let stored = self
+            .charts
+            .get(index)
+            .ok_or_else(|| invalid_error(CHART, "chart inventory index is invalid"))?;
+        if !matches!(&location, Location::ChartSheet { .. }) {
+            return unsupported_embedded_mutation();
+        }
+        let mut updated = stored.entry.chart.clone();
+        updated.set_formula_with(series, role, formula, self.limits)?;
+        let source = self
+            .workbook
+            .get(stored.start..stored.end)
+            .ok_or_else(|| invalid_error(CHART, "chart source range is invalid"))?;
+        let patched = patch_chart_data(source, &stored.entry.chart, &updated, self.limits)?;
+        let workbook = replace_chart_sheet_stream(
+            &self.workbook,
+            location.sheet_index(),
+            stored.start,
+            stored.end,
+            &patched,
+            self.limits,
+        )?;
+        self.install_workbook(workbook).map(drop)
+    }
+
+    /// Updates one existing chart cache cell without changing its section or
+    /// coordinate. Embedded chart edits remain refused atomically.
+    pub fn set_cache(
+        &mut self,
+        selector: Selector<'_>,
+        kind: CacheKind,
+        series: u8,
+        point: u16,
+        format: u16,
+        value: Value,
+    ) -> Result<()> {
+        let location = self
+            .resolve(selector)?
+            .ok_or_else(|| invalid_error(CHART, "chart selector was not found"))?;
+        let index = self
+            .charts
+            .iter()
+            .position(|value| value.entry.location == location)
+            .ok_or_else(|| invalid_error(CHART, "chart location was not found"))?;
+        let stored = self
+            .charts
+            .get(index)
+            .ok_or_else(|| invalid_error(CHART, "chart inventory index is invalid"))?;
+        if !matches!(&location, Location::ChartSheet { .. }) {
+            return unsupported_embedded_mutation();
+        }
+        let mut updated = stored.entry.chart.clone();
+        updated.set_cache_with(kind, series, point, format, value, self.limits)?;
+        let source = self
+            .workbook
+            .get(stored.start..stored.end)
+            .ok_or_else(|| invalid_error(CHART, "chart source range is invalid"))?;
+        let patched = patch_chart_data(source, &stored.entry.chart, &updated, self.limits)?;
+        let workbook = replace_chart_sheet_stream(
+            &self.workbook,
+            location.sheet_index(),
+            stored.start,
+            stored.end,
+            &patched,
+            self.limits,
+        )?;
+        self.install_workbook(workbook).map(drop)
     }
 
     /// Consume the editor and return the parsed chart inventory without persisting.
@@ -947,9 +1035,7 @@ fn parse_workbook_charts(input: &[u8], limits: Limits) -> Result<Vec<StoredChart
                     },
                     chart,
                 },
-                #[cfg(test)]
                 start: sheet.start,
-                #[cfg(test)]
                 end: sheet.end,
                 #[cfg(test)]
                 object: None,
@@ -992,8 +1078,6 @@ fn parse_workbook_charts(input: &[u8], limits: Limits) -> Result<Vec<StoredChart
             let end = start
                 .checked_add(chart_ref.as_bytes().len())
                 .ok_or_else(|| Error::InvalidData("chart end offset overflow".into()))?;
-            #[cfg(not(test))]
-            let _ = end;
             let object = chart_objects
                 .iter()
                 .rev()
@@ -1012,9 +1096,7 @@ fn parse_workbook_charts(input: &[u8], limits: Limits) -> Result<Vec<StoredChart
                     },
                     chart,
                 },
-                #[cfg(test)]
                 start,
-                #[cfg(test)]
                 end,
                 #[cfg(test)]
                 object: Some((object.1, object.2)),
@@ -1023,6 +1105,66 @@ fn parse_workbook_charts(input: &[u8], limits: Limits) -> Result<Vec<StoredChart
     }
     if output.len() > limits.max_charts {
         return invalid(CHART, "chart count exceeds limit");
+    }
+    Ok(output)
+}
+
+fn replace_chart_sheet_stream(
+    input: &[u8],
+    sheet_index: usize,
+    start: usize,
+    end: usize,
+    replacement: &[u8],
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    let (_, sheets) = bindings(input)?;
+    let sheet = sheets
+        .iter()
+        .find(|value| value.index == sheet_index)
+        .ok_or_else(|| invalid_error(BOUNDSHEET, "chart-sheet index was not found"))?;
+    if sheet.kind != 2 || sheet.start != start || sheet.end != end || start > end {
+        return invalid(CHART, "chart-sheet source range is stale or invalid");
+    }
+    let old_len = end
+        .checked_sub(start)
+        .ok_or_else(|| Error::InvalidData("chart-sheet length underflow".into()))?;
+    let mut output = Vec::with_capacity(
+        input
+            .len()
+            .checked_sub(old_len)
+            .and_then(|value| value.checked_add(replacement.len()))
+            .ok_or_else(|| Error::InvalidData("rewritten Workbook size overflow".into()))?,
+    );
+    output.extend_from_slice(&input[..start]);
+    output.extend_from_slice(replacement);
+    output.extend_from_slice(&input[end..]);
+
+    let global_end = sheets
+        .iter()
+        .map(|value| value.start)
+        .min()
+        .ok_or_else(|| invalid_error(BOUNDSHEET, "workbook has no sheet substreams"))?;
+    let old_len = u32::try_from(old_len)
+        .map_err(|_| Error::InvalidData("chart-sheet length exceeds u32".into()))?;
+    let new_len = u32::try_from(replacement.len())
+        .map_err(|_| Error::InvalidData("replacement chart length exceeds u32".into()))?;
+    for value in ranges(&input[..global_end])? {
+        if value.kind != BOUNDSHEET {
+            continue;
+        }
+        let old_offset = u32_at(&input[value.body_start..value.body_end], 0)?;
+        let new_offset = if usize::try_from(old_offset).unwrap_or(usize::MAX) > start {
+            old_offset
+                .checked_sub(old_len)
+                .and_then(|value| value.checked_add(new_len))
+                .ok_or_else(|| Error::InvalidData("BoundSheet offset adjustment overflow".into()))?
+        } else {
+            old_offset
+        };
+        output[value.body_start..value.body_start + 4].copy_from_slice(&new_offset.to_le_bytes());
+    }
+    if output.len() > limits.max_workbook_bytes {
+        return invalid(CHART, "rewritten Workbook exceeds chart editor limit");
     }
     Ok(output)
 }

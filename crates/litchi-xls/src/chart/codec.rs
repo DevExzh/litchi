@@ -46,7 +46,7 @@ pub(super) fn parse_chart(input: &[u8], limits: Limits) -> Result<Chart> {
     let mut current_axis = None;
     let mut axis_depth = None;
     let mut group_depth = None;
-    let mut cache_index = 0u16;
+    let mut cache_kind = None;
     let mut pending_line = None;
     let mut pending_drop: Option<PendingDrop> = None;
     let mut pending_begin = false;
@@ -497,42 +497,26 @@ pub(super) fn parse_chart(input: &[u8], limits: Limits) -> Result<Chart> {
             }),
             SI_INDEX => {
                 exact(data, 2, SI_INDEX)?;
-                cache_index = u16_at(data, 0)?;
+                cache_kind = Some(CacheKind::from_wire(u16_at(data, 0)?).ok_or_else(|| {
+                    invalid_error(SI_INDEX, "SIIndex selects an undefined cache section")
+                })?);
             },
             BLANK => {
                 exact(data, 6, BLANK)?;
-                chart.cached_values.push(Cache {
-                    cache_index,
-                    row: u16_at(data, 0)?,
-                    column: u8::try_from(u16_at(data, 2)?)
-                        .map_err(|_| invalid_error(BLANK, "cached column exceeds BIFF8 grid"))?,
-                    format: u16_at(data, 4)?,
-                    value: Value::Blank,
-                });
+                let kind = cache_kind
+                    .ok_or_else(|| invalid_error(SI_INDEX, "cache data precedes SIIndex"))?;
+                chart.cached_values.push(parse_cache(kind, BLANK, data)?);
             },
             NUMBER => {
                 exact(data, 14, NUMBER)?;
-                chart.cached_values.push(Cache {
-                    cache_index,
-                    row: u16_at(data, 0)?,
-                    column: u8::try_from(u16_at(data, 2)?)
-                        .map_err(|_| invalid_error(NUMBER, "cached column exceeds BIFF8 grid"))?,
-                    format: u16_at(data, 4)?,
-                    value: Value::Number(f64_at(data, 6)?),
-                });
+                let kind = cache_kind
+                    .ok_or_else(|| invalid_error(SI_INDEX, "cache data precedes SIIndex"))?;
+                chart.cached_values.push(parse_cache(kind, NUMBER, data)?);
             },
             LABEL => {
-                if data.len() < 8 {
-                    return invalid(LABEL, "cached Label is truncated");
-                }
-                chart.cached_values.push(Cache {
-                    cache_index,
-                    row: u16_at(data, 0)?,
-                    column: u8::try_from(u16_at(data, 2)?)
-                        .map_err(|_| invalid_error(LABEL, "cached column exceeds BIFF8 grid"))?,
-                    format: u16_at(data, 4)?,
-                    value: Value::Text(parse_biff8_string(&data[6..])?),
-                });
+                let kind = cache_kind
+                    .ok_or_else(|| invalid_error(SI_INDEX, "cache data precedes SIIndex"))?;
+                chart.cached_values.push(parse_cache(kind, LABEL, data)?);
             },
             BOF | EOF => return invalid(value.kind, "nested BOF/EOF is invalid in a chart"),
             _ => chart.unknown_records.push(Raw {
@@ -552,6 +536,344 @@ pub(super) fn parse_chart(input: &[u8], limits: Limits) -> Result<Chart> {
     }
     chart.validate(limits)?;
     Ok(chart)
+}
+
+fn parse_cache(kind: CacheKind, record_type: u16, data: &[u8]) -> Result<Cache> {
+    let (point, series, format, value) = match record_type {
+        BLANK => {
+            exact(data, 6, BLANK)?;
+            (
+                u16_at(data, 0)?,
+                u8::try_from(u16_at(data, 2)?)
+                    .map_err(|_| invalid_error(BLANK, "cached column exceeds BIFF8 grid"))?,
+                u16_at(data, 4)?,
+                Value::Blank,
+            )
+        },
+        NUMBER => {
+            exact(data, 14, NUMBER)?;
+            (
+                u16_at(data, 0)?,
+                u8::try_from(u16_at(data, 2)?)
+                    .map_err(|_| invalid_error(NUMBER, "cached column exceeds BIFF8 grid"))?,
+                u16_at(data, 4)?,
+                Value::Number(f64_at(data, 6)?),
+            )
+        },
+        LABEL => {
+            if data.len() < 9 {
+                return invalid(LABEL, "cached Label is truncated");
+            }
+            (
+                u16_at(data, 0)?,
+                u8::try_from(u16_at(data, 2)?)
+                    .map_err(|_| invalid_error(LABEL, "cached column exceeds BIFF8 grid"))?,
+                u16_at(data, 4)?,
+                Value::Text(parse_xl_unicode_string(&data[6..])?),
+            )
+        },
+        _ => return invalid(record_type, "record is not a chart cache cell"),
+    };
+    Cache::new(kind, series, point, format, value)
+}
+
+fn write_cache(cache: &Cache) -> Result<(u16, Vec<u8>)> {
+    let mut data = Vec::new();
+    data.extend(cache.point.to_le_bytes());
+    data.extend(u16::from(cache.series).to_le_bytes());
+    data.extend(cache.format.to_le_bytes());
+    let record_type = match &cache.value {
+        Value::Number(number) => {
+            if !number.is_finite() {
+                return invalid(NUMBER, "cached chart number must be finite");
+            }
+            data.extend(number.to_le_bytes());
+            NUMBER
+        },
+        Value::Text(text) => {
+            data.extend(xl_unicode_string(text)?);
+            LABEL
+        },
+        Value::Blank => BLANK,
+    };
+    Ok((record_type, data))
+}
+
+fn write_link(link: &DataLink, limits: Limits) -> Result<Vec<u8>> {
+    validate_link(link, limits)?;
+    let mut data = vec![link.role as u8, link.source as u8];
+    data.extend(u16::from(link.unlinked_number_format).to_le_bytes());
+    data.extend(link.number_format.to_le_bytes());
+    data.extend(
+        u16::try_from(link.formula_tokens.len())
+            .map_err(|_| Error::InvalidData("chart formula exceeds u16".into()))?
+            .to_le_bytes(),
+    );
+    data.extend(&link.formula_tokens);
+    Ok(data)
+}
+
+/// Patches only typed series links and cache cells in an existing chart stream.
+///
+/// Every other record is copied from the source allocation, including unknown
+/// records and their original order. The semantic models must have identical
+/// chart topology; this function is deliberately not a general chart writer.
+pub(crate) fn patch_chart_data(
+    input: &[u8],
+    old: &Chart,
+    new: &Chart,
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    old.validate_semantics(limits)?;
+    new.validate_semantics(limits)?;
+    ensure_data_edit_shape(old, new)?;
+    let source_chart = parse_chart(input, limits)?;
+    if !source_chart.eq(old) {
+        return Err(Error::UnsafeEdit(
+            "chart source differs from its typed snapshot".into(),
+        ));
+    }
+
+    let mut link_changes = old
+        .series
+        .iter()
+        .map(|series| vec![false; series.links.len()])
+        .collect::<Vec<_>>();
+    for (series_index, (old_series, new_series)) in old.series.iter().zip(&new.series).enumerate() {
+        for (link_index, (old_link, new_link)) in
+            old_series.links.iter().zip(&new_series.links).enumerate()
+        {
+            if old_link.formula_tokens == new_link.formula_tokens
+                && old_link.references == new_link.references
+            {
+                continue;
+            }
+            if new_link.source != Source::Cells {
+                return Err(Error::UnsafeEdit(
+                    "only worksheet-cell chart formulas can be patched".into(),
+                ));
+            }
+            Formula::parse(new_link.formula_tokens.clone(), limits)?;
+            link_changes[series_index][link_index] = true;
+        }
+    }
+
+    let mut cache_changes = vec![false; old.cached_values.len()];
+    for (index, (old_cache, new_cache)) in
+        old.cached_values.iter().zip(&new.cached_values).enumerate()
+    {
+        if old_cache.format != new_cache.format || old_cache.value != new_cache.value {
+            cache_changes[index] = true;
+        }
+    }
+    if !link_changes.iter().flatten().any(|value| *value)
+        && !cache_changes.iter().any(|value| *value)
+    {
+        return Ok(input.to_vec());
+    }
+
+    let records = ranges_with(input, limits.max_records_per_chart)?;
+    if records.first().is_none_or(|value| {
+        value.kind != BOF || !is_chart_bof(&input[value.body_start..value.body_end])
+    }) || records.last().is_none_or(|value| value.kind != EOF)
+    {
+        return invalid(BOF, "chart data patch requires a complete chart substream");
+    }
+    let mut output = Vec::with_capacity(input.len());
+    let mut depth = 0usize;
+    let mut current_series = None;
+    let mut series_depth = None;
+    let mut seen_series = 0usize;
+    let mut seen_links = vec![0usize; old.series.len()];
+    let mut cache_kind = None;
+    let mut seen_caches = 0usize;
+
+    for value in records {
+        let encoded = &input[value.start..value.end];
+        let data = &input[value.body_start..value.body_end];
+        match value.kind {
+            BEGIN => {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidData("chart nesting overflow".into()))?;
+                output.extend_from_slice(encoded);
+            },
+            END => {
+                if depth == 0 {
+                    return invalid(END, "unbalanced End record in chart data patch");
+                }
+                if series_depth == Some(depth) {
+                    current_series = None;
+                    series_depth = None;
+                }
+                depth -= 1;
+                output.extend_from_slice(encoded);
+            },
+            SERIES => {
+                if seen_series >= old.series.len() {
+                    return Err(Error::UnsafeEdit(
+                        "chart source contains an unmodeled series record".into(),
+                    ));
+                }
+                current_series = Some(seen_series);
+                series_depth = Some(
+                    depth
+                        .checked_add(1)
+                        .ok_or_else(|| Error::InvalidData("chart nesting overflow".into()))?,
+                );
+                seen_series += 1;
+                output.extend_from_slice(encoded);
+            },
+            BRAI => {
+                let Some(series_index) = current_series else {
+                    output.extend_from_slice(encoded);
+                    continue;
+                };
+                let link_index = *seen_links.get(series_index).ok_or_else(|| {
+                    Error::InvalidData("chart series link state is missing".into())
+                })?;
+                *seen_links.get_mut(series_index).ok_or_else(|| {
+                    Error::InvalidData("chart series link state disappeared".into())
+                })? += 1;
+                let old_link = old
+                    .series
+                    .get(series_index)
+                    .and_then(|series| series.links.get(link_index))
+                    .ok_or_else(|| Error::UnsafeEdit("chart source link is not modeled".into()))?;
+                let parsed = parse_link(data, limits)?;
+                if parsed != *old_link {
+                    return Err(Error::UnsafeEdit(
+                        "chart source link differs from its typed snapshot".into(),
+                    ));
+                }
+                let changed = link_changes
+                    .get(series_index)
+                    .and_then(|links| links.get(link_index))
+                    .copied()
+                    .ok_or_else(|| Error::UnsafeEdit("chart source link is not modeled".into()))?;
+                if changed {
+                    let link = &new.series[series_index].links[link_index];
+                    output.extend(record(BRAI, &write_link(link, limits)?)?);
+                    link_changes[series_index][link_index] = false;
+                } else {
+                    output.extend_from_slice(encoded);
+                }
+            },
+            SI_INDEX => {
+                exact(data, 2, SI_INDEX)?;
+                cache_kind = Some(CacheKind::from_wire(u16_at(data, 0)?).ok_or_else(|| {
+                    invalid_error(SI_INDEX, "SIIndex selects an undefined cache section")
+                })?);
+                output.extend_from_slice(encoded);
+            },
+            BLANK | NUMBER | LABEL => {
+                let kind = cache_kind
+                    .ok_or_else(|| invalid_error(SI_INDEX, "cache data precedes SIIndex"))?;
+                let parsed = parse_cache(kind, value.kind, data)?;
+                let cache_index = seen_caches;
+                let old_cache = old
+                    .cached_values
+                    .get(cache_index)
+                    .ok_or_else(|| Error::UnsafeEdit("chart source cache is not modeled".into()))?;
+                if parsed != *old_cache {
+                    return Err(Error::UnsafeEdit(
+                        "chart source cache differs from its typed snapshot".into(),
+                    ));
+                }
+                seen_caches = seen_caches
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidData("chart cache count overflow".into()))?;
+                let changed = cache_changes
+                    .get(cache_index)
+                    .copied()
+                    .ok_or_else(|| Error::UnsafeEdit("chart source cache is not modeled".into()))?;
+                if changed {
+                    let (record_type, data) = write_cache(&new.cached_values[cache_index])?;
+                    output.extend(record(record_type, &data)?);
+                    cache_changes[cache_index] = false;
+                } else {
+                    output.extend_from_slice(encoded);
+                }
+            },
+            _ => output.extend_from_slice(encoded),
+        }
+    }
+    if depth != 0
+        || current_series.is_some()
+        || series_depth.is_some()
+        || seen_series != old.series.len()
+        || seen_caches != old.cached_values.len()
+        || seen_links
+            .iter()
+            .enumerate()
+            .any(|(index, count)| *count != old.series[index].links.len())
+        || link_changes.iter().flatten().any(|value| *value)
+        || cache_changes.iter().any(|value| *value)
+    {
+        return Err(Error::UnsafeEdit(
+            "chart data edit did not find every typed target record".into(),
+        ));
+    }
+    Ok(output)
+}
+
+fn ensure_data_edit_shape(old: &Chart, new: &Chart) -> Result<()> {
+    if old.x != new.x
+        || old.y != new.y
+        || old.width != new.width
+        || old.height != new.height
+        || old.sheet_properties != new.sheet_properties
+        || old.plot_area_present != new.plot_area_present
+        || old.title != new.title
+        || old.groups != new.groups
+        || old.axes != new.axes
+        || old.legend != new.legend
+        || old.formatting != new.formatting
+        || old.data_labels != new.data_labels
+        || old.unknown_records != new.unknown_records
+        || old.series.len() != new.series.len()
+        || old.cached_values.len() != new.cached_values.len()
+    {
+        return Err(Error::UnsafeEdit(
+            "chart data edit would change an unsupported graph structure".into(),
+        ));
+    }
+    for (old_series, new_series) in old.series.iter().zip(&new.series) {
+        if old_series.category_kind != new_series.category_kind
+            || old_series.category_count != new_series.category_count
+            || old_series.value_count != new_series.value_count
+            || old_series.bubble_count != new_series.bubble_count
+            || old_series.chart_group != new_series.chart_group
+            || old_series.name != new_series.name
+            || old_series.links.len() != new_series.links.len()
+        {
+            return Err(Error::UnsafeEdit(
+                "chart data edit would change series topology".into(),
+            ));
+        }
+        for (old_link, new_link) in old_series.links.iter().zip(&new_series.links) {
+            if old_link.role != new_link.role
+                || old_link.source != new_link.source
+                || old_link.unlinked_number_format != new_link.unlinked_number_format
+                || old_link.number_format != new_link.number_format
+            {
+                return Err(Error::UnsafeEdit(
+                    "chart data edit would change a link's semantic metadata".into(),
+                ));
+            }
+        }
+    }
+    for (old_cache, new_cache) in old.cached_values.iter().zip(&new.cached_values) {
+        if old_cache.kind != new_cache.kind
+            || old_cache.point != new_cache.point
+            || old_cache.series != new_cache.series
+        {
+            return Err(Error::UnsafeEdit(
+                "chart data edit would change cache placement".into(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 pub(super) fn validate_link(link: &DataLink, limits: Limits) -> Result<()> {
@@ -735,16 +1057,7 @@ pub(super) fn serialize_chart(chart: &Chart, limits: Limits) -> Result<Vec<u8>> 
         push_record(&mut out, SERIES, &body)?;
         push_record(&mut out, BEGIN, &[])?;
         for link in &series.links {
-            let mut data = vec![link.role as u8, link.source as u8];
-            data.extend(u16::from(link.unlinked_number_format).to_le_bytes());
-            data.extend(link.number_format.to_le_bytes());
-            data.extend(
-                u16::try_from(link.formula_tokens.len())
-                    .map_err(|_| Error::InvalidData("chart formula exceeds u16".into()))?
-                    .to_le_bytes(),
-            );
-            data.extend(&link.formula_tokens);
-            push_record(&mut out, BRAI, &data)?;
+            push_record(&mut out, BRAI, &write_link(link, limits)?)?;
         }
         if let Some(name) = &series.name {
             push_record(&mut out, SERIES_TEXT, &short_text(name)?)?;
@@ -857,38 +1170,12 @@ pub(super) fn serialize_chart(chart: &Chart, limits: Limits) -> Result<Vec<u8>> 
     }
     let mut active_cache = None;
     for value in &chart.cached_values {
-        if active_cache != Some(value.cache_index) {
-            push_record(&mut out, SI_INDEX, &value.cache_index.to_le_bytes())?;
-            active_cache = Some(value.cache_index);
+        if active_cache != Some(value.kind) {
+            push_record(&mut out, SI_INDEX, &value.kind.wire().to_le_bytes())?;
+            active_cache = Some(value.kind);
         }
-        match &value.value {
-            Value::Number(number) => {
-                if !number.is_finite() {
-                    return invalid(NUMBER, "cached chart number must be finite");
-                }
-                let mut data = Vec::new();
-                data.extend(value.row.to_le_bytes());
-                data.extend(u16::from(value.column).to_le_bytes());
-                data.extend(value.format.to_le_bytes());
-                data.extend(number.to_le_bytes());
-                push_record(&mut out, NUMBER, &data)?;
-            },
-            Value::Text(text) => {
-                let mut data = Vec::new();
-                data.extend(value.row.to_le_bytes());
-                data.extend(u16::from(value.column).to_le_bytes());
-                data.extend(value.format.to_le_bytes());
-                data.extend(biff8_string(text)?);
-                push_record(&mut out, LABEL, &data)?;
-            },
-            Value::Blank => {
-                let mut data = Vec::with_capacity(6);
-                data.extend(value.row.to_le_bytes());
-                data.extend(u16::from(value.column).to_le_bytes());
-                data.extend(value.format.to_le_bytes());
-                push_record(&mut out, BLANK, &data)?;
-            },
-        }
+        let (record_type, data) = write_cache(value)?;
+        push_record(&mut out, record_type, &data)?;
     }
     for value in &chart.unknown_records {
         if !known_record(value.record_type) {

@@ -1,11 +1,12 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use super::codec::{parse_chart, serialize_chart};
+use super::codec::{parse_chart, patch_chart_data, serialize_chart};
 use super::package::{GENERATED_CHART_OBJECT_ID, chart_bof};
 use super::package::{build_workbook_fixture, ranges, remap_extern_sheet};
 use super::wire::{
-    AREA_FORMAT, BEGIN, BOF, CHART, CRT_LINE, DROP_BAR, END, EOF, LINE_FORMAT, record,
+    AREA_FORMAT, BEGIN, BOF, BRAI, CHART, CRT_LINE, DROP_BAR, END, EOF, LABEL, LINE_FORMAT, NUMBER,
+    SI_INDEX, record,
 };
 use super::*;
 use crate::Error;
@@ -65,14 +66,25 @@ mod tests {
         }
     }
 
+    fn data_chart() -> Chart {
+        let mut chart = Chart::default();
+        chart.series.push(complete_series());
+        chart.cached_values.extend([
+            Cache::new(CacheKind::Values, 0, 0, 0, Value::Number(1.0)).expect("finite chart value"),
+            Cache::new(CacheKind::Categories, 0, 0, 0, Value::Text("Jan".into()))
+                .expect("bounded chart label"),
+        ]);
+        chart
+    }
+
     #[test]
     fn typed_inventory_reports_data_sources_without_rendering() {
         let mut chart = Chart::default();
         chart.series.push(complete_series());
         chart.cached_values.push(Cache {
-            cache_index: 1,
-            row: 0,
-            column: 0,
+            kind: CacheKind::Values,
+            point: 0,
+            series: 0,
             format: 0,
             value: Value::Number(42.0),
         });
@@ -123,16 +135,16 @@ mod tests {
         chart.series.push(complete_series());
         chart.cached_values.extend([
             Cache {
-                cache_index: 1,
-                row: 0,
-                column: 0,
+                kind: CacheKind::Values,
+                point: 0,
+                series: 0,
                 format: 0,
                 value: Value::Blank,
             },
             Cache {
-                cache_index: 1,
-                row: 0,
-                column: 0,
+                kind: CacheKind::Values,
+                point: 0,
+                series: 0,
                 format: 0,
                 value: Value::Blank,
             },
@@ -183,9 +195,9 @@ mod tests {
             ..Default::default()
         });
         chart.cached_values.push(Cache {
-            cache_index: 0,
-            row: 0,
-            column: 0,
+            kind: CacheKind::Values,
+            point: 0,
+            series: 0,
             format: 0,
             value: Value::Number(42.0),
         });
@@ -321,10 +333,11 @@ mod tests {
                 format: format.clone(),
             }],
         });
+        chart.series.push(complete_series());
         chart.cached_values.push(Cache {
-            cache_index: 3,
-            row: 4,
-            column: 5,
+            kind: CacheKind::Values,
+            point: 4,
+            series: 0,
             format: 9,
             value: Value::Blank,
         });
@@ -339,12 +352,260 @@ mod tests {
                 .all(|value| !matches!(value, Format::Line(_)))
         );
         assert!(parsed.cached_values.iter().any(|value| {
-            value.cache_index == 3
-                && value.row == 4
-                && value.column == 5
+            value.kind == CacheKind::Values
+                && value.point == 4
+                && value.series == 0
                 && value.format == 9
                 && value.value == Value::Blank
         }));
+    }
+
+    #[test]
+    fn typed_formula_and_cache_edits_round_trip() {
+        let limits = Limits::default();
+        let mut chart = data_chart();
+        let formula = Formula::range(CellRef {
+            extern_sheet_index: 0,
+            first_row: 4,
+            last_row: 5,
+            first_column: 1,
+            last_column: 1,
+        })
+        .expect("absolute chart range");
+        chart
+            .set_formula(0, Role::Values, formula.clone())
+            .expect("same-cardinality formula edit");
+        chart
+            .set_cache(CacheKind::Values, 0, 0, 9, Value::Number(7.5))
+            .expect("existing cache edit");
+
+        let bytes = serialize_chart(&chart, limits).expect("bounded chart serialization");
+        let parsed = parse_chart(&bytes, limits).expect("chart round trip");
+        assert_eq!(
+            parsed.series[0]
+                .link(Role::Values)
+                .expect("values link")
+                .formula(limits)
+                .expect("typed values formula"),
+            formula
+        );
+        assert!(parsed.cached_values.iter().any(|value| {
+            value.kind == CacheKind::Values
+                && value.series == 0
+                && value.point == 0
+                && value.format == 9
+                && value.value == Value::Number(7.5)
+        }));
+        assert!(parsed.cached_values.iter().any(|value| {
+            value.kind == CacheKind::Categories && value.value == Value::Text("Jan".into())
+        }));
+    }
+
+    #[test]
+    fn formula_and_cache_edits_are_bounded_and_transactional() {
+        let mut chart = data_chart();
+        let original = chart.clone();
+        let transposed = Formula::range(CellRef {
+            extern_sheet_index: 0,
+            first_row: 9,
+            last_row: 9,
+            first_column: 1,
+            last_column: 2,
+        })
+        .expect("absolute chart range");
+        assert!(matches!(
+            chart.set_formula(0, Role::Values, transposed),
+            Err(Error::UnsafeEdit(_))
+        ));
+        assert_eq!(chart, original);
+
+        let one_cell = Formula::cell(CellRef {
+            extern_sheet_index: 0,
+            first_row: 9,
+            last_row: 9,
+            first_column: 1,
+            last_column: 1,
+        })
+        .expect("absolute chart cell");
+        assert!(matches!(
+            chart.set_formula(0, Role::Values, one_cell),
+            Err(Error::InvalidRecord {
+                record_type: BRAI,
+                ..
+            })
+        ));
+        assert_eq!(chart, original);
+
+        assert!(matches!(
+            chart.set_cache(CacheKind::Values, 0, 0, 0, Value::Number(f64::NAN)),
+            Err(Error::InvalidRecord {
+                record_type: NUMBER,
+                ..
+            })
+        ));
+        assert_eq!(chart, original);
+        assert!(matches!(
+            chart.set_cache(CacheKind::Values, 0, 99, 0, Value::Blank),
+            Err(Error::UnsafeEdit(_))
+        ));
+        assert_eq!(chart, original);
+    }
+
+    #[test]
+    fn malformed_formula_and_cache_metadata_are_rejected() {
+        let limits = Limits::default();
+        let absolute = Formula::cell(CellRef {
+            extern_sheet_index: 0,
+            first_row: 0,
+            last_row: 0,
+            first_column: 0,
+            last_column: 0,
+        })
+        .expect("absolute chart cell");
+        let mut relative = absolute.tokens().to_vec();
+        relative[5..7].copy_from_slice(&0x4000u16.to_le_bytes());
+        assert!(Formula::parse(relative, limits).is_err());
+        assert!(Formula::parse(vec![0x15], limits).is_err());
+
+        let source = serialize_chart(&data_chart(), limits).expect("chart serialization");
+        let mut invalid_section = source.clone();
+        let section = ranges(&invalid_section)
+            .expect("framed chart")
+            .into_iter()
+            .find(|value| value.kind == SI_INDEX)
+            .expect("SIIndex record");
+        invalid_section[section.body_start..section.body_end].copy_from_slice(&0u16.to_le_bytes());
+        assert!(matches!(
+            parse_chart(&invalid_section, limits),
+            Err(Error::InvalidRecord {
+                record_type: SI_INDEX,
+                ..
+            })
+        ));
+
+        let mut invalid_number = source.clone();
+        let number = ranges(&invalid_number)
+            .expect("framed chart")
+            .into_iter()
+            .find(|value| value.kind == NUMBER)
+            .expect("Number cache record");
+        invalid_number[number.body_start + 6..number.body_end]
+            .copy_from_slice(&f64::NAN.to_le_bytes());
+        assert!(matches!(
+            parse_chart(&invalid_number, limits),
+            Err(Error::InvalidRecord {
+                record_type: NUMBER,
+                ..
+            })
+        ));
+
+        let mut invalid_label = source;
+        let label = ranges(&invalid_label)
+            .expect("framed chart")
+            .into_iter()
+            .find(|value| value.kind == LABEL)
+            .expect("Label cache record");
+        invalid_label[label.body_start..label.body_start + 2].copy_from_slice(&4u16.to_le_bytes());
+        assert!(matches!(
+            parse_chart(&invalid_label, limits),
+            Err(Error::InvalidRecord {
+                record_type: LABEL,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn chart_data_patch_preserves_unknown_records_and_refuses_graph_changes() {
+        let limits = Limits::default();
+        let base = serialize_chart(&data_chart(), limits).expect("chart serialization");
+        let eof = ranges(&base)
+            .expect("framed chart")
+            .last()
+            .expect("chart EOF")
+            .start;
+        let opaque = record(0x7777, b"opaque chart extension").expect("opaque record framing");
+        let mut source = base;
+        source.splice(eof..eof, opaque.iter().copied());
+        let old = parse_chart(&source, limits).expect("chart with opaque record");
+        let mut updated = old.clone();
+        let formula = Formula::range(CellRef {
+            extern_sheet_index: 0,
+            first_row: 6,
+            last_row: 7,
+            first_column: 1,
+            last_column: 1,
+        })
+        .expect("absolute chart range");
+        updated
+            .set_formula(0, Role::Values, formula.clone())
+            .expect("same-cardinality formula edit");
+        updated
+            .set_cache(CacheKind::Values, 0, 0, 11, Value::Number(8.25))
+            .expect("existing cache edit");
+
+        let patched = patch_chart_data(&source, &old, &updated, limits).expect("safe patch");
+        let opaque_range = ranges(&patched)
+            .expect("patched chart framing")
+            .into_iter()
+            .find(|value| value.kind == 0x7777)
+            .expect("opaque record survives");
+        assert_eq!(
+            &patched[opaque_range.start..opaque_range.end],
+            opaque.as_slice()
+        );
+        let parsed = parse_chart(&patched, limits).expect("patched chart parses");
+        assert_eq!(parsed.unknown_records, old.unknown_records);
+        assert_eq!(
+            parsed.series[0]
+                .link(Role::Values)
+                .expect("values link")
+                .formula(limits)
+                .expect("patched formula"),
+            formula
+        );
+        assert!(parsed.cached_values.iter().any(|value| {
+            value.kind == CacheKind::Values
+                && value.format == 11
+                && value.value == Value::Number(8.25)
+        }));
+
+        let mut graph_change = updated;
+        graph_change.title = Some("unsafe graph edit".into());
+        assert!(matches!(
+            patch_chart_data(&source, &old, &graph_change, limits),
+            Err(Error::UnsafeEdit(_))
+        ));
+    }
+
+    #[test]
+    fn embedded_formula_edit_is_an_atomic_refusal() {
+        let limits = Limits::default();
+        let original = build_workbook_fixture(Chart::default(), limits).unwrap();
+        let mut editor = Editor::open(original.clone(), limits).unwrap();
+        let formula = Formula::cell(CellRef {
+            extern_sheet_index: 0,
+            first_row: 0,
+            last_row: 0,
+            first_column: 0,
+            last_column: 0,
+        })
+        .expect("absolute chart cell");
+        assert!(matches!(
+            editor.set_formula(
+                Selector::Embedded {
+                    sheet: "Sheet1",
+                    index: 0,
+                },
+                0,
+                Role::Values,
+                formula,
+            ),
+            Err(Error::Graph(
+                litchi_ograph::Error::UnsupportedMutation { .. }
+            ))
+        ));
+        assert_eq!(editor.finish().unwrap(), original);
     }
 
     #[test]

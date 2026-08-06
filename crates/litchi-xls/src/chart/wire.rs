@@ -187,6 +187,60 @@ pub(crate) fn parse_biff8_string(data: &[u8]) -> Result<String> {
         Ok(data[2..].iter().map(|v| char::from(*v)).collect())
     }
 }
+
+/// Parses the `XLUnicodeString` used by an XLS `Label` cache record.
+pub(crate) fn parse_xl_unicode_string(data: &[u8]) -> Result<String> {
+    if data.len() < 3 {
+        return invalid(LABEL, "cached Label string is truncated");
+    }
+    let count = usize::from(u16_at(data, 0)?);
+    let flags = data[2];
+    if flags & !1 != 0 {
+        return invalid(LABEL, "cached Label string uses reserved flags");
+    }
+    let wide = flags & 1 != 0;
+    let width = if wide { 2 } else { 1 };
+    let bytes = count
+        .checked_mul(width)
+        .ok_or_else(|| Error::InvalidData("cached Label string length overflow".into()))?;
+    let end = 3usize
+        .checked_add(bytes)
+        .ok_or_else(|| Error::InvalidData("cached Label string length overflow".into()))?;
+    if data.len() != end {
+        return invalid(LABEL, "cached Label string length mismatch");
+    }
+    if wide {
+        let units = data[3..]
+            .chunks_exact(2)
+            .map(|value| u16::from_le_bytes([value[0], value[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf16(&units)
+            .map_err(|_| invalid_error(LABEL, "cached Label string is invalid UTF-16"))
+    } else {
+        Ok(data[3..].iter().map(|value| char::from(*value)).collect())
+    }
+}
+
+/// Encodes one bounded `XLUnicodeString` for an XLS `Label` cache record.
+pub(crate) fn xl_unicode_string(value: &str) -> Result<Vec<u8>> {
+    let units = value.encode_utf16().collect::<Vec<_>>();
+    if units.len() > 255 {
+        return invalid(LABEL, "cached Label string exceeds 255 UTF-16 code units");
+    }
+    let wide = units.iter().any(|value| *value > 255);
+    let mut data = Vec::with_capacity(3 + units.len() * if wide { 2 } else { 1 });
+    data.extend((units.len() as u16).to_le_bytes());
+    data.push(u8::from(wide));
+    if wide {
+        for value in units {
+            data.extend(value.to_le_bytes());
+        }
+    } else {
+        data.extend(units.into_iter().map(|value| value as u8));
+    }
+    Ok(data)
+}
+
 #[cfg(test)]
 pub(crate) fn biff8_string(value: &str) -> Result<Vec<u8>> {
     let units = value.encode_utf16().collect::<Vec<_>>();
