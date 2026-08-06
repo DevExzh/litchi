@@ -9,6 +9,7 @@ use litchi_core::{Error, Metadata};
 use litchi_ole_common::property_set::PropertySetReader;
 use std::path::Path;
 
+#[cfg(any(feature = "iwa", feature = "ooxml", feature = "xls"))]
 fn append_cell_text(out: &mut String, cell: &litchi_core::sheet::CellValue) {
     use litchi_core::sheet::CellValue;
 

@@ -1,5 +1,6 @@
 //! Table implementation for Word documents.
 
+#[cfg(any(feature = "doc", feature = "odf"))]
 use litchi_core::Error;
 use litchi_core::Result;
 
