@@ -312,11 +312,16 @@ impl IWorkPackage {
     }
 
     /// Open a package from a path under caller-selected ingress ceilings.
+    ///
+    /// Flat packages retain the owned source bytes so an unchanged package
+    /// can be written back byte-for-byte, including ZIP metadata and comments.
+    /// Legacy nested packages still normalize through the archive adapter.
     pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: PackageLimits) -> Result<Self> {
         let path = path.as_ref();
         let size = std::fs::metadata(path)?.len();
         limits.check_input_size(size, "iWork package input")?;
-        Self::from_bytes_with_limits(&std::fs::read(path)?, limits)
+        let source: Arc<[u8]> = std::fs::read(path)?.into();
+        Self::from_shared_bytes_with_limits(source, limits)
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
@@ -1137,6 +1142,26 @@ mod tests {
         package.write_to(&mut written).unwrap();
         assert_eq!(written, source.as_ref());
         assert_eq!(package.entry_names().collect::<Vec<_>>(), ["preview.jpg"]);
+    }
+
+    #[test]
+    fn path_open_preserves_flat_source_for_noop_writes() -> crate::Result<()> {
+        let mut bytes = zip(&[("preview.jpg", b"preview")]);
+        let end_of_central_directory = bytes.len() - 22;
+        let comment = b"path-preserve-mode-comment";
+        bytes[end_of_central_directory + 20..end_of_central_directory + 22]
+            .copy_from_slice(&(comment.len() as u16).to_le_bytes());
+        bytes.extend_from_slice(comment);
+
+        let file = tempfile::NamedTempFile::new()?;
+        std::fs::write(file.path(), &bytes)?;
+        let package = IWorkPackage::open(file.path())?;
+
+        assert_eq!(package.to_bytes()?, bytes);
+        let mut written = Vec::new();
+        package.write_to(&mut written)?;
+        assert_eq!(written, bytes);
+        Ok(())
     }
 
     #[test]
