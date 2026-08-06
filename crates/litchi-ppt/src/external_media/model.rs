@@ -2,6 +2,54 @@
 
 use crate::records::Record;
 
+/// Resource ceilings for one complete legacy PowerPoint record tree.
+///
+/// The limits apply before any record payload is decoded. External paths are
+/// also bounded by the format-level ceiling in the codec.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Limits {
+    /// Maximum serialized root record size.
+    pub max_root_bytes: usize,
+    /// Maximum payload retained for one parsed record.
+    pub max_record_bytes: usize,
+    /// Maximum record nesting visited while checking owners.
+    pub max_depth: usize,
+    /// Maximum records visited while checking owners.
+    pub max_records: usize,
+    /// Maximum `ExObjRefAtom` records retained from the owner tree.
+    pub max_owner_references: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            max_root_bytes: 64 * 1024 * 1024,
+            max_record_bytes: 64 * 1024 * 1024,
+            max_depth: 128,
+            max_records: 1_000_000,
+            max_owner_references: 65_536,
+        }
+    }
+}
+
+/// Playback flags shared by every `ExMediaAtom`-backed media object.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Playback {
+    pub loop_playback: bool,
+    pub rewind_after_playing: bool,
+    pub narration: bool,
+}
+
+impl Playback {
+    pub const fn new(loop_playback: bool, rewind_after_playing: bool, narration: bool) -> Self {
+        Self {
+            loop_playback,
+            rewind_after_playing,
+            narration,
+        }
+    }
+}
+
 /// The eight-byte semantic payload carried by an `ExMediaAtom`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Media {
@@ -103,4 +151,28 @@ pub struct Collection {
     pub id_seed: u32,
     pub objects: Vec<Object>,
     pub(crate) unknown_records: Vec<UnknownRecord>,
+}
+
+impl Collection {
+    /// Return the typed playback flags for one media object.
+    pub fn playback(&self, id: u32) -> Option<Playback> {
+        self.get(id).map(Object::playback)
+    }
+}
+
+impl Object {
+    /// Return the playback flags carried by this media definition.
+    pub fn playback(&self) -> Playback {
+        let media = match self {
+            Self::Movie(value) => value.video.media,
+            Self::LinkedAudio(value) => value.media,
+            Self::CdAudio(value) => value.media,
+            Self::EmbeddedWav(value) => value.media,
+        };
+        Playback {
+            loop_playback: media.loop_playback,
+            rewind_after_playing: media.rewind_after_playing,
+            narration: media.narration,
+        }
+    }
 }

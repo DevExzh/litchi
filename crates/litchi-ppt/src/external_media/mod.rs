@@ -7,11 +7,15 @@
 
 mod codec;
 mod model;
+mod package;
+mod transaction;
+mod validation;
 
 #[cfg(test)]
 mod tests;
 
 pub use model::{
-    CdAudio, CdTime, Collection, EmbeddedWav, LinkedAudio, LinkedAudioKind, Media, Movie,
-    MovieKind, Object, UnknownRecord, Video,
+    CdAudio, CdTime, Collection, EmbeddedWav, Limits, LinkedAudio, LinkedAudioKind, Media, Movie,
+    MovieKind, Object, Playback, UnknownRecord, Video,
 };
+pub use transaction::{Change, Commit, Patch, Revision, Snapshot, Transaction};

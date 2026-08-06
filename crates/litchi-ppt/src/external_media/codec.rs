@@ -284,11 +284,36 @@ impl Object {
             Self::EmbeddedWav(value) => value.media.id,
         }
     }
+
+    /// Serialize one complete typed external-media object container.
+    pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
+        match self {
+            Self::Movie(value) => value.to_record_bytes(),
+            Self::LinkedAudio(value) => value.to_record_bytes(),
+            Self::CdAudio(value) => value.to_record_bytes(),
+            Self::EmbeddedWav(value) => value.to_record_bytes(),
+        }
+    }
 }
 
 impl Collection {
     /// Discover the single `ExObjListContainer`, if present.
     pub fn parse(root: &Record) -> Result<Option<Self>> {
+        let result = Self::parse_media_only(root)?;
+        let hyperlinks = Hyperlinks::parse(root)?;
+        if let Some(result) = &result
+            && hyperlinks
+                .hyperlinks
+                .iter()
+                .any(|hyperlink| result.get(hyperlink.id).is_some())
+        {
+            return corrupted("external-object list reuses an ID for media and a hyperlink");
+        }
+        Ok(result)
+    }
+
+    /// Discover media without re-parsing the hyperlink relationship graph.
+    pub(crate) fn parse_media_only(root: &Record) -> Result<Option<Self>> {
         let mut lists = Vec::new();
         collect_external_object_lists(root, &mut lists);
         if lists.len() > 1 {
@@ -297,16 +322,7 @@ impl Collection {
         let Some(record) = lists.first() else {
             return Ok(None);
         };
-        let result = Self::parse_list(record)?;
-        let hyperlinks = Hyperlinks::parse(root)?;
-        if hyperlinks
-            .hyperlinks
-            .iter()
-            .any(|hyperlink| result.get(hyperlink.id).is_some())
-        {
-            return corrupted("external-object list reuses an ID for media and a hyperlink");
-        }
-        Ok(Some(result))
+        Ok(Some(Self::parse_list(record)?))
     }
 
     fn parse_list(record: &Record) -> Result<Self> {
@@ -405,6 +421,35 @@ impl Collection {
             }
         }
         Ok(())
+    }
+
+    /// Serialize the complete `ExObjListContainer`, retaining opaque child
+    /// records in their original relative positions.
+    pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
+        let seed = i32::try_from(self.id_seed)
+            .map_err(|_| Error::Corrupted("ExObjListAtom identifier seed exceeds i32".into()))?;
+        let mut payload = record_bytes(
+            0,
+            0,
+            RecordType::ExObjListAtom.as_u16(),
+            &seed.to_le_bytes(),
+        )?;
+        let mut unknown_index = 0usize;
+        for object_index in 0..=self.objects.len() {
+            while let Some(record) = self.unknown_records.get(unknown_index)
+                && record.object_index == object_index
+            {
+                payload.extend_from_slice(&record.to_record_bytes()?);
+                unknown_index += 1;
+            }
+            if let Some(object) = self.objects.get(object_index) {
+                payload.extend_from_slice(&object.to_record_bytes()?);
+            }
+        }
+        if unknown_index != self.unknown_records.len() {
+            return corrupted("opaque external-object records have invalid positions");
+        }
+        record_bytes(0x0f, 0, RecordType::ExObjList.as_u16(), &payload)
     }
 }
 
