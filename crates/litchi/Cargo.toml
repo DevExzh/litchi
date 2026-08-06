@@ -405,7 +405,7 @@ required-features = ["ooxml"]
 
 [[example]]
 name = "pptx_protection"
-required-features = ["ooxml"]
+required-features = ["ooxml_encryption"]
 
 [[example]]
 name = "pptx_simple_demo"
