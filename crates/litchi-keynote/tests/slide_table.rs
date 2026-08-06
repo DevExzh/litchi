@@ -1,19 +1,16 @@
+use litchi_iwa_common::{formula as common_formula, table::sort as common_sort};
 use litchi_keynote::slide::table::{formula, sort};
-use litchi_numbers::formula as numbers_formula;
-use litchi_numbers::table::sort as numbers_sort;
 
-fn into_keynote_expression(
-    value: numbers_formula::FormulaExpression,
-) -> formula::FormulaExpression {
+fn into_keynote_expression(value: common_formula::FormulaExpression) -> formula::FormulaExpression {
     value
 }
 
-fn into_keynote_order(value: numbers_sort::Order) -> sort::Order {
+fn into_keynote_order(value: common_sort::Order) -> sort::Order {
     value
 }
 
 #[test]
-fn formula_leaf_reuses_numbers_types_and_constructors() {
+fn formula_leaf_uses_neutral_common_types_and_constructors() {
     let reference = formula::FormulaCellReference::mixed(2, 3, true, false);
     let expression = formula::FormulaExpression::binary(
         formula::FormulaBinaryOperator::Add,
@@ -23,14 +20,14 @@ fn formula_leaf_reuses_numbers_types_and_constructors() {
 
     let from_keynote = into_keynote_expression(expression.clone());
     assert_eq!(from_keynote, expression);
-    let canonical: numbers_formula::FormulaExpression =
-        numbers_formula::FormulaExpression::table_cell(
+    let canonical: common_formula::FormulaExpression =
+        common_formula::FormulaExpression::table_cell(
             7,
-            numbers_formula::FormulaCellReference::relative(1, 1),
+            common_formula::FormulaCellReference::relative(1, 1),
         );
-    let from_numbers = into_keynote_expression(canonical);
+    let from_common = into_keynote_expression(canonical);
     assert_eq!(
-        from_numbers,
+        from_common,
         formula::FormulaExpression::table_cell(7, formula::FormulaCellReference::relative(1, 1),)
     );
 
@@ -43,10 +40,6 @@ fn formula_leaf_reuses_numbers_types_and_constructors() {
                 formula::FormulaCellReference::relative(0, 1),
             )),
         }
-    );
-    assert_eq!(
-        formula::FormulaCachedValue::Boolean(true).into_value(),
-        litchi_numbers::cell::Value::Boolean(true)
     );
 }
 
@@ -79,19 +72,19 @@ fn formula_leaf_exposes_axis_and_pivot_constructors() {
 }
 
 #[test]
-fn sort_leaf_reuses_numbers_types_and_validates_orders() -> sort::Result<()> {
+fn sort_leaf_uses_neutral_common_types_and_validates_orders() -> sort::Result<()> {
     let column = sort::ColumnIndex::new(3)?;
     let rule = sort::Rule::new(column, sort::Direction::Descending);
     let order = sort::Order::selected_rows([rule])?;
 
     let from_keynote = into_keynote_order(order.clone());
     assert_eq!(from_keynote, order);
-    let canonical = numbers_sort::Order::new([numbers_sort::Rule::new(
-        numbers_sort::ColumnIndex::new(1)?,
-        numbers_sort::Direction::Ascending,
+    let canonical = common_sort::Order::new([common_sort::Rule::new(
+        common_sort::ColumnIndex::new(1)?,
+        common_sort::Direction::Ascending,
     )])?;
-    let from_numbers = into_keynote_order(canonical);
-    assert_eq!(from_numbers.scope(), sort::Scope::EntireTable);
+    let from_common = into_keynote_order(canonical);
+    assert_eq!(from_common.scope(), sort::Scope::EntireTable);
 
     assert_eq!(order.scope(), sort::Scope::SelectedRows);
     assert_eq!(order.rules(), &[rule]);

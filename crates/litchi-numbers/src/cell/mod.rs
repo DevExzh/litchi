@@ -6,6 +6,8 @@ pub mod wire;
 
 use std::fmt;
 
+use litchi_iwa_common::formula::FormulaCachedValue;
+
 /// Seconds between the Unix epoch and Apple's 2001-01-01 UTC epoch.
 pub const APPLE_EPOCH_UNIX_OFFSET_SECONDS: f64 = 978_307_200.0;
 
@@ -121,6 +123,18 @@ impl Value {
             Self::Empty | Self::Date(_) | Self::Duration(_) | Self::Formula(_) | Self::Error(_) => {
                 None
             },
+        }
+    }
+}
+
+impl From<FormulaCachedValue> for Value {
+    fn from(value: FormulaCachedValue) -> Self {
+        match value {
+            FormulaCachedValue::Number(number) => Self::Number(number),
+            FormulaCachedValue::Text(text) => Self::Text(text),
+            FormulaCachedValue::Boolean(boolean) => Self::Boolean(boolean),
+            FormulaCachedValue::Date(date) => Self::Date(date),
+            FormulaCachedValue::Duration(duration) => Self::Duration(duration),
         }
     }
 }

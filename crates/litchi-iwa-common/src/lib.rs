@@ -9,6 +9,8 @@
 pub mod chart;
 pub mod color;
 pub mod comment;
+/// Dependency-free formula vocabulary shared by iWork table owners.
+pub mod formula;
 pub mod media;
 pub mod shape;
 pub mod table;
