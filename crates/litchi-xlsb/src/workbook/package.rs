@@ -2,6 +2,7 @@
 
 use super::model::Workbook;
 use crate::calc::Props;
+use crate::cell_watches;
 use crate::package::error::Result;
 use crate::package::formula::{Context, View, excel_name_eq, table::Definition as TableDefinition};
 use crate::package::styles_table::StylesTable;
@@ -27,6 +28,35 @@ const CHART_SHEET_RELATIONSHIP_TYPES: &[&str] = &[
 ];
 
 impl Workbook {
+    /// Read the typed cell-watch and worksheet phonetic snapshot selected by
+    /// zero-based worksheet index.
+    pub fn cell_watches(&self, worksheet_index: usize) -> Result<cell_watches::Snapshot> {
+        let uri = self.worksheet_uri(worksheet_index)?;
+        cell_watches::workbook::read(&self.package, &uri)
+    }
+
+    /// Start a detached cell-watch edit for one worksheet.
+    pub fn edit_cell_watches(&self, worksheet_index: usize) -> Result<cell_watches::Edit> {
+        Ok(self.cell_watches(worksheet_index)?.edit())
+    }
+
+    /// Apply a source-checked cell-watch commit atomically to one worksheet.
+    pub fn apply_cell_watches(
+        &mut self,
+        worksheet_index: usize,
+        commit: &cell_watches::Commit,
+    ) -> Result<cell_watches::Snapshot> {
+        let uri = self.worksheet_uri(worksheet_index)?;
+        cell_watches::workbook::apply(&mut self.package, &uri, commit)
+    }
+
+    /// Read the typed cell-watch and phonetic snapshot selected by worksheet
+    /// name.
+    pub fn cell_watches_by_name(&self, worksheet_name: &str) -> Result<cell_watches::Snapshot> {
+        let index = self.worksheet_index(worksheet_name)?;
+        self.cell_watches(index)
+    }
+
     /// Load inert persisted Office Add-in task panes.
     pub fn task_panes(&self) -> Result<Option<web::Panes>> {
         Ok(web::load(&self.package)?)

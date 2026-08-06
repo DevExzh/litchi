@@ -326,7 +326,7 @@ impl Workbook {
     }
 
     /// Open an XLSB workbook from a reader
-    fn worksheet_index(&self, worksheet_name: &str) -> Result<usize> {
+    pub(in crate::workbook) fn worksheet_index(&self, worksheet_name: &str) -> Result<usize> {
         self.formula_context
             .worksheet_names
             .iter()

@@ -271,6 +271,11 @@ pub const BEGIN_COMMENT: Kind = Kind(0x027B);
 pub const END_COMMENT: Kind = Kind(0x027C);
 pub const COMMENT_TEXT: Kind = Kind(0x027D);
 
+// Worksheet cell watches ([MS-XLSB] sections 2.4.21, 2.4.331, and 2.4.378)
+pub const BEGIN_CELL_WATCHES: Kind = Kind(605);
+pub const END_CELL_WATCHES: Kind = Kind(606);
+pub const CELL_WATCH: Kind = Kind(607);
+
 // Hyperlinks
 pub const H_LINK: Kind = Kind(0x01EE);
 
