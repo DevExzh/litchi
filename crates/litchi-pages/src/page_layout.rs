@@ -481,15 +481,13 @@ impl Layout {
         {
             return Err(Error::NonCanonicalOrientation);
         }
-        if let (Some(width), Some(left), Some(right)) =
-            (self.page_width(), self.left_margin(), self.right_margin())
-            && left + right >= width
+        if let Some(width) = self.page_width()
+            && !leaves_positive_space(width, self.left_margin(), self.right_margin())
         {
             return Err(Error::HorizontalMargins);
         }
-        if let (Some(height), Some(top), Some(bottom)) =
-            (self.page_height(), self.top_margin(), self.bottom_margin())
-            && top + bottom >= height
+        if let Some(height) = self.page_height()
+            && !leaves_positive_space(height, self.top_margin(), self.bottom_margin())
         {
             return Err(Error::VerticalMargins);
         }
@@ -532,6 +530,17 @@ impl Default for Layout {
     fn default() -> Self {
         Self::empty()
     }
+}
+
+/// Check the positive body-space invariant without adding two `f32` values.
+///
+/// An absent native margin has the scalar default of zero. Checking each
+/// margin against the page dimension first keeps the subtraction finite and
+/// avoids accepting an overflowing sum as a valid layout.
+fn leaves_positive_space(page: f32, first_margin: Option<f32>, second_margin: Option<f32>) -> bool {
+    let first = first_margin.unwrap_or(0.0);
+    let second = second_margin.unwrap_or(0.0);
+    first < page && second < page && first < page - second
 }
 
 #[cfg(test)]
@@ -597,7 +606,63 @@ mod tests {
             ),
             Err(Error::HorizontalMargins)
         ));
+        assert!(matches!(
+            Layout::new(
+                Some(100.0),
+                None,
+                Some(100.0),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+            Err(Error::HorizontalMargins)
+        ));
+        assert!(matches!(
+            Layout::new(
+                Some(f32::MAX),
+                None,
+                Some(f32::MAX),
+                Some(f32::MAX),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+            Err(Error::HorizontalMargins)
+        ));
         assert_eq!(Orientation::unknown(0), Err(Error::NonCanonicalOrientation));
         assert!(!Orientation::Unknown(1).is_canonical());
+    }
+
+    #[test]
+    fn rejected_margin_setters_leave_the_previous_layout_unchanged() {
+        let mut layout = Layout::new(
+            Some(100.0),
+            None,
+            Some(10.0),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap_or_else(|error| panic!("valid layout: {error}"));
+
+        assert_eq!(
+            layout.set_left_margin(Some(100.0)),
+            Err(Error::HorizontalMargins)
+        );
+        assert_eq!(layout.left_margin(), Some(10.0));
     }
 }

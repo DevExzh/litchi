@@ -10,6 +10,9 @@ const FIRST_PAGE_DIFFERENT: u8 = 2;
 const EVEN_ODD_PAGES_DIFFERENT: u8 = 4;
 const FIRST_PAGE_HIDES_HEADER_FOOTER: u8 = 8;
 
+/// Maximum bytes retained by one opaque section-background payload.
+pub const MAX_BACKGROUND_PAYLOAD_BYTES: usize = 4 * 1024 * 1024;
+
 /// Validation failures for section semantic values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 #[non_exhaustive]
@@ -26,6 +29,9 @@ pub enum Error {
     /// An opaque fill payload was empty.
     #[error("Pages section background payload cannot be empty")]
     EmptyBackgroundPayload,
+    /// An opaque fill payload exceeded the semantic storage budget.
+    #[error("Pages section background payload exceeds the semantic byte budget")]
+    BackgroundPayloadTooLarge,
 }
 
 /// Result type for section semantic value construction and validation.
@@ -253,16 +259,16 @@ pub enum Background {
 pub struct Opaque(Box<[u8]>);
 
 impl Opaque {
-    /// Retain a non-empty native payload in exact-size owned storage.
+    /// Retain a non-empty native payload in exact-size bounded storage.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::EmptyBackgroundPayload`] for an empty payload.
+    /// Returns [`Error::EmptyBackgroundPayload`] for an empty payload or
+    /// [`Error::BackgroundPayloadTooLarge`] when it exceeds the semantic byte
+    /// budget.
     pub fn new(input: impl Into<Box<[u8]>>) -> Result<Self> {
         let payload = input.into();
-        if payload.is_empty() {
-            return Err(Error::EmptyBackgroundPayload);
-        }
+        validate_background_payload(&payload)?;
         Ok(Self(payload))
     }
 
@@ -270,8 +276,11 @@ impl Opaque {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::EmptyBackgroundPayload`] for an empty payload.
+    /// Returns [`Error::EmptyBackgroundPayload`] for an empty payload or
+    /// [`Error::BackgroundPayloadTooLarge`] when it exceeds the semantic byte
+    /// budget. The length is checked before copying the borrowed bytes.
     pub fn from_slice(payload: &[u8]) -> Result<Self> {
+        validate_background_payload(payload)?;
         Self::new(payload.to_vec().into_boxed_slice())
     }
 
@@ -391,7 +400,10 @@ impl Section {
     /// Returns all section text joined with newlines.
     #[must_use]
     pub fn plain_text(&self) -> String {
-        let mut text = String::with_capacity(self.text_len());
+        let mut text = String::new();
+        if let Some(length) = self.checked_text_len() {
+            text.reserve(length);
+        }
         self.append_plain_text(&mut text);
         text
     }
@@ -402,27 +414,27 @@ impl Section {
         self.heading.is_none() && self.paragraphs.is_empty() && self.text_storages.is_empty()
     }
 
-    /// Returns the UTF-8 byte length of the rendered section text.
-    pub(crate) fn text_len(&self) -> usize {
+    /// Return the rendered section length when all additions are representable.
+    pub(crate) fn checked_text_len(&self) -> Option<usize> {
         let mut length = 0usize;
         let mut values = 0usize;
 
         if let Some(heading) = &self.heading {
-            length = length.saturating_add(heading.len());
-            values = values.saturating_add(1);
+            length = length.checked_add(heading.len())?;
+            values = values.checked_add(1)?;
         }
         for paragraph in &self.paragraphs {
-            length = length.saturating_add(paragraph.len());
-            values = values.saturating_add(1);
+            length = length.checked_add(paragraph.len())?;
+            values = values.checked_add(1)?;
         }
         for storage in &self.text_storages {
             if !storage.is_empty() {
-                length = length.saturating_add(storage.len());
-                values = values.saturating_add(1);
+                length = length.checked_add(storage.len())?;
+                values = values.checked_add(1)?;
             }
         }
 
-        length.saturating_add(values.saturating_sub(1))
+        length.checked_add(values.saturating_sub(1))
     }
 
     pub(crate) fn append_plain_text(&self, output: &mut String) {
@@ -530,6 +542,16 @@ impl SectionType {
     }
 }
 
+fn validate_background_payload(payload: &[u8]) -> Result<()> {
+    if payload.is_empty() {
+        return Err(Error::EmptyBackgroundPayload);
+    }
+    if payload.len() > MAX_BACKGROUND_PAYLOAD_BYTES {
+        return Err(Error::BackgroundPayloadTooLarge);
+    }
+    Ok(())
+}
+
 fn append_value(output: &mut String, first: &mut bool, value: &str) {
     if !*first {
         output.push('\n');
@@ -547,16 +569,23 @@ mod tests {
     #[test]
     fn settings_pack_presence_and_retain_lossless_values() {
         let mut settings = Settings::new();
-        settings.set_name(Some("Overview")).unwrap();
+        settings
+            .set_name(Some("Overview"))
+            .unwrap_or_else(|error| panic!("valid section name: {error}"));
         settings.set_inherit_previous_header_footer(Some(false));
         settings.set_first_page_different(None);
         settings.set_even_odd_pages_different(Some(true));
         settings.set_first_page_hides_header_footer(Some(true));
-        settings.set_start(Some(Start::Unknown(7))).unwrap();
+        settings
+            .set_start(Some(Start::Unknown(7)))
+            .unwrap_or_else(|error| panic!("valid section start: {error}"));
         settings
             .set_page_numbering(Some(PageNumbering::Restart))
-            .unwrap();
-        settings.set_starting_page_number(Some(PageNumber::new(4).unwrap()));
+            .unwrap_or_else(|error| panic!("valid page numbering: {error}"));
+        settings.set_starting_page_number(Some(
+            PageNumber::new(4)
+                .unwrap_or_else(|error| panic!("valid starting page number: {error}")),
+        ));
 
         assert!(size_of::<Settings>() <= 48);
         assert_eq!(settings.name(), Some("Overview"));
@@ -592,16 +621,28 @@ mod tests {
 
     #[test]
     fn background_opaque_owns_exact_storage() {
-        let opaque = Opaque::from_slice(&[0x0a, 0xff]).unwrap();
+        let opaque = Opaque::from_slice(&[0x0a, 0xff])
+            .unwrap_or_else(|error| panic!("valid opaque background: {error}"));
         assert_eq!(opaque.as_bytes(), [0x0a, 0xff]);
         assert_eq!(opaque.into_bytes().as_ref(), [0x0a, 0xff]);
         assert_eq!(
             Opaque::from_slice(&[]).err(),
             Some(Error::EmptyBackgroundPayload)
         );
+        let oversized = vec![0_u8; MAX_BACKGROUND_PAYLOAD_BYTES + 1];
         assert_eq!(
-            Background::Opaque(Opaque::from_slice(&[0x01]).unwrap()),
-            Background::Opaque(Opaque::from_slice(&[0x01]).unwrap())
+            Opaque::from_slice(&oversized).err(),
+            Some(Error::BackgroundPayloadTooLarge)
+        );
+        assert_eq!(
+            Background::Opaque(
+                Opaque::from_slice(&[0x01])
+                    .unwrap_or_else(|error| panic!("valid opaque background: {error}")),
+            ),
+            Background::Opaque(
+                Opaque::from_slice(&[0x01])
+                    .unwrap_or_else(|error| panic!("valid opaque background: {error}")),
+            )
         );
     }
 
@@ -641,7 +682,7 @@ mod tests {
             section.plain_text(),
             "Introduction\nFirst paragraph\nStorage text"
         );
-        assert_eq!(section.text_len(), section.plain_text().len());
+        assert_eq!(section.checked_text_len(), Some(section.plain_text().len()));
     }
 
     #[test]

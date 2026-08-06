@@ -142,7 +142,8 @@ mod tests {
 
     #[test]
     fn positions_and_selectors_are_compact_and_typed() {
-        let position = Position::from_utf16_index(17).unwrap();
+        let position = Position::from_utf16_index(17)
+            .unwrap_or_else(|error| panic!("valid UTF-16 position: {error}"));
         assert_eq!(position.utf16_index(), 17);
         assert_eq!(Selector::from(position), Selector::At(position));
         assert_eq!(Selector::at(position), Selector::At(position));
@@ -162,7 +163,7 @@ mod tests {
             "body",
             Some("*".to_owned().into_boxed_str()),
         )
-        .unwrap();
+        .unwrap_or_else(|error| panic!("valid footnote: {error}"));
         assert_eq!(footnote.position, Position::ZERO);
         assert_eq!(footnote.text.as_ref(), "body");
         assert_eq!(footnote.custom_mark.as_deref(), Some("*"));

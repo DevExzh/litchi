@@ -5,7 +5,9 @@ use thiserror::Error;
 use crate::{Section, SectionType};
 use litchi_iwa_text::storage::Storage;
 
-/// Default maximum UTF-8 bytes retained by one semantic Pages document.
+/// Maximum UTF-8 bytes retained by one semantic Pages document.
+///
+/// Caller-selected budgets may tighten this ceiling but cannot relax it.
 pub const DEFAULT_MAX_TEXT_BYTES: usize = 64 * 1024 * 1024;
 /// Maximum number of ordered sections accepted by one semantic document.
 pub const MAX_SECTIONS: usize = 4096;
@@ -73,8 +75,10 @@ impl Body {
     /// # Errors
     ///
     /// Returns [`Error::TooManyBodyStorages`] or [`Error::TextTooLarge`] when
-    /// the supplied values exceed the semantic bounds.
+    /// the supplied values exceed the selected budget or hard semantic
+    /// ceiling.
     pub fn with_max_text_bytes(text_storages: Vec<Storage>, max_text_bytes: usize) -> Result<Self> {
+        let text_limit = effective_max_text_bytes(max_text_bytes);
         if text_storages.len() > MAX_BODY_STORAGES {
             return Err(Error::TooManyBodyStorages {
                 actual: text_storages.len(),
@@ -85,14 +89,10 @@ impl Body {
         let text_len = text_storages.iter().try_fold(0usize, |length, storage| {
             length
                 .checked_add(storage.len())
-                .ok_or(Error::TextTooLarge {
-                    limit: max_text_bytes,
-                })
+                .ok_or(Error::TextTooLarge { limit: text_limit })
         })?;
-        if text_len > max_text_bytes {
-            return Err(Error::TextTooLarge {
-                limit: max_text_bytes,
-            });
+        if text_len > text_limit {
+            return Err(Error::TextTooLarge { limit: text_limit });
         }
 
         Ok(Self {
@@ -187,12 +187,13 @@ impl Document {
     /// Returns a typed error when the root's sections exceed the section or
     /// caller-selected text budget, or use a non-canonical index.
     pub fn from_root_with_max_text_bytes(root: Root, max_text_bytes: usize) -> Result<Self> {
+        let text_limit = effective_max_text_bytes(max_text_bytes);
         let sections = root
             .into_body()
             .map(Body::into_section)
             .into_iter()
             .collect();
-        Self::from_sections_with_max_text_bytes(sections, max_text_bytes)
+        Self::from_sections_with_max_text_bytes(sections, text_limit)
     }
 
     /// Build an immutable document from ordered semantic sections.
@@ -218,6 +219,7 @@ impl Document {
         sections: Vec<Section>,
         max_text_bytes: usize,
     ) -> Result<Self> {
+        let text_limit = effective_max_text_bytes(max_text_bytes);
         if sections.len() > MAX_SECTIONS {
             return Err(Error::TooManySections {
                 actual: sections.len(),
@@ -233,18 +235,17 @@ impl Document {
                     actual: section.index(),
                 });
             }
+            let section_text_len = section
+                .checked_text_len()
+                .ok_or(Error::TextTooLarge { limit: text_limit })?;
             text_len = text_len
-                .checked_add(section.text_len())
+                .checked_add(section_text_len)
                 .and_then(|length| length.checked_add(usize::from(expected != 0)))
-                .ok_or(Error::TextTooLarge {
-                    limit: max_text_bytes,
-                })?;
+                .ok_or(Error::TextTooLarge { limit: text_limit })?;
         }
 
-        if text_len > max_text_bytes {
-            return Err(Error::TextTooLarge {
-                limit: max_text_bytes,
-            });
+        if text_len > text_limit {
+            return Err(Error::TextTooLarge { limit: text_limit });
         }
 
         Ok(Self {
@@ -297,6 +298,10 @@ impl Document {
     }
 }
 
+fn effective_max_text_bytes(requested: usize) -> usize {
+    requested.min(DEFAULT_MAX_TEXT_BYTES)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -335,6 +340,12 @@ mod tests {
                 actual: 1
             })
         ));
+    }
+
+    #[test]
+    fn caller_budget_cannot_relax_hard_text_ceiling() {
+        assert_eq!(effective_max_text_bytes(usize::MAX), DEFAULT_MAX_TEXT_BYTES);
+        assert_eq!(effective_max_text_bytes(8), 8);
     }
 
     #[test]
