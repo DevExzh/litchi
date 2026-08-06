@@ -15,6 +15,7 @@ pub mod image;
 mod parser;
 pub mod prop;
 mod record;
+pub mod rule;
 pub mod shape;
 pub mod write;
 
