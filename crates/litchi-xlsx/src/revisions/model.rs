@@ -323,7 +323,15 @@ pub(super) fn validate_package(v: &Revisions) -> Result<()> {
     let mut rels = HashSet::new();
     let mut ids = HashSet::new();
     let mut total = 0usize;
-    for p in &v.logs {
+    for (index, p) in v.logs.iter().enumerate() {
+        let header = v
+            .headers
+            .headers
+            .get(index)
+            .ok_or_else(|| invalid("revision log/header count mismatch"))?;
+        if p.relationship_id != header.relationship_id {
+            return Err(invalid("revision log order does not match headers"));
+        }
         if !rels.insert(&p.relationship_id) {
             return Err(invalid("duplicate revisionLog relationship id"));
         }

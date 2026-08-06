@@ -141,6 +141,135 @@ fn package_writer_round_trip() {
     store_workbook_revisions(&mut p, &v, RevisionConformance::Strict).unwrap();
     assert_eq!(load_workbook_revisions(&p).unwrap().unwrap(), v);
 }
+
+fn revision_user(id: i32, name: &str) -> RevisionUser {
+    RevisionUser {
+        guid: guid(9),
+        name: name.into(),
+        id,
+        date_time: "2026-07-17T12:00:00Z".into(),
+        extension_elements: vec![],
+    }
+}
+
+fn owner_bytes(package: &OpcPackage) -> Vec<(String, Vec<u8>)> {
+    let value = load_workbook_revisions(package).unwrap().unwrap();
+    let workbook = package.main_document_part().unwrap();
+    let mut parts = vec![(
+        format!("{}::rels", workbook.partname()),
+        workbook.rels().to_xml().into_bytes(),
+    )];
+    let mut names = vec![value.users_part_name, value.headers_part_name];
+    names.extend(value.logs.into_iter().map(|log| log.part_name));
+    for name in names {
+        let uri = PackURI::new(&name).unwrap();
+        let part = package.get_part(&uri).unwrap();
+        parts.push((name.clone(), part.blob().to_vec()));
+        parts.push((format!("{name}::rels"), part.rels().to_xml().into_bytes()));
+    }
+    parts.sort_by(|left, right| left.0.cmp(&right.0));
+    parts
+}
+
+#[test]
+fn transaction_noop_preserves_package_bytes() {
+    let mut package = package();
+    store_workbook_revisions(&mut package, &value(), RevisionConformance::Strict).unwrap();
+    let before = owner_bytes(&package);
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    let staged = transaction.revisions().cloned();
+    assert!(!transaction.replace(staged).unwrap());
+    let commit = transaction.commit().unwrap();
+    assert!(!commit.changed());
+    assert!(commit.patch().is_empty());
+    assert_eq!(owner_bytes(&package), before);
+}
+
+#[test]
+fn transaction_edits_one_typed_user() {
+    let mut package = package();
+    store_workbook_revisions(&mut package, &value(), RevisionConformance::Strict).unwrap();
+    let before = owner_bytes(&package);
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    assert!(transaction.set_user(revision_user(7, "Alice")).unwrap());
+    let commit = transaction.commit().unwrap();
+    assert!(commit.changed());
+    assert_eq!(
+        load_workbook_revisions(&package)
+            .unwrap()
+            .unwrap()
+            .users
+            .users[0]
+            .name,
+        "Alice"
+    );
+    assert_ne!(
+        commit
+            .snapshot()
+            .source_xml("/xl/revisions/userNames.xml")
+            .unwrap(),
+        write_revision_users(&RevisionUsers::default(), RevisionConformance::Strict).unwrap()
+    );
+    let after = owner_bytes(&package);
+    assert_ne!(after, before);
+    assert_eq!(
+        after
+            .iter()
+            .find(|(name, _)| name.ends_with("revisionHeaders.xml"))
+            .map(|(_, bytes)| bytes),
+        before
+            .iter()
+            .find(|(name, _)| name.ends_with("revisionHeaders.xml"))
+            .map(|(_, bytes)| bytes)
+    );
+}
+
+#[test]
+fn invalid_edit_is_staged_and_failure_atomic() {
+    let mut package = package();
+    store_workbook_revisions(&mut package, &value(), RevisionConformance::Strict).unwrap();
+    let before = owner_bytes(&package);
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    let mut invalid_user = revision_user(7, "Alice");
+    invalid_user.guid = "not-a-guid".into();
+    assert!(transaction.set_user(invalid_user).is_err());
+    assert!(transaction.revisions().unwrap().users.users.is_empty());
+    drop(transaction);
+    assert_eq!(owner_bytes(&package), before);
+}
+
+#[test]
+fn stale_patch_and_shared_relationship_are_rejected_atomically() {
+    let mut source_package = package();
+    store_workbook_revisions(&mut source_package, &value(), RevisionConformance::Strict).unwrap();
+    let mut transaction = Transaction::new(&mut source_package).unwrap();
+    transaction.set_user(revision_user(7, "Alice")).unwrap();
+    let patch = transaction.commit().unwrap().patch().clone();
+    let after_commit = owner_bytes(&source_package);
+    assert!(patch.apply(&mut source_package).is_err());
+    assert_eq!(owner_bytes(&source_package), after_commit);
+
+    let mut unsafe_package = package();
+    store_workbook_revisions(&mut unsafe_package, &value(), RevisionConformance::Strict).unwrap();
+    let users_target = PackURI::new("/xl/revisions/userNames.xml").unwrap();
+    let unsafe_before = owner_bytes(&unsafe_package);
+    unsafe_package
+        .get_part_mut(&PackURI::new("/xl/workbook.xml").unwrap())
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            "urn:litchi:unexpected-revision-owner".into(),
+            users_target.relative_ref("/xl/"),
+            "rIdUnsafe".into(),
+            false,
+        );
+    let unsafe_before_edit = owner_bytes(&unsafe_package);
+    let mut transaction = Transaction::new(&mut unsafe_package).unwrap();
+    transaction.set_user(revision_user(7, "Alice")).unwrap();
+    assert!(transaction.commit().is_err());
+    assert_eq!(owner_bytes(&unsafe_package), unsafe_before_edit);
+    assert_ne!(unsafe_before, unsafe_before_edit);
+}
 #[test]
 fn malformed_and_caps() {
     for x in [

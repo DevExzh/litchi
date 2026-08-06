@@ -6,6 +6,10 @@
 mod codec;
 mod model;
 mod package;
+pub mod patch;
+pub mod snapshot;
+pub mod transaction;
+pub mod validation;
 
 use crate::error::Error;
 
@@ -30,7 +34,10 @@ pub use model::{
     RevisionHeaderProperties, RevisionHeaders, RevisionLog, RevisionLogPart, RevisionRecord,
     RevisionRecordKind, RevisionUser, RevisionUsers, RevisionXmlElement, Revisions,
 };
-pub use package::{load_workbook_revisions, store_workbook_revisions};
+pub use package::{load_workbook_revisions, remove_workbook_revisions, store_workbook_revisions};
+pub use patch::{Commit, Patch};
+pub use snapshot::Snapshot;
+pub use transaction::Transaction;
 
 #[cfg(test)]
 mod tests;

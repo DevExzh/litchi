@@ -160,11 +160,13 @@ pub use query_table::{
     write_query_table,
 };
 pub use revisions::{
-    RevisionAttribute, RevisionAttributeNamespace, RevisionConformance, RevisionHeader,
-    RevisionHeaderProperties, RevisionHeaders, RevisionLog, RevisionLogPart, RevisionRecord,
-    RevisionRecordKind, RevisionUser, RevisionUsers, RevisionXmlElement, Revisions,
-    load_workbook_revisions, parse_revision_headers, parse_revision_log, parse_revision_users,
-    store_workbook_revisions, write_revision_headers, write_revision_log, write_revision_users,
+    Commit as RevisionCommit, Patch as RevisionPatch, RevisionAttribute,
+    RevisionAttributeNamespace, RevisionConformance, RevisionHeader, RevisionHeaderProperties,
+    RevisionHeaders, RevisionLog, RevisionLogPart, RevisionRecord, RevisionRecordKind,
+    RevisionUser, RevisionUsers, RevisionXmlElement, Revisions, Snapshot as RevisionSnapshot,
+    Transaction as RevisionTransaction, load_workbook_revisions, parse_revision_headers,
+    parse_revision_log, parse_revision_users, remove_workbook_revisions, store_workbook_revisions,
+    write_revision_headers, write_revision_log, write_revision_users,
 };
 pub use rich_values::codec::{parse_feature_property_bags, write_feature_property_bags};
 pub use rich_values::package::load as load_rich_values;
