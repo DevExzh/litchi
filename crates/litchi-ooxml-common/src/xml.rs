@@ -7,6 +7,12 @@ use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 use thiserror::Error;
 
+/// Return whether a value follows the XML 1.0 Fifth Edition NCName grammar.
+///
+/// Relationship IDs and namespace prefixes use this Unicode-aware grammar;
+/// ASCII-only approximations reject valid producer documents.
+pub use crate::xml_name::is_ncname;
+
 /// Result of a shared OOXML decoding operation.
 pub type Result<T> = std::result::Result<T, XmlError>;
 
@@ -124,47 +130,6 @@ pub fn xsd_token_atom(value: &str) -> Option<&str> {
         .filter(|atom| !atom.is_empty());
     let atom = atoms.next()?;
     atoms.next().is_none().then_some(atom)
-}
-
-/// Return whether `value` is an XML 1.0 Fifth Edition NCName.
-///
-/// Relationship IDs and namespace prefixes use this Unicode-aware grammar;
-/// ASCII-only approximations reject valid producer documents.
-pub fn is_ncname(value: &str) -> bool {
-    let mut characters = value.chars();
-    characters.next().is_some_and(is_ncname_start) && characters.all(is_ncname_character)
-}
-
-fn is_ncname_start(character: char) -> bool {
-    character != ':' && is_name_start(character)
-}
-
-fn is_ncname_character(character: char) -> bool {
-    character != ':'
-        && (is_name_start(character)
-            || matches!(
-                character,
-                '-' | '.' | '0'..='9' | '\u{B7}' | '\u{300}'..='\u{36F}' | '\u{203F}'..='\u{2040}'
-            ))
-}
-
-fn is_name_start(character: char) -> bool {
-    matches!(
-        character,
-        ':' | 'A'..='Z' | '_' | 'a'..='z'
-            | '\u{C0}'..='\u{D6}'
-            | '\u{D8}'..='\u{F6}'
-            | '\u{F8}'..='\u{2FF}'
-            | '\u{370}'..='\u{37D}'
-            | '\u{37F}'..='\u{1FFF}'
-            | '\u{200C}'..='\u{200D}'
-            | '\u{2070}'..='\u{218F}'
-            | '\u{2C00}'..='\u{2FEF}'
-            | '\u{3001}'..='\u{D7FF}'
-            | '\u{F900}'..='\u{FDCF}'
-            | '\u{FDF0}'..='\u{FFFD}'
-            | '\u{10000}'..='\u{EFFFF}'
-    )
 }
 
 pub fn is_omml_name(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]) -> bool {

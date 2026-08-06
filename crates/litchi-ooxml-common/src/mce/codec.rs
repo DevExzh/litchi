@@ -14,6 +14,7 @@ use std::{
 use super::model::{
     Capabilities, Error, Limits, NAMESPACE, Name, OffsetLimits, Output, Report, XML_NS,
 };
+use crate::xml_name::{self, QualifiedName};
 
 type R<T> = Result<T, Error>;
 
@@ -468,7 +469,7 @@ fn start(
         if a == "xmlns" {
             c.ns.insert("".into(), v.clone());
         } else if let Some(p) = a.strip_prefix("xmlns:") {
-            if !valid_ncname(p) || v.is_empty() {
+            if !xml_name::is_ncname(p) || v.is_empty() {
                 return Err(bad("invalid namespace"));
             }
             c.ns.insert(p.into(), v.clone());
@@ -534,7 +535,7 @@ fn start(
     if let Some((_, value)) = directives.iter().find(|(name, _)| name == "Ignorable") {
         let mut seen = HashSet::new();
         for prefix in value.split_whitespace() {
-            if !valid_ncname(prefix) || !seen.insert(prefix) {
+            if !xml_name::is_ncname(prefix) || !seen.insert(prefix) {
                 return Err(bad("invalid or duplicate Ignorable prefix"));
             }
             let uri =
@@ -600,7 +601,7 @@ fn start(
             "MustUnderstand" => {
                 let mut seen = HashSet::new();
                 for prefix in value.split_whitespace() {
-                    if !valid_ncname(prefix) || !seen.insert(prefix) {
+                    if !xml_name::is_ncname(prefix) || !seen.insert(prefix) {
                         return Err(bad("invalid or duplicate MustUnderstand prefix"));
                     }
                     let uri =
@@ -642,7 +643,7 @@ fn start(
                 let mut ok = true;
                 let mut count = 0;
                 for p in req.split_whitespace() {
-                    if !valid_ncname(p) {
+                    if !xml_name::is_ncname(p) {
                         return Err(bad("invalid Requires prefix"));
                     }
                     count += 1;
@@ -794,10 +795,9 @@ fn attr<'a>(r: &'a [(String, String)], n: &str) -> R<Option<&'a str>> {
     Ok(v)
 }
 fn expand(q: &str, ns: &BTreeMap<String, String>, element: bool) -> R<Name> {
-    let (p, l) = q.split_once(':').unwrap_or(("", q));
-    if l.is_empty() || q.matches(':').count() > 1 {
-        return Err(bad("invalid QName"));
-    }
+    let qualified = QualifiedName::try_from(q).map_err(|_| bad("invalid QName"))?;
+    let p = qualified.prefix().unwrap_or_default();
+    let l = qualified.local();
     let n = if p.is_empty() {
         if element {
             ns.get("").cloned().unwrap_or_default()
@@ -832,7 +832,7 @@ fn parse_qname_target(
     let (prefix, local) = token
         .split_once(':')
         .ok_or_else(|| bad("preservation and processing targets must be prefixed QNames"))?;
-    if token.matches(':').count() != 1 || !valid_ncname(prefix) || local.is_empty() {
+    if token.matches(':').count() != 1 || !xml_name::is_ncname(prefix) || local.is_empty() {
         return Err(bad("invalid compatibility target QName"));
     }
     let namespace = ns
@@ -848,21 +848,13 @@ fn parse_qname_target(
         }
         return Err(bad("wildcard is not allowed in ProcessContent"));
     }
-    if !valid_ncname(local) {
+    if !xml_name::is_ncname(local) {
         return Err(bad("invalid compatibility target QName"));
     }
     Ok(NamePattern::Exact(Name {
         namespace,
         local_name: local.into(),
     }))
-}
-fn valid_ncname(value: &str) -> bool {
-    let mut chars = value.chars();
-    let Some(first) = chars.next() else {
-        return false;
-    };
-    (first == '_' || first.is_alphabetic())
-        && chars.all(|ch| ch == '_' || ch == '-' || ch == '.' || ch.is_alphanumeric())
 }
 #[allow(clippy::too_many_arguments)]
 fn write_start(

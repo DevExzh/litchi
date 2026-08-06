@@ -15,6 +15,7 @@ pub mod ribbon;
 pub mod vba;
 pub mod web;
 pub mod xml;
+pub mod xml_name;
 
 pub use error::{Error, Result};
 pub use properties::{Keywords, Props};

@@ -2,6 +2,7 @@
 
 use crate::mce::{Capabilities, Limits, Name, process_markup_compatibility};
 use crate::xml::decode_xml_reference;
+use crate::xml_name;
 use crate::{Error, Result};
 use litchi_opc::ContentType;
 use quick_xml::XmlVersion;
@@ -612,7 +613,7 @@ fn validate_instruction(
         .decoder()
         .decode(instruction.target())
         .map_err(|error| Error::Xml(error.to_string()))?;
-    if !valid_xml_name(&target) {
+    if !xml_name::is_xml_name(&target) {
         return Err(Error::Xml(format!(
             "invalid processing-instruction target '{target}'"
         )));
@@ -728,7 +729,7 @@ fn validate_xml_chars(value: &str) -> Result<()> {
 }
 
 pub(super) fn require_rel_id(value: &str, label: &str) -> Result<()> {
-    if valid_ncname(value) {
+    if xml_name::is_ncname(value) {
         Ok(())
     } else {
         Err(Error::Relationship(format!(
@@ -739,11 +740,7 @@ pub(super) fn require_rel_id(value: &str, label: &str) -> Result<()> {
 
 fn validate_qname(value: &[u8], kind: &str) -> Result<()> {
     let value = std::str::from_utf8(value).map_err(|error| Error::Xml(error.to_string()))?;
-    let mut parts = value.split(':');
-    let first = parts.next().unwrap_or_default();
-    let second = parts.next();
-    let valid = valid_ncname(first) && second.is_none_or(valid_ncname) && parts.next().is_none();
-    if valid {
+    if xml_name::is_qualified_name(value) {
         Ok(())
     } else {
         Err(Error::Xml(format!("invalid XML {kind} QName '{value}'")))
@@ -758,7 +755,7 @@ fn validate_namespace_declaration(value: &[u8]) -> Result<()> {
         return Err(Error::Xml("invalid XML namespace declaration".into()));
     };
     let prefix = std::str::from_utf8(prefix).map_err(|error| Error::Xml(error.to_string()))?;
-    if valid_ncname(prefix) {
+    if xml_name::is_ncname(prefix) {
         Ok(())
     } else {
         Err(Error::Xml(format!(
@@ -767,55 +764,10 @@ fn validate_namespace_declaration(value: &[u8]) -> Result<()> {
     }
 }
 
-fn valid_ncname(value: &str) -> bool {
-    let mut characters = value.chars();
-    characters.next().is_some_and(is_ncname_start) && characters.all(is_ncname_character)
-}
-
-fn valid_xml_name(value: &str) -> bool {
-    let mut characters = value.chars();
-    characters.next().is_some_and(is_name_start) && characters.all(is_name_character)
-}
-
 fn valid_encoding_name(value: &str) -> bool {
     let mut bytes = value.bytes();
     bytes.next().is_some_and(|byte| byte.is_ascii_alphabetic())
         && bytes.all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
-}
-
-fn is_ncname_start(character: char) -> bool {
-    character != ':' && is_name_start(character)
-}
-
-fn is_ncname_character(character: char) -> bool {
-    character != ':' && is_name_character(character)
-}
-
-fn is_name_start(character: char) -> bool {
-    matches!(
-        character,
-        ':' | 'A'..='Z' | '_' | 'a'..='z'
-            | '\u{C0}'..='\u{D6}'
-            | '\u{D8}'..='\u{F6}'
-            | '\u{F8}'..='\u{2FF}'
-            | '\u{370}'..='\u{37D}'
-            | '\u{37F}'..='\u{1FFF}'
-            | '\u{200C}'..='\u{200D}'
-            | '\u{2070}'..='\u{218F}'
-            | '\u{2C00}'..='\u{2FEF}'
-            | '\u{3001}'..='\u{D7FF}'
-            | '\u{F900}'..='\u{FDCF}'
-            | '\u{FDF0}'..='\u{FFFD}'
-            | '\u{10000}'..='\u{EFFFF}'
-    )
-}
-
-fn is_name_character(character: char) -> bool {
-    is_name_start(character)
-        || matches!(
-            character,
-            '-' | '.' | '0'..='9' | '\u{B7}' | '\u{300}'..='\u{36F}' | '\u{203F}'..='\u{2040}'
-        )
 }
 
 fn require_nested_depth(depth: usize) -> Result<()> {

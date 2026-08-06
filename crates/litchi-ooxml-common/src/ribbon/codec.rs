@@ -1,5 +1,6 @@
 //! Bounded XML validation for neutral Ribbon customUI documents.
 
+use crate::xml_name;
 use crate::{Error, Result};
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{OpcPackage, Part};
@@ -236,7 +237,7 @@ fn validate_namespace_declaration(name: &[u8], value: &str) -> Result<()> {
     if let Some(prefix) = prefix {
         let prefix = std::str::from_utf8(prefix)
             .map_err(|error| Error::Xml(format!("invalid namespace prefix: {error}")))?;
-        if !valid_ncname(prefix) || prefix == "xmlns" {
+        if !xml_name::is_ncname(prefix) || prefix == "xmlns" {
             return Err(Error::Invalid(format!(
                 "invalid Ribbon namespace prefix '{prefix}'"
             )));
@@ -397,7 +398,7 @@ fn validate_instruction(reader: &NsReader<&[u8]>, instruction: &BytesPI<'_>) -> 
         .decoder()
         .decode(instruction.target())
         .map_err(|error| Error::Xml(format!("invalid Ribbon instruction target: {error}")))?;
-    if !valid_xml_name(&target) || target.eq_ignore_ascii_case("xml") {
+    if !xml_name::is_xml_name(&target) || target.eq_ignore_ascii_case("xml") {
         return Err(Error::Invalid(format!(
             "invalid Ribbon processing-instruction target '{target}'"
         )));
@@ -412,14 +413,7 @@ fn validate_instruction(reader: &NsReader<&[u8]>, instruction: &BytesPI<'_>) -> 
 fn validate_qname(value: &[u8], kind: &str) -> Result<()> {
     let value = std::str::from_utf8(value)
         .map_err(|error| Error::Xml(format!("invalid Ribbon {kind} name: {error}")))?;
-    let mut components = value.split(':');
-    let first = components.next().unwrap_or_default();
-    let second = components.next();
-    let valid = match second {
-        Some(local) => valid_ncname(first) && valid_ncname(local) && components.next().is_none(),
-        None => valid_ncname(first),
-    };
-    if valid {
+    if xml_name::is_qualified_name(value) {
         Ok(())
     } else {
         Err(Error::Invalid(format!(
@@ -449,51 +443,6 @@ fn valid_encoding_name(value: &str) -> bool {
     let mut bytes = value.bytes();
     bytes.next().is_some_and(|byte| byte.is_ascii_alphabetic())
         && bytes.all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
-}
-
-fn valid_xml_name(value: &str) -> bool {
-    let mut characters = value.chars();
-    characters.next().is_some_and(is_name_start) && characters.all(is_name_character)
-}
-
-fn valid_ncname(value: &str) -> bool {
-    let mut characters = value.chars();
-    characters.next().is_some_and(is_ncname_start) && characters.all(is_ncname_character)
-}
-
-fn is_ncname_start(character: char) -> bool {
-    character != ':' && is_name_start(character)
-}
-
-fn is_ncname_character(character: char) -> bool {
-    character != ':' && is_name_character(character)
-}
-
-fn is_name_start(character: char) -> bool {
-    matches!(
-        character,
-        ':' | 'A'..='Z' | '_' | 'a'..='z'
-            | '\u{C0}'..='\u{D6}'
-            | '\u{D8}'..='\u{F6}'
-            | '\u{F8}'..='\u{2FF}'
-            | '\u{370}'..='\u{37D}'
-            | '\u{37F}'..='\u{1FFF}'
-            | '\u{200C}'..='\u{200D}'
-            | '\u{2070}'..='\u{218F}'
-            | '\u{2C00}'..='\u{2FEF}'
-            | '\u{3001}'..='\u{D7FF}'
-            | '\u{F900}'..='\u{FDCF}'
-            | '\u{FDF0}'..='\u{FFFD}'
-            | '\u{10000}'..='\u{EFFFF}'
-    )
-}
-
-fn is_name_character(character: char) -> bool {
-    is_name_start(character)
-        || matches!(
-            character,
-            '-' | '.' | '0'..='9' | '\u{B7}' | '\u{300}'..='\u{36F}' | '\u{203F}'..='\u{2040}'
-        )
 }
 
 fn validate_root(
