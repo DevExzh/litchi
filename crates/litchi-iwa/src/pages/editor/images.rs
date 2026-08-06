@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use litchi_iwa_common::media::Type as MediaType;
 use litchi_iwa_common::shape::image::ImageAdjustments;
+use litchi_pages::image::Options as PagesImageOptions;
 
 use super::*;
 use litchi_iwa_common::comment::DrawableId;
@@ -15,7 +16,7 @@ use crate::image_caption::{CaptionObjectIds, DrawableCaptionKind};
 use crate::media::MediaAssetId;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{
-    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
+    DrawableFlipAxis, DrawableGeometry, DrawableProperties, DrawableSize,
     flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
 };
 
@@ -38,35 +39,6 @@ pub struct PagesImageInfo {
     pub image_adjustments: ImageAdjustments,
     pub original_size: Option<DrawableSize>,
     pub natural_size: Option<DrawableSize>,
-}
-
-/// Typed layout metadata for a newly created Pages image.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PagesImageOptions {
-    /// Top-left position on the page, in points.
-    pub position: DrawablePoint,
-    /// Displayed image size, in points.
-    pub size: DrawableSize,
-    /// Untransformed media dimensions reported to Pages, in points.
-    pub natural_size: DrawableSize,
-}
-
-impl PagesImageOptions {
-    /// Create options whose displayed and natural dimensions are identical.
-    pub const fn new(position: DrawablePoint, size: DrawableSize) -> Self {
-        Self {
-            position,
-            size,
-            natural_size: size,
-        }
-    }
-
-    /// Set media dimensions independently of the displayed size.
-    #[must_use]
-    pub const fn with_natural_size(mut self, natural_size: DrawableSize) -> Self {
-        self.natural_size = natural_size;
-        self
-    }
 }
 
 /// Result of removing a body-anchored Pages image.
@@ -128,7 +100,7 @@ impl PagesEditor {
             style_id,
             asset.data_identifier.get(),
             geometry,
-            options.natural_size,
+            options.natural_size(),
             root.left_margin.unwrap_or_default(),
         )?;
         staged.update_archive(&archive_name, |archive| {
@@ -186,8 +158,8 @@ impl PagesEditor {
         if created.anchor_character_index != expected_anchor
             || created.image_data_identifier != asset.data_identifier
             || created.geometry != geometry
-            || created.original_size != Some(options.natural_size)
-            || created.natural_size != Some(options.natural_size)
+            || created.original_size != Some(options.natural_size())
+            || created.natural_size != Some(options.natural_size())
             || created_graph.object_ids != ids.all()
             || verified.extract_media(asset.data_identifier)? != data
         {
@@ -777,6 +749,7 @@ mod tests {
 
     use super::*;
     use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
+    use crate::shapes::DrawablePoint;
 
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
     const IMAGE_SIZE: DrawableSize = DrawableSize {
@@ -790,7 +763,10 @@ mod tests {
     const UPDATED_ANGLE_DEGREES: f32 = 7.5;
 
     fn options() -> PagesImageOptions {
-        PagesImageOptions::new(IMAGE_POSITION, IMAGE_SIZE).with_natural_size(NATURAL_IMAGE_SIZE)
+        PagesImageOptions::new(IMAGE_POSITION, IMAGE_SIZE)
+            .unwrap_or_else(|error| panic!("valid Pages image options: {error}"))
+            .with_natural_size(NATURAL_IMAGE_SIZE)
+            .unwrap_or_else(|error| panic!("valid Pages natural image size: {error}"))
     }
 
     fn selector(image: &PagesImageInfo) -> DrawableId {
@@ -1214,18 +1190,12 @@ mod tests {
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
-        assert!(
-            editor
-                .add_body_image(
-                    4,
-                    "lena.png",
-                    &original,
-                    options().with_natural_size(DrawableSize {
-                        width: 0.0,
-                        height: NATURAL_IMAGE_SIZE.height,
-                    }),
-                )
-                .is_err()
+        assert_eq!(
+            options().with_natural_size(DrawableSize {
+                width: 0.0,
+                height: NATURAL_IMAGE_SIZE.height,
+            }),
+            Err(litchi_pages::image::Error::InvalidSize)
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 

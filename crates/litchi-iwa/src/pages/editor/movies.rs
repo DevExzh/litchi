@@ -612,7 +612,7 @@ impl PagesEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pages::PagesImageOptions;
+    use litchi_pages::image::Options as PagesImageOptions;
     use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-pages-movie";
@@ -1038,15 +1038,42 @@ mod tests {
         let baseline = editor.to_bytes().unwrap();
         assert!(editor.duplicate_body_movie(999, 0).is_err());
         assert_eq!(editor.to_bytes().unwrap(), baseline);
-        for result in [
-            editor.add_body_movie(4, "poster.png", POSTER, "poster.png", POSTER, options()),
-            editor.add_body_movie(4, "movie.mov", MOVIE, "movie.mov", MOVIE, options()),
-            editor.add_body_movie(4, "movie.mov", MOVIE, "poster.png", POSTER, options()),
-            editor.add_body_movie(5, "movie.mov", MOVIE, "poster.png", POSTER, options()),
-        ] {
-            assert!(result.is_err());
-            assert_eq!(editor.to_bytes().unwrap(), baseline);
-        }
+        let result = editor.add_body_movie(
+            4,
+            "poster.png",
+            POSTER,
+            "poster.png",
+            POSTER,
+            options(),
+        );
+        assert!(result.is_err());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let result = editor.add_body_movie(
+            4,
+            "movie.mov",
+            MOVIE,
+            "movie.mov",
+            MOVIE,
+            options(),
+        );
+        assert!(result.is_err());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let result = editor.add_body_movie(
+            4,
+            "../movie.mov",
+            MOVIE,
+            "poster.png",
+            POSTER,
+            options(),
+        );
+        assert!(result.is_err());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let result = editor.add_body_movie(5, "movie.mov", MOVIE, "poster.png", POSTER, options());
+        assert!(result.is_err());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
         assert!(PagesMovieOptions::new(POSITION, SIZE, Duration::ZERO).is_err());
         assert!(
             PagesMovieOptions::new(
@@ -1065,7 +1092,8 @@ mod tests {
                 4,
                 "poster.png",
                 POSTER,
-                PagesImageOptions::new(POSITION, SIZE),
+                PagesImageOptions::new(POSITION, SIZE)
+                    .unwrap_or_else(|error| panic!("valid Pages image options: {error}")),
             )
             .unwrap();
         let before = editor.to_bytes().unwrap();

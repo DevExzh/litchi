@@ -38,7 +38,7 @@ pub use document::PagesDocument;
 pub use editor::{
     PagesAudioInfo, PagesBodyChartInfo, PagesBodyShapeInfo,
     PagesCellValue, PagesDrawableTextInfo, PagesEditor, PagesHeaderFooterInfo, PagesImageInfo,
-    PagesImageOptions, PagesMovieInfo, PagesSectionInfo, PagesTable,
+    PagesMovieInfo, PagesSectionInfo, PagesTable,
     PagesTableCellParagraphIndents, PagesTableCellParagraphLineSpacing,
     PagesTableCellParagraphList, PagesTableCellParagraphListBullet,
     PagesTableCellParagraphListBulletGeometry, PagesTableCellParagraphListIndentation,

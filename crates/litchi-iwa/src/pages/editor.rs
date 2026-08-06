@@ -4672,7 +4672,7 @@ mod types;
 pub use audio::{PagesAudioInfo, RemovedPagesAudio};
 pub use body_shapes::{PagesBodyShapeInfo, RemovedPagesBodyShape};
 pub use charts::{PagesBodyChartInfo, RemovedPagesBodyChart};
-pub use images::{PagesImageInfo, PagesImageOptions, RemovedPagesImage};
+pub use images::{PagesImageInfo, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, RemovedPagesMovie};
 pub use tables::{
     PagesCellValue, PagesTable, PagesTableCellConditionalHighlightInfo, PagesTableCellInset,

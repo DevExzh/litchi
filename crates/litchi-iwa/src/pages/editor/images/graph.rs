@@ -110,18 +110,9 @@ pub(super) struct ImageCaptionSlot {
 }
 
 pub(super) fn image_creation_values(options: PagesImageOptions) -> Result<DrawableGeometry> {
-    if !options.natural_size.width.is_finite()
-        || !options.natural_size.height.is_finite()
-        || options.natural_size.width <= 0.0
-        || options.natural_size.height <= 0.0
-    {
-        return Err(Error::ParseError(
-            "Pages image natural size must be finite and greater than zero".to_owned(),
-        ));
-    }
     DrawableGeometry {
-        position: Some(options.position),
-        size: Some(options.size),
+        position: Some(options.position()),
+        size: Some(options.size()),
         flags: Some(DEFAULT_DRAWABLE_FLAGS),
         angle: Some(DEFAULT_IMAGE_ROTATION_DEGREES),
     }
