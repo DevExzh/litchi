@@ -2,7 +2,10 @@
 
 use super::codec;
 use super::model::Metadata;
-use super::transaction::{Patch, RecipientSelector, Snapshot, Transaction, TransactionError};
+use super::transaction::{
+    Error as TransactionError, Patch, RecipientSelector, Snapshot as TransactionSnapshot,
+    Transaction,
+};
 use super::validation;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
@@ -10,13 +13,13 @@ use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Patch as ObjectP
 
 /// An immutable DOC snapshot carrying the route-slip semantic state and bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PackageSnapshot {
+pub struct Snapshot {
     bytes: Vec<u8>,
-    route_slip: Snapshot,
+    route_slip: TransactionSnapshot,
 }
 
-impl PackageSnapshot {
-    fn new(bytes: Vec<u8>, route_slip: Snapshot) -> Self {
+impl Snapshot {
+    fn new(bytes: Vec<u8>, route_slip: TransactionSnapshot) -> Self {
         Self { bytes, route_slip }
     }
 
@@ -28,7 +31,7 @@ impl PackageSnapshot {
 
     /// Returns the immutable semantic route-slip snapshot.
     #[must_use]
-    pub fn route_slip(&self) -> &Snapshot {
+    pub fn route_slip(&self) -> &TransactionSnapshot {
         &self.route_slip
     }
 
@@ -46,16 +49,16 @@ impl PackageSnapshot {
 
 /// A package commit containing a semantic patch and the common OLE byte patch.
 #[derive(Debug, Clone)]
-pub struct PackageCommit {
-    snapshot: PackageSnapshot,
+pub struct Commit {
+    snapshot: Snapshot,
     patch: Patch,
     package_patch: ObjectPatch,
 }
 
-impl PackageCommit {
+impl Commit {
     /// The immutable post-edit package snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &PackageSnapshot {
+    pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
@@ -73,7 +76,7 @@ impl PackageCommit {
 
     /// Splits the package commit into its snapshot, semantic patch, and byte patch.
     #[must_use]
-    pub fn into_parts(self) -> (PackageSnapshot, Patch, ObjectPatch) {
+    pub fn into_parts(self) -> (Snapshot, Patch, ObjectPatch) {
         (self.snapshot, self.patch, self.package_patch)
     }
 }
@@ -83,8 +86,8 @@ impl PackageCommit {
 pub struct Editor {
     package: ObjectEditor,
     table_name: String,
-    original_route_slip: Snapshot,
-    route_slip: Snapshot,
+    original_route_slip: TransactionSnapshot,
+    route_slip: TransactionSnapshot,
     changed: bool,
 }
 
@@ -116,8 +119,8 @@ impl Editor {
         let table = package
             .stream(&table_path)
             .ok_or_else(|| PackageError::StreamNotFound(table_name.to_owned()))?;
-        let route_slip =
-            Snapshot::from_option(codec::parse(&fib, table)?).map_err(PackageError::from)?;
+        let route_slip = TransactionSnapshot::from_option(codec::parse(&fib, table)?)
+            .map_err(PackageError::from)?;
         Ok(Self {
             package,
             table_name: table_name.to_owned(),
@@ -135,7 +138,7 @@ impl Editor {
 
     /// Returns the current immutable route-slip semantic snapshot.
     #[must_use]
-    pub fn route_slip(&self) -> &Snapshot {
+    pub fn route_slip(&self) -> &TransactionSnapshot {
         &self.route_slip
     }
 
@@ -152,13 +155,13 @@ impl Editor {
     }
 
     /// Sets or replaces the complete route-slip metadata.
-    pub fn set(&mut self, metadata: Metadata) -> Result<PackageCommit> {
-        let snapshot = Snapshot::new(metadata)?;
+    pub fn set(&mut self, metadata: Metadata) -> Result<Commit> {
+        let snapshot = TransactionSnapshot::new(metadata)?;
         self.install(snapshot)
     }
 
     /// Replaces existing route-slip metadata, rejecting an absent range.
-    pub fn replace(&mut self, metadata: Metadata) -> Result<PackageCommit> {
+    pub fn replace(&mut self, metadata: Metadata) -> Result<Commit> {
         if !self.route_slip.is_present() {
             return Err(PackageError::InvalidFormat(
                 "cannot replace missing route-slip metadata".into(),
@@ -168,7 +171,7 @@ impl Editor {
     }
 
     /// Applies and publishes a semantic transaction atomically.
-    pub fn apply(&mut self, transaction: Transaction) -> Result<PackageCommit> {
+    pub fn apply(&mut self, transaction: Transaction) -> Result<Commit> {
         let commit = transaction.commit().map_err(transaction_error)?;
         if commit.patch().before() != &self.route_slip {
             return Err(PackageError::InvalidFormat(
@@ -179,21 +182,21 @@ impl Editor {
     }
 
     /// Sets the current recipient stage and publishes the edit atomically.
-    pub fn set_stage(&mut self, selector: RecipientSelector<'_>) -> Result<PackageCommit> {
+    pub fn set_stage(&mut self, selector: RecipientSelector<'_>) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.set_stage(selector).map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Advances to the next recipient and publishes the lifecycle edit.
-    pub fn advance_stage(&mut self) -> Result<PackageCommit> {
+    pub fn advance_stage(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.advance_stage().map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Adds a recipient and publishes the edit atomically.
-    pub fn add_recipient(&mut self, recipient: super::model::Recipient) -> Result<PackageCommit> {
+    pub fn add_recipient(&mut self, recipient: super::model::Recipient) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction
             .add_recipient(recipient)
@@ -206,7 +209,7 @@ impl Editor {
         &mut self,
         selector: RecipientSelector<'_>,
         recipient: super::model::Recipient,
-    ) -> Result<PackageCommit> {
+    ) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction
             .replace_recipient(selector, recipient)
@@ -215,7 +218,7 @@ impl Editor {
     }
 
     /// Removes a selected recipient and publishes the edit atomically.
-    pub fn remove_recipient(&mut self, selector: RecipientSelector<'_>) -> Result<PackageCommit> {
+    pub fn remove_recipient(&mut self, selector: RecipientSelector<'_>) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction
             .remove_recipient(selector)
@@ -224,23 +227,23 @@ impl Editor {
     }
 
     /// Clears the route-slip range and its semantic metadata.
-    pub fn clear(&mut self) -> Result<PackageCommit> {
+    pub fn clear(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.clear().map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Completes routing by clearing the route-slip FIB range.
-    pub fn complete(&mut self) -> Result<PackageCommit> {
+    pub fn complete(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.complete().map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Captures the current package as an immutable snapshot.
-    pub fn snapshot(&self) -> Result<PackageSnapshot> {
+    pub fn snapshot(&self) -> Result<Snapshot> {
         let bytes = self.package.clone().finish().map_err(PackageError::from)?;
-        Ok(PackageSnapshot::new(bytes, self.route_slip.clone()))
+        Ok(Snapshot::new(bytes, self.route_slip.clone()))
     }
 
     /// Finishes the edit and returns the rendered DOC bytes.
@@ -249,19 +252,19 @@ impl Editor {
     }
 
     /// Commits the package as an immutable snapshot with reversible patches.
-    pub fn commit(self) -> Result<PackageCommit> {
+    pub fn commit(self) -> Result<Commit> {
         let semantic_patch = Patch::new(self.original_route_slip, self.route_slip.clone());
         let object_commit = self.package.commit().map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
-        let snapshot = PackageSnapshot::new(bytes, self.route_slip);
-        Ok(PackageCommit {
+        let snapshot = Snapshot::new(bytes, self.route_slip);
+        Ok(Commit {
             snapshot,
             patch: semantic_patch,
             package_patch: object_commit.into_patch(),
         })
     }
 
-    fn install(&mut self, snapshot: Snapshot) -> Result<PackageCommit> {
+    fn install(&mut self, snapshot: TransactionSnapshot) -> Result<Commit> {
         let semantic_patch = Patch::new(self.route_slip.clone(), snapshot.clone());
         if semantic_patch.is_noop() {
             let package_patch = self
@@ -271,7 +274,7 @@ impl Editor {
                 .map_err(PackageError::from)?
                 .into_patch();
             let package_snapshot = self.snapshot()?;
-            return Ok(PackageCommit {
+            return Ok(Commit {
                 snapshot: package_snapshot,
                 patch: semantic_patch,
                 package_patch,
@@ -289,17 +292,17 @@ impl Editor {
             .commit()
             .map_err(PackageError::from)?;
         let bytes = package_commit.patch().after().to_vec();
-        let package_snapshot = PackageSnapshot::new(bytes, candidate.route_slip.clone());
+        let package_snapshot = Snapshot::new(bytes, candidate.route_slip.clone());
         let package_patch = package_commit.into_patch();
         *self = candidate;
-        Ok(PackageCommit {
+        Ok(Commit {
             snapshot: package_snapshot,
             patch: semantic_patch,
             package_patch,
         })
     }
 
-    fn write_snapshot(&mut self, snapshot: &Snapshot) -> Result<()> {
+    fn write_snapshot(&mut self, snapshot: &TransactionSnapshot) -> Result<()> {
         let word_path = vec!["WordDocument".to_owned()];
         let table_path = vec![self.table_name.clone()];
         let mut word = self

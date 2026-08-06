@@ -2,7 +2,7 @@
 
 #[cfg(all(test, feature = "formula"))]
 mod owned_mtef_tests {
-    use super::Document;
+    use crate::Document;
     use std::collections::HashMap;
     use std::sync::Arc;
 

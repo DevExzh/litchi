@@ -6,7 +6,10 @@
 //! intact. No comparison, merge, accept, or reject operation is performed.
 
 use super::model::Limits;
-use super::transaction::{Change, Editor as DocumentEditor, Patch, Revision, Snapshot};
+use super::transaction::{
+    Change, Editor as DocumentEditor, Patch as DocumentPatch, Revision,
+    Snapshot as DocumentSnapshot,
+};
 use crate::package::{Error, Package as PresentationPackage, Result};
 use crate::presentation::Presentation;
 use crate::records::Record;
@@ -18,14 +21,14 @@ pub const MAX_PACKAGE_BYTES: usize = 256 * 1024 * 1024;
 
 /// An immutable PPT package snapshot with its live document-comparison owner.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PackageSnapshot {
+pub struct Snapshot {
     bytes: Arc<[u8]>,
-    document: Snapshot,
+    document: DocumentSnapshot,
     document_persist_id: u32,
     limits: Limits,
 }
 
-impl PackageSnapshot {
+impl Snapshot {
     /// Parse a complete OLE2 PowerPoint package using default limits.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes_with_limits(bytes.to_vec(), Limits::default())
@@ -62,7 +65,7 @@ impl PackageSnapshot {
     }
 
     /// Immutable live `DocumentContainer` snapshot.
-    pub const fn document(&self) -> &Snapshot {
+    pub const fn document(&self) -> &DocumentSnapshot {
         &self.document
     }
 
@@ -83,8 +86,8 @@ impl PackageSnapshot {
     }
 
     /// Begin an isolated package edit over the review-owned metadata.
-    pub fn edit(&self) -> PackageEditor {
-        PackageEditor {
+    pub fn edit(&self) -> Editor {
+        Editor {
             source: self.clone(),
             document: self.document.edit(),
         }
@@ -93,12 +96,12 @@ impl PackageSnapshot {
 
 /// An isolated package transaction over inert document-comparison metadata.
 #[derive(Debug, Clone)]
-pub struct PackageEditor {
-    source: PackageSnapshot,
+pub struct Editor {
+    source: Snapshot,
     document: DocumentEditor,
 }
 
-impl PackageEditor {
+impl Editor {
     /// Read the transaction-local review records.
     pub fn review(&self) -> Result<super::model::Review> {
         self.document.review()
@@ -115,7 +118,7 @@ impl PackageEditor {
     }
 
     /// Return the current transaction-local document snapshot.
-    pub fn document_snapshot(&self) -> Result<Snapshot> {
+    pub fn document_snapshot(&self) -> Result<DocumentSnapshot> {
         self.document.snapshot()
     }
 
@@ -155,13 +158,13 @@ impl PackageEditor {
 
     /// Publish the package edit as a fresh OLE artifact and source-checked
     /// reversible patch.
-    pub fn commit(self) -> Result<PackageCommit> {
+    pub fn commit(self) -> Result<Commit> {
         let document_commit = self.document.commit()?;
         let source = self.source;
         let target_document = document_commit.snapshot().clone();
 
         if target_document.bytes() == source.document.bytes() {
-            let patch = PackagePatch {
+            let patch = Patch {
                 base: source.revision(),
                 target: source.revision(),
                 before: source.bytes.clone(),
@@ -169,7 +172,7 @@ impl PackageEditor {
                 document: document_commit.patch().clone(),
                 limits: source.limits,
             };
-            return Ok(PackageCommit {
+            return Ok(Commit {
                 snapshot: source,
                 patch,
             });
@@ -187,7 +190,7 @@ impl PackageEditor {
             target_document.bytes().to_vec(),
         )?;
         let bytes = editor.finish()?;
-        let snapshot = PackageSnapshot::from_bytes_with_limits(bytes, source.limits)?;
+        let snapshot = Snapshot::from_bytes_with_limits(bytes, source.limits)?;
         if snapshot.document_persist_id != source.document_persist_id
             || snapshot.document.bytes() != target_document.bytes()
         {
@@ -195,7 +198,7 @@ impl PackageEditor {
                 "published review metadata did not round-trip through the live document".into(),
             ));
         }
-        let patch = PackagePatch {
+        let patch = Patch {
             base: source.revision(),
             target: snapshot.revision(),
             before: source.bytes,
@@ -203,60 +206,60 @@ impl PackageEditor {
             document: document_commit.patch().clone(),
             limits: snapshot.limits,
         };
-        Ok(PackageCommit { snapshot, patch })
+        Ok(Commit { snapshot, patch })
     }
 
     /// Discard the package candidate and recover the source snapshot.
-    pub fn rollback(self) -> PackageSnapshot {
+    pub fn rollback(self) -> Snapshot {
         self.source
     }
 }
 
 /// A committed package snapshot and reversible source-checked patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PackageCommit {
-    snapshot: PackageSnapshot,
-    patch: PackagePatch,
+pub struct Commit {
+    snapshot: Snapshot,
+    patch: Patch,
 }
 
-impl PackageCommit {
-    pub const fn snapshot(&self) -> &PackageSnapshot {
+impl Commit {
+    pub const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
-    pub const fn patch(&self) -> &PackagePatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
-    pub fn document(&self) -> &Snapshot {
+    pub fn document(&self) -> &DocumentSnapshot {
         self.snapshot.document()
     }
 
-    pub fn undo(&self, current: &PackageSnapshot) -> Result<PackageSnapshot> {
+    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.undo(current)
     }
 
-    pub fn redo(&self, current: &PackageSnapshot) -> Result<PackageSnapshot> {
+    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         self.patch.redo(current)
     }
 
-    pub fn into_parts(self) -> (PackageSnapshot, PackagePatch) {
+    pub fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }
 
 /// A reversible whole-artifact package patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PackagePatch {
+pub struct Patch {
     base: Revision,
     target: Revision,
     before: Arc<[u8]>,
     after: Arc<[u8]>,
-    document: Patch,
+    document: DocumentPatch,
     limits: Limits,
 }
 
-impl PackagePatch {
+impl Patch {
     pub const fn base(&self) -> Revision {
         self.base
     }
@@ -273,35 +276,38 @@ impl PackagePatch {
         &self.after
     }
 
-    pub const fn document(&self) -> &Patch {
+    pub const fn document(&self) -> &DocumentPatch {
         &self.document
     }
 
-    pub fn undo(&self, current: &PackageSnapshot) -> Result<PackageSnapshot> {
+    pub fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.target || current.bytes() != self.after.as_ref() {
             return Err(Error::InvalidFormat(
                 "cannot undo review package edits against a different source".into(),
             ));
         }
-        PackageSnapshot::from_bytes_with_limits(self.before.to_vec(), self.limits)
+        Snapshot::from_bytes_with_limits(self.before.to_vec(), self.limits)
     }
 
-    pub fn redo(&self, current: &PackageSnapshot) -> Result<PackageSnapshot> {
+    pub fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
         if current.revision() != self.base || current.bytes() != self.before.as_ref() {
             return Err(Error::InvalidFormat(
                 "cannot redo review package edits against a different source".into(),
             ));
         }
-        PackageSnapshot::from_bytes_with_limits(self.after.to_vec(), self.limits)
+        Snapshot::from_bytes_with_limits(self.after.to_vec(), self.limits)
     }
 }
 
 /// Load the live document-comparison snapshot from an already opened PPT.
-pub(crate) fn from_presentation(presentation: &Presentation) -> Result<Snapshot> {
+pub(crate) fn from_presentation(presentation: &Presentation) -> Result<DocumentSnapshot> {
     snapshot_from_presentation(presentation, Limits::default())
 }
 
-fn snapshot_from_presentation(presentation: &Presentation, limits: Limits) -> Result<Snapshot> {
+fn snapshot_from_presentation(
+    presentation: &Presentation,
+    limits: Limits,
+) -> Result<DocumentSnapshot> {
     let offset = presentation.slide_directory().document_offset();
     let stream = presentation.document_stream();
     let (record, consumed) = Record::parse_strict(stream, offset)?;
@@ -316,5 +322,5 @@ fn snapshot_from_presentation(presentation: &Presentation, limits: Limits) -> Re
             "live persist record is not a DocumentContainer".into(),
         ));
     }
-    Snapshot::parse_with_limits(source, limits)
+    DocumentSnapshot::parse_with_limits(source, limits)
 }

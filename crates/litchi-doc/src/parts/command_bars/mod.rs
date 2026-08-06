@@ -21,5 +21,7 @@ pub use model::{
     MacroCommand, MacroCommands, MacroName, MacroNames, Operation, Toolbar, ToolbarDelta,
     ToolbarWrapper, XString,
 };
-pub use package::{Editor, FIB_INDEX_CMDS, PackageCommit, PackageSnapshot, parse, write};
-pub use transaction::{Commit, Snapshot, Transaction, TransactionError};
+pub use package::{
+    Commit as PackageCommit, Editor, FIB_INDEX_CMDS, Snapshot as PackageSnapshot, parse, write,
+};
+pub use transaction::{Commit, Error as TransactionError, Snapshot, Transaction};

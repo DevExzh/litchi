@@ -29,7 +29,7 @@ mod validation;
 pub use litchi_ole_common::smart_tags::Limits;
 pub use package::Editor;
 pub use semantic::{TableKind, TableRange, Topology};
-pub use transaction::{Commit, Patch, Snapshot, Transaction, TransactionError};
+pub use transaction::{Commit, Error as TransactionError, Patch, Snapshot, Transaction};
 
 /// Producer that originally created a smart-tag factoid.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

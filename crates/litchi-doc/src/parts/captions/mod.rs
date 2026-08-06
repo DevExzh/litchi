@@ -22,9 +22,9 @@ pub use crate::parts::numbering::NumberFormat as Format;
 pub use model::{
     AutoEntry, AutoTable, Definition, Heading, Info, LabelTable, Location, Numbering, Separator,
 };
-pub use package::{Editor, PackageCommit, PackageSnapshot};
+pub use package::{Commit as PackageCommit, Editor, Snapshot as PackageSnapshot};
 pub use semantic::Tables;
-pub use transaction::{Commit, Snapshot, Transaction, TransactionError};
+pub use transaction::{Commit, Error as TransactionError, Snapshot, Transaction};
 
 // The document state predates the contextual facade and uses this name
 // internally. It is crate-visible only; the public path is `captions::Tables`.

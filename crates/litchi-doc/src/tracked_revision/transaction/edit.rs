@@ -2,7 +2,7 @@
 
 use super::super::{Revision, RevisionEditor, RevisionKind, RevisionMetadata};
 use super::snapshot::Snapshot;
-use super::{Commit, Patch, Result, TransactionError};
+use super::{Commit, Error, Patch, Result};
 
 /// A staged, failure-atomic edit over one source tracked-revision snapshot.
 #[derive(Clone)]
@@ -14,7 +14,7 @@ pub struct Transaction {
 impl Transaction {
     pub(super) fn new(source: Snapshot) -> Result<Self> {
         let editor = RevisionEditor::open(source.bytes().to_vec(), source.limits())
-            .map_err(TransactionError::Invalid)?;
+            .map_err(Error::Invalid)?;
         Ok(Self { source, editor })
     }
 
@@ -32,7 +32,7 @@ impl Transaction {
 
     /// Returns the current candidate revisions in source order.
     pub fn revisions(&self) -> Result<Vec<Revision>> {
-        self.editor.revisions().map_err(TransactionError::Invalid)
+        self.editor.revisions().map_err(Error::Invalid)
     }
 
     /// Returns the current candidate revision-author table.
@@ -52,15 +52,11 @@ impl Transaction {
     /// A byte-identical candidate returns the original snapshot, preserving
     /// exact source bytes and avoiding an unnecessary CFB parse and allocation.
     pub fn snapshot(&self) -> Result<Snapshot> {
-        let bytes = self
-            .editor
-            .clone()
-            .finish()
-            .map_err(TransactionError::Invalid)?;
+        let bytes = self.editor.clone().finish().map_err(Error::Invalid)?;
         if bytes == self.source.bytes() {
             return Ok(self.source.clone());
         }
-        Snapshot::open(bytes, self.source.limits()).map_err(TransactionError::Invalid)
+        Snapshot::open(bytes, self.source.limits()).map_err(Error::Invalid)
     }
 
     /// Adds a revision mark to an existing main-story range.
@@ -73,7 +69,7 @@ impl Transaction {
     ) -> Result<Revision> {
         self.editor
             .add(start_cp, end_cp, kind, metadata)
-            .map_err(TransactionError::Invalid)
+            .map_err(Error::Invalid)
     }
 
     /// Inserts inert plain text and marks it as an insertion or move target.
@@ -86,7 +82,7 @@ impl Transaction {
     ) -> Result<Revision> {
         self.editor
             .add_text(cp, text, kind, metadata)
-            .map_err(TransactionError::Invalid)
+            .map_err(Error::Invalid)
     }
 
     /// Replaces one revision's typed metadata without touching unrelated SPRMs.
@@ -97,16 +93,14 @@ impl Transaction {
         let current = self
             .editor
             .revisions()
-            .map_err(TransactionError::Invalid)?
+            .map_err(Error::Invalid)?
             .get(index)
             .cloned()
             .ok_or_else(|| invalid("revision index is out of range"))?;
         if same_metadata(&current, &metadata) {
             return Ok(current);
         }
-        self.editor
-            .update(index, metadata)
-            .map_err(TransactionError::Invalid)
+        self.editor.update(index, metadata).map_err(Error::Invalid)
     }
 
     /// Alias for [`Self::replace`].
@@ -125,17 +119,17 @@ impl Transaction {
 
     /// Removes one revision mark while retaining its text/current formatting.
     pub fn remove(&mut self, index: usize) -> Result<Revision> {
-        self.editor.remove(index).map_err(TransactionError::Invalid)
+        self.editor.remove(index).map_err(Error::Invalid)
     }
 
     /// Accepts one revision using Word redline semantics.
     pub fn accept(&mut self, index: usize) -> Result<Revision> {
-        self.editor.accept(index).map_err(TransactionError::Invalid)
+        self.editor.accept(index).map_err(Error::Invalid)
     }
 
     /// Rejects one revision using Word redline semantics.
     pub fn reject(&mut self, index: usize) -> Result<Revision> {
-        self.editor.reject(index).map_err(TransactionError::Invalid)
+        self.editor.reject(index).map_err(Error::Invalid)
     }
 
     /// Discards the candidate and recovers its immutable source snapshot.
@@ -159,6 +153,6 @@ fn same_metadata(revision: &Revision, metadata: &RevisionMetadata) -> bool {
         && revision.revision_save_id == metadata.revision_save_id
 }
 
-fn invalid(message: impl Into<String>) -> TransactionError {
-    TransactionError::Invalid(crate::package::Error::InvalidFormat(message.into()))
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(crate::package::Error::InvalidFormat(message.into()))
 }

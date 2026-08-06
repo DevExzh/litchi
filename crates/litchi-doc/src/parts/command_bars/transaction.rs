@@ -86,13 +86,13 @@ impl Transaction {
     }
 
     /// Replaces the complete optional command-bar range atomically.
-    pub fn set(&mut self, command_bars: Option<CommandBars<'_>>) -> Result<(), TransactionError> {
-        self.working = Snapshot::new(command_bars).map_err(TransactionError::Invalid)?;
+    pub fn set(&mut self, command_bars: Option<CommandBars<'_>>) -> Result<(), Error> {
+        self.working = Snapshot::new(command_bars).map_err(Error::Invalid)?;
         Ok(())
     }
 
     /// Replaces the complete command-bar range while keeping it present.
-    pub fn replace(&mut self, command_bars: CommandBars<'_>) -> Result<(), TransactionError> {
+    pub fn replace(&mut self, command_bars: CommandBars<'_>) -> Result<(), Error> {
         self.set(Some(command_bars))
     }
 
@@ -102,7 +102,7 @@ impl Transaction {
     }
 
     /// Commits the staged edit and returns its reversible semantic patch.
-    pub fn commit(self) -> Result<Commit, TransactionError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         Ok(Commit {
             before: self.before,
             after: self.working,
@@ -141,9 +141,9 @@ impl Commit {
     }
 
     /// Applies this patch only to the exact source snapshot.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, TransactionError> {
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source != &self.before {
-            return Err(TransactionError::Conflict);
+            return Err(Error::Conflict);
         }
         Ok(self.after.clone())
     }
@@ -160,14 +160,14 @@ impl Commit {
 
 /// Errors produced while staging or applying a command-bar edit.
 #[derive(Debug)]
-pub enum TransactionError {
+pub enum Error {
     /// The candidate violates a bounded command-bar invariant.
     Invalid(PackageError),
     /// The transaction was created from a different snapshot.
     Conflict,
 }
 
-impl std::fmt::Display for TransactionError {
+impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
@@ -176,4 +176,4 @@ impl std::fmt::Display for TransactionError {
     }
 }
 
-impl std::error::Error for TransactionError {}
+impl std::error::Error for Error {}

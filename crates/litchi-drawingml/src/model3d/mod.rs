@@ -23,7 +23,7 @@ pub use model::{
     Blip, Child, Id, Inert, Metadata, Namespace, Raster, RasterChild, Reference, ValueError,
 };
 pub use package::{Relationship, Resolver, Target};
-pub use validation::{ValidationError, validate, validate_relationships};
+pub use validation::{Error, validate, validate_relationships};
 
 /// Microsoft 2017 3D-model namespace defined by `[MS-ODRAWXML]` §2.31.
 pub const NAMESPACE: &str = "http://schemas.microsoft.com/office/drawing/2017/model3d";

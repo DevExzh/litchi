@@ -19,7 +19,9 @@ pub use model::{
     TableDiffFlags, TextDiffFlags, Unknown,
 };
 
-pub use package::{MAX_PACKAGE_BYTES, PackageCommit, PackagePatch, PackageSnapshot};
+pub use package::{
+    Commit as PackageCommit, MAX_PACKAGE_BYTES, Patch as PackagePatch, Snapshot as PackageSnapshot,
+};
 pub use transaction::{Change, ChangeKind, Commit, Editor, Patch, Revision, Snapshot};
 
 #[cfg(test)]

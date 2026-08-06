@@ -19,14 +19,14 @@ use crate::package::Error as PackageError;
 
 /// Errors produced by a staged tracked-revision edit or source-checked patch.
 #[derive(Debug)]
-pub enum TransactionError {
+pub enum Error {
     /// The candidate violates a DOC, CFB, resource, or SPRM invariant.
     Invalid(PackageError),
     /// A patch was applied to a snapshot other than its exact source.
     Conflict,
 }
 
-impl std::fmt::Display for TransactionError {
+impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
@@ -35,12 +35,12 @@ impl std::fmt::Display for TransactionError {
     }
 }
 
-impl std::error::Error for TransactionError {}
+impl std::error::Error for Error {}
 
-impl From<PackageError> for TransactionError {
+impl From<PackageError> for Error {
     fn from(error: PackageError) -> Self {
         Self::Invalid(error)
     }
 }
 
-type Result<T> = std::result::Result<T, TransactionError>;
+type Result<T> = std::result::Result<T, Error>;

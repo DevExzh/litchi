@@ -143,11 +143,7 @@ impl TablePatch {
     /// Every byte outside the owned ranges is copied unchanged. The returned
     /// vector may grow or shrink when a string or table count changes. FIB
     /// pointer updates remain the caller's responsibility.
-    pub fn apply(
-        &self,
-        table_stream: &[u8],
-        main_document_chars: u32,
-    ) -> Result<Vec<u8>, PatchError> {
+    pub fn apply(&self, table_stream: &[u8], main_document_chars: u32) -> Result<Vec<u8>, Error> {
         self.before
             .context
             .check_stream(table_stream, main_document_chars)?;
@@ -162,7 +158,7 @@ impl TablePatch {
                         .checked_sub(replacement.range.length)
                         .and_then(|length| length.checked_add(replacement.after.len()))
                         .ok_or_else(|| {
-                            PatchError::Invalid("patched table stream length overflows".to_string())
+                            Error::Invalid("patched table stream length overflows".to_string())
                         })
                 })?;
         let mut output = Vec::with_capacity(output_len);
@@ -172,19 +168,19 @@ impl TablePatch {
                 table_stream
                     .get(cursor..replacement.range.offset)
                     .ok_or_else(|| {
-                        PatchError::Invalid("table patch range is not ordered".to_string())
+                        Error::Invalid("table patch range is not ordered".to_string())
                     })?,
             );
             output.extend_from_slice(&replacement.after);
             cursor = replacement
                 .range
                 .end()
-                .ok_or_else(|| PatchError::Invalid("table patch range overflows".to_string()))?;
+                .ok_or_else(|| Error::Invalid("table patch range overflows".to_string()))?;
         }
         output.extend_from_slice(
             table_stream
                 .get(cursor..)
-                .ok_or_else(|| PatchError::Invalid("table patch cursor is invalid".to_string()))?,
+                .ok_or_else(|| Error::Invalid("table patch cursor is invalid".to_string()))?,
         );
 
         self.after
@@ -194,7 +190,7 @@ impl TablePatch {
         Ok(output)
     }
 
-    fn replacements(&self) -> Result<Vec<Replacement>, PatchError> {
+    fn replacements(&self) -> Result<Vec<Replacement>, Error> {
         let mut replacements = Vec::with_capacity(2);
         if let (Some(range), Some(_before), Some(after)) = (
             self.before.context.ranges.referenced_files,
@@ -221,9 +217,9 @@ impl TablePatch {
             let previous_end = pair[0]
                 .range
                 .end()
-                .ok_or_else(|| PatchError::Invalid("table patch range overflows".to_string()))?;
+                .ok_or_else(|| Error::Invalid("table patch range overflows".to_string()))?;
             if previous_end > pair[1].range.offset {
-                return Err(PatchError::Invalid(
+                return Err(Error::Invalid(
                     "PlcfWKB and SttbFnm source ranges overlap".to_string(),
                 ));
             }
@@ -234,7 +230,7 @@ impl TablePatch {
 
 /// A checked failure while applying a bounded table patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PatchError {
+pub enum Error {
     /// The caller supplied a stream, range, fingerprint, or `ccpText` that is
     /// not the source captured by this patch.
     SourceConflict(String),
@@ -242,7 +238,7 @@ pub enum PatchError {
     Invalid(String),
 }
 
-impl fmt::Display for PatchError {
+impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::SourceConflict(message) => {
@@ -255,7 +251,7 @@ impl fmt::Display for PatchError {
     }
 }
 
-impl std::error::Error for PatchError {}
+impl std::error::Error for Error {}
 
 #[derive(Debug, Clone)]
 struct Replacement {
@@ -277,7 +273,7 @@ impl WireImage {
         ranges: SourceRanges,
         referenced_files: Option<&[u8]>,
         subdocuments: Option<&[u8]>,
-    ) -> Result<Self, PatchError> {
+    ) -> Result<Self, Error> {
         let context = SourceContext::capture(table_stream, main_document_chars, ranges)?;
         Ok(Self {
             context,
@@ -334,7 +330,7 @@ impl WireImage {
         })
     }
 
-    fn check_source_slices(&self, table_stream: &[u8]) -> Result<(), PatchError> {
+    fn check_source_slices(&self, table_stream: &[u8]) -> Result<(), Error> {
         for (range, expected, name) in [
             (
                 self.context.ranges.referenced_files,
@@ -351,18 +347,16 @@ impl WireImage {
                 (Some(range), Some(expected)) => {
                     let actual = table_stream.get(
                         range.offset..range.end().ok_or_else(|| {
-                            PatchError::Invalid(format!("{name} source range overflows"))
+                            Error::Invalid(format!("{name} source range overflows"))
                         })?,
                     );
                     if actual != Some(expected) {
-                        return Err(PatchError::SourceConflict(format!(
-                            "{name} source bytes differ"
-                        )));
+                        return Err(Error::SourceConflict(format!("{name} source bytes differ")));
                     }
                 },
                 (None, None) => {},
                 _ => {
-                    return Err(PatchError::SourceConflict(format!(
+                    return Err(Error::SourceConflict(format!(
                         "{name} source presence differs"
                     )));
                 },
@@ -377,15 +371,15 @@ impl SourceContext {
         table_stream: &[u8],
         main_document_chars: u32,
         ranges: SourceRanges,
-    ) -> Result<Self, PatchError> {
+    ) -> Result<Self, Error> {
         let ordered = ordered_ranges(ranges)?;
         for pair in ordered.windows(2) {
             let previous_end = pair[0]
                 .1
                 .end()
-                .ok_or_else(|| PatchError::Invalid("table source range overflows".to_string()))?;
+                .ok_or_else(|| Error::Invalid("table source range overflows".to_string()))?;
             if previous_end > pair[1].1.offset {
-                return Err(PatchError::Invalid(
+                return Err(Error::Invalid(
                     "PlcfWKB and SttbFnm source ranges overlap".to_string(),
                 ));
             }
@@ -393,9 +387,9 @@ impl SourceContext {
         for (_, range) in &ordered {
             let end = range
                 .end()
-                .ok_or_else(|| PatchError::Invalid("table source range overflows".to_string()))?;
+                .ok_or_else(|| Error::Invalid("table source range overflows".to_string()))?;
             if end > table_stream.len() {
-                return Err(PatchError::Invalid(
+                return Err(Error::Invalid(
                     "table source range exceeds the table stream".to_string(),
                 ));
             }
@@ -430,16 +424,16 @@ impl SourceContext {
         })
     }
 
-    fn check_stream(self, table_stream: &[u8], main_document_chars: u32) -> Result<(), PatchError> {
+    fn check_stream(self, table_stream: &[u8], main_document_chars: u32) -> Result<(), Error> {
         if self.main_document_chars != main_document_chars {
-            return Err(PatchError::SourceConflict(
+            return Err(Error::SourceConflict(
                 "main-document character count differs".to_string(),
             ));
         }
         if self.table_stream_length != table_stream.len()
             || self.fingerprint != fingerprint(table_stream)
         {
-            return Err(PatchError::SourceConflict(
+            return Err(Error::SourceConflict(
                 "table-stream context differs".to_string(),
             ));
         }
@@ -447,7 +441,7 @@ impl SourceContext {
     }
 }
 
-fn ordered_ranges(ranges: SourceRanges) -> Result<Vec<(&'static str, TableRange)>, PatchError> {
+fn ordered_ranges(ranges: SourceRanges) -> Result<Vec<(&'static str, TableRange)>, Error> {
     let mut ordered = Vec::with_capacity(2);
     if let Some(range) = ranges.referenced_files {
         ordered.push(("SttbFnm", range));
@@ -462,15 +456,15 @@ fn ordered_ranges(ranges: SourceRanges) -> Result<Vec<(&'static str, TableRange)
 fn gap_fingerprints(
     table_stream: &[u8],
     ordered: &[(&'static str, TableRange)],
-) -> Result<[Fingerprint; 3], PatchError> {
+) -> Result<[Fingerprint; 3], Error> {
     let mut gaps = [Fingerprint::empty(); 3];
     let mut cursor = 0usize;
     for (index, (_, range)) in ordered.iter().enumerate() {
         let end = range
             .end()
-            .ok_or_else(|| PatchError::Invalid("table source range overflows".to_string()))?;
+            .ok_or_else(|| Error::Invalid("table source range overflows".to_string()))?;
         if index >= gaps.len() || range.offset < cursor {
-            return Err(PatchError::Invalid(
+            return Err(Error::Invalid(
                 "table source ranges are not disjoint".to_string(),
             ));
         }
@@ -478,9 +472,7 @@ fn gap_fingerprints(
         cursor = end;
     }
     if ordered.len() >= gaps.len() {
-        return Err(PatchError::Invalid(
-            "too many owned table ranges".to_string(),
-        ));
+        return Err(Error::Invalid("too many owned table ranges".to_string()));
     }
     gaps[ordered.len()] = fingerprint(&table_stream[cursor..]);
     Ok(gaps)
@@ -610,7 +602,7 @@ fn compose_fingerprint(
     gaps: &[Fingerprint; 3],
     ordered: &[(&'static str, TableRange)],
     layout: &[u8],
-) -> Result<Fingerprint, PatchError> {
+) -> Result<Fingerprint, Error> {
     let mut result = Fingerprint::empty();
     let mut layout_offset = 0usize;
     for (index, (_, range)) in ordered.iter().enumerate() {
@@ -618,18 +610,16 @@ fn compose_fingerprint(
         let table_length = range.length;
         let table = layout
             .get(layout_offset..layout_offset + table_length)
-            .ok_or_else(|| {
-                PatchError::Invalid("encoded table layout is inconsistent".to_string())
-            })?;
+            .ok_or_else(|| Error::Invalid("encoded table layout is inconsistent".to_string()))?;
         result = concat(result, fingerprint(table))?;
         layout_offset = layout_offset
             .checked_add(table_length)
-            .ok_or_else(|| PatchError::Invalid("encoded table layout overflows".to_string()))?;
+            .ok_or_else(|| Error::Invalid("encoded table layout overflows".to_string()))?;
     }
     concat(result, gaps[ordered.len()])
 }
 
-fn concat(left: Fingerprint, right: Fingerprint) -> Result<Fingerprint, PatchError> {
+fn concat(left: Fingerprint, right: Fingerprint) -> Result<Fingerprint, Error> {
     let pow_a = power(HASH_BASE_A, right.length);
     let pow_b = power(HASH_BASE_B, right.length);
     Ok(Fingerprint {
@@ -638,7 +628,7 @@ fn concat(left: Fingerprint, right: Fingerprint) -> Result<Fingerprint, PatchErr
         length: left
             .length
             .checked_add(right.length)
-            .ok_or_else(|| PatchError::Invalid("fingerprint length overflows".to_string()))?,
+            .ok_or_else(|| Error::Invalid("fingerprint length overflows".to_string()))?,
     })
 }
 

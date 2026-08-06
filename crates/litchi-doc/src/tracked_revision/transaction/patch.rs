@@ -1,7 +1,7 @@
 //! Source-checked reversible DOC tracked-revision patches.
 
 use super::snapshot::{Snapshot, fingerprint};
-use super::{Result, TransactionError};
+use super::{Error, Result};
 
 /// A reversible replacement of a complete validated DOC artifact.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,7 +56,7 @@ impl Patch {
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.fingerprint() != self.before_fingerprint || source.bytes() != self.before.bytes()
         {
-            return Err(TransactionError::Conflict);
+            return Err(Error::Conflict);
         }
         if self.is_noop() {
             return Ok(source.clone());

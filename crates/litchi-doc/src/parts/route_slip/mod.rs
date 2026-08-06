@@ -22,10 +22,10 @@ mod tests;
 
 pub use codec::{parse, parse_bytes, to_bytes};
 pub use model::{DeliveryOption, EditKind, Metadata, NarrowString, Protection, Recipient};
-pub use package::{Editor, PackageCommit, PackageSnapshot};
+pub use package::{Commit as PackageCommit, Editor, Snapshot as PackageSnapshot};
 pub use transaction::{
-    Commit, Patch, RecipientSelectionError, RecipientSelector, Snapshot, Transaction,
-    TransactionError,
+    Commit, Error as TransactionError, Patch, RecipientSelectionError, RecipientSelector, Snapshot,
+    Transaction,
 };
 
 /// FIB index of `fcRouteSlip`/`lcbRouteSlip` in `FibRgFcLcb97`.

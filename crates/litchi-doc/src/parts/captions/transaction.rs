@@ -98,40 +98,39 @@ impl Transaction {
     }
 
     /// Replaces both caption tables as one validated operation.
-    pub fn replace(&mut self, tables: Tables) -> Result<(), TransactionError> {
-        self.working = Snapshot::new(tables).map_err(TransactionError::Invalid)?;
+    pub fn replace(&mut self, tables: Tables) -> Result<(), Error> {
+        self.working = Snapshot::new(tables).map_err(Error::Invalid)?;
         Ok(())
     }
 
     /// Replaces the label definitions while retaining automatic-caption rules.
-    pub fn replace_labels(&mut self, labels: LabelTable) -> Result<(), TransactionError> {
-        let tables = Tables::try_new(Some(labels), self.working.auto().cloned())
-            .map_err(TransactionError::Invalid)?;
-        self.working = Snapshot::new(tables).map_err(TransactionError::Invalid)?;
+    pub fn replace_labels(&mut self, labels: LabelTable) -> Result<(), Error> {
+        let tables =
+            Tables::try_new(Some(labels), self.working.auto().cloned()).map_err(Error::Invalid)?;
+        self.working = Snapshot::new(tables).map_err(Error::Invalid)?;
         Ok(())
     }
 
     /// Replaces automatic-caption rules while retaining label definitions.
-    pub fn replace_auto(&mut self, auto: AutoTable) -> Result<(), TransactionError> {
-        let tables = Tables::try_new(self.working.labels().cloned(), Some(auto))
-            .map_err(TransactionError::Invalid)?;
-        self.working = Snapshot::new(tables).map_err(TransactionError::Invalid)?;
+    pub fn replace_auto(&mut self, auto: AutoTable) -> Result<(), Error> {
+        let tables =
+            Tables::try_new(self.working.labels().cloned(), Some(auto)).map_err(Error::Invalid)?;
+        self.working = Snapshot::new(tables).map_err(Error::Invalid)?;
         Ok(())
     }
 
     /// Removes the label range. Non-empty rules that would dangle are rejected.
-    pub fn clear_labels(&mut self) -> Result<(), TransactionError> {
-        let tables = Tables::try_new(None, self.working.auto().cloned())
-            .map_err(TransactionError::Invalid)?;
-        self.working = Snapshot::new(tables).map_err(TransactionError::Invalid)?;
+    pub fn clear_labels(&mut self) -> Result<(), Error> {
+        let tables = Tables::try_new(None, self.working.auto().cloned()).map_err(Error::Invalid)?;
+        self.working = Snapshot::new(tables).map_err(Error::Invalid)?;
         Ok(())
     }
 
     /// Removes the automatic-caption range while retaining labels.
-    pub fn clear_auto(&mut self) -> Result<(), TransactionError> {
-        let tables = Tables::try_new(self.working.labels().cloned(), None)
-            .map_err(TransactionError::Invalid)?;
-        self.working = Snapshot::new(tables).map_err(TransactionError::Invalid)?;
+    pub fn clear_auto(&mut self) -> Result<(), Error> {
+        let tables =
+            Tables::try_new(self.working.labels().cloned(), None).map_err(Error::Invalid)?;
+        self.working = Snapshot::new(tables).map_err(Error::Invalid)?;
         Ok(())
     }
 
@@ -141,7 +140,7 @@ impl Transaction {
     }
 
     /// Commits the staged semantic edit and returns its reversible patch.
-    pub fn commit(self) -> Result<Commit, TransactionError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         Ok(Commit {
             before: self.before,
             after: self.working,
@@ -180,9 +179,9 @@ impl Commit {
     }
 
     /// Applies this patch to the exact source snapshot.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, TransactionError> {
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source != &self.before {
-            return Err(TransactionError::Conflict);
+            return Err(Error::Conflict);
         }
         Ok(self.after.clone())
     }
@@ -199,14 +198,14 @@ impl Commit {
 
 /// Errors produced while staging or applying a caption edit.
 #[derive(Debug)]
-pub enum TransactionError {
+pub enum Error {
     /// The candidate violates a bounded caption invariant.
     Invalid(PackageError),
     /// The transaction was created from a different snapshot.
     Conflict,
 }
 
-impl std::fmt::Display for TransactionError {
+impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
@@ -215,4 +214,4 @@ impl std::fmt::Display for TransactionError {
     }
 }
 
-impl std::error::Error for TransactionError {}
+impl std::error::Error for Error {}

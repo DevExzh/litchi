@@ -2,7 +2,10 @@
 
 use super::codec;
 use super::model::CommandBars;
-use super::transaction::{Commit, Snapshot, Transaction, TransactionError};
+use super::transaction::{
+    Commit as TransactionCommit, Error as TransactionError, Snapshot as TransactionSnapshot,
+    Transaction,
+};
 use super::validation;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
@@ -53,13 +56,13 @@ pub fn write(
 
 /// An immutable DOC package snapshot carrying its command-bar metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PackageSnapshot {
+pub struct Snapshot {
     bytes: Vec<u8>,
-    command_bars: Snapshot,
+    command_bars: TransactionSnapshot,
 }
 
-impl PackageSnapshot {
-    fn new(bytes: Vec<u8>, command_bars: Snapshot) -> Self {
+impl Snapshot {
+    fn new(bytes: Vec<u8>, command_bars: TransactionSnapshot) -> Self {
         Self {
             bytes,
             command_bars,
@@ -68,7 +71,7 @@ impl PackageSnapshot {
 
     /// Returns the immutable semantic command-bar snapshot.
     #[must_use]
-    pub fn command_bars(&self) -> &Snapshot {
+    pub fn command_bars(&self) -> &TransactionSnapshot {
         &self.command_bars
     }
 
@@ -86,22 +89,22 @@ impl PackageSnapshot {
 
 /// A package commit containing semantic and reversible OLE byte patches.
 #[derive(Debug, Clone)]
-pub struct PackageCommit {
-    snapshot: PackageSnapshot,
-    patch: Commit,
+pub struct Commit {
+    snapshot: Snapshot,
+    patch: TransactionCommit,
     package_patch: ObjectPatch,
 }
 
-impl PackageCommit {
+impl Commit {
     /// The immutable post-edit package snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &PackageSnapshot {
+    pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// The reversible semantic command-bar patch.
     #[must_use]
-    pub fn patch(&self) -> &Commit {
+    pub fn patch(&self) -> &TransactionCommit {
         &self.patch
     }
 
@@ -113,7 +116,7 @@ impl PackageCommit {
 
     /// Splits the package snapshot, semantic patch, and CFB byte patch.
     #[must_use]
-    pub fn into_parts(self) -> (PackageSnapshot, Commit, ObjectPatch) {
+    pub fn into_parts(self) -> (Snapshot, TransactionCommit, ObjectPatch) {
         (self.snapshot, self.patch, self.package_patch)
     }
 }
@@ -123,8 +126,8 @@ impl PackageCommit {
 pub struct Editor {
     package: ObjectEditor,
     table_name: String,
-    original: Snapshot,
-    command_bars: Snapshot,
+    original: TransactionSnapshot,
+    command_bars: TransactionSnapshot,
     changed: bool,
 }
 
@@ -152,7 +155,7 @@ impl Editor {
         let table = package
             .stream(&[table_name.to_owned()])
             .ok_or_else(|| PackageError::StreamNotFound(table_name.to_owned()))?;
-        let command_bars = Snapshot::new(parse(&fib, table)?)?;
+        let command_bars = TransactionSnapshot::new(parse(&fib, table)?)?;
         Ok(Self {
             package,
             table_name: table_name.to_owned(),
@@ -164,7 +167,7 @@ impl Editor {
 
     /// Returns the current immutable semantic command-bar snapshot.
     #[must_use]
-    pub fn command_bars(&self) -> &Snapshot {
+    pub fn command_bars(&self) -> &TransactionSnapshot {
         &self.command_bars
     }
 
@@ -181,12 +184,12 @@ impl Editor {
     }
 
     /// Sets or replaces the complete command-bar range atomically.
-    pub fn set(&mut self, command_bars: CommandBars<'_>) -> Result<PackageCommit> {
-        self.install(Snapshot::new(Some(command_bars))?)
+    pub fn set(&mut self, command_bars: CommandBars<'_>) -> Result<Commit> {
+        self.install(TransactionSnapshot::new(Some(command_bars))?)
     }
 
     /// Replaces existing command-bar metadata, rejecting an absent range.
-    pub fn replace(&mut self, command_bars: CommandBars<'_>) -> Result<PackageCommit> {
+    pub fn replace(&mut self, command_bars: CommandBars<'_>) -> Result<Commit> {
         if !self.command_bars.is_present() {
             return Err(PackageError::InvalidFormat(
                 "cannot replace missing command-bar metadata".into(),
@@ -196,7 +199,7 @@ impl Editor {
     }
 
     /// Applies and publishes a semantic transaction atomically.
-    pub fn apply(&mut self, transaction: Transaction) -> Result<PackageCommit> {
+    pub fn apply(&mut self, transaction: Transaction) -> Result<Commit> {
         let commit = transaction.commit().map_err(transaction_error)?;
         if commit.before() != &self.command_bars {
             return Err(PackageError::InvalidFormat(
@@ -207,16 +210,16 @@ impl Editor {
     }
 
     /// Clears the command-bar FIB range while preserving its old table bytes.
-    pub fn clear(&mut self) -> Result<PackageCommit> {
+    pub fn clear(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.clear();
         self.apply(transaction)
     }
 
     /// Captures the current package as an immutable snapshot.
-    pub fn snapshot(&self) -> Result<PackageSnapshot> {
+    pub fn snapshot(&self) -> Result<Snapshot> {
         let bytes = self.package.clone().finish().map_err(PackageError::from)?;
-        Ok(PackageSnapshot::new(bytes, self.command_bars.clone()))
+        Ok(Snapshot::new(bytes, self.command_bars.clone()))
     }
 
     /// Finishes the edit and returns rendered DOC bytes.
@@ -225,20 +228,20 @@ impl Editor {
     }
 
     /// Commits the package as an immutable snapshot with reversible patches.
-    pub fn commit(self) -> Result<PackageCommit> {
-        let patch = Commit::new(self.original, self.command_bars.clone());
+    pub fn commit(self) -> Result<Commit> {
+        let patch = TransactionCommit::new(self.original, self.command_bars.clone());
         let object_commit = self.package.commit().map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
         let package_patch = object_commit.into_patch();
-        Ok(PackageCommit {
-            snapshot: PackageSnapshot::new(bytes, self.command_bars),
+        Ok(Commit {
+            snapshot: Snapshot::new(bytes, self.command_bars),
             patch,
             package_patch,
         })
     }
 
-    fn install(&mut self, snapshot: Snapshot) -> Result<PackageCommit> {
-        let patch = Commit::new(self.command_bars.clone(), snapshot.clone());
+    fn install(&mut self, snapshot: TransactionSnapshot) -> Result<Commit> {
+        let patch = TransactionCommit::new(self.command_bars.clone(), snapshot.clone());
         if patch.is_noop() {
             let package_patch = self
                 .package
@@ -246,7 +249,7 @@ impl Editor {
                 .commit()
                 .map_err(PackageError::from)?
                 .into_patch();
-            return Ok(PackageCommit {
+            return Ok(Commit {
                 snapshot: self.snapshot()?,
                 patch,
                 package_patch,
@@ -264,16 +267,16 @@ impl Editor {
             .map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
         let package_patch = object_commit.into_patch();
-        let package_snapshot = PackageSnapshot::new(bytes, candidate.command_bars.clone());
+        let package_snapshot = Snapshot::new(bytes, candidate.command_bars.clone());
         *self = candidate;
-        Ok(PackageCommit {
+        Ok(Commit {
             snapshot: package_snapshot,
             patch,
             package_patch,
         })
     }
 
-    fn write_snapshot(&mut self, snapshot: &Snapshot) -> Result<()> {
+    fn write_snapshot(&mut self, snapshot: &TransactionSnapshot) -> Result<()> {
         let word_path = vec!["WordDocument".to_owned()];
         let table_path = vec![self.table_name.clone()];
         let mut word = self
@@ -303,7 +306,7 @@ impl Editor {
         }
 
         let reparsed_fib = FileInformationBlock::parse(&word)?;
-        let reparsed = Snapshot::new(parse(&reparsed_fib, &table)?)?;
+        let reparsed = TransactionSnapshot::new(parse(&reparsed_fib, &table)?)?;
         if &reparsed != snapshot {
             return Err(PackageError::Corrupted(
                 "command-bar snapshot failed FIB/table-stream round-trip validation".into(),

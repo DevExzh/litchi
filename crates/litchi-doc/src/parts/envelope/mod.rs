@@ -11,8 +11,8 @@ pub use model::{
     PropertyValue, RecipientCollection, RecipientProperties, RecipientProperty, SecurityFlags,
     Sensitivity, Text, Version,
 };
-pub use package::{Editor, PackageCommit, PackageSnapshot};
-pub use transaction::{Commit, Patch, Snapshot, Transaction, TransactionError};
+pub use package::{Commit as PackageCommit, Editor, Snapshot as PackageSnapshot};
+pub use transaction::{Commit, Error as TransactionError, Patch, Snapshot, Transaction};
 
 /// FIB index of `fcMsoEnvelope`/`lcbMsoEnvelope` in `FibRgFcLcb2000`.
 pub const FIB_INDEX: usize = validation::FIB_INDEX;

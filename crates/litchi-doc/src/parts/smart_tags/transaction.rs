@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use super::Limits;
 
-type TxResult<T> = Result<T, TransactionError>;
+type TxResult<T> = Result<T, Error>;
 
 /// An immutable snapshot of the selected Word table stream and its FIB.
 ///
@@ -482,7 +482,7 @@ impl Transaction {
     pub fn snapshot(&self) -> TxResult<Snapshot> {
         self.source
             .materialize(self.metadata.clone())
-            .map_err(TransactionError::Invalid)
+            .map_err(Error::Invalid)
     }
 
     /// Discard the candidate and recover the immutable source snapshot.
@@ -605,7 +605,7 @@ impl Patch {
     /// Apply only to the exact source snapshot used to create this patch.
     pub fn apply(&self, source: &Snapshot) -> TxResult<Snapshot> {
         if source.fingerprint() != self.before.fingerprint() || source != &self.before {
-            return Err(TransactionError::Conflict);
+            return Err(Error::Conflict);
         }
         Ok(self.after.clone())
     }
@@ -619,14 +619,14 @@ impl Patch {
 
 /// Errors produced by a staged smart-tag edit.
 #[derive(Debug)]
-pub enum TransactionError {
+pub enum Error {
     /// The candidate violates a DOC, MS-OSHARED, or fixed-topology invariant.
     Invalid(PackageError),
     /// The patch was applied to a different source snapshot.
     Conflict,
 }
 
-impl std::fmt::Display for TransactionError {
+impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
@@ -635,9 +635,9 @@ impl std::fmt::Display for TransactionError {
     }
 }
 
-impl std::error::Error for TransactionError {}
+impl std::error::Error for Error {}
 
-impl From<PackageError> for TransactionError {
+impl From<PackageError> for Error {
     fn from(error: PackageError) -> Self {
         Self::Invalid(error)
     }
@@ -651,8 +651,8 @@ fn empty_metadata() -> DocumentSmartTags {
     }
 }
 
-fn invalid(message: impl Into<String>) -> TransactionError {
-    TransactionError::Invalid(PackageError::InvalidFormat(message.into()))
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(PackageError::InvalidFormat(message.into()))
 }
 
 fn corrupted(message: impl Into<String>) -> PackageError {

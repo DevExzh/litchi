@@ -1,6 +1,6 @@
 //! Focused regression tests for the tracked-revision semantic layer.
 
-use super::{Limits, RevisionEditor, RevisionKind, RevisionMetadata, Snapshot, TransactionError};
+use super::{Error, Limits, RevisionEditor, RevisionKind, RevisionMetadata, Snapshot};
 use crate::writer::{CharacterFormatting, ParagraphFormatting, TextRevision, Writer};
 use std::io::Cursor;
 
@@ -169,7 +169,7 @@ fn no_op_inverse_and_stale_source_checks_preserve_exact_bytes() {
     let other = Snapshot::parse(&other_editor.finish().unwrap()).unwrap();
     assert!(matches!(
         committed.patch().apply(&other),
-        Err(TransactionError::Conflict)
+        Err(Error::Conflict)
     ));
 }
 

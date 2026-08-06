@@ -117,9 +117,9 @@ impl Patch {
     }
 
     /// Apply this patch only to its exact source snapshot.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, TransactionError> {
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source != &self.before {
-            return Err(TransactionError::Conflict);
+            return Err(Error::Conflict);
         }
         Ok(self.after.clone())
     }
@@ -191,20 +191,20 @@ impl Transaction {
     }
 
     /// Replace the complete optional FIB range atomically.
-    pub fn set(&mut self, envelope: Option<Envelope>) -> Result<(), TransactionError> {
-        self.working = Snapshot::from_option(envelope).map_err(TransactionError::Invalid)?;
+    pub fn set(&mut self, envelope: Option<Envelope>) -> Result<(), Error> {
+        self.working = Snapshot::from_option(envelope).map_err(Error::Invalid)?;
         Ok(())
     }
 
     /// Replace the present envelope, rejecting an absent range only at the
     /// package facade; detached transactions may also create the range.
-    pub fn replace(&mut self, envelope: Envelope) -> Result<(), TransactionError> {
+    pub fn replace(&mut self, envelope: Envelope) -> Result<(), Error> {
         self.set(Some(envelope))
     }
 
     /// Replace the supported Office message body under the known CLSID.
-    pub fn set_message(&mut self, message: Message) -> Result<(), TransactionError> {
-        self.replace(Envelope::from_message(message).map_err(TransactionError::Invalid)?)
+    pub fn set_message(&mut self, message: Message) -> Result<(), Error> {
+        self.replace(Envelope::from_message(message).map_err(Error::Invalid)?)
     }
 
     /// Clone-first update of the supported Office message body.
@@ -212,17 +212,13 @@ impl Transaction {
     /// The closure never receives the transaction's live state. The edited
     /// clone is validated before it becomes the staged snapshot, so a failed
     /// edit leaves the transaction unchanged.
-    pub fn update_message<F>(&mut self, edit: F) -> Result<(), TransactionError>
+    pub fn update_message<F>(&mut self, edit: F) -> Result<(), Error>
     where
         F: FnOnce(&mut Message),
     {
-        let envelope = self
-            .working
-            .envelope
-            .as_ref()
-            .ok_or(TransactionError::Missing)?;
+        let envelope = self.working.envelope.as_ref().ok_or(Error::Missing)?;
         let Payload::Message(message) = envelope.payload() else {
-            return Err(TransactionError::Unsupported);
+            return Err(Error::Unsupported);
         };
         let mut message = message.as_ref().clone();
         edit(&mut message);
@@ -235,7 +231,7 @@ impl Transaction {
     }
 
     /// Commit the staged state into a reversible semantic patch.
-    pub fn commit(self) -> Result<Commit, TransactionError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let patch = Patch::new(self.before, self.working.clone());
         Ok(Commit::new(self.working, patch))
     }
@@ -243,7 +239,7 @@ impl Transaction {
 
 /// Failure modes for semantic envelope edits.
 #[derive(Debug)]
-pub enum TransactionError {
+pub enum Error {
     /// The candidate violates a bounded `[MS-DOC]`/`[MS-OSHARED]` invariant.
     Invalid(PackageError),
     /// The patch or package transaction was created from a different snapshot.
@@ -254,7 +250,7 @@ pub enum TransactionError {
     Unsupported,
 }
 
-impl fmt::Display for TransactionError {
+impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
@@ -267,9 +263,9 @@ impl fmt::Display for TransactionError {
     }
 }
 
-impl std::error::Error for TransactionError {}
+impl std::error::Error for Error {}
 
-impl From<PackageError> for TransactionError {
+impl From<PackageError> for Error {
     fn from(error: PackageError) -> Self {
         Self::Invalid(error)
     }

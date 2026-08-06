@@ -23,9 +23,9 @@ mod tests;
 pub use model::{
     Collection, FileNameKey, FileNameKeyError, FileNameMetadata, Kind, Name, Reference,
 };
-pub use package::{Editor, PackageCommit, PackageSnapshot};
-pub use patch::{PatchError, SourceContext, SourceRanges, TablePatch, TableRange};
+pub use package::{Commit as PackageCommit, Editor, Snapshot as PackageSnapshot};
+pub use patch::{Error as PatchError, SourceContext, SourceRanges, TablePatch, TableRange};
 pub use transaction::{
-    Commit, FileNameSelector, Patch, ReferenceSelector, SelectionError, Snapshot, Transaction,
-    TransactionError,
+    Commit, Error as TransactionError, FileNameSelector, Patch, ReferenceSelector, SelectionError,
+    Snapshot, Transaction,
 };

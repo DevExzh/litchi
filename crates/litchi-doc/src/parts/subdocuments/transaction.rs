@@ -5,7 +5,7 @@ use super::codec::{self, PLCF_WKB, STTB_FNM, WKB_FLAGS_REQUIRED, WKB_OUTLINE_LEV
 use super::model::{
     Collection, FileNameKey, FileNameKeyError, FileNameMetadata, Kind, Name, Reference,
 };
-use super::patch::{PatchError, SourceContext, SourceRanges, TablePatch, WireImage};
+use super::patch::{Error as PatchError, SourceContext, SourceRanges, TablePatch, WireImage};
 use super::validation;
 use crate::package::{Error as PackageError, Result as PackageResult};
 use crate::parts::fib::FileInformationBlock;
@@ -208,7 +208,7 @@ impl Transaction {
         kind: Kind,
         path: impl Into<String>,
         metadata: FileNameMetadata,
-    ) -> Result<FileNameKey, TransactionError> {
+    ) -> Result<FileNameKey, Error> {
         let mut candidate = self.working.collection.clone();
         let key = allocate_key(&candidate, kind)?;
         candidate.referenced_files.push(Name {
@@ -234,9 +234,9 @@ impl Transaction {
         start: u32,
         path: impl Into<String>,
         metadata: FileNameMetadata,
-    ) -> Result<FileNameKey, TransactionError> {
+    ) -> Result<FileNameKey, Error> {
         if self.working.wire.context.ranges().subdocuments().is_none() {
-            return Err(TransactionError::Unsupported(
+            return Err(Error::Unsupported(
                 "the source has no PlcfWKB slice; adding one requires a FIB/package writer",
             ));
         }
@@ -275,14 +275,14 @@ impl Transaction {
         selector: FileNameSelector,
         path: impl Into<String>,
         metadata: FileNameMetadata,
-    ) -> Result<(), TransactionError> {
+    ) -> Result<(), Error> {
         let index = self.resolve_file_name(selector)?;
         let mut candidate = self.working.collection.clone();
         let file_count = candidate.referenced_files.len();
         let file = candidate
             .referenced_files
             .get_mut(index)
-            .ok_or(TransactionError::Selection(SelectionError::FileNameIndex {
+            .ok_or(Error::Selection(SelectionError::FileNameIndex {
                 index,
                 len: file_count,
             }))?;
@@ -299,7 +299,7 @@ impl Transaction {
         &mut self,
         selector: FileNameSelector,
         path: impl Into<String>,
-    ) -> Result<(), TransactionError> {
+    ) -> Result<(), Error> {
         let index = self.resolve_file_name(selector)?;
         let metadata = self.working.collection.referenced_files[index].metadata();
         self.update_file_name(selector, path, metadata)
@@ -311,7 +311,7 @@ impl Transaction {
         &mut self,
         selector: FileNameSelector,
         identifier: u16,
-    ) -> Result<FileNameKey, TransactionError> {
+    ) -> Result<FileNameKey, Error> {
         let index = self.resolve_file_name(selector)?;
         let mut candidate = self.working.collection.clone();
         let old_key = candidate.referenced_files[index].key();
@@ -322,7 +322,7 @@ impl Transaction {
             .enumerate()
             .any(|(other, file)| other != index && file.key() == key)
         {
-            return Err(TransactionError::Invalid(PackageError::Corrupted(
+            return Err(Error::Invalid(PackageError::Corrupted(
                 "the requested FNPI key is already allocated".to_string(),
             )));
         }
@@ -341,7 +341,7 @@ impl Transaction {
         &mut self,
         selector: ReferenceSelector,
         start: u32,
-    ) -> Result<(), TransactionError> {
+    ) -> Result<(), Error> {
         let index = self.resolve_reference(selector)?;
         let mut candidate = self.working.collection.clone();
         candidate.subdocuments[index].start = start;
@@ -356,11 +356,11 @@ impl Transaction {
         &mut self,
         selector: ReferenceSelector,
         file: FileNameSelector,
-    ) -> Result<(), TransactionError> {
+    ) -> Result<(), Error> {
         let file_index = self.resolve_file_name(file)?;
         let candidate_file = self.working.collection.referenced_files[file_index].clone();
         if candidate_file.kind() != Kind::Subdocument {
-            return Err(TransactionError::Invalid(PackageError::Corrupted(
+            return Err(Error::Invalid(PackageError::Corrupted(
                 "WKB references must use a subdocument FNPI".to_string(),
             )));
         }
@@ -373,10 +373,7 @@ impl Transaction {
 
     /// Removes one WKB entry. Referenced file names remain in `SttbFnm` so
     /// unrelated mail-merge or future owner references are not guessed at.
-    pub fn remove_subdocument(
-        &mut self,
-        selector: ReferenceSelector,
-    ) -> Result<(), TransactionError> {
+    pub fn remove_subdocument(&mut self, selector: ReferenceSelector) -> Result<(), Error> {
         let index = self.resolve_reference(selector)?;
         let mut candidate = self.working.collection.clone();
         candidate.subdocuments.remove(index);
@@ -385,15 +382,15 @@ impl Transaction {
 
     /// Commits the candidate and creates both a semantic patch and a bounded
     /// exact table-stream patch.
-    pub fn commit(self) -> Result<Commit, TransactionError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         validation::collection(&self.working.collection, self.working.main_document_chars)
-            .map_err(TransactionError::Invalid)?;
+            .map_err(Error::Invalid)?;
         let after_wire = WireImage::reencode(
             &self.before.wire,
             &self.working.collection,
             self.working.main_document_chars,
         )
-        .map_err(TransactionError::Invalid)?;
+        .map_err(Error::Invalid)?;
         let after = Snapshot {
             collection: self.working.collection,
             main_document_chars: self.working.main_document_chars,
@@ -411,20 +408,20 @@ impl Transaction {
         })
     }
 
-    fn publish(&mut self, collection: Collection) -> Result<(), TransactionError> {
+    fn publish(&mut self, collection: Collection) -> Result<(), Error> {
         validation::collection(&collection, self.working.main_document_chars)
-            .map_err(TransactionError::Invalid)?;
+            .map_err(Error::Invalid)?;
         self.working.collection = collection;
         Ok(())
     }
 
-    fn resolve_file_name(&self, selector: FileNameSelector) -> Result<usize, TransactionError> {
+    fn resolve_file_name(&self, selector: FileNameSelector) -> Result<usize, Error> {
         match selector {
             FileNameSelector::Index(index) => {
                 if index < self.working.collection.referenced_files.len() {
                     Ok(index)
                 } else {
-                    Err(TransactionError::Selection(SelectionError::FileNameIndex {
+                    Err(Error::Selection(SelectionError::FileNameIndex {
                         index,
                         len: self.working.collection.referenced_files.len(),
                     }))
@@ -436,23 +433,19 @@ impl Transaction {
                 .referenced_files
                 .iter()
                 .position(|file| file.key() == key)
-                .ok_or(TransactionError::Selection(SelectionError::FileNameKey(
-                    key,
-                ))),
+                .ok_or(Error::Selection(SelectionError::FileNameKey(key))),
         }
     }
 
-    fn resolve_reference(&self, selector: ReferenceSelector) -> Result<usize, TransactionError> {
+    fn resolve_reference(&self, selector: ReferenceSelector) -> Result<usize, Error> {
         let index = selector.get();
         if index < self.working.collection.subdocuments.len() {
             Ok(index)
         } else {
-            Err(TransactionError::Selection(
-                SelectionError::ReferenceIndex {
-                    index,
-                    len: self.working.collection.subdocuments.len(),
-                },
-            ))
+            Err(Error::Selection(SelectionError::ReferenceIndex {
+                index,
+                len: self.working.collection.subdocuments.len(),
+            }))
         }
     }
 }
@@ -499,9 +492,9 @@ impl Patch {
     }
 
     /// Applies this semantic patch only to the exact source snapshot.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, TransactionError> {
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source != &self.before {
-            return Err(TransactionError::Conflict);
+            return Err(Error::Conflict);
         }
         Ok(self.after.clone())
     }
@@ -579,7 +572,7 @@ impl std::error::Error for SelectionError {}
 
 /// Errors produced while staging or applying a semantic subdocument edit.
 #[derive(Debug)]
-pub enum TransactionError {
+pub enum Error {
     /// The candidate violates an MS-DOC invariant or wire limit.
     Invalid(PackageError),
     /// A selector could not be resolved.
@@ -593,7 +586,7 @@ pub enum TransactionError {
     Patch(PatchError),
 }
 
-impl fmt::Display for TransactionError {
+impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
@@ -605,21 +598,21 @@ impl fmt::Display for TransactionError {
     }
 }
 
-impl std::error::Error for TransactionError {}
+impl std::error::Error for Error {}
 
-impl From<PackageError> for TransactionError {
+impl From<PackageError> for Error {
     fn from(error: PackageError) -> Self {
         Self::Invalid(error)
     }
 }
 
-impl From<PatchError> for TransactionError {
+impl From<PatchError> for Error {
     fn from(error: PatchError) -> Self {
         Self::Patch(error)
     }
 }
 
-fn allocate_key(collection: &Collection, kind: Kind) -> Result<FileNameKey, TransactionError> {
+fn allocate_key(collection: &Collection, kind: Kind) -> Result<FileNameKey, Error> {
     for identifier in 0..=0x0FFEu16 {
         let key = FileNameKey::try_new(kind, identifier).map_err(key_error)?;
         if !collection
@@ -630,7 +623,7 @@ fn allocate_key(collection: &Collection, kind: Kind) -> Result<FileNameKey, Tran
             return Ok(key);
         }
     }
-    Err(TransactionError::Invalid(PackageError::Corrupted(
+    Err(Error::Invalid(PackageError::Corrupted(
         "no unused FNPI identifier remains".to_string(),
     )))
 }
@@ -641,8 +634,8 @@ fn raw_fnfb(metadata: FileNameMetadata) -> u8 {
         | u8::from(metadata.is_non_file_system_path) * codec::FNFB_NON_FILE_SYS
 }
 
-fn key_error(error: FileNameKeyError) -> TransactionError {
-    TransactionError::Invalid(PackageError::Corrupted(error.to_string()))
+fn key_error(error: FileNameKeyError) -> Error {
+    Error::Invalid(PackageError::Corrupted(error.to_string()))
 }
 
 fn patch_error(error: PatchError) -> PackageError {

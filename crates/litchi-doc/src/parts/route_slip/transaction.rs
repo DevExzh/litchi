@@ -48,7 +48,7 @@ impl std::error::Error for RecipientSelectionError {}
 
 /// Errors produced while staging semantic route-slip edits.
 #[derive(Debug)]
-pub enum TransactionError {
+pub enum Error {
     /// A recipient selector could not be resolved.
     Selection(RecipientSelectionError),
     /// The route-slip protection policy does not permit metadata editing.
@@ -59,7 +59,7 @@ pub enum TransactionError {
     Conflict,
 }
 
-impl fmt::Display for TransactionError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Selection(error) => error.fmt(f),
@@ -72,15 +72,15 @@ impl fmt::Display for TransactionError {
     }
 }
 
-impl std::error::Error for TransactionError {}
+impl std::error::Error for Error {}
 
-impl From<RecipientSelectionError> for TransactionError {
+impl From<RecipientSelectionError> for Error {
     fn from(error: RecipientSelectionError) -> Self {
         Self::Selection(error)
     }
 }
 
-impl From<PackageError> for TransactionError {
+impl From<PackageError> for Error {
     fn from(error: PackageError) -> Self {
         Self::Invalid(error)
     }
@@ -237,9 +237,9 @@ impl Patch {
     }
 
     /// Applies this patch only to its expected source snapshot.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, TransactionError> {
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source != &self.before {
-            return Err(TransactionError::Conflict);
+            return Err(Error::Conflict);
         }
         Ok(self.after.clone())
     }
@@ -311,7 +311,7 @@ impl Transaction {
     }
 
     /// Replaces the route-slip metadata candidate.
-    pub fn set(&mut self, metadata: Metadata) -> Result<(), TransactionError> {
+    pub fn set(&mut self, metadata: Metadata) -> Result<(), Error> {
         self.ensure_editable()?;
         validation::metadata(&metadata)?;
         self.working = Snapshot::from(metadata);
@@ -319,7 +319,7 @@ impl Transaction {
     }
 
     /// Sets the current stage by a checked recipient selector.
-    pub fn set_stage(&mut self, selector: RecipientSelector<'_>) -> Result<(), TransactionError> {
+    pub fn set_stage(&mut self, selector: RecipientSelector<'_>) -> Result<(), Error> {
         let index = self.resolve(selector)?;
         self.ensure_editable()?;
         let metadata = self
@@ -328,7 +328,7 @@ impl Transaction {
             .as_mut()
             .ok_or(RecipientSelectionError::NoMetadata)?;
         metadata.stage = u16::try_from(index).map_err(|_| {
-            TransactionError::Invalid(PackageError::Corrupted(
+            Error::Invalid(PackageError::Corrupted(
                 "recipient index exceeds u16::MAX".into(),
             ))
         })?;
@@ -337,7 +337,7 @@ impl Transaction {
 
     /// Advances to the next recipient without leaving the checked stage
     /// domain. The final recipient cannot advance further.
-    pub fn advance_stage(&mut self) -> Result<usize, TransactionError> {
+    pub fn advance_stage(&mut self) -> Result<usize, Error> {
         self.ensure_editable()?;
         let metadata = self
             .working
@@ -345,15 +345,15 @@ impl Transaction {
             .as_mut()
             .ok_or(RecipientSelectionError::NoMetadata)?;
         let next = usize::from(metadata.stage).checked_add(1).ok_or_else(|| {
-            TransactionError::Invalid(PackageError::Corrupted("route stage overflows".into()))
+            Error::Invalid(PackageError::Corrupted("route stage overflows".into()))
         })?;
         if next >= metadata.recipients.len() {
-            return Err(TransactionError::Invalid(PackageError::Corrupted(
+            return Err(Error::Invalid(PackageError::Corrupted(
                 "route slip is already at its final recipient".into(),
             )));
         }
         metadata.stage = u16::try_from(next).map_err(|_| {
-            TransactionError::Invalid(PackageError::Corrupted(
+            Error::Invalid(PackageError::Corrupted(
                 "recipient index exceeds u16::MAX".into(),
             ))
         })?;
@@ -361,7 +361,7 @@ impl Transaction {
     }
 
     /// Adds a recipient after the existing ordered recipients.
-    pub fn add_recipient(&mut self, recipient: Recipient) -> Result<(), TransactionError> {
+    pub fn add_recipient(&mut self, recipient: Recipient) -> Result<(), Error> {
         self.ensure_editable()?;
         validation::recipient(&recipient)?;
         let metadata = self
@@ -379,7 +379,7 @@ impl Transaction {
         &mut self,
         selector: RecipientSelector<'_>,
         recipient: Recipient,
-    ) -> Result<(), TransactionError> {
+    ) -> Result<(), Error> {
         let index = self.resolve(selector)?;
         self.ensure_editable()?;
         validation::recipient(&recipient)?;
@@ -394,10 +394,7 @@ impl Transaction {
     }
 
     /// Removes one recipient and keeps the current stage valid.
-    pub fn remove_recipient(
-        &mut self,
-        selector: RecipientSelector<'_>,
-    ) -> Result<(), TransactionError> {
+    pub fn remove_recipient(&mut self, selector: RecipientSelector<'_>) -> Result<(), Error> {
         let index = self.resolve(selector)?;
         self.ensure_editable()?;
         let metadata = self
@@ -406,7 +403,7 @@ impl Transaction {
             .as_mut()
             .ok_or(RecipientSelectionError::NoMetadata)?;
         if metadata.recipients.len() == 1 {
-            return Err(TransactionError::Invalid(PackageError::Corrupted(
+            return Err(Error::Invalid(PackageError::Corrupted(
                 "a route slip must retain at least one recipient".into(),
             )));
         }
@@ -423,19 +420,19 @@ impl Transaction {
     }
 
     /// Clears the route-slip metadata from the candidate package state.
-    pub fn clear(&mut self) -> Result<(), TransactionError> {
+    pub fn clear(&mut self) -> Result<(), Error> {
         self.ensure_editable()?;
         self.working = Snapshot::empty();
         Ok(())
     }
 
     /// Completes routing and removes the route-slip metadata from the candidate.
-    pub fn complete(&mut self) -> Result<(), TransactionError> {
+    pub fn complete(&mut self) -> Result<(), Error> {
         self.clear()
     }
 
     /// Atomically publishes the candidate as a snapshot and reversible patch.
-    pub fn commit(self) -> Result<Commit, TransactionError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         validation::metadata_option(&self.working.metadata)?;
         let patch = Patch::new(self.before, self.working.clone());
         Ok(Commit::new(self.working, patch))
@@ -482,9 +479,9 @@ impl Transaction {
         }
     }
 
-    fn ensure_editable(&self) -> Result<(), TransactionError> {
+    fn ensure_editable(&self) -> Result<(), Error> {
         if let Some(metadata) = self.working.metadata() {
-            validation::editable(metadata).map_err(TransactionError::Protected)
+            validation::editable(metadata).map_err(Error::Protected)
         } else {
             Ok(())
         }

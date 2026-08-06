@@ -782,7 +782,7 @@ fn require_root(local: &str, namespace: &str) -> Result<()> {
     Ok(())
 }
 
-fn validation_error(error: crate::model3d::ValidationError) -> Error {
+fn validation_error(error: crate::model3d::Error) -> Error {
     Error::Invalid(error.to_string())
 }
 

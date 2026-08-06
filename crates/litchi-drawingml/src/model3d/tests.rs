@@ -1,6 +1,6 @@
 use super::codec::{opaque, read, write};
 use super::{
-    Id, Metadata, Raster, RasterChild, Reference, Relationship, Resolver, Target, ValidationError,
+    Error, Id, Metadata, Raster, RasterChild, Reference, Relationship, Resolver, Target,
     validate_relationships,
 };
 
@@ -71,14 +71,14 @@ fn relationship_graph_distinguishes_embedded_linked_and_missing_targets() {
     missing.reference.embedded = Some(Id::new("rIdMissing").unwrap());
     assert!(matches!(
         validate_relationships(&missing, &graph),
-        Err(ValidationError::MissingRelationship { field: "model", .. })
+        Err(Error::MissingRelationship { field: "model", .. })
     ));
 
     let mut wrong_mode = metadata;
     wrong_mode.reference.linked = Some(Id::new("rIdInternal").unwrap());
     assert!(matches!(
         validate_relationships(&wrong_mode, &graph),
-        Err(ValidationError::LinkedTargetIsInternal { field: "model", .. })
+        Err(Error::LinkedTargetIsInternal { field: "model", .. })
     ));
 }
 

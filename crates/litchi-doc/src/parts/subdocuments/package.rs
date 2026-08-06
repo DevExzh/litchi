@@ -8,7 +8,10 @@
 //! candidate reparse validation.
 
 use super::model::Collection;
-use super::transaction::{Commit, Patch, Snapshot, Transaction, TransactionError};
+use super::transaction::{
+    Commit as TransactionCommit, Error as TransactionError, Patch, Snapshot as TransactionSnapshot,
+    Transaction,
+};
 use super::validation;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
@@ -16,13 +19,13 @@ use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Patch as ObjectP
 
 /// Immutable package bytes plus the contextual subdocument snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PackageSnapshot {
+pub struct Snapshot {
     bytes: Vec<u8>,
-    subdocuments: Snapshot,
+    subdocuments: TransactionSnapshot,
 }
 
-impl PackageSnapshot {
-    fn new(bytes: Vec<u8>, subdocuments: Snapshot) -> Self {
+impl Snapshot {
+    fn new(bytes: Vec<u8>, subdocuments: TransactionSnapshot) -> Self {
         Self {
             bytes,
             subdocuments,
@@ -31,7 +34,7 @@ impl PackageSnapshot {
 
     /// The immutable semantic and detached-wire snapshot.
     #[must_use]
-    pub fn subdocuments(&self) -> &Snapshot {
+    pub fn subdocuments(&self) -> &TransactionSnapshot {
         &self.subdocuments
     }
 
@@ -57,16 +60,16 @@ impl PackageSnapshot {
 /// patch. The semantic patch remains detached; [`Self::package_patch`] is the
 /// publication boundary that includes FIB pointer relocation.
 #[derive(Debug, Clone)]
-pub struct PackageCommit {
-    snapshot: PackageSnapshot,
+pub struct Commit {
+    snapshot: Snapshot,
     patch: Patch,
     package_patch: ObjectPatch,
 }
 
-impl PackageCommit {
+impl Commit {
     /// The immutable post-edit package snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &PackageSnapshot {
+    pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
@@ -84,7 +87,7 @@ impl PackageCommit {
 
     /// Split the package snapshot and both reversible patches.
     #[must_use]
-    pub fn into_parts(self) -> (PackageSnapshot, Patch, ObjectPatch) {
+    pub fn into_parts(self) -> (Snapshot, Patch, ObjectPatch) {
         (self.snapshot, self.patch, self.package_patch)
     }
 }
@@ -94,11 +97,11 @@ impl PackageCommit {
 pub struct Editor {
     package: ObjectEditor,
     table_name: String,
-    original: Snapshot,
+    original: TransactionSnapshot,
     /// The semantic/detached wire lineage. The physical package may contain
     /// older table images because publication is append-only, so this value
     /// intentionally remains the detached candidate lineage.
-    subdocuments: Snapshot,
+    subdocuments: TransactionSnapshot,
     changed: bool,
 }
 
@@ -127,7 +130,7 @@ impl Editor {
             .stream(&table_path)
             .ok_or_else(|| PackageError::StreamNotFound(table_name.to_owned()))?;
         validation::package_fib(&fib, table)?;
-        let subdocuments = Snapshot::parse(&fib, table)?.ok_or_else(|| {
+        let subdocuments = TransactionSnapshot::parse(&fib, table)?.ok_or_else(|| {
             PackageError::InvalidFormat(
                 "DOC package has no FIB-addressed PlcfWKB or SttbFnm owner".to_owned(),
             )
@@ -143,7 +146,7 @@ impl Editor {
 
     /// The current contextual subdocument snapshot.
     #[must_use]
-    pub fn subdocuments(&self) -> &Snapshot {
+    pub fn subdocuments(&self) -> &TransactionSnapshot {
         &self.subdocuments
     }
 
@@ -166,7 +169,7 @@ impl Editor {
     }
 
     /// Apply and publish a validated semantic transaction atomically.
-    pub fn apply(&mut self, transaction: Transaction) -> Result<PackageCommit> {
+    pub fn apply(&mut self, transaction: Transaction) -> Result<Commit> {
         let commit = transaction.commit().map_err(transaction_error)?;
         if commit.patch().before() != &self.subdocuments {
             return Err(PackageError::InvalidFormat(
@@ -177,9 +180,9 @@ impl Editor {
     }
 
     /// Capture the current package as an immutable snapshot.
-    pub fn snapshot(&self) -> Result<PackageSnapshot> {
+    pub fn snapshot(&self) -> Result<Snapshot> {
         let bytes = self.package.clone().finish().map_err(PackageError::from)?;
-        Ok(PackageSnapshot::new(bytes, self.subdocuments.clone()))
+        Ok(Snapshot::new(bytes, self.subdocuments.clone()))
     }
 
     /// Finish the edit and return rendered DOC bytes.
@@ -189,18 +192,18 @@ impl Editor {
 
     /// Commit the current package as a semantic snapshot plus reversible
     /// semantic and whole-CFB patches.
-    pub fn commit(self) -> Result<PackageCommit> {
+    pub fn commit(self) -> Result<Commit> {
         let patch = Patch::new(self.original, self.subdocuments.clone());
         let object_commit = self.package.commit().map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
-        Ok(PackageCommit {
-            snapshot: PackageSnapshot::new(bytes, self.subdocuments),
+        Ok(Commit {
+            snapshot: Snapshot::new(bytes, self.subdocuments),
             patch,
             package_patch: object_commit.into_patch(),
         })
     }
 
-    fn install(&mut self, commit: Commit) -> Result<PackageCommit> {
+    fn install(&mut self, commit: TransactionCommit) -> Result<Commit> {
         let (snapshot, patch) = commit.into_parts();
         if patch.is_noop() {
             let package_patch = self
@@ -209,7 +212,7 @@ impl Editor {
                 .commit()
                 .map_err(PackageError::from)?
                 .into_patch();
-            return Ok(PackageCommit {
+            return Ok(Commit {
                 snapshot: self.snapshot()?,
                 patch,
                 package_patch,
@@ -230,16 +233,16 @@ impl Editor {
             .map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
         let package_patch = object_commit.into_patch();
-        let package_snapshot = PackageSnapshot::new(bytes, candidate.subdocuments.clone());
+        let package_snapshot = Snapshot::new(bytes, candidate.subdocuments.clone());
         *self = candidate;
-        Ok(PackageCommit {
+        Ok(Commit {
             snapshot: package_snapshot,
             patch,
             package_patch,
         })
     }
 
-    fn write_snapshot(&mut self, snapshot: &Snapshot) -> Result<()> {
+    fn write_snapshot(&mut self, snapshot: &TransactionSnapshot) -> Result<()> {
         let word_path = vec!["WordDocument".to_owned()];
         let table_path = vec![self.table_name.clone()];
         let mut word = self
@@ -254,7 +257,7 @@ impl Editor {
             .to_vec();
         let fib = FileInformationBlock::parse(&word)?;
         validation::package_fib(&fib, &table)?;
-        let current = Snapshot::parse(&fib, &table)?.ok_or_else(|| {
+        let current = TransactionSnapshot::parse(&fib, &table)?.ok_or_else(|| {
             PackageError::Corrupted(
                 "the current DOC package lost its subdocument table owner".to_owned(),
             )
@@ -295,7 +298,7 @@ impl Editor {
 
         let reparsed_fib = FileInformationBlock::parse(&word)?;
         validation::package_fib(&reparsed_fib, &table)?;
-        let reparsed = Snapshot::parse(&reparsed_fib, &table)?.ok_or_else(|| {
+        let reparsed = TransactionSnapshot::parse(&reparsed_fib, &table)?.ok_or_else(|| {
             PackageError::Corrupted(
                 "published DOC package lost its subdocument table owner".to_owned(),
             )
@@ -318,7 +321,7 @@ impl Editor {
     }
 }
 
-fn same_source(left: &Snapshot, right: &Snapshot) -> bool {
+fn same_source(left: &TransactionSnapshot, right: &TransactionSnapshot) -> bool {
     left.collection() == right.collection()
         && left.main_document_chars() == right.main_document_chars()
         && left.referenced_files_bytes() == right.referenced_files_bytes()

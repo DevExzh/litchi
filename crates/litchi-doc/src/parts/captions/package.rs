@@ -2,7 +2,10 @@
 
 use super::codec::{AUTO_CAPTION_FIB_INDEX, CAPTION_FIB_INDEX};
 use super::semantic::Tables;
-use super::transaction::{Commit, Snapshot, Transaction, TransactionError};
+use super::transaction::{
+    Commit as TransactionCommit, Error as TransactionError, Snapshot as TransactionSnapshot,
+    Transaction,
+};
 use super::validation;
 use super::{AutoTable, LabelTable};
 use crate::package::{Error as PackageError, Result};
@@ -11,19 +14,19 @@ use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Patch as ObjectP
 
 /// An immutable DOC package snapshot carrying its caption metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PackageSnapshot {
+pub struct Snapshot {
     bytes: Vec<u8>,
-    captions: Snapshot,
+    captions: TransactionSnapshot,
 }
 
-impl PackageSnapshot {
-    fn new(bytes: Vec<u8>, captions: Snapshot) -> Self {
+impl Snapshot {
+    fn new(bytes: Vec<u8>, captions: TransactionSnapshot) -> Self {
         Self { bytes, captions }
     }
 
     /// Returns the immutable caption snapshot.
     #[must_use]
-    pub fn captions(&self) -> &Snapshot {
+    pub fn captions(&self) -> &TransactionSnapshot {
         &self.captions
     }
 
@@ -47,22 +50,22 @@ impl PackageSnapshot {
 
 /// A package commit containing semantic and reversible OLE byte patches.
 #[derive(Debug, Clone)]
-pub struct PackageCommit {
-    snapshot: PackageSnapshot,
-    patch: Commit,
+pub struct Commit {
+    snapshot: Snapshot,
+    patch: TransactionCommit,
     package_patch: ObjectPatch,
 }
 
-impl PackageCommit {
+impl Commit {
     /// The immutable post-edit package snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &PackageSnapshot {
+    pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// The reversible semantic caption patch.
     #[must_use]
-    pub fn patch(&self) -> &Commit {
+    pub fn patch(&self) -> &TransactionCommit {
         &self.patch
     }
 
@@ -74,7 +77,7 @@ impl PackageCommit {
 
     /// Splits the commit into its snapshot, semantic patch, and byte patch.
     #[must_use]
-    pub fn into_parts(self) -> (PackageSnapshot, Commit, ObjectPatch) {
+    pub fn into_parts(self) -> (Snapshot, TransactionCommit, ObjectPatch) {
         (self.snapshot, self.patch, self.package_patch)
     }
 }
@@ -84,8 +87,8 @@ impl PackageCommit {
 pub struct Editor {
     package: ObjectEditor,
     table_name: String,
-    original: Snapshot,
-    captions: Snapshot,
+    original: TransactionSnapshot,
+    captions: TransactionSnapshot,
     changed: bool,
 }
 
@@ -113,7 +116,7 @@ impl Editor {
         let table = package
             .stream(&[table_name.to_owned()])
             .ok_or_else(|| PackageError::StreamNotFound(table_name.to_owned()))?;
-        let captions = Snapshot::new(Tables::parse(&fib, table)?)?;
+        let captions = TransactionSnapshot::new(Tables::parse(&fib, table)?)?;
         Ok(Self {
             package,
             table_name: table_name.to_owned(),
@@ -125,7 +128,7 @@ impl Editor {
 
     /// Returns the current immutable caption snapshot.
     #[must_use]
-    pub fn captions(&self) -> &Snapshot {
+    pub fn captions(&self) -> &TransactionSnapshot {
         &self.captions
     }
 
@@ -148,12 +151,12 @@ impl Editor {
     }
 
     /// Sets or replaces both caption tables atomically.
-    pub fn set(&mut self, tables: Tables) -> Result<PackageCommit> {
-        self.install(Snapshot::new(tables)?)
+    pub fn set(&mut self, tables: Tables) -> Result<Commit> {
+        self.install(TransactionSnapshot::new(tables)?)
     }
 
     /// Replaces existing caption metadata, rejecting an absent pair.
-    pub fn replace(&mut self, tables: Tables) -> Result<PackageCommit> {
+    pub fn replace(&mut self, tables: Tables) -> Result<Commit> {
         if !self.captions.is_present() {
             return Err(PackageError::InvalidFormat(
                 "cannot replace missing caption metadata".into(),
@@ -163,7 +166,7 @@ impl Editor {
     }
 
     /// Applies a semantic transaction and publishes it atomically.
-    pub fn apply(&mut self, transaction: Transaction) -> Result<PackageCommit> {
+    pub fn apply(&mut self, transaction: Transaction) -> Result<Commit> {
         let commit = transaction.commit().map_err(transaction_error)?;
         if commit.before() != &self.captions {
             return Err(PackageError::InvalidFormat(
@@ -174,7 +177,7 @@ impl Editor {
     }
 
     /// Replaces the label table while retaining automatic-caption rules.
-    pub fn replace_labels(&mut self, labels: LabelTable) -> Result<PackageCommit> {
+    pub fn replace_labels(&mut self, labels: LabelTable) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction
             .replace_labels(labels)
@@ -183,37 +186,37 @@ impl Editor {
     }
 
     /// Replaces automatic-caption rules while retaining labels.
-    pub fn replace_auto(&mut self, auto: AutoTable) -> Result<PackageCommit> {
+    pub fn replace_auto(&mut self, auto: AutoTable) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.replace_auto(auto).map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Removes only the label range, rejecting rules that would dangle.
-    pub fn clear_labels(&mut self) -> Result<PackageCommit> {
+    pub fn clear_labels(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.clear_labels().map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Removes only the automatic-caption range while retaining labels.
-    pub fn clear_auto(&mut self) -> Result<PackageCommit> {
+    pub fn clear_auto(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.clear_auto().map_err(transaction_error)?;
         self.apply(transaction)
     }
 
     /// Removes both caption table ranges while preserving their old bytes.
-    pub fn clear(&mut self) -> Result<PackageCommit> {
+    pub fn clear(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.clear();
         self.apply(transaction)
     }
 
     /// Captures the current package as an immutable snapshot.
-    pub fn snapshot(&self) -> Result<PackageSnapshot> {
+    pub fn snapshot(&self) -> Result<Snapshot> {
         let bytes = self.package.clone().finish().map_err(PackageError::from)?;
-        Ok(PackageSnapshot::new(bytes, self.captions.clone()))
+        Ok(Snapshot::new(bytes, self.captions.clone()))
     }
 
     /// Finishes the edit and returns rendered DOC bytes.
@@ -222,19 +225,19 @@ impl Editor {
     }
 
     /// Commits the package as an immutable snapshot with reversible patches.
-    pub fn commit(self) -> Result<PackageCommit> {
-        let patch = Commit::new(self.original, self.captions.clone());
+    pub fn commit(self) -> Result<Commit> {
+        let patch = TransactionCommit::new(self.original, self.captions.clone());
         let object_commit = self.package.commit().map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
-        Ok(PackageCommit {
-            snapshot: PackageSnapshot::new(bytes, self.captions),
+        Ok(Commit {
+            snapshot: Snapshot::new(bytes, self.captions),
             patch,
             package_patch: object_commit.into_patch(),
         })
     }
 
-    fn install(&mut self, snapshot: Snapshot) -> Result<PackageCommit> {
-        let patch = Commit::new(self.captions.clone(), snapshot.clone());
+    fn install(&mut self, snapshot: TransactionSnapshot) -> Result<Commit> {
+        let patch = TransactionCommit::new(self.captions.clone(), snapshot.clone());
         if patch.is_noop() {
             let package_patch = self
                 .package
@@ -243,7 +246,7 @@ impl Editor {
                 .map_err(PackageError::from)?
                 .into_patch();
             let package_snapshot = self.snapshot()?;
-            return Ok(PackageCommit {
+            return Ok(Commit {
                 snapshot: package_snapshot,
                 patch,
                 package_patch,
@@ -261,16 +264,16 @@ impl Editor {
             .map_err(PackageError::from)?;
         let bytes = package_commit.patch().after().to_vec();
         let package_patch = package_commit.into_patch();
-        let package_snapshot = PackageSnapshot::new(bytes, candidate.captions.clone());
+        let package_snapshot = Snapshot::new(bytes, candidate.captions.clone());
         *self = candidate;
-        Ok(PackageCommit {
+        Ok(Commit {
             snapshot: package_snapshot,
             patch,
             package_patch,
         })
     }
 
-    fn write_snapshot(&mut self, snapshot: &Snapshot) -> Result<()> {
+    fn write_snapshot(&mut self, snapshot: &TransactionSnapshot) -> Result<()> {
         let word_path = vec!["WordDocument".to_owned()];
         let table_path = vec![self.table_name.clone()];
         let word = self

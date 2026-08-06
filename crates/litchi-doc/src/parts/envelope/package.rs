@@ -2,7 +2,9 @@
 
 use super::codec;
 use super::model::{Envelope, Message};
-use super::transaction::{Patch, Snapshot, Transaction, TransactionError};
+use super::transaction::{
+    Error as TransactionError, Patch, Snapshot as TransactionSnapshot, Transaction,
+};
 use super::validation;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
@@ -10,19 +12,19 @@ use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Patch as ObjectP
 
 /// Immutable package bytes plus the decoded envelope state.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PackageSnapshot {
+pub struct Snapshot {
     bytes: Vec<u8>,
-    envelope: Snapshot,
+    envelope: TransactionSnapshot,
 }
 
-impl PackageSnapshot {
-    fn new(bytes: Vec<u8>, envelope: Snapshot) -> Self {
+impl Snapshot {
+    fn new(bytes: Vec<u8>, envelope: TransactionSnapshot) -> Self {
         Self { bytes, envelope }
     }
 
     /// The immutable semantic envelope snapshot.
     #[must_use]
-    pub fn envelope(&self) -> &Snapshot {
+    pub fn envelope(&self) -> &TransactionSnapshot {
         &self.envelope
     }
 
@@ -52,16 +54,16 @@ impl PackageSnapshot {
 
 /// A package commit containing a semantic patch and a reversible CFB patch.
 #[derive(Debug, Clone)]
-pub struct PackageCommit {
-    snapshot: PackageSnapshot,
+pub struct Commit {
+    snapshot: Snapshot,
     patch: Patch,
     package_patch: ObjectPatch,
 }
 
-impl PackageCommit {
+impl Commit {
     /// The immutable post-edit package snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> &PackageSnapshot {
+    pub fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
@@ -79,7 +81,7 @@ impl PackageCommit {
 
     /// Split the commit into its snapshot and both reversible patches.
     #[must_use]
-    pub fn into_parts(self) -> (PackageSnapshot, Patch, ObjectPatch) {
+    pub fn into_parts(self) -> (Snapshot, Patch, ObjectPatch) {
         (self.snapshot, self.patch, self.package_patch)
     }
 }
@@ -89,8 +91,8 @@ impl PackageCommit {
 pub struct Editor {
     package: ObjectEditor,
     table_name: String,
-    original: Snapshot,
-    envelope: Snapshot,
+    original: TransactionSnapshot,
+    envelope: TransactionSnapshot,
     changed: bool,
 }
 
@@ -119,7 +121,7 @@ impl Editor {
         let table = package
             .stream(&table_path)
             .ok_or_else(|| PackageError::StreamNotFound(table_name.into()))?;
-        let envelope = Snapshot::from_option(codec::parse_fib(&fib, table)?)?;
+        let envelope = TransactionSnapshot::from_option(codec::parse_fib(&fib, table)?)?;
         Ok(Self {
             package,
             table_name: table_name.to_owned(),
@@ -131,7 +133,7 @@ impl Editor {
 
     /// The current immutable semantic envelope snapshot.
     #[must_use]
-    pub fn envelope(&self) -> &Snapshot {
+    pub fn envelope(&self) -> &TransactionSnapshot {
         &self.envelope
     }
 
@@ -160,17 +162,17 @@ impl Editor {
     }
 
     /// Set or replace the complete envelope FIB range.
-    pub fn set(&mut self, envelope: Envelope) -> Result<PackageCommit> {
-        self.install(Snapshot::new(envelope)?)
+    pub fn set(&mut self, envelope: Envelope) -> Result<Commit> {
+        self.install(TransactionSnapshot::new(envelope)?)
     }
 
     /// Set or replace the supported Office message body.
-    pub fn set_message(&mut self, message: Message) -> Result<PackageCommit> {
+    pub fn set_message(&mut self, message: Message) -> Result<Commit> {
         self.set(Envelope::from_message(message)?)
     }
 
     /// Replace an existing envelope, rejecting a missing FIB range.
-    pub fn replace(&mut self, envelope: Envelope) -> Result<PackageCommit> {
+    pub fn replace(&mut self, envelope: Envelope) -> Result<Commit> {
         if !self.envelope.is_present() {
             return Err(PackageError::InvalidFormat(
                 "cannot replace missing MsoEnvelope metadata".into(),
@@ -180,7 +182,7 @@ impl Editor {
     }
 
     /// Apply and publish a clone-first semantic transaction atomically.
-    pub fn apply(&mut self, transaction: Transaction) -> Result<PackageCommit> {
+    pub fn apply(&mut self, transaction: Transaction) -> Result<Commit> {
         let commit = transaction.commit().map_err(transaction_error)?;
         if commit.patch().before() != &self.envelope {
             return Err(PackageError::InvalidFormat(
@@ -191,7 +193,7 @@ impl Editor {
     }
 
     /// Clone-first update of the supported Office message body.
-    pub fn update_message<F>(&mut self, edit: F) -> Result<PackageCommit>
+    pub fn update_message<F>(&mut self, edit: F) -> Result<Commit>
     where
         F: FnOnce(&mut Message),
     {
@@ -203,16 +205,16 @@ impl Editor {
     }
 
     /// Clear the complete envelope FIB range.
-    pub fn clear(&mut self) -> Result<PackageCommit> {
+    pub fn clear(&mut self) -> Result<Commit> {
         let mut transaction = self.edit();
         transaction.clear();
         self.apply(transaction)
     }
 
     /// Capture the current package as an immutable snapshot.
-    pub fn snapshot(&self) -> Result<PackageSnapshot> {
+    pub fn snapshot(&self) -> Result<Snapshot> {
         let bytes = self.package.clone().finish().map_err(PackageError::from)?;
-        Ok(PackageSnapshot::new(bytes, self.envelope.clone()))
+        Ok(Snapshot::new(bytes, self.envelope.clone()))
     }
 
     /// Finish the edit and return rendered DOC bytes.
@@ -221,18 +223,18 @@ impl Editor {
     }
 
     /// Commit the package as an immutable snapshot with reversible patches.
-    pub fn commit(self) -> Result<PackageCommit> {
+    pub fn commit(self) -> Result<Commit> {
         let patch = Patch::new(self.original, self.envelope.clone());
         let object_commit = self.package.commit().map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
-        Ok(PackageCommit {
-            snapshot: PackageSnapshot::new(bytes, self.envelope),
+        Ok(Commit {
+            snapshot: Snapshot::new(bytes, self.envelope),
             patch,
             package_patch: object_commit.into_patch(),
         })
     }
 
-    fn install(&mut self, snapshot: Snapshot) -> Result<PackageCommit> {
+    fn install(&mut self, snapshot: TransactionSnapshot) -> Result<Commit> {
         let patch = Patch::new(self.envelope.clone(), snapshot.clone());
         if patch.is_noop() {
             let package_patch = self
@@ -241,7 +243,7 @@ impl Editor {
                 .commit()
                 .map_err(PackageError::from)?
                 .into_patch();
-            return Ok(PackageCommit {
+            return Ok(Commit {
                 snapshot: self.snapshot()?,
                 patch,
                 package_patch,
@@ -261,16 +263,16 @@ impl Editor {
             .map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
         let package_patch = object_commit.into_patch();
-        let package_snapshot = PackageSnapshot::new(bytes, candidate.envelope.clone());
+        let package_snapshot = Snapshot::new(bytes, candidate.envelope.clone());
         *self = candidate;
-        Ok(PackageCommit {
+        Ok(Commit {
             snapshot: package_snapshot,
             patch,
             package_patch,
         })
     }
 
-    fn write_snapshot(&mut self, snapshot: &Snapshot) -> Result<()> {
+    fn write_snapshot(&mut self, snapshot: &TransactionSnapshot) -> Result<()> {
         let word_path = vec!["WordDocument".to_owned()];
         let table_path = vec![self.table_name.clone()];
         let mut word = self
@@ -309,7 +311,7 @@ impl Editor {
         }
 
         let reparsed_fib = FileInformationBlock::parse(&word)?;
-        let reparsed = Snapshot::from_option(codec::parse_fib(&reparsed_fib, &table)?)?;
+        let reparsed = TransactionSnapshot::from_option(codec::parse_fib(&reparsed_fib, &table)?)?;
         if &reparsed != snapshot {
             return Err(PackageError::Corrupted(
                 "MsoEnvelope snapshot failed FIB/table-stream round-trip validation".into(),
