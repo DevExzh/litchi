@@ -13,6 +13,7 @@ pub mod columns;
 pub mod comment;
 pub mod date_time;
 pub mod font;
+pub mod highlight;
 pub mod hyperlink;
 pub mod language;
 pub mod number_attachment;
@@ -30,5 +31,6 @@ pub use character::{
     TextUnderline,
 };
 pub use font::{Font, Name, NameError};
+pub use highlight::{TextHighlight, TextHighlightId};
 pub use language::{Error as LanguageError, TextLanguage, TextLanguageRun, TextLanguageTag};
 pub use position::{Error as PositionError, TextPosition, TextRange};

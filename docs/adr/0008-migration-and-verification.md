@@ -6435,6 +6435,31 @@ after verification. This is a bounded semantic-leaf and native-open slice;
 remaining debt includes the broader monolithic adapter split, raw storage
 APIs outside these leaves, and the other ADR 0005/0006 resource work.
 
+This follow-up completes the TextHighlight ownership handoff required by ADRs
+0001–0004. `litchi_iwa_text::highlight` now owns the compact non-zero semantic
+identity and UTF-16 range, including typed zero-ID rejection and a compact
+`Option` representation. Native numeric conversion is confined to the focused
+`highlight::raw` boundary; `litchi-iwa` retains annotation graph discovery,
+protobuf validation, range-table mutation, package ownership checks, and
+transactional CRUD. The former `litchi-iwa/src/text/highlight_types.rs` owner
+was deleted, and the example's raw-ID operations now use the explicit adapter
+boundary. No compatibility alias or archive dependency was added to the leaf.
+
+The focused text suite passed 58 tests, the integrated IWA library suite passed
+1,484 tests, strict no-dependency Clippy passed for both text and IWA library
+targets (with the three pre-existing IWA dead-code groups explicitly allowed),
+and the migrated highlight example compiles. CLI round trips exposed
+non-zero highlight IDs and ranges in Pages (`0..8`), Numbers (`0..7`), and
+Keynote (`0..9`). Computer Use opened the Pages and Keynote fixtures in the
+real applications; their accessibility trees exposed the generated text and
+their screenshots showed the turquoise native highlight. The newly generated
+Numbers fixture was rejected by Numbers as damaged (an existing fixture
+generation gap), so the known-good `/private/tmp/litchi-adr-numbers-text.numbers`
+fixture was opened instead; its accessibility tree exposed the text box and
+the CLI confirmed `TextHighlight { id: 131, range: 0..3 }`. Pages, Numbers, and
+Keynote were closed after verification. Remaining text debt includes raw
+`IWorkTextEditor` storage selectors and the broader monolithic adapter split.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

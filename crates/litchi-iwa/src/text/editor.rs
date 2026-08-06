@@ -36,7 +36,7 @@ use super::highlight::{
     add_text_highlight, remove_text_highlight, remove_unreferenced_highlight_objects,
     text_highlights, update_text_highlight,
 };
-use super::highlight_types::{TextHighlight, TextHighlightId};
+use litchi_iwa_text::highlight::{TextHighlight, TextHighlightId};
 use super::hyperlink::{
     add_text_hyperlink, remove_text_hyperlink, remove_unreferenced_hyperlink_objects,
     text_hyperlinks, update_text_hyperlink,

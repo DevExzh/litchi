@@ -8,7 +8,10 @@ use super::annotation::{
     AnnotationKind, add_annotation, annotations, remove_annotation,
     remove_unreferenced_annotation_objects, update_annotation,
 };
-use super::highlight_types::{TextHighlight, TextHighlightId};
+use litchi_iwa_text::highlight::{
+    TextHighlight, TextHighlightId,
+    raw::{from_object_id, object_id as native_object_id},
+};
 use litchi_iwa_text::position::TextRange;
 
 /// Read every native plain highlight in a storage, ordered by text position.
@@ -21,7 +24,7 @@ pub(crate) fn text_highlights(
         .filter(|annotation| annotation.graph.is_plain_highlight())
         .map(|annotation| {
             Ok(TextHighlight::new(
-                TextHighlightId::from_native(annotation.object_id),
+                from_object_id(annotation.object_id)?,
                 annotation.range,
             ))
         })
@@ -42,7 +45,7 @@ pub(crate) fn add_text_highlight(
         String::new(),
     )?;
     Ok(TextHighlight::new(
-        TextHighlightId::from_native(annotation.object_id),
+        from_object_id(annotation.object_id)?,
         annotation.range,
     ))
 }
@@ -57,7 +60,7 @@ pub(crate) fn update_text_highlight(
     let annotation = update_annotation(
         package,
         storage_id,
-        id.object_id(),
+        native_object_id(id),
         range,
         AnnotationKind::PlainHighlight,
         "",
@@ -74,7 +77,7 @@ pub(crate) fn remove_text_highlight(
     let annotation = remove_annotation(
         package,
         storage_id,
-        id.object_id(),
+        native_object_id(id),
         AnnotationKind::PlainHighlight,
     )?;
     Ok(TextHighlight::new(id, annotation.range))

@@ -20,7 +20,6 @@ mod font;
 mod highlight;
 mod highlight_object;
 mod highlight_storage;
-mod highlight_types;
 mod hyperlink;
 mod hyperlink_object;
 mod hyperlink_storage;
@@ -66,7 +65,7 @@ pub use date_time_field::{TextDateTimeField, TextDateTimeFieldId};
 pub use editor::{IWorkTextEditor, TextStorageInfo};
 pub(crate) use extractor::TextExtractor;
 pub use font::{Font, Name, NameError, TextFont, TextFontName};
-pub use highlight_types::{TextHighlight, TextHighlightId};
+pub use litchi_iwa_text::highlight::{TextHighlight, TextHighlightId};
 pub use litchi_iwa_common::text::layout;
 pub use litchi_iwa_text::comment::{
     TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,

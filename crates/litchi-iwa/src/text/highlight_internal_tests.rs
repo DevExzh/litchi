@@ -10,6 +10,7 @@ use crate::wire::{
     patch_varint_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields, transform_length_delimited_field,
 };
+use litchi_iwa_text::highlight::raw::object_id as native_object_id;
 use prost::Message;
 
 use super::*;
@@ -66,7 +67,7 @@ fn unknown_table_entry_and_highlight_fields_survive_updates() {
                     data,
                 },
             )?;
-            let object = archive.object_mut(highlight.id.object_id()).unwrap();
+            let object = archive.object_mut(native_object_id(highlight.id)).unwrap();
             let original = &object.messages[0];
             let data = patch_varint_field(&original.data, 88, false, Some(9))?;
             object.replace_message(
@@ -103,7 +104,7 @@ fn unknown_table_entry_and_highlight_fields_survive_updates() {
             .iter()
             .any(|field| field.number() == 77)
     }));
-    let object = archive.object(highlight.id.object_id()).unwrap();
+    let object = archive.object(native_object_id(highlight.id)).unwrap();
     assert!(
         parse_wire_fields(&object.messages[0].data)
             .unwrap()
@@ -209,7 +210,7 @@ fn highlight_with_an_additional_owner_cannot_be_updated_or_deleted() {
                 .unwrap();
             other.archive_info.message_infos[0]
                 .object_references
-                .push(highlight.id.object_id());
+                .push(native_object_id(highlight.id));
             Ok(())
         })
         .unwrap();
@@ -242,11 +243,11 @@ fn comment_backed_annotations_are_classified_without_mutation() {
     .unwrap();
     let location = locate_storage(&package, storage_id).unwrap();
     let archive = package.archive(&location.archive_name).unwrap();
-    let object = archive.object(created.id.object_id()).unwrap();
+    let object = archive.object(native_object_id(created.id)).unwrap();
     let graph = validate_plain_highlight_graph(
         &package,
         &location.archive_name,
-        created.id.object_id(),
+        native_object_id(created.id),
         object,
     )
     .unwrap()
@@ -272,7 +273,7 @@ fn comment_backed_annotations_are_classified_without_mutation() {
     assert_eq!(comments.len(), 1);
     assert_eq!(
         litchi_iwa_text::comment::raw::comment_id_value(comments[0].id()),
-        created.id.object_id()
+        native_object_id(created.id)
     );
     assert_eq!(comments[0].body().as_str(), "note");
     assert!(

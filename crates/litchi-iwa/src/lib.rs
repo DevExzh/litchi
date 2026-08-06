@@ -274,6 +274,9 @@ pub enum Error {
     TextHyperlink(#[from] litchi_iwa_text::hyperlink::Error),
 
     #[error(transparent)]
+    TextHighlight(#[from] litchi_iwa_text::highlight::Error),
+
+    #[error(transparent)]
     TextNumberAttachment(#[from] litchi_iwa_text::number_attachment::Error),
 
     #[error(transparent)]

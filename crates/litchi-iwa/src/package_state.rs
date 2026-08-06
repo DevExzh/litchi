@@ -127,6 +127,7 @@ fn clone_error(error: &Error) -> Error {
         Error::IwaCommon(error) => Error::IwaCommon(error.clone()),
         Error::PagesSemantic(error) => Error::PagesSemantic(error.clone()),
         Error::TextHyperlink(error) => Error::TextHyperlink(*error),
+        Error::TextHighlight(error) => Error::TextHighlight(*error),
         Error::TextNumberAttachment(error) => Error::TextNumberAttachment(*error),
         Error::TextComment(error) => Error::TextComment(*error),
         Error::ParagraphStyle(error) => Error::ParagraphStyle(*error),
