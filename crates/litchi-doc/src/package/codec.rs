@@ -114,6 +114,21 @@ impl<R: Read + Seek> Package<R> {
         Document::from_ole_with_options(&mut self.ole, options)
     }
 
+    /// Inspect the package's typed MS-OFFCRYPTO DataSpaces graph.
+    ///
+    /// This is a structural, inert view of encryption and Information Rights
+    /// Management metadata. It validates the CFB graph, transform headers,
+    /// licenses, integrity sidecars, and custom-XML promotion markers, but it
+    /// never decrypts content, evaluates a license, contacts a rights server,
+    /// or activates protected content. `None` means the package has no
+    /// DataSpaces graph.
+    pub fn data_spaces(
+        &mut self,
+    ) -> std::result::Result<Option<litchi_crypto::spaces::Graph>, litchi_crypto::spaces::Error>
+    {
+        litchi_crypto::spaces::inspect(&mut self.ole)
+    }
+
     /// Get the underlying OLE file.
     ///
     /// This provides access to lower-level OLE operations and streams.

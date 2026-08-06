@@ -82,6 +82,13 @@ pub mod table;
 pub mod tracked_revision;
 pub mod vba;
 
+/// Typed, inert MS-OFFCRYPTO DataSpaces and legacy-binary IRM metadata.
+///
+/// The package facade exposes [`Package::data_spaces`] for structural
+/// inspection. Rights evaluation, decryption, and external policy services
+/// remain outside this crate.
+pub use litchi_crypto::spaces;
+
 pub mod embedded_object;
 pub mod equation;
 pub use parts::annotation_bookmarks;

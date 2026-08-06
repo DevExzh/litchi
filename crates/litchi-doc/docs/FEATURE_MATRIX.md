@@ -51,7 +51,7 @@ shared Office codecs are counted only where the DOC API exposes them.
 | XML signatures storage and signatures stream | ✅ | ✅ | ✅ | Trust-neutral CFB signature verification and transactional signing/editing are exposed; certificate trust and revocation are not established |
 | ObjectPool and embedded OLE/package objects | ✅ | ✅ | ✅ | Object storages can be inventoried, added, removed, reordered, and preserved with inert payloads; objects are never activated or opened |
 | Macros storage and VBA project payload | ✅ | ✅ | ✅ | Bounded MS-OVBA compressed-container, dir, PROJECT, module, and cache-free source metadata are read and authored; code is never compiled or executed |
-| Information Rights Management Data Space and protected content | ❌ | ❌ | ❌ | [MS-DOC] 2.1.12-2.1.13 and [MS-OFFCRYPTO] define IRM/protected-content storage, but litchi-doc exposes no typed DOC rights/license/decryption API; generic OLE preservation is not semantic support |
+| Information Rights Management Data Space and protected content | 🟡 | ✅ | ❌ | `Package::data_spaces` exposes the validated, inert `litchi_doc::spaces::Graph` from the shared MS-OFFCRYPTO owner, including legacy-binary IRM transform/license topology, labels, and integrity sidecars; rights evaluation, decryption, and protected-content access remain outside the API |
 | Unknown streams and storages | 🟡 | ✅ | 🟡 | Package-preserving editors can retain unrelated CFB topology where supported, but an arbitrary stream has no DOC semantic model or write guarantee |
 
 ## [MS-DOC] PLC, property, and auxiliary-family audit

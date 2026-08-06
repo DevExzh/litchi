@@ -75,3 +75,9 @@ fn opens_apache_poi_cryptoapi_document() {
         .unwrap();
     assert!(!document.text().unwrap().trim().is_empty());
 }
+
+#[test]
+fn ordinary_doc_exposes_an_empty_dataspaces_profile() {
+    let mut package = Package::open(poi_fixture("test.doc")).unwrap();
+    assert!(package.data_spaces().unwrap().is_none());
+}

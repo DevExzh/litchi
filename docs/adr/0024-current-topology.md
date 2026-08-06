@@ -380,6 +380,13 @@ semantic, codec, validation, package, transaction, and focused-test layers
 nested by responsibility, with reserved wire bits and unknown XML/records
 preserved through edits.
 
+The DOC package now exposes the shared `litchi_doc::spaces` facade and
+`Package::data_spaces` structural inspection for MS-OFFCRYPTO DataSpaces and
+legacy-binary IRM graphs. The owner remains deliberately inert: it validates
+transform/license topology, labels, integrity sidecars, and custom-XML
+promotion markers without evaluating rights, decrypting streams, or contacting
+external policy services.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR
