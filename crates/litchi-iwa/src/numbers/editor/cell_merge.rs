@@ -2449,7 +2449,7 @@ mod tests {
         .unwrap()
         .unwrap();
         match BncCell::parse(&data).unwrap().cached_scalar().unwrap() {
-            Some(crate::numbers::bnc::CachedScalar::Number(value)) => value,
+            Some(crate::numbers::bnc::CachedScalar::Number(value)) => value.get(),
             value => panic!("Expected numeric formula cache, found {value:?}"),
         }
     }
