@@ -643,6 +643,60 @@ fn build_settings_project_to_semantic_values_and_validate_transactionally() {
 }
 
 #[test]
+fn typed_build_mutators_preserve_transactional_invariants() {
+    let mut rotate = KeynoteBuildSettings::rotate_action(90.0, KeynoteRotationDirection::Clockwise);
+    let before_invalid_acceleration = rotate.clone();
+    assert!(
+        rotate
+            .set_action_acceleration(BuildAcceleration::from_native(99))
+            .is_err()
+    );
+    assert_eq!(rotate, before_invalid_acceleration);
+
+    rotate
+        .set_action_acceleration(BuildAcceleration::EaseIn)
+        .unwrap();
+    assert!(matches!(
+        rotate.semantic().unwrap().effect(),
+        litchi_keynote::build::Effect::Action(litchi_keynote::build::Action::Rotate(action))
+            if action.acceleration() == BuildAcceleration::EaseIn
+    ));
+
+    let mut move_settings = KeynoteBuildSettings::move_action(4.0, 5.0);
+    move_settings.set_move_alignment(true).unwrap();
+    let path = KeynoteMotionPath::straight(8.0, 13.0);
+    move_settings.set_move_path(path.clone()).unwrap();
+    assert_eq!(
+        move_settings
+            .move_action
+            .as_ref()
+            .map(|action| (&action.path, action.align_to_path)),
+        Some((&path, true))
+    );
+
+    let mut simple = KeynoteBuildSettings::appear_in();
+    simple
+        .set_effect(litchi_keynote::build::Effect::Appear)
+        .unwrap();
+    assert_eq!(
+        simple.semantic().unwrap().effect(),
+        &litchi_keynote::build::Effect::Appear
+    );
+    let before_invalid_effect = simple.clone();
+    let custom_rotation =
+        litchi_keynote::build::Effect::action(litchi_keynote::build::Action::Rotate(
+            litchi_keynote::build::Rotation::new(
+                90.0,
+                litchi_keynote::build::RotationDirection::Clockwise,
+                BuildAcceleration::Custom,
+            )
+            .unwrap(),
+        ));
+    assert!(simple.set_effect(custom_rotation).is_err());
+    assert_eq!(simple, before_invalid_effect);
+}
+
+#[test]
 fn slide_build_crud_is_transactional_and_updates_native_caches() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
     assert!(editor.slide_builds(0).unwrap().is_empty());
