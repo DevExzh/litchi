@@ -397,6 +397,14 @@ OLE Property Set editor through host-validated package snapshots. Each owner
 keeps unknown XML, BIFF12 records, or CFB topology opaque, returns exact
 no-op sources, and rejects stale or protected edits before publication.
 
+The next continuation adds DOC subdocument package publication with checked
+FIB/table-pointer relocation; PPT native diagram build transactions; XLS OLE
+object metadata edits; OGraph series metadata transactions; DOCX OpenType
+run-property extensions; and XLSB shared-workbook revision metadata. These
+owners remain nested by semantic, wire, validation, package, and transaction
+responsibility, preserve unknown source material, and keep referenced files,
+SmartArt layout, collaboration, activation, and external execution inert.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

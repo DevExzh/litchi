@@ -57,7 +57,7 @@ formula results are recalculated or that external, macro, or embedded content is
 | Sheet protection | 🟡 | ✅ | 🟡 | Worksheet and chart-sheet protection flags and the supported strong-protection metadata are typed. Protection is not a cryptographic authorization boundary. |
 | Scenarios and what-if analysis | 🟡 | ✅ | ✅ | `litchi_xlsb::scenarios` exposes bounded `BrtBeginScenMan`/`BrtBeginSct`/`BrtSlc` snapshots and transactional worksheet replacement. Known metadata is typed; unknown records and source order are retained, unsafe or ambiguous edits are refused, and scenario values are never substituted or recalculated. |
 | Cell watches and phonetic metadata | ✅ | ✅ | ✅ | `[MS-XLSB]` 2.4.21, 2.4.331, 2.4.378, and 2.4.744 are exposed as typed worksheet cell-watch collections and worksheet-wide phonetic defaults with bounded, source-checked transactional edits; watch-window monitoring, phonetic rendering, and language conversion are not performed. |
-| Shared-workbook revision records | ❌ | ❌ | ❌ | BIFF12 workbook collaboration/revision behavior is not implemented as a typed API. |
+| Shared-workbook revision records | 🟡 | ✅ | ✅ | `shared_workbook::{Snapshot, Transaction, Commit, Patch}` owns bounded user, header, and inert revision-log metadata with package relationship validation, source-checked CRUD, unknown-record retention, and failure atomicity; collaboration, locking, conflict resolution, and recalculation remain inactive. |
 
 ## Charts, drawings, pivots, and package objects
 
