@@ -4,6 +4,7 @@
 //! in [`model`], XML codecs in [`codec`], package access in [`package`],
 //! construction in [`authoring`], and the concise entry points in [`facade`].
 
+pub mod annotations;
 pub mod authoring;
 pub mod charts;
 pub mod codec;

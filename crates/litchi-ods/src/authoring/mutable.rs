@@ -93,6 +93,32 @@ impl MutableSpreadsheet {
         self.set_settings(None)
     }
 
+    /// Capture the source-checked cell-annotation owner for this snapshot.
+    pub fn annotations(&self) -> Result<crate::annotations::Snapshot> {
+        self.spreadsheet.annotations()
+    }
+
+    /// Apply one failure-atomic cell-annotation transaction.
+    ///
+    /// The transaction resolves cells by exact sheet name and zero-based
+    /// logical coordinates.  If the closure or commit fails, this facade and
+    /// its package bytes remain unchanged; an empty commit does not rebuild
+    /// the archive.
+    pub fn edit_annotations<F>(&mut self, edit: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::annotations::Transaction) -> Result<()>,
+    {
+        let snapshot = self.spreadsheet.annotations()?;
+        let mut transaction = snapshot.edit();
+        edit(&mut transaction)?;
+        let commit = transaction.commit()?;
+        if commit.changed() {
+            let content_xml = commit.content_xml().to_owned();
+            self.spreadsheet.publish_annotations(&content_xml)?;
+        }
+        Ok(())
+    }
+
     /// Return the typed worksheet graph in document order.
     pub fn sheets(&self) -> &[Sheet] {
         self.spreadsheet.sheets()

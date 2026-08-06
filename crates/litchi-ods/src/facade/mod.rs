@@ -72,6 +72,23 @@ impl Spreadsheet {
         Ok(())
     }
 
+    /// Capture the source-checked cell-annotation owner for this spreadsheet.
+    ///
+    /// The owner retains the exact `content.xml` source and resolves cells by
+    /// sheet name plus zero-based logical coordinates.  It is parsed on
+    /// demand so an immutable spreadsheet does not retain a second XML copy.
+    pub fn annotations(&self) -> Result<crate::annotations::Snapshot> {
+        crate::annotations::Snapshot::parse(self.package.content_xml())
+    }
+
+    /// Publish a validated annotation transaction without rebuilding an
+    /// unchanged package.
+    pub(crate) fn publish_annotations(&mut self, content_xml: &str) -> Result<()> {
+        let package = crate::annotations::replace_content(&self.package, content_xml)?;
+        *self = Self::from_package(package)?;
+        Ok(())
+    }
+
     /// Borrow the compact cross-format metadata projection.
     pub fn metadata(&self) -> &litchi_core::Metadata {
         self.metadata.value()
@@ -371,6 +388,9 @@ impl Spreadsheet {
 mod tests {
     use super::*;
 
+    const ANNOTATED_CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:vendor="urn:example:vendor" office:version="1.3"><office:body><office:spreadsheet><vendor:keep/><table:table table:name="Data"><table:table-row><table:table-cell><office:annotation><text:p>existing</text:p></office:annotation></table:table-cell><table:table-cell/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
+
     #[test]
     fn builder_round_trips_through_facade() {
         let bytes = Builder::new().build().unwrap();
@@ -411,5 +431,48 @@ mod tests {
             crate::embedded::Source::Linked { ref href }
                 if href == "https://example.invalid/object"
         ));
+    }
+
+    #[test]
+    fn spreadsheet_and_mutable_facades_expose_contextual_annotation_edits() {
+        let bytes = Builder::new()
+            .content_xml(ANNOTATED_CONTENT)
+            .build()
+            .unwrap();
+        let spreadsheet = Spreadsheet::from_bytes(bytes.clone()).unwrap();
+        let annotations = spreadsheet.annotations().unwrap();
+        assert_eq!(
+            annotations
+                .cell("Data", 0, 0)
+                .unwrap()
+                .unwrap()
+                .annotation()
+                .text(),
+            "existing"
+        );
+
+        let mut mutable = MutableSpreadsheet::from_bytes(bytes.clone()).unwrap();
+        mutable
+            .edit_annotations(|transaction| {
+                transaction.set("Data", 0, 1, crate::annotations::Annotation::new("added"))
+            })
+            .unwrap();
+        let edited = Spreadsheet::from_bytes(mutable.to_bytes()).unwrap();
+        assert_eq!(
+            edited
+                .annotations()
+                .unwrap()
+                .cell("Data", 0, 1)
+                .unwrap()
+                .unwrap()
+                .annotation()
+                .text(),
+            "added"
+        );
+        assert!(edited.content_xml().contains("vendor:keep"));
+
+        let mut no_op = MutableSpreadsheet::from_bytes(bytes.clone()).unwrap();
+        no_op.edit_annotations(|_| Ok(())).unwrap();
+        assert_eq!(no_op.to_bytes(), bytes);
     }
 }
