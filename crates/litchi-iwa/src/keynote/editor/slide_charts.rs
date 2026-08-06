@@ -86,6 +86,7 @@ use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry,
     remove_orphaned_image_asset,
 };
+use litchi_iwa_common::comment::DrawableId;
 
 const KEYNOTE_THEME_MESSAGE_TYPE: u32 = 10;
 
@@ -243,12 +244,17 @@ impl KeynoteEditor {
     }
 
     /// Change the native kind of one slide chart while preserving its data.
-    pub fn set_slide_chart_kind(
+    pub fn set_slide_chart_kind<Selector>(
         &mut self,
         slide_index: usize,
-        drawable_object_id: u64,
+        selector: Selector,
         kind: Kind,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        Selector: TryInto<DrawableId>,
+        Selector::Error: std::fmt::Debug,
+    {
+        let drawable_object_id = checked_chart_selector(selector)?.get();
         require_creatable_kind(kind)?;
         self.update_slide_chart(slide_index, drawable_object_id, |chart| {
             chart
@@ -275,12 +281,17 @@ impl KeynoteEditor {
     }
 
     /// Replace the complete inline data grid of one slide chart.
-    pub fn set_slide_chart_data(
+    pub fn set_slide_chart_data<Selector>(
         &mut self,
         slide_index: usize,
-        drawable_object_id: u64,
+        selector: Selector,
         data: ChartData,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        Selector: TryInto<DrawableId>,
+        Selector::Error: std::fmt::Debug,
+    {
+        let drawable_object_id = checked_chart_selector(selector)?.get();
         self.update_slide_chart(slide_index, drawable_object_id, |chart| {
             let payload = chart.chart.as_mut().ok_or_else(|| {
                 Error::InvalidFormat(format!(
@@ -304,12 +315,17 @@ impl KeynoteEditor {
     }
 
     /// Set whether rows or columns form one slide chart's series.
-    pub fn set_slide_chart_direction(
+    pub fn set_slide_chart_direction<Selector>(
         &mut self,
         slide_index: usize,
-        drawable_object_id: u64,
+        selector: Selector,
         direction: Direction,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        Selector: TryInto<DrawableId>,
+        Selector::Error: std::fmt::Debug,
+    {
+        let drawable_object_id = checked_chart_selector(selector)?.get();
         if direction.is_unsupported() {
             return Err(Error::ParseError(
                 "cannot assign an unsupported chart series direction".to_owned(),
@@ -340,12 +356,17 @@ impl KeynoteEditor {
     }
 
     /// Update one chart's slide-space geometry.
-    pub fn set_slide_chart_geometry(
+    pub fn set_slide_chart_geometry<Selector>(
         &mut self,
         slide_index: usize,
-        drawable_object_id: u64,
+        selector: Selector,
         geometry: DrawableGeometry,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        Selector: TryInto<DrawableId>,
+        Selector::Error: std::fmt::Debug,
+    {
+        let drawable_object_id = checked_chart_selector(selector)?.get();
         geometry.validate()?;
         self.update_slide_chart(slide_index, drawable_object_id, |chart| {
             let drawable = chart.drawable.super_.as_mut().ok_or_else(|| {
@@ -374,11 +395,16 @@ impl KeynoteEditor {
     /// identities while retaining editable inline data and opaque protobuf
     /// fields. It is owned by the same slide but has an independent chart grid
     /// and geometry.
-    pub fn duplicate_slide_chart(
+    pub fn duplicate_slide_chart<Selector>(
         &mut self,
         slide_index: usize,
-        source_drawable_object_id: u64,
-    ) -> Result<KeynoteSlideChartInfo> {
+        selector: Selector,
+    ) -> Result<KeynoteSlideChartInfo>
+    where
+        Selector: TryInto<DrawableId>,
+        Selector::Error: std::fmt::Debug,
+    {
+        let source_drawable_object_id = checked_chart_selector(selector)?.get();
         let source = chart_graph(self, slide_index, source_drawable_object_id)?;
         let source_style_ids =
             local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
@@ -517,11 +543,16 @@ impl KeynoteEditor {
     }
 
     /// Remove a standalone slide chart and its private title, caption, and styles.
-    pub fn remove_slide_chart(
+    pub fn remove_slide_chart<Selector>(
         &mut self,
         slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<RemovedKeynoteSlideChart> {
+        selector: Selector,
+    ) -> Result<RemovedKeynoteSlideChart>
+    where
+        Selector: TryInto<DrawableId>,
+        Selector::Error: std::fmt::Debug,
+    {
+        let drawable_object_id = checked_chart_selector(selector)?.get();
         let source = chart_graph(self, slide_index, drawable_object_id)?;
         let style_ids =
             local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
@@ -613,6 +644,16 @@ impl KeynoteEditor {
         *self = Self::from_bytes(&staged.to_bytes()?)?;
         Ok(())
     }
+}
+
+fn checked_chart_selector<Selector>(selector: Selector) -> Result<DrawableId>
+where
+    Selector: TryInto<DrawableId>,
+    Selector::Error: std::fmt::Debug,
+{
+    selector
+        .try_into()
+        .map_err(|error| Error::ParseError(format!("Keynote chart selector is invalid: {error:?}")))
 }
 
 fn update_chart_payload(

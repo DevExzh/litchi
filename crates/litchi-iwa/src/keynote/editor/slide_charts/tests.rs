@@ -10,21 +10,21 @@ use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
 use crate::charts::{
     Axis, Bound, Bounds, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
     ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartLegendFill,
-    ChartLegendFont, ChartLegendFontSize, ChartLegendFrame,
-    ChartLegendRect, ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance,
-    ChartPieStartAngle, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners,
-    ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke, ChartSeriesStrokePattern,
-    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAutoFit,
-    ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Index, LabelAffixes,
-    LabelVisibility, LeaderLineVisibility, MajorStepCount, MinorStepCount, NegativeStyle,
-    NumberFormat, Scale, Steps, TickMarkLocation, Visibility,
+    ChartLegendFont, ChartLegendFontSize, ChartLegendFrame, ChartLegendRect, ChartLegendShadow,
+    ChartLegendStroke, ChartPieLabelDistance, ChartPieStartAngle, ChartPieWedgeExplosion,
+    ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars,
+    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
+    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Index,
+    LabelAffixes, LabelVisibility, LeaderLineVisibility, MajorStepCount, MinorStepCount,
+    NegativeStyle, NumberFormat, Scale, Steps, TickMarkLocation, Visibility,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::shapes::{
     Appearance, BlurRadius, Drop, Offset, Pattern, RgbColorSpace, RgbaColor, ShapeFill,
     ShapeImageFillTechnique, Stroke, Width,
 };
+use litchi_iwa_common::comment::DrawableId;
 use litchi_iwa_common::shape::shadow::{Angle, Opacity};
 
 const POSITION: DrawablePoint = DrawablePoint { x: 240.0, y: 260.0 };
@@ -189,6 +189,25 @@ fn chart_creation_rejects_invalid_inputs_transactionally() {
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn lifecycle_chart_apis_accept_checked_selectors_and_reject_zero() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let chart = editor
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let selector = DrawableId::from_raw(chart.drawable_object_id).unwrap();
+
+    editor
+        .set_slide_chart_kind(0, selector, Kind::Bar2d)
+        .unwrap();
+    assert_eq!(editor.slide_charts(0).unwrap()[0].kind, Kind::Bar2d);
+
+    let baseline = editor.to_bytes().unwrap();
+    assert!(editor.set_slide_chart_kind(0, 0_u64, Kind::Line2d).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    assert!(DrawableId::new(0).is_none());
 }
 
 #[test]
@@ -797,11 +816,7 @@ fn scratch_presentation_supports_native_chart_gap_crud() {
     );
     let baseline = editor.to_bytes().unwrap();
     editor
-        .set_slide_chart_gap_spacing(
-            0,
-            source.drawable_object_id,
-            Spacing::DEFAULT,
-        )
+        .set_slide_chart_gap_spacing(0, source.drawable_object_id, Spacing::DEFAULT)
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
