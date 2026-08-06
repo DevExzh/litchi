@@ -9,7 +9,7 @@ mod package;
 #[cfg(test)]
 mod tests;
 
-pub use model::{EmbeddedMediaAsset, MediaAsset, MediaLimits, MediaStats, MediaType};
+pub use model::{EmbeddedMediaAsset, MediaAsset, MediaAssetId, MediaLimits, MediaStats, MediaType};
 pub use package::{IWorkMediaEditor, MediaManager};
 
 pub(crate) use codec::{embedded_assets, reachable_embedded_assets};

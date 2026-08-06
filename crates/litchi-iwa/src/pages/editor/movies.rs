@@ -10,6 +10,7 @@ use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media::MediaAssetId;
 use crate::media_playback::replace_movie_playback_settings;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{
@@ -109,8 +110,8 @@ impl PagesEditor {
             ids,
             self.body_storage_id,
             style_id,
-            movie_asset.data_identifier,
-            poster_asset.data_identifier,
+            movie_asset.data_identifier.get(),
+            poster_asset.data_identifier.get(),
             geometry,
             options.natural_size(),
             duration_seconds,
@@ -138,7 +139,10 @@ impl PagesEditor {
         )?;
         patch_pages_zorder(&mut staged, None, Some(ids.drawable))?;
         add_component_object_uuids(&mut staged, DOCUMENT_OBJECT_ID, &ids.uuid_objects())?;
-        for data_identifier in [movie_asset.data_identifier, poster_asset.data_identifier] {
+        for data_identifier in [
+            movie_asset.data_identifier.get(),
+            poster_asset.data_identifier.get(),
+        ] {
             add_component_data_reference(
                 &mut staged,
                 DOCUMENT_OBJECT_ID,
@@ -168,18 +172,21 @@ impl PagesEditor {
                 Error::InvalidFormat("Pages movie creation failed validation".to_owned())
             })?;
         let created_graph = body_movie_graph(&verified, ids.drawable)?;
+        let created_movie_data_identifier = MediaAssetId::try_from(created.movie_data_identifier)?;
+        let created_poster_image_data_identifier =
+            MediaAssetId::try_from(created.poster_image_data_identifier)?;
         let expected_anchor = u32::try_from(anchor_character_index)
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
         if created.anchor_character_index != expected_anchor
-            || created.movie_data_identifier != movie_asset.data_identifier
-            || created.poster_image_data_identifier != poster_asset.data_identifier
+            || created_movie_data_identifier != movie_asset.data_identifier
+            || created_poster_image_data_identifier != poster_asset.data_identifier
             || created.geometry != geometry
             || created.original_size != Some(options.natural_size())
             || created.natural_size != Some(options.natural_size())
             || created.duration.as_secs_f32() != duration_seconds
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(movie_asset.data_identifier)? != movie_data
-            || verified.extract_media(poster_asset.data_identifier)? != poster_data
+            || verified.extract_media(movie_asset.data_identifier.get())? != movie_data
+            || verified.extract_media(poster_asset.data_identifier.get())? != poster_data
         {
             return Err(Error::InvalidFormat(
                 "Pages movie creation produced an inconsistent graph".to_owned(),
@@ -505,7 +512,8 @@ impl PagesEditor {
         replacement: &[u8],
     ) -> Result<Vec<u8>> {
         let source = body_movie_graph(self, drawable_object_id)?;
-        self.replace_media(source.info.movie_data_identifier, replacement)
+        let data_identifier = MediaAssetId::try_from(source.info.movie_data_identifier)?;
+        self.replace_media(data_identifier.get(), replacement)
     }
 
     /// Replace the poster image referenced by one body-anchored movie.
@@ -518,7 +526,8 @@ impl PagesEditor {
         replacement: &[u8],
     ) -> Result<Vec<u8>> {
         let source = body_movie_graph(self, drawable_object_id)?;
-        self.replace_media(source.info.poster_image_data_identifier, replacement)
+        let data_identifier = MediaAssetId::try_from(source.info.poster_image_data_identifier)?;
+        self.replace_media(data_identifier.get(), replacement)
     }
 
     /// Remove a body movie, its attachment/private graph, and unshared assets.
@@ -570,12 +579,13 @@ impl PagesEditor {
             .map(|(data, _)| *data)
             .collect::<HashSet<_>>();
         for identifier in data_identifiers {
+            let identifier = MediaAssetId::try_from(identifier)?;
             if media
                 .asset(identifier)
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier);
+                removed_data_identifiers.push(identifier.get());
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -589,7 +599,7 @@ impl PagesEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_assets
                     .iter()
-                    .any(|asset| asset.data_identifier == *identifier)
+                    .any(|asset| asset.data_identifier.get() == *identifier)
             })
         {
             return Err(Error::InvalidFormat(
@@ -1036,14 +1046,7 @@ mod tests {
         for result in [
             editor.add_body_movie(4, "poster.png", POSTER, "poster.png", POSTER, options()),
             editor.add_body_movie(4, "movie.mov", MOVIE, "movie.mov", MOVIE, options()),
-            editor.add_body_movie(
-                4,
-                "movie.mov",
-                MOVIE,
-                "poster.png",
-                POSTER,
-                options(),
-            ),
+            editor.add_body_movie(4, "movie.mov", MOVIE, "poster.png", POSTER, options()),
             editor.add_body_movie(5, "movie.mov", MOVIE, "poster.png", POSTER, options()),
         ] {
             assert!(result.is_err());

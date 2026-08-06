@@ -12,6 +12,7 @@ use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media::MediaAssetId;
 use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, offset_drawable_geometry,
@@ -101,7 +102,7 @@ impl NumbersEditor {
             ids,
             sheet_id,
             context.style_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             geometry,
             duration_seconds,
         )?;
@@ -122,7 +123,7 @@ impl NumbersEditor {
         add_component_data_reference(
             &mut staged,
             context.component_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             ids.drawable,
         )?;
         if context.stylesheet_component_id != context.component_id {
@@ -144,13 +145,13 @@ impl NumbersEditor {
                 Error::InvalidFormat("Numbers audio creation failed validation".to_owned())
             })?;
         let created_graph = audio_graph(&verified, sheet_id, ids.drawable)?;
-        if created.audio_data_identifier != asset.data_identifier
+        if created.audio_data_identifier != asset.data_identifier.get()
             || created.position != options.position
             || created.duration.as_secs_f32() != duration_seconds
             || created_graph.object_ids != ids.all()
             || created_graph.uuid_object_ids != ids.all()
-            || created_graph.data_references != [(asset.data_identifier, ids.drawable)]
-            || verified.extract_media(asset.data_identifier)? != data
+            || created_graph.data_references != [(asset.data_identifier.get(), ids.drawable)]
+            || verified.extract_media(asset.data_identifier.get())? != data
         {
             return Err(Error::InvalidFormat(
                 "Numbers audio creation produced an inconsistent graph".to_owned(),
@@ -519,12 +520,13 @@ impl NumbersEditor {
             .map(|(data, _)| *data)
             .collect::<HashSet<_>>();
         for identifier in data_identifiers {
+            let identifier = MediaAssetId::try_from(identifier)?;
             if media
                 .asset(identifier)
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier);
+                removed_data_identifiers.push(identifier.get());
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -538,7 +540,7 @@ impl NumbersEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_assets
                     .iter()
-                    .any(|asset| asset.data_identifier == *identifier)
+                    .any(|asset| asset.data_identifier.get() == *identifier)
             })
         {
             return Err(Error::InvalidFormat(

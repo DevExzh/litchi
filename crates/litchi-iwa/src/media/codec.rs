@@ -12,7 +12,7 @@ use crate::protobuf;
 use litchi_iwa_common::varint::{decode_varint_from_bytes, encode_varint_into};
 use crate::{Error, Result};
 
-use super::model::{EmbeddedMediaAsset, MediaAsset, MediaLimits, MediaType};
+use super::model::{EmbeddedMediaAsset, MediaAsset, MediaAssetId, MediaLimits, MediaType};
 
 pub(crate) const PACKAGE_METADATA_ENTRY: &str = "Index/Metadata.iwa";
 pub(crate) const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
@@ -141,7 +141,7 @@ pub(crate) fn validate_new_media(filename: &str, data: &[u8], maximum_length: us
 
 pub(crate) fn materialized_file_name(
     preferred_filename: &str,
-    data_identifier: u64,
+    data_identifier: MediaAssetId,
 ) -> Result<String> {
     let path = Path::new(preferred_filename);
     let stem = path
@@ -252,6 +252,7 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
     let mut assets = Vec::with_capacity(metadata.datas.len());
     let mut identifiers = std::collections::HashSet::with_capacity(metadata.datas.len());
     for data in metadata.datas {
+        let data_identifier = MediaAssetId::try_from(data.identifier)?;
         if !identifiers.insert(data.identifier) {
             return Err(Error::Bundle(format!(
                 "Duplicate DataInfo identifier {}",
@@ -282,7 +283,7 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
             .map(MediaType::from_extension)
             .unwrap_or(MediaType::Unknown);
         assets.push(EmbeddedMediaAsset {
-            data_identifier: data.identifier,
+            data_identifier,
             preferred_filename: data.preferred_file_name,
             package_path,
             media_type,

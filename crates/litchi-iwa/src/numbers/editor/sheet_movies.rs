@@ -9,6 +9,7 @@ use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media::MediaAssetId;
 use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
@@ -129,8 +130,8 @@ impl NumbersEditor {
             ids,
             sheet_id,
             context.style_id,
-            movie_asset.data_identifier,
-            poster_asset.data_identifier,
+            movie_asset.data_identifier.get(),
+            poster_asset.data_identifier.get(),
             geometry,
             options.natural_size,
             duration_seconds,
@@ -153,7 +154,7 @@ impl NumbersEditor {
             add_component_data_reference(
                 &mut staged,
                 context.component_id,
-                data_identifier,
+                data_identifier.get(),
                 ids.drawable,
             )?;
         }
@@ -176,15 +177,15 @@ impl NumbersEditor {
                 Error::InvalidFormat("Numbers movie creation failed validation".to_owned())
             })?;
         let created_graph = movie_graph(&verified, sheet_id, ids.drawable)?;
-        if created.movie_data_identifier != movie_asset.data_identifier
-            || created.poster_image_data_identifier != poster_asset.data_identifier
+        if created.movie_data_identifier != movie_asset.data_identifier.get()
+            || created.poster_image_data_identifier != poster_asset.data_identifier.get()
             || created.geometry != geometry
             || created.original_size != Some(options.natural_size)
             || created.natural_size != Some(options.natural_size)
             || created.duration.as_secs_f32() != duration_seconds
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(movie_asset.data_identifier)? != movie_data
-            || verified.extract_media(poster_asset.data_identifier)? != poster_data
+            || verified.extract_media(movie_asset.data_identifier.get())? != movie_data
+            || verified.extract_media(poster_asset.data_identifier.get())? != poster_data
         {
             return Err(Error::InvalidFormat(
                 "Numbers movie creation produced an inconsistent graph".to_owned(),
@@ -626,12 +627,13 @@ impl NumbersEditor {
             .map(|(data, _)| *data)
             .collect::<HashSet<_>>();
         for identifier in data_identifiers {
+            let identifier = MediaAssetId::try_from(identifier)?;
             if media
                 .asset(identifier)
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier);
+                removed_data_identifiers.push(identifier.get());
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -645,7 +647,7 @@ impl NumbersEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_assets
                     .iter()
-                    .any(|asset| asset.data_identifier == *identifier)
+                    .any(|asset| asset.data_identifier.get() == *identifier)
             })
         {
             return Err(Error::InvalidFormat(

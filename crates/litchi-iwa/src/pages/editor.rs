@@ -19,7 +19,7 @@ use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::comments::IWorkDrawableCommentEditor;
-use crate::media::reachable_embedded_assets;
+use crate::media::{MediaAssetId, reachable_embedded_assets};
 use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
     component_uuid_identifiers, next_object_identifier, release_package_identifier_suffix,
@@ -2698,6 +2698,7 @@ impl PagesEditor {
     }
 
     pub fn extract_media(&self, data_identifier: u64) -> Result<Vec<u8>> {
+        let data_identifier = MediaAssetId::try_from(data_identifier)?;
         if !self
             .media_assets()?
             .iter()
@@ -2712,6 +2713,7 @@ impl PagesEditor {
 
     /// Replace a referenced materialized asset without changing its data identifier.
     pub fn replace_media(&mut self, data_identifier: u64, replacement: &[u8]) -> Result<Vec<u8>> {
+        let data_identifier = MediaAssetId::try_from(data_identifier)?;
         if !self
             .media_assets()?
             .iter()

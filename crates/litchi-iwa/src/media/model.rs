@@ -1,5 +1,7 @@
 //! Semantic media models and resource profiles.
 
+use std::fmt;
+use std::num::NonZeroU64;
 use std::path::PathBuf;
 
 use crate::{Error, Result};
@@ -133,11 +135,58 @@ impl Default for MediaLimits {
     }
 }
 
+/// A validated native identifier for one embedded media asset.
+///
+/// iWork uses zero as the absence value for media references. Keeping that
+/// sentinel out of the semantic API leaves the native representation at the
+/// archive boundary while making an addressed asset compact and non-null.
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct MediaAssetId(NonZeroU64);
+
+impl MediaAssetId {
+    /// Construct a media asset identifier, returning `None` for the native
+    /// null sentinel.
+    #[must_use]
+    pub const fn new(raw: u64) -> Option<Self> {
+        match NonZeroU64::new(raw) {
+            Some(value) => Some(Self(value)),
+            None => None,
+        }
+    }
+
+    /// Return the native identifier used at the archive boundary.
+    #[must_use]
+    pub const fn get(self) -> u64 {
+        self.0.get()
+    }
+
+    pub(crate) fn next(self) -> Option<Self> {
+        self.get().checked_add(1).and_then(Self::new)
+    }
+}
+
+impl TryFrom<u64> for MediaAssetId {
+    type Error = Error;
+
+    fn try_from(raw: u64) -> Result<Self> {
+        Self::new(raw).ok_or_else(|| {
+            Error::InvalidFormat("embedded media asset identifiers must be non-zero".to_owned())
+        })
+    }
+}
+
+impl fmt::Display for MediaAssetId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.get().fmt(formatter)
+    }
+}
+
 /// Metadata-backed view of one `TSP.DataInfo` record.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EmbeddedMediaAsset {
     /// Stable `TSP.DataInfo.identifier` used by drawable protobufs.
-    pub data_identifier: u64,
+    pub data_identifier: MediaAssetId,
     /// Name iWork prefers when materializing or exporting the asset.
     pub preferred_filename: String,
     /// Materialized package member, when present.

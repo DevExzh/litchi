@@ -3,6 +3,7 @@
 #![allow(unused_imports)]
 
 use super::*;
+use crate::media::MediaAssetId;
 
 impl NumbersEditor {
     /// List metadata-backed media reachable from this spreadsheet package.
@@ -25,6 +26,7 @@ impl NumbersEditor {
     }
 
     pub fn extract_media(&self, data_identifier: u64) -> Result<Vec<u8>> {
+        let data_identifier = MediaAssetId::try_from(data_identifier)?;
         if !self
             .media_assets()?
             .iter()
@@ -39,6 +41,7 @@ impl NumbersEditor {
 
     /// Replace a referenced materialized asset without changing its data identifier.
     pub fn replace_media(&mut self, data_identifier: u64, replacement: &[u8]) -> Result<Vec<u8>> {
+        let data_identifier = MediaAssetId::try_from(data_identifier)?;
         if !self
             .media_assets()?
             .iter()
