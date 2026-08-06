@@ -1053,6 +1053,16 @@ impl Presentation {
         Ok(result)
     }
 
+    /// Parse and validate the complete inert presentation-comment catalog.
+    ///
+    /// Author seed metadata lives in the document stream while comment atoms
+    /// live in slide extensions; this facade joins both scopes and checks the
+    /// cross-record index rule before returning the inventory.
+    pub fn comment_catalog(&self) -> Result<crate::comments::Catalog> {
+        let authors = crate::comments::Authors::parse(&self.live_document_record()?)?;
+        crate::comments::Catalog::from_parts(authors, self.comments()?)
+    }
+
     /// Return all shape-scoped programmable tags in slide and shape order.
     pub fn shape_programmable_tags(
         &self,

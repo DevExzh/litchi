@@ -1,5 +1,6 @@
-use super::{Authors, parse_slide_comments};
+use super::{Authors, Catalog, parse_slide_comments};
 use crate::consts::RecordType;
+use crate::presentation::ParsedSlideComments;
 use crate::records::Record;
 
 fn record_bytes(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
@@ -105,6 +106,27 @@ fn rejects_comment_indices_above_author_seed() {
     let authors = Authors::parse(&root(vec![prog_tags_record(10, &author_container(7))])).unwrap();
 
     assert!(authors.validate_comments(&comments).is_err());
+}
+
+#[test]
+fn catalog_joins_slide_comments_and_author_seeds() {
+    let comments =
+        parse_slide_comments(&root(vec![prog_tags_record(10, &comment_container(7))])).unwrap();
+    let authors = Authors::parse(&root(vec![prog_tags_record(10, &author_container(7))])).unwrap();
+    let catalog = Catalog::from_parts(
+        authors,
+        vec![ParsedSlideComments {
+            slide_number: 2,
+            comments,
+        }],
+    )
+    .unwrap();
+
+    assert_eq!(catalog.authors().len(), 1);
+    assert_eq!(catalog.slides().len(), 1);
+    assert_eq!(catalog.comments().count(), 1);
+    assert_eq!(catalog.slide(2).unwrap().comments[0].index, 7);
+    assert!(catalog.slide(1).is_none());
 }
 
 #[test]

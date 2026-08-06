@@ -194,7 +194,7 @@ pub use client_data::{
     OFFICE_ART_CLIENT_DATA_RECORD_TYPE,
 };
 pub use color_scheme::{ColorScheme, ColorSchemeAtom, ColorSchemeAtomKind, SchemeColor};
-pub use comments::{Author, Authors};
+pub use comments::{Author, Authors, Catalog};
 pub use current_user::CurrentUser;
 pub use document_atom::{DocumentAtom, DocumentDimensions, SlideSizeType};
 pub use document_properties::{

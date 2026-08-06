@@ -12,4 +12,4 @@ mod model;
 mod tests;
 
 pub(crate) use codec::parse_slide_comments;
-pub use model::{Author, Authors};
+pub use model::{Author, Authors, Catalog};
