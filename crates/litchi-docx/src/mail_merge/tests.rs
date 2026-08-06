@@ -106,3 +106,90 @@ fn round_trips_strict_recipient_data_with_canonical_base64() {
     assert!(xml.contains("AQID"));
     assert_eq!(Recipients::parse_xml(xml.as_bytes()).unwrap(), recipients);
 }
+
+#[test]
+fn source_checked_settings_edits_preserve_opaque_owner_markup() {
+    let source = format!(
+        r#"<w:settings xmlns:w="{W}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:future"><x:before/><w:mailMerge><w:query w:val="old"/><x:opaque keep="yes"/></w:mailMerge><x:after/></w:settings>"#
+    );
+    let snapshot = super::Snapshot::from_xml(source.as_bytes().to_vec()).unwrap();
+    let mut edit = snapshot.edit();
+    edit.edit_settings(|settings| {
+        settings.set_query(Some("new".into()));
+        Ok(())
+    })
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.changed());
+    let updated = commit.snapshot();
+    let updated_xml = std::str::from_utf8(updated.xml_bytes()).unwrap();
+    assert!(updated_xml.contains("x:before"));
+    assert!(updated_xml.contains("x:after"));
+    assert!(updated_xml.contains(r#"x:opaque keep="yes""#));
+    assert!(updated_xml.contains(r#"query w:val="new""#));
+    assert_eq!(
+        commit.patch().inverse().apply(updated).unwrap().xml_bytes(),
+        source.as_bytes()
+    );
+
+    let stale = super::Snapshot::from_xml(
+        source
+            .replace("w:val=\"old\"", "w:val=\"stale\"")
+            .into_bytes(),
+    )
+    .unwrap();
+    assert!(commit.patch().apply(&stale).is_err());
+}
+
+#[test]
+fn recipient_transaction_is_typed_bounded_and_reversible() {
+    let settings = format!(r#"<w:settings xmlns:w="{W}"><w:mailMerge/></w:settings>"#);
+    let recipients = format!(
+        r#"<w:recipients xmlns:w="{W}" xmlns:x="urn:future"><w:recipientData><w:active w:val="0"/></w:recipientData><x:opaque/></w:recipients>"#
+    );
+    let snapshot =
+        super::Snapshot::from_parts(settings.into_bytes(), Some(recipients.as_bytes().to_vec()))
+            .unwrap();
+    let mut edit = snapshot.edit();
+    edit.set_recipient_active(0, true).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.snapshot().recipients().unwrap().recipients()[0].active());
+    let recipient_xml = std::str::from_utf8(commit.snapshot().recipients_xml().unwrap()).unwrap();
+    assert!(recipient_xml.contains("x:opaque"));
+    assert!(!recipient_xml.contains("<w:active"));
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(&commit.snapshot())
+            .unwrap()
+            .recipients_xml(),
+        Some(recipients.as_bytes())
+    );
+}
+
+#[test]
+fn exact_noop_retains_source_and_invalid_recipient_edits_are_atomic() {
+    let settings = format!(
+        r#"<w:settings xmlns:w="{W}"><w:mailMerge><w:query w:val="same"/></w:mailMerge></w:settings>"#
+    );
+    let snapshot = super::Snapshot::from_xml(settings.as_bytes().to_vec()).unwrap();
+    let mut no_op = snapshot.edit();
+    no_op
+        .edit_settings(|settings| {
+            settings.set_query(Some("same".into()));
+            Ok(())
+        })
+        .unwrap();
+    let no_op = no_op.commit().unwrap();
+    assert!(!no_op.changed());
+    assert_eq!(no_op.snapshot().xml_bytes(), settings.as_bytes());
+
+    let recipients = format!(r#"<w:recipients xmlns:w="{W}"><w:recipientData/></w:recipients>"#);
+    let snapshot =
+        super::Snapshot::from_parts(settings.into_bytes(), Some(recipients.into_bytes())).unwrap();
+    let before = snapshot.recipients().unwrap().clone();
+    let mut edit = snapshot.edit();
+    assert!(edit.set_recipient_active(1, true).is_err());
+    assert_eq!(edit.recipients().unwrap(), &before);
+}

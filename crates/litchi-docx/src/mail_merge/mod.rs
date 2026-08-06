@@ -4,6 +4,7 @@ mod adapter;
 mod codec;
 mod model;
 mod package;
+mod transaction;
 
 #[cfg(test)]
 mod tests;
@@ -18,6 +19,7 @@ pub use model::{
     MainDocumentType, Recipient, Recipients, Settings,
 };
 pub use package::{Source, Target};
+pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
 
 /// Content type for the inert mail-merge recipient-data part.
 pub const RECIPIENT_CONTENT_TYPE: &str =
