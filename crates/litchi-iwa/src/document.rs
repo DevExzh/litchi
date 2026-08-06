@@ -52,7 +52,7 @@ impl Document {
     }
 
     /// Open an iWork document under caller-selected bundle ingress ceilings.
-    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
+    pub(crate) fn open_with_limits<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
         let path_ref = path.as_ref();
         let bundle = Bundle::open_with_limits(path_ref, limits)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
@@ -105,7 +105,7 @@ impl Document {
     }
 
     /// Open an iWork document from bytes under caller-selected bundle limits.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
+    pub(crate) fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
         let bundle = Bundle::from_bytes_with_limits(bytes, limits)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
