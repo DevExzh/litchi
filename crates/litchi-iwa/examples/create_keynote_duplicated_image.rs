@@ -4,11 +4,12 @@ use std::env;
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideImageOptions};
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_keynote::slide::image::Options as ImageOptions;
 
-const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 704.0, y: 284.0 };
-const IMAGE_SIZE: DrawableSize = DrawableSize {
+const IMAGE_POSITION: Point = Point { x: 704.0, y: 284.0 };
+const IMAGE_SIZE: Size = Size {
     width: 512.0,
     height: 512.0,
 };
@@ -38,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0,
         preferred_filename,
         &image,
-        KeynoteSlideImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
+        ImageOptions::new(IMAGE_POSITION, IMAGE_SIZE)?,
     )?;
     let duplicate = editor.duplicate_slide_image(0, source.drawable_object_id)?;
     editor.save(output)?;

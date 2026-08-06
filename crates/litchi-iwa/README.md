@@ -688,7 +688,7 @@ retained hidden for later toggling; fresh slides cloned from the layout preserve
 the same native behavior:
 
 ```rust
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideImageOptions};
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
 
 let mut keynote = KeynoteDocumentBuilder::new()
     .title("Native slide numbers")
@@ -814,7 +814,8 @@ asset are all created directly; no blank Keynote package is embedded:
 ```rust
 use std::fs;
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_keynote::slide::image::Options as ImageOptions;
 
 let image = fs::read("chart.png")?;
 let mut keynote = KeynoteDocumentBuilder::new().build()?;
@@ -822,10 +823,10 @@ let source = keynote.add_slide_image(
     0,
     "chart.png",
     &image,
-    KeynoteSlideImageOptions::new(
-        DrawablePoint { x: 704.0, y: 284.0 },
-        DrawableSize { width: 512.0, height: 512.0 },
-    ),
+    ImageOptions::new(
+        Point { x: 704.0, y: 284.0 },
+        Size { width: 512.0, height: 512.0 },
+    )?,
 )?;
 keynote.set_slide_image_title(0, source.drawable_object_id, "Quarterly revenue")?;
 keynote.set_slide_image_caption(0, source.drawable_object_id, "North America, Q4")?;

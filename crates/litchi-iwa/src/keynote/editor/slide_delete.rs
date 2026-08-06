@@ -160,6 +160,7 @@ mod tests {
     use super::*;
     use crate::media::MediaAssetId;
     use crate::shapes::{DrawablePoint, DrawableSize};
+    use litchi_keynote::slide::image::Options as ImageOptions;
 
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 80.0, y: 90.0 };
     const IMAGE_SIZE: DrawableSize = DrawableSize {
@@ -197,7 +198,7 @@ mod tests {
                 1,
                 "litchi_logo.png",
                 include_bytes!("../../../../../media/litchi_logo.png"),
-                KeynoteSlideImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
+                ImageOptions::new(IMAGE_POSITION, IMAGE_SIZE).unwrap(),
             )
             .unwrap();
         assert_eq!(editor.media_assets().unwrap().len(), 1);
@@ -221,7 +222,7 @@ mod tests {
                 1,
                 "litchi_logo.png",
                 include_bytes!("../../../../../media/litchi_logo.png"),
-                KeynoteSlideImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
+                ImageOptions::new(IMAGE_POSITION, IMAGE_SIZE).unwrap(),
             )
             .unwrap();
         editor.duplicate_slide(1).unwrap();

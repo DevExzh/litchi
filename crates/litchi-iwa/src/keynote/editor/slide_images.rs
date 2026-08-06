@@ -12,10 +12,11 @@ use crate::image_adjustments::replace_image_adjustments;
 use crate::image_caption::{CaptionObjectIds, DrawableCaptionKind};
 use crate::media::MediaAssetId;
 use crate::shapes::{
-    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
+    DrawableFlipAxis, DrawableGeometry, DrawableProperties, DrawableSize, flip_drawable_geometry,
+    offset_drawable_geometry, restore_drawable_original_size,
 };
 use litchi_iwa_common::shape::image::ImageAdjustments;
+use litchi_keynote::slide::image::Options as ImageOptions;
 
 mod graph;
 
@@ -47,35 +48,6 @@ pub struct KeynoteSlideImageInfo {
     pub natural_size: Option<DrawableSize>,
 }
 
-/// Typed layout metadata for a newly created Keynote slide image.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct KeynoteSlideImageOptions {
-    /// Top-left position on the slide, in points.
-    pub position: DrawablePoint,
-    /// Displayed image size on the slide, in points.
-    pub size: DrawableSize,
-    /// Untransformed media dimensions reported to Keynote, in points.
-    pub natural_size: DrawableSize,
-}
-
-impl KeynoteSlideImageOptions {
-    /// Create options whose displayed and natural dimensions are identical.
-    pub const fn new(position: DrawablePoint, size: DrawableSize) -> Self {
-        Self {
-            position,
-            size,
-            natural_size: size,
-        }
-    }
-
-    /// Set media dimensions independently of the displayed size.
-    #[must_use]
-    pub const fn with_natural_size(mut self, natural_size: DrawableSize) -> Self {
-        self.natural_size = natural_size;
-        self
-    }
-}
-
 /// Result of removing one slide-owned image and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedKeynoteSlideImage {
@@ -100,7 +72,7 @@ impl KeynoteEditor {
         slide_index: usize,
         preferred_filename: &str,
         data: &[u8],
-        options: KeynoteSlideImageOptions,
+        options: ImageOptions,
     ) -> Result<KeynoteSlideImageInfo> {
         let geometry = image_creation_values(options)?;
         let context = image_creation_context(self, slide_index)?;
@@ -121,7 +93,7 @@ impl KeynoteEditor {
             context.style_id,
             asset.data_identifier.get(),
             geometry,
-            options.natural_size,
+            options.natural_size(),
         )?;
         staged.update_archive(&context.archive_name, |archive| {
             for object in objects {
@@ -163,8 +135,8 @@ impl KeynoteEditor {
         if created.kind != KeynoteSlideImageKind::File
             || created.image_data_identifier != asset.data_identifier.get()
             || created.geometry != geometry
-            || created.original_size != Some(options.natural_size)
-            || created.natural_size != Some(options.natural_size)
+            || created.original_size != Some(options.natural_size())
+            || created.natural_size != Some(options.natural_size())
             || created_graph.object_ids != ids.all()
             || verified.extract_media(asset.data_identifier.get())? != data
         {
@@ -755,6 +727,7 @@ mod tests {
 
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
+    use crate::shapes::DrawablePoint;
     use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
@@ -767,9 +740,11 @@ mod tests {
         height: 480.0,
     };
 
-    fn options() -> KeynoteSlideImageOptions {
-        KeynoteSlideImageOptions::new(IMAGE_POSITION, IMAGE_SIZE)
+    fn options() -> ImageOptions {
+        ImageOptions::new(IMAGE_POSITION, IMAGE_SIZE)
+            .unwrap()
             .with_natural_size(NATURAL_IMAGE_SIZE)
+            .unwrap()
     }
 
     #[test]
@@ -1192,18 +1167,12 @@ mod tests {
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
-        assert!(
-            editor
-                .add_slide_image(
-                    0,
-                    "lena.png",
-                    &original,
-                    options().with_natural_size(DrawableSize {
-                        width: 0.0,
-                        height: NATURAL_IMAGE_SIZE.height,
-                    }),
-                )
-                .is_err()
+        assert_eq!(
+            options().with_natural_size(DrawableSize {
+                width: 0.0,
+                height: NATURAL_IMAGE_SIZE.height,
+            }),
+            Err(litchi_keynote::Error::InvalidImageSize)
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 

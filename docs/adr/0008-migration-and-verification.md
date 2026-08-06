@@ -6345,6 +6345,20 @@ entry reassembly, raw `IWorkTextEditor` IDs/storage, full source-path
 retention for byte-ingress `open`, or the remaining monolithic adapters are
 complete.
 
+The concrete-crate audit for ADRs 0001–0004 found no direct `litchi_iwa`
+imports in `litchi-pages`, `litchi-numbers`, or `litchi-keynote`. It retained
+three follow-up seams: Pages' flat document re-exports and opaque background
+payload, Keynote's flat background re-exports and opaque payload, and the
+Numbers `table::{Position, Range}` migration aliases. The first implementation
+slice moved the archive-free Keynote slide-image insertion value from the
+monolith into `litchi_keynote::slide::image::Options`. The leaf now validates
+finite placement and strictly positive displayed/natural dimensions, stores
+only three common geometry values, and reports typed image-specific errors;
+the old `KeynoteSlideImageOptions` owner and facade re-exports were removed.
+The focused leaf tests, four Keynote image CRUD tests, five image examples,
+and strict Keynote Clippy passed. Table-lock ownership was intentionally
+outside this audit scope.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

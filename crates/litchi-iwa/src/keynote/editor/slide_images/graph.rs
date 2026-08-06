@@ -102,19 +102,10 @@ pub(super) struct SlideImageGraph {
     pub(super) data_references: Vec<(u64, u64)>,
 }
 
-pub(super) fn image_creation_values(options: KeynoteSlideImageOptions) -> Result<DrawableGeometry> {
-    if !options.natural_size.width.is_finite()
-        || !options.natural_size.height.is_finite()
-        || options.natural_size.width <= 0.0
-        || options.natural_size.height <= 0.0
-    {
-        return Err(Error::ParseError(
-            "Keynote image natural size must be finite and greater than zero".to_owned(),
-        ));
-    }
+pub(super) fn image_creation_values(options: ImageOptions) -> Result<DrawableGeometry> {
     DrawableGeometry {
-        position: Some(options.position),
-        size: Some(options.size),
+        position: Some(options.position()),
+        size: Some(options.size()),
         flags: Some(DEFAULT_DRAWABLE_FLAGS),
         angle: Some(DEFAULT_IMAGE_ROTATION_DEGREES),
     }
