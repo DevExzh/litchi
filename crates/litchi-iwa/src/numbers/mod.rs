@@ -63,11 +63,17 @@ impl From<litchi_numbers::table::headers::Error> for crate::Error {
     }
 }
 
+impl From<litchi_numbers::table::merge::Error> for crate::Error {
+    fn from(error: litchi_numbers::table::merge::Error) -> Self {
+        Self::ParseError(error.to_string())
+    }
+}
+
 pub use creation::NumbersDocumentBuilder;
 pub use document::NumbersDocument;
 pub use editor::{
-    Dimension, Direction, IWorkTableCellRegion, NumbersEditor, NumbersPivotCategoryInfo,
-    NumbersSheetAudioInfo, NumbersSheetAudioOptions, NumbersSheetChartInfo, NumbersSheetImageInfo,
+    Dimension, Direction, NumbersEditor, NumbersPivotCategoryInfo, NumbersSheetAudioInfo,
+    NumbersSheetAudioOptions, NumbersSheetChartInfo, NumbersSheetImageInfo,
     NumbersSheetImageOptions, NumbersSheetInfo, NumbersSheetMovieInfo, NumbersSheetMovieOptions,
     NumbersSheetShapeInfo, NumbersTableCellParagraphIndents, NumbersTableCellParagraphLineSpacing,
     NumbersTableCellParagraphList, NumbersTableCellParagraphListBullet,

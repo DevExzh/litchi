@@ -3,6 +3,7 @@
 #![allow(unused_imports)]
 
 use super::*;
+use litchi_numbers::table::merge::Region;
 
 impl NumbersEditor {
     /// List absolute pivot categories backed by valid calculation-engine
@@ -2417,12 +2418,12 @@ impl NumbersEditor {
     }
 
     /// List every native merged-cell rectangle in one attached table.
-    pub fn table_cell_merges(&self, table_id: u64) -> Result<Vec<IWorkTableCellRegion>> {
+    pub fn table_cell_merges(&self, table_id: u64) -> Result<Vec<Region>> {
         cell_merge::regions_in_package(&self.package, table_id)
     }
 
     /// Merge one non-overlapping rectangular cell region transactionally.
-    pub fn merge_cells(&mut self, table_id: u64, region: IWorkTableCellRegion) -> Result<()> {
+    pub fn merge_cells(&mut self, table_id: u64, region: Region) -> Result<()> {
         let mut staged = self.package.clone();
         cell_merge::merge_in_package(&mut staged, table_id, region)?;
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
@@ -2436,7 +2437,7 @@ impl NumbersEditor {
     }
 
     /// Remove one exact merged-cell rectangle, returning whether it existed.
-    pub fn unmerge_cells(&mut self, table_id: u64, region: IWorkTableCellRegion) -> Result<bool> {
+    pub fn unmerge_cells(&mut self, table_id: u64, region: Region) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_merge::unmerge_in_package(&mut staged, table_id, region)?;
         if !changed {

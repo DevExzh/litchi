@@ -56,7 +56,7 @@ pub use editor::{
     KeynoteTableCellParagraphListNumberFormat, KeynoteTableCellParagraphListNumberScale,
     KeynoteTableCellParagraphListNumberTiering, KeynoteTableCellParagraphListNumbering,
     KeynoteTableCellParagraphListPlacement, KeynoteTableCellParagraphSpacing,
-    KeynoteTableCellParagraphTabStops, KeynoteTableCellRegion, KeynoteTableCellTextAlignment,
+    KeynoteTableCellParagraphTabStops, KeynoteTableCellTextAlignment,
     KeynoteTableCellTextBackground, KeynoteTableCellTextBaselineShift,
     KeynoteTableCellTextCapitalization, KeynoteTableCellTextCharacterSpacing,
     KeynoteTableCellTextColor, KeynoteTableCellTextDecorations, KeynoteTableCellTextFont,

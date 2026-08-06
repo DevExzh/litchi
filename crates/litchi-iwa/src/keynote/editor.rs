@@ -5574,7 +5574,7 @@ pub use slide_tables::{
     KeynoteTableCellParagraphListLevelPlacement, KeynoteTableCellParagraphListNumberFormat,
     KeynoteTableCellParagraphListNumberScale, KeynoteTableCellParagraphListNumberTiering,
     KeynoteTableCellParagraphListNumbering, KeynoteTableCellParagraphListPlacement,
-    KeynoteTableCellParagraphSpacing, KeynoteTableCellParagraphTabStops, KeynoteTableCellRegion,
+    KeynoteTableCellParagraphSpacing, KeynoteTableCellParagraphTabStops,
     KeynoteTableCellTextAlignment, KeynoteTableCellTextBackground,
     KeynoteTableCellTextBaselineShift, KeynoteTableCellTextCapitalization,
     KeynoteTableCellTextCharacterSpacing, KeynoteTableCellTextColor,

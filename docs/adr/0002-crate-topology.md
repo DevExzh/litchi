@@ -435,7 +435,19 @@ canonical sparse cells directly while retaining format-owned comments and
 merge regions as separate sidecars; read-only comment sidecars are compact
 sorted boxed pairs, and the former tuple-keyed cell maps are no longer rebuilt
 in either reader. The generic structured extractor remains the last current
-`NumbersTable::into_parts` consumer and is staged separately.
+`TableDataExtractor` consumer and is staged separately.
+
+Shared iWork merged-cell geometry now follows the same ownership boundary at
+`litchi-numbers::table::merge::{Region, Axis, Deletion, AnchorRelocation}`.
+`Region` is a checked, 16-byte archive-free rectangle backed by compact `u32`
+coordinates and non-zero spans; the leaf also owns the pure axis insertion,
+deletion, and surviving-anchor transformations. Numbers, Pages, and Keynote
+table facades accept and borrow this one semantic type rather than publishing
+an `IWorkTableCellRegion` or format-prefixed duplicate. `litchi-iwa` retains
+only merge-formula parsing, native table-bound checks, unknown-wire
+preservation, formula-anchor relocation, and transactional package mutation;
+the conversion from physical `usize` indices to the bounded leaf domain is
+checked at that adapter boundary.
 
 The archive-free result aggregation is now isolated in
 `litchi-iwa-structured`. Its `StructuredData` value depends only on the

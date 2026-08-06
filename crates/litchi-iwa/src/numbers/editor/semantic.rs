@@ -8,7 +8,7 @@ use super::table_duplicate::{
     duplicate_attached_table_graph_in_package, duplicate_table_name, table_owned_graph,
 };
 use super::{
-    DOCUMENT_COMPONENT_IDENTIFIER, EMPTY_TABLE_POSITION_OFFSET, IWorkTableCellRegion,
+    DOCUMENT_COMPONENT_IDENTIFIER, EMPTY_TABLE_POSITION_OFFSET,
     SHAPE_INFO_MESSAGE_TYPE, TABLE_DUPLICATE_OFFSET, cell_data_format, cell_fill, cell_layout,
     cell_merge, cell_paragraph_list, cell_paragraph_style, conditional_highlight, formula_cache,
     stroke_layers, table_bootstrap, table_cells, table_create, table_formula,

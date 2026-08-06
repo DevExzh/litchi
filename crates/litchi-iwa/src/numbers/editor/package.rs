@@ -1236,14 +1236,14 @@ pub(crate) fn set_table_cell_border_in_package(
 pub(crate) fn table_cell_merges_in_package(
     package: &IWorkPackage,
     table_id: u64,
-) -> Result<Vec<IWorkTableCellRegion>> {
+) -> Result<Vec<Region>> {
     cell_merge::regions_in_package(package, table_id)
 }
 
 pub(crate) fn merge_table_cells_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    region: IWorkTableCellRegion,
+    region: Region,
 ) -> Result<()> {
     cell_merge::merge_in_package(package, table_id, region)
 }
@@ -1251,7 +1251,7 @@ pub(crate) fn merge_table_cells_in_package(
 pub(crate) fn unmerge_table_cells_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    region: IWorkTableCellRegion,
+    region: Region,
 ) -> Result<bool> {
     cell_merge::unmerge_in_package(package, table_id, region)
 }

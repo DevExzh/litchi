@@ -407,13 +407,15 @@ fn relocate_merge_anchors(
     relocations: &[MergeAnchorRelocation],
 ) -> Result<()> {
     for relocation in relocations {
+        let ((source_row, source_column), (destination_row, destination_column)) =
+            native_anchor_coordinates(relocation)?;
         model::relocate_attached_cell_in_package(
             package,
             table_id,
-            relocation.source_row,
-            relocation.source_column,
-            relocation.destination_row,
-            relocation.destination_column,
+            source_row,
+            source_column,
+            destination_row,
+            destination_column,
         )?;
     }
     Ok(())
@@ -427,8 +429,7 @@ fn validated_merge_anchor_sources(
     let mut planned_sources = HashSet::with_capacity(relocations.len());
     let mut planned_destinations = HashSet::with_capacity(relocations.len());
     for relocation in relocations {
-        let source = (relocation.source_row, relocation.source_column);
-        let destination = (relocation.destination_row, relocation.destination_column);
+        let (source, destination) = native_anchor_coordinates(relocation)?;
         if !planned_sources.insert(source) || !planned_destinations.insert(destination) {
             return Err(Error::InvalidFormat(
                 "iWork merged-cell deletion has overlapping anchor relocations".to_owned(),
@@ -455,19 +456,35 @@ fn merge_anchor_formula_hosts(
 ) -> Result<Vec<FormulaHostCoordinate>> {
     let mut hosts = Vec::new();
     for relocation in relocations {
-        if model::attached_cell_is_formula(
-            package,
-            table_id,
-            relocation.source_row,
-            relocation.source_column,
-        )? {
+        let ((source_row, source_column), _) = native_anchor_coordinates(relocation)?;
+        if model::attached_cell_is_formula(package, table_id, source_row, source_column)? {
             hosts.push(FormulaHostCoordinate::from_table_coordinates(
-                relocation.source_row,
-                relocation.source_column,
+                source_row,
+                source_column,
             )?);
         }
     }
     Ok(hosts)
+}
+
+fn native_anchor_coordinates(
+    relocation: &MergeAnchorRelocation,
+) -> Result<((usize, usize), (usize, usize))> {
+    let source = relocation.source();
+    let destination = relocation.destination();
+    let source_row = usize::try_from(source.row())
+        .map_err(|_| Error::ParseError("iWork merge source row exceeds usize".to_owned()))?;
+    let source_column = usize::try_from(source.column())
+        .map_err(|_| Error::ParseError("iWork merge source column exceeds usize".to_owned()))?;
+    let destination_row = usize::try_from(destination.row())
+        .map_err(|_| Error::ParseError("iWork merge destination row exceeds usize".to_owned()))?;
+    let destination_column = usize::try_from(destination.column()).map_err(|_| {
+        Error::ParseError("iWork merge destination column exceeds usize".to_owned())
+    })?;
+    Ok((
+        (source_row, source_column),
+        (destination_row, destination_column),
+    ))
 }
 
 fn without_relocated_cells(

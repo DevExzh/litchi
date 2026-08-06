@@ -14,6 +14,8 @@ pub mod dimension;
 pub mod edit;
 /// Header, footer, and repeating-row/column semantics.
 pub mod headers;
+/// Compact merged-cell geometry and topology algebra.
+pub mod merge;
 /// Checked, archive-free table sort semantics.
 pub mod sort;
 /// Compact, presence-preserving table title semantics.

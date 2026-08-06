@@ -3,13 +3,12 @@
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::numbers::{
-    FormulaCachedValue, FormulaExpression, IWorkTableCellRegion, NumbersDocumentBuilder,
-};
+use litchi_iwa::numbers::{FormulaCachedValue, FormulaExpression, NumbersDocumentBuilder};
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 use litchi_numbers::TableSelector;
+use litchi_numbers::table::merge::Region;
+use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 
 const TABLE_ROWS: usize = 4;
 const TABLE_COLUMNS: usize = 5;
@@ -22,17 +21,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .ok_or("usage: create_iwork_table_merges <output-directory>")?,
     );
     std::fs::create_dir_all(&output)?;
-    let region = IWorkTableCellRegion::new(1, 1, 2, 3)?;
+    let region = Region::new(1, 1, 2, 3)?;
     create_numbers(&output, region)?;
     create_pages(&output, region)?;
     create_keynote(&output, region)?;
     Ok(())
 }
 
-fn create_numbers(
-    output: &Path,
-    region: IWorkTableCellRegion,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn create_numbers(output: &Path, region: Region) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Merged Cells")
         .table_dimensions(TABLE_ROWS, TABLE_COLUMNS)
@@ -41,8 +37,8 @@ fn create_numbers(
     let table = TableSelector::index(0);
     editor.set_formula_with_cached_value(
         table_id,
-        region.row(),
-        region.column(),
+        region.row() as usize,
+        region.column() as usize,
         FormulaExpression::Number(MERGED_FORMULA_RESULT.try_into()?),
         FormulaCachedValue::Number(MERGED_FORMULA_RESULT.try_into()?),
     )?;
@@ -60,10 +56,7 @@ fn create_numbers(
     Ok(())
 }
 
-fn create_pages(
-    output: &Path,
-    region: IWorkTableCellRegion,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn create_pages(output: &Path, region: Region) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = PagesDocumentBuilder::new()
         .body_text("Native merged-cell CRUD\n")
         .body_table("Merged Cells", TABLE_ROWS, TABLE_COLUMNS)
@@ -71,8 +64,8 @@ fn create_pages(
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_formula(
         table_id,
-        region.row(),
-        region.column(),
+        region.row() as usize,
+        region.column() as usize,
         FormulaExpression::Number(MERGED_FORMULA_RESULT.try_into()?),
         FormulaCachedValue::Number(MERGED_FORMULA_RESULT.try_into()?),
     )?;
@@ -90,10 +83,7 @@ fn create_pages(
     Ok(())
 }
 
-fn create_keynote(
-    output: &Path,
-    region: IWorkTableCellRegion,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn create_keynote(output: &Path, region: Region) -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = KeynoteDocumentBuilder::new()
         .title("Native merged-cell CRUD")
         .build()?;
@@ -111,8 +101,8 @@ fn create_keynote(
     editor.set_slide_table_formula(
         0,
         table.model_object_id,
-        region.row(),
-        region.column(),
+        region.row() as usize,
+        region.column() as usize,
         FormulaExpression::Number(MERGED_FORMULA_RESULT.try_into()?),
         FormulaCachedValue::Number(MERGED_FORMULA_RESULT.try_into()?),
     )?;

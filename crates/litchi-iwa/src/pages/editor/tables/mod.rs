@@ -57,8 +57,6 @@ const INLINE_TABLE_DUPLICATE_OFFSET: f32 = 0.0;
 pub type PagesCellValue = litchi_numbers::cell::Value;
 /// One mutation in a transactional Pages table-cell batch.
 pub type PagesTableCellUpdate = litchi_numbers::cell::Update;
-/// A validated native merged-cell rectangle.
-pub type PagesTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
 pub use crate::shapes::RgbaColor as PagesTableCellTextColor;
 pub use crate::table_cell_border::{
     TableCellBorderSide as PagesTableCellBorderSide, TableCellBorders as PagesTableCellBorders,

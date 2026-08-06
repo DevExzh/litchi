@@ -9,6 +9,7 @@ use litchi_numbers::cell::data_format::{
     Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,
     Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,
 };
+use litchi_numbers::table::merge::Region;
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,7 +39,7 @@ pub struct PagesTable {
     pub info: PagesTableInfo,
     semantic_table: litchi_numbers::Table,
     comments: Box<[((usize, usize), Comment)]>,
-    merges: Vec<PagesTableCellRegion>,
+    merges: Vec<Region>,
 }
 
 impl PagesTable {
@@ -89,7 +90,7 @@ impl PagesTable {
     }
 
     /// Borrow native merged-cell rectangles in formula-store order.
-    pub fn merges(&self) -> &[PagesTableCellRegion] {
+    pub fn merges(&self) -> &[Region] {
         &self.merges
     }
 }
@@ -3277,7 +3278,7 @@ impl PagesEditor {
     }
 
     /// List native merged-cell rectangles in one reachable body table.
-    pub fn table_cell_merges(&self, model_object_id: u64) -> Result<Vec<PagesTableCellRegion>> {
+    pub fn table_cell_merges(&self, model_object_id: u64) -> Result<Vec<Region>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_merges_in_package(self.package(), model_object_id)
     }
@@ -3286,7 +3287,7 @@ impl PagesEditor {
     pub fn merge_table_cells(
         &mut self,
         model_object_id: u64,
-        region: PagesTableCellRegion,
+        region: Region,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -3309,7 +3310,7 @@ impl PagesEditor {
     pub fn unmerge_table_cells(
         &mut self,
         model_object_id: u64,
-        region: PagesTableCellRegion,
+        region: Region,
     ) -> Result<bool> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();

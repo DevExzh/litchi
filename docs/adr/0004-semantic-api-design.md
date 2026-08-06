@@ -664,6 +664,13 @@ types. The low-level writer preserves untouched merge records, namespace
 spelling, unknown attributes, and schema order; a safe facade never exposes
 relationship IDs or physical merge record positions.
 
+The iWork table adapters use the same semantic ownership rule. Their shared
+`litchi-numbers::table::merge::Region` is a compact checked rectangle, and its
+pure axis rebase algebra is independent of protobuf or package state. Native
+IWA merge formulas, formula-store ordering, anchor payload movement, and
+transactional publication remain private to `litchi-iwa`; Pages and Keynote
+retain only their format-owned comment and merge sidecars.
+
 Bitflags represent small orthogonal settings, Roaring bitmaps represent large
 sparse integer sets, enums represent exclusive states, and inheritance uses an
 explicit tri-state. The facade exposes named operations rather than bit math.

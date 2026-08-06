@@ -38,6 +38,7 @@ mod topology;
 pub use conditional_highlight::KeynoteTableCellConditionalHighlightInfo;
 use graph::{require_table_model, slide_table_graph, table_template};
 use litchi_iwa_common::comment::Comment;
+use litchi_numbers::table::merge::Region;
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 use storage::{remove_objects, set_table_geometry_in_package, set_uniform_table_dimensions};
 pub use title::KeynoteTableTitleSettings;
@@ -51,8 +52,6 @@ const TABLE_ANGLE_DEGREES: f32 = 0.0;
 pub type KeynoteTableCellValue = litchi_numbers::cell::Value;
 /// One mutation in a transactional Keynote table-cell batch.
 pub type KeynoteTableCellUpdate = litchi_numbers::cell::Update;
-/// A validated native merged-cell rectangle.
-pub type KeynoteTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
 pub use crate::shapes::RgbaColor as KeynoteTableCellTextColor;
 pub use crate::text::Background as KeynoteTableCellTextBackground;
 pub use crate::text::Outline as KeynoteTableCellTextOutline;
@@ -117,7 +116,7 @@ pub struct KeynoteSlideTable {
     pub info: KeynoteSlideTableInfo,
     semantic_table: litchi_numbers::Table,
     comments: Box<[((usize, usize), Comment)]>,
-    merges: Vec<KeynoteTableCellRegion>,
+    merges: Vec<Region>,
 }
 
 impl KeynoteSlideTable {
@@ -167,7 +166,7 @@ impl KeynoteSlideTable {
     }
 
     /// Borrow native merged-cell rectangles in formula-store order.
-    pub fn merges(&self) -> &[KeynoteTableCellRegion] {
+    pub fn merges(&self) -> &[Region] {
         &self.merges
     }
 }
@@ -248,7 +247,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         model_object_id: u64,
-    ) -> Result<Vec<KeynoteTableCellRegion>> {
+    ) -> Result<Vec<Region>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_merges_in_package(self.package(), model_object_id)
     }
@@ -258,7 +257,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        region: KeynoteTableCellRegion,
+        region: Region,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -282,7 +281,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        region: KeynoteTableCellRegion,
+        region: Region,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();

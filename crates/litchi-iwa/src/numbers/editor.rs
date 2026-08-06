@@ -24,6 +24,7 @@ use litchi_numbers::table::topology::{
     ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion,
 };
 use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
+use litchi_numbers::table::merge::Region;
 use litchi_iwa_text::position::TextPosition;
 use prost::Message;
 
@@ -210,7 +211,6 @@ mod text_box_create;
 mod text_box_duplicate;
 
 pub use crate::charts::Direction;
-pub use cell_merge::IWorkTableCellRegion;
 pub use litchi_numbers::table::title::Settings;
 use model::*;
 
