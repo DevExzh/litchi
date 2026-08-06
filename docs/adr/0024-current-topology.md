@@ -387,6 +387,16 @@ transform/license topology, labels, integrity sidecars, and custom-XML
 promotion markers without evaluating rights, decrypting streams, or contacting
 external policy services.
 
+The subsequent migration wave completes five more contextual owners. DOCX
+numbering now exposes Word 2012 `restartNumberingAfterBreak` edits with
+namespace-aware source preservation; ODS exposes cell-anchored annotation
+snapshots and package transactions; XLSB exposes threaded comments, people,
+mentions, and worksheet relationship edits; PPTX exposes inert non-Ink
+`p:contentPart` payload inventories; and DOC, PPT, and XLS publish the shared
+OLE Property Set editor through host-validated package snapshots. Each owner
+keeps unknown XML, BIFF12 records, or CFB topology opaque, returns exact
+no-op sources, and rejects stale or protected edits before publication.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR
