@@ -11,6 +11,7 @@ pub struct Builder {
 }
 
 impl Builder {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             definition: Definition::new("chart:line"),
@@ -18,6 +19,7 @@ impl Builder {
     }
 
     /// Supply the typed chart definition to publish.
+    #[must_use]
     pub fn with_definition(mut self, definition: Definition) -> Self {
         self.definition = definition;
         self
@@ -32,6 +34,12 @@ impl Builder {
         &mut self.definition
     }
 
+    /// Serialize the definition into a validated chart package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the definition fails serialization or validation,
+    /// or if the package cannot be written.
     pub fn build(self) -> Result<Vec<u8>> {
         let content_xml = serialize_content(&self.definition)?;
         crate::codec::validate(&content_xml)?;

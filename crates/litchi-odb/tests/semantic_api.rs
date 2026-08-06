@@ -1,3 +1,8 @@
+#![allow(
+    clippy::unwrap_used,
+    reason = "test code panics on failure; unwrap keeps assertions concise"
+)]
+
 use litchi_odb::{Builder, Database, connection::Connection, query::Query};
 
 #[test]

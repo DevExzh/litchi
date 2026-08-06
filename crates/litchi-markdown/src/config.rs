@@ -77,6 +77,7 @@ impl MarkdownOptions {
     ///
     /// let options = MarkdownOptions::new();
     /// ```
+    #[must_use]
     #[inline]
     pub fn new() -> Self {
         Self::default()
@@ -94,6 +95,7 @@ impl MarkdownOptions {
     ///
     /// let options = MarkdownOptions::new().with_styles(true);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_styles(mut self, include: bool) -> Self {
         self.include_styles = include;
@@ -112,6 +114,7 @@ impl MarkdownOptions {
     ///
     /// let options = MarkdownOptions::new().with_metadata(true);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_metadata(mut self, include: bool) -> Self {
         self.include_metadata = include;
@@ -128,6 +131,7 @@ impl MarkdownOptions {
     /// let options = MarkdownOptions::new()
     ///     .with_table_style(TableStyle::MinimalHtml);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_table_style(mut self, style: TableStyle) -> Self {
         self.table_style = style;
@@ -145,6 +149,7 @@ impl MarkdownOptions {
     ///
     /// let options = MarkdownOptions::new().with_html_table_indent(4);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_html_table_indent(mut self, indent: usize) -> Self {
         self.html_table_indent = indent;
@@ -161,6 +166,7 @@ impl MarkdownOptions {
     /// let options = MarkdownOptions::new()
     ///     .with_formula_style(FormulaStyle::Dollar);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_formula_style(mut self, style: FormulaStyle) -> Self {
         self.formula_style = style;
@@ -178,6 +184,7 @@ impl MarkdownOptions {
     ///
     /// let options = MarkdownOptions::new().with_list_indent(4);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_list_indent(mut self, indent: usize) -> Self {
         self.list_indent = indent;
@@ -194,6 +201,7 @@ impl MarkdownOptions {
     /// let options = MarkdownOptions::new()
     ///     .with_script_style(ScriptStyle::Unicode);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_script_style(mut self, style: ScriptStyle) -> Self {
         self.script_style = style;
@@ -210,6 +218,7 @@ impl MarkdownOptions {
     /// let options = MarkdownOptions::new()
     ///     .with_strikethrough_style(StrikethroughStyle::Html);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_strikethrough_style(mut self, style: StrikethroughStyle) -> Self {
         self.strikethrough_style = style;
@@ -235,6 +244,7 @@ impl MarkdownOptions {
     /// let options = MarkdownOptions::new()
     ///     .with_parallel(false);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_parallel(mut self, use_parallel: bool) -> Self {
         self.use_parallel = use_parallel;
@@ -252,7 +262,7 @@ impl MarkdownOptions {
 pub enum TableStyle {
     /// Use Markdown tables (only when no merged cells exist).
     ///
-    /// If merged cells are detected, falls back to MinimalHtml.
+    /// If merged cells are detected, falls back to `MinimalHtml`.
     ///
     /// Example:
     /// ```markdown
@@ -264,7 +274,7 @@ pub enum TableStyle {
 
     /// Use minimal HTML tables (no indentation, no line feeds).
     ///
-    /// Note: If the TableStyle is set to MinimalHtml, the indentation config will be ignored.
+    /// Note: If the `TableStyle` is set to `MinimalHtml`, the indentation config will be ignored.
     ///
     /// Example:
     /// ```html

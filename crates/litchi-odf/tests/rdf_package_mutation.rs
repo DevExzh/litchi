@@ -1,3 +1,8 @@
+#![allow(
+    clippy::unwrap_used,
+    reason = "tests are expected to panic on unexpected errors"
+)]
+
 use litchi_odf::{odp, ods, odt};
 use litchi_odf_common::core::{OwnedPackage, PackageWriter};
 use litchi_odf_common::{

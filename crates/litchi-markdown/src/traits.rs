@@ -32,6 +32,11 @@ use litchi_core::Result;
 pub trait ToMarkdown {
     /// Convert this item to Markdown with default options.
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying document content cannot be read
+    /// or converted to Markdown.
+    ///
     /// # Examples
     ///
     /// ```rust,ignore
@@ -52,6 +57,11 @@ pub trait ToMarkdown {
     /// # Arguments
     ///
     /// * `options` - Configuration for the conversion
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying document content cannot be read
+    /// or converted to Markdown.
     ///
     /// # Examples
     ///

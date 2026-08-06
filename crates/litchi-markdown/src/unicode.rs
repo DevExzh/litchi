@@ -182,6 +182,7 @@ static SUBSCRIPT_MAP: phf::Map<char, char> = phf_map! {
 ///
 /// This function uses a compile-time perfect hash function for O(1) lookup
 /// with zero runtime cost. The lookup table is embedded directly in the binary.
+#[must_use]
 #[inline]
 pub fn to_superscript(c: char) -> Option<char> {
     SUPERSCRIPT_MAP.get(&c).copied()
@@ -206,6 +207,7 @@ pub fn to_superscript(c: char) -> Option<char> {
 ///
 /// This function uses a compile-time perfect hash function for O(1) lookup
 /// with zero runtime cost. The lookup table is embedded directly in the binary.
+#[must_use]
 #[inline]
 pub fn to_subscript(c: char) -> Option<char> {
     SUBSCRIPT_MAP.get(&c).copied()
@@ -235,6 +237,7 @@ pub fn to_subscript(c: char) -> Option<char> {
 ///
 /// This function pre-allocates the output string with the exact capacity needed,
 /// minimizing allocations. Character conversion uses zero-cost lookups.
+#[must_use]
 #[inline]
 pub fn convert_to_superscript(text: &str) -> String {
     // Pre-allocate with same capacity as input (superscript chars are same byte size or larger)
@@ -270,6 +273,7 @@ pub fn convert_to_superscript(text: &str) -> String {
 ///
 /// This function pre-allocates the output string with the exact capacity needed,
 /// minimizing allocations. Character conversion uses zero-cost lookups.
+#[must_use]
 #[inline]
 pub fn convert_to_subscript(text: &str) -> String {
     // Pre-allocate with same capacity as input (subscript chars are same byte size or larger)
@@ -295,6 +299,7 @@ pub fn convert_to_subscript(text: &str) -> String {
 /// assert!(can_convert_to_superscript("n+1"));
 /// assert!(!can_convert_to_superscript("query")); // 'q' has no superscript
 /// ```
+#[must_use]
 #[inline]
 pub fn can_convert_to_superscript(text: &str) -> bool {
     text.chars().all(|c| to_superscript(c).is_some())
@@ -313,6 +318,7 @@ pub fn can_convert_to_superscript(text: &str) -> bool {
 /// assert!(can_convert_to_subscript("i+1"));
 /// assert!(!can_convert_to_subscript("abc")); // 'b' and 'c' have no subscript
 /// ```
+#[must_use]
 #[inline]
 pub fn can_convert_to_subscript(text: &str) -> bool {
     text.chars().all(|c| to_subscript(c).is_some())

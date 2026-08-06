@@ -1,4 +1,4 @@
-//! OpenDocument Database support with semantic responsibility layers.
+//! `OpenDocument` Database support with semantic responsibility layers.
 #![forbid(unsafe_code)]
 
 mod authoring;

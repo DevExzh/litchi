@@ -1,4 +1,4 @@
-//! OpenDocument Chart support with semantic responsibility layers.
+//! `OpenDocument` Chart support with semantic responsibility layers.
 #![forbid(unsafe_code)]
 
 pub mod authoring;

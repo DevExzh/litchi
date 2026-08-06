@@ -27,6 +27,7 @@ pub enum Error {
 
 impl Error {
     /// Numeric code-page identifier associated with the failure.
+    #[must_use]
     pub const fn page(self) -> u32 {
         match self {
             Self::Unsupported(page) | Self::Invalid(page) | Self::Unmappable(page) => page,
@@ -80,21 +81,29 @@ impl Page {
 
     /// Validates a numeric identifier and preserves the unsupported value in
     /// a typed error.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Unsupported`] when the identifier has no exact
+    /// supported codec.
     pub fn require(page: u32) -> Result<Self, Error> {
         Self::new(page).ok_or(Error::Unsupported(page))
     }
 
     /// Numeric Windows code-page identifier.
+    #[must_use]
     pub const fn id(self) -> u32 {
         self.0.id() as u32
     }
 
     /// Exact 16-bit storage form of this supported identifier.
+    #[must_use]
     pub const fn id16(self) -> u16 {
         self.0.id()
     }
 
     /// Canonical codec name.
+    #[must_use]
     pub fn name(self) -> &'static str {
         self.codec().name()
     }
@@ -104,7 +113,12 @@ impl Page {
     /// Malformed input returns [`Error::Invalid`] rather than inserting a
     /// replacement character. The returned text borrows the input when the
     /// codec can do so safely.
-    pub fn decode<'a>(self, bytes: &'a [u8]) -> Result<Cow<'a, str>, Error> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when the byte sequence is malformed for the
+    /// selected page.
+    pub fn decode(self, bytes: &[u8]) -> Result<Cow<'_, str>, Error> {
         let (text, malformed) = self.codec().decode_without_bom_handling(bytes);
         if malformed {
             Err(Error::Invalid(self.id()))
@@ -117,7 +131,8 @@ impl Page {
     ///
     /// Use this only when the owning format explicitly defines recovery or a
     /// diagnostic records that recovery occurred.
-    pub fn decode_lossy<'a>(self, bytes: &'a [u8]) -> Cow<'a, str> {
+    #[must_use]
+    pub fn decode_lossy(self, bytes: &[u8]) -> Cow<'_, str> {
         self.recover(bytes).0
     }
 
@@ -125,7 +140,8 @@ impl Page {
     ///
     /// This is intended for formats such as VBA that retain malformed source
     /// bytes and expose the recovery status to callers.
-    pub fn recover<'a>(self, bytes: &'a [u8]) -> (Cow<'a, str>, bool) {
+    #[must_use]
+    pub fn recover(self, bytes: &[u8]) -> (Cow<'_, str>, bool) {
         self.codec().decode_without_bom_handling(bytes)
     }
 
@@ -133,7 +149,12 @@ impl Page {
     ///
     /// Unrepresentable text returns [`Error::Unmappable`] rather than writing
     /// replacement bytes. The output may borrow an already-compatible input.
-    pub fn encode<'a>(self, text: &'a str) -> Result<Cow<'a, [u8]>, Error> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Unmappable`] when the text cannot be represented by
+    /// the selected page.
+    pub fn encode(self, text: &str) -> Result<Cow<'_, [u8]>, Error> {
         if let Some(order) = self.0.utf16_order() {
             return Ok(Cow::Owned(encode_utf16(text, order)));
         }
@@ -194,56 +215,107 @@ impl Mbcs {
     pub const UTF_8: Self = Self(Page::UTF_8);
 
     /// Validates a byte-stream code-page identifier.
+    #[must_use]
     pub fn new(page: u32) -> Option<Self> {
-        let page = Page::new(page)?;
-        match page.0 {
+        let validated = Page::new(page)?;
+        match validated.0 {
             Kind::Utf16Le | Kind::Utf16Be => None,
-            _ => Some(Self(page)),
+            Kind::Ibm866
+            | Kind::Windows874
+            | Kind::ShiftJis
+            | Kind::Gbk
+            | Kind::EucKr
+            | Kind::Big5
+            | Kind::Windows1250
+            | Kind::Windows1251
+            | Kind::Windows1252
+            | Kind::Windows1253
+            | Kind::Windows1254
+            | Kind::Windows1255
+            | Kind::Windows1256
+            | Kind::Windows1257
+            | Kind::Windows1258
+            | Kind::Macintosh
+            | Kind::Koi8R
+            | Kind::EucJp
+            | Kind::Koi8U
+            | Kind::Iso8859_2
+            | Kind::Iso8859_3
+            | Kind::Iso8859_4
+            | Kind::Iso8859_5
+            | Kind::Iso8859_6
+            | Kind::Iso8859_7
+            | Kind::Iso8859_8
+            | Kind::Iso8859_13
+            | Kind::Iso8859_15
+            | Kind::Gb18030
+            | Kind::Utf8 => Some(Self(validated)),
         }
     }
 
     /// Validates a byte-stream identifier and retains the unsupported value.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Unsupported`] when the identifier has no exact
+    /// supported codec or names an excluded UTF-16 page.
     pub fn require(page: u32) -> Result<Self, Error> {
         Self::new(page).ok_or(Error::Unsupported(page))
     }
 
     /// General code-page capability represented by this value.
+    #[must_use]
     pub const fn page(self) -> Page {
         self.0
     }
 
     /// Numeric Windows code-page identifier.
+    #[must_use]
     pub const fn id(self) -> u32 {
         self.0.id()
     }
 
     /// Exact 16-bit storage form of this supported identifier.
+    #[must_use]
     pub const fn id16(self) -> u16 {
         self.0.id16()
     }
 
     /// Canonical codec name.
+    #[must_use]
     pub fn name(self) -> &'static str {
         self.0.name()
     }
 
     /// Strictly decodes bytes without BOM or terminator handling.
-    pub fn decode<'a>(self, bytes: &'a [u8]) -> Result<Cow<'a, str>, Error> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when the byte sequence is malformed for the
+    /// selected page.
+    pub fn decode(self, bytes: &[u8]) -> Result<Cow<'_, str>, Error> {
         self.0.decode(bytes)
     }
 
     /// Decodes bytes with replacement for explicitly recoverable formats.
-    pub fn decode_lossy<'a>(self, bytes: &'a [u8]) -> Cow<'a, str> {
+    #[must_use]
+    pub fn decode_lossy(self, bytes: &[u8]) -> Cow<'_, str> {
         self.0.decode_lossy(bytes)
     }
 
     /// Decodes with replacement and reports whether recovery was required.
-    pub fn recover<'a>(self, bytes: &'a [u8]) -> (Cow<'a, str>, bool) {
+    #[must_use]
+    pub fn recover(self, bytes: &[u8]) -> (Cow<'_, str>, bool) {
         self.0.recover(bytes)
     }
 
     /// Strictly encodes text, rejecting unrepresentable characters.
-    pub fn encode<'a>(self, text: &'a str) -> Result<Cow<'a, [u8]>, Error> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Unmappable`] when the text cannot be represented by
+    /// the selected page.
+    pub fn encode(self, text: &str) -> Result<Cow<'_, [u8]>, Error> {
         self.0.encode(text)
     }
 }
@@ -300,37 +372,56 @@ impl Ansi {
     }
 
     /// Validates an ANSI identifier and retains the unsupported value.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Unsupported`] when the identifier lies outside the
+    /// `[MS-OSHARED]` ANSI page set.
     pub fn require(page: u32) -> Result<Self, Error> {
         Self::new(page).ok_or(Error::Unsupported(page))
     }
 
     /// General byte-stream capability represented by this ANSI page.
+    #[must_use]
     pub const fn mbcs(self) -> Mbcs {
         self.0
     }
 
     /// Numeric Windows code-page identifier.
+    #[must_use]
     pub const fn id(self) -> u32 {
         self.0.id()
     }
 
     /// Exact 16-bit storage form of this supported identifier.
+    #[must_use]
     pub const fn id16(self) -> u16 {
         self.0.id16()
     }
 
     /// Canonical codec name.
+    #[must_use]
     pub fn name(self) -> &'static str {
         self.0.name()
     }
 
     /// Strictly decodes ANSI bytes without terminator handling.
-    pub fn decode<'a>(self, bytes: &'a [u8]) -> Result<Cow<'a, str>, Error> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when the byte sequence is malformed for the
+    /// selected page.
+    pub fn decode(self, bytes: &[u8]) -> Result<Cow<'_, str>, Error> {
         self.0.decode(bytes)
     }
 
     /// Strictly encodes text, rejecting unrepresentable characters.
-    pub fn encode<'a>(self, text: &'a str) -> Result<Cow<'a, [u8]>, Error> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Unmappable`] when the text cannot be represented by
+    /// the selected page.
+    pub fn encode(self, text: &str) -> Result<Cow<'_, [u8]>, Error> {
         self.0.encode(text)
     }
 }
@@ -414,24 +505,41 @@ enum Utf16Order {
     Big,
 }
 
-fn encode_utf16(text: &str, order: Utf16Order) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(text.encode_utf16().count().saturating_mul(2));
-    for unit in text.encode_utf16() {
-        let pair = match order {
-            Utf16Order::Little => unit.to_le_bytes(),
-            Utf16Order::Big => unit.to_be_bytes(),
-        };
-        bytes.extend_from_slice(&pair);
-    }
-    bytes
-}
-
 impl Kind {
     const fn utf16_order(self) -> Option<Utf16Order> {
         match self {
             Self::Utf16Le => Some(Utf16Order::Little),
             Self::Utf16Be => Some(Utf16Order::Big),
-            _ => None,
+            Self::Ibm866
+            | Self::Windows874
+            | Self::ShiftJis
+            | Self::Gbk
+            | Self::EucKr
+            | Self::Big5
+            | Self::Windows1250
+            | Self::Windows1251
+            | Self::Windows1252
+            | Self::Windows1253
+            | Self::Windows1254
+            | Self::Windows1255
+            | Self::Windows1256
+            | Self::Windows1257
+            | Self::Windows1258
+            | Self::Macintosh
+            | Self::Koi8R
+            | Self::EucJp
+            | Self::Koi8U
+            | Self::Iso8859_2
+            | Self::Iso8859_3
+            | Self::Iso8859_4
+            | Self::Iso8859_5
+            | Self::Iso8859_6
+            | Self::Iso8859_7
+            | Self::Iso8859_8
+            | Self::Iso8859_13
+            | Self::Iso8859_15
+            | Self::Gb18030
+            | Self::Utf8 => None,
         }
     }
 
@@ -548,16 +656,32 @@ impl Kind {
     }
 }
 
+fn encode_utf16(text: &str, order: Utf16Order) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(text.encode_utf16().count().saturating_mul(2));
+    for unit in text.encode_utf16() {
+        let pair = match order {
+            Utf16Order::Little => unit.to_le_bytes(),
+            Utf16Order::Big => unit.to_be_bytes(),
+        };
+        bytes.extend_from_slice(&pair);
+    }
+    bytes
+}
+
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
+
     use super::*;
-    use std::mem;
 
     #[test]
     fn page_is_compact_and_checked() {
-        assert_eq!(mem::size_of::<Page>(), 1);
-        assert_eq!(mem::size_of::<Mbcs>(), 1);
-        assert_eq!(mem::size_of::<Ansi>(), 1);
+        assert_eq!(size_of::<Page>(), 1);
+        assert_eq!(size_of::<Mbcs>(), 1);
+        assert_eq!(size_of::<Ansi>(), 1);
         assert_eq!(Page::new(1252), Some(Page::WINDOWS_1252));
         assert_eq!(Page::WINDOWS_1252.name(), "windows-1252");
         assert_eq!(Page::try_from(99999), Err(Error::Unsupported(99999)));

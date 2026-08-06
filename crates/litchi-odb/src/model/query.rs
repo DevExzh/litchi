@@ -15,10 +15,14 @@ impl Query {
         }
     }
 
+    /// Returns the query name.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the query command text.
+    #[must_use]
     pub fn command(&self) -> &str {
         &self.command
     }
