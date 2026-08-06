@@ -90,6 +90,11 @@ format-specific semantic records remain in the concrete legacy format crates.
 The property-set editor keys staged mutations by complete CFB stream paths, so
 equal leaf names in different storage trees remain distinct during rewrites.
 
+The DOCX drawing inventory also exposes the checked Word 2010 `AnchorId` value
+on `wp:inline` and `wp:anchor` objects. Its `[MS-DOCX]`/`[MS-ODRAWXML]`
+eight-digit hexadecimal range is enforced at the XML boundary; object/pict
+authoring and layout remain outside this small inert inventory owner.
+
 The current legacy owners also use nested semantic folders: DOC fields, PPT
 animation parser/types/writer, XLS list objects, and ODraw properties expose
 facades over model/codec/package/test seams. These are source-organization and
@@ -257,6 +262,15 @@ malformed OLE Property Set types are inert or rejected at that boundary. The
 common toolbar owner is split into semantic subdomains, while DOC field and
 OfficeArt snapshots, PPT chart/ODraw, XLS chart/OLE controls, and XLSB pivot
 definition/record validation stay in their contextual owners.
+
+The current OLE2 continuation extends that common boundary with code-page-aware
+`[MS-OSHARED]` `HeadingPairs` and `DocParts` composite values, while DOC,
+ODraw, PPT, and XLS keep their format-specific owners. DOC now authors checked
+`Asumyi`/`PlcfAsumy` ranges; ODraw exposes typed solver rules; PPT master
+metadata authors `SlideNameAtom`; and XLS owns a layered `[MS-XLS]` `XML`
+stream model with typed schema/map/data-binding identities and list-column
+dependency validation. These are bounded metadata operations: no macros,
+external binding, schema resolution, layout, or rendering is activated.
 
 ODT mutable editing, ODS authoring and formula evaluation, ODP authoring,
 DOCX paragraph codecs, PPTX presentation properties, and XLSX chart-sheet

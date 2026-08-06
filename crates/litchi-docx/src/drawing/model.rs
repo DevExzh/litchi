@@ -12,6 +12,32 @@ pub enum Anchor {
     Floating,
 }
 
+/// The checked Word 2010 identifier carried by a DrawingML anchor.
+///
+/// Word stores this value as eight hexadecimal ASCII digits.  The zero and
+/// high-bit ranges are reserved by `[MS-DOCX]` and `[MS-ODRAWXML]`, so the
+/// constructor keeps those values out of the semantic model.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct AnchorId(u32);
+
+impl AnchorId {
+    /// Construct an anchor identifier in the schema-defined range.
+    #[inline]
+    pub const fn new(value: u32) -> Option<Self> {
+        if value != 0 && value < 0x8000_0000 {
+            Some(Self(value))
+        } else {
+            None
+        }
+    }
+
+    /// Return the numeric identifier.
+    #[inline]
+    pub const fn get(self) -> u32 {
+        self.0
+    }
+}
+
 /// The semantic family discovered for a drawing object.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Kind {
@@ -51,6 +77,8 @@ pub struct Object {
     kind: Kind,
     /// Discovered WordprocessingML placement.
     anchor: Anchor,
+    /// Checked Word 2010 anchor identifier, when authored.
+    anchor_id: Option<AnchorId>,
 }
 
 impl Object {
@@ -73,6 +101,7 @@ impl Object {
             Some(preset),
             Kind::Shape,
             Anchor::Inline,
+            None,
             String::new(),
         )
     }
@@ -88,6 +117,7 @@ impl Object {
         preset: Option<Preset>,
         kind: Kind,
         anchor: Anchor,
+        anchor_id: Option<AnchorId>,
         text: String,
     ) -> Self {
         Self {
@@ -101,6 +131,7 @@ impl Object {
             preset,
             kind,
             anchor,
+            anchor_id,
         }
     }
 
@@ -199,6 +230,12 @@ impl Object {
     #[inline]
     pub fn anchor(&self) -> Anchor {
         self.anchor
+    }
+
+    /// Return the checked Word 2010 anchor identifier.
+    #[inline]
+    pub fn anchor_id(&self) -> Option<AnchorId> {
+        self.anchor_id
     }
 
     /// Return whether the object contains a text-box story.

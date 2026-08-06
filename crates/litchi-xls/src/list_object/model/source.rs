@@ -4,6 +4,7 @@ use super::super::codec::{append_string, parse_string, u32_at};
 use super::super::{FEATURE11_RECORD_TYPE, FEATURE12_RECORD_TYPE, MAX_FEATURE_BYTES, invalid};
 use super::{ListColumnId, validate_name};
 use crate::Result;
+use crate::xml_map::{MapId, XPath};
 use std::collections::HashSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -965,18 +966,15 @@ impl XmlDataType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XmlColumnMapping {
     pub(in crate::list_object) can_be_single: bool,
-    pub(in crate::list_object) map_id: u32,
-    pub(in crate::list_object) xpath: String,
+    pub(in crate::list_object) map_id: MapId,
+    pub(in crate::list_object) xpath: XPath,
 }
 impl XmlColumnMapping {
     pub fn try_new(map_id: u32, xpath: impl Into<String>, can_be_single: bool) -> Result<Self> {
-        let xpath = xpath.into();
-        if map_id == 0 || xpath.encode_utf16().count() >= 32000 {
-            return Err(invalid(
-                FEATURE11_RECORD_TYPE,
-                "invalid XML map id or XPath",
-            ));
-        }
+        let map_id =
+            MapId::new(map_id).map_err(|_| invalid(FEATURE11_RECORD_TYPE, "invalid XML map id"))?;
+        let xpath = XPath::new(xpath.into())
+            .map_err(|_| invalid(FEATURE11_RECORD_TYPE, "invalid XML XPath"))?;
         Ok(Self {
             can_be_single,
             map_id,
@@ -984,9 +982,15 @@ impl XmlColumnMapping {
         })
     }
     pub const fn map_id(&self) -> u32 {
+        self.map_id.get()
+    }
+    pub const fn map_identifier(&self) -> MapId {
         self.map_id
     }
     pub fn xpath(&self) -> &str {
+        self.xpath.as_str()
+    }
+    pub const fn path(&self) -> &XPath {
         &self.xpath
     }
     pub const fn can_be_single(&self) -> bool {

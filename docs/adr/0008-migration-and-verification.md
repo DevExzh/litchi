@@ -5614,6 +5614,20 @@ owning property identifier; the referenced non-simple CFB stream remains
 inert package data. Focused tests cover UTF-16/code-page round trips,
 identifier mismatch rejection, and opaque unsupported stream variants.
 
+This continuation also covers the shared `[MS-OSHARED]` `HeadingPairs` and
+`DocParts` vector composites with code-page-aware binary codecs and cross-PID
+validation; typed `[MS-XLS]` XML-map metadata and root-stream loading with
+list-column dependency checks; bounded `[MS-DOC]` auto-summary authoring;
+typed `[MS-ODRAW]` solver rules; and `[MS-PPT]` master `SlideNameAtom`
+authoring. All external binding, schema resolution, macro execution, layout,
+and rendering remain inert.
+
+The DOCX vertical slice additionally types and validates `[MS-DOCX]` 2.6.2.1
+and `[MS-ODRAWXML]` 2.18.2.1 `anchorId` values in the drawing inventory. The
+parser accepts only eight-digit hexadecimal identifiers in the specified
+nonzero, below-`0x80000000` range and preserves them without activating or
+rendering the drawing.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

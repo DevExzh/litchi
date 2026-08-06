@@ -1,6 +1,6 @@
 //! Regression tests for the layered drawing inventory owner.
 
-use super::{Anchor, Kind, Object, parse};
+use super::{Anchor, AnchorId, Kind, Object, parse};
 use litchi_drawingml::geom::Preset;
 
 #[test]
@@ -41,6 +41,7 @@ fn object_dimensions_and_context_are_ergonomic() {
     assert!((object.height_pt() - 144.0).abs() < 0.1);
     assert_eq!(object.kind(), Kind::Shape);
     assert_eq!(object.anchor(), Anchor::Inline);
+    assert_eq!(object.anchor_id(), None);
 }
 
 #[test]
@@ -106,8 +107,33 @@ fn parses_shape_inventory() {
     assert_eq!(drawing.height_emu(), 2000000);
     assert_eq!(drawing.preset(), Some(Preset::Rect));
     assert_eq!(drawing.kind(), Kind::Shape);
+    assert_eq!(drawing.anchor_id(), None);
     assert!(!drawing.is_text_box());
     assert!(drawing.is_inline());
+}
+
+#[test]
+fn parses_checked_inline_and_floating_anchor_ids() {
+    let xml = br#"<w:p>
+        <w:r><w:drawing><wp:inline wp14:anchorId="00000001"/>
+        </w:drawing></w:r>
+        <w:r><w:drawing><wp:anchor wp14:anchorId="7fffffff"/></w:drawing></w:r>
+    </w:p>"#;
+    let drawings = parse(xml).unwrap();
+    assert_eq!(drawings.len(), 2);
+    assert_eq!(drawings[0].anchor_id(), AnchorId::new(1));
+    assert_eq!(drawings[1].anchor_id(), AnchorId::new(0x7fff_ffff));
+}
+
+#[test]
+fn rejects_invalid_anchor_ids() {
+    for value in ["00000000", "80000000", "0000001", "0000000G"] {
+        let xml = format!(r#"<w:drawing><wp:inline wp14:anchorId="{value}"/></w:drawing>"#);
+        assert!(
+            parse(xml.as_bytes()).is_err(),
+            "accepted invalid anchorId {value}"
+        );
+    }
 }
 
 #[test]

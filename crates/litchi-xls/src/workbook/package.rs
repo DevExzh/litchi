@@ -42,6 +42,7 @@ impl<R: Read + Seek> Workbook<R> {
             external_links: crate::Links::default(),
             pivot_caches: Vec::new(),
             pivot_cache_stream_ids: Vec::new(),
+            xml_map: None,
             defined_names: Vec::new(),
             defined_name_records: Vec::new(),
             formatting: Arc::new(Formatting::default()),
@@ -73,6 +74,7 @@ impl<R: Read + Seek> Workbook<R> {
     pub fn new_with_options(reader: R, options: OpenOptions<'_>) -> Result<Self> {
         let mut workbook = Self::empty(OleFile::open(reader)?);
 
+        workbook.xml_map = crate::xml_map::parse_stream_if_present(&mut workbook.ole_file)?;
         workbook.parse_workbook(&options)?;
         Ok(workbook)
     }
@@ -96,6 +98,7 @@ impl<R: Read + Seek> Workbook<R> {
     ) -> Result<Self> {
         let mut workbook = Self::empty(ole_file);
 
+        workbook.xml_map = crate::xml_map::parse_stream_if_present(&mut workbook.ole_file)?;
         workbook.parse_workbook(&options)?;
         Ok(workbook)
     }
@@ -193,6 +196,8 @@ impl<R: Read + Seek> Workbook<R> {
                 Err(_) => {},
             }
         }
+
+        crate::xml_map::validate_list_columns(self.xml_map.as_ref(), &self.worksheets)?;
 
         let cache_paths = pivot_cache_stream_paths(self.ole_file.list_streams());
         let mut pivot_caches = Vec::with_capacity(cache_paths.len());

@@ -11,6 +11,6 @@ mod model;
 #[cfg(test)]
 mod tests;
 
-pub use model::{Anchor, Kind, Object};
+pub use model::{Anchor, AnchorId, Kind, Object};
 
 pub(crate) use codec::parse;

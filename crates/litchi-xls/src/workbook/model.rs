@@ -66,6 +66,8 @@ pub struct Workbook<R: Read + Seek> {
     pub(super) pivot_caches: Vec<crate::PivotCache>,
     /// SXStreamID values in global PivotCache ordinal order.
     pub(super) pivot_cache_stream_ids: Vec<u16>,
+    /// Typed, inert workbook XML maps from the root-level `XML` stream.
+    pub(super) xml_map: Option<crate::xml_map::MapInfo>,
     /// Formatting defects repaired while opening; always empty in strict mode.
     pub(super) tolerance: ToleranceReport,
 }
@@ -169,6 +171,15 @@ impl<R: Read + Seek> Workbook<R> {
     /// Global PivotCache ordinal-to-storage-stream map from SXStreamID records.
     pub fn pivot_cache_stream_ids(&self) -> &[u16] {
         &self.pivot_cache_stream_ids
+    }
+
+    /// The workbook's optional legacy XML-map definition.
+    ///
+    /// Schemas and data-binding children are inert metadata. No schema is
+    /// resolved, no bound file is opened, and no mapped cell is imported or
+    /// exported by this accessor.
+    pub fn xml_map(&self) -> Option<&crate::xml_map::MapInfo> {
+        self.xml_map.as_ref()
     }
 
     /// Resolves a worksheet PivotTable's global cache link.

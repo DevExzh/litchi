@@ -85,7 +85,6 @@ impl Snapshot {
             inner: self.inner.edit(),
         }
     }
-
 }
 
 /// A transactional semantic edit of one master name.

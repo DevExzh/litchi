@@ -98,7 +98,7 @@ rendering, external I/O, macro execution, or certificate trust.
 | Threaded comments, persons, mentions, and modern comment threads | ❌ | ❌ | ❌ | The .xls model supports classic NOTE comments only; modern threaded-comment parts are not a BIFF8 typed feature. |
 | Slicers and timelines | ❌ | ❌ | ❌ | No typed slicer/timeline cache or view model is provided for the BIFF8 crate. |
 | Rich data types and dynamic-array spill semantics | ❌ | ❌ | ❌ | The [MS-XLS] cell/formula records do not become a modern rich-value or spill-calculation engine in this crate. |
-| XML maps and mapped XML import/export | ❌ | ❌ | ❌ | List-object XML-source metadata is not an XML map or mapped-cell implementation. |
+| XML maps and mapped XML import/export | 🟡 | ✅ | 🟡 | `[MS-XLS]` XML-map metadata has a typed `MapInfo`/schema/map/data-binding owner, bounded XML codec, workbook `XML`-stream loading, and list-column dependency checks; schema resolution and mapped-cell import/export remain inert |
 | Complete Excel formula evaluation | ❌ | ❌ | ❌ | Formula tokens and cached results can be read, but there is no Excel-compatible recalculation engine, dependency graph, external-function execution, or volatile refresh. |
 | Chart rendering and complete chart authoring | ❌ | ❌ | ❌ | The bounded chart model is intentionally not a renderer or a complete fresh chart writer; unsafe graph edits fail rather than producing a corrupt workbook. |
 | Macro, control, DDE, RTD, database, and external-link execution | ❌ | ❌ | ❌ | These protocol families are represented only as inert metadata or cached payloads. |

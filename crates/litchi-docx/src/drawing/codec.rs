@@ -1,6 +1,6 @@
 //! Streaming WordprocessingML drawing inventory decoder.
 
-use super::model::{Anchor, Kind, Object};
+use super::model::{Anchor, AnchorId, Kind, Object};
 use crate::error::{Error, Result};
 use litchi_core::unit::EMUS_PER_INCH;
 use litchi_drawingml::geom::Preset;
@@ -29,6 +29,7 @@ pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
     let mut preset = None;
     let mut has_text_box = false;
     let mut is_inline = true;
+    let mut anchor_id = None;
     let mut text_content = String::new();
 
     loop {
@@ -48,13 +49,16 @@ pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
                         has_text_box = false;
                         has_shape = false;
                         is_inline = true;
+                        anchor_id = None;
                         text_content.clear();
                     },
                     b"inline" if in_drawing => {
                         is_inline = true;
+                        anchor_id = parse_anchor_id(&element)?;
                     },
                     b"anchor" if in_drawing => {
                         is_inline = false;
+                        anchor_id = parse_anchor_id(&element)?;
                     },
                     b"extent" if in_drawing => {
                         width_emu = number_attribute(&element, b"cx", EMUS_PER_INCH)?;
@@ -129,6 +133,7 @@ pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
                             } else {
                                 Anchor::Floating
                             },
+                            anchor_id,
                             text_content.clone(),
                         ));
                     },
@@ -151,6 +156,48 @@ pub(crate) fn parse(xml_bytes: &[u8]) -> Result<SmallVec<[Object; 4]>> {
     }
 
     Ok(objects)
+}
+
+fn parse_anchor_id(element: &BytesStart<'_>) -> Result<Option<AnchorId>> {
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let raw_name = attribute.key.as_ref();
+        let local_name = raw_name
+            .rsplit(|byte| *byte == b':')
+            .next()
+            .unwrap_or(raw_name);
+        if local_name != b"anchorId" {
+            continue;
+        }
+        if value.is_some() {
+            return Err(Error::InvalidFormat(
+                "DrawingML anchor has duplicate anchorId attributes".to_string(),
+            ));
+        }
+        let text = std::str::from_utf8(&attribute.value).map_err(|error| {
+            Error::InvalidFormat(format!("DrawingML anchorId is not UTF-8: {error}"))
+        })?;
+        if text.len() != 8 || !text.bytes().all(is_ascii_hex_digit) {
+            return Err(Error::InvalidFormat(format!(
+                "invalid DrawingML anchorId '{text}'; expected eight hexadecimal digits"
+            )));
+        }
+        let parsed = u32::from_str_radix(text, 16).map_err(|error| {
+            Error::InvalidFormat(format!("invalid DrawingML anchorId '{text}': {error}"))
+        })?;
+        value = Some(AnchorId::new(parsed).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "DrawingML anchorId '{text}' is outside the nonzero, below-0x80000000 range"
+            ))
+        })?);
+    }
+    Ok(value)
+}
+
+#[inline]
+fn is_ascii_hex_digit(value: u8) -> bool {
+    value.is_ascii_digit() || matches!(value, b'a'..=b'f' | b'A'..=b'F')
 }
 
 fn parse_preset(element: &BytesStart<'_>) -> Result<Preset> {

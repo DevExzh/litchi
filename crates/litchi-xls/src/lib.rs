@@ -109,6 +109,9 @@ mod scenario;
 /// Inert BIFF8 VBA project markers and object code names.
 mod vba;
 
+/// Typed, inert legacy XLS XML maps and their root-level `XML` stream.
+pub mod xml_map;
+
 /// BIFF8 workbook-global environment and behavioral options.
 mod environment;
 
@@ -443,3 +446,7 @@ pub use writer::{
     ShapeColor, ShapeFill, ShapeKind, ShapeLine, ShapeText, ShapeTextRun, ShapeWrite, Writer,
 };
 pub use xf_ext::{ExtProp, FullColorExt, FullColorType, XfExt};
+pub use xml_map::{
+    DataBinding, LoadMode, Map, MapId, MapInfo, NamespaceDeclaration, OpaqueXml, Schema, SchemaId,
+    XPath,
+};

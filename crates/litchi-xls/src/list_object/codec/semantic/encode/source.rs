@@ -172,8 +172,8 @@ impl ListObject {
             if let Some(v) = xml.and_then(|v| v.mapping.as_ref()) {
                 feature.extend_from_slice(&1u16.to_le_bytes());
                 feature.extend_from_slice(&(2u32 | u32::from(v.can_be_single) << 2).to_le_bytes());
-                feature.extend_from_slice(&v.map_id.to_le_bytes());
-                append_string(&mut feature, &v.xpath)
+                feature.extend_from_slice(&v.map_id.get().to_le_bytes());
+                append_string(&mut feature, v.xpath.as_str())
             }
             if let Some(tokens) = calc {
                 append_formula(&mut feature, tokens)?

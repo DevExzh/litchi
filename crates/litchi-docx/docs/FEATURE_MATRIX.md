@@ -132,7 +132,7 @@ family has no typed model even if an untouched part can remain in a package-pres
 | SDT web-extension links (webExtensionsLinked, webExtensionCreated) | 🟡 | 🟡 | 🟡 | Web-extension package graphs are typed separately, but these SDT-to-add-in behaviors are not a semantic host integration |
 | Paragraph/table extension identifiers (paraId, textId) and noSpellErr | 🟡 | ✅ | 🟡 | paraId participates in modern-comment identity graphs; there is no general paragraph textId or noSpellErr editing model |
 | Conflict revision markup (conflictIns, conflictDel, and custom XML conflict ranges) | ❌ | ❌ | ❌ | [MS-DOCX] 2.2.5 conflict families are not represented by the ordinary tracked-revision model |
-| anchorId on object and pict | ❌ | ❌ | ❌ | The extended drawing anchor identifier from [MS-DOCX] 2.2.6 has no typed object/picture API |
+| anchorId on object and pict | 🟡 | ✅ | ❌ | Paragraph drawing inventories expose the checked Word 2010 `AnchorId` from `wp:inline`/`wp:anchor`; `w:object`/`w:pict` authoring and generic drawing serialization remain outside this owner |
 | Um Al-Qura umalqura calendar extension | ❌ | ❌ | ❌ | [MS-DOCX] 2.2.7 is not a typed calendar or date-rendering model |
 | sectPr footnoteColumns | ❌ | ❌ | ❌ | The Word 2012 multi-column footnote layout extension is not exposed; ordinary note numbering and placement remain supported |
 | pPr collapsed | ❌ | ❌ | ❌ | Collapsed paragraph display state is not modeled |
