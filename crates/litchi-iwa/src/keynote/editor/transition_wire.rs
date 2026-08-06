@@ -127,7 +127,7 @@ pub(super) fn patch_transition_settings_wire(
         &animation_path(DIRECTION_FIELD),
         animation.direction.is_some(),
         settings
-            .direction
+            .direction()
             .map(|direction| u64::from(direction.native_value())),
     )?;
     data = patch_nested_varint_field(

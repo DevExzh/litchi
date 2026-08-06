@@ -8,21 +8,23 @@ use litchi_keynote::transition::{
 const TRANSITION_ANIMATION_TYPE: &str = "Transition";
 const NO_EFFECT_DURATION_SECONDS: f64 = 1.0;
 
-fn without_effect(settings: &TransitionSettings) -> TransitionSettings {
-    TransitionSettings {
-        animation_type: Some(TRANSITION_ANIMATION_TYPE.into()),
-        effect: Some(Effect::None),
-        duration: Some(NO_EFFECT_DURATION_SECONDS),
-        direction: None,
-        delay: settings.delay,
-        is_automatic: settings.is_automatic,
-        animation_parameters: AnimationParameters {
-            random_number_seed: settings.animation_parameters.random_number_seed,
-            writing_direction_is_rtl: settings.animation_parameters.writing_direction_is_rtl,
-            ..AnimationParameters::default()
-        },
-        custom_parameters: CustomParameters::default(),
-    }
+fn without_effect(settings: &TransitionSettings) -> Result<TransitionSettings> {
+    let mut animation_parameters = AnimationParameters::new();
+    animation_parameters
+        .set_random_number_seed(settings.animation_parameters().random_number_seed());
+    animation_parameters
+        .set_writing_direction_is_rtl(settings.animation_parameters().writing_direction_is_rtl());
+
+    let mut cleared = TransitionSettings::new();
+    cleared.set_animation_type(Some(TRANSITION_ANIMATION_TYPE))?;
+    cleared.set_effect(Some(Effect::None))?;
+    cleared.set_duration(Some(NO_EFFECT_DURATION_SECONDS))?;
+    cleared.set_direction(None);
+    cleared.set_delay(settings.delay())?;
+    cleared.set_is_automatic(settings.is_automatic());
+    cleared.set_animation_parameters(animation_parameters)?;
+    cleared.set_custom_parameters(CustomParameters::new())?;
+    Ok(cleared)
 }
 
 impl KeynoteEditor {
@@ -49,7 +51,7 @@ impl KeynoteEditor {
         let Some(settings) = self.slide_transition(slide_index)? else {
             return Ok(false);
         };
-        let cleared = without_effect(&settings);
+        let cleared = without_effect(&settings)?;
         if cleared == settings {
             return Ok(false);
         }

@@ -6,13 +6,14 @@ use super::soundtrack_wire::{
 use super::*;
 use litchi_keynote::soundtrack::Settings;
 
-fn settings_from_native(soundtrack: &kn::Soundtrack) -> Settings {
+fn settings_from_native(soundtrack: &kn::Soundtrack) -> Result<Settings> {
     Settings::new(
         soundtrack.volume,
         soundtrack
             .mode
             .map(litchi_keynote::soundtrack::Mode::from_raw),
     )
+    .map_err(|error| Error::ParseError(format!("invalid Keynote soundtrack settings: {error}")))
 }
 
 impl KeynoteEditor {
@@ -22,7 +23,7 @@ impl KeynoteEditor {
         let Some(record) = read_soundtrack(&graph)? else {
             return Ok(None);
         };
-        Ok(Some(settings_from_native(&record.native)))
+        Ok(Some(settings_from_native(&record.native)?))
     }
 
     /// Replace soundtrack mode and volume without changing its media collection.
@@ -36,14 +37,14 @@ impl KeynoteEditor {
                 "Keynote show has no soundtrack object".to_owned(),
             ));
         };
-        let current = settings_from_native(&record.native);
+        let current = settings_from_native(&record.native)?;
         if current == settings {
             return Ok(());
         }
 
         let data = patch_soundtrack_wire(record.data, &record.native, &settings)?;
         let verified_native = decode_soundtrack(&data)?;
-        if settings_from_native(&verified_native) != settings {
+        if settings_from_native(&verified_native)? != settings {
             return Err(Error::InvalidFormat(
                 "Keynote soundtrack wire patch failed validation".to_owned(),
             ));

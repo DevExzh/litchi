@@ -62,13 +62,13 @@ pub(super) fn patch_soundtrack_wire(
         original,
         VOLUME_FIELD,
         soundtrack.volume.is_some(),
-        settings.volume.map(f64::to_bits),
+        settings.volume().map(f64::to_bits),
     )?;
     patch_varint_field(
         &data,
         MODE_FIELD,
         soundtrack.mode.is_some(),
-        settings.mode.map(|mode| i64::from(mode.as_raw()) as u64),
+        settings.mode().map(|mode| i64::from(mode.as_raw()) as u64),
     )
 }
 
