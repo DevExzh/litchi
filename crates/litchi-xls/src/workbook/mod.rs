@@ -7,7 +7,7 @@
 
 mod codec;
 mod model;
-mod package;
+pub mod package;
 
 #[cfg(test)]
 mod tests;

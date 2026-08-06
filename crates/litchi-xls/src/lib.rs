@@ -16,7 +16,7 @@ mod encryption;
 pub mod records;
 
 /// Workbook parsing implementation
-mod workbook;
+pub mod workbook;
 
 /// Worksheet parsing implementation and worksheet-owned semantic views.
 pub mod worksheet;

@@ -5,6 +5,9 @@
 //! VBA, custom-XML, and revision-log streams. BIFF grammar stays in the
 //! sibling codec module.
 
+#[path = "package/property_set.rs"]
+pub mod property_set;
+
 use super::codec::{WorkbookGlobalsSink, pivot_cache_stream_paths};
 use super::model::{OpenOptions, Workbook};
 use crate::defined_names::DefinedNameSlot;
