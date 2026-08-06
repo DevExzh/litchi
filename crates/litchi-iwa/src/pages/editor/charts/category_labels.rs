@@ -1,8 +1,10 @@
 //! Native category-label layout CRUD for Pages body charts.
 
 use super::*;
+use litchi_iwa_common::chart::category_labels::Layout;
+
 use crate::charts::category_labels::{
-    Layout, chart_category_label_layout as read_native_category_label_layout,
+    chart_category_label_layout as read_native_category_label_layout,
     set_chart_category_label_layout as set_native_category_label_layout,
 };
 
@@ -62,10 +64,10 @@ fn set_body_chart_category_label_layout(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::category_labels::{Frequency, Interval};
     use crate::charts::{ChartData, Kind};
     use crate::pages::PagesDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
+    use litchi_iwa_common::chart::category_labels::{Frequency, Interval};
 
     #[test]
     fn scratch_document_supports_category_label_layout_crud() {

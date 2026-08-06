@@ -3,12 +3,12 @@
 use std::env;
 use std::path::Path;
 
-use litchi_iwa::charts::category_labels::{Frequency, Interval, Layout};
 use litchi_iwa::charts::{ChartData, Kind};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_common::chart::category_labels::{Frequency, Interval, Layout};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);

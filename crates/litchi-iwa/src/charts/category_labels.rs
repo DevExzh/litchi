@@ -6,7 +6,7 @@
 
 use prost::Message;
 
-pub use litchi_iwa_common::chart::category_labels::{Frequency, Interval, Layout};
+use litchi_iwa_common::chart::category_labels::{Frequency, Layout};
 
 use crate::charts::Axis;
 use crate::charts::axis::{chart_axis_labels_visible, set_chart_axis_labels_visible};
