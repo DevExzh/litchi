@@ -250,7 +250,7 @@ pub use sheet_audio::{NumbersSheetAudioInfo, NumbersSheetAudioOptions, RemovedNu
 pub use sheet_charts::{NumbersSheetChartInfo, RemovedNumbersSheetChart};
 pub use sheet_images::{NumbersSheetImageInfo, NumbersSheetImageOptions, RemovedNumbersSheetImage};
 pub use sheet_movies::{NumbersSheetMovieInfo, NumbersSheetMovieOptions, RemovedNumbersSheetMovie};
-pub use sheet_shapes::{NumbersSheetShapeInfo, NumbersSheetShapeKind, RemovedNumbersSheetShape};
+pub use sheet_shapes::{NumbersSheetShapeInfo, RemovedNumbersSheetShape};
 use storage::*;
 pub use table_axis_deletion::{TableColumnDeletion, TableRowDeletion};
 pub use table_axis_insertion::{TableColumnInsertion, TableRowInsertion};

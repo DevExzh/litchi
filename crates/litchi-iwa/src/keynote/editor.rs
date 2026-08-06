@@ -5558,7 +5558,7 @@ pub use slide_images::{
     RemovedKeynoteSlideImage,
 };
 pub use slide_movies::{KeynoteSlideMovieInfo, RemovedKeynoteSlideMovie};
-pub use slide_shapes::{KeynoteSlideShapeInfo, KeynoteSlideShapeKind, RemovedKeynoteSlideShape};
+pub use slide_shapes::{KeynoteSlideShapeInfo, RemovedKeynoteSlideShape};
 pub use slide_tables::{
     KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableCellConditionalHighlightInfo,
     KeynoteTableCellInset, KeynoteTableCellInsets, KeynoteTableCellLayout,

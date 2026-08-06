@@ -10,7 +10,7 @@ use crate::package_metadata::{
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, Endpoints,
     LineSegment, LineStyle, RgbaColor, Shadow, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
-    ShapePathKind, Stroke, flip_drawable_geometry, line_geometry, line_path_source,
+    Stroke, flip_drawable_geometry, line_geometry, line_path_source,
     line_segments_match, reset_shape_effects, reset_shape_fill, reset_shape_shadow,
     reset_shape_stroke, reset_shape_text_layout, set_shape_effects, set_shape_fill,
     set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
@@ -20,7 +20,7 @@ use crate::shapes::{
 };
 use crate::text::layout::Layout;
 use litchi_iwa_common::shape::effects::Effects;
-use litchi_iwa_common::shape::path::Preset;
+use litchi_iwa_common::shape::path::{Kind, Preset};
 
 use super::text_box_create::{
     BodyTextShapeObjectIds, BodyTextShapeRole, body_text_shape_objects, body_text_storage,
@@ -32,16 +32,13 @@ mod graph;
 use caption::*;
 use graph::*;
 
-/// Structural path family used by an ordinary Pages body shape.
-pub type PagesBodyShapeKind = ShapePathKind;
-
 /// One ordinary, non-text-box shape anchored to the Pages body text flow.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PagesBodyShapeInfo {
     pub drawable_object_id: u64,
     /// UTF-16 index of the object-replacement character in the body text.
     pub anchor_character_index: u32,
-    pub kind: PagesBodyShapeKind,
+    pub kind: Kind,
     /// Source-buildable preset and its native controls, when recognized.
     pub preset: Option<Preset>,
     /// Document-space endpoints when this shape is a native straight line.
@@ -952,7 +949,7 @@ mod tests {
         let created = editor
             .add_body_rectangle(4, "Built from typed objects", POSITION, SIZE)
             .unwrap();
-        assert_eq!(created.kind, PagesBodyShapeKind::Rectangle);
+        assert_eq!(created.kind, Kind::Rectangle);
         assert_eq!(created.preset, Some(Preset::Rectangle));
         assert_eq!(created.storage.text, "Built from typed objects");
         let horizontally_flipped = editor
@@ -1156,7 +1153,7 @@ mod tests {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
         let baseline_body = editor.body_text().unwrap();
         let created = editor.add_body_line(4, LINE_START, LINE_END).unwrap();
-        assert_eq!(created.kind, PagesBodyShapeKind::Line);
+        assert_eq!(created.kind, Kind::Line);
         assert_eq!(created.preset, None);
         assert_eq!(created.storage.text, "");
         assert!(line_segments_match(
@@ -1201,7 +1198,7 @@ mod tests {
         let removed = editor
             .remove_body_shape(created.drawable_object_id)
             .unwrap();
-        assert_eq!(removed.shape.kind, PagesBodyShapeKind::Line);
+        assert_eq!(removed.shape.kind, Kind::Line);
         assert_eq!(editor.body_text().unwrap(), baseline_body);
         assert!(editor.body_shapes().unwrap().is_empty());
     }
@@ -1735,7 +1732,7 @@ mod tests {
         let created = editor
             .add_body_shape(4, "Rounded", POSITION, SIZE, Preset::ROUNDED_RECTANGLE)
             .unwrap();
-        assert_eq!(created.kind, PagesBodyShapeKind::RoundedRectangle);
+        assert_eq!(created.kind, Kind::RoundedRectangle);
         assert_eq!(created.preset, Some(Preset::ROUNDED_RECTANGLE));
 
         let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -1747,12 +1744,12 @@ mod tests {
         );
 
         for (preset, kind) in [
-            (Preset::Ellipse, PagesBodyShapeKind::Ellipse),
-            (Preset::LeftArrow, PagesBodyShapeKind::LeftArrow),
-            (Preset::RightArrow, PagesBodyShapeKind::RightArrow),
-            (Preset::DoubleArrow, PagesBodyShapeKind::DoubleArrow),
-            (Preset::PENTAGON, PagesBodyShapeKind::RegularPolygon),
-            (Preset::STAR, PagesBodyShapeKind::Star),
+            (Preset::Ellipse, Kind::Ellipse),
+            (Preset::LeftArrow, Kind::LeftArrow),
+            (Preset::RightArrow, Kind::RightArrow),
+            (Preset::DoubleArrow, Kind::DoubleArrow),
+            (Preset::PENTAGON, Kind::RegularPolygon),
+            (Preset::STAR, Kind::Star),
         ] {
             editor
                 .set_body_shape_preset(created.drawable_object_id, preset)

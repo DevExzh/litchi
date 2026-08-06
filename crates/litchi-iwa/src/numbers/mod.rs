@@ -64,7 +64,7 @@ pub use editor::{
     NumbersSheetAudioInfo,
     NumbersSheetAudioOptions, NumbersSheetChartInfo, NumbersSheetImageInfo,
     NumbersSheetImageOptions, NumbersSheetInfo, NumbersSheetMovieInfo, NumbersSheetMovieOptions,
-    NumbersSheetShapeInfo, NumbersSheetShapeKind, NumbersTableCellParagraphIndents,
+    NumbersSheetShapeInfo, NumbersTableCellParagraphIndents,
     NumbersTableCellParagraphLineSpacing, NumbersTableCellParagraphList,
     NumbersTableCellParagraphListBullet, NumbersTableCellParagraphListBulletGeometry,
     NumbersTableCellParagraphListIndentation, NumbersTableCellParagraphListLabelColor,
