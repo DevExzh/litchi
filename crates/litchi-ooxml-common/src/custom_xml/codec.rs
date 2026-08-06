@@ -63,6 +63,134 @@ pub fn write_props(props: &Props, conformance: Conformance) -> Result<Vec<u8>> {
     Ok(out)
 }
 
+/// Rewrite the typed properties projection while retaining source markup when
+/// the schema-reference topology is unchanged. The bounded lexical patch is
+/// deliberately limited to the known `itemID` attribute; structural schema
+/// edits use the deterministic writer and never interpret extension XML.
+pub(super) fn rewrite_props(
+    source: &[u8],
+    before: &Props,
+    after: &Props,
+    conformance: Conformance,
+) -> Result<Vec<u8>> {
+    if before == after {
+        return Ok(source.to_vec());
+    }
+    if read_props(source)? != *before {
+        return invalid("custom XML properties source projection is stale");
+    }
+    if before.schemas == after.schemas
+        && let Some((value_start, value_end)) = item_id_span(source)?
+    {
+        let mut output = Vec::with_capacity(
+            source
+                .len()
+                .saturating_sub(value_end.saturating_sub(value_start))
+                .saturating_add(escaped_attr_len(&after.id)?),
+        );
+        output.extend_from_slice(&source[..value_start]);
+        push_escaped_attr(&mut output, &after.id);
+        output.extend_from_slice(&source[value_end..]);
+        if read_props(&output).is_ok_and(|props| props == *after) {
+            return Ok(output);
+        }
+    }
+    write_props(after, conformance)
+}
+
+fn item_id_span(source: &[u8]) -> Result<Option<(usize, usize)>> {
+    let mut start = None;
+    let mut position = 0usize;
+    while let Some(offset) = source
+        .get(position..)
+        .and_then(|tail| tail.iter().position(|b| *b == b'<'))
+    {
+        let tag_start = position + offset;
+        if source.get(tag_start + 1) == Some(&b'?')
+            || source.get(tag_start + 1) == Some(&b'!')
+            || source.get(tag_start + 1) == Some(&b'/')
+        {
+            position = tag_start.saturating_add(2);
+            continue;
+        }
+        start = Some(tag_start);
+        break;
+    }
+    let Some(tag_start) = start else {
+        return Ok(None);
+    };
+    let mut quote = None;
+    let mut tag_end = None;
+    for (offset, byte) in source[tag_start..].iter().enumerate() {
+        match (quote, *byte) {
+            (None, b'\'' | b'"') => quote = Some(*byte),
+            (Some(value), byte) if value == byte => quote = None,
+            (None, b'>') => {
+                tag_end = Some(tag_start + offset);
+                break;
+            },
+            _ => {},
+        }
+    }
+    let Some(tag_end) = tag_end else {
+        return invalid("custom XML properties root tag is incomplete");
+    };
+    let mut cursor = tag_start + 1;
+    while cursor < tag_end && !matches!(source[cursor], b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'>')
+    {
+        cursor += 1;
+    }
+    while cursor < tag_end {
+        while cursor < tag_end && source[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= tag_end || source[cursor] == b'/' {
+            break;
+        }
+        let name_start = cursor;
+        while cursor < tag_end
+            && !source[cursor].is_ascii_whitespace()
+            && !matches!(source[cursor], b'=' | b'/' | b'>')
+        {
+            cursor += 1;
+        }
+        let name = &source[name_start..cursor];
+        while cursor < tag_end && source[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= tag_end || source[cursor] != b'=' {
+            return invalid("custom XML properties root attribute is malformed");
+        }
+        cursor += 1;
+        while cursor < tag_end && source[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        let Some(&delimiter) = source.get(cursor) else {
+            return invalid("custom XML properties root attribute has no value");
+        };
+        if !matches!(delimiter, b'\'' | b'"') {
+            return invalid("custom XML properties root attribute is unquoted");
+        }
+        cursor += 1;
+        let value_start = cursor;
+        while cursor < tag_end && source[cursor] != delimiter {
+            cursor += 1;
+        }
+        if cursor >= tag_end {
+            return invalid("custom XML properties root attribute is unterminated");
+        }
+        if name
+            .rsplit(|byte| *byte == b':')
+            .next()
+            .is_some_and(|local| local == b"itemID")
+        {
+            return Ok(Some((value_start, cursor)));
+        }
+        cursor += 1;
+    }
+    Ok(None)
+}
+
 /// Validate a typed properties value without serializing it.
 pub fn validate_props(props: &Props) -> Result<()> {
     if !valid_guid(&props.id) {
@@ -419,7 +547,9 @@ fn parse_props_xml(xml: &[u8]) -> Result<Props> {
                     .decode()
                     .map_err(|error| Error::Xml(error.to_string()))?;
                 validate_xml_chars(&text)?;
-                if !is_xml_whitespace(text.as_bytes()) {
+                if !matches!(contexts.last(), Some(PropsContext::Opaque))
+                    && !is_xml_whitespace(text.as_bytes())
+                {
                     return invalid("text is not permitted in custom XML properties");
                 }
             },
@@ -431,7 +561,9 @@ fn parse_props_xml(xml: &[u8]) -> Result<Props> {
                 if contexts.is_empty() {
                     return invalid("CDATA is not permitted outside custom XML properties");
                 }
-                if !is_xml_whitespace(text.as_bytes()) {
+                if !matches!(contexts.last(), Some(PropsContext::Opaque))
+                    && !is_xml_whitespace(text.as_bytes())
+                {
                     return invalid("CDATA is not permitted in custom XML properties");
                 }
             },
@@ -441,7 +573,9 @@ fn parse_props_xml(xml: &[u8]) -> Result<Props> {
                 }
                 let value = decode_xml_reference(&reference)?;
                 validate_xml_chars(&value)?;
-                if !is_xml_whitespace(value.as_bytes()) {
+                if !matches!(contexts.last(), Some(PropsContext::Opaque))
+                    && !is_xml_whitespace(value.as_bytes())
+                {
                     return invalid("references are not permitted in custom XML properties");
                 }
             },
@@ -449,9 +583,10 @@ fn parse_props_xml(xml: &[u8]) -> Result<Props> {
                 text.decode()
                     .map_err(|error| Error::Xml(error.to_string()))?;
             },
-            Event::PI(_) => {
+            Event::PI(_) if !matches!(contexts.last(), Some(PropsContext::Opaque)) => {
                 return invalid("processing instructions are forbidden in custom XML properties");
             },
+            Event::PI(_) => {},
             Event::Eof => break,
         }
         event_seen = true;
@@ -473,6 +608,7 @@ enum PropsContext {
     Item,
     Schemas,
     Schema,
+    Opaque,
 }
 
 fn props_start(
@@ -517,6 +653,12 @@ fn props_start(
             schemas.push(required_attr(element, &element.namespace, "uri")?.into());
             Ok(PropsContext::Schema)
         },
+        Some(PropsContext::Opaque) => Ok(PropsContext::Opaque),
+        Some(PropsContext::Item) | Some(PropsContext::Schemas) | Some(PropsContext::Schema) => {
+            // Future properties markup is retained in the source part and is
+            // intentionally not interpreted by this host-neutral layer.
+            Ok(PropsContext::Opaque)
+        },
         _ => invalid(format!(
             "unexpected custom XML properties element {{{}}}{}",
             element.namespace, element.local_name
@@ -525,16 +667,10 @@ fn props_start(
 }
 
 fn reject_attributes_except(element: &ResolvedElement, allowed: &[(&str, &str)]) -> Result<()> {
-    for (namespace, local_name, _) in &element.attributes {
-        if !allowed.iter().any(|(allowed_namespace, allowed_name)| {
-            namespace == allowed_namespace && local_name == allowed_name
-        }) {
-            return invalid(format!(
-                "unexpected attribute {{{namespace}}}{local_name} on {}",
-                element.local_name
-            ));
-        }
-    }
+    // Unknown attributes are opaque extension data. Known attributes are
+    // still checked by `required_attr`; retaining this helper keeps the
+    // semantic call sites explicit without discarding future markup.
+    let _ = (element, allowed);
     Ok(())
 }
 

@@ -217,6 +217,197 @@ fn rejects_invalid_declarations_attributes_and_xml_characters() {
     assert!(write_props(&props, Conformance::Transitional).is_err());
 }
 
+#[test]
+fn transaction_preserves_opaque_payload_and_relationship_topology() {
+    let mut package = package_with_source();
+    add(
+        &mut package,
+        NewItem {
+            source: PackURI::new("/word/document.xml").unwrap(),
+            rel_id: "rIdData".into(),
+            part: PackURI::new("/customXml/item1.xml").unwrap(),
+            content_type: "application/xml".into(),
+            xml: br#"<customer xmlns="urn:customer"><future marker="keep"/></customer>"#.to_vec(),
+            props: Some(NewProps {
+                part: PackURI::new("/customXml/itemProps1.xml").unwrap(),
+                rel_id: "rIdProps".into(),
+                value: sample_props(),
+            }),
+            conformance: Conformance::Transitional,
+        },
+    )
+    .unwrap();
+    let data = PackURI::new("/customXml/item1.xml").unwrap();
+    let props = PackURI::new("/customXml/itemProps1.xml").unwrap();
+    let props_before = package.get_part(&props).unwrap().blob().to_vec();
+    package
+        .get_part_mut(&data)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            "urn:future:custom-xml".into(),
+            "https://example.invalid/opaque".into(),
+            "rIdFuture".into(),
+            true,
+        );
+
+    let before = Snapshot::load(&package).unwrap();
+    assert_eq!(before.items()[0].relationships().len(), 2);
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    assert!(
+        transaction
+            .set_item_xml(
+                0,
+                br#"<customer xmlns="urn:customer"><future marker="changed"/></customer>"#.to_vec(),
+            )
+            .unwrap()
+    );
+    let commit = transaction.commit().unwrap();
+    assert!(commit.changed());
+    assert_eq!(package.get_part(&props).unwrap().blob(), props_before);
+    assert_eq!(
+        package
+            .get_part(&data)
+            .unwrap()
+            .rels()
+            .get("rIdFuture")
+            .unwrap()
+            .target_ref(),
+        "https://example.invalid/opaque"
+    );
+
+    let patch = commit.patch().clone();
+    assert!(patch.inverse().apply(&mut package).unwrap());
+    assert_eq!(Snapshot::load(&package).unwrap(), before);
+}
+
+#[test]
+fn properties_edits_retain_future_markup() {
+    let mut package = package_with_source();
+    add(
+        &mut package,
+        NewItem {
+            source: PackURI::new("/word/document.xml").unwrap(),
+            rel_id: "rIdData".into(),
+            part: PackURI::new("/customXml/item1.xml").unwrap(),
+            content_type: "application/xml".into(),
+            xml: b"<root/>".to_vec(),
+            props: Some(NewProps {
+                part: PackURI::new("/customXml/itemProps1.xml").unwrap(),
+                rel_id: "rIdProps".into(),
+                value: sample_props(),
+            }),
+            conformance: Conformance::Transitional,
+        },
+    )
+    .unwrap();
+    let props_part = PackURI::new("/customXml/itemProps1.xml").unwrap();
+    let source = format!(
+        r#"<ds:datastoreItem xmlns:ds="{TRANSITIONAL_NAMESPACE}" xmlns:x="urn:future" x:marker="keep" ds:itemID="{{11111111-1111-1111-1111-111111111111}}"><x:future>opaque</x:future><ds:schemaRefs><ds:schemaRef ds:uri="urn:customer"/></ds:schemaRefs></ds:datastoreItem>"#
+    );
+    package
+        .get_part_mut(&props_part)
+        .unwrap()
+        .set_blob(source.into_bytes());
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    let mut updated = sample_props();
+    updated.id = "{22222222-2222-2222-2222-222222222222}".into();
+    assert!(transaction.set_properties(0, updated).unwrap());
+    transaction.commit().unwrap();
+    let xml = std::str::from_utf8(package.get_part(&props_part).unwrap().blob()).unwrap();
+    assert!(xml.contains("x:marker=\"keep\""));
+    assert!(xml.contains("<x:future>opaque</x:future>"));
+    assert!(xml.contains("22222222-2222-2222-2222-222222222222"));
+}
+
+#[test]
+fn transaction_crud_is_source_checked_and_failure_atomic() {
+    let mut package = package_with_source();
+    let source = PackURI::new("/word/document.xml").unwrap();
+    let initial_parts = package.part_count();
+    let initial_relationships = package.get_part(&source).unwrap().rels().len();
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    let index = transaction
+        .insert(NewItem {
+            source: source.clone(),
+            rel_id: "rIdInserted".into(),
+            part: PackURI::new("/customXml/item2.xml").unwrap(),
+            content_type: "application/xml".into(),
+            xml: b"<opaque xmlns=\"urn:opaque\"><x:future xmlns:x=\"urn:x\"/></opaque>".to_vec(),
+            props: Some(NewProps {
+                part: PackURI::new("/customXml/itemProps2.xml").unwrap(),
+                rel_id: "rIdProps".into(),
+                value: sample_props(),
+            }),
+            conformance: Conformance::Strict,
+        })
+        .unwrap();
+    assert_eq!(index, 0);
+    let commit = transaction.commit().unwrap();
+    assert_eq!(discover(&package).unwrap().len(), 1);
+    let patch = commit.patch().clone();
+    assert!(patch.inverse().apply(&mut package).unwrap());
+    assert!(discover(&package).unwrap().is_empty());
+    assert_eq!(package.part_count(), initial_parts);
+    assert_eq!(
+        package.get_part(&source).unwrap().rels().len(),
+        initial_relationships
+    );
+
+    let mut stale = package_with_source();
+    let mut source_edit = Transaction::new(&mut stale).unwrap();
+    source_edit
+        .insert(NewItem {
+            source: source.clone(),
+            rel_id: "rIdStale".into(),
+            part: PackURI::new("/customXml/stale.xml").unwrap(),
+            content_type: "application/xml".into(),
+            xml: b"<stale/>".to_vec(),
+            props: None,
+            conformance: Conformance::Transitional,
+        })
+        .unwrap();
+    let stale_patch = source_edit.commit().unwrap().patch().clone();
+    package
+        .get_part_mut(&source)
+        .unwrap()
+        .set_blob(b"<changed/>".to_vec());
+    let before_parts = package.part_count();
+    assert!(stale_patch.apply(&mut package).is_err());
+    assert_eq!(package.part_count(), before_parts);
+    assert_eq!(package.get_part(&source).unwrap().blob(), b"<changed/>");
+}
+
+#[test]
+fn exact_noop_does_not_unsign_or_rewrite() {
+    let mut package = package_with_source();
+    add(
+        &mut package,
+        NewItem {
+            source: PackURI::new("/word/document.xml").unwrap(),
+            rel_id: "rIdData".into(),
+            part: PackURI::new("/customXml/item1.xml").unwrap(),
+            content_type: "application/xml".into(),
+            xml: b"<root/>".to_vec(),
+            props: None,
+            conformance: Conformance::Transitional,
+        },
+    )
+    .unwrap();
+    package.relate_to(
+        "_xmlsignatures/origin.sigs",
+        litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN,
+    );
+    let before = Snapshot::load(&package).unwrap();
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    assert!(!transaction.set_xml(0, b"<root/>".to_vec()).unwrap());
+    let commit = transaction.commit().unwrap();
+    assert!(!commit.changed());
+    assert!(commit.patch().is_empty());
+    assert!(package.is_signed());
+    assert_eq!(Snapshot::load(&package).unwrap(), before);
+}
+
 fn package_with_source() -> OpcPackage {
     let mut package = OpcPackage::new();
     package.add_part(Box::new(BlobPart::new(

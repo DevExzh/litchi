@@ -1,7 +1,7 @@
 //! Typed Custom XML Data Storage values and bounded authoring requests.
 
 use crate::mce::Name;
-use litchi_opc::PackURI;
+use litchi_opc::{PackURI, TargetMode};
 use std::sync::Arc;
 
 /// Transitional Custom XML Data Storage namespace.
@@ -88,46 +88,88 @@ pub struct Props {
 }
 
 /// One relationship occurrence targeting a Custom XML Data Storage part.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Relationship {
+    /// Relationship ID on the owning part.
+    pub id: String,
+    /// Relationship type URI retained without interpretation.
+    pub relationship_type: String,
+    /// Original target reference, including any opaque query or fragment.
+    pub target: String,
+    /// Whether the target is internal or external.
+    pub target_mode: TargetMode,
+}
+
+impl Relationship {
+    pub(super) fn from_opc(value: &litchi_opc::Relationship) -> Self {
+        Self {
+            id: value.r_id().into(),
+            relationship_type: value.reltype().into(),
+            target: value.target_ref().into(),
+            target_mode: value.target_mode(),
+        }
+    }
+
+    /// Whether this relationship targets outside the OPC package.
+    #[must_use]
+    pub const fn is_external(&self) -> bool {
+        matches!(self.target_mode, TargetMode::External)
+    }
+}
+
+/// One relationship occurrence targeting a Custom XML Data Storage part.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Item {
     /// Part that owns the data relationship.
     source: PackURI,
     /// Relationship ID on [`Self::source`].
-    rel_id: String,
+    pub(super) rel_id: String,
+    /// Complete source-side relationship, including its original target mode.
+    pub(super) source_relationship: Relationship,
     /// Canonical package name of the data part.
-    part: PackURI,
+    pub(super) part: PackURI,
     /// Declared XML-based content type.
-    content_type: String,
+    pub(super) content_type: String,
     /// Expanded name of the payload document element.
-    root: Name,
+    pub(super) root: Name,
     /// Exact, uninterpreted payload bytes.
-    xml: Arc<Vec<u8>>,
+    pub(super) xml: Arc<Vec<u8>>,
     /// Canonical package name of the optional properties part.
-    props_part: Option<PackURI>,
+    pub(super) props_part: Option<PackURI>,
     /// Parsed optional properties.
-    props: Option<Props>,
+    pub(super) props: Option<Props>,
+    /// Exact optional properties XML retained without normalization.
+    pub(super) props_xml: Option<Arc<Vec<u8>>>,
+    /// Every outbound relationship on the data part, including unknown ones.
+    pub(super) relationships: Arc<[Relationship]>,
 }
 
 impl Item {
     pub(super) fn new(
         source: PackURI,
         rel_id: String,
+        source_relationship: Relationship,
         part: PackURI,
         content_type: String,
         root: Name,
         xml: Arc<Vec<u8>>,
         props_part: Option<PackURI>,
         props: Option<Props>,
+        props_xml: Option<Arc<Vec<u8>>>,
+        relationships: Arc<[Relationship]>,
     ) -> Self {
         Self {
             source,
             rel_id,
+            source_relationship,
             part,
             content_type,
             root,
             xml,
             props_part,
             props,
+            props_xml,
+            relationships,
         }
     }
 
@@ -141,6 +183,12 @@ impl Item {
     #[must_use]
     pub fn rel_id(&self) -> &str {
         &self.rel_id
+    }
+
+    /// Complete source-side relationship, including unknown metadata.
+    #[must_use]
+    pub fn source_relationship(&self) -> &Relationship {
+        &self.source_relationship
     }
 
     /// Canonical package name of the data part.
@@ -178,6 +226,18 @@ impl Item {
     pub fn props(&self) -> Option<&Props> {
         self.props.as_ref()
     }
+
+    /// Exact optional properties XML borrowed from shared OPC storage.
+    #[must_use]
+    pub fn props_xml(&self) -> Option<&[u8]> {
+        self.props_xml.as_deref().map(Vec::as_slice)
+    }
+
+    /// Every outbound relationship on the data part in stable ID order.
+    #[must_use]
+    pub fn relationships(&self) -> &[Relationship] {
+        &self.relationships
+    }
 }
 
 /// Properties authoring request.
@@ -185,7 +245,7 @@ impl Item {
 /// Grouping these fields makes an incomplete properties request
 /// unrepresentable: the part name, relationship ID, and value are all present
 /// or all absent through [`Option`].
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewProps {
     /// Package name for the new properties part.
     pub part: PackURI,
@@ -196,7 +256,7 @@ pub struct NewProps {
 }
 
 /// Deterministic package authoring request.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewItem {
     /// Existing part that will own the new data relationship.
     pub source: PackURI,
