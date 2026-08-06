@@ -224,6 +224,9 @@ mod sheet_metadata;
 /// Shape extraction
 pub mod shapes;
 
+/// Typed, inert worksheet OfficeArt anchor metadata.
+pub mod drawing_metadata;
+
 /// Shared parsing utilities
 mod utils;
 
@@ -352,6 +355,7 @@ pub use differential_format::{
     DifferentialFormat, ThemeColor, XfBorder, XfColor, XfColorSource, XfFontScheme, XfFontWeight,
     XfGradient, XfGradientStop, XfProperties, XfProperty,
 };
+pub use drawing_metadata::{AnchorBehavior, AnchorPoint, SheetAnchor};
 pub use encryption::EncryptionProfile;
 pub use ent_ex_u2::EntExU2;
 pub use environment::{LinkUpdateMode, ObjectDisplayMode, WorkbookEnvironment};

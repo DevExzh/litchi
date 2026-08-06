@@ -11,6 +11,8 @@ use litchi_odraw::{
 };
 use std::collections::VecDeque;
 
+use crate::drawing_metadata::{self, SheetAnchor};
+
 const MSO_DRAWING: u16 = 0x00EC;
 const TXO: u16 = 0x01B6;
 const CONTINUE: u16 = 0x003C;
@@ -28,6 +30,8 @@ pub struct Shape {
     pub is_group: bool,
     /// Child shapes (for group shapes)
     pub children: Vec<Shape>,
+    /// XLS cell-relative anchor from the shape's `OfficeArtClientAnchorSheet`.
+    pub sheet_anchor: Option<SheetAnchor>,
 }
 
 impl Shape {
@@ -55,6 +59,10 @@ impl Shape {
             .iter()
             .map(|child| Self::from_odraw(child, texts))
             .collect::<std::io::Result<_>>()?;
+        let sheet_anchor = shape
+            .client_anchor()
+            .map(drawing_metadata::decode_sheet_anchor)
+            .transpose()?;
 
         Ok(Self {
             shape_type: shape.kind(),
@@ -62,6 +70,7 @@ impl Shape {
             text,
             is_group: matches!(shape.kind(), Kind::Group | Kind::Table),
             children,
+            sheet_anchor,
         })
     }
 }
@@ -428,6 +437,7 @@ mod tests {
             text,
             is_group,
             children,
+            sheet_anchor: None,
         }
     }
 
@@ -569,6 +579,34 @@ mod tests {
         // Random data that isn't valid BIFF
         let data = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
         assert!(count_shapes_in_workbook(&data).is_err());
+    }
+
+    #[test]
+    fn projects_the_typed_sheet_anchor_from_officeart() {
+        use litchi_odraw::{shape::Flags, shape::Native, write};
+
+        let expected = SheetAnchor::new(
+            crate::AnchorPoint::new(1, 2, -4, 3).unwrap(),
+            crate::AnchorPoint::new(4, 7, 900, 200).unwrap(),
+            crate::AnchorBehavior::Size,
+        )
+        .unwrap();
+        let mut children = Vec::new();
+        write::ShapeBuilder::new(Native::RECTANGLE, 42)
+            .with_flags(Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
+            .write(&mut children)
+            .unwrap();
+        write::PropertyBuilder::new().write(&mut children).unwrap();
+        children.extend_from_slice(&expected.to_record_bytes());
+        write::atom(&mut children, 0, write::Atom::ClientData, &[]).unwrap();
+
+        let mut bytes = Vec::new();
+        write::container(&mut bytes, 0, write::Container::Sp, &children).unwrap();
+        let (record, consumed) = Record::parse(&bytes, 0).unwrap();
+        assert_eq!(consumed, bytes.len());
+        let parsed = DrawShape::try_from(record).unwrap();
+        let projected = Shape::from_odraw(&parsed, &mut VecDeque::new()).unwrap();
+        assert_eq!(projected.sheet_anchor, Some(expected));
     }
 
     #[test]
