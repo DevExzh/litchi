@@ -2,18 +2,19 @@
 
 use super::codec::scan_slide;
 use super::model::{ContentPart, Payload, Relationship, RelationshipMetadata, Target};
+use super::transaction::{Commit, Patch, RelationshipState, Snapshot};
+use super::validation::{
+    self, MAX_PAYLOAD_BYTES, MAX_PAYLOAD_RELATIONSHIPS, MAX_RELATIONSHIP_FIELD_BYTES,
+    MAX_TOTAL_PAYLOAD_BYTES,
+};
 use crate::presentation::embedded::{invalid, limit};
 use crate::{Error, Result};
 use litchi_opc::constants::content_type as ct;
-use litchi_opc::{OpcPackage, PackURI, Part};
-use std::collections::HashMap;
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 const MAX_CONTENT_PARTS: usize = 4_096;
-const MAX_PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
-const MAX_TOTAL_PAYLOAD_BYTES: usize = 256 * 1024 * 1024;
-const MAX_PAYLOAD_RELATIONSHIPS: usize = 4_096;
-const MAX_RELATIONSHIP_FIELD_BYTES: usize = 16 * 1024;
 
 /// Finite resource policy for content-part discovery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -179,6 +180,174 @@ pub fn load_slide(
         });
     }
     Ok(result)
+}
+
+/// Capture a source-checked snapshot of one slide-owned content-part graph.
+pub fn load_snapshot(
+    package: &OpcPackage,
+    slide_index: usize,
+    slide: &dyn Part,
+    limits: &mut Limits,
+) -> Result<Snapshot> {
+    let parts = load_slide(package, slide_index, slide, limits)?;
+    validation::validate_package_graph(package, slide, &parts)?;
+    let relationships = super::transaction::relationship_states(slide.rels().iter())?;
+    Snapshot::from_parts(
+        slide_index,
+        slide.partname().clone(),
+        slide.blob_arc(),
+        parts,
+        relationships,
+    )
+}
+
+/// Apply a source-checked content-part patch atomically to its owning package.
+pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+    let before = patch.before();
+    let slide = package.get_part(&before.slide_part_name)?;
+    let current = load_snapshot(package, before.slide_index, slide, &mut Limits::default())?;
+    if !current.same_source(before) {
+        return Err(validation::invalid_revision());
+    }
+    if patch.is_empty() {
+        return Ok(current);
+    }
+
+    let mut staged = package.clone();
+    staged.unsign();
+    install_patch(&mut staged, patch)?;
+    let slide = staged.get_part(&before.slide_part_name)?;
+    let resulting = load_snapshot(
+        &staged,
+        patch.after().slide_index,
+        slide,
+        &mut Limits::default(),
+    )?;
+    if !resulting.same_source(patch.after()) {
+        return Err(invalid(
+            "published content-part graph differs from the commit",
+        ));
+    }
+    *package = staged;
+    Ok(resulting)
+}
+
+/// Apply a committed content-part transaction atomically.
+#[inline]
+pub fn apply_commit(package: &mut OpcPackage, commit: Commit) -> Result<Snapshot> {
+    apply_patch(package, commit.patch())
+}
+
+fn install_patch(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
+    let before = patch.before();
+    let after = patch.after();
+    let slide_name = before.slide_part_name.clone();
+    package
+        .get_part_mut(&slide_name)?
+        .set_blob(after.source_xml.as_ref().clone());
+    sync_slide_relationships(
+        package.get_part_mut(&slide_name)?,
+        &after.slide_relationships,
+    )?;
+
+    let before_payloads: HashSet<PackURI> = before
+        .payloads
+        .iter()
+        .map(|payload| payload.part_name().clone())
+        .collect();
+    let after_payloads: HashSet<PackURI> = after
+        .payloads
+        .iter()
+        .map(|payload| payload.part_name().clone())
+        .collect();
+
+    for payload in after.payloads.iter() {
+        if package.contains_part(payload.part_name()) {
+            if !before_payloads.contains(payload.part_name()) {
+                return Err(invalid(format!(
+                    "content-part payload '{}' conflicts with an unrelated package part",
+                    payload.part_name().as_str()
+                )));
+            }
+            let part = package.get_part_mut(payload.part_name())?;
+            part.set_content_type(payload.content_type().to_owned())?;
+            part.set_blob(payload.bytes().to_vec());
+            sync_payload_relationships(part, payload.relationships())?;
+        } else {
+            package.try_add_part(Box::new(BlobPart::new(
+                payload.part_name().clone(),
+                payload.content_type().to_owned(),
+                payload.bytes().to_vec(),
+            )))?;
+            sync_payload_relationships(
+                package.get_part_mut(payload.part_name())?,
+                payload.relationships(),
+            )?;
+        }
+    }
+
+    for part_name in before_payloads.difference(&after_payloads) {
+        if !has_inbound_relationship(package, part_name)? {
+            package.remove_part(part_name);
+        }
+    }
+    Ok(())
+}
+
+fn sync_slide_relationships(part: &mut dyn Part, desired: &[RelationshipState]) -> Result<()> {
+    let current: Vec<String> = part
+        .rels()
+        .iter()
+        .map(|value| value.r_id().to_owned())
+        .collect();
+    for id in current {
+        part.rels_mut().remove(&id);
+    }
+    for relationship in desired {
+        part.rels_mut().try_add_relationship(
+            relationship.relationship_type.clone(),
+            relationship.target_ref.clone(),
+            relationship.id.clone(),
+            relationship.target_mode,
+        )?;
+    }
+    Ok(())
+}
+
+fn sync_payload_relationships(part: &mut dyn Part, desired: &[RelationshipMetadata]) -> Result<()> {
+    let current: Vec<String> = part
+        .rels()
+        .iter()
+        .map(|value| value.r_id().to_owned())
+        .collect();
+    for id in current {
+        part.rels_mut().remove(&id);
+    }
+    for relationship in desired {
+        part.rels_mut().try_add_relationship(
+            relationship.relationship_type().to_owned(),
+            relationship.target_ref().to_owned(),
+            relationship.id().to_owned(),
+            relationship.target_mode(),
+        )?;
+    }
+    Ok(())
+}
+
+fn has_inbound_relationship(package: &OpcPackage, target: &PackURI) -> Result<bool> {
+    for source in package.iter_parts() {
+        for relationship in source.rels().iter() {
+            if !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .map(|value| value.is_equivalent_to(target))
+                    .unwrap_or(false)
+            {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
 }
 
 fn make_payload(part: &dyn Part, maximum_relationships: usize) -> Result<Payload> {

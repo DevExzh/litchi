@@ -75,6 +75,19 @@ pub struct Anchor {
 }
 
 impl Anchor {
+    /// Create an opaque content-part anchor from its exact XML bytes.
+    ///
+    /// The anchor is checked when it is inserted into a snapshot transaction;
+    /// construction itself stays allocation-only so callers can assemble a
+    /// detached graph without an OPC package.
+    #[inline]
+    pub fn new(relationship_id: impl Into<String>, xml: impl Into<Vec<u8>>) -> Self {
+        Self {
+            relationship_id: relationship_id.into(),
+            xml: xml.into(),
+        }
+    }
+
     /// The `r:id` value resolved against the owning slide relationship graph.
     #[inline]
     pub fn relationship_id(&self) -> &str {
@@ -99,6 +112,24 @@ pub struct Relationship {
 }
 
 impl Relationship {
+    /// Create relationship metadata for a detached content-part graph.
+    #[inline]
+    pub fn new(
+        id: impl Into<String>,
+        relationship_type: impl Into<String>,
+        target_ref: impl Into<String>,
+        target_mode: TargetMode,
+        target: Target,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            relationship_type: relationship_type.into(),
+            target_ref: target_ref.into(),
+            target_mode,
+            target,
+        }
+    }
+
     /// Relationship identifier in the owning slide `.rels` part.
     #[inline]
     pub fn id(&self) -> &str {
@@ -152,9 +183,23 @@ pub enum Target {
 }
 
 impl Target {
+    /// Construct an inert internal target.
+    #[inline]
+    pub fn internal(payload: Payload) -> Self {
+        Self::Internal(payload)
+    }
+
+    /// Construct an inert external target without contacting its URI.
+    #[inline]
+    pub fn external(target_ref: impl Into<String>) -> Self {
+        Self::External {
+            target_ref: target_ref.into(),
+        }
+    }
+
     /// Return the internal payload, when present.
     #[inline]
-    pub fn internal(&self) -> Option<&Payload> {
+    pub fn payload(&self) -> Option<&Payload> {
         match self {
             Self::Internal(payload) => Some(payload),
             Self::External { .. } => None,
@@ -181,6 +226,33 @@ pub struct Payload {
 }
 
 impl Payload {
+    /// Create opaque payload bytes and an empty outbound relationship set.
+    #[inline]
+    pub fn new(
+        part_name: PackURI,
+        content_type: impl Into<Arc<str>>,
+        bytes: impl Into<Vec<u8>>,
+    ) -> Self {
+        Self {
+            part_name,
+            content_type: content_type.into(),
+            bytes: Arc::<[u8]>::from(bytes.into()),
+            relationships: Arc::from([]),
+        }
+    }
+
+    /// Attach opaque relationship metadata to a payload.
+    #[inline]
+    pub fn with_relationships(
+        mut self,
+        relationships: impl IntoIterator<Item = RelationshipMetadata>,
+    ) -> Self {
+        let mut values = relationships.into_iter().collect::<Vec<_>>();
+        values.sort_unstable_by(|left, right| left.id.cmp(&right.id));
+        self.relationships = Arc::<[RelationshipMetadata]>::from(values);
+        self
+    }
+
     /// Absolute OPC part name of this target.
     #[inline]
     pub fn part_name(&self) -> &PackURI {
@@ -216,6 +288,22 @@ pub struct RelationshipMetadata {
 }
 
 impl RelationshipMetadata {
+    /// Create outbound relationship metadata without resolving its target.
+    #[inline]
+    pub fn new(
+        id: impl Into<String>,
+        relationship_type: impl Into<String>,
+        target_ref: impl Into<String>,
+        target_mode: TargetMode,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            relationship_type: relationship_type.into(),
+            target_ref: target_ref.into(),
+            target_mode,
+        }
+    }
+
     /// Relationship identifier in the payload part's `.rels` graph.
     #[inline]
     pub fn id(&self) -> &str {
