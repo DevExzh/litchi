@@ -1025,9 +1025,22 @@ fn node_xml(node: &Node, strict: bool) -> Result<Vec<u8>> {
 }
 
 fn write_node(xml: &mut String, node: &Node, strict: bool) -> Result<()> {
+    let (node_prefix, _) = split_qname(&node.qname)?;
+    let mut required_prefixes = HashSet::new();
+    if !node.namespace.is_empty() {
+        required_prefixes.insert(node_prefix.to_owned());
+    }
+    for attribute in &node.attributes {
+        if let Some((prefix, _)) = attribute.qname.split_once(':') {
+            required_prefixes.insert(prefix.to_owned());
+        }
+    }
     xml.push('<');
     xml.push_str(&node.qname);
     for (prefix, uri) in &node.bindings {
+        if !required_prefixes.contains(prefix) {
+            continue;
+        }
         if prefix.is_empty() {
             xml.push_str(" xmlns=\"");
         } else {
