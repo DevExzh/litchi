@@ -7,6 +7,10 @@
 
 mod codec;
 mod model;
+mod transaction;
+
+#[cfg(test)]
+mod tests;
 
 pub use codec::parse_variables;
 pub use model::{
@@ -14,3 +18,4 @@ pub use model::{
     MAX_DOCUMENT_VARIABLE_VALUE_CHARS, MAX_DOCUMENT_VARIABLE_XML_BYTES, MAX_DOCUMENT_VARIABLES,
     Variables,
 };
+pub use transaction::{Commit, Patch, Snapshot, Transaction};

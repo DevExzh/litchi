@@ -1,3 +1,6 @@
+use std::borrow::Cow;
+use std::ops::Range;
+
 use super::model::{MAX_DOCUMENT_VARIABLE_DEPTH, MAX_DOCUMENT_VARIABLE_XML_BYTES, Variables};
 use crate::{Error, Result};
 use quick_xml::XmlVersion;
@@ -181,6 +184,284 @@ pub fn parse_variables(xml: &[u8]) -> Result<Variables> {
         return Err(invalid("settings part has no settings root"));
     }
     Ok(variables)
+}
+
+/// Rewrite only the typed `docVars` owner in a complete settings source.
+pub(super) fn rewrite(xml: &[u8], before: &Variables, after: &Variables) -> Result<Vec<u8>> {
+    let current = parse_variables(xml)?;
+    if current != *before {
+        return Err(invalid("document-variable source is stale"));
+    }
+    after.validate()?;
+
+    let layout = scan_settings_layout(xml)?;
+    let replacement = if after.is_empty() {
+        Vec::new()
+    } else {
+        document_variables_element(&layout, after).into_bytes()
+    };
+
+    let output = if let Some(range) = layout.doc_vars_range {
+        replace_range(xml, range, &replacement)
+    } else if let Some(range) = layout.root_empty_range {
+        expand_empty_root(xml, range, &layout.root_qname, &replacement)?
+    } else if replacement.is_empty() {
+        xml.to_vec()
+    } else {
+        let offset = layout
+            .doc_vars_insert_at
+            .or(layout.root_end)
+            .ok_or_else(|| invalid("settings root has no document-variable insertion point"))?;
+        insert_fragment(xml, offset, &replacement)
+    };
+    if output.len() > MAX_DOCUMENT_VARIABLE_XML_BYTES {
+        return Err(invalid(format!(
+            "rewritten settings XML exceeds the {MAX_DOCUMENT_VARIABLE_XML_BYTES} byte document-variable limit"
+        )));
+    }
+    Ok(output)
+}
+
+#[derive(Debug, Default)]
+struct SettingsLayout {
+    root_qname: Vec<u8>,
+    word_prefix: Option<Vec<u8>>,
+    strict: bool,
+    root_empty_range: Option<Range<usize>>,
+    root_end: Option<usize>,
+    doc_vars_range: Option<Range<usize>>,
+    doc_vars_insert_at: Option<usize>,
+}
+
+fn scan_settings_layout(xml: &[u8]) -> Result<SettingsLayout> {
+    if xml.len() > MAX_DOCUMENT_VARIABLE_XML_BYTES {
+        return Err(invalid(format!(
+            "settings XML exceeds the {MAX_DOCUMENT_VARIABLE_XML_BYTES} byte document-variable limit"
+        )));
+    }
+
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().check_end_names = true;
+    let mut layout = SettingsLayout::default();
+    let mut depth = 0usize;
+    let mut doc_vars_start = None;
+
+    loop {
+        let event_start = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid("document-variable XML offset is too large"))?;
+        let event = reader
+            .read_event()
+            .map_err(|error| xml_error(error.to_string()))?
+            .into_owned();
+        let event_end = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid("document-variable XML offset is too large"))?;
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+
+        match event {
+            Event::Start(element) => {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("document-variable XML nesting overflow"))?;
+                if depth > MAX_DOCUMENT_VARIABLE_DEPTH {
+                    return Err(invalid(format!(
+                        "document-variable XML exceeds depth {MAX_DOCUMENT_VARIABLE_DEPTH}"
+                    )));
+                }
+                if depth == 1 {
+                    capture_settings_root(&mut layout, &namespace, &element)?;
+                } else if depth == 2
+                    && is_wordprocessing_namespace(&namespace)
+                    && element.local_name().as_ref() == b"docVars"
+                {
+                    if doc_vars_start.is_some() || layout.doc_vars_range.is_some() {
+                        return Err(invalid("duplicate docVars container"));
+                    }
+                    doc_vars_start = Some(event_start);
+                }
+                if depth == 2
+                    && is_wordprocessing_namespace(&namespace)
+                    && layout.doc_vars_insert_at.is_none()
+                    && is_after_doc_vars(element.local_name().as_ref())
+                {
+                    layout.doc_vars_insert_at = Some(event_start);
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("document-variable XML nesting overflow"))?;
+                if child_depth > MAX_DOCUMENT_VARIABLE_DEPTH {
+                    return Err(invalid(format!(
+                        "document-variable XML exceeds depth {MAX_DOCUMENT_VARIABLE_DEPTH}"
+                    )));
+                }
+                if child_depth == 1 {
+                    capture_settings_root(&mut layout, &namespace, &element)?;
+                    layout.root_empty_range = Some(event_start..event_end);
+                } else if child_depth == 2
+                    && is_wordprocessing_namespace(&namespace)
+                    && element.local_name().as_ref() == b"docVars"
+                {
+                    if layout.doc_vars_range.is_some() || doc_vars_start.is_some() {
+                        return Err(invalid("duplicate docVars container"));
+                    }
+                    layout.doc_vars_range = Some(event_start..event_end);
+                }
+                if child_depth == 2
+                    && is_wordprocessing_namespace(&namespace)
+                    && layout.doc_vars_insert_at.is_none()
+                    && is_after_doc_vars(element.local_name().as_ref())
+                {
+                    layout.doc_vars_insert_at = Some(event_start);
+                }
+            },
+            Event::End(_) => {
+                if depth == 2
+                    && let Some(start) = doc_vars_start.take()
+                {
+                    layout.doc_vars_range = Some(start..event_end);
+                }
+                if depth == 1 {
+                    layout.root_end = Some(event_start);
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("invalid document-variable XML nesting"))?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+
+    if depth != 0 {
+        return Err(invalid("unterminated document-variable settings XML"));
+    }
+    if layout.root_qname.is_empty() {
+        return Err(invalid("settings root is missing"));
+    }
+    Ok(layout)
+}
+
+fn capture_settings_root(
+    layout: &mut SettingsLayout,
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+) -> Result<()> {
+    if !layout.root_qname.is_empty()
+        || !is_wordprocessing_namespace(namespace)
+        || element.local_name().as_ref() != b"settings"
+    {
+        return Err(invalid("document variables require one Word settings root"));
+    }
+    layout.root_qname = element.name().as_ref().to_vec();
+    layout.word_prefix = element
+        .name()
+        .prefix()
+        .map(|prefix| prefix.into_inner().to_vec());
+    layout.strict = matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value)) if *value == STRICT_WORD_NAMESPACE
+    );
+    Ok(())
+}
+
+fn is_after_doc_vars(local_name: &[u8]) -> bool {
+    matches!(
+        local_name,
+        b"rsids"
+            | b"uiCompat97To2003"
+            | b"attachedSchema"
+            | b"themeFontLang"
+            | b"clrSchemeMapping"
+            | b"doNotIncludeSubdocsInStats"
+            | b"doNotAutoCompressPictures"
+            | b"forceUpgrade"
+            | b"captions"
+            | b"readModeInkLockDown"
+            | b"smartTagType"
+            | b"schemaLibrary"
+            | b"shapeDefaults"
+            | b"doNotEmbedSmartTags"
+            | b"decimalSymbol"
+            | b"listSeparator"
+    )
+}
+
+fn document_variables_element(layout: &SettingsLayout, variables: &Variables) -> String {
+    let prefix = layout
+        .word_prefix
+        .as_deref()
+        .map(String::from_utf8_lossy)
+        .unwrap_or(Cow::Borrowed("w"));
+    let mut output = format!("<{prefix}:docVars");
+    if layout.word_prefix.is_none() {
+        let namespace = if layout.strict {
+            STRICT_WORD_NAMESPACE
+        } else {
+            TRANSITIONAL_WORD_NAMESPACE
+        };
+        output.push_str(" xmlns:");
+        output.push_str(&prefix);
+        output.push_str("=\"");
+        output.push_str(&String::from_utf8_lossy(namespace));
+        output.push('"');
+    }
+    output.push('>');
+    variables.write_entries(&mut output, &prefix);
+    output.push_str("</");
+    output.push_str(&prefix);
+    output.push_str(":docVars>");
+    output
+}
+
+fn replace_range(source: &[u8], range: Range<usize>, replacement: &[u8]) -> Vec<u8> {
+    let capacity = source
+        .len()
+        .saturating_sub(range.len())
+        .saturating_add(replacement.len());
+    let mut output = Vec::with_capacity(capacity);
+    output.extend_from_slice(&source[..range.start]);
+    output.extend_from_slice(replacement);
+    output.extend_from_slice(&source[range.end..]);
+    output
+}
+
+fn expand_empty_root(
+    source: &[u8],
+    range: Range<usize>,
+    root_qname: &[u8],
+    replacement: &[u8],
+) -> Result<Vec<u8>> {
+    let root = &source[range.clone()];
+    let slash = root
+        .windows(2)
+        .rposition(|window| window == b"/>")
+        .ok_or_else(|| invalid("invalid empty settings root"))?;
+    let capacity = source
+        .len()
+        .saturating_add(replacement.len())
+        .saturating_add(root_qname.len())
+        .saturating_add(4);
+    let mut output = Vec::with_capacity(capacity);
+    output.extend_from_slice(&source[..range.start]);
+    output.extend_from_slice(&root[..slash]);
+    output.push(b'>');
+    output.extend_from_slice(replacement);
+    output.extend_from_slice(b"</");
+    output.extend_from_slice(root_qname);
+    output.push(b'>');
+    output.extend_from_slice(&source[range.end..]);
+    Ok(output)
+}
+
+fn insert_fragment(source: &[u8], offset: usize, replacement: &[u8]) -> Vec<u8> {
+    let capacity = source.len().saturating_add(replacement.len());
+    let mut output = Vec::with_capacity(capacity);
+    output.extend_from_slice(&source[..offset]);
+    output.extend_from_slice(replacement);
+    output.extend_from_slice(&source[offset..]);
+    output
 }
 
 fn validate_settings_root(
