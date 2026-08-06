@@ -87,7 +87,7 @@ impl Info {
     }
 }
 
-pub fn load(package: &OpcPackage) -> Result<Option<Part>> {
+pub(super) fn load(package: &OpcPackage) -> Result<Option<Part>> {
     let presentation = package.main_document_part()?;
     require_presentation_content_type(presentation.content_type())?;
     let presentation_name = presentation.partname().to_string();
@@ -166,7 +166,7 @@ pub fn load(package: &OpcPackage) -> Result<Option<Part>> {
     }))
 }
 
-pub fn store(package: &mut OpcPackage, value: &Part) -> Result<()> {
+pub(super) fn store(package: &mut OpcPackage, value: &Part) -> Result<()> {
     if load(package)?.is_some() {
         return Err(invalid("package already contains Changes Information"));
     }
