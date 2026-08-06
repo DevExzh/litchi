@@ -10,8 +10,8 @@ use std::io::Cursor;
 use std::path::Path;
 use std::sync::Arc;
 
-use litchi_iwa::application::Application;
 use litchi_iwa::Document;
+use litchi_iwa::application::Application;
 use litchi_iwa::detect::{self, Format};
 use litchi_iwa::keynote::{KeynoteDocument, KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocument, NumbersDocumentBuilder, NumbersEditor};
@@ -80,11 +80,7 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
         document_snapshot_stats.total_objects,
         document_stats.total_objects
     );
-    let bundle_snapshot = document.bundle().snapshot();
-    assert_eq!(
-        bundle_snapshot.iter_archives().count(),
-        document.bundle().iter_archives().count()
-    );
+    document.validate()?;
     document.text()?;
     document.extract_structured_data()?;
 
