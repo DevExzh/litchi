@@ -674,7 +674,8 @@ impl Bundle {
     fn parse_zip_bytes(bytes: &[u8], limits: BundleLimits) -> Result<HashMap<String, Archive>> {
         let ingress_limits = limits.archive_ingress_limits()?;
         let catalog =
-            litchi_iwa_archive::ComponentCatalog::from_bytes_with_limits(bytes, ingress_limits)?;
+            litchi_iwa_archive::ComponentCatalog::from_bytes_with_limits(bytes, ingress_limits)
+                .map_err(map_archive_ingress_error)?;
         Ok(catalog
             .into_iter()
             .map(litchi_iwa_archive::Component::into_parts)
@@ -1216,6 +1217,13 @@ impl BundleMetadata {
     }
 }
 
+fn map_archive_ingress_error(error: litchi_iwa_archive::Error) -> Error {
+    match error {
+        litchi_iwa_archive::Error::Iwa(error) => Error::IwaCore(error.into()),
+        error => error.into(),
+    }
+}
+
 /// Detect the application type from a bundle path
 pub fn detect_application_type<P: AsRef<Path>>(bundle_path: P) -> Result<String> {
     Ok(match crate::detect::path(bundle_path)? {
@@ -1284,6 +1292,14 @@ mod tests {
     use super::*;
     use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits, ArchiveObject, RawMessage};
     use std::fs;
+
+    fn zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        litchi_iwa_archive::package::to_bytes(
+            entries.iter().copied(),
+            litchi_iwa_archive::Limits::default(),
+        )
+        .unwrap()
+    }
 
     #[test]
     fn test_bundle_validation() {
@@ -1430,16 +1446,8 @@ mod tests {
             ],
         };
         let compressed = SnappyStream::compress(&source.to_bytes()?)?;
-        let mut index_writer = soapberry_zip::office::StreamingArchiveWriter::new();
-        index_writer
-            .write_stored("Index/Document.iwa", &compressed)
-            .unwrap();
-        let index = index_writer.finish_to_bytes().unwrap();
-        let mut outer_writer = soapberry_zip::office::StreamingArchiveWriter::new();
-        outer_writer
-            .write_stored("legacy.pages/Index.zip", &index)
-            .unwrap();
-        let bytes = outer_writer.finish_to_bytes().unwrap();
+        let index = zip(&[("Index/Document.iwa", &compressed)]);
+        let bytes = zip(&[("legacy.pages/Index.zip", &index)]);
 
         let archive_limits = IwaArchiveLimits::default().with_objects(1)?;
         let limits = BundleLimits::default().with_archive_limits(archive_limits)?;
@@ -1501,11 +1509,7 @@ mod tests {
         assert!(BundleLimits::new(BundleLimits::MAX_INPUT_BYTES + 1, 1, 1, 1, 1).is_err());
 
         let compressed = SnappyStream::compress(&[0_u8; 64])?;
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
-        writer
-            .write_stored("Index/Document.iwa", &compressed)
-            .unwrap();
-        let bytes = writer.finish_to_bytes().unwrap();
+        let bytes = zip(&[("Index/Document.iwa", &compressed)]);
 
         let tight_stream = BundleLimits::new(
             bytes.len() as u64,

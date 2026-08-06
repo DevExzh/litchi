@@ -697,7 +697,6 @@ mod tests {
     use crate::archive::{ArchiveObject, RawMessage};
     use crate::protobuf::{kn, tn, tp, tsa, tsk, tsp};
     use prost::Message;
-    use soapberry_zip::office::StreamingArchiveWriter;
     use std::io::Cursor;
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -741,11 +740,11 @@ mod tests {
     }
 
     fn package(names: &[(&str, &[u8])]) -> Vec<u8> {
-        let mut writer = StreamingArchiveWriter::new();
-        for (name, data) in names {
-            writer.write_stored(name, data).unwrap();
-        }
-        writer.finish_to_bytes().unwrap()
+        litchi_iwa_archive::package::to_bytes(
+            names.iter().copied(),
+            litchi_iwa_archive::Limits::default(),
+        )
+        .unwrap()
     }
 
     fn document(format: Format) -> Vec<u8> {

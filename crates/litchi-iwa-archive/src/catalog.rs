@@ -189,6 +189,24 @@ mod tests {
     }
 
     #[test]
+    fn rejects_mixed_direct_and_legacy_representations() -> Result<()> {
+        let mut index = StreamingArchiveWriter::new();
+        index.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
+        let index_bytes = index.finish_to_bytes()?;
+
+        let mut outer = StreamingArchiveWriter::new();
+        outer.write_stored("legacy.pages/Index.zip", &index_bytes)?;
+        outer.write_stored("Index/CalculationEngine.iwa", &iwa_bytes(2, 7000)?)?;
+        let outer_bytes = outer.finish_to_bytes()?;
+
+        assert!(matches!(
+            ComponentCatalog::from_bytes(&outer_bytes),
+            Err(crate::Error::InvalidBundle(message)) if message.contains("mixes direct IWA")
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn rejects_input_above_profile() -> Result<()> {
         let limits = Limits::new(1, 10, 100, 100, 100)?;
         let result = ComponentCatalog::from_bytes_with_limits(b"not a zip", limits);

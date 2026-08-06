@@ -39,11 +39,18 @@ pub(crate) fn parse_iwa_components(
         return Err(Error::Encrypted);
     }
 
-    if archive.file_names().any(is_iwa_name) {
+    let has_direct_iwa = archive.file_names().any(is_iwa_name);
+    let nested_name = nested_index_name(archive)?;
+    if has_direct_iwa && nested_name.is_some() {
+        return Err(Error::InvalidBundle(
+            "iWork package mixes direct IWA members with a legacy Index.zip".to_owned(),
+        ));
+    }
+    if has_direct_iwa {
         return parse_direct_iwa_components(archive, validated_limits);
     }
 
-    let Some(index_name) = nested_index_name(archive)? else {
+    let Some(index_name) = nested_name else {
         return Ok(Vec::new());
     };
     let index_data = archive.read(&index_name)?;

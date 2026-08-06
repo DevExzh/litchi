@@ -5,7 +5,6 @@ use std::io::Write;
 use std::path::{Component, Path};
 use std::sync::Arc;
 
-use soapberry_zip::office::StreamingArchiveWriter;
 use tempfile::NamedTempFile;
 
 use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits};
@@ -275,7 +274,7 @@ impl PackageLimits {
         Ok(())
     }
 
-    fn archive_ingress_limits(self) -> Result<litchi_iwa_archive::Limits> {
+    fn physical_archive_limits(self) -> Result<litchi_iwa_archive::Limits> {
         let limits = litchi_iwa_archive::Limits::new(
             self.max_input_bytes,
             self.max_entries,
@@ -332,7 +331,7 @@ impl IWorkPackage {
         limits.check_input_size(input_size, "iWork package input")?;
         let catalog = litchi_iwa_archive::package::Catalog::from_bytes_with_limits(
             bytes,
-            limits.archive_ingress_limits()?,
+            limits.physical_archive_limits()?,
         )?;
         let mut entries = Vec::new();
         entries.try_reserve(catalog.len()).map_err(|_error| {
@@ -347,11 +346,13 @@ impl IWorkPackage {
             entries.push(Entry::new(name, data));
         }
         let archive_limits = limits.effective_archive_limits()?;
-        Ok(Self {
+        let package = Self {
             state: Arc::new(PackageState::from_entries(entries, archive_limits)?),
             limits,
             mutation_revision: 0,
-        })
+        };
+        package.validate_state()?;
+        Ok(package)
     }
 
     pub fn len(&self) -> usize {
@@ -617,11 +618,15 @@ impl IWorkPackage {
     /// discovery, so newly-created document indexes are inserted first.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         self.validate_state()?;
-        let mut writer = StreamingArchiveWriter::new();
-        self.write_entries(&mut writer)?;
-        writer
-            .finish_to_bytes()
-            .map_err(|error| Error::Bundle(format!("Failed to finish iWork ZIP: {error}")))
+        litchi_iwa_archive::package::to_bytes(
+            self.state
+                .entries
+                .as_slice()
+                .iter()
+                .map(|entry| (entry.name(), entry.data())),
+            self.limits.physical_archive_limits()?,
+        )
+        .map_err(|error| Error::Bundle(format!("iWork package egress: {error}")))
     }
 
     /// Stream the package as a ZIP to a caller-owned sequential sink.
@@ -631,12 +636,16 @@ impl IWorkPackage {
     /// not allocate a second buffer containing the complete package.
     pub fn write_to<W: Write>(&self, sink: W) -> Result<()> {
         self.validate_state()?;
-        let mut writer = StreamingArchiveWriter::with_writer(sink);
-        self.write_entries(&mut writer)?;
-        writer
-            .finish()
-            .map(|_| ())
-            .map_err(|error| Error::Bundle(format!("Failed to finish iWork ZIP: {error}")))
+        litchi_iwa_archive::package::write_to(
+            self.state
+                .entries
+                .as_slice()
+                .iter()
+                .map(|entry| (entry.name(), entry.data())),
+            sink,
+            self.limits.physical_archive_limits()?,
+        )
+        .map_err(|error| Error::Bundle(format!("iWork package egress: {error}")))
     }
 
     /// Atomically save the package to a regular file in the destination
@@ -682,20 +691,6 @@ impl IWorkPackage {
         // Make the rename durable on filesystems that support directory sync.
         if let Ok(directory) = File::open(parent) {
             directory.sync_all()?;
-        }
-        Ok(())
-    }
-
-    fn write_entries<W: Write>(&self, writer: &mut StreamingArchiveWriter<W>) -> Result<()> {
-        for entry in self.state.entries.iter() {
-            writer
-                .write_stored(entry.name(), entry.data())
-                .map_err(|error| {
-                    Error::Bundle(format!(
-                        "Failed to write package entry {}: {error}",
-                        entry.name()
-                    ))
-                })?;
         }
         Ok(())
     }
@@ -1010,27 +1005,34 @@ mod tests {
         archive
     }
 
+    fn zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        litchi_iwa_archive::package::to_bytes(
+            entries.iter().copied(),
+            litchi_iwa_archive::Limits::default(),
+        )
+        .unwrap()
+    }
+
+    fn physical_entries(bytes: &[u8]) -> Vec<(String, Vec<u8>)> {
+        litchi_iwa_archive::package::Catalog::from_bytes(bytes)
+            .unwrap()
+            .into_iter()
+            .map(litchi_iwa_archive::package::Entry::into_parts)
+            .collect()
+    }
+
     fn legacy_package() -> Vec<u8> {
         let compressed = SnappyStream::compress(&archive().to_bytes().unwrap()).unwrap();
-        let mut index = StreamingArchiveWriter::new();
-        index
-            .write_stored("Index/Document.iwa", &compressed)
-            .unwrap();
-        let index = index.finish_to_bytes().unwrap();
-
-        let mut outer = StreamingArchiveWriter::new();
-        outer
-            .write_stored("mac.numbers/preview.jpg", b"preview")
-            .unwrap();
-        outer.write_stored("mac.numbers/Index.zip", &index).unwrap();
-        outer
-            .write_stored("mac.numbers/Metadata/Properties.plist", b"plist")
-            .unwrap();
-        outer.finish_to_bytes().unwrap()
+        let index = zip(&[("Index/Document.iwa", &compressed)]);
+        zip(&[
+            ("mac.numbers/preview.jpg", b"preview"),
+            ("mac.numbers/Index.zip", &index),
+            ("mac.numbers/Metadata/Properties.plist", b"plist"),
+        ])
     }
 
     fn empty_package_with_limits(limits: PackageLimits) -> IWorkPackage {
-        let bytes = StreamingArchiveWriter::new().finish_to_bytes().unwrap();
+        let bytes = zip(&[]);
         IWorkPackage::from_bytes_with_limits(&bytes, limits).unwrap()
     }
 
@@ -1093,11 +1095,7 @@ mod tests {
         let decompressed = archive().to_bytes().unwrap();
         assert!(decompressed.len() > 8);
         let compressed = SnappyStream::compress(&decompressed).unwrap();
-        let mut writer = StreamingArchiveWriter::new();
-        writer
-            .write_stored("Index/Document.iwa", &compressed)
-            .unwrap();
-        let bytes = writer.finish_to_bytes().unwrap();
+        let bytes = zip(&[("Index/Document.iwa", &compressed)]);
 
         let input_limits = PackageLimits::new(
             10,
@@ -1149,11 +1147,7 @@ mod tests {
         let source = archive_with_two_objects();
         let decompressed = source.to_bytes()?;
         let compressed = SnappyStream::compress(&decompressed)?;
-        let mut writer = StreamingArchiveWriter::new();
-        writer
-            .write_stored("Index/Document.iwa", &compressed)
-            .unwrap();
-        let bytes = writer.finish_to_bytes().unwrap();
+        let bytes = zip(&[("Index/Document.iwa", &compressed)]);
 
         let archive_limits = IwaArchiveLimits::default().with_objects(1)?;
         let package_limits = PackageLimits::default().with_archive_limits(archive_limits)?;
@@ -1229,10 +1223,7 @@ mod tests {
 
     #[test]
     fn package_limits_reject_flat_archive_metadata_before_materialization() {
-        let mut writer = StreamingArchiveWriter::new();
-        writer.write_stored("Data/asset", b"asset").unwrap();
-        writer.write_stored("Metadata/other", b"other").unwrap();
-        let bytes = writer.finish_to_bytes().unwrap();
+        let bytes = zip(&[("Data/asset", b"asset"), ("Metadata/other", b"other")]);
 
         let one_entry = PackageLimits::new(
             1,
@@ -1249,18 +1240,11 @@ mod tests {
     #[test]
     fn package_limits_apply_to_legacy_nested_index_zip() {
         let compressed = SnappyStream::compress(&archive().to_bytes().unwrap()).unwrap();
-        let mut index = StreamingArchiveWriter::new();
-        index
-            .write_stored("Index/Document.iwa", &compressed)
-            .unwrap();
-        index
-            .write_stored("Index/Metadata.iwa", &compressed)
-            .unwrap();
-        let index = index.finish_to_bytes().unwrap();
-
-        let mut outer = StreamingArchiveWriter::new();
-        outer.write_stored("mac.pages/Index.zip", &index).unwrap();
-        let bytes = outer.finish_to_bytes().unwrap();
+        let index = zip(&[
+            ("Index/Document.iwa", &compressed),
+            ("Index/Metadata.iwa", &compressed),
+        ]);
+        let bytes = zip(&[("mac.pages/Index.zip", &index)]);
 
         let one_entry = PackageLimits::new(
             1,
@@ -1270,6 +1254,28 @@ mod tests {
         .unwrap();
         let error = IWorkPackage::from_bytes_with_limits(&bytes, one_entry).unwrap_err();
         assert!(error.to_string().contains("legacy package index"));
+    }
+
+    #[test]
+    fn package_limits_apply_to_flattened_legacy_entry_count() {
+        let compressed = SnappyStream::compress(&archive().to_bytes().unwrap()).unwrap();
+        let index = zip(&[
+            ("Index/Document.iwa", &compressed),
+            ("Index/Metadata.iwa", &compressed),
+        ]);
+        let bytes = zip(&[
+            ("mac.pages/Index.zip", &index),
+            ("mac.pages/Data/asset", b"asset"),
+        ]);
+
+        let limits = PackageLimits::new(
+            2,
+            PackageLimits::MAX_ENTRY_BYTES,
+            PackageLimits::MAX_TOTAL_BYTES,
+        )
+        .unwrap();
+        let error = IWorkPackage::from_bytes_with_limits(&bytes, limits).unwrap_err();
+        assert!(error.to_string().contains("entry count"));
     }
 
     #[test]
@@ -1629,6 +1635,70 @@ mod tests {
             reparsed.entry_names().collect::<Vec<_>>(),
             ["Index/Document.iwa", "Data/a", "Data/b"]
         );
+    }
+
+    #[test]
+    fn preserves_opaque_entry_bytes_and_order_across_egress() {
+        let input = zip(&[
+            ("Metadata/first", b"\0metadata\xff"),
+            ("Index/Unknown.iwa", b"opaque iwa bytes"),
+            ("Data/last", b"\xffasset\0"),
+        ]);
+        let package = IWorkPackage::from_bytes(&input).unwrap();
+        let expected = physical_entries(&input);
+
+        assert_eq!(physical_entries(&package.to_bytes().unwrap()), expected);
+        let mut streamed = Vec::new();
+        package.write_to(&mut streamed).unwrap();
+        assert_eq!(physical_entries(&streamed), expected);
+    }
+
+    #[test]
+    fn egress_validates_before_emitting_zip_bytes() {
+        let limits = PackageLimits::new(1, 4, 4).unwrap();
+        let mut package = empty_package_with_limits(limits);
+        package
+            .insert_entry("Data/asset", vec![1, 2, 3, 4])
+            .unwrap();
+        package.entry_mut("Data/asset").unwrap().push(5);
+
+        let mut sink = Vec::new();
+        assert!(package.write_to(&mut sink).is_err());
+        assert!(sink.is_empty());
+    }
+
+    #[test]
+    fn update_archive_failure_preserves_bytes_order_and_revision() {
+        let mut package = IWorkPackage::new();
+        package
+            .insert_entry("Data/asset", b"asset".to_vec())
+            .unwrap();
+        package
+            .replace_archive("Index/Document.iwa", &archive())
+            .unwrap();
+        let before_entries = package.entry_names().map(str::to_owned).collect::<Vec<_>>();
+        let before_bytes = package.entry("Index/Document.iwa").unwrap().to_vec();
+        let before_revision = package.mutation_revision();
+
+        let error = package
+            .update_archive("Index/Document.iwa", |_archive| {
+                Err(Error::InvalidFormat("reject archive edit".to_owned()))
+            })
+            .unwrap_err();
+
+        assert!(error.to_string().contains("reject archive edit"));
+        assert_eq!(
+            package.entry_names().collect::<Vec<_>>(),
+            before_entries
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            package.entry("Index/Document.iwa"),
+            Some(before_bytes.as_slice())
+        );
+        assert_eq!(package.mutation_revision(), before_revision);
     }
 
     #[test]

@@ -87,8 +87,8 @@ fn inspect_zip(
     }
 
     let has_direct_iwa = archive.file_names().any(is_iwa_name);
-    let index_name = nested_index_name(archive)?;
-    if has_direct_iwa && index_name.is_some() {
+    let nested_name = nested_index_name(archive)?;
+    if has_direct_iwa && nested_name.is_some() {
         return Err(Error::InvalidBundle(
             "iWork package mixes direct IWA members with a legacy Index.zip".to_owned(),
         ));
@@ -100,7 +100,7 @@ fn inspect_zip(
     if !allow_nested {
         return Ok(empty_detection_root());
     }
-    let Some(index_name) = index_name else {
+    let Some(index_name) = nested_name else {
         return Ok(empty_detection_root());
     };
     let index_data = archive.read(&index_name)?;
