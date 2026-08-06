@@ -2,7 +2,57 @@
 
 use super::super::model::*;
 
+use crate::numbering::{Patch as NumberingPatch, Snapshot as NumberingSnapshot};
+
 impl Package {
+    /// Load the source-preserving numbering snapshot from the main document.
+    pub fn numbering_snapshot(&self) -> Result<Option<NumberingSnapshot>> {
+        use litchi_opc::constants::relationship_type as rt;
+
+        let main = self.opc.main_document_part()?;
+        let relationship = match main.rels().part_with_reltype(rt::NUMBERING) {
+            Ok(relationship) => relationship,
+            Err(_) => return Ok(None),
+        };
+        let target = relationship.target_partname()?;
+        let part = self.opc.get_part(&target)?;
+        Ok(Some(crate::numbering::parse_snapshot_part(part)?))
+    }
+
+    /// Apply a numbering patch to the current package graph atomically.
+    ///
+    /// The source snapshot must still match the authored numbering part. The
+    /// candidate is validated before the existing OPC transaction publishes
+    /// its replacement, and a failed publication leaves the package untouched.
+    pub fn apply_numbering_patch(
+        &mut self,
+        source: &NumberingSnapshot,
+        patch: &NumberingPatch,
+    ) -> Result<NumberingSnapshot> {
+        let current = self
+            .numbering_snapshot()?
+            .ok_or_else(|| Error::PartNotFound("numbering part".into()))?;
+        if current.xml_bytes() != source.xml_bytes() {
+            return Err(Error::InvalidFormat(
+                "numbering package source does not match its snapshot precondition".into(),
+            ));
+        }
+        let candidate = patch.apply(&current)?;
+        let replacement = candidate.xml_bytes().to_vec();
+        self.edit_opc(|opc| {
+            let target = {
+                let main = opc.main_document_part()?;
+                let relationship = main
+                    .rels()
+                    .part_with_reltype(litchi_opc::constants::relationship_type::NUMBERING)?;
+                relationship.target_partname()?
+            };
+            opc.get_part_mut(&target)?.set_blob(replacement);
+            Ok(())
+        })?;
+        Ok(candidate)
+    }
+
     /// Update the footnotes.xml part with new content.
     #[allow(unused)] // Kept for future use
     fn update_footnotes_part(&mut self, xml: String) -> Result<()> {

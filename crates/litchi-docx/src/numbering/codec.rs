@@ -6,12 +6,15 @@
 use super::model::{
     Collection, Definition, Instance, Level, Override, PictureBullet, Restart, Suffix,
 };
+use super::transaction::Change;
+use super::validation;
 use crate::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::borrow::Cow;
 
 const TRANSITIONAL_RELATIONSHIPS_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -57,14 +60,18 @@ struct PendingPictureBullet {
 
 impl Collection {
     pub fn from_xml(xml: &[u8]) -> Result<Self> {
+        validation::validate_xml(xml)?;
         let mut reader = NsReader::from_reader(xml);
+        reader.config_mut().check_end_names = true;
         let mut result = Self::new();
         let mut abstract_num: Option<PendingDefinition> = None;
         let mut num: Option<PendingInstance> = None;
         let mut level_override: Option<PendingOverride> = None;
         let mut level: Option<PendingLevel> = None;
         let mut picture_bullet: Option<PendingPictureBullet> = None;
+        let mut ignorable = Vec::<Vec<Vec<u8>>>::new();
         let mut depth = 0usize;
+        let mut nodes = 0usize;
 
         loop {
             let decoder = reader.decoder();
@@ -76,7 +83,24 @@ impl Collection {
             let (namespace, event) = resolver.resolve_event(event);
             match event {
                 Event::Start(element) => {
+                    nodes = nodes
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("numbering XML element counter overflow"))?;
+                    if nodes > validation::MAX_XML_NODES {
+                        return Err(invalid(&format!(
+                            "numbering XML exceeds {} elements",
+                            validation::MAX_XML_NODES
+                        )));
+                    }
                     depth = depth.checked_add(1).ok_or_else(too_deep)?;
+                    if depth > validation::MAX_XML_DEPTH {
+                        return Err(invalid(&format!(
+                            "numbering XML nesting exceeds {}",
+                            validation::MAX_XML_DEPTH
+                        )));
+                    }
+                    let effective_ignorable =
+                        effective_ignorable(&element, decoder, &resolver, ignorable.last())?;
                     begin_element(
                         &namespace,
                         &element,
@@ -88,10 +112,29 @@ impl Collection {
                         &mut level_override,
                         &mut level,
                         &mut picture_bullet,
+                        &effective_ignorable,
                     )?;
+                    ignorable.push(effective_ignorable);
                 },
                 Event::Empty(element) => {
+                    nodes = nodes
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("numbering XML element counter overflow"))?;
+                    if nodes > validation::MAX_XML_NODES {
+                        return Err(invalid(&format!(
+                            "numbering XML exceeds {} elements",
+                            validation::MAX_XML_NODES
+                        )));
+                    }
                     let child_depth = depth.checked_add(1).ok_or_else(too_deep)?;
+                    if child_depth > validation::MAX_XML_DEPTH {
+                        return Err(invalid(&format!(
+                            "numbering XML nesting exceeds {}",
+                            validation::MAX_XML_DEPTH
+                        )));
+                    }
+                    let effective_ignorable =
+                        effective_ignorable(&element, decoder, &resolver, ignorable.last())?;
                     empty_element(
                         &namespace,
                         &element,
@@ -104,6 +147,7 @@ impl Collection {
                         &mut level_override,
                         &mut level,
                         &mut picture_bullet,
+                        &effective_ignorable,
                     )?;
                 },
                 Event::End(element) => {
@@ -185,6 +229,9 @@ impl Collection {
                     depth = depth
                         .checked_sub(1)
                         .ok_or_else(|| invalid("invalid numbering XML nesting"))?;
+                    ignorable
+                        .pop()
+                        .ok_or_else(|| invalid("numbering XML scope stack underflow"))?;
                 },
                 Event::Eof
                     if depth != 0
@@ -192,7 +239,8 @@ impl Collection {
                         || num.is_some()
                         || level_override.is_some()
                         || level.is_some()
-                        || picture_bullet.is_some() =>
+                        || picture_bullet.is_some()
+                        || !ignorable.is_empty() =>
                 {
                     return Err(invalid("unterminated numbering XML"));
                 },
@@ -225,6 +273,7 @@ fn begin_element(
     level_override: &mut Option<PendingOverride>,
     level: &mut Option<PendingLevel>,
     picture_bullet: &mut Option<PendingPictureBullet>,
+    ignorable: &[Vec<u8>],
 ) -> Result<()> {
     if let Some(pending) = picture_bullet.as_mut() {
         return capture_picture_bullet_image(namespace, element, decoder, resolver, pending);
@@ -252,6 +301,9 @@ fn begin_element(
                     num_type: None,
                     num_style_link: None,
                     style_link: None,
+                    restart_numbering_after_break: restart_numbering_after_break(
+                        element, decoder, resolver, ignorable,
+                    )?,
                     levels: Vec::new(),
                 },
             });
@@ -329,6 +381,7 @@ fn empty_element(
     level_override: &mut Option<PendingOverride>,
     level: &mut Option<PendingLevel>,
     picture_bullet: &mut Option<PendingPictureBullet>,
+    ignorable: &[Vec<u8>],
 ) -> Result<()> {
     if let Some(pending) = picture_bullet.as_mut() {
         return capture_picture_bullet_image(namespace, element, decoder, resolver, pending);
@@ -357,6 +410,9 @@ fn empty_element(
                     num_type: None,
                     num_style_link: None,
                     style_link: None,
+                    restart_numbering_after_break: restart_numbering_after_break(
+                        element, decoder, resolver, ignorable,
+                    )?,
                     levels: Vec::new(),
                 },
             )?;
@@ -738,6 +794,73 @@ fn required_level(
         .ok_or_else(|| invalid(&format!("invalid numbering level '{value}'")))
 }
 
+fn effective_ignorable(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    inherited: Option<&Vec<Vec<u8>>>,
+) -> Result<Vec<Vec<u8>>> {
+    let mut direct = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() != b"Ignorable" {
+            continue;
+        }
+        let (namespace, _) = resolver.resolve_attribute(attribute.key);
+        if !is_markup_compatibility_namespace(&namespace) {
+            continue;
+        }
+        if direct.is_some() {
+            return Err(invalid("duplicate numbering mc:Ignorable attributes"));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        direct = Some(validation::parse_ignorable(&value)?);
+    }
+    Ok(direct.or_else(|| inherited.cloned()).unwrap_or_default())
+}
+
+fn restart_numbering_after_break(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    ignorable: &[Vec<u8>],
+) -> Result<Option<bool>> {
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() != b"restartNumberingAfterBreak" {
+            continue;
+        }
+        let (namespace, _) = resolver.resolve_attribute(attribute.key);
+        if !is_word_2012_namespace(&namespace) {
+            continue;
+        }
+        let prefix = attribute
+            .key
+            .prefix()
+            .map(|prefix| prefix.into_inner().to_vec())
+            .filter(|prefix| !prefix.is_empty())
+            .ok_or_else(|| {
+                invalid("restartNumberingAfterBreak must use a prefixed Word 2012 attribute")
+            })?;
+        if !validation::has_ignorable_prefix(ignorable, &prefix) {
+            return Err(invalid(
+                "restartNumberingAfterBreak namespace is not listed in numbering mc:Ignorable",
+            ));
+        }
+        if value.is_some() {
+            return Err(invalid("duplicate restartNumberingAfterBreak attributes"));
+        }
+        let raw = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        value = Some(validation::parse_on_off(&raw)?);
+    }
+    Ok(value)
+}
+
 fn on_off(
     element: &BytesStart<'_>,
     decoder: Decoder,
@@ -759,6 +882,650 @@ fn invalid(message: &str) -> Error {
     Error::Invalid(message.to_owned())
 }
 
+#[derive(Debug, Clone)]
+struct RawAttribute {
+    name: Vec<u8>,
+    name_start: usize,
+    value_start: usize,
+    value_end: usize,
+}
+
+#[derive(Debug, Clone)]
+struct AttributeRange {
+    name_start: usize,
+    value_start: usize,
+    value_end: usize,
+}
+
+#[derive(Debug, Clone, Default)]
+struct Scope {
+    namespaces: Vec<(Vec<u8>, Vec<u8>)>,
+    ignorable: Vec<Vec<u8>>,
+}
+
+impl Scope {
+    fn set_namespace(&mut self, prefix: Vec<u8>, namespace: Vec<u8>) {
+        if let Some((_, value)) = self
+            .namespaces
+            .iter_mut()
+            .find(|(candidate, _)| *candidate == prefix)
+        {
+            *value = namespace;
+        } else {
+            self.namespaces.push((prefix, namespace));
+        }
+    }
+
+    fn namespace(&self, prefix: &[u8]) -> Option<&[u8]> {
+        self.namespaces
+            .iter()
+            .find(|(candidate, _)| candidate.as_slice() == prefix)
+            .map(|(_, namespace)| namespace.as_slice())
+    }
+
+    fn prefix_for(&self, namespace: &[u8]) -> Option<Vec<u8>> {
+        self.namespaces
+            .iter()
+            .find(|(prefix, candidate)| !prefix.is_empty() && candidate.as_slice() == namespace)
+            .map(|(prefix, _)| prefix.clone())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct DefinitionLocation {
+    id: u32,
+    start: usize,
+    tag_end: usize,
+    extension: Option<AttributeRange>,
+    ignorable: Option<AttributeRange>,
+    scope: Scope,
+}
+
+#[derive(Debug, Default)]
+struct Layout {
+    definitions: Vec<DefinitionLocation>,
+}
+
+#[derive(Debug, Clone)]
+struct Edit {
+    start: usize,
+    end: usize,
+    replacement: Vec<u8>,
+}
+
+/// Rewrite only the Word 2012 restart attribute seams in `numbering.xml`.
+/// Every byte outside an edited attribute or the owning `abstractNum` start
+/// tag is copied from the authored source.
+pub(crate) fn rewrite_restart_numbering_after_break(
+    xml: &[u8],
+    changes: &[Change],
+) -> Result<Vec<u8>> {
+    validation::validate_xml(xml)?;
+    let layout = locate_definitions(xml)?;
+    let mut edits = Vec::new();
+
+    for change in changes {
+        let location = layout
+            .definitions
+            .iter()
+            .find(|definition| definition.id == change.abstract_num_id)
+            .ok_or_else(|| {
+                invalid(&format!(
+                    "abstract numbering definition {} does not exist",
+                    change.abstract_num_id
+                ))
+            })?;
+
+        let current = extension_value(xml, location)?;
+        if current != change.before {
+            return Err(invalid(&format!(
+                "abstract numbering definition {} does not match its source policy",
+                change.abstract_num_id
+            )));
+        }
+        if change.before == change.after {
+            continue;
+        }
+
+        match (location.extension.as_ref(), change.after) {
+            (Some(attribute), Some(value)) => edits.push(Edit {
+                start: attribute.value_start,
+                end: attribute.value_end,
+                replacement: on_off_lexical(value).as_bytes().to_vec(),
+            }),
+            (Some(attribute), None) => edits.push(Edit {
+                start: attribute.name_start,
+                end: attribute.value_end,
+                replacement: Vec::new(),
+            }),
+            (None, Some(value)) => {
+                insert_restart_attribute(xml, location, value, &mut edits)?;
+            },
+            (None, None) => {
+                return Err(invalid(
+                    "numbering edit tried to remove an absent restart attribute",
+                ));
+            },
+        }
+    }
+
+    if edits.is_empty() {
+        return Ok(xml.to_vec());
+    }
+    edits.sort_by(|left, right| {
+        right
+            .start
+            .cmp(&left.start)
+            .then_with(|| right.end.cmp(&left.end))
+    });
+    for pair in edits.windows(2) {
+        if pair[0].start < pair[1].end {
+            return Err(invalid("overlapping numbering XML edits"));
+        }
+    }
+    let mut output = xml.to_vec();
+    for edit in edits {
+        if edit.end > output.len() || edit.start > edit.end {
+            return Err(invalid("numbering XML edit range is outside its source"));
+        }
+        output.splice(edit.start..edit.end, edit.replacement);
+    }
+    Ok(output)
+}
+
+fn extension_value(xml: &[u8], location: &DefinitionLocation) -> Result<Option<bool>> {
+    let Some(attribute) = location.extension.as_ref() else {
+        return Ok(None);
+    };
+    let value = xml
+        .get(attribute.value_start..attribute.value_end)
+        .ok_or_else(|| invalid("restart attribute value range is outside numbering XML"))?;
+    let value = std::str::from_utf8(value)
+        .map_err(|error| invalid(&format!("restart attribute is not UTF-8: {error}")))?;
+    validation::parse_on_off(value).map(Some)
+}
+
+fn insert_restart_attribute(
+    xml: &[u8],
+    location: &DefinitionLocation,
+    value: bool,
+    edits: &mut Vec<Edit>,
+) -> Result<()> {
+    let extension_prefix = location
+        .scope
+        .prefix_for(validation::WORD_2012_NAMESPACE)
+        .unwrap_or_else(|| choose_prefix(&location.scope, b"w15"));
+    let extension_prefix_is_bound = location
+        .scope
+        .namespace(&extension_prefix)
+        .is_some_and(|namespace| namespace == validation::WORD_2012_NAMESPACE);
+    let extension_name = qualified_name(&extension_prefix, b"restartNumberingAfterBreak");
+
+    let mut insertion = Vec::new();
+    if !extension_prefix_is_bound {
+        append_attribute(
+            &mut insertion,
+            &qualified_name(b"xmlns", &extension_prefix),
+            validation::WORD_2012_NAMESPACE,
+        );
+    }
+
+    if let Some(ignorable) = location.ignorable.as_ref() {
+        let raw = xml
+            .get(ignorable.value_start..ignorable.value_end)
+            .ok_or_else(|| invalid("numbering mc:Ignorable range is outside its source"))?;
+        let raw = std::str::from_utf8(raw)
+            .map_err(|error| invalid(&format!("numbering mc:Ignorable is not UTF-8: {error}")))?;
+        if !validation::has_ignorable_prefix(&location.scope.ignorable, &extension_prefix) {
+            let replacement = append_ignorable_token(raw, &extension_prefix);
+            edits.push(Edit {
+                start: ignorable.value_start,
+                end: ignorable.value_end,
+                replacement,
+            });
+        }
+    } else if !validation::has_ignorable_prefix(&location.scope.ignorable, &extension_prefix) {
+        let compatibility_prefix = location
+            .scope
+            .prefix_for(validation::MC_NAMESPACE)
+            .unwrap_or_else(|| choose_prefix(&location.scope, b"mc"));
+        let compatibility_is_bound = location
+            .scope
+            .namespace(&compatibility_prefix)
+            .is_some_and(|namespace| namespace == validation::MC_NAMESPACE);
+        if !compatibility_is_bound {
+            append_attribute(
+                &mut insertion,
+                &qualified_name(b"xmlns", &compatibility_prefix),
+                validation::MC_NAMESPACE,
+            );
+        }
+        let ignorable = render_ignorable(&location.scope.ignorable, &extension_prefix);
+        append_attribute(
+            &mut insertion,
+            &qualified_name(&compatibility_prefix, b"Ignorable"),
+            ignorable.as_bytes(),
+        );
+    }
+
+    append_attribute(
+        &mut insertion,
+        &extension_name,
+        on_off_lexical(value).as_bytes(),
+    );
+    let tag = xml
+        .get(location.start..location.tag_end)
+        .ok_or_else(|| invalid("abstractNum start tag range is outside numbering XML"))?;
+    let offset = attribute_insert_offset(tag)
+        .ok_or_else(|| invalid("abstractNum start tag has no attribute insertion point"))?;
+    edits.push(Edit {
+        start: location.start + offset,
+        end: location.start + offset,
+        replacement: insertion,
+    });
+    Ok(())
+}
+
+fn append_attribute(output: &mut Vec<u8>, name: &[u8], value: &[u8]) {
+    output.push(b' ');
+    output.extend_from_slice(name);
+    output.extend_from_slice(b"=\"");
+    output.extend_from_slice(value);
+    output.push(b'\"');
+}
+
+fn qualified_name(prefix: &[u8], local: &[u8]) -> Vec<u8> {
+    let mut name = Vec::with_capacity(prefix.len() + 1 + local.len());
+    name.extend_from_slice(prefix);
+    name.push(b':');
+    name.extend_from_slice(local);
+    name
+}
+
+fn on_off_lexical(value: bool) -> &'static str {
+    if value { "true" } else { "false" }
+}
+
+fn append_ignorable_token(value: &str, prefix: &[u8]) -> Vec<u8> {
+    let prefix = String::from_utf8_lossy(prefix);
+    if value.trim().is_empty() {
+        prefix.into_owned().into_bytes()
+    } else {
+        format!("{value} {prefix}").into_bytes()
+    }
+}
+
+fn render_ignorable(value: &[Vec<u8>], added: &[u8]) -> String {
+    let mut output = value
+        .iter()
+        .map(|prefix| String::from_utf8_lossy(prefix).into_owned())
+        .collect::<Vec<_>>();
+    if !validation::has_ignorable_prefix(value, added) {
+        output.push(String::from_utf8_lossy(added).into_owned());
+    }
+    output.join(" ")
+}
+
+fn choose_prefix(scope: &Scope, preferred: &[u8]) -> Vec<u8> {
+    if scope.namespace(preferred).is_none() {
+        return preferred.to_vec();
+    }
+    for suffix in 2..=1024 {
+        let mut candidate = preferred.to_vec();
+        candidate.extend_from_slice(suffix.to_string().as_bytes());
+        if scope.namespace(&candidate).is_none() {
+            return candidate;
+        }
+    }
+    // The input is bounded and the loop above provides ample room for a
+    // valid NCName. This branch is retained as a checked failure boundary.
+    preferred.to_vec()
+}
+
+fn attribute_insert_offset(tag: &[u8]) -> Option<usize> {
+    let close = tag.iter().rposition(|byte| *byte == b'>')?;
+    let mut before_close = close;
+    while before_close > 0 && tag[before_close - 1].is_ascii_whitespace() {
+        before_close -= 1;
+    }
+    if before_close > 0 && tag[before_close - 1] == b'/' {
+        Some(before_close - 1)
+    } else {
+        Some(close)
+    }
+}
+
+fn locate_definitions(xml: &[u8]) -> Result<Layout> {
+    validation::validate_xml(xml)?;
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    let mut layout = Layout::default();
+    let mut scopes = Vec::<Scope>::new();
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+
+    loop {
+        let event_start = position(&reader)?;
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .into_owned();
+        let event_end = position(&reader)?;
+        let resolver = reader.resolver().clone();
+        let decoder = reader.decoder();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) => {
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("numbering XML element counter overflow"))?;
+                if nodes > validation::MAX_XML_NODES {
+                    return Err(invalid(&format!(
+                        "numbering XML exceeds {} elements",
+                        validation::MAX_XML_NODES
+                    )));
+                }
+                depth = depth.checked_add(1).ok_or_else(too_deep)?;
+                if depth > validation::MAX_XML_DEPTH {
+                    return Err(invalid(&format!(
+                        "numbering XML nesting exceeds {}",
+                        validation::MAX_XML_DEPTH
+                    )));
+                }
+                let tag = xml
+                    .get(event_start..event_end)
+                    .ok_or_else(|| invalid("numbering element range is outside its source"))?;
+                let scope = scope_for(scopes.last(), &element, tag, decoder, &resolver)?;
+                if is_wordprocessing_namespace(&namespace)
+                    && element.local_name().as_ref() == b"abstractNum"
+                {
+                    layout.definitions.push(definition_location(
+                        xml,
+                        event_start,
+                        event_end,
+                        &element,
+                        decoder,
+                        &resolver,
+                        &scope,
+                    )?);
+                }
+                scopes.push(scope);
+            },
+            Event::Empty(element) => {
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("numbering XML element counter overflow"))?;
+                if nodes > validation::MAX_XML_NODES {
+                    return Err(invalid(&format!(
+                        "numbering XML exceeds {} elements",
+                        validation::MAX_XML_NODES
+                    )));
+                }
+                let child_depth = depth.checked_add(1).ok_or_else(too_deep)?;
+                if child_depth > validation::MAX_XML_DEPTH {
+                    return Err(invalid(&format!(
+                        "numbering XML nesting exceeds {}",
+                        validation::MAX_XML_DEPTH
+                    )));
+                }
+                let tag = xml
+                    .get(event_start..event_end)
+                    .ok_or_else(|| invalid("numbering element range is outside its source"))?;
+                let parent = scopes.last();
+                let scope = scope_for(parent, &element, tag, decoder, &resolver)?;
+                if is_wordprocessing_namespace(&namespace)
+                    && element.local_name().as_ref() == b"abstractNum"
+                {
+                    layout.definitions.push(definition_location(
+                        xml,
+                        event_start,
+                        event_end,
+                        &element,
+                        decoder,
+                        &resolver,
+                        &scope,
+                    )?);
+                }
+            },
+            Event::End(_) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("invalid numbering XML nesting"))?;
+                scopes
+                    .pop()
+                    .ok_or_else(|| invalid("numbering XML scope stack underflow"))?;
+            },
+            Event::Eof if depth != 0 || !scopes.is_empty() => {
+                return Err(invalid("unterminated numbering XML"));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(layout)
+}
+
+fn scope_for(
+    inherited: Option<&Scope>,
+    element: &BytesStart<'_>,
+    tag: &[u8],
+    decoder: Decoder,
+    _resolver: &NamespaceResolver,
+) -> Result<Scope> {
+    let mut scope = inherited.cloned().unwrap_or_default();
+    let raw_attributes = scan_attributes(tag)?;
+    for attribute in &raw_attributes {
+        let prefix = if attribute.name == b"xmlns" {
+            Some(Vec::new())
+        } else {
+            attribute
+                .name
+                .strip_prefix(b"xmlns:")
+                .map(|prefix| prefix.to_vec())
+        };
+        let Some(prefix) = prefix else {
+            continue;
+        };
+        let value = decoded_attribute_value(element, &attribute.name, decoder)?;
+        scope.set_namespace(prefix, value.into_bytes());
+    }
+
+    let mut direct_ignorable = None;
+    for attribute in &raw_attributes {
+        let Some((prefix, local)) = split_qualified_name(&attribute.name) else {
+            continue;
+        };
+        if local != b"Ignorable" || scope.namespace(prefix) != Some(validation::MC_NAMESPACE) {
+            continue;
+        }
+        if direct_ignorable.is_some() {
+            return Err(invalid("duplicate numbering mc:Ignorable attributes"));
+        }
+        let value = decoded_attribute_value(element, &attribute.name, decoder)?;
+        direct_ignorable = Some(validation::parse_ignorable(&value)?);
+    }
+    if let Some(value) = direct_ignorable {
+        scope.ignorable = value;
+    }
+    Ok(scope)
+}
+
+fn definition_location(
+    xml: &[u8],
+    start: usize,
+    tag_end: usize,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    scope: &Scope,
+) -> Result<DefinitionLocation> {
+    let id = required_u32(element, b"abstractNumId", decoder, resolver)?;
+    let tag = xml
+        .get(start..tag_end)
+        .ok_or_else(|| invalid("abstractNum range is outside numbering XML"))?;
+    let raw_attributes = scan_attributes(tag)?;
+    let mut extension = None;
+    for attribute in &raw_attributes {
+        let Some((prefix, local)) = split_qualified_name(&attribute.name) else {
+            continue;
+        };
+        if local != b"restartNumberingAfterBreak" {
+            continue;
+        }
+        if scope.namespace(prefix) != Some(validation::WORD_2012_NAMESPACE) {
+            continue;
+        }
+        if !validation::has_ignorable_prefix(&scope.ignorable, prefix) {
+            return Err(invalid(
+                "restartNumberingAfterBreak namespace is not listed in numbering mc:Ignorable",
+            ));
+        }
+        if extension.is_some() {
+            return Err(invalid("duplicate restartNumberingAfterBreak attributes"));
+        }
+        extension = Some(AttributeRange {
+            name_start: start + attribute.name_start,
+            value_start: start + attribute.value_start,
+            value_end: start + attribute.value_end,
+        });
+        let value = xml
+            .get(start + attribute.value_start..start + attribute.value_end)
+            .ok_or_else(|| invalid("restart attribute value range is outside numbering XML"))?;
+        let value = std::str::from_utf8(value)
+            .map_err(|error| invalid(&format!("restart attribute is not UTF-8: {error}")))?;
+        validation::parse_on_off(value)?;
+    }
+    let ignorable = raw_attributes.iter().find_map(|attribute| {
+        let (prefix, local) = split_qualified_name(&attribute.name)?;
+        if local == b"Ignorable" && scope.namespace(prefix) == Some(validation::MC_NAMESPACE) {
+            Some(AttributeRange {
+                name_start: start + attribute.name_start,
+                value_start: start + attribute.value_start,
+                value_end: start + attribute.value_end,
+            })
+        } else {
+            None
+        }
+    });
+    Ok(DefinitionLocation {
+        id,
+        start,
+        tag_end,
+        extension,
+        ignorable,
+        scope: scope.clone(),
+    })
+}
+
+fn decoded_attribute_value(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+) -> Result<String> {
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.as_ref() != name {
+            continue;
+        }
+        return attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map(Cow::into_owned)
+            .map_err(|error| Error::Xml(error.to_string()));
+    }
+    Err(invalid("numbering namespace attribute value is missing"))
+}
+
+fn split_qualified_name(name: &[u8]) -> Option<(&[u8], &[u8])> {
+    let index = name.iter().rposition(|byte| *byte == b':')?;
+    let (prefix, local) = name.split_at(index);
+    let local = local.get(1..)?;
+    (!prefix.is_empty() && !local.is_empty()).then_some((prefix, local))
+}
+
+fn scan_attributes(tag: &[u8]) -> Result<Vec<RawAttribute>> {
+    let mut index = 0usize;
+    if tag.first() != Some(&b'<') {
+        return Err(invalid("numbering start tag does not begin with '<'"));
+    }
+    index += 1;
+    skip_name(tag, &mut index)?;
+    let mut attributes = Vec::new();
+    loop {
+        while tag.get(index).is_some_and(u8::is_ascii_whitespace) {
+            index += 1;
+        }
+        if index >= tag.len() || tag[index] == b'>' {
+            break;
+        }
+        if tag[index] == b'/' {
+            index += 1;
+            while tag.get(index).is_some_and(u8::is_ascii_whitespace) {
+                index += 1;
+            }
+            if tag.get(index) == Some(&b'>') {
+                break;
+            }
+            return Err(invalid("numbering empty start tag has invalid close"));
+        }
+        let name_start = index;
+        skip_name(tag, &mut index)?;
+        let name = tag[name_start..index].to_vec();
+        while tag.get(index).is_some_and(u8::is_ascii_whitespace) {
+            index += 1;
+        }
+        if tag.get(index) != Some(&b'=') {
+            return Err(invalid("numbering attribute has no value"));
+        }
+        index += 1;
+        while tag.get(index).is_some_and(u8::is_ascii_whitespace) {
+            index += 1;
+        }
+        let quote = *tag
+            .get(index)
+            .ok_or_else(|| invalid("numbering attribute value is truncated"))?;
+        if !matches!(quote, b'\'' | b'\"') {
+            return Err(invalid("numbering attribute value is not quoted"));
+        }
+        index += 1;
+        let value_start = index;
+        while tag.get(index).is_some_and(|byte| *byte != quote) {
+            index += 1;
+        }
+        let value_end = index;
+        if tag.get(index) != Some(&quote) {
+            return Err(invalid("numbering attribute value is unterminated"));
+        }
+        index += 1;
+        attributes.push(RawAttribute {
+            name,
+            name_start,
+            value_start,
+            value_end,
+        });
+    }
+    Ok(attributes)
+}
+
+fn skip_name(tag: &[u8], index: &mut usize) -> Result<()> {
+    let start = *index;
+    while tag
+        .get(*index)
+        .is_some_and(|byte| !byte.is_ascii_whitespace() && !matches!(*byte, b'=' | b'/' | b'>'))
+    {
+        *index += 1;
+    }
+    if *index == start {
+        return Err(invalid("numbering XML name is missing"));
+    }
+    Ok(())
+}
+
+fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
+    usize::try_from(reader.buffer_position())
+        .map_err(|_| invalid("numbering XML offset does not fit usize"))
+}
+
 /// Parse a standalone WordprocessingML numbering payload.
 pub fn parse_numbering(xml: &[u8]) -> Result<Collection> {
     Collection::from_xml(xml)
@@ -770,6 +1537,20 @@ fn is_wordprocessing_namespace(namespace: &ResolveResult<'_>) -> bool {
         ResolveResult::Bound(Namespace(value))
             if *value == TRANSITIONAL_WORDPROCESSING_NAMESPACE
                 || *value == STRICT_WORDPROCESSING_NAMESPACE
+    )
+}
+
+fn is_word_2012_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value)) if *value == validation::WORD_2012_NAMESPACE
+    )
+}
+
+fn is_markup_compatibility_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value)) if *value == validation::MC_NAMESPACE
     )
 }
 

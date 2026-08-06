@@ -6,8 +6,18 @@ use crate::{Error, Result};
 use litchi_opc::PackURI;
 use std::mem::size_of;
 
+const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+const W12: &str = "http://schemas.microsoft.com/office/word/2012/wordml";
+const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+
 fn parse(xml: &[u8]) -> Result<Collection> {
     parse_numbering(xml)
+}
+
+fn numbering_xml(definitions: &str) -> String {
+    format!(
+        r#"<w:numbering xmlns:w="{W}" xmlns:w12="{W12}" xmlns:mc="{MC}" mc:Ignorable="w12">{definitions}</w:numbering>"#
+    )
 }
 
 fn assert_rejected_without_panicking(xml: &[u8]) {
@@ -32,6 +42,177 @@ fn parses_complete_level_and_override() {
     assert!(level.legal);
     assert_eq!(value.abstract_nums()[0].num_type(), Some(MultiLevel::Multi));
     assert_eq!(value.nums()[0].overrides()[0].start_override, Some(5));
+}
+
+#[test]
+fn parses_word_2012_restart_policy_on_abstract_definitions() {
+    let value = parse(
+        numbering_xml(
+            r#"<w:abstractNum w:abstractNumId="1" w12:restartNumberingAfterBreak="on"/><w:abstractNum w:abstractNumId="2" w12:restartNumberingAfterBreak="0"/><w:abstractNum w:abstractNumId="3"/>"#,
+        )
+        .as_bytes(),
+    )
+    .unwrap();
+
+    assert_eq!(
+        value
+            .get_abstract_num(1)
+            .unwrap()
+            .restart_numbering_after_break(),
+        Some(true)
+    );
+    assert_eq!(
+        value
+            .get_abstract_num(2)
+            .unwrap()
+            .restart_numbering_after_break(),
+        Some(false)
+    );
+    assert_eq!(
+        value
+            .get_abstract_num(3)
+            .unwrap()
+            .restart_numbering_after_break(),
+        None
+    );
+
+    for (lexical, expected) in [
+        ("1", true),
+        ("true", true),
+        ("on", true),
+        ("0", false),
+        ("false", false),
+        ("off", false),
+    ] {
+        let xml = numbering_xml(&format!(
+            r#"<w:abstractNum w:abstractNumId="1" w12:restartNumberingAfterBreak="{lexical}"/>"#
+        ));
+        assert_eq!(
+            parse(xml.as_bytes())
+                .unwrap()
+                .get_abstract_num(1)
+                .unwrap()
+                .restart_numbering_after_break(),
+            Some(expected),
+            "lexical ST_OnOff value {lexical}"
+        );
+    }
+}
+
+#[test]
+fn numbering_snapshot_edits_only_the_extension_seam_and_round_trips() {
+    let source_xml = numbering_xml(
+        r#"<w:abstractNum w:abstractNumId="1" w:foo="keep" w12:restartNumberingAfterBreak='0'><x:future xmlns:x="urn:future" x:value="keep"/></w:abstractNum>"#,
+    );
+    let source = Snapshot::from_xml(source_xml.as_bytes().to_vec()).unwrap();
+    assert_eq!(source.xml_bytes(), source_xml.as_bytes());
+    assert_eq!(
+        source.restart_numbering_after_break(1).unwrap(),
+        Some(false)
+    );
+
+    let mut no_op = source.edit();
+    no_op
+        .set_restart_numbering_after_break(1, Some(false))
+        .unwrap();
+    let no_op_commit = no_op.commit().unwrap();
+    assert_eq!(no_op_commit.snapshot().xml_bytes(), source.xml_bytes());
+
+    let mut edit = source.edit();
+    edit.set_restart_numbering_after_break(1, Some(true))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+
+    assert_eq!(source.xml_bytes(), source_xml.as_bytes());
+    assert_eq!(
+        commit.snapshot().restart_numbering_after_break(1).unwrap(),
+        Some(true)
+    );
+    let changed = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+    assert!(changed.contains(r#"w:foo="keep""#));
+    assert!(changed.contains(r#"w12:restartNumberingAfterBreak='true'"#));
+    assert!(changed.contains(r#"x:future xmlns:x="urn:future" x:value="keep""#));
+    assert_eq!(
+        commit.patch().before_restart_numbering_after_break(1),
+        Some(Some(false))
+    );
+    assert_eq!(
+        commit.patch().after_restart_numbering_after_break(1),
+        Some(Some(true))
+    );
+
+    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    assert_eq!(restored.xml_bytes(), source_xml.as_bytes());
+    assert_eq!(
+        restored.restart_numbering_after_break(1).unwrap(),
+        Some(false)
+    );
+}
+
+#[test]
+fn numbering_snapshot_can_add_and_remove_a_prefixed_extension_without_reformatting() {
+    let source_xml = format!(
+        r#"<w:numbering xmlns:w="{W}"><w:abstractNum w:abstractNumId="1"><x:future xmlns:x="urn:future"/></w:abstractNum></w:numbering>"#
+    );
+    let source = Snapshot::from_xml(source_xml.as_bytes().to_vec()).unwrap();
+    let mut edit = source.edit();
+    edit.set_restart_numbering_after_break(1, Some(false))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let changed = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+    assert!(
+        changed.contains(r#"xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml""#)
+    );
+    assert!(
+        changed
+            .contains(r#"xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006""#)
+    );
+    assert!(changed.contains(r#"mc:Ignorable="w15""#));
+    assert!(changed.contains(r#"w15:restartNumberingAfterBreak="false""#));
+    assert!(changed.contains(r#"<x:future xmlns:x="urn:future"/>"#));
+    assert_eq!(
+        commit.snapshot().restart_numbering_after_break(1).unwrap(),
+        Some(false)
+    );
+
+    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    assert_eq!(restored.xml_bytes(), source_xml.as_bytes());
+    assert_eq!(restored.restart_numbering_after_break(1).unwrap(), None);
+}
+
+#[test]
+fn numbering_snapshot_rejects_invalid_extension_scope_and_stale_edits_atomically() {
+    let invalid_value = format!(
+        r#"<w:numbering xmlns:w="{W}" xmlns:w12="{W12}" xmlns:mc="{MC}" mc:Ignorable="w12"><w:abstractNum w:abstractNumId="1" w12:restartNumberingAfterBreak="sometimes"/></w:numbering>"#
+    );
+    assert!(Snapshot::from_xml(invalid_value.into_bytes()).is_err());
+
+    let missing_ignorable = format!(
+        r#"<w:numbering xmlns:w="{W}" xmlns:w12="{W12}"><w:abstractNum w:abstractNumId="1" w12:restartNumberingAfterBreak="true"/></w:numbering>"#
+    );
+    assert!(Snapshot::from_xml(missing_ignorable.into_bytes()).is_err());
+
+    let source =
+        Snapshot::from_xml(numbering_xml(r#"<w:abstractNum w:abstractNumId="1"/>"#).into_bytes())
+            .unwrap();
+    assert!(
+        source
+            .edit()
+            .set_restart_numbering_after_break(99, Some(true))
+            .is_err()
+    );
+
+    let mut edit = source.edit();
+    edit.set_restart_numbering_after_break(1, Some(true))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let alternate = Snapshot::from_xml(
+        numbering_xml(r#"<w:abstractNum w:abstractNumId="1"/><x:future xmlns:x="urn:other"/>"#)
+            .into_bytes(),
+    )
+    .unwrap();
+    assert!(commit.patch().apply(&alternate).is_err());
+    assert_eq!(source.restart_numbering_after_break(1).unwrap(), None);
 }
 
 #[test]

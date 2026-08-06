@@ -8,7 +8,7 @@ use crate::error::{Error, Result};
 use crate::footnote::Note;
 use crate::header_footer::{Kind, Story};
 use crate::mail_merge::{Recipients, extract_recipients, is_settings_relationship};
-use crate::numbering::{Collection, parse_part};
+use crate::numbering::{Collection, Snapshot, parse_part, parse_snapshot_part};
 use crate::settings::{DocumentSettings, extract_document_variables};
 use crate::theme::Theme;
 use crate::web;
@@ -461,6 +461,27 @@ impl<'a> Document<'a> {
                 // No numbering in document
                 Ok(None)
             },
+        }
+    }
+
+    /// Get a source-preserving snapshot of the document's numbering part.
+    ///
+    /// The snapshot exposes the typed abstract definitions and can publish a
+    /// failure-atomic `restartNumberingAfterBreak` edit without rewriting
+    /// unrelated numbering XML. The document facade itself remains borrowed
+    /// and read-only; callers can retain the committed snapshot for package
+    /// publication through the package graph APIs.
+    pub fn numbering_snapshot(&self) -> Result<Option<Snapshot>> {
+        let main_part = self.opc.main_document_part()?;
+        let rels = main_part.rels();
+
+        match rels.part_with_reltype(relationship_type::NUMBERING) {
+            Ok(rel) => {
+                let target = rel.target_partname()?;
+                let numbering_part = self.opc.get_part(&target)?;
+                Ok(Some(parse_snapshot_part(numbering_part)?))
+            },
+            Err(_) => Ok(None),
         }
     }
 

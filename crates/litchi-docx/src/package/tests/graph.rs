@@ -32,6 +32,47 @@ fn saves_and_reopens_package() {
 }
 
 #[test]
+fn numbering_patch_publishes_through_the_package_graph() {
+    let source_xml = br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"/></w:numbering>"#;
+    let numbering_uri = PackURI::new("/word/numbering.xml").unwrap();
+    let mut package = Package::new().unwrap();
+    package
+        .edit_opc(|opc| {
+            opc.get_part_mut(&numbering_uri)
+                .map_err(Error::from)?
+                .set_blob(source_xml.to_vec());
+            Ok(())
+        })
+        .unwrap();
+
+    let source = package.numbering_snapshot().unwrap().unwrap();
+    let mut edit = source.edit();
+    edit.set_restart_numbering_after_break(1, Some(false))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let published = package
+        .apply_numbering_patch(&source, commit.patch())
+        .unwrap();
+    assert_eq!(
+        published.restart_numbering_after_break(1).unwrap(),
+        Some(false)
+    );
+
+    let mut output = Cursor::new(Vec::new());
+    package.to_plain_stream(&mut output).unwrap();
+    let reopened = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    assert_eq!(
+        reopened
+            .numbering_snapshot()
+            .unwrap()
+            .unwrap()
+            .restart_numbering_after_break(1)
+            .unwrap(),
+        Some(false)
+    );
+}
+
+#[test]
 fn failed_stream_keeps_document_and_properties_retryable() {
     let mut package = Package::new().unwrap();
     package

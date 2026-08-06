@@ -280,6 +280,7 @@ mod tests {
                 num_type: None,
                 num_style_link: None,
                 style_link: None,
+                restart_numbering_after_break: None,
                 levels,
             }],
             nums: vec![Instance {

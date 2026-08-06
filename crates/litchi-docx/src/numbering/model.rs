@@ -42,6 +42,12 @@ pub struct Definition {
     pub num_type: Option<MultiLevel>,
     pub num_style_link: Option<String>,
     pub style_link: Option<String>,
+    /// Word 2012 policy for restarting this definition at the next section.
+    ///
+    /// `None` means that the extension attribute was absent. An explicit
+    /// `Some(false)` remains distinct from absence, as required by the
+    /// `ST_OnOff` attribute in `[MS-DOCX]` §2.5.2.1.
+    pub restart_numbering_after_break: Option<bool>,
     pub levels: Vec<Level>,
 }
 
@@ -446,6 +452,11 @@ impl Definition {
     }
     pub fn style_link(&self) -> Option<&str> {
         self.style_link.as_deref()
+    }
+    /// Return the optional Word 2012 section-break restart policy.
+    #[must_use]
+    pub const fn restart_numbering_after_break(&self) -> Option<bool> {
+        self.restart_numbering_after_break
     }
     pub fn levels(&self) -> &[Level] {
         &self.levels

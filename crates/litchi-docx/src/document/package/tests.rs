@@ -11,5 +11,6 @@ fn minimal_package_exposes_all_document_facade_layers() {
     assert!(document.styles().is_ok());
     assert!(document.settings().is_ok());
     assert!(document.numbering().is_ok());
+    assert!(document.numbering_snapshot().is_ok());
     assert!(document.statistics().is_ok());
 }

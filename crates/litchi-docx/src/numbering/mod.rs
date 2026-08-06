@@ -3,6 +3,8 @@
 mod codec;
 mod model;
 mod package;
+mod transaction;
+mod validation;
 
 #[cfg(test)]
 mod tests;
@@ -13,3 +15,5 @@ pub use model::{
     ParseFormatError, ParseMultiLevelError, PictureBullet, Restart, Suffix,
 };
 pub(crate) use package::parse_part;
+pub(crate) use package::parse_snapshot_part;
+pub use transaction::{Commit, Patch, Snapshot, Transaction};
