@@ -400,7 +400,7 @@ fn write_client_anchor(
     right: i32,
     bottom: i32,
 ) -> std::io::Result<()> {
-    crate::ClientAnchor::rect(left, top, right, bottom)
+    crate::Anchor::full(left, top, right, bottom)
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string()))?
         .write_to(data)
 }

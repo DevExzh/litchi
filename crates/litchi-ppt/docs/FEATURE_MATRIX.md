@@ -54,7 +54,7 @@ compound files, OfficeArt, OLE activation metadata, native charts, encryption, a
 |---------|--------|------|-------|-------|
 | Text boxes, paragraphs, runs, and formatting | ✅ | ✅ | ✅ | Text extraction and authoring with fonts, colors, paragraphs, runs, alignment, tabs, fills, and line/paragraph formatting |
 | Text extensions and outline metadata | ✅ | ✅ | ✅ | Language and spelling defaults, Kinsoku settings, text special information, master defaults, metachar placeholders, bookmarks, and OutlineTextRefAtom outline references |
-| OfficeArt shapes and groups | ✅ | ✅ | ✅ | AutoShapes, groups, anchors, fills, gradients, lines, shadows, geometry, shape flags, and Escher records |
+| OfficeArt shapes and groups | ✅ | ✅ | ✅ | AutoShapes, groups, fills, gradients, lines, shadows, geometry, shape flags, and Escher records; `client_anchor::{Snapshot, Transaction, Patch}` owns bounded MS-PPT host anchors with exact no-op retention and source-checked reversible edits |
 | Placeholders and inherited layout hints | ✅ | ✅ | ✅ | Placeholder kinds and contexts for slides, main masters, title masters, notes masters, and handout masters are validated; unresolved inheritance is not rendered |
 | Pictures and BLIP resources | ✅ | ✅ | ✅ | JPEG/PNG and supported OfficeArt BLIP payloads with picture frames, image relationships, and writer support |
 | Tables | ✅ | ✅ | ✅ | OfficeArt table groups, grids, cells, rows, columns, cell text, dimensions, and table authoring |

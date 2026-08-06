@@ -309,7 +309,7 @@ pub fn anchor(shape: &Shape<'_>) -> Result<Option<Anchor>> {
     {
         return Err(corrupted("Invalid PowerPoint OfficeArtClientAnchor header"));
     }
-    let anchor = crate::ClientAnchorData::parse(anchor.data())?;
+    let anchor = crate::client_anchor::Data::parse(anchor.data())?;
     Anchor::new(anchor.left(), anchor.top(), anchor.right(), anchor.bottom()).map(Some)
 }
 

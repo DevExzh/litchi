@@ -188,10 +188,7 @@ pub use shapes::{AutoShape, Placeholder, PlaceholderSize, PlaceholderType, Shape
 // Re-export legacy types
 pub use bookmark_summary::{Bookmark, Summary};
 pub use broadcast::{Broadcast, BroadcastProperties, Broadcasts};
-pub use client_anchor::{
-    ClientAnchor, ClientAnchorData, ClientAnchorEncoding, ClientAnchorLimits,
-    OFFICE_ART_CLIENT_ANCHOR_RECORD_TYPE, Rect, SmallRect,
-};
+pub use client_anchor::Anchor;
 pub use client_data::{
     ClientData, ClientDataChild, ClientDataChildKind, ClientDataLimits,
     OFFICE_ART_CLIENT_DATA_RECORD_TYPE,
