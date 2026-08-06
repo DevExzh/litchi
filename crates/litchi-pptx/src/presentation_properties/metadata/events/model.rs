@@ -162,6 +162,50 @@ impl Draft {
         self.object_id
     }
 
+    /// Return a copy with a different typed event kind.
+    #[must_use]
+    pub fn with_kind(mut self, kind: Kind) -> Self {
+        self.kind = kind;
+        self
+    }
+
+    /// Return a copy with a different timeline offset.
+    #[must_use]
+    pub fn with_time(mut self, time: Offset) -> Self {
+        self.time = time;
+        self
+    }
+
+    /// Return a copy with a different target object identifier.
+    #[must_use]
+    pub fn with_object_id(mut self, object_id: u32) -> Self {
+        self.object_id = object_id;
+        self
+    }
+
+    /// Set the typed event kind inside a transaction edit closure.
+    pub fn set_kind(&mut self, kind: Kind) {
+        self.kind = kind;
+    }
+
+    /// Set the timeline offset inside a transaction edit closure.
+    pub fn set_time(&mut self, time: Offset) {
+        self.time = time;
+    }
+
+    /// Set the target object identifier inside a transaction edit closure.
+    pub fn set_object_id(&mut self, object_id: u32) {
+        self.object_id = object_id;
+    }
+
+    pub(crate) fn from_event(event: &Event) -> Self {
+        Self {
+            kind: event.kind.clone(),
+            time: event.time.clone(),
+            object_id: event.object_id,
+        }
+    }
+
     /// Return the exact normalized media-stream offset for a seek event.
     pub fn seek_time(&self) -> Option<&Offset> {
         match &self.kind {
