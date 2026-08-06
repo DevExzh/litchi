@@ -26,6 +26,64 @@ pub enum Error {
 /// Result type for shape-path value construction.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Semantic family of a native iWork shape path.
+///
+/// This classification contains no path payload, archive identifier, or
+/// protobuf state. Concrete format adapters decode native path sources into
+/// this value and retain the native payload separately when it is not modeled.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Kind {
+    /// A native two-point straight line.
+    Line,
+    /// A rectangular path.
+    Rectangle,
+    /// A rounded rectangular path.
+    RoundedRectangle,
+    /// An elliptical path.
+    Ellipse,
+    /// A regular polygon path.
+    RegularPolygon,
+    /// A chevron path.
+    Chevron,
+    /// A left-pointing arrow path.
+    LeftArrow,
+    /// A right-pointing arrow path.
+    RightArrow,
+    /// A double-arrow path.
+    DoubleArrow,
+    /// A star path.
+    Star,
+    /// A plus-sign path.
+    Plus,
+    /// A general Bezier path.
+    BezierPath,
+    /// A point-control path.
+    PointPath,
+    /// A scalar-control path.
+    ScalarPath,
+    /// A callout path.
+    Callout,
+    /// A connection-line path.
+    ConnectionLine,
+    /// An editable Bezier path.
+    EditableBezierPath,
+}
+
+#[cfg(test)]
+mod kind_tests {
+    use std::mem::size_of;
+
+    use super::Kind;
+
+    #[test]
+    fn path_kind_is_compact_and_archive_free() {
+        assert_eq!(size_of::<Kind>(), 1);
+        assert_eq!(Kind::Rectangle, Kind::Rectangle);
+        assert_ne!(Kind::Line, Kind::Ellipse);
+    }
+}
+
 /// Corner radius in the path's natural coordinate system.
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]

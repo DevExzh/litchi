@@ -49,10 +49,10 @@ pub(crate) use line_end::{
 pub use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection, ReflectionOpacity};
 pub use litchi_iwa_common::shape::fill::Opacity as GradientOpacity;
 pub use litchi_iwa_common::shape::fill::{Angle, Gradient, Kind, Stop, StopMidpoint, StopPosition};
+pub(crate) use litchi_iwa_common::shape::path::Kind as ShapePathKind;
 pub use litchi_iwa_common::shape::path::{
     CornerRadius, InnerRadiusRatio, PolygonSides, Preset, StarPoints,
 };
-pub use path::ShapePathKind;
 pub(crate) use path::{set_shape_preset, shape_path_kind, shape_path_source, shape_preset};
 
 impl From<litchi_iwa_common::shape::path::Error> for crate::Error {
