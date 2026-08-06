@@ -81,8 +81,8 @@ fn authoring_round_trips_the_complete_plcf_asumy() {
 fn constructors_enforce_positive_levels_and_signed_wire_bounds() {
     assert!(AutoSummaryRange::new(0, 1, 0).is_err());
 
-    // CP and ASUMY.lLevel are signed 32-bit fields on the wire. The largest
-    // representable values remain authorable.
+    // CP has a format-defined upper bound and ASUMY.lLevel is signed on the
+    // wire. The largest representable values remain authorable.
     assert!(AutoSummaryRange::new(2_147_483_645, 2_147_483_646, 2_147_483_647).is_ok());
 
     // Negative CPs and levels are represented by their two's-complement wire

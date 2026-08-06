@@ -40,7 +40,7 @@ impl AutoSummaryRange {
     ///
     /// The range is half-open. Its CPs and priority are checked against the
     /// domains of `PlcfAsumy`; in particular, empty ranges and values outside
-    /// the signed wire domains are rejected.
+    /// the format's CP and priority domains are rejected.
     pub fn new(start: u32, end: u32, level: u32) -> Result<Self> {
         let range = Self { start, end, level };
         validation::range(&range)?;
