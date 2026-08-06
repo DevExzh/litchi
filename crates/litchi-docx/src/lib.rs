@@ -113,7 +113,7 @@ pub use document::{Block, Document, Element, ImageWatermarkPart};
 pub use math::{OfficeMath, OfficeMathParagraph};
 pub use package::Package;
 pub use paragraph::{
-    Paragraph, Run, RunBreak, RunBreakClear, RunBreakType, RunProperties, RunUnderline,
+    Collapsed, Paragraph, Run, RunBreak, RunBreakClear, RunBreakType, RunProperties, RunUnderline,
     RunUnderlineColor,
 };
 pub use run_effects::{Effect, OpaqueExtension, RunEffects};

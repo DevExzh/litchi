@@ -33,7 +33,7 @@ use super::package::{
 /// runs, tables, sections, and other elements.
 pub struct MutableDocument {
     /// Document body content (paragraphs, tables, etc.)
-    body: DocumentBody,
+    pub(crate) body: DocumentBody,
     /// Header content (optional)
     header: Option<Vec<MutableParagraph>>,
     /// Footer content (optional)
@@ -59,7 +59,7 @@ pub struct MutableDocument {
     /// Table of Contents configuration (optional)
     toc_config: Option<(usize, TableOfContents)>, // (insertion index, config)
     /// Whether the document has been modified
-    modified: bool,
+    pub(crate) modified: bool,
     /// Exact document/root/body opening XML retained from an existing document.
     pub(super) preserved_prefix: Option<String>,
     /// Exact body/document closing XML retained from an existing document.

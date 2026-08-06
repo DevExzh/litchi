@@ -7,7 +7,7 @@ use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesEnd, BytesStart};
 use quick_xml::name::{NamespaceResolver, QName, ResolveResult};
 
-pub(super) fn is_fragment_word_name(
+pub(crate) fn is_fragment_word_name(
     namespace: &ResolveResult<'_>,
     name: QName<'_>,
     local_name: &[u8],

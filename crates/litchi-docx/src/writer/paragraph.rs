@@ -1,6 +1,7 @@
 //! Paragraph types and implementation for DOCX documents.
 use crate::error::{Error, Result};
 use crate::namespace::normalize_xml_integer;
+use crate::paragraph::collapsed::Collapsed;
 use crate::paragraph::extensions::Extensions;
 use crate::{OfficeMath, OfficeMathParagraph};
 use litchi_core::xml::escape_xml;
@@ -295,6 +296,8 @@ pub struct MutableParagraph {
     pub(crate) properties: ParagraphProperties,
     /// Word 2010 paragraph-level extension attributes.
     pub(crate) extension_values: Extensions,
+    /// Word 2012 paragraph collapse marker.
+    pub(crate) collapsed: Option<Collapsed>,
     pub(crate) property_change: Option<ParagraphPropertyChange>,
 }
 
@@ -305,6 +308,7 @@ impl MutableParagraph {
             style: None,
             properties: ParagraphProperties::default(),
             extension_values: Extensions::new(),
+            collapsed: None,
             property_change: None,
         }
     }
@@ -684,6 +688,7 @@ impl MutableParagraph {
         // Write paragraph properties
         if self.style.is_some()
             || self.properties.has_properties()
+            || self.collapsed.is_some()
             || self.property_change.is_some()
         {
             xml.push_str("<w:pPr>");
@@ -800,6 +805,10 @@ impl MutableParagraph {
             if let Some(ref division_id) = self.properties.division_id {
                 write!(xml, "<w:divId w:val=\"{}\"/>", escape_xml(division_id))
                     .map_err(|e| Error::Xml(e.to_string()))?;
+            }
+
+            if let Some(collapsed) = self.collapsed {
+                crate::paragraph::collapsed::append_xml(xml, collapsed)?;
             }
 
             if let Some(section) = &self.properties.section {
@@ -843,6 +852,7 @@ impl MutableParagraph {
         // Write paragraph properties (same as to_xml)
         if self.style.is_some()
             || self.properties.has_properties()
+            || self.collapsed.is_some()
             || self.property_change.is_some()
         {
             xml.push_str("<w:pPr>");
@@ -959,6 +969,10 @@ impl MutableParagraph {
             if let Some(ref division_id) = self.properties.division_id {
                 write!(xml, "<w:divId w:val=\"{}\"/>", escape_xml(division_id))
                     .map_err(|e| Error::Xml(e.to_string()))?;
+            }
+
+            if let Some(collapsed) = self.collapsed {
+                crate::paragraph::collapsed::append_xml(xml, collapsed)?;
             }
 
             if let Some(section) = &self.properties.section {

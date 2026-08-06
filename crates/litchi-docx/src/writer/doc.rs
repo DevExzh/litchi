@@ -17,3 +17,4 @@ mod tests;
 
 pub use super::super::format::ImageFormat;
 pub use model::{MutableDocument, Protection};
+pub(crate) use package::{BodyElement, DocumentBody};

@@ -10,3 +10,4 @@ mod text;
 mod xml;
 
 pub(crate) use text::extract_word_text;
+pub(crate) use xml::is_fragment_word_name;

@@ -317,7 +317,7 @@ impl DocumentBody {
     }
 
     /// Element positions of all paragraphs, typed and preserved, in body order.
-    pub(super) fn paragraph_positions(&self) -> Vec<usize> {
+    pub(crate) fn paragraph_positions(&self) -> Vec<usize> {
         self.elements
             .iter()
             .enumerate()
@@ -542,7 +542,7 @@ impl DocumentBody {
         Ok(())
     }
 
-    pub(super) fn paragraph_count(&self) -> usize {
+    pub(crate) fn paragraph_count(&self) -> usize {
         self.elements
             .iter()
             .filter(|element| {
