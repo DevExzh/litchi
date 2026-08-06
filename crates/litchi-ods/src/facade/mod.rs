@@ -49,6 +49,29 @@ impl Spreadsheet {
         self.package.styles_xml()
     }
 
+    /// Capture document, sheet, and automatic cell-protection metadata in a
+    /// source-checked immutable snapshot.
+    pub fn protection(&self) -> Result<crate::protection::Snapshot> {
+        crate::protection::Snapshot::parse(self.package.content_xml(), self.package.styles_xml())
+    }
+
+    /// Apply a failure-atomic protection edit and rebuild only `content.xml`.
+    /// Password values remain inert verifiers; this method never authenticates
+    /// or enforces a protection policy.
+    pub fn update_protection<F>(&mut self, edit: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::protection::Transaction) -> Result<()>,
+    {
+        let snapshot = self.protection()?;
+        let commit = crate::protection::update(&snapshot, edit)?;
+        if !commit.changed() {
+            return Ok(());
+        }
+        let package = self.package.replace_content_xml(commit.content_xml())?;
+        *self = Self::from_package(package)?;
+        Ok(())
+    }
+
     /// Borrow the compact cross-format metadata projection.
     pub fn metadata(&self) -> &litchi_core::Metadata {
         self.metadata.value()

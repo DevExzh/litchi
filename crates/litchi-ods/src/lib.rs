@@ -15,6 +15,7 @@ pub mod media;
 pub mod metadata;
 pub mod model;
 pub mod package;
+pub mod protection;
 pub mod settings;
 pub mod styles;
 pub mod worksheet;
