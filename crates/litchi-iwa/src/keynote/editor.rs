@@ -1540,7 +1540,7 @@ impl KeynoteEditor {
         Self::from_package(IWorkPackage::from_bytes(bytes)?)
     }
 
-    pub fn from_package(package: IWorkPackage) -> Result<Self> {
+    pub(crate) fn from_package(package: IWorkPackage) -> Result<Self> {
         let editor = Self {
             text: IWorkTextEditor::from_package(package),
         };
@@ -5120,7 +5120,7 @@ impl KeynoteEditor {
         Ok(created)
     }
 
-    pub fn package(&self) -> &IWorkPackage {
+    pub(crate) fn package(&self) -> &IWorkPackage {
         self.text.package()
     }
 
@@ -5173,7 +5173,7 @@ impl KeynoteEditor {
         Ok(old)
     }
 
-    pub fn into_package(self) -> IWorkPackage {
+    pub(crate) fn into_package(self) -> IWorkPackage {
         self.text.into_package()
     }
 
