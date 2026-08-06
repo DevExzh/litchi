@@ -16,15 +16,33 @@ fn without_effect(settings: &TransitionSettings) -> Result<TransitionSettings> {
         .set_writing_direction_is_rtl(settings.animation_parameters().writing_direction_is_rtl());
 
     let mut cleared = TransitionSettings::new();
-    cleared.set_animation_type(Some(TRANSITION_ANIMATION_TYPE))?;
-    cleared.set_effect(Some(Effect::None))?;
-    cleared.set_duration(Some(NO_EFFECT_DURATION_SECONDS))?;
+    cleared
+        .set_animation_type(Some(TRANSITION_ANIMATION_TYPE))
+        .map_err(transition_error)?;
+    cleared
+        .set_effect(Some(Effect::None))
+        .map_err(transition_error)?;
+    cleared
+        .set_duration(Some(NO_EFFECT_DURATION_SECONDS))
+        .map_err(transition_error)?;
     cleared.set_direction(None);
-    cleared.set_delay(settings.delay())?;
+    cleared
+        .set_delay(settings.delay())
+        .map_err(transition_error)?;
     cleared.set_is_automatic(settings.is_automatic());
-    cleared.set_animation_parameters(animation_parameters)?;
-    cleared.set_custom_parameters(CustomParameters::new())?;
+    cleared
+        .set_animation_parameters(animation_parameters)
+        .map_err(transition_error)?;
+    cleared
+        .set_custom_parameters(CustomParameters::new())
+        .map_err(transition_error)?;
     Ok(cleared)
+}
+
+fn transition_error(error: litchi_keynote::Error) -> Error {
+    Error::ParseError(format!(
+        "invalid Keynote transition clear settings: {error}"
+    ))
 }
 
 impl KeynoteEditor {
