@@ -4,6 +4,7 @@
 //! stay in contextual layers while this module remains the ergonomic facade.
 
 mod codec;
+mod edit;
 mod package;
 mod semantic;
 mod validation;
@@ -11,6 +12,7 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
+pub use edit::{Commit, Patch, Snapshot, Transaction};
 pub use litchi_ole_common::object::Limits;
 pub use package::Editor;
 pub use semantic::*;

@@ -58,6 +58,10 @@ impl Editor {
             .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))
     }
 
+    pub(crate) fn worksheet_count(&self) -> usize {
+        self.sheets.len()
+    }
+
     /// Adds a typed worksheet form-control Obj record transactionally.
     ///
     /// The operation authors only the BIFF `Obj` metadata. It does not load,

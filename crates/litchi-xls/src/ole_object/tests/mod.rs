@@ -2,6 +2,8 @@
 
 mod package;
 
+mod transaction;
+
 mod codec;
 
 mod validation;
