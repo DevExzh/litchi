@@ -7,6 +7,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod bookmark;
 pub mod character;
 pub mod columns;
 pub mod font;
@@ -15,6 +16,10 @@ pub mod paragraph;
 pub mod position;
 pub mod storage;
 
+pub use bookmark::{
+    Bookmark, Error as BookmarkError, Id as BookmarkId, Name as BookmarkName,
+    Settings as BookmarkSettings, Visibility as BookmarkVisibility,
+};
 pub use character::{
     Error as CharacterError, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
     TextDecorations, TextLigatures, TextPointSize, TextScript, TextStrikethrough, TextStyle,

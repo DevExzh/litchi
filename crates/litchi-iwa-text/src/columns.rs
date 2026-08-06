@@ -44,9 +44,7 @@ impl std::fmt::Display for Error {
             Self::GapNegative => "text column gap must be non-negative",
             Self::WidthNotFinite => "text column width must be finite",
             Self::WidthNonPositive => "text column width must be positive",
-            Self::MissingFollowing => {
-                "variable text columns must contain at least two columns"
-            },
+            Self::MissingFollowing => "variable text columns must contain at least two columns",
             Self::TooManyVariableColumns => {
                 "variable text columns exceed the supported column limit"
             },
@@ -318,7 +316,10 @@ mod tests {
         assert_eq!(Gap::from_points(-0.0), Err(Error::GapNegative));
         assert_eq!(Gap::from_points(f32::NAN), Err(Error::GapNotFinite));
         assert_eq!(Width::from_points(0.0), Err(Error::WidthNonPositive));
-        assert_eq!(Width::from_points(f32::INFINITY), Err(Error::WidthNotFinite));
+        assert_eq!(
+            Width::from_points(f32::INFINITY),
+            Err(Error::WidthNotFinite)
+        );
     }
 
     #[test]
@@ -343,7 +344,10 @@ mod tests {
     #[test]
     fn variable_layouts_are_bounded_and_need_a_following_column() {
         let width = Width::from_points(72.0).unwrap();
-        assert_eq!(Variable::new(width, Vec::new()), Err(Error::MissingFollowing));
+        assert_eq!(
+            Variable::new(width, Vec::new()),
+            Err(Error::MissingFollowing)
+        );
         let following = vec![Following::new(Gap::ZERO, width); MAX_VARIABLE_COLUMNS];
         assert_eq!(
             Variable::new(width, following),

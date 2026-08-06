@@ -8,11 +8,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for bookmark in pages.body_bookmarks()? {
         println!(
             "id={} range={}..{} name={:?} visibility={:?}",
-            bookmark.id.object_id(),
+            bookmark.id.get(),
             bookmark.range.start().utf16_index(),
             bookmark.range.end().utf16_index(),
-            bookmark.settings.name.as_ref().map(|name| name.as_str()),
-            bookmark.settings.visibility,
+            bookmark.settings.name().map(|name| name.as_str()),
+            bookmark.settings.visibility(),
         );
     }
     Ok(())

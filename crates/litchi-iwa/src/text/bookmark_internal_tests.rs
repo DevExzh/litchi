@@ -69,7 +69,7 @@ fn unknown_table_entry_and_bookmark_fields_survive_updates() {
                     data,
                 },
             )?;
-            let object = archive.object_mut(bookmark.id.object_id()).unwrap();
+            let object = archive.object_mut(bookmark.id.get()).unwrap();
             let original = &object.messages[0];
             let data = patch_varint_field(&original.data, 88, false, Some(9))?;
             object.replace_message(
@@ -110,7 +110,7 @@ fn unknown_table_entry_and_bookmark_fields_survive_updates() {
                 .iter()
                 .any(|field| field.number() == 77)
     );
-    let object = archive.object(bookmark.id.object_id()).unwrap();
+    let object = archive.object(bookmark.id.get()).unwrap();
     assert!(
         parse_wire_fields(&object.messages[0].data)
             .unwrap()
@@ -230,7 +230,7 @@ fn bookmark_with_an_additional_owner_cannot_be_updated_or_deleted() {
                 .unwrap();
             other.archive_info.message_infos[0]
                 .object_references
-                .push(bookmark.id.object_id());
+                .push(bookmark.id.get());
             Ok(())
         })
         .unwrap();
