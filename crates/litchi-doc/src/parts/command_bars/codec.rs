@@ -44,12 +44,9 @@ pub fn parse_bytes<'a>(data: &'a [u8]) -> Result<CommandBars<'a>> {
             PLF_MCD => Entry::MacroCommands(parse_macro_commands(&mut reader)?),
             PLF_ACD => Entry::AllocatedCommands(parse_allocated_commands(&mut reader)?),
             PLF_KME | PLF_KME_MISMATCHED => Entry::KeyMaps(parse_key_maps(&mut reader)?),
+            0x10 => Entry::CommandStrings(parse_command_strings(&mut reader)?),
+            0x11 => Entry::MacroNames(parse_macro_names(&mut reader)?),
             CTB_WRAPPER => Entry::Toolbar(parse_toolbar_wrapper(&mut reader)?),
-            0x10 | 0x11 => {
-                return Err(unsupported(
-                    "TcgSttbf/MacroNames records are not decoded because their nested string-table boundaries are not safely inferable in this bounded owner",
-                ));
-            },
             other => {
                 return Err(unsupported(format!(
                     "Tcg255 record tag 0x{other:02X} is not safely bounded"
@@ -82,6 +79,8 @@ pub fn to_bytes(value: &CommandBars<'_>) -> Result<Vec<u8>> {
             Entry::MacroCommands(commands) => encode_macro_commands(&mut output, commands)?,
             Entry::AllocatedCommands(commands) => encode_allocated_commands(&mut output, commands)?,
             Entry::KeyMaps(maps) => encode_key_maps(&mut output, maps)?,
+            Entry::CommandStrings(strings) => encode_command_strings(&mut output, strings)?,
+            Entry::MacroNames(names) => encode_macro_names(&mut output, names)?,
             Entry::Toolbar(wrapper) => encode_toolbar_wrapper(&mut output, wrapper)?,
         }
     }
@@ -108,6 +107,28 @@ impl<'a> XString<'a> {
             return Err(corrupted("Xst has trailing bytes"));
         }
         Ok(value)
+    }
+
+    /// Parse an `Xstz` prefix: an `Xst` followed by its required null word.
+    pub fn parse_terminated_prefix(data: &'a [u8]) -> Result<(Self, usize)> {
+        let (value, consumed) = Self::parse_prefix(data)?;
+        let end = consumed
+            .checked_add(2)
+            .ok_or_else(|| corrupted("Xstz terminator range overflows"))?;
+        let terminator = data
+            .get(consumed..end)
+            .ok_or_else(|| corrupted("Xstz terminator is truncated"))?;
+        if terminator != [0, 0] {
+            return Err(corrupted("Xstz terminator must be zero"));
+        }
+        Ok((value, end))
+    }
+
+    /// Serialize the `Xstz` form used by `MacroName`.
+    pub fn to_terminated_bytes(&self) -> Vec<u8> {
+        let mut output = self.to_bytes();
+        output.extend_from_slice(&[0, 0]);
+        output
     }
 
     /// Serialize the two-byte length and the exact UTF-16 payload.
@@ -196,6 +217,42 @@ fn parse_key_maps(reader: &mut Reader<'_>) -> Result<KeyMaps> {
         ));
     }
     KeyMaps::new(kind, entries)
+}
+
+fn parse_command_strings<'a>(reader: &mut Reader<'a>) -> Result<CommandStrings<'a>> {
+    reader.expect(0x10, "TcgSttbf tag")?;
+    if reader.u16("TcgSttbfCore fExtend")? != u16::MAX {
+        return Err(corrupted("TcgSttbfCore fExtend must be 0xFFFF"));
+    }
+    let count = usize::from(reader.u16("TcgSttbfCore cData")?);
+    validate_count(count, "TcgSttbfCore cData")?;
+    if reader.u16("TcgSttbfCore cbExtra")? != 2 {
+        return Err(corrupted("TcgSttbfCore cbExtra must be 2"));
+    }
+    let mut strings = Vec::with_capacity(count);
+    for _ in 0..count {
+        let (text, consumed) = XString::parse_prefix(reader.remaining())?;
+        reader.advance(consumed, "TcgSttbfCore Data")?;
+        strings.push(CommandString::new(
+            text,
+            reader.u16("TcgSttbfCore ExtraData")?,
+        )?);
+    }
+    CommandStrings::new(strings)
+}
+
+fn parse_macro_names<'a>(reader: &mut Reader<'a>) -> Result<MacroNames<'a>> {
+    reader.expect(0x11, "MacroNames tag")?;
+    let count = usize::from(reader.u16("MacroNames iMac")?);
+    validate_count(count, "MacroNames iMac")?;
+    let mut names = Vec::with_capacity(count);
+    for _ in 0..count {
+        let index = reader.u16("MacroName ibst")?;
+        let (name, consumed) = XString::parse_terminated_prefix(reader.remaining())?;
+        reader.advance(consumed, "MacroName xstz")?;
+        names.push(MacroName::new(index, name)?);
+    }
+    MacroNames::new(names)
 }
 
 fn parse_toolbar_wrapper<'a>(reader: &mut Reader<'a>) -> Result<ToolbarWrapper<'a>> {
@@ -376,6 +433,38 @@ fn encode_key_maps(output: &mut Vec<u8>, value: &KeyMaps) -> Result<()> {
         output.extend_from_slice(&entry.secondary_key.to_le_bytes());
         output.extend_from_slice(&entry.action.raw().to_le_bytes());
         output.extend_from_slice(&entry.parameter.to_le_bytes());
+    }
+    Ok(())
+}
+
+fn encode_command_strings(output: &mut Vec<u8>, value: &CommandStrings<'_>) -> Result<()> {
+    value.validate()?;
+    output.push(0x10);
+    output.extend_from_slice(&u16::MAX.to_le_bytes());
+    output.extend_from_slice(
+        &u16::try_from(value.strings.len())
+            .map_err(|_| corrupted("TcgSttbfCore cData exceeds u16::MAX"))?
+            .to_le_bytes(),
+    );
+    output.extend_from_slice(&2u16.to_le_bytes());
+    for string in &value.strings {
+        output.extend_from_slice(&string.text.to_bytes());
+        output.extend_from_slice(&string.references.to_le_bytes());
+    }
+    Ok(())
+}
+
+fn encode_macro_names(output: &mut Vec<u8>, value: &MacroNames<'_>) -> Result<()> {
+    value.validate()?;
+    output.push(0x11);
+    output.extend_from_slice(
+        &u16::try_from(value.names.len())
+            .map_err(|_| corrupted("MacroNames iMac exceeds u16::MAX"))?
+            .to_le_bytes(),
+    );
+    for name in &value.names {
+        output.extend_from_slice(&name.index.to_le_bytes());
+        output.extend_from_slice(&name.name.to_terminated_bytes());
     }
     Ok(())
 }

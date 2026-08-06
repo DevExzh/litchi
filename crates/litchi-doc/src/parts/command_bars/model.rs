@@ -82,6 +82,177 @@ impl<'a> XString<'a> {
     }
 }
 
+/// One entry in the command string table (`TcgSttbfCore`, MS-DOC 2.9.319).
+///
+/// The string itself is retained as UTF-16 wire data and the reference count
+/// is kept even though litchi-doc never executes the command it describes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandString<'a> {
+    pub(super) text: XString<'a>,
+    pub(super) references: u16,
+}
+
+impl<'a> CommandString<'a> {
+    /// Construct one command-string entry with its on-disk reference count.
+    pub fn new(text: XString<'a>, references: u16) -> Result<Self> {
+        let value = Self { text, references };
+        value.validate()?;
+        Ok(value)
+    }
+
+    /// Return the command name or allocated-command argument.
+    pub const fn text(&self) -> &XString<'a> {
+        &self.text
+    }
+
+    /// Return the number of wire references to this string.
+    pub const fn references(&self) -> u16 {
+        self.references
+    }
+
+    /// Copy borrowed wire text into an owned representation.
+    pub fn into_owned(self) -> CommandString<'static> {
+        CommandString {
+            text: self.text.into_owned(),
+            references: self.references,
+        }
+    }
+
+    pub(super) fn validate(&self) -> Result<()> {
+        if self.text.len() > usize::from(u16::MAX) {
+            return Err(corrupted("TcgSttbf command string exceeds u16::MAX"));
+        }
+        Ok(())
+    }
+}
+
+/// The extended command string table (`TcgSttbf`, MS-DOC 2.9.318).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandStrings<'a> {
+    pub(super) strings: Vec<CommandString<'a>>,
+}
+
+impl<'a> CommandStrings<'a> {
+    /// Construct a validated command string table.
+    pub fn new(strings: Vec<CommandString<'a>>) -> Result<Self> {
+        let value = Self { strings };
+        value.validate()?;
+        Ok(value)
+    }
+
+    /// Return command names and allocated-command arguments in table order.
+    pub fn strings(&self) -> &[CommandString<'a>] {
+        &self.strings
+    }
+
+    /// Mutably access entries while retaining the explicit validation step.
+    pub fn strings_mut(&mut self) -> &mut Vec<CommandString<'a>> {
+        &mut self.strings
+    }
+
+    /// Return the number of indexed command strings.
+    pub const fn len(&self) -> usize {
+        self.strings.len()
+    }
+
+    /// Whether the table has no entries.
+    pub const fn is_empty(&self) -> bool {
+        self.strings.is_empty()
+    }
+
+    /// Copy borrowed wire strings into an owned table.
+    pub fn into_owned(self) -> CommandStrings<'static> {
+        CommandStrings {
+            strings: self
+                .strings
+                .into_iter()
+                .map(CommandString::into_owned)
+                .collect(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        super::validation::validate_command_strings(self)
+    }
+}
+
+/// One macro-name entry from `MacroNames` (MS-DOC 2.9.151).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MacroName<'a> {
+    pub(super) index: u16,
+    pub(super) name: XString<'a>,
+}
+
+impl<'a> MacroName<'a> {
+    /// Construct a macro name with its explicit `ibst` index.
+    pub fn new(index: u16, name: XString<'a>) -> Result<Self> {
+        let value = Self { index, name };
+        value.validate()?;
+        Ok(value)
+    }
+
+    /// Return the macro-name-table index referenced by `Mcd.ibst`.
+    pub const fn index(&self) -> u16 {
+        self.index
+    }
+
+    /// Return the null-terminated macro name without its wire terminator.
+    pub const fn name(&self) -> &XString<'a> {
+        &self.name
+    }
+
+    /// Copy borrowed wire text into an owned representation.
+    pub fn into_owned(self) -> MacroName<'static> {
+        MacroName {
+            index: self.index,
+            name: self.name.into_owned(),
+        }
+    }
+
+    pub(super) fn validate(&self) -> Result<()> {
+        if self.name.len() > 255 {
+            return Err(corrupted("MacroName exceeds 255 UTF-16 characters"));
+        }
+        Ok(())
+    }
+}
+
+/// The macro-name table referenced by `Mcd.ibst` (`MacroNames`, MS-DOC 2.9.152).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MacroNames<'a> {
+    pub(super) names: Vec<MacroName<'a>>,
+}
+
+impl<'a> MacroNames<'a> {
+    /// Construct a validated macro-name table.
+    pub fn new(names: Vec<MacroName<'a>>) -> Result<Self> {
+        let value = Self { names };
+        value.validate()?;
+        Ok(value)
+    }
+
+    /// Return macro names in their stored order.
+    pub fn names(&self) -> &[MacroName<'a>] {
+        &self.names
+    }
+
+    /// Mutably access names while retaining the explicit validation step.
+    pub fn names_mut(&mut self) -> &mut Vec<MacroName<'a>> {
+        &mut self.names
+    }
+
+    /// Copy borrowed wire names into an owned table.
+    pub fn into_owned(self) -> MacroNames<'static> {
+        MacroNames {
+            names: self.names.into_iter().map(MacroName::into_owned).collect(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        super::validation::validate_macro_names(self)
+    }
+}
+
 /// A macro-command descriptor from `PlfMcd` (MS-DOC 2.9.154/2.9.202).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MacroCommand {
@@ -514,6 +685,15 @@ pub enum CustomizationData<'a> {
     Deltas(Vec<ToolbarDelta>),
 }
 
+impl<'a> CustomizationData<'a> {
+    pub fn into_owned(self) -> CustomizationData<'static> {
+        match self {
+            Self::Toolbar(toolbar) => CustomizationData::Toolbar(toolbar.into_owned()),
+            Self::Deltas(deltas) => CustomizationData::Deltas(deltas),
+        }
+    }
+}
+
 /// One `Customization` entry in a `CTBWRAPPER`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Customization<'a> {
@@ -566,6 +746,16 @@ impl<'a> Customization<'a> {
 
     pub fn data_mut(&mut self) -> &mut CustomizationData<'a> {
         &mut self.data
+    }
+
+    /// Copy borrowed toolbar bytes into an owned customization.
+    pub fn into_owned(self) -> Customization<'static> {
+        Customization {
+            toolbar_id: self.toolbar_id,
+            reserved: self.reserved,
+            delta_count: self.delta_count,
+            data: self.data.into_owned(),
+        }
     }
 
     pub(super) fn validate(&self, customization_count: usize) -> Result<()> {
@@ -659,6 +849,21 @@ impl<'a> Toolbar<'a> {
         self.validate(1)
     }
 
+    /// Copy borrowed toolbar names, headers, and control payloads into an
+    /// owned toolbar while retaining every opaque TBC-specific byte.
+    pub fn into_owned(self) -> Toolbar<'static> {
+        Toolbar {
+            name: self.name.into_owned(),
+            header: self.header.into_owned(),
+            visual_data: self.visual_data,
+            toolbar_index: self.toolbar_index,
+            reserved: self.reserved,
+            unused: self.unused,
+            control_count: self.control_count,
+            controls: self.controls.into_iter().map(Control::into_owned).collect(),
+        }
+    }
+
     pub(super) fn validate(&self, customization_count: usize) -> Result<()> {
         super::validation::validate_toolbar(self, customization_count)
     }
@@ -715,6 +920,29 @@ impl<'a> ToolbarWrapper<'a> {
         self.customizations.len()
     }
 
+    /// Copy borrowed wrapper bytes into an owned snapshot representation.
+    pub fn into_owned(self) -> ToolbarWrapper<'static> {
+        ToolbarWrapper {
+            reserved1: self.reserved1,
+            reserved2: self.reserved2,
+            reserved3: self.reserved3,
+            reserved4: self.reserved4,
+            reserved5: self.reserved5,
+            cb_tbd: self.cb_tbd,
+            toolbar_controls: Cow::Owned(self.toolbar_controls.into_owned()),
+            delta_controls: self
+                .delta_controls
+                .into_iter()
+                .map(Control::into_owned)
+                .collect(),
+            customizations: self
+                .customizations
+                .into_iter()
+                .map(Customization::into_owned)
+                .collect(),
+        }
+    }
+
     pub fn validate(&self) -> Result<()> {
         super::validation::validate_toolbar_wrapper(self)
     }
@@ -726,7 +954,22 @@ pub enum Entry<'a> {
     MacroCommands(MacroCommands),
     AllocatedCommands(AllocatedCommands),
     KeyMaps(KeyMaps),
+    CommandStrings(CommandStrings<'a>),
+    MacroNames(MacroNames<'a>),
     Toolbar(ToolbarWrapper<'a>),
+}
+
+impl<'a> Entry<'a> {
+    pub fn into_owned(self) -> Entry<'static> {
+        match self {
+            Self::MacroCommands(value) => Entry::MacroCommands(value),
+            Self::AllocatedCommands(value) => Entry::AllocatedCommands(value),
+            Self::KeyMaps(value) => Entry::KeyMaps(value),
+            Self::CommandStrings(value) => Entry::CommandStrings(value.into_owned()),
+            Self::MacroNames(value) => Entry::MacroNames(value.into_owned()),
+            Self::Toolbar(value) => Entry::Toolbar(value.into_owned()),
+        }
+    }
 }
 
 /// Command-related customizations addressed by `fcCmds`/`lcbCmds`.
@@ -758,6 +1001,15 @@ impl<'a> CommandBars<'a> {
 
     pub fn entries_mut(&mut self) -> &mut Vec<Entry<'a>> {
         &mut self.entries
+    }
+
+    /// Copy all borrowed command-bar payloads into an owned representation.
+    pub fn into_owned(self) -> CommandBars<'static> {
+        CommandBars {
+            version: self.version,
+            entries: self.entries.into_iter().map(Entry::into_owned).collect(),
+            terminator: self.terminator,
+        }
     }
 
     pub const fn terminator(&self) -> u8 {

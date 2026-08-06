@@ -2,10 +2,58 @@
 
 use super::model::*;
 use crate::package::{Error as PackageError, Result};
+use crate::parts::fib::{FileInformationBlock, WORD_97_NFIB};
 
 /// A count cap that is large enough for real documents while preventing a
 /// malformed FIB payload from requesting an unbounded allocation.
 pub(super) const MAX_ITEMS: usize = 1 << 20;
+pub(super) const COMMAND_POINTER_BASE: usize = 154;
+pub(super) const FIB_INDEX_CMDS: usize = 24;
+
+/// Validate the Word profile required by the package editor.
+pub(super) fn package_fib(fib: &FileInformationBlock) -> Result<()> {
+    if fib.version() < WORD_97_NFIB {
+        return Err(PackageError::UnsupportedVersion {
+            nfib: fib.version(),
+            name: fib.version_name(),
+        });
+    }
+    if fib.is_encrypted() {
+        return Err(corrupted(
+            "encrypted DOC packages cannot be edited by the command-bar owner",
+        ));
+    }
+    if fib.table_pointer_count().is_none() {
+        return Err(corrupted(
+            "WordDocument FIB table-pointer array is truncated",
+        ));
+    }
+    if fib.table_pointer_count().unwrap_or(0) <= FIB_INDEX_CMDS {
+        return Err(corrupted("WordDocument FIB does not expose fcCmds/lcbCmds"));
+    }
+    Ok(())
+}
+
+/// Locate the `fcCmds/lcbCmds` pair in the WordDocument stream.
+pub(super) fn pointer_location(fib: &FileInformationBlock) -> Result<usize> {
+    package_fib(fib)?;
+    let offset = COMMAND_POINTER_BASE
+        .checked_add(
+            FIB_INDEX_CMDS
+                .checked_mul(8)
+                .ok_or_else(|| corrupted("fcCmds pointer index overflows"))?,
+        )
+        .ok_or_else(|| corrupted("fcCmds pointer offset overflows"))?;
+    let end = offset
+        .checked_add(8)
+        .ok_or_else(|| corrupted("fcCmds pointer range overflows"))?;
+    if end > fib.raw_data().len() {
+        return Err(corrupted(
+            "WordDocument FIB does not contain fcCmds/lcbCmds",
+        ));
+    }
+    Ok(offset)
+}
 
 pub(super) fn validate_command_bars(value: &CommandBars<'_>) -> Result<()> {
     if value.version != 0xFF {
@@ -17,12 +65,107 @@ pub(super) fn validate_command_bars(value: &CommandBars<'_>) -> Result<()> {
     if value.entries.len() > MAX_ITEMS {
         return Err(corrupted("Tcg255 record count exceeds the bounded limit"));
     }
+    let mut command_strings = None;
+    let mut macro_names = None;
     for entry in &value.entries {
         match entry {
             Entry::MacroCommands(commands) => commands.validate()?,
             Entry::AllocatedCommands(commands) => commands.validate()?,
             Entry::KeyMaps(maps) => maps.validate()?,
+            Entry::CommandStrings(strings) => {
+                if command_strings.replace(strings).is_some() {
+                    return Err(corrupted(
+                        "Tcg255 contains more than one TcgSttbf command string table",
+                    ));
+                }
+                strings.validate()?;
+            },
+            Entry::MacroNames(names) => {
+                if macro_names.replace(names).is_some() {
+                    return Err(corrupted("Tcg255 contains more than one MacroNames table"));
+                }
+                names.validate()?;
+            },
             Entry::Toolbar(wrapper) => wrapper.validate()?,
+        }
+    }
+    validate_command_references(value, command_strings, macro_names)?;
+    Ok(())
+}
+
+fn validate_command_references(
+    value: &CommandBars<'_>,
+    command_strings: Option<&CommandStrings<'_>>,
+    macro_names: Option<&MacroNames<'_>>,
+) -> Result<()> {
+    let macro_commands = value.entries.iter().find_map(|entry| match entry {
+        Entry::MacroCommands(commands) => Some(commands),
+        _ => None,
+    });
+    let allocated_commands = value.entries.iter().find_map(|entry| match entry {
+        Entry::AllocatedCommands(commands) => Some(commands),
+        _ => None,
+    });
+
+    if let Some(commands) = macro_commands.filter(|commands| !commands.commands.is_empty()) {
+        let names = macro_names.ok_or_else(|| {
+            corrupted("PlfMcd requires a MacroNames table for its macro-name indexes")
+        })?;
+        let strings = command_strings.ok_or_else(|| {
+            corrupted("PlfMcd requires a TcgSttbf table for its command-name indexes")
+        })?;
+        for command in &commands.commands {
+            if !names
+                .names
+                .iter()
+                .any(|name| name.index == command.macro_name_index)
+            {
+                return Err(corrupted(format!(
+                    "Mcd ibst {} has no MacroNames entry",
+                    command.macro_name_index
+                )));
+            }
+            if usize::from(command.command_name_index) >= strings.strings.len() {
+                return Err(corrupted(format!(
+                    "Mcd ibstName {} is outside TcgSttbf",
+                    command.command_name_index
+                )));
+            }
+        }
+    }
+
+    if let Some(commands) = allocated_commands.filter(|commands| !commands.commands.is_empty()) {
+        let strings = command_strings.ok_or_else(|| {
+            corrupted("PlfAcd requires a TcgSttbf table for its argument indexes")
+        })?;
+        for command in &commands.commands {
+            if usize::from(command.argument_index) >= strings.strings.len() {
+                return Err(corrupted(format!(
+                    "Acd ibst {} is outside TcgSttbf",
+                    command.argument_index
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn validate_command_strings(value: &CommandStrings<'_>) -> Result<()> {
+    if value.strings.len() > usize::from(u16::MAX) {
+        return Err(corrupted("TcgSttbfCore cData exceeds u16::MAX"));
+    }
+    value.strings.iter().try_for_each(CommandString::validate)
+}
+
+pub(super) fn validate_macro_names(value: &MacroNames<'_>) -> Result<()> {
+    if value.names.len() > usize::from(u16::MAX) {
+        return Err(corrupted("MacroNames iMac exceeds u16::MAX"));
+    }
+    let mut indexes = std::collections::HashSet::with_capacity(value.names.len());
+    for name in &value.names {
+        name.validate()?;
+        if !indexes.insert(name.index) {
+            return Err(corrupted(format!("MacroNames repeats ibst {}", name.index)));
         }
     }
     Ok(())

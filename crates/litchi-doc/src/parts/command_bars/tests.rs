@@ -1,6 +1,7 @@
 use super::*;
 use crate::parts::fib::FileInformationBlock;
 use crate::writer::fib::FibBuilder;
+use litchi_cfb::{OleFile, OleWriter};
 use litchi_ole_common::toolbar::{
     ControlFlags, ControlHeader, ControlType, Data, Flags, GeneralFlags, GeneralInfo, Header,
     Restrictions, SpecificFlags, Type, WString,
@@ -103,6 +104,27 @@ fn sample() -> CommandBars<'static> {
             )
             .expect("key maps"),
         ),
+        Entry::CommandStrings(
+            CommandStrings::new(
+                (0..6)
+                    .map(|index| {
+                        CommandString::new(
+                            XString::new(&format!("command-{index}")).expect("command string"),
+                            index as u16,
+                        )
+                        .expect("command string entry")
+                    })
+                    .collect(),
+            )
+            .expect("command strings"),
+        ),
+        Entry::MacroNames(
+            MacroNames::new(vec![
+                MacroName::new(4, XString::new("AutoMacro").expect("macro name"))
+                    .expect("macro name entry"),
+            ])
+            .expect("macro names"),
+        ),
         Entry::Toolbar(wrapper),
     ])
     .expect("command bars")
@@ -115,10 +137,10 @@ fn round_trip_preserves_typed_records_and_opaque_bytes() {
     let parsed = parse_bytes(&bytes).expect("parse");
     assert_eq!(parsed, value);
     assert_eq!(to_bytes(&parsed).expect("serialize parsed"), bytes);
-    assert_eq!(parsed.entries().len(), 4);
+    assert_eq!(parsed.entries().len(), 6);
     assert_eq!(parsed.version(), 0xFF);
     assert_eq!(parsed.terminator(), 0x40);
-    let wrapper = match &parsed.entries()[3] {
+    let wrapper = match &parsed.entries()[5] {
         Entry::Toolbar(wrapper) => wrapper,
         _ => panic!("toolbar wrapper entry"),
     };
@@ -131,6 +153,73 @@ fn round_trip_preserves_typed_records_and_opaque_bytes() {
         wrapper.delta_controls()[0].command().unwrap().raw(),
         0x0000_1231
     );
+    let strings = match &parsed.entries()[3] {
+        Entry::CommandStrings(strings) => strings,
+        _ => panic!("command string table"),
+    };
+    assert_eq!(strings.strings()[3].text().text(), "command-3");
+    assert_eq!(strings.strings()[3].references(), 3);
+    let names = match &parsed.entries()[4] {
+        Entry::MacroNames(names) => names,
+        _ => panic!("macro name table"),
+    };
+    assert_eq!(names.names()[0].index(), 4);
+    assert_eq!(names.names()[0].name().text(), "AutoMacro");
+}
+
+#[test]
+fn command_bar_snapshots_are_owned_and_failure_atomic() {
+    let source = sample();
+    let snapshot = source.snapshot().expect("owned snapshot");
+    let stale = snapshot.edit();
+    let mut transaction = snapshot.edit();
+    transaction.clear();
+    let commit = transaction.commit().expect("semantic commit");
+
+    assert!(!commit.is_noop());
+    assert!(!commit.snapshot().is_present());
+    assert!(commit.apply(&snapshot).is_ok());
+    let mut changed_stale = stale;
+    changed_stale.clear();
+    assert!(commit.apply(changed_stale.snapshot()).is_err());
+    assert_eq!(commit.inverse().apply(commit.snapshot()).unwrap(), snapshot);
+    assert_eq!(snapshot.command_bars().unwrap(), &source.into_owned());
+}
+
+#[test]
+fn package_editor_publishes_command_bars_and_preserves_unrelated_bytes() {
+    let original_table = b"opaque table prefix\0";
+    let mut editor = Editor::open(base_document(original_table)).expect("DOC package opens");
+    assert!(!editor.command_bars().is_present());
+
+    let value = sample();
+    let committed = editor.set(value.clone()).expect("command bars publish");
+    let bytes = committed
+        .snapshot()
+        .finish()
+        .expect("package snapshot renders");
+    let reopened = Editor::open(bytes.clone()).expect("published package reopens");
+    assert_eq!(reopened.command_bars().command_bars(), Some(&value));
+
+    let mut ole = OleFile::open(std::io::Cursor::new(bytes.clone())).expect("CFB opens");
+    let table = ole.open_stream(&["0Table"]).expect("table stream exists");
+    assert!(table.starts_with(original_table));
+    assert!(committed.package_patch().inverse().apply(&bytes).is_ok());
+
+    let mut cleared = Editor::open(bytes).expect("published package opens for clear");
+    let cleared = cleared.clear().expect("command bars clear");
+    let cleared_bytes = cleared.snapshot().finish().expect("clear renders");
+    let mut ole = OleFile::open(std::io::Cursor::new(cleared_bytes)).expect("cleared CFB opens");
+    let word = ole
+        .open_stream(&["WordDocument"])
+        .expect("WordDocument stream exists");
+    let pointer = 154 + FIB_INDEX_CMDS * 8;
+    assert_eq!(&word[pointer..pointer + 8], &[0; 8]);
+
+    let mut stale_editor = Editor::open(base_document(b"stale")).expect("stale package opens");
+    let stale = stale_editor.edit();
+    stale_editor.set(sample()).expect("publish stale package");
+    assert!(stale_editor.apply(stale).is_err());
 }
 
 #[test]
@@ -310,9 +399,30 @@ fn rejects_bad_counts_reserved_words_and_relationships() {
 }
 
 #[test]
-fn rejects_unknown_and_variable_records_without_guessing_boundaries() {
+fn rejects_unknown_records_without_guessing_boundaries() {
     assert!(parse_bytes(&[0xFF, 0x10, 0x40]).is_err());
     assert!(parse_bytes(&[0xFF, 0x7F, 0x40]).is_err());
+}
+
+#[test]
+fn rejects_invalid_command_string_and_macro_name_boundaries() {
+    let value = sample();
+    let mut bytes = to_bytes(&value).expect("serialize");
+    let strings_tag = bytes
+        .iter()
+        .position(|byte| *byte == 0x10)
+        .expect("TcgSttbf tag");
+    bytes[strings_tag + 3..strings_tag + 5].copy_from_slice(&3u16.to_le_bytes());
+    assert!(parse_bytes(&bytes).is_err());
+
+    let mut bytes = to_bytes(&value).expect("serialize");
+    let names_tag = bytes
+        .iter()
+        .position(|byte| *byte == 0x11)
+        .expect("MacroNames tag");
+    let name_terminator = names_tag + 1 + 2 + 2 + 2 + "AutoMacro".encode_utf16().count() * 2;
+    bytes[name_terminator..name_terminator + 2].copy_from_slice(&[1, 0]);
+    assert!(parse_bytes(&bytes).is_err());
 }
 
 #[test]
@@ -413,4 +523,24 @@ fn fib_with_pointer(offset: usize, length: usize) -> FileInformationBlock {
     data[pointer_offset..pointer_offset + 4].copy_from_slice(&(offset as u32).to_le_bytes());
     data[pointer_offset + 4..pointer_offset + 8].copy_from_slice(&(length as u32).to_le_bytes());
     FileInformationBlock::parse(&data).expect("test FIB")
+}
+
+fn base_document(table: &[u8]) -> Vec<u8> {
+    let pointer_count = 117usize;
+    let word_len = 154 + pointer_count * 8;
+    let mut word = vec![0; word_len];
+    word[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
+    word[2..4].copy_from_slice(&0x0101u16.to_le_bytes());
+    word[152..154].copy_from_slice(&(pointer_count as u16).to_le_bytes());
+
+    let mut writer = OleWriter::new();
+    writer
+        .create_stream(&["WordDocument"], &word)
+        .expect("WordDocument stream");
+    writer
+        .create_stream(&["0Table"], table)
+        .expect("0Table stream");
+    let mut output = std::io::Cursor::new(Vec::new());
+    writer.write_to(&mut output).expect("CFB write");
+    output.into_inner()
 }
