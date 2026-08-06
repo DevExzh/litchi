@@ -1,7 +1,8 @@
 use std::env;
 use std::path::PathBuf;
 
-use litchi_iwa::keynote::{KeynoteEditor, KeynoteTableRowInsertion};
+use litchi_iwa::keynote::KeynoteEditor;
+use litchi_numbers::table::topology::RowInsertion;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -23,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut editor = KeynoteEditor::open(input)?;
-    editor.insert_slide_table_row(slide_index, table_id, KeynoteTableRowInsertion::body(row))?;
+    editor.insert_slide_table_row(slide_index, table_id, RowInsertion::body(row))?;
     editor.save(output)?;
     Ok(())
 }

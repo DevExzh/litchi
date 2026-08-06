@@ -3779,7 +3779,7 @@ fn table_row_insertion_preserves_explicit_stroke_layers_on_original_cells() {
 
     let mut editor = NumbersEditor::from_package(package).unwrap();
     editor
-        .insert_table_row(test_table_selector(&editor, 10), TableRowInsertion::body(1))
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(1))
         .unwrap();
 
     let sidecar = test_stroke_sidecar(editor.package());
@@ -3840,7 +3840,7 @@ fn table_row_insertion_splits_crossing_stroke_runs_without_normalizing_unknown_f
 
     let mut editor = NumbersEditor::from_package(package).unwrap();
     editor
-        .insert_table_row(test_table_selector(&editor, 10), TableRowInsertion::body(2))
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(2))
         .unwrap();
 
     let layer = test_stroke_layer(editor.package(), 50);
@@ -3885,7 +3885,7 @@ fn table_row_deletion_removes_or_compacts_explicit_stroke_layers_and_metadata_re
 
     let mut editor = NumbersEditor::from_package(package).unwrap();
     editor
-        .remove_table_row(test_table_selector(&editor, 10), TableRowDeletion::body(1))
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(1))
         .unwrap();
 
     let sidecar = test_stroke_sidecar(editor.package());
@@ -3919,7 +3919,7 @@ fn table_column_insertion_preserves_explicit_stroke_layers_on_original_cells() {
     editor
         .insert_table_column(
             test_table_selector(&editor, 10),
-            TableColumnInsertion::body(1),
+            ColumnInsertion::body(1),
         )
         .unwrap();
 
@@ -3950,7 +3950,7 @@ fn inserts_blank_table_row_and_shifts_cells_uids_headers_and_formulas() {
         .unwrap();
 
     editor
-        .insert_table_row(test_table_selector(&editor, 10), TableRowInsertion::body(1))
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(1))
         .unwrap();
 
     let bytes = editor.to_bytes().unwrap();
@@ -4057,7 +4057,7 @@ fn appends_blank_table_row_without_allocating_storage() {
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
     editor
-        .insert_table_row(test_table_selector(&editor, 10), TableRowInsertion::body(4))
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(4))
         .unwrap();
     assert_eq!(editor.tables().unwrap()[0].rows, 5);
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -4106,7 +4106,7 @@ fn row_insert_rejects_missing_destination_tile_transactionally() {
 
     assert!(
         editor
-            .insert_table_row(test_table_selector(&editor, 10), TableRowInsertion::body(3))
+            .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(3))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -4118,7 +4118,7 @@ fn row_insert_rejects_out_of_bounds_index_transactionally() {
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .insert_table_row(test_table_selector(&editor, 10), TableRowInsertion::body(5))
+            .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(5))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -4138,7 +4138,7 @@ fn row_insert_rewrites_relative_formula_ast_losslessly() {
     let before = editor.to_bytes().unwrap();
 
     editor
-        .insert_table_row(test_table_selector(&editor, 10), TableRowInsertion::body(2))
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(2))
         .unwrap();
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -4146,7 +4146,7 @@ fn row_insert_rewrites_relative_formula_ast_losslessly() {
         Some(&CellValue::Formula("=B2".to_owned()))
     );
     editor
-        .remove_table_row(test_table_selector(&editor, 10), TableRowDeletion::body(2))
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(2))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
@@ -4168,7 +4168,7 @@ fn column_insert_rewrites_absolute_formula_ast_losslessly() {
     editor
         .insert_table_column(
             test_table_selector(&editor, 10),
-            TableColumnInsertion::body(1),
+            ColumnInsertion::body(1),
         )
         .unwrap();
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -4179,7 +4179,7 @@ fn column_insert_rewrites_absolute_formula_ast_losslessly() {
     editor
         .remove_table_column(
             test_table_selector(&editor, 10),
-            TableColumnDeletion::body(1),
+            ColumnDeletion::body(1),
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -4235,7 +4235,7 @@ fn row_insert_rewrites_range_ast_and_preserves_unknown_formula_wire() {
     let before = editor.to_bytes().unwrap();
 
     editor
-        .insert_table_row(test_table_selector(&editor, 10), TableRowInsertion::body(2))
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(2))
         .unwrap();
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -4243,7 +4243,7 @@ fn row_insert_rewrites_range_ast_and_preserves_unknown_formula_wire() {
         Some(&CellValue::Formula("=SUM(B1:B2)".to_owned()))
     );
     editor
-        .remove_table_row(test_table_selector(&editor, 10), TableRowDeletion::body(2))
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(2))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
@@ -4265,7 +4265,7 @@ fn row_insert_rewrites_segmented_formula_ast_losslessly() {
     let before = editor.to_bytes().unwrap();
 
     editor
-        .insert_table_row(test_table_selector(&editor, 10), TableRowInsertion::body(2))
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(2))
         .unwrap();
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -4273,7 +4273,7 @@ fn row_insert_rewrites_segmented_formula_ast_losslessly() {
         Some(&CellValue::Formula("=B2".to_owned()))
     );
     editor
-        .remove_table_row(test_table_selector(&editor, 10), TableRowDeletion::body(2))
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(2))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
@@ -4300,7 +4300,7 @@ fn row_insert_copy_on_writes_shared_formula_ast_and_remerges_on_delete() {
     let before = editor.to_bytes().unwrap();
 
     editor
-        .insert_table_row(test_table_selector(&editor, 10), TableRowInsertion::body(2))
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(2))
         .unwrap();
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets().unwrap()[0].tables[0];
@@ -4313,7 +4313,7 @@ fn row_insert_copy_on_writes_shared_formula_ast_and_remerges_on_delete() {
         Some(&CellValue::Formula("=B4".to_owned()))
     );
     editor
-        .remove_table_row(test_table_selector(&editor, 10), TableRowDeletion::body(2))
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(2))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
@@ -4385,7 +4385,7 @@ fn row_insert_expands_footer_aggregate_and_delete_restores_exact_bytes() {
     let before = editor.to_bytes().unwrap();
 
     editor
-        .insert_table_row(test_table_selector(&editor, 10), TableRowInsertion::body(3))
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(3))
         .unwrap();
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -4407,7 +4407,7 @@ fn row_insert_expands_footer_aggregate_and_delete_restores_exact_bytes() {
     assert_eq!(edges.edge_without_owner_columns, [1, 1, 1]);
 
     editor
-        .remove_table_row(test_table_selector(&editor, 10), TableRowDeletion::body(3))
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(3))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
@@ -4648,7 +4648,7 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
     let before = editor.to_bytes().unwrap();
 
     editor
-        .insert_table_row(test_table_selector(&editor, 10), TableRowInsertion::body(3))
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(3))
         .unwrap();
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -4697,7 +4697,7 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
     );
 
     editor
-        .remove_table_row(test_table_selector(&editor, 10), TableRowDeletion::body(3))
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(3))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
@@ -4717,7 +4717,7 @@ fn row_insert_rejects_incoming_cross_table_formula_transactionally() {
 
     assert!(
         editor
-            .insert_table_row(test_table_selector(&editor, 10), TableRowInsertion::body(1))
+            .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(1))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -4798,7 +4798,7 @@ fn row_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
 
     let mut editor = NumbersEditor::from_package(package).unwrap();
     editor
-        .insert_table_row(test_table_selector(&editor, 10), TableRowInsertion::body(1))
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(1))
         .unwrap();
 
     let document = editor.package().archive("Index/Document.iwa").unwrap();
@@ -4863,7 +4863,7 @@ fn inserts_blank_table_column_and_shifts_cells_uids_headers_and_formulas() {
     editor
         .insert_table_column(
             test_table_selector(&editor, 10),
-            TableColumnInsertion::body(1),
+            ColumnInsertion::body(1),
         )
         .unwrap();
 
@@ -4974,7 +4974,7 @@ fn appends_blank_table_column_and_grows_dependency_ranges() {
     editor
         .insert_table_column(
             test_table_selector(&editor, 10),
-            TableColumnInsertion::body(4),
+            ColumnInsertion::body(4),
         )
         .unwrap();
 
@@ -5006,7 +5006,7 @@ fn column_insert_rejects_out_of_bounds_and_incoming_formulas_transactionally() {
         editor
             .insert_table_column(
                 test_table_selector(&editor, 10),
-                TableColumnInsertion::body(5)
+                ColumnInsertion::body(5)
             )
             .is_err()
     );
@@ -5026,7 +5026,7 @@ fn column_insert_rejects_out_of_bounds_and_incoming_formulas_transactionally() {
         editor
             .insert_table_column(
                 test_table_selector(&editor, 10),
-                TableColumnInsertion::body(1)
+                ColumnInsertion::body(1)
             )
             .is_err()
     );
@@ -5059,7 +5059,7 @@ fn column_insert_rejects_short_cell_offset_tables_transactionally() {
         editor
             .insert_table_column(
                 test_table_selector(&editor, 10),
-                TableColumnInsertion::body(1)
+                ColumnInsertion::body(1)
             )
             .is_err()
     );
@@ -5144,7 +5144,7 @@ fn column_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
     editor
         .insert_table_column(
             test_table_selector(&editor, 10),
-            TableColumnInsertion::body(1),
+            ColumnInsertion::body(1),
         )
         .unwrap();
 
@@ -5202,10 +5202,10 @@ fn row_insert_then_delete_restores_exact_package_bytes() {
     let baseline = editor.to_bytes().unwrap();
 
     editor
-        .insert_table_row(test_table_selector(&editor, 10), TableRowInsertion::body(2))
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(2))
         .unwrap();
     editor
-        .remove_table_row(test_table_selector(&editor, 10), TableRowDeletion::body(2))
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(2))
         .unwrap();
 
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -5231,13 +5231,13 @@ fn column_insert_then_delete_restores_exact_package_bytes() {
     editor
         .insert_table_column(
             test_table_selector(&editor, 10),
-            TableColumnInsertion::body(2),
+            ColumnInsertion::body(2),
         )
         .unwrap();
     editor
         .remove_table_column(
             test_table_selector(&editor, 10),
-            TableColumnDeletion::body(2),
+            ColumnDeletion::body(2),
         )
         .unwrap();
 
@@ -5279,13 +5279,13 @@ fn section_relative_header_insertions_shift_formulas_and_restore_exactly() {
     editor
         .insert_table_row(
             test_table_selector(&editor, 10),
-            TableRowInsertion::header(1),
+            RowInsertion::header(1),
         )
         .unwrap();
     editor
         .insert_table_column(
             test_table_selector(&editor, 10),
-            TableColumnInsertion::header(1),
+            ColumnInsertion::header(1),
         )
         .unwrap();
 
@@ -5304,13 +5304,13 @@ fn section_relative_header_insertions_shift_formulas_and_restore_exactly() {
     editor
         .remove_table_column(
             test_table_selector(&editor, 10),
-            TableColumnDeletion::header(1),
+            ColumnDeletion::header(1),
         )
         .unwrap();
     editor
         .remove_table_row(
             test_table_selector(&editor, 10),
-            TableRowDeletion::header(1),
+            RowDeletion::header(1),
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -5349,7 +5349,7 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
     editor
         .insert_table_row(
             test_table_selector(&editor, 10),
-            TableRowInsertion::footer(0),
+            RowInsertion::footer(0),
         )
         .unwrap();
     assert_eq!(
@@ -5367,7 +5367,7 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
     editor
         .remove_table_row(
             test_table_selector(&editor, 10),
-            TableRowDeletion::footer(0),
+            RowDeletion::footer(0),
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -5375,7 +5375,7 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
     editor
         .insert_table_row(
             test_table_selector(&editor, 10),
-            TableRowInsertion::footer(1),
+            RowInsertion::footer(1),
         )
         .unwrap();
     assert_eq!(
@@ -5388,7 +5388,7 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
     editor
         .remove_table_row(
             test_table_selector(&editor, 10),
-            TableRowDeletion::footer(1),
+            RowDeletion::footer(1),
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -5402,19 +5402,19 @@ fn section_insertions_create_first_fixed_regions_transactionally() {
     editor
         .insert_table_row(
             test_table_selector(&editor, 10),
-            TableRowInsertion::header(0),
+            RowInsertion::header(0),
         )
         .unwrap();
     editor
         .insert_table_row(
             test_table_selector(&editor, 10),
-            TableRowInsertion::footer(0),
+            RowInsertion::footer(0),
         )
         .unwrap();
     editor
         .insert_table_column(
             test_table_selector(&editor, 10),
-            TableColumnInsertion::header(0),
+            ColumnInsertion::header(0),
         )
         .unwrap();
     let settings = editor
@@ -5427,19 +5427,19 @@ fn section_insertions_create_first_fixed_regions_transactionally() {
     editor
         .remove_table_column(
             test_table_selector(&editor, 10),
-            TableColumnDeletion::header(0),
+            ColumnDeletion::header(0),
         )
         .unwrap();
     editor
         .remove_table_row(
             test_table_selector(&editor, 10),
-            TableRowDeletion::footer(0),
+            RowDeletion::footer(0),
         )
         .unwrap();
     editor
         .remove_table_row(
             test_table_selector(&editor, 10),
-            TableRowDeletion::header(0),
+            RowDeletion::header(0),
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -5449,7 +5449,7 @@ fn section_insertions_create_first_fixed_regions_transactionally() {
         editor
             .insert_table_row(
                 test_table_selector(&editor, 10),
-                TableRowInsertion::header(1)
+                RowInsertion::header(1)
             )
             .is_err()
     );
@@ -5457,7 +5457,7 @@ fn section_insertions_create_first_fixed_regions_transactionally() {
         editor
             .insert_table_row(
                 test_table_selector(&editor, 10),
-                TableRowInsertion::footer(1)
+                RowInsertion::footer(1)
             )
             .is_err()
     );
@@ -5465,7 +5465,7 @@ fn section_insertions_create_first_fixed_regions_transactionally() {
         editor
             .insert_table_column(
                 test_table_selector(&editor, 10),
-                TableColumnInsertion::header(1)
+                ColumnInsertion::header(1)
             )
             .is_err()
     );
@@ -5499,19 +5499,19 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
     editor
         .remove_table_row(
             test_table_selector(&editor, 10),
-            TableRowDeletion::header(0),
+            RowDeletion::header(0),
         )
         .unwrap();
     editor
         .remove_table_row(
             test_table_selector(&editor, 10),
-            TableRowDeletion::footer(0),
+            RowDeletion::footer(0),
         )
         .unwrap();
     editor
         .remove_table_column(
             test_table_selector(&editor, 10),
-            TableColumnDeletion::header(0),
+            ColumnDeletion::header(0),
         )
         .unwrap();
 
@@ -5538,7 +5538,7 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
         editor
             .remove_table_row(
                 test_table_selector(&editor, 10),
-                TableRowDeletion::header(0)
+                RowDeletion::header(0)
             )
             .is_err()
     );
@@ -5546,7 +5546,7 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
         editor
             .remove_table_row(
                 test_table_selector(&editor, 10),
-                TableRowDeletion::footer(0)
+                RowDeletion::footer(0)
             )
             .is_err()
     );
@@ -5554,20 +5554,20 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
         editor
             .remove_table_column(
                 test_table_selector(&editor, 10),
-                TableColumnDeletion::header(0)
+                ColumnDeletion::header(0)
             )
             .is_err()
     );
     assert!(
         editor
-            .remove_table_row(test_table_selector(&editor, 10), TableRowDeletion::body(2))
+            .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(2))
             .is_err()
     );
     assert!(
         editor
             .remove_table_column(
                 test_table_selector(&editor, 10),
-                TableColumnDeletion::body(3)
+                ColumnDeletion::body(3)
             )
             .is_err()
     );
@@ -5585,7 +5585,7 @@ fn removes_populated_table_axes_with_reference_cleanup_and_formula_shifts() {
         .set_formula(10, 2, 2, FormulaExpression::Number(7.0))
         .unwrap();
     editor
-        .remove_table_row(test_table_selector(&editor, 10), TableRowDeletion::body(1))
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(1))
         .unwrap();
 
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -5603,7 +5603,7 @@ fn removes_populated_table_axes_with_reference_cleanup_and_formula_shifts() {
     editor
         .remove_table_column(
             test_table_selector(&editor, 10),
-            TableColumnDeletion::body(1),
+            ColumnDeletion::body(1),
         )
         .unwrap();
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -5621,13 +5621,13 @@ fn table_axis_delete_releases_comment_graphs() {
         let mut editor = NumbersEditor::from_package(test_package_with_comments(false)).unwrap();
         if remove_row {
             editor
-                .remove_table_row(test_table_selector(&editor, 10), TableRowDeletion::body(0))
+                .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(0))
                 .unwrap();
         } else {
             editor
                 .remove_table_column(
                     test_table_selector(&editor, 10),
-                    TableColumnDeletion::body(1),
+                    ColumnDeletion::body(1),
                 )
                 .unwrap();
         }
@@ -5658,7 +5658,7 @@ fn table_axis_delete_rejects_live_formula_references_transactionally() {
 
     assert!(
         editor
-            .remove_table_row(test_table_selector(&editor, 10), TableRowDeletion::body(1))
+            .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(1))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -5666,21 +5666,21 @@ fn table_axis_delete_rejects_live_formula_references_transactionally() {
         editor
             .remove_table_column(
                 test_table_selector(&editor, 10),
-                TableColumnDeletion::body(1)
+                ColumnDeletion::body(1)
             )
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
     assert!(
         editor
-            .remove_table_row(test_table_selector(&editor, 10), TableRowDeletion::body(4))
+            .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(4))
             .is_err()
     );
     assert!(
         editor
             .remove_table_column(
                 test_table_selector(&editor, 10),
-                TableColumnDeletion::body(4)
+                ColumnDeletion::body(4)
             )
             .is_err()
     );

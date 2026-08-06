@@ -20,6 +20,9 @@ use litchi_numbers::cell::data_format::{
     Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,
     Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,
 };
+use litchi_numbers::table::topology::{
+    ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion,
+};
 use litchi_iwa_text::position::TextPosition;
 use prost::Message;
 
@@ -187,8 +190,6 @@ mod sheet_shapes;
 mod storage;
 mod stroke_layers;
 mod table_appearance;
-mod table_axis_deletion;
-mod table_axis_insertion;
 mod table_bootstrap;
 mod table_cells;
 mod table_create;
@@ -253,8 +254,6 @@ pub use sheet_images::{NumbersSheetImageInfo, NumbersSheetImageOptions, RemovedN
 pub use sheet_movies::{NumbersSheetMovieInfo, NumbersSheetMovieOptions, RemovedNumbersSheetMovie};
 pub use sheet_shapes::{NumbersSheetShapeInfo, RemovedNumbersSheetShape};
 use storage::*;
-pub use table_axis_deletion::{TableColumnDeletion, TableRowDeletion};
-pub use table_axis_insertion::{TableColumnInsertion, TableRowInsertion};
 pub(crate) use table_cells::TableCellBatch;
 pub(crate) use table_duplicate::{duplicate_attached_table_graph_in_package, duplicate_table_name};
 use table_duplicate::{

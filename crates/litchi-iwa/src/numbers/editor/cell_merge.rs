@@ -420,8 +420,8 @@ mod tests {
     use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
     use crate::numbers::{
         FormulaAxisReference, FormulaCachedValue, FormulaCellReference, FormulaExpression,
-        NumbersDocument, NumbersDocumentBuilder, TableColumnDeletion, TableColumnInsertion,
-        TableRowDeletion, TableRowInsertion,
+        NumbersDocument, NumbersDocumentBuilder, ColumnDeletion, ColumnInsertion,
+        RowDeletion, RowInsertion,
     };
     use crate::pages::{PagesDocumentBuilder, PagesEditor};
     use crate::shapes::{DrawablePoint, DrawableSize};
@@ -555,7 +555,7 @@ mod tests {
         editor
             .insert_table_row(
                 test_table_selector(&editor, table_id),
-                TableRowInsertion::body(0),
+                RowInsertion::body(0),
             )
             .unwrap();
         assert_eq!(
@@ -565,19 +565,19 @@ mod tests {
         editor
             .insert_table_row(
                 test_table_selector(&editor, table_id),
-                TableRowInsertion::body(2),
+                RowInsertion::body(2),
             )
             .unwrap();
         editor
             .insert_table_column(
                 test_table_selector(&editor, table_id),
-                TableColumnInsertion::body(0),
+                ColumnInsertion::body(0),
             )
             .unwrap();
         editor
             .insert_table_column(
                 test_table_selector(&editor, table_id),
-                TableColumnInsertion::body(2),
+                ColumnInsertion::body(2),
             )
             .unwrap();
 
@@ -611,7 +611,7 @@ mod tests {
         editor
             .remove_table_row(
                 test_table_selector(&editor, table_id),
-                TableRowDeletion::body(0),
+                RowDeletion::body(0),
             )
             .unwrap();
         assert_eq!(
@@ -631,7 +631,7 @@ mod tests {
         editor
             .remove_table_column(
                 test_table_selector(&editor, table_id),
-                TableColumnDeletion::body(0),
+                ColumnDeletion::body(0),
             )
             .unwrap();
         assert_eq!(
@@ -641,7 +641,7 @@ mod tests {
         editor
             .remove_table_row(
                 test_table_selector(&editor, table_id),
-                TableRowDeletion::body(0),
+                RowDeletion::body(0),
             )
             .unwrap();
         assert_eq!(
@@ -651,7 +651,7 @@ mod tests {
         editor
             .remove_table_column(
                 test_table_selector(&editor, table_id),
-                TableColumnDeletion::body(0),
+                ColumnDeletion::body(0),
             )
             .unwrap();
         assert!(editor.table_cell_merges(table_id).unwrap().is_empty());
@@ -701,7 +701,7 @@ mod tests {
         editor
             .remove_table_row(
                 test_table_selector(&editor, table_id),
-                TableRowDeletion::body(0),
+                RowDeletion::body(0),
             )
             .unwrap();
         assert_eq!(
@@ -717,7 +717,7 @@ mod tests {
         editor
             .remove_table_column(
                 test_table_selector(&editor, table_id),
-                TableColumnDeletion::body(0),
+                ColumnDeletion::body(0),
             )
             .unwrap();
         assert!(editor.table_cell_merges(table_id).unwrap().is_empty());
@@ -784,7 +784,7 @@ mod tests {
         editor
             .remove_table_row(
                 test_table_selector(&editor, source_table_id),
-                TableRowDeletion::body(0),
+                RowDeletion::body(0),
             )
             .unwrap();
         assert_eq!(
@@ -802,7 +802,7 @@ mod tests {
         editor
             .remove_table_column(
                 test_table_selector(&editor, source_table_id),
-                TableColumnDeletion::body(0),
+                ColumnDeletion::body(0),
             )
             .unwrap();
         assert!(
@@ -883,7 +883,7 @@ mod tests {
         editor
             .remove_table_row(
                 test_table_selector(&editor, source_table_id),
-                TableRowDeletion::body(0),
+                RowDeletion::body(0),
             )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -899,7 +899,7 @@ mod tests {
         editor
             .remove_table_column(
                 test_table_selector(&editor, source_table_id),
-                TableColumnDeletion::body(0),
+                ColumnDeletion::body(0),
             )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -979,7 +979,7 @@ mod tests {
         editor
             .remove_table_row(
                 test_table_selector(&editor, source_table_id),
-                TableRowDeletion::body(0),
+                RowDeletion::body(0),
             )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -1005,7 +1005,7 @@ mod tests {
         editor
             .remove_table_column(
                 test_table_selector(&editor, source_table_id),
-                TableColumnDeletion::body(0),
+                ColumnDeletion::body(0),
             )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -1111,7 +1111,7 @@ mod tests {
         editor
             .remove_table_row(
                 test_table_selector(&editor, source_table_id),
-                TableRowDeletion::body(0),
+                RowDeletion::body(0),
             )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -1203,7 +1203,7 @@ mod tests {
         editor
             .remove_table_column(
                 test_table_selector(&editor, source_table_id),
-                TableColumnDeletion::body(0),
+                ColumnDeletion::body(0),
             )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -1254,7 +1254,7 @@ mod tests {
         editor
             .remove_table_column(
                 test_table_selector(&editor, table_id),
-                TableColumnDeletion::body(0),
+                ColumnDeletion::body(0),
             )
             .unwrap();
 
@@ -1388,7 +1388,7 @@ mod tests {
         editor
             .insert_table_row(
                 test_table_selector(&editor, table_id),
-                TableRowInsertion::body(1),
+                RowInsertion::body(1),
             )
             .unwrap();
         assert_eq!(
@@ -1471,10 +1471,10 @@ mod tests {
             )
             .unwrap();
         pages
-            .insert_table_row(pages_table_id, TableRowInsertion::body(1))
+            .insert_table_row(pages_table_id, RowInsertion::body(1))
             .unwrap();
         pages
-            .insert_table_column(pages_table_id, TableColumnInsertion::body(0))
+            .insert_table_column(pages_table_id, ColumnInsertion::body(0))
             .unwrap();
         let pages_expected = IWorkTableCellRegion::new(1, 2, 3, 2).unwrap();
         assert_eq!(
@@ -1509,13 +1509,13 @@ mod tests {
             )
             .unwrap();
         keynote
-            .insert_slide_table_row(0, keynote_table.model_object_id, TableRowInsertion::body(1))
+            .insert_slide_table_row(0, keynote_table.model_object_id, RowInsertion::body(1))
             .unwrap();
         keynote
             .insert_slide_table_column(
                 0,
                 keynote_table.model_object_id,
-                TableColumnInsertion::body(0),
+                ColumnInsertion::body(0),
             )
             .unwrap();
         let keynote_expected = IWorkTableCellRegion::new(1, 2, 3, 2).unwrap();
@@ -1553,14 +1553,14 @@ mod tests {
             .unwrap();
         pages.merge_table_cells(pages_table_id, region).unwrap();
         pages
-            .remove_table_row(pages_table_id, TableRowDeletion::body(0))
+            .remove_table_row(pages_table_id, RowDeletion::body(0))
             .unwrap();
         assert_eq!(
             pages.table_cell_merges(pages_table_id).unwrap(),
             vec![IWorkTableCellRegion::new(1, 1, 1, 2).unwrap()]
         );
         pages
-            .remove_table_column(pages_table_id, TableColumnDeletion::body(0))
+            .remove_table_column(pages_table_id, ColumnDeletion::body(0))
             .unwrap();
         assert!(pages.table_cell_merges(pages_table_id).unwrap().is_empty());
         assert_eq!(
@@ -1597,7 +1597,7 @@ mod tests {
             .merge_slide_table_cells(0, keynote_table.model_object_id, region)
             .unwrap();
         keynote
-            .remove_slide_table_row(0, keynote_table.model_object_id, TableRowDeletion::body(0))
+            .remove_slide_table_row(0, keynote_table.model_object_id, RowDeletion::body(0))
             .unwrap();
         assert_eq!(
             keynote
@@ -1609,7 +1609,7 @@ mod tests {
             .remove_slide_table_column(
                 0,
                 keynote_table.model_object_id,
-                TableColumnDeletion::body(0),
+                ColumnDeletion::body(0),
             )
             .unwrap();
         assert!(
@@ -1657,14 +1657,14 @@ mod tests {
             .unwrap();
         pages.merge_table_cells(pages_table_id, region).unwrap();
         pages
-            .remove_table_row(pages_table_id, TableRowDeletion::body(0))
+            .remove_table_row(pages_table_id, RowDeletion::body(0))
             .unwrap();
         assert_eq!(
             pages.table_formula(pages_table_id, 1, 1).unwrap(),
             Some("=E3".to_owned())
         );
         pages
-            .remove_table_column(pages_table_id, TableColumnDeletion::body(0))
+            .remove_table_column(pages_table_id, ColumnDeletion::body(0))
             .unwrap();
         assert!(pages.table_cell_merges(pages_table_id).unwrap().is_empty());
         assert_eq!(
@@ -1714,7 +1714,7 @@ mod tests {
             .merge_slide_table_cells(0, keynote_table.model_object_id, region)
             .unwrap();
         keynote
-            .remove_slide_table_row(0, keynote_table.model_object_id, TableRowDeletion::body(0))
+            .remove_slide_table_row(0, keynote_table.model_object_id, RowDeletion::body(0))
             .unwrap();
         assert_eq!(
             keynote
@@ -1726,7 +1726,7 @@ mod tests {
             .remove_slide_table_column(
                 0,
                 keynote_table.model_object_id,
-                TableColumnDeletion::body(0),
+                ColumnDeletion::body(0),
             )
             .unwrap();
         assert!(

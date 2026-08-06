@@ -4699,11 +4699,11 @@ pub use tables::{
     PagesTableCellTextDecorations, PagesTableCellTextFont, PagesTableCellTextLigatures,
     PagesTableCellTextOutline, PagesTableCellTextScript, PagesTableCellTextShadow,
     PagesTableCellTextStyle, PagesTableCellTextWrap, PagesTableCellUpdate,
-    PagesTableCellVerticalAlignment, PagesTableColumnDeletion, PagesTableColumnInsertion,
+    PagesTableCellVerticalAlignment,
     PagesTableDimension, PagesTableDimensionSize, PagesTableFormulaAxisReference,
     PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue, PagesTableFormulaCellReference,
     PagesTableFormulaExpression, PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo,
-    PagesTablePoints, PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
+    PagesTablePoints, PagesTableSortColumnIndex,
     PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule,
     PagesTableSortScope, PagesTableTitleSettings,
 };

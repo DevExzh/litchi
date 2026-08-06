@@ -6544,6 +6544,28 @@ Pages, Numbers, and Keynote fixtures in their native applications, confirmed
 the expected text markers and highlighted content without repair prompts, and
 closed all three applications afterward.
 
+This 2026-08-06 follow-up completes the archive-free section-relative table
+topology handoff. `litchi-numbers::table::topology` now owns the focused
+`RowInsertion`, `ColumnInsertion`, `RowDeletion`, and `ColumnDeletion` values;
+the Numbers, Pages, and Keynote IWA adapters consume those canonical types
+directly, while native section counts, object identifiers, graph updates,
+formula/merge maintenance, and wire publication remain adapter-owned. The
+former `Table*`, `PagesTable*`, and `KeynoteTable*` topology facades and their
+module files were removed rather than retained as compatibility aliases.
+
+The semantic leaf and IWA library checks, strict no-dependency Clippy targets,
+focused topology examples, topology unit test, diff check, and crate-boundary
+checker pass. Native iWork verification for this slice is performed separately
+with the real Pages, Numbers, and Keynote applications. Computer Use created
+`/private/tmp/litchi-topology-pages.pages`,
+`/private/tmp/litchi-topology-numbers.numbers`, and
+`/private/tmp/litchi-topology-keynote.key`, inserted the marker
+`Litchi topology verification`, reopened each saved document state, and found
+no repair prompts. Pages, Numbers, and Keynote were then quit through their
+application menus and confirmed absent from the final application list. The
+broader stale internal fixture build remains deferred under the typed-selector
+migration.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

@@ -37,6 +37,9 @@ mod topology;
 pub use conditional_highlight::KeynoteTableCellConditionalHighlightInfo;
 use graph::{require_table_model, slide_table_graph, table_template};
 use litchi_iwa_common::comment::Comment;
+use litchi_numbers::table::topology::{
+    ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion,
+};
 use storage::{remove_objects, set_table_geometry_in_package, set_uniform_table_dimensions};
 pub use title::KeynoteTableTitleSettings;
 
@@ -49,14 +52,6 @@ const TABLE_ANGLE_DEGREES: f32 = 0.0;
 pub type KeynoteTableCellValue = litchi_numbers::cell::Value;
 /// One mutation in a transactional Keynote table-cell batch.
 pub type KeynoteTableCellUpdate = litchi_numbers::cell::Update;
-/// Section-relative row deletion shared by native iWork tables.
-pub type KeynoteTableRowDeletion = crate::numbers::TableRowDeletion;
-/// Section-relative column deletion shared by native iWork tables.
-pub type KeynoteTableColumnDeletion = crate::numbers::TableColumnDeletion;
-/// Section-relative row insertion shared by native iWork tables.
-pub type KeynoteTableRowInsertion = crate::numbers::TableRowInsertion;
-/// Section-relative column insertion shared by native iWork tables.
-pub type KeynoteTableColumnInsertion = crate::numbers::TableColumnInsertion;
 /// A validated native merged-cell rectangle.
 pub type KeynoteTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
 pub use crate::shapes::RgbaColor as KeynoteTableCellTextColor;

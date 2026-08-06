@@ -5,10 +5,11 @@ use std::path::{Path, PathBuf};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::{
     FormulaCachedValue, FormulaExpression, IWorkTableCellRegion, NumbersDocumentBuilder,
-    TableColumnDeletion, TableColumnInsertion, TableRowDeletion, TableRowInsertion,
 };
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
+use litchi_numbers::TableSelector;
 
 const TABLE_ROWS: usize = 4;
 const TABLE_COLUMNS: usize = 5;
@@ -36,24 +37,25 @@ fn create_numbers(
         .table_name("Merged Cells")
         .table_dimensions(TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor.tables()?.remove(0).id();
+    let table = TableSelector::index(0);
     editor.set_formula_with_cached_value(
         table_id,
         region.row(),
         region.column(),
-        FormulaExpression::Number(MERGED_FORMULA_RESULT),
-        FormulaCachedValue::Number(MERGED_FORMULA_RESULT),
+        FormulaExpression::Number(MERGED_FORMULA_RESULT.try_into()?),
+        FormulaCachedValue::Number(MERGED_FORMULA_RESULT.try_into()?),
     )?;
     editor.merge_cells(table_id, region)?;
     editor.save(output.join("merged-cells.numbers"))?;
     editor.unmerge_cells(table_id, region)?;
     editor.save(output.join("unmerged-cells.numbers"))?;
     editor.merge_cells(table_id, region)?;
-    editor.insert_table_row(table_id, TableRowInsertion::body(1))?;
-    editor.insert_table_column(table_id, TableColumnInsertion::body(0))?;
+    editor.insert_table_row(table, RowInsertion::body(1))?;
+    editor.insert_table_column(table, ColumnInsertion::body(0))?;
     editor.save(output.join("merged-cells-after-axis-insertions.numbers"))?;
-    editor.remove_table_row(table_id, TableRowDeletion::body(0))?;
-    editor.remove_table_column(table_id, TableColumnDeletion::body(1))?;
+    editor.remove_table_row(table, RowDeletion::body(0))?;
+    editor.remove_table_column(table, ColumnDeletion::body(1))?;
     editor.save(output.join("merged-cells-after-axis-deletions.numbers"))?;
     Ok(())
 }
@@ -71,19 +73,19 @@ fn create_pages(
         table_id,
         region.row(),
         region.column(),
-        FormulaExpression::Number(MERGED_FORMULA_RESULT),
-        FormulaCachedValue::Number(MERGED_FORMULA_RESULT),
+        FormulaExpression::Number(MERGED_FORMULA_RESULT.try_into()?),
+        FormulaCachedValue::Number(MERGED_FORMULA_RESULT.try_into()?),
     )?;
     editor.merge_table_cells(table_id, region)?;
     editor.save(output.join("merged-cells.pages"))?;
     editor.unmerge_table_cells(table_id, region)?;
     editor.save(output.join("unmerged-cells.pages"))?;
     editor.merge_table_cells(table_id, region)?;
-    editor.insert_table_row(table_id, TableRowInsertion::body(1))?;
-    editor.insert_table_column(table_id, TableColumnInsertion::body(0))?;
+    editor.insert_table_row(table_id, RowInsertion::body(1))?;
+    editor.insert_table_column(table_id, ColumnInsertion::body(0))?;
     editor.save(output.join("merged-cells-after-axis-insertions.pages"))?;
-    editor.remove_table_row(table_id, TableRowDeletion::body(0))?;
-    editor.remove_table_column(table_id, TableColumnDeletion::body(1))?;
+    editor.remove_table_row(table_id, RowDeletion::body(0))?;
+    editor.remove_table_column(table_id, ColumnDeletion::body(1))?;
     editor.save(output.join("merged-cells-after-axis-deletions.pages"))?;
     Ok(())
 }
@@ -111,19 +113,19 @@ fn create_keynote(
         table.model_object_id,
         region.row(),
         region.column(),
-        FormulaExpression::Number(MERGED_FORMULA_RESULT),
-        FormulaCachedValue::Number(MERGED_FORMULA_RESULT),
+        FormulaExpression::Number(MERGED_FORMULA_RESULT.try_into()?),
+        FormulaCachedValue::Number(MERGED_FORMULA_RESULT.try_into()?),
     )?;
     editor.merge_slide_table_cells(0, table.model_object_id, region)?;
     editor.save(output.join("merged-cells.key"))?;
     editor.unmerge_slide_table_cells(0, table.model_object_id, region)?;
     editor.save(output.join("unmerged-cells.key"))?;
     editor.merge_slide_table_cells(0, table.model_object_id, region)?;
-    editor.insert_slide_table_row(0, table.model_object_id, TableRowInsertion::body(1))?;
-    editor.insert_slide_table_column(0, table.model_object_id, TableColumnInsertion::body(0))?;
+    editor.insert_slide_table_row(0, table.model_object_id, RowInsertion::body(1))?;
+    editor.insert_slide_table_column(0, table.model_object_id, ColumnInsertion::body(0))?;
     editor.save(output.join("merged-cells-after-axis-insertions.key"))?;
-    editor.remove_slide_table_row(0, table.model_object_id, TableRowDeletion::body(0))?;
-    editor.remove_slide_table_column(0, table.model_object_id, TableColumnDeletion::body(1))?;
+    editor.remove_slide_table_row(0, table.model_object_id, RowDeletion::body(0))?;
+    editor.remove_slide_table_column(0, table.model_object_id, ColumnDeletion::body(1))?;
     editor.save(output.join("merged-cells-after-axis-deletions.key"))?;
     Ok(())
 }

@@ -5,6 +5,7 @@
 //! consumers operate through the typed [`super::NumbersEditor`] API.
 
 use super::*;
+use litchi_numbers::table::dimension::{Dimension, Size};
 
 pub(crate) fn set_table_cell_in_package(
     package: &mut IWorkPackage,
@@ -1421,10 +1422,10 @@ pub(crate) fn table_dimensions_in_package(
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum TableTopologyMutation {
-    InsertRow(TableRowInsertion),
-    InsertColumn(TableColumnInsertion),
-    RemoveRow(TableRowDeletion),
-    RemoveColumn(TableColumnDeletion),
+    InsertRow(RowInsertion),
+    InsertColumn(ColumnInsertion),
+    RemoveRow(RowDeletion),
+    RemoveColumn(ColumnDeletion),
 }
 
 impl TableTopologyMutation {
@@ -1448,7 +1449,7 @@ impl TableTopologyMutation {
 pub(crate) fn insert_table_row_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    insertion: TableRowInsertion,
+    insertion: RowInsertion,
 ) -> Result<usize> {
     row_insert::insert_attached_table_row(package, table_id, insertion)
 }
@@ -1456,7 +1457,7 @@ pub(crate) fn insert_table_row_in_package(
 pub(crate) fn insert_table_column_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    insertion: TableColumnInsertion,
+    insertion: ColumnInsertion,
 ) -> Result<usize> {
     column_insert::insert_attached_table_column(package, table_id, insertion)
 }
@@ -1464,7 +1465,7 @@ pub(crate) fn insert_table_column_in_package(
 pub(crate) fn remove_table_row_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    deletion: TableRowDeletion,
+    deletion: RowDeletion,
 ) -> Result<(usize, usize)> {
     table_delete::remove_attached_table_row(package, table_id, deletion)
 }
@@ -1472,7 +1473,7 @@ pub(crate) fn remove_table_row_in_package(
 pub(crate) fn remove_table_column_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    deletion: TableColumnDeletion,
+    deletion: ColumnDeletion,
 ) -> Result<(usize, usize)> {
     table_delete::remove_attached_table_column(package, table_id, deletion)
 }
@@ -1480,8 +1481,8 @@ pub(crate) fn remove_table_column_in_package(
 pub(crate) fn set_table_dimension_size_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    dimension: NumbersTableDimension,
-    size: NumbersTableDimensionSize,
+    dimension: Dimension,
+    size: Size,
 ) -> Result<()> {
     table_dimension::set_attached_table_dimension_size(package, table_id, dimension, size)
 }
@@ -1489,8 +1490,8 @@ pub(crate) fn set_table_dimension_size_in_package(
 pub(crate) fn table_dimension_size_in_package(
     package: &IWorkPackage,
     table_id: u64,
-    dimension: NumbersTableDimension,
-) -> Result<NumbersTableDimensionSize> {
+    dimension: Dimension,
+) -> Result<Size> {
     table_dimension::read_attached_table_dimension_size(package, table_id, dimension)
 }
 

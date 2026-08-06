@@ -45,6 +45,9 @@ use crate::protobuf::tst::TableInfoArchive;
 use crate::table_appearance::TableAppearance;
 use crate::table_lock::table_lock_state_from_message;
 use litchi_iwa_common::table::lock::State as TableLockState;
+use litchi_numbers::table::topology::{
+    ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion,
+};
 
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
@@ -52,17 +55,9 @@ const OBJECT_REPLACEMENT_CHARACTER: u16 = 0xfffc;
 const INLINE_TABLE_DUPLICATE_OFFSET: f32 = 0.0;
 
 /// Strongly typed cell value shared by Pages and Numbers table storage.
-pub type PagesCellValue = crate::numbers::CellValue;
+pub type PagesCellValue = litchi_numbers::cell::Value;
 /// One mutation in a transactional Pages table-cell batch.
-pub type PagesTableCellUpdate = crate::numbers::TableCellUpdate;
-/// Section-relative row deletion shared by native iWork tables.
-pub type PagesTableRowDeletion = crate::numbers::TableRowDeletion;
-/// Section-relative column deletion shared by native iWork tables.
-pub type PagesTableColumnDeletion = crate::numbers::TableColumnDeletion;
-/// Section-relative row insertion shared by native iWork tables.
-pub type PagesTableRowInsertion = crate::numbers::TableRowInsertion;
-/// Section-relative column insertion shared by native iWork tables.
-pub type PagesTableColumnInsertion = crate::numbers::TableColumnInsertion;
+pub type PagesTableCellUpdate = litchi_numbers::cell::Update;
 /// A validated native merged-cell rectangle.
 pub type PagesTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
 pub use crate::shapes::RgbaColor as PagesTableCellTextColor;

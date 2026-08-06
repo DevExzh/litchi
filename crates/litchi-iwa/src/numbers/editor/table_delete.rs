@@ -51,7 +51,7 @@ impl NumbersEditor {
     pub fn remove_table_row(
         &mut self,
         selector: litchi_numbers::TableSelector<'_>,
-        deletion: TableRowDeletion,
+        deletion: RowDeletion,
     ) -> Result<()> {
         let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
@@ -71,7 +71,7 @@ impl NumbersEditor {
     pub fn remove_table_column(
         &mut self,
         selector: litchi_numbers::TableSelector<'_>,
-        deletion: TableColumnDeletion,
+        deletion: ColumnDeletion,
     ) -> Result<()> {
         let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
@@ -85,7 +85,7 @@ impl NumbersEditor {
 pub(super) fn remove_attached_table_row(
     package: &mut IWorkPackage,
     table_id: u64,
-    deletion: TableRowDeletion,
+    deletion: RowDeletion,
 ) -> Result<(usize, usize)> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     let old_rows = descriptor.model.number_of_rows as usize;
@@ -165,7 +165,7 @@ pub(super) fn remove_attached_table_row(
 pub(super) fn remove_attached_table_column(
     package: &mut IWorkPackage,
     table_id: u64,
-    deletion: TableColumnDeletion,
+    deletion: ColumnDeletion,
 ) -> Result<(usize, usize)> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     let old_columns = descriptor.model.number_of_columns as usize;
@@ -304,7 +304,7 @@ struct ResolvedRowDeletion {
 
 fn resolve_row_deletion(
     model: &TableModelArchive,
-    deletion: TableRowDeletion,
+    deletion: RowDeletion,
 ) -> Result<ResolvedRowDeletion> {
     let mut settings = NumbersTableHeaderSettings::from_model(model)?;
     let rows = model.number_of_rows as usize;
@@ -320,7 +320,7 @@ fn resolve_row_deletion(
         })?;
     let body_rows = rows - fixed_rows;
     match deletion {
-        TableRowDeletion::Header { index } => {
+        RowDeletion::Header { index } => {
             validate_section_deletion(index, header_rows, "header row")?;
             settings.header_rows = decremented_header_count(header_rows)?;
             Ok(ResolvedRowDeletion {
@@ -328,14 +328,14 @@ fn resolve_row_deletion(
                 updated_header_settings: Some(settings),
             })
         },
-        TableRowDeletion::Body { index } => {
+        RowDeletion::Body { index } => {
             validate_section_deletion(index, body_rows, "body row")?;
             Ok(ResolvedRowDeletion {
                 physical_index: header_rows + index,
                 updated_header_settings: None,
             })
         },
-        TableRowDeletion::Footer { index } => {
+        RowDeletion::Footer { index } => {
             validate_section_deletion(index, footer_rows, "footer row")?;
             settings.footer_rows = decremented_header_count(footer_rows)?;
             Ok(ResolvedRowDeletion {
@@ -353,7 +353,7 @@ struct ResolvedColumnDeletion {
 
 fn resolve_column_deletion(
     model: &TableModelArchive,
-    deletion: TableColumnDeletion,
+    deletion: ColumnDeletion,
 ) -> Result<ResolvedColumnDeletion> {
     let mut settings = NumbersTableHeaderSettings::from_model(model)?;
     let columns = model.number_of_columns as usize;
@@ -362,7 +362,7 @@ fn resolve_column_deletion(
         Error::InvalidFormat("iWork header columns exceed the table column count".to_owned())
     })?;
     match deletion {
-        TableColumnDeletion::Header { index } => {
+        ColumnDeletion::Header { index } => {
             validate_section_deletion(index, header_columns, "header column")?;
             settings.header_columns = decremented_header_count(header_columns)?;
             Ok(ResolvedColumnDeletion {
@@ -370,7 +370,7 @@ fn resolve_column_deletion(
                 updated_header_settings: Some(settings),
             })
         },
-        TableColumnDeletion::Body { index } => {
+        ColumnDeletion::Body { index } => {
             validate_section_deletion(index, body_columns, "body column")?;
             Ok(ResolvedColumnDeletion {
                 physical_index: header_columns + index,

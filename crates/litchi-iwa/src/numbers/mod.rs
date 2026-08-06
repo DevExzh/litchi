@@ -83,8 +83,7 @@ pub use editor::{
     NumbersTableSortRule, NumbersTableSortScope, NumbersTextBoxInfo, Points,
     RemovedNumbersSheetAudio, RemovedNumbersSheetChart, RemovedNumbersSheetImage,
     RemovedNumbersSheetMovie, RemovedNumbersSheetShape, RemovedNumbersTextBox, Settings, Size,
-    TableCellConditionalHighlightInfo, TableColumnDeletion, TableColumnInsertion, TableRowDeletion,
-    TableRowInsertion,
+    TableCellConditionalHighlightInfo,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,

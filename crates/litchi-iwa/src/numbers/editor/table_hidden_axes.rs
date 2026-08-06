@@ -120,13 +120,13 @@ mod tests {
         editor
             .insert_table_row(
                 test_table_selector(&editor, table_id),
-                TableRowInsertion::Body { index: 0 },
+                RowInsertion::Body { index: 0 },
             )
             .unwrap();
         editor
             .insert_table_column(
                 test_table_selector(&editor, table_id),
-                TableColumnInsertion::Body { index: 0 },
+                ColumnInsertion::Body { index: 0 },
             )
             .unwrap();
         assert_eq!(
@@ -139,13 +139,13 @@ mod tests {
         editor
             .remove_table_row(
                 test_table_selector(&editor, table_id),
-                TableRowDeletion::Body { index: 0 },
+                RowDeletion::Body { index: 0 },
             )
             .unwrap();
         editor
             .remove_table_column(
                 test_table_selector(&editor, table_id),
-                TableColumnDeletion::Body { index: 0 },
+                ColumnDeletion::Body { index: 0 },
             )
             .unwrap();
         assert_eq!(
@@ -158,13 +158,13 @@ mod tests {
         editor
             .remove_table_row(
                 test_table_selector(&editor, table_id),
-                TableRowDeletion::Body { index: 1 },
+                RowDeletion::Body { index: 1 },
             )
             .unwrap();
         editor
             .remove_table_column(
                 test_table_selector(&editor, table_id),
-                TableColumnDeletion::Body { index: 0 },
+                ColumnDeletion::Body { index: 0 },
             )
             .unwrap();
         assert!(

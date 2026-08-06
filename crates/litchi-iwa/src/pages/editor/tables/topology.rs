@@ -12,7 +12,7 @@ impl PagesEditor {
     pub fn insert_table_row(
         &mut self,
         model_object_id: u64,
-        insertion: PagesTableRowInsertion,
+        insertion: RowInsertion,
     ) -> Result<()> {
         self.edit_table_topology(model_object_id, TableTopologyMutation::InsertRow(insertion))
     }
@@ -21,7 +21,7 @@ impl PagesEditor {
     pub fn insert_table_column(
         &mut self,
         model_object_id: u64,
-        insertion: PagesTableColumnInsertion,
+        insertion: ColumnInsertion,
     ) -> Result<()> {
         self.edit_table_topology(
             model_object_id,
@@ -36,7 +36,7 @@ impl PagesEditor {
     pub fn remove_table_row(
         &mut self,
         model_object_id: u64,
-        deletion: PagesTableRowDeletion,
+        deletion: RowDeletion,
     ) -> Result<()> {
         self.edit_table_topology(model_object_id, TableTopologyMutation::RemoveRow(deletion))
     }
@@ -45,7 +45,7 @@ impl PagesEditor {
     pub fn remove_table_column(
         &mut self,
         model_object_id: u64,
-        deletion: PagesTableColumnDeletion,
+        deletion: ColumnDeletion,
     ) -> Result<()> {
         self.edit_table_topology(
             model_object_id,

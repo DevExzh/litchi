@@ -1,15 +1,20 @@
 use std::env;
 use std::path::PathBuf;
 
-use litchi_iwa::numbers::{NumbersEditor, TableColumnDeletion};
+use litchi_iwa::numbers::NumbersEditor;
+use litchi_numbers::table::topology::ColumnDeletion;
+use litchi_numbers::TableSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
     let input = PathBuf::from(arguments.next().ok_or(
-        "usage: remove_numbers_column <input.numbers> <output.numbers> <table-id> <header|body> <index>",
+        "usage: remove_numbers_column <input.numbers> <output.numbers> <table-index> <header|body> <index>",
     )?);
     let output = PathBuf::from(arguments.next().ok_or("missing output path")?);
-    let table_id = arguments.next().ok_or("missing table ID")?.parse::<u64>()?;
+    let table_index = arguments
+        .next()
+        .ok_or("missing table index")?
+        .parse::<usize>()?;
     let section = arguments.next().ok_or("missing column section")?;
     let index = arguments
         .next()
@@ -20,13 +25,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let deletion = match section.as_str() {
-        "header" => TableColumnDeletion::header(index),
-        "body" => TableColumnDeletion::body(index),
+        "header" => ColumnDeletion::header(index),
+        "body" => ColumnDeletion::body(index),
         _ => return Err(format!("unsupported column section {section:?}").into()),
     };
 
     let mut editor = NumbersEditor::open(input)?;
-    editor.remove_table_column(table_id, deletion)?;
+    editor.remove_table_column(TableSelector::index(table_index), deletion)?;
     editor.save(output)?;
     Ok(())
 }

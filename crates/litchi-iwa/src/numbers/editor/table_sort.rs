@@ -423,8 +423,8 @@ pub(super) fn delete_table_sort_column(
 mod tests {
     use super::*;
     use crate::numbers::{
-        NumbersDocumentBuilder, TableColumnDeletion, TableColumnInsertion, TableRowDeletion,
-        TableRowInsertion,
+        NumbersDocumentBuilder, ColumnDeletion, ColumnInsertion, RowDeletion,
+        RowInsertion,
     };
 
     #[test]
@@ -511,13 +511,13 @@ mod tests {
         editor
             .insert_table_row(
                 test_table_selector(&editor, table_id),
-                TableRowInsertion::body(0),
+                RowInsertion::body(0),
             )
             .unwrap();
         editor
             .insert_table_column(
                 test_table_selector(&editor, table_id),
-                TableColumnInsertion::body(0),
+                ColumnInsertion::body(0),
             )
             .unwrap();
         assert_eq!(
@@ -528,13 +528,13 @@ mod tests {
         editor
             .remove_table_row(
                 test_table_selector(&editor, table_id),
-                TableRowDeletion::body(0),
+                RowDeletion::body(0),
             )
             .unwrap();
         editor
             .remove_table_column(
                 test_table_selector(&editor, table_id),
-                TableColumnDeletion::body(0),
+                ColumnDeletion::body(0),
             )
             .unwrap();
         let remaining = Order::new([Rule::new(
@@ -550,7 +550,7 @@ mod tests {
         editor
             .remove_table_column(
                 test_table_selector(&editor, table_id),
-                TableColumnDeletion::body(2),
+                ColumnDeletion::body(2),
             )
             .unwrap();
         assert_eq!(editor.table_sort_order(selector).unwrap(), None);

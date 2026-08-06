@@ -2,8 +2,10 @@
 
 use std::path::PathBuf;
 
-use litchi_iwa::numbers::{NumbersEditor, TableColumnInsertion, TableRowInsertion};
+use litchi_iwa::numbers::NumbersEditor;
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
+use litchi_numbers::table::topology::{ColumnInsertion, RowInsertion};
+use litchi_numbers::TableSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = std::env::args().skip(1);
@@ -19,11 +21,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let shifted = HiddenAxes::new([AxisIndex::row(3), AxisIndex::column(2)])?;
 
     let mut editor = NumbersEditor::open(source)?;
-    let table = editor.tables()?.remove(0);
-    assert_eq!(editor.table_hidden_axes(table.object_id)?, initial);
-    editor.insert_table_row(table.object_id, TableRowInsertion::body(0))?;
-    editor.insert_table_column(table.object_id, TableColumnInsertion::body(0))?;
-    assert_eq!(editor.table_hidden_axes(table.object_id)?, shifted);
+    let table = TableSelector::index(0);
+    assert_eq!(editor.table_hidden_axes(table)?, initial);
+    editor.insert_table_row(table, RowInsertion::body(0))?;
+    editor.insert_table_column(table, ColumnInsertion::body(0))?;
+    assert_eq!(editor.table_hidden_axes(table)?, shifted);
     editor.save(output)?;
     Ok(())
 }

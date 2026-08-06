@@ -1504,10 +1504,10 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
     let baseline = editor.to_bytes().unwrap();
 
     editor
-        .insert_slide_table_row(0, model_id, KeynoteTableRowInsertion::body(1))
+        .insert_slide_table_row(0, model_id, RowInsertion::body(1))
         .unwrap();
     editor
-        .insert_slide_table_column(0, model_id, KeynoteTableColumnInsertion::body(1))
+        .insert_slide_table_column(0, model_id, ColumnInsertion::body(1))
         .unwrap();
     let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let shifted = reopened.slide_table(0, model_id).unwrap();
@@ -1531,10 +1531,10 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
     );
 
     editor
-        .remove_slide_table_column(0, model_id, KeynoteTableColumnDeletion::body(1))
+        .remove_slide_table_column(0, model_id, ColumnDeletion::body(1))
         .unwrap();
     editor
-        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::body(1))
+        .remove_slide_table_row(0, model_id, RowDeletion::body(1))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
     assert_eq!(
@@ -1545,12 +1545,12 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
     let before_error = editor.to_bytes().unwrap();
     assert!(
         editor
-            .insert_slide_table_row(1, model_id, KeynoteTableRowInsertion::body(usize::MAX))
+            .insert_slide_table_row(1, model_id, RowInsertion::body(usize::MAX))
             .is_err()
     );
     assert!(
         editor
-            .remove_slide_table_column(0, model_id, KeynoteTableColumnDeletion::body(usize::MAX))
+            .remove_slide_table_column(0, model_id, ColumnDeletion::body(usize::MAX))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before_error);
@@ -1599,7 +1599,7 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
     let baseline = editor.to_bytes().unwrap();
 
     editor
-        .insert_slide_table_row(0, model_id, KeynoteTableRowInsertion::body(3))
+        .insert_slide_table_row(0, model_id, RowInsertion::body(3))
         .unwrap();
     assert_eq!(
         editor
@@ -1609,7 +1609,7 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
         Some("=SUM(B2:B4)")
     );
     editor
-        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::body(3))
+        .remove_slide_table_row(0, model_id, RowDeletion::body(3))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
@@ -1637,13 +1637,13 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
     let baseline = editor.to_bytes().unwrap();
 
     editor
-        .insert_slide_table_row(0, model_id, KeynoteTableRowInsertion::header(1))
+        .insert_slide_table_row(0, model_id, RowInsertion::header(1))
         .unwrap();
     editor
-        .insert_slide_table_row(0, model_id, KeynoteTableRowInsertion::footer(0))
+        .insert_slide_table_row(0, model_id, RowInsertion::footer(0))
         .unwrap();
     editor
-        .insert_slide_table_column(0, model_id, KeynoteTableColumnInsertion::header(1))
+        .insert_slide_table_column(0, model_id, ColumnInsertion::header(1))
         .unwrap();
     let settings = editor.slide_table_header_settings(0, model_id).unwrap();
     assert_eq!(settings.header_row_count(), 2);
@@ -1653,13 +1653,13 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
     assert_eq!((table.info.rows, table.info.columns), (6, 5));
 
     editor
-        .remove_slide_table_column(0, model_id, KeynoteTableColumnDeletion::header(1))
+        .remove_slide_table_column(0, model_id, ColumnDeletion::header(1))
         .unwrap();
     editor
-        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::footer(0))
+        .remove_slide_table_row(0, model_id, RowDeletion::footer(0))
         .unwrap();
     editor
-        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::header(1))
+        .remove_slide_table_row(0, model_id, RowDeletion::header(1))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
@@ -1691,13 +1691,13 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
         )
         .unwrap();
     editor
-        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::header(0))
+        .remove_slide_table_row(0, model_id, RowDeletion::header(0))
         .unwrap();
     editor
-        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::footer(0))
+        .remove_slide_table_row(0, model_id, RowDeletion::footer(0))
         .unwrap();
     editor
-        .remove_slide_table_column(0, model_id, KeynoteTableColumnDeletion::header(0))
+        .remove_slide_table_column(0, model_id, ColumnDeletion::header(0))
         .unwrap();
     let settings = editor.slide_table_header_settings(0, model_id).unwrap();
     assert_eq!(settings.header_row_count(), 0);

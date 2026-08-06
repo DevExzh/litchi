@@ -26,7 +26,7 @@ impl NumbersEditor {
     pub fn insert_table_column(
         &mut self,
         selector: litchi_numbers::TableSelector<'_>,
-        insertion: TableColumnInsertion,
+        insertion: ColumnInsertion,
     ) -> Result<()> {
         let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
@@ -52,7 +52,7 @@ impl NumbersEditor {
 pub(super) fn insert_attached_table_column(
     package: &mut IWorkPackage,
     table_id: u64,
-    insertion: TableColumnInsertion,
+    insertion: ColumnInsertion,
 ) -> Result<usize> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     let old_columns = descriptor.model.number_of_columns as usize;
@@ -126,7 +126,7 @@ struct ResolvedColumnInsertion {
 
 fn resolve_column_insertion(
     model: &TableModelArchive,
-    insertion: TableColumnInsertion,
+    insertion: ColumnInsertion,
 ) -> Result<ResolvedColumnInsertion> {
     let columns = model.number_of_columns as usize;
     let mut settings = NumbersTableHeaderSettings::from_model(model)?;
@@ -135,7 +135,7 @@ fn resolve_column_insertion(
         Error::InvalidFormat("iWork header columns exceed the table column count".to_owned())
     })?;
     match insertion {
-        TableColumnInsertion::Header { index } => {
+        ColumnInsertion::Header { index } => {
             validate_section_insertion(index, header_columns, "header column")?;
             settings.header_columns = Some(NumbersTableHeaderCount::new(header_columns + 1)?);
             Ok(ResolvedColumnInsertion {
@@ -143,7 +143,7 @@ fn resolve_column_insertion(
                 updated_header_settings: Some(settings),
             })
         },
-        TableColumnInsertion::Body { index } => {
+        ColumnInsertion::Body { index } => {
             validate_section_insertion(index, body_columns, "body column")?;
             Ok(ResolvedColumnInsertion {
                 physical_index: header_columns + index,
