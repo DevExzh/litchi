@@ -1,13 +1,15 @@
-//! Contextual authoring of the `[MS-PPT]` `SlideNameAtom` record.
+//! Contextual authoring of bounded `[MS-PPT]` master metadata.
 //!
 //! The same atom names a main master, title master, notes master, and handout
-//! master. This owner deliberately handles only that bounded semantic field;
-//! every other child remains in the parent snapshot as an opaque record.
+//! master. The notes-master text-style package is a separate nested owner.
+//! Every other child remains in the parent snapshot as an opaque record.
 
 mod codec;
 mod model;
 mod validation;
 
+/// Notes-master round-trip text-style package metadata.
+pub mod notes_styles;
 /// Main-master design-name metadata.
 pub mod template;
 
@@ -87,6 +89,11 @@ impl Snapshot {
         template::codec::read(self.context(), self.record())
     }
 
+    /// Read the optional notes-master `txStyles` round-trip package.
+    pub fn notes_styles(&self) -> Result<Option<notes_styles::Styles>> {
+        notes_styles::codec::read(self.context(), self.record())
+    }
+
     /// Open an isolated semantic edit.
     pub fn edit(&self) -> Editor {
         Editor {
@@ -95,7 +102,7 @@ impl Snapshot {
     }
 }
 
-/// A transactional semantic edit of one master name.
+/// A transactional semantic edit of one master’s bounded metadata.
 #[derive(Debug, Clone)]
 pub struct Editor {
     inner: master_layout::Transaction,
@@ -115,6 +122,11 @@ impl Editor {
     /// Read the candidate main-master design name.
     pub fn template_name(&self) -> Result<Option<template::Name>> {
         template::codec::read(self.context(), self.inner.record())
+    }
+
+    /// Read the candidate notes-master `txStyles` round-trip package.
+    pub fn notes_styles(&self) -> Result<Option<notes_styles::Styles>> {
+        notes_styles::codec::read(self.context(), self.inner.record())
     }
 
     /// Borrow the transaction-local master record.
@@ -173,6 +185,32 @@ impl Editor {
         Ok(())
     }
 
+    /// Set or replace the notes-master `txStyles` package atomically.
+    pub fn set_notes_styles(&mut self, styles: notes_styles::Styles) -> Result<()> {
+        let replacement = notes_styles::codec::encode(&styles)?;
+        let index = notes_styles::validation::styles_index(self.context(), self.inner.record())?;
+        match index {
+            Some(index) => {
+                self.inner
+                    .replace(master_layout::Path::root().child(index), replacement)?;
+            },
+            None => {
+                let index = notes_styles::validation::styles_insertion_index(
+                    self.context(),
+                    self.inner.record(),
+                )?;
+                self.inner
+                    .add(master_layout::Path::root(), index, replacement)?;
+            },
+        }
+        Ok(())
+    }
+
+    /// Build and set a notes-master `txStyles` package from XML atomically.
+    pub fn set_notes_styles_xml(&mut self, xml: impl AsRef<[u8]>) -> Result<()> {
+        self.set_notes_styles(notes_styles::Styles::from_xml(xml)?)
+    }
+
     /// Remove the master name atom, returning whether one was present.
     pub fn clear_name(&mut self) -> Result<bool> {
         let Some(index) = validation::name_index(self.context(), self.inner.record())? else {
@@ -187,6 +225,18 @@ impl Editor {
     pub fn clear_template_name(&mut self) -> Result<bool> {
         let Some(index) =
             template::validation::template_index(self.context(), self.inner.record())?
+        else {
+            return Ok(false);
+        };
+        self.inner
+            .remove(master_layout::Path::root().child(index))?;
+        Ok(true)
+    }
+
+    /// Remove the notes-master `txStyles` package, returning whether one was present.
+    pub fn clear_notes_styles(&mut self) -> Result<bool> {
+        let Some(index) =
+            notes_styles::validation::styles_index(self.context(), self.inner.record())?
         else {
             return Ok(false);
         };
@@ -233,6 +283,11 @@ impl Commit {
     /// The structural patch produced by the semantic edit.
     pub const fn changes(&self) -> &ChangeSet {
         &self.changes
+    }
+
+    /// Read the committed notes-master `txStyles` round-trip package.
+    pub fn notes_styles(&self) -> Result<Option<notes_styles::Styles>> {
+        self.snapshot.notes_styles()
     }
 
     /// Undo this patch against its exact target snapshot.

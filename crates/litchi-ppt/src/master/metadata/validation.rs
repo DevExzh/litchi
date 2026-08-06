@@ -1,4 +1,4 @@
-//! Context and wire invariants for `SlideNameAtom`.
+//! Context and wire invariants for master metadata owners.
 
 use super::model::Name;
 use crate::consts::RecordType;
@@ -21,6 +21,9 @@ pub(super) fn validate(context: Context, root: &Record) -> Result<()> {
     let mut name_index = None;
     for (index, child) in root.children.iter().enumerate() {
         if !is_name_record(child) {
+            if super::notes_styles::validation::is_record(child) {
+                super::notes_styles::validation::validate_record(child)?;
+            }
             continue;
         }
         validate_name_record(child)?;
