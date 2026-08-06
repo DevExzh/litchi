@@ -6,8 +6,23 @@
 use crate::Result;
 use std::io::{Read, Seek, SeekFrom, Write};
 
+/// UTF-8 BOM bytes.
+pub const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
+/// UTF-16 little-endian BOM bytes.
+pub const UTF16_LE_BOM: [u8; 2] = [0xFF, 0xFE];
+/// UTF-16 big-endian BOM bytes.
+pub const UTF16_BE_BOM: [u8; 2] = [0xFE, 0xFF];
+/// UTF-32 little-endian BOM bytes.
+pub const UTF32_LE_BOM: [u8; 4] = [0xFF, 0xFE, 0x00, 0x00];
+/// UTF-32 big-endian BOM bytes.
+pub const UTF32_BE_BOM: [u8; 4] = [0x00, 0x00, 0xFE, 0xFF];
+
 /// Supported BOM encodings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
+)]
 pub enum BomKind {
     Utf8,
     Utf16Le,
@@ -19,6 +34,7 @@ pub enum BomKind {
 impl BomKind {
     /// Returns the byte representation of the BOM.
     #[inline]
+    #[must_use]
     pub const fn as_bytes(&self) -> &'static [u8] {
         match self {
             BomKind::Utf8 => &UTF8_BOM,
@@ -31,28 +47,29 @@ impl BomKind {
 
     /// Returns the length in bytes of the BOM.
     #[inline]
-    #[allow(clippy::len_without_is_empty)] // No need to check for empty BOMs
+    #[allow(
+        clippy::len_without_is_empty,
+        reason = "BOMs are never empty, so an `is_empty` accessor would be meaningless"
+    )]
+    #[must_use]
     pub const fn len(&self) -> usize {
         self.as_bytes().len()
     }
 }
-
-/// UTF-8 BOM bytes.
-pub const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
-/// UTF-16 little-endian BOM bytes.
-pub const UTF16_LE_BOM: [u8; 2] = [0xFF, 0xFE];
-/// UTF-16 big-endian BOM bytes.
-pub const UTF16_BE_BOM: [u8; 2] = [0xFE, 0xFF];
-/// UTF-32 little-endian BOM bytes.
-pub const UTF32_LE_BOM: [u8; 4] = [0xFF, 0xFE, 0x00, 0x00];
-/// UTF-32 big-endian BOM bytes.
-pub const UTF32_BE_BOM: [u8; 4] = [0x00, 0x00, 0xFE, 0xFF];
 
 /// Detects and consumes a BOM if present.
 ///
 /// Returns the detected BOM kind and leaves the reader positioned after the
 /// BOM. When no BOM is found, rewinds the reader to the original position and
 /// returns `Ok(None)`.
+///
+/// # Errors
+///
+/// Returns an error if reading from or seeking in the reader fails.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
+)]
 pub fn strip_bom<R: Read + Seek>(reader: &mut R) -> Result<Option<(BomKind, usize)>> {
     let start = reader.stream_position()?;
     let mut buf = [0u8; 4];
@@ -65,7 +82,7 @@ pub fn strip_bom<R: Read + Seek>(reader: &mut R) -> Result<Option<(BomKind, usiz
         }
     }
 
-    if let Some((kind, len)) = detect_bom(&buf, read) {
+    if let Some((kind, len)) = detect_bom(buf, read) {
         reader.seek(SeekFrom::Start(start + len as u64))?;
         return Ok(Some((kind, len)));
     }
@@ -75,12 +92,20 @@ pub fn strip_bom<R: Read + Seek>(reader: &mut R) -> Result<Option<(BomKind, usiz
 }
 
 /// Writes the requested BOM to the writer.
+///
+/// # Errors
+///
+/// Returns an error if writing to the writer fails.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
+)]
 pub fn write_bom<W: Write>(writer: &mut W, kind: BomKind) -> Result<()> {
     writer.write_all(kind.as_bytes())?;
     Ok(())
 }
 
-fn detect_bom(buf: &[u8; 4], read: usize) -> Option<(BomKind, usize)> {
+fn detect_bom(buf: [u8; 4], read: usize) -> Option<(BomKind, usize)> {
     if read >= UTF32_BE_BOM.len() {
         if buf[..UTF32_BE_BOM.len()] == UTF32_BE_BOM {
             return Some((BomKind::Utf32Be, UTF32_BE_BOM.len()));

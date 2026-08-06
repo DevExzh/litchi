@@ -4,46 +4,46 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum FileFormat {
-    /// Microsoft Word Document (OLE2 format, .doc)
+    /// Microsoft Word Document (OLE2 format, `.doc`)
     Doc,
-    /// Microsoft Word Document (OOXML format, .docx)
+    /// Microsoft Word Document (OOXML format, `.docx`)
     Docx,
-    /// Microsoft PowerPoint Presentation (OLE2 format, .ppt)
+    /// Microsoft `PowerPoint` Presentation (OLE2 format, `.ppt`)
     Ppt,
-    /// Microsoft PowerPoint Presentation (OOXML format, .pptx)
+    /// Microsoft `PowerPoint` Presentation (OOXML format, `.pptx`)
     Pptx,
-    /// Microsoft Excel Spreadsheet (OLE2 format, .xls)
+    /// Microsoft Excel Spreadsheet (OLE2 format, `.xls`)
     Xls,
-    /// Microsoft Excel Spreadsheet (OOXML format, .xlsx)
+    /// Microsoft Excel Spreadsheet (OOXML format, `.xlsx`)
     Xlsx,
-    /// Microsoft Excel Spreadsheet (Binary OOXML format, .xlsb)
+    /// Microsoft Excel Spreadsheet (Binary OOXML format, `.xlsb`)
     Xlsb,
-    /// Rich Text Format Document (.rtf)
+    /// Rich Text Format Document (`.rtf`)
     Rtf,
-    /// Apple Pages Document (.pages)
+    /// Apple Pages Document (`.pages`)
     Pages,
-    /// Apple Keynote Presentation (.key)
+    /// Apple Keynote Presentation (`.key`)
     Keynote,
-    /// Apple Numbers Spreadsheet (.numbers)
+    /// Apple Numbers Spreadsheet (`.numbers`)
     Numbers,
-    /// OpenDocument Text (.odt)
+    /// `OpenDocument` Text (`.odt`)
     Odt,
-    /// OpenDocument Spreadsheet (.ods)
+    /// `OpenDocument` Spreadsheet (`.ods`)
     Ods,
-    /// OpenDocument Presentation (.odp)
+    /// `OpenDocument` Presentation (`.odp`)
     Odp,
-    /// OpenDocument Drawing (.odg, .otg)
+    /// `OpenDocument` Drawing (`.odg`, `.otg`)
     Odg,
-    /// OpenDocument Chart (.odc, .otc)
+    /// `OpenDocument` Chart (`.odc`, `.otc`)
     Odc,
-    /// OpenDocument Formula (.odf, .otf)
+    /// `OpenDocument` Formula (`.odf`, `.otf`)
     Odf,
-    /// OpenDocument Image (.odi, .oti)
+    /// `OpenDocument` Image (`.odi`, `.oti`)
     Odi,
-    /// OpenDocument Master Document (.odm, .otm)
+    /// `OpenDocument` Master Document (`.odm`, `.otm`)
     Odm,
-    /// OpenDocument Web Document (.oth)
+    /// `OpenDocument` Web Document (`.oth`)
     Oth,
-    /// OpenDocument Database Front End (.odb)
+    /// `OpenDocument` Database Front End (`.odb`)
     Odb,
 }

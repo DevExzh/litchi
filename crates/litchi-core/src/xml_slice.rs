@@ -31,14 +31,16 @@ pub struct XmlSlice {
 }
 
 impl XmlSlice {
-    /// Create a new XmlSlice from an arena and byte range.
+    /// Create a new `XmlSlice` from an arena and byte range.
     #[inline]
+    #[must_use]
     pub fn new(arena: Arc<Vec<u8>>, start: u32, len: u32) -> Self {
         Self { arena, start, len }
     }
 
     /// Get the data bytes as a slice.
     #[inline]
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         let start = self.start as usize;
         let end = start + self.len as usize;
@@ -47,24 +49,28 @@ impl XmlSlice {
 
     /// Get the length of the data.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.len as usize
     }
 
     /// Check if the slice is empty.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
     /// Get a clone of the underlying Arc (for creating sub-slices).
     #[inline]
+    #[must_use]
     pub fn arc(&self) -> Arc<Vec<u8>> {
         Arc::clone(&self.arena)
     }
 
     /// Get the start offset.
     #[inline]
+    #[must_use]
     pub fn start(&self) -> u32 {
         self.start
     }
@@ -86,6 +92,7 @@ pub struct XmlArenaBuilder {
 impl XmlArenaBuilder {
     /// Create a new arena builder with estimated capacity.
     #[inline]
+    #[must_use]
     pub fn with_capacity(buffer_capacity: usize, element_count: usize) -> Self {
         Self {
             buffer: Vec::with_capacity(buffer_capacity),
@@ -96,6 +103,11 @@ impl XmlArenaBuilder {
     /// Get a mutable reference to the current write position in the buffer.
     /// Returns the start position for this element.
     #[inline]
+    #[must_use]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the arena format stores offsets as u32 by design; buffers over 4 GiB are out of scope"
+    )]
     pub fn start_element(&self) -> u32 {
         self.buffer.len() as u32
     }
@@ -109,6 +121,10 @@ impl XmlArenaBuilder {
     /// Finish writing an element and record its position.
     /// Returns the index of this element.
     #[inline]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "the arena format stores offsets as u32 by design; buffers over 4 GiB are out of scope"
+    )]
     pub fn finish_element(&mut self, start: u32) -> usize {
         let len = self.buffer.len() as u32 - start;
         let idx = self.positions.len();
@@ -118,6 +134,7 @@ impl XmlArenaBuilder {
 
     /// Convert the builder into a shared arena and return slice creators.
     #[inline]
+    #[must_use]
     pub fn build(self) -> (Arc<[u8]>, Vec<(u32, u32)>) {
         let arena: Arc<[u8]> = self.buffer.into();
         (arena, self.positions)
@@ -125,6 +142,7 @@ impl XmlArenaBuilder {
 
     /// Get the number of elements recorded.
     #[inline]
+    #[must_use]
     pub fn element_count(&self) -> usize {
         self.positions.len()
     }

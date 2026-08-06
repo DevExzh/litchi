@@ -50,6 +50,7 @@ pub struct Limits {
 
 impl Limits {
     /// Creates a fully explicit finite limit set.
+    #[must_use]
     pub const fn new(
         memory: u64,
         input_bytes: u64,
@@ -64,6 +65,7 @@ impl Limits {
     }
 
     /// Conservative named defaults. Workload-specific limits remain explicit.
+    #[must_use]
     pub const fn for_profile(profile: Profile) -> Self {
         const MIB: u64 = 1024 * 1024;
         const GIB: u64 = 1024 * MIB;
@@ -84,6 +86,7 @@ impl Limits {
     }
 
     /// Returns the limit for one dimension.
+    #[must_use]
     pub const fn get(self, resource: Resource) -> u64 {
         self.values[resource.index()]
     }
@@ -123,6 +126,7 @@ impl Budget {
     }
 
     /// Creates a child charged both locally and against every ancestor.
+    #[must_use]
     pub fn child(&self, scope: impl Into<Arc<str>>, limits: Limits) -> Self {
         Self {
             node: Arc::new(Node::new(scope.into(), limits, Some(self.node.clone()))),
@@ -130,6 +134,11 @@ impl Budget {
     }
 
     /// Reserves outstanding capacity and releases it when the token is dropped.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ResourceLimit` if charging `amount` would exceed the limit of
+    /// this budget or any ancestor.
     pub fn reserve(&self, resource: Resource, amount: u64) -> Result<Reservation, ResourceLimit> {
         let nodes = self.charge(resource, amount)?;
         Ok(Reservation {
@@ -140,16 +149,23 @@ impl Budget {
     }
 
     /// Charges cumulative work that is not released during this budget's life.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ResourceLimit` if charging `amount` would exceed the limit of
+    /// this budget or any ancestor.
     pub fn consume(&self, resource: Resource, amount: u64) -> Result<(), ResourceLimit> {
         self.charge(resource, amount).map(|_| ())
     }
 
     /// Current local usage for one resource.
+    #[must_use]
     pub fn used(&self, resource: Resource) -> u64 {
         self.node.used[resource.index()].load(Ordering::Acquire)
     }
 
     /// Current local limit for one resource.
+    #[must_use]
     pub fn limit(&self, resource: Resource) -> u64 {
         self.node.limits.get(resource)
     }
@@ -175,7 +191,8 @@ impl Budget {
                     });
                 },
             }
-            current = node.parent.clone();
+            let parent = node.parent.clone();
+            current = parent;
         }
         Ok(charged)
     }
@@ -191,11 +208,13 @@ pub struct Reservation {
 
 impl Reservation {
     /// Reserved amount.
+    #[must_use]
     pub const fn amount(&self) -> u64 {
         self.amount
     }
 
     /// Reserved resource kind.
+    #[must_use]
     pub const fn resource(&self) -> Resource {
         self.resource
     }
@@ -204,15 +223,6 @@ impl Reservation {
 impl Drop for Reservation {
     fn drop(&mut self) {
         release_nodes(&self.nodes, self.resource, self.amount);
-    }
-}
-
-fn release_nodes(nodes: &[Arc<Node>], resource: Resource, amount: u64) {
-    for node in nodes {
-        let counter = &node.used[resource.index()];
-        let _ = counter.fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
-            Some(used.saturating_sub(amount))
-        });
     }
 }
 
@@ -226,8 +236,23 @@ pub struct ResourceLimit {
     pub scope: Arc<str>,
 }
 
+fn release_nodes(nodes: &[Arc<Node>], resource: Resource, amount: u64) {
+    for node in nodes {
+        let counter = &node.used[resource.index()];
+        let _prev = counter.fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
+            Some(used.saturating_sub(amount))
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
+
     use super::*;
 
     fn limits(memory: u64) -> Limits {

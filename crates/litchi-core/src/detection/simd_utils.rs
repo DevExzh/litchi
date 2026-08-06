@@ -8,6 +8,86 @@
 use crate::simd::cmp::simd_eq_u8;
 use smallvec::SmallVec;
 
+/// Bitmask representing which Office format signatures match.
+///
+/// This is used by `check_office_signatures()` to efficiently return
+/// multiple matches at once.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormatSignatureMask {
+    bits: u8,
+}
+
+impl FormatSignatureMask {
+    /// OLE2 signature bit (legacy Office: .doc, .xls, .ppt)
+    pub const OLE2: Self = Self { bits: 0b001 };
+
+    /// ZIP signature bit (modern Office, ODF, iWork)
+    pub const ZIP: Self = Self { bits: 0b010 };
+
+    /// RTF signature bit
+    pub const RTF: Self = Self { bits: 0b100 };
+
+    /// Create an empty mask with no matches
+    #[inline]
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self { bits: 0 }
+    }
+
+    /// Check if OLE2 signature matches
+    #[inline]
+    #[must_use]
+    pub const fn is_ole2(self) -> bool {
+        (self.bits & Self::OLE2.bits) != 0
+    }
+
+    /// Check if ZIP signature matches
+    #[inline]
+    #[must_use]
+    pub const fn is_zip(self) -> bool {
+        (self.bits & Self::ZIP.bits) != 0
+    }
+
+    /// Check if RTF signature matches
+    #[inline]
+    #[must_use]
+    pub const fn is_rtf(self) -> bool {
+        (self.bits & Self::RTF.bits) != 0
+    }
+
+    /// Check if any signature matches
+    #[inline]
+    #[must_use]
+    pub const fn has_match(self) -> bool {
+        self.bits != 0
+    }
+
+    /// Get number of matching signatures
+    #[inline]
+    #[must_use]
+    pub const fn count(self) -> u32 {
+        self.bits.count_ones()
+    }
+}
+
+impl std::ops::BitOr for FormatSignatureMask {
+    type Output = Self;
+
+    #[inline]
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self {
+            bits: self.bits | rhs.bits,
+        }
+    }
+}
+
+impl std::ops::BitOrAssign for FormatSignatureMask {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.bits |= rhs.bits;
+    }
+}
+
 /// Check if a byte slice starts with a given signature using SIMD acceleration.
 ///
 /// This function is optimized for checking multiple signatures or longer patterns.
@@ -34,6 +114,7 @@ use smallvec::SmallVec;
 /// assert!(signature_matches(data, ole2_sig));
 /// ```
 #[inline]
+#[must_use]
 pub fn signature_matches(data: &[u8], signature: &[u8]) -> bool {
     if data.len() < signature.len() {
         return false;
@@ -82,6 +163,7 @@ pub fn signature_matches(data: &[u8], signature: &[u8]) -> bool {
 ///
 /// assert_eq!(signature_matches_any(data, &signatures), Some(1));
 /// ```
+#[must_use]
 pub fn signature_matches_any(data: &[u8], signatures: &[&[u8]]) -> Option<usize> {
     for (idx, sig) in signatures.iter().enumerate() {
         if signature_matches(data, sig) {
@@ -113,7 +195,7 @@ pub fn signature_matches_any(data: &[u8], signatures: &[&[u8]]) -> Option<usize>
 ///
 /// For N signatures of length L bytes:
 /// - Sequential: O(N * L) comparisons
-/// - Parallel SIMD: O(N * L / vector_width) comparisons
+/// - Parallel SIMD: O(N * L / `vector_width`) comparisons
 /// - Typical speedup: 4-8x for checking 3-8 signatures
 /// - Zero heap allocations for ≤8 matches (stack-only)
 ///
@@ -132,6 +214,7 @@ pub fn signature_matches_any(data: &[u8], signatures: &[&[u8]]) -> Option<usize>
 /// let matches = parallel_signature_check(data, &signatures);
 /// assert_eq!(matches.as_slice(), &[0, 2]);
 /// ```
+#[must_use]
 pub fn parallel_signature_check(data: &[u8], signatures: &[&[u8]]) -> SmallVec<[usize; 8]> {
     // Use SmallVec with inline capacity of 8 to avoid heap allocation
     // This covers the common case of checking multiple format signatures
@@ -189,6 +272,7 @@ pub fn parallel_signature_check(data: &[u8], signatures: &[&[u8]]) -> SmallVec<[
 /// assert!(!mask.is_ole2());
 /// assert!(!mask.is_rtf());
 /// ```
+#[must_use]
 pub fn check_office_signatures(data: &[u8]) -> FormatSignatureMask {
     let mut mask = FormatSignatureMask::empty();
 
@@ -208,80 +292,6 @@ pub fn check_office_signatures(data: &[u8]) -> FormatSignatureMask {
     }
 
     mask
-}
-
-/// Bitmask representing which Office format signatures match.
-///
-/// This is used by `check_office_signatures()` to efficiently return
-/// multiple matches at once.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FormatSignatureMask {
-    bits: u8,
-}
-
-impl FormatSignatureMask {
-    /// OLE2 signature bit (legacy Office: .doc, .xls, .ppt)
-    pub const OLE2: Self = Self { bits: 0b001 };
-
-    /// ZIP signature bit (modern Office, ODF, iWork)
-    pub const ZIP: Self = Self { bits: 0b010 };
-
-    /// RTF signature bit
-    pub const RTF: Self = Self { bits: 0b100 };
-
-    /// Create an empty mask with no matches
-    #[inline]
-    pub const fn empty() -> Self {
-        Self { bits: 0 }
-    }
-
-    /// Check if OLE2 signature matches
-    #[inline]
-    pub const fn is_ole2(self) -> bool {
-        (self.bits & Self::OLE2.bits) != 0
-    }
-
-    /// Check if ZIP signature matches
-    #[inline]
-    pub const fn is_zip(self) -> bool {
-        (self.bits & Self::ZIP.bits) != 0
-    }
-
-    /// Check if RTF signature matches
-    #[inline]
-    pub const fn is_rtf(self) -> bool {
-        (self.bits & Self::RTF.bits) != 0
-    }
-
-    /// Check if any signature matches
-    #[inline]
-    pub const fn has_match(self) -> bool {
-        self.bits != 0
-    }
-
-    /// Get number of matching signatures
-    #[inline]
-    pub const fn count(self) -> u32 {
-        self.bits.count_ones()
-    }
-}
-
-impl std::ops::BitOr for FormatSignatureMask {
-    type Output = Self;
-
-    #[inline]
-    fn bitor(self, rhs: Self) -> Self::Output {
-        Self {
-            bits: self.bits | rhs.bits,
-        }
-    }
-}
-
-impl std::ops::BitOrAssign for FormatSignatureMask {
-    #[inline]
-    fn bitor_assign(&mut self, rhs: Self) {
-        self.bits |= rhs.bits;
-    }
 }
 
 /// Fast substring search using SIMD for pattern matching in file content.
@@ -308,6 +318,7 @@ impl std::ops::BitOrAssign for FormatSignatureMask {
 ///
 /// assert!(find_pattern(content, pattern).is_some());
 /// ```
+#[must_use]
 pub fn find_pattern(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     if needle.is_empty() || haystack.len() < needle.len() {
         return None;
@@ -350,6 +361,7 @@ pub fn find_pattern(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 /// # Returns
 ///
 /// * `true` if all patterns are found, `false` otherwise
+#[must_use]
 pub fn contains_all_patterns(content: &[u8], patterns: &[&[u8]]) -> bool {
     patterns
         .iter()
@@ -368,6 +380,7 @@ pub fn contains_all_patterns(content: &[u8], patterns: &[&[u8]]) -> bool {
 /// # Returns
 ///
 /// * `Some(index)` of first matching pattern, or `None`
+#[must_use]
 pub fn contains_any_pattern(content: &[u8], patterns: &[&[u8]]) -> Option<usize> {
     for (idx, pattern) in patterns.iter().enumerate() {
         if find_pattern(content, pattern).is_some() {
@@ -391,6 +404,7 @@ pub fn contains_any_pattern(content: &[u8], patterns: &[&[u8]]) -> Option<usize>
 ///
 /// * `true` if content types match, `false` otherwise
 #[inline]
+#[must_use]
 pub fn content_type_matches(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
@@ -421,6 +435,7 @@ pub fn content_type_matches(a: &[u8], b: &[u8]) -> bool {
 /// # Returns
 ///
 /// * `true` if content type matches any valid type
+#[must_use]
 pub fn content_type_matches_any(content_type: &[u8], valid_types: &[&[u8]]) -> bool {
     valid_types
         .iter()
@@ -429,6 +444,12 @@ pub fn content_type_matches_any(content_type: &[u8], valid_types: &[&[u8]]) -> b
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
+
     use super::*;
 
     #[test]
@@ -555,8 +576,8 @@ mod tests {
 
         // Test with no matches
         let non_matching_data = &[0xFF, 0xFF, 0xFF, 0xFF];
-        let matches = parallel_signature_check(non_matching_data, &signatures);
-        assert!(matches.is_empty());
+        let no_matches = parallel_signature_check(non_matching_data, &signatures);
+        assert!(no_matches.is_empty());
 
         // Test that it doesn't allocate for small results (stays on stack)
         // This is implicit - SmallVec with capacity 8 should not allocate
@@ -566,10 +587,10 @@ mod tests {
             &[0x50, 0x4B][..],
             &[0x00, 0x00][..],
         ];
-        let matches = parallel_signature_check(data, &many_signatures);
-        assert_eq!(matches.as_slice(), &[0, 2]);
+        let matches_many = parallel_signature_check(data, &many_signatures);
+        assert_eq!(matches_many.as_slice(), &[0, 2]);
         // Verify SmallVec didn't spill to heap (capacity check)
-        assert!(!matches.spilled());
+        assert!(!matches_many.spilled());
     }
 
     #[test]
@@ -584,25 +605,25 @@ mod tests {
 
         // Test OLE2 signature
         let ole2_data = &[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
-        let mask = check_office_signatures(ole2_data);
-        assert!(mask.is_ole2());
-        assert!(!mask.is_zip());
-        assert!(!mask.is_rtf());
-        assert_eq!(mask.count(), 1);
+        let mask_ole2 = check_office_signatures(ole2_data);
+        assert!(mask_ole2.is_ole2());
+        assert!(!mask_ole2.is_zip());
+        assert!(!mask_ole2.is_rtf());
+        assert_eq!(mask_ole2.count(), 1);
 
         // Test RTF signature
         let rtf_data = b"{\\rtf1\\ansi";
-        let mask = check_office_signatures(rtf_data);
-        assert!(mask.is_rtf());
-        assert!(!mask.is_ole2());
-        assert!(!mask.is_zip());
-        assert_eq!(mask.count(), 1);
+        let mask_rtf = check_office_signatures(rtf_data);
+        assert!(mask_rtf.is_rtf());
+        assert!(!mask_rtf.is_ole2());
+        assert!(!mask_rtf.is_zip());
+        assert_eq!(mask_rtf.count(), 1);
 
         // Test no match
         let unknown_data = &[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
-        let mask = check_office_signatures(unknown_data);
-        assert!(!mask.has_match());
-        assert_eq!(mask.count(), 0);
+        let mask_unknown = check_office_signatures(unknown_data);
+        assert!(!mask_unknown.has_match());
+        assert_eq!(mask_unknown.count(), 0);
     }
 
     #[test]
@@ -614,10 +635,10 @@ mod tests {
         assert!(!mask.is_rtf());
 
         let rtf_data = b"{\\rtf";
-        let mask = check_office_signatures(rtf_data);
-        assert!(mask.is_rtf());
-        assert!(!mask.is_ole2());
-        assert!(!mask.is_zip());
+        let mask_rtf = check_office_signatures(rtf_data);
+        assert!(mask_rtf.is_rtf());
+        assert!(!mask_rtf.is_ole2());
+        assert!(!mask_rtf.is_zip());
 
         for incomplete in [b"PK\x03".as_slice(), b"{\\rt".as_slice()] {
             assert!(!check_office_signatures(incomplete).has_match());

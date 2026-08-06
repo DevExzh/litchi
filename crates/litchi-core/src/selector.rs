@@ -13,12 +13,14 @@ pub struct Position(usize);
 impl Position {
     /// Creates a zero-based position.
     #[inline]
+    #[must_use]
     pub const fn new(value: usize) -> Self {
         Self(value)
     }
 
     /// Returns the zero-based value.
     #[inline]
+    #[must_use]
     pub const fn get(self) -> usize {
         self.0
     }
@@ -69,7 +71,7 @@ impl<'a, Id> From<&'a str> for Selector<'a, Id> {
     }
 }
 
-impl<'a, Id> From<String> for Selector<'a, Id> {
+impl<Id> From<String> for Selector<'_, Id> {
     fn from(value: String) -> Self {
         Self::Name(Cow::Owned(value))
     }
@@ -81,13 +83,13 @@ impl<'a, Id> From<&'a String> for Selector<'a, Id> {
     }
 }
 
-impl<'a, Id> From<usize> for Selector<'a, Id> {
+impl<Id> From<usize> for Selector<'_, Id> {
     fn from(value: usize) -> Self {
         Self::Position(value.into())
     }
 }
 
-impl<'a, Id> From<Position> for Selector<'a, Id> {
+impl<Id> From<Position> for Selector<'_, Id> {
     fn from(value: Position) -> Self {
         Self::Position(value)
     }
@@ -117,7 +119,7 @@ mod tests {
 
     #[test]
     fn owned_names_adapt_to_the_callers_scope() {
-        fn scoped<'a>(name: String, _scope: &'a ()) -> Selector<'a, SheetId> {
+        fn scoped(name: String, _scope: &()) -> Selector<'_, SheetId> {
             name.into()
         }
 

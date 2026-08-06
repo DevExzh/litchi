@@ -1,15 +1,24 @@
+use std::sync::LazyLock;
+
 use aho_corasick::{AhoCorasick, MatchKind};
-use once_cell::sync::Lazy;
 
 // Static initialization: automaton is built only once, thread-safe
-static XML_ESCAPER: Lazy<AhoCorasick> = Lazy::new(|| {
+#[allow(
+    clippy::expect_used,
+    reason = "building an Aho-Corasick automaton from five fixed short patterns cannot fail"
+)]
+static XML_ESCAPER: LazyLock<AhoCorasick> = LazyLock::new(|| {
     AhoCorasick::builder()
         .build(["&", "<", ">", "\"", "'"])
         .expect("Failed to build XML escaper")
 });
 
 // Use LeftmostLongest to ensure longer entities are matched first (e.g., &amp; instead of &lt;)
-static XML_UNESCAPER: Lazy<AhoCorasick> = Lazy::new(|| {
+#[allow(
+    clippy::expect_used,
+    reason = "building an Aho-Corasick automaton from five fixed short patterns cannot fail"
+)]
+static XML_UNESCAPER: LazyLock<AhoCorasick> = LazyLock::new(|| {
     AhoCorasick::builder()
         .match_kind(MatchKind::LeftmostLongest)
         .build(["&amp;", "&lt;", "&gt;", "&quot;", "&apos;"])
@@ -26,6 +35,10 @@ static XML_UNESCAPER: Lazy<AhoCorasick> = Lazy::new(|| {
 /// assert_eq!(escape_xml("<tag>\"hello\"</tag>"), "&lt;tag&gt;&quot;hello&quot;&lt;/tag&gt;");
 /// ```
 #[inline]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
+)]
 pub fn escape_xml(s: &str) -> String {
     XML_ESCAPER.replace_all(s, &["&amp;", "&lt;", "&gt;", "&quot;", "&apos;"])
 }

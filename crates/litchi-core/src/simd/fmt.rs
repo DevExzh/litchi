@@ -5,8 +5,8 @@
 //!
 //! # Architecture Support
 //!
-//! ## x86_64
-//! - **SSE2**: 128-bit operations (baseline for x86_64)
+//! ## `x86_64`
+//! - **SSE2**: 128-bit operations (baseline for `x86_64`)
 //! - **SSSE3**: Enhanced shuffles for table lookups
 //! - **SSE4.1**: Additional operations
 //! - **AVX2**: 256-bit operations (~2x throughput)
@@ -46,10 +46,51 @@
 //! ```
 
 #[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
+use std::arch::x86_64::{
+    _mm_and_si128, _mm_loadl_epi64, _mm_loadu_si128, _mm_set1_epi8, _mm_shuffle_epi8,
+    _mm_srli_epi16, _mm_storeu_si128, _mm_unpackhi_epi8, _mm_unpacklo_epi8, _mm256_castsi256_si128,
+    _mm256_extracti128_si256, _mm256_loadu_si256,
+};
 
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::*;
+
+/// Format bytes as hexadecimal at compile time (when possible)
+///
+/// This macro expands to efficient SIMD code at runtime while allowing
+/// compile-time evaluation for constant inputs.
+///
+/// # Examples
+///
+/// ```
+/// use litchi_core::hex_fmt;
+///
+/// let hex = hex_fmt!(b"\xDE\xAD\xBE\xEF");
+/// assert_eq!(hex, "DEADBEEF");
+/// ```
+#[macro_export]
+macro_rules! hex_fmt {
+    ($bytes:expr) => {
+        $crate::simd::fmt::hex_encode($bytes)
+    };
+}
+
+/// Format bytes as lowercase hexadecimal at compile time (when possible)
+///
+/// # Examples
+///
+/// ```
+/// use litchi_core::hex_fmt_lower;
+///
+/// let hex = hex_fmt_lower!(b"\xDE\xAD\xBE\xEF");
+/// assert_eq!(hex, "deadbeef");
+/// ```
+#[macro_export]
+macro_rules! hex_fmt_lower {
+    ($bytes:expr) => {
+        $crate::simd::fmt::hex_encode_lower($bytes)
+    };
+}
 
 /// Lookup table for converting nibbles (0-15) to ASCII hex characters (0-9, A-F)
 ///
@@ -73,6 +114,7 @@ const HEX_CHARS_LOWER: &[u8; 16] = b"0123456789abcdef";
 /// assert_eq!(hex_encode(data), "DEADBEEF");
 /// ```
 #[inline]
+#[must_use]
 pub fn hex_encode(bytes: &[u8]) -> String {
     let mut result = String::with_capacity(bytes.len() * 2);
     hex_encode_to_string(bytes, &mut result, false);
@@ -90,6 +132,7 @@ pub fn hex_encode(bytes: &[u8]) -> String {
 /// assert_eq!(hex_encode_lower(data), "deadbeef");
 /// ```
 #[inline]
+#[must_use]
 pub fn hex_encode_lower(bytes: &[u8]) -> String {
     let mut result = String::with_capacity(bytes.len() * 2);
     hex_encode_to_string(bytes, &mut result, true);
@@ -117,22 +160,27 @@ pub fn hex_encode_to_string(bytes: &[u8], output: &mut String, lowercase: bool) 
             && is_x86_feature_detected!("avx512bw")
             && is_x86_feature_detected!("avx512vl")
         {
+            // SAFETY: AVX-512F/BW/VL support was detected at runtime.
             unsafe {
                 hex_encode_avx512(bytes, output, lowercase);
             }
         } else if is_x86_feature_detected!("avx2") {
+            // SAFETY: AVX2 support was detected at runtime.
             unsafe {
                 hex_encode_avx2(bytes, output, lowercase);
             }
         } else if is_x86_feature_detected!("ssse3") {
+            // SAFETY: SSSE3 support was detected at runtime.
             unsafe {
                 hex_encode_ssse3(bytes, output, lowercase);
             }
         } else if is_x86_feature_detected!("sse4.1") {
+            // SAFETY: SSE4.1 support was detected at runtime.
             unsafe {
                 hex_encode_sse41(bytes, output, lowercase);
             }
         } else if is_x86_feature_detected!("sse2") {
+            // SAFETY: SSE2 support was detected at runtime.
             unsafe {
                 hex_encode_sse2(bytes, output, lowercase);
             }
@@ -180,7 +228,6 @@ pub fn hex_encode_to_string(bytes: &[u8], output: &mut String, lowercase: bool) 
 /// This is the fallback implementation used when no SIMD instructions are available.
 /// It's also competitive for very small inputs (<16 bytes).
 #[inline]
-#[allow(dead_code)] // Used conditionally based on target features
 fn hex_encode_scalar(bytes: &[u8], output: &mut String, lowercase: bool) {
     let hex_table = if lowercase {
         HEX_CHARS_LOWER
@@ -212,6 +259,7 @@ unsafe fn hex_encode_sse2(bytes: &[u8], output: &mut String, lowercase: bool) {
         HEX_CHARS
     };
 
+    // SAFETY: only valid ASCII hex characters are pushed, keeping the `String` valid UTF-8.
     let buf = unsafe { output.as_mut_vec() };
     let mut i = 0;
 
@@ -245,11 +293,14 @@ unsafe fn hex_encode_sse2(bytes: &[u8], output: &mut String, lowercase: bool) {
 #[target_feature(enable = "ssse3")]
 unsafe fn hex_encode_ssse3(bytes: &[u8], output: &mut String, lowercase: bool) {
     let hex_table_vec = if lowercase {
-        unsafe { _mm_loadu_si128(HEX_CHARS_LOWER.as_ptr() as *const __m128i) }
+        // SAFETY: the hex table is a 16-byte static array; `loadu` does not require alignment.
+        unsafe { _mm_loadu_si128(HEX_CHARS_LOWER.as_ptr().cast()) }
     } else {
-        unsafe { _mm_loadu_si128(HEX_CHARS.as_ptr() as *const __m128i) }
+        // SAFETY: same as above.
+        unsafe { _mm_loadu_si128(HEX_CHARS.as_ptr().cast()) }
     };
 
+    // SAFETY: only valid ASCII hex characters are appended, keeping the `String` valid UTF-8.
     let buf = unsafe { output.as_mut_vec() };
     let mut i = 0;
 
@@ -258,7 +309,9 @@ unsafe fn hex_encode_ssse3(bytes: &[u8], output: &mut String, lowercase: bool) {
     // Process 8 bytes at a time (produces 16 hex chars)
     while i + 8 <= bytes.len() {
         // Load 8 bytes into lower 64 bits
-        let input = unsafe { _mm_loadl_epi64(bytes[i..].as_ptr() as *const __m128i) };
+        // SAFETY: `i + 8 <= bytes.len()`, so 8 bytes are readable at `bytes[i..]`;
+        // `loadl` does not require alignment.
+        let input = unsafe { _mm_loadl_epi64(bytes[i..].as_ptr().cast()) };
 
         // Extract high and low nibbles
         let high = _mm_and_si128(_mm_srli_epi16(input, 4), mask_0f);
@@ -273,7 +326,8 @@ unsafe fn hex_encode_ssse3(bytes: &[u8], output: &mut String, lowercase: bool) {
 
         // Store result (16 bytes = 16 hex chars)
         let mut result: [u8; 16] = [0; 16];
-        unsafe { _mm_storeu_si128(result.as_mut_ptr() as *mut __m128i, hex_chars) };
+        // SAFETY: `result` is a 16-byte local; `storeu` does not require alignment.
+        unsafe { _mm_storeu_si128(result.as_mut_ptr().cast(), hex_chars) };
 
         buf.extend_from_slice(&result);
         i += 8;
@@ -299,6 +353,7 @@ unsafe fn hex_encode_ssse3(bytes: &[u8], output: &mut String, lowercase: bool) {
 unsafe fn hex_encode_sse41(bytes: &[u8], output: &mut String, lowercase: bool) {
     // SSE4.1 adds some useful instructions but for hex encoding SSSE3 is sufficient
     // We'll use the SSSE3 implementation
+    // SAFETY: SSE4.1 implies SSSE3 support.
     unsafe { hex_encode_ssse3(bytes, output, lowercase) };
 }
 
@@ -311,44 +366,49 @@ unsafe fn hex_encode_avx2(bytes: &[u8], output: &mut String, lowercase: bool) {
 
     // Process 16 bytes at a time (produces 32 hex chars)
     while i + 16 <= bytes.len() {
-        // SAFETY: All intrinsic operations are safe within this target_feature context
-        unsafe {
-            // Load 16 bytes
-            let input = _mm_loadu_si128(bytes[i..].as_ptr() as *const __m128i);
+        // SAFETY: `i + 16 <= bytes.len()`, so 16 bytes are readable at `bytes[i..]`;
+        // `loadu` does not require alignment.
+        let input = unsafe { _mm_loadu_si128(bytes[i..].as_ptr().cast()) };
 
-            // Extract high and low nibbles
-            let high_128 = _mm_and_si128(_mm_srli_epi16(input, 4), _mm_set1_epi8(0x0F));
-            let low_128 = _mm_and_si128(input, _mm_set1_epi8(0x0F));
+        // Extract high and low nibbles
+        let high_128 = _mm_and_si128(_mm_srli_epi16(input, 4), _mm_set1_epi8(0x0F));
+        let low_128 = _mm_and_si128(input, _mm_set1_epi8(0x0F));
 
-            // Interleave nibbles in the low 64 bits (first 8 bytes)
-            let nibbles_lo = _mm_unpacklo_epi8(high_128, low_128);
-            // Interleave nibbles in the high 64 bits (second 8 bytes)
-            let nibbles_hi = _mm_unpackhi_epi8(high_128, low_128);
+        // Interleave nibbles in the low 64 bits (first 8 bytes)
+        let nibbles_lo = _mm_unpacklo_epi8(high_128, low_128);
+        // Interleave nibbles in the high 64 bits (second 8 bytes)
+        let nibbles_hi = _mm_unpackhi_epi8(high_128, low_128);
 
-            // Load hex table and lookup
-            let hex_table_128 = _mm_loadu_si128(
+        // Load hex table and lookup
+        // SAFETY: the hex tables are 16-byte static arrays; `loadu` is unaligned-safe.
+        let hex_table_128 = unsafe {
+            _mm_loadu_si128(
                 if lowercase {
                     HEX_CHARS_LOWER
                 } else {
                     HEX_CHARS
                 }
-                .as_ptr() as *const __m128i,
-            );
-            let hex_lo = _mm_shuffle_epi8(hex_table_128, nibbles_lo);
-            let hex_hi = _mm_shuffle_epi8(hex_table_128, nibbles_hi);
+                .as_ptr()
+                .cast(),
+            )
+        };
+        let hex_lo = _mm_shuffle_epi8(hex_table_128, nibbles_lo);
+        let hex_hi = _mm_shuffle_epi8(hex_table_128, nibbles_hi);
 
-            // Store results (16 + 16 = 32 hex chars)
-            let mut result: [u8; 32] = [0; 32];
-            _mm_storeu_si128(result.as_mut_ptr() as *mut __m128i, hex_lo);
-            _mm_storeu_si128(result[16..].as_mut_ptr() as *mut __m128i, hex_hi);
+        // Store results (16 + 16 = 32 hex chars)
+        let mut result: [u8; 32] = [0; 32];
+        // SAFETY: `result` is a 32-byte local; `storeu` does not require alignment.
+        unsafe { _mm_storeu_si128(result.as_mut_ptr().cast(), hex_lo) };
+        // SAFETY: the second 16-byte half of `result` is fully writable.
+        unsafe { _mm_storeu_si128(result[16..].as_mut_ptr().cast(), hex_hi) };
 
-            buf.extend_from_slice(&result);
-        }
+        buf.extend_from_slice(&result);
         i += 16;
     }
 
     // Handle remaining bytes with SSSE3
     if i < bytes.len() {
+        // SAFETY: AVX2 implies SSSE3 support.
         unsafe { hex_encode_ssse3(&bytes[i..], output, lowercase) };
     }
 }
@@ -362,56 +422,63 @@ unsafe fn hex_encode_avx512(bytes: &[u8], output: &mut String, lowercase: bool) 
 
     // Process 32 bytes at a time (produces 64 hex chars)
     while i + 32 <= bytes.len() {
-        // SAFETY: All intrinsic operations are safe within this target_feature context
-        unsafe {
-            // Load 32 bytes
-            let input = _mm256_loadu_si256(bytes[i..].as_ptr() as *const __m256i);
+        // SAFETY: `i + 32 <= bytes.len()`, so 32 bytes are readable at `bytes[i..]`;
+        // `loadu` does not require alignment.
+        let input = unsafe { _mm256_loadu_si256(bytes[i..].as_ptr().cast()) };
 
-            // Split into two 128-bit lanes
-            let input_lo = _mm256_castsi256_si128(input);
-            let input_hi = _mm256_extracti128_si256(input, 1);
+        // Split into two 128-bit lanes
+        let input_lo = _mm256_castsi256_si128(input);
+        let input_hi = _mm256_extracti128_si256(input, 1);
 
-            // Process each 128-bit lane
-            let hex_table_128 = _mm_loadu_si128(
+        // Process each 128-bit lane
+        // SAFETY: the hex tables are 16-byte static arrays; `loadu` is unaligned-safe.
+        let hex_table_128 = unsafe {
+            _mm_loadu_si128(
                 if lowercase {
                     HEX_CHARS_LOWER
                 } else {
                     HEX_CHARS
                 }
-                .as_ptr() as *const __m128i,
-            );
-            let mask_0f = _mm_set1_epi8(0x0F);
+                .as_ptr()
+                .cast(),
+            )
+        };
+        let mask_0f = _mm_set1_epi8(0x0F);
 
-            // First 16 bytes
-            let high_lo = _mm_and_si128(_mm_srli_epi16(input_lo, 4), mask_0f);
-            let low_lo = _mm_and_si128(input_lo, mask_0f);
-            let nibbles_lo_lo = _mm_unpacklo_epi8(high_lo, low_lo);
-            let nibbles_lo_hi = _mm_unpackhi_epi8(high_lo, low_lo);
-            let hex_lo_lo = _mm_shuffle_epi8(hex_table_128, nibbles_lo_lo);
-            let hex_lo_hi = _mm_shuffle_epi8(hex_table_128, nibbles_lo_hi);
+        // First 16 bytes
+        let high_lo = _mm_and_si128(_mm_srli_epi16(input_lo, 4), mask_0f);
+        let low_lo = _mm_and_si128(input_lo, mask_0f);
+        let nibbles_lo_lo = _mm_unpacklo_epi8(high_lo, low_lo);
+        let nibbles_lo_hi = _mm_unpackhi_epi8(high_lo, low_lo);
+        let hex_lo_lo = _mm_shuffle_epi8(hex_table_128, nibbles_lo_lo);
+        let hex_lo_hi = _mm_shuffle_epi8(hex_table_128, nibbles_lo_hi);
 
-            // Second 16 bytes
-            let high_hi = _mm_and_si128(_mm_srli_epi16(input_hi, 4), mask_0f);
-            let low_hi = _mm_and_si128(input_hi, mask_0f);
-            let nibbles_hi_lo = _mm_unpacklo_epi8(high_hi, low_hi);
-            let nibbles_hi_hi = _mm_unpackhi_epi8(high_hi, low_hi);
-            let hex_hi_lo = _mm_shuffle_epi8(hex_table_128, nibbles_hi_lo);
-            let hex_hi_hi = _mm_shuffle_epi8(hex_table_128, nibbles_hi_hi);
+        // Second 16 bytes
+        let high_hi = _mm_and_si128(_mm_srli_epi16(input_hi, 4), mask_0f);
+        let low_hi = _mm_and_si128(input_hi, mask_0f);
+        let nibbles_hi_lo = _mm_unpacklo_epi8(high_hi, low_hi);
+        let nibbles_hi_hi = _mm_unpackhi_epi8(high_hi, low_hi);
+        let hex_hi_lo = _mm_shuffle_epi8(hex_table_128, nibbles_hi_lo);
+        let hex_hi_hi = _mm_shuffle_epi8(hex_table_128, nibbles_hi_hi);
 
-            // Store results (64 hex chars total)
-            let mut result: [u8; 64] = [0; 64];
-            _mm_storeu_si128(result.as_mut_ptr() as *mut __m128i, hex_lo_lo);
-            _mm_storeu_si128(result[16..].as_mut_ptr() as *mut __m128i, hex_lo_hi);
-            _mm_storeu_si128(result[32..].as_mut_ptr() as *mut __m128i, hex_hi_lo);
-            _mm_storeu_si128(result[48..].as_mut_ptr() as *mut __m128i, hex_hi_hi);
+        // Store results (64 hex chars total)
+        let mut result: [u8; 64] = [0; 64];
+        // SAFETY: `result` is a 64-byte local; `storeu` does not require alignment.
+        unsafe { _mm_storeu_si128(result.as_mut_ptr().cast(), hex_lo_lo) };
+        // SAFETY: bytes 16..32 of `result` are fully writable.
+        unsafe { _mm_storeu_si128(result[16..].as_mut_ptr().cast(), hex_lo_hi) };
+        // SAFETY: bytes 32..48 of `result` are fully writable.
+        unsafe { _mm_storeu_si128(result[32..].as_mut_ptr().cast(), hex_hi_lo) };
+        // SAFETY: bytes 48..64 of `result` are fully writable.
+        unsafe { _mm_storeu_si128(result[48..].as_mut_ptr().cast(), hex_hi_hi) };
 
-            buf.extend_from_slice(&result);
-        }
+        buf.extend_from_slice(&result);
         i += 32;
     }
 
     // Handle remaining bytes with AVX2
     if i < bytes.len() {
+        // SAFETY: all CPUs with AVX-512F/BW/VL support AVX2.
         unsafe { hex_encode_avx2(&bytes[i..], output, lowercase) };
     }
 }
@@ -569,6 +636,7 @@ unsafe fn hex_encode_sve2(bytes: &[u8], output: &mut String, lowercase: bool) {
 /// assert_eq!(format_hex_with_separator(data, " "), "01 23 45 67");
 /// ```
 #[inline]
+#[must_use]
 pub fn format_hex_with_separator(bytes: &[u8], separator: &str) -> String {
     if bytes.is_empty() {
         return String::new();
@@ -584,9 +652,13 @@ pub fn format_hex_with_separator(bytes: &[u8], separator: &str) -> String {
         }
         let high = (byte >> 4) as usize;
         let low = (byte & 0x0F) as usize;
-        // SAFETY: We're only pushing valid ASCII characters
+        // SAFETY: only valid ASCII hex characters are pushed, keeping the `String`
+        // valid UTF-8.
         unsafe {
             result.as_mut_vec().push(HEX_CHARS[high]);
+        }
+        // SAFETY: same as above.
+        unsafe {
             result.as_mut_vec().push(HEX_CHARS[low]);
         }
     }
@@ -598,45 +670,14 @@ pub fn format_hex_with_separator(bytes: &[u8], separator: &str) -> String {
 // Compile-time macros
 //
 
-/// Format bytes as hexadecimal at compile time (when possible)
-///
-/// This macro expands to efficient SIMD code at runtime while allowing
-/// compile-time evaluation for constant inputs.
-///
-/// # Examples
-///
-/// ```
-/// use litchi_core::hex_fmt;
-///
-/// let hex = hex_fmt!(b"\xDE\xAD\xBE\xEF");
-/// assert_eq!(hex, "DEADBEEF");
-/// ```
-#[macro_export]
-macro_rules! hex_fmt {
-    ($bytes:expr) => {
-        $crate::simd::fmt::hex_encode($bytes)
-    };
-}
-
-/// Format bytes as lowercase hexadecimal at compile time (when possible)
-///
-/// # Examples
-///
-/// ```
-/// use litchi_core::hex_fmt_lower;
-///
-/// let hex = hex_fmt_lower!(b"\xDE\xAD\xBE\xEF");
-/// assert_eq!(hex, "deadbeef");
-/// ```
-#[macro_export]
-macro_rules! hex_fmt_lower {
-    ($bytes:expr) => {
-        $crate::simd::fmt::hex_encode_lower($bytes)
-    };
-}
-
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
+
     use super::*;
 
     #[test]
@@ -687,14 +728,14 @@ mod tests {
     fn test_simd_variants_comprehensive() {
         // Test data of various sizes to trigger different code paths
         let test_cases = vec![
-            vec![],                                       // Empty
-            vec![0x42],                                   // 1 byte (scalar fallback)
-            vec![0x01, 0x23, 0x45, 0x67],                 // 4 bytes
-            (0..8).collect::<Vec<u8>>(),                  // 8 bytes (SSE/SSSE3 boundary)
-            (0..16).collect::<Vec<u8>>(),                 // 16 bytes (AVX2 boundary)
-            (0..32).collect::<Vec<u8>>(),                 // 32 bytes (AVX512 boundary)
-            (0..=255).collect::<Vec<u8>>(),               // Full byte range
-            (0..1000).map(|i| (i % 256) as u8).collect(), // Large data
+            vec![],                                                      // Empty
+            vec![0x42],                                                  // 1 byte (scalar fallback)
+            vec![0x01, 0x23, 0x45, 0x67],                                // 4 bytes
+            (0..8).collect::<Vec<u8>>(),  // 8 bytes (SSE/SSSE3 boundary)
+            (0..16).collect::<Vec<u8>>(), // 16 bytes (AVX2 boundary)
+            (0..32).collect::<Vec<u8>>(), // 32 bytes (AVX512 boundary)
+            (0..=255).collect::<Vec<u8>>(), // Full byte range
+            (0..1000).map(|i| u8::try_from(i % 256).unwrap()).collect(), // Large data
         ];
 
         for data in test_cases {
@@ -731,6 +772,7 @@ mod tests {
         let data: Vec<u8> = (0..32).collect();
 
         let mut result = String::new();
+        // SAFETY: SSE2 is always available on `x86_64`.
         unsafe {
             hex_encode_sse2(&data, &mut result, false);
         }
@@ -745,13 +787,13 @@ mod tests {
     #[test]
     fn test_x86_ssse3_directly() {
         if !is_x86_feature_detected!("ssse3") {
-            eprintln!("SSSE3 not available, skipping test");
             return;
         }
 
         let data: Vec<u8> = (0..64).collect();
 
         let mut result = String::new();
+        // SAFETY: SSSE3 support was detected at runtime above.
         unsafe {
             hex_encode_ssse3(&data, &mut result, false);
         }
@@ -766,13 +808,13 @@ mod tests {
     #[test]
     fn test_x86_sse41_directly() {
         if !is_x86_feature_detected!("sse4.1") {
-            eprintln!("SSE4.1 not available, skipping test");
             return;
         }
 
         let data: Vec<u8> = (0..64).collect();
 
         let mut result = String::new();
+        // SAFETY: SSE4.1 support was detected at runtime above.
         unsafe {
             hex_encode_sse41(&data, &mut result, false);
         }
@@ -787,13 +829,13 @@ mod tests {
     #[test]
     fn test_x86_avx2_directly() {
         if !is_x86_feature_detected!("avx2") {
-            eprintln!("AVX2 not available, skipping test");
             return;
         }
 
         let data: Vec<u8> = (0..=255).collect();
 
         let mut result = String::new();
+        // SAFETY: AVX2 support was detected at runtime above.
         unsafe {
             hex_encode_avx2(&data, &mut result, false);
         }
@@ -811,13 +853,13 @@ mod tests {
             || !is_x86_feature_detected!("avx512bw")
             || !is_x86_feature_detected!("avx512vl")
         {
-            eprintln!("AVX-512 not available, skipping test");
             return;
         }
 
         let data: Vec<u8> = (0..=255).collect();
 
         let mut result = String::new();
+        // SAFETY: AVX-512 support was detected at runtime above.
         unsafe {
             hex_encode_avx512(&data, &mut result, false);
         }
@@ -839,21 +881,21 @@ mod tests {
 
         // All ones (0xFF)
         let ones = vec![0xFFu8; 100];
-        let result = hex_encode(&ones);
-        assert_eq!(result.len(), 200);
-        assert!(result.chars().all(|c| c == 'F'));
+        let result_ones = hex_encode(&ones);
+        assert_eq!(result_ones.len(), 200);
+        assert!(result_ones.chars().all(|c| c == 'F'));
 
         // Alternating pattern
         let alternating: Vec<u8> = (0..128)
             .map(|i| if i % 2 == 0 { 0xAA } else { 0x55 })
             .collect();
-        let result = hex_encode(&alternating);
-        assert_eq!(result.len(), 256);
+        let result_alt = hex_encode(&alternating);
+        assert_eq!(result_alt.len(), 256);
 
         // Test boundary values
         let boundary = vec![0x00, 0x0F, 0x10, 0x7F, 0x80, 0xF0, 0xFF];
-        let result = hex_encode(&boundary);
-        assert_eq!(result, "000F107F80F0FF");
+        let result_boundary = hex_encode(&boundary);
+        assert_eq!(result_boundary, "000F107F80F0FF");
     }
 
     /// Test lowercase vs uppercase consistency
@@ -892,6 +934,7 @@ mod tests {
 
         // Test SSE2
         let mut sse2_result = String::new();
+        // SAFETY: SSE2 is always available on `x86_64`.
         unsafe {
             hex_encode_sse2(&data, &mut sse2_result, false);
         }
@@ -900,6 +943,7 @@ mod tests {
         // Test SSSE3 if available
         if is_x86_feature_detected!("ssse3") {
             let mut ssse3_result = String::new();
+            // SAFETY: SSSE3 support was detected at runtime.
             unsafe {
                 hex_encode_ssse3(&data, &mut ssse3_result, false);
             }
@@ -909,6 +953,7 @@ mod tests {
         // Test SSE4.1 if available
         if is_x86_feature_detected!("sse4.1") {
             let mut sse41_result = String::new();
+            // SAFETY: SSE4.1 support was detected at runtime.
             unsafe {
                 hex_encode_sse41(&data, &mut sse41_result, false);
             }
@@ -918,6 +963,7 @@ mod tests {
         // Test AVX2 if available
         if is_x86_feature_detected!("avx2") {
             let mut avx2_result = String::new();
+            // SAFETY: AVX2 support was detected at runtime.
             unsafe {
                 hex_encode_avx2(&data, &mut avx2_result, false);
             }
@@ -930,6 +976,7 @@ mod tests {
             && is_x86_feature_detected!("avx512vl")
         {
             let mut avx512_result = String::new();
+            // SAFETY: AVX-512F/BW/VL support was detected at runtime.
             unsafe {
                 hex_encode_avx512(&data, &mut avx512_result, false);
             }
@@ -943,7 +990,7 @@ mod tests {
         for size in [
             1, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65, 127, 128, 129, 255, 256, 257, 1000,
         ] {
-            let data: Vec<u8> = (0..size).map(|i| (i % 256) as u8).collect();
+            let data: Vec<u8> = (0..size).map(|i| u8::try_from(i % 256).unwrap()).collect();
 
             let mut expected = String::new();
             hex_encode_scalar(&data, &mut expected, false);
@@ -951,8 +998,7 @@ mod tests {
             let result = hex_encode(&data);
             assert_eq!(
                 result, expected,
-                "Size {} failed: expected {}, got {}",
-                size, expected, result
+                "Size {size} failed: expected {expected}, got {result}"
             );
         }
     }

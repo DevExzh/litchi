@@ -2,6 +2,7 @@ use crate::simd::fmt::hex_encode_to_string;
 use rand::RngExt;
 
 /// Generate a random RFC4122 v4 GUID as raw 16 bytes
+#[must_use]
 pub fn generate_guid_bytes() -> [u8; 16] {
     let mut bytes = [0u8; 16];
     let mut rng = rand::rng();
@@ -13,12 +14,14 @@ pub fn generate_guid_bytes() -> [u8; 16] {
 }
 
 /// Generate a random GUID in the form {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
+#[must_use]
 pub fn generate_guid_braced() -> String {
     let bytes = generate_guid_bytes();
     format_guid_braced(&bytes)
 }
 
 /// Format raw GUID bytes as a braced string {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
+#[must_use]
 pub fn format_guid_braced(bytes: &[u8; 16]) -> String {
     let mut out = String::with_capacity(38);
     out.push('{');

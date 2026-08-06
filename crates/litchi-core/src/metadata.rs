@@ -124,6 +124,7 @@ impl Metadata {
     /// Check if the metadata contains any actual data.
     ///
     /// Returns true if at least one field is populated.
+    #[must_use]
     pub fn has_data(&self) -> bool {
         self.title.is_some()
             || self.subject.is_some()

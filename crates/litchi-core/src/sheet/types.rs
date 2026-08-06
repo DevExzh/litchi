@@ -38,18 +38,32 @@ impl CellValue {
     pub const EMPTY: &'static CellValue = &CellValue::Empty;
 
     /// Get the value as a string slice if it's a String variant.
+    #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self {
             CellValue::String(s) => Some(s),
-            _ => None,
+            CellValue::Empty
+            | CellValue::Bool(_)
+            | CellValue::Int(_)
+            | CellValue::Float(_)
+            | CellValue::DateTime(_)
+            | CellValue::Error(_)
+            | CellValue::Formula { .. } => None,
         }
     }
 
     /// Get the value as a float if it's a Float variant.
+    #[must_use]
     pub fn as_float(&self) -> Option<f64> {
         match self {
             CellValue::Float(f) => Some(*f),
-            _ => None,
+            CellValue::Empty
+            | CellValue::Bool(_)
+            | CellValue::Int(_)
+            | CellValue::String(_)
+            | CellValue::DateTime(_)
+            | CellValue::Error(_)
+            | CellValue::Formula { .. } => None,
         }
     }
 
@@ -62,23 +76,23 @@ impl CellValue {
     /// 4. Boolean keywords (TRUE/FALSE/1/0/YES/NO/ON/OFF) -> Bool
     /// 5. Everything else -> String
     pub fn infer_from_str<S: AsRef<str>>(s: S) -> Self {
-        let s = s.as_ref();
-        if s.is_empty() {
+        let text = s.as_ref();
+        if text.is_empty() {
             return Self::Empty;
         }
 
-        if let Ok(i) = s.parse::<i64>() {
+        if let Ok(i) = text.parse::<i64>() {
             return Self::Int(i);
         }
 
-        if let Ok(f) = fast_float2::parse(s) {
+        if let Ok(f) = fast_float2::parse(text) {
             return Self::Float(f);
         }
 
-        match s.to_uppercase().as_str() {
+        match text.to_uppercase().as_str() {
             "TRUE" | "1" | "YES" | "ON" => Self::Bool(true),
             "FALSE" | "0" | "NO" | "OFF" => Self::Bool(false),
-            _ => Self::String(s.to_string()),
+            _ => Self::String(text.to_string()),
         }
     }
 }
@@ -93,7 +107,7 @@ impl From<bool> for CellValue {
 
 impl From<i32> for CellValue {
     fn from(i: i32) -> Self {
-        Self::Int(i as i64)
+        Self::Int(i64::from(i))
     }
 }
 
@@ -105,11 +119,15 @@ impl From<i64> for CellValue {
 
 impl From<u32> for CellValue {
     fn from(i: u32) -> Self {
-        Self::Int(i as i64)
+        Self::Int(i64::from(i))
     }
 }
 
 impl From<usize> for CellValue {
+    #[allow(
+        clippy::cast_possible_wrap,
+        reason = "wrapping on huge values preserves the historical behavior of this public conversion; realistic cell values always fit in i64"
+    )]
     fn from(i: usize) -> Self {
         Self::Int(i as i64)
     }
@@ -117,7 +135,7 @@ impl From<usize> for CellValue {
 
 impl From<f32> for CellValue {
     fn from(f: f32) -> Self {
-        Self::Float(f as f64)
+        Self::Float(f64::from(f))
     }
 }
 
@@ -147,6 +165,12 @@ impl From<&String> for CellValue {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
+
     use super::*;
 
     #[test]
@@ -235,8 +259,8 @@ mod tests {
             assert!((f - expected).abs() < 0.001);
         }
 
-        let float_val = CellValue::infer_from_str("-0.5");
-        assert!(matches!(float_val, CellValue::Float(_)));
+        let float_val_neg = CellValue::infer_from_str("-0.5");
+        assert!(matches!(float_val_neg, CellValue::Float(_)));
     }
 
     #[test]
@@ -305,8 +329,8 @@ mod tests {
         let float_val: CellValue = std::f32::consts::PI.into();
         assert!(matches!(float_val, CellValue::Float(_)));
 
-        let float_val: CellValue = std::f64::consts::PI.into();
-        assert!(matches!(float_val, CellValue::Float(_)));
+        let float_val_64: CellValue = std::f64::consts::PI.into();
+        assert!(matches!(float_val_64, CellValue::Float(_)));
 
         assert!(matches!(
             CellValue::from("hello".to_string()),

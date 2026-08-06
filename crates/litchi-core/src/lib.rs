@@ -1,7 +1,7 @@
-// Many items in this crate were previously private inside the umbrella
-// `litchi` crate and never had public doc coverage. Tighten this once a
-// docs pass lands.
-#![allow(missing_docs)]
+#![allow(
+    missing_docs,
+    reason = "many items in this crate were previously private inside the umbrella `litchi` crate and never had public doc coverage; tighten this once a docs pass lands"
+)]
 //! Common types, traits, and utilities shared across formats.
 //!
 //! This module provides unified types and traits used by both OLE2 (legacy)

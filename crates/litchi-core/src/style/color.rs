@@ -23,6 +23,10 @@ use std::str::FromStr;
 /// let yellow = RGBColor::from_name("yellow").unwrap();
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
+)]
 pub struct RGBColor {
     /// Red component (0-255)
     pub r: u8,
@@ -49,6 +53,7 @@ impl RGBColor {
     /// let color = RGBColor::new(255, 128, 0); // Orange
     /// ```
     #[inline]
+    #[must_use]
     pub const fn new(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b }
     }
@@ -70,36 +75,43 @@ impl RGBColor {
     /// let blue = RGBColor::from_hex("#0000FF").unwrap();
     /// let green = RGBColor::from_hex("#0f0").unwrap(); // Short form
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `hex` is not a valid `#RGB` or `#RRGGBB` hex string.
     pub fn from_hex(hex: &str) -> Result<Self> {
-        let hex = hex.trim().trim_start_matches('#');
+        let hex_str = hex.trim().trim_start_matches('#');
 
-        match hex.len() {
+        match hex_str.len() {
             3 => {
                 // #RGB format - expand to #RRGGBB
-                let r = u8::from_str_radix(&hex[0..1], 16)
-                    .map_err(|_| crate::Error::Other("Invalid hex digit for red".to_string()))?;
-                let g = u8::from_str_radix(&hex[1..2], 16)
-                    .map_err(|_| crate::Error::Other("Invalid hex digit for green".to_string()))?;
-                let b = u8::from_str_radix(&hex[2..3], 16)
-                    .map_err(|_| crate::Error::Other("Invalid hex digit for blue".to_string()))?;
+                let r = u8::from_str_radix(&hex_str[0..1], 16)
+                    .map_err(|_err| crate::Error::Other("Invalid hex digit for red".to_string()))?;
+                let g = u8::from_str_radix(&hex_str[1..2], 16).map_err(|_err| {
+                    crate::Error::Other("Invalid hex digit for green".to_string())
+                })?;
+                let b = u8::from_str_radix(&hex_str[2..3], 16).map_err(|_err| {
+                    crate::Error::Other("Invalid hex digit for blue".to_string())
+                })?;
 
                 // Expand single digit to double (e.g., F -> FF)
                 Ok(Self::new(r * 17, g * 17, b * 17))
             },
             6 => {
                 // #RRGGBB format
-                let r = u8::from_str_radix(&hex[0..2], 16)
-                    .map_err(|_| crate::Error::Other("Invalid hex value for red".to_string()))?;
-                let g = u8::from_str_radix(&hex[2..4], 16)
-                    .map_err(|_| crate::Error::Other("Invalid hex value for green".to_string()))?;
-                let b = u8::from_str_radix(&hex[4..6], 16)
-                    .map_err(|_| crate::Error::Other("Invalid hex value for blue".to_string()))?;
+                let r = u8::from_str_radix(&hex_str[0..2], 16)
+                    .map_err(|_err| crate::Error::Other("Invalid hex value for red".to_string()))?;
+                let g = u8::from_str_radix(&hex_str[2..4], 16).map_err(|_err| {
+                    crate::Error::Other("Invalid hex value for green".to_string())
+                })?;
+                let b = u8::from_str_radix(&hex_str[4..6], 16).map_err(|_err| {
+                    crate::Error::Other("Invalid hex value for blue".to_string())
+                })?;
 
                 Ok(Self::new(r, g, b))
             },
             _ => Err(crate::Error::Other(format!(
-                "Invalid hex color format '{}', expected #RGB or #RRGGBB",
-                hex
+                "Invalid hex color format '{hex_str}', expected #RGB or #RRGGBB"
             ))),
         }
     }
@@ -119,12 +131,15 @@ impl RGBColor {
     /// let blue = RGBColor::from_name("blue").unwrap();
     /// assert_eq!(red, RGBColor::new(255, 0, 0));
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `name` is not a known CSS3 color name.
     pub fn from_name(name: &str) -> Result<Self> {
         // Basic CSS3 named colors - commonly used across all Office formats
         let color_lower = name.to_lowercase();
         match color_lower.as_str() {
-            // Primary colors
-            "black" => Ok(Self::new(0, 0, 0)),
+            // Primary colors ("black" is handled together with "transparent" below)
             "white" => Ok(Self::new(255, 255, 255)),
             "red" => Ok(Self::new(255, 0, 0)),
             "green" => Ok(Self::new(0, 128, 0)),
@@ -147,11 +162,9 @@ impl RGBColor {
             "pink" => Ok(Self::new(255, 192, 203)),
             "brown" => Ok(Self::new(165, 42, 42)),
             "gold" => Ok(Self::new(255, 215, 0)),
-            "transparent" => Ok(Self::new(0, 0, 0)), // Treat as black
-            _ => Err(crate::Error::Other(format!(
-                "Unknown color name '{}'",
-                name
-            ))),
+            // Treat transparent as black
+            "black" | "transparent" => Ok(Self::new(0, 0, 0)),
+            _ => Err(crate::Error::Other(format!("Unknown color name '{name}'"))),
         }
     }
 
@@ -165,6 +178,7 @@ impl RGBColor {
     /// let color = RGBColor::new(255, 0, 0);
     /// assert_eq!(color.to_hex(), "FF0000");
     /// ```
+    #[must_use]
     pub fn to_hex(&self) -> String {
         format!("{:02X}{:02X}{:02X}", self.r, self.g, self.b)
     }
@@ -180,24 +194,28 @@ impl RGBColor {
     /// assert_eq!(color.to_hex_string(), "#ff0000");
     /// ```
     #[inline]
+    #[must_use]
     pub fn to_hex_string(&self) -> String {
         format!("#{:02x}{:02x}{:02x}", self.r, self.g, self.b)
     }
 
     /// Get red component
     #[inline]
+    #[must_use]
     pub const fn red(&self) -> u8 {
         self.r
     }
 
     /// Get green component
     #[inline]
+    #[must_use]
     pub const fn green(&self) -> u8 {
         self.g
     }
 
     /// Get blue component
     #[inline]
+    #[must_use]
     pub const fn blue(&self) -> u8 {
         self.b
     }
@@ -264,6 +282,12 @@ impl fmt::Display for RGBColor {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
+
     use super::*;
 
     #[test]
@@ -279,11 +303,11 @@ mod tests {
         let color = RGBColor::new(255, 128, 64);
         assert_eq!(color.to_hex(), "FF8040");
 
-        let color = RGBColor::new(0, 0, 0);
-        assert_eq!(color.to_hex(), "000000");
+        let color_black = RGBColor::new(0, 0, 0);
+        assert_eq!(color_black.to_hex(), "000000");
 
-        let color = RGBColor::new(255, 255, 255);
-        assert_eq!(color.to_hex(), "FFFFFF");
+        let color_white = RGBColor::new(255, 255, 255);
+        assert_eq!(color_white.to_hex(), "FFFFFF");
     }
 
     #[test]
@@ -297,11 +321,11 @@ mod tests {
         let color = RGBColor::from_hex("#ff0000").unwrap();
         assert_eq!(color, RGBColor::new(255, 0, 0));
 
-        let color = RGBColor::from_hex("ff0000").unwrap(); // Without #
-        assert_eq!(color, RGBColor::new(255, 0, 0));
+        let color_no_hash = RGBColor::from_hex("ff0000").unwrap(); // Without #
+        assert_eq!(color_no_hash, RGBColor::new(255, 0, 0));
 
-        let color = RGBColor::from_hex("#00ff00").unwrap();
-        assert_eq!(color, RGBColor::new(0, 255, 0));
+        let color_green = RGBColor::from_hex("#00ff00").unwrap();
+        assert_eq!(color_green, RGBColor::new(0, 255, 0));
     }
 
     #[test]
@@ -309,11 +333,11 @@ mod tests {
         let color = RGBColor::from_hex("#f00").unwrap();
         assert_eq!(color, RGBColor::new(255, 0, 0));
 
-        let color = RGBColor::from_hex("#0f0").unwrap();
-        assert_eq!(color, RGBColor::new(0, 255, 0));
+        let color_green = RGBColor::from_hex("#0f0").unwrap();
+        assert_eq!(color_green, RGBColor::new(0, 255, 0));
 
-        let color = RGBColor::from_hex("#abc").unwrap();
-        assert_eq!(color, RGBColor::new(170, 187, 204));
+        let color_abc = RGBColor::from_hex("#abc").unwrap();
+        assert_eq!(color_abc, RGBColor::new(170, 187, 204));
     }
 
     #[test]
@@ -355,11 +379,11 @@ mod tests {
         let color: RGBColor = "#ff0000".parse().unwrap();
         assert_eq!(color, RGBColor::new(255, 0, 0));
 
-        let color: RGBColor = "red".parse().unwrap();
-        assert_eq!(color, RGBColor::new(255, 0, 0));
+        let color_named: RGBColor = "red".parse().unwrap();
+        assert_eq!(color_named, RGBColor::new(255, 0, 0));
 
-        let color: RGBColor = "#f00".parse().unwrap();
-        assert_eq!(color, RGBColor::new(255, 0, 0));
+        let color_short: RGBColor = "#f00".parse().unwrap();
+        assert_eq!(color_short, RGBColor::new(255, 0, 0));
     }
 
     #[test]

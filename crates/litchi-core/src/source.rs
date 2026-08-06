@@ -12,6 +12,10 @@ static NEXT_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 
 /// Opaque identity and revision for one stable source snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
+)]
 pub struct SourceVersion {
     id: u64,
     revision: u64,
@@ -22,6 +26,7 @@ impl SourceVersion {
     ///
     /// The adapter owns the meaning of `id` and must keep it stable for one
     /// source while increasing `revision` whenever observable bytes change.
+    #[must_use]
     pub const fn new(id: u64, revision: u64) -> Self {
         Self { id, revision }
     }
@@ -31,11 +36,13 @@ impl SourceVersion {
     }
 
     /// Opaque process-local source identity.
+    #[must_use]
     pub const fn id(self) -> u64 {
         self.id
     }
 
     /// Source revision captured by the adapter.
+    #[must_use]
     pub const fn revision(self) -> u64 {
         self.revision
     }
@@ -47,21 +54,36 @@ impl SourceVersion {
 /// `version()` before work and compares it later when the adapter can detect
 /// external mutation.
 pub trait ReadAt: Send + Sync {
-    /// Current byte length of the source snapshot.
-    fn len(&self) -> io::Result<u64>;
-
     /// Returns whether this source is empty.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error reported by the underlying adapter's `len`.
     fn is_empty(&self) -> io::Result<bool> {
         self.len().map(|length| length == 0)
     }
 
+    /// Current byte length of the source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error reported by the underlying adapter.
+    fn len(&self) -> io::Result<u64>;
+
     /// Reads bytes at `offset` without changing shared state.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error reported by the underlying adapter.
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize>;
 
-    /// Returns the adapter's current source identity/revision.
-    fn version(&self) -> io::Result<SourceVersion>;
-
     /// Fills `output` or returns `UnexpectedEof` without panicking.
+    ///
+    /// # Errors
+    ///
+    /// Returns `UnexpectedEof` if the source ends before `output` is filled,
+    /// `InvalidData` if the adapter reports impossible read counts, or any
+    /// error reported by the underlying adapter.
     fn read_exact_at(&self, mut offset: u64, mut output: &mut [u8]) -> io::Result<()> {
         while !output.is_empty() {
             match self.read_at(offset, output) {
@@ -89,10 +111,21 @@ pub trait ReadAt: Send + Sync {
         }
         Ok(())
     }
+
+    /// Returns the adapter's current source identity/revision.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error reported by the underlying adapter.
+    fn version(&self) -> io::Result<SourceVersion>;
 }
 
 /// Move-owned in-memory source with O(1) clones and no source-byte copy.
 #[derive(Debug, Clone)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
+)]
 pub struct OwnedSource {
     bytes: Arc<Vec<u8>>,
     version: SourceVersion,
@@ -100,6 +133,7 @@ pub struct OwnedSource {
 
 impl OwnedSource {
     /// Moves a vector into shared immutable ownership.
+    #[must_use]
     pub fn new(bytes: Vec<u8>) -> Self {
         Self {
             bytes: Arc::new(bytes),
@@ -108,6 +142,7 @@ impl OwnedSource {
     }
 
     /// Wraps an existing shared vector without copying its bytes.
+    #[must_use]
     pub fn from_arc(bytes: Arc<Vec<u8>>) -> Self {
         Self {
             bytes,
@@ -116,6 +151,7 @@ impl OwnedSource {
     }
 
     /// Direct borrowed access for parsers able to use a contiguous source.
+    #[must_use]
     pub fn as_slice(&self) -> &[u8] {
         self.bytes.as_slice()
     }
@@ -130,11 +166,11 @@ impl From<Vec<u8>> for OwnedSource {
 impl ReadAt for OwnedSource {
     fn len(&self) -> io::Result<u64> {
         u64::try_from(self.bytes.len())
-            .map_err(|_| io::Error::other("source length does not fit u64"))
+            .map_err(|_err| io::Error::other("source length does not fit u64"))
     }
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
-        read_slice_at(self.as_slice(), offset, output)
+        Ok(read_slice_at(self.as_slice(), offset, output))
     }
 
     fn version(&self) -> io::Result<SourceVersion> {
@@ -144,6 +180,10 @@ impl ReadAt for OwnedSource {
 
 /// Scoped zero-copy positional view over borrowed bytes.
 #[derive(Debug, Clone, Copy)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
+)]
 pub struct SliceSource<'a> {
     bytes: &'a [u8],
     version: SourceVersion,
@@ -151,6 +191,7 @@ pub struct SliceSource<'a> {
 
 impl<'a> SliceSource<'a> {
     /// Creates a scoped source without copying the bytes.
+    #[must_use]
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
             bytes,
@@ -159,6 +200,7 @@ impl<'a> SliceSource<'a> {
     }
 
     /// Returns the borrowed source bytes.
+    #[must_use]
     pub const fn as_slice(&self) -> &'a [u8] {
         self.bytes
     }
@@ -167,11 +209,11 @@ impl<'a> SliceSource<'a> {
 impl ReadAt for SliceSource<'_> {
     fn len(&self) -> io::Result<u64> {
         u64::try_from(self.bytes.len())
-            .map_err(|_| io::Error::other("source length does not fit u64"))
+            .map_err(|_err| io::Error::other("source length does not fit u64"))
     }
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
-        read_slice_at(self.bytes, offset, output)
+        Ok(read_slice_at(self.bytes, offset, output))
     }
 
     fn version(&self) -> io::Result<SourceVersion> {
@@ -179,20 +221,26 @@ impl ReadAt for SliceSource<'_> {
     }
 }
 
-fn read_slice_at(input: &[u8], offset: u64, output: &mut [u8]) -> io::Result<usize> {
+fn read_slice_at(input: &[u8], offset: u64, output: &mut [u8]) -> usize {
     let Ok(start) = usize::try_from(offset) else {
-        return Ok(0);
+        return 0;
     };
-    let Some(input) = input.get(start..) else {
-        return Ok(0);
+    let Some(input_slice) = input.get(start..) else {
+        return 0;
     };
-    let count = input.len().min(output.len());
-    output[..count].copy_from_slice(&input[..count]);
-    Ok(count)
+    let count = input_slice.len().min(output.len());
+    output[..count].copy_from_slice(&input_slice[..count]);
+    count
 }
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
+
     use super::*;
 
     #[test]

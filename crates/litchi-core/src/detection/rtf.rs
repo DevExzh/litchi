@@ -46,6 +46,7 @@ const RTF_SIGNATURE_LEN: usize = 5;
 /// assert!(detect_rtf_format(non_rtf_data).is_none());
 /// ```
 #[inline]
+#[must_use]
 pub fn detect_rtf_format(bytes: &[u8]) -> Option<FileFormat> {
     if bytes.len() < RTF_SIGNATURE_LEN {
         return None;
@@ -82,13 +83,19 @@ pub fn detect_rtf_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<F
     }
 
     // Reset to beginning
-    let _ = reader.seek(SeekFrom::Start(0));
+    let _pos = reader.seek(SeekFrom::Start(0));
 
     detect_rtf_format(&buffer)
 }
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
+
     use super::*;
     use std::io::Cursor;
 

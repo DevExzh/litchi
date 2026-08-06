@@ -16,73 +16,12 @@ pub const EMUS_PER_PT: i64 = 12_700;
 pub const EMUS_PER_TWIP: i64 = 635;
 pub const PPT_MASTER_UNITS_PER_INCH: i64 = 576;
 
-#[inline]
-pub fn pt_to_emu_f64(pt: f64) -> i64 {
-    (pt * EMUS_PER_PT as f64) as i64
-}
-
-#[inline]
-pub fn pt_to_emu_i32(pt: i32) -> i32 {
-    pt.saturating_mul(EMUS_PER_PT as i32)
-}
-
-#[inline]
-pub fn pt_f32_to_emu_u32(pt: f32) -> u32 {
-    (pt * EMUS_PER_PT as f32) as u32
-}
-
-#[inline]
-pub fn emu_to_pt_f64(emu: i64) -> f64 {
-    emu as f64 / EMUS_PER_PT as f64
-}
-
-#[inline]
-pub fn px_to_emu(px: u32, dpi: u32) -> i64 {
-    ((px as f64) * EMUS_PER_INCH as f64 / dpi as f64) as i64
-}
-
-#[inline]
-pub fn emu_to_px(emu: i64, dpi: u32) -> u32 {
-    ((emu as f64) * dpi as f64 / EMUS_PER_INCH as f64) as u32
-}
-
-#[inline]
-pub fn px_to_emu_96(px: u32) -> i64 {
-    px_to_emu(px, 96)
-}
-
-#[inline]
-pub fn emu_to_px_96(emu: i64) -> u32 {
-    emu_to_px(emu, 96)
-}
-
-#[inline]
-pub fn twip_to_emu_i64(twips: i64) -> i64 {
-    twips.saturating_mul(EMUS_PER_TWIP)
-}
-
-#[inline]
-pub fn emu_to_twip_i64(emu: i64) -> i64 {
-    (emu as f64 / EMUS_PER_TWIP as f64).round() as i64
-}
-
-#[inline]
-pub fn emu_u32_to_ppt_master_u32(emu: u32) -> u32 {
-    ((emu as u64 * PPT_MASTER_UNITS_PER_INCH as u64) / EMUS_PER_INCH as u64) as u32
-}
-
-#[inline]
-pub fn emu_i32_to_ppt_master_i16_round(emu: i32) -> i16 {
-    ((emu as f64) * PPT_MASTER_UNITS_PER_INCH as f64 / EMUS_PER_INCH as f64).round() as i16
-}
-
-#[inline]
-pub fn ppt_master_i64_to_emu_i32(master: i64) -> i32 {
-    ((master * EMUS_PER_INCH) / PPT_MASTER_UNITS_PER_INCH) as i32
-}
-
 /// Supported length units
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
+)]
 pub enum LengthUnit {
     /// Millimeter
     Millimeter,
@@ -109,6 +48,7 @@ pub enum LengthUnit {
 impl LengthUnit {
     /// Get the unit abbreviation
     #[inline]
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Millimeter => "mm",
@@ -147,7 +87,7 @@ impl FromStr for LengthUnit {
 
     fn from_str(s: &str) -> Result<Self> {
         Self::from_str_internal(s)
-            .ok_or_else(|| crate::Error::Other(format!("Unknown length unit '{}'", s)))
+            .ok_or_else(|| crate::Error::Other(format!("Unknown length unit '{s}'")))
     }
 }
 
@@ -194,18 +134,21 @@ impl Length {
     /// * `value` - Numeric value
     /// * `unit` - Length unit
     #[inline]
+    #[must_use]
     pub fn new(value: f64, unit: LengthUnit) -> Self {
         Self { value, unit }
     }
 
     /// Get the numeric value
     #[inline]
+    #[must_use]
     pub fn value(&self) -> f64 {
         self.value
     }
 
     /// Get the unit
     #[inline]
+    #[must_use]
     pub fn unit(&self) -> LengthUnit {
         self.unit
     }
@@ -219,6 +162,11 @@ impl Length {
     /// # Returns
     ///
     /// `Ok(Length)` with unit Pixel, or `Err` if conversion fails
+    ///
+    /// # Errors
+    ///
+    /// This function currently always returns `Ok`; the `Result` return type is
+    /// kept for API compatibility.
     ///
     /// # Examples
     ///
@@ -234,7 +182,7 @@ impl Length {
     /// assert_eq!(pixels.value() as i32, 96);
     /// ```
     pub fn to_pixels(&self, dpi: u32) -> Result<Self> {
-        let dpi_f64 = dpi as f64;
+        let dpi_f64 = f64::from(dpi);
 
         let pixel_value = match self.unit {
             LengthUnit::Pixel => self.value,
@@ -242,7 +190,7 @@ impl Length {
             LengthUnit::Centimeter => self.value / 2.54 * dpi_f64,
             LengthUnit::Millimeter => self.value / 25.4 * dpi_f64,
             LengthUnit::Meter => self.value / 0.0254 * dpi_f64,
-            LengthUnit::Kilometer => self.value / 0.0000254 * dpi_f64,
+            LengthUnit::Kilometer => self.value / 0.000_025_4 * dpi_f64,
             LengthUnit::Point => self.value / 72.0 * dpi_f64,
             LengthUnit::Pica => self.value / 6.0 * dpi_f64,
             LengthUnit::Foot => self.value * 12.0 * dpi_f64,
@@ -253,6 +201,10 @@ impl Length {
     }
 
     /// Convert to inches
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the unit is `Pixel`, which requires DPI information.
     ///
     /// # Examples
     ///
@@ -269,7 +221,7 @@ impl Length {
             LengthUnit::Centimeter => self.value / 2.54,
             LengthUnit::Millimeter => self.value / 25.4,
             LengthUnit::Meter => self.value / 0.0254,
-            LengthUnit::Kilometer => self.value / 0.0000254,
+            LengthUnit::Kilometer => self.value / 0.000_025_4,
             LengthUnit::Point => self.value / 72.0,
             LengthUnit::Pica => self.value / 6.0,
             LengthUnit::Foot => self.value * 12.0,
@@ -286,6 +238,10 @@ impl Length {
 
     /// Convert to centimeters
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the unit is `Pixel`, which requires DPI information.
+    ///
     /// # Examples
     ///
     /// ```
@@ -301,7 +257,7 @@ impl Length {
             LengthUnit::Inch => self.value * 2.54,
             LengthUnit::Millimeter => self.value / 10.0,
             LengthUnit::Meter => self.value * 100.0,
-            LengthUnit::Kilometer => self.value * 100000.0,
+            LengthUnit::Kilometer => self.value * 100_000.0,
             LengthUnit::Point => self.value / 72.0 * 2.54,
             LengthUnit::Pica => self.value / 6.0 * 2.54,
             LengthUnit::Foot => self.value * 12.0 * 2.54,
@@ -353,13 +309,12 @@ impl FromStr for Length {
 
         if digits.is_empty() {
             return Err(crate::Error::Other(format!(
-                "No numeric value found in '{}'",
-                s
+                "No numeric value found in '{s}'"
             )));
         }
 
-        let value: f64 = digits.parse().map_err(|_| {
-            crate::Error::Other(format!("Failed to parse numeric value from '{}'", s))
+        let value: f64 = digits.parse().map_err(|_err| {
+            crate::Error::Other(format!("Failed to parse numeric value from '{s}'"))
         })?;
 
         let unit = if non_digits.is_empty() {
@@ -380,71 +335,221 @@ impl fmt::Display for Length {
 
 impl PartialEq for Length {
     fn eq(&self, other: &Self) -> bool {
-        if self.unit != other.unit {
+        if self.unit == other.unit {
+            (self.value - other.value).abs() < 1e-10
+        } else {
             // Try to convert to common unit for comparison
             if let (Ok(a), Ok(b)) = (self.to_inches(), other.to_inches()) {
                 (a.value - b.value).abs() < 1e-10
             } else {
                 false
             }
-        } else {
-            (self.value - other.value).abs() < 1e-10
         }
     }
 }
 
 impl PartialOrd for Length {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.unit != other.unit {
+        if self.unit == other.unit {
+            self.value.partial_cmp(&other.value)
+        } else {
             // Try to convert to common unit for comparison
             if let (Ok(a), Ok(b)) = (self.to_inches(), other.to_inches()) {
                 a.value.partial_cmp(&b.value)
             } else {
                 None
             }
-        } else {
-            self.value.partial_cmp(&other.value)
         }
     }
 }
 
+#[inline]
+#[must_use]
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "float-to-int truncation toward zero is the intended conversion semantics"
+)]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "EMUS_PER_PT (12_700) is exactly representable as f64"
+)]
+pub fn pt_to_emu_f64(pt: f64) -> i64 {
+    (pt * EMUS_PER_PT as f64) as i64
+}
+
+#[inline]
+#[must_use]
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "EMUS_PER_PT (12_700) always fits in i32"
+)]
+pub fn pt_to_emu_i32(pt: i32) -> i32 {
+    pt.saturating_mul(EMUS_PER_PT as i32)
+}
+
+#[inline]
+#[must_use]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "float-to-int truncation toward zero is the intended conversion semantics"
+)]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "EMUS_PER_PT (12_700) is exactly representable as f32"
+)]
+pub fn pt_f32_to_emu_u32(pt: f32) -> u32 {
+    (pt * EMUS_PER_PT as f32) as u32
+}
+
+#[inline]
+#[must_use]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "f64 precision is sufficient for document dimensions; EMUS_PER_PT is exactly representable"
+)]
+pub fn emu_to_pt_f64(emu: i64) -> f64 {
+    emu as f64 / EMUS_PER_PT as f64
+}
+
+#[inline]
+#[must_use]
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "float-to-int truncation toward zero is the intended conversion semantics"
+)]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "EMUS_PER_INCH (914_400) is exactly representable as f64"
+)]
+pub fn px_to_emu(px: u32, dpi: u32) -> i64 {
+    (f64::from(px) * EMUS_PER_INCH as f64 / f64::from(dpi)) as i64
+}
+
+#[inline]
+#[must_use]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "float-to-int truncation toward zero is the intended conversion semantics"
+)]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "f64 precision is sufficient for document dimensions; EMUS_PER_INCH is exactly representable"
+)]
+pub fn emu_to_px(emu: i64, dpi: u32) -> u32 {
+    ((emu as f64) * f64::from(dpi) / EMUS_PER_INCH as f64) as u32
+}
+
+#[inline]
+#[must_use]
+pub fn px_to_emu_96(px: u32) -> i64 {
+    px_to_emu(px, 96)
+}
+
+#[inline]
+#[must_use]
+pub fn emu_to_px_96(emu: i64) -> u32 {
+    emu_to_px(emu, 96)
+}
+
+#[inline]
+#[must_use]
+pub fn twip_to_emu_i64(twips: i64) -> i64 {
+    twips.saturating_mul(EMUS_PER_TWIP)
+}
+
+#[inline]
+#[must_use]
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "the explicit round-to-nearest conversion intentionally discards the fractional part"
+)]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "f64 precision is sufficient for document dimensions; EMUS_PER_TWIP is exactly representable"
+)]
+pub fn emu_to_twip_i64(emu: i64) -> i64 {
+    (emu as f64 / EMUS_PER_TWIP as f64).round() as i64
+}
+
+#[inline]
+#[must_use]
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "the widened u64 computation is divided back down before the intentional narrowing cast"
+)]
+pub fn emu_u32_to_ppt_master_u32(emu: u32) -> u32 {
+    ((u64::from(emu) * PPT_MASTER_UNITS_PER_INCH as u64) / EMUS_PER_INCH as u64) as u32
+}
+
+#[inline]
+#[must_use]
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "the explicit round-to-nearest conversion intentionally discards the fractional part"
+)]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "the conversion constants are exactly representable as f64"
+)]
+pub fn emu_i32_to_ppt_master_i16_round(emu: i32) -> i16 {
+    (f64::from(emu) * PPT_MASTER_UNITS_PER_INCH as f64 / EMUS_PER_INCH as f64).round() as i16
+}
+
+#[inline]
+#[must_use]
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "the divided-down result is expected to fit in i32; narrowing is the intended semantics"
+)]
+pub fn ppt_master_i64_to_emu_i32(master: i64) -> i32 {
+    ((master * EMUS_PER_INCH) / PPT_MASTER_UNITS_PER_INCH) as i32
+}
+
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
+
     use super::*;
 
     #[test]
     fn test_parse_length() {
         let length = "2.5cm".parse::<Length>().unwrap();
-        assert_eq!(length.value(), 2.5);
+        assert!((length.value() - 2.5).abs() < f64::EPSILON);
         assert_eq!(length.unit(), LengthUnit::Centimeter);
 
-        let length = "10pt".parse::<Length>().unwrap();
-        assert_eq!(length.value(), 10.0);
-        assert_eq!(length.unit(), LengthUnit::Point);
+        let length_pt = "10pt".parse::<Length>().unwrap();
+        assert!((length_pt.value() - 10.0).abs() < f64::EPSILON);
+        assert_eq!(length_pt.unit(), LengthUnit::Point);
 
-        let length = "1.5in".parse::<Length>().unwrap();
-        assert_eq!(length.value(), 1.5);
-        assert_eq!(length.unit(), LengthUnit::Inch);
+        let length_in = "1.5in".parse::<Length>().unwrap();
+        assert!((length_in.value() - 1.5).abs() < f64::EPSILON);
+        assert_eq!(length_in.unit(), LengthUnit::Inch);
 
         // Negative values
-        let length = "-5mm".parse::<Length>().unwrap();
-        assert_eq!(length.value(), -5.0);
-        assert_eq!(length.unit(), LengthUnit::Millimeter);
+        let length_mm = "-5mm".parse::<Length>().unwrap();
+        assert!((length_mm.value() + 5.0).abs() < f64::EPSILON);
+        assert_eq!(length_mm.unit(), LengthUnit::Millimeter);
     }
 
     #[test]
     fn test_to_pixels() {
         let inch = Length::new(1.0, LengthUnit::Inch);
         let pixels = inch.to_pixels(96).unwrap();
-        assert_eq!(pixels.value() as i32, 96);
+        assert!((pixels.value() - 96.0).abs() < 0.001);
 
         let cm = Length::new(2.54, LengthUnit::Centimeter);
-        let pixels = cm.to_pixels(96).unwrap();
-        assert_eq!(pixels.value() as i32, 96);
+        let pixels_from_cm = cm.to_pixels(96).unwrap();
+        assert!((pixels_from_cm.value() - 96.0).abs() < 0.001);
 
         let pt = Length::new(72.0, LengthUnit::Point);
-        let pixels = pt.to_pixels(96).unwrap();
-        assert_eq!(pixels.value() as i32, 96);
+        let pixels_from_pt = pt.to_pixels(96).unwrap();
+        assert!((pixels_from_pt.value() - 96.0).abs() < 0.001);
     }
 
     #[test]
@@ -454,12 +559,12 @@ mod tests {
         assert!((inches.value() - 1.0).abs() < 0.001);
 
         let mm = Length::new(25.4, LengthUnit::Millimeter);
-        let inches = mm.to_inches().unwrap();
-        assert!((inches.value() - 1.0).abs() < 0.001);
+        let inches_from_mm = mm.to_inches().unwrap();
+        assert!((inches_from_mm.value() - 1.0).abs() < 0.001);
 
         let pt = Length::new(72.0, LengthUnit::Point);
-        let inches = pt.to_inches().unwrap();
-        assert!((inches.value() - 1.0).abs() < 0.001);
+        let inches_from_pt = pt.to_inches().unwrap();
+        assert!((inches_from_pt.value() - 1.0).abs() < 0.001);
     }
 
     #[test]
@@ -469,8 +574,8 @@ mod tests {
         assert!((cm.value() - 2.54).abs() < 0.001);
 
         let mm = Length::new(10.0, LengthUnit::Millimeter);
-        let cm = mm.to_centimeters().unwrap();
-        assert!((cm.value() - 1.0).abs() < 0.001);
+        let cm_from_mm = mm.to_centimeters().unwrap();
+        assert!((cm_from_mm.value() - 1.0).abs() < 0.001);
     }
 
     #[test]
@@ -488,7 +593,7 @@ mod tests {
         let length = Length::new(2.5, LengthUnit::Centimeter);
         assert_eq!(length.to_string(), "2.5cm");
 
-        let length = Length::new(10.0, LengthUnit::Point);
-        assert_eq!(length.to_string(), "10pt");
+        let length_pt = Length::new(10.0, LengthUnit::Point);
+        assert_eq!(length_pt.to_string(), "10pt");
     }
 }

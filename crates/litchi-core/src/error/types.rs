@@ -72,7 +72,7 @@ pub enum Error {
 
 impl From<BinaryError> for Error {
     fn from(err: BinaryError) -> Self {
-        Error::ParseError(format!("Binary parsing error: {}", err))
+        Error::ParseError(format!("Binary parsing error: {err}"))
     }
 }
 

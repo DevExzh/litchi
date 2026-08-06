@@ -5,7 +5,7 @@ use crate::{Error, Result};
 /// Decode hex-encoded string to bytes with SIMD acceleration.
 ///
 /// This function efficiently decodes hex-encoded strings into byte vectors using
-/// SIMD instructions when available (AVX2/SSE on x86_64, NEON on aarch64).
+/// SIMD instructions when available (AVX2/SSE on `x86_64`, NEON on aarch64).
 /// It automatically strips whitespace and validates the input.
 ///
 /// # Arguments
@@ -40,7 +40,7 @@ use crate::{Error, Result};
 /// # Performance
 ///
 /// This function uses SIMD instructions when available:
-/// - **x86_64**: AVX2 (32 bytes/iteration) or SSE4.1 (16 bytes/iteration)
+/// - **`x86_64`**: AVX2 (32 bytes/iteration) or SSE4.1 (16 bytes/iteration)
 /// - **aarch64**: NEON (16 bytes/iteration)
 /// - **Fallback**: Optimized scalar implementation
 ///
@@ -95,7 +95,7 @@ pub fn decode(hex_str: &str) -> Result<Vec<u8>> {
 }
 
 /// Scalar fallback for hex decoding (optimized for small inputs).
-#[inline(always)]
+#[inline]
 fn decode_hex_scalar(hex_bytes: &[u8]) -> Result<Vec<u8>> {
     let mut result = Vec::with_capacity(hex_bytes.len() / 2);
 
@@ -109,7 +109,7 @@ fn decode_hex_scalar(hex_bytes: &[u8]) -> Result<Vec<u8>> {
 }
 
 /// Convert a hex character to its nibble value (0-15).
-#[inline(always)]
+#[inline]
 fn hex_char_to_nibble(c: u8) -> Result<u8> {
     match c {
         b'0'..=b'9' => Ok(c - b'0'),
@@ -559,6 +559,12 @@ unsafe fn combine_nibbles_neon(
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
+
     use super::*;
 
     #[test]

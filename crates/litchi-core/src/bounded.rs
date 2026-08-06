@@ -10,11 +10,16 @@ use thiserror::Error;
 /// during constant evaluation without a panicking constructor.
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "public API name is stable and used by dependent crates; renaming would be a breaking change"
+)]
 pub struct BoundedU32<const MIN: u32, const MAX: u32>(u32);
 
 impl<const MIN: u32, const MAX: u32> BoundedU32<MIN, MAX> {
     /// Creates a bounded value, returning `None` for an invalid range or value.
     #[inline]
+    #[must_use]
     pub const fn new(value: u32) -> Option<Self> {
         if MIN <= MAX && value >= MIN && value <= MAX {
             Some(Self(value))
@@ -24,6 +29,11 @@ impl<const MIN: u32, const MAX: u32> BoundedU32<MIN, MAX> {
     }
 
     /// Creates a bounded value with a structured error.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BoundsError::InvalidRange` if `MIN > MAX`, or
+    /// `BoundsError::OutOfRange` if `value` is outside `MIN..=MAX`.
     #[inline]
     pub const fn try_new(value: u32) -> Result<Self, BoundsError> {
         if MIN > MAX {
@@ -41,6 +51,7 @@ impl<const MIN: u32, const MAX: u32> BoundedU32<MIN, MAX> {
 
     /// Returns the validated value.
     #[inline]
+    #[must_use]
     pub const fn get(self) -> u32 {
         self.0
     }
@@ -113,10 +124,10 @@ pub enum BoundsError {
 mod tests {
     use super::*;
 
-    type Percent = BoundedU32<0, 100>;
-
     const HALF: Option<Percent> = Percent::new(50);
     const INVALID: Option<Percent> = Percent::new(101);
+
+    type Percent = BoundedU32<0, 100>;
 
     #[test]
     fn validates_in_const_context_without_panicking() {
