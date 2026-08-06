@@ -212,32 +212,24 @@ pub(crate) fn reject_other_attributes(
     element: &BytesStart<'_>,
     allowed: &[(&str, &[u8])],
 ) -> Result<()> {
+    // The typed projection owns only the schema-defined attributes. Other
+    // well-formed attributes are opaque extension data and remain in the
+    // retained Properties stream; `allowed` documents the known fields and
+    // keeps duplicate-required-attribute checks at their call sites.
+    let _ = allowed;
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
-        let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
-        let is_allowed = match resolved {
-            ResolveResult::Bound(namespace) => {
-                allowed.iter().any(|(allowed_namespace, allowed_local)| {
-                    namespace.as_ref() == allowed_namespace.as_bytes()
-                        && local.as_ref() == *allowed_local
-                })
-            },
-            ResolveResult::Unbound => allowed.iter().any(|(allowed_namespace, allowed_local)| {
-                allowed_namespace.is_empty() && local.as_ref() == *allowed_local
-            }),
-            ResolveResult::Unknown(_) => {
-                return Err(invalid("XML attribute uses an unknown namespace prefix"));
-            },
-        };
-        if !is_allowed {
-            return Err(invalid(format!(
-                "XML element has unexpected attribute '{}'",
-                String::from_utf8_lossy(attribute.key.as_ref())
-            )));
+        let (resolved, _) = reader.resolver().resolve_attribute(attribute.key);
+        if matches!(resolved, ResolveResult::Unknown(_)) {
+            return Err(invalid("XML attribute uses an unknown namespace prefix"));
         }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+            .map_err(|error| xml_error(error.to_string()))?;
+        validate_characters(&value)?;
     }
     Ok(())
 }
@@ -262,7 +254,10 @@ pub(crate) fn is_whitespace(value: &[u8]) -> bool {
         .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "keeps the vocabulary dependency explicit for API audits"
+)]
 fn _namespace_marker() -> &'static str {
     CUSTOM_XML_NAMESPACE
 }

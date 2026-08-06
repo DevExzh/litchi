@@ -6,6 +6,9 @@
 
 mod codec;
 mod model;
+mod patch;
+mod snapshot;
+mod transaction;
 mod xml;
 
 #[cfg(test)]
@@ -15,6 +18,9 @@ pub use self::codec::{inspect, inspect_with_limits, parse_properties, write, wri
 pub use self::model::{
     Error, Item, ItemId, ItemKind, Limits, Promotion, Properties, Result, RootName, Store,
 };
+pub use self::patch::{Change, Patch};
+pub use self::snapshot::{Revision, Snapshot};
+pub use self::transaction::{Commit, Transaction, update};
 
 pub const STORE_STORAGE: &str = "MsoDataStore";
 pub const REDUNDANT_PROMOTION_STORAGE: &str = "IsRedundantDataStorePromotion";

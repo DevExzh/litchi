@@ -1,5 +1,6 @@
 use std::fmt;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use litchi_cfb::OleError;
 
@@ -195,9 +196,9 @@ pub enum ItemKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Item {
     pub(crate) storage_name: String,
-    pub(crate) xml: Vec<u8>,
+    pub(crate) xml: Arc<[u8]>,
     pub(crate) root_name: RootName,
-    pub(crate) properties_xml: Vec<u8>,
+    pub(crate) properties_xml: Arc<[u8]>,
     pub(crate) properties: Properties,
 }
 
@@ -215,9 +216,9 @@ impl Item {
         let properties_xml = super::codec::write_properties(&properties)?;
         Ok(Self {
             storage_name,
-            xml,
+            xml: Arc::from(xml),
             root_name,
-            properties_xml,
+            properties_xml: Arc::from(properties_xml),
             properties,
         })
     }
@@ -256,14 +257,14 @@ impl Item {
 
     pub fn set_xml(&mut self, xml: Vec<u8>) -> Result<()> {
         let root_name = super::xml::validate_payload(&xml, &Limits::default())?;
-        self.xml = xml;
+        self.xml = Arc::from(xml);
         self.root_name = root_name;
         Ok(())
     }
 
     pub fn set_properties(&mut self, properties: Properties) -> Result<()> {
         super::codec::validate_properties(&properties, &Limits::default())?;
-        self.properties_xml = super::codec::write_properties(&properties)?;
+        self.properties_xml = Arc::from(super::codec::write_properties(&properties)?);
         self.properties = properties;
         Ok(())
     }

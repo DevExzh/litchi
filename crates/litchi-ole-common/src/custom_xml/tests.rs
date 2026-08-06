@@ -1,5 +1,6 @@
 use std::io::Cursor;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use litchi_cfb::{OleFile, OleWriter};
 
@@ -79,11 +80,15 @@ fn rejects_conflicting_markers_bad_shape_and_hostile_xml() {
     assert!(inspect(&mut ole).is_err());
 
     assert!(Item::new("item", b"<!DOCTYPE x><x/>".to_vec(), properties()).is_err());
-    assert!(
+    assert_eq!(
         parse_properties(
             br#"<ds:datastoreItem xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml" ds:itemID="{E0FCA697-D525-4175-A08B-DFD1F1FC7C9F}"><ds:bad/></ds:datastoreItem>"#
         )
-        .is_err()
+        .unwrap(),
+        Properties {
+            item_id: ITEM_ID.parse().unwrap(),
+            schema_references: Vec::new(),
+        }
     );
     assert!(Item::new("item", b"<x>\0</x>".to_vec(), properties()).is_err());
     let mut invalid_properties = properties();
@@ -147,4 +152,194 @@ fn accepts_and_preserves_utf16_xml_streams() {
     let item = Item::new("UTF16ITEM", item_xml.clone(), properties()).unwrap();
     assert_eq!(item.xml(), item_xml);
     assert_eq!(item.root_name().local_name, "Sources");
+}
+
+fn snapshot_item(byte: u8, storage_name: &str) -> Item {
+    let properties = Properties {
+        item_id: ItemId::from_bytes([byte; 16]),
+        schema_references: vec![format!("urn:source:{byte:02x}")],
+    };
+    Item::new(
+        storage_name,
+        format!(r#"<source xmlns="urn:source"><value>{byte}</value></source>"#).into_bytes(),
+        properties,
+    )
+    .unwrap()
+}
+
+fn snapshot_store() -> Snapshot {
+    Snapshot::from_store(
+        Store::new(Promotion::Unspecified, vec![snapshot_item(1, "ITEMONE")]).unwrap(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn transaction_edits_store_item_and_properties_without_losing_opaque_bytes() {
+    let mut item = snapshot_item(1, "ITEMONE");
+    let source_properties = format!(
+        r#"<?xml version="1.0"?><ds:datastoreItem xmlns:ds="{CUSTOM_XML_NAMESPACE}" xmlns:x="urn:future" x:marker="keep" ds:itemID="{ITEM_ID}"><!--future property--><x:future>opaque</x:future><ds:schemaRefs><ds:schemaRef ds:uri="urn:source:01"/></ds:schemaRefs></ds:datastoreItem>"#
+    );
+    item.properties_xml = Arc::from(source_properties.into_bytes());
+    item.properties = parse_properties(item.properties_xml()).unwrap();
+    let source_item_xml = item.xml().to_vec();
+    let source =
+        Snapshot::from_store(Store::new(Promotion::Unspecified, vec![item]).unwrap()).unwrap();
+
+    let mut transaction = source.edit();
+    transaction.set_promotion(Promotion::Modified).unwrap();
+    assert!(transaction.set_storage_name(0, "RENAMED".into()).unwrap());
+    assert!(
+        transaction
+            .set_item_id(0, ItemId::from_bytes([2; 16]))
+            .unwrap()
+    );
+    assert!(
+        transaction
+            .set_schema_references(0, ["urn:edited"])
+            .unwrap()
+    );
+    assert!(
+        transaction
+            .set_xml(
+                0,
+                br#"<source xmlns="urn:source"><future marker="retained"/></source>"#.to_vec(),
+            )
+            .unwrap()
+    );
+
+    let commit = transaction.commit().unwrap();
+    assert!(commit.changed());
+    assert_eq!(commit.snapshot().promotion(), Promotion::Modified);
+    assert_eq!(commit.snapshot().items()[0].storage_name(), "RENAMED");
+    assert_eq!(
+        commit.snapshot().items()[0].xml(),
+        b"<source xmlns=\"urn:source\"><future marker=\"retained\"/></source>"
+    );
+    assert_eq!(source.items()[0].xml(), source_item_xml.as_slice());
+    assert!(
+        std::str::from_utf8(commit.snapshot().items()[0].properties_xml())
+            .unwrap()
+            .contains("future property")
+    );
+    assert!(
+        std::str::from_utf8(commit.snapshot().items()[0].properties_xml())
+            .unwrap()
+            .contains("x:marker=\"keep\"")
+    );
+    assert!(
+        std::str::from_utf8(commit.snapshot().items()[0].properties_xml())
+            .unwrap()
+            .contains("<x:future>opaque</x:future>")
+    );
+    assert!(
+        std::str::from_utf8(commit.snapshot().items()[0].properties_xml())
+            .unwrap()
+            .contains("ds:uri=\"urn:edited\"")
+    );
+    assert!(
+        std::str::from_utf8(commit.snapshot().items()[0].properties_xml())
+            .unwrap()
+            .contains("02020202-0202-0202-0202-020202020202")
+    );
+}
+
+#[test]
+fn no_op_commit_reuses_the_exact_source_and_patch_is_empty() {
+    let source = snapshot_store();
+    let commit = source.edit().commit().unwrap();
+
+    assert!(!commit.changed());
+    assert!(commit.patch().is_noop());
+    assert!(commit.patch().change().is_none());
+    assert_eq!(commit.snapshot(), &source);
+    assert!(Arc::ptr_eq(
+        &source.store().items[0].xml,
+        &commit.snapshot().store().items[0].xml
+    ));
+    assert!(Arc::ptr_eq(
+        &source.store().items[0].properties_xml,
+        &commit.snapshot().store().items[0].properties_xml
+    ));
+}
+
+#[test]
+fn inverse_and_stale_patch_application_are_source_checked() {
+    let source = snapshot_store();
+    let mut transaction = source.edit();
+    transaction
+        .set_schema_references(0, ["urn:edited"])
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+
+    assert_eq!(commit.patch().apply(&source).unwrap(), *commit.snapshot());
+    assert_eq!(
+        commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+        source
+    );
+
+    let mut stale_transaction = source.edit();
+    stale_transaction
+        .set_xml(
+            0,
+            b"<source xmlns=\"urn:source\"><stale/></source>".to_vec(),
+        )
+        .unwrap();
+    let stale = stale_transaction.commit().unwrap().snapshot().clone();
+    assert!(commit.patch().apply(&stale).is_err());
+    assert_eq!(
+        stale.items()[0].xml(),
+        b"<source xmlns=\"urn:source\"><stale/></source>"
+    );
+}
+
+#[test]
+fn failed_edits_and_malformed_or_limited_candidates_are_atomic() {
+    let source = snapshot_store();
+    let mut transaction = source.edit();
+    let before = transaction.items().to_vec();
+    assert!(
+        transaction
+            .set_xml(0, b"<!DOCTYPE x><x/>".to_vec())
+            .is_err()
+    );
+    assert_eq!(transaction.items(), before.as_slice());
+    assert!(
+        transaction
+            .set_properties_xml(0, b"<not-properties/>".to_vec())
+            .is_err()
+    );
+    assert_eq!(transaction.items(), before.as_slice());
+
+    let duplicate = Item::new(
+        "ITEMTWO",
+        b"<source xmlns=\"urn:source\"><duplicate/></source>".to_vec(),
+        source.items()[0].properties().clone(),
+    )
+    .unwrap();
+    assert!(transaction.insert(duplicate).is_err());
+    assert_eq!(transaction.items(), before.as_slice());
+
+    let too_small = Limits {
+        max_item_bytes: 1,
+        ..Limits::default()
+    };
+    assert!(Snapshot::from_store_with_limits(source.store().clone(), too_small).is_err());
+    let no_items = Limits {
+        max_items: 0,
+        ..Limits::default()
+    };
+    assert!(Snapshot::from_store_with_limits(source.store().clone(), no_items).is_err());
+
+    let mut oversized_properties = source.items()[0].properties().clone();
+    oversized_properties.schema_references = vec!["x".repeat(128)];
+    let limited_properties = Limits {
+        max_string_bytes: 64,
+        ..Limits::default()
+    };
+    let limited =
+        Snapshot::from_store_with_limits(source.store().clone(), limited_properties).unwrap();
+    let mut edit = limited.edit();
+    assert!(edit.set_properties(0, oversized_properties).is_err());
+    assert_eq!(edit.items(), limited.items());
 }
