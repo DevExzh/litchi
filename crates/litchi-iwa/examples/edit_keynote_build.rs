@@ -5,8 +5,9 @@ use std::env;
 use litchi_iwa::keynote::{
     BuildAcceleration, BuildStart, KeynoteBuildSettings, KeynoteEditor, KeynoteFlipDirection,
     KeynoteHorizontalBuildDirection, KeynoteJiggleIntensity, KeynoteKeyboardDirection,
-    KeynoteMotionPathPoint, KeynoteRotationDirection, KeynoteSwooshDirection,
+    KeynoteMotionPath, KeynoteMotionPathPoint, KeynoteRotationDirection, KeynoteSwooshDirection,
 };
+use litchi_keynote::{Seconds, build};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -25,10 +26,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some(_) => return Err(usage().into()),
             };
             if let Some(effect) = arguments.next() {
-                settings.effect = effect;
+                settings.set_effect(build::Effect::from_identifier(&effect)?)?;
             }
             if let Some(duration) = arguments.next() {
-                settings.duration = duration.parse()?;
+                settings.set_duration(Seconds::new(duration.parse()?)?)?;
             }
             let build = editor.add_slide_build(slide_index, object_id, settings)?;
             println!(
@@ -45,20 +46,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             let mut settings = KeynoteBuildSettings::rotate_action(total_degrees, direction);
             if let Some(acceleration) = arguments.next() {
-                settings
-                    .rotation
-                    .as_mut()
-                    .ok_or("Rotate constructor omitted its parameters")?
-                    .acceleration = match acceleration.as_str() {
-                    "none" => BuildAcceleration::None,
-                    "ease-in" => BuildAcceleration::EaseIn,
-                    "ease-out" => BuildAcceleration::EaseOut,
-                    "ease-in-out" => BuildAcceleration::EaseInOut,
-                    _ => return Err(usage().into()),
-                };
+                settings.set_action_acceleration(parse_acceleration(&acceleration)?)?;
             }
             if let Some(duration) = arguments.next() {
-                settings.duration = duration.parse()?;
+                settings.set_duration(Seconds::new(duration.parse()?)?)?;
             }
             let build = editor.add_slide_build(slide_index, object_id, settings)?;
             println!(
@@ -70,14 +61,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let scale_factor = arguments.next().ok_or(usage())?.parse()?;
             let mut settings = KeynoteBuildSettings::scale_action(scale_factor);
             if let Some(acceleration) = arguments.next() {
-                settings
-                    .scale
-                    .as_mut()
-                    .ok_or("Scale constructor omitted its parameters")?
-                    .acceleration = parse_acceleration(&acceleration)?;
+                settings.set_action_acceleration(parse_acceleration(&acceleration)?)?;
             }
             if let Some(duration) = arguments.next() {
-                settings.duration = duration.parse()?;
+                settings.set_duration(Seconds::new(duration.parse()?)?)?;
             }
             let build = editor.add_slide_build(slide_index, object_id, settings)?;
             println!(
@@ -89,14 +76,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let opacity_percent = arguments.next().ok_or(usage())?.parse()?;
             let mut settings = KeynoteBuildSettings::opacity_action(opacity_percent);
             if let Some(acceleration) = arguments.next() {
-                settings
-                    .opacity
-                    .as_mut()
-                    .ok_or("Opacity constructor omitted its parameters")?
-                    .acceleration = parse_acceleration(&acceleration)?;
+                settings.set_action_acceleration(parse_acceleration(&acceleration)?)?;
             }
             if let Some(duration) = arguments.next() {
-                settings.duration = duration.parse()?;
+                settings.set_duration(Seconds::new(duration.parse()?)?)?;
             }
             let build = editor.add_slide_build(slide_index, object_id, settings)?;
             println!(
@@ -113,16 +96,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 _ => return Err(usage().into()),
             };
             let mut settings = KeynoteBuildSettings::move_action(delta_x, delta_y);
-            let move_action = settings
-                .move_action
-                .as_mut()
-                .ok_or("Move constructor omitted its parameters")?;
-            move_action.align_to_path = align_to_path;
+            settings.set_move_alignment(align_to_path)?;
             if let Some(acceleration) = arguments.next() {
-                move_action.acceleration = parse_acceleration(&acceleration)?;
+                settings.set_action_acceleration(parse_acceleration(&acceleration)?)?;
             }
             if let Some(duration) = arguments.next() {
-                settings.duration = duration.parse()?;
+                settings.set_duration(Seconds::new(duration.parse()?)?)?;
             }
             let build = editor.add_slide_build(slide_index, object_id, settings)?;
             println!(
@@ -137,17 +116,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let control_1_y = arguments.next().ok_or(usage())?.parse()?;
             let control_2_x = arguments.next().ok_or(usage())?.parse()?;
             let control_2_y = arguments.next().ok_or(usage())?.parse()?;
-            let mut settings = KeynoteBuildSettings::move_action(delta_x, delta_y);
-            let path = &mut settings
-                .move_action
-                .as_mut()
-                .ok_or("Move constructor omitted its parameters")?
-                .path;
+            let mut path = KeynoteMotionPath::straight(delta_x, delta_y);
             path.subpaths[0].nodes[0].out_control_point =
                 KeynoteMotionPathPoint::new(control_1_x, control_1_y);
             path.subpaths[0].nodes[1].in_control_point =
                 KeynoteMotionPathPoint::new(control_2_x, control_2_y);
             path.recalculate_natural_size();
+            let settings = KeynoteBuildSettings::move_along_path(path);
             let build = editor.add_slide_build(slide_index, object_id, settings)?;
             println!(
                 "added Bézier Move action {} with chunk {}",
@@ -341,15 +316,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         "update" => {
             let effect = arguments.next().ok_or(usage())?;
-            let duration = arguments.next().ok_or(usage())?.parse()?;
+            let duration = Seconds::new(arguments.next().ok_or(usage())?.parse()?)?;
             let build = editor
                 .slide_builds(slide_index)?
                 .into_iter()
                 .find(|build| build.object_id == object_id)
                 .ok_or("build is not owned by the requested slide")?;
             let mut settings = build.settings;
-            settings.effect = effect;
-            settings.duration = duration;
+            settings.set_effect(build::Effect::from_identifier(&effect)?)?;
+            settings.set_duration(duration)?;
             editor.set_slide_build(slide_index, object_id, settings)?;
             println!("updated build {object_id}");
         },
@@ -366,17 +341,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "after-previous" => BuildStart::AfterPrevious,
                 _ => return Err(usage().into()),
             };
-            let delay = arguments.next().ok_or(usage())?.parse()?;
+            let delay = Seconds::new(arguments.next().ok_or(usage())?.parse()?)?;
             let build = editor
                 .slide_builds(slide_index)?
                 .into_iter()
                 .find(|build| build.object_id == object_id)
                 .ok_or("build is not owned by the requested slide")?;
             let mut settings = build.settings;
-            settings.start = start;
-            settings.delay = delay;
+            if matches!(start, BuildStart::OnClick | BuildStart::WithPrevious) {
+                settings.set_delay(Seconds::ZERO)?;
+            }
+            settings.set_start(start)?;
+            settings.set_delay(delay)?;
             editor.set_slide_build(slide_index, object_id, settings)?;
-            println!("retimed build {object_id}: start={start:?}, delay={delay}");
+            println!(
+                "retimed build {object_id}: start={start:?}, delay={}",
+                delay.as_f64()
+            );
         },
         "remove" => {
             editor.remove_slide_build(slide_index, object_id)?;
@@ -434,7 +415,7 @@ fn add_typed_build(
     name: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(duration) = duration {
-        settings.duration = duration.parse()?;
+        settings.set_duration(Seconds::new(duration.parse()?)?)?;
     }
     let build = editor.add_slide_build(slide_index, object_id, settings)?;
     println!(
