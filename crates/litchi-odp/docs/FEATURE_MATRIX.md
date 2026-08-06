@@ -51,7 +51,7 @@ the existence of a PPTX feature is never treated as ODP support.
 | Images and package media | ✅ | ✅ | ✅ | Package-contained and linked image/media references are typed; package bytes are read without fetching external URLs, and builder media embedding creates package resources |
 | Embedded objects and OLE-like payloads | 🟡 | 🟡 | 🟡 | Frames/object references can remain as bounded opaque content/resources; payloads are not opened, activated, executed, or rendered as native documents |
 | Embedded charts | 🟡 | 🟡 | 🟡 | Shared ODF chart views can inspect chart XML vocabulary, but ODP exposes no complete typed chart-part model or chart data/editor; chart frames are bounded/opaque |
-| Annotations/comments | 🟡 | 🟡 | 🟡 | ODF annotation vocabulary can be retained by package/XML paths, but the public ODP facade has no complete slide-anchor comment CRUD model |
+| Annotations/comments | ✅ | ✅ | ✅ | `annotation::{Anchor, Info, Position}` inventories shared rich ODF annotations at validated pages or uniquely named shapes; `Presentation` provides atomic add/replace/remove while untouched XML and no-op bytes remain preserved |
 | Hyperlinks and external references | ✅ | ✅ | ✅ | Shape links, XLink targets, show/actuate values, page jumps, and action metadata are typed and serialized; targets are never opened or followed |
 | Forms and controls | ❌ | ❌ | ❌ | No public ODP form/control model or authoring surface is exposed; a control-shaped XML payload is not treated as typed form support |
 | Scripts, events, and macros | 🟡 | 🟡 | 🟡 | Event/action and script-binding metadata can be represented as inert values; no script, macro, or event execution occurs |

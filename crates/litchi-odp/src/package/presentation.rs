@@ -155,6 +155,62 @@ impl Presentation {
         page_metadata::parse(self.package.content_xml())
     }
 
+    /// Inspect slide- and shape-anchored ODF annotations in document order.
+    ///
+    /// Rich annotation bodies are shared with the other ODF family crates;
+    /// this facade adds only the presentation-specific page/shape anchor.
+    pub fn annotations(&self) -> Result<Vec<crate::annotation::Info>> {
+        crate::annotation::annotations(self.package.content_xml())
+    }
+
+    /// Find a uniquely named slide or shape annotation.
+    pub fn find_annotation(&self, name: &str) -> Result<Option<crate::annotation::Info>> {
+        crate::annotation::find(self.package.content_xml(), name)
+    }
+
+    /// Add an annotation to a page or uniquely named shape atomically.
+    pub fn add_annotation(
+        &mut self,
+        anchor: &crate::annotation::Anchor,
+        annotation: &crate::annotation::Annotation,
+    ) -> Result<usize> {
+        let (bytes, index) = crate::annotation::add(
+            self.package.package(),
+            self.package.content_xml(),
+            anchor,
+            annotation,
+        )?;
+        let replacement = Self::from_bytes(bytes)?;
+        *self = replacement;
+        Ok(index)
+    }
+
+    /// Replace one annotation body while retaining its existing anchor.
+    pub fn replace_annotation(
+        &mut self,
+        index: usize,
+        annotation: &crate::annotation::Annotation,
+    ) -> Result<()> {
+        let bytes = crate::annotation::replace(
+            self.package.package(),
+            self.package.content_xml(),
+            index,
+            annotation,
+        )?;
+        let replacement = Self::from_bytes(bytes)?;
+        *self = replacement;
+        Ok(())
+    }
+
+    /// Remove one annotation atomically.
+    pub fn remove_annotation(&mut self, index: usize) -> Result<()> {
+        let bytes =
+            crate::annotation::remove(self.package.package(), self.package.content_xml(), index)?;
+        let replacement = Self::from_bytes(bytes)?;
+        *self = replacement;
+        Ok(())
+    }
+
     /// Inspect named presentation page layouts and their typed placeholders.
     pub fn layouts(&self) -> Result<page_layout::Collection> {
         match self.package.styles_xml() {

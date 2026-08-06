@@ -7,6 +7,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod annotation;
 pub mod authoring;
 pub mod codec;
 pub mod facade;
