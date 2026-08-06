@@ -181,6 +181,17 @@ codec, PPTX ChartEx validation, RTF content fields, XLSB pivot writing, and
 XLSX workbook-edit tests. These are nested ownership boundaries; they do not
 make the RTF lint backlog or Office conformance claims disappear.
 
+The next owner continuation layers DOC numbering, DrawingML diagram data, IWA
+editor tables, ODS style protection, ODT mutable semantics, PPT animation test
+domains, PPTX shape tags, XLS workbook codecs, XLSB conditional-formatting
+binary codecs, and XLSX data-validation codecs into contextual model, codec,
+validation, and test folders. XLS also exposes a bounded `toolbar` facade for
+the `[MS-XLS]` XCB stream. It reuses the shared `[MS-OSHARED]` toolbar model,
+preserves reserved and fixed visual bytes, and refuses variable or unknown
+control payloads without activating macros, UI, or ActiveX behavior. These
+owners remain format-local and prefix-free while shared wire logic stays in
+the common crates.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

@@ -5395,6 +5395,36 @@ pass. This remains bounded implementation evidence, not a claim of complete
 `[MS-DOC]`, `[MS-ODRAW]`, `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, `[MS-XLS]`,
 RTF, OOXML, or ODF conformance.
 
+## Layered owner and XLS XCB continuation
+
+This continuation completes another disjoint set of semantic owner moves while
+adding the next bounded OLE2 feature. DOC numbering, DrawingML diagram data,
+IWA editor tables, ODS style protection, ODT mutable semantics, PPT animation
+parser tests, PPTX shape tags, XLS workbook codecs, XLSB conditional-formatting
+binary codecs, and XLSX data-validation codecs now use contextual nested
+facades over model, wire/codec, validation, and focused-test seams. The public
+names remain prefix-free within their format contexts; no compatibility aliases
+were added.
+
+The XLS owner now exposes an inert `toolbar` facade for the `[MS-XLS]` XCB
+stream. It reuses `litchi-ole-common::toolbar` for shared TB/TBC headers and
+flags, preserves reserved fields and fixed visual bytes, and round-trips the
+bounded CTBWRAPPER/CTBS/CTB structure. Controls requiring variable `TBCData`,
+unknown control types, or uninterpreted command payloads are rejected rather
+than guessed; no macro, UI, ActiveX, or external behavior executes.
+
+Strict all-target checks pass for DOC, DrawingML, IWA, ODS, ODT, PPT, PPTX,
+XLS, XLSB, and XLSX. With lint caps for the known workspace lint debt, the
+library matrix passes DOC (847 with two ignored), DrawingML (92), IWA (1,529),
+ODS (67), ODT (516), PPT (882 with one ignored), PPTX (305), XLS (855), XLSB
+(413), and XLSX (645). Focused additions include 45 DOC numbering tests, 13
+DrawingML diagram-data tests plus two API tests, 39 IWA table tests, 8 ODS
+style-protection tests, 15 ODT mutable tests, 35 PPT parser tests, 7 XLS XCB
+tests, 44 XLSB binary tests, and the XLSX data-validation codec/mutation tests.
+Formatting, diff, and the 46-package boundary check pass. This is bounded
+feature and topology evidence, not a claim of complete OLE2, OOXML, or ODF
+conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

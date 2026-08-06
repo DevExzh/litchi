@@ -230,6 +230,9 @@ pub mod hyperlinks;
 /// Comment/note parsing (NOTE 0x001C)
 pub mod comments;
 
+/// Inert BIFF8 Office Toolbars stream (`XCB`) metadata.
+pub mod toolbar;
+
 /// AutoFilter and sort parsing (AUTOFILTERINFO 0x009D, AUTOFILTER 0x009E, SORT 0x0090)
 pub mod autofilter;
 
@@ -427,6 +430,7 @@ pub use table_styles::{
     DifferentialFormatId, TableStyle, TableStyleElement, TableStyleRegion, TableStyles,
 };
 pub use theme::Theme;
+pub use toolbar::{Control, Toolbar, ToolbarSet, VisualData, Wrapper};
 pub use user_routing::{CUsr, CbUsr, DocRoute, RecipName, RoutingDelivery, UsrInfo};
 pub use uses_elfs::UsesElfs;
 pub use vba::{VbaMetadata, VbaProjectStorage};

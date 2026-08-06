@@ -14,24 +14,31 @@
 //! workflows. Relationship IDs and tag-part names never participate in the
 //! safe selector.
 
-use super::{
+use super::model::{
+    Anchor, Attached, Container, Element, Family, Layout, Node, NodeKind, NvPhase,
+    RawCandidateKind, RawFrame, RawMapFrame,
+};
+use super::validation::{
+    active_pml_offsets, bump_nodes, has_non_namespace_attrs, offset_u32, preserved_anchor_uses,
+    shape_mce_capabilities, take_active, try_push, validate_owner_content_type,
+    validate_staged_anchor, xml_error, xml_position,
+};
+use crate::tag::{
     CONTENT_TYPE, Conformance, List, Source, allocation, available_part_name,
     available_relationship_id, has_other_inbound, invalid, pml, relationship_namespace,
     replace_xml, staged_xml, validate_relative_target, validate_selected_relationship,
 };
 use crate::{Error, Result};
-use litchi_ooxml_common::mce::{Capabilities, OffsetLimits, active_offsets};
+use litchi_ooxml_common::mce::{OffsetLimits, active_offsets};
 use litchi_opc::{OpcPackage, PackURI, Part as OpcPart, XmlPart};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::ops::Range;
 
-const MAX_OWNER_BYTES: usize = 64 * 1024 * 1024;
-const MAX_OWNER_NODES: usize = 1_000_000;
+pub(super) const MAX_OWNER_BYTES: usize = 64 * 1024 * 1024;
+pub(super) const MAX_OWNER_NODES: usize = 1_000_000;
 const MAX_RELATIONSHIP_ID_BYTES: usize = 4_096;
-const P14: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
-const P15: &str = "http://schemas.microsoft.com/office/powerpoint/2012/main";
 
 /// Load the optional programmable-tag list attached to one semantic shape.
 ///
@@ -273,126 +280,16 @@ pub fn remove<'k>(
     Ok(Some(attached.source.into_list()))
 }
 
-struct Attached {
-    relationship_type: String,
-    source: Source,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Family {
-    Shape,
-    Picture,
-    Connector,
-    GraphicFrame,
-    Group,
-}
-
-impl Family {
-    fn from_local(local: &[u8]) -> Option<Self> {
-        match local {
-            b"sp" => Some(Self::Shape),
-            b"pic" => Some(Self::Picture),
-            b"cxnSp" => Some(Self::Connector),
-            b"graphicFrame" => Some(Self::GraphicFrame),
-            b"grpSp" => Some(Self::Group),
-            _ => None,
-        }
-    }
-
-    fn non_visual(self) -> &'static [u8] {
-        match self {
-            Self::Shape => b"nvSpPr",
-            Self::Picture => b"nvPicPr",
-            Self::Connector => b"nvCxnSpPr",
-            Self::GraphicFrame => b"nvGraphicFramePr",
-            Self::Group => b"nvGrpSpPr",
-        }
-    }
-
-    fn permits_placeholder(self) -> bool {
-        !matches!(self, Self::Connector | Self::Group)
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Element {
-    span: Range<usize>,
-    open_end: usize,
-    close_start: usize,
-    empty: bool,
-}
-
-#[derive(Debug, Clone)]
-struct Container {
-    element: Element,
-    child_elements: usize,
-    preserve_when_empty: bool,
-}
-
-#[derive(Debug, Clone)]
-struct Anchor {
-    id: String,
-    span: Range<usize>,
-    id_value: Range<usize>,
-}
-
-#[derive(Debug)]
-struct Layout {
-    conformance: Conformance,
-    nv_pr: Element,
-    insertion: usize,
-    container: Option<Container>,
-    anchor: Option<Anchor>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum NvPhase {
-    Start,
-    Placeholder,
-    Media,
-    CustomerData,
-    Extensions,
-}
-
-#[derive(Debug)]
-enum NodeKind {
-    Root(Family),
-    NonVisual,
-    NvPr {
-        phase: NvPhase,
-        ext_start: Option<usize>,
-    },
-    Container {
-        children: usize,
-        tags_seen: bool,
-        preserve_when_empty: bool,
-    },
-    Anchor {
-        id: String,
-        id_value: Range<usize>,
-    },
-    Opaque,
-}
-
-#[derive(Debug)]
-struct Node {
-    kind: NodeKind,
-    start: usize,
-    open_end: usize,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct RawFrame {
-    semantic: bool,
-}
-
 fn selected_layout<'k>(owner: &dyn OpcPart, key: crate::shape::Key<'k>) -> Result<Layout> {
     validate_owner_content_type(owner.content_type())?;
     let span = selected_raw_span(owner.blob(), key)?;
     scan_layout(owner.blob(), span)
 }
 
-fn selected_raw_span<'k>(xml: &[u8], key: crate::shape::Key<'k>) -> Result<Range<usize>> {
+pub(super) fn selected_raw_span<'k>(
+    xml: &[u8],
+    key: crate::shape::Key<'k>,
+) -> Result<Range<usize>> {
     let scene = crate::shape::read(xml)?;
     let shape = scene.shape(key)?;
     let family = selected_family(shape)?;
@@ -414,32 +311,6 @@ fn selected_family(shape: crate::shape::Shape<'_>) -> Result<Family> {
             "programmable tags are not defined for this extension shape",
         )),
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RawCandidateKind {
-    Supported(Family),
-    Unsupported,
-}
-
-impl RawCandidateKind {
-    fn is_group(self) -> bool {
-        matches!(self, Self::Supported(Family::Group))
-    }
-
-    fn family(self) -> Option<Family> {
-        match self {
-            Self::Supported(family) => Some(family),
-            Self::Unsupported => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct RawMapFrame {
-    active_tree: bool,
-    active_candidate: Option<RawCandidateKind>,
-    selected_start: Option<usize>,
 }
 
 fn raw_shape_span(
@@ -650,26 +521,7 @@ fn raw_candidate(
     (local.as_ref() == b"contentPart").then_some(RawCandidateKind::Unsupported)
 }
 
-fn validate_owner_content_type(content_type: &str) -> Result<()> {
-    if matches!(
-        content_type,
-        "application/vnd.openxmlformats-officedocument.presentationml.slide+xml"
-            | "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"
-            | "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"
-            | "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"
-            | "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml"
-            | "application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml"
-    ) {
-        Ok(())
-    } else {
-        Err(Error::ContentType {
-            expected: "PresentationML shape-tag owner".into(),
-            actual: content_type.into(),
-        })
-    }
-}
-
-fn scan_layout(xml: &[u8], shape_span: Range<usize>) -> Result<Layout> {
+pub(super) fn scan_layout(xml: &[u8], shape_span: Range<usize>) -> Result<Layout> {
     if xml.len() > MAX_OWNER_BYTES {
         return Err(Error::Limit {
             resource: "shape-tag owner XML bytes",
@@ -1111,10 +963,10 @@ fn resolve(
     anchor: &Anchor,
     conformance: Conformance,
 ) -> Result<Source> {
-    super::resolve_anchor(
+    crate::tag::resolve_anchor(
         owner,
         package,
-        &super::Anchor {
+        &crate::tag::Anchor {
             id: anchor.id.clone(),
             span: anchor.span.clone(),
             id_value: anchor.id_value.clone(),
@@ -1123,7 +975,7 @@ fn resolve(
     )
 }
 
-fn add_anchor(xml: &[u8], layout: &Layout, relationship_id: &str) -> Result<Vec<u8>> {
+pub(super) fn add_anchor(xml: &[u8], layout: &Layout, relationship_id: &str) -> Result<Vec<u8>> {
     if layout.anchor.is_some() {
         return Err(invalid("selected shape already has a p:tags anchor"));
     }
@@ -1168,7 +1020,7 @@ fn replace_anchor_id(xml: &[u8], layout: &Layout, relationship_id: &str) -> Resu
     replace_xml(xml, anchor.id_value.clone(), relationship_id.as_bytes())
 }
 
-fn remove_anchor(xml: &[u8], layout: &Layout) -> Result<Vec<u8>> {
+pub(super) fn remove_anchor(xml: &[u8], layout: &Layout) -> Result<Vec<u8>> {
     let anchor = layout
         .anchor
         .as_ref()
@@ -1249,108 +1101,7 @@ fn container_contains_only_anchor(
     Ok(before.iter().all(u8::is_ascii_whitespace) && after.iter().all(u8::is_ascii_whitespace))
 }
 
-fn validate_staged_anchor<'k>(
-    owner: &dyn OpcPart,
-    xml: &[u8],
-    key: crate::shape::Key<'k>,
-    expected_id: Option<&str>,
-) -> Result<()> {
-    validate_owner_content_type(owner.content_type())?;
-    let staged = scan_layout(xml, selected_raw_span(xml, key)?)?;
-    if staged.anchor.as_ref().map(|anchor| anchor.id.as_str()) != expected_id {
-        return Err(invalid("staged shape tag anchor did not round-trip"));
-    }
-    Ok(())
-}
-
-fn active_pml_offsets(xml: &[u8], span: &Range<usize>) -> Result<Vec<u32>> {
-    let mut reader = NsReader::from_reader(xml);
-    let mut offsets = Vec::new();
-    let mut nodes = 0usize;
-    loop {
-        let start = xml_position(&reader)?;
-        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
-        let profile = pml(&namespace);
-        drop(namespace);
-        match event {
-            Event::Start(_) | Event::Empty(_)
-                if start >= span.start && start < span.end && profile.is_some() =>
-            {
-                bump_nodes(&mut nodes)?;
-                try_push(
-                    &mut offsets,
-                    offset_u32(start)?,
-                    "shape MCE candidate offsets",
-                )?;
-            },
-            Event::Eof => break,
-            _ => {},
-        }
-        if start >= span.end {
-            break;
-        }
-    }
-    active_offsets(
-        xml,
-        &offsets,
-        &shape_mce_capabilities(),
-        &OffsetLimits::default(),
-    )
-    .map_err(Into::into)
-}
-
-fn preserved_anchor_uses(xml: &[u8], relationship_id: &str) -> Result<usize> {
-    if xml.len() > MAX_OWNER_BYTES {
-        return Err(Error::Limit {
-            resource: "shape-tag owner XML bytes",
-            limit: MAX_OWNER_BYTES,
-        });
-    }
-    let mut reader = NsReader::from_reader(xml);
-    let mut nodes = 0usize;
-    let mut uses = 0usize;
-    loop {
-        let start = xml_position(&reader)?;
-        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
-        let profile = pml(&namespace);
-        drop(namespace);
-        match event {
-            Event::Start(element) | Event::Empty(element)
-                if profile.is_some() && element.local_name().as_ref() == b"tags" =>
-            {
-                bump_nodes(&mut nodes)?;
-                let profile =
-                    profile.ok_or_else(|| invalid("preserved p:tags profile is missing"))?;
-                let (id, _) = anchor_id(
-                    &reader,
-                    xml,
-                    &element,
-                    start..xml_position(&reader)?,
-                    profile,
-                )?;
-                if id == relationship_id {
-                    uses = uses.checked_add(1).ok_or(Error::Limit {
-                        resource: "preserved shape tag-anchor references",
-                        limit: MAX_OWNER_NODES,
-                    })?;
-                }
-            },
-            Event::Start(_) | Event::Empty(_) => bump_nodes(&mut nodes)?,
-            Event::Eof => break,
-            _ => {},
-        }
-    }
-    Ok(uses)
-}
-
-fn shape_mce_capabilities() -> Capabilities {
-    let mut capabilities = Capabilities::ooxml_baseline();
-    capabilities.understand_namespace(P14);
-    capabilities.understand_namespace(P15);
-    capabilities
-}
-
-fn anchor_id(
+pub(super) fn anchor_id(
     reader: &NsReader<&[u8]>,
     xml: &[u8],
     element: &BytesStart<'_>,
@@ -1368,8 +1119,8 @@ fn anchor_id(
         let is_any_relationship_namespace = matches!(
             &namespace,
             ResolveResult::Bound(Namespace(value))
-                if *value == super::REL_TEXT.as_bytes()
-                    || *value == super::STRICT_REL_TEXT.as_bytes()
+                if *value == super::super::REL_TEXT.as_bytes()
+                    || *value == super::super::STRICT_REL_TEXT.as_bytes()
         );
         if !is_any_relationship_namespace {
             continue;
@@ -1411,7 +1162,7 @@ fn anchor_id(
     Ok((relationship_id, start..end))
 }
 
-pub(super) fn attribute_value_span(element: &[u8], selected: &[u8]) -> Result<Range<usize>> {
+pub(crate) fn attribute_value_span(element: &[u8], selected: &[u8]) -> Result<Range<usize>> {
     if element.first() != Some(&b'<') {
         return Err(invalid("shape p:tags start tag is malformed"));
     }
@@ -1472,472 +1223,4 @@ pub(super) fn attribute_value_span(element: &[u8], selected: &[u8]) -> Result<Ra
         }
     }
     found.ok_or_else(|| invalid("shape p:tags relationship attribute span is missing"))
-}
-
-fn has_non_namespace_attrs(element: &BytesStart<'_>) -> Result<bool> {
-    for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute.map_err(xml_error)?;
-        let name = attribute.key.as_ref();
-        if name != b"xmlns" && !name.starts_with(b"xmlns:") {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-fn take_active<I>(active: &mut std::iter::Peekable<I>, start: usize) -> Result<bool>
-where
-    I: Iterator<Item = u32>,
-{
-    let start = offset_u32(start)?;
-    if active.peek().copied() == Some(start) {
-        let _ = active.next();
-        Ok(true)
-    } else if active.peek().is_some_and(|offset| *offset < start) {
-        Err(invalid("MCE-active shape offsets are out of source order"))
-    } else {
-        Ok(false)
-    }
-}
-
-fn try_push<T>(values: &mut Vec<T>, value: T, resource: &'static str) -> Result<()> {
-    if values.len() == values.capacity() {
-        values
-            .try_reserve(1)
-            .map_err(|source| allocation(resource, source))?;
-    }
-    values.push(value);
-    Ok(())
-}
-
-fn bump_nodes(nodes: &mut usize) -> Result<()> {
-    *nodes = nodes.checked_add(1).ok_or(Error::Limit {
-        resource: "shape-tag owner XML nodes",
-        limit: MAX_OWNER_NODES,
-    })?;
-    if *nodes > MAX_OWNER_NODES {
-        Err(Error::Limit {
-            resource: "shape-tag owner XML nodes",
-            limit: MAX_OWNER_NODES,
-        })
-    } else {
-        Ok(())
-    }
-}
-
-fn offset_u32(offset: usize) -> Result<u32> {
-    u32::try_from(offset).map_err(|_| invalid("shape-tag XML offset does not fit u32"))
-}
-
-fn xml_position(reader: &NsReader<&[u8]>) -> Result<usize> {
-    usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid("shape-tag XML offset does not fit usize"))
-}
-
-fn xml_error(error: impl std::fmt::Display) -> Error {
-    Error::Xml(error.to_string())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::tag::Tag;
-    use std::sync::Arc;
-
-    const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
-    const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-    const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
-    const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
-    const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
-
-    fn list(name: &str, value: &str) -> List {
-        let mut list = List::new();
-        list.add(Tag::new(name, value).expect("valid tag"))
-            .expect("unique tag");
-        list
-    }
-
-    fn owner_package(xml: Vec<u8>) -> (OpcPackage, PackURI) {
-        let owner = PackURI::new("/ppt/slides/slide1.xml").expect("owner URI");
-        let mut package = OpcPackage::new();
-        package.add_part(Box::new(XmlPart::new(
-            owner.clone(),
-            "application/vnd.openxmlformats-officedocument.presentationml.slide+xml".into(),
-            xml,
-        )));
-        (package, owner)
-    }
-
-    fn shape_xml(name: &str, id: u32) -> String {
-        format!(
-            r#"<p:sp><p:nvSpPr><p:cNvPr id="{id}" name="{name}"/><p:cNvSpPr/><p:nvPr><p:ph/></p:nvPr></p:nvSpPr><p:spPr/></p:sp>"#
-        )
-    }
-
-    fn mce_shared_anchor_package() -> (OpcPackage, PackURI, PackURI) {
-        let anchor = r#"<p:custDataLst><p:tags r:id="rId1"/></p:custDataLst>"#;
-        let active = shape_xml("Active", 2).replace("<p:ph/>", anchor);
-        let inactive = shape_xml("Inactive", 3).replace("<p:ph/>", anchor);
-        let xml = format!(
-            r#"<p:sld xmlns:p="{PML}" xmlns:r="{REL}" xmlns:mc="{MC}" xmlns:p14="{P14}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><mc:AlternateContent><mc:Choice Requires="p14">{active}</mc:Choice><mc:Fallback>{inactive}</mc:Fallback></mc:AlternateContent></p:spTree></p:cSld></p:sld>"#
-        )
-        .into_bytes();
-        let (mut package, owner) = owner_package(xml);
-        package
-            .get_part_mut(&owner)
-            .expect("owner")
-            .rels_mut()
-            .add_relationship(
-                crate::tag::TAG_REL.into(),
-                "../tags/tag1.xml".into(),
-                "rId1".into(),
-                false,
-            );
-        let part = PackURI::new("/ppt/tags/tag1.xml").expect("part URI");
-        package.add_part(Box::new(XmlPart::new(
-            part.clone(),
-            CONTENT_TYPE.into(),
-            format!(r#"<p:tagLst xmlns:p="{PML}"><p:tag name="Owner" val="Alice"/></p:tagLst>"#)
-                .into_bytes(),
-        )));
-        (package, owner, part)
-    }
-
-    #[test]
-    fn maps_all_five_families_and_nested_groups_to_raw_source() {
-        let xml = format!(
-            r#"<p:sld xmlns:p="{PML}" xmlns:r="{REL}"><p:cSld><p:spTree>
-                <p:nvGrpSpPr/><p:grpSpPr/>
-                {}
-                <p:pic><p:nvPicPr><p:cNvPr id="3" name="Picture"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill/><p:spPr/></p:pic>
-                <p:cxnSp><p:nvCxnSpPr><p:cNvPr id="4" name="Connector"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr><p:spPr/></p:cxnSp>
-                <p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="5" name="Frame"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm/></p:graphicFrame>
-                <p:grpSp><p:nvGrpSpPr><p:cNvPr id="6" name="Group"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>{}</p:grpSp>
-            </p:spTree></p:cSld></p:sld>"#,
-            shape_xml("Auto", 2),
-            shape_xml("Nested", 7),
-        )
-        .into_bytes();
-
-        let expected = [
-            ("Auto", b"<p:sp>".as_slice()),
-            ("Picture", b"<p:pic>".as_slice()),
-            ("Connector", b"<p:cxnSp>".as_slice()),
-            ("Frame", b"<p:graphicFrame>".as_slice()),
-            ("Group", b"<p:grpSp>".as_slice()),
-            ("Nested", b"<p:sp>".as_slice()),
-        ];
-        for (index, (name, opening)) in expected.iter().enumerate() {
-            let by_name = selected_raw_span(&xml, crate::shape::Key::Name(name))
-                .expect("name maps to raw span");
-            let by_index = selected_raw_span(&xml, crate::shape::Key::Index(index))
-                .expect("index maps to raw span");
-            assert_eq!(by_name, by_index);
-            assert!(xml[by_name].starts_with(opening));
-
-            let layout = scan_layout(&xml, by_index).expect("shape layout");
-            let staged = add_anchor(&xml, &layout, "rId9").expect("anchor insertion");
-            let staged_span = selected_raw_span(&staged, crate::shape::Key::Name(name))
-                .expect("staged shape maps");
-            let staged_layout = scan_layout(&staged, staged_span).expect("staged layout");
-            assert_eq!(
-                staged_layout
-                    .anchor
-                    .as_ref()
-                    .map(|anchor| anchor.id.as_str()),
-                Some("rId9")
-            );
-            let removed = remove_anchor(&staged, &staged_layout).expect("anchor removal");
-            let removed_span = selected_raw_span(&removed, crate::shape::Key::Name(name))
-                .expect("removed shape maps");
-            assert!(
-                scan_layout(&removed, removed_span)
-                    .expect("removed layout")
-                    .anchor
-                    .is_none()
-            );
-        }
-    }
-
-    #[test]
-    fn preserves_customer_data_and_inserts_before_extensions() {
-        let xml = format!(
-            r#"<p:sld xmlns:p="{PML}" xmlns:r="{REL}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/>
-            <p:sp><p:nvSpPr><p:cNvPr id="2" name="Ordered"/><p:cNvSpPr/><p:nvPr><p:ph/><p:audioFile r:link="rIdAudio"/><p:custDataLst keep="yes"><p:custData r:id="rIdData"/></p:custDataLst><!--keep--><p:extLst/></p:nvPr></p:nvSpPr><p:spPr/></p:sp>
-            </p:spTree></p:cSld></p:sld>"#
-        )
-        .into_bytes();
-        let span = selected_raw_span(&xml, crate::shape::Key::Name("Ordered")).expect("shape");
-        let layout = scan_layout(&xml, span).expect("layout");
-        let staged = add_anchor(&xml, &layout, "rIdTags").expect("insert");
-        let text = std::str::from_utf8(&staged).expect("UTF-8 fixture");
-        assert!(text.find("<p:custData ").unwrap() < text.find("<p:tags ").unwrap());
-        assert!(text.find("<p:tags ").unwrap() < text.find("</p:custDataLst>").unwrap());
-        assert!(text.find("</p:custDataLst>").unwrap() < text.find("<!--keep-->").unwrap());
-        assert!(text.find("<!--keep-->").unwrap() < text.find("<p:extLst").unwrap());
-
-        let staged_span =
-            selected_raw_span(&staged, crate::shape::Key::Name("Ordered")).expect("shape");
-        let staged_layout = scan_layout(&staged, staged_span).expect("layout");
-        let removed = remove_anchor(&staged, &staged_layout).expect("remove");
-        assert_eq!(removed, xml);
-    }
-
-    #[test]
-    fn mce_mapping_edits_only_the_active_raw_branch() {
-        let p14 = P14;
-        let xml = format!(
-            r#"<p:sld xmlns:p="{PML}" xmlns:r="{REL}" xmlns:mc="{MC}" xmlns:p14="{p14}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/>
-            <mc:AlternateContent><mc:Choice Requires="p14">{}</mc:Choice><mc:Fallback><p:pic><p:nvPicPr><p:cNvPr id="3" name="Inactive"/><p:cNvPicPr/><p:nvPr><p:custDataLst><p:tags r:id="rIdInactive"/></p:custDataLst></p:nvPr></p:nvPicPr><p:blipFill/><p:spPr/></p:pic></mc:Fallback></mc:AlternateContent>
-            {}
-            </p:spTree></p:cSld></p:sld>"#,
-            shape_xml("Active", 2),
-            shape_xml("Second", 4),
-        )
-        .into_bytes();
-
-        let active_span =
-            selected_raw_span(&xml, crate::shape::Key::Index(0)).expect("active span");
-        assert!(
-            xml[active_span.clone()]
-                .windows(13)
-                .any(|bytes| bytes == b"name=\"Active\"")
-        );
-        assert!(
-            !xml[active_span.clone()]
-                .windows(15)
-                .any(|bytes| bytes == b"name=\"Inactive\"")
-        );
-        let layout = scan_layout(&xml, active_span).expect("active layout");
-        let staged = add_anchor(&xml, &layout, "rIdTags").expect("active insertion");
-        let text = std::str::from_utf8(&staged).expect("UTF-8 fixture");
-        assert_eq!(text.matches("<p:tags ").count(), 2);
-        assert!(text.contains(r#"<p:tags r:id="rIdInactive"/>"#));
-        let inactive = text.find("name=\"Inactive\"").expect("inactive branch");
-        let inactive_end = text[inactive..].find("</p:pic>").expect("picture end") + inactive;
-        assert!(!text[inactive..inactive_end].contains("rIdTags"));
-    }
-
-    #[test]
-    fn inactive_mce_anchor_forces_replacement_fork_and_removal_retention() {
-        let (mut package, owner, original_part) = mce_shared_anchor_package();
-
-        let old = put(&mut package, &owner, "Active", list("Reviewer", "Bob"))
-            .expect("replace active attachment")
-            .expect("old list");
-        assert_eq!(old.get("owner").expect("old tag").value(), "Alice");
-        let active = load(&package, &owner, "Active")
-            .expect("load active attachment")
-            .expect("active attachment");
-        assert_ne!(active.rel(), "rId1");
-        assert_ne!(active.part(), &original_part);
-        assert_eq!(
-            active.list().get("reviewer").expect("new tag").value(),
-            "Bob"
-        );
-        let owner_part = package.get_part(&owner).expect("owner");
-        assert!(owner_part.rels().get("rId1").is_some());
-        assert!(package.get_part(&original_part).is_ok());
-        let owner_xml = std::str::from_utf8(owner_part.blob()).expect("UTF-8 fixture");
-        assert_eq!(owner_xml.matches(r#"r:id="rId1""#).count(), 1);
-        let inactive = owner_xml
-            .find("name=\"Inactive\"")
-            .expect("inactive branch");
-        let inactive_end = owner_xml[inactive..]
-            .find("</p:sp>")
-            .expect("inactive shape end")
-            + inactive;
-        assert!(owner_xml[inactive..inactive_end].contains(r#"r:id="rId1""#));
-
-        let (mut package, owner, original_part) = mce_shared_anchor_package();
-        let removed = remove(&mut package, &owner, "Active")
-            .expect("remove active attachment")
-            .expect("old list");
-        assert_eq!(removed.get("owner").expect("old tag").value(), "Alice");
-        assert!(
-            load(&package, &owner, "Active")
-                .expect("load active")
-                .is_none()
-        );
-        let owner_part = package.get_part(&owner).expect("owner");
-        assert!(owner_part.rels().get("rId1").is_some());
-        assert!(package.get_part(&original_part).is_ok());
-        let owner_xml = std::str::from_utf8(owner_part.blob()).expect("UTF-8 fixture");
-        assert_eq!(owner_xml.matches(r#"r:id="rId1""#).count(), 1);
-        let inactive = owner_xml
-            .find("name=\"Inactive\"")
-            .expect("inactive branch");
-        let inactive_end = owner_xml[inactive..]
-            .find("</p:sp>")
-            .expect("inactive shape end")
-            + inactive;
-        assert!(owner_xml[inactive..inactive_end].contains(r#"r:id="rId1""#));
-    }
-
-    #[test]
-    fn shape_crud_is_atomic_noop_safe_and_move_based() {
-        let xml = format!(
-            r#"<p:sld xmlns:p="{PML}" xmlns:r="{REL}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/>{}</p:spTree></p:cSld></p:sld>"#,
-            shape_xml("Title", 2),
-        )
-        .into_bytes();
-        let (mut package, owner) = owner_package(xml);
-
-        assert!(load(&package, &owner, "Title").expect("load").is_none());
-        assert_eq!(
-            put(&mut package, &owner, "Title", list("Owner", "Alice")).expect("create"),
-            None
-        );
-        let source = load(&package, &owner, 0_usize)
-            .expect("load")
-            .expect("attachment");
-        assert_eq!(source.list().get("owner").expect("tag").value(), "Alice");
-
-        let owner_before = package.get_part(&owner).expect("owner").blob_arc();
-        let part_before = package
-            .get_part(source.part())
-            .expect("tag part")
-            .blob_arc();
-        package.relate_to(
-            "_xmlsignatures/origin.sigs",
-            litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN,
-        );
-        assert!(package.is_signed());
-        let old = put(&mut package, &owner, "Title", list("Owner", "Alice"))
-            .expect("no-op")
-            .expect("old list");
-        assert_eq!(old.get("OWNER").expect("old tag").value(), "Alice");
-        assert!(package.is_signed());
-        assert!(Arc::ptr_eq(
-            &owner_before,
-            &package.get_part(&owner).expect("owner").blob_arc()
-        ));
-        assert!(Arc::ptr_eq(
-            &part_before,
-            &package
-                .get_part(source.part())
-                .expect("tag part")
-                .blob_arc()
-        ));
-
-        assert!(put(&mut package, &owner, "Missing", List::new()).is_err());
-        assert!(package.is_signed());
-        assert!(Arc::ptr_eq(
-            &owner_before,
-            &package.get_part(&owner).expect("owner").blob_arc()
-        ));
-
-        let removed = remove(&mut package, &owner, "Title")
-            .expect("remove")
-            .expect("old list");
-        assert_eq!(removed.get("owner").expect("tag").value(), "Alice");
-        assert!(!package.is_signed());
-        assert!(load(&package, &owner, "Title").expect("load").is_none());
-        assert!(
-            remove(&mut package, &owner, "Title")
-                .expect("idempotent remove")
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn strict_shape_crud_uses_strict_namespaces_and_relationship_type() {
-        let xml = format!(
-            r#"<p:sld xmlns:p="{STRICT_PML}" xmlns:r="{STRICT_REL}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/>{}</p:spTree></p:cSld></p:sld>"#,
-            shape_xml("Strict", 2),
-        )
-        .into_bytes();
-        let (mut package, owner) = owner_package(xml);
-        assert_eq!(
-            put(&mut package, &owner, "Strict", List::new()).expect("strict create"),
-            None
-        );
-        let source = load(&package, &owner, "Strict")
-            .expect("strict load")
-            .expect("strict attachment");
-        assert_eq!(source.conformance(), Conformance::Strict);
-        assert_eq!(
-            package
-                .get_part(&owner)
-                .expect("owner")
-                .rels()
-                .get(source.rel())
-                .expect("relationship")
-                .reltype(),
-            crate::tag::STRICT_TAG_REL
-        );
-        let owner_xml = std::str::from_utf8(package.get_part(&owner).expect("owner").blob())
-            .expect("UTF-8 fixture");
-        assert!(owner_xml.contains(STRICT_PML));
-        assert!(owner_xml.contains(STRICT_REL));
-        let part_xml =
-            std::str::from_utf8(package.get_part(source.part()).expect("tag part").blob())
-                .expect("UTF-8 tag part");
-        assert!(part_xml.contains(STRICT_PML));
-    }
-
-    #[test]
-    fn shared_shape_anchor_forks_then_collects_each_orphan() {
-        let anchor = r#"<p:custDataLst><p:tags r:id="rId1"/></p:custDataLst>"#;
-        let first = shape_xml("First", 2).replace("<p:ph/>", anchor);
-        let second = shape_xml("Second", 3).replace("<p:ph/>", anchor);
-        let xml = format!(
-            r#"<p:sld xmlns:p="{PML}" xmlns:r="{REL}"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/>{first}{second}</p:spTree></p:cSld></p:sld>"#
-        )
-        .into_bytes();
-        let (mut package, owner) = owner_package(xml);
-        package
-            .get_part_mut(&owner)
-            .expect("owner")
-            .rels_mut()
-            .add_relationship(
-                crate::tag::TAG_REL.into(),
-                "../tags/tag1.xml".into(),
-                "rId1".into(),
-                false,
-            );
-        let original_part = PackURI::new("/ppt/tags/tag1.xml").expect("part URI");
-        package.add_part(Box::new(XmlPart::new(
-            original_part.clone(),
-            CONTENT_TYPE.into(),
-            format!(r#"<p:tagLst xmlns:p="{PML}"><p:tag name="Owner" val="Alice"/></p:tagLst>"#)
-                .into_bytes(),
-        )));
-
-        let old = put(&mut package, &owner, "First", list("Reviewer", "Bob"))
-            .expect("fork")
-            .expect("old list");
-        assert_eq!(old.get("owner").expect("old tag").value(), "Alice");
-        let first = load(&package, &owner, "First")
-            .expect("first load")
-            .expect("first attachment");
-        let second = load(&package, &owner, "Second")
-            .expect("second load")
-            .expect("second attachment");
-        assert_ne!(first.rel(), second.rel());
-        assert_ne!(first.part(), second.part());
-        assert_eq!(
-            first.list().get("reviewer").expect("new tag").value(),
-            "Bob"
-        );
-        assert_eq!(
-            second.list().get("owner").expect("old tag").value(),
-            "Alice"
-        );
-
-        let forked_part = first.part().clone();
-        assert!(
-            remove(&mut package, &owner, "First")
-                .expect("remove first")
-                .is_some()
-        );
-        assert!(package.get_part(&forked_part).is_err());
-        assert!(package.get_part(&original_part).is_ok());
-        assert!(
-            remove(&mut package, &owner, "Second")
-                .expect("remove second")
-                .is_some()
-        );
-        assert!(package.get_part(&original_part).is_err());
-    }
 }
