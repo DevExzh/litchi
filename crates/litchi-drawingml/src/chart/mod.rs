@@ -77,6 +77,7 @@
 pub mod axis;
 pub mod bubble;
 pub mod data;
+pub mod edit;
 pub mod legend;
 pub mod model;
 pub mod plot_area;
@@ -90,6 +91,7 @@ pub use axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
 pub use data::{
     Layout, MultiLevelStringData, NumberFormat, NumericData, RichText, StringData, TitleText,
 };
+pub use edit::{Commit, DataLabelFlag, Patch, Snapshot, Transaction};
 pub use legend::Legend;
 pub use model::{
     Chart, ColorMapOverride, ColorMapping, ColorSchemeIndex, ExtensionList, ExternalData,
