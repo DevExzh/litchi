@@ -928,8 +928,9 @@ fn classify_shape(namespace: &ResolveResult<'_>, name: QName<'_>) -> Option<Kind
         Some(Kind::Group)
     } else if is_pml(namespace, name, b"cxnSp") {
         Some(Kind::Connector)
-    } else if name.local_name().as_ref() == b"contentPart"
-        && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == P14.as_bytes() || *value == P15.as_bytes())
+    } else if is_pml(namespace, name, b"contentPart")
+        || (name.local_name().as_ref() == b"contentPart"
+            && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == P14.as_bytes() || *value == P15.as_bytes()))
     {
         Some(Kind::Content)
     } else {

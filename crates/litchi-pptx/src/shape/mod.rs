@@ -169,6 +169,27 @@ mod tests {
     }
 
     #[test]
+    fn indexes_standard_presentationml_content_parts_as_content_shapes() {
+        let rel = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+        let xml = format!(
+            r#"<p:spTree xmlns:p="{PML}" xmlns:r="{rel}">
+                <p:nvGrpSpPr/><p:grpSpPr/>
+                <p:contentPart r:id="rIdOpaque"/>
+            </p:spTree>"#
+        );
+        let scene = Scene::read(xml.as_bytes()).expect("content-part scene");
+        assert_eq!(scene.len(), 1);
+        assert!(matches!(
+            scene.at(0).expect("content part"),
+            Shape::Content(_)
+        ));
+        assert_eq!(
+            scene.at(0).expect("content part").xml().unwrap(),
+            b"<p:contentPart r:id=\"rIdOpaque\"/>"
+        );
+    }
+
+    #[test]
     fn nested_ole_fallback_picture_is_not_a_scene_shape() {
         let xml = format!(
             r#"<p:spTree xmlns:p="{PML}" xmlns:a="{DML}">

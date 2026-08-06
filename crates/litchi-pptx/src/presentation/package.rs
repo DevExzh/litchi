@@ -43,6 +43,23 @@ pub(super) fn vba(
     embedded::vba::discover(package, presentation.part().partname())
 }
 
+pub(super) fn content_parts(
+    package: &OpcPackage,
+    presentation: &PresentationPart<'_>,
+) -> Result<Vec<embedded::content_parts::ContentPart>> {
+    let mut limits = embedded::content_parts::Limits::default();
+    let mut content_parts = Vec::new();
+    for (slide_index, slide) in slides(package, presentation)?.into_iter().enumerate() {
+        content_parts.extend(embedded::content_parts::load_slide(
+            package,
+            slide_index,
+            slide.part().part(),
+            &mut limits,
+        )?);
+    }
+    Ok(content_parts)
+}
+
 pub(super) fn hyperlinks(
     package: &OpcPackage,
     presentation: &PresentationPart<'_>,

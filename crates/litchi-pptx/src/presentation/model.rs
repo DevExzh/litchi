@@ -66,6 +66,15 @@ impl<'a> Presentation<'a> {
         package::vba(self.package, &self.part)
     }
 
+    /// Load all inert, opaque PresentationML content parts in slide order.
+    ///
+    /// The content-part anchor, relationship metadata, and referenced
+    /// payload bytes are retained without interpreting or executing the
+    /// external vocabulary stored by the producer.
+    pub fn content_parts(&self) -> Result<Vec<embedded::content_parts::ContentPart>> {
+        package::content_parts(self.package, &self.part)
+    }
+
     /// Discover inert hyperlinks owned by the presentation's slides.
     ///
     /// Each result contains the zero-based slide position and a typed target.
