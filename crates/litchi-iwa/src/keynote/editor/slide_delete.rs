@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::data_reference_registry::component_data_identifiers;
+use crate::media::MediaAssetId;
 
 impl KeynoteEditor {
     /// Remove a slide and its slide-tree node.
@@ -143,6 +144,7 @@ fn remove_dedicated_slide_component(
 
     let mut media = IWorkMediaEditor::from_package(package)?;
     for identifier in data_identifiers {
+        let identifier = MediaAssetId::try_from(identifier)?;
         if media
             .asset(identifier)
             .is_some_and(|asset| !asset.is_referenced())
