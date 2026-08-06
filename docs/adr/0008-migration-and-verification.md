@@ -6238,8 +6238,9 @@ verification remains part of the next fixture matrix run.
 The archive-free IWA index foundation slice is complete. `litchi-iwa-index`
 contains typed fragment/byte-span/object/reference values, deterministic
 immutable indexing, typed duplicate/null/reference failures, and graph
-queries without archive dependencies. Four leaf tests, strict Clippy, and the
-46-package/127-edge topology audit pass; private adapter integration remains
+queries without archive dependencies. Five leaf tests cover deterministic
+multi-edge ordering plus fragment/source boundary rejection; strict Clippy and the
+46-package/128-edge topology audit pass; private adapter integration remains
 explicit follow-up work. The Keynote build leaf likewise passes its focused
 semantic suite, strict Clippy, and formatting checks; its native adapter and
 CRUD migration remain open, so this slice makes no new native Keynote claim.

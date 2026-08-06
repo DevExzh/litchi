@@ -347,6 +347,7 @@ mod tests {
         let one = object(1);
         let two = object(2);
         let three = object(3);
+        let four = object(4);
         let mut builder = IndexBuilder::new();
         builder.add_fragment(second).expect("second fragment");
         builder.add_fragment(first).expect("first fragment");
@@ -359,6 +360,10 @@ mod tests {
         builder
             .add_object(ObjectRecord::new(two, first, span(20, 2)))
             .expect("second object");
+        builder
+            .add_object(ObjectRecord::new(four, second, span(40, 4)))
+            .expect("fourth object");
+        builder.add_reference(three, four).expect("third to fourth");
         builder.add_reference(three, one).expect("third to first");
         builder.add_reference(two, three).expect("second to third");
 
@@ -368,23 +373,30 @@ mod tests {
                 .objects()
                 .map(|record| record.id())
                 .collect::<Vec<_>>(),
-            [one, two, three]
+            [one, two, three, four]
         );
         assert_eq!(index.fragments().collect::<Vec<_>>(), [first, second]);
         assert_eq!(
             index.fragment_object_ids(first),
             Some([two, three].as_slice())
         );
-        assert_eq!(index.fragment_object_ids(second), Some([one].as_slice()));
+        assert_eq!(
+            index.fragment_object_ids(second),
+            Some([one, four].as_slice())
+        );
         assert_eq!(
             index.outgoing(two).map(|ids| ids.collect::<Vec<_>>()),
             Some(vec![three])
         );
         assert_eq!(
+            index.outgoing(three).map(|ids| ids.collect::<Vec<_>>()),
+            Some(vec![one, four])
+        );
+        assert_eq!(
             index.incoming(one).map(|ids| ids.collect::<Vec<_>>()),
             Some(vec![three])
         );
-        assert_eq!(index.reachable(two), [two, three, one]);
+        assert_eq!(index.reachable(two), [two, three, one, four]);
         assert!(!index.has_cycle(two));
     }
 
@@ -417,6 +429,35 @@ mod tests {
         assert!(matches!(
             builder.build(),
             Err(IndexError::UnknownTarget(target)) if target == second
+        ));
+    }
+
+    #[test]
+    fn builder_rejects_unregistered_fragments_and_reference_sources() {
+        let registered_fragment = fragment(1);
+        let unregistered_fragment = fragment(2);
+        let source = object(1);
+        let target = object(2);
+        let mut builder = IndexBuilder::new();
+        builder
+            .add_fragment(registered_fragment)
+            .expect("registered fragment");
+
+        assert_eq!(
+            builder.add_object(ObjectRecord::new(source, unregistered_fragment, span(0, 1),)),
+            Err(IndexError::UnknownFragment(unregistered_fragment))
+        );
+
+        builder
+            .add_object(ObjectRecord::new(target, registered_fragment, span(0, 1)))
+            .expect("target object");
+        builder
+            .add_reference(source, target)
+            .expect("reference with deferred source validation");
+
+        assert!(matches!(
+            builder.build(),
+            Err(IndexError::UnknownSource(missing)) if missing == source
         ));
     }
 
