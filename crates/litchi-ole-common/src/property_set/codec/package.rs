@@ -1,5 +1,6 @@
 //! CFB/package integration and metadata projection for Property Sets.
 
+use super::super::binding::Binding;
 use super::super::model::*;
 use super::binary::{filetime_to_date, filetime_to_duration};
 use super::support::allocation;
@@ -19,6 +20,12 @@ pub trait PropertySetReader {
     /// Strictly parse a Property Set stream at path.
     fn property_set_stream(&mut self, path: &[&str]) -> Result<Stream, OleError>;
 
+    /// Strictly parse a standard or GUID-derived Property Set binding.
+    fn property_set(&mut self, binding: Binding) -> Result<Stream, OleError> {
+        let name = binding.name();
+        self.property_set_stream(&[name.as_str()])
+    }
+
     /// Parse standard SummaryInformation and DocumentSummaryInformation metadata.
     fn get_metadata(&mut self) -> Result<Metadata, OleError>;
 }
@@ -33,7 +40,7 @@ impl<R: Read + Seek> PropertySetReader for OleFile<R> {
     /// Parse standard metadata. Missing streams are optional; malformed streams are errors.
     fn get_metadata(&mut self) -> Result<Metadata, OleError> {
         let mut metadata = Metadata::default();
-        match PropertySetReader::property_set_stream(self, &["\u{0005}SummaryInformation"]) {
+        match PropertySetReader::property_set(self, Binding::SummaryInformation) {
             Ok(stream) => {
                 let section = stream
                     .sections
@@ -44,8 +51,7 @@ impl<R: Read + Seek> PropertySetReader for OleFile<R> {
             Err(OleError::StreamNotFound) => {},
             Err(error) => return Err(error),
         }
-        match PropertySetReader::property_set_stream(self, &["\u{0005}DocumentSummaryInformation"])
-        {
+        match PropertySetReader::property_set(self, Binding::DocumentSummaryInformation) {
             Ok(stream) => {
                 let section = stream
                     .sections

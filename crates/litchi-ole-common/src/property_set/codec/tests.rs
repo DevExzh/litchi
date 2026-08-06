@@ -1,8 +1,9 @@
 //! Focused invariants for the layered Property Set codec.
 
-use super::super::model::{Standard, Value};
-use super::Editor;
+use super::super::binding::Binding;
+use super::super::model::{Guid, Section, Stream, Value};
 use super::binary::parse_typed_property;
+use super::{Editor, PropertySetReader};
 use litchi_cfb::consts::VT_I4;
 use litchi_cfb::{OleFile, OleWriter};
 use std::io::Cursor;
@@ -18,11 +19,9 @@ fn typed_property_codec_preserves_scalar_values() {
 
 #[test]
 fn editor_preserves_nested_streams_with_matching_leaf_names() {
-    let property_set = super::super::model::Stream::new(super::super::model::Section::new(
-        super::super::model::SUMMARY_INFORMATION_FMTID,
-    ))
-    .to_bytes()
-    .expect("empty property set is serializable");
+    let property_set = Stream::new(Section::new(super::super::model::SUMMARY_INFORMATION_FMTID))
+        .to_bytes()
+        .expect("empty property set is serializable");
 
     let mut writer = OleWriter::new();
     writer
@@ -36,7 +35,7 @@ fn editor_preserves_nested_streams_with_matching_leaf_names() {
 
     let mut editor = Editor::new(source.into_inner()).expect("editor source");
     editor
-        .update(Standard::SummaryInformation, |section| {
+        .update(Binding::SummaryInformation, |section| {
             section.add(2, Value::Lpstr("Title".into()))
         })
         .expect("summary edit");
@@ -46,5 +45,32 @@ fn editor_preserves_nested_streams_with_matching_leaf_names() {
         ole.open_stream(&["Nested", "\u{0005}SummaryInformation"])
             .expect("nested stream survives"),
         b"nested payload"
+    );
+}
+
+#[test]
+fn reader_opens_a_guid_derived_binding_without_a_format_specific_path() {
+    let binding = Binding::custom(Guid::from_bytes([
+        0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xFE, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD,
+        0xEF,
+    ]));
+    let bytes = Stream::new(Section::new(binding.format_identifier()))
+        .to_bytes()
+        .expect("custom property set should serialize");
+    let name = binding.name();
+
+    let mut writer = OleWriter::new();
+    writer
+        .create_stream(&[name.as_str()], &bytes)
+        .expect("standard binding stream should be writable");
+    let mut cfb = Cursor::new(Vec::new());
+    writer.write_to(&mut cfb).expect("CFB should serialize");
+
+    let mut ole = OleFile::open(Cursor::new(cfb.into_inner())).expect("CFB should open");
+    let parsed = PropertySetReader::property_set(&mut ole, binding)
+        .expect("binding reader should resolve the standard name");
+    assert_eq!(
+        parsed.sections[0].format_identifier,
+        binding.format_identifier()
     );
 }

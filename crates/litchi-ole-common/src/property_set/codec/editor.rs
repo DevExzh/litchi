@@ -1,5 +1,6 @@
 //! Transactional semantic editor for OLE Property Set streams.
 
+use super::super::binding::Binding;
 use super::super::model::*;
 use super::package::try_path_refs;
 use super::semantic::validate_section;
@@ -43,34 +44,34 @@ impl Editor {
         })
     }
 
-    pub fn property_set(&self, kind: Standard) -> Result<Option<Section>, OleError> {
+    pub fn property_set(&self, kind: Binding) -> Result<Option<Section>, OleError> {
         let Some(stream) = self.load_stream(kind)? else {
             return Ok(None);
         };
         stream
-            .section(kind.format_id())
+            .section(kind.format_identifier())
             .map(try_clone_property_set)
             .transpose()
     }
 
-    pub fn update<F>(&mut self, kind: Standard, edit: F) -> Result<(), OleError>
+    pub fn update<F>(&mut self, kind: Binding, edit: F) -> Result<(), OleError>
     where
         F: FnOnce(&mut Section) -> Result<(), OleError>,
     {
         let mut stream = self.load_stream(kind)?.unwrap_or_else(|| {
-            let base = if kind == Standard::UserDefinedProperties {
-                DOCUMENT_SUMMARY_INFORMATION_FMTID
+            let base = if kind == Binding::UserDefinedProperties {
+                Binding::DocumentSummaryInformation.format_identifier()
             } else {
-                kind.format_id()
+                kind.format_identifier()
             };
             Stream::new(Section::new(base))
         });
-        if stream.section(kind.format_id()).is_none() {
-            stream.add_section(Section::new(kind.format_id()))?;
+        if stream.section(kind.format_identifier()).is_none() {
+            stream.add_section(Section::new(kind.format_identifier()))?;
         }
         let version = stream.version;
         let section = stream
-            .section_mut(kind.format_id())
+            .section_mut(kind.format_identifier())
             .ok_or_else(|| invalid("Property Set section was not available after insertion"))?;
         let mut candidate = try_clone_property_set(section)?;
         edit(&mut candidate)?;
@@ -83,10 +84,10 @@ impl Editor {
 
     pub fn replace(
         &mut self,
-        kind: Standard,
+        kind: Binding,
         section: Section,
     ) -> Result<Option<Section>, OleError> {
-        if section.format_identifier != kind.format_id() {
+        if section.format_identifier != kind.format_identifier() {
             return Err(invalid(
                 "Replacement section format ID does not match target",
             ));
@@ -99,11 +100,11 @@ impl Editor {
         Ok(previous)
     }
 
-    pub fn remove(&mut self, kind: Standard) -> Result<Option<Section>, OleError> {
+    pub fn remove(&mut self, kind: Binding) -> Result<Option<Section>, OleError> {
         let Some(previous) = self.property_set(kind)? else {
             return Ok(None);
         };
-        if kind == Standard::UserDefinedProperties {
+        if kind == Binding::UserDefinedProperties {
             let mut stream = self
                 .load_stream(kind)?
                 .ok_or_else(|| invalid("Property Set stream disappeared during removal"))?;
@@ -149,10 +150,11 @@ impl Editor {
         Ok(output.into_inner())
     }
 
-    fn stage(&mut self, kind: Standard, replacement: Option<Vec<u8>>) -> Result<(), OleError> {
+    fn stage(&mut self, kind: Binding, replacement: Option<Vec<u8>>) -> Result<(), OleError> {
+        let name = kind.name();
         let mut key = try_vec_with_capacity(1, "staged property-set stream path")?;
         key.push(try_clone_string(
-            kind.path(),
+            name.as_str(),
             "staged property-set stream path",
         )?);
         if !self.staged.contains_key(&key) {
@@ -164,16 +166,19 @@ impl Editor {
         Ok(())
     }
 
-    fn load_stream(&self, kind: Standard) -> Result<Option<Stream>, OleError> {
-        let path = kind.path();
+    fn load_stream(&self, kind: Binding) -> Result<Option<Stream>, OleError> {
+        let name = kind.name();
         if let Some((_, staged)) = self.staged.iter().find(|(candidate, _)| {
-            candidate.len() == 1 && candidate.first().is_some_and(|name| name == path)
+            candidate.len() == 1
+                && candidate
+                    .first()
+                    .is_some_and(|candidate| candidate == name.as_str())
         }) {
             return staged.as_ref().map(|data| Stream::parse(data)).transpose();
         }
         self.streams
             .iter()
-            .find(|(candidate, _)| candidate.len() == 1 && candidate[0] == path)
+            .find(|(candidate, _)| candidate.len() == 1 && candidate[0] == name.as_str())
             .map(|(_, data)| Stream::parse(data))
             .transpose()
     }

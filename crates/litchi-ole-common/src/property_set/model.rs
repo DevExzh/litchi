@@ -1166,31 +1166,6 @@ pub const USER_DEFINED_PROPERTIES_FMTID: Guid = Guid::from_bytes([
     0x05, 0xD5, 0xCD, 0xD5, 0x9C, 0x2E, 0x1B, 0x10, 0x93, 0x97, 0x08, 0x00, 0x2B, 0x2C, 0xF9, 0xAE,
 ]);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Standard {
-    SummaryInformation,
-    DocumentSummaryInformation,
-    UserDefinedProperties,
-}
-
-impl Standard {
-    pub(crate) fn path(self) -> &'static str {
-        match self {
-            Self::SummaryInformation => "\u{0005}SummaryInformation",
-            Self::DocumentSummaryInformation | Self::UserDefinedProperties => {
-                "\u{0005}DocumentSummaryInformation"
-            },
-        }
-    }
-    pub(crate) fn format_id(self) -> Guid {
-        match self {
-            Self::SummaryInformation => SUMMARY_INFORMATION_FMTID,
-            Self::DocumentSummaryInformation => DOCUMENT_SUMMARY_INFORMATION_FMTID,
-            Self::UserDefinedProperties => USER_DEFINED_PROPERTIES_FMTID,
-        }
-    }
-}
-
 impl From<Metadata> for litchi_core::Metadata {
     fn from(ole_metadata: Metadata) -> Self {
         litchi_core::Metadata {
