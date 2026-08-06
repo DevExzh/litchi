@@ -86,9 +86,6 @@ impl Snapshot {
         }
     }
 
-    fn into_inner(self) -> master_layout::Snapshot {
-        self.inner
-    }
 }
 
 /// A transactional semantic edit of one master name.
