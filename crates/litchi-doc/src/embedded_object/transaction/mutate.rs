@@ -6,13 +6,36 @@ use super::super::storage::object_target;
 use crate::package::{Error as PackageError, Result};
 use std::collections::HashSet;
 
+use super::inventory::object_for_reference;
+
 impl Editor {
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         self.changed
     }
 
+    /// # Errors
+    ///
+    /// Returns an error when a managed field does not resolve to its owning
+    /// `ObjectPool` storage.
     pub fn objects(&self) -> Result<Vec<Reference>> {
-        managed_objects(&self.word, &self.pieces, &self.fields)
+        managed_objects(&self.word, &self.pieces, &self.fields)?
+            .into_iter()
+            .map(|mut reference| {
+                let object =
+                    object_for_reference(self.package.objects(), &reference).ok_or_else(|| {
+                        corrupted(format!(
+                            "managed embedded-object storage {:?} is missing",
+                            reference.storage_name
+                        ))
+                    })?;
+                // Field instructions carry the numeric storage identity. Use
+                // the resolved directory spelling for subsequent CFB edits,
+                // so producer forms such as `_00042` remain addressable.
+                reference.storage_name = object.key().to_owned();
+                Ok(reference)
+            })
+            .collect()
     }
 
     /// Adds an object at the main-story boundary. No existing logical range

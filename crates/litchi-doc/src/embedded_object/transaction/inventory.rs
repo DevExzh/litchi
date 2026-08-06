@@ -6,6 +6,11 @@ use crate::package::Result;
 use litchi_ole_common::object::{Object, Objects};
 
 impl Editor {
+    /// Validates every DOC field reference against the owning `ObjectPool`.
+    pub(in crate::embedded_object) fn validate_references(&self) -> Result<()> {
+        self.objects().map(|_| ())
+    }
+
     /// Returns the current managed-object snapshot with inert OLE metadata.
     ///
     /// The projection only reads the editor's current candidate. It never
@@ -13,6 +18,11 @@ impl Editor {
     /// and it does not publish any state. Mutations continue to operate on a
     /// cloned candidate and therefore remain atomic if a later validation
     /// step fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a managed field has no owning `ObjectPool`
+    /// storage or a metadata projection cannot be read.
     pub fn inventory(&self) -> Result<Inventory> {
         let references = self.objects()?;
         let mut entries = Vec::with_capacity(references.len());
@@ -30,7 +40,10 @@ impl Editor {
     }
 }
 
-fn object_for_reference<'a>(objects: &'a Objects, reference: &Reference) -> Option<&'a Object> {
+pub(in crate::embedded_object) fn object_for_reference<'a>(
+    objects: &'a Objects,
+    reference: &Reference,
+) -> Option<&'a Object> {
     objects.get(&reference.storage_name).or_else(|| {
         objects.iter().find(|object| {
             object

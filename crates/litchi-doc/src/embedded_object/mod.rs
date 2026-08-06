@@ -13,7 +13,9 @@ mod transaction;
 mod tests;
 
 pub use litchi_ole_common::object::Limits;
+pub use litchi_ole_common::object::link::{Link, Moniker, Times};
 pub use model::{
     Clipboard, CompObj, Editor, Entry, Info, Inventory, Kind, Metadata, Ole, Reference, Unknown,
     WriteOptions,
 };
+pub use transaction::{Commit, Patch, Snapshot, Transaction, TransactionError};
