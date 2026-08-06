@@ -63,7 +63,23 @@ pub(super) fn extract(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
         crate::Error::InvalidFormat(format!("Keynote show payload is invalid: {error}"))
     })?;
 
-    let mut slides = Vec::with_capacity(show.slide_tree.slides.len());
+    if show.slide_tree.slides.len() > litchi_iwa_structured::MAX_SLIDES {
+        return Err(crate::Error::InvalidFormat(format!(
+            "Keynote slide tree contains {} slides; maximum is {}",
+            show.slide_tree.slides.len(),
+            litchi_iwa_structured::MAX_SLIDES
+        )));
+    }
+
+    let mut slides = Vec::new();
+    slides
+        .try_reserve(show.slide_tree.slides.len())
+        .map_err(|_| {
+            crate::Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Keynote structured slides",
+                amount: show.slide_tree.slides.len(),
+            })
+        })?;
 
     for node_reference in show.slide_tree.slides {
         let node_object = required_object(
@@ -170,11 +186,11 @@ pub(super) fn extract(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
                 note.contained_storage.identifier,
                 "Keynote speaker-note storage",
             )?;
-            let text = decode_storage_text(storage.messages, "Keynote speaker-note storage")?;
-            if !text.is_empty() {
+            let storage = decode_storage(storage.messages, "Keynote speaker-note storage")?;
+            if !storage.is_empty() {
                 // Speaker notes currently have a plain-string semantic slot;
                 // keep the conversion at this archive/leaf boundary.
-                slide.set_notes(Some(text));
+                slide.set_notes(Some(storage.text().to_owned()));
             }
         }
         slides.push(slide.build());
@@ -209,7 +225,7 @@ fn drawable_text(
         identifier,
         context,
         required,
-        std::convert::identity,
+        |storage| storage.text().to_owned(),
     )
 }
 
@@ -226,7 +242,7 @@ fn drawable_storage(
         identifier,
         context,
         required,
-        Storage::from_text,
+        std::convert::identity,
     )
 }
 
@@ -236,7 +252,7 @@ fn drawable_value<T>(
     identifier: u64,
     context: &str,
     required: bool,
-    materialize: impl FnOnce(String) -> T,
+    materialize: impl FnOnce(Storage) -> T,
 ) -> Result<Option<T>> {
     let drawable = required_object(bundle, object_index, identifier, context)?;
     let has_placeholder = drawable
@@ -286,18 +302,21 @@ fn drawable_value<T>(
         return Ok(None);
     };
     let storage_object = required_object(bundle, object_index, storage_id, context)?;
-    let text = decode_storage_text(storage_object.messages, context)?;
-    Ok((!text.is_empty()).then(|| materialize(text)))
+    let storage = decode_storage(storage_object.messages, context)?;
+    if storage.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(materialize(storage)))
 }
 
-fn decode_storage_text(messages: &[crate::archive::RawMessage], context: &str) -> Result<String> {
+fn decode_storage(messages: &[crate::archive::RawMessage], context: &str) -> Result<Storage> {
     let payload = unique_payload(messages, STORAGE_MESSAGE_TYPES, context)?;
     let storage = crate::protobuf::tswp::StorageArchive::decode(payload).map_err(|error| {
         crate::Error::InvalidFormat(format!(
             "{context} text-storage payload is invalid: {error}"
         ))
     })?;
-    Ok(storage.text.concat())
+    super::text::from_archive(storage, context)
 }
 
 fn unique_payload<'a>(

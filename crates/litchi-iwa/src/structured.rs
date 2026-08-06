@@ -8,6 +8,7 @@
 mod keynote;
 mod numbers;
 mod pages;
+mod text;
 
 use crate::Result;
 use crate::application::Application;

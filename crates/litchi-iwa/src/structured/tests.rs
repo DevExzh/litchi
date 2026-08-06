@@ -132,6 +132,13 @@ fn pages_structured_adapter_transfers_text_storage_without_flattening() {
             .collect::<Vec<_>>(),
         ["first second"]
     );
+    assert_eq!(
+        sections[0].text_storages()[0].runs(),
+        [
+            litchi_iwa_text::storage::Run::new(0, 5),
+            litchi_iwa_text::storage::Run::new(5, 7),
+        ]
+    );
 }
 
 #[test]
@@ -314,6 +321,13 @@ fn keynote_structured_adapter_transfers_drawable_text_storage() {
             .map(|storage| storage.text())
             .collect::<Vec<_>>(),
         ["body text"]
+    );
+    assert_eq!(
+        slides[0].text_storages()[0].runs(),
+        [
+            litchi_iwa_text::storage::Run::new(0, 4),
+            litchi_iwa_text::storage::Run::new(4, 5),
+        ]
     );
 }
 

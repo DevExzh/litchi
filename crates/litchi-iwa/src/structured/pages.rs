@@ -3,7 +3,6 @@
 use crate::Result;
 use crate::bundle::Bundle;
 use crate::object_index::ObjectIndex;
-use litchi_iwa_text::storage::Storage;
 use litchi_pages::{Section, SectionType};
 use prost::Message;
 
@@ -51,7 +50,10 @@ pub(super) fn extract(bundle: &Bundle, object_index: &ObjectIndex) -> Result<Vec
                 reference.identifier
             ))
         })?;
-        let storage = Storage::from_text(storage.text.concat());
+        let storage = super::text::from_archive(
+            storage,
+            &format!("Pages body object {}", reference.identifier),
+        )?;
         if !storage.is_empty() {
             section_builder.push_text_storage(storage);
         }
