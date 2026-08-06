@@ -125,6 +125,9 @@ pub struct FibBuilder {
     lcb_plcf_bkf: u32,
     fc_plcf_bkl: u32,
     lcb_plcf_bkl: u32,
+    /// Command-related customizations (`Tcg`) offset and size.
+    fc_cmds: u32,
+    lcb_cmds: u32,
     /// Smart-tag bookmark information (`SttbfBkmkFactoid`).
     fc_sttbf_bkmk_factoid: u32,
     lcb_sttbf_bkmk_factoid: u32,
@@ -271,6 +274,8 @@ impl FibBuilder {
             lcb_plcf_bkf: 0,
             fc_plcf_bkl: 0,
             lcb_plcf_bkl: 0,
+            fc_cmds: 0,
+            lcb_cmds: 0,
             fc_sttbf_bkmk_factoid: 0,
             lcb_sttbf_bkmk_factoid: 0,
             fc_plcf_bkf_factoid: 0,
@@ -509,6 +514,12 @@ impl FibBuilder {
     pub fn set_plcf_bkl(&mut self, offset: u32, size: u32) {
         self.fc_plcf_bkl = offset;
         self.lcb_plcf_bkl = size;
+    }
+
+    /// Set the optional command-bar table (`Tcg`) offset and size.
+    pub fn set_cmds(&mut self, offset: u32, size: u32) {
+        self.fc_cmds = offset;
+        self.lcb_cmds = size;
     }
 
     pub fn set_sttbf_bkmk_factoid(&mut self, offset: u32, size: u32) {
@@ -878,6 +889,7 @@ impl FibBuilder {
         const STTBFBKMK: usize = 21;
         const PLCFBKF: usize = 22;
         const PLCFBKL: usize = 23;
+        const CMDS: usize = 24;
         const GRPXSTATNOWNERS: usize = 36; // Comment-owner XST array
         const STTBFATNBKMK: usize = 37; // Annotation bookmark names
         const PLCFATNBKF: usize = 42; // Annotation bookmark starts
@@ -923,6 +935,7 @@ impl FibBuilder {
         set_field(buf, STTBFBKMK, self.fc_sttbf_bkmk, self.lcb_sttbf_bkmk);
         set_field(buf, PLCFBKF, self.fc_plcf_bkf, self.lcb_plcf_bkf);
         set_field(buf, PLCFBKL, self.fc_plcf_bkl, self.lcb_plcf_bkl);
+        set_field(buf, CMDS, self.fc_cmds, self.lcb_cmds);
         set_field(buf, PLCFENDREF, self.fc_plcfend_ref, self.lcb_plcfend_ref);
         set_field(buf, PLCFENDTXT, self.fc_plcfend_txt, self.lcb_plcfend_txt);
         set_field(buf, STTBFRMARK, self.fc_sttbf_rmark, self.lcb_sttbf_rmark);

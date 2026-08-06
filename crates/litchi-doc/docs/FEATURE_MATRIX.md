@@ -93,7 +93,7 @@ shared Office codecs are counted only where the DOC API exposes them.
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Command bars, keymaps, menus, toolbars, and UI customizations | ❌ | ❌ | ❌ | [MS-DOC] 2.9 includes CTB, Customization, PlfMcd, PlfKme, PlfAcd, and related UI records, but no public semantic API exposes them |
+| Command bars, keymaps, menus, toolbars, and UI customizations | 🟡 | ✅ | ✅ | Bounded `CommandBars` metadata covers the FIB `Tcg` seam, inert `PlfMcd`/`PlfAcd`/`PlfKme` records, and a lossless CTBWRAPPER shell; variable control-data and unknown Tcg records are refused, and macros/UI are never executed |
 | Routing slips and route-slip protection | 🟡 | ✅ | ✅ | Typed, lossless `RouteSlip`/`RouteSlipInfo` metadata is parsed and serialized through the FIB/table-stream seam; `Document` does not yet own the route-slip lifecycle or enforce its protection policy |
 | Macro or control execution | ❌ | ❌ | ❌ | VBA source, macro names, form metadata, OLE objects, and control payloads are passive data only |
 | External document/database/include resolution | ❌ | ❌ | ❌ | RD, include/link/DDE, mail-merge paths, SQL, connection strings, and referenced subdocuments are never opened, contacted, imported, or refreshed |
@@ -105,5 +105,5 @@ shared Office codecs are counted only where the DOC API exposes them.
 
 - crates/litchi-doc/src/package.rs owns DOC opening, OLE access, encryption selection, properties, signatures, custom XML, and macro/storage access.
 - crates/litchi-doc/src/document.rs, paragraph.rs, table.rs, section.rs, sprm.rs, parts/, and writer/ own CP/text, PLC, FKP, style/list, story, and formatting behavior.
-- crates/litchi-doc/src/parts/fields.rs, revisions.rs, mail_merge.rs, route_slip/, structured_tags.rs, ole_controls.rs, smart_tags.rs, document_properties*.rs, and PLC helpers provide bounded metadata codecs.
+- crates/litchi-doc/src/parts/fields/, revisions.rs, mail_merge/, route_slip/, command_bars/, structured_tags.rs, ole_controls/, smart_tags.rs, document_properties*.rs, and PLC helpers provide bounded metadata codecs.
 - crates/litchi-doc/src/shapes.rs, image.rs, equation.rs, embedded_object.rs, and vba.rs own payload-oriented OfficeArt, picture, MTEF, OLE, and VBA support.

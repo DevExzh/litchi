@@ -1,10 +1,18 @@
-//! Namespace-aware XML codecs for ODT-specific document structures.
+//! Namespace-aware XML wire codecs for ODT-specific document structures.
 
-use super::model::{
+use super::super::MAX_SEMANTIC_ITEMS;
+use super::super::model::{
     ChangeType, Comment, Section, SectionDdeSource, SectionDisplay, SectionSource, TrackChange,
     TrackedChanges,
 };
-use super::{MAX_SEMANTIC_DEPTH, MAX_SEMANTIC_ITEMS};
+use super::semantic::{
+    ActiveComment, ActiveSection, ActiveTrackedChange, ChangeRangeState, PendingAnnotation,
+    PendingChangeRange,
+};
+use super::validation::{
+    checked_semantic_depth, ensure_pending_capacity, parse_boolean, parse_tracked_change_bool,
+    validate_protection_key, validate_tracked_change_text,
+};
 use crate::elements::xml::{
     DC_NAMESPACE, META_NAMESPACE, OFFICE_NAMESPACE, TEXT_NAMESPACE, XLINK_NAMESPACE, XML_NAMESPACE,
     append_checked, append_text_control, decode_reference, is_bound, namespaced_attribute,
@@ -15,29 +23,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
 use std::collections::HashMap;
 
-struct ActiveTrackedChange {
-    id: String,
-    xml_id: Option<String>,
-    author: Option<String>,
-    date: Option<String>,
-    comment: String,
-    change_type: Option<ChangeType>,
-    style_name: Option<String>,
-    merge_last_paragraph: Option<bool>,
-    content: String,
-    depth: usize,
-    kind_depth: Option<usize>,
-    change_info_depth: Option<usize>,
-    change_info_seen: bool,
-    creator_depth: Option<usize>,
-    date_depth: Option<usize>,
-    comment_depth: Option<usize>,
-    comment_seen: bool,
-    paragraph_depth: Option<usize>,
-    seen_paragraph: bool,
-}
-
-pub(super) fn parse_change_declarations(content: &str) -> Result<TrackedChanges> {
+pub(crate) fn parse_change_declarations(content: &str) -> Result<TrackedChanges> {
     let mut reader = NsReader::from_str(content);
     let mut buffer = Vec::new();
     let mut document_depth = 0usize;
@@ -102,27 +88,7 @@ pub(super) fn parse_change_declarations(content: &str) -> Result<TrackedChanges>
                                 "duplicate tracked-change ID '{id}'"
                             )));
                         }
-                        active = Some(ActiveTrackedChange {
-                            id,
-                            xml_id,
-                            author: None,
-                            date: None,
-                            comment: String::new(),
-                            change_type: None,
-                            style_name: None,
-                            merge_last_paragraph: None,
-                            content: String::new(),
-                            depth: 1,
-                            kind_depth: None,
-                            change_info_depth: None,
-                            change_info_seen: false,
-                            creator_depth: None,
-                            date_depth: None,
-                            comment_depth: None,
-                            comment_seen: false,
-                            paragraph_depth: None,
-                            seen_paragraph: false,
-                        });
+                        active = Some(ActiveTrackedChange::new(id, xml_id));
                     }
                 }
             },
@@ -202,30 +168,7 @@ pub(super) fn parse_change_declarations(content: &str) -> Result<TrackedChanges>
                             Error::InvalidFormat("changed-region stack underflow".to_string())
                         })?;
                         if change.depth == 0 {
-                            let change = active.take().expect("checked change");
-                            let change_type = change.change_type.ok_or_else(|| {
-                                Error::InvalidFormat(format!(
-                                    "changed region '{}' has no change declaration",
-                                    change.id
-                                ))
-                            })?;
-                            if !change.change_info_seen {
-                                return Err(Error::InvalidFormat(format!(
-                                    "changed region '{}' has no office:change-info",
-                                    change.id
-                                )));
-                            }
-                            changes.push(TrackChange {
-                                id: change.id,
-                                xml_id: change.xml_id,
-                                author: change.author,
-                                date: change.date,
-                                comment: change.comment_seen.then_some(change.comment),
-                                change_type,
-                                style_name: change.style_name,
-                                merge_last_paragraph: change.merge_last_paragraph,
-                                content: change.content,
-                            });
+                            changes.push(active.take().expect("checked change").finish()?);
                         }
                     }
                     tracked_depth = tracked_depth.checked_sub(1).ok_or_else(|| {
@@ -441,71 +384,6 @@ fn process_change_declaration_start(
     Ok(())
 }
 
-fn parse_tracked_change_bool(name: &str, value: &str) -> Result<bool> {
-    match value {
-        "true" | "1" => Ok(true),
-        "false" | "0" => Ok(false),
-        _ => Err(Error::InvalidFormat(format!(
-            "text:{name} is not an XML Schema boolean"
-        ))),
-    }
-}
-
-fn validate_tracked_change_text(value: &str, description: &str, allow_empty: bool) -> Result<()> {
-    const MAX_TRACKED_CHANGE_TEXT_BYTES: usize = 1024 * 1024;
-    if value.len() > MAX_TRACKED_CHANGE_TEXT_BYTES {
-        return Err(Error::InvalidFormat(format!(
-            "{description} exceeds {MAX_TRACKED_CHANGE_TEXT_BYTES} bytes"
-        )));
-    }
-    if !allow_empty && value.is_empty() {
-        return Err(Error::InvalidFormat(format!(
-            "{description} cannot be empty"
-        )));
-    }
-    if value.chars().any(|character| {
-        character == '\0' || (character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
-    }) {
-        return Err(Error::InvalidFormat(format!(
-            "{description} contains invalid XML characters"
-        )));
-    }
-    Ok(())
-}
-
-fn validate_protection_key(value: &str) -> Result<()> {
-    validate_tracked_change_text(value, "text:protection-key", false)?;
-    let mut symbols = 0usize;
-    let mut padding = 0usize;
-    let mut saw_padding = false;
-    for byte in value.bytes() {
-        if byte.is_ascii_whitespace() {
-            continue;
-        }
-        symbols += 1;
-        if byte == b'=' {
-            saw_padding = true;
-            padding += 1;
-        } else if byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/') {
-            if saw_padding {
-                return Err(Error::InvalidFormat(
-                    "text:protection-key has data after base64 padding".to_string(),
-                ));
-            }
-        } else {
-            return Err(Error::InvalidFormat(
-                "text:protection-key is not base64Binary".to_string(),
-            ));
-        }
-    }
-    if symbols == 0 || !symbols.is_multiple_of(4) || padding > 2 {
-        return Err(Error::InvalidFormat(
-            "text:protection-key is not base64Binary".to_string(),
-        ));
-    }
-    Ok(())
-}
-
 fn process_change_declaration_empty(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
@@ -598,19 +476,7 @@ fn append_change_declaration_text(change: &mut ActiveTrackedChange, value: &str)
     }
 }
 
-struct PendingChangeRange {
-    text: String,
-    seen_paragraph: bool,
-}
-
-#[derive(Default)]
-struct ChangeRangeState {
-    pending: HashMap<String, PendingChangeRange>,
-    completed: HashMap<String, Vec<String>>,
-    completed_count: usize,
-}
-
-pub(super) fn correlate_change_ranges(content: &str, changes: &mut [TrackChange]) -> Result<()> {
+pub(crate) fn correlate_change_ranges(content: &str, changes: &mut [TrackChange]) -> Result<()> {
     let change_types: HashMap<String, ChangeType> = changes
         .iter()
         .map(|change| (change.id.clone(), change.change_type))
@@ -880,18 +746,7 @@ fn process_change_marker(
     Ok(())
 }
 
-struct ActiveComment {
-    comment: Comment,
-    depth: usize,
-    creator_depth: Option<usize>,
-    date_depth: Option<usize>,
-    fallback_date_depth: Option<usize>,
-    fallback_date: String,
-    paragraph_depth: Option<usize>,
-    seen_paragraph: bool,
-}
-
-pub(super) fn parse_comments(content: &str) -> Result<Vec<Comment>> {
+pub(crate) fn parse_comments(content: &str) -> Result<Vec<Comment>> {
     let mut reader = NsReader::from_str(content);
     let mut buffer = Vec::new();
     let mut document_depth = 0usize;
@@ -949,22 +804,7 @@ pub(super) fn parse_comments(content: &str) -> Result<Vec<Comment>> {
                         "annotation",
                     )?
                     .unwrap_or_else(|| format!("comment_{}", comments.len()));
-                    active = Some(ActiveComment {
-                        comment: Comment {
-                            id,
-                            author: None,
-                            date: None,
-                            content: String::new(),
-                            reference: None,
-                        },
-                        depth: 1,
-                        creator_depth: None,
-                        date_depth: None,
-                        fallback_date_depth: None,
-                        fallback_date: String::new(),
-                        paragraph_depth: None,
-                        seen_paragraph: false,
-                    });
+                    active = Some(ActiveComment::new(id));
                 }
             },
             Event::Empty(ref element) if active.is_some() => {
@@ -1048,11 +888,7 @@ pub(super) fn parse_comments(content: &str) -> Result<Vec<Comment>> {
                         Error::InvalidFormat("annotation element stack underflow".to_string())
                     })?;
                     if comment.depth == 0 {
-                        let mut comment = active.take().expect("checked annotation");
-                        if comment.comment.date.is_none() && !comment.fallback_date.is_empty() {
-                            comment.comment.date = Some(comment.fallback_date);
-                        }
-                        comments.push(comment.comment);
+                        comments.push(active.take().expect("checked annotation").finish());
                     }
                 }
             },
@@ -1090,12 +926,6 @@ fn append_comment_text(comment: &mut ActiveComment, value: &str) -> Result<()> {
     } else {
         Ok(())
     }
-}
-
-struct PendingAnnotation {
-    name: String,
-    text: String,
-    seen_paragraph: bool,
 }
 
 fn parse_annotation_references(content: &str) -> Result<HashMap<String, String>> {
@@ -1163,11 +993,7 @@ fn parse_annotation_references(content: &str) -> Result<HashMap<String, String>>
                     )? {
                         add_pending_annotation(
                             &mut pending,
-                            PendingAnnotation {
-                                name,
-                                text: String::new(),
-                                seen_paragraph: paragraph_depth.is_some(),
-                            },
+                            PendingAnnotation::new(name, paragraph_depth.is_some()),
                         )?;
                     }
                 } else if office_element && element.local_name().as_ref() == b"annotation-end" {
@@ -1217,11 +1043,7 @@ fn parse_annotation_references(content: &str) -> Result<HashMap<String, String>>
                     {
                         add_pending_annotation(
                             &mut pending,
-                            PendingAnnotation {
-                                name,
-                                text: String::new(),
-                                seen_paragraph: paragraph_depth.is_some(),
-                            },
+                            PendingAnnotation::new(name, paragraph_depth.is_some()),
                         )?;
                     }
                 }
@@ -1263,15 +1085,6 @@ fn finish_annotation_reference(
     Ok(())
 }
 
-fn ensure_pending_capacity(length: usize) -> Result<()> {
-    if length >= MAX_SEMANTIC_ITEMS {
-        return Err(Error::InvalidFormat(format!(
-            "document exceeds {MAX_SEMANTIC_ITEMS} annotation ranges"
-        )));
-    }
-    Ok(())
-}
-
 fn add_pending_annotation(
     pending: &mut HashMap<String, PendingAnnotation>,
     annotation: PendingAnnotation,
@@ -1287,16 +1100,7 @@ fn add_pending_annotation(
     Ok(())
 }
 
-struct ActiveSection {
-    section: Section,
-    depth: usize,
-    paragraph_depth: Option<usize>,
-    seen_paragraph: bool,
-    order: usize,
-    source_depth: Option<usize>,
-}
-
-pub(super) fn parse_sections(content: &str) -> Result<Vec<Section>> {
+pub(crate) fn parse_sections(content: &str) -> Result<Vec<Section>> {
     let mut reader = NsReader::from_str(content);
     let mut buffer = Vec::new();
     let mut document_depth = 0usize;
@@ -1340,14 +1144,10 @@ pub(super) fn parse_sections(content: &str) -> Result<Vec<Section>> {
                             "document exceeds {MAX_SEMANTIC_ITEMS} sections"
                         )));
                     }
-                    active.push(ActiveSection {
-                        section: section_from_start(&reader, element)?,
-                        depth: 1,
-                        paragraph_depth: None,
-                        seen_paragraph: false,
-                        order: next_order,
-                        source_depth: None,
-                    });
+                    active.push(ActiveSection::new(
+                        section_from_start(&reader, element)?,
+                        next_order,
+                    ));
                     next_order += 1;
                 } else if let Some(section) = active.last_mut()
                     && section.depth == 2
@@ -1461,7 +1261,7 @@ pub(super) fn parse_sections(content: &str) -> Result<Vec<Section>> {
                     })?;
                 }
                 if let Some(section) = active.pop_if(|section| section.depth == 0) {
-                    sections.push((section.order, section.section));
+                    sections.push(section.into_ordered());
                 }
             },
             Event::Eof => break,
@@ -1629,26 +1429,4 @@ fn apply_section_source(
         });
     }
     Ok(())
-}
-
-fn parse_boolean(value: &str, context: &str) -> Result<bool> {
-    match value {
-        "true" | "1" => Ok(true),
-        "false" | "0" => Ok(false),
-        _ => Err(Error::InvalidFormat(format!(
-            "{context} must be true, false, 1, or 0"
-        ))),
-    }
-}
-
-fn checked_semantic_depth(depth: usize, context: &str) -> Result<usize> {
-    let depth = depth
-        .checked_add(1)
-        .ok_or_else(|| Error::InvalidFormat(format!("{context} nesting depth overflow")))?;
-    if depth > MAX_SEMANTIC_DEPTH {
-        return Err(Error::InvalidFormat(format!(
-            "{context} nesting exceeds {MAX_SEMANTIC_DEPTH} levels"
-        )));
-    }
-    Ok(depth)
 }

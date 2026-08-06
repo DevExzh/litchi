@@ -126,6 +126,13 @@ dimensions into model and codec seams. It preserves borrowed payloads and
 reserved bits and remains inert: DOC/PPT/XLS command-bar lifecycle wiring and
 macro/UI execution are intentionally outside this common owner.
 
+DOC now adds a contextual `parts/command_bars` owner on top of that common
+codec. Its public `CommandBars` facade reads and writes the optional FIB
+`fcCmds`/`lcbCmds` table range, exposing bounded macro-command, allocated-
+command, key-map, and CTBWRAPPER metadata without activating any command. The
+owner intentionally refuses variable TBC data and unknown Tcg records when a
+safe boundary cannot be recovered.
+
 ## ODF
 
 [`litchi-odf-common`](../../crates/litchi-odf-common/Cargo.toml) is the shared
@@ -166,6 +173,13 @@ graphic-property models, OGraph chart models, and the DOC/DOCX/PPT/PPTX/XLSB/
 XLSX owners listed in ADR 0008. Their facades retain typed snapshots and
 format-specific ownership while moving semantic, wire/XML, validation, and
 test responsibilities into contextual folders.
+
+The current continuation extends that inventory with DOC document and
+writer-core models, DOC field tests, DOCX field tests, DrawingML chart-reader
+semantic domains, IWA Numbers editor semantics, ODS traversal, ODT parser
+codec, PPTX ChartEx validation, RTF content fields, XLSB pivot writing, and
+XLSX workbook-edit tests. These are nested ownership boundaries; they do not
+make the RTF lint backlog or Office conformance claims disappear.
 
 ## Historical terminology
 

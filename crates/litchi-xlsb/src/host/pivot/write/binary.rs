@@ -1,4 +1,4 @@
-//! Serializer for the XLSB PivotCache definition stream (MS-XLSB 2.1.7.38).
+//! Binary serializer for the XLSB PivotCache definition stream (MS-XLSB 2.1.7.38).
 //!
 //! This is the exact inverse of `parse.rs`: record order, payload layouts,
 //! flag bits, optional-field presence flags, and collection counts all
@@ -209,7 +209,7 @@ fn optional_index(value: Option<u32>, context: &'static str) -> Result<i32> {
 /// hierarchies, the tuple cache, calculated items and members, and the
 /// Excel 2013 extensions. Content that cannot round-trip through the reader
 /// is rejected; see the module documentation for the exact refusal rules.
-pub(crate) fn write_pivot_cache_definition(definition: &PivotCacheDefinition) -> Result<Vec<u8>> {
+pub(super) fn write_pivot_cache_definition(definition: &PivotCacheDefinition) -> Result<Vec<u8>> {
     let mut data = Vec::with_capacity(512);
     let mut writer = Writer::new(&mut data);
     writer.write_record(rt::BEGIN_PIVOT_CACHE_DEF, &definition_payload(definition))?;

@@ -95,6 +95,11 @@ pub use parts::captions::{
     CaptionLocation, CaptionTables, ChapterHeading, ChapterNumbering, ChapterSeparator,
 };
 pub use parts::chp::CharacterConditionalFormatting;
+pub use parts::command_bars::{
+    Action, AllocatedCommand, AllocatedCommands, CommandBars, Customization, CustomizationData,
+    Entry, KeyMap, KeyMapKind, KeyMaps, MacroCommand, MacroCommands, Operation, Toolbar,
+    ToolbarDelta, ToolbarWrapper, XString,
+};
 pub use parts::document_properties::{
     CompatibilityOptions60, DocumentProperties, DocumentPropertiesBase, DocumentPropertyVersion,
     DocumentStatistics, DocumentTimestamp, EndnotePlacement, FootnotePlacement,

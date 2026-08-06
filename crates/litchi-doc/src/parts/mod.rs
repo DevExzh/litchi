@@ -14,6 +14,7 @@ pub mod captions;
 /// - Headers/footers, footnotes/endnotes, comments, hyperlinks, numbering/lists
 pub mod chp;
 pub mod chp_bin_table;
+pub mod command_bars;
 pub mod comments;
 pub mod document_properties;
 pub mod document_properties_2000;

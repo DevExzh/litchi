@@ -5367,6 +5367,34 @@ specification evidence, not a claim of complete `[MS-DOC]`, `[MS-ODRAW]`,
 `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, `[MS-XLS]`, OOXML, or ODF
 conformance.
 
+## Layered OLE2, OOXML, ODF, RTF, and IWA continuation
+
+This follow-up wave continues the same breaking, contextual migration through
+behavior-heavy owners. DOC now has nested document state, writer-core state,
+field tests, and a public bounded `CommandBars` owner. DOC command bars parse
+and serialize the FIB `Tcg` seam with inert `PlfMcd`, `PlfAcd`, and `PlfKme`
+records plus a lossless CTBWRAPPER shell; variable control-data and unknown
+records are rejected rather than guessed, and no macro or UI behavior runs.
+DOCX field tests, DrawingML chart-reader semantics, IWA Numbers semantics, ODS
+traversal, ODT parser codec, PPTX ChartEx validation, RTF field content, XLSB
+pivot writing, and XLSX workbook-edit tests now use nested contextual owners.
+
+The public facades retain typed snapshots, borrowed data, deterministic
+serialization, and format-local ergonomics. No compatibility aliases or
+redundant format prefixes were introduced. One moved XLSX layout test required
+an explicit `Value` import after the test tree split; no production behavior
+changed.
+
+The strict all-target matrix passes for every affected crate except the known
+pre-existing RTF workspace-lint backlog. The lint-capped all-target matrix
+passes for DOC, DOCX, DrawingML, IWA, ODS, ODT, PPTX, RTF, XLSB, and XLSX. The
+lint-capped library matrix passes DOC (847 with two ignored), DOCX (644),
+DrawingML (92), IWA (1,529), ODS (67), ODT (516), PPTX (305), RTF (287), XLSB
+(413), and XLSX (645). Formatting, diff, and the 46-package boundary check
+pass. This remains bounded implementation evidence, not a claim of complete
+`[MS-DOC]`, `[MS-ODRAW]`, `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, `[MS-XLS]`,
+RTF, OOXML, or ODF conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

@@ -7,10 +7,7 @@ use crate::package::{Error as PackageError, Result};
 use crate::paragraph::{Paragraph, Run};
 use crate::parts::associated_strings::DocumentAssociatedStrings;
 use crate::parts::auto_summary::DocumentAutoSummary;
-use crate::parts::bookmarks::BookmarksTable;
 use crate::parts::captions::CaptionTables;
-use crate::parts::chp_bin_table::ChpBinTable;
-use crate::parts::comments::CommentsTable;
 use crate::parts::embedded_fonts::DocumentEmbeddedFonts;
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::fields::{
@@ -26,172 +23,33 @@ use crate::parts::fields::{
     StyleReferenceField, SymbolField, TableOfAuthoritiesEntryField, TableOfAuthoritiesField,
     TableOfContentsEntryField, TableOfContentsField, UserIdentityField, non_plcf_field_texts,
 };
-use crate::parts::footnotes::{EndnotesTable, FootnotesTable};
 use crate::parts::form_fields::FormFieldData;
 use crate::parts::format_consistency::DocumentFormatConsistencyMarks;
 use crate::parts::glossary::{AttachedGlossary, GlossaryMetadata};
 use crate::parts::grammar_cookies::GrammarCookieTables;
-use crate::parts::headers::HeadersTable;
-use crate::parts::hyperlinks::HyperlinksTable;
 use crate::parts::list_names::ListNamesTable;
 use crate::parts::list_templates::ListTemplateTable;
 use crate::parts::mail_merge::DocumentMailMerge;
 use crate::parts::numbering::{ListTables, ParagraphListBinding};
 use crate::parts::ole::controls::Controls;
-use crate::parts::pap_bin_table::PapBinTable;
 use crate::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 use crate::parts::proofing::ProofingTables;
 use crate::parts::protection::Ranges;
 use crate::parts::repair_bookmarks::DocumentRepairBookmarks;
-use crate::parts::revisions::RevisionAuthorTable;
 use crate::parts::rmd_threading::DocumentRmdThreading;
 use crate::parts::rsids::DocumentRsids;
 use crate::parts::saved_by::SavedByTable;
-use crate::parts::sections::SectionsTable;
 use crate::parts::smart_tags::DocumentSmartTags;
 use crate::parts::structured_tags::DocumentStructuredTags;
 use crate::parts::styles::StyleSheet;
 use crate::parts::subdocuments::Collection;
 use crate::parts::table_char_cache::TableCharacterCache;
-use crate::parts::text::TextExtractor;
 use crate::parts::text_services::TextServicesTables;
 use crate::parts::textbox_breaks::TextBoxBreakTables;
 use crate::table::Table;
-use std::collections::HashMap;
 use std::sync::Arc;
 
-/// A Word document (.doc).
-///
-/// This is the main API for reading and manipulating legacy Word document content.
-/// It provides access to paragraphs, tables, and other document elements.
-///
-/// # Examples
-///
-/// ```rust,no_run
-/// use litchi_doc::Package;
-///
-/// let mut pkg = Package::open("document.doc")?;
-/// let doc = pkg.document()?;
-///
-/// // Extract all text
-/// let text = doc.text()?;
-/// println!("Document text: {}", text);
-///
-/// // Get paragraph count
-/// let count = doc.paragraph_count()?;
-/// println!("Number of paragraphs: {}", count);
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-pub struct Document {
-    /// File Information Block from WordDocument stream
-    pub(super) fib: FileInformationBlock,
-    /// The WordDocument stream - main document binary data
-    /// Used during initialization for TextExtractor and ChpBinTable parsing
-    #[allow(dead_code)] // False positive: used during initialization via parse_chp_bin_table
-    pub(super) word_document: Vec<u8>,
-    /// The Data stream - contains embedded objects, pictures, etc.
-    /// According to Apache POI, pictures are stored here, not in WordDocument stream.
-    pub(super) data_stream: Option<Vec<u8>>,
-    /// Text extractor - holds the extracted document text
-    pub(super) text_extractor: TextExtractor,
-    /// Character property bin table - parsed once and shared across all paragraph extractors
-    pub(super) chp_bin_table: Option<ChpBinTable>,
-    /// Paragraph property bin table - parsed once and shared across all paragraph extractors
-    pub(super) pap_bin_table: Option<PapBinTable>,
-    /// Fields table - contains field information (embedded equations, hyperlinks, etc.)
-    /// Used during initialization for hyperlink extraction; exposed via `fields_table()` accessor.
-    pub(super) fields_table: Option<FieldsTable>,
-    /// Headers and footers table
-    pub(super) headers_table: Option<HeadersTable>,
-    /// Footnotes table
-    pub(super) footnotes_table: Option<FootnotesTable>,
-    /// Endnotes table
-    pub(super) endnotes_table: Option<EndnotesTable>,
-    /// Comments table
-    pub(super) comments_table: CommentsTable,
-    /// Standard bookmark tables
-    pub(super) bookmarks_table: BookmarksTable,
-    /// Legacy Word smart-tag bookmarks, property bags, and recognizer ranges.
-    pub(super) smart_tags: Option<DocumentSmartTags>,
-    /// Revision-save identifiers assigned in the document.
-    pub(super) rsids: Option<DocumentRsids>,
-    /// E-mail review threading data parallel to the revision-author table.
-    pub(super) rmd_threading: Option<DocumentRmdThreading>,
-    /// Embedded TrueType font descriptions.
-    pub(super) embedded_fonts: Option<DocumentEmbeddedFonts>,
-    /// AutoSummary priority ranges for the main document.
-    pub(super) auto_summary: Option<DocumentAutoSummary>,
-    /// Word 2003 range-level protection ("editable ranges") metadata.
-    pub(super) protected_ranges: Option<Ranges>,
-    /// Format consistency-checker marks.
-    pub(super) format_consistency_marks: Option<DocumentFormatConsistencyMarks>,
-    /// Word 2003 structured document tag bookmarks.
-    pub(super) structured_tags: Option<DocumentStructuredTags>,
-    /// Word 2003 XML schema definition references (`Hplxsdr`).
-    pub(super) xml_schemas: Option<crate::parts::xml_schemas::Collection>,
-    /// Custom XML save transform path (`fcCustomXForm`).
-    pub(super) custom_xml_transform_path: Option<String>,
-    /// OLE controls recorded in the document.
-    pub(super) ole_controls: Option<Controls>,
-    /// Mail-merge data-source state (`Pms` and the ODSO property set).
-    pub(super) mail_merge: Option<DocumentMailMerge>,
-    /// Master-document subdocument directory and referenced-file name table.
-    pub(super) subdocuments: Option<Collection>,
-    /// Revision-mark authors
-    pub(super) revision_authors: RevisionAuthorTable,
-    /// Fixed associated-document strings
-    pub(super) associated_strings: Option<DocumentAssociatedStrings>,
-    /// Names parallel to list definitions for LISTNUM fields
-    pub(super) list_names: Option<ListNamesTable>,
-    /// List-level template codes parallel to list definitions
-    pub(super) list_templates: Option<ListTemplateTable>,
-    /// Deferred strict spelling/grammar proofing metadata parse
-    pub(super) proofing_tables: Result<ProofingTables>,
-    /// Deferred strict grammar-checker cookie metadata parse
-    pub(super) grammar_cookies: Result<GrammarCookieTables>,
-    /// Deferred strict deprecated table-character cache parse
-    pub(super) table_char_cache: Result<Option<TableCharacterCache>>,
-    /// Deferred strict textbox break-table metadata parse
-    pub(super) textbox_breaks: Result<TextBoxBreakTables>,
-    /// Deferred strict Text Services Framework metadata parse
-    pub(super) text_services: Result<TextServicesTables>,
-    /// Deferred strict Word 97/2000 save-history metadata parse
-    pub(super) saved_by_table: Result<SavedByTable>,
-    /// Deferred strict caption label and AutoCaption metadata parse
-    pub(super) caption_tables: Result<CaptionTables>,
-    /// Deferred strict repair-bookmark metadata parse
-    pub(super) repair_bookmarks: Result<Option<DocumentRepairBookmarks>>,
-    /// Deferred strict glossary-only AutoText metadata parse
-    pub(super) glossary_metadata: Result<Option<GlossaryMetadata>>,
-    /// Deferred strict secondary-FIB glossary parse for templates
-    pub(super) attached_glossary: Result<Option<AttachedGlossary>>,
-    /// Section ranges, layout, and property revision marks
-    pub(super) sections: SectionsTable,
-    /// Floating-shape anchors from the Main Document PlcfSpa (empty when the
-    /// document has no floating shapes in the main story).
-    pub(super) shape_anchors: Vec<crate::parts::spa::ShapeAnchor>,
-    /// Floating-shape anchors from the Header Document PlcfSpa (empty when
-    /// the document has no floating shapes in the header story).
-    pub(super) header_shape_anchors: Vec<crate::parts::spa::ShapeAnchor>,
-    /// Text box entries from the PlcftxbxTxt (empty when the document has no
-    /// textbox story).
-    pub(super) textbox_entries: Vec<crate::parts::textbox::TextBoxEntry>,
-    /// Text box entries from the PlcfHdrtxbxTxt (empty when the document has
-    /// no header textbox story).
-    pub(super) header_textbox_entries: Vec<crate::parts::textbox::TextBoxEntry>,
-    /// Hyperlinks table
-    pub(super) hyperlinks_table: Option<HyperlinksTable>,
-    /// List/numbering tables
-    pub(super) list_tables: Option<ListTables>,
-    /// Word 97+ stylesheet, including raw style UPX property sets.
-    pub(super) stylesheet: Option<StyleSheet>,
-    /// Extracted MTEF data from OLE streams (stream_name -> mtef_data)
-    #[allow(dead_code)] // Stored for debugging and raw access
-    pub(super) mtef_data: HashMap<String, Vec<u8>>,
-    /// Parsed MTEF formulas rendered while their temporary parser arena is alive.
-    /// Owned strings avoid a self-referential document and remain cheap to share.
-    pub(super) parsed_mtef: HashMap<String, Arc<str>>,
-}
+use super::state::Document;
 
 impl Document {
     /// Get all text content from the document.
@@ -2435,202 +2293,5 @@ impl Document {
         }
 
         Ok(elements)
-    }
-
-    /// Extract tables from a list of paragraphs at a specific nesting level.
-    ///
-    /// This is based on Apache POI's table extraction algorithm that scans
-    /// paragraphs for table markers and groups them into Table structures.
-    ///
-    /// # Arguments
-    ///
-    /// * `paragraphs` - List of paragraphs to scan
-    /// * `level` - Table nesting level to extract (1 for top-level tables)
-    ///
-    /// # Returns
-    ///
-    /// Vector of Table objects found at the specified nesting level
-    fn extract_tables_from_paragraphs(
-        &self,
-        paragraphs: &[Paragraph],
-        level: i32,
-    ) -> Result<Vec<Table>> {
-        let mut tables = Vec::new();
-        let mut i = 0;
-
-        while i < paragraphs.len() {
-            let para = &paragraphs[i];
-            let props = para.properties();
-
-            // Check if this paragraph starts a table at the requested level
-            if props.in_table && props.table_nesting_level == level {
-                // Found the start of a table - collect all paragraphs in this table
-                let mut table_paras = Vec::new();
-
-                // Collect paragraphs until we exit the table
-                while i < paragraphs.len() {
-                    let current_para = &paragraphs[i];
-                    let current_props = current_para.properties();
-
-                    if !current_props.in_table || current_props.table_nesting_level < level {
-                        // Exited the table
-                        break;
-                    }
-
-                    table_paras.push(current_para.clone());
-                    i += 1;
-                }
-
-                // Now extract rows from the collected table paragraphs
-                let rows = self.extract_rows_from_table_paragraphs(&table_paras, level)?;
-
-                if !rows.is_empty() {
-                    let properties = rows.first().and_then(|row| row.properties()).cloned();
-                    if let Some(properties) = properties {
-                        tables.push(Table::with_properties(rows, properties));
-                    } else {
-                        tables.push(Table::new(rows));
-                    }
-                }
-            } else {
-                i += 1;
-            }
-        }
-
-        Ok(tables)
-    }
-
-    /// Extract rows from table paragraphs.
-    ///
-    /// Groups consecutive paragraphs into rows based on the is_table_row_end marker.
-    /// Based on Apache POI's Table.initRows() logic.
-    ///
-    /// # Arguments
-    ///
-    /// * `table_paras` - Paragraphs belonging to a table
-    /// * `level` - Table nesting level
-    ///
-    /// # Returns
-    ///
-    /// Vector of Row objects
-    fn extract_rows_from_table_paragraphs(
-        &self,
-        table_paras: &[Paragraph],
-        level: i32,
-    ) -> Result<Vec<crate::table::Row>> {
-        use crate::table::Row;
-
-        let mut rows = Vec::new();
-        let mut current_row_paras = Vec::new();
-
-        for para in table_paras {
-            let props = para.properties();
-
-            // Skip paragraphs from nested tables (higher level)
-            if props.table_nesting_level > level {
-                continue;
-            }
-
-            // Add paragraph to current row
-            current_row_paras.push(para.clone());
-
-            // Check if this paragraph marks the end of a row
-            if props.is_table_row_end && props.table_nesting_level == level {
-                // End of row - create cells from the collected paragraphs
-                let cells = self.extract_cells_from_row_paragraphs(
-                    &current_row_paras,
-                    props.table_properties.as_ref(),
-                )?;
-
-                if !cells.is_empty() {
-                    rows.push(Row::with_metadata(
-                        cells,
-                        props.table_properties.clone(),
-                        para.table_formatting_revision().cloned(),
-                        props.table_properties_preserved_for_revision,
-                    ));
-                }
-
-                current_row_paras.clear();
-            }
-        }
-
-        // Handle any remaining paragraphs (incomplete row)
-        if !current_row_paras.is_empty() {
-            let last = current_row_paras
-                .last()
-                .expect("non-empty row paragraph collection");
-            let cells = self.extract_cells_from_row_paragraphs(
-                &current_row_paras,
-                last.properties().table_properties.as_ref(),
-            )?;
-            if !cells.is_empty() {
-                rows.push(Row::with_metadata(
-                    cells,
-                    last.properties().table_properties.clone(),
-                    last.table_formatting_revision().cloned(),
-                    last.properties().table_properties_preserved_for_revision,
-                ));
-            }
-        }
-
-        crate::table::apply_table_cell_styles(&mut rows);
-        Ok(rows)
-    }
-
-    /// Extract cells from row paragraphs.
-    ///
-    /// Each cell typically consists of one or more paragraphs.
-    /// Cell marks delimit groups of one or more paragraphs, while TAP properties
-    /// provide the corresponding per-cell formatting.
-    ///
-    /// # Arguments
-    ///
-    /// * `row_paras` - Paragraphs belonging to a row
-    ///
-    /// # Returns
-    ///
-    /// Vector of Cell objects
-    fn extract_cells_from_row_paragraphs(
-        &self,
-        row_paras: &[Paragraph],
-        table_properties: Option<&crate::parts::tap::TableProperties>,
-    ) -> Result<Vec<crate::table::Cell>> {
-        use crate::table::Cell;
-
-        let mut cells = Vec::new();
-        let mut cell_paragraphs = Vec::new();
-        for para in row_paras {
-            let props = para.properties();
-
-            // Skip the row-end marker paragraph as it doesn't contain cell content
-            if props.is_table_row_end {
-                continue;
-            }
-
-            cell_paragraphs.push(para.clone());
-            if props.is_table_cell_end {
-                let properties = table_properties
-                    .and_then(|tap| tap.cell_properties.get(cells.len()))
-                    .cloned();
-                cells.push(Cell::with_properties(
-                    std::mem::take(&mut cell_paragraphs),
-                    properties,
-                ));
-            }
-        }
-
-        if !cell_paragraphs.is_empty() {
-            let properties = table_properties
-                .and_then(|tap| tap.cell_properties.get(cells.len()))
-                .cloned();
-            cells.push(Cell::with_properties(cell_paragraphs, properties));
-        }
-
-        if cells.is_empty() && !row_paras.is_empty() {
-            cells.push(Cell::new(String::new()));
-        }
-
-        Ok(cells)
     }
 }

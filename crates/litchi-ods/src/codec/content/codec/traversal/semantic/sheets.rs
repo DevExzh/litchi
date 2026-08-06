@@ -1,4 +1,4 @@
-use super::{
+use super::super::{
     BTreeMap, Builder, CALCEXT_NAMESPACE_URI, COMPLEX_COLOR_SLOTS, CellBuilder, CellDetective,
     CellTextContentBuilder, ConditionalColorScale, ConditionalFormat, ConditionalFormatRule,
     DATA_BAR_ENTRY_COUNT, Error, Event, LOEXT_NAMESPACE_URI, MAX_COLOR_TRANSFORMATIONS,
@@ -12,12 +12,16 @@ use super::{
     parse_dde_source, validate_conditional_format, validate_rule, validate_sparkline_group,
 };
 
-impl Parser {
+pub(super) trait SheetTraversal {
+    fn parse_sheets(xml_content: &str) -> Result<Vec<Sheet>>;
+}
+
+impl SheetTraversal for Parser {
     /// Parse all sheets from ODS content.xml
     // quick-xml exposes a streaming event source, so the format's nested parser
     // state is intentionally coordinated here without constructing a DOM.
     #[allow(clippy::cognitive_complexity)]
-    pub fn parse_sheets(xml_content: &str) -> Result<Vec<Sheet>> {
+    fn parse_sheets(xml_content: &str) -> Result<Vec<Sheet>> {
         let mut reader = Reader::from_str(xml_content);
         let mut buf = Vec::new();
         let mut sheets = Vec::new();
@@ -1717,7 +1721,7 @@ impl Parser {
             ));
         }
 
-        super::super::super::package::attach_content_assets(xml_content, &mut sheets)?;
+        super::super::super::super::package::attach_content_assets(xml_content, &mut sheets)?;
         Ok(sheets)
     }
 }

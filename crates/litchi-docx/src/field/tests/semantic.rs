@@ -1,4 +1,4 @@
-//! Focused field model, instruction, and XML regression tests.
+//! Focused field model, instruction, and XML semantic regression tests.
 
 #[allow(
     clippy::wildcard_imports,
