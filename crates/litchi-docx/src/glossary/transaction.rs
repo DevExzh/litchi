@@ -6,7 +6,7 @@ use super::graph::{
     remove_graph, validate_raw_graph_metadata, validate_relationship_metadata,
 };
 use super::model::{Catalog, Conformance, Entry, Name};
-use super::{OpcPackage, PackURI, Result, write};
+use super::{OpcPackage, PackURI, Result, read, write};
 
 /// Stable fingerprint of the complete glossary source graph.
 pub type Revision = u64;
@@ -370,8 +370,12 @@ impl<'a> Transaction<'a> {
         }
         let snapshot = Snapshot::load(&candidate)?;
         match (self.draft.as_ref(), snapshot.graph.as_ref()) {
-            (Some(expected), Some(actual))
-                if graph_matches_catalog(actual, expected, &expected.catalog, None)? => {},
+            (Some(expected), Some(actual)) => {
+                let expected_catalog = published_catalog(expected)?;
+                if !graph_matches_catalog(actual, expected, &expected_catalog, None)? {
+                    return Err(invalid("glossary publication changed the staged graph"));
+                }
+            },
             (None, None) => {},
             _ => return Err(invalid("glossary publication changed the staged graph")),
         }
@@ -528,6 +532,21 @@ fn validate_candidate(graph: &raw::Graph) -> Result<()> {
         })?;
     }
     Ok(())
+}
+
+fn published_catalog(graph: &raw::Graph) -> Result<Catalog> {
+    if let Some(xml) = &graph.root_xml {
+        let (catalog, conformance) = read(xml.as_slice())?;
+        if conformance == graph.conformance && catalog == graph.catalog {
+            return Ok(graph.catalog.clone());
+        }
+    }
+    let encoded = write(&graph.catalog, graph.conformance)?;
+    let (catalog, conformance) = read(&encoded)?;
+    if conformance != graph.conformance {
+        return Err(invalid("canonical glossary changed conformance"));
+    }
+    Ok(catalog)
 }
 
 fn fingerprint(main_part: &str, conformance: Conformance, graph: Option<&raw::Graph>) -> Revision {
