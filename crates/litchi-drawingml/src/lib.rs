@@ -8,6 +8,7 @@
 
 pub mod blip;
 pub mod chart;
+pub mod color;
 pub mod coordinate;
 pub mod diagram;
 pub mod ext;
