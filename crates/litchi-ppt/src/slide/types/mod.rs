@@ -20,7 +20,7 @@ use crate::shapes::ShapeEnum;
 use crate::slide::notes::{NoteDescriptor, SpeakerNotes};
 use crate::slide_extension::SlideExtension;
 use crate::slide_round_trip::SlideRoundTripMetadata12;
-use crate::slide_sync::SlideSyncInfo;
+use crate::slide_sync::Synchronization;
 use once_cell::unsync::OnceCell;
 
 pub use model::{ParsedComment, ParsedSlideTiming};
@@ -56,7 +56,7 @@ pub struct Slide<'doc> {
     /// Lazily parsed PowerPoint 12 slide/master round-trip metadata.
     powerpoint12_extension: OnceCell<SlideExtension>,
     /// Lazily parsed, inert slide-library synchronization metadata.
-    sync_info: OnceCell<Option<SlideSyncInfo>>,
+    sync_info: OnceCell<Option<Synchronization>>,
     /// Lazily parsed direct PowerPoint 12 slide round-trip metadata.
     round_trip_metadata: OnceCell<SlideRoundTripMetadata12>,
     notes_descriptor: Result<Option<NoteDescriptor>, String>,

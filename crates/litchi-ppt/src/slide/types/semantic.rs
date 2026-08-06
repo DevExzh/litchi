@@ -11,7 +11,7 @@ use crate::shapes::ShapeEnum;
 use crate::slide::notes::SpeakerNotes;
 use crate::slide_extension::SlideExtension;
 use crate::slide_round_trip::SlideRoundTripMetadata12;
-use crate::slide_sync::SlideSyncInfo;
+use crate::slide_sync::Synchronization;
 use crate::transition::{TransitionInfo, parse_transition};
 
 impl<'doc> Slide<'doc> {
@@ -256,9 +256,9 @@ impl<'doc> Slide<'doc> {
     }
 
     /// Return inert PowerPoint 12 slide-library synchronization metadata.
-    pub fn sync_info(&self) -> Result<Option<&SlideSyncInfo>> {
+    pub fn sync_info(&self) -> Result<Option<&Synchronization>> {
         self.sync_info
-            .get_or_try_init(|| SlideSyncInfo::parse(&self.record))
+            .get_or_try_init(|| Synchronization::parse(&self.record))
             .map(Option::as_ref)
     }
 

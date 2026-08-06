@@ -506,10 +506,13 @@ fn exposes_inert_slide_library_synchronization_metadata() {
     let slide = Slide::from_slide_data(create_slide_data(slide_record, 256, &doc_data), 1);
 
     let sync = slide.sync_info().unwrap().unwrap();
-    assert_eq!(sync.server_slide_id, "server-id");
-    assert_eq!(sync.slide_library_url, "http://example.com/library");
-    assert_eq!(sync.server_modified.year, 2026);
-    assert_eq!(sync.client_inserted.year, 2025);
+    assert_eq!(sync.server_slide_id().as_str(), "server-id");
+    assert_eq!(
+        sync.slide_library_url().as_str(),
+        "http://example.com/library"
+    );
+    assert_eq!(sync.server_modified().year(), 2026);
+    assert_eq!(sync.client_inserted().year(), 2025);
     assert!(std::ptr::eq(sync, slide.sync_info().unwrap().unwrap()));
 }
 

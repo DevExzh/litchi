@@ -284,7 +284,12 @@ pub use slide_round_trip::{
     ContentMasterReference, EmbeddedXmlPackage, SlideRoundTripMetadata12, ThemeKind, ThemePackage,
 };
 pub use slide_show_settings::{ColorIndex, ColorIndexKind, SlideShowFlags, SlideShowSettings};
-pub use slide_sync::{SlideSyncInfo, SystemTime};
+pub use slide_sync::{
+    Change as SlideSyncChange, ChangeSet as SlideSyncChangeSet, Commit as SlideSyncCommit,
+    Editor as SlideSyncEditor, LibraryUrl, Limits as SlideSyncLimits, MAX_TEXT_BYTES,
+    Revision as SlideSyncRevision, ServerId, Snapshot as SlideSyncSnapshot, Synchronization,
+    SystemTime,
+};
 pub use smart_tags::{SmartTag, SmartTagProperty, SmartTagStore, SmartTagType};
 pub use style_text_prop::{StyleTextPropAtom, TextCFRun, TextPFRun};
 pub use text_bookmark::TextBookmark;
