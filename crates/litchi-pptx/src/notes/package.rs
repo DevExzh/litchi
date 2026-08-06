@@ -1,7 +1,8 @@
 //! Transactional OPC graph ownership for PresentationML notes.
 
 use super::codec::{root_conformance, scan_xml, validate_resource_xml};
-use super::model::{Conformance, Graph, Master, Slide, Theme};
+use super::model::{Conformance, Graph, Link, Master, Slide, Theme};
+use super::transaction::{PartState, Patch, Snapshot};
 use super::{
     MAX_MASTER_XML, MAX_NOTES_SLIDES, MAX_NOTES_XML, MAX_PRESENTATION_XML, MAX_SLIDE_XML,
     MAX_THEME_XML, MAX_TOTAL_BYTES, SLIDE_CT, THEME_CT, allocation, checked_add, invalid, limit,
@@ -12,6 +13,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI, TargetMode};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::sync::Arc;
 #[derive(Debug)]
 struct ThemeIndex {
     relationship_id: String,
@@ -53,6 +55,91 @@ pub fn load(package: &OpcPackage, presentation_name: &PackURI) -> Result<Option<
         return Ok(None);
     };
     Ok(Some(materialize(package, index)?))
+}
+
+/// Capture a complete source-checked snapshot of an existing notes graph.
+pub fn load_snapshot(
+    package: &OpcPackage,
+    presentation_name: &PackURI,
+) -> Result<Option<Snapshot>> {
+    let Some(index) = load_index(package, presentation_name)? else {
+        return Ok(None);
+    };
+    let graph = materialize(package, index)?;
+    let presentation = package.get_part(presentation_name)?;
+    let presentation_part = PartState::from_part(presentation);
+    let mut parts = vec![presentation_part.clone()];
+    parts.push(PartState::from_part(package.get_part(
+        &PackURI::new(graph.master().part()).map_err(Error::Invalid)?,
+    )?));
+    parts.push(PartState::from_part(package.get_part(
+        &PackURI::new(graph.master().theme().part()).map_err(Error::Invalid)?,
+    )?));
+    for slide in graph.slides() {
+        parts.push(PartState::from_part(
+            package.get_part(&PackURI::new(slide.owner()).map_err(Error::Invalid)?)?,
+        ));
+        parts.push(PartState::from_part(
+            package.get_part(&PackURI::new(slide.part()).map_err(Error::Invalid)?)?,
+        ));
+    }
+    Snapshot::from_parts(
+        presentation.partname().clone(),
+        presentation_part,
+        parts,
+        graph,
+    )
+    .map(Some)
+}
+
+/// Apply a source-checked notes patch atomically.
+pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+    let current = load_snapshot(package, patch.before().presentation_part_name())?
+        .ok_or_else(|| invalid("notes patch source graph is absent"))?;
+    if !current.same_source(patch.before()) {
+        return Err(invalid("notes patch source is stale"));
+    }
+    if patch.is_empty() {
+        return Ok(current);
+    }
+    let mut candidate = package.clone();
+    for part in &patch.after().parts {
+        let target = candidate.get_part_mut(&part.name)?;
+        target.set_content_type(part.content_type.clone())?;
+        target.set_blob_shared(Arc::clone(&part.data));
+        let ids: Vec<_> = target
+            .rels()
+            .iter()
+            .map(|relationship| relationship.r_id().to_owned())
+            .collect();
+        for id in ids {
+            target.rels_mut().remove(&id);
+        }
+        for link in &part.relationships {
+            target.rels_mut().try_add_relationship(
+                link.relationship_type.clone(),
+                link.target_ref.clone(),
+                link.id.clone(),
+                link.target_mode,
+            )?;
+        }
+    }
+    let resulting = load_snapshot(&candidate, patch.after().presentation_part_name())?
+        .ok_or_else(|| invalid("published notes graph is absent"))?;
+    if !resulting.same_source(patch.after()) {
+        return Err(invalid("published notes graph differs from the commit"));
+    }
+    candidate.unsign();
+    *package = candidate;
+    Ok(resulting)
+}
+
+/// Apply a committed notes edit atomically.
+pub fn apply_commit(
+    package: &mut OpcPackage,
+    commit: super::transaction::Commit,
+) -> Result<Snapshot> {
+    apply_patch(package, commit.patch())
 }
 
 /// Validate and index the complete notes graph without copying resource payloads.
@@ -156,21 +243,27 @@ fn load_index(package: &OpcPackage, presentation_name: &PackURI) -> Result<Optio
         "notesMaster",
         "notes master",
     )?;
-    if master_part.rels().iter().count() != 1 {
+    let theme_relationships: Vec<_> = master_part
+        .rels()
+        .iter()
+        .filter(|relationship| relationship.reltype() == conformance.theme_rel())
+        .collect();
+    if theme_relationships.len() != 1 {
         return Err(invalid(
             "notes master must have exactly one bounded theme relationship",
         ));
     }
-    let theme_relationship = master_part
-        .rels()
-        .iter()
-        .next()
-        .ok_or_else(|| invalid("notes master lacks theme relationship"))?;
+    let theme_relationship = theme_relationships[0];
     validate_id(theme_relationship.r_id())?;
     if theme_relationship.reltype() != conformance.theme_rel() || theme_relationship.is_external() {
         return Err(invalid(
             "notes-master theme relationship has wrong type or target mode",
         ));
+    }
+    for relationship in master_part.rels().iter() {
+        if relationship.r_id() != theme_relationship.r_id() {
+            validate_opaque_relationship(package, master_part, relationship)?;
+        }
     }
     let theme_name = relationship_target(master_part, theme_relationship)?;
     validate_leaf_path(&theme_name, "/ppt/theme/", "notes-master theme")?;
@@ -184,10 +277,8 @@ fn load_index(package: &OpcPackage, presentation_name: &PackURI) -> Result<Optio
         "theme",
         "notes-master theme",
     )?;
-    if theme_part.rels().iter().next().is_some() {
-        return Err(invalid(
-            "notes-master theme has unsupported outbound relationships",
-        ));
+    for relationship in theme_part.rels().iter() {
+        validate_opaque_relationship(package, theme_part, relationship)?;
     }
     let mut total = checked_add(
         master_part.blob().len(),
@@ -230,7 +321,15 @@ fn load_index(package: &OpcPackage, presentation_name: &PackURI) -> Result<Optio
             "notes",
             "notes slide",
         )?;
-        if notes_part.rels().iter().count() != 2 {
+        let known_relationships = notes_part
+            .rels()
+            .iter()
+            .filter(|relationship| {
+                relationship.reltype() == conformance.slide_rel()
+                    || relationship.reltype() == conformance.notes_master_rel()
+            })
+            .count();
+        if known_relationships != 2 {
             return Err(invalid(
                 "notes slide must have exactly slide and notes-master relationships",
             ));
@@ -253,9 +352,7 @@ fn load_index(package: &OpcPackage, presentation_name: &PackURI) -> Result<Optio
                     ));
                 }
             } else {
-                return Err(invalid(
-                    "notes slide has an unsupported outbound relationship",
-                ));
+                validate_opaque_relationship(package, notes_part, child)?;
             }
         }
         let backlink = backlink.ok_or_else(|| invalid("notes slide lacks slide backlink"))?;
@@ -334,6 +431,7 @@ fn materialize(package: &OpcPackage, index: GraphIndex) -> Result<Graph> {
             part_name: slide.part_name.as_str().to_owned(),
             content_type: slide.content_type,
             data,
+            relationships: relationship_links(package.get_part(&slide.part_name)?.rels()),
             backlink_relationship_id: slide.backlink_relationship_id,
             notes_master_relationship_id: slide.notes_master_relationship_id,
         });
@@ -345,11 +443,15 @@ fn materialize(package: &OpcPackage, index: GraphIndex) -> Result<Graph> {
             part_name: index.master.part_name.as_str().to_owned(),
             content_type: index.master.content_type,
             data: master_data,
+            relationships: relationship_links(package.get_part(&index.master.part_name)?.rels()),
             theme: Theme {
                 relationship_id: index.master.theme.relationship_id,
                 part_name: index.master.theme.part_name.as_str().to_owned(),
                 content_type: index.master.theme.content_type,
                 data: theme_data,
+                relationships: relationship_links(
+                    package.get_part(&index.master.theme.part_name)?.rels(),
+                ),
             },
         },
         slides,
@@ -611,6 +713,7 @@ pub fn put(package: &mut OpcPackage, presentation_name: &PackURI, graph: Graph) 
         part_name: master_name,
         content_type: master_content_type,
         data: master_data,
+        relationships: mut master_relationships,
         theme,
     } = master;
     let Theme {
@@ -618,18 +721,23 @@ pub fn put(package: &mut OpcPackage, presentation_name: &PackURI, graph: Graph) 
         part_name: theme_name,
         content_type: theme_content_type,
         data: theme_data,
+        relationships: theme_relationships,
     } = theme;
     let theme_uri = PackURI::new(theme_name).map_err(Error::Invalid)?;
     let master_uri = PackURI::new(master_name).map_err(Error::Invalid)?;
 
-    let theme_part = BlobPart::new(theme_uri.clone(), theme_content_type, theme_data);
+    let mut theme_part = BlobPart::new(theme_uri.clone(), theme_content_type, theme_data);
     let mut master_part = BlobPart::new(master_uri.clone(), master_content_type, master_data);
-    master_part.rels_mut().try_add_relationship(
-        conformance.theme_rel().into(),
-        theme_uri.relative_ref(master_uri.base_uri()),
-        theme_relationship_id,
-        TargetMode::Internal,
-    )?;
+    if master_relationships.is_empty() {
+        master_relationships.push(Link::new(
+            theme_relationship_id,
+            conformance.theme_rel(),
+            theme_uri.relative_ref(master_uri.base_uri()),
+            TargetMode::Internal,
+        ));
+    }
+    add_links(&mut master_part, &master_relationships)?;
+    add_links(&mut theme_part, &theme_relationships)?;
 
     let mut note_parts = Vec::new();
     note_parts
@@ -643,24 +751,29 @@ pub fn put(package: &mut OpcPackage, presentation_name: &PackURI, graph: Graph) 
             part_name,
             content_type,
             data,
+            relationships,
             backlink_relationship_id,
             notes_master_relationship_id,
         } = slide;
         let notes_uri = PackURI::new(part_name).map_err(Error::Invalid)?;
         let slide_uri = PackURI::new(&slide_part_name).map_err(Error::Invalid)?;
         let mut notes_part = BlobPart::new(notes_uri.clone(), content_type, data);
-        notes_part.rels_mut().try_add_relationship(
-            conformance.slide_rel().into(),
-            slide_uri.relative_ref(notes_uri.base_uri()),
-            backlink_relationship_id,
-            TargetMode::Internal,
-        )?;
-        notes_part.rels_mut().try_add_relationship(
-            conformance.notes_master_rel().into(),
-            master_uri.relative_ref(notes_uri.base_uri()),
-            notes_master_relationship_id,
-            TargetMode::Internal,
-        )?;
+        let mut relationships = relationships;
+        if relationships.is_empty() {
+            relationships.push(Link::new(
+                backlink_relationship_id,
+                conformance.slide_rel(),
+                slide_uri.relative_ref(notes_uri.base_uri()),
+                TargetMode::Internal,
+            ));
+            relationships.push(Link::new(
+                notes_master_relationship_id,
+                conformance.notes_master_rel(),
+                master_uri.relative_ref(notes_uri.base_uri()),
+                TargetMode::Internal,
+            ));
+        }
+        add_links(&mut notes_part, &relationships)?;
         if by_slide
             .insert(slide_part_name, (notes_uri, slide_relationship_id))
             .is_some()
@@ -759,12 +872,13 @@ pub fn slide(package: &OpcPackage, slide_name: &PackURI) -> Result<Option<Slide>
         part_name: slide.part_name.as_str().to_owned(),
         content_type: slide.content_type,
         data,
+        relationships: relationship_links(package.get_part(&slide.part_name)?.rels()),
         backlink_relationship_id: slide.backlink_relationship_id,
         notes_master_relationship_id: slide.notes_master_relationship_id,
     }))
 }
 
-fn validate_graph(graph: &Graph) -> Result<()> {
+pub(crate) fn validate_graph(graph: &Graph) -> Result<()> {
     if graph.slides.len() > MAX_NOTES_SLIDES {
         return Err(limit("notes-slide count", MAX_NOTES_SLIDES));
     }
@@ -786,6 +900,7 @@ fn validate_graph(graph: &Graph) -> Result<()> {
         "notesMaster",
         "notes master",
     )?;
+    super::validation::validate_links(&graph.master.relationships)?;
     validate_resource_xml(
         &graph.master.theme.data,
         MAX_THEME_XML,
@@ -793,6 +908,7 @@ fn validate_graph(graph: &Graph) -> Result<()> {
         "theme",
         "notes-master theme",
     )?;
+    super::validation::validate_links(&graph.master.theme.relationships)?;
     let mut total = checked_add(
         graph.master.data.len(),
         graph.master.theme.data.len(),
@@ -830,6 +946,7 @@ fn validate_graph(graph: &Graph) -> Result<()> {
             "notes",
             "notes slide",
         )?;
+        super::validation::validate_links(&slide.relationships)?;
         total = checked_add(total, slide.data.len(), "aggregate bytes")?;
         if total > MAX_TOTAL_BYTES {
             return Err(limit("notes aggregate bytes", MAX_TOTAL_BYTES));
@@ -890,6 +1007,54 @@ fn relationship_target(
     PackURI::from_rel_ref(part.partname().base_uri(), relationship.target_ref())
         .map_err(Error::Invalid)
 }
+
+fn relationship_links(relationships: &litchi_opc::Relationships) -> Vec<Link> {
+    let mut links: Vec<_> = relationships
+        .iter()
+        .map(|relationship| {
+            Link::new(
+                relationship.r_id(),
+                relationship.reltype(),
+                relationship.target_ref(),
+                relationship.target_mode(),
+            )
+        })
+        .collect();
+    links.sort_unstable_by(|left, right| left.id.cmp(&right.id));
+    links
+}
+
+fn add_links(part: &mut dyn Part, links: &[Link]) -> Result<()> {
+    for link in links {
+        part.rels_mut().try_add_relationship(
+            link.relationship_type.clone(),
+            link.target_ref.clone(),
+            link.id.clone(),
+            link.target_mode,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_opaque_relationship(
+    package: &OpcPackage,
+    source: &dyn Part,
+    relationship: &litchi_opc::Relationship,
+) -> Result<()> {
+    validate_id(relationship.r_id())?;
+    if relationship.is_external() {
+        return Ok(());
+    }
+    let target = relationship.target_partname()?;
+    package.get_part(&target).map(|_| ()).map_err(|_| {
+        invalid(format!(
+            "opaque notes relationship '{}' from '{}' targets a missing part",
+            relationship.r_id(),
+            source.partname().as_str()
+        ))
+    })
+}
+
 fn validate_leaf_path(uri: &PackURI, prefix: &str, label: &str) -> Result<()> {
     let Some(rest) = uri.as_str().strip_prefix(prefix) else {
         return Err(invalid(format!("{label} is outside {prefix}")));

@@ -357,3 +357,116 @@ fn rejects_external_wrong_root_outbound_orphan_and_caps_before_mutation() {
     assert!(put(&mut package, &name, graph).is_err());
     assert_eq!(package.get_part(&name).unwrap().blob(), before);
 }
+
+#[test]
+fn source_checked_transaction_no_op_is_byte_stable() {
+    let (mut package, name) = synthetic(Conformance::Transitional);
+    let before = package.get_part(&name).unwrap().blob().to_vec();
+    let snapshot = Snapshot::load(&package, &name).unwrap().unwrap();
+    let commit = snapshot.edit().commit().unwrap();
+    assert!(!commit.is_changed());
+    commit.patch().apply(&mut package).unwrap();
+    assert_eq!(package.get_part(&name).unwrap().blob(), before);
+}
+
+#[test]
+fn source_checked_text_edit_preserves_opaque_xml_and_relationships() {
+    let (mut package, name) = synthetic(Conformance::Transitional);
+    let opaque_name = PackURI::new("/ppt/custom/notes.bin").unwrap();
+    package.add_part(Box::new(BlobPart::new(
+        opaque_name.clone(),
+        "application/octet-stream".into(),
+        b"opaque".to_vec(),
+    )));
+    let notes_name = PackURI::new("/ppt/notesSlides/notesSlide1.xml").unwrap();
+    package
+        .get_part_mut(&notes_name)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            "urn:vendor:notes-extension".into(),
+            "../custom/notes.bin".into(),
+            "rIdOpaque".into(),
+            false,
+        );
+
+    let snapshot = Snapshot::load(&package, &name).unwrap().unwrap();
+    assert!(
+        snapshot.slides()[0]
+            .xml()
+            .windows(b"AlternateContent".len())
+            .any(|w| w == b"AlternateContent")
+    );
+    let mut edit = snapshot.edit();
+    assert!(edit.set_text(0, "Updated <speaker> & note").unwrap());
+    let commit = edit.commit().unwrap();
+    commit.patch().apply(&mut package).unwrap();
+
+    let notes = package.get_part(&notes_name).unwrap();
+    assert!(
+        notes
+            .blob()
+            .windows(b"AlternateContent".len())
+            .any(|w| w == b"AlternateContent")
+    );
+    assert!(
+        std::str::from_utf8(notes.blob())
+            .unwrap()
+            .contains("Updated &lt;speaker&gt; &amp; note")
+    );
+    assert_eq!(
+        notes.rels().get("rIdOpaque").unwrap().target_ref(),
+        "../custom/notes.bin"
+    );
+}
+
+#[test]
+fn source_checked_transaction_rejects_stale_source_atomically() {
+    let (mut package, name) = synthetic(Conformance::Transitional);
+    let snapshot = Snapshot::load(&package, &name).unwrap().unwrap();
+    let mut edit = snapshot.edit();
+    edit.set_text(0, "Changed").unwrap();
+    let commit = edit.commit().unwrap();
+    let notes_name = PackURI::new("/ppt/notesSlides/notesSlide1.xml").unwrap();
+    package
+        .get_part_mut(&notes_name)
+        .unwrap()
+        .set_blob(b"<stale/>".to_vec());
+    let before = package.get_part(&notes_name).unwrap().blob().to_vec();
+    assert!(commit.patch().apply(&mut package).is_err());
+    assert_eq!(package.get_part(&notes_name).unwrap().blob(), before);
+}
+
+#[test]
+fn source_checked_transaction_inverse_restores_master_and_theme() {
+    let (mut package, name) = synthetic(Conformance::Transitional);
+    let snapshot = Snapshot::load(&package, &name).unwrap().unwrap();
+    let mut edit = snapshot.edit();
+    edit.replace_master_xml(
+        format!(
+            "<p:notesMaster xmlns:p=\"{}\"><p:cSld/><p:extLst/></p:notesMaster>",
+            P
+        )
+        .into_bytes(),
+    )
+    .unwrap();
+    edit.replace_theme_xml(format!("<a:theme xmlns:a=\"{}\"/>", A).into_bytes())
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    commit.patch().apply(&mut package).unwrap();
+    assert_eq!(
+        Snapshot::load(&package, &name)
+            .unwrap()
+            .unwrap()
+            .master()
+            .xml(),
+        commit.snapshot().master().xml()
+    );
+    commit.patch().undo(&mut package).unwrap();
+    assert!(
+        Snapshot::load(&package, &name)
+            .unwrap()
+            .unwrap()
+            .same_source(&snapshot)
+    );
+}

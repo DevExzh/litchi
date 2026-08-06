@@ -128,6 +128,139 @@ impl Slide {
     }
 }
 
+/// Replace the inert DrawingML text projection without rebuilding the notes
+/// document. All markup, namespace declarations, extension branches, and
+/// unrelated runs remain byte-identical; only the contents of existing
+/// `a:t` elements are changed.
+pub(crate) fn rewrite_text(xml: &[u8], text: &str) -> Result<Vec<u8>> {
+    if text.len() > MAX_NOTES_XML {
+        return Err(limit("speaker-notes text bytes", MAX_NOTES_XML));
+    }
+    if !text.chars().all(is_xml_char) {
+        return Err(invalid("speaker notes contain an invalid XML character"));
+    }
+    let escaped = quick_xml::escape::escape(text);
+    let spans = text_spans(xml)?;
+    let Some(_first) = spans.first() else {
+        return Err(invalid("notes slide has no DrawingML text run"));
+    };
+    let mut output = Vec::new();
+    output
+        .try_reserve(xml.len().saturating_add(escaped.len()))
+        .map_err(|source| allocation("speaker-notes text rewrite", source))?;
+    let mut cursor = 0usize;
+    for (index, span) in spans.iter().enumerate() {
+        output.extend_from_slice(&xml[cursor..span.start]);
+        if index == 0 {
+            if let Some(name) = span.empty_name.as_deref() {
+                output.extend_from_slice(&xml[span.start..span.end - 1]);
+                output.push(b'>');
+                output.extend_from_slice(escaped.as_bytes());
+                output.extend_from_slice(b"</");
+                output.extend_from_slice(name);
+                output.push(b'>');
+            } else {
+                output.extend_from_slice(escaped.as_bytes());
+            }
+        } else if span.empty_name.is_some() {
+            output.extend_from_slice(&xml[span.start..span.end]);
+        }
+        cursor = span.end;
+    }
+    output.extend_from_slice(&xml[cursor..]);
+    Ok(output)
+}
+
+struct TextSpan {
+    start: usize,
+    end: usize,
+    empty_name: Option<Vec<u8>>,
+}
+
+fn text_spans(xml: &[u8]) -> Result<Vec<TextSpan>> {
+    // The bounded XML scan above is authoritative for syntax and namespace
+    // conformance. This byte scanner only locates replaceable text payloads,
+    // avoiding a serializer pass that would rewrite opaque markup.
+    let mut spans = Vec::new();
+    let mut cursor = 0usize;
+    while let Some(relative) = xml[cursor..].iter().position(|byte| *byte == b'<') {
+        let start = cursor + relative;
+        if xml
+            .get(start + 1)
+            .is_some_and(|byte| matches!(byte, b'!' | b'?'))
+        {
+            cursor = start + 2;
+            continue;
+        }
+        if xml.get(start + 1) == Some(&b'/') {
+            cursor = start + 2;
+            continue;
+        }
+        let name_start = start + 1;
+        let Some(name_end) = xml[name_start..]
+            .iter()
+            .position(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'>'))
+            .map(|offset| name_start + offset)
+        else {
+            return Err(invalid("unterminated notes XML element"));
+        };
+        let name = &xml[name_start..name_end];
+        let local = name.rsplit(|byte| *byte == b':').next().unwrap_or(name);
+        let end = tag_end(xml, name_end)?;
+        if local != b"t" {
+            cursor = end + 1;
+            continue;
+        }
+        let self_closing = xml[name_end..=end]
+            .get(..xml[name_end..=end].len().saturating_sub(1))
+            .and_then(|value| value.iter().rposition(|byte| !byte.is_ascii_whitespace()))
+            .is_some_and(|position| xml[name_end + position] == b'/');
+        if self_closing {
+            spans.push(TextSpan {
+                start,
+                end: end + 1,
+                empty_name: Some(name.to_vec()),
+            });
+            cursor = end + 1;
+            continue;
+        }
+        let close_prefix = {
+            let mut value = Vec::with_capacity(name.len() + 2);
+            value.extend_from_slice(b"</");
+            value.extend_from_slice(name);
+            value.push(b'>');
+            value
+        };
+        let Some(close_relative) = xml[end + 1..]
+            .windows(close_prefix.len())
+            .position(|window| window == close_prefix)
+        else {
+            return Err(invalid("notes text element is unterminated"));
+        };
+        let close_start = end + 1 + close_relative;
+        spans.push(TextSpan {
+            start: end + 1,
+            end: close_start,
+            empty_name: None,
+        });
+        cursor = close_start + close_prefix.len();
+    }
+    Ok(spans)
+}
+
+fn tag_end(xml: &[u8], start: usize) -> Result<usize> {
+    let mut quote = None;
+    for (offset, byte) in xml[start..].iter().enumerate() {
+        match (quote, *byte) {
+            (None, b'\'' | b'"') => quote = Some(*byte),
+            (Some(value), byte) if value == byte => quote = None,
+            (None, b'>') => return Ok(start + offset),
+            _ => {},
+        }
+    }
+    Err(invalid("unterminated notes XML start tag"))
+}
+
 #[derive(Default)]
 pub(crate) struct XmlScan {
     pub(crate) relationship_attributes: Vec<String>,

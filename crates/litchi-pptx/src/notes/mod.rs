@@ -3,10 +3,13 @@
 mod codec;
 mod model;
 mod package;
+mod transaction;
+mod validation;
 
 pub use codec::{master_xml, write_text, write_text_with};
-pub use model::{Conformance, Graph, Master, Slide, Theme};
-pub use package::{clear, load, put, remove, slide};
+pub use model::{Conformance, Graph, Link, Master, Slide, Theme};
+pub use package::{apply_commit, apply_patch, clear, load, load_snapshot, put, remove, slide};
+pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
 
 pub(crate) const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 pub(crate) const PS: &str = "http://purl.oclc.org/ooxml/presentationml/main";
