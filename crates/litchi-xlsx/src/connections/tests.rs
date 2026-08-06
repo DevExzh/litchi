@@ -231,3 +231,159 @@ fn rejects_external_wrong_content_and_outbound_package_edges() {
     assert!(load_from_package(&package("application/xml", false, false)).is_err());
     assert!(load_from_package(&package(CONNECTIONS_CONTENT_TYPE, false, true)).is_err());
 }
+
+fn transaction_connection(id: u32, name: &str) -> Connection {
+    Connection {
+        id,
+        source_file: None,
+        odc_file: None,
+        keep_alive: None,
+        interval: None,
+        name: Some(name.into()),
+        description: None,
+        connection_type: Some(1),
+        reconnection_method: None,
+        refreshed_version: 7,
+        min_refreshable_version: None,
+        save_password: None,
+        new_connection: None,
+        deleted: None,
+        only_use_connection_file: None,
+        background: None,
+        refresh_on_load: None,
+        save_data: None,
+        credentials: None,
+        single_sign_on_id: None,
+        database: None,
+        olap: None,
+        web: None,
+        text: None,
+        parameters: None,
+        extension_xml: None,
+    }
+}
+
+fn transaction_package(with_connection: bool) -> OpcPackage {
+    let mut package = OpcPackage::new();
+    let workbook = PackURI::new("/xl/workbook.xml").unwrap();
+    let mut workbook_part = BlobPart::new(
+        workbook.clone(),
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml".into(),
+        br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#
+            .to_vec(),
+    );
+    package.relate_to(
+        "xl/workbook.xml",
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+    );
+    if with_connection {
+        workbook_part.rels_mut().add_relationship(
+            CONNECTIONS_RELATIONSHIP.into(),
+            "connections.xml".into(),
+            "rIdConnections".into(),
+            false,
+        );
+    }
+    package.add_part(Box::new(workbook_part));
+    if with_connection {
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/connections.xml").unwrap(),
+            CONNECTIONS_CONTENT_TYPE.into(),
+            format!(
+                r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="7" name="before"><x:future xmlns:x="urn:future" marker="keep"/></connection></connections>"#
+            )
+            .into_bytes(),
+        )));
+    }
+    package
+}
+
+#[test]
+fn typed_transaction_preserves_opaque_connection_xml_and_inverse() {
+    let mut package = transaction_package(true);
+    let before = Snapshot::load(&package).unwrap();
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    assert!(
+        transaction
+            .edit(1, |connection| {
+                connection.name = Some("after".into());
+                Ok(())
+            })
+            .unwrap()
+    );
+    let commit = transaction.commit().unwrap();
+    assert!(commit.changed());
+    let source = package
+        .get_part(&PackURI::new("/xl/connections.xml").unwrap())
+        .unwrap()
+        .blob();
+    assert!(
+        source
+            .windows(b"marker=\"keep\"".len())
+            .any(|window| window == b"marker=\"keep\"")
+    );
+    assert!(
+        source
+            .windows(b"name=\"after\"".len())
+            .any(|window| window == b"name=\"after\"")
+    );
+    commit.patch().inverse().apply(&mut package).unwrap();
+    assert_eq!(Snapshot::load(&package).unwrap(), before);
+}
+
+#[test]
+fn transaction_noop_and_stale_failure_are_source_checked() {
+    let mut package = transaction_package(true);
+    let before = Snapshot::load(&package).unwrap();
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    assert!(!transaction.edit(1, |_connection| Ok(())).unwrap());
+    let commit = transaction.commit().unwrap();
+    assert!(!commit.changed());
+    assert!(commit.patch().is_empty());
+    assert_eq!(Snapshot::load(&package).unwrap(), before);
+
+    let patch = {
+        let mut transaction = Transaction::new(&mut package).unwrap();
+        transaction
+            .edit(1, |connection| {
+                connection.name = Some("changed".into());
+                Ok(())
+            })
+            .unwrap();
+        transaction.commit().unwrap().patch().clone()
+    };
+    package
+        .get_part_mut(&PackURI::new("/xl/connections.xml").unwrap())
+        .unwrap()
+        .set_blob(b"<connections/>".to_vec());
+    assert!(patch.apply(&mut package).is_err());
+}
+
+#[test]
+fn transaction_creates_and_removes_the_connections_owner() {
+    let mut package = transaction_package(false);
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    transaction
+        .set(transaction_connection(9, "created"))
+        .unwrap();
+    transaction.commit().unwrap();
+    assert_eq!(
+        Snapshot::load(&package)
+            .unwrap()
+            .connections()
+            .unwrap()
+            .connections[0]
+            .id,
+        9
+    );
+
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    transaction.remove(9).unwrap();
+    transaction.commit().unwrap();
+    assert!(Snapshot::load(&package).unwrap().connections().is_none());
+    assert!(
+        package
+            .get_part(&PackURI::new("/xl/connections.xml").unwrap())
+            .is_err()
+    );
+}

@@ -27,6 +27,20 @@ pub(super) const MAX_WEB_TABLES: usize = 65_536;
 pub(super) const MAX_TEXT_FIELDS: usize = 2001;
 pub(super) const MAX_STRING_BYTES: usize = 1024 * 1024;
 
+/// SpreadsheetML namespace conformance used when authoring a connection part.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Conformance {
+    #[default]
+    Transitional,
+    Strict,
+}
+
+impl Conformance {
+    pub(crate) fn strict(self) -> bool {
+        matches!(self, Self::Strict)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CredentialsMethod {
     Integrated,

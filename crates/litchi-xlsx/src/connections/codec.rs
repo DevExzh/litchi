@@ -212,6 +212,12 @@ fn project(n: &Node) -> Result<Connections> {
     noattrs(n)?;
     let mut out = Vec::new();
     for c in kids(n)? {
+        // Future producers may place extension elements beside the typed
+        // connection catalog. They stay in the source snapshot and are not
+        // projected into the semantic model.
+        if c.ns != CORE_NAMESPACE && c.ns != STRICT_NAMESPACE || c.l != "connection" {
+            continue;
+        }
         if out.len() >= MAX_CONNECTIONS {
             return Err(invalid("connection limit exceeded"));
         }
@@ -281,7 +287,9 @@ fn parse_connection(n: &Node) -> Result<Connection> {
     )?;
     let mut order = 0;
     for child in kids(n)? {
-        expect_any(child)?;
+        if child.ns != CORE_NAMESPACE && child.ns != STRICT_NAMESPACE {
+            continue;
+        }
         let i = match child.l.as_str() {
             "dbPr" => 0,
             "olapPr" => 1,
@@ -289,7 +297,7 @@ fn parse_connection(n: &Node) -> Result<Connection> {
             "textPr" => 3,
             "parameters" => 4,
             "extLst" => 5,
-            _ => return Err(invalid("unexpected connection child")),
+            _ => continue,
         };
         if i < order {
             return Err(invalid("connection children out of order"));
@@ -950,7 +958,10 @@ fn i32opt(n: &Node, l: &str) -> Result<Option<i32>> {
 fn only(n: &Node, a: &[&str]) -> Result<()> {
     for x in &n.attrs {
         if !x.ns.is_empty() || !a.contains(&x.l.as_str()) {
-            return Err(invalid(format!("unexpected attribute '{}'", x.q)));
+            // Attribute extensions are deliberately opaque. The package
+            // transaction retains their original source span while typed
+            // access continues to validate every known attribute.
+            continue;
         }
     }
     Ok(())
@@ -1083,4 +1094,761 @@ en!(parse_field,field_str,TextFieldType,"general"=>TextFieldType::General,"text"
 
 fn xml_error(e: impl std::fmt::Display) -> Box<dyn std::error::Error + Send + Sync> {
     invalid(e.to_string())
+}
+
+/// Patch typed connection fields inside their original XML spans.
+///
+/// Connection and query-table parts contain many producer extensions. The
+/// transaction therefore changes scalar attributes in place and replaces only
+/// the known property child whose typed value changed. Unrelated source bytes
+/// remain untouched; structural collection edits retain existing connection
+/// blocks and append new canonical blocks.
+pub(super) fn patch_connections_source(
+    source: &[u8],
+    before: &Connections,
+    after: &Connections,
+    strict: bool,
+) -> Result<Vec<u8>> {
+    if before == after {
+        return Ok(source.to_vec());
+    }
+    let tree = SourceTree::parse(source)?;
+    if tree.nodes[tree.root].local != "connections" || tree.nodes[tree.root].self_closing {
+        return after.to_xml(strict);
+    }
+    let nodes = tree.nodes[tree.root]
+        .children
+        .iter()
+        .copied()
+        .filter(|node| tree.nodes[*node].local == "connection")
+        .collect::<Vec<_>>();
+    if nodes.len() != before.connections.len() {
+        return after.to_xml(strict);
+    }
+    let mut source_ids = Vec::with_capacity(nodes.len());
+    for node in &nodes {
+        let id = tree
+            .attribute(source, *node, "id")?
+            .ok_or_else(|| invalid("connection source is missing its id"))?
+            .parse::<u32>()
+            .map_err(|_| invalid("connection source has an invalid id"))?;
+        source_ids.push(id);
+    }
+    let mut edits = Vec::new();
+    for (position, connection) in after.connections.iter().enumerate() {
+        if let Some(before_index) = before
+            .connections
+            .iter()
+            .position(|candidate| candidate.id == connection.id)
+        {
+            let source_node = nodes
+                .iter()
+                .enumerate()
+                .find(|(index, _)| source_ids[*index] == connection.id)
+                .map(|(index, _)| index)
+                .ok_or_else(|| invalid("connection source identity changed"))?;
+            let node = nodes[source_node];
+            let replacement = patch_connection_source(
+                &source[tree.nodes[node].start..tree.nodes[node].end],
+                &before.connections[before_index],
+                connection,
+                strict,
+            )?;
+            edits.push(SourceEdit {
+                range: tree.nodes[node].start..tree.nodes[node].end,
+                replacement,
+            });
+        } else {
+            let _ = position;
+            let replacement = canonical_connection(connection, strict)?;
+            edits.push(SourceEdit {
+                range: tree.nodes[tree.root].end_start..tree.nodes[tree.root].end_start,
+                replacement,
+            });
+        }
+    }
+    for (index, node) in nodes.iter().enumerate() {
+        if !after
+            .connections
+            .iter()
+            .any(|connection| connection.id == source_ids[index])
+        {
+            edits.push(SourceEdit {
+                range: tree.nodes[*node].start..tree.nodes[*node].end,
+                replacement: Vec::new(),
+            });
+        }
+    }
+    apply_source_edits(source, edits)
+}
+
+fn patch_connection_source(
+    source: &[u8],
+    before: &Connection,
+    after: &Connection,
+    strict: bool,
+) -> Result<Vec<u8>> {
+    let tree = SourceTree::parse(source)?;
+    let node = tree.root;
+    if tree.nodes[node].local != "connection" {
+        return Err(invalid("connection source has an invalid root"));
+    }
+    let mut edits = Vec::new();
+    patch_optional_attr(
+        &tree,
+        node,
+        "id",
+        Some(&before.id.to_string()),
+        Some(&after.id.to_string()),
+        &mut edits,
+    )?;
+    patch_optional_attr(
+        &tree,
+        node,
+        "sourceFile",
+        before.source_file.as_deref(),
+        after.source_file.as_deref(),
+        &mut edits,
+    )?;
+    patch_optional_attr(
+        &tree,
+        node,
+        "odcFile",
+        before.odc_file.as_deref(),
+        after.odc_file.as_deref(),
+        &mut edits,
+    )?;
+    patch_bool(
+        &tree,
+        node,
+        "keepAlive",
+        before.keep_alive,
+        after.keep_alive,
+        &mut edits,
+    )?;
+    patch_number(
+        &tree,
+        node,
+        "interval",
+        before.interval,
+        after.interval,
+        &mut edits,
+    )?;
+    patch_optional_attr(
+        &tree,
+        node,
+        "name",
+        before.name.as_deref(),
+        after.name.as_deref(),
+        &mut edits,
+    )?;
+    patch_optional_attr(
+        &tree,
+        node,
+        "description",
+        before.description.as_deref(),
+        after.description.as_deref(),
+        &mut edits,
+    )?;
+    patch_number(
+        &tree,
+        node,
+        "type",
+        before.connection_type,
+        after.connection_type,
+        &mut edits,
+    )?;
+    patch_number(
+        &tree,
+        node,
+        "reconnectionMethod",
+        before.reconnection_method,
+        after.reconnection_method,
+        &mut edits,
+    )?;
+    patch_optional_attr(
+        &tree,
+        node,
+        "refreshedVersion",
+        Some(&before.refreshed_version.to_string()),
+        Some(&after.refreshed_version.to_string()),
+        &mut edits,
+    )?;
+    patch_number(
+        &tree,
+        node,
+        "minRefreshableVersion",
+        before.min_refreshable_version,
+        after.min_refreshable_version,
+        &mut edits,
+    )?;
+    patch_bool(
+        &tree,
+        node,
+        "savePassword",
+        before.save_password,
+        after.save_password,
+        &mut edits,
+    )?;
+    patch_bool(
+        &tree,
+        node,
+        "new",
+        before.new_connection,
+        after.new_connection,
+        &mut edits,
+    )?;
+    patch_bool(
+        &tree,
+        node,
+        "deleted",
+        before.deleted,
+        after.deleted,
+        &mut edits,
+    )?;
+    patch_bool(
+        &tree,
+        node,
+        "onlyUseConnectionFile",
+        before.only_use_connection_file,
+        after.only_use_connection_file,
+        &mut edits,
+    )?;
+    patch_bool(
+        &tree,
+        node,
+        "background",
+        before.background,
+        after.background,
+        &mut edits,
+    )?;
+    patch_bool(
+        &tree,
+        node,
+        "refreshOnLoad",
+        before.refresh_on_load,
+        after.refresh_on_load,
+        &mut edits,
+    )?;
+    patch_bool(
+        &tree,
+        node,
+        "saveData",
+        before.save_data,
+        after.save_data,
+        &mut edits,
+    )?;
+    patch_optional_attr(
+        &tree,
+        node,
+        "credentials",
+        before.credentials.map(credentials_str),
+        after.credentials.map(credentials_str),
+        &mut edits,
+    )?;
+    patch_optional_attr(
+        &tree,
+        node,
+        "singleSignOnId",
+        before.single_sign_on_id.as_deref(),
+        after.single_sign_on_id.as_deref(),
+        &mut edits,
+    )?;
+
+    patch_child(
+        &tree,
+        source,
+        node,
+        "dbPr",
+        before.database != after.database,
+        after
+            .database
+            .is_some()
+            .then(|| canonical_child(after, "dbPr", strict))
+            .transpose()?,
+        &mut edits,
+    )?;
+    patch_child(
+        &tree,
+        source,
+        node,
+        "olapPr",
+        before.olap != after.olap,
+        after
+            .olap
+            .is_some()
+            .then(|| canonical_child(after, "olapPr", strict))
+            .transpose()?,
+        &mut edits,
+    )?;
+    patch_child(
+        &tree,
+        source,
+        node,
+        "webPr",
+        before.web != after.web,
+        after
+            .web
+            .is_some()
+            .then(|| canonical_child(after, "webPr", strict))
+            .transpose()?,
+        &mut edits,
+    )?;
+    patch_child(
+        &tree,
+        source,
+        node,
+        "textPr",
+        before.text != after.text,
+        after
+            .text
+            .is_some()
+            .then(|| canonical_child(after, "textPr", strict))
+            .transpose()?,
+        &mut edits,
+    )?;
+    patch_child(
+        &tree,
+        source,
+        node,
+        "parameters",
+        before.parameters != after.parameters,
+        after
+            .parameters
+            .is_some()
+            .then(|| canonical_child(after, "parameters", strict))
+            .transpose()?,
+        &mut edits,
+    )?;
+    patch_child(
+        &tree,
+        source,
+        node,
+        "extLst",
+        before.extension_xml != after.extension_xml,
+        after
+            .extension_xml
+            .as_ref()
+            .map(|_| canonical_child(after, "extLst", strict))
+            .transpose()?,
+        &mut edits,
+    )?;
+    apply_source_edits(source, edits)
+}
+
+fn canonical_connection(value: &Connection, strict: bool) -> Result<Vec<u8>> {
+    let mut output = BoundedXml::new();
+    write_connection(&mut output, value, strict)?;
+    Ok(output.finish())
+}
+
+fn canonical_child(value: &Connection, name: &str, strict: bool) -> Result<Vec<u8>> {
+    let source = canonical_connection(value, strict)?;
+    let tree = SourceTree::parse(&source)?;
+    let node = tree.nodes[tree.root]
+        .children
+        .iter()
+        .copied()
+        .find(|node| tree.nodes[*node].local == name)
+        .ok_or_else(|| invalid(format!("canonical connection is missing '{name}'")))?;
+    Ok(source[tree.nodes[node].start..tree.nodes[node].end].to_vec())
+}
+
+fn patch_child(
+    tree: &SourceTree,
+    _source: &[u8],
+    parent: usize,
+    name: &str,
+    changed: bool,
+    replacement: Option<Vec<u8>>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    if !changed {
+        return Ok(());
+    }
+    let existing = tree.child(parent, name)?;
+    match (existing, replacement) {
+        (Some(node), Some(replacement)) => edits.push(SourceEdit {
+            range: tree.nodes[node].start..tree.nodes[node].end,
+            replacement,
+        }),
+        (Some(node), None) => edits.push(SourceEdit {
+            range: tree.nodes[node].start..tree.nodes[node].end,
+            replacement: Vec::new(),
+        }),
+        (None, Some(replacement)) => {
+            if tree.nodes[parent].self_closing {
+                return Err(invalid(
+                    "connection source needs a structural child insertion",
+                ));
+            }
+            edits.push(SourceEdit {
+                range: tree.nodes[parent].end_start..tree.nodes[parent].end_start,
+                replacement,
+            });
+        },
+        (None, None) => {},
+    }
+    Ok(())
+}
+
+fn patch_bool(
+    tree: &SourceTree,
+    node: usize,
+    name: &str,
+    before: Option<bool>,
+    after: Option<bool>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    patch_optional_attr(
+        tree,
+        node,
+        name,
+        before.map(|value| if value { "1" } else { "0" }),
+        after.map(|value| if value { "1" } else { "0" }),
+        edits,
+    )
+}
+
+fn patch_number<T: std::fmt::Display + Copy>(
+    tree: &SourceTree,
+    node: usize,
+    name: &str,
+    before: Option<T>,
+    after: Option<T>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    let before = before.map(|value| value.to_string());
+    let after = after.map(|value| value.to_string());
+    patch_optional_attr(tree, node, name, before.as_deref(), after.as_deref(), edits)
+}
+
+fn patch_optional_attr(
+    tree: &SourceTree,
+    node: usize,
+    name: &str,
+    before: Option<&str>,
+    after: Option<&str>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    if before == after {
+        return Ok(());
+    }
+    let attribute = tree.nodes[node]
+        .attrs
+        .iter()
+        .find(|attribute| attribute.local == name);
+    match (attribute, after) {
+        (Some(attribute), Some(value)) => edits.push(SourceEdit {
+            range: attribute.value_start..attribute.value_end,
+            replacement: escape_attribute(value),
+        }),
+        (Some(attribute), None) => edits.push(SourceEdit {
+            range: attribute.start..attribute.value_end + 1,
+            replacement: Vec::new(),
+        }),
+        (None, Some(value)) if before.is_none() => edits.push(SourceEdit {
+            range: tree.nodes[node].close_pos..tree.nodes[node].close_pos,
+            replacement: format!(
+                " {name}=\"{}\"",
+                String::from_utf8_lossy(&escape_attribute(value))
+            )
+            .into_bytes(),
+        }),
+        (None, Some(_)) => {
+            return Err(invalid(format!(
+                "connection source is missing attribute '{name}'"
+            )));
+        },
+        (None, None) => {
+            if before.is_some() {
+                return Err(invalid(format!(
+                    "connection source is missing attribute '{name}'"
+                )));
+            }
+        },
+    }
+    Ok(())
+}
+
+fn escape_attribute(value: &str) -> Vec<u8> {
+    let mut result = Vec::with_capacity(value.len());
+    for character in value.chars() {
+        match character {
+            '&' => result.extend_from_slice(b"&amp;"),
+            '<' => result.extend_from_slice(b"&lt;"),
+            '"' => result.extend_from_slice(b"&quot;"),
+            '\r' => result.extend_from_slice(b"&#xD;"),
+            '\n' => result.extend_from_slice(b"&#xA;"),
+            '\t' => result.extend_from_slice(b"&#x9;"),
+            _ => {
+                let mut encoded = [0; 4];
+                result.extend_from_slice(character.encode_utf8(&mut encoded).as_bytes());
+            },
+        }
+    }
+    result
+}
+
+#[derive(Debug)]
+struct SourceEdit {
+    range: std::ops::Range<usize>,
+    replacement: Vec<u8>,
+}
+
+fn apply_source_edits(source: &[u8], mut edits: Vec<SourceEdit>) -> Result<Vec<u8>> {
+    edits.sort_by(|left, right| right.range.start.cmp(&left.range.start));
+    for pair in edits.windows(2) {
+        if pair[0].range.start < pair[1].range.end {
+            return Err(invalid("connection source edits overlap"));
+        }
+    }
+    let mut result = source.to_vec();
+    for edit in edits {
+        if edit.range.end > result.len() {
+            return Err(invalid("connection source edit is out of bounds"));
+        }
+        result.splice(edit.range, edit.replacement);
+    }
+    Ok(result)
+}
+
+#[derive(Debug)]
+struct SourceTree {
+    nodes: Vec<SourceNode>,
+    root: usize,
+}
+
+#[derive(Debug)]
+struct SourceNode {
+    local: String,
+    start: usize,
+    end_start: usize,
+    end: usize,
+    close_pos: usize,
+    self_closing: bool,
+    attrs: Vec<SourceAttribute>,
+    children: Vec<usize>,
+}
+
+#[derive(Debug)]
+struct SourceAttribute {
+    local: String,
+    start: usize,
+    value_start: usize,
+    value_end: usize,
+}
+
+impl SourceTree {
+    fn parse(source: &[u8]) -> Result<Self> {
+        let mut nodes: Vec<SourceNode> = Vec::new();
+        let mut stack: Vec<usize> = Vec::new();
+        let mut root: Option<usize> = None;
+        let mut position = 0;
+        while position < source.len() {
+            if source[position] != b'<' {
+                position += 1;
+                continue;
+            }
+            if source[position..].starts_with(b"<?") {
+                position = find_source_bytes(source, position + 2, b"?>")? + 2;
+                continue;
+            }
+            if source[position..].starts_with(b"<!--") {
+                position = find_source_bytes(source, position + 4, b"-->")? + 3;
+                continue;
+            }
+            if source[position..].starts_with(b"<![CDATA[") {
+                position = find_source_bytes(source, position + 9, b"]]>")? + 3;
+                continue;
+            }
+            if source[position..].starts_with(b"<!") {
+                position = source_tag_end(source, position)? + 1;
+                continue;
+            }
+            if source[position..].starts_with(b"</") {
+                let end = source_tag_end(source, position)?;
+                let name_start = position + 2;
+                let name_end = source_name_end(source, name_start);
+                let node = stack
+                    .pop()
+                    .ok_or_else(|| invalid("connection source has an unmatched closing tag"))?;
+                if nodes[node].local != source_local(&source[name_start..name_end])? {
+                    return Err(invalid("connection source has mismatched tags"));
+                }
+                nodes[node].end_start = position;
+                nodes[node].end = end + 1;
+                position = end + 1;
+                continue;
+            }
+            let end = source_tag_end(source, position)?;
+            let (local, attrs, close_pos, self_closing) = source_start_tag(source, position, end)?;
+            let node = nodes.len();
+            nodes.push(SourceNode {
+                local,
+                start: position,
+                end_start: end + 1,
+                end: end + 1,
+                close_pos,
+                self_closing,
+                attrs,
+                children: Vec::new(),
+            });
+            if let Some(parent) = stack.last().copied() {
+                nodes[parent].children.push(node);
+            } else if root.replace(node).is_some() {
+                return Err(invalid("connection source has multiple roots"));
+            }
+            if !self_closing {
+                stack.push(node);
+            }
+            position = end + 1;
+        }
+        if !stack.is_empty() {
+            return Err(invalid("connection source has unterminated markup"));
+        }
+        Ok(Self {
+            nodes,
+            root: root.ok_or_else(|| invalid("connection source has no root"))?,
+        })
+    }
+
+    fn attribute(&self, source: &[u8], node: usize, name: &str) -> Result<Option<String>> {
+        Ok(self.nodes[node]
+            .attrs
+            .iter()
+            .find(|attribute| attribute.local == name)
+            .map(|attribute| {
+                std::str::from_utf8(&source[attribute.value_start..attribute.value_end])
+                    .map(str::to_owned)
+                    .map_err(xml_error)
+            })
+            .transpose()?)
+    }
+
+    fn child(&self, node: usize, name: &str) -> Result<Option<usize>> {
+        let mut result = None;
+        for child in &self.nodes[node].children {
+            if self.nodes[*child].local == name {
+                if result.replace(*child).is_some() {
+                    return Err(invalid(format!("connection source has duplicate '{name}'")));
+                }
+            }
+        }
+        Ok(result)
+    }
+}
+
+fn find_source_bytes(source: &[u8], start: usize, needle: &[u8]) -> Result<usize> {
+    source[start..]
+        .windows(needle.len())
+        .position(|window| window == needle)
+        .map(|position| start + position)
+        .ok_or_else(|| invalid("connection source has an unterminated declaration"))
+}
+
+fn source_tag_end(source: &[u8], start: usize) -> Result<usize> {
+    let mut quote = None;
+    for (offset, byte) in source[start + 1..].iter().enumerate() {
+        match (quote, byte) {
+            (Some(value), byte) if *byte == value => quote = None,
+            (None, b'\'' | b'\"') => quote = Some(*byte),
+            (None, b'>') => return Ok(start + 1 + offset),
+            _ => {},
+        }
+    }
+    Err(invalid("connection source has an unterminated tag"))
+}
+
+fn source_start_tag(
+    source: &[u8],
+    start: usize,
+    end: usize,
+) -> Result<(String, Vec<SourceAttribute>, usize, bool)> {
+    let name_start = start + 1;
+    let name_end = source_name_end(source, name_start);
+    if name_start == name_end {
+        return Err(invalid("connection source has an empty element name"));
+    }
+    let mut attributes = Vec::new();
+    let mut position = name_end;
+    while position < end {
+        while position < end && source[position].is_ascii_whitespace() {
+            position += 1;
+        }
+        if position >= end || source[position] == b'/' {
+            break;
+        }
+        let attr_start = position;
+        let attr_end = source_name_end(source, position);
+        if attr_end == attr_start {
+            return Err(invalid("connection source has an invalid attribute"));
+        }
+        position = attr_end;
+        while position < end && source[position].is_ascii_whitespace() {
+            position += 1;
+        }
+        if position >= end || source[position] != b'=' {
+            return Err(invalid("connection source attribute is missing '='"));
+        }
+        position += 1;
+        while position < end && source[position].is_ascii_whitespace() {
+            position += 1;
+        }
+        let quote = *source
+            .get(position)
+            .ok_or_else(|| invalid("connection source attribute is missing quotes"))?;
+        if !matches!(quote, b'\'' | b'\"') {
+            return Err(invalid("connection source attribute is missing quotes"));
+        }
+        position += 1;
+        let value_start = position;
+        while position < end && source[position] != quote {
+            position += 1;
+        }
+        if position >= end {
+            return Err(invalid("connection source attribute is unterminated"));
+        }
+        let value_end = position;
+        position += 1;
+        attributes.push(SourceAttribute {
+            local: source_local(&source[attr_start..attr_end])?,
+            start: attr_start,
+            value_start,
+            value_end,
+        });
+    }
+    let self_closing = source[..end]
+        .iter()
+        .rposition(|byte| !byte.is_ascii_whitespace())
+        .is_some_and(|position| source[position] == b'/');
+    let close_pos = if self_closing {
+        source[..end]
+            .iter()
+            .rposition(|byte| !byte.is_ascii_whitespace())
+            .unwrap_or(end)
+    } else {
+        end
+    };
+    Ok((
+        source_local(&source[name_start..name_end])?,
+        attributes,
+        close_pos,
+        self_closing,
+    ))
+}
+
+fn source_name_end(source: &[u8], mut position: usize) -> usize {
+    while position < source.len()
+        && !source[position].is_ascii_whitespace()
+        && !matches!(source[position], b'/' | b'>' | b'=')
+    {
+        position += 1;
+    }
+    position
+}
+
+fn source_local(value: &[u8]) -> Result<String> {
+    let value = std::str::from_utf8(value).map_err(xml_error)?;
+    Ok(value.rsplit(':').next().unwrap_or(value).to_owned())
 }
