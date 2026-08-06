@@ -64,19 +64,37 @@ impl IWorkPackage {
     /// inconsistent. Object UUID maps are deliberately retained because Apple
     /// uses stable UUIDs for objects inherited from its built-in templates.
     pub fn regenerate_document_identity(&mut self) -> Result<IWorkDocumentIdentity> {
+        self.regenerate_document_identity_with(|package, name, data| {
+            package.insert_entry(name, data).map(|_| ())
+        })
+    }
+
+    fn regenerate_document_identity_with<F>(
+        &mut self,
+        mut insert: F,
+    ) -> Result<IWorkDocumentIdentity>
+    where
+        F: FnMut(&mut IWorkPackage, &str, Vec<u8>) -> Result<()>,
+    {
         let identity = IWorkDocumentIdentity::generate();
         let properties = updated_properties(self, &identity)?;
         let metadata = updated_package_revision(self, &identity.version_uuid)?;
 
-        // All fallible parsing, mutation, validation, and compression happens
-        // before the package is touched. These three constant entry names have
-        // already passed package validation when the source was opened.
-        self.insert_entry(PROPERTIES_ENTRY, properties)?;
-        self.insert_entry(
+        // Stage every mutation in a copy-on-write edit. The source package is
+        // published only after all insertions and the final validation succeed,
+        // so a failure after any earlier staged insertion cannot expose a
+        // partially regenerated identity. Cloning shares the entry storage
+        // until the first write, keeping rejected transactions cheap.
+        let mut staged = self.clone();
+        insert(&mut staged, PROPERTIES_ENTRY, properties)?;
+        insert(
+            &mut staged,
             DOCUMENT_IDENTIFIER_ENTRY,
             identity.document_uuid.as_bytes().to_vec(),
         )?;
-        self.insert_entry(PACKAGE_METADATA_ENTRY, metadata)?;
+        insert(&mut staged, PACKAGE_METADATA_ENTRY, metadata)?;
+        staged.validate()?;
+        *self = staged;
         Ok(identity)
     }
 }
@@ -271,6 +289,34 @@ mod tests {
         let before = package.to_bytes().unwrap();
         assert!(package.regenerate_document_identity().is_err());
         assert_eq!(package.to_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn injected_mid_operation_failure_does_not_publish_staged_identity() {
+        let mut package = identity_package();
+        let before = package.to_bytes().unwrap();
+        let before_revision = package.mutation_revision();
+        let mut insertion_count = 0;
+
+        let error = package.regenerate_document_identity_with(|staged, name, data| {
+            insertion_count += 1;
+            if insertion_count == 2 {
+                return Err(Error::InvalidFormat(
+                    "injected identity insertion failure".to_owned(),
+                ));
+            }
+            staged.insert_entry(name, data).map(|_| ())
+        });
+
+        assert!(
+            error
+                .unwrap_err()
+                .to_string()
+                .contains("injected identity insertion failure")
+        );
+        assert_eq!(insertion_count, 2);
+        assert_eq!(package.to_bytes().unwrap(), before);
+        assert_eq!(package.mutation_revision(), before_revision);
     }
 
     fn identity_package() -> IWorkPackage {
