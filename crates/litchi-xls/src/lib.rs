@@ -255,7 +255,7 @@ mod sort_data;
 mod query_table;
 
 /// BIFF8 `RealTimeData` record: typed, inert real-time data (RTD) topics.
-mod real_time_data;
+pub mod real_time_data;
 
 /// Typed, inert readers for the shared-workbook RRD revision record family.
 pub mod revision_records;
@@ -416,7 +416,6 @@ pub use query_table::{
     HtmlFormatting, OleDbConnection, QueryParameter, QueryParameterType, QuerySource, QueryTable,
     TextCodePage, TextDelimiter, TextField, TextFieldFormat, TextQuery,
 };
-pub use real_time_data::{RealTimeData, RtdCell, RtdValue};
 pub use records::{PhoneticRun, PhoneticString, SharedStringFormatRun, SharedStringProperties};
 pub use revision_log::{
     OpaqueRevisionRecord, REVISION_LOG_STREAM_NAME, Revision, RevisionChange, RevisionHeader,

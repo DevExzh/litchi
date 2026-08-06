@@ -411,7 +411,7 @@ pub(crate) fn write_book_ext<W: Write>(writer: &mut W, value: &crate::BookExt) -
 
 pub(crate) fn write_real_time_data<W: Write>(
     writer: &mut W,
-    value: &crate::RealTimeData,
+    value: &crate::real_time_data::Record,
 ) -> Result<()> {
     workbook::write_real_time_data(writer, value)
 }

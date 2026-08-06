@@ -1,7 +1,7 @@
 //! MS-DOC codecs and bounded binary helpers for tracked revisions.
 
 use super::model::*;
-use crate::CommentDateTime;
+use crate::DateTime;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fkp::{ChpxFkp, PapxFkp, ParagraphHeight};
 use crate::sprm::parse_sprms;
@@ -30,7 +30,7 @@ pub(super) const MAX_TEXT_UNITS: usize = 16 * 1024 * 1024;
 pub(super) struct ParsedMetadata {
     author_index: u16,
     author: String,
-    timestamp: Option<CommentDateTime>,
+    timestamp: Option<DateTime>,
     reason: Option<u16>,
     rsid: Option<u32>,
 }
@@ -1011,7 +1011,7 @@ pub(super) fn validate_range(start: u32, end: u32, limit: u32) -> Result<()> {
         Ok(())
     }
 }
-pub(super) fn pack_dttm(value: Option<CommentDateTime>) -> Result<u32> {
+pub(super) fn pack_dttm(value: Option<DateTime>) -> Result<u32> {
     let Some(v) = value else { return Ok(0) };
     if !(1900..=2411).contains(&v.year)
         || !(1..=12).contains(&v.month)
@@ -1029,11 +1029,11 @@ pub(super) fn pack_dttm(value: Option<CommentDateTime>) -> Result<u32> {
         | u32::from(v.year - 1900) << 20
         | u32::from(v.weekday) << 29)
 }
-pub(super) fn decode_dttm(raw: u32) -> Result<Option<CommentDateTime>> {
+pub(super) fn decode_dttm(raw: u32) -> Result<Option<DateTime>> {
     if raw == 0 {
         return Ok(None);
     };
-    let value = CommentDateTime {
+    let value = DateTime {
         minute: (raw & 0x3f) as u8,
         hour: ((raw >> 6) & 0x1f) as u8,
         day: ((raw >> 11) & 0x1f) as u8,

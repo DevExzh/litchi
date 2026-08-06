@@ -13,7 +13,7 @@ use super::validation::{RecordSpan, frame_logical_payload, replace_range, scan_r
 use crate::error::{Error, Result};
 
 #[derive(Debug, Clone, Copy)]
-struct RealTimeDataSpan {
+struct Span {
     first_record: usize,
     end_record: usize,
 }
@@ -29,7 +29,7 @@ struct RealTimeDataSpan {
 pub(crate) struct Package {
     records: Vec<RecordSpan>,
     real_time_data: Vec<Record>,
-    real_time_data_spans: Vec<RealTimeDataSpan>,
+    real_time_data_spans: Vec<Span>,
     unknown_records: Vec<usize>,
 }
 
@@ -83,7 +83,7 @@ impl Package {
             let parsed = Record::parse(&logical_payload, previous_topic.as_deref())?;
             previous_topic = Some(parsed.topic.clone());
             real_time_data.push(parsed);
-            real_time_data_spans.push(RealTimeDataSpan {
+            real_time_data_spans.push(Span {
                 first_record,
                 end_record,
             });

@@ -141,7 +141,7 @@ impl<R: Read + Seek> Workbook<R> {
                     let previous_topic =
                         self.real_time_data.last().map(|topic| topic.topic.as_str());
                     self.real_time_data.push(
-                        crate::real_time_data::RealTimeData::parse(&payload, previous_topic)?,
+                        crate::real_time_data::Record::parse(&payload, previous_topic)?,
                     );
                 },
                 crate::web_pub::WEB_PUB_RECORD_TYPE => {

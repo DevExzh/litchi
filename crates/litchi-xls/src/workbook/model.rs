@@ -57,7 +57,7 @@ pub struct Workbook<R: Read + Seek> {
     /// Workbook-wide custom views (`UserBView` records), in record order.
     pub(super) custom_views: Vec<crate::custom_view::WorkbookCustomView>,
     /// Real-time data (RTD) topics (`RealTimeData` records), in record order.
-    pub(super) real_time_data: Vec<crate::real_time_data::RealTimeData>,
+    pub(super) real_time_data: Vec<crate::real_time_data::Record>,
     /// MDX (OLAP cube) metadata from the workbook globals `METADATA` production.
     pub(super) mdx_metadata: crate::mdx_metadata::MdxMetadata,
     /// Published Web pages (`WebPub` records), in record order.
@@ -133,7 +133,7 @@ impl<R: Read + Seek> Workbook<R> {
     /// The topics are inert: this reader never locates, launches, or queries
     /// an RTD server; each entry only reports the topic, the last cached
     /// value, and the subscribed cells.
-    pub fn real_time_data(&self) -> &[crate::real_time_data::RealTimeData] {
+    pub fn real_time_data(&self) -> &[crate::real_time_data::Record] {
         &self.real_time_data
     }
 

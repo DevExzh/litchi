@@ -35,8 +35,5 @@ pub(crate) use codec::{CONTINUE_FRT_RECORD_TYPE, REAL_TIME_DATA_RECORD_TYPE};
 #[allow(unused_imports, unreachable_pub)]
 pub use edit::{Commit, Patch, Snapshot, Transaction, apply, read};
 
-// The crate-root facade is migrated separately; keep its existing exports
-// working while the contextual owner uses prefix-free canonical names.
 #[allow(unused_imports, unreachable_pub)]
 pub use model::{Cell, Record, UnknownRecord, Value};
-pub use model::{Cell as RtdCell, Record as RealTimeData, Value as RtdValue};

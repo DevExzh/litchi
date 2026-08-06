@@ -346,18 +346,18 @@ fn worksheet_location_bounds_are_atomic_and_never_unwind() {
     }
 
     for outcome in [
-        std::panic::catch_unwind(|| crate::RtdCell::new(65_536, 0, 0)),
-        std::panic::catch_unwind(|| crate::RtdCell::new(0, 256, 0)),
+        std::panic::catch_unwind(|| crate::real_time_data::Cell::new(65_536, 0, 0)),
+        std::panic::catch_unwind(|| crate::real_time_data::Cell::new(0, 256, 0)),
     ] {
         assert!(matches!(outcome, Ok(Err(Error::InvalidCellReference(_)))));
         assert_eq!(state(&writer), max_state);
     }
-    let invalid_topic = crate::RealTimeData {
+    let invalid_topic = crate::real_time_data::Record {
         common_prefix_len: 0,
         topic_segments: vec!["server".to_string(), String::new()],
         topic: "server".to_string(),
-        value: crate::RtdValue::Integer(1),
-        cells: vec![crate::RtdCell::new(0, 0, 1).unwrap()],
+        value: crate::real_time_data::Value::Integer(1),
+        cells: vec![crate::real_time_data::Cell::new(0, 0, 1).unwrap()],
     };
     let missing_sheet = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         writer.add_real_time_data(invalid_topic)

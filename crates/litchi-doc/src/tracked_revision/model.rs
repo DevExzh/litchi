@@ -1,6 +1,6 @@
 //! Typed semantic values and package-side run state for tracked revisions.
 
-use crate::CommentDateTime;
+use crate::DateTime;
 use crate::parts::fkp::ParagraphHeight;
 
 /// A revision representation supported by binary DOC.
@@ -21,7 +21,7 @@ pub enum RevisionKind {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RevisionMetadata {
     pub author: String,
-    pub timestamp: Option<CommentDateTime>,
+    pub timestamp: Option<DateTime>,
     pub reason: Option<u16>,
     pub revision_save_id: Option<u32>,
 }
@@ -36,7 +36,7 @@ impl RevisionMetadata {
         }
     }
 
-    pub fn with_timestamp(mut self, timestamp: CommentDateTime) -> Self {
+    pub fn with_timestamp(mut self, timestamp: DateTime) -> Self {
         self.timestamp = Some(timestamp);
         self
     }
@@ -60,7 +60,7 @@ pub struct Revision {
     pub end_cp: u32,
     pub author_index: u16,
     pub author: String,
-    pub timestamp: Option<CommentDateTime>,
+    pub timestamp: Option<DateTime>,
     pub reason: Option<u16>,
     pub revision_save_id: Option<u32>,
     /// Move pair identity when binary insertion/deletion marks share an RSID.

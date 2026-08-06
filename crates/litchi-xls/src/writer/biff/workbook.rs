@@ -316,7 +316,7 @@ const MAX_RECORD_DATA: usize = 8224;
 /// Record type: 0x0813
 pub(super) fn write_real_time_data<W: Write>(
     writer: &mut W,
-    value: &crate::RealTimeData,
+    value: &crate::real_time_data::Record,
 ) -> Result<()> {
     let payload = value.to_payload()?;
     let mut chunks = payload.chunks(MAX_RECORD_DATA);

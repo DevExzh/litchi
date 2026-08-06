@@ -43,10 +43,10 @@ impl Writer {
     /// record (MS-XLS 2.4.214) in the workbook globals.
     ///
     /// When the topic shares a prefix with the previously added topic, set
-    /// [`crate::RealTimeData::common_prefix_len`] and store only the
+    /// [`crate::real_time_data::Record::common_prefix_len`] and store only the
     /// trailing sub-strings in `topic_segments`, matching the on-disk prefix
     /// compression.
-    pub fn add_real_time_data(&mut self, topic: crate::RealTimeData) -> Result<()> {
+    pub fn add_real_time_data(&mut self, topic: crate::real_time_data::Record) -> Result<()> {
         if let Some(cell) = topic
             .cells
             .iter()

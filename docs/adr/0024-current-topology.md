@@ -451,6 +451,17 @@ transactions with opaque XML/BIFF12 retention and relationship validation.
 These services remain inert and never retrieve schemas, render notes, contact
 providers, execute add-ins, or refresh external data.
 
+The eighth continuation extends the same OLE2/OOXML boundary with DOC tracked
+revision snapshots, DOCX chart-graph and document-variable transactions, PPT
+broadcast and terminal document-structure edits, XLS RTD topic transactions,
+XLSB web-extension binding edits, XLSX XML-map edits, and PPTX structure,
+guide, color-map, and custom-show inverse edits. Shared `litchi-ole-common`
+now also owns CFB directory catalogs, Custom XML stores, and VBA-signature
+metadata. Each owner is nested by semantic model, bounded codec, package
+integration, validation, and source-checked `Snapshot`/`Transaction`/`Commit`/
+`Patch` layers; opaque XML, BIFF, and CFB tails remain preserved and external
+links, macros, add-ins, broadcasts, and formula/runtime behavior remain inert.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

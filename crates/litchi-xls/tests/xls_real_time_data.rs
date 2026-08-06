@@ -1,11 +1,12 @@
 //! Round-trip tests for the BIFF8 RealTimeData record (RTD topics).
 
+use litchi_xls::Workbook;
+use litchi_xls::real_time_data::{Cell, Record, Value};
 use litchi_xls::writer::Writer;
-use litchi_xls::{RealTimeData, RtdCell, RtdValue, Workbook};
 use std::io::Cursor;
 
-fn rtd_topic(segments: &[&str], value: RtdValue, cells: Vec<RtdCell>) -> RealTimeData {
-    RealTimeData {
+fn rtd_topic(segments: &[&str], value: Value, cells: Vec<Cell>) -> Record {
+    Record {
         common_prefix_len: 0,
         topic_segments: segments.iter().map(|segment| segment.to_string()).collect(),
         topic: segments.concat(),
@@ -19,8 +20,8 @@ fn real_time_data_round_trips_through_writer_and_reader() {
     let topics = vec![
         rtd_topic(
             &["PROG.ID", "", "STOCK", "MSFT"],
-            RtdValue::Text("58.25".to_string()),
-            vec![RtdCell {
+            Value::Text("58.25".to_string()),
+            vec![Cell {
                 row: 1,
                 column: 2,
                 sheet_index: 0,
@@ -28,14 +29,14 @@ fn real_time_data_round_trips_through_writer_and_reader() {
         ),
         rtd_topic(
             &["PROG.ID", "", "BOND"],
-            RtdValue::Number(102.375),
+            Value::Number(102.375),
             vec![
-                RtdCell {
+                Cell {
                     row: 3,
                     column: 4,
                     sheet_index: 0,
                 },
-                RtdCell {
+                Cell {
                     row: 5,
                     column: 6,
                     sheet_index: 0,
@@ -44,17 +45,17 @@ fn real_time_data_round_trips_through_writer_and_reader() {
         ),
         rtd_topic(
             &["OTHER.SERVER", "remote", "FX"],
-            RtdValue::Boolean(true),
+            Value::Boolean(true),
             Vec::new(),
         ),
         rtd_topic(
             &["OTHER.SERVER", "remote", "RATES"],
-            RtdValue::Integer(-7),
+            Value::Integer(-7),
             Vec::new(),
         ),
         rtd_topic(
             &["OTHER.SERVER", "remote", "ERR"],
-            RtdValue::Error(0x2A),
+            Value::Error(0x2A),
             Vec::new(),
         ),
     ];
@@ -74,10 +75,10 @@ fn real_time_data_round_trips_through_writer_and_reader() {
 
 #[test]
 fn real_time_data_prefix_compression_round_trips() {
-    let first = rtd_topic(&["PROG.ID", "", "STOCK"], RtdValue::Integer(1), Vec::new());
+    let first = rtd_topic(&["PROG.ID", "", "STOCK"], Value::Integer(1), Vec::new());
     // The second topic shares the "PROG.ID" prefix (7 characters) with the
     // first, so only the trailing sub-strings are stored.
-    let mut second = rtd_topic(&["", "BOND"], RtdValue::Integer(2), Vec::new());
+    let mut second = rtd_topic(&["", "BOND"], Value::Integer(2), Vec::new());
     second.common_prefix_len = 7;
     second.topic = "PROG.IDBOND".to_string();
 

@@ -45,7 +45,7 @@ pub(crate) fn generate_workbook_stream(
     book_ext: Option<&crate::BookExt>,
     theme: Option<&crate::Theme>,
     mdx_metadata: Option<&crate::MdxMetadata>,
-    real_time_data: &[crate::RealTimeData],
+    real_time_data: &[crate::real_time_data::Record],
     web_publications: &[crate::WebPub],
     xf_extensions: &[crate::XfExt],
     style_extensions: &[crate::StyleExt],

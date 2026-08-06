@@ -46,11 +46,12 @@ for DrawingML, charts, diagrams, ink, math, and 3D extensions, [MS-OWEXML] for w
 | Slides, IDs, ordering, duplication, and visibility | ✅ | ✅ | ✅ | Enumerate, add, insert, duplicate, move, remove, resolve stable slide identities, and expose hidden state |
 | Presentation size, root properties, and view settings | 🟡 | ✅ | ✅ | Typed slide/notes dimensions, size type, presentation and view settings, PowerPoint 2010 browse-mode state, and bounded extension serialization; settings do not render or drive a host UI |
 | Sections | ✅ | ✅ | ✅ | Typed section IDs and names, resolved slide-index membership, and graph-safe ordered CRUD |
-| Custom slide shows | ✅ | ✅ | ✅ | Typed named subsets and graph-safe ordered CRUD |
+| Custom slide shows | ✅ | ✅ | ✅ | Typed named subsets and graph-safe ordered CRUD; `presentation_properties::metadata::custom_show::{Snapshot, Transaction, Commit, Patch}` adds source-checked XML inverse edits |
 | Slide masters and layouts | ✅ | ✅ | ✅ | Semantic master/layout reading with shape and placeholder inventory, typed layout references, matching/type metadata, relationship validation, new-master and layout authoring, placeholder add/replace, and unreferenced-layout removal |
 | Handout master | ✅ | ✅ | ✅ | Root relationship resolution, handout settings, and header/footer metadata |
 | Speaker notes and notes masters | ✅ | ✅ | ✅ | `notes::{Snapshot, Transaction, Commit, Patch}` provides bounded source-checked notes-slide/master/theme/text lifecycle edits over the complete notes graph, retaining opaque XML and relationships; notes are inert and never rendered |
-| Themes, color maps, and overrides | ✅ | ✅ | ✅ | Master-, layout-, and slide-scoped theme resolution, typed color maps and overrides, 12-slot color schemes, major/minor font schemes, attachment, replacement, removal, and orphan cleanup; fmtScheme authoring is not covered |
+| Themes, color maps, and overrides | ✅ | ✅ | ✅ | Master-, layout-, and slide-scoped theme resolution, typed color maps and overrides, 12-slot color schemes, major/minor font schemes, attachment, replacement, removal, and orphan cleanup; contextual `color_map::{Snapshot, Transaction, Commit, Patch}` adds source-checked map edits, while fmtScheme authoring is not covered |
+| Presentation property structure and extended guides | ✅ | ✅ | ✅ | `presentation_properties::metadata::structure::{Snapshot, Transaction, Commit, Patch}` and `guides::{Snapshot, Transaction, Commit, Patch}` edit ordered sections/custom-show references and bounded `p15` guide XML while retaining unrelated extension namespaces |
 | Headers, footers, and visibility settings | ✅ | ✅ | ✅ | Presentation and slide header/footer flags and related inherited settings are typed and serialized; layout is not calculated |
 
 ## Slides, text, shapes, and drawing content

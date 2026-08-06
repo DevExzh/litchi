@@ -1279,7 +1279,7 @@ pub struct Writer {
     /// MDX (OLAP cube) metadata emitted as the globals `METADATA` production.
     pub(super) mdx_metadata: Option<crate::MdxMetadata>,
     /// Real-time data (RTD) topics emitted as `RealTimeData` records.
-    pub(super) real_time_data: Vec<crate::RealTimeData>,
+    pub(super) real_time_data: Vec<crate::real_time_data::Record>,
     /// Web pages published from the workbook globals (`WebPub` records).
     pub(super) web_publications: Vec<crate::WebPub>,
     pub(super) xf_extensions: Vec<crate::XfExt>,
