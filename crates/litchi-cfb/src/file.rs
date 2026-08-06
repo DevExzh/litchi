@@ -865,8 +865,15 @@ impl<R: Read + Seek> OleFile<R> {
     /// have been claimed. FAT sectors contain padding entries for their full
     /// sector width, but only entries addressing physical sectors may carry
     /// allocation markers.
+    ///
+    /// Entries beyond the physical file are tolerated with any marker: MS-CFB
+    /// 2.3 requires past-end-of-file entries to be FREESECT, but real-world
+    /// producers (including Word and Apache POI) routinely fill the padding
+    /// with ENDOFCHAIN instead. Those entries address no physical bytes and
+    /// every chain walk is bounds-checked against the physical file, so the
+    /// markers are inert; rejecting them would refuse files that Word itself
+    /// opens.
     fn validate_physical_sector_layout(&self) -> Result<(), OleError> {
-        let physical_sector_count = self.sector_roles.len();
         for (sector, role) in self.sector_roles.iter().enumerate() {
             let entry = self.fat.get(sector).copied().ok_or_else(|| {
                 OleError::CorruptedFile(format!(
@@ -876,13 +883,6 @@ impl<R: Read + Seek> OleFile<R> {
             if *role == PhysicalSectorRole::Unclaimed && entry != FREESECT {
                 return Err(OleError::CorruptedFile(format!(
                     "unclaimed physical sector {sector} has FAT marker 0x{entry:08X}"
-                )));
-            }
-        }
-        for (sector, entry) in self.fat.iter().enumerate().skip(physical_sector_count) {
-            if *entry != FREESECT {
-                return Err(OleError::CorruptedFile(format!(
-                    "FAT entry {sector} beyond the physical file is not FREESECT"
                 )));
             }
         }
@@ -2229,7 +2229,10 @@ mod tests {
     }
 
     #[test]
-    fn rejects_nonfree_fat_padding_beyond_the_physical_file() {
+    fn tolerates_nonfree_fat_padding_beyond_the_physical_file() {
+        // MS-CFB 2.3 requires past-end-of-file FAT entries to be FREESECT,
+        // but real producers (Word, Apache POI) fill the padding with
+        // ENDOFCHAIN; the markers address no physical bytes and are inert.
         let mut data = sample_file();
         let physical_sector_count = data.len() / 512 - 1;
         let fat_sector = u32::from_le_bytes(data[0x4c..0x50].try_into().unwrap());
@@ -2241,11 +2244,7 @@ mod tests {
         );
         data[padding_offset..padding_offset + 4].copy_from_slice(&ENDOFCHAIN.to_le_bytes());
 
-        assert!(matches!(
-            OleFile::open(Cursor::new(data)),
-            Err(OleError::CorruptedFile(message))
-                if message.contains("beyond the physical file")
-        ));
+        assert!(OleFile::open(Cursor::new(data)).is_ok());
     }
 
     #[test]
