@@ -60,8 +60,8 @@ compound files, OfficeArt, OLE activation metadata, native charts, encryption, a
 | Tables | ✅ | ✅ | ✅ | OfficeArt table groups, grids, cells, rows, columns, cell text, dimensions, and table authoring |
 | Legacy color schemes and theme-like round-trip metadata | 🟡 | ✅ | ✅ | Eight-color scheme atoms, per-slide and master scheme inventory, and bounded PowerPoint 12 theme records; this is not a full OOXML theme model |
 | Native Graph and Excel charts | 🟡 | ✅ | 🟡 | Typed inert chart inventory over Graph and Excel-hosted OGraph books, persist mapping, frame/slide selectors, bounded decompression, and per-object failures; standalone Graph packages also expose a transaction that replaces a Graph-framed chart substream inside an OGraph-validated package, while PptWriter::add_chart still refuses fresh authoring because a complete Office-compatible binary chart grammar is not implemented |
-| Diagram and SmartArt objects | ❌ | ❌ | ❌ | MS-PPT exposes diagram build records in the animation family, but this crate has no native diagram or SmartArt object model or authoring surface |
-| Diagram build records | 🟡 | ✅ | ✅ | Bounded `DiagramBuildContainer`/`DiagramBuildAtom` metadata follows [MS-PPT] §§2.8.13–2.8.14 and 2.13.7, retaining fixed-width unknown enum values and reserved bytes; it does not render, author, or play SmartArt diagrams |
+| Diagram and SmartArt objects | 🟡 | ✅ | ❌ | A bounded native inventory groups the MS-PPT build identity and metadata with matching MS-ODRAW shape references and inert OfficeArt payload handles; it does not calculate layout, render, or author SmartArt |
+| Diagram build records | 🟡 | ✅ | ✅ | Bounded `DiagramBuildContainer`/`DiagramBuildAtom` metadata follows [MS-PPT] §§2.8.13–2.8.14 and 2.13.7, retaining fixed-width unknown enum values and reserved bytes; the diagram inventory reuses that owner and does not render, author, or play SmartArt diagrams |
 
 ## Interaction, notes, review, and slide show
 
@@ -107,7 +107,7 @@ compound files, OfficeArt, OLE activation metadata, native charts, encryption, a
 |-----------------------------------------------|--------|------|-------|-------|
 | General title-, notes-, and handout-master authoring | 🟡 | ✅ | 🟡 | Record/context metadata and references are available, but the writer's semantic master builder is for main masters and notes pages |
 | Complete native chart authoring | 🟡 | ✅ | ❌ | Graph and Excel chart payloads can be inspected through the neutral chart inventory; bounded standalone Graph package replacement is available, but it does not claim fresh chart creation or arbitrary semantic mutation |
-| Native diagram or SmartArt authoring | ❌ | ❌ | ❌ | MS-PPT diagram-build records do not imply a diagram object model |
+| Native diagram or SmartArt authoring | ❌ | ❌ | ❌ | The read-only inventory is not a layout/rendering engine or full SmartArt authoring surface; MS-PPT diagram-build records remain animation metadata |
 | Full OfficeArt record and vendor-extension semantics | 🟡 | 🟡 | 🟡 | The record graph handles the implemented record families and preserves bounded unknown data where possible; unsupported record semantics are not promoted to typed APIs |
 | External resource resolution and OLE/macro/media execution | ❌ | N/A | N/A | URLs, paths, links, OLE verbs, macro names, scripts, and media remain inert even when their containing records are supported |
 | Rendering and slide-show playback | ❌ | N/A | N/A | The crate serializes and exposes presentation data; it does not calculate layout, render shapes, play transitions, or run animation timelines |

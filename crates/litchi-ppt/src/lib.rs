@@ -89,6 +89,9 @@ pub mod odraw;
 // PowerPoint host metadata over format-neutral Office Graph views.
 pub mod chart;
 
+/// Bounded native diagram inventory over MS-PPT build metadata and OfficeArt shapes.
+pub mod diagram;
+
 // Format-specific semantic owners
 pub mod bookmark_summary;
 pub mod broadcast;
