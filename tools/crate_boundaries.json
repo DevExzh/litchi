@@ -99,6 +99,7 @@
       "litchi-iwa-core",
       "soapberry-zip"
     ],
+    "litchi-iwa-cache": [],
     "litchi-iwa-common": [],
     "litchi-iwa-core": [
       "litchi-iwa-protos"
@@ -307,6 +308,7 @@
     "litchi-drawingml",
     "litchi-eval",
     "litchi-iwa-archive",
+    "litchi-iwa-cache",
     "litchi-iwa-common",
     "litchi-iwa-core",
     "litchi-iwa-detect",
