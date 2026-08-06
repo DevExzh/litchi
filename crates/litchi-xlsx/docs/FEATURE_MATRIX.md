@@ -99,8 +99,8 @@ query, macro, chart, pivot, or external content is executed.
 
 | Feature family exposed by [MS-XLSX] | Status | Read | Write | Notes |
 |-------------------------------------|--------|------|-------|-------|
-| Rich values and modern rich-data objects | ❌ | ❌ | ❌ | The [MS-XLSX] conceptual model includes rich values, supporting property bags, rich styles, hyperlinks as rich values, and rich-value relationships; no public typed rich-data model is provided here. |
-| Feature property bags and checkbox/XF-control extensions | ❌ | ❌ | ❌ | Feature-property-bag XML is not treated as typed cell/style/control semantics. |
+| Rich values and modern rich-data objects | 🟡 | ✅ | ✅ | `rich_values` owns typed `rvData`, `rvStructures`, and `arrayData`; rich styles, supporting bags, type metadata, and web-image payloads remain bounded opaque documents. Package snapshots retain complete relationship topology. |
+| Feature property bags and checkbox/XF-control extensions | 🟡 | ✅ | ✅ | Typed `FeaturePropertyBags`, checkbox defaults, `XFControls`, `XFComplement`, `XFComplements`, and `DXFComplements` validation are inert; unknown XML and relationship IDs/topology are retained. |
 | Python in Excel and external code services | ❌ | ❌ | ❌ | Python environments, scripts, parameter encodings, external-code-service parts, and execution are not implemented. |
 | Complete PivotTable refresh/calculation | ❌ | ❌ | ❌ | Pivot metadata can be read or edited in bounded scope, but caches are not refreshed, cube connections are not queried, and report layouts are not calculated. |
 | Complete chart/drawing rendering and extension grammar | ❌ | ❌ | ❌ | Typed resources do not constitute an Excel renderer or unrestricted support for every chart, DrawingML, slicer, timeline, or producer extension schema. |

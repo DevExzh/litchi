@@ -1,6 +1,7 @@
 //! OPC graph lifecycle and transactional CRUD for modern comments.
 
 use super::model::{Author, AuthorPart, Authors, Comment, Graph, List, Part, Reply};
+use super::semantic::ExtensionList;
 use super::{
     MODERN_COMMENT_AUTHOR_CONTENT_TYPE, MODERN_COMMENT_AUTHOR_RELATIONSHIP_TYPE,
     MODERN_COMMENT_CONTENT_TYPE, MODERN_COMMENT_RELATIONSHIP_TYPE, SLIDE_CONTENT_TYPE,
@@ -449,6 +450,99 @@ mod comments {
             return Ok(false);
         }
         Ok(true)
+    }
+
+    /// Read the typed extension envelope for one comment without exposing
+    /// relationship or collaboration behavior.
+    pub fn load_modern_comment_extensions(
+        package: &OpcPackage,
+        slide_part_name: &PackURI,
+        comment_id: &str,
+    ) -> Result<Option<ExtensionList>> {
+        find_modern_comment(package, slide_part_name, comment_id)?
+            .map(|comment| comment.extensions())
+            .transpose()
+    }
+
+    /// Transactionally update one comment's typed task/reaction extension
+    /// envelope while retaining all opaque extension entries.
+    pub fn update_modern_comment_extensions<F>(
+        package: &mut OpcPackage,
+        slide_part_name: &PackURI,
+        comment_id: &str,
+        update: F,
+    ) -> Result<bool>
+    where
+        F: FnOnce(&mut ExtensionList),
+    {
+        let mut update = Some(update);
+        let mut failure = None;
+        let result =
+            update_modern_comment(
+                package,
+                slide_part_name,
+                comment_id,
+                |comment| match comment.extensions() {
+                    Ok(mut extensions) => {
+                        if let Some(update) = update.take() {
+                            update(&mut extensions);
+                        }
+                        if let Err(error) = comment.set_extensions(extensions) {
+                            failure = Some(error);
+                        }
+                    },
+                    Err(error) => failure = Some(error),
+                },
+            )?;
+        if let Some(error) = failure {
+            return Err(error);
+        }
+        Ok(result)
+    }
+
+    /// Read the typed extension envelope for one reply.
+    pub fn load_modern_comment_reply_extensions(
+        package: &OpcPackage,
+        slide_part_name: &PackURI,
+        comment_id: &str,
+        reply_id: &str,
+    ) -> Result<Option<ExtensionList>> {
+        find_modern_comment_reply(package, slide_part_name, comment_id, reply_id)?
+            .map(|reply| reply.extensions())
+            .transpose()
+    }
+
+    /// Transactionally update one reply's typed reaction extension envelope.
+    pub fn update_modern_comment_reply_extensions<F>(
+        package: &mut OpcPackage,
+        slide_part_name: &PackURI,
+        comment_id: &str,
+        reply_id: &str,
+        update: F,
+    ) -> Result<bool>
+    where
+        F: FnOnce(&mut ExtensionList),
+    {
+        let mut update = Some(update);
+        let mut failure = None;
+        let result =
+            update_modern_comment_reply(package, slide_part_name, comment_id, reply_id, |reply| {
+                match reply.extensions() {
+                    Ok(mut extensions) => {
+                        if let Some(update) = update.take() {
+                            update(&mut extensions);
+                        }
+                        if let Err(error) = reply.set_extensions(extensions) {
+                            failure = Some(error);
+                        }
+                    },
+                    Err(error) => failure = Some(error),
+                }
+            })?;
+        if let Some(error) = failure {
+            return Err(error);
+        }
+        Ok(result)
     }
 
     /// Replace a reply without permitting its stable GUID to change.
@@ -1124,7 +1218,9 @@ pub use authors::{
 };
 pub use comments::{
     add_modern_comment, add_modern_comment_reply, find_modern_comment, find_modern_comment_reply,
-    load_modern_comments, remove_modern_comment, remove_modern_comment_reply,
-    reorder_modern_comments, replace_modern_comment, replace_modern_comment_reply,
-    store_modern_comment, update_modern_comment, update_modern_comment_reply,
+    load_modern_comment_extensions, load_modern_comment_reply_extensions, load_modern_comments,
+    remove_modern_comment, remove_modern_comment_reply, reorder_modern_comments,
+    replace_modern_comment, replace_modern_comment_reply, store_modern_comment,
+    update_modern_comment, update_modern_comment_extensions, update_modern_comment_reply,
+    update_modern_comment_reply_extensions,
 };

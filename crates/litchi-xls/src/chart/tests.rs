@@ -150,6 +150,17 @@ mod tests {
             },
         ]);
         assert!(chart.validate_semantics(Limits::default()).is_err());
+
+        let mut chart = Chart::default();
+        chart.series.push(complete_series());
+        chart.cached_values.push(Cache {
+            kind: CacheKind::Values,
+            point: 2,
+            series: 0,
+            format: 0,
+            value: Value::Blank,
+        });
+        assert!(chart.validate_semantics(Limits::default()).is_err());
     }
 
     #[test]
@@ -336,7 +347,7 @@ mod tests {
         chart.series.push(complete_series());
         chart.cached_values.push(Cache {
             kind: CacheKind::Values,
-            point: 4,
+            point: 1,
             series: 0,
             format: 9,
             value: Value::Blank,
@@ -353,7 +364,7 @@ mod tests {
         );
         assert!(parsed.cached_values.iter().any(|value| {
             value.kind == CacheKind::Values
-                && value.point == 4
+                && value.point == 1
                 && value.series == 0
                 && value.format == 9
                 && value.value == Value::Blank
@@ -505,7 +516,8 @@ mod tests {
             .into_iter()
             .find(|value| value.kind == LABEL)
             .expect("Label cache record");
-        invalid_label[label.body_start..label.body_start + 2].copy_from_slice(&4u16.to_le_bytes());
+        invalid_label[label.body_start + 6..label.body_start + 8]
+            .copy_from_slice(&4u16.to_le_bytes());
         assert!(matches!(
             parse_chart(&invalid_label, limits),
             Err(Error::InvalidRecord {

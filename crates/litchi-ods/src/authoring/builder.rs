@@ -1,4 +1,5 @@
 use crate::model::names::{Definition, Expression, Range};
+use crate::worksheet::{Cell, Sheet};
 use litchi_core::{Error, Result};
 use litchi_odf_common::core::PackageWriter;
 use quick_xml::{
@@ -38,6 +39,98 @@ impl Builder {
         self
     }
 
+    /// Decode the builder's current typed worksheet snapshot.
+    pub fn sheets(&self) -> Result<Vec<Sheet>> {
+        crate::worksheet::codec::parse(&self.content_xml)
+    }
+
+    /// Atomically replace all worksheets in the builder's content snapshot.
+    pub fn set_sheets(&mut self, sheets: Vec<Sheet>) -> Result<&mut Self> {
+        let updated = crate::worksheet::package::replace_tables(&self.content_xml, &sheets)?;
+        self.content_xml = updated;
+        Ok(self)
+    }
+
+    /// Append one validated worksheet while preserving sheet order.
+    pub fn add_sheet(&mut self, sheet: Sheet) -> Result<&mut Self> {
+        let mut sheets = self.sheets()?;
+        sheets.push(sheet);
+        self.set_sheets(sheets)
+    }
+
+    /// Remove one worksheet by its exact ODF name.
+    pub fn remove_sheet(&mut self, name: &str) -> Result<Sheet> {
+        let mut sheets = self.sheets()?;
+        let index = sheets
+            .iter()
+            .position(|sheet| sheet.name == name)
+            .ok_or_else(|| Error::InvalidFormat(format!("ODS sheet '{name}' was not found")))?;
+        let removed = sheets.remove(index);
+        self.set_sheets(sheets)?;
+        Ok(removed)
+    }
+
+    /// Atomically replace one logical cell in a named worksheet.
+    pub fn set_cell(
+        &mut self,
+        sheet_name: &str,
+        row: usize,
+        column: usize,
+        cell: Cell,
+    ) -> Result<&mut Self> {
+        self.edit_sheet(sheet_name, |sheet| sheet.set_cell(row, column, cell))
+    }
+
+    /// Clear one logical cell while retaining its direct style, if any.
+    pub fn clear_cell(&mut self, sheet_name: &str, row: usize, column: usize) -> Result<&mut Self> {
+        self.edit_sheet(sheet_name, |sheet| sheet.clear_cell(row, column))
+    }
+
+    /// Set an inert formula on one logical cell.
+    pub fn set_formula(
+        &mut self,
+        sheet_name: &str,
+        row: usize,
+        column: usize,
+        formula: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let formula = formula.into();
+        self.edit_sheet(sheet_name, move |sheet| {
+            sheet.set_formula(row, column, formula)
+        })
+    }
+
+    /// Set a direct cell style reference on one logical cell.
+    pub fn set_cell_style(
+        &mut self,
+        sheet_name: &str,
+        row: usize,
+        column: usize,
+        style_name: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let style_name = style_name.into();
+        self.edit_sheet(sheet_name, move |sheet| {
+            sheet.set_cell_style(row, column, style_name)
+        })
+    }
+
+    fn edit_sheet<F>(&mut self, sheet_name: &str, operation: F) -> Result<&mut Self>
+    where
+        F: FnOnce(&mut Sheet) -> Result<()>,
+    {
+        let sheets = self.sheets()?;
+        let candidate = crate::worksheet::transaction::edit(&sheets, |candidate| {
+            let sheet = candidate
+                .iter_mut()
+                .find(|sheet| sheet.name == sheet_name)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!("ODS sheet '{sheet_name}' was not found"))
+                })?;
+            operation(sheet)
+        })?;
+        self.set_sheets(candidate)
+    }
+
     /// Return authored named definitions in their insertion order.
     pub fn definitions(&self) -> &[Definition] {
         &self.definitions
@@ -69,6 +162,7 @@ impl Builder {
             crate::codec::names::replace(&self.content_xml, &self.definitions)?
         };
         validate_content_xml(&content_xml)?;
+        crate::worksheet::codec::parse(&content_xml)?;
         let mut writer = PackageWriter::new();
         writer.set_mimetype(MIMETYPE)?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
@@ -81,7 +175,7 @@ impl Builder {
 /// This is intentionally a structural boundary check rather than a complete
 /// schema validator. The reader borrows `xml`, so authoring does not create a
 /// second content buffer or an intermediate DOM.
-fn validate_content_xml(xml: &str) -> Result<()> {
+pub(crate) fn validate_content_xml(xml: &str) -> Result<()> {
     if xml.len() > MAX_CONTENT_XML_BYTES {
         return Err(Error::InvalidFormat(format!(
             "ODS content.xml exceeds {MAX_CONTENT_XML_BYTES} bytes"

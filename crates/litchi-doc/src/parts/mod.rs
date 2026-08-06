@@ -37,7 +37,6 @@ pub mod list_names;
 pub mod list_templates;
 pub mod mail_merge;
 pub mod numbering;
-pub mod ole;
 pub mod ole_controls;
 pub mod pap;
 pub mod pap_bin_table;

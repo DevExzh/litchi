@@ -35,7 +35,9 @@ impl DocumentSettings {
         let mut reader = NsReader::from_reader(xml_bytes);
 
         let mut settings = Self::new();
-        settings.values.set_extensions(Extensions::parse(xml_bytes)?);
+        settings
+            .values
+            .set_extensions(Extensions::parse(xml_bytes)?);
         settings.mail_merge = parse_settings_mail_merge(xml_bytes)?;
         let mut depth = 0usize;
         let mut saw_root = false;

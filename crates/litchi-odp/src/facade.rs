@@ -1,7 +1,7 @@
 //! Primary API for presentation consumers.
 
 pub use crate::authoring::Builder;
-pub use crate::package::Presentation;
+pub use crate::package::{MasterPage, Presentation};
 
 /// Slide-owned semantic values.
 pub mod slide {
@@ -21,4 +21,10 @@ pub mod layout {
 /// Static metadata attached to presentation pages.
 pub mod page {
     pub use crate::model::page_metadata::{Collection, Page, parse};
+}
+
+/// Presentation master pages and their shared ODF regions/children.
+pub mod master {
+    pub use crate::package::MasterPage;
+    pub use litchi_odf_common::style::master::{Child, ChildKind, Kind, Master, Region};
 }

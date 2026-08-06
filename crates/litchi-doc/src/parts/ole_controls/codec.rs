@@ -1,42 +1,30 @@
-//! Binary codec for `OcxInfo` and `RgxOcxInfo`.
+//! Exact little-endian codecs for `OcxInfo`, `RgxOcxInfo`, and ObjectPool `ODT`.
 
-use super::model::{Flags, OCX_INFO_SIZE, OcxInfo, RgxOcxInfo, Story};
+use super::model::{Format, Metadata, OcxInfo, Persist1, Persist2, RgxOcxInfo, Story};
+use super::validation;
 use crate::package::{Error as PackageError, Result};
-use std::collections::HashSet;
 
+/// The fixed serialized size of one `OcxInfo` record.
+pub(super) const OCX_INFO_SIZE: usize = 20;
 const ARRAY_HEADER_SIZE: usize = 4;
+const ODT_MIN_SIZE: usize = 4;
+const ODT_MAX_SIZE: usize = 6;
 
 /// Decode one complete `RgxOcxInfo` payload.
 pub fn parse_bytes(data: &[u8]) -> Result<RgxOcxInfo> {
     let count = usize::try_from(read_u32(data, 0, "RgxOcxInfo cOcxInfo")?)
         .map_err(|_| corrupted("RgxOcxInfo count exceeds usize"))?;
-    if data.len() < ARRAY_HEADER_SIZE {
-        return Err(corrupted("RgxOcxInfo header is truncated"));
-    }
-    let expected = count
-        .checked_mul(OCX_INFO_SIZE)
-        .and_then(|size| size.checked_add(ARRAY_HEADER_SIZE))
-        .ok_or_else(|| corrupted("RgxOcxInfo size overflows"))?;
-    if expected != data.len() {
-        return Err(corrupted(format!(
-            "RgxOcxInfo requires {expected} bytes for {count} records, got {}",
-            data.len()
-        )));
-    }
+    validation::table_size(count, data.len(), OCX_INFO_SIZE)?;
 
     let mut infos = Vec::with_capacity(count);
-    let mut cookies = HashSet::with_capacity(count);
     for index in 0..count {
         let offset = index
             .checked_mul(OCX_INFO_SIZE)
             .and_then(|value| value.checked_add(ARRAY_HEADER_SIZE))
             .ok_or_else(|| corrupted("OcxInfo offset overflows"))?;
-        let info = decode_info(data, offset)?;
-        if !cookies.insert(info.cookie()) {
-            return Err(corrupted("OcxInfo dwCookie values must be unique"));
-        }
-        infos.push(info);
+        infos.push(decode_info(data, offset)?);
     }
+    validation::infos(&infos)?;
     Ok(RgxOcxInfo::from_infos(infos))
 }
 
@@ -58,6 +46,57 @@ pub fn to_bytes(table: &RgxOcxInfo) -> Result<Vec<u8>> {
     Ok(data)
 }
 
+/// Decode one complete ObjectPool `ODT`/`ObjInfo` stream.
+pub fn parse_metadata(data: &[u8]) -> Result<Metadata> {
+    if data.len() != ODT_MIN_SIZE && data.len() != ODT_MAX_SIZE {
+        return Err(corrupted("ObjectPool ObjInfo ODT must be 4 or 6 bytes"));
+    }
+    let persist1 = Persist1::from_raw(read_u16(data, 0, "ODTPersist1")?)?;
+    let format = Format::from_raw(read_u16(data, 2, "ODT cf")?)?;
+    let persist2 = if data.len() == ODT_MAX_SIZE {
+        Some(Persist2::from_raw(read_u16(data, 4, "ODTPersist2")?)?)
+    } else {
+        None
+    };
+    Metadata::try_new(persist1, format, persist2)
+}
+
+/// Encode one complete ObjectPool `ODT`/`ObjInfo` stream.
+pub fn to_metadata_bytes(metadata: &Metadata) -> Result<Vec<u8>> {
+    metadata.validate()?;
+    let mut data = Vec::with_capacity(if metadata.persist2().is_some() { 6 } else { 4 });
+    data.extend_from_slice(&metadata.persist1().raw().to_le_bytes());
+    data.extend_from_slice(&metadata.format().raw().to_le_bytes());
+    if let Some(persist2) = metadata.persist2() {
+        data.extend_from_slice(&persist2.raw().to_le_bytes());
+    }
+    Ok(data)
+}
+
+impl RgxOcxInfo {
+    /// Decode one complete `RgxOcxInfo` payload.
+    pub fn parse_bytes(data: &[u8]) -> Result<Self> {
+        parse_bytes(data)
+    }
+
+    /// Encode one complete `RgxOcxInfo` payload.
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        to_bytes(self)
+    }
+}
+
+impl Metadata {
+    /// Decode one complete ObjectPool `ODT`/`ObjInfo` stream.
+    pub fn parse_bytes(data: &[u8]) -> Result<Self> {
+        parse_metadata(data)
+    }
+
+    /// Encode one complete ObjectPool `ODT`/`ObjInfo` stream.
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        to_metadata_bytes(self)
+    }
+}
+
 fn decode_info(data: &[u8], offset: usize) -> Result<OcxInfo> {
     let record = data
         .get(
@@ -67,7 +106,7 @@ fn decode_info(data: &[u8], offset: usize) -> Result<OcxInfo> {
                     .ok_or_else(|| corrupted("OcxInfo record range overflows"))?,
         )
         .ok_or_else(|| corrupted("OcxInfo record is truncated"))?;
-    let flags = Flags::from_raw(read_u16(record, 14, "OcxInfo flags")?)?;
+    let flags = super::model::Flags::from_raw(read_u16(record, 14, "OcxInfo flags")?)?;
     let story = Story::from_raw(read_u16(record, 16, "OcxInfo idoc")?)?;
     Ok(OcxInfo::new(
         read_u32(record, 0, "OcxInfo dwCookie")?,

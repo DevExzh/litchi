@@ -25,6 +25,10 @@ pub(crate) mod chart_resources;
 pub mod chartsheet;
 #[path = "../host/comments.rs"]
 pub mod comments;
+
+/// Contextual facade for inert threaded-comments/person package CRUD. The
+/// legacy `package::comments` adapter remains separate and owns BIFF12 notes.
+pub use crate::comments::threaded::package as threaded_comments;
 #[path = "../host/connections/mod.rs"]
 pub mod connections;
 #[path = "../host/data_validation.rs"]
@@ -61,6 +65,8 @@ pub(crate) mod pivot_tables;
 #[path = "../host/records.rs"]
 #[allow(dead_code, unreachable_pub)]
 pub(crate) mod records;
+#[path = "../host/scenarios/mod.rs"]
+pub mod scenarios;
 #[path = "../host/shared_strings.rs"]
 pub mod shared_strings;
 #[path = "../host/sheet_view.rs"]

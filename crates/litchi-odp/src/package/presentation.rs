@@ -121,6 +121,12 @@ impl Presentation {
         self.package.styles_xml()
     }
 
+    /// Borrow the validated archive for package-level snapshot edits within
+    /// the crate's semantic owner modules.
+    pub(crate) fn owned_package(&self) -> &crate::core::OwnedPackage {
+        self.package.package()
+    }
+
     /// Get the number of slides in the presentation.
     pub fn slide_count(&self) -> Result<usize> {
         let slides = self.slides()?;

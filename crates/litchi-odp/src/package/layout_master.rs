@@ -1,14 +1,15 @@
 //! Lossless custom slide-layout and slide-master editing for packaged ODP files.
 
-use super::page_layout_definition::{
-    parse_page_layouts, remove_page_layout_xml,
-    set_page_layout_xml,
-};
-use super::{Presentation, Layout};
+use super::Presentation;
 use crate::core::PackageWriter;
-use crate::odt::MasterPage as SharedMasterPage;
-use crate::odt::header_footer::parse_master_pages;
+use crate::model::page_layout::Layout;
+use crate::model::page_layout::{
+    parse as parse_page_layouts, remove_xml as remove_page_layout_xml,
+    set_xml as set_page_layout_xml,
+};
 use litchi_core::{Error, Result};
+use litchi_odf_common::style::master::Master as SharedMasterPage;
+use litchi_odf_common::style::master::reader::read as parse_master_pages;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::{NsReader, XmlVersion};
@@ -195,10 +196,7 @@ impl Presentation {
         self.commit_design(styles, self.content_xml().to_string())
     }
 
-    pub fn replace_page_layout(
-        &mut self,
-        layout: &Layout,
-    ) -> Result<()> {
+    pub fn replace_page_layout(&mut self, layout: &Layout) -> Result<()> {
         layout.validate()?;
         let styles = required_styles(self)?.to_string();
         if !definitions(&styles, STYLE, "presentation-page-layout", STYLE, "name")?
@@ -213,11 +211,7 @@ impl Presentation {
         self.commit_design(styles, self.content_xml().to_string())
     }
 
-    pub fn remove_page_layout(
-        &mut self,
-        name: &str,
-        replacement: Option<&str>,
-    ) -> Result<()> {
+    pub fn remove_page_layout(&mut self, name: &str, replacement: Option<&str>) -> Result<()> {
         validate_name(name, "presentation page layout name")?;
         if replacement == Some(name) {
             return invalid("layout replacement must differ from removed layout");
@@ -275,10 +269,7 @@ impl Presentation {
         self.commit_design(styles, self.content_xml().to_string())
     }
 
-    pub fn replace_master_page(
-        &mut self,
-        master: &MasterPage,
-    ) -> Result<()> {
+    pub fn replace_master_page(&mut self, master: &MasterPage) -> Result<()> {
         let fragment = master.fragment()?;
         let styles = required_styles(self)?.to_string();
         let masters = definitions(&styles, STYLE, "master-page", STYLE, "name")?;
@@ -289,11 +280,7 @@ impl Presentation {
         self.commit_design(styles, self.content_xml().to_string())
     }
 
-    pub fn remove_master_page(
-        &mut self,
-        name: &str,
-        replacement: Option<&str>,
-    ) -> Result<()> {
+    pub fn remove_master_page(&mut self, name: &str, replacement: Option<&str>) -> Result<()> {
         validate_name(name, "master page name")?;
         if replacement == Some(name) {
             return invalid("master replacement must differ from removed master");
@@ -404,7 +391,7 @@ impl Presentation {
 
     fn commit_design(&mut self, styles: String, content: String) -> Result<()> {
         validate_references(&styles, &content)?;
-        let package = self.package_ref().package()?;
+        let package = self.owned_package().package()?;
         let mut writer = PackageWriter::new();
         writer.set_mimetype(package.mimetype())?;
         writer.add_file("content.xml", content.as_bytes())?;
@@ -414,7 +401,7 @@ impl Presentation {
                 writer.add_file(path, &package.get_file(path)?)?;
             }
         }
-        writer.copy_auxiliary_files_from(self.package_ref())?;
+        writer.copy_auxiliary_files_from(self.owned_package())?;
         let next = Presentation::from_bytes(writer.finish()?)?;
         *self = next;
         Ok(())
@@ -850,12 +837,8 @@ fn masters_from_xml(xml: &str) -> Result<Vec<MasterPage>> {
         let root = roots[0];
         let model = MasterPage {
             master_page,
-            page_layout_name: attr(
-                root,
-                PRESENTATION,
-                "presentation-page-layout-name",
-            )
-            .map(str::to_string),
+            page_layout_name: attr(root, PRESENTATION, "presentation-page-layout-name")
+                .map(str::to_string),
             header_name: attr(root, PRESENTATION, "use-header-name").map(str::to_string),
             footer_name: attr(root, PRESENTATION, "use-footer-name").map(str::to_string),
             date_time_name: attr(root, PRESENTATION, "use-date-time-name").map(str::to_string),

@@ -14,6 +14,7 @@ pub mod ext;
 pub mod fill;
 pub mod geom;
 pub mod geometry;
+pub mod model3d;
 pub mod text;
 pub mod theme;
 pub mod xfrm;

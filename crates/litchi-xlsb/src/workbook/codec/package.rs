@@ -33,6 +33,80 @@ struct MergeBlockLayout {
 }
 
 impl Workbook {
+    /// Return the typed Scenario Manager stored in one worksheet, if any.
+    ///
+    /// Scenario values are inert snapshots. The reader does not apply them to
+    /// worksheet cells and never recalculates formulas.
+    pub fn scenarios(
+        &self,
+        worksheet_index: usize,
+    ) -> Result<Option<crate::package::scenarios::Manager>> {
+        let uri = self.worksheet_uri(worksheet_index)?;
+        let part = self.package.get_part(&uri)?;
+        crate::package::scenarios::parse_worksheet(part.blob())
+    }
+
+    /// Return the typed Scenario Manager for a worksheet selected by name.
+    pub fn scenarios_by_name(
+        &self,
+        worksheet_name: &str,
+    ) -> Result<Option<crate::package::scenarios::Manager>> {
+        let index = self.worksheet_index(worksheet_name)?;
+        self.scenarios(index)
+    }
+
+    /// Atomically replace or add a worksheet's Scenario Manager.
+    ///
+    /// The scenario owner validates the complete candidate worksheet before
+    /// this method publishes it. Existing record order and opaque records are
+    /// retained by the owner; malformed or ambiguous structure is refused.
+    pub fn set_scenarios(
+        &mut self,
+        worksheet_index: usize,
+        scenarios: crate::package::scenarios::Manager,
+    ) -> Result<()> {
+        let uri = self.worksheet_uri(worksheet_index)?;
+        let original = self.package.get_part(&uri)?.blob().to_vec();
+        let updated = crate::package::scenarios::replace_worksheet(&original, Some(&scenarios))?;
+        crate::package::scenarios::parse_worksheet(&updated)?;
+        self.package.unsign();
+        self.package.get_part_mut(&uri)?.set_blob(updated);
+        Ok(())
+    }
+
+    /// Atomically remove a worksheet's Scenario Manager.
+    ///
+    /// Returns `true` only when a scenario collection was removed. Unknown
+    /// worksheet records remain byte-for-byte in their original order.
+    pub fn remove_scenarios(&mut self, worksheet_index: usize) -> Result<bool> {
+        let uri = self.worksheet_uri(worksheet_index)?;
+        let original = self.package.get_part(&uri)?.blob().to_vec();
+        let updated = crate::package::scenarios::replace_worksheet(&original, None)?;
+        if updated == original {
+            return Ok(false);
+        }
+        crate::package::scenarios::parse_worksheet(&updated)?;
+        self.package.unsign();
+        self.package.get_part_mut(&uri)?.set_blob(updated);
+        Ok(true)
+    }
+
+    /// Atomically replace or add a worksheet's Scenario Manager by name.
+    pub fn set_scenarios_by_name(
+        &mut self,
+        worksheet_name: &str,
+        scenarios: crate::package::scenarios::Manager,
+    ) -> Result<()> {
+        let index = self.worksheet_index(worksheet_name)?;
+        self.set_scenarios(index, scenarios)
+    }
+
+    /// Remove a worksheet's Scenario Manager by name.
+    pub fn remove_scenarios_by_name(&mut self, worksheet_name: &str) -> Result<bool> {
+        let index = self.worksheet_index(worksheet_name)?;
+        self.remove_scenarios(index)
+    }
+
     pub fn merged_cell_ranges(&self, worksheet_index: usize) -> Result<Vec<MergedCell>> {
         let uri = self.worksheet_uri(worksheet_index)?;
         let part = self.package.get_part(&uri)?;

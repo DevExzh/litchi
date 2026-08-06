@@ -3,8 +3,9 @@
 use crate::{
     Spreadsheet,
     model::names::{Definition, Expression, Range, Scope},
+    worksheet::{Cell, CellView, Sheet},
 };
-use litchi_core::Result;
+use litchi_core::{Error, Result};
 use litchi_odf_common::rdf::Triple;
 use std::path::Path;
 
@@ -31,6 +32,116 @@ impl MutableSpreadsheet {
 
     pub fn spreadsheet(&self) -> &Spreadsheet {
         &self.spreadsheet
+    }
+
+    /// Return the typed worksheet graph in document order.
+    pub fn sheets(&self) -> &[Sheet] {
+        self.spreadsheet.sheets()
+    }
+
+    /// Find a worksheet by its exact ODF name.
+    pub fn sheet(&self, name: &str) -> Option<&Sheet> {
+        self.spreadsheet.sheet(name)
+    }
+
+    /// Look up a logical cell in the current immutable snapshot.
+    pub fn cell(&self, sheet_name: &str, row: usize, column: usize) -> Option<CellView<'_>> {
+        self.spreadsheet.cell(sheet_name, row, column)
+    }
+
+    /// Atomically replace all worksheets in the current package snapshot.
+    pub fn set_sheets(&mut self, sheets: Vec<Sheet>) -> Result<()> {
+        self.spreadsheet.publish_sheets(sheets)
+    }
+
+    /// Append one worksheet while preserving document order.
+    pub fn add_sheet(&mut self, sheet: Sheet) -> Result<()> {
+        self.edit_sheets(move |sheets| {
+            sheets.push(sheet);
+            Ok(())
+        })
+    }
+
+    /// Remove one worksheet by its exact ODF name.
+    pub fn remove_sheet(&mut self, name: &str) -> Result<Sheet> {
+        let mut removed = None;
+        self.edit_sheets(|sheets| {
+            let index = sheets
+                .iter()
+                .position(|sheet| sheet.name == name)
+                .ok_or_else(|| Error::InvalidFormat(format!("ODS sheet '{name}' was not found")))?;
+            removed = Some(sheets.remove(index));
+            Ok(())
+        })?;
+        removed
+            .ok_or_else(|| Error::InvalidFormat("ODS sheet removal was not committed".to_string()))
+    }
+
+    /// Atomically replace one logical cell in a named worksheet.
+    pub fn set_cell(
+        &mut self,
+        sheet_name: &str,
+        row: usize,
+        column: usize,
+        cell: Cell,
+    ) -> Result<()> {
+        self.edit_sheet(sheet_name, |sheet| sheet.set_cell(row, column, cell))
+    }
+
+    /// Clear one logical cell while retaining its direct style, if any.
+    pub fn clear_cell(&mut self, sheet_name: &str, row: usize, column: usize) -> Result<()> {
+        self.edit_sheet(sheet_name, |sheet| sheet.clear_cell(row, column))
+    }
+
+    /// Set an inert formula on one logical cell.
+    pub fn set_formula(
+        &mut self,
+        sheet_name: &str,
+        row: usize,
+        column: usize,
+        formula: impl Into<String>,
+    ) -> Result<()> {
+        let formula = formula.into();
+        self.edit_sheet(sheet_name, move |sheet| {
+            sheet.set_formula(row, column, formula)
+        })
+    }
+
+    /// Set a direct cell style reference on one logical cell.
+    pub fn set_cell_style(
+        &mut self,
+        sheet_name: &str,
+        row: usize,
+        column: usize,
+        style_name: impl Into<String>,
+    ) -> Result<()> {
+        let style_name = style_name.into();
+        self.edit_sheet(sheet_name, move |sheet| {
+            sheet.set_cell_style(row, column, style_name)
+        })
+    }
+
+    fn edit_sheets<F>(&mut self, operation: F) -> Result<()>
+    where
+        F: FnOnce(&mut Vec<Sheet>) -> Result<()>,
+    {
+        let candidate = crate::worksheet::transaction::edit(self.spreadsheet.sheets(), operation)?;
+        self.spreadsheet.publish_sheets(candidate)
+    }
+
+    fn edit_sheet<F>(&mut self, sheet_name: &str, operation: F) -> Result<()>
+    where
+        F: FnOnce(&mut Sheet) -> Result<()>,
+    {
+        self.edit_sheets(|sheets| {
+            let sheet = sheets
+                .iter_mut()
+                .find(|sheet| sheet.name == sheet_name)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!("ODS sheet '{sheet_name}' was not found"))
+                })?;
+            operation(sheet)
+        })
     }
 
     /// Return the ordered named-definition catalog of the edited snapshot.

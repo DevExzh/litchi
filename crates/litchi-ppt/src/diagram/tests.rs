@@ -73,7 +73,8 @@ fn drawing_with_group() -> Vec<u8> {
     let child = record(0x0F, 0, 0xF004, &[child_sp, child_anchor].concat());
     let group = record(0x0F, 0, 0xF003, &[group_header, child].concat());
     let dg = record(0, 0, 0xF008, &[0; 8]);
-    record(0x0F, 0, 0xF002, &[dg, patriarch, group].concat())
+    let root_group = record(0x0F, 0, 0xF003, &[patriarch, group].concat());
+    record(0x0F, 0, 0xF002, &[dg, root_group].concat())
 }
 
 fn build_list(builds: &[Container]) -> Vec<u8> {

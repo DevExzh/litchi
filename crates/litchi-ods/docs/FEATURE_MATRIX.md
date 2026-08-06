@@ -30,10 +30,10 @@ The ODS-specific source vocabulary includes cell, row, sheet, formula,
 conditional-format, validation, DataPilot, database-range, protection,
 scenario, consolidation, detective, sparkline, DDE, and tracked-change models.
 The current crate exports the package facade, named-definition APIs, formula
-codec, resource inventories, RDF APIs, and several model modules, but the large
-sheet parser/evaluator and sheet writer sources are not connected to the
-`litchi_ods::Spreadsheet`/`MutableSpreadsheet` public surface. This distinction
-is intentional in the rows below.
+codec, resource inventories, RDF APIs, and the bounded worksheet graph through
+`litchi_ods::worksheet`, `Spreadsheet`, `Builder`, and
+`MutableSpreadsheet`. This is a worksheet graph, not a full calculation or
+rendering engine.
 
 The Microsoft `[MS-XLSX]` Front Matter and ToC describe extensions to OOXML
 SpreadsheetML, not ODS. Their Part Enumerations, Extensions, Conceptual
@@ -67,12 +67,12 @@ the existence of an XLSX feature is never treated as ODS support.
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Sheets, rows, columns, and cells | 🟡 | 🟡 | ❌ | Typed `Sheet`, `Row`, and cell parser/writer sources exist, including bounded expansion of repeated rows/cells, but they are not currently exported through the public ODS facade; the supported builder accepts content XML rather than a sheet object graph |
-| Cell scalar types | 🟡 | 🟡 | 🟡 | Source models cover string, number, boolean, date/time, duration, percentage, currency, and error-like values; public cell CRUD is not wired |
+| Sheets, rows, columns, and cells | ✅ | ✅ | ✅ | Public `worksheet::{Sheet, Row, Cell}` graph with logical lookup over physical repetition runs; `Builder` and `MutableSpreadsheet` provide atomic add/remove/set/clear operations |
+| Cell scalar types | ✅ | ✅ | ✅ | Typed string, number, boolean, date/time, percentage, currency, and unknown value tokens are validated and serialized without expanding repeats |
 | Rich cell text, spans, whitespace, fields, and hyperlinks | 🟡 | 🟡 | 🟡 | Structure-preserving source models retain mixed text and inert hyperlinks; no public cell range API exposes or mutates them |
 | Formula strings and references | ✅ | ✅ | ✅ | Public `codec::formula` parses and represents OpenFormula-like functions, literals, A1 references, ranges, operators, and sheet references; this codec is independent of package cell CRUD |
 | Formula evaluation and recalculation | 🟡 | 🟡 | N/A | An ODS evaluation adapter source normalizes common `of:=`/A1/semicolon syntax for the shared evaluator, but the adapter is not part of the current exported codec module; full OpenFormula semantics, recalculation, rendering, and external I/O are not provided |
-| Repeated rows/cells and merged/covered cells | 🟡 | 🟡 | 🟡 | Source parser/writer models expand bounded repeated structures and represent merge spans; the full-width/full-height blank-padding convention is intentionally deferred, and no public sheet editor consumes the model |
+| Repeated rows/cells and merged/covered cells | ✅ | ✅ | ✅ | Physical repeated runs are retained, logical lookup/edit splits only the affected run, and merge/covered metadata is typed and validated |
 | Named ranges and named expressions | ✅ | ✅ | ✅ | Global and sheet-scoped definitions are parsed, validated, ordered, looked up, added, replaced, and removed through the package facade and minimal builder |
 | Cell and sheet styles | 🟡 | 🟡 | 🟡 | Typed source structures cover alignment, borders, background, number/data styles, text properties, and protection flags; style-use resolution and public application to cells are not implemented |
 | Conditional cell styles (`style:map`) | 🟡 | 🟡 | 🟡 | Typed inert conditions and apply-style names are modeled and preserved; conditions are not evaluated and the package editor is not exposed |
@@ -95,7 +95,7 @@ the existence of an XLSX feature is never treated as ODS support.
 
 | Feature family | Status | Read | Write | Notes |
 |----------------|--------|------|-------|-------|
-| Full public worksheet authoring | ❌ | 🟡 | ❌ | The current facade does not expose add/remove sheets, row/column insertion, cell mutation, or semantic sheet serialization; raw `content.xml` remains the escape hatch |
+| Full public worksheet authoring | 🟡 | ✅ | ✅ | Bounded worksheet graph and transactional sheet/cell CRUD are public; advanced ODF table extensions, calculation, rendering, and rich-text editing remain outside this slice |
 | Full OpenFormula semantics | ❌ | 🟡 | ❌ | The public parser is not an evaluator; unsupported grammar, external workbook references, dynamic arrays, volatile behavior, data tables, and host-service functions are not resolved |
 | XLSX slicers and timelines | ❌ | ❌ | ❌ | `[MS-XLSX]` ToC families for slicer caches, slicers, timelines, and their extension parts are OOXML features, not typed ODS support |
 | XLSX PivotTable/data-model extensions | ❌ | ❌ | ❌ | OOXML PivotTable caches, OLAP/data-model structures, rich pivot data, pivot UI/version/auto-refresh extensions, and related XML parts are not implemented; ODF DataPilot metadata is not an equivalent claim |

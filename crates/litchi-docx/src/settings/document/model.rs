@@ -5,8 +5,8 @@ use super::super::notes::NoteNumberingProperties;
 use crate::mail_merge::Settings as MailMergeSettings;
 use crate::numbering::Format;
 use crate::settings::{
-    ColorSchemeMapping, CompatibilityOption, CompatibilitySetting, ProofingState, ProtectionType,
-    Extensions, SmartTagType, ThemeFontLanguages, View,
+    ColorSchemeMapping, CompatibilityOption, CompatibilitySetting, Extensions, ProofingState,
+    ProtectionType, SmartTagType, ThemeFontLanguages, View,
 };
 
 /// An inert reference to the external template associated with a document.

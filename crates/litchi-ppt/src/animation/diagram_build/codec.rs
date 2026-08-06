@@ -87,7 +87,7 @@ impl Build {
     }
 
     /// Serialize the complete `BuildAtom` record.
-    pub fn to_bytes(self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(Self::RECORD_LEN);
         bytes.extend_from_slice(&encode_header(
             0,
@@ -205,7 +205,7 @@ impl Container {
     }
 
     /// Serialize the complete container, including both fixed child records.
-    pub fn to_bytes(self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> Vec<u8> {
         let build = self.build().to_bytes();
         let atom = self.atom().to_bytes();
         let mut bytes = Vec::with_capacity(Self::RECORD_LEN);

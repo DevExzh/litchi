@@ -77,6 +77,7 @@ impl Workbook {
             index,
             self.styles.cell_xfs.len(),
         )?;
+        worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(blob)?);
         if let Some(uri) = comments_uri {
             let part = self.package.get_part(&uri)?;
             if !part.rels().is_empty() {

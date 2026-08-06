@@ -11,6 +11,7 @@ pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
 pub struct Spreadsheet {
     package: crate::package::Package,
     definitions: Vec<Definition>,
+    sheets: Vec<crate::worksheet::Sheet>,
 }
 
 impl Spreadsheet {
@@ -26,9 +27,11 @@ impl Spreadsheet {
 
     fn from_package(package: crate::package::Package) -> Result<Self> {
         let definitions = package.definitions()?;
+        let sheets = package.sheets()?;
         Ok(Self {
             package,
             definitions,
+            sheets,
         })
     }
 
@@ -38,6 +41,28 @@ impl Spreadsheet {
 
     pub fn styles_xml(&self) -> Option<&str> {
         self.package.styles_xml()
+    }
+
+    /// Return the typed worksheet graph in document order.
+    pub fn sheets(&self) -> &[crate::worksheet::Sheet] {
+        &self.sheets
+    }
+
+    /// Find a worksheet by its exact ODF name.
+    pub fn sheet(&self, name: &str) -> Option<&crate::worksheet::Sheet> {
+        self.sheets.iter().find(|sheet| sheet.name == name)
+    }
+
+    /// Look up a logical cell while retaining the distinction between a
+    /// missing coordinate and a physical repeated cell run.
+    pub fn cell(
+        &self,
+        sheet_name: &str,
+        row: usize,
+        column: usize,
+    ) -> Option<crate::worksheet::CellView<'_>> {
+        self.sheet(sheet_name)
+            .map(|sheet| sheet.cell_view(row, column))
     }
 
     /// Discover package, inline, missing, and inert linked images.
@@ -136,6 +161,14 @@ impl Spreadsheet {
         let package = self.package.replace_content_xml(&updated)?;
         self.package = package;
         self.definitions = definitions;
+        Ok(())
+    }
+
+    /// Publish a validated worksheet snapshot as one package transaction.
+    pub(crate) fn publish_sheets(&mut self, sheets: Vec<crate::worksheet::Sheet>) -> Result<()> {
+        let package = self.package.replace_sheets(&sheets)?;
+        self.package = package;
+        self.sheets = sheets;
         Ok(())
     }
 

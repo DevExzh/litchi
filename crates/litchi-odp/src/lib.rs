@@ -14,8 +14,8 @@ pub mod model;
 pub mod package;
 
 pub use facade::slide::{Shape, Slide};
-pub use facade::{Builder, Presentation};
-pub use facade::{layout, page, slide};
+pub use facade::{Builder, MasterPage, Presentation};
+pub use facade::{layout, master, page, slide};
 
 // Keep implementation modules ergonomic internally without flattening their
 // semantic vocabulary into the public crate root.

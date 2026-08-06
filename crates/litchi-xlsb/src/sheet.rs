@@ -6,6 +6,7 @@ use crate::package::comments::Comment;
 use crate::package::data_validation::{Settings, Validation};
 use crate::package::hyperlinks::Hyperlink;
 use crate::package::merged_cells::MergedCell;
+use crate::package::scenarios::Manager;
 use crate::package::sheet_view::SheetView;
 use crate::package::web_extension_bindings::Binding;
 use litchi_core::sheet::{
@@ -135,6 +136,7 @@ pub struct Worksheet {
     conditional_formattings: Vec<Formatting>,
     web_extension_bindings: Vec<Binding>,
     sheet_views: Vec<SheetView>,
+    scenarios: Option<Manager>,
 }
 
 impl Worksheet {
@@ -159,6 +161,7 @@ impl Worksheet {
             conditional_formattings: Vec::new(),
             web_extension_bindings: Vec::new(),
             sheet_views: Vec::new(),
+            scenarios: None,
         }
     }
 
@@ -233,6 +236,10 @@ impl Worksheet {
         self.sheet_views = sheet_views;
     }
 
+    pub(crate) fn set_scenarios(&mut self, scenarios: Option<Manager>) {
+        self.scenarios = scenarios;
+    }
+
     /// Get all merged cells
     pub fn merged_cells(&self) -> &[MergedCell] {
         &self.merged_cells
@@ -304,6 +311,14 @@ impl Worksheet {
     /// [`crate::package::xlsx::views::SheetView`].
     pub fn sheet_views(&self) -> &[SheetView] {
         &self.sheet_views
+    }
+
+    /// The worksheet's inert Scenario Manager snapshot, if present.
+    ///
+    /// Scenario values are metadata only; litchi never substitutes them into
+    /// cells or recalculates the workbook.
+    pub fn scenarios(&self) -> Option<&Manager> {
+        self.scenarios.as_ref()
     }
 }
 

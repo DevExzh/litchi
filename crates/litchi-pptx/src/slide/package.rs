@@ -58,6 +58,13 @@ pub(crate) fn slide_comments<'a>(
     part.comments(package)
 }
 
+pub(crate) fn slide_zooms<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+) -> Result<crate::shape::zoom::Owner> {
+    crate::shape::zoom::package::load_part(package, part)
+}
+
 pub(crate) fn slide_sync<'a>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,

@@ -10,9 +10,9 @@
 use std::collections::HashSet;
 
 use super::model::{
-    Chart, DataKind, DataLink, Format, GroupKind, Kind, Limits, Role, Source, Value,
+    CacheKind, Chart, DataKind, DataLink, Format, GroupKind, Kind, Limits, Role, Source, Value,
 };
-use super::wire::{BRAI, CHART, DATA_FORMAT, LABEL, NUMBER, SCATTER, SERIES, SI_INDEX};
+use super::wire::{BLANK, BRAI, CHART, DATA_FORMAT, LABEL, NUMBER, SCATTER, SERIES, SI_INDEX};
 use crate::{Error, Result};
 
 const SERIES_AI_ROLES: [Role; 4] = [Role::Name, Role::Values, Role::Categories, Role::Bubbles];
@@ -299,11 +299,24 @@ fn validate_cache(chart: &Chart) -> Result<()> {
         .try_reserve(chart.cached_values.len())
         .map_err(|_allocation_error| Error::Allocation("chart cache validation"))?;
     for cache in &chart.cached_values {
-        if usize::from(cache.series) >= chart.series.len() {
+        let Some(series) = chart.series.get(usize::from(cache.series)) else {
             return invalid(
                 SI_INDEX,
                 "cached chart column does not identify a Series record",
             );
+        };
+        let point_count = match cache.kind {
+            CacheKind::Values => series.value_count,
+            CacheKind::Categories => series.category_count,
+            CacheKind::Bubbles => series.bubble_count,
+        };
+        if cache.point >= point_count {
+            let record_type = match cache.value {
+                Value::Blank => BLANK,
+                Value::Number(_) => NUMBER,
+                Value::Text(_) => LABEL,
+            };
+            return invalid(record_type, "cached chart point exceeds its Series count");
         }
         if !cells.insert((cache.kind, cache.point, cache.series)) {
             return invalid(SI_INDEX, "chart data cache contains a duplicate cell");

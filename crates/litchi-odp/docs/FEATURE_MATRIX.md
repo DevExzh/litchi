@@ -76,7 +76,7 @@ the existence of a PPTX feature is never treated as ODP support.
 | Charts and chart data ranges | 🟡 | 🟡 | 🟡 | Chart frames and shared chart range/series views are bounded metadata; no public ODP chart authoring, recalculation, or rendering engine is available |
 | Presentation page layouts | ✅ | ✅ | ✅ | Named presentation page layouts and typed placeholder roles/geometry are parsed, validated, added, replaced, and serialized through public builder/package APIs |
 | Slide page metadata and layout references | ✅ | ✅ | ✅ | Page names, IDs, page-layout/master references, and related declaration bindings are inspected and authored through the public page metadata model |
-| Master pages | 🟡 | 🟡 | ❌ | Master-page references are visible in page metadata and the source tree contains a lossless master editor, but `package/layout_master.rs` is not exported by the current package module; no public master CRUD claim is made |
+| Master pages | ✅ | ✅ | ✅ | Typed master-page metadata, shared ODF regions/children, lossless XML fragments, package CRUD, ordering, and slide master/layout assignment are exposed through the layered `master` facade |
 | Handout master | ❌ | ❌ | ❌ | No public typed handout-master model or authoring path is exposed |
 | Headers, footers, and date-time declarations | ✅ | ✅ | ✅ | Typed declaration collections cover header/footer/date-time values and page bindings; field expansion and host clock identity remain inert |
 | Backgrounds and named drawing resources | 🟡 | 🟡 | 🟡 | Direct background/drawing properties and source-level named fill-image, gradient, hatch, marker, opacity, and stroke-dash values are bounded; no complete public resolver or renderer is provided |

@@ -13,6 +13,7 @@ pub mod media;
 pub mod model;
 pub mod package;
 pub mod styles;
+pub mod worksheet;
 
 pub use drawing::{Frame, Part};
 pub use embedded::{Kind, Object, Parameter, Root};
@@ -20,3 +21,4 @@ pub use facade::{Builder, MutableSpreadsheet, Spreadsheet};
 pub use litchi_odf_common::rdf;
 pub use media::Image;
 pub use model::names;
+pub use worksheet::{Cell, CellValue, CellView, Merge, Row, Sheet};

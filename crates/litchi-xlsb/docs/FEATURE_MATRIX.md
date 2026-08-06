@@ -55,7 +55,7 @@ formula results are recalculated or that external, macro, or embedded content is
 | Structured tables | ✅ | ✅ | ✅ | List/table identity, ranges, columns, header/totals metadata, style IDs, typed totals functions, inert calculated-column formulas, and worksheet wiring are serialized. |
 | Page setup and print metadata | 🟡 | ✅ | 🟡 | Supported worksheet and chart-sheet page setup, margins, paper, scale/fit, orientation, print flags, and relationships are bounded; printer-driver/rendering behavior is not implemented. |
 | Sheet protection | 🟡 | ✅ | 🟡 | Worksheet and chart-sheet protection flags and the supported strong-protection metadata are typed. Protection is not a cryptographic authorization boundary. |
-| Scenarios and what-if analysis | ❌ | ❌ | ❌ | The [MS-XLSB] conceptual feature family is not exposed as a typed workbook authoring model. |
+| Scenarios and what-if analysis | 🟡 | ✅ | ✅ | `litchi_xlsb::scenarios` exposes bounded `BrtBeginScenMan`/`BrtBeginSct`/`BrtSlc` snapshots and transactional worksheet replacement. Known metadata is typed; unknown records and source order are retained, unsafe or ambiguous edits are refused, and scenario values are never substituted or recalculated. |
 | Cell watches and phonetic metadata | ❌ | ❌ | ❌ | No public typed BIFF12 cell-watch or phonetic-properties model is provided. |
 | Shared-workbook revision records | ❌ | ❌ | ❌ | BIFF12 workbook collaboration/revision behavior is not implemented as a typed API. |
 

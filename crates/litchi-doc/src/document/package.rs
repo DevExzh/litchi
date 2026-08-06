@@ -22,7 +22,7 @@ use crate::parts::list_names::ListNamesTable;
 use crate::parts::list_templates::ListTemplateTable;
 use crate::parts::mail_merge::DocumentMailMerge;
 use crate::parts::numbering::ListTables;
-use crate::parts::ole::controls::Controls;
+use crate::parts::ole_controls::RgxOcxInfo;
 use crate::parts::pap_bin_table::PapBinTable;
 use crate::parts::proofing::ProofingTables;
 use crate::parts::protection::Ranges;
@@ -129,7 +129,7 @@ impl Document {
         let xml_schemas = crate::parts::xml_schemas::Collection::parse(&fib, &table_stream)?;
         let custom_xml_transform_path =
             crate::parts::xml_schemas::parse_custom_xml_transform(&fib, &table_stream)?;
-        let ole_controls = Controls::parse(&fib, &table_stream)?;
+        let ole_controls = RgxOcxInfo::parse(&fib, &table_stream)?;
         let mail_merge = DocumentMailMerge::parse(&fib, &table_stream)?;
         let subdocuments = Collection::parse(&fib, &table_stream)?;
         let revision_authors = RevisionAuthorTable::parse(&fib, &table_stream)?;

@@ -92,6 +92,37 @@ impl Package {
         self.edit_typed(move |opc| crate::tag::remove(opc, &slide_name))
     }
 
+    /// Read the lossless zoom owner of one slide.
+    pub fn zooms<'a>(
+        &self,
+        slide: impl Into<crate::slide::Key<'a>>,
+    ) -> Result<crate::shape::zoom::Owner> {
+        self.ensure_graph_current("zooms")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        crate::shape::zoom::load(&self.opc, &slide_name)
+    }
+
+    /// Replace one slide's zoom owner transactionally.
+    pub fn put_zooms<'a>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'a>>,
+        owner: crate::shape::zoom::Owner,
+    ) -> Result<Option<crate::shape::zoom::Owner>> {
+        self.ensure_graph_current("put_zooms")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        self.edit_typed(move |opc| crate::shape::zoom::store(opc, &slide_name, owner))
+    }
+
+    /// Remove all zoom metadata from one slide while retaining its other XML.
+    pub fn remove_zooms<'a>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'a>>,
+    ) -> Result<Option<crate::shape::zoom::Owner>> {
+        self.ensure_graph_current("remove_zooms")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        self.edit_typed(move |opc| crate::shape::zoom::remove(opc, &slide_name))
+    }
+
     /// Read one semantic shape's optional programmable-tag list.
     pub fn shape_tags<'s, 'k>(
         &self,

@@ -34,7 +34,7 @@ pub(super) use crate::parts::list_names::ListNamesTable;
 pub(super) use crate::parts::list_templates::ListTemplateTable;
 pub(super) use crate::parts::mail_merge::DocumentMailMerge;
 pub(super) use crate::parts::numbering::{ListTables, ParagraphListBinding};
-pub(super) use crate::parts::ole::controls::Controls;
+pub(super) use crate::parts::ole_controls::RgxOcxInfo;
 pub(super) use crate::parts::paragraph_extractor::{ExtractedParagraph, ParagraphExtractor};
 pub(super) use crate::parts::proofing::ProofingTables;
 pub(super) use crate::parts::protection::Ranges;

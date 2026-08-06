@@ -1,4 +1,8 @@
-use super::{FIB_INDEX_PLC_OCX, Flags, OcxInfo, RgxOcxInfo, Story, parse, parse_bytes, to_bytes};
+use super::{
+    Entry, FIB_INDEX_PLC_OCX, FieldCounts, Flags, Format, Metadata, ObjectPool, OcxInfo, Persist1,
+    Persist2, RgxOcxInfo, StorageName, Story, parse, parse_bytes, parse_metadata, to_bytes,
+    to_metadata_bytes,
+};
 use crate::parts::fib::FileInformationBlock;
 
 const FIB_POINTER_COUNT: usize = FIB_INDEX_PLC_OCX + 1;
@@ -98,9 +102,154 @@ fn reads_the_fc_plcocx_table_pointer() {
     let absent = fib_with_pointer(0, 0);
     assert!(parse(&absent, &[]).unwrap().is_none());
 
-    let invalid_empty = fib_with_pointer(1, 0);
-    assert!(parse(&invalid_empty, &[0]).is_err());
+    let undefined_empty = fib_with_pointer(1, 0);
+    assert!(parse(&undefined_empty, &[0]).unwrap().is_none());
 
     let truncated = fib_with_pointer(4, payload.len() as u32);
     assert!(parse(&truncated, &table_stream).is_err());
+}
+
+fn metadata_sample() -> Metadata {
+    let persist1 = Persist1::try_new(
+        true, true, true, false, true, true, true, true, true, 0x402D,
+    )
+    .unwrap();
+    let persist2 = Persist2::try_new(true, true, true, 0xFFF0).unwrap();
+    Metadata::try_new(persist1, Format::UnicodeText, Some(persist2)).unwrap()
+}
+
+#[test]
+fn object_metadata_round_trips_exact_persist_words() {
+    let metadata = metadata_sample();
+    let bytes = to_metadata_bytes(&metadata).unwrap();
+    assert_eq!(bytes, [0x7F, 0xF3, 0x14, 0x00, 0xFD, 0xFF]);
+    assert_eq!(parse_metadata(&bytes).unwrap(), metadata);
+    assert_eq!(Metadata::parse_bytes(&bytes).unwrap(), metadata);
+    assert_eq!(metadata.to_bytes().unwrap(), bytes);
+    assert_eq!(
+        to_metadata_bytes(&parse_metadata(&bytes).unwrap()).unwrap(),
+        bytes
+    );
+    assert!(metadata.is_activex());
+    assert!(metadata.stores_control_data_in_stream());
+}
+
+#[test]
+fn object_metadata_preserves_absent_and_zero_persist2() {
+    let persist1 = Persist1::try_new(
+        false, false, false, false, false, false, false, false, false, 0,
+    )
+    .unwrap();
+    let without = Metadata::try_new(persist1, Format::Text, None).unwrap();
+    assert_eq!(to_metadata_bytes(&without).unwrap(), [0, 0, 2, 0]);
+
+    let with_zero = Metadata::try_new(
+        persist1,
+        Format::Text,
+        Some(Persist2::try_new(false, false, false, 0).unwrap()),
+    )
+    .unwrap();
+    assert_eq!(to_metadata_bytes(&with_zero).unwrap(), [0, 0, 2, 0, 0, 0]);
+    assert_ne!(without, with_zero);
+}
+
+#[test]
+fn object_metadata_rejects_invalid_domains_and_relationships() {
+    assert!(parse_metadata(&[0, 0, 0x06, 0]).is_err());
+    assert!(parse_metadata(&[0x00, 0x04, 0x02, 0x00]).is_err());
+    assert!(parse_metadata(&[0x00, 0x20, 0x02, 0x00]).is_err());
+    assert!(parse_metadata(&[0x00, 0x00, 0x02, 0x00, 0x02, 0x00]).is_err());
+    assert!(parse_metadata(&[0, 0, 2, 0, 0]).is_err());
+}
+
+#[test]
+fn validates_story_specific_field_indices() {
+    let table = RgxOcxInfo::try_new(vec![OcxInfo::new(
+        1,
+        2,
+        0,
+        0,
+        Flags::new(false, false, false, false, false, false, false, 0),
+        Story::Main,
+        0,
+    )])
+    .unwrap();
+    assert!(
+        table
+            .validate_fields(FieldCounts::new(2, 0, 0, 0, 0, 0, 0))
+            .is_err()
+    );
+    assert!(
+        table
+            .validate_fields(FieldCounts::new(3, 0, 0, 0, 0, 0, 0))
+            .is_ok()
+    );
+}
+
+#[test]
+fn object_pool_validates_inert_activex_stream_metadata() {
+    let metadata = metadata_sample();
+    let name = StorageName::try_new("_42").unwrap();
+    let entry = Entry::try_with_streams(
+        name,
+        Some("{00000000-0000-0000-0000-000000000000}".to_owned()),
+        Some(metadata),
+        true,
+        true,
+        true,
+    )
+    .unwrap();
+    let pool = ObjectPool::try_new(vec![entry]).unwrap();
+    let entry = pool.get("_42").unwrap();
+    let active_x = entry.active_x().unwrap();
+    assert!(active_x.stream_data());
+    assert!(active_x.data_present());
+    assert!(entry.print_present());
+    assert!(entry.enhanced_print_present());
+    assert_eq!(
+        entry.class_id(),
+        Some("{00000000-0000-0000-0000-000000000000}")
+    );
+    assert!(
+        Entry::try_new(
+            StorageName::try_new("_43").unwrap(),
+            None,
+            Some(metadata),
+            false,
+        )
+        .is_err()
+    );
+    assert!(StorageName::try_new("bad").is_err());
+}
+
+#[test]
+fn editor_commit_round_trips_without_mutating_the_source_snapshot() {
+    let source = RgxOcxInfo::try_new(vec![sample()]).unwrap();
+    let replacement = OcxInfo::new(
+        0xABCD,
+        3,
+        4,
+        5,
+        Flags::new(false, true, false, true, false, false, true, 0x11),
+        Story::Comment,
+        0xCAFE,
+    );
+    let mut editor = source.edit();
+    editor.replace(0, replacement).unwrap();
+    editor
+        .push(OcxInfo::new(
+            99,
+            1,
+            2,
+            3,
+            Flags::new(false, false, false, false, false, false, false, 0),
+            Story::Main,
+            0,
+        ))
+        .unwrap();
+    let commit = editor.commit().unwrap();
+    assert_eq!(commit.patch().changes().len(), 2);
+    assert_eq!(source.infos(), &[sample()]);
+    let bytes = to_bytes(commit.snapshot()).unwrap();
+    assert_eq!(&parse_bytes(&bytes).unwrap(), commit.snapshot());
 }

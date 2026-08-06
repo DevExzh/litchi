@@ -86,7 +86,7 @@ for DrawingML, charts, diagrams, ink, math, and 3D extensions, [MS-OWEXML] for w
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Classic comments | ✅ | ✅ | ✅ | Validated authors, comments, anchors, dates, IDs, package relationships, and graph-safe CRUD |
-| Modern comments | ✅ | ✅ | ✅ | Validated authors, anchors, replies, status, author references, and package-aware CRUD; reaction and task extensions are separate gaps below |
+| Modern comments | ✅ | ✅ | ✅ | Validated authors, anchors, replies, status, author references, and bounded task, reaction, moniker, and V2 command/change package models; command data is inert, unknown XML is preserved, unsafe mutations are rejected, and collaboration behavior is never executed |
 | Embedded OLE and package objects | ✅ | ✅ | ✅ | Typed per-slide inert OLE inventory, embedded/link modes, ProgIDs, ppt/embeddings payloads, frames, and byte-identical payload round trips; objects are never activated |
 | ActiveX/control payloads | 🟡 | ✅ | 🟡 | Control/OLE relationships and payloads can be retained as inert package data; controls are not instantiated, rendered, or executed |
 | Embedded fonts | ✅ | ✅ | ✅ | Typed font inventory, faces, PANOSE/pitch/charset metadata, embedded payloads, obfuscation, licensing checks, and ordered CRUD |
@@ -109,11 +109,11 @@ for DrawingML, charts, diagrams, ink, math, and 3D extensions, [MS-OWEXML] for w
 | Feature family exposed by the specifications | Status | Read | Write | Notes |
 |-----------------------------------------------|--------|------|-------|-------|
 | PowerPoint math extension (a14:m) | ❌ | ❌ | ❌ | The package exposes ordinary DrawingML text extraction and common equation tooling elsewhere, but no typed PresentationML math-extension object or authoring API is claimed here |
-| Section, slide, and summary zoom objects | ❌ | ❌ | ❌ | [MS-PPTX] 2.2.15 and the sectionzoom, slidezoom, and summaryzoom schemas are not represented as semantic shape types; fallback pictures/groups are not treated as zoom support |
+| Section, slide, and summary zoom objects | 🟡 | 🟡 | 🟡 | [MS-PPTX] 2.2.15 is covered by the contextual `shape::zoom::Owner`: typed target/property metadata, lossless fallbacks and unknown choices, package target/relationship validation, and transactional CRUD are implemented; rendering/layout is intentionally out of scope |
 | 3D models and animated model3d content | ❌ | ❌ | ❌ | [MS-ODRAWXML] model3d parts and related animation payloads have no typed PPTX object or relationship API |
 | Designer/design-element/designer-tag metadata | ❌ | ❌ | ❌ | [MS-PPTX] design element, designer property, and designer tag extensions are not exposed as typed fields or CRUD |
 | Classification metadata | ❌ | ❌ | ❌ | Font PANOSE classification is unrelated; PowerPoint classification extension elements are not implemented |
-| Modern comment task, reaction, and V2 change-command families | ❌ | ❌ | ❌ | Base modern comments and replies are supported, but the newer task details, reactions, monikers, and command/change schemas in [MS-PPTX] 2.18 through 2.21 are not typed |
+| Modern comment task, reaction, and V2 change-command families | ✅ | ✅ | ✅ | Bounded typed semantic, wire, and package support for [MS-PPTX] 2.18 through 2.21; command data is inert, unknown XML is preserved, unsafe mutations are rejected, and collaboration behavior is never executed |
 | Non-Ink content parts | ❌ | ❌ | ❌ | The content-part implementation is scoped to inert InkML; arbitrary content-part payloads are not imported, interpreted, or authored |
 | Full media TracksInfo/player semantics | 🟡 | ✅ | 🟡 | Selected media and narration metadata is bounded and inert; the full track schema, playback events, and player behavior are not a semantic runtime |
 | Full extension-schema conformance | 🟡 | 🟡 | 🟡 | Unknown extension XML can be retained at supported owners under limits, but schema presence alone does not grant typed support for every versioned [MS-PPTX] or [MS-ODRAWXML] family |

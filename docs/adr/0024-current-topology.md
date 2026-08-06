@@ -222,11 +222,11 @@ transactions, field parsing, writer package semantics, and writer tests; ODS
 data-pilot parsing; PPT embedded objects, animation behavior, text-format, and
 text-style writers; XLS OLE objects and writer streams; XLSB formula text and
 worksheet writing; and XLSX ActiveX and XLDM package owners. DOC's
-`parts/ole/controls` facade also decodes the specified 20-byte `OcxInfo` body
-while preserving shorter entries and undefined tails. These additions keep
-semantic, wire/XML or BIFF, validation, package, and test ownership nested;
-they remain inert with respect to control activation, macros, and external
-behavior.
+`parts/ole_controls` facade now owns the specified 20-byte `OcxInfo` body,
+ObjectPool metadata, and the live document FIB seam without retaining the old
+`parts/ole/controls` owner. These additions keep semantic, wire/XML or BIFF,
+validation, package, and test ownership nested; they remain inert with respect
+to control activation, macros, and external behavior.
 
 The current continuation extends the topology with layered ODT document and
 text-element owners; ODS database-range and table-template style owners; ODP
@@ -256,6 +256,17 @@ package operations now use nested model, codec, package/transaction,
 validation, and test folders. These changes preserve the prefix-free facade
 rule and the standalone OOXML/ODF crate topology; no compatibility wrapper or
 duplicate shared-format grammar was introduced.
+
+This continuation adds ODP master-page editing through the shared
+`litchi-odf-common::style::master` model, a transactional ODS worksheet graph,
+DOC captions and ObjectPool/ActiveX metadata, DOCX settings extensions, PPT
+diagram inventories, PPTX modern-comment V2 commands and zoom owners, XLS
+chart snapshots, XLSB scenario and threaded-comment owners, XLSX rich-value
+and feature-property-bag owners, and shared DrawingML model3d resources. Each
+new owner keeps semantic, wire, validation, package/transaction, and focused
+test seams nested behind a concise prefix-free facade; unknown records remain
+opaque where the specification requires preservation, and no runtime activates
+macros, controls, links, collaboration, rendering, or external code.
 
 ## Historical terminology
 

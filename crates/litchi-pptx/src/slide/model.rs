@@ -107,6 +107,11 @@ impl<'a> Slide<'a> {
         package::slide_comments(self.package, &self.part)
     }
 
+    /// Read typed section, slide, and summary zoom metadata in this slide.
+    pub fn zooms(&self) -> Result<crate::shape::zoom::Owner> {
+        package::slide_zooms(self.package, &self.part)
+    }
+
     /// Count semantic shapes in the slide's scene.
     pub fn shape_count(&self) -> Result<usize> {
         Ok(self.shapes()?.len())

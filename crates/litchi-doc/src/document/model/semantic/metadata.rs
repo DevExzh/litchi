@@ -99,7 +99,7 @@ impl Document {
     ///
     /// The data is inert: no control is instantiated or activated and no
     /// control code is executed.
-    pub fn ole_controls(&self) -> Option<&Controls> {
+    pub fn ole_controls(&self) -> Option<&RgxOcxInfo> {
         self.ole_controls.as_ref()
     }
 

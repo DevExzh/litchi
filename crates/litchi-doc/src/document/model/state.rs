@@ -18,7 +18,7 @@ use crate::parts::list_names::ListNamesTable;
 use crate::parts::list_templates::ListTemplateTable;
 use crate::parts::mail_merge::DocumentMailMerge;
 use crate::parts::numbering::ListTables;
-use crate::parts::ole::controls::Controls;
+use crate::parts::ole_controls::RgxOcxInfo;
 use crate::parts::pap_bin_table::PapBinTable;
 use crate::parts::proofing::ProofingTables;
 use crate::parts::protection::Ranges;
@@ -107,7 +107,7 @@ pub struct Document {
     /// Custom XML save transform path (`fcCustomXForm`).
     pub(in crate::document) custom_xml_transform_path: Option<String>,
     /// OLE controls recorded in the document.
-    pub(in crate::document) ole_controls: Option<Controls>,
+    pub(in crate::document) ole_controls: Option<RgxOcxInfo>,
     /// Mail-merge data-source state (`Pms` and the ODSO property set).
     pub(in crate::document) mail_merge: Option<DocumentMailMerge>,
     /// Master-document subdocument directory and referenced-file name table.

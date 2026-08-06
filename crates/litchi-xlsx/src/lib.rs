@@ -43,6 +43,7 @@ pub mod print_options;
 pub mod query_table;
 pub mod raw;
 pub mod revisions;
+pub mod rich_values;
 pub mod row;
 pub mod scenarios;
 pub mod shapes;
@@ -159,6 +160,8 @@ pub use revisions::{
     load_workbook_revisions, parse_revision_headers, parse_revision_log, parse_revision_users,
     store_workbook_revisions, write_revision_headers, write_revision_log, write_revision_users,
 };
+pub use rich_values::codec::{parse_feature_property_bags, write_feature_property_bags};
+pub use rich_values::package::load as load_rich_values;
 pub use row::{Height, HeightAt, Row, Rows};
 pub use scenarios::{
     CellReference, InputCell, Scenario, UnknownAttribute, UnknownElement,

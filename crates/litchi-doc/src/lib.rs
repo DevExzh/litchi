@@ -51,6 +51,13 @@ pub mod sprm;
 pub mod sprm_operations;
 
 pub mod bookmark;
+/// Contextual Word caption and AutoCaption metadata.
+pub mod captions {
+    pub use crate::parts::captions::{
+        AutoEntry, AutoTable, Definition, Format, Heading, Info, LabelTable, Location, Numbering,
+        Separator, Tables,
+    };
+}
 pub mod comment;
 pub mod document;
 mod encryption;
@@ -90,10 +97,6 @@ pub use package::{EncryptionKind, Error, OpenOptions, Package, Result};
 pub use paragraph::{Paragraph, Run};
 pub use parts::associated_strings::{AssociatedStringSlot, DocumentAssociatedStrings};
 pub use parts::auto_summary::{AutoSummaryRange, DocumentAutoSummary};
-pub use parts::captions::{
-    AutoCaptionEntry, AutoCaptionTable, CaptionDefinition, CaptionInfo, CaptionLabelTable,
-    CaptionLocation, CaptionTables, ChapterHeading, ChapterNumbering, ChapterSeparator,
-};
 pub use parts::chp::CharacterConditionalFormatting;
 pub use parts::command_bars::{
     Action, AllocatedCommand, AllocatedCommands, CommandBars, CommandId, Customization,
@@ -196,7 +199,7 @@ pub use parts::mail_merge::{
     RecipientInfo, Rfs, SortColumnAndDirection, SortDirection, SttbfRfs, Wpms,
 };
 pub use parts::numbering::{ListLevel, ListTables, NumberFormat, ParagraphListBinding};
-pub use parts::ole::controls::{Control, Controls};
+pub use parts::ole_controls;
 pub use parts::pap::ParagraphConditionalFormatting;
 pub use parts::proofing::{
     ProofingEntry, ProofingFeature, ProofingRange, ProofingState, ProofingStateTable,

@@ -5,3 +5,5 @@ mod mutable;
 
 pub use builder::Builder;
 pub use mutable::MutableSpreadsheet;
+
+pub(crate) use builder::validate_content_xml;

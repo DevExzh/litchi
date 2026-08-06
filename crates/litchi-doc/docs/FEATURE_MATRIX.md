@@ -66,14 +66,14 @@ shared Office codecs are counted only where the DOC API exposes them.
 | Section layout, columns, borders, page/line numbering, and note placement | ✅ | ✅ | ✅ | Section properties are typed and serialized; pagination and line-breaking calculations are not performed |
 | PLRSID, saved-by, associated strings, proofing, grammar, and spelling PLCs | ✅ | ✅ | ✅ | Bounded auxiliary tables and state are read and mutated with mandatory/optional emission rules where required |
 | Auto-summary (Asumyi and PlcfAsumy) | 🟡 | ✅ | 🟡 | The auto-summary state/ranges have a typed read model; authoring is bounded and does not run Word’s summary algorithm |
-| Captions and AutoCaption tables | 🟡 | ✅ | ❌ | Caption definitions, labels, locations, and chapter-numbering metadata are typed for inspection; automatic caption insertion and refresh are not implemented |
+| Captions and AutoCaption tables | 🟡 | ✅ | 🟡 | Contextual `captions::{Tables, LabelTable, AutoTable}` owns bounded FIB/table-stream codecs, typed labels, numbering/location options, and validated ProgID-to-label references; detached table bytes round-trip, while Word caption insertion, field refresh, host activation, and macro execution remain inert |
 | Smart tags and factoids (Plcffactoid, property bags, and related STTBs) | ✅ | ✅ | ✅ | Bounded property-bag/factoid codecs and typed entries support CRUD; recognizers, schema downloads, VBA callbacks, and URLs remain inert |
 | Master-document subdocuments (PlcfWKB, WKB, FNPI, SttbFnm) | 🟡 | ✅ | 🟡 | Directory, outline, referenced-file names, and metadata are typed; referenced files are stored verbatim and never opened or followed |
 | Revision marks, author tables, and property revisions | ✅ | ✅ | ✅ | Insert/delete/move and paragraph, table, cell, row, and property revision records support transactional edit/accept/reject behavior |
 | Document variables, attached-template and web-export metadata | 🟡 | ✅ | ✅ | Stored settings and relationship-like metadata are available where exposed; templates and web targets are not loaded and web layout is not generated |
 | Mail-merge settings, sources, filters, and recipients (Pms, Pmfs, Rfs, ODSO) | 🟡 | ✅ | ✅ | Word 97 and Word 2002+ source descriptors, SQL/connection text, recipient filtering, sorting, inclusion, and field mappings are typed bounded metadata; data sources are never contacted and no merge is run |
 | Legacy form fields and FFData | ✅ | ✅ | ✅ | Text, checkbox, dropdown, defaults, selections, help/status text, and verbatim entry/exit macro names are typed; macros and host form behavior are inert |
-| ActiveX/OCX control semantics | 🟡 | ❌ | ❌ | Inert [MS-DOC] OcxInfo/RgxOcxInfo metadata and typed ObjectPool `CompObj`/`Ole`/`ObjInfo` inventory are available, including lossless unknown streams and malformed metadata; lifecycle, property, event, rendering, and activation APIs remain intentionally absent |
+| ActiveX/OCX control semantics | 🟡 | ✅ | ✅ | `litchi_doc::ole_controls` exposes inert, typed [MS-DOC] OcxInfo/RgxOcxInfo, story-specific `ifld` validation, ObjectPool `ODT`/`ODTPersist1`/`ODTPersist2`, exact `ObjInfo`/`OCXDATA`/presentation-stream metadata, and snapshot editing; CFB payloads, lifecycle, properties, events, rendering, and activation remain intentionally absent |
 | Document protection settings and range-level protected bookmarks | 🟡 | ✅ | ✅ | Protection modes, hashes, SttbfBkmkProt ranges, editor assignments, and usernames are typed; editing policy is not enforced |
 | Document statistics and DOP version metadata | ✅ | ✅ | ✅ | Word/character/paragraph/line/page counts where stored, versioned DOP records, compatibility options, typography, macro-security metadata, and related state are exposed within bounded models |
 
@@ -105,5 +105,5 @@ shared Office codecs are counted only where the DOC API exposes them.
 
 - crates/litchi-doc/src/package.rs owns DOC opening, OLE access, encryption selection, properties, signatures, custom XML, and macro/storage access.
 - crates/litchi-doc/src/document.rs, paragraph.rs, table.rs, section.rs, sprm.rs, parts/, and writer/ own CP/text, PLC, FKP, style/list, story, and formatting behavior.
-- crates/litchi-doc/src/parts/fields/, revisions.rs, mail_merge/, route_slip/, command_bars/, structured_tags.rs, ole_controls/, smart_tags.rs, document_properties*.rs, and PLC helpers provide bounded metadata codecs.
+- crates/litchi-doc/src/parts/fields/, revisions.rs, mail_merge/, route_slip/, captions/, command_bars/, structured_tags.rs, ole_controls/, smart_tags.rs, document_properties*.rs, and PLC helpers provide bounded metadata codecs.
 - crates/litchi-doc/src/shapes.rs, image.rs, equation.rs, embedded_object.rs, and vba.rs own payload-oriented OfficeArt, picture, MTEF, OLE, and VBA support.

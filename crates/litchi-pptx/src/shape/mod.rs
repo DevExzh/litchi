@@ -24,6 +24,7 @@
 pub mod diagram;
 pub mod text;
 pub mod theme;
+pub mod zoom;
 
 mod model;
 mod reader;

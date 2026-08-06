@@ -7,16 +7,16 @@ use super::model::{Diagram, Inventory, Limits, ShapeRef};
 use super::validation::{collect_associated, diagram_builds, validate_shape_ids};
 
 /// Parse a native diagram inventory from a BuildList and its PPDrawing body.
-pub fn parse(build_list: &Record, drawing: &[u8]) -> Result<Inventory<'_>> {
+pub fn parse<'data>(build_list: &Record, drawing: &'data [u8]) -> Result<Inventory<'data>> {
     parse_with_limits(build_list, drawing, Limits::default())
 }
 
 /// Parse a native diagram inventory with explicit resource ceilings.
-pub fn parse_with_limits(
+pub fn parse_with_limits<'data>(
     build_list: &Record,
-    drawing: &[u8],
+    drawing: &'data [u8],
     limits: Limits,
-) -> Result<Inventory<'_>> {
+) -> Result<Inventory<'data>> {
     let builds = diagram_builds(build_list, limits)?;
     let drawing = crate::odraw::parse_drawing(drawing)?;
     validate_shape_ids(&drawing)?;
@@ -42,16 +42,16 @@ pub fn parse_with_limits(
 }
 
 /// Parse one exact serialized BuildList record and a PPDrawing body.
-pub fn parse_bytes(build_list: &[u8], drawing: &[u8]) -> Result<Inventory<'_>> {
+pub fn parse_bytes<'data>(build_list: &[u8], drawing: &'data [u8]) -> Result<Inventory<'data>> {
     parse_bytes_with_limits(build_list, drawing, Limits::default())
 }
 
 /// Parse one exact serialized BuildList record with explicit limits.
-pub fn parse_bytes_with_limits(
+pub fn parse_bytes_with_limits<'data>(
     build_list: &[u8],
-    drawing: &[u8],
+    drawing: &'data [u8],
     limits: Limits,
-) -> Result<Inventory<'_>> {
+) -> Result<Inventory<'data>> {
     let (record, consumed) = Record::parse_strict(build_list, 0)?;
     if consumed != build_list.len() {
         return Err(Error::Corrupted("BuildList has trailing bytes".to_string()));
