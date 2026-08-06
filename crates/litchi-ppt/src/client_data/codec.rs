@@ -1,8 +1,9 @@
 //! OfficeArtClientData binary codec and grammar validation.
 
+use std::sync::Arc;
+
 use super::model::{
-    ClientData, ClientDataChild, ClientDataChildKind, ClientDataLimits, MAX_DEFINED_CHILDREN,
-    u32_at,
+    ClientData, ClientDataChild, ClientDataChildKind, ClientDataLimits, MAX_KNOWN_CHILDREN, u32_at,
 };
 use crate::embedded::reference::Reference;
 use crate::package::{Error, Result};
@@ -42,7 +43,12 @@ impl ClientDataChildKind {
             Self::RoundTripShapeChecksumForCustomLayouts12 => {
                 RT_ROUND_TRIP_SHAPE_CHECKSUM_FOR_CL_12
             },
+            Self::Unknown => 0,
         }
+    }
+
+    fn known_record_type(self) -> Option<u16> {
+        (!self.is_unknown()).then(|| self.record_type())
     }
 
     pub(super) fn canonical_header(self) -> (u16, u16) {
@@ -55,17 +61,22 @@ impl ClientDataChildKind {
         }
     }
 
-    pub(super) fn slot(self) -> u8 {
+    pub(super) fn slot(self) -> Option<u8> {
         match self {
-            Self::ShapeFlags => 0,
-            Self::ShapeFlags10 => 1,
-            Self::ExternalObjectReference => 2,
-            Self::AnimationInfo => 3,
-            Self::MouseClickInteractiveInfo => 4,
-            Self::MouseOverInteractiveInfo => 5,
-            Self::Placeholder => 6,
-            Self::RecolorInfo => 7,
-            _ => 8,
+            Self::ShapeFlags => Some(0),
+            Self::ShapeFlags10 => Some(1),
+            Self::ExternalObjectReference => Some(2),
+            Self::AnimationInfo => Some(3),
+            Self::MouseClickInteractiveInfo => Some(4),
+            Self::MouseOverInteractiveInfo => Some(5),
+            Self::Placeholder => Some(6),
+            Self::RecolorInfo => Some(7),
+            Self::ProgrammableTags
+            | Self::RoundTripNewPlaceholderId12
+            | Self::RoundTripShapeId12
+            | Self::RoundTripHeaderFooterPlaceholder12
+            | Self::RoundTripShapeChecksumForCustomLayouts12 => Some(8),
+            Self::Unknown => None,
         }
     }
 }
@@ -73,12 +84,29 @@ impl ClientDataChildKind {
 impl ClientDataChild {
     /// Construct a canonical child record for the selected alternative.
     pub fn new(kind: ClientDataChildKind, payload: Vec<u8>) -> Result<Self> {
+        let record_type = kind.known_record_type().ok_or_else(|| {
+            Error::InvalidFormat("opaque client-data children require a raw record type".into())
+        })?;
         let (version, instance) = kind.canonical_header();
         let child = Self {
             kind,
+            record_type,
             version,
             instance,
-            payload,
+            payload: Arc::from(payload.into_boxed_slice()),
+        };
+        child.validate()?;
+        Ok(child)
+    }
+
+    /// Construct an inert producer-defined child without interpreting it.
+    pub fn opaque(version: u16, instance: u16, record_type: u16, payload: Vec<u8>) -> Result<Self> {
+        let child = Self {
+            kind: ClientDataChildKind::Unknown,
+            record_type,
+            version,
+            instance,
+            payload: Arc::from(payload.into_boxed_slice()),
         };
         child.validate()?;
         Ok(child)
@@ -86,15 +114,39 @@ impl ClientDataChild {
 
     /// Serialize this complete child record.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        encode_record(
-            self.version,
-            self.instance,
-            self.kind.record_type(),
-            &self.payload,
-        )
+        encode_record(self.version, self.instance, self.record_type, &self.payload)
     }
 
     fn validate(&self) -> Result<()> {
+        if self.version > 0x000F {
+            return corrupted(format!(
+                "client-data recVer is out of range: {}",
+                self.version
+            ));
+        }
+        if self.instance > 0x0FFF {
+            return corrupted(format!(
+                "client-data recInstance is out of range: {}",
+                self.instance
+            ));
+        }
+        if let Some(expected_record_type) = self.kind.known_record_type() {
+            if self.record_type != expected_record_type {
+                return corrupted(format!(
+                    "{:?} recType must be 0x{expected_record_type:04X}",
+                    self.kind
+                ));
+            }
+        } else if is_known_record_type(self.record_type) {
+            return corrupted(format!(
+                "opaque client-data record type 0x{:04X} is a defined child",
+                self.record_type
+            ));
+        }
+
+        if self.kind.is_unknown() {
+            return Ok(());
+        }
         let (expected_version, expected_instance) = self.kind.canonical_header();
         if self.version != expected_version {
             return corrupted(format!("{:?} recVer must be {expected_version}", self.kind));
@@ -165,6 +217,7 @@ impl ClientDataChild {
             | ClientDataChildKind::MouseOverInteractiveInfo
             | ClientDataChildKind::RecolorInfo
             | ClientDataChildKind::ProgrammableTags => {},
+            ClientDataChildKind::Unknown => unreachable!("unknown children return above"),
         }
         Ok(())
     }
@@ -247,9 +300,10 @@ impl ClientData {
             let kind = classify(child_type, child_instance)?;
             let child = ClientDataChild {
                 kind,
+                record_type: child_type,
                 version: child_version,
                 instance: child_instance,
-                payload: bytes[offset + HEADER_LEN..end].to_vec(),
+                payload: Arc::from(bytes[offset + HEADER_LEN..end].to_vec().into_boxed_slice()),
             };
             child.validate()?;
             children.push(child);
@@ -261,17 +315,39 @@ impl ClientData {
 
     /// Iterate over the §2.7.4 tail in its original record order.
     pub fn round_trip_records(&self) -> impl Iterator<Item = &ClientDataChild> {
-        self.children.iter().filter(|child| child.kind.slot() == 8)
+        self.children
+            .iter()
+            .filter(|child| child.kind.slot() == Some(8))
     }
 
     /// Serialize the complete container and every child byte-exactly.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        validate_sequence(&self.children, ClientDataLimits::default())?;
-        let mut payload = Vec::new();
+        self.to_bytes_with_limits(ClientDataLimits::default())
+    }
+
+    /// Serialize with the same resource bounds used by a source snapshot.
+    pub fn to_bytes_with_limits(&self, limits: ClientDataLimits) -> Result<Vec<u8>> {
+        validate_sequence(&self.children, limits)?;
+        let payload_capacity = self
+            .children
+            .iter()
+            .try_fold(0usize, |length, child| {
+                length
+                    .checked_add(HEADER_LEN)
+                    .and_then(|length| length.checked_add(child.payload.len()))
+            })
+            .ok_or_else(|| {
+                Error::Corrupted("OfficeArtClientData payload length overflows".into())
+            })?;
+        let mut payload = Vec::with_capacity(payload_capacity);
         for child in &self.children {
             payload.extend_from_slice(&child.to_bytes()?);
         }
         encode_record(0x0F, 0, OFFICE_ART_CLIENT_DATA_RECORD_TYPE, &payload)
+    }
+
+    pub(super) fn validate_with_limits(&self, limits: ClientDataLimits) -> Result<()> {
+        validate_sequence(&self.children, limits)
     }
 }
 
@@ -297,32 +373,47 @@ fn classify(record_type: u16, instance: u16) -> Result<ClientDataChildKind> {
         RT_ROUND_TRIP_SHAPE_CHECKSUM_FOR_CL_12 => {
             ClientDataChildKind::RoundTripShapeChecksumForCustomLayouts12
         },
-        _ => {
-            return corrupted(format!(
-                "record type 0x{record_type:04X} is not valid in OfficeArtClientData"
-            ));
-        },
+        _ => ClientDataChildKind::Unknown,
     };
     Ok(kind)
 }
 
 fn validate_sequence(children: &[ClientDataChild], limits: ClientDataLimits) -> Result<()> {
-    if children.len() > limits.max_child_records || children.len() > MAX_DEFINED_CHILDREN {
+    if children.len() > limits.max_child_records || children.len() > MAX_KNOWN_CHILDREN {
         return corrupted("OfficeArtClientData has too many child records");
     }
-    let mut seen = [false; MAX_DEFINED_CHILDREN];
-    let mut last_slot = 0;
-    for (index, child) in children.iter().enumerate() {
+    let mut seen = [false; MAX_KNOWN_CHILDREN];
+    let mut last_slot = None;
+    let mut payload_len = 0usize;
+    for child in children {
         child.validate()?;
-        let slot = child.kind.slot();
-        if index != 0 && slot < last_slot {
+        if child.payload.len() > limits.max_child_payload_bytes {
+            return corrupted("OfficeArtClientData child exceeds the configured size limit");
+        }
+        payload_len = payload_len
+            .checked_add(HEADER_LEN)
+            .and_then(|value| value.checked_add(child.payload.len()))
+            .ok_or_else(|| {
+                Error::Corrupted("OfficeArtClientData payload length overflows".into())
+            })?;
+        if payload_len > limits.max_payload_bytes {
+            return corrupted("OfficeArtClientData payload exceeds the configured limit");
+        }
+
+        let Some(slot) = child.kind.slot() else {
+            continue;
+        };
+        if last_slot.is_some_and(|previous| slot < previous) {
             return corrupted(format!(
                 "{:?} appears outside its OfficeArtClientData slot",
                 child.kind
             ));
         }
-        last_slot = slot;
+        last_slot = Some(slot);
         let identity = child.kind as usize;
+        if identity >= seen.len() {
+            return corrupted("OfficeArtClientData child kind exceeds the known grammar");
+        }
         if seen[identity] {
             return corrupted(format!(
                 "OfficeArtClientData contains duplicate {:?} records",
@@ -332,6 +423,24 @@ fn validate_sequence(children: &[ClientDataChild], limits: ClientDataLimits) -> 
         seen[identity] = true;
     }
     Ok(())
+}
+
+fn is_known_record_type(record_type: u16) -> bool {
+    matches!(
+        record_type,
+        RT_ROUND_TRIP_SHAPE_ID_12
+            | RT_ROUND_TRIP_HF_PLACEHOLDER_12
+            | RT_ROUND_TRIP_SHAPE_CHECKSUM_FOR_CL_12
+            | RT_EXTERNAL_OBJECT_REF
+            | RT_PLACEHOLDER
+            | RT_SHAPE_FLAGS
+            | RT_SHAPE_FLAGS_10
+            | RT_ROUND_TRIP_NEW_PLACEHOLDER_ID_12
+            | RT_RECOLOR_INFO
+            | RT_INTERACTIVE_INFO
+            | RT_ANIMATION_INFO
+            | RT_PROG_TAGS
+    )
 }
 
 fn require_len(payload: &[u8], expected: usize, name: &str) -> Result<()> {
@@ -347,6 +456,16 @@ pub(super) fn encode_record(
     record_type: u16,
     data: &[u8],
 ) -> Result<Vec<u8>> {
+    if version > 0x000F {
+        return Err(Error::InvalidFormat(
+            "PowerPoint record version exceeds its four-bit field".into(),
+        ));
+    }
+    if instance > 0x0FFF {
+        return Err(Error::InvalidFormat(
+            "PowerPoint record instance exceeds its twelve-bit field".into(),
+        ));
+    }
     let length = u32::try_from(data.len())
         .map_err(|_| Error::Corrupted("PowerPoint record payload exceeds u32".into()))?;
     let mut bytes = Vec::with_capacity(HEADER_LEN.saturating_add(data.len()));

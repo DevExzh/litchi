@@ -1,8 +1,10 @@
 //! Semantic OfficeArt client-data values.
 
+use std::sync::Arc;
+
 use crate::embedded::reference::Reference;
 
-pub(super) const MAX_DEFINED_CHILDREN: usize = 13;
+pub(super) const MAX_KNOWN_CHILDREN: usize = 13;
 
 /// Resource limits for a shape client-data container.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20,7 +22,7 @@ impl Default for ClientDataLimits {
         Self {
             max_payload_bytes: 16 * 1024 * 1024,
             max_child_payload_bytes: 16 * 1024 * 1024,
-            max_child_records: MAX_DEFINED_CHILDREN,
+            max_child_records: MAX_KNOWN_CHILDREN,
         }
     }
 }
@@ -41,21 +43,36 @@ pub enum ClientDataChildKind {
     RoundTripShapeId12,
     RoundTripHeaderFooterPlaceholder12,
     RoundTripShapeChecksumForCustomLayouts12,
+    /// A producer-defined record retained without interpretation.
+    Unknown,
+}
+
+impl ClientDataChildKind {
+    /// Whether this child is an opaque producer extension.
+    pub const fn is_unknown(self) -> bool {
+        matches!(self, Self::Unknown)
+    }
 }
 
 /// One validated child record, retaining its exact payload and advisory instance.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientDataChild {
     pub(super) kind: ClientDataChildKind,
+    pub(super) record_type: u16,
     pub(super) version: u16,
     pub(super) instance: u16,
-    pub(super) payload: Vec<u8>,
+    pub(super) payload: Arc<[u8]>,
 }
 
 impl ClientDataChild {
     /// Classified child kind.
     pub fn kind(&self) -> ClientDataChildKind {
         self.kind
+    }
+
+    /// Raw OfficeArt record type, including producer-defined values.
+    pub const fn record_type(&self) -> u16 {
+        self.record_type
     }
 
     /// Record version retained from the input.
@@ -71,6 +88,11 @@ impl ClientDataChild {
     /// Exact child payload.
     pub fn payload(&self) -> &[u8] {
         &self.payload
+    }
+
+    /// Whether this child is an opaque producer record.
+    pub const fn is_unknown(&self) -> bool {
+        self.kind.is_unknown()
     }
 
     /// External object ID when this is an ExObjRefAtom.
@@ -120,6 +142,11 @@ impl ClientData {
     /// Return the unique record of a particular kind.
     pub fn child(&self, kind: ClientDataChildKind) -> Option<&ClientDataChild> {
         self.children.iter().find(|child| child.kind == kind)
+    }
+
+    /// Return opaque producer records in their original order.
+    pub fn unknown_children(&self) -> impl Iterator<Item = &ClientDataChild> {
+        self.children.iter().filter(|child| child.is_unknown())
     }
 
     pub fn shape_flags(&self) -> Option<&ClientDataChild> {
