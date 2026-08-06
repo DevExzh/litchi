@@ -15,7 +15,7 @@ pub(crate) fn blob_size(size: usize, limits: Limits) -> Result<(), Error> {
 pub(crate) fn layout(
     source: &[u8],
     kind: Kind,
-    outer: Outer,
+    outer: &Outer,
     header: Header,
     limits: Limits,
 ) -> Result<Layout, Error> {
@@ -140,7 +140,7 @@ pub(crate) fn layout(
 
 fn size(raw: u32, field: &'static str, maximum: usize) -> Result<usize, Error> {
     let value =
-        usize::try_from(raw).map_err(|_| Error::invalid(format!("{field} size overflows")))?;
+        usize::try_from(raw).map_err(|_error| Error::invalid(format!("{field} size overflows")))?;
     if value > maximum {
         return Err(Error::Limit(field));
     }
@@ -156,7 +156,7 @@ fn field_range(
     field: &'static str,
 ) -> Result<Range<usize>, Error> {
     let offset = usize::try_from(raw_offset)
-        .map_err(|_| Error::invalid(format!("{field} offset overflows usize")))?;
+        .map_err(|_error| Error::invalid(format!("{field} offset overflows usize")))?;
     let start = base
         .checked_add(offset)
         .ok_or_else(|| Error::invalid(format!("{field} offset overflows usize")))?;

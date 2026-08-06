@@ -71,40 +71,68 @@ pub struct Blob {
     source: Arc<[u8]>,
     kind: Kind,
     layout: codec::Layout,
+    limits: Limits,
 }
 
 impl Blob {
     /// Parses a complete blob using conservative default resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error`] when the source is malformed or exceeds the default
+    /// resource limits.
     pub fn parse(source: &[u8], kind: Kind) -> Result<Self, Error> {
         Self::parse_with(source, kind, Limits::default())
     }
 
     /// Parses a complete blob using caller-provided resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error`] when the source violates the wire invariants or the
+    /// supplied resource limits.
     pub fn parse_with(source: &[u8], kind: Kind, limits: Limits) -> Result<Self, Error> {
         let layout = codec::parse(source, kind, limits)?;
         Ok(Self {
             source: Arc::from(source),
             kind,
             layout,
+            limits,
         })
     }
 
     /// Parses an already-shared source allocation without copying it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error`] when the source violates the wire invariants or the
+    /// supplied resource limits.
     pub fn parse_shared(source: Arc<[u8]>, kind: Kind, limits: Limits) -> Result<Self, Error> {
         let layout = codec::parse(&source, kind, limits)?;
         Ok(Self {
             source,
             kind,
             layout,
+            limits,
         })
     }
 
     /// Parses a complete `DigSigBlob` using default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error`] when the source is malformed or exceeds the default
+    /// resource limits.
     pub fn parse_property(source: &[u8]) -> Result<Self, Error> {
         Self::parse(source, Kind::Property)
     }
 
     /// Parses a complete `WordSigBlob` using default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error`] when the source is malformed or exceeds the default
+    /// resource limits.
     pub fn parse_word(source: &[u8]) -> Result<Self, Error> {
         Self::parse(source, Kind::Word)
     }
@@ -113,6 +141,12 @@ impl Blob {
     #[must_use]
     pub const fn kind(&self) -> Kind {
         self.kind
+    }
+
+    /// Returns the resource limits retained for subsequent edits.
+    #[must_use]
+    pub const fn limits(&self) -> Limits {
+        self.limits
     }
 
     /// Borrows the typed nested signature information.
@@ -137,6 +171,28 @@ impl Blob {
     #[must_use]
     pub fn into_bytes(self) -> Arc<[u8]> {
         self.source
+    }
+
+    /// Captures this exact source as an immutable editing snapshot.
+    #[must_use]
+    pub fn snapshot(&self) -> super::Snapshot {
+        super::Snapshot::from_blob(self.clone())
+    }
+
+    /// Starts a source-checked edit over this exact source.
+    #[must_use]
+    pub fn edit(&self) -> super::Transaction {
+        self.snapshot().edit()
+    }
+
+    /// Alias for [`Self::edit`] using transactional terminology.
+    #[must_use]
+    pub fn transaction(&self) -> super::Transaction {
+        self.edit()
+    }
+
+    pub(crate) fn layout(&self) -> &codec::Layout {
+        &self.layout
     }
 }
 

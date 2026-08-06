@@ -8,9 +8,15 @@
 
 mod codec;
 mod model;
+mod patch;
+mod snapshot;
+mod transaction;
 mod validation;
 
 #[cfg(test)]
 mod tests;
 
 pub use model::{Blob, Error, Info, Kind, Limits};
+pub use patch::{Change, Patch};
+pub use snapshot::Snapshot;
+pub use transaction::{Commit, Revision, Transaction, update};
