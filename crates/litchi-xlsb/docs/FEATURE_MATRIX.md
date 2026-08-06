@@ -48,7 +48,7 @@ formula results are recalculated or that external, macro, or embedded content is
 | Worksheet cell CRUD | ✅ | ✅ | ✅ | Typed worksheet snapshots and writer models support cell insertion, lookup, value changes, and sheet serialization. |
 | Hyperlinks | ✅ | ✅ | ✅ | BIFF12 hyperlink targets, display/location metadata, and bounded authoring are supported; links are never followed. |
 | Classic comments and notes | ✅ | ✅ | ✅ | Worksheet comment records have a typed model and writer support. Comment text and anchors are data only. |
-| Threaded comments and persons | ❌ | ❌ | ❌ | No typed threaded-comment/person/mention model is exposed. |
+| Threaded comments and persons | ✅ | ✅ | ✅ | Contextual `comments::threaded::{Snapshot, Transaction, Commit, Patch}` owns bounded people/thread/mention metadata, worksheet relationship validation, source-checked CRUD, exact no-op replay, and inert package publication; collaboration services are never contacted. |
 | Data validation | ✅ | ✅ | ✅ | Validation ranges and supported rule/formula forms are read and written through the worksheet/package writer. |
 | Conditional formatting | ✅ | ✅ | ✅ | Classic rules, differential formatting, formulas, ranges, icon sets, color scales, data bars, and implemented extension/FRT forms are validated and serialized. Formulas are not evaluated. |
 | AutoFilter, filter criteria, and sort state | 🟡 | ✅ | 🟡 | Worksheet AutoFilter and criteria metadata are modeled; the complete Excel filter UI and every producer extension are not a semantic engine. |
