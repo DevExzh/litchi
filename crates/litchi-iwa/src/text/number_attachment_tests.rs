@@ -4,6 +4,7 @@ use super::{
 use crate::pages::PagesEditor;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::comment::DrawableId;
+use litchi_iwa_text::number_attachment::raw::object_id as native_object_id;
 
 const PREFIX: &str = "Page ";
 const POSITION: DrawablePoint = DrawablePoint { x: 40.0, y: 80.0 };
@@ -75,7 +76,7 @@ fn invalid_positions_and_text_replacement_are_transactional() {
             .package()
             .archive(name)
             .unwrap()
-            .object(attachment.id.object_id())
+            .object(native_object_id(attachment.id))
             .is_some()
     }));
     assert_eq!(pages.to_bytes().unwrap(), baseline);

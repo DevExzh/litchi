@@ -18,7 +18,6 @@ pub(crate) use super::character::{
 use super::font::TextFont;
 use super::paragraph_direction::ParagraphWritingDirection;
 use super::paragraph_flow::ParagraphFlow;
-use super::paragraph_following_style::{NamedParagraphStyle, ParagraphFollowingStyle};
 use super::paragraph_style_apply::{self, AppliedParagraphStyle};
 use super::paragraph_style_catalog;
 use super::paragraph_style_delete;
@@ -36,6 +35,7 @@ use super::style::{
 use super::style_registry::{
     object_archive_name, register_private_style, unregister_private_style,
 };
+use litchi_iwa_text::paragraph::style::{NamedParagraphStyle, ParagraphFollowingStyle};
 
 #[derive(Debug, Clone)]
 enum ParagraphProperty<'a> {
@@ -641,7 +641,7 @@ pub(crate) fn applied_named_paragraph_style(
 pub(super) fn apply_named_paragraph_style(
     package: &mut IWorkPackage,
     storage_id: u64,
-    target: super::paragraph_following_style::ParagraphStyleId,
+    target: litchi_iwa_text::paragraph::style::ParagraphStyleId,
 ) -> Result<NamedParagraphStyle> {
     paragraph_style_apply::apply_named_paragraph_style(package, storage_id, target)
 }
@@ -649,8 +649,8 @@ pub(super) fn apply_named_paragraph_style(
 pub(super) fn create_named_paragraph_style(
     package: &mut IWorkPackage,
     storage_id: u64,
-    source: super::paragraph_following_style::ParagraphStyleId,
-    name: super::paragraph_following_style::ParagraphStyleName,
+    source: litchi_iwa_text::paragraph::style::ParagraphStyleId,
+    name: litchi_iwa_text::paragraph::style::ParagraphStyleName,
 ) -> Result<NamedParagraphStyle> {
     let storage = storage::locate(package, storage_id)?;
     paragraph_style_catalog::create_named_paragraph_style(package, storage.style_id, source, name)
@@ -659,8 +659,8 @@ pub(super) fn create_named_paragraph_style(
 pub(super) fn rename_named_paragraph_style(
     package: &mut IWorkPackage,
     storage_id: u64,
-    target: super::paragraph_following_style::ParagraphStyleId,
-    name: super::paragraph_following_style::ParagraphStyleName,
+    target: litchi_iwa_text::paragraph::style::ParagraphStyleId,
+    name: litchi_iwa_text::paragraph::style::ParagraphStyleName,
 ) -> Result<NamedParagraphStyle> {
     let storage = storage::locate(package, storage_id)?;
     paragraph_style_rename::rename_named_paragraph_style(package, storage.style_id, target, name)
@@ -669,7 +669,7 @@ pub(super) fn rename_named_paragraph_style(
 pub(super) fn delete_named_paragraph_style(
     package: &mut IWorkPackage,
     storage_id: u64,
-    target: super::paragraph_following_style::ParagraphStyleId,
+    target: litchi_iwa_text::paragraph::style::ParagraphStyleId,
 ) -> Result<NamedParagraphStyle> {
     let storage = storage::locate(package, storage_id)?;
     paragraph_style_delete::delete_named_paragraph_style(package, storage.style_id, target)

@@ -4,10 +4,10 @@
 
 use super::PagesEditor;
 use crate::Result;
-use litchi_iwa_common::comment::DrawableId;
 use crate::text::{
     TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings, TextPosition,
 };
+use litchi_iwa_common::comment::DrawableId;
 
 impl PagesEditor {
     /// Read every number attachment in the main Pages body.
@@ -226,7 +226,8 @@ mod tests {
             )
             .unwrap();
         let after_insert = pages.to_bytes().unwrap();
-        let missing_attachment = TextNumberAttachmentId::from_object_id(999_999).unwrap();
+        let missing_attachment =
+            litchi_iwa_text::number_attachment::raw::from_object_id(999_999).unwrap();
         assert!(
             pages
                 .update_text_box_number_attachment(

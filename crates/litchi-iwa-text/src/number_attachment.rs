@@ -4,6 +4,11 @@
 //! package mutation stay in the owning IWA adapter. This module owns only the
 //! checked values exchanged at that boundary.
 
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "Opaque IDs keep their raw adapter module adjacent to private representations."
+)]
+
 use std::fmt;
 use std::num::NonZeroU64;
 
@@ -57,30 +62,39 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TextNumberAttachmentId(NonZeroU64);
 
-impl TextNumberAttachmentId {
-    /// Construct an identifier obtained from a native object reference.
+/// Explicit native-boundary conversions for the opaque attachment handle.
+#[allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "Keep the explicit raw adapter boundary adjacent to its opaque handle."
+)]
+pub mod raw {
+    use super::{Result, TextNumberAttachmentId};
+
+    /// Validate a native attachment object identifier at the IWA boundary.
     ///
     /// # Errors
     ///
     /// Returns [`Error::ZeroObjectId`] when `identifier` is zero.
-    pub const fn from_object_id(identifier: u64) -> Result<Self> {
+    pub const fn from_object_id(identifier: u64) -> Result<TextNumberAttachmentId> {
+        TextNumberAttachmentId::from_raw(identifier)
+    }
+
+    /// Recover a native attachment object identifier inside an adapter.
+    #[must_use]
+    pub const fn object_id(identifier: TextNumberAttachmentId) -> u64 {
+        identifier.into_raw()
+    }
+}
+
+impl TextNumberAttachmentId {
+    const fn from_raw(identifier: u64) -> Result<Self> {
         match NonZeroU64::new(identifier) {
-            Some(identifier) => Ok(Self(identifier)),
+            Some(non_zero) => Ok(Self(non_zero)),
             None => Err(Error::ZeroObjectId),
         }
     }
 
-    /// Construct an identifier from a native value without losing its bits.
-    ///
-    /// This is intentionally fallible: zero is not a valid native object
-    /// identifier and is never representable by the semantic value.
-    pub const fn from_native(identifier: u64) -> Result<Self> {
-        Self::from_object_id(identifier)
-    }
-
-    /// Return the underlying package object identifier.
-    #[must_use]
-    pub const fn object_id(self) -> u64 {
+    const fn into_raw(self) -> u64 {
         self.0.get()
     }
 }
@@ -183,12 +197,24 @@ impl TextNumberAttachmentText {
     /// Validate and own borrowed native attachment text.
     ///
     /// Validation occurs before allocation for borrowed input.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::TextTooLong`] when `value` exceeds the bounded native
+    /// text budget, or [`Error::TextControlCharacter`] when it contains a
+    /// Unicode control character.
     pub fn new(value: &str) -> Result<Self> {
         validate_text(value)?;
         Ok(Self(value.into()))
     }
 
     /// Validate and retain an existing boxed string without reallocating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::TextTooLong`] when `value` exceeds the bounded native
+    /// text budget, or [`Error::TextControlCharacter`] when it contains a
+    /// Unicode control character.
     pub fn from_boxed(value: Box<str>) -> Result<Self> {
         validate_text(&value)?;
         Ok(Self(value))
@@ -295,6 +321,10 @@ impl TextNumberAttachmentSettings {
 }
 
 /// One native number attachment at a U+FFFC text position.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "TextNumberAttachment is the established semantic name at the adapter boundary."
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextNumberAttachment {
     /// Native attachment object identifier.
@@ -343,15 +373,12 @@ mod tests {
     #[test]
     fn identifiers_are_nonzero_and_native_sized() {
         assert_eq!(size_of::<TextNumberAttachmentId>(), size_of::<u64>());
-        assert_eq!(
-            TextNumberAttachmentId::from_object_id(0),
-            Err(Error::ZeroObjectId)
-        );
+        assert_eq!(raw::from_object_id(0), Err(Error::ZeroObjectId));
 
-        let identifier = TextNumberAttachmentId::from_native(42).unwrap_or_else(|error| {
+        let identifier = raw::from_object_id(42).unwrap_or_else(|error| {
             panic!("nonzero native identifiers should be accepted: {error}")
         });
-        assert_eq!(identifier.object_id(), 42);
+        assert_eq!(raw::object_id(identifier), 42);
     }
 
     #[test]
@@ -419,11 +446,11 @@ mod tests {
     fn attachment_is_composed_from_typed_compact_values() {
         assert_eq!(size_of::<TextNumberAttachmentFormat>(), size_of::<u32>());
         let attachment = TextNumberAttachment::new(
-            TextNumberAttachmentId::from_object_id(7).unwrap(),
+            raw::from_object_id(7).unwrap(),
             TextPosition::from_utf16_code_units(4),
             TextNumberAttachmentSettings::new(TextNumberAttachmentKind::PageCount),
         );
-        assert_eq!(attachment.id.object_id(), 7);
+        assert_eq!(raw::object_id(attachment.id), 7);
         assert_eq!(attachment.position.utf16_index(), 4);
         assert_eq!(
             attachment.settings.kind,

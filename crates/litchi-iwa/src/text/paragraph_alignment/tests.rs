@@ -23,6 +23,7 @@ use crate::text::{
 };
 use litchi_iwa_text::columns::{Columns, Count};
 use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
+use litchi_iwa_text::paragraph::style::raw::{from_native_id, native_id};
 
 const SOURCE_PAGES_OBJECT_TITLE_STYLE_ID: u64 = 121;
 
@@ -63,9 +64,8 @@ fn pages_following_paragraph_style_catalog_round_trips_and_resets() {
     let body = styles.iter().find(|style| style.name() == "Body").unwrap();
     let expected = ParagraphFollowingStyle::Named(body.id());
     let before = pages.to_bytes().unwrap();
-    let hidden_object_title = ParagraphFollowingStyle::Named(
-        ParagraphStyleId::new(SOURCE_PAGES_OBJECT_TITLE_STYLE_ID).unwrap(),
-    );
+    let hidden_object_title =
+        ParagraphFollowingStyle::Named(from_native_id(SOURCE_PAGES_OBJECT_TITLE_STYLE_ID).unwrap());
     assert!(
         pages
             .set_text_box_paragraph_following_style(
@@ -4861,7 +4861,7 @@ fn named_paragraph_style_rename_uses_exact_native_anchor_with_sibling_payload() 
         .unwrap();
     let storage_id = text_box.storage.object_id;
     let mut package = pages.into_package();
-    let location = native::locate_style(&package, created.id().get()).unwrap();
+    let location = native::locate_style(&package, native_id(created.id())).unwrap();
     let sibling_data = vec![0x98, 0x06, 0x09];
     package
         .update_archive(&location.archive_name, |archive| {
@@ -4892,7 +4892,7 @@ fn named_paragraph_style_rename_uses_exact_native_anchor_with_sibling_payload() 
     )
     .unwrap();
     assert_eq!(renamed.name(), "Rename target");
-    let style_after = native::locate_style(&package, created.id().get()).unwrap();
+    let style_after = native::locate_style(&package, native_id(created.id())).unwrap();
     assert_eq!(style_after.message_index, location.message_index + 1);
     let archive = package.archive(&style_after.archive_name).unwrap();
     let object = archive.object(style_after.object_id).unwrap();

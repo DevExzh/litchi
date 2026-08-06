@@ -3,8 +3,8 @@
 use crate::{Error, IWorkPackage, Result};
 
 use super::paragraph_alignment::{native, storage};
-use super::paragraph_following_style::NamedParagraphStyle;
 use super::paragraph_style_apply::{applied_named_paragraph_style, apply_named_paragraph_style};
+use litchi_iwa_text::paragraph::style::{NamedParagraphStyle, raw::native_id};
 
 pub(super) fn redefine_applied_named_paragraph_style(
     package: &mut IWorkPackage,
@@ -21,7 +21,7 @@ pub(super) fn redefine_applied_named_paragraph_style(
     let mut current = storage.style_id;
     let target = applied.style().id();
     let mut variations = Vec::new();
-    while current != target.get() {
+    while current != native_id(target) {
         if variations.contains(&current) {
             return Err(Error::InvalidFormat(format!(
                 "iWork paragraph-style override chain contains a cycle at {current}"
@@ -38,7 +38,7 @@ pub(super) fn redefine_applied_named_paragraph_style(
     }
 
     let mut staged = package.clone();
-    native::redefine_named_style(&mut staged, target.get(), &variations)?;
+    native::redefine_named_style(&mut staged, native_id(target), &variations)?;
     let redefined = apply_named_paragraph_style(&mut staged, storage_id, target)?;
     let verified = applied_named_paragraph_style(&staged, storage_id)?;
     if verified.style() != &redefined || verified.has_overrides() {

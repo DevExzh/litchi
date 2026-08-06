@@ -5,6 +5,10 @@
 //! checked semantic values that cross that boundary.
 
 #![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "Opaque IDs keep their raw adapter module adjacent to private representations."
+)]
+#![allow(
     clippy::module_name_repetitions,
     reason = "The explicit names distinguish paragraph-style identities at format boundaries."
 )]
@@ -102,6 +106,18 @@ impl AsRef<str> for ParagraphStyleName {
     }
 }
 
+impl PartialEq<str> for ParagraphStyleName {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<&str> for ParagraphStyleName {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
 impl TryFrom<&str> for ParagraphStyleName {
     type Error = Error;
 
@@ -124,28 +140,40 @@ impl TryFrom<String> for ParagraphStyleName {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ParagraphStyleId(NonZeroU64);
 
-impl ParagraphStyleId {
-    /// Validate a paragraph-style identifier.
+/// Explicit native-boundary conversions for the opaque paragraph-style handle.
+#[allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "Keep the explicit raw adapter boundary adjacent to its opaque handle."
+)]
+pub mod raw {
+    use super::{ParagraphStyleId, Result};
+
+    /// Validate a native paragraph-style identifier at the IWA boundary.
     ///
     /// # Errors
     ///
     /// Returns [`Error::ZeroId`] when `value` is zero.
-    pub fn new(value: u64) -> Result<Self> {
-        NonZeroU64::new(value).map(Self).ok_or(Error::ZeroId)
+    pub fn from_native_id(value: u64) -> Result<ParagraphStyleId> {
+        ParagraphStyleId::from_raw(value)
     }
 
-    /// Return the numeric identifier used by the archive adapter.
+    /// Recover a native paragraph-style identifier inside an adapter.
     #[must_use]
-    pub const fn get(self) -> u64 {
-        self.0.get()
+    pub const fn native_id(value: ParagraphStyleId) -> u64 {
+        value.into_raw()
     }
 }
 
-impl TryFrom<u64> for ParagraphStyleId {
-    type Error = Error;
+impl ParagraphStyleId {
+    const fn from_raw(value: u64) -> Result<Self> {
+        match NonZeroU64::new(value) {
+            Some(non_zero) => Ok(Self(non_zero)),
+            None => Err(Error::ZeroId),
+        }
+    }
 
-    fn try_from(value: u64) -> Result<Self> {
-        Self::new(value)
+    const fn into_raw(self) -> u64 {
+        self.0.get()
     }
 }
 
@@ -250,8 +278,8 @@ mod tests {
 
     #[test]
     fn identifiers_are_nonzero_and_compact() {
-        assert_eq!(ParagraphStyleId::new(0), Err(Error::ZeroId));
-        assert_eq!(ParagraphStyleId::new(42).unwrap().get(), 42);
+        assert_eq!(raw::from_native_id(0), Err(Error::ZeroId));
+        assert_eq!(raw::native_id(raw::from_native_id(42).unwrap()), 42);
         assert_eq!(size_of::<ParagraphStyleId>(), size_of::<u64>());
     }
 
@@ -282,7 +310,7 @@ mod tests {
         assert_eq!(name.as_str(), "Heading");
         assert_eq!(name.clone().into_string(), "Heading");
 
-        let id = ParagraphStyleId::new(7).unwrap();
+        let id = raw::from_native_id(7).unwrap();
         let style = NamedParagraphStyle::new(id, name.clone());
         assert_eq!(style.id(), id);
         assert_eq!(style.name(), &name);
@@ -296,7 +324,7 @@ mod tests {
             ParagraphFollowingStyle::Same
         );
 
-        let id = ParagraphStyleId::new(9).unwrap();
+        let id = raw::from_native_id(9).unwrap();
         assert_eq!(
             ParagraphFollowingStyle::named(id),
             ParagraphFollowingStyle::Named(id)

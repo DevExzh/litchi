@@ -12,9 +12,9 @@ use crate::wire::{repeated_length_delimited_payloads, rewrite_repeated_length_de
 use crate::{Error, IWorkPackage, IWorkThemeArchive, Result};
 
 use super::paragraph_alignment::native;
-use super::paragraph_following_style::{NamedParagraphStyle, ParagraphStyleId};
 use super::paragraph_style_catalog::{ThemeLocation, locate_themes};
 use super::style_registry::object_archive_name;
+use litchi_iwa_text::paragraph::style::{NamedParagraphStyle, ParagraphStyleId, raw::native_id};
 
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const STYLESHEET_STYLES_FIELD: u32 = 1;
@@ -38,36 +38,36 @@ pub(super) fn delete_named_paragraph_style(
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "iWork paragraph style {} is not selectable",
-                target.get()
+                native_id(target)
             ))
         })?;
-    let location = native::locate_style(package, target.get())?;
-    let stylesheet_id = native::stylesheet_id(&location.style, target.get())?;
+    let location = native::locate_style(package, native_id(target))?;
+    let stylesheet_id = native::stylesheet_id(&location.style, native_id(target))?;
     let stylesheet_archive_name = object_archive_name(package, stylesheet_id)?;
     if location.archive_name != stylesheet_archive_name {
         return Err(Error::InvalidFormat(format!(
             "named iWork paragraph style {} is not stored with stylesheet {stylesheet_id}",
-            target.get()
+            native_id(target)
         )));
     }
-    let themes = locate_themes(package, stylesheet_id, target.get())?;
-    ensure_no_live_references(package, target.get(), stylesheet_id, &themes)?;
+    let themes = locate_themes(package, stylesheet_id, native_id(target))?;
+    ensure_no_live_references(package, native_id(target), stylesheet_id, &themes)?;
 
     let mut staged = package.clone();
     for theme in &themes {
-        remove_theme_preset(&mut staged, theme, stylesheet_id, target.get())?;
+        remove_theme_preset(&mut staged, theme, stylesheet_id, native_id(target))?;
     }
     remove_stylesheet_entry(
         &mut staged,
         &stylesheet_archive_name,
         stylesheet_id,
-        target.get(),
+        native_id(target),
     )?;
     if let Some(component) = component_identifier_for_entry(&staged, &stylesheet_archive_name)? {
-        remove_component_external_references_to_object(&mut staged, component, target.get())?;
-        remove_component_object_uuids(&mut staged, component, &[target.get()])?;
+        remove_component_external_references_to_object(&mut staged, component, native_id(target))?;
+        remove_component_object_uuids(&mut staged, component, &[native_id(target)])?;
     }
-    release_package_identifier_suffix(&mut staged, &[target.get()])?;
+    release_package_identifier_suffix(&mut staged, &[native_id(target)])?;
 
     if native::named_paragraph_styles(&staged, first_style_id)?
         .iter()

@@ -41,7 +41,6 @@ use super::hyperlink::{
     add_text_hyperlink, remove_text_hyperlink, remove_unreferenced_hyperlink_objects,
     text_hyperlinks, update_text_hyperlink,
 };
-use super::hyperlink_types::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
 use super::language::{
     remove_text_language_boundary, reset_text_languages, set_text_language, text_language,
     text_languages,
@@ -50,9 +49,6 @@ use super::number_attachment::{
     insert_text_number_attachment, remove_text_number_attachment,
     remove_unreferenced_number_attachment_objects, text_number_attachments,
     update_text_number_attachment,
-};
-use super::number_attachment_types::{
-    TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings,
 };
 use super::paragraph_alignment::{
     applied_named_paragraph_style, apply_named_paragraph_style, create_named_paragraph_style,
@@ -81,9 +77,6 @@ use super::paragraph_alignment::{
 };
 use super::paragraph_direction::ParagraphWritingDirection;
 use super::paragraph_flow::ParagraphFlow;
-use super::paragraph_following_style::{
-    NamedParagraphStyle, ParagraphFollowingStyle, ParagraphStyleId, ParagraphStyleName,
-};
 use super::paragraph_list::{
     ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
     ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
@@ -120,12 +113,20 @@ use super::text_comment::{
     add_text_comment, add_text_comment_reply, remove_text_comment, remove_text_comment_reply,
     text_comment_replies, text_comments, update_text_comment, update_text_comment_reply,
 };
-use super::text_comment_types::{
+use litchi_iwa_text::comment::{
     TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
     TextCommentReplyId,
 };
-use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
 use litchi_iwa_text::date_time::{DisplayText, Settings};
+use litchi_iwa_text::hyperlink::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
+use litchi_iwa_text::number_attachment::{
+    TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings,
+};
+use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
+use litchi_iwa_text::paragraph::style::{
+    NamedParagraphStyle, ParagraphFollowingStyle, ParagraphStyleId, ParagraphStyleName,
+    raw::native_id,
+};
 use litchi_iwa_text::position::{TextPosition, TextRange};
 use litchi_iwa_text::storage::Storage;
 use litchi_iwa_text::{TextLanguage, TextLanguageRun};
@@ -1813,7 +1814,7 @@ impl IWorkTextEditor {
         if current.style().id() != target {
             return Err(Error::InvalidFormat(format!(
                 "iWork text storage {object_id} does not currently use paragraph style {}",
-                target.get()
+                native_id(target)
             )));
         }
 

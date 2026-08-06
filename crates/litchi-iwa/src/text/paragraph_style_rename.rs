@@ -5,7 +5,9 @@ use crate::wire::patch_nested_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
 
 use super::paragraph_alignment::native;
-use super::paragraph_following_style::{NamedParagraphStyle, ParagraphStyleId, ParagraphStyleName};
+use litchi_iwa_text::paragraph::style::{
+    NamedParagraphStyle, ParagraphStyleId, ParagraphStyleName, raw::native_id,
+};
 
 const STYLE_SUPER_FIELD: u32 = 1;
 const STYLE_NAME_FIELD: u32 = 1;
@@ -20,7 +22,7 @@ pub(super) fn rename_named_paragraph_style(
     let current = native::named_paragraph_styles(package, first_style_id)?;
     if current
         .iter()
-        .any(|style| style.id() != target && style.name() == name.as_str())
+        .any(|style| style.id() != target && style.name().as_str() == name.as_str())
     {
         return Err(Error::InvalidFormat(format!(
             "iWork paragraph style name {:?} already exists",
@@ -29,16 +31,16 @@ pub(super) fn rename_named_paragraph_style(
     }
     if let Some(existing) = current
         .iter()
-        .find(|style| style.id() == target && style.name() == name.as_str())
+        .find(|style| style.id() == target && style.name().as_str() == name.as_str())
     {
         return Ok(existing.clone());
     }
 
-    let location = native::locate_style(package, target.get())?;
+    let location = native::locate_style(package, native_id(target))?;
     let mut staged = package.clone();
     rename_at_location(&mut staged, &location, name.as_str())?;
 
-    let renamed = NamedParagraphStyle::new(target, name.as_str().to_owned())?;
+    let renamed = NamedParagraphStyle::from_owned(target, name.as_str().to_owned())?;
     let matches = native::named_paragraph_styles(&staged, first_style_id)?
         .into_iter()
         .filter(|style| style == &renamed)

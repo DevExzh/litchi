@@ -10,9 +10,12 @@
 pub mod bookmark;
 pub mod character;
 pub mod columns;
+pub mod comment;
 pub mod date_time;
 pub mod font;
+pub mod hyperlink;
 pub mod language;
+pub mod number_attachment;
 pub mod paragraph;
 pub mod position;
 pub mod storage;

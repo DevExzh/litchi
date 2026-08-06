@@ -9,11 +9,16 @@
     clippy::module_name_repetitions,
     reason = "TextComment names identify the comment semantic value in this focused module"
 )]
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "Opaque IDs keep their raw adapter module adjacent to private representations."
+)]
 
 use std::num::NonZeroU64;
 
-use litchi_iwa_common::comment::Uuid;
+use litchi_iwa_common::comment::{AuthorId, Uuid};
 
+use crate::date_time::Instant;
 use crate::position::TextRange;
 
 /// Maximum UTF-8 byte length retained by a ranged comment body.
@@ -61,45 +66,55 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TextCommentId(NonZeroU64);
 
-impl TextCommentId {
-    /// Validate a native comment identifier.
+/// Explicit native-boundary conversions for the opaque comment handle.
+#[allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "Keep the explicit raw adapter boundary adjacent to its opaque handles."
+)]
+pub mod raw {
+    use super::{Result, TextCommentId, TextCommentReplyId};
+
+    /// Validate a native ranged-comment object identifier.
     ///
     /// # Errors
     ///
     /// Returns [`Error::ZeroCommentId`] for the native zero sentinel.
-    pub fn new(identifier: u64) -> Result<Self> {
-        NonZeroU64::new(identifier)
-            .map(Self)
-            .ok_or(Error::ZeroCommentId)
+    pub const fn comment_id(identifier: u64) -> Result<TextCommentId> {
+        TextCommentId::from_raw(identifier)
     }
 
-    /// Construct an identifier obtained from a native object reference.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::ZeroCommentId`] for the native zero sentinel.
-    pub fn from_object_id(identifier: u64) -> Result<Self> {
-        Self::new(identifier)
-    }
-
-    /// Return the native object identifier.
+    /// Recover a native ranged-comment object identifier inside an adapter.
     #[must_use]
-    pub const fn object_id(self) -> u64 {
+    pub const fn comment_id_value(identifier: TextCommentId) -> u64 {
+        identifier.into_raw()
+    }
+
+    /// Validate a native direct-reply object identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::ZeroReplyId`] for the native zero sentinel.
+    pub const fn reply_id(identifier: u64) -> Result<TextCommentReplyId> {
+        TextCommentReplyId::from_raw(identifier)
+    }
+
+    /// Recover a native direct-reply object identifier inside an adapter.
+    #[must_use]
+    pub const fn reply_id_value(identifier: TextCommentReplyId) -> u64 {
+        identifier.into_raw()
+    }
+}
+
+impl TextCommentId {
+    const fn from_raw(identifier: u64) -> Result<Self> {
+        match NonZeroU64::new(identifier) {
+            Some(non_zero) => Ok(Self(non_zero)),
+            None => Err(Error::ZeroCommentId),
+        }
+    }
+
+    const fn into_raw(self) -> u64 {
         self.0.get()
-    }
-}
-
-impl TryFrom<u64> for TextCommentId {
-    type Error = Error;
-
-    fn try_from(identifier: u64) -> Result<Self> {
-        Self::new(identifier)
-    }
-}
-
-impl From<TextCommentId> for u64 {
-    fn from(identifier: TextCommentId) -> Self {
-        identifier.object_id()
     }
 }
 
@@ -109,44 +124,15 @@ impl From<TextCommentId> for u64 {
 pub struct TextCommentReplyId(NonZeroU64);
 
 impl TextCommentReplyId {
-    /// Validate a native reply identifier.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::ZeroReplyId`] for the native zero sentinel.
-    pub fn new(identifier: u64) -> Result<Self> {
-        NonZeroU64::new(identifier)
-            .map(Self)
-            .ok_or(Error::ZeroReplyId)
+    const fn from_raw(identifier: u64) -> Result<Self> {
+        match NonZeroU64::new(identifier) {
+            Some(non_zero) => Ok(Self(non_zero)),
+            None => Err(Error::ZeroReplyId),
+        }
     }
 
-    /// Construct an identifier obtained from a native reply reference.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::ZeroReplyId`] for the native zero sentinel.
-    pub fn from_object_id(identifier: u64) -> Result<Self> {
-        Self::new(identifier)
-    }
-
-    /// Return the native reply-storage object identifier.
-    #[must_use]
-    pub const fn object_id(self) -> u64 {
+    const fn into_raw(self) -> u64 {
         self.0.get()
-    }
-}
-
-impl TryFrom<u64> for TextCommentReplyId {
-    type Error = Error;
-
-    fn try_from(identifier: u64) -> Result<Self> {
-        Self::new(identifier)
-    }
-}
-
-impl From<TextCommentReplyId> for u64 {
-    fn from(identifier: TextCommentReplyId) -> Self {
-        identifier.object_id()
     }
 }
 
@@ -302,40 +288,199 @@ impl TryFrom<&str> for TextCommentReplyBody {
     }
 }
 
-/// One ranged text comment with optional native metadata.
+/// Metadata retained for a ranged text comment without exposing archive IDs.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Metadata {
+    creation_date: Option<Instant>,
+    author: Option<AuthorId>,
+    storage_uuid: Uuid,
+}
+
+impl Metadata {
+    /// Construct validated comment metadata.
+    #[must_use]
+    pub const fn new(
+        creation_date: Option<Instant>,
+        author: Option<AuthorId>,
+        storage_uuid: Uuid,
+    ) -> Self {
+        Self {
+            creation_date,
+            author,
+            storage_uuid,
+        }
+    }
+
+    /// Return the optional Apple reference-date creation instant.
+    #[must_use]
+    pub const fn creation_date(self) -> Option<Instant> {
+        self.creation_date
+    }
+
+    /// Return the optional typed author identity.
+    #[must_use]
+    pub const fn author(self) -> Option<AuthorId> {
+        self.author
+    }
+
+    /// Return the stable semantic comment-storage UUID.
+    #[must_use]
+    pub const fn storage_uuid(self) -> Uuid {
+        self.storage_uuid
+    }
+}
+
+/// One ranged text comment with validated semantic metadata.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextComment {
     /// Stable semantic comment identity.
-    pub id: TextCommentId,
+    id: TextCommentId,
     /// Nonempty half-open UTF-16 range covered by the comment.
-    pub range: TextRange,
+    range: TextRange,
     /// Root comment body.
-    pub body: TextCommentBody,
-    /// Seconds since Apple's 2001-01-01 reference date, when stored.
-    pub creation_date_seconds: Option<f64>,
-    /// Native annotation-author object identifier, when stored.
-    pub author_object_id: Option<u64>,
-    /// Stable UUID of the owned root comment storage.
-    pub storage_uuid: Uuid,
-    /// Number of direct replies in the thread.
-    pub reply_count: u32,
+    body: TextCommentBody,
+    metadata: Metadata,
+    reply_count: u32,
+}
+
+impl TextComment {
+    /// Construct a comment from validated semantic values.
+    #[must_use]
+    pub const fn new(
+        id: TextCommentId,
+        range: TextRange,
+        body: TextCommentBody,
+        metadata: Metadata,
+        reply_count: u32,
+    ) -> Self {
+        Self {
+            id,
+            range,
+            body,
+            metadata,
+            reply_count,
+        }
+    }
+
+    /// Return the opaque semantic comment identity.
+    #[must_use]
+    pub const fn id(&self) -> TextCommentId {
+        self.id
+    }
+
+    /// Return the nonempty UTF-16 range covered by the comment.
+    #[must_use]
+    pub const fn range(&self) -> TextRange {
+        self.range
+    }
+
+    /// Borrow the validated root-comment body.
+    #[must_use]
+    pub const fn body(&self) -> &TextCommentBody {
+        &self.body
+    }
+
+    /// Return validated comment metadata.
+    #[must_use]
+    pub const fn metadata(&self) -> Metadata {
+        self.metadata
+    }
+
+    /// Return the optional Apple reference-date creation instant.
+    #[must_use]
+    pub const fn creation_date(&self) -> Option<Instant> {
+        self.metadata.creation_date()
+    }
+
+    /// Return the optional typed author identity.
+    #[must_use]
+    pub const fn author(&self) -> Option<AuthorId> {
+        self.metadata.author()
+    }
+
+    /// Return the stable semantic comment-storage UUID.
+    #[must_use]
+    pub const fn storage_uuid(&self) -> Uuid {
+        self.metadata.storage_uuid()
+    }
+
+    /// Return the number of direct replies in the thread.
+    #[must_use]
+    pub const fn reply_count(&self) -> u32 {
+        self.reply_count
+    }
 }
 
 /// One direct reply owned by a ranged text comment.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextCommentReply {
     /// Stable semantic reply identity.
-    pub id: TextCommentReplyId,
+    id: TextCommentReplyId,
     /// Parent ranged-comment identity.
-    pub comment_id: TextCommentId,
+    comment_id: TextCommentId,
     /// Reply body.
-    pub body: TextCommentReplyBody,
-    /// Seconds since Apple's 2001-01-01 reference date, when stored.
-    pub creation_date_seconds: Option<f64>,
-    /// Native annotation-author object identifier, when stored.
-    pub author_object_id: Option<u64>,
-    /// Stable UUID of the reply comment storage.
-    pub storage_uuid: Uuid,
+    body: TextCommentReplyBody,
+    metadata: Metadata,
+}
+
+impl TextCommentReply {
+    /// Construct a reply from validated semantic values.
+    #[must_use]
+    pub const fn new(
+        id: TextCommentReplyId,
+        comment_id: TextCommentId,
+        body: TextCommentReplyBody,
+        metadata: Metadata,
+    ) -> Self {
+        Self {
+            id,
+            comment_id,
+            body,
+            metadata,
+        }
+    }
+
+    /// Return the opaque semantic reply identity.
+    #[must_use]
+    pub const fn id(&self) -> TextCommentReplyId {
+        self.id
+    }
+
+    /// Return the parent ranged-comment identity.
+    #[must_use]
+    pub const fn comment_id(&self) -> TextCommentId {
+        self.comment_id
+    }
+
+    /// Borrow the validated reply body.
+    #[must_use]
+    pub const fn body(&self) -> &TextCommentReplyBody {
+        &self.body
+    }
+
+    /// Return validated reply metadata.
+    #[must_use]
+    pub const fn metadata(&self) -> Metadata {
+        self.metadata
+    }
+
+    /// Return the optional Apple reference-date creation instant.
+    #[must_use]
+    pub const fn creation_date(&self) -> Option<Instant> {
+        self.metadata.creation_date()
+    }
+
+    /// Return the optional typed author identity.
+    #[must_use]
+    pub const fn author(&self) -> Option<AuthorId> {
+        self.metadata.author()
+    }
+
+    /// Return the stable semantic comment-storage UUID.
+    #[must_use]
+    pub const fn storage_uuid(&self) -> Uuid {
+        self.metadata.storage_uuid()
+    }
 }
 
 fn validate_body(value: &str, reply: bool) -> Result<()> {
@@ -359,24 +504,23 @@ fn validate_body(value: &str, reply: bool) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use std::mem::size_of;
+    use std::result::Result as TestResult;
 
-    use litchi_iwa_common::comment::Uuid;
+    use litchi_iwa_common::comment::{AuthorId, Uuid};
 
     use super::{
-        Error, MAX_BODY_BYTES, TextComment, TextCommentBody, TextCommentId, TextCommentReply,
-        TextCommentReplyBody, TextCommentReplyId,
+        Error, MAX_BODY_BYTES, Metadata, TextComment, TextCommentBody, TextCommentId,
+        TextCommentReply, TextCommentReplyBody, TextCommentReplyId, raw,
     };
+    use crate::date_time::Instant;
     use crate::position::TextRange;
 
     #[test]
     fn identifiers_are_nonzero_and_compact() {
-        assert_eq!(TextCommentId::new(0), Err(Error::ZeroCommentId));
-        assert_eq!(TextCommentReplyId::new(0), Err(Error::ZeroReplyId));
-        assert_eq!(TextCommentId::new(7).map(TextCommentId::object_id), Ok(7));
-        assert_eq!(
-            TextCommentReplyId::try_from(9).map(TextCommentReplyId::object_id),
-            Ok(9)
-        );
+        assert_eq!(raw::comment_id(0), Err(Error::ZeroCommentId));
+        assert_eq!(raw::reply_id(0), Err(Error::ZeroReplyId));
+        assert_eq!(raw::comment_id_value(raw::comment_id(7).unwrap()), 7);
+        assert_eq!(raw::reply_id_value(raw::reply_id(9).unwrap()), 9);
         assert_eq!(size_of::<TextCommentId>(), size_of::<u64>());
         assert_eq!(size_of::<TextCommentReplyId>(), size_of::<u64>());
     }
@@ -415,43 +559,53 @@ mod tests {
     }
 
     #[test]
-    fn records_preserve_ranges_uuid_metadata_and_reply_counts() -> std::result::Result<(), String> {
-        let comment = TextComment {
-            id: TextCommentId::new(11).map_err(|error| error.to_string())?,
-            range: TextRange::from_utf16_indexes(2, 7).map_err(|error| error.to_string())?,
-            body: TextCommentBody::new("root").map_err(|error| error.to_string())?,
-            creation_date_seconds: Some(42.5),
-            author_object_id: Some(13),
-            storage_uuid: Uuid::from_parts(14, 15).map_err(|error| error.to_string())?,
-            reply_count: 3,
-        };
-        assert_eq!(comment.id.object_id(), 11);
-        assert_eq!(comment.range.start().utf16_index(), 2);
-        assert_eq!(comment.range.end().utf16_index(), 7);
-        assert_eq!(comment.body.as_str(), "root");
-        assert_eq!(comment.creation_date_seconds, Some(42.5));
-        assert_eq!(comment.author_object_id, Some(13));
+    fn records_preserve_ranges_uuid_metadata_and_reply_counts() -> TestResult<(), String> {
+        let comment = TextComment::new(
+            raw::comment_id(11).map_err(|error| error.to_string())?,
+            TextRange::from_utf16_indexes(2, 7).map_err(|error| error.to_string())?,
+            TextCommentBody::new("root").map_err(|error| error.to_string())?,
+            Metadata::new(
+                Some(Instant::from_reference_date_seconds(42.5).unwrap()),
+                Some(AuthorId::new(13).unwrap()),
+                Uuid::from_parts(14, 15).map_err(|error| error.to_string())?,
+            ),
+            3,
+        );
+        assert_eq!(raw::comment_id_value(comment.id()), 11);
+        assert_eq!(comment.range().start().utf16_index(), 2);
+        assert_eq!(comment.range().end().utf16_index(), 7);
+        assert_eq!(comment.body().as_str(), "root");
         assert_eq!(
-            (comment.storage_uuid.lower(), comment.storage_uuid.upper()),
+            comment.creation_date().map(Instant::reference_date_seconds),
+            Some(42.5)
+        );
+        assert_eq!(comment.author().map(AuthorId::get), Some(13));
+        assert_eq!(
+            (
+                comment.storage_uuid().lower(),
+                comment.storage_uuid().upper()
+            ),
             (14, 15)
         );
-        assert_eq!(comment.reply_count, 3);
+        assert_eq!(comment.reply_count(), 3);
 
-        let reply = TextCommentReply {
-            id: TextCommentReplyId::new(16).map_err(|error| error.to_string())?,
-            comment_id: comment.id,
-            body: TextCommentReplyBody::new("reply").map_err(|error| error.to_string())?,
-            creation_date_seconds: None,
-            author_object_id: None,
-            storage_uuid: Uuid::from_parts(17, 18).map_err(|error| error.to_string())?,
-        };
-        assert_eq!(reply.id.object_id(), 16);
-        assert_eq!(reply.comment_id, comment.id);
-        assert_eq!(reply.body.as_str(), "reply");
-        assert_eq!(reply.creation_date_seconds, None);
-        assert_eq!(reply.author_object_id, None);
+        let reply = TextCommentReply::new(
+            raw::reply_id(16).map_err(|error| error.to_string())?,
+            comment.id(),
+            TextCommentReplyBody::new("reply").map_err(|error| error.to_string())?,
+            Metadata::new(
+                None,
+                None,
+                Uuid::from_parts(17, 18).map_err(|error| error.to_string())?,
+            ),
+        );
+        assert_eq!(raw::reply_id_value(reply.id()), 16);
+        assert_eq!(reply.comment_id(), comment.id());
+        assert_eq!(reply.body().as_str(), "reply");
+        assert_eq!(reply.creation_date(), None);
+        assert_eq!(reply.author(), None);
         assert_eq!(
-            (reply.storage_uuid.lower(), reply.storage_uuid.upper()),
+            (reply.storage_uuid().lower(), reply.storage_uuid().upper()),
             (17, 18)
         );
         Ok(())

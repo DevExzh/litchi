@@ -1894,7 +1894,7 @@ mod tests {
         assert_eq!(
             styles
                 .iter()
-                .map(|style| style.id().get())
+                .map(|style| litchi_iwa_text::paragraph::style::raw::native_id(style.id()))
                 .collect::<Vec<_>>(),
             KeynoteParagraphStylePreset::ALL
                 .into_iter()

@@ -270,8 +270,11 @@ fn comment_backed_annotations_are_classified_without_mutation() {
     assert!(text_highlights(&package, storage_id).unwrap().is_empty());
     let comments = crate::text::text_comment::text_comments(&package, storage_id).unwrap();
     assert_eq!(comments.len(), 1);
-    assert_eq!(comments[0].id.object_id(), created.id.object_id());
-    assert_eq!(comments[0].body.as_str(), "note");
+    assert_eq!(
+        litchi_iwa_text::comment::raw::comment_id_value(comments[0].id()),
+        created.id.object_id()
+    );
+    assert_eq!(comments[0].body().as_str(), "note");
     assert!(
         remove_text_highlight(&mut package, storage_id, created.id).is_err(),
         "comment-backed annotation must not be discarded"

@@ -26,9 +26,6 @@ use super::super::paragraph_direction::{
 use super::super::paragraph_flow::{
     ParagraphFlow, ParagraphHyphenation, hyphenation_from_native, hyphenation_to_native,
 };
-use super::super::paragraph_following_style::{
-    NamedParagraphStyle, ParagraphFollowingStyle, ParagraphStyleId,
-};
 use super::super::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
     decimal_character_from_native,
@@ -44,6 +41,10 @@ use super::super::style::{
 use super::super::style_registry::object_archive;
 use super::{NativeTextCapitalization, NativeTextCharacterSpacing, NativeTextValue};
 use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
+use litchi_iwa_text::paragraph::style::{
+    NamedParagraphStyle, ParagraphFollowingStyle, ParagraphStyleId,
+    raw::{from_native_id, native_id},
+};
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const THEME_MESSAGE_TYPES: &[u32] = &[10, 10_001, 12_009];
@@ -571,8 +572,8 @@ pub(crate) fn named_paragraph_styles(
                 "iWork paragraph style preset {preset_id} has no name"
             ))
         })?;
-        styles.push(NamedParagraphStyle::new(
-            ParagraphStyleId::new(preset_id)?,
+        styles.push(NamedParagraphStyle::from_owned(
+            from_native_id(preset_id)?,
             name,
         )?);
     }
@@ -635,7 +636,7 @@ pub(crate) fn validate_named_paragraph_style(
     } else {
         Err(Error::InvalidFormat(format!(
             "iWork paragraph style {} is not a named style in this text stylesheet",
-            target.get()
+            native_id(target)
         )))
     }
 }
@@ -705,7 +706,7 @@ pub(crate) fn direct_overrides(
         properties
             .following_style
             .map(|reference| {
-                ParagraphStyleId::new(reference.identifier).map(ParagraphFollowingStyle::Named)
+                from_native_id(reference.identifier).map(ParagraphFollowingStyle::Named)
             })
             .transpose()?
     };
@@ -1249,7 +1250,9 @@ pub(crate) fn variation_object(
                 .following_style
                 .and_then(|following| match following {
                     ParagraphFollowingStyle::Same => None,
-                    ParagraphFollowingStyle::Named(identifier) => Some(reference(identifier.get())),
+                    ParagraphFollowingStyle::Named(identifier) => {
+                        Some(reference(native_id(identifier)))
+                    },
                 }),
             line_spacing: overrides.line_spacing.map(line_spacing_archive),
             space_before: overrides.space_before.map(ParagraphSpacingPoints::points),
@@ -1285,7 +1288,7 @@ pub(crate) fn variation_object(
     if let Some(ParagraphFollowingStyle::Named(identifier)) = overrides.following_style {
         object.archive_info.message_infos[0]
             .object_references
-            .push(identifier.get());
+            .push(native_id(identifier));
     }
     if overrides.font_color.is_some() {
         object.archive_info.message_infos[0]

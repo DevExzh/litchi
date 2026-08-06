@@ -18,11 +18,14 @@ use super::hyperlink_storage::{
     ensure_range_available, locate_storage_with_archive, patch_ranged_object_table, raw_boundaries,
     remove_range, validate_range,
 };
-use super::hyperlink_types::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
 use super::smart_field_object::{
     ensure_no_metadata_reference, require_exclusive_storage_reference,
 };
 use super::storage_wire::{StorageLocation, text_utf16_len};
+use litchi_iwa_text::hyperlink::{
+    TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    raw::{from_object_id, object_id as native_object_id},
+};
 use litchi_iwa_text::position::{TextPosition, TextRange};
 
 /// Read every native hyperlink in a storage, ordered by text position.
@@ -57,7 +60,7 @@ pub(crate) fn add_text_hyperlink(
     )?;
 
     let identifier = next_object_identifier(package)?;
-    let id = TextHyperlinkId::from_native(identifier);
+    let id = from_object_id(identifier)?;
     let hyperlink_object = new_hyperlink_object(identifier, target)?;
     let archive_name = location.archive_name.clone();
     let mut staged = package.clone();
@@ -116,11 +119,11 @@ pub(crate) fn update_text_hyperlink(
         storage_id,
         range,
         &boundaries,
-        Some(id.object_id()),
+        Some(native_object_id(id)),
         &location.storage.text,
         RangedObjectTable::SmartField,
     )?;
-    require_exclusive_storage_reference(package, storage_id, id.object_id(), "hyperlink")?;
+    require_exclusive_storage_reference(package, storage_id, native_object_id(id), "hyperlink")?;
 
     let archive_name = location.archive_name.clone();
     let mut staged = package.clone();
@@ -134,7 +137,7 @@ pub(crate) fn update_text_hyperlink(
                 raw_boundaries(storage_id, table, storage, RangedObjectTable::SmartField)?;
             remove_range(
                 &mut boundaries,
-                id.object_id(),
+                native_object_id(id),
                 RangedObjectTable::SmartField,
             )?;
             ensure_range_available(
@@ -145,11 +148,11 @@ pub(crate) fn update_text_hyperlink(
                 &storage.text,
                 RangedObjectTable::SmartField,
             )?;
-            add_range(&mut boundaries, range, id.object_id())?;
+            add_range(&mut boundaries, range, native_object_id(id))?;
             encode_table(table, boundaries).map(|table| (Some(table), None, None))
         },
     )?;
-    patch_hyperlink_target(&mut staged, &archive_name, id.object_id(), target)?;
+    patch_hyperlink_target(&mut staged, &archive_name, native_object_id(id), target)?;
     let verified = roundtrip(&staged)?;
     let updated = hyperlink_by_id(&verified, storage_id, id)?;
     if updated.range != range || updated.target != *target {
@@ -170,8 +173,8 @@ pub(crate) fn remove_text_hyperlink(
     let removed = hyperlink_by_id(package, storage_id, id)?;
     let located = locate_storage_with_archive(package, storage_id, RangedObjectTable::SmartField)?;
     let location = &located.location;
-    require_exclusive_storage_reference(package, storage_id, id.object_id(), "hyperlink")?;
-    let registered_component = component_identifier_for_object_uuid(package, id.object_id())?;
+    require_exclusive_storage_reference(package, storage_id, native_object_id(id), "hyperlink")?;
+    let registered_component = component_identifier_for_object_uuid(package, native_object_id(id))?;
     let owning_component = component_identifier_for_entry(package, &location.archive_name)?;
 
     let archive_name = location.archive_name.clone();
@@ -186,7 +189,7 @@ pub(crate) fn remove_text_hyperlink(
                 raw_boundaries(storage_id, table, storage, RangedObjectTable::SmartField)?;
             remove_range(
                 &mut boundaries,
-                id.object_id(),
+                native_object_id(id),
                 RangedObjectTable::SmartField,
             )?;
             if boundaries
@@ -194,29 +197,33 @@ pub(crate) fn remove_text_hyperlink(
                 .any(|boundary| boundary.object_id.is_some())
             {
                 encode_table(table, boundaries)
-                    .map(|table| (Some(table), None, Some(id.object_id())))
+                    .map(|table| (Some(table), None, Some(native_object_id(id))))
             } else {
-                Ok((None, None, Some(id.object_id())))
+                Ok((None, None, Some(native_object_id(id))))
             }
         },
     )?;
-    ensure_no_metadata_reference(&staged, id.object_id(), "hyperlink")?;
+    ensure_no_metadata_reference(&staged, native_object_id(id), "hyperlink")?;
     staged.update_archive(&archive_name, |archive| {
-        let object = archive.remove_object(id.object_id()).ok_or_else(|| {
+        let object = archive.remove_object(native_object_id(id)).ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "iWork hyperlink object {} disappeared during deletion",
-                id.object_id()
+                native_object_id(id)
             ))
         })?;
-        validate_hyperlink_object(id.object_id(), &object).map(|_| ())
+        validate_hyperlink_object(native_object_id(id), &object).map(|_| ())
     })?;
     if let Some(component) = owning_component {
-        remove_component_external_references_to_object(&mut staged, component, id.object_id())?;
+        remove_component_external_references_to_object(
+            &mut staged,
+            component,
+            native_object_id(id),
+        )?;
     }
     if let Some(component) = registered_component {
-        remove_component_object_uuids(&mut staged, component, &[id.object_id()])?;
+        remove_component_object_uuids(&mut staged, component, &[native_object_id(id)])?;
     }
-    release_package_identifier_suffix(&mut staged, &[id.object_id()])?;
+    release_package_identifier_suffix(&mut staged, &[native_object_id(id)])?;
     let verified = roundtrip(&staged)?;
     if text_hyperlinks(&verified, storage_id)?
         .iter()
@@ -300,11 +307,11 @@ fn hyperlink_by_id(
         [hyperlink] => Ok(hyperlink.clone()),
         [] => Err(Error::InvalidFormat(format!(
             "text storage {storage_id} does not own hyperlink object {}",
-            id.object_id()
+            native_object_id(id)
         ))),
         _ => Err(Error::InvalidFormat(format!(
             "text storage {storage_id} references hyperlink object {} more than once",
-            id.object_id()
+            native_object_id(id)
         ))),
     }
 }
@@ -339,7 +346,7 @@ fn collect_hyperlinks(
             )));
         }
         hyperlinks.push(TextHyperlink::new(
-            TextHyperlinkId::from_native(identifier),
+            from_object_id(identifier)?,
             TextRange::new(
                 TextPosition::from_utf16_code_units(boundary.index),
                 TextPosition::from_utf16_code_units(end),

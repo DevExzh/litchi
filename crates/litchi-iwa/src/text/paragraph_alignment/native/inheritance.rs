@@ -9,7 +9,6 @@ use crate::text::paragraph_direction::{
     ParagraphWritingDirection, from_native as writing_direction_from_native,
 };
 use crate::text::paragraph_flow::{ParagraphFlow, hyphenation_from_native};
-use crate::text::paragraph_following_style::{ParagraphFollowingStyle, ParagraphStyleId};
 use crate::text::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
     decimal_character_from_native,
@@ -22,6 +21,7 @@ use crate::text::style::{
     TextUnderline,
 };
 use crate::{Error, IWorkPackage, Result};
+use litchi_iwa_text::paragraph::style::{ParagraphFollowingStyle, raw::from_native_id};
 
 use super::super::{NativeTextCharacterSpacing, NativeTextValue};
 use super::{
@@ -563,7 +563,7 @@ pub(super) fn following_style(
         let Some(reference) = properties.following_style else {
             return Ok(InheritanceControl::Continue);
         };
-        *value = Some(ParagraphFollowingStyle::Named(ParagraphStyleId::new(
+        *value = Some(ParagraphFollowingStyle::Named(from_native_id(
             reference.identifier,
         )?));
         Ok(InheritanceControl::Complete)

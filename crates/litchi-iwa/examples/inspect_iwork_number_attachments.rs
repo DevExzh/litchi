@@ -1,4 +1,5 @@
 use litchi_iwa::text::IWorkTextEditor;
+use litchi_iwa_text::number_attachment::raw::object_id as native_object_id;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = std::env::args()
@@ -10,7 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!(
                 "storage={} id={} position={} settings={:?}",
                 storage.object_id,
-                attachment.id.object_id(),
+                native_object_id(attachment.id),
                 attachment.position.utf16_index(),
                 attachment.settings,
             );

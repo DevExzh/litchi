@@ -214,7 +214,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         editor.add_slide_text_box_comment_reply(
             0,
             created.drawable_object_id,
-            comment.id,
+            comment.id(),
             TextCommentReplyBody::new("Created reply by litchi-iwa")?,
         )?;
     }

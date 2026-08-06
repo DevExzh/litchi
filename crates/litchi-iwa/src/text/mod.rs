@@ -24,16 +24,13 @@ mod highlight_types;
 mod hyperlink;
 mod hyperlink_object;
 mod hyperlink_storage;
-mod hyperlink_types;
 mod language;
 mod number_attachment;
 mod number_attachment_object;
 mod number_attachment_storage;
-mod number_attachment_types;
 pub(crate) mod paragraph_alignment;
 mod paragraph_direction;
 mod paragraph_flow;
-mod paragraph_following_style;
 mod paragraph_list;
 mod paragraph_style_apply;
 mod paragraph_style_catalog;
@@ -46,7 +43,6 @@ mod storage_wire;
 pub mod style;
 pub(crate) mod style_registry;
 mod text_comment;
-mod text_comment_types;
 
 #[cfg(test)]
 mod bookmark_tests;
@@ -68,28 +64,34 @@ pub use bookmark_types::{
 };
 pub use date_time_field::{TextDateTimeField, TextDateTimeFieldId};
 pub use editor::{IWorkTextEditor, TextStorageInfo};
+pub(crate) use extractor::TextExtractor;
 pub use font::{Font, Name, NameError, TextFont, TextFontName};
 pub use highlight_types::{TextHighlight, TextHighlightId};
-pub use hyperlink_types::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
 pub use litchi_iwa_common::text::layout;
+pub use litchi_iwa_text::comment::{
+    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
+    TextCommentReplyId,
+};
+pub use litchi_iwa_text::hyperlink::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
 pub use litchi_iwa_text::language::{
     Error as TextLanguageError, TextLanguage, TextLanguageRun, TextLanguageTag,
 };
-pub use litchi_iwa_text::paragraph;
-pub use litchi_iwa_text::position::{Error as TextPositionError, TextPosition, TextRange};
-pub use number_attachment_types::{
+pub use litchi_iwa_text::number_attachment::{
     TextNumberAttachment, TextNumberAttachmentFormat, TextNumberAttachmentId,
     TextNumberAttachmentKind, TextNumberAttachmentSettings, TextNumberAttachmentText,
 };
+pub use litchi_iwa_text::paragraph;
+pub use litchi_iwa_text::paragraph::style::{
+    NamedParagraphStyle, ParagraphFollowingStyle, ParagraphStyleId, ParagraphStyleName,
+};
+pub use litchi_iwa_text::position::{Error as TextPositionError, TextPosition, TextRange};
+pub use litchi_iwa_text::storage::{Error as StorageError, Fragment, Run, Storage};
 pub(crate) use paragraph_alignment::{
     applied_named_paragraph_style as applied_named_paragraph_style_in_storage,
     named_paragraph_styles as named_paragraph_styles_in_storage,
 };
 pub use paragraph_direction::ParagraphWritingDirection;
 pub use paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
-pub use paragraph_following_style::{
-    NamedParagraphStyle, ParagraphFollowingStyle, ParagraphStyleId, ParagraphStyleName,
-};
 pub use paragraph_list::{
     ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
     ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
@@ -117,13 +119,6 @@ pub use paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabAlignment,
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
 };
-pub use text_comment_types::{
-    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
-    TextCommentReplyId,
-};
-
-pub(crate) use extractor::TextExtractor;
-pub use litchi_iwa_text::storage::{Error as StorageError, Fragment, Run, Storage};
 pub use style::{
     CharacterError, ParagraphBackground, ParagraphBorder, ParagraphBorders, ParagraphIndentPoints,
     ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,

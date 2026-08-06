@@ -12,6 +12,7 @@ use super::*;
 use crate::text::hyperlink_storage::{
     RangedObjectTable, SMART_FIELD_TABLE_FIELD, TABLE_ENTRIES_FIELD, locate_storage,
 };
+use litchi_iwa_text::hyperlink::raw::object_id as native_object_id;
 use prost::Message;
 
 fn fixture() -> (super::super::IWorkTextEditor, u64) {
@@ -86,7 +87,7 @@ fn unknown_table_entry_and_hyperlink_fields_survive_updates() {
                     data,
                 },
             )?;
-            let object = archive.object_mut(hyperlink.id.object_id()).unwrap();
+            let object = archive.object_mut(native_object_id(hyperlink.id)).unwrap();
             let original = &object.messages[0];
             let data = patch_varint_field(&original.data, 88, false, Some(9))?;
             object.replace_message(
@@ -129,7 +130,7 @@ fn unknown_table_entry_and_hyperlink_fields_survive_updates() {
             .iter()
             .any(|field| field.number() == 77)
     );
-    let object = archive.object(hyperlink.id.object_id()).unwrap();
+    let object = archive.object(native_object_id(hyperlink.id)).unwrap();
     assert!(
         parse_wire_fields(&object.messages[0].data)
             .unwrap()
@@ -254,7 +255,7 @@ fn hyperlink_with_an_additional_owner_cannot_be_updated_or_deleted() {
                 .unwrap();
             other.archive_info.message_infos[0]
                 .object_references
-                .push(hyperlink.id.object_id());
+                .push(native_object_id(hyperlink.id));
             Ok(())
         })
         .unwrap();

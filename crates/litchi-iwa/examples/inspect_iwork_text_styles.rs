@@ -3,6 +3,7 @@
 use std::env;
 
 use litchi_iwa::text::IWorkTextEditor;
+use litchi_iwa_text::comment::raw::comment_id_value;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -27,11 +28,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Ok(comments) = editor.text_comments(storage.object_id) {
             println!("storage={} comments={comments:?}", storage.object_id);
             for comment in comments {
-                if let Ok(replies) = editor.text_comment_replies(storage.object_id, comment.id) {
+                if let Ok(replies) = editor.text_comment_replies(storage.object_id, comment.id()) {
                     println!(
                         "storage={} comment={} replies={replies:?}",
                         storage.object_id,
-                        comment.id.object_id()
+                        comment_id_value(comment.id())
                     );
                 }
             }

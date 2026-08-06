@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .sheet_name("Scratch Sheet")
         .table_name("Scratch Table")
         .build()?;
-    let sheet_id = editor.sheets()?[0].object_id;
+    let sheet_id = editor.sheets()?[0].id();
     let created = editor.add_sheet_text_box(
         sheet_id,
         &text,
@@ -216,7 +216,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         editor.add_sheet_text_box_comment_reply(
             sheet_id,
             created.drawable_object_id,
-            comment.id,
+            comment.id(),
             TextCommentReplyBody::new("Created reply by litchi-iwa")?,
         )?;
     }

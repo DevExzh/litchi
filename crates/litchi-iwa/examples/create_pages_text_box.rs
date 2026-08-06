@@ -167,7 +167,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )?;
         editor.add_text_box_comment_reply(
             created.drawable_object_id,
-            comment.id,
+            comment.id(),
             TextCommentReplyBody::new("Created reply by litchi-iwa")?,
         )?;
     }

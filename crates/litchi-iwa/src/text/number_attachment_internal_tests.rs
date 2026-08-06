@@ -8,8 +8,9 @@ use crate::wire::{
 
 use super::*;
 use crate::text::number_attachment_storage::ATTACHMENT_TABLE_FIELD;
-use crate::text::number_attachment_types::{
+use litchi_iwa_text::number_attachment::{
     TextNumberAttachmentKind, TextNumberAttachmentSettings, TextNumberAttachmentText,
+    raw::object_id as native_object_id,
 };
 use prost::Message;
 
@@ -64,7 +65,7 @@ fn unknown_table_root_and_nested_fields_survive_updates() {
                 },
             )?;
 
-            let object = archive.object_mut(attachment.id.object_id()).unwrap();
+            let object = archive.object_mut(native_object_id(attachment.id)).unwrap();
             let original = &object.messages[0];
             let mut data = patch_varint_field(&original.data, 88, false, Some(9))?;
             data = transform_length_delimited_field(&data, 1, |textual| {
@@ -102,7 +103,7 @@ fn unknown_table_root_and_nested_fields_survive_updates() {
             .iter()
             .any(|field| field.number() == 99)
     );
-    let object = archive.object(attachment.id.object_id()).unwrap();
+    let object = archive.object(native_object_id(attachment.id)).unwrap();
     assert!(
         parse_wire_fields(&object.messages[0].data)
             .unwrap()
@@ -221,7 +222,7 @@ fn missing_kind_and_additional_owner_fail_transactionally() {
         .archive_name;
     package
         .update_archive(&archive_name, |archive| {
-            let object = archive.object_mut(attachment.id.object_id()).unwrap();
+            let object = archive.object_mut(native_object_id(attachment.id)).unwrap();
             let original = &object.messages[0];
             let data = patch_nested_varint_field(&original.data, &[1, 2], true, None)?;
             object.replace_message(
@@ -261,7 +262,7 @@ fn missing_kind_and_additional_owner_fail_transactionally() {
                 .unwrap();
             other.archive_info.message_infos[0]
                 .object_references
-                .push(attachment.id.object_id());
+                .push(native_object_id(attachment.id));
             Ok(())
         })
         .unwrap();

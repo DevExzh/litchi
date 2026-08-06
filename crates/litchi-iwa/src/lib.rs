@@ -215,8 +215,8 @@ pub(crate) use package::IWorkPackage;
 pub use shapes::DrawableTitleCaption;
 pub use structured::StructuredData;
 pub use text::{
-    Fragment, ParagraphStyle, Run, Storage, TextDecorations, TextPointSize,
-    TextStrikethrough, TextStyle, TextUnderline,
+    Fragment, ParagraphStyle, Run, Storage, TextDecorations, TextPointSize, TextStrikethrough,
+    TextStyle, TextUnderline,
 };
 pub(crate) use theme::{IWorkThemeArchive, IWorkThemeExtensions};
 
@@ -269,6 +269,18 @@ pub enum Error {
 
     #[error(transparent)]
     PagesSemantic(#[from] litchi_pages::Error),
+
+    #[error(transparent)]
+    TextHyperlink(#[from] litchi_iwa_text::hyperlink::Error),
+
+    #[error(transparent)]
+    TextNumberAttachment(#[from] litchi_iwa_text::number_attachment::Error),
+
+    #[error(transparent)]
+    TextComment(#[from] litchi_iwa_text::comment::Error),
+
+    #[error(transparent)]
+    ParagraphStyle(#[from] litchi_iwa_text::paragraph::style::Error),
 
     #[error("Invalid IWA format: {0}")]
     InvalidFormat(String),

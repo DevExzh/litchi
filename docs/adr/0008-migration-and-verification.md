@@ -6397,6 +6397,44 @@ eager package materialization, fully source-backed lazy object access,
 remaining monolithic adapters, and the intentionally unsupported archive
 member classes above.
 
+This 2026-08-06 slice completes the next text-leaf boundary migration. The
+archive-free `litchi-iwa-text` crate now owns hyperlink, number-attachment,
+ranged-comment, and paragraph-style values; the former IWA owners
+`hyperlink_types.rs`, `number_attachment_types.rs`,
+`paragraph_following_style.rs`, and `text_comment_types.rs` were deleted.
+Each native identity is a compact opaque non-zero handle. Conversion to and
+from a native archive identifier is available only through the explicit
+`litchi_iwa_text::<leaf>::raw` adapter module, while normal semantic code has
+no object-ID constructor or accessor. Ranged comments additionally keep their
+records private, expose only checked accessors, and carry typed `Instant`,
+`AuthorId`, and `Uuid` metadata; hyperlink and comment owned text validates
+before borrowed input is allocated, and boxed native text is adopted without
+another allocation. The IWA facade retains structured leaf error variants
+instead of flattening these failures into `InvalidFormat(String)`.
+
+The focused leaf suite passed 57 tests, the integrated IWA library suite
+passed 1,485 tests, strict no-dependency Clippy passed for `litchi-iwa-text`,
+and the IWA library Clippy target passed with the three pre-existing dead-code
+groups explicitly allowed. The edited examples compile in their focused
+targets; an all-example check still reports unrelated baseline API drift in
+older table/image examples. An independent ADR audit found the initial
+identity/metadata boundary issues; the changes above resolve those findings
+without compatibility aliases. The workspace formatter remains noisy outside
+the scoped files, so only changed-file formatting and `git diff --check` are
+used for this migration turn.
+
+Computer Use verified the generated fixtures in the real iWork applications.
+Pages exposed `Page [attachment: 1] of [attachment: 1]` from
+`/private/tmp/litchi-adr-pages-number-attachments.pages`; Numbers exposed the
+`ADR leaf Numbers hyperlink comment` text box and its markup marker from
+`/private/tmp/litchi-adr-numbers-text.numbers`; and Keynote exposed the
+`ADR leaf Keynote hyperlink comment` text box and marker from
+`/private/tmp/litchi-adr-keynote-text.key`. The Pages text fixture was also
+opened during the same run. Pages, Numbers, and Keynote were saved and closed
+after verification. This is a bounded semantic-leaf and native-open slice;
+remaining debt includes the broader monolithic adapter split, raw storage
+APIs outside these leaves, and the other ADR 0005/0006 resource work.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512
