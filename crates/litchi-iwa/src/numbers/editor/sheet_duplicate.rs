@@ -1,6 +1,7 @@
 //! Native-style duplication of populated Numbers sheets.
 
 use super::*;
+use litchi_numbers::{SheetSelector, TableSelector};
 
 mod wire;
 
@@ -126,7 +127,10 @@ impl NumbersEditor {
             match drawable {
                 SheetDrawableClone::Table { model_id, name, .. } => {
                     let cloned = working.duplicate_table(model_id)?;
-                    working.move_table(cloned.object_id, new_sheet_id)?;
+                    working.move_table(
+                        TableSelector::name(&cloned.name),
+                        SheetSelector::name(&name),
+                    )?;
                     working.rename_table(cloned.object_id, &name)?;
                     restore_table_geometry(&mut working.package, model_id, cloned.object_id)?;
                     cloned_drawable_ids

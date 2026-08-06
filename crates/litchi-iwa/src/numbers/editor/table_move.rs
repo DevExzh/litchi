@@ -5,27 +5,25 @@ use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields,
     remove_repeated_length_delimited_field_where,
 };
+use litchi_numbers::{SheetSelector, TableSelector};
 
 impl NumbersEditor {
     /// Move an existing table to another sheet, preserving its object identity and contents.
     ///
     /// The table is appended to the destination sheet's drawable order. Its native table-info
     /// parent reference, sheet ownership lists, and IWA reference metadata are updated together.
-    pub fn move_table(&mut self, table_id: u64, target_sheet_id: u64) -> Result<NumbersTableInfo> {
+    pub fn move_table(
+        &mut self,
+        selector: TableSelector,
+        target: SheetSelector,
+    ) -> Result<NumbersTableInfo> {
+        let table_id = super::table_sort::resolve_table_selector(self, &selector)?;
         let table = self
             .tables()?
             .into_iter()
             .find(|table| table.object_id == table_id)
             .ok_or_else(|| Error::ParseError(format!("Numbers table {table_id} not found")))?;
-        let sheets = self.sheets()?;
-        if !sheets
-            .iter()
-            .any(|sheet| sheet.object_id == target_sheet_id)
-        {
-            return Err(Error::ParseError(format!(
-                "Numbers target sheet {target_sheet_id} is not in the workbook"
-            )));
-        }
+        let target_sheet_id = resolve_sheet_selector(self, &target)?;
 
         let owner = find_table_owner(&self.package, table_id)?;
         if owner.sheet_id == target_sheet_id {
@@ -87,6 +85,36 @@ impl NumbersEditor {
         }
         self.package = staged;
         Ok(verified_table)
+    }
+}
+
+fn resolve_sheet_selector(editor: &NumbersEditor, selector: &SheetSelector) -> Result<u64> {
+    let sheets = editor.sheets()?;
+    match selector {
+        SheetSelector::Name(name) => {
+            let mut matches = sheets.iter().filter(|sheet| sheet.name == *name);
+            let Some(sheet) = matches.next() else {
+                return Err(Error::ParseError(format!(
+                    "Numbers sheet named {name:?} not found"
+                )));
+            };
+            if matches.next().is_some() {
+                return Err(Error::ParseError(format!(
+                    "Numbers sheet name {name:?} is ambiguous"
+                )));
+            }
+            Ok(sheet.object_id)
+        },
+        SheetSelector::Index(index) => {
+            sheets
+                .get(*index)
+                .map(|sheet| sheet.object_id)
+                .ok_or_else(|| {
+                    Error::ParseError(format!(
+                        "Numbers sheet catalog index {index} is out of bounds"
+                    ))
+                })
+        },
     }
 }
 
@@ -375,4 +403,40 @@ fn replace_reference_values(values: &mut [u64], source: u64, target: u64) -> Res
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::numbers::NumbersDocumentBuilder;
+
+    #[test]
+    fn moves_table_with_name_and_sheet_selectors() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_name("Revenue")
+            .table_dimensions(2, 2)
+            .build()
+            .unwrap();
+        let target = editor.add_empty_sheet("Archive").unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+
+        let moved = editor
+            .move_table(
+                TableSelector::name("Revenue"),
+                SheetSelector::name("Archive"),
+            )
+            .unwrap();
+        assert_eq!(moved.object_id, table_id);
+        assert_eq!(
+            find_table_owner(editor.package(), table_id)
+                .unwrap()
+                .sheet_id,
+            target.object_id
+        );
+        assert!(
+            editor
+                .move_table(TableSelector::index(1), SheetSelector::index(0))
+                .is_err()
+        );
+    }
 }

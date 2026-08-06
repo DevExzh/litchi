@@ -1,6 +1,7 @@
 //! Typed sort-rule configuration and execution for Numbers tables.
 
 use super::*;
+use litchi_numbers::TableSelector;
 use litchi_numbers::table::sort::{self, ColumnIndex, Direction, Order, RowRange, Rule, Scope};
 
 mod apply;
@@ -64,7 +65,8 @@ impl NumbersEditor {
     /// by Numbers after its last sort rule is removed. Selected-row orders
     /// expose their persisted [`Scope::SelectedRows`] scope;
     /// their view-state selected interval is intentionally not guessed.
-    pub fn table_sort_order(&self, table_id: u64) -> Result<Option<Order>> {
+    pub fn table_sort_order(&self, selector: TableSelector) -> Result<Option<Order>> {
+        let table_id = resolve_table_selector(self, &selector)?;
         table_sort_order_in_package(&self.package, table_id)
     }
 
@@ -75,11 +77,12 @@ impl NumbersEditor {
     /// entirely by this crate. This operation configures the native rule; it
     /// does not execute it or reorder stored rows. Numbers exposes that
     /// separate action as **Sort Now**.
-    pub fn set_table_sort_order(&mut self, table_id: u64, order: Order) -> Result<()> {
+    pub fn set_table_sort_order(&mut self, selector: TableSelector, order: Order) -> Result<()> {
+        let table_id = resolve_table_selector(self, &selector)?;
         let mut staged = self.package.clone();
         set_table_sort_order_in_package(&mut staged, table_id, &order)?;
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        if verified.table_sort_order(table_id)?.as_ref() != Some(&order) {
+        if verified.table_sort_order(selector)?.as_ref() != Some(&order) {
             return Err(Error::InvalidFormat(
                 "Numbers table sort order failed round-trip validation".to_owned(),
             ));
@@ -93,13 +96,14 @@ impl NumbersEditor {
     /// When a table already carries native sort metadata, this preserves
     /// Numbers' empty-order marker and any associated reference tracker,
     /// exactly as removing the final rule in the Numbers UI does.
-    pub fn clear_table_sort_order(&mut self, table_id: u64) -> Result<()> {
+    pub fn clear_table_sort_order(&mut self, selector: TableSelector) -> Result<()> {
+        let table_id = resolve_table_selector(self, &selector)?;
         let mut staged = self.package.clone();
         if !clear_table_sort_order_in_package(&mut staged, table_id)? {
             return Ok(());
         }
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        if verified.table_sort_order(table_id)?.is_some() {
+        if verified.table_sort_order(selector)?.is_some() {
             return Err(Error::InvalidFormat(
                 "Numbers table sort-order clear failed round-trip validation".to_owned(),
             ));
@@ -127,8 +131,9 @@ impl NumbersEditor {
     ///
     /// Returns `true` when one or more body rows were physically reordered,
     /// and `false` when the body was already in the requested stable order.
-    pub fn apply_table_sort_order(&mut self, table_id: u64) -> Result<bool> {
-        let order = self.table_sort_order(table_id)?.ok_or_else(|| {
+    pub fn apply_table_sort_order(&mut self, selector: TableSelector) -> Result<bool> {
+        let table_id = resolve_table_selector(self, &selector)?;
+        let order = table_sort_order_in_package(&self.package, table_id)?.ok_or_else(|| {
             Error::ParseError(
                 "Cannot execute a Numbers sort without a configured table sort order".to_owned(),
             )
@@ -144,7 +149,7 @@ impl NumbersEditor {
             return Ok(false);
         }
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        if verified.table_sort_order(table_id)?.as_ref() != Some(&order) {
+        if verified.table_sort_order(selector)?.as_ref() != Some(&order) {
             return Err(Error::InvalidFormat(
                 "Numbers table sort execution did not preserve its sort order".to_owned(),
             ));
@@ -165,10 +170,11 @@ impl NumbersEditor {
     /// one-row or already stable selection.
     pub fn apply_table_sort_order_to_rows(
         &mut self,
-        table_id: u64,
+        selector: TableSelector,
         rows: RowRange,
     ) -> Result<bool> {
-        let order = self.table_sort_order(table_id)?.ok_or_else(|| {
+        let table_id = resolve_table_selector(self, &selector)?;
+        let order = table_sort_order_in_package(&self.package, table_id)?.ok_or_else(|| {
             Error::ParseError(
                 "Cannot execute a Numbers sort without a configured table sort order".to_owned(),
             )
@@ -184,13 +190,46 @@ impl NumbersEditor {
             return Ok(false);
         }
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        if verified.table_sort_order(table_id)?.as_ref() != Some(&order) {
+        if verified.table_sort_order(selector)?.as_ref() != Some(&order) {
             return Err(Error::InvalidFormat(
                 "Numbers selected-row sort execution did not preserve its sort order".to_owned(),
             ));
         }
         self.package = staged;
         Ok(true)
+    }
+}
+
+pub(super) fn resolve_table_selector(
+    editor: &NumbersEditor,
+    selector: &TableSelector,
+) -> Result<u64> {
+    let tables = editor.tables()?;
+    match selector {
+        TableSelector::Name(name) => {
+            let mut matches = tables.iter().filter(|table| table.name == *name);
+            let Some(table) = matches.next() else {
+                return Err(Error::ParseError(format!(
+                    "Numbers table named {name:?} not found"
+                )));
+            };
+            if matches.next().is_some() {
+                return Err(Error::ParseError(format!(
+                    "Numbers table name {name:?} is ambiguous"
+                )));
+            }
+            Ok(table.object_id)
+        },
+        TableSelector::Index(index) => {
+            tables
+                .get(*index)
+                .map(|table| table.object_id)
+                .ok_or_else(|| {
+                    Error::ParseError(format!(
+                        "Numbers table catalog index {index} is out of bounds"
+                    ))
+                })
+        },
     }
 }
 
@@ -458,19 +497,48 @@ mod tests {
     }
 
     #[test]
+    fn table_sort_selector_resolves_by_name_and_catalog_index() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .table_name("Revenue")
+            .table_dimensions(2, 2)
+            .build()
+            .unwrap();
+        let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+            NumbersTableSortColumnIndex::new(0).unwrap(),
+            NumbersTableSortDirection::Ascending,
+        )])
+        .unwrap();
+
+        editor
+            .set_table_sort_order(TableSelector::name("Revenue"), order.clone())
+            .unwrap();
+        assert_eq!(
+            editor.table_sort_order(TableSelector::index(0)).unwrap(),
+            Some(order)
+        );
+        assert!(editor.table_sort_order(TableSelector::index(1)).is_err());
+        assert!(
+            editor
+                .table_sort_order(TableSelector::name("Missing"))
+                .is_err()
+        );
+    }
+
+    #[test]
     fn full_table_sort_rules_survive_native_topology_semantics() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_dimensions(4, 4)
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
+        let selector = TableSelector::name("Table 1");
         let initial = Order::new([
             Rule::new(ColumnIndex::new(1).unwrap(), Direction::Ascending),
             Rule::new(ColumnIndex::new(3).unwrap(), Direction::Descending),
         ])
         .unwrap();
         editor
-            .set_table_sort_order(table_id, initial.clone())
+            .set_table_sort_order(selector.clone(), initial.clone())
             .unwrap();
 
         editor
@@ -479,7 +547,10 @@ mod tests {
         editor
             .insert_table_column(table_id, TableColumnInsertion::body(0))
             .unwrap();
-        assert_eq!(editor.table_sort_order(table_id).unwrap(), Some(initial));
+        assert_eq!(
+            editor.table_sort_order(selector.clone()).unwrap(),
+            Some(initial)
+        );
 
         editor
             .remove_table_row(table_id, TableRowDeletion::body(0))
@@ -492,11 +563,14 @@ mod tests {
             Direction::Descending,
         )])
         .unwrap();
-        assert_eq!(editor.table_sort_order(table_id).unwrap(), Some(remaining));
+        assert_eq!(
+            editor.table_sort_order(selector.clone()).unwrap(),
+            Some(remaining)
+        );
 
         editor
             .remove_table_column(table_id, TableColumnDeletion::body(2))
             .unwrap();
-        assert_eq!(editor.table_sort_order(table_id).unwrap(), None);
+        assert_eq!(editor.table_sort_order(selector).unwrap(), None);
     }
 }

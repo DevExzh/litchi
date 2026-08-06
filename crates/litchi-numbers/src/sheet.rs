@@ -11,6 +11,20 @@ pub enum Selector<'a> {
     Index(usize),
 }
 
+impl<'a> Selector<'a> {
+    /// Creates a name-first sheet selector without allocating.
+    #[must_use]
+    pub const fn name(name: &'a str) -> Self {
+        Self::Name(name)
+    }
+
+    /// Creates a checked zero-based sheet selector.
+    #[must_use]
+    pub const fn index(index: usize) -> Self {
+        Self::Index(index)
+    }
+}
+
 /// Errors raised while resolving a semantic table selector.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SelectorError {

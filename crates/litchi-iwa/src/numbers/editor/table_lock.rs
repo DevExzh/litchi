@@ -5,24 +5,31 @@ use crate::table_lock::{
     TableLockState, set_table_lock_state_for_model as set_native_table_lock_state,
     table_lock_state_for_model as read_native_table_lock_state,
 };
+use litchi_numbers::TableSelector;
 
 impl NumbersEditor {
     /// Read one table's interactive lock state.
-    pub fn table_lock_state(&self, table_id: u64) -> Result<TableLockState> {
+    pub fn table_lock_state(&self, selector: TableSelector) -> Result<TableLockState> {
+        let table_id = super::table_sort::resolve_table_selector(self, &selector)?;
         let (drawable_id, archive_name) = table_lock_context(&self.package, table_id)?;
         read_native_table_lock_state(&self.package, &archive_name, drawable_id, table_id)
     }
 
     /// Set one table's interactive lock state transactionally.
-    pub fn set_table_lock_state(&mut self, table_id: u64, state: TableLockState) -> Result<()> {
-        if self.table_lock_state(table_id)? == state {
+    pub fn set_table_lock_state(
+        &mut self,
+        selector: TableSelector,
+        state: TableLockState,
+    ) -> Result<()> {
+        let table_id = super::table_sort::resolve_table_selector(self, &selector)?;
+        if self.table_lock_state(selector.clone())? == state {
             return Ok(());
         }
         let (drawable_id, archive_name) = table_lock_context(&self.package, table_id)?;
         let mut staged = self.package.clone();
         set_native_table_lock_state(&mut staged, &archive_name, drawable_id, table_id, state)?;
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
-        if verified.table_lock_state(table_id)? != state {
+        if verified.table_lock_state(selector)? != state {
             return Err(Error::InvalidFormat(
                 "Numbers table lock update failed validation".to_owned(),
             ));
@@ -63,7 +70,9 @@ mod tests {
         let table = editor.tables().unwrap().remove(0);
         let baseline = editor.to_bytes().unwrap();
         assert_eq!(
-            editor.table_lock_state(table.object_id).unwrap(),
+            editor
+                .table_lock_state(TableSelector::name("Locked Table"))
+                .unwrap(),
             TableLockState::Unlocked
         );
         assert_eq!(
@@ -72,24 +81,29 @@ mod tests {
         );
 
         editor
-            .set_table_lock_state(table.object_id, TableLockState::Locked)
+            .set_table_lock_state(TableSelector::name("Locked Table"), TableLockState::Locked)
             .unwrap();
         let duplicate = editor.duplicate_table(table.object_id).unwrap();
         assert_eq!(
-            editor.table_lock_state(duplicate.object_id).unwrap(),
+            editor.table_lock_state(TableSelector::index(1)).unwrap(),
             TableLockState::Locked
         );
 
         editor
-            .set_table_lock_state(duplicate.object_id, TableLockState::Unlocked)
+            .set_table_lock_state(TableSelector::index(1), TableLockState::Unlocked)
             .unwrap();
         assert_eq!(
-            editor.table_lock_state(table.object_id).unwrap(),
+            editor
+                .table_lock_state(TableSelector::name("Locked Table"))
+                .unwrap(),
             TableLockState::Locked
         );
         editor.remove_table(duplicate.object_id).unwrap();
         editor
-            .set_table_lock_state(table.object_id, TableLockState::Unlocked)
+            .set_table_lock_state(
+                TableSelector::name("Locked Table"),
+                TableLockState::Unlocked,
+            )
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
     }

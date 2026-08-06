@@ -9,6 +9,7 @@ use litchi_iwa_common::table::cell::{
     BorderSide,
     layout::{Inset, Insets, Layout, TextWrap, VerticalAlignment},
 };
+use litchi_numbers::{SheetSelector, TableSelector};
 
 fn cell_number(value: f64) -> CellValue {
     CellValue::number(value).expect("finite test number")
@@ -1462,7 +1463,10 @@ fn cell_comment_crud_preserves_value_and_comment_metadata() {
     let original = editor.cell_comment(10, 0, 1).unwrap().unwrap();
     assert_eq!(original.comment.text, "Original comment");
     assert_eq!(original.comment.creation_date_seconds, Some(123.5));
-    assert_eq!(original.comment.reply_ids.as_ref(), [StorageId::new(70).unwrap()]);
+    assert_eq!(
+        original.comment.reply_ids.as_ref(),
+        [StorageId::new(70).unwrap()]
+    );
     assert_eq!(original.comment.storage_uuid.unwrap().lower(), 61);
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let reader_comment = document.sheets().unwrap()[0].tables[0]
@@ -1522,7 +1526,10 @@ fn cell_comment_reply_crud_is_copy_on_write_and_transactional() {
     );
     assert_eq!(
         after_add.comment.reply_ids.as_ref(),
-        [StorageId::new(70).unwrap(), StorageId::new(added_id).unwrap()]
+        [
+            StorageId::new(70).unwrap(),
+            StorageId::new(added_id).unwrap()
+        ]
     );
     let replies = editor.cell_comment_replies(10, 0, 1).unwrap();
     assert_eq!(replies[1].comment.text, "Second reply");
@@ -5635,7 +5642,7 @@ fn table_sort_order_is_typed_transactional_and_native_clear_compatible() {
     let mut editor = NumbersEditor::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
     assert_eq!(
-        editor.table_sort_order(10).unwrap(),
+        editor.table_sort_order(TableSelector::index(0)).unwrap(),
         Some(
             NumbersTableSortOrder::new([NumbersTableSortRule::new(
                 NumbersTableSortColumnIndex::new(1).unwrap(),
@@ -5656,8 +5663,13 @@ fn table_sort_order_is_typed_transactional_and_native_clear_compatible() {
         ),
     ])
     .unwrap();
-    editor.set_table_sort_order(10, order.clone()).unwrap();
-    assert_eq!(editor.table_sort_order(10).unwrap(), Some(order.clone()));
+    editor
+        .set_table_sort_order(TableSelector::index(0), order.clone())
+        .unwrap();
+    assert_eq!(
+        editor.table_sort_order(TableSelector::index(0)).unwrap(),
+        Some(order.clone())
+    );
     assert_eq!(order.rules()[0].column().get(), 2);
     assert_eq!(
         order.rules()[0].direction(),
@@ -5665,7 +5677,10 @@ fn table_sort_order_is_typed_transactional_and_native_clear_compatible() {
     );
     let changed = editor.to_bytes().unwrap();
     let reparsed = NumbersEditor::from_bytes(&changed).unwrap();
-    assert_eq!(reparsed.table_sort_order(10).unwrap(), Some(order.clone()));
+    assert_eq!(
+        reparsed.table_sort_order(TableSelector::index(0)).unwrap(),
+        Some(order.clone())
+    );
 
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     let model =
@@ -5701,7 +5716,9 @@ fn table_sort_order_is_typed_transactional_and_native_clear_compatible() {
         vec![tracker.as_slice()]
     );
 
-    editor.set_table_sort_order(10, order.clone()).unwrap();
+    editor
+        .set_table_sort_order(TableSelector::index(0), order.clone())
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), changed);
 
     let out_of_bounds = NumbersTableSortOrder::new([NumbersTableSortRule::new(
@@ -5709,11 +5726,20 @@ fn table_sort_order_is_typed_transactional_and_native_clear_compatible() {
         NumbersTableSortDirection::Ascending,
     )])
     .unwrap();
-    assert!(editor.set_table_sort_order(10, out_of_bounds).is_err());
+    assert!(
+        editor
+            .set_table_sort_order(TableSelector::index(0), out_of_bounds)
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), changed);
 
-    editor.clear_table_sort_order(10).unwrap();
-    assert_eq!(editor.table_sort_order(10).unwrap(), None);
+    editor
+        .clear_table_sort_order(TableSelector::index(0))
+        .unwrap();
+    assert_eq!(
+        editor.table_sort_order(TableSelector::index(0)).unwrap(),
+        None
+    );
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     let model =
         TableModelArchive::decode(archive.object(10).unwrap().messages[0].data.as_slice()).unwrap();
@@ -5741,7 +5767,9 @@ fn table_sort_order_is_typed_transactional_and_native_clear_compatible() {
         vec![tracker.as_slice()]
     );
     let cleared = editor.to_bytes().unwrap();
-    editor.clear_table_sort_order(10).unwrap();
+    editor
+        .clear_table_sort_order(TableSelector::index(0))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), cleared);
     assert_ne!(cleared, baseline);
 }
@@ -5782,8 +5810,12 @@ fn table_sort_order_rejects_duplicate_wire_fields_transactionally() {
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
-    assert!(editor.table_sort_order(10).is_err());
-    assert!(editor.set_table_sort_order(10, order).is_err());
+    assert!(editor.table_sort_order(TableSelector::index(0)).is_err());
+    assert!(
+        editor
+            .set_table_sort_order(TableSelector::index(0), order)
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
@@ -5828,9 +5860,17 @@ fn table_sort_order_rejects_malformed_nested_wire_transactionally() {
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
-    assert!(editor.table_sort_order(10).is_err());
-    assert!(editor.set_table_sort_order(10, order).is_err());
-    assert!(editor.clear_table_sort_order(10).is_err());
+    assert!(editor.table_sort_order(TableSelector::index(0)).is_err());
+    assert!(
+        editor
+            .set_table_sort_order(TableSelector::index(0), order)
+            .is_err()
+    );
+    assert!(
+        editor
+            .clear_table_sort_order(TableSelector::index(0))
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
@@ -6031,9 +6071,10 @@ fn source_created_table_supports_sort_order_configuration_crud() {
         .table_dimensions(4, 3)
         .build()
         .unwrap();
-    let table_id = editor.tables().unwrap()[0].object_id;
     let baseline = editor.to_bytes().unwrap();
-    editor.clear_table_sort_order(table_id).unwrap();
+    editor
+        .clear_table_sort_order(TableSelector::index(0))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
     let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
         NumbersTableSortColumnIndex::new(1).unwrap(),
@@ -6041,13 +6082,21 @@ fn source_created_table_supports_sort_order_configuration_crud() {
     )])
     .unwrap();
     editor
-        .set_table_sort_order(table_id, order.clone())
+        .set_table_sort_order(TableSelector::index(0), order.clone())
         .unwrap();
     let reparsed = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(reparsed.table_sort_order(table_id).unwrap(), Some(order));
+    assert_eq!(
+        reparsed.table_sort_order(TableSelector::index(0)).unwrap(),
+        Some(order)
+    );
 
-    editor.clear_table_sort_order(table_id).unwrap();
-    assert_eq!(editor.table_sort_order(table_id).unwrap(), None);
+    editor
+        .clear_table_sort_order(TableSelector::index(0))
+        .unwrap();
+    assert_eq!(
+        editor.table_sort_order(TableSelector::index(0)).unwrap(),
+        None
+    );
 }
 
 #[test]
@@ -6105,23 +6154,27 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
     .unwrap();
     assert_eq!(order.scope(), NumbersTableSortScope::SelectedRows);
     editor
-        .set_table_sort_order(table_id, order.clone())
+        .set_table_sort_order(TableSelector::index(0), order.clone())
         .unwrap();
     assert_eq!(
         NumbersEditor::from_bytes(&editor.to_bytes().unwrap())
             .unwrap()
-            .table_sort_order(table_id)
+            .table_sort_order(TableSelector::index(0))
             .unwrap(),
         Some(order.clone())
     );
 
     let before_wrong_executor = editor.to_bytes().unwrap();
-    assert!(editor.apply_table_sort_order(table_id).is_err());
+    assert!(
+        editor
+            .apply_table_sort_order(TableSelector::index(0))
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), before_wrong_executor);
     let outside = NumbersTableSortRowRange::new(1, 5).unwrap();
     assert!(
         editor
-            .apply_table_sort_order_to_rows(table_id, outside)
+            .apply_table_sort_order_to_rows(TableSelector::index(0), outside)
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before_wrong_executor);
@@ -6129,10 +6182,13 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
     let selected = NumbersTableSortRowRange::new(1, 4).unwrap();
     assert!(
         editor
-            .apply_table_sort_order_to_rows(table_id, selected)
+            .apply_table_sort_order_to_rows(TableSelector::index(0), selected)
             .unwrap()
     );
-    assert_eq!(editor.table_sort_order(table_id).unwrap(), Some(order));
+    assert_eq!(
+        editor.table_sort_order(TableSelector::index(0)).unwrap(),
+        Some(order)
+    );
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets().unwrap()[0].tables[0];
     assert_eq!(
@@ -6166,14 +6222,16 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
         comment_id
     );
     assert_eq!(
-        editor.cell_comment_replies(table_id, 4, 1).unwrap()[0].storage_id.get(),
+        editor.cell_comment_replies(table_id, 4, 1).unwrap()[0]
+            .storage_id
+            .get(),
         reply_id
     );
 
     let sorted = editor.to_bytes().unwrap();
     assert!(
         !editor
-            .apply_table_sort_order_to_rows(table_id, selected)
+            .apply_table_sort_order_to_rows(TableSelector::index(0), selected)
             .unwrap()
     );
     assert_eq!(editor.to_bytes().unwrap(), sorted);
@@ -6202,10 +6260,19 @@ fn table_sort_order_executes_stable_body_sort_and_remaps_row_uids() {
         NumbersTableSortDirection::Ascending,
     )])
     .unwrap();
-    editor.set_table_sort_order(10, order.clone()).unwrap();
+    editor
+        .set_table_sort_order(TableSelector::index(0), order.clone())
+        .unwrap();
 
-    assert!(editor.apply_table_sort_order(10).unwrap());
-    assert_eq!(editor.table_sort_order(10).unwrap(), Some(order));
+    assert!(
+        editor
+            .apply_table_sort_order(TableSelector::index(0))
+            .unwrap()
+    );
+    assert_eq!(
+        editor.table_sort_order(TableSelector::index(0)).unwrap(),
+        Some(order)
+    );
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets().unwrap()[0].tables[0];
     assert_eq!(table.get_cell(0, 0), Some(&CellValue::Text("A".to_owned())));
@@ -6232,7 +6299,11 @@ fn table_sort_order_executes_stable_body_sort_and_remaps_row_uids() {
     assert_eq!(uid_map.row_index_for_uid, [2, 0, 3, 1]);
 
     let sorted = editor.to_bytes().unwrap();
-    assert!(!editor.apply_table_sort_order(10).unwrap());
+    assert!(
+        !editor
+            .apply_table_sort_order(TableSelector::index(0))
+            .unwrap()
+    );
     assert_eq!(editor.to_bytes().unwrap(), sorted);
 }
 
@@ -6266,11 +6337,18 @@ fn source_created_table_executes_stable_plain_text_sort() {
     )])
     .unwrap();
     editor
-        .set_table_sort_order(table_id, order.clone())
+        .set_table_sort_order(TableSelector::index(0), order.clone())
         .unwrap();
 
-    assert!(editor.apply_table_sort_order(table_id).unwrap());
-    assert_eq!(editor.table_sort_order(table_id).unwrap(), Some(order));
+    assert!(
+        editor
+            .apply_table_sort_order(TableSelector::index(0))
+            .unwrap()
+    );
+    assert_eq!(
+        editor.table_sort_order(TableSelector::index(0)).unwrap(),
+        Some(order)
+    );
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets().unwrap()[0].tables[0];
     assert_eq!(
@@ -6315,7 +6393,11 @@ fn source_created_table_executes_stable_plain_text_sort() {
     );
 
     let sorted = editor.to_bytes().unwrap();
-    assert!(!editor.apply_table_sort_order(table_id).unwrap());
+    assert!(
+        !editor
+            .apply_table_sort_order(TableSelector::index(0))
+            .unwrap()
+    );
     assert_eq!(editor.to_bytes().unwrap(), sorted);
 }
 
@@ -6339,7 +6421,7 @@ fn table_sort_resolves_plain_text_keys_from_segmented_string_storage() {
         .unwrap();
     editor
         .set_table_sort_order(
-            TABLE_ID,
+            TableSelector::index(0),
             NumbersTableSortOrder::new([NumbersTableSortRule::new(
                 NumbersTableSortColumnIndex::new(0).unwrap(),
                 NumbersTableSortDirection::Ascending,
@@ -6351,7 +6433,11 @@ fn table_sort_resolves_plain_text_keys_from_segmented_string_storage() {
     move_table_data_list_entries_to_segment(&mut package, STRING_LIST_ID, STRING_SEGMENT_ID);
     let mut editor = NumbersEditor::from_package(package).unwrap();
 
-    assert!(editor.apply_table_sort_order(TABLE_ID).unwrap());
+    assert!(
+        editor
+            .apply_table_sort_order(TableSelector::index(0))
+            .unwrap()
+    );
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets().unwrap()[0].tables[0];
     assert_eq!(
@@ -6395,7 +6481,7 @@ fn table_sort_rejects_missing_plain_text_storage_transactionally() {
         .unwrap();
     editor
         .set_table_sort_order(
-            TABLE_ID,
+            TableSelector::index(0),
             NumbersTableSortOrder::new([NumbersTableSortRule::new(
                 NumbersTableSortColumnIndex::new(0).unwrap(),
                 NumbersTableSortDirection::Ascending,
@@ -6423,7 +6509,9 @@ fn table_sort_rejects_missing_plain_text_storage_transactionally() {
     let mut editor = NumbersEditor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
 
-    let error = editor.apply_table_sort_order(TABLE_ID).unwrap_err();
+    let error = editor
+        .apply_table_sort_order(TableSelector::index(0))
+        .unwrap_err();
     assert!(error.to_string().contains("references missing string"));
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
@@ -6477,10 +6565,14 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
     )])
     .unwrap();
     editor
-        .set_table_sort_order(table_id, order.clone())
+        .set_table_sort_order(TableSelector::index(0), order.clone())
         .unwrap();
 
-    assert!(editor.apply_table_sort_order(table_id).unwrap());
+    assert!(
+        editor
+            .apply_table_sort_order(TableSelector::index(0))
+            .unwrap()
+    );
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets().unwrap()[0].tables[0];
     assert_eq!(
@@ -6515,10 +6607,7 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
     let moved_comment = editor.cell_comment(table_id, 1, 1).unwrap().unwrap();
     assert_eq!(moved_comment.row, 1);
     assert_eq!(moved_comment.column, original_comment.column);
-    assert_eq!(
-        moved_comment.storage_id,
-        original_comment.storage_id
-    );
+    assert_eq!(moved_comment.storage_id, original_comment.storage_id);
     assert_eq!(moved_comment.comment, original_comment.comment);
     let moved_replies = editor.cell_comment_replies(table_id, 1, 1).unwrap();
     assert_eq!(moved_replies.len(), 1);
@@ -6526,13 +6615,13 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
         moved_replies[0].root_storage_id,
         original_reply.root_storage_id
     );
-    assert_eq!(
-        moved_replies[0].storage_id,
-        original_reply.storage_id
-    );
+    assert_eq!(moved_replies[0].storage_id, original_reply.storage_id);
     assert_eq!(moved_replies[0].comment, original_reply.comment);
     let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(reopened.table_sort_order(table_id).unwrap(), Some(order));
+    assert_eq!(
+        reopened.table_sort_order(TableSelector::index(0)).unwrap(),
+        Some(order)
+    );
     assert!(reopened.cell_comment(table_id, 2, 1).unwrap().is_none());
     assert_eq!(
         reopened
@@ -6543,7 +6632,9 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
         original_comment.storage_id
     );
     assert_eq!(
-        reopened.cell_comment_replies(table_id, 1, 1).unwrap()[0].storage_id.get(),
+        reopened.cell_comment_replies(table_id, 1, 1).unwrap()[0]
+            .storage_id
+            .get(),
         reply_id
     );
 }
@@ -6588,7 +6679,7 @@ fn table_sort_keeps_user_hidden_axes_at_their_physical_positions() {
     editor.set_table_hidden_axes(table_id, &hidden).unwrap();
     editor
         .set_table_sort_order(
-            table_id,
+            TableSelector::index(0),
             NumbersTableSortOrder::new([NumbersTableSortRule::new(
                 NumbersTableSortColumnIndex::new(1).unwrap(),
                 NumbersTableSortDirection::Descending,
@@ -6597,7 +6688,11 @@ fn table_sort_keeps_user_hidden_axes_at_their_physical_positions() {
         )
         .unwrap();
 
-    assert!(editor.apply_table_sort_order(table_id).unwrap());
+    assert!(
+        editor
+            .apply_table_sort_order(TableSelector::index(0))
+            .unwrap()
+    );
     assert_eq!(editor.table_hidden_axes(table_id).unwrap(), hidden);
     let table = &NumbersDocument::from_bytes(&editor.to_bytes().unwrap())
         .unwrap()
@@ -6680,7 +6775,7 @@ fn table_sort_moves_rows_across_tile_boundaries() {
         .unwrap();
     editor
         .set_table_sort_order(
-            10,
+            TableSelector::index(0),
             NumbersTableSortOrder::new([NumbersTableSortRule::new(
                 NumbersTableSortColumnIndex::new(0).unwrap(),
                 NumbersTableSortDirection::Ascending,
@@ -6689,7 +6784,11 @@ fn table_sort_moves_rows_across_tile_boundaries() {
         )
         .unwrap();
 
-    assert!(editor.apply_table_sort_order(10).unwrap());
+    assert!(
+        editor
+            .apply_table_sort_order(TableSelector::index(0))
+            .unwrap()
+    );
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets().unwrap()[0].tables[0];
     assert_eq!(table.get_cell(0, 0), Some(&cell_number(0.0)));
@@ -6770,7 +6869,7 @@ fn table_sort_execution_keeps_explicit_border_layers_attached_to_cells() {
         .unwrap();
     editor
         .set_table_sort_order(
-            10,
+            TableSelector::index(0),
             NumbersTableSortOrder::new([NumbersTableSortRule::new(
                 NumbersTableSortColumnIndex::new(1).unwrap(),
                 NumbersTableSortDirection::Ascending,
@@ -6778,7 +6877,11 @@ fn table_sort_execution_keeps_explicit_border_layers_attached_to_cells() {
             .unwrap(),
         )
         .unwrap();
-    assert!(editor.apply_table_sort_order(10).unwrap());
+    assert!(
+        editor
+            .apply_table_sort_order(TableSelector::index(0))
+            .unwrap()
+    );
 
     let top = test_stroke_layer(editor.package(), 88);
     assert_eq!(top.row_column_index, Some(3));
@@ -6840,7 +6943,7 @@ fn table_sort_distinguishes_empty_and_populated_conditional_style_storage() {
             .unwrap();
         editor
             .set_table_sort_order(
-                10,
+                TableSelector::index(0),
                 NumbersTableSortOrder::new([NumbersTableSortRule::new(
                     NumbersTableSortColumnIndex::new(1).unwrap(),
                     NumbersTableSortDirection::Ascending,
@@ -6850,9 +6953,17 @@ fn table_sort_distinguishes_empty_and_populated_conditional_style_storage() {
             .unwrap();
         let before = editor.to_bytes().unwrap();
         if should_sort {
-            assert!(editor.apply_table_sort_order(10).unwrap());
+            assert!(
+                editor
+                    .apply_table_sort_order(TableSelector::index(0))
+                    .unwrap()
+            );
         } else {
-            assert!(editor.apply_table_sort_order(10).is_err());
+            assert!(
+                editor
+                    .apply_table_sort_order(TableSelector::index(0))
+                    .is_err()
+            );
             assert_eq!(editor.to_bytes().unwrap(), before);
         }
     }
@@ -6929,7 +7040,11 @@ fn cell_conditional_highlighting_is_detected_and_deleted_without_changing_value(
 fn table_sort_execution_rejects_unsupported_state_transactionally() {
     let mut no_order = NumbersEditor::from_package(test_package()).unwrap();
     let before = no_order.to_bytes().unwrap();
-    assert!(no_order.apply_table_sort_order(10).is_err());
+    assert!(
+        no_order
+            .apply_table_sort_order(TableSelector::index(0))
+            .is_err()
+    );
     assert_eq!(no_order.to_bytes().unwrap(), before);
 
     let mut spill_package = test_package_with_calculation_engine();
@@ -6948,7 +7063,7 @@ fn table_sort_execution_rejects_unsupported_state_transactionally() {
         .unwrap();
     spill_editor
         .set_table_sort_order(
-            10,
+            TableSelector::index(0),
             NumbersTableSortOrder::new([NumbersTableSortRule::new(
                 NumbersTableSortColumnIndex::new(1).unwrap(),
                 NumbersTableSortDirection::Ascending,
@@ -6957,7 +7072,11 @@ fn table_sort_execution_rejects_unsupported_state_transactionally() {
         )
         .unwrap();
     let before = spill_editor.to_bytes().unwrap();
-    assert!(spill_editor.apply_table_sort_order(10).is_err());
+    assert!(
+        spill_editor
+            .apply_table_sort_order(TableSelector::index(0))
+            .is_err()
+    );
     assert_eq!(spill_editor.to_bytes().unwrap(), before);
 
     let mut formula_editor =
@@ -6977,7 +7096,7 @@ fn table_sort_execution_rejects_unsupported_state_transactionally() {
         .unwrap();
     formula_editor
         .set_table_sort_order(
-            10,
+            TableSelector::index(0),
             NumbersTableSortOrder::new([NumbersTableSortRule::new(
                 NumbersTableSortColumnIndex::new(1).unwrap(),
                 NumbersTableSortDirection::Ascending,
@@ -6986,7 +7105,11 @@ fn table_sort_execution_rejects_unsupported_state_transactionally() {
         )
         .unwrap();
     let before = formula_editor.to_bytes().unwrap();
-    assert!(formula_editor.apply_table_sort_order(10).is_err());
+    assert!(
+        formula_editor
+            .apply_table_sort_order(TableSelector::index(0))
+            .is_err()
+    );
     assert_eq!(formula_editor.to_bytes().unwrap(), before);
 }
 
@@ -7419,7 +7542,9 @@ fn moves_populated_table_between_sheets_losslessly() {
     let baseline = package.to_bytes().unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
 
-    let moved = editor.move_table(10, 50).unwrap();
+    let moved = editor
+        .move_table(TableSelector::index(0), SheetSelector::index(1))
+        .unwrap();
     assert_eq!(moved.name, "Table 1");
     assert_eq!(find_table_owner(editor.package(), 10).unwrap().sheet_id, 50);
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
@@ -7466,13 +7591,25 @@ fn moves_populated_table_between_sheets_losslessly() {
     );
 
     let mut editor = NumbersEditor::from_bytes(&baseline).unwrap();
-    editor.move_table(10, 50).unwrap();
-    editor.move_table(10, 2).unwrap();
+    editor
+        .move_table(TableSelector::index(0), SheetSelector::index(1))
+        .unwrap();
+    editor
+        .move_table(TableSelector::index(0), SheetSelector::index(0))
+        .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     let before = editor.to_bytes().unwrap();
-    assert!(editor.move_table(999, 50).is_err());
-    assert!(editor.move_table(10, 999).is_err());
+    assert!(
+        editor
+            .move_table(TableSelector::index(1), SheetSelector::index(1))
+            .is_err()
+    );
+    assert!(
+        editor
+            .move_table(TableSelector::index(0), SheetSelector::index(2))
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 

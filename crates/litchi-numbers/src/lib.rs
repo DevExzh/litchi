@@ -13,6 +13,8 @@ pub mod cell;
 pub mod document;
 /// Dependency-free formula vocabulary shared by Numbers, Pages, and Keynote.
 pub mod formula;
+/// Human-readable and checked positional selectors for Numbers objects.
+pub mod selector;
 /// Semantic sheet containers.
 pub mod sheet;
 /// Sparse semantic table vocabulary.
@@ -26,6 +28,7 @@ pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
     FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
 };
+pub use selector::TableSelector;
 pub use sheet::{
     Builder as SheetBuilder, Selector as SheetSelector, SelectorError as SheetSelectorError, Sheet,
 };
