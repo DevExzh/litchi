@@ -3,7 +3,7 @@
 use crate::error::Result;
 
 use super::super::package::Editor;
-use super::super::{FormControl, OleObjectRecord};
+use super::super::{FormControl, ObjectMetadataEdit, OleObjectRecord};
 use super::{Commit, Patch, Snapshot};
 
 /// A detached transaction over typed XLS OLE objects and form controls.
@@ -81,6 +81,21 @@ impl Transaction {
     /// Reorders embedded-OLE records while preserving their raw subrecords.
     pub fn reorder_objects(&mut self, worksheet: usize, ids: &[u16]) -> Result<()> {
         self.with_candidate(|editor| editor.reorder(worksheet, ids))
+    }
+
+    /// Updates bounded metadata on one existing embedded OLE object.
+    ///
+    /// `object_id` is the source identity check for the operation. The edit
+    /// only changes `FtCmo` identity/flags and `FtPioGrbit`; the `FtPictFmla`
+    /// storage reference, unknown subrecords, text object, and inert payload
+    /// remain untouched.
+    pub fn update_object_metadata(
+        &mut self,
+        worksheet: usize,
+        object_id: u16,
+        edit: ObjectMetadataEdit,
+    ) -> Result<()> {
+        self.with_candidate(|editor| editor.update_object_metadata(worksheet, object_id, edit))
     }
 
     /// Replaces one referenced storage with a validated inert CFB payload.

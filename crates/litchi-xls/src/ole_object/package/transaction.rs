@@ -1,7 +1,7 @@
 //! Workbook and CFB transaction layer for XLS OLE objects.
 
 use super::super::codec::{ranges, u32_at};
-use super::super::semantic::{FormControl, OleObjectRecord};
+use super::super::semantic::{FormControl, ObjectMetadataEdit, OleObjectRecord};
 use super::super::*;
 use crate::error::{Error, Result};
 use litchi_cfb::OleFile;
@@ -179,6 +179,27 @@ impl Editor {
             reordered.push(remaining.remove(index));
         }
         *sheet = reordered;
+        candidate.commit()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    pub fn update_object_metadata(
+        &mut self,
+        worksheet: usize,
+        object_id: u16,
+        edit: ObjectMetadataEdit,
+    ) -> Result<()> {
+        let mut candidate = self.clone();
+        let sheet = candidate
+            .sheets
+            .get_mut(worksheet)
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?;
+        let object = sheet
+            .iter_mut()
+            .find(|value| value.object_id() == object_id)
+            .ok_or_else(|| invalid(OBJ, "OLE object ID not found"))?;
+        edit.apply(object)?;
         candidate.commit()?;
         *self = candidate;
         Ok(())

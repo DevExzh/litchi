@@ -1,8 +1,11 @@
 //! Focused publication tests for the OLE-object facade.
 
-use super::super::{CheckState, FormControl, FtCblsData, FtCmo, Limits, ObjSubrecord};
+use super::super::{
+    CheckState, FormControl, FtCblsData, FtCmo, FtPictFmla, FtPioGrbit, Limits, ObjSubrecord,
+    ObjectMetadataEdit, OleObjectRecord,
+};
 use super::super::{Snapshot, Transaction};
-use litchi_cfb::OleWriter;
+use litchi_cfb::{OleFile, OleWriter};
 use std::io::Cursor;
 
 fn record(kind: u16, body: &[u8]) -> Vec<u8> {
@@ -38,6 +41,51 @@ fn workbook_cfb(controls: &[Vec<u8>]) -> Vec<u8> {
     writer
         .create_stream(&["Workbook"], &workbook_stream(controls))
         .expect("Workbook stream should be created");
+    let mut output = Cursor::new(Vec::new());
+    writer
+        .write_to(&mut output)
+        .expect("test compound file should be written");
+    output.into_inner()
+}
+
+fn ole_object(id: u16, position: u32, marker: u8) -> OleObjectRecord {
+    OleObjectRecord {
+        subrecords: vec![
+            ObjSubrecord::Common(FtCmo {
+                object_type: 8,
+                object_id: id,
+                flags: 0x0011,
+                reserved: [0xCC; 12],
+            }),
+            ObjSubrecord::PictureFlags(FtPioGrbit { raw: 0x0208 }),
+            ObjSubrecord::Unknown {
+                kind: 0x7777,
+                data: vec![marker, 0xA5],
+            },
+            ObjSubrecord::PictureFormula(FtPictFmla {
+                formula: vec![0x05, 0, 0, 0, 0],
+                storage_position: Some(position),
+                control_buffer_size: Some(0),
+            }),
+            ObjSubrecord::End,
+        ],
+        text_object: None,
+    }
+}
+
+fn object_workbook_cfb(object: &OleObjectRecord, payload: &[u8]) -> Vec<u8> {
+    let object_bytes = object.to_record_bytes().unwrap();
+    let workbook = workbook_stream(std::slice::from_ref(&object_bytes));
+    let mut writer = OleWriter::new();
+    writer
+        .create_stream(&["Workbook"], &workbook)
+        .expect("Workbook stream should be created");
+    writer
+        .create_storage(&["MBD0000002A"])
+        .expect("object storage should be created");
+    writer
+        .create_stream(&["MBD0000002A", "Payload"], payload)
+        .expect("opaque payload should be created");
     let mut output = Cursor::new(Vec::new());
     writer
         .write_to(&mut output)
@@ -133,4 +181,112 @@ fn valid_control_edit_publishes_typed_patch_and_keeps_unknowns() {
         commit.patch().inverse().apply(&applied).unwrap().finish(),
         snapshot.finish()
     );
+}
+
+#[test]
+fn empty_object_metadata_edit_preserves_exact_bytes() {
+    let source = ole_object(7, 0x2A, 0xB1);
+    let input = object_workbook_cfb(&source, b"raw embedded payload");
+    let snapshot = Snapshot::open(input.clone(), Limits::default()).unwrap();
+    let mut transaction = snapshot.edit();
+
+    transaction
+        .update_object_metadata(0, 7, ObjectMetadataEdit::new())
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+
+    assert!(!commit.changed());
+    assert_eq!(commit.snapshot().finish(), input);
+}
+
+#[test]
+fn object_metadata_edit_changes_typed_fields_and_preserves_unknown_payload() {
+    let source = ole_object(7, 0x2A, 0xB1);
+    let input = object_workbook_cfb(&source, b"raw embedded payload");
+    let snapshot = Snapshot::open(input, Limits::default()).unwrap();
+    let mut transaction = snapshot.edit();
+    transaction
+        .update_object_metadata(
+            0,
+            7,
+            ObjectMetadataEdit::new()
+                .with_object_id(9)
+                .with_common_flags(0xA55A)
+                .with_picture_flags(FtPioGrbit {
+                    raw: 0x0208 | 0x0001,
+                }),
+        )
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    let object = &commit.snapshot().objects(0).unwrap()[0];
+
+    assert_eq!(object.object_id(), 9);
+    assert!(
+        object
+            .subrecords
+            .iter()
+            .any(|value| { matches!(value, ObjSubrecord::Common(FtCmo { flags: 0xA55A, .. })) })
+    );
+    assert!(object.subrecords.iter().any(|value| {
+        matches!(
+            value,
+            ObjSubrecord::PictureFlags(FtPioGrbit { raw: 0x0209 })
+        )
+    }));
+    assert!(object.subrecords.iter().any(|value| {
+        matches!(value, ObjSubrecord::Unknown { kind: 0x7777, data } if data == &[0xB1, 0xA5])
+    }));
+    assert_eq!(object.storage_position(), Some(0x2A));
+
+    let mut ole = OleFile::open(Cursor::new(commit.snapshot().finish())).unwrap();
+    assert_eq!(
+        ole.open_stream(&["MBD0000002A", "Payload"]).unwrap(),
+        b"raw embedded payload"
+    );
+}
+
+#[test]
+fn metadata_edit_rejects_stale_identity_and_invalid_flags_atomically() {
+    let source = ole_object(7, 0x2A, 0xB1);
+    let input = object_workbook_cfb(&source, b"raw embedded payload");
+    let snapshot = Snapshot::open(input, Limits::default()).unwrap();
+    let mut transaction = snapshot.edit();
+    let before = transaction.snapshot().unwrap().finish();
+
+    assert!(
+        transaction
+            .update_object_metadata(0, 8, ObjectMetadataEdit::new().with_common_flags(0xAAAA),)
+            .is_err()
+    );
+    assert!(
+        transaction
+            .update_object_metadata(
+                0,
+                7,
+                ObjectMetadataEdit::new().with_picture_flags(FtPioGrbit { raw: 0x0012 }),
+            )
+            .is_err()
+    );
+    assert_eq!(transaction.snapshot().unwrap().finish(), before);
+}
+
+#[test]
+fn metadata_patch_rejects_stale_snapshot_without_mutation() {
+    let source = ole_object(7, 0x2A, 0xB1);
+    let input = object_workbook_cfb(&source, b"raw embedded payload");
+    let snapshot = Snapshot::open(input.clone(), Limits::default()).unwrap();
+    let stale = Snapshot::open(
+        object_workbook_cfb(&ole_object(8, 0x2A, 0xB1), b"raw embedded payload"),
+        Limits::default(),
+    )
+    .unwrap();
+    let stale_before = stale.finish();
+    let mut transaction = snapshot.edit();
+    transaction
+        .update_object_metadata(0, 7, ObjectMetadataEdit::new().with_common_flags(0xA55A))
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+
+    assert!(commit.patch().apply(&stale).is_err());
+    assert_eq!(stale.finish(), stale_before);
 }
