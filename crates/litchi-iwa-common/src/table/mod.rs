@@ -6,3 +6,5 @@ pub mod cell;
 pub mod lock;
 /// Checked, archive-free table sort semantics.
 pub mod sort;
+/// Lossless, archive-free table title settings.
+pub mod title;
