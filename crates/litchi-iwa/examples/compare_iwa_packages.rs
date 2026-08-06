@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::env;
 
-use litchi_iwa::IWorkPackage;
+use litchi_iwa::raw::package::IWorkPackage;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);

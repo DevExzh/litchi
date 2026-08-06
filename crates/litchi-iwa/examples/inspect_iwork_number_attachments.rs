@@ -1,4 +1,4 @@
-use litchi_iwa::IWorkPackage;
+use litchi_iwa::raw::package::IWorkPackage;
 use litchi_iwa::text::IWorkTextEditor;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

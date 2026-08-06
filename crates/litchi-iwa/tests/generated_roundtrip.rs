@@ -64,7 +64,7 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
     assert_eq!(detect::path(path)?, Some(expected));
 
     let document = Document::open(path)?;
-    assert_send_sync::<litchi_iwa::Bundle>();
+    assert_send_sync::<litchi_iwa::raw::bundle::Bundle>();
     assert_send_sync::<litchi_iwa::Document>();
     assert_send_sync::<PagesDocument>();
     assert_send_sync::<NumbersDocument>();

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::env;
 
-use litchi_iwa::IWorkPackage;
+use litchi_iwa::raw::package::IWorkPackage;
 use litchi_iwa_core::ArchiveObject;
 use litchi_iwa_protos::tp::{
     DocumentArchive, SectionArchive, SectionTemplateArchive, SettingsArchive,

@@ -1,6 +1,6 @@
 use std::env;
 
-use litchi_iwa::IWorkPackage;
+use litchi_iwa::raw::package::IWorkPackage;
 use litchi_iwa_protos::tsce::ast_node_array_archive::AstNodeType;
 use litchi_iwa_protos::tst::TableDataList;
 use prost::Message;

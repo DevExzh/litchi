@@ -945,7 +945,7 @@ pub struct ResolvedObject {
 
 /// A borrowed view of an indexed object and its immutable payloads.
 ///
-/// The view is tied to the [`crate::Bundle`] used for resolution. It is the
+/// The view is tied to the [`crate::raw::bundle::Bundle`] used for resolution. It is the
 /// allocation-free read path for traversal and extraction; callers that need
 /// an owned value can consume it with [`Self::into_owned`].
 #[derive(Debug, Clone, Copy)]
