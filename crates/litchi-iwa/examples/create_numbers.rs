@@ -1,13 +1,13 @@
 //! Create a Numbers spreadsheet without an input document or template.
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 use litchi_iwa::numbers::{
     FormulaCachedValue, FormulaCellReference, FormulaExpression, NumbersDocumentBuilder,
-    NumbersTableHeaderCount, NumbersTableHeaderSettings,
 };
 use litchi_iwa::text::{Font, TextStyle};
+use litchi_numbers::TableSelector;
 use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 use litchi_numbers::table::topology::RowInsertion;
-use litchi_numbers::TableSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
@@ -39,10 +39,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_table_cell_text_font(table_id, 1, 0, Font::named("CourierNewPSMT")?)?;
     editor.set_table_header_settings(
         table,
-        NumbersTableHeaderSettings {
-            header_rows: Some(NumbersTableHeaderCount::ONE),
-            header_columns: Some(NumbersTableHeaderCount::ONE),
-            footer_rows: Some(NumbersTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;

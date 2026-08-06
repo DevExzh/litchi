@@ -36,6 +36,17 @@ other sum types. `Unknown` retains bounded lossless content. Common read methods
 live on the enum or narrow static-dispatch traits; the facade does not use boxed
 trait objects.
 
+Numbers table header and footer configuration uses the focused
+`litchi_numbers::table::headers::{Count, Settings}` module. `Count` is a
+one-byte, `NonZeroU8`-backed value with the checked native `1..=5` domain;
+`Option<Count>` therefore preserves presence without an extra storage byte.
+`Settings` contains only archive-free optional counts and Boolean fields plus
+effective-value helpers. Its non-exhaustive typed error rejects zero, overflow,
+and out-of-range counts. Native protobuf presence, canonical wire framing,
+unknown-field preservation, table-bound validation, and transaction readback
+remain private to the IWA adapter. Pages and Keynote consume these canonical
+short names directly, with no format-prefixed compatibility aliases.
+
 Pages header/footer roles follow the focused-module rule at
 `litchi_pages::header_footer::{Template, Kind}`. These one-byte enums contain
 only semantic page-template and region roles; IWA keeps native object lookup,

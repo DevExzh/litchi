@@ -1505,14 +1505,14 @@ pub(crate) fn table_size_points_in_package(
 pub(crate) fn table_header_settings_in_package(
     package: &IWorkPackage,
     table_id: u64,
-) -> Result<NumbersTableHeaderSettings> {
+) -> Result<HeaderSettings> {
     table_headers::read_attached_table_header_settings(package, table_id)
 }
 
 pub(crate) fn set_table_header_settings_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    settings: NumbersTableHeaderSettings,
+    settings: HeaderSettings,
 ) -> Result<()> {
     table_headers::set_attached_table_header_settings(package, table_id, settings)
 }

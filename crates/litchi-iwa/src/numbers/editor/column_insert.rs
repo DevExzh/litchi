@@ -121,7 +121,7 @@ pub(super) fn insert_attached_table_column(
 
 struct ResolvedColumnInsertion {
     physical_index: usize,
-    updated_header_settings: Option<NumbersTableHeaderSettings>,
+    updated_header_settings: Option<HeaderSettings>,
 }
 
 fn resolve_column_insertion(
@@ -129,7 +129,7 @@ fn resolve_column_insertion(
     insertion: ColumnInsertion,
 ) -> Result<ResolvedColumnInsertion> {
     let columns = model.number_of_columns as usize;
-    let mut settings = NumbersTableHeaderSettings::from_model(model)?;
+    let mut settings = table_headers::settings_from_model(model)?;
     let header_columns = settings.header_column_count();
     let body_columns = columns.checked_sub(header_columns).ok_or_else(|| {
         Error::InvalidFormat("iWork header columns exceed the table column count".to_owned())
@@ -137,7 +137,7 @@ fn resolve_column_insertion(
     match insertion {
         ColumnInsertion::Header { index } => {
             validate_section_insertion(index, header_columns, "header column")?;
-            settings.header_columns = Some(NumbersTableHeaderCount::new(header_columns + 1)?);
+            settings.header_columns = Some(HeaderCount::new(header_columns + 1)?);
             Ok(ResolvedColumnInsertion {
                 physical_index: index,
                 updated_header_settings: Some(settings),

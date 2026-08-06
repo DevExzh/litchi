@@ -278,7 +278,7 @@ fn apply_attached_table_sort_range(
 
 fn table_body_bounds(model: &TableModelArchive) -> Result<(usize, usize)> {
     let rows = model.number_of_rows as usize;
-    let settings = NumbersTableHeaderSettings::from_model(model)?;
+    let settings = table_headers::settings_from_model(model)?;
     let body_start = settings.header_row_count();
     let body_end = rows
         .checked_sub(settings.footer_row_count())

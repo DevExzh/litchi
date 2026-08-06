@@ -4699,13 +4699,11 @@ pub use tables::{
     PagesTableCellTextDecorations, PagesTableCellTextFont, PagesTableCellTextLigatures,
     PagesTableCellTextOutline, PagesTableCellTextScript, PagesTableCellTextShadow,
     PagesTableCellTextStyle, PagesTableCellTextWrap, PagesTableCellUpdate,
-    PagesTableCellVerticalAlignment,
-    PagesTableDimension, PagesTableDimensionSize, PagesTableFormulaAxisReference,
-    PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue, PagesTableFormulaCellReference,
-    PagesTableFormulaExpression, PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableInfo,
-    PagesTablePoints, PagesTableSortColumnIndex,
-    PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule,
-    PagesTableSortScope, PagesTableTitleSettings,
+    PagesTableCellVerticalAlignment, PagesTableDimension, PagesTableDimensionSize,
+    PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
+    PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableInfo, PagesTablePoints,
+    PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder,
+    PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope, PagesTableTitleSettings,
 };
 
 #[cfg(test)]

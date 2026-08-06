@@ -1,9 +1,9 @@
 use std::env;
 
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 use litchi_iwa::pages::{
-    PagesCellValue, PagesDocumentBuilder, PagesTableCellUpdate,
-    PagesTableDimensionSize, PagesTableFormulaCachedValue, PagesTableFormulaCellReference,
-    PagesTableFormulaExpression, PagesTableHeaderCount, PagesTableHeaderSettings,
+    PagesCellValue, PagesDocumentBuilder, PagesTableCellUpdate, PagesTableDimensionSize,
+    PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
     PagesTableTitleSettings,
 };
 use litchi_numbers::table::topology::{ColumnInsertion, RowInsertion};
@@ -43,10 +43,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_table_header_settings(
         table.model_object_id,
-        PagesTableHeaderSettings {
-            header_rows: Some(PagesTableHeaderCount::ONE),
-            header_columns: Some(PagesTableHeaderCount::ONE),
-            footer_rows: Some(PagesTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;

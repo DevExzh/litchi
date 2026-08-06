@@ -3917,10 +3917,7 @@ fn table_column_insertion_preserves_explicit_stroke_layers_on_original_cells() {
 
     let mut editor = NumbersEditor::from_package(package).unwrap();
     editor
-        .insert_table_column(
-            test_table_selector(&editor, 10),
-            ColumnInsertion::body(1),
-        )
+        .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::body(1))
         .unwrap();
 
     let sidecar = test_stroke_sidecar(editor.package());
@@ -4166,10 +4163,7 @@ fn column_insert_rewrites_absolute_formula_ast_losslessly() {
     let before = editor.to_bytes().unwrap();
 
     editor
-        .insert_table_column(
-            test_table_selector(&editor, 10),
-            ColumnInsertion::body(1),
-        )
+        .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::body(1))
         .unwrap();
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -4177,10 +4171,7 @@ fn column_insert_rewrites_absolute_formula_ast_losslessly() {
         Some(&CellValue::Formula("=$C$2".to_owned()))
     );
     editor
-        .remove_table_column(
-            test_table_selector(&editor, 10),
-            ColumnDeletion::body(1),
-        )
+        .remove_table_column(test_table_selector(&editor, 10), ColumnDeletion::body(1))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
@@ -4324,8 +4315,8 @@ fn row_insert_expands_footer_aggregate_and_delete_restores_exact_bytes() {
     editor
         .set_table_header_settings(
             test_table_selector(&editor, 10),
-            NumbersTableHeaderSettings {
-                footer_rows: Some(NumbersTableHeaderCount::ONE),
+            HeaderSettings {
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -4424,8 +4415,8 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
     editor
         .set_table_header_settings(
             test_table_selector(&editor, 10),
-            NumbersTableHeaderSettings {
-                footer_rows: Some(NumbersTableHeaderCount::ONE),
+            HeaderSettings {
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -4861,10 +4852,7 @@ fn inserts_blank_table_column_and_shifts_cells_uids_headers_and_formulas() {
         .unwrap();
 
     editor
-        .insert_table_column(
-            test_table_selector(&editor, 10),
-            ColumnInsertion::body(1),
-        )
+        .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::body(1))
         .unwrap();
 
     let bytes = editor.to_bytes().unwrap();
@@ -4972,10 +4960,7 @@ fn appends_blank_table_column_and_grows_dependency_ranges() {
     let mut editor = NumbersEditor::from_package(package).unwrap();
 
     editor
-        .insert_table_column(
-            test_table_selector(&editor, 10),
-            ColumnInsertion::body(4),
-        )
+        .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::body(4))
         .unwrap();
 
     assert_eq!(editor.tables().unwrap()[0].columns, 5);
@@ -5004,10 +4989,7 @@ fn column_insert_rejects_out_of_bounds_and_incoming_formulas_transactionally() {
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .insert_table_column(
-                test_table_selector(&editor, 10),
-                ColumnInsertion::body(5)
-            )
+            .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::body(5))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -5024,10 +5006,7 @@ fn column_insert_rejects_out_of_bounds_and_incoming_formulas_transactionally() {
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .insert_table_column(
-                test_table_selector(&editor, 10),
-                ColumnInsertion::body(1)
-            )
+            .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::body(1))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -5057,10 +5036,7 @@ fn column_insert_rejects_short_cell_offset_tables_transactionally() {
 
     assert!(
         editor
-            .insert_table_column(
-                test_table_selector(&editor, 10),
-                ColumnInsertion::body(1)
-            )
+            .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::body(1))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -5142,10 +5118,7 @@ fn column_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
 
     let mut editor = NumbersEditor::from_package(package).unwrap();
     editor
-        .insert_table_column(
-            test_table_selector(&editor, 10),
-            ColumnInsertion::body(1),
-        )
+        .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::body(1))
         .unwrap();
 
     let document = editor.package().archive("Index/Document.iwa").unwrap();
@@ -5229,16 +5202,10 @@ fn column_insert_then_delete_restores_exact_package_bytes() {
     let baseline = editor.to_bytes().unwrap();
 
     editor
-        .insert_table_column(
-            test_table_selector(&editor, 10),
-            ColumnInsertion::body(2),
-        )
+        .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::body(2))
         .unwrap();
     editor
-        .remove_table_column(
-            test_table_selector(&editor, 10),
-            ColumnDeletion::body(2),
-        )
+        .remove_table_column(test_table_selector(&editor, 10), ColumnDeletion::body(2))
         .unwrap();
 
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -5250,10 +5217,10 @@ fn section_relative_header_insertions_shift_formulas_and_restore_exactly() {
     editor
         .set_table_header_settings(
             test_table_selector(&editor, 10),
-            NumbersTableHeaderSettings {
-                header_rows: Some(NumbersTableHeaderCount::ONE),
-                header_columns: Some(NumbersTableHeaderCount::ONE),
-                footer_rows: Some(NumbersTableHeaderCount::ONE),
+            HeaderSettings {
+                header_rows: Some(HeaderCount::ONE),
+                header_columns: Some(HeaderCount::ONE),
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -5277,16 +5244,10 @@ fn section_relative_header_insertions_shift_formulas_and_restore_exactly() {
     let baseline = editor.to_bytes().unwrap();
 
     editor
-        .insert_table_row(
-            test_table_selector(&editor, 10),
-            RowInsertion::header(1),
-        )
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::header(1))
         .unwrap();
     editor
-        .insert_table_column(
-            test_table_selector(&editor, 10),
-            ColumnInsertion::header(1),
-        )
+        .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::header(1))
         .unwrap();
 
     let settings = editor
@@ -5302,16 +5263,10 @@ fn section_relative_header_insertions_shift_formulas_and_restore_exactly() {
     );
 
     editor
-        .remove_table_column(
-            test_table_selector(&editor, 10),
-            ColumnDeletion::header(1),
-        )
+        .remove_table_column(test_table_selector(&editor, 10), ColumnDeletion::header(1))
         .unwrap();
     editor
-        .remove_table_row(
-            test_table_selector(&editor, 10),
-            RowDeletion::header(1),
-        )
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::header(1))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
@@ -5322,8 +5277,8 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
     editor
         .set_table_header_settings(
             test_table_selector(&editor, 10),
-            NumbersTableHeaderSettings {
-                footer_rows: Some(NumbersTableHeaderCount::ONE),
+            HeaderSettings {
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -5347,10 +5302,7 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
     let baseline = editor.to_bytes().unwrap();
 
     editor
-        .insert_table_row(
-            test_table_selector(&editor, 10),
-            RowInsertion::footer(0),
-        )
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::footer(0))
         .unwrap();
     assert_eq!(
         editor
@@ -5365,18 +5317,12 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
         Some(&CellValue::Formula("=SUM(B2:B3)".to_owned()))
     );
     editor
-        .remove_table_row(
-            test_table_selector(&editor, 10),
-            RowDeletion::footer(0),
-        )
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::footer(0))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     editor
-        .insert_table_row(
-            test_table_selector(&editor, 10),
-            RowInsertion::footer(1),
-        )
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::footer(1))
         .unwrap();
     assert_eq!(
         editor
@@ -5386,10 +5332,7 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
         2
     );
     editor
-        .remove_table_row(
-            test_table_selector(&editor, 10),
-            RowDeletion::footer(1),
-        )
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::footer(1))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
@@ -5400,22 +5343,13 @@ fn section_insertions_create_first_fixed_regions_transactionally() {
     let baseline = editor.to_bytes().unwrap();
 
     editor
-        .insert_table_row(
-            test_table_selector(&editor, 10),
-            RowInsertion::header(0),
-        )
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::header(0))
         .unwrap();
     editor
-        .insert_table_row(
-            test_table_selector(&editor, 10),
-            RowInsertion::footer(0),
-        )
+        .insert_table_row(test_table_selector(&editor, 10), RowInsertion::footer(0))
         .unwrap();
     editor
-        .insert_table_column(
-            test_table_selector(&editor, 10),
-            ColumnInsertion::header(0),
-        )
+        .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::header(0))
         .unwrap();
     let settings = editor
         .table_header_settings(test_table_selector(&editor, 10))
@@ -5425,48 +5359,30 @@ fn section_insertions_create_first_fixed_regions_transactionally() {
     assert_eq!(settings.header_column_count(), 1);
 
     editor
-        .remove_table_column(
-            test_table_selector(&editor, 10),
-            ColumnDeletion::header(0),
-        )
+        .remove_table_column(test_table_selector(&editor, 10), ColumnDeletion::header(0))
         .unwrap();
     editor
-        .remove_table_row(
-            test_table_selector(&editor, 10),
-            RowDeletion::footer(0),
-        )
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::footer(0))
         .unwrap();
     editor
-        .remove_table_row(
-            test_table_selector(&editor, 10),
-            RowDeletion::header(0),
-        )
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::header(0))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .insert_table_row(
-                test_table_selector(&editor, 10),
-                RowInsertion::header(1)
-            )
+            .insert_table_row(test_table_selector(&editor, 10), RowInsertion::header(1))
             .is_err()
     );
     assert!(
         editor
-            .insert_table_row(
-                test_table_selector(&editor, 10),
-                RowInsertion::footer(1)
-            )
+            .insert_table_row(test_table_selector(&editor, 10), RowInsertion::footer(1))
             .is_err()
     );
     assert!(
         editor
-            .insert_table_column(
-                test_table_selector(&editor, 10),
-                ColumnInsertion::header(1)
-            )
+            .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::header(1))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -5478,10 +5394,10 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
     editor
         .set_table_header_settings(
             test_table_selector(&editor, 10),
-            NumbersTableHeaderSettings {
-                header_rows: Some(NumbersTableHeaderCount::ONE),
-                header_columns: Some(NumbersTableHeaderCount::ONE),
-                footer_rows: Some(NumbersTableHeaderCount::ONE),
+            HeaderSettings {
+                header_rows: Some(HeaderCount::ONE),
+                header_columns: Some(HeaderCount::ONE),
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -5497,22 +5413,13 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
         .unwrap();
 
     editor
-        .remove_table_row(
-            test_table_selector(&editor, 10),
-            RowDeletion::header(0),
-        )
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::header(0))
         .unwrap();
     editor
-        .remove_table_row(
-            test_table_selector(&editor, 10),
-            RowDeletion::footer(0),
-        )
+        .remove_table_row(test_table_selector(&editor, 10), RowDeletion::footer(0))
         .unwrap();
     editor
-        .remove_table_column(
-            test_table_selector(&editor, 10),
-            ColumnDeletion::header(0),
-        )
+        .remove_table_column(test_table_selector(&editor, 10), ColumnDeletion::header(0))
         .unwrap();
 
     let settings = editor
@@ -5536,26 +5443,17 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .remove_table_row(
-                test_table_selector(&editor, 10),
-                RowDeletion::header(0)
-            )
+            .remove_table_row(test_table_selector(&editor, 10), RowDeletion::header(0))
             .is_err()
     );
     assert!(
         editor
-            .remove_table_row(
-                test_table_selector(&editor, 10),
-                RowDeletion::footer(0)
-            )
+            .remove_table_row(test_table_selector(&editor, 10), RowDeletion::footer(0))
             .is_err()
     );
     assert!(
         editor
-            .remove_table_column(
-                test_table_selector(&editor, 10),
-                ColumnDeletion::header(0)
-            )
+            .remove_table_column(test_table_selector(&editor, 10), ColumnDeletion::header(0))
             .is_err()
     );
     assert!(
@@ -5565,10 +5463,7 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
     );
     assert!(
         editor
-            .remove_table_column(
-                test_table_selector(&editor, 10),
-                ColumnDeletion::body(3)
-            )
+            .remove_table_column(test_table_selector(&editor, 10), ColumnDeletion::body(3))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -5601,10 +5496,7 @@ fn removes_populated_table_axes_with_reference_cleanup_and_formula_shifts() {
         .set_cell(10, 1, 1, CellValue::Text("discarded column".to_owned()))
         .unwrap();
     editor
-        .remove_table_column(
-            test_table_selector(&editor, 10),
-            ColumnDeletion::body(1),
-        )
+        .remove_table_column(test_table_selector(&editor, 10), ColumnDeletion::body(1))
         .unwrap();
     let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets().unwrap()[0].tables[0];
@@ -5625,10 +5517,7 @@ fn table_axis_delete_releases_comment_graphs() {
                 .unwrap();
         } else {
             editor
-                .remove_table_column(
-                    test_table_selector(&editor, 10),
-                    ColumnDeletion::body(1),
-                )
+                .remove_table_column(test_table_selector(&editor, 10), ColumnDeletion::body(1))
                 .unwrap();
         }
 
@@ -5664,10 +5553,7 @@ fn table_axis_delete_rejects_live_formula_references_transactionally() {
     assert_eq!(editor.to_bytes().unwrap(), baseline);
     assert!(
         editor
-            .remove_table_column(
-                test_table_selector(&editor, 10),
-                ColumnDeletion::body(1)
-            )
+            .remove_table_column(test_table_selector(&editor, 10), ColumnDeletion::body(1))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -5678,10 +5564,7 @@ fn table_axis_delete_rejects_live_formula_references_transactionally() {
     );
     assert!(
         editor
-            .remove_table_column(
-                test_table_selector(&editor, 10),
-                ColumnDeletion::body(4)
-            )
+            .remove_table_column(test_table_selector(&editor, 10), ColumnDeletion::body(4))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -5712,13 +5595,13 @@ fn table_header_settings_are_typed_transactional_and_wire_exact() {
         editor
             .table_header_settings(test_table_selector(&editor, 10))
             .unwrap(),
-        NumbersTableHeaderSettings::default()
+        HeaderSettings::default()
     );
 
-    let settings = NumbersTableHeaderSettings {
-        header_rows: Some(NumbersTableHeaderCount::TWO),
-        header_columns: Some(NumbersTableHeaderCount::ONE),
-        footer_rows: Some(NumbersTableHeaderCount::ONE),
+    let settings = HeaderSettings {
+        header_rows: Some(HeaderCount::TWO),
+        header_columns: Some(HeaderCount::ONE),
+        footer_rows: Some(HeaderCount::ONE),
         header_rows_frozen: Some(true),
         header_columns_frozen: Some(false),
         repeating_header_rows_enabled: Some(true),
@@ -5754,17 +5637,14 @@ fn table_header_settings_are_typed_transactional_and_wire_exact() {
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), changed);
     editor
-        .set_table_header_settings(
-            test_table_selector(&editor, 10),
-            NumbersTableHeaderSettings::default(),
-        )
+        .set_table_header_settings(test_table_selector(&editor, 10), HeaderSettings::default())
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     let before = editor.to_bytes().unwrap();
-    let too_many_rows = NumbersTableHeaderSettings {
-        header_rows: Some(NumbersTableHeaderCount::THREE),
-        footer_rows: Some(NumbersTableHeaderCount::TWO),
+    let too_many_rows = HeaderSettings {
+        header_rows: Some(HeaderCount::THREE),
+        footer_rows: Some(HeaderCount::TWO),
         ..Default::default()
     };
     assert!(
@@ -5772,8 +5652,8 @@ fn table_header_settings_are_typed_transactional_and_wire_exact() {
             .set_table_header_settings(test_table_selector(&editor, 10), too_many_rows)
             .is_err()
     );
-    let too_many_columns = NumbersTableHeaderSettings {
-        header_columns: Some(NumbersTableHeaderCount::FIVE),
+    let too_many_columns = HeaderSettings {
+        header_columns: Some(HeaderCount::FIVE),
         ..Default::default()
     };
     assert!(
@@ -5822,7 +5702,7 @@ fn table_header_settings_reject_malformed_wire_transactionally() {
             editor
                 .set_table_header_settings(
                     test_table_selector(&editor, 10),
-                    NumbersTableHeaderSettings::default()
+                    HeaderSettings::default()
                 )
                 .is_err()
         );
@@ -6348,9 +6228,9 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
     editor
         .set_table_header_settings(
             test_table_selector(&editor, table_id),
-            NumbersTableHeaderSettings {
-                header_rows: Some(NumbersTableHeaderCount::ONE),
-                footer_rows: Some(NumbersTableHeaderCount::ONE),
+            HeaderSettings {
+                header_rows: Some(HeaderCount::ONE),
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -6765,9 +6645,9 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
     editor
         .set_table_header_settings(
             test_table_selector(&editor, table_id),
-            NumbersTableHeaderSettings {
-                header_rows: Some(NumbersTableHeaderCount::ONE),
-                footer_rows: Some(NumbersTableHeaderCount::ONE),
+            HeaderSettings {
+                header_rows: Some(HeaderCount::ONE),
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -6890,9 +6770,9 @@ fn table_sort_keeps_user_hidden_axes_at_their_physical_positions() {
     editor
         .set_table_header_settings(
             test_table_selector(&editor, table_id),
-            NumbersTableHeaderSettings {
-                header_rows: Some(NumbersTableHeaderCount::ONE),
-                footer_rows: Some(NumbersTableHeaderCount::ONE),
+            HeaderSettings {
+                header_rows: Some(HeaderCount::ONE),
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -7101,8 +6981,8 @@ fn table_sort_execution_keeps_explicit_border_layers_attached_to_cells() {
     editor
         .set_table_header_settings(
             test_table_selector(&editor, 10),
-            NumbersTableHeaderSettings {
-                header_rows: Some(NumbersTableHeaderCount::ONE),
+            HeaderSettings {
+                header_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )

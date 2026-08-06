@@ -107,7 +107,7 @@ pub(super) fn insert_attached_table_row(
 struct ResolvedRowInsertion {
     physical_index: usize,
     footer_range_insertion: FooterRangeInsertion,
-    updated_header_settings: Option<NumbersTableHeaderSettings>,
+    updated_header_settings: Option<HeaderSettings>,
 }
 
 fn resolve_row_insertion(
@@ -115,7 +115,7 @@ fn resolve_row_insertion(
     insertion: RowInsertion,
 ) -> Result<ResolvedRowInsertion> {
     let rows = model.number_of_rows as usize;
-    let mut settings = NumbersTableHeaderSettings::from_model(model)?;
+    let mut settings = table_headers::settings_from_model(model)?;
     let header_rows = settings.header_row_count();
     let footer_rows = settings.footer_row_count();
     let body_rows = rows
@@ -129,7 +129,7 @@ fn resolve_row_insertion(
     match insertion {
         RowInsertion::Header { index } => {
             validate_section_insertion(index, header_rows, "header row")?;
-            settings.header_rows = Some(NumbersTableHeaderCount::new(header_rows + 1)?);
+            settings.header_rows = Some(HeaderCount::new(header_rows + 1)?);
             Ok(ResolvedRowInsertion {
                 physical_index: index,
                 footer_range_insertion: FooterRangeInsertion::FixedSection,
@@ -146,7 +146,7 @@ fn resolve_row_insertion(
         },
         RowInsertion::Footer { index } => {
             validate_section_insertion(index, footer_rows, "footer row")?;
-            settings.footer_rows = Some(NumbersTableHeaderCount::new(footer_rows + 1)?);
+            settings.footer_rows = Some(HeaderCount::new(footer_rows + 1)?);
             Ok(ResolvedRowInsertion {
                 physical_index: rows - footer_rows + index,
                 footer_range_insertion: FooterRangeInsertion::FixedSection,

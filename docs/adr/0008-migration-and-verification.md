@@ -6566,6 +6566,30 @@ application menus and confirmed absent from the final application list. The
 broader stale internal fixture build remains deferred under the typed-selector
 migration.
 
+This follow-up completes the archive-free table-header semantic handoff.
+`litchi_numbers::table::headers` now owns the focused `Count` and `Settings`
+values consumed by Numbers, Pages, and Keynote. `Count` is a compact
+`NonZeroU8` value with checked 1..=5 construction; `Settings` carries the
+optional header-row, header-column, footer-row, freeze, and repeat semantics
+without any archive or generated-protobuf dependency. IWA remains responsible
+for native `u32` conversion, wire-field validation, bounds checks, transactions,
+and publication. The former application-prefixed header facades and their
+compatibility aliases were removed.
+
+The semantic and IWA library checks, strict no-dependency Clippy targets,
+focused header examples, Numbers unit suite, formatter/diff check, and
+crate-boundary checker pass. The full IWA example target still exposes older,
+unrelated stale native-ID fixtures and remains deferred under the typed
+selector migration. Computer Use created and saved
+`/private/tmp/litchi-headers-pages-native.pages`,
+`/private/tmp/litchi-headers-numbers-native.numbers`, and
+`/private/tmp/litchi-headers-keynote-native.key` in the real iWork
+applications. Each native accessibility tree showed a 1/1/1
+header-column/header-row/footer configuration and the `HEADER`, `BODY`, and
+`FOOTER` markers. Pages, Numbers, and Keynote were then quit through their
+application menus and the final app list contained only Finder, Terminal, and
+ChatGPT.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

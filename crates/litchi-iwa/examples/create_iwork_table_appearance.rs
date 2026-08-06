@@ -1,16 +1,11 @@
 //! Create Pages, Numbers, and Keynote files with native table appearance overrides.
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 use std::path::PathBuf;
 
-use litchi_iwa::keynote::{
-    KeynoteDocumentBuilder, KeynoteEditor, KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
-};
-use litchi_iwa::numbers::{
-    NumbersDocumentBuilder, NumbersEditor, NumbersTableHeaderCount, NumbersTableHeaderSettings,
-};
-use litchi_iwa::pages::{
-    PagesDocumentBuilder, PagesEditor, PagesTableHeaderCount, PagesTableHeaderSettings,
-};
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
+use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa::table_appearance::{
     TableAppearance, TableGridlineVisibility, TableGridlines, TableRowBanding, TableRowSizing,
@@ -44,10 +39,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let numbers_table = numbers.tables()?.remove(0);
     numbers.set_table_header_settings(
         numbers_table.object_id,
-        NumbersTableHeaderSettings {
-            header_rows: Some(NumbersTableHeaderCount::ONE),
-            header_columns: Some(NumbersTableHeaderCount::ONE),
-            footer_rows: Some(NumbersTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;
@@ -66,10 +61,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pages_table = pages.tables()?.remove(0);
     pages.set_table_header_settings(
         pages_table.model_object_id,
-        PagesTableHeaderSettings {
-            header_rows: Some(PagesTableHeaderCount::ONE),
-            header_columns: Some(PagesTableHeaderCount::ONE),
-            footer_rows: Some(PagesTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;
@@ -98,10 +93,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     keynote.set_slide_table_header_settings(
         0,
         keynote_table.model_object_id,
-        KeynoteTableHeaderSettings {
-            header_rows: Some(KeynoteTableHeaderCount::ONE),
-            header_columns: Some(KeynoteTableHeaderCount::ONE),
-            footer_rows: Some(KeynoteTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;

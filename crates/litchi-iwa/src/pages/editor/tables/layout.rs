@@ -2,10 +2,7 @@
 
 use super::*;
 
-/// A validated non-zero native header or footer count.
-pub type PagesTableHeaderCount = crate::numbers::NumbersTableHeaderCount;
-/// Lossless header/footer configuration shared by native iWork tables.
-pub type PagesTableHeaderSettings = crate::numbers::NumbersTableHeaderSettings;
+use litchi_numbers::table::headers::Settings as HeaderSettings;
 /// One row or column addressed by zero-based index.
 pub type PagesTableDimension = crate::numbers::NumbersTableDimension;
 /// A validated positive point measurement for a table axis.
@@ -15,7 +12,7 @@ pub type PagesTableDimensionSize = crate::numbers::NumbersTableDimensionSize;
 
 impl PagesEditor {
     /// Read a body table's lossless header and footer configuration.
-    pub fn table_header_settings(&self, model_object_id: u64) -> Result<PagesTableHeaderSettings> {
+    pub fn table_header_settings(&self, model_object_id: u64) -> Result<HeaderSettings> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_header_settings_in_package(self.package(), model_object_id)
     }
@@ -24,7 +21,7 @@ impl PagesEditor {
     pub fn set_table_header_settings(
         &mut self,
         model_object_id: u64,
-        settings: PagesTableHeaderSettings,
+        settings: HeaderSettings,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         if self.table_header_settings(model_object_id)? == settings {

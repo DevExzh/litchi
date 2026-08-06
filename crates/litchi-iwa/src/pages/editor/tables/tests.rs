@@ -13,6 +13,7 @@ use crate::table_cell_data_format::{
     TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemNegativeStyle,
     TableCellNumeralSystemPlaces,
 };
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 use litchi_iwa_common::table::cell::number_format::{
     DecimalPlaces as NumberDecimalPlaces, NegativeStyle as NumberNegativeStyle,
     ThousandsSeparator as NumberThousandsSeparator,
@@ -918,8 +919,8 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     editor
         .set_table_header_settings(
             model_id,
-            PagesTableHeaderSettings {
-                header_rows: Some(PagesTableHeaderCount::ONE),
+            HeaderSettings {
+                header_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -1270,8 +1271,8 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
     editor
         .set_table_header_settings(
             model_id,
-            PagesTableHeaderSettings {
-                footer_rows: Some(PagesTableHeaderCount::ONE),
+            HeaderSettings {
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -1323,10 +1324,10 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
     editor
         .set_table_header_settings(
             model_id,
-            PagesTableHeaderSettings {
-                header_rows: Some(PagesTableHeaderCount::ONE),
-                header_columns: Some(PagesTableHeaderCount::ONE),
-                footer_rows: Some(PagesTableHeaderCount::ONE),
+            HeaderSettings {
+                header_rows: Some(HeaderCount::ONE),
+                header_columns: Some(HeaderCount::ONE),
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -1648,10 +1649,10 @@ fn source_built_table_roundtrips_layout_crud_transactionally() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let settings = PagesTableHeaderSettings {
-        header_rows: Some(PagesTableHeaderCount::TWO),
-        header_columns: Some(PagesTableHeaderCount::ONE),
-        footer_rows: Some(PagesTableHeaderCount::ONE),
+    let settings = HeaderSettings {
+        header_rows: Some(HeaderCount::TWO),
+        header_columns: Some(HeaderCount::ONE),
+        footer_rows: Some(HeaderCount::ONE),
         ..Default::default()
     };
 
@@ -1710,9 +1711,9 @@ fn source_built_table_roundtrips_layout_crud_transactionally() {
         reopened
             .set_table_header_settings(
                 model_id,
-                PagesTableHeaderSettings {
-                    header_rows: Some(PagesTableHeaderCount::FOUR),
-                    footer_rows: Some(PagesTableHeaderCount::ONE),
+                HeaderSettings {
+                    header_rows: Some(HeaderCount::FOUR),
+                    footer_rows: Some(HeaderCount::ONE),
                     ..Default::default()
                 },
             )

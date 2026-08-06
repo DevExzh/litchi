@@ -415,6 +415,20 @@ IWA semantic definitions are removed; only crate-private re-exports remain
 where untouched format modules still resolve the shared type during their
 later migrations.
 
+Numbers table section settings follow the same ownership boundary at
+`litchi-numbers::table::headers::{Count, Settings}`. `Count` is a compact
+`NonZeroU8` value for the native `1..=5` domain, so an optional count retains
+presence without a second byte; `Settings` preserves optional count and
+Boolean field presence while exposing only archive-free effective-value
+helpers. Pages and Keynote consume these canonical Numbers table values
+directly. IWA retains native model conversion, wire-presence and framing
+validation, header/body/footer capacity checks, object lookup, unknown-field
+preservation, and staged transactional publication. The former
+`NumbersTableHeader*`, `PagesTableHeader*`, and `KeynoteTableHeader*` facade
+names are removed rather than retained as compatibility aliases. Counts above
+the native range are rejected as a typed malformed-document/value error; they
+are not silently widened or normalized.
+
 The Pages and Keynote table readers now consume the same leaf `Table` through
 an ownership-preserving adapter seam. Their public table facades borrow the
 canonical sparse cells directly while retaining format-owned comments and

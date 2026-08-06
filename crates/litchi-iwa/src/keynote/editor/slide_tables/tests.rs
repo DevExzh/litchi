@@ -24,6 +24,7 @@ use litchi_numbers::cell::data_format::numeral_system::{
 };
 use litchi_numbers::cell::data_format::pop_up_menu::PopUpMenu;
 use litchi_numbers::cell::data_format::{Checkbox, DataFormat, StarRating, Text as TextFormat};
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 fn table_geometry() -> (DrawablePoint, DrawableSize) {
     (
@@ -936,10 +937,10 @@ fn source_built_table_roundtrips_full_crud() {
     editor
         .set_slide_table_geometry(0, table.drawable_object_id, replacement)
         .unwrap();
-    let headers = KeynoteTableHeaderSettings {
-        header_rows: Some(KeynoteTableHeaderCount::TWO),
+    let headers = HeaderSettings {
+        header_rows: Some(HeaderCount::TWO),
         header_columns: None,
-        footer_rows: Some(KeynoteTableHeaderCount::ONE),
+        footer_rows: Some(HeaderCount::ONE),
         ..Default::default()
     };
     editor
@@ -1142,8 +1143,8 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         .set_slide_table_header_settings(
             0,
             model_id,
-            KeynoteTableHeaderSettings {
-                header_rows: Some(KeynoteTableHeaderCount::ONE),
+            HeaderSettings {
+                header_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -1568,8 +1569,8 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
         .set_slide_table_header_settings(
             0,
             model_id,
-            KeynoteTableHeaderSettings {
-                footer_rows: Some(KeynoteTableHeaderCount::ONE),
+            HeaderSettings {
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -1626,10 +1627,10 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
         .set_slide_table_header_settings(
             0,
             model_id,
-            KeynoteTableHeaderSettings {
-                header_rows: Some(KeynoteTableHeaderCount::ONE),
-                header_columns: Some(KeynoteTableHeaderCount::ONE),
-                footer_rows: Some(KeynoteTableHeaderCount::ONE),
+            HeaderSettings {
+                header_rows: Some(HeaderCount::ONE),
+                header_columns: Some(HeaderCount::ONE),
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )

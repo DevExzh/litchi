@@ -36,10 +36,9 @@ pub mod editor;
 pub use creation::PagesDocumentBuilder;
 pub use document::PagesDocument;
 pub use editor::{
-    PagesAudioInfo, PagesBodyChartInfo, PagesBodyShapeInfo,
-    PagesCellValue, PagesDrawableTextInfo, PagesEditor, PagesHeaderFooterInfo, PagesImageInfo,
-    PagesMovieInfo, PagesSectionInfo, PagesTable,
-    PagesTableCellParagraphIndents, PagesTableCellParagraphLineSpacing,
+    PagesAudioInfo, PagesBodyChartInfo, PagesBodyShapeInfo, PagesCellValue, PagesDrawableTextInfo,
+    PagesEditor, PagesHeaderFooterInfo, PagesImageInfo, PagesMovieInfo, PagesSectionInfo,
+    PagesTable, PagesTableCellParagraphIndents, PagesTableCellParagraphLineSpacing,
     PagesTableCellParagraphList, PagesTableCellParagraphListBullet,
     PagesTableCellParagraphListBulletGeometry, PagesTableCellParagraphListIndentation,
     PagesTableCellParagraphListLabelColor, PagesTableCellParagraphListLevel,
@@ -51,15 +50,13 @@ pub use editor::{
     PagesTableCellTextCapitalization, PagesTableCellTextCharacterSpacing, PagesTableCellTextColor,
     PagesTableCellTextDecorations, PagesTableCellTextFont, PagesTableCellTextLigatures,
     PagesTableCellTextOutline, PagesTableCellTextScript, PagesTableCellTextShadow,
-    PagesTableCellTextStyle, PagesTableCellUpdate, PagesTableDimension,
-    PagesTableDimensionSize,
+    PagesTableCellTextStyle, PagesTableCellUpdate, PagesTableDimension, PagesTableDimensionSize,
     PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
-    PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableHeaderCount,
-    PagesTableHeaderSettings, PagesTableInfo, PagesTablePoints, PagesTableSortColumnIndex,
-    PagesTableSortDirection,
-    PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope,
-    PagesTableTitleSettings, RemovedPagesAudio, RemovedPagesBodyChart, RemovedPagesBodyShape,
-    RemovedPagesImage, RemovedPagesMovie, RemovedPagesTextBox,
+    PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableInfo, PagesTablePoints,
+    PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder,
+    PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope, PagesTableTitleSettings,
+    RemovedPagesAudio, RemovedPagesBodyChart, RemovedPagesBodyShape, RemovedPagesImage,
+    RemovedPagesMovie, RemovedPagesTextBox,
 };
 pub use litchi_pages::footnote::body::{Footnote, Position, Selector};
 pub use litchi_pages::{Section, SectionType};

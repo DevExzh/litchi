@@ -261,9 +261,9 @@ fn validate_deletion_features(
     model: &TableModelArchive,
     axis: TableAxis,
     new_length: usize,
-    updated_header_settings: Option<NumbersTableHeaderSettings>,
+    updated_header_settings: Option<HeaderSettings>,
 ) -> Result<()> {
-    let stored_settings = NumbersTableHeaderSettings::from_model(model)?;
+    let stored_settings = table_headers::settings_from_model(model)?;
     let settings = updated_header_settings.unwrap_or(stored_settings);
     let fixed_regions_fit = match axis {
         TableAxis::Row => settings
@@ -299,14 +299,14 @@ fn validate_deletion_features(
 
 struct ResolvedRowDeletion {
     physical_index: usize,
-    updated_header_settings: Option<NumbersTableHeaderSettings>,
+    updated_header_settings: Option<HeaderSettings>,
 }
 
 fn resolve_row_deletion(
     model: &TableModelArchive,
     deletion: RowDeletion,
 ) -> Result<ResolvedRowDeletion> {
-    let mut settings = NumbersTableHeaderSettings::from_model(model)?;
+    let mut settings = table_headers::settings_from_model(model)?;
     let rows = model.number_of_rows as usize;
     let header_rows = settings.header_row_count();
     let footer_rows = settings.footer_row_count();
@@ -348,14 +348,14 @@ fn resolve_row_deletion(
 
 struct ResolvedColumnDeletion {
     physical_index: usize,
-    updated_header_settings: Option<NumbersTableHeaderSettings>,
+    updated_header_settings: Option<HeaderSettings>,
 }
 
 fn resolve_column_deletion(
     model: &TableModelArchive,
     deletion: ColumnDeletion,
 ) -> Result<ResolvedColumnDeletion> {
-    let mut settings = NumbersTableHeaderSettings::from_model(model)?;
+    let mut settings = table_headers::settings_from_model(model)?;
     let columns = model.number_of_columns as usize;
     let header_columns = settings.header_column_count();
     let body_columns = columns.checked_sub(header_columns).ok_or_else(|| {
@@ -389,10 +389,10 @@ fn validate_section_deletion(index: usize, length: usize, section: &str) -> Resu
     Ok(())
 }
 
-fn decremented_header_count(count: usize) -> Result<Option<NumbersTableHeaderCount>> {
+fn decremented_header_count(count: usize) -> Result<Option<HeaderCount>> {
     match count.checked_sub(1) {
         Some(0) => Ok(None),
-        Some(count) => NumbersTableHeaderCount::new(count).map(Some),
+        Some(count) => Ok(Some(HeaderCount::new(count)?)),
         None => Err(Error::InvalidFormat(
             "iWork header/footer deletion underflow".to_owned(),
         )),

@@ -933,7 +933,6 @@ round-trip.
 ```rust
 use litchi_iwa::numbers::{
     CellValue, FormulaAxisReference, FormulaCellReference, FormulaExpression, NumbersEditor,
-    NumbersTableHeaderCount,
     Settings as TableTitleSettings,
 };
 use litchi_iwa::pages::PagesEditor;
@@ -947,12 +946,13 @@ use litchi_iwa::keynote::{
     KeynoteSlideTextRole, KeynoteSwooshDirection,
 };
 use litchi_keynote::transition::{Acceleration, Effect, TextDelivery};
+use litchi_numbers::table::headers::Count as HeaderCount;
 
 let mut numbers = NumbersEditor::open("input.numbers")?;
 let table = numbers.tables()?.remove(0);
 let mut headers = numbers.table_header_settings(table.object_id)?;
-headers.header_rows = Some(NumbersTableHeaderCount::TWO);
-headers.footer_rows = Some(NumbersTableHeaderCount::ONE);
+headers.header_rows = Some(HeaderCount::TWO);
+headers.footer_rows = Some(HeaderCount::ONE);
 headers.header_rows_frozen = Some(true);
 numbers.set_table_header_settings(table.object_id, headers)?;
 numbers.set_table_title_settings(

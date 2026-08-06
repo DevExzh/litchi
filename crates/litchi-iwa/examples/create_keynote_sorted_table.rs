@@ -1,11 +1,9 @@
 //! Create and physically sort a plain-text Keynote table without an input presentation.
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 use std::env;
 
-use litchi_iwa::keynote::{
-    KeynoteDocumentBuilder, KeynoteTableCellUpdate, KeynoteTableCellValue, KeynoteTableHeaderCount,
-    KeynoteTableHeaderSettings,
-};
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteTableCellUpdate, KeynoteTableCellValue};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_numbers::table::sort::{ColumnIndex, Direction, Order, Rule};
 
@@ -31,8 +29,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_table_header_settings(
         0,
         table.model_object_id,
-        KeynoteTableHeaderSettings {
-            header_rows: Some(KeynoteTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;

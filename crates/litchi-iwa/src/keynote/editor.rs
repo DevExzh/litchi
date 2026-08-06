@@ -5582,9 +5582,8 @@ pub use slide_tables::{
     KeynoteTableCellTextOutline, KeynoteTableCellTextScript, KeynoteTableCellTextShadow,
     KeynoteTableCellTextStyle, KeynoteTableCellTextWrap, KeynoteTableCellUpdate,
     KeynoteTableCellValue, KeynoteTableCellVerticalAlignment, KeynoteTableDimension,
-    KeynoteTableDimensionSize,
-    KeynoteTableHeaderCount, KeynoteTableHeaderSettings, KeynoteTablePoints,
-    KeynoteTableTitleSettings, RemovedKeynoteSlideTable,
+    KeynoteTableDimensionSize, KeynoteTablePoints, KeynoteTableTitleSettings,
+    RemovedKeynoteSlideTable,
 };
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;
 use transition_wire::{transition_settings_from_wire, validate_transition_wire};

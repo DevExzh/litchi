@@ -1,20 +1,15 @@
 //! Create Numbers, Pages, and Keynote files with native fixed table sections.
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{
-    KeynoteDocumentBuilder, KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
-};
-use litchi_iwa::numbers::{
-    NumbersDocumentBuilder, NumbersTableHeaderCount, NumbersTableHeaderSettings,
-};
-use litchi_iwa::pages::{
-    PagesDocumentBuilder, PagesTableHeaderCount, PagesTableHeaderSettings,
-};
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
-use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 use litchi_numbers::TableSelector;
+use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
+use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 
 const TABLE_ROWS: usize = 4;
 const TABLE_COLUMNS: usize = 4;
@@ -50,10 +45,10 @@ fn create_numbers(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
     let table = TableSelector::index(0);
     editor.set_table_header_settings(
         table,
-        NumbersTableHeaderSettings {
-            header_rows: Some(NumbersTableHeaderCount::ONE),
-            header_columns: Some(NumbersTableHeaderCount::ONE),
-            footer_rows: Some(NumbersTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;
@@ -77,10 +72,10 @@ fn create_pages(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_header_settings(
         table_id,
-        PagesTableHeaderSettings {
-            header_rows: Some(PagesTableHeaderCount::ONE),
-            header_columns: Some(PagesTableHeaderCount::ONE),
-            footer_rows: Some(PagesTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;
@@ -114,37 +109,21 @@ fn create_keynote(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
     editor.set_slide_table_header_settings(
         0,
         table.model_object_id,
-        KeynoteTableHeaderSettings {
-            header_rows: Some(KeynoteTableHeaderCount::ONE),
-            header_columns: Some(KeynoteTableHeaderCount::ONE),
-            footer_rows: Some(KeynoteTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;
-    editor.insert_slide_table_row(
-        0,
-        table.model_object_id,
-        RowInsertion::header(1),
-    )?;
-    editor.insert_slide_table_row(
-        0,
-        table.model_object_id,
-        RowInsertion::footer(0),
-    )?;
-    editor.insert_slide_table_column(
-        0,
-        table.model_object_id,
-        ColumnInsertion::header(1),
-    )?;
+    editor.insert_slide_table_row(0, table.model_object_id, RowInsertion::header(1))?;
+    editor.insert_slide_table_row(0, table.model_object_id, RowInsertion::footer(0))?;
+    editor.insert_slide_table_column(0, table.model_object_id, ColumnInsertion::header(1))?;
     editor.set_slide_table_cells(0, table.model_object_id, section_values())?;
     editor.save(insertions)?;
     editor.remove_slide_table_row(0, table.model_object_id, RowDeletion::header(0))?;
     editor.remove_slide_table_row(0, table.model_object_id, RowDeletion::footer(1))?;
-    editor.remove_slide_table_column(
-        0,
-        table.model_object_id,
-        ColumnDeletion::header(0),
-    )?;
+    editor.remove_slide_table_column(0, table.model_object_id, ColumnDeletion::header(0))?;
     editor.save(deletions)?;
     Ok(())
 }

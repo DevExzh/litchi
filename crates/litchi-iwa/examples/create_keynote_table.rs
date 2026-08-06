@@ -1,9 +1,9 @@
 use std::env;
 
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 use litchi_iwa::keynote::{
     KeynoteDocumentBuilder, KeynoteTableCellUpdate, KeynoteTableCellValue,
-    KeynoteTableDimensionSize, KeynoteTableHeaderCount, KeynoteTableHeaderSettings,
-    KeynoteTableTitleSettings,
+    KeynoteTableDimensionSize, KeynoteTableTitleSettings,
 };
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_keynote::slide::table::formula::{
@@ -53,10 +53,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_table_header_settings(
         0,
         table.model_object_id,
-        KeynoteTableHeaderSettings {
-            header_rows: Some(KeynoteTableHeaderCount::ONE),
-            header_columns: Some(KeynoteTableHeaderCount::ONE),
-            footer_rows: Some(KeynoteTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;
@@ -96,11 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         FormulaCachedValue::Number(218.0.try_into()?),
     )?;
     editor.insert_slide_table_row(0, table.model_object_id, RowInsertion::body(2))?;
-    editor.insert_slide_table_column(
-        0,
-        table.model_object_id,
-        ColumnInsertion::body(1),
-    )?;
+    editor.insert_slide_table_column(0, table.model_object_id, ColumnInsertion::body(1))?;
     editor.set_slide_table_cells(
         0,
         table.model_object_id,

@@ -21,6 +21,7 @@ use litchi_numbers::cell::data_format::number::{
 use litchi_numbers::cell::data_format::numeral_system::NumeralSystem;
 use litchi_numbers::cell::data_format::pop_up_menu::PopUpMenu;
 use litchi_numbers::cell::data_format::{Checkbox, DataFormat, StarRating, Text};
+use litchi_numbers::table::headers::Settings as HeaderSettings;
 
 mod appearance;
 mod comments;
@@ -37,9 +38,7 @@ mod topology;
 pub use conditional_highlight::KeynoteTableCellConditionalHighlightInfo;
 use graph::{require_table_model, slide_table_graph, table_template};
 use litchi_iwa_common::comment::Comment;
-use litchi_numbers::table::topology::{
-    ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion,
-};
+use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 use storage::{remove_objects, set_table_geometry_in_package, set_uniform_table_dimensions};
 pub use title::KeynoteTableTitleSettings;
 
@@ -55,6 +54,8 @@ pub type KeynoteTableCellUpdate = litchi_numbers::cell::Update;
 /// A validated native merged-cell rectangle.
 pub type KeynoteTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
 pub use crate::shapes::RgbaColor as KeynoteTableCellTextColor;
+pub use crate::text::Background as KeynoteTableCellTextBackground;
+pub use crate::text::Outline as KeynoteTableCellTextOutline;
 pub use crate::text::ParagraphIndents as KeynoteTableCellParagraphIndents;
 pub use crate::text::ParagraphLineSpacing as KeynoteTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphList as KeynoteTableCellParagraphList;
@@ -71,27 +72,21 @@ pub use crate::text::ParagraphListNumbering as KeynoteTableCellParagraphListNumb
 pub use crate::text::ParagraphListPlacement as KeynoteTableCellParagraphListPlacement;
 pub use crate::text::ParagraphSpacing as KeynoteTableCellParagraphSpacing;
 pub use crate::text::ParagraphTabStops as KeynoteTableCellParagraphTabStops;
+pub use crate::text::Shadow as KeynoteTableCellTextShadow;
 pub use crate::text::TextAlignment as KeynoteTableCellTextAlignment;
-pub use crate::text::Background as KeynoteTableCellTextBackground;
 pub use crate::text::TextBaselineShift as KeynoteTableCellTextBaselineShift;
 pub use crate::text::TextCapitalization as KeynoteTableCellTextCapitalization;
 pub use crate::text::TextCharacterSpacing as KeynoteTableCellTextCharacterSpacing;
 pub use crate::text::TextDecorations as KeynoteTableCellTextDecorations;
 pub use crate::text::TextFont as KeynoteTableCellTextFont;
 pub use crate::text::TextLigatures as KeynoteTableCellTextLigatures;
-pub use crate::text::Outline as KeynoteTableCellTextOutline;
 pub use crate::text::TextScript as KeynoteTableCellTextScript;
-pub use crate::text::Shadow as KeynoteTableCellTextShadow;
 pub use crate::text::TextStyle as KeynoteTableCellTextStyle;
 pub use litchi_iwa_common::table::cell::layout::{
     Inset as KeynoteTableCellInset, Insets as KeynoteTableCellInsets,
     Layout as KeynoteTableCellLayout, TextWrap as KeynoteTableCellTextWrap,
     VerticalAlignment as KeynoteTableCellVerticalAlignment,
 };
-/// A validated non-zero native header or footer count.
-pub type KeynoteTableHeaderCount = crate::numbers::NumbersTableHeaderCount;
-/// Lossless header/footer configuration shared by native iWork tables.
-pub type KeynoteTableHeaderSettings = crate::numbers::NumbersTableHeaderSettings;
 /// One row or column addressed by zero-based index.
 pub type KeynoteTableDimension = crate::numbers::NumbersTableDimension;
 /// A validated positive point measurement for a table axis.
@@ -3936,7 +3931,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         model_object_id: u64,
-    ) -> Result<KeynoteTableHeaderSettings> {
+    ) -> Result<HeaderSettings> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_header_settings_in_package(self.package(), model_object_id)
     }
@@ -3946,7 +3941,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        settings: KeynoteTableHeaderSettings,
+        settings: HeaderSettings,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();

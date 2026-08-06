@@ -1,11 +1,11 @@
 //! Create a Numbers table with a hidden body row and a configured sort order.
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 use std::path::PathBuf;
 
 use litchi_iwa::numbers::{
-    NumbersDocumentBuilder, NumbersTableHeaderCount, NumbersTableHeaderSettings,
-    NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
-    NumbersTableSortRule,
+    NumbersDocumentBuilder, NumbersTableSortColumnIndex, NumbersTableSortDirection,
+    NumbersTableSortOrder, NumbersTableSortRule,
 };
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
@@ -23,9 +23,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let table_id = editor.tables()?.remove(0).object_id;
     editor.set_table_header_settings(
         table_id,
-        NumbersTableHeaderSettings {
-            header_rows: Some(NumbersTableHeaderCount::ONE),
-            footer_rows: Some(NumbersTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;

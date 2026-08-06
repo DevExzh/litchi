@@ -23,6 +23,7 @@ use litchi_numbers::cell::data_format::{
 use litchi_numbers::table::topology::{
     ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion,
 };
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 use litchi_iwa_text::position::TextPosition;
 use prost::Message;
 
@@ -259,7 +260,6 @@ pub(crate) use table_duplicate::{duplicate_attached_table_graph_in_package, dupl
 use table_duplicate::{
     register_cloned_numbers_objects, register_numbers_component_reference, table_owned_graph,
 };
-pub use table_headers::{NumbersTableHeaderCount, NumbersTableHeaderSettings};
 pub use table_sort::{
     NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
     NumbersTableSortRowRange, NumbersTableSortRule, NumbersTableSortScope,

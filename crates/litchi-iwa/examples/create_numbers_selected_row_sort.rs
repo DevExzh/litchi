@@ -1,9 +1,9 @@
 //! Create a Numbers table and execute a selected-row sort without an input file.
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 use litchi_iwa::numbers::{
-    NumbersDocumentBuilder, NumbersTableHeaderCount, NumbersTableHeaderSettings,
-    NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
-    NumbersTableSortRowRange, NumbersTableSortRule,
+    NumbersDocumentBuilder, NumbersTableSortColumnIndex, NumbersTableSortDirection,
+    NumbersTableSortOrder, NumbersTableSortRowRange, NumbersTableSortRule,
 };
 use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 
@@ -18,9 +18,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let table_id = editor.tables()?.remove(0).object_id;
     editor.set_table_header_settings(
         table_id,
-        NumbersTableHeaderSettings {
-            header_rows: Some(NumbersTableHeaderCount::ONE),
-            footer_rows: Some(NumbersTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;

@@ -40,6 +40,16 @@ interpreted; mutation continues through the shared bounded patch primitives.
 This keeps borrowed inspection allocation-conscious without weakening the
 transactional publication boundary.
 
+The Numbers table-header adapter applies the same publication rule to
+`litchi_numbers::table::headers::{Count, Settings}`. It validates every
+recognized field's canonical presence and value before staging a wire patch,
+retains unknown payload fields, validates table-section capacities, reparses
+the staged package, and publishes only after typed readback equals the
+requested settings. The leaf error is non-exhaustive and is mapped only at the
+IWA boundary. Pages and Keynote share the value type; their remaining native
+model-object selectors are an explicit migration debt and do not become a
+precedent for new semantic APIs.
+
 ## Identity and selection
 
 Handles carry snapshot lineage and stable internal identity. Public lookup is

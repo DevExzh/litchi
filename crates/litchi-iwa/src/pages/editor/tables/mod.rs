@@ -24,8 +24,7 @@ pub use formula::{
 };
 pub use hidden_axes::{PagesTableAxisIndex, PagesTableHiddenAxes};
 pub use layout::{
-    PagesTableDimension, PagesTableDimensionSize, PagesTableHeaderCount, PagesTableHeaderSettings,
-    PagesTablePoints,
+    PagesTableDimension, PagesTableDimensionSize, PagesTablePoints,
 };
 pub use sort::{
     PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder,
