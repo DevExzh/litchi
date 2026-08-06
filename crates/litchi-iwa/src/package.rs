@@ -320,6 +320,15 @@ impl IWorkPackage {
         Self::from_bytes_with_limits(bytes, PackageLimits::default())
     }
 
+    /// Parse a package from an immutable, already-owned byte source.
+    ///
+    /// The source allocation is retained by the physical archive provenance,
+    /// so callers that already own an `Arc<[u8]>` avoid an ingress copy while
+    /// preserving exact ZIP bytes for a no-op write.
+    pub fn from_shared_bytes(source: Arc<[u8]>) -> Result<Self> {
+        Self::from_shared_bytes_with_limits(source, PackageLimits::default())
+    }
+
     /// Parse a package under caller-selected ingress ceilings.
     ///
     /// The same ceilings are applied to the outer ZIP and, when present, the
@@ -333,6 +342,27 @@ impl IWorkPackage {
             bytes,
             limits.physical_archive_limits()?,
         )?;
+        Self::from_catalog(catalog, limits)
+    }
+
+    /// Parse an already-owned package source under caller-selected ingress
+    /// ceilings without copying the source bytes.
+    pub fn from_shared_bytes_with_limits(source: Arc<[u8]>, limits: PackageLimits) -> Result<Self> {
+        let input_size = u64::try_from(source.len()).map_err(|_| {
+            Error::InvalidFormat("iWork package input length does not fit u64".to_owned())
+        })?;
+        limits.check_input_size(input_size, "iWork package input")?;
+        let catalog = litchi_iwa_archive::package::Catalog::from_shared_bytes_with_limits(
+            source,
+            limits.physical_archive_limits()?,
+        )?;
+        Self::from_catalog(catalog, limits)
+    }
+
+    fn from_catalog(
+        catalog: litchi_iwa_archive::package::Catalog,
+        limits: PackageLimits,
+    ) -> Result<Self> {
         let mut entries = Vec::new();
         entries.try_reserve(catalog.len()).map_err(|_error| {
             Error::IwaCommon(litchi_iwa_common::Error::Allocation {
@@ -489,10 +519,13 @@ impl IWorkPackage {
     }
 
     /// Parse a compressed `.iwa` package member.
+    ///
+    /// The immutable parsed representation is retained in the package-state
+    /// cache and cloned only at this owned-return boundary. Repeated reads of
+    /// one snapshot therefore share decompression and protobuf parsing.
     pub fn archive(&self, name: &str) -> Result<Archive> {
         let normalized = normalize_entry_name(name);
-        let limits = self.limits.effective_archive_limits()?;
-        self.parse_archive(normalized, limits)
+        Ok(self.parsed_archive(normalized)?.as_ref().clone())
     }
 
     /// Borrow a parsed `.iwa` package member through a bounded read cache.
@@ -966,6 +999,7 @@ fn validate_entry_name(name: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use std::sync::Barrier;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::thread;
@@ -1034,6 +1068,16 @@ mod tests {
     fn empty_package_with_limits(limits: PackageLimits) -> IWorkPackage {
         let bytes = zip(&[]);
         IWorkPackage::from_bytes_with_limits(&bytes, limits).unwrap()
+    }
+
+    #[test]
+    fn shared_bytes_preserve_the_source_for_noop_writes() {
+        let bytes = zip(&[("preview.jpg", b"preview")]);
+        let source: Arc<[u8]> = bytes.into();
+        let package = IWorkPackage::from_shared_bytes(source.clone()).unwrap();
+
+        assert_eq!(package.to_bytes().unwrap(), source.as_ref());
+        assert_eq!(package.entry_names().collect::<Vec<_>>(), ["preview.jpg"]);
     }
 
     #[test]

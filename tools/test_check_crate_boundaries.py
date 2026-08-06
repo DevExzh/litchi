@@ -213,6 +213,22 @@ class BoundaryPolicyTests(unittest.TestCase):
             violations,
         )
 
+    def test_resolved_canonical_edge_requires_policy_cleanup(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        edge = next(iter(self.policy.canonical_edges))
+        edges = dict(snapshot.edges)
+        del edges[edge]
+        dependencies = dict(snapshot.dependencies)
+        dependencies[edge.dependent] -= frozenset({edge.dependency})
+        snapshot = replace(snapshot, edges=edges, dependencies=dependencies)
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertIn(
+            f"resolved canonical edge still listed: {edge.display()}; remove its policy entry",
+            violations,
+        )
+
     def test_allowed_edges_cannot_hide_a_dependency_cycle(self) -> None:
         snapshot = valid_snapshot(self.policy)
         edge = boundaries.Edge("litchi-core", "litchi-sheet")

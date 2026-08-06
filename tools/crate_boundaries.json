@@ -13,7 +13,6 @@
       "litchi-formula",
       "litchi-imgconv",
       "litchi-iwa",
-      "litchi-iwa-graph",
       "litchi-markdown",
       "litchi-odf-common",
       "litchi-odp",
@@ -94,8 +93,7 @@
       "litchi-iwa-text",
       "litchi-keynote",
       "litchi-numbers",
-      "litchi-pages",
-      "soapberry-zip"
+      "litchi-pages"
     ],
     "litchi-iwa-archive": [
       "litchi-iwa-core",
@@ -289,7 +287,6 @@
     ],
     "litchi-xlsx": [
       "litchi-core",
-      "litchi-drawingml",
       "litchi-ooxml-common",
       "litchi-opc",
       "litchi-sheet",

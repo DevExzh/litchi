@@ -520,6 +520,10 @@ def audit_snapshot(snapshot: Snapshot, policy: Policy) -> list[str]:
     for edge in sorted(actual_edges - known_edges):
         evidence = "; ".join(snapshot.edges[edge])
         violations.append(f"unclassified internal edge {edge.display()} ({evidence})")
+    for edge in sorted(policy.canonical_edges - actual_edges):
+        violations.append(
+            f"resolved canonical edge still listed: {edge.display()}; remove its policy entry"
+        )
     for edge in sorted(policy.migration_edges - actual_edges):
         violations.append(
             f"resolved migration debt still listed: {edge.display()}; remove its policy entry"
