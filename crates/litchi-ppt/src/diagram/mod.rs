@@ -13,10 +13,14 @@
 
 mod codec;
 mod model;
+mod transaction;
 mod validation;
 
 #[cfg(test)]
 mod tests;
 
 pub use codec::{parse, parse_bytes, parse_bytes_with_limits, parse_with_limits};
-pub use model::{Build, Diagram, Id, Inventory, Limits, Payload, PayloadKind, ShapeRef};
+pub use model::{
+    Build, Diagram, EditLimits, Id, Inventory, Limits, Payload, PayloadKind, ShapeRef,
+};
+pub use transaction::{Change, Commit, Patch, Revision, Snapshot, Transaction};

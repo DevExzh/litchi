@@ -258,6 +258,33 @@ impl Default for Limits {
     }
 }
 
+/// Resource ceilings retained by a source-preserving diagram transaction.
+///
+/// The edit owner never grows a BuildList, but it still bounds all source
+/// bytes and the shape index it retains before exposing mutation methods.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EditLimits {
+    /// Maximum complete BuildList byte length.
+    pub max_build_list_bytes: usize,
+    /// Maximum complete OfficeArt drawing byte length.
+    pub max_drawing_bytes: usize,
+    /// Maximum diagram entries retained from one BuildList.
+    pub max_diagrams: usize,
+    /// Maximum unique OfficeArt shape identifiers retained for graph checks.
+    pub max_shapes: usize,
+}
+
+impl Default for EditLimits {
+    fn default() -> Self {
+        Self {
+            max_build_list_bytes: 16 * 1024 * 1024,
+            max_drawing_bytes: 64 * 1024 * 1024,
+            max_diagrams: 1024,
+            max_shapes: 1_000_000,
+        }
+    }
+}
+
 /// Read-only native diagram inventory for one PPT drawing/build-list pair.
 #[derive(Debug)]
 pub struct Inventory<'data> {
@@ -316,6 +343,16 @@ impl<'data> Inventory<'data> {
     ) -> Option<&'inventory Shape<'data>> {
         reference.resolve(&self.drawing)
     }
+}
+
+/// One typed diagram build together with its byte offset in the source
+/// BuildList.  The offset is an implementation detail of the transactional
+/// owner; keeping it beside the existing [`Build`] avoids cloning or
+/// reconstructing the surrounding BuildList records during an edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct LocatedBuild {
+    pub(super) offset: usize,
+    pub(super) build: Build,
 }
 
 fn find_shape<'drawing, 'data>(

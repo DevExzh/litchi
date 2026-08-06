@@ -9,7 +9,7 @@ use crate::package::{Error, Result};
 use crate::records::Record;
 use litchi_odraw::shape::Flags as ShapeFlags;
 
-use super::model::{Build, Id, Limits, Payload, PayloadKind, ShapeRef};
+use super::model::{Build, EditLimits, Id, Limits, Payload, PayloadKind, ShapeRef};
 
 pub(super) fn diagram_builds(record: &Record, limits: Limits) -> Result<Vec<Build>> {
     validate_build_list(record)?;
@@ -84,6 +84,88 @@ pub(super) fn validate_build_list(record: &Record) -> Result<()> {
         return Err(Error::Corrupted(
             "BuildList children do not cover its payload".to_string(),
         ));
+    }
+    Ok(())
+}
+
+/// Validate the structural envelope needed by the source-preserving editor.
+///
+/// Unlike the read-only inventory validator, this deliberately does not
+/// reject future or host-specific BuildList children.  They are outside the
+/// semantic edit surface but remain byte-for-byte inert in the transaction.
+pub(super) fn validate_edit_build_list(record: &Record, limits: EditLimits) -> Result<()> {
+    if record.record_type != RecordType::BuildList
+        || record.record_type_raw != RecordType::BuildList.as_u16()
+    {
+        return Err(Error::InvalidFormat(
+            "diagram transaction requires a BuildList record".to_string(),
+        ));
+    }
+    if record.instance != 0 || !matches!(record.version, 0 | 0x0F) {
+        return Err(Error::Corrupted(
+            "BuildList requires record instance 0 and version 0 or 0xF".to_string(),
+        ));
+    }
+    if usize::try_from(record.data_length).ok() != Some(record.data.len()) {
+        return Err(Error::Corrupted(
+            "BuildList record length does not match its payload".to_string(),
+        ));
+    }
+    if record.data.len() > limits.max_build_list_bytes.saturating_sub(8) {
+        return Err(Error::InvalidFormat(
+            "BuildList exceeds the configured transaction byte limit".to_string(),
+        ));
+    }
+
+    let mut encoded_len = 0usize;
+    for child in &record.children {
+        if usize::try_from(child.data_length).ok() != Some(child.data.len()) {
+            return Err(Error::Corrupted(
+                "BuildList child length does not match its payload".to_string(),
+            ));
+        }
+        encoded_len = encoded_len
+            .checked_add(8)
+            .and_then(|value| value.checked_add(child.data.len()))
+            .ok_or_else(|| Error::Corrupted("BuildList child length overflow".to_string()))?;
+    }
+    if encoded_len != record.data.len() {
+        return Err(Error::Corrupted(
+            "BuildList children do not cover its payload".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Parse and validate the bounded shape graph used by checked shape edits.
+pub(super) fn shape_ids(drawing: &Drawing<'_>, maximum: usize) -> Result<Vec<u32>> {
+    let mut ids = HashSet::new();
+    ids.try_reserve(drawing.shapes().len().min(maximum))
+        .map_err(|_| allocation("diagram shape index"))?;
+    for shape in drawing.shapes() {
+        collect_shape_ids_bounded(shape, &mut ids, maximum)?;
+    }
+    let mut ordered = ids.into_iter().collect::<Vec<_>>();
+    ordered.sort_unstable();
+    Ok(ordered)
+}
+
+fn collect_shape_ids_bounded(
+    shape: &Shape<'_>,
+    ids: &mut HashSet<u32>,
+    maximum: usize,
+) -> Result<()> {
+    if !ids.insert(shape.id()) {
+        return Err(Error::InvalidFormat(format!(
+            "duplicate OfficeArt shape identifier {}",
+            shape.id()
+        )));
+    }
+    if ids.len() > maximum {
+        return Err(limit("diagram shape index", maximum));
+    }
+    for child in shape.children() {
+        collect_shape_ids_bounded(child, ids, maximum)?;
     }
     Ok(())
 }

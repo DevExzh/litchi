@@ -1,5 +1,5 @@
 use super::*;
-use crate::animation::diagram_build::{self, Atom, Build as BuildAtom, BuildType, Container};
+use crate::animation::diagram_build::{self, Atom, Build as BuildAtom, BuildType, Container, Kind};
 use crate::consts::RecordType;
 
 fn record(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
@@ -170,4 +170,136 @@ fn shared_record_parser_remains_the_single_diagram_wire_owner() {
 fn malformed_drawing_is_not_silently_dropped() {
     let value = build_list(&[build(3, 42, BuildType::Custom)]);
     assert!(parse_bytes(&value, &[0; 7]).is_err());
+}
+
+#[test]
+fn transaction_noop_replays_the_exact_build_list() {
+    let drawing = drawing_with_group();
+    let source = build_list(&[build(9, 42, BuildType::AllAtOnce)]);
+    let snapshot = Snapshot::parse(&source, &drawing).unwrap();
+
+    let commit = snapshot.edit().commit().unwrap();
+    assert!(commit.patch().is_empty());
+    assert_eq!(commit.snapshot().bytes(), source.as_slice());
+    assert_eq!(
+        commit.patch().apply(&snapshot).unwrap().bytes(),
+        source.as_slice()
+    );
+}
+
+#[test]
+fn transaction_mode_edit_changes_only_the_fixed_mode_field() {
+    let drawing = drawing_with_group();
+    let source = build_list(&[build(9, 42, BuildType::AllAtOnce)]);
+    let snapshot = Snapshot::parse(&source, &drawing).unwrap();
+    let id = Id::new(9, 42);
+
+    let mut edit = snapshot.edit();
+    edit.set_mode(id, BuildType::DepthByNode).unwrap();
+    let commit = edit.commit().unwrap();
+    let after = commit.snapshot().bytes();
+    assert_eq!(&source[..48], &after[..48]);
+    assert_eq!(&source[52..], &after[52..]);
+    assert_eq!(&after[48..52], &1u32.to_le_bytes());
+    assert_eq!(
+        commit.snapshot().get(id).unwrap().mode(),
+        BuildType::DepthByNode
+    );
+    assert_eq!(commit.patch().changes().len(), 1);
+}
+
+#[test]
+fn transaction_shape_edit_checks_the_officeart_graph_and_identity() {
+    let drawing = drawing_with_group();
+    let source = build_list(&[
+        build(9, 42, BuildType::AllAtOnce),
+        build(9, 77, BuildType::Down),
+    ]);
+    let snapshot = Snapshot::parse(&source, &drawing).unwrap();
+    let mut edit = snapshot.edit();
+
+    assert!(edit.set_shape_id(Id::new(9, 42), 999).is_err());
+    assert!(!edit.is_changed());
+    assert!(edit.set_shape_id(Id::new(9, 42), 77).is_err());
+    assert!(!edit.is_changed());
+}
+
+#[test]
+fn transaction_shape_edit_updates_to_an_existing_shape() {
+    let drawing = drawing_with_group();
+    let source = build_list(&[build(9, 42, BuildType::AllAtOnce)]);
+    let snapshot = Snapshot::parse(&source, &drawing).unwrap();
+    let mut edit = snapshot.edit();
+    let target = edit.set_shape_id(Id::new(9, 42), 77).unwrap();
+    assert_eq!(target, Id::new(9, 77));
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.snapshot().get(target).unwrap().shape_id(), 77);
+    let after = commit.snapshot().bytes();
+    assert_eq!(&source[..32], &after[..32]);
+    assert_eq!(&source[36..], &after[36..]);
+    assert_eq!(&after[32..36], &77u32.to_le_bytes());
+}
+
+#[test]
+fn transaction_preserves_unknown_kind_reserved_bytes_and_opaque_children() {
+    let drawing = drawing_with_group();
+    let diagram = build(9, 42, BuildType::Unknown(0xDEAD_BEEF)).to_bytes();
+    let opaque = record(0, 0, 0x7FFE, &[0xA1, 0xB2, 0xC3, 0xD4]);
+    let mut source = record(
+        0,
+        0,
+        RecordType::BuildList.as_u16(),
+        &[diagram.as_slice(), opaque.as_slice()].concat(),
+    );
+    source[8 + 16..8 + 20].copy_from_slice(&0xCAFE_BABEu32.to_le_bytes());
+    source[8 + 30..8 + 32].copy_from_slice(&[0xA5, 0x5A]);
+    let snapshot = Snapshot::parse(&source, &drawing).unwrap();
+    let before = snapshot.get(Id::new(9, 42)).unwrap();
+    assert_eq!(before.record().build().kind(), Kind::Unknown(0xCAFE_BABE));
+    assert_eq!(before.record().build().reserved(), [0xA5, 0x5A]);
+
+    let mut edit = snapshot.edit();
+    edit.set_mode(Id::new(9, 42), BuildType::Down).unwrap();
+    let target = edit.commit().unwrap().snapshot().clone();
+    assert_eq!(
+        target.get(Id::new(9, 42)).unwrap().record().build().kind(),
+        Kind::Unknown(0xCAFE_BABE)
+    );
+    assert_eq!(
+        target
+            .get(Id::new(9, 42))
+            .unwrap()
+            .record()
+            .build()
+            .reserved(),
+        [0xA5, 0x5A]
+    );
+    assert_eq!(
+        &target.bytes()[diagram.len() + 8..],
+        &source[diagram.len() + 8..]
+    );
+}
+
+#[test]
+fn transaction_rejects_stale_sources_and_supports_inverse_replay() {
+    let drawing = drawing_with_group();
+    let source = build_list(&[build(9, 42, BuildType::AllAtOnce)]);
+    let snapshot = Snapshot::parse(&source, &drawing).unwrap();
+    let mut edit = snapshot.edit();
+    edit.set_mode(Id::new(9, 42), BuildType::DepthByNode)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+
+    let mut other = snapshot.edit();
+    other.set_mode(Id::new(9, 42), BuildType::Down).unwrap();
+    let other = other.commit().unwrap();
+    assert!(commit.patch().apply(other.snapshot()).is_err());
+
+    let target = commit.patch().apply(&snapshot).unwrap();
+    let restored = commit.patch().undo(&target).unwrap();
+    assert_eq!(restored.bytes(), snapshot.bytes());
+    assert_eq!(
+        commit.patch().redo(&restored).unwrap().bytes(),
+        target.bytes()
+    );
 }
