@@ -185,7 +185,7 @@ pub(super) fn validate_transition_settings(settings: &TransitionSettings) -> Res
     })?;
 
     if let Some(payload) = settings.animation_parameters().color_payload() {
-        let color = tsp::Color::decode(payload.as_ref()).map_err(|error| {
+        let color = tsp::Color::decode(payload).map_err(|error| {
             Error::ParseError(format!("invalid Keynote transition color payload: {error}"))
         })?;
         for component in [
@@ -204,7 +204,7 @@ pub(super) fn validate_transition_settings(settings: &TransitionSettings) -> Res
         .into_iter()
         .flatten()
     {
-        tsd::PathSourceArchive::decode(payload.as_ref()).map_err(|error| {
+        tsd::PathSourceArchive::decode(payload).map_err(|error| {
             Error::ParseError(format!(
                 "invalid Keynote transition timing-curve payload: {error}"
             ))
