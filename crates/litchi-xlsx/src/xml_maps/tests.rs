@@ -4,7 +4,7 @@ use super::model::{CONTENT_TYPE, MAX_OPAQUE_BYTES, NS, REL, STRICT_NS, STRICT_RE
 use super::*;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, PackageWriter};
 
 fn package(bytes: &[u8]) -> XmlMapInfo {
     let package = OpcPackage::from_bytes(bytes).unwrap();
@@ -358,4 +358,133 @@ fn package_xml_maps_mutators_reject_invalid_existing_graphs_before_replacement()
         )
         .is_err()
     );
+}
+
+fn package_with_source(conformance: XmlMapConformance) -> (OpcPackage, XmlMapInfo) {
+    let mut package = workbook_package();
+    let namespace = if conformance.is_strict() {
+        std::str::from_utf8(STRICT_NS).unwrap()
+    } else {
+        std::str::from_utf8(NS).unwrap()
+    };
+    let raw = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><MapInfo xmlns="{namespace}" xmlns:future="urn:litchi:future" SelectionNamespaces="xmlns:xs='http://www.w3.org/2001/XMLSchema'"><Schema ID="schema-1" SchemaRef="urn:litchi:example" Namespace="urn:litchi:example"><x:payload xmlns:x="urn:litchi:payload"><x:future marker="keep"/></x:payload></Schema><Map ID="1" Name="Example map" RootElement="example" SchemaID="schema-1" ShowImportExportValidationErrors="1" AutoFit="1" Append="0" PreserveSortAFLayout="1" PreserveFormat="1"><DataBinding DataBindingName="inert binding" FileBinding="0" ConnectionID="7" DataBindingLoadMode="1"><x:binding xmlns:x="urn:litchi:binding"/></DataBinding></Map></MapInfo>"#
+    );
+    let parsed = XmlMapInfo::parse(raw.as_bytes()).unwrap();
+    store_in_package(&mut package, &parsed, conformance).unwrap();
+    let part_name = package
+        .main_document_part()
+        .unwrap()
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == REL || relationship.reltype() == STRICT_REL)
+        .unwrap()
+        .target_partname()
+        .unwrap();
+    package
+        .get_part_mut(&part_name)
+        .unwrap()
+        .set_blob(raw.into_bytes());
+    assert_eq!(
+        load_from_package_with_conformance(&package).unwrap(),
+        Some((parsed.clone(), conformance))
+    );
+    (package, parsed)
+}
+
+#[test]
+fn transaction_crud_preserves_source_payload_and_round_trips_both_conformances() {
+    for conformance in [XmlMapConformance::Transitional, XmlMapConformance::Strict] {
+        let mut package = workbook_package();
+        let value = fixture_info();
+        let mut create = Transaction::new_with_conformance(&mut package, conformance).unwrap();
+        assert!(create.info().is_none());
+        assert!(create.set(value.clone()).unwrap());
+        let commit = create.commit().unwrap();
+        assert!(commit.changed());
+        assert_eq!(commit.snapshot().conformance(), conformance);
+        assert_eq!(
+            load_from_package_with_conformance(&package).unwrap(),
+            Some((value.clone(), conformance))
+        );
+
+        let mut edit = Transaction::new(&mut package).unwrap();
+        assert!(
+            edit.edit_map(1, |map| {
+                map.name = "edited map".into();
+                Ok(())
+            })
+            .unwrap()
+        );
+        let commit = edit.commit().unwrap();
+        assert!(commit.changed());
+        assert_eq!(commit.snapshot().info().unwrap().maps[0].name, "edited map");
+
+        let mut remove_map = Transaction::new(&mut package).unwrap();
+        assert!(remove_map.remove_map(1).is_err());
+        assert_eq!(remove_map.info().unwrap().maps.len(), 1);
+
+        let mut remove = Transaction::new(&mut package).unwrap();
+        assert!(remove.remove().unwrap().is_some());
+        assert!(remove.commit().unwrap().changed());
+        assert!(Snapshot::load(&package).unwrap().is_empty());
+    }
+}
+
+#[test]
+fn transaction_noop_inverse_and_stale_patch_are_atomic() {
+    let (mut package, value) = package_with_source(XmlMapConformance::Transitional);
+    let original_bytes = PackageWriter::to_bytes(&package).unwrap();
+    let before = Snapshot::load(&package).unwrap();
+    let original_relationships = package.main_document_part().unwrap().rels().to_xml();
+
+    let mut no_op = Transaction::new(&mut package).unwrap();
+    assert!(!no_op.edit_map(1, |_map| Ok(())).unwrap());
+    let commit = no_op.commit().unwrap();
+    assert!(!commit.changed());
+    assert!(commit.patch().is_empty());
+    assert_eq!(PackageWriter::to_bytes(&package).unwrap(), original_bytes);
+
+    let mut changed = Transaction::new(&mut package).unwrap();
+    changed
+        .edit_map(1, |map| {
+            map.name = "changed".into();
+            Ok(())
+        })
+        .unwrap();
+    let patch = changed.commit().unwrap().patch().clone();
+    assert!(
+        patch
+            .after()
+            .source_xml()
+            .unwrap()
+            .windows(b"xmlns:future=\"urn:litchi:future\"".len())
+            .any(|window| window == b"xmlns:future=\"urn:litchi:future\"")
+    );
+    assert!(
+        patch
+            .after()
+            .source_xml()
+            .unwrap()
+            .windows(b"<x:future marker=\"keep\"/>".len())
+            .any(|window| window == b"<x:future marker=\"keep\"/>")
+    );
+    assert_eq!(
+        package.main_document_part().unwrap().rels().to_xml(),
+        original_relationships
+    );
+    patch.inverse().apply(&mut package).unwrap();
+    assert_eq!(PackageWriter::to_bytes(&package).unwrap(), original_bytes);
+    assert_eq!(Snapshot::load(&package).unwrap(), before);
+    assert_eq!(Snapshot::load(&package).unwrap().info(), Some(&value));
+
+    let mut stale = package.clone();
+    let part_name = Snapshot::load(&stale).unwrap().part_name().unwrap().clone();
+    stale
+        .get_part_mut(&part_name)
+        .unwrap()
+        .set_blob(b"<stale/>".to_vec());
+    let stale_bytes = PackageWriter::to_bytes(&stale).unwrap();
+    assert!(patch.apply(&mut stale).is_err());
+    assert_eq!(PackageWriter::to_bytes(&stale).unwrap(), stale_bytes);
 }

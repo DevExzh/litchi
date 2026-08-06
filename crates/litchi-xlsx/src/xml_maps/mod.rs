@@ -8,6 +8,9 @@
 mod codec;
 mod model;
 mod package;
+pub mod patch;
+pub mod snapshot;
+pub mod transaction;
 
 #[cfg(test)]
 mod tests;
@@ -16,6 +19,9 @@ pub use model::{XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMap
 pub use package::{
     load_from_package, load_from_package_with_conformance, remove_from_package, store_in_package,
 };
+pub use patch::{Commit, Patch};
+pub use snapshot::Snapshot;
+pub use transaction::Transaction;
 
 fn invalid(message: impl Into<String>) -> Box<dyn std::error::Error + Send + Sync> {
     std::io::Error::new(std::io::ErrorKind::InvalidData, message.into()).into()

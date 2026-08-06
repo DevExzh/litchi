@@ -880,3 +880,799 @@ fn escape_attr(out: &mut BoundedXml, value: &str) -> Result<()> {
 fn xml_error(e: impl std::fmt::Display) -> Box<dyn std::error::Error + Send + Sync> {
     invalid(e.to_string())
 }
+
+/// Patch known Custom XML Maps fields inside their source XML spans.
+///
+/// The semantic parser intentionally projects schema and binding payloads into
+/// bounded inert bytes. Transactions use this source patcher so changing a
+/// typed attribute does not discard producer extensions, comments, namespace
+/// spelling, or the original payload markup. Structural catalog replacement
+/// falls back to the already validated canonical writer.
+pub(super) fn patch_source(
+    source: &[u8],
+    before: &XmlMapInfo,
+    after: &XmlMapInfo,
+    before_strict: bool,
+    after_strict: bool,
+) -> Result<Vec<u8>> {
+    if before == after && before_strict == after_strict {
+        return Ok(source.to_vec());
+    }
+
+    let tree = SourceTree::parse(source)?;
+    let root = tree.root;
+    if tree.nodes[root].local != "MapInfo" || tree.nodes[root].self_closing {
+        return after.to_xml(after_strict);
+    }
+
+    let schema_nodes = tree.direct_children(root, "Schema");
+    let map_nodes = tree.direct_children(root, "Map");
+    if schema_nodes.len() != before.schemas.len() || map_nodes.len() != before.maps.len() {
+        return after.to_xml(after_strict);
+    }
+    for (node, schema) in schema_nodes.iter().zip(&before.schemas) {
+        if tree.attribute_value(source, *node, "ID")?.as_deref() != Some(schema.id.as_str()) {
+            return after.to_xml(after_strict);
+        }
+        if tree.nodes[*node].self_closing
+            && schema.payload_xml.is_none()
+            && after
+                .schemas
+                .iter()
+                .find(|candidate| candidate.id == schema.id)
+                .and_then(|candidate| candidate.payload_xml.as_ref())
+                .is_some()
+        {
+            return after.to_xml(after_strict);
+        }
+    }
+    for (node, map) in map_nodes.iter().zip(&before.maps) {
+        let id = tree
+            .attribute_value(source, *node, "ID")?
+            .and_then(|value| value.parse::<u32>().ok());
+        if id != Some(map.id) {
+            return after.to_xml(after_strict);
+        }
+        if tree.nodes[*node].self_closing
+            && map.data_binding.is_none()
+            && after
+                .maps
+                .iter()
+                .find(|candidate| candidate.id == map.id)
+                .and_then(|candidate| candidate.data_binding.as_ref())
+                .is_some()
+        {
+            return after.to_xml(after_strict);
+        }
+    }
+
+    let mut edits = Vec::new();
+    patch_attribute(
+        &tree,
+        root,
+        "SelectionNamespaces",
+        Some(&before.selection_namespaces),
+        Some(&after.selection_namespaces),
+        &mut edits,
+    )?;
+    if before_strict != after_strict {
+        patch_attribute(
+            &tree,
+            root,
+            "xmlns",
+            Some(if before_strict {
+                STRICT_NS_TEXT
+            } else {
+                NS_TEXT
+            }),
+            Some(if after_strict {
+                STRICT_NS_TEXT
+            } else {
+                NS_TEXT
+            }),
+            &mut edits,
+        )?;
+    }
+
+    for (node, before_schema) in schema_nodes.iter().zip(&before.schemas) {
+        let after_schema = after
+            .schemas
+            .iter()
+            .find(|schema| schema.id == before_schema.id)
+            .ok_or_else(|| invalid("Schema identity changed during source patching"));
+        let Ok(after_schema) = after_schema else {
+            return after.to_xml(after_strict);
+        };
+        patch_attribute(
+            &tree,
+            *node,
+            "ID",
+            Some(&before_schema.id),
+            Some(&after_schema.id),
+            &mut edits,
+        )?;
+        patch_attribute(
+            &tree,
+            *node,
+            "SchemaRef",
+            before_schema.schema_reference.as_deref(),
+            after_schema.schema_reference.as_deref(),
+            &mut edits,
+        )?;
+        patch_attribute(
+            &tree,
+            *node,
+            "Namespace",
+            before_schema.namespace.as_deref(),
+            after_schema.namespace.as_deref(),
+            &mut edits,
+        )?;
+        patch_payload(
+            &tree,
+            source,
+            *node,
+            before_schema.payload_xml.as_deref(),
+            after_schema.payload_xml.as_deref(),
+            &mut edits,
+        )?;
+    }
+
+    for (node, before_map) in map_nodes.iter().zip(&before.maps) {
+        let after_map = after
+            .maps
+            .iter()
+            .find(|map| map.id == before_map.id)
+            .ok_or_else(|| invalid("Map identity changed during source patching"));
+        let Ok(after_map) = after_map else {
+            return after.to_xml(after_strict);
+        };
+        patch_attribute(
+            &tree,
+            *node,
+            "ID",
+            Some(&before_map.id.to_string()),
+            Some(&after_map.id.to_string()),
+            &mut edits,
+        )?;
+        patch_attribute(
+            &tree,
+            *node,
+            "Name",
+            Some(&before_map.name),
+            Some(&after_map.name),
+            &mut edits,
+        )?;
+        patch_attribute(
+            &tree,
+            *node,
+            "RootElement",
+            Some(&before_map.root_element),
+            Some(&after_map.root_element),
+            &mut edits,
+        )?;
+        patch_attribute(
+            &tree,
+            *node,
+            "SchemaID",
+            Some(&before_map.schema_id),
+            Some(&after_map.schema_id),
+            &mut edits,
+        )?;
+        patch_bool_attribute(
+            &tree,
+            *node,
+            "ShowImportExportValidationErrors",
+            before_map.show_import_export_validation_errors,
+            after_map.show_import_export_validation_errors,
+            &mut edits,
+        )?;
+        patch_bool_attribute(
+            &tree,
+            *node,
+            "AutoFit",
+            before_map.auto_fit,
+            after_map.auto_fit,
+            &mut edits,
+        )?;
+        patch_bool_attribute(
+            &tree,
+            *node,
+            "Append",
+            before_map.append,
+            after_map.append,
+            &mut edits,
+        )?;
+        patch_bool_attribute(
+            &tree,
+            *node,
+            "PreserveSortAFLayout",
+            before_map.preserve_sort_auto_filter_layout,
+            after_map.preserve_sort_auto_filter_layout,
+            &mut edits,
+        )?;
+        patch_bool_attribute(
+            &tree,
+            *node,
+            "PreserveFormat",
+            before_map.preserve_format,
+            after_map.preserve_format,
+            &mut edits,
+        )?;
+
+        let binding_node = tree.direct_child(*node, "DataBinding")?;
+        match (
+            before_map.data_binding.as_ref(),
+            after_map.data_binding.as_ref(),
+            binding_node,
+        ) {
+            (Some(before_binding), Some(after_binding), Some(binding_node)) => {
+                patch_attribute(
+                    &tree,
+                    binding_node,
+                    "DataBindingName",
+                    before_binding.data_binding_name.as_deref(),
+                    after_binding.data_binding_name.as_deref(),
+                    &mut edits,
+                )?;
+                patch_bool_optional_attribute(
+                    &tree,
+                    binding_node,
+                    "FileBinding",
+                    before_binding.file_binding,
+                    after_binding.file_binding,
+                    &mut edits,
+                )?;
+                patch_number_optional_attribute(
+                    &tree,
+                    binding_node,
+                    "ConnectionID",
+                    before_binding.connection_id,
+                    after_binding.connection_id,
+                    &mut edits,
+                )?;
+                patch_attribute(
+                    &tree,
+                    binding_node,
+                    "FileBindingName",
+                    before_binding.file_binding_name.as_deref(),
+                    after_binding.file_binding_name.as_deref(),
+                    &mut edits,
+                )?;
+                patch_number_attribute(
+                    &tree,
+                    binding_node,
+                    "DataBindingLoadMode",
+                    before_binding.load_mode,
+                    after_binding.load_mode,
+                    &mut edits,
+                )?;
+                patch_payload(
+                    &tree,
+                    source,
+                    binding_node,
+                    before_binding.payload_xml.as_deref(),
+                    after_binding.payload_xml.as_deref(),
+                    &mut edits,
+                )?;
+            },
+            (None, Some(after_binding), None) => {
+                let replacement = binding_fragment(after_binding)?;
+                insert_child(&tree, *node, replacement, &mut edits)?;
+            },
+            (Some(_), None, Some(binding_node)) => edits.push(SourceEdit {
+                range: tree.nodes[binding_node].start..tree.nodes[binding_node].end,
+                replacement: Vec::new(),
+            }),
+            (None, None, None) => {},
+            _ => return after.to_xml(after_strict),
+        }
+    }
+
+    apply_source_edits(source, edits)
+}
+
+fn patch_payload(
+    tree: &SourceTree,
+    source: &[u8],
+    parent: usize,
+    before: Option<&[u8]>,
+    after: Option<&[u8]>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    if before == after {
+        return Ok(());
+    }
+    let existing = tree.element_children(parent).first().copied();
+    match (existing, after) {
+        (Some(node), Some(payload)) => edits.push(SourceEdit {
+            range: tree.nodes[node].start..tree.nodes[node].end,
+            replacement: payload.to_vec(),
+        }),
+        (Some(node), None) => edits.push(SourceEdit {
+            range: tree.nodes[node].start..tree.nodes[node].end,
+            replacement: Vec::new(),
+        }),
+        (None, Some(payload)) => insert_child(tree, parent, payload.to_vec(), edits)?,
+        (None, None) => {},
+    }
+    let _ = source;
+    Ok(())
+}
+
+fn insert_child(
+    tree: &SourceTree,
+    parent: usize,
+    replacement: Vec<u8>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    if tree.nodes[parent].self_closing {
+        return Err(invalid(
+            "custom XML maps source needs a structural child insertion",
+        ));
+    }
+    edits.push(SourceEdit {
+        range: tree.nodes[parent].end_start..tree.nodes[parent].end_start,
+        replacement,
+    });
+    Ok(())
+}
+
+fn patch_bool_attribute(
+    tree: &SourceTree,
+    node: usize,
+    name: &str,
+    before: bool,
+    after: bool,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    patch_attribute(
+        tree,
+        node,
+        name,
+        Some(if before { "1" } else { "0" }),
+        Some(if after { "1" } else { "0" }),
+        edits,
+    )
+}
+
+fn patch_bool_optional_attribute(
+    tree: &SourceTree,
+    node: usize,
+    name: &str,
+    before: Option<bool>,
+    after: Option<bool>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    patch_attribute(
+        tree,
+        node,
+        name,
+        before.map(|value| if value { "1" } else { "0" }),
+        after.map(|value| if value { "1" } else { "0" }),
+        edits,
+    )
+}
+
+fn patch_number_attribute(
+    tree: &SourceTree,
+    node: usize,
+    name: &str,
+    before: u32,
+    after: u32,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    patch_attribute(
+        tree,
+        node,
+        name,
+        Some(&before.to_string()),
+        Some(&after.to_string()),
+        edits,
+    )
+}
+
+fn patch_number_optional_attribute(
+    tree: &SourceTree,
+    node: usize,
+    name: &str,
+    before: Option<u32>,
+    after: Option<u32>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    let before = before.map(|value| value.to_string());
+    let after = after.map(|value| value.to_string());
+    patch_attribute(tree, node, name, before.as_deref(), after.as_deref(), edits)
+}
+
+fn patch_attribute(
+    tree: &SourceTree,
+    node: usize,
+    name: &str,
+    before: Option<&str>,
+    after: Option<&str>,
+    edits: &mut Vec<SourceEdit>,
+) -> Result<()> {
+    if before == after {
+        return Ok(());
+    }
+    let attribute = tree.attribute(node, name);
+    match (attribute, after) {
+        (Some(attribute), Some(value)) => edits.push(SourceEdit {
+            range: attribute.value_start..attribute.value_end,
+            replacement: escape_source_attribute(value),
+        }),
+        (Some(attribute), None) => edits.push(SourceEdit {
+            range: attribute.start..attribute.value_end + 1,
+            replacement: Vec::new(),
+        }),
+        (None, Some(value)) if before.is_none() => edits.push(SourceEdit {
+            range: tree.nodes[node].close_pos..tree.nodes[node].close_pos,
+            replacement: format!(
+                " {name}=\"{}\"",
+                String::from_utf8_lossy(&escape_source_attribute(value))
+            )
+            .into_bytes(),
+        }),
+        (None, Some(_)) => {
+            return Err(invalid(format!(
+                "custom XML maps source is missing attribute '{name}'"
+            )));
+        },
+        (None, None) => {
+            if before.is_some() {
+                return Err(invalid(format!(
+                    "custom XML maps source is missing attribute '{name}'"
+                )));
+            }
+        },
+    }
+    Ok(())
+}
+
+fn binding_fragment(binding: &XmlMapDataBinding) -> Result<Vec<u8>> {
+    let mut xml = BoundedXml::new();
+    xml.push_str("<DataBinding")?;
+    optional_string_attr(
+        &mut xml,
+        "DataBindingName",
+        binding.data_binding_name.as_deref(),
+    )?;
+    optional_bool_attr(&mut xml, "FileBinding", binding.file_binding)?;
+    optional_u32_attr(&mut xml, "ConnectionID", binding.connection_id)?;
+    optional_string_attr(
+        &mut xml,
+        "FileBindingName",
+        binding.file_binding_name.as_deref(),
+    )?;
+    optional_u32_attr(&mut xml, "DataBindingLoadMode", Some(binding.load_mode))?;
+    if let Some(payload) = &binding.payload_xml {
+        xml.push_char('>')?;
+        xml.push_bytes(payload)?;
+        xml.push_str("</DataBinding>")?;
+    } else {
+        xml.push_str("/>")?;
+    }
+    Ok(xml.finish())
+}
+
+fn escape_source_attribute(value: &str) -> Vec<u8> {
+    let mut result = Vec::with_capacity(value.len());
+    for character in value.chars() {
+        match character {
+            '&' => result.extend_from_slice(b"&amp;"),
+            '<' => result.extend_from_slice(b"&lt;"),
+            '"' => result.extend_from_slice(b"&quot;"),
+            '\r' => result.extend_from_slice(b"&#xD;"),
+            '\n' => result.extend_from_slice(b"&#xA;"),
+            '\t' => result.extend_from_slice(b"&#x9;"),
+            _ => {
+                let mut encoded = [0; 4];
+                result.extend_from_slice(character.encode_utf8(&mut encoded).as_bytes());
+            },
+        }
+    }
+    result
+}
+
+#[derive(Debug)]
+struct SourceEdit {
+    range: std::ops::Range<usize>,
+    replacement: Vec<u8>,
+}
+
+fn apply_source_edits(source: &[u8], mut edits: Vec<SourceEdit>) -> Result<Vec<u8>> {
+    edits.sort_by(|left, right| right.range.start.cmp(&left.range.start));
+    for pair in edits.windows(2) {
+        if pair[0].range.start < pair[1].range.end {
+            return Err(invalid("custom XML maps source edits overlap"));
+        }
+    }
+    let mut result = source.to_vec();
+    for edit in edits {
+        if edit.range.end > result.len() {
+            return Err(invalid("custom XML maps source edit is out of bounds"));
+        }
+        result.splice(edit.range, edit.replacement);
+    }
+    if result.len() > MAX_PART_BYTES {
+        return Err(invalid("serialized custom XML maps part exceeds 32 MiB"));
+    }
+    Ok(result)
+}
+
+#[derive(Debug)]
+struct SourceTree {
+    nodes: Vec<SourceNode>,
+    root: usize,
+}
+
+#[derive(Debug)]
+struct SourceNode {
+    local: String,
+    start: usize,
+    end_start: usize,
+    end: usize,
+    close_pos: usize,
+    self_closing: bool,
+    attrs: Vec<SourceAttribute>,
+    children: Vec<usize>,
+}
+
+#[derive(Debug)]
+struct SourceAttribute {
+    name: String,
+    local: String,
+    start: usize,
+    value_start: usize,
+    value_end: usize,
+}
+
+impl SourceTree {
+    fn parse(source: &[u8]) -> Result<Self> {
+        let mut nodes = Vec::<SourceNode>::new();
+        let mut stack = Vec::<usize>::new();
+        let mut root = None::<usize>;
+        let mut position = 0;
+        while position < source.len() {
+            if source[position] != b'<' {
+                position += 1;
+                continue;
+            }
+            if source[position..].starts_with(b"<?") {
+                position = find_source_bytes(source, position + 2, b"?>")? + 2;
+                continue;
+            }
+            if source[position..].starts_with(b"<!--") {
+                position = find_source_bytes(source, position + 4, b"-->")? + 3;
+                continue;
+            }
+            if source[position..].starts_with(b"<![CDATA[") {
+                position = find_source_bytes(source, position + 9, b"]]>")? + 3;
+                continue;
+            }
+            if source[position..].starts_with(b"<!") {
+                position = source_tag_end(source, position)? + 1;
+                continue;
+            }
+            if source[position..].starts_with(b"</") {
+                let end = source_tag_end(source, position)?;
+                let name_start = position + 2;
+                let name_end = source_name_end(source, name_start);
+                let node = stack.pop().ok_or_else(|| {
+                    invalid("custom XML maps source has an unmatched closing tag")
+                })?;
+                if nodes[node].local != source_local(&source[name_start..name_end])? {
+                    return Err(invalid("custom XML maps source has mismatched tags"));
+                }
+                nodes[node].end_start = position;
+                nodes[node].end = end + 1;
+                position = end + 1;
+                continue;
+            }
+            let end = source_tag_end(source, position)?;
+            let (local, attrs, close_pos, self_closing) = source_start_tag(source, position, end)?;
+            let node = nodes.len();
+            if node >= MAX_EVENTS {
+                return Err(invalid("custom XML maps source node limit exceeded"));
+            }
+            nodes.push(SourceNode {
+                local,
+                start: position,
+                end_start: end + 1,
+                end: end + 1,
+                close_pos,
+                self_closing,
+                attrs,
+                children: Vec::new(),
+            });
+            if let Some(parent) = stack.last().copied() {
+                nodes[parent].children.push(node);
+            } else if root.replace(node).is_some() {
+                return Err(invalid("custom XML maps source has multiple roots"));
+            }
+            if !self_closing {
+                if stack.len() >= MAX_DEPTH {
+                    return Err(invalid("custom XML maps source depth limit exceeded"));
+                }
+                stack.push(node);
+            }
+            position = end + 1;
+        }
+        if !stack.is_empty() {
+            return Err(invalid("custom XML maps source has unterminated markup"));
+        }
+        Ok(Self {
+            nodes,
+            root: root.ok_or_else(|| invalid("custom XML maps source has no root"))?,
+        })
+    }
+
+    fn attribute(&self, node: usize, name: &str) -> Option<&SourceAttribute> {
+        self.nodes[node].attrs.iter().find(|attribute| {
+            attribute.name == name
+                || (!name.eq_ignore_ascii_case("xmlns") && attribute.local == name)
+        })
+    }
+
+    fn attribute_value(&self, source: &[u8], node: usize, name: &str) -> Result<Option<String>> {
+        self.attribute(node, name)
+            .map(|attribute| {
+                let raw = std::str::from_utf8(&source[attribute.value_start..attribute.value_end])
+                    .map_err(xml_error)?;
+                quick_xml::escape::unescape(raw)
+                    .map(|value| value.into_owned())
+                    .map_err(xml_error)
+            })
+            .transpose()
+    }
+
+    fn direct_children(&self, node: usize, local: &str) -> Vec<usize> {
+        self.nodes[node]
+            .children
+            .iter()
+            .copied()
+            .filter(|child| self.nodes[*child].local == local)
+            .collect()
+    }
+
+    fn direct_child(&self, node: usize, local: &str) -> Result<Option<usize>> {
+        let mut result = None;
+        for child in self.nodes[node]
+            .children
+            .iter()
+            .copied()
+            .filter(|child| self.nodes[*child].local == local)
+        {
+            if result.replace(child).is_some() {
+                return Err(invalid(format!(
+                    "custom XML maps source has duplicate '{local}'"
+                )));
+            }
+        }
+        Ok(result)
+    }
+
+    fn element_children(&self, node: usize) -> Vec<usize> {
+        self.nodes[node].children.clone()
+    }
+}
+
+fn find_source_bytes(source: &[u8], start: usize, needle: &[u8]) -> Result<usize> {
+    source[start..]
+        .windows(needle.len())
+        .position(|window| window == needle)
+        .map(|position| start + position)
+        .ok_or_else(|| invalid("custom XML maps source has an unterminated declaration"))
+}
+
+fn source_tag_end(source: &[u8], start: usize) -> Result<usize> {
+    let mut quote = None;
+    for (offset, byte) in source[start + 1..].iter().enumerate() {
+        match (quote, byte) {
+            (Some(value), byte) if *byte == value => quote = None,
+            (None, b'\'' | b'\"') => quote = Some(*byte),
+            (None, b'>') => return Ok(start + 1 + offset),
+            _ => {},
+        }
+    }
+    Err(invalid("custom XML maps source has an unterminated tag"))
+}
+
+fn source_start_tag(
+    source: &[u8],
+    start: usize,
+    end: usize,
+) -> Result<(String, Vec<SourceAttribute>, usize, bool)> {
+    let name_start = start + 1;
+    let name_end = source_name_end(source, name_start);
+    if name_start == name_end {
+        return Err(invalid("custom XML maps source has an empty element name"));
+    }
+    let mut attrs = Vec::new();
+    let mut position = name_end;
+    while position < end {
+        while position < end && source[position].is_ascii_whitespace() {
+            position += 1;
+        }
+        if position >= end || source[position] == b'/' {
+            break;
+        }
+        let attribute_start = position;
+        let attribute_end = source_name_end(source, position);
+        if attribute_end == attribute_start {
+            return Err(invalid("custom XML maps source has an invalid attribute"));
+        }
+        position = attribute_end;
+        while position < end && source[position].is_ascii_whitespace() {
+            position += 1;
+        }
+        if position >= end || source[position] != b'=' {
+            return Err(invalid("custom XML maps source attribute is missing '='"));
+        }
+        position += 1;
+        while position < end && source[position].is_ascii_whitespace() {
+            position += 1;
+        }
+        let quote = *source
+            .get(position)
+            .ok_or_else(|| invalid("custom XML maps source attribute is missing quotes"))?;
+        if !matches!(quote, b'\'' | b'\"') {
+            return Err(invalid(
+                "custom XML maps source attribute is missing quotes",
+            ));
+        }
+        position += 1;
+        let value_start = position;
+        while position < end && source[position] != quote {
+            position += 1;
+        }
+        if position >= end {
+            return Err(invalid("custom XML maps source attribute is unterminated"));
+        }
+        let value_end = position;
+        position += 1;
+        let name = std::str::from_utf8(&source[attribute_start..attribute_end])
+            .map_err(xml_error)?
+            .to_owned();
+        attrs.push(SourceAttribute {
+            local: source_local(name.as_bytes())?,
+            name,
+            start: attribute_start,
+            value_start,
+            value_end,
+        });
+    }
+    let self_closing = source[..end]
+        .iter()
+        .rposition(|byte| !byte.is_ascii_whitespace())
+        .is_some_and(|position| source[position] == b'/');
+    let close_pos = if self_closing {
+        source[..end]
+            .iter()
+            .rposition(|byte| !byte.is_ascii_whitespace())
+            .unwrap_or(end)
+    } else {
+        end
+    };
+    Ok((
+        source_local(&source[name_start..name_end])?,
+        attrs,
+        close_pos,
+        self_closing,
+    ))
+}
+
+fn source_name_end(source: &[u8], mut position: usize) -> usize {
+    while position < source.len()
+        && !source[position].is_ascii_whitespace()
+        && !matches!(source[position], b'/' | b'>' | b'=')
+    {
+        position += 1;
+    }
+    position
+}
+
+fn source_local(value: &[u8]) -> Result<String> {
+    let value = std::str::from_utf8(value).map_err(xml_error)?;
+    Ok(value.rsplit(':').next().unwrap_or(value).to_owned())
+}

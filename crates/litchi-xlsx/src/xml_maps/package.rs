@@ -32,13 +32,31 @@ pub fn store_in_package(
     conformance: XmlMapConformance,
 ) -> Result<()> {
     let xml = value.to_xml(conformance.is_strict())?;
+    store_xml_in_package(package, &xml, conformance)
+}
+
+/// Publish already-validated XML for a Custom XML Maps part.
+///
+/// Transactions use this narrow service after patching the original source
+/// bytes. Keeping the package graph orchestration here means source edits and
+/// ordinary callers share the same bounded relationship validation.
+pub(super) fn store_xml_in_package(
+    package: &mut OpcPackage,
+    xml: &[u8],
+    conformance: XmlMapConformance,
+) -> Result<()> {
+    if xml.len() > MAX_PART_BYTES {
+        return Err(invalid("custom XML maps part exceeds 32 MiB"));
+    }
     let workbook_uri = main_workbook_uri(package)?;
     let existing = xml_maps_relationship(package, &workbook_uri)?;
 
     if let Some(existing) = existing {
         validate_xml_maps_graph(package, &workbook_uri, Some(&existing))?;
         validate_xml_maps_part(package, &existing.part_name)?;
-        package.get_part_mut(&existing.part_name)?.set_blob(xml);
+        package
+            .get_part_mut(&existing.part_name)?
+            .set_blob(xml.to_vec());
         if existing.conformance != conformance {
             let workbook = package.get_part_mut(&workbook_uri)?;
             workbook.rels_mut().remove(&existing.relationship_id);
@@ -57,7 +75,7 @@ pub fn store_in_package(
         package.try_add_part(Box::new(litchi_opc::part::BlobPart::new(
             part_name,
             CONTENT_TYPE.into(),
-            xml,
+            xml.to_vec(),
         )))?;
         package
             .get_part_mut(&workbook_uri)?
