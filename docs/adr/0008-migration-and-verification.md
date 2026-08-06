@@ -6321,6 +6321,30 @@ raw `IWorkTextEditor` object IDs and storage message exposure, eager
 weighted-cache integration into package state, edited ZIP-entry reassembly,
 and the remaining monolithic semantic adapters.
 
+The next 2026-08-06 slice wires immutable source access and bounded semantic
+caching through the split. `litchi-iwa-archive::Catalog::from_read_at` and the
+facade's `IWorkPackage::from_read_at` now read through positional `ReadAt`,
+check the configured size before allocation, and reject a changed source with
+typed `SourceChanged` errors. Flat catalogs retain their exact shared source
+for validated no-op output; legacy nested catalogs deliberately normalize on
+write. `PackageState` now uses the dependency-free `litchi-iwa-cache` weighted
+LRU with decompressed-stream byte weights, per-key invalidation, copy-on-write
+forks, and a bounded active-flight budget. The `litchi-iwa-text` leaf owns
+`paragraph::border::{Sides, Offset}` and bookmark text semantics; the old flat
+paragraph-border owners are gone, and list-bullet validation checks before
+allocation. The archive, cache, and text leaves passed their focused suites
+(20, 8, and 33 tests); the facade bookmark slice passed 10 tests, and the
+workspace boundary checker remained green. Computer Use created and saved
+fresh native fixtures containing the migration marker at
+`/private/tmp/litchi-native-border-cache-20260806.pages`,
+`/private/tmp/litchi-native-border-cache-20260806.numbers`, and
+`/private/tmp/litchi-native-border-cache-20260806.key`; each was shown by its
+native application and Pages, Numbers, and Keynote were closed afterward.
+This is structural/API and native-open evidence, not a claim that edited ZIP
+entry reassembly, raw `IWorkTextEditor` IDs/storage, full source-path
+retention for byte-ingress `open`, or the remaining monolithic adapters are
+complete.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

@@ -45,9 +45,10 @@ impl Sides {
     /// All four paragraph edges.
     pub const ALL: Self = Self(ALL_BITS);
 
-    /// Construct any combination of paragraph-border edges.
+    /// Construct any combination of paragraph-border edges from top, bottom,
+    /// left, and right flags, in that order.
     #[must_use]
-    pub const fn new(top: bool, bottom: bool, left: bool, right: bool) -> Self {
+    pub const fn from_flags([top, bottom, left, right]: [bool; 4]) -> Self {
         Self(
             (if top { Self::TOP.0 } else { 0 })
                 | (if bottom { Self::BOTTOM.0 } else { 0 })

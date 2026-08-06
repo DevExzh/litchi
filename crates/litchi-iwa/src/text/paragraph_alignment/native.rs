@@ -2101,12 +2101,12 @@ fn border_sides_from_native_bits(bits: i32) -> Result<BorderSides> {
             "native paragraph-border sides contain unknown bits".to_owned(),
         ));
     }
-    Ok(BorderSides::new(
+    Ok(BorderSides::from_flags([
         bits & 1 != 0,
         bits & 2 != 0,
         bits & 4 != 0,
         bits & 8 != 0,
-    ))
+    ]))
 }
 
 fn border_offset_from_native_inset(inset: f32) -> Result<BorderOffset> {
@@ -2139,12 +2139,12 @@ fn paragraph_border_sides_from_legacy(value: i32) -> Result<BorderSides> {
             "native paragraph border has an unknown legacy side value".to_owned(),
         ));
     }
-    Ok(BorderSides::new(
+    Ok(BorderSides::from_flags([
         value & LEGACY_BORDER_TOP != 0,
         value & LEGACY_BORDER_BOTTOM != 0,
         value & LEGACY_BORDER_LEFT != 0,
         value & LEGACY_BORDER_RIGHT != 0,
-    ))
+    ]))
 }
 
 pub(super) fn capitalization_from_character(

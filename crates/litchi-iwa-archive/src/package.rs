@@ -389,8 +389,8 @@ impl Catalog {
     /// snapshot, exceeds the physical limits, or is not a valid package.
     pub fn from_read_at_with_limits(source: &dyn ReadAt, limits: Limits) -> Result<Self> {
         let checked_limits = limits.validate()?;
-        let source = read_source(source, checked_limits)?;
-        Self::from_source_with_checked_limits(source, checked_limits)
+        let source_bytes = read_source(source, checked_limits)?;
+        Self::from_source_with_checked_limits(source_bytes, checked_limits)
     }
 
     fn from_source_with_checked_limits(source: Arc<[u8]>, checked_limits: Limits) -> Result<Self> {
@@ -489,11 +489,20 @@ impl Catalog {
     }
 }
 
+impl IntoIterator for Catalog {
+    type Item = Entry;
+    type IntoIter = std::vec::IntoIter<Entry>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.entries.into_iter()
+    }
+}
+
 fn read_source(source: &dyn ReadAt, limits: Limits) -> Result<Arc<[u8]>> {
     let expected = source.version()?;
-    let length = source.len()?;
-    limits.check_input_size(length, "ReadAt input")?;
-    let length = usize::try_from(length).map_err(|_error| {
+    let source_length = source.len()?;
+    limits.check_input_size(source_length, "ReadAt input")?;
+    let length = usize::try_from(source_length).map_err(|_error| {
         Error::InvalidBundle("ReadAt input length does not fit usize".to_owned())
     })?;
 
@@ -516,15 +525,6 @@ fn read_source(source: &dyn ReadAt, limits: Limits) -> Result<Arc<[u8]>> {
     }
 
     Ok(bytes.into())
-}
-
-impl IntoIterator for Catalog {
-    type Item = Entry;
-    type IntoIter = std::vec::IntoIter<Entry>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.entries.into_iter()
-    }
 }
 
 fn header_metadata(header: &PhysicalHeader) -> HeaderMetadata {
@@ -1065,10 +1065,12 @@ mod tests {
     }
 
     #[test]
-    fn rejects_a_positional_source_that_changes_during_snapshot() {
-        let bytes = zip(&[("Data/a", b"a")]).unwrap();
+    fn rejects_a_positional_source_that_changes_during_snapshot() -> Result<()> {
+        let bytes = zip(&[("Data/a", b"a")])?;
         let source = TestSource::new(bytes, 4, true);
-        let error = Catalog::from_read_at(&source).unwrap_err();
+        let error = Catalog::from_read_at(&source).err().ok_or_else(|| {
+            Error::InvalidBundle("changed source unexpectedly parsed successfully".to_owned())
+        })?;
 
         assert!(matches!(
             error,
@@ -1078,6 +1080,7 @@ mod tests {
                     && observed.id() == 41
                     && observed.revision() == 1
         ));
+        Ok(())
     }
 
     #[test]

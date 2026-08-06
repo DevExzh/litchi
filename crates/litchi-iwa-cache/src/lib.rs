@@ -432,6 +432,11 @@ where
     ///
     /// Bounding active flights prevents a burst of distinct slow parser keys
     /// from growing an unbounded wait registry before any value is cacheable.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WeightError::ZeroCapacity`] when `max_weight` is zero or
+    /// [`WeightError::ZeroFlightCapacity`] when `max_flights` is zero.
     pub fn new_with_limits(max_weight: usize, max_flights: usize) -> Result<Self, WeightError> {
         if max_weight == 0 {
             return Err(WeightError::ZeroCapacity);
@@ -643,6 +648,13 @@ where
 
     /// Return a cached value or run one fallible parser whose retained weight
     /// is known only after parsing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GetOrInsertError::Parse`] for a parser error,
+    /// [`GetOrInsertError::Cache`] for a cache error, or
+    /// [`GetOrInsertError::ParserPanicked`] to a waiter when the initiating
+    /// parser panicked.
     pub fn get_or_try_insert_with_weight<F>(
         &self,
         key: K,
@@ -690,8 +702,8 @@ where
             return Ok(Lookup::Wait(Arc::clone(flight)));
         }
 
-        if let Some(weight) = weight {
-            self.validate_weight(weight)?;
+        if let Some(requested_weight) = weight {
+            self.validate_weight(requested_weight)?;
         }
         if state.flights.len() >= self.max_flights {
             return Err(CacheError::FlightsLimit {

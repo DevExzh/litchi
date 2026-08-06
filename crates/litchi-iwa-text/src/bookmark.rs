@@ -58,6 +58,10 @@ pub struct Id(NonZeroU64);
 
 impl Id {
     /// Validate a bookmark identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::ZeroId`] when `value` is zero.
     pub fn new(value: u64) -> Result<Self> {
         NonZeroU64::new(value).map(Self).ok_or(Error::ZeroId)
     }
@@ -87,6 +91,11 @@ impl Name {
     /// Validation happens before allocation for borrowed input. Owned
     /// `String` input can be converted without a second allocation through
     /// [`TryFrom<String>`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed validation error when `value` is empty, too long,
+    /// surrounded by whitespace, or contains a control character.
     pub fn new(value: &str) -> Result<Self> {
         validate_name(value)?;
         Ok(Self(value.into()))

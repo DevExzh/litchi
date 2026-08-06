@@ -247,6 +247,11 @@ impl ParagraphListBullet {
     ///
     /// The caller must already own the marker; validation still happens before
     /// the value is published.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed validation error when `bullet` is empty, too long, or
+    /// contains a control character.
     pub fn from_boxed(bullet: Box<str>) -> Result<Self> {
         validate_bullet(&bullet)?;
         Ok(Self(bullet))
@@ -257,26 +262,6 @@ impl ParagraphListBullet {
     pub fn as_str(&self) -> &str {
         &self.0
     }
-}
-
-fn validate_bullet(value: &str) -> Result<()> {
-    let mut character_count = 0;
-    for character in value.chars() {
-        character_count += 1;
-        if character_count > MAX_PARAGRAPH_LIST_BULLET_CHARACTERS {
-            return Err(Error::BulletTooLong {
-                characters: character_count,
-                maximum: MAX_PARAGRAPH_LIST_BULLET_CHARACTERS,
-            });
-        }
-        if character.is_control() {
-            return Err(Error::BulletControlCharacter);
-        }
-    }
-    if character_count == 0 {
-        return Err(Error::BulletEmpty);
-    }
-    Ok(())
 }
 
 impl Default for ParagraphListBullet {
@@ -720,6 +705,26 @@ impl ParagraphListIndentation {
             ParagraphListTextGap(step / STANDARD_FONT_EM_POINTS),
         ))
     }
+}
+
+fn validate_bullet(value: &str) -> Result<()> {
+    let mut character_count = 0;
+    for character in value.chars() {
+        character_count += 1;
+        if character_count > MAX_PARAGRAPH_LIST_BULLET_CHARACTERS {
+            return Err(Error::BulletTooLong {
+                characters: character_count,
+                maximum: MAX_PARAGRAPH_LIST_BULLET_CHARACTERS,
+            });
+        }
+        if character.is_control() {
+            return Err(Error::BulletControlCharacter);
+        }
+    }
+    if character_count == 0 {
+        return Err(Error::BulletEmpty);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
