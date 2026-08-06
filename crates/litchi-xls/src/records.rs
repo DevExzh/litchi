@@ -1096,6 +1096,7 @@ pub enum CellRecord {
         col: u16,
         xf_index: u16,
         value: FormulaValue,
+        metadata: crate::formula_metadata::Metadata,
         formula: Vec<u8>,
     },
 }
@@ -1339,35 +1340,14 @@ impl CellRecord {
     }
 
     fn parse_formula(data: &[u8]) -> Result<Self> {
-        if data.len() < 22 {
-            return Err(Error::InvalidLength {
-                expected: 22,
-                found: data.len(),
-            });
-        }
-
-        let row = binary::read_u16_le_at(data, 0)?;
-        let col = binary::read_u16_le_at(data, 2)?;
-        let xf_index = binary::read_u16_le_at(data, 4)?;
-        let value = utils::parse_formula_value(&data[6..14])?;
-        let formula_len = binary::read_u16_le_at(data, 20)? as usize;
-        let formula_end = 22usize
-            .checked_add(formula_len)
-            .ok_or_else(|| Error::InvalidData("Formula token length overflow".to_string()))?;
-        if formula_end > data.len() {
-            return Err(Error::InvalidLength {
-                expected: formula_end,
-                found: data.len(),
-            });
-        }
-        let formula = data[22..formula_end].to_vec();
-
+        let parsed = crate::formula_metadata::parse_record(data)?;
         Ok(CellRecord::Formula {
-            row,
-            col,
-            xf_index,
-            value,
-            formula,
+            row: parsed.row,
+            col: parsed.col,
+            xf_index: parsed.xf_index,
+            value: parsed.value,
+            metadata: parsed.metadata,
+            formula: parsed.formula,
         })
     }
 }

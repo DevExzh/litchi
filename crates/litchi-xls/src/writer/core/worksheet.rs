@@ -51,6 +51,7 @@ pub(super) struct WritableCell {
     pos: CellPos,
     /// Cell value
     pub value: CellValue,
+    pub formula_metadata: Option<crate::FormulaMetadata>,
     pub format_idx: u16,
     pub pivot_xf_role: Option<PivotCellXfRole>,
 }
@@ -65,9 +66,18 @@ impl WritableCell {
         Self {
             pos,
             value,
+            formula_metadata: None,
             format_idx,
             pivot_xf_role,
         }
+    }
+
+    pub(super) const fn with_formula_metadata(
+        mut self,
+        formula_metadata: Option<crate::FormulaMetadata>,
+    ) -> Self {
+        self.formula_metadata = formula_metadata;
+        self
     }
 
     pub(super) const fn row(&self) -> u16 {

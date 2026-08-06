@@ -289,6 +289,7 @@ fn classifies_numeric_and_formula_caches_without_literal_false_positives() {
         col: 1,
         xf_index: 16,
         value: crate::records::FormulaValue::Number(45_000.5),
+        metadata: crate::FormulaMetadata::default(),
         formula: vec![0x1e, 1, 0],
     };
     let literal = CellRecord::Number {

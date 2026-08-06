@@ -538,9 +538,23 @@ fn test_write_formula() {
     let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_formula(sheet, 0, 0, "SUM(A1:B1)").unwrap();
+    let metadata = crate::FormulaMetadata::new()
+        .with_fill_alignment(true)
+        .with_clear_errors(true)
+        .with_calculation_cache(0xCAFE_BABE);
+    writer
+        .write_formula_with_metadata(sheet, 0, 1, "A1+1", metadata)
+        .unwrap();
 
     let cell = writer.worksheets[0].cells.get(&(0, 0)).unwrap();
     assert!(matches!(&cell.value, CellValue::Formula(f) if f == "SUM(A1:B1)"));
+    assert_eq!(
+        writer.worksheets[0]
+            .cells
+            .get(&(0, 1))
+            .and_then(|cell| cell.formula_metadata),
+        Some(metadata)
+    );
 }
 
 #[test]
@@ -565,6 +579,13 @@ fn test_formula_round_trips_through_xls_reader() {
     writer.write_number(sheet, 0, 0, 2.0).unwrap();
     writer.write_number(sheet, 0, 1, 3.0).unwrap();
     writer.write_formula(sheet, 0, 2, "SUM(A1:B1)").unwrap();
+    let metadata = crate::FormulaMetadata::new()
+        .with_fill_alignment(true)
+        .with_clear_errors(true)
+        .with_calculation_cache(0x1020_3040);
+    writer
+        .write_formula_with_metadata(sheet, 0, 4, "A1+1", metadata)
+        .unwrap();
     writer
         .write_formula(sheet, 0, 3, "IF(TRUE,\"a\"\"b\",FALSE)")
         .unwrap();
@@ -578,6 +599,12 @@ fn test_formula_round_trips_through_xls_reader() {
     assert!(formula_cell.is_formula());
     assert_eq!(formula_cell.formula(), Some("=SUM((A1:B1))"));
     assert!(!formula_cell.formula_bytes().unwrap().is_empty());
+    assert_eq!(
+        formula_cell.formula_metadata(),
+        Some(&crate::FormulaMetadata::new().with_always_calculate(true))
+    );
+    let metadata_cell = workbook.xls_worksheet(0).unwrap().get_cell(0, 4).unwrap();
+    assert_eq!(metadata_cell.formula_metadata(), Some(&metadata));
     assert_eq!(
         workbook
             .xls_worksheet(0)

@@ -36,6 +36,14 @@ returns the crate's typed error and never unwinds. Named ranges, conditional
 formats, data validation, and workbook formula records reuse the same tokens;
 they do not reintroduce raw columns at an adapter boundary.
 
+The cell-level `Formula` owner also types the metadata surrounding the token
+stream described by [MS-XLS] 2.4.127: `fAlwaysCalc`, `fFill`, `fShrFmla`,
+`fClearErrors`, and the opaque `chn` calculation cache. Reserved flag bits,
+zero-length `cce`, truncated payloads, and an orphaned shared-formula flag are
+rejected at the BIFF boundary. `Cell::formula_metadata` exposes the decoded
+value, while the writer accepts non-shared metadata and refuses to emit
+`fShrFmla` until a `ShrFmla` sequence owner exists.
+
 The refactor is intentionally breaking. Redundant `Ptg` prefixes and public
 tuple construction are not retained as aliases. Context supplies the missing
 meaning, for example `Ptg::Ref(Ref::new(...))`.
@@ -46,6 +54,8 @@ meaning, for example `Ptg::Ref(Ref::new(...))`.
   column by construction.
 - Text formulas, defined names, conditional formats, and validation formulas
   share one grid boundary and one failure policy.
+- Formula metadata round-trips independently of formula evaluation, preserving
+  BIFF8 calculation flags and the opaque cache without claiming recalculation.
 - The safe path does not need a defensive runtime branch for a column value
   that its input type cannot hold.
 - This safety correction makes no parser-throughput or allocation claim.
@@ -54,9 +64,9 @@ meaning, for example `Ptg::Ref(Ref::new(...))`.
 
 Focused tests cover `IV` as the last accepted column; `IW`, `ZZZZ`, overflow-
 length column strings, and malformed rows as typed rejections; direct checked
-reference and area construction; exact encoded flag bits; and public writer
-serialization returning an error without unwinding. All 42 formula tests and
-the focused writer and reversed-defined-range regressions pass, together with
-warning-denied Clippy, rustdoc, formatting, diff validation, and workspace
-lint. Per explicit user direction, the previously green full-workspace test
-suite is not repeated.
+reference and area construction; exact encoded flag bits; Formula metadata
+decoding and validation; and public writer serialization returning an error
+without unwinding. The formula-metadata and focused writer regressions pass;
+the previously green broader formula gates remain the reference verification
+for this ADR. Per explicit user direction, the full-workspace test suite is
+not repeated.

@@ -152,6 +152,9 @@ mod consolidation;
 /// BIFF formula token rendering
 mod formula;
 
+/// Typed metadata surrounding a BIFF8 `Formula` record.
+pub mod formula_metadata;
+
 /// Internal workbook and sheet defined names (`Lbl`).
 mod defined_names;
 
@@ -363,6 +366,7 @@ pub use force_full_calculation::ForceFullCalculation;
 pub use formula_errors::{
     FormulaErrorChecks, FormulaErrorFeature, FormulaErrorHeader, FormulaErrorRange,
 };
+pub use formula_metadata::Metadata as FormulaMetadata;
 pub use function_group::{BuiltInFunctionCategories, FunctionGroups};
 pub use header_footer_picture::HeaderFooterPicture;
 pub use interface_records::{InterfaceEnd, InterfaceHdr};

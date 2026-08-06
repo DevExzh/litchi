@@ -193,16 +193,30 @@ pub(crate) fn write_formula<W: Write>(
     xf_index: u16,
     tokens: &[u8],
 ) -> Result<()> {
+    write_formula_with_metadata(
+        writer,
+        row,
+        col,
+        xf_index,
+        tokens,
+        crate::FormulaMetadata::new().with_always_calculate(true),
+    )
+}
+
+pub(crate) fn write_formula_with_metadata<W: Write>(
+    writer: &mut W,
+    row: u32,
+    col: u16,
+    xf_index: u16,
+    tokens: &[u8],
+    metadata: crate::FormulaMetadata,
+) -> Result<()> {
     let row_u16 = u16::try_from(row).map_err(|_| {
         Error::InvalidData(format!(
             "Row index {row} exceeds BIFF8 limit 65535 for FORMULA record"
         ))
     })?;
-    if tokens.is_empty() {
-        return Err(Error::InvalidFormula(
-            "Formula token stream cannot be empty".to_string(),
-        ));
-    }
+    let flags = crate::formula_metadata::encode_flags(metadata, tokens)?;
     // A BIFF record payload is limited to 8,224 bytes. FORMULA contributes
     // 22 fixed bytes before the token stream.
     if tokens.len() > 8_202 {
@@ -222,8 +236,8 @@ pub(crate) fn write_formula<W: Write>(
     writer.write_all(&xf_index.to_le_bytes())?;
     // FormulaValue special cached EMPTY: type, reserved, data, reserved[3], marker.
     writer.write_all(&[3, 0, 0, 0, 0, 0, 0xff, 0xff])?;
-    writer.write_all(&0x0001u16.to_le_bytes())?; // fAlwaysCalc
-    writer.write_all(&0u32.to_le_bytes())?; // chn
+    writer.write_all(&flags.to_le_bytes())?;
+    writer.write_all(&metadata.calculation_cache().to_le_bytes())?;
     writer.write_all(&token_len.to_le_bytes())?;
     writer.write_all(tokens)?;
     Ok(())
@@ -259,8 +273,11 @@ mod tests {
                     col: 5,
                     xf_index: 15,
                     value: FormulaValue::Empty,
+                    metadata,
                     ref formula,
                 } if formula == &tokens
+                    && metadata
+                        == crate::FormulaMetadata::new().with_always_calculate(true)
             ),
             "{record:?}"
         );

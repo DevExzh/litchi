@@ -1,6 +1,7 @@
 //! Cell representation for XLS files
 
 use crate::formula::{FormulaContext, render_formula};
+use crate::formula_metadata::Metadata;
 use crate::number_format::Formatting;
 use crate::records::{BoolErrValue, CellRecord, FormulaValue};
 use crate::utils;
@@ -14,6 +15,7 @@ pub struct Cell {
     value: CellValue,
     formula: Option<String>,
     formula_bytes: Option<Vec<u8>>,
+    formula_metadata: Option<Metadata>,
     shared_string_index: Option<u32>,
     xf_index: u16,
 }
@@ -27,6 +29,7 @@ impl Cell {
             value,
             formula: None,
             formula_bytes: None,
+            formula_metadata: None,
             shared_string_index: None,
             xf_index: 0,
         }
@@ -40,6 +43,7 @@ impl Cell {
             value,
             formula: Some(formula),
             formula_bytes: None,
+            formula_metadata: None,
             shared_string_index: None,
             xf_index: 0,
         }
@@ -59,6 +63,10 @@ impl Cell {
         let xf_index = record_xf_index(record);
         let shared_string_index = match record {
             CellRecord::LabelSst { sst_index, .. } => Some(*sst_index),
+            _ => None,
+        };
+        let formula_metadata = match record {
+            CellRecord::Formula { metadata, .. } => Some(*metadata),
             _ => None,
         };
         let (row, col, value, formula, formula_bytes) = match record {
@@ -128,6 +136,7 @@ impl Cell {
                 value,
                 formula,
                 xf_index: _,
+                metadata: _,
             } => {
                 let cell_value = match value {
                     FormulaValue::Number(n) => CellValue::Float(*n),
@@ -169,6 +178,7 @@ impl Cell {
             value,
             formula,
             formula_bytes,
+            formula_metadata,
             shared_string_index,
             xf_index,
         })
@@ -195,6 +205,12 @@ impl Cell {
     /// Original BIFF formula token stream for cells read from a workbook.
     pub fn formula_bytes(&self) -> Option<&[u8]> {
         self.formula_bytes.as_deref()
+    }
+
+    /// Typed BIFF8 calculation flags and application cache for a formula read
+    /// from a workbook.
+    pub fn formula_metadata(&self) -> Option<&Metadata> {
+        self.formula_metadata.as_ref()
     }
 
     pub(crate) fn set_rendered_formula(&mut self, formula: Option<String>) {
@@ -442,12 +458,14 @@ mod tests {
             col: 0,
             xf_index: 0,
             value: FormulaValue::Number(std::f64::consts::PI),
+            metadata: Metadata::default(),
             formula: formula.clone(),
         };
         let cell = Cell::from_record(&record, None).unwrap();
         assert!(cell.is_formula());
         assert_eq!(cell.formula(), Some("=(2+3)"));
         assert_eq!(cell.formula_bytes(), Some(formula.as_slice()));
+        assert_eq!(cell.formula_metadata(), Some(&Metadata::default()));
         if let CellValue::Float(v) = cell.value() {
             assert!((v - std::f64::consts::PI).abs() < 0.001);
         } else {
@@ -462,6 +480,7 @@ mod tests {
             col: 0,
             xf_index: 0,
             value: FormulaValue::String("Result".to_string()),
+            metadata: Metadata::default(),
             formula: vec![],
         };
         let cell = Cell::from_record(&record, None).unwrap();
@@ -475,6 +494,7 @@ mod tests {
             col: 0,
             xf_index: 0,
             value: FormulaValue::Bool(false),
+            metadata: Metadata::default(),
             formula: vec![],
         };
         let cell = Cell::from_record(&record, None).unwrap();
@@ -488,6 +508,7 @@ mod tests {
             col: 0,
             xf_index: 0,
             value: FormulaValue::Error(15),
+            metadata: Metadata::default(),
             formula: vec![],
         };
         let cell = Cell::from_record(&record, None).unwrap();
@@ -501,6 +522,7 @@ mod tests {
             col: 0,
             xf_index: 0,
             value: FormulaValue::Empty,
+            metadata: Metadata::default(),
             formula: vec![],
         };
         let cell = Cell::from_record(&record, None).unwrap();
@@ -518,6 +540,7 @@ mod tests {
             col: 0,
             xf_index: 0,
             value: FormulaValue::Number(1.0),
+            metadata: Metadata::default(),
             formula: formula.clone(),
         };
         let cell = Cell::from_record(&record, None).unwrap();
@@ -538,6 +561,7 @@ mod tests {
             col: 0,
             xf_index: 0,
             value: FormulaValue::Number(42.0),
+            metadata: Metadata::default(),
             formula,
         };
 

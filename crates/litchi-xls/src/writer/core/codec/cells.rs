@@ -113,6 +113,43 @@ impl Writer {
         )
     }
 
+    /// Write a formula with explicit BIFF8 `Formula` metadata.
+    ///
+    /// The shared-formula flag is intentionally rejected until this writer
+    /// owns the corresponding `ShrFmla` sequence. All other flags and the
+    /// opaque application cache are emitted verbatim.
+    pub fn write_formula_with_metadata(
+        &mut self,
+        sheet: usize,
+        row: u32,
+        col: u16,
+        formula: &str,
+        metadata: crate::FormulaMetadata,
+    ) -> Result<()> {
+        self.write_formula_with_format_and_metadata(sheet, row, col, formula, 0, metadata)
+    }
+
+    /// Write a formatted formula with explicit BIFF8 `Formula` metadata.
+    pub fn write_formula_with_format_and_metadata(
+        &mut self,
+        sheet: usize,
+        row: u32,
+        col: u16,
+        formula: &str,
+        format_id: u16,
+        metadata: crate::FormulaMetadata,
+    ) -> Result<()> {
+        crate::formula_metadata::validate_for_write(metadata)?;
+        let pos = CellPos::try_new(row, col)?;
+        self.write_cell_with_formula_metadata(
+            sheet,
+            pos,
+            CellValue::Formula(formula.to_string()),
+            format_id,
+            Some(metadata),
+        )
+    }
+
     /// Register a number format pattern and return its BIFF format index.
     ///
     /// This is a thin wrapper around the internal `FormattingManager`
@@ -183,6 +220,17 @@ impl Writer {
         value: CellValue,
         format_id: u16,
     ) -> Result<()> {
+        self.write_cell_with_formula_metadata(sheet, pos, value, format_id, None)
+    }
+
+    fn write_cell_with_formula_metadata(
+        &mut self,
+        sheet: usize,
+        pos: CellPos,
+        value: CellValue,
+        format_id: u16,
+        formula_metadata: Option<crate::FormulaMetadata>,
+    ) -> Result<()> {
         if self.fmt.get_format(format_id).is_none() {
             return Err(Error::InvalidFormat(format_id));
         }
@@ -192,7 +240,9 @@ impl Writer {
             .get_mut(sheet)
             .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
-        worksheet.add_cell(WritableCell::new(pos, value, format_id, None));
+        worksheet.add_cell(
+            WritableCell::new(pos, value, format_id, None).with_formula_metadata(formula_metadata),
+        );
 
         Ok(())
     }

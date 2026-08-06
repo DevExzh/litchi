@@ -884,7 +884,17 @@ pub(crate) fn generate_workbook_stream(
                     let expression = formula.strip_prefix('=').unwrap_or(formula);
                     let tokens = FormulaTokenizer::new().tokenize(expression)?;
                     let encoded = encode_ptg_tokens(&tokens);
-                    biff::write_formula(&mut stream, *row, *col, xf_index, &encoded)?;
+                    let metadata = cell.formula_metadata.unwrap_or_else(|| {
+                        crate::FormulaMetadata::new().with_always_calculate(true)
+                    });
+                    biff::write_formula_with_metadata(
+                        &mut stream,
+                        *row,
+                        *col,
+                        xf_index,
+                        &encoded,
+                        metadata,
+                    )?;
                 },
                 CellValue::Blank => {
                     // Skip blank cells

@@ -37,8 +37,8 @@ mod vba;
 mod workbook;
 mod worksheet;
 
-pub(crate) use cells::write_formula;
 pub(crate) use cells::write_table;
+pub(crate) use cells::{write_formula, write_formula_with_metadata};
 pub(crate) use comment::CommentConfig;
 pub(crate) use conditional_format::Cf12Config;
 pub(crate) use drawing::{PrimitiveShapeConfig, write_worksheet_drawing};
