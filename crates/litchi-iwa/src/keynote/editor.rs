@@ -37,11 +37,11 @@ use crate::text::{
     ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
     ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering, ParagraphSpacing,
     ParagraphStart, ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextComment,
-    TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId,
-    TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId,
-    TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition,
-    TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextComment, TextCommentBody,
+    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
+    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
+    TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -580,6 +580,15 @@ impl KeynoteBuildSettings {
         self.semantic().map(|settings| settings.effect().clone())
     }
 
+    /// Replace the native build effect from a checked semantic value.
+    pub fn set_effect(&mut self, effect: litchi_keynote::build::Effect) -> Result<()> {
+        let mut candidate = self.clone();
+        apply_semantic_build_effect(&mut candidate, effect)?;
+        builds::validate_build_settings(&candidate)?;
+        *self = candidate;
+        Ok(())
+    }
+
     /// Return the semantic start relationship.
     pub fn start(&self) -> Result<BuildStart> {
         self.semantic().map(|settings| settings.start())
@@ -608,9 +617,9 @@ impl KeynoteBuildSettings {
     /// Replace the delay transactionally.
     pub fn set_delay(&mut self, delay: litchi_keynote::Seconds) -> Result<()> {
         let mut candidate = self.semantic()?;
-        candidate.set_delay(delay).map_err(|error| {
-            Error::ParseError(format!("invalid Keynote build delay: {error}"))
-        })?;
+        candidate
+            .set_delay(delay)
+            .map_err(|error| Error::ParseError(format!("invalid Keynote build delay: {error}")))?;
         self.delay = delay.as_f64();
         Ok(())
     }
@@ -623,6 +632,76 @@ impl KeynoteBuildSettings {
             Error::ParseError(format!("invalid Keynote build duration: {error}"))
         })?;
         self.duration = duration.as_f64();
+        Ok(())
+    }
+
+    /// Replace the timing acceleration of a typed Rotate, Scale, Opacity, or
+    /// Move action.
+    pub fn set_action_acceleration(&mut self, acceleration: BuildAcceleration) -> Result<()> {
+        if acceleration.kind().is_none() {
+            return Err(Error::ParseError(
+                "Keynote action acceleration is not a recognized value".to_owned(),
+            ));
+        }
+        let mut candidate = self.clone();
+        let mut found = false;
+        if let Some(action) = candidate.rotation.as_mut() {
+            action.acceleration = acceleration;
+            found = true;
+        } else if let Some(action) = candidate.scale.as_mut() {
+            action.acceleration = acceleration;
+            found = true;
+        } else if let Some(action) = candidate.opacity.as_mut() {
+            action.acceleration = acceleration;
+            found = true;
+        } else if let Some(action) = candidate.move_action.as_mut() {
+            action.acceleration = acceleration;
+            found = true;
+        }
+        if !found {
+            return Err(Error::ParseError(
+                "Keynote action acceleration requires a typed action".to_owned(),
+            ));
+        }
+        if acceleration != BuildAcceleration::Custom {
+            candidate.timing_curve = None;
+        }
+        builds::validate_build_settings(&candidate)?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Replace the editable path of a typed Move action.
+    pub fn set_move_path(&mut self, path: KeynoteMotionPath) -> Result<()> {
+        if self.move_action.is_none() {
+            return Err(Error::ParseError(
+                "Keynote Move path requires a typed Move action".to_owned(),
+            ));
+        }
+        builds::validate_motion_path(&path)?;
+        let mut candidate = self.clone();
+        let Some(action) = candidate.move_action.as_mut() else {
+            return Err(Error::ParseError(
+                "Keynote Move path requires a typed Move action".to_owned(),
+            ));
+        };
+        action.path = path;
+        builds::validate_build_settings(&candidate)?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Replace whether a typed Move action follows its path tangent.
+    pub fn set_move_alignment(&mut self, align_to_path: bool) -> Result<()> {
+        let mut candidate = self.clone();
+        let Some(action) = candidate.move_action.as_mut() else {
+            return Err(Error::ParseError(
+                "Keynote Move alignment requires a typed Move action".to_owned(),
+            ));
+        };
+        action.align_to_path = align_to_path;
+        builds::validate_build_settings(&candidate)?;
+        *self = candidate;
         Ok(())
     }
 
@@ -1003,6 +1082,337 @@ impl KeynoteBuildSettings {
             ..Self::appear_in()
         }
     }
+}
+
+fn apply_semantic_build_effect(
+    settings: &mut KeynoteBuildSettings,
+    effect: litchi_keynote::build::Effect,
+) -> Result<()> {
+    effect
+        .validate()
+        .map_err(|error| Error::ParseError(format!("invalid Keynote build effect: {error}")))?;
+    let previous_timing_curve = settings.timing_curve.clone();
+    settings.direction = None;
+    settings.rotation = None;
+    settings.scale = None;
+    settings.opacity = None;
+    settings.move_action = None;
+    settings.emphasis = None;
+    settings.keyboard = None;
+    settings.object_effect = None;
+    settings.timing_curve = None;
+    settings.custom_parameters = KeynoteBuildCustomParameters::default();
+
+    match effect {
+        litchi_keynote::build::Effect::Appear => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            settings.effect = "apple:bc-appear".to_owned();
+        },
+        litchi_keynote::build::Effect::Dissolve => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            settings.effect = "apple:bc-dissolve".to_owned();
+        },
+        litchi_keynote::build::Effect::MoveIn => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            settings.effect = "apple:bc-move".to_owned();
+        },
+        litchi_keynote::build::Effect::Scale => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            settings.effect = "apple:bc-scale".to_owned();
+        },
+        litchi_keynote::build::Effect::FadeAndScale => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            settings.effect = "apple:bc-fade-scale".to_owned();
+        },
+        litchi_keynote::build::Effect::Action(action) => {
+            settings.animation_type = "Action".to_owned();
+            settings.effect = action.identifier().to_owned();
+            match action {
+                litchi_keynote::build::Action::Rotate(action) => {
+                    settings.rotation = Some(KeynoteRotationAction {
+                        total_degrees: action.total_degrees(),
+                        direction: match action.direction() {
+                            litchi_keynote::build::RotationDirection::Clockwise => {
+                                KeynoteRotationDirection::Clockwise
+                            },
+                            litchi_keynote::build::RotationDirection::Counterclockwise => {
+                                KeynoteRotationDirection::Counterclockwise
+                            },
+                        },
+                        acceleration: action.acceleration(),
+                    });
+                },
+                litchi_keynote::build::Action::Scale(action) => {
+                    settings.scale = Some(KeynoteScaleAction {
+                        scale_factor: action.factor(),
+                        acceleration: action.acceleration(),
+                    });
+                },
+                litchi_keynote::build::Action::Opacity(action) => {
+                    settings.opacity = Some(KeynoteOpacityAction {
+                        opacity_percent: action.percent(),
+                        acceleration: action.acceleration(),
+                    });
+                },
+                litchi_keynote::build::Action::Move(action) => {
+                    settings.move_action = Some(KeynoteMoveAction {
+                        path: native_motion_path_from_semantic(action.path())?,
+                        align_to_path: action.align_to_path(),
+                        acceleration: action.acceleration(),
+                    });
+                },
+                litchi_keynote::build::Action::Unknown(_) => {
+                    return Err(Error::ParseError(
+                        "Keynote unknown actions cannot be written without native parameters"
+                            .to_owned(),
+                    ));
+                },
+                _ => {
+                    return Err(Error::ParseError(
+                        "Keynote action variant is not supported by this adapter".to_owned(),
+                    ));
+                },
+            }
+        },
+        litchi_keynote::build::Effect::Emphasis(emphasis) => {
+            settings.animation_type = "Action".to_owned();
+            settings.effect = emphasis.identifier().to_owned();
+            let (action, direction) = native_emphasis_action(emphasis)?;
+            settings.emphasis = Some(action);
+            settings.direction = direction;
+        },
+        litchi_keynote::build::Effect::Keyboard(keyboard) => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            settings.effect = KEYBOARD_BUILD_EFFECT.to_owned();
+            settings.direction = Some(builds::native_keyboard_direction(
+                match keyboard.direction() {
+                    litchi_keynote::build::KeyboardDirection::Forward => {
+                        KeynoteKeyboardDirection::Forward
+                    },
+                    litchi_keynote::build::KeyboardDirection::Backward => {
+                        KeynoteKeyboardDirection::Backward
+                    },
+                },
+            ));
+            settings.keyboard = Some(KeynoteKeyboardBuild {
+                direction: match keyboard.direction() {
+                    litchi_keynote::build::KeyboardDirection::Forward => {
+                        KeynoteKeyboardDirection::Forward
+                    },
+                    litchi_keynote::build::KeyboardDirection::Backward => {
+                        KeynoteKeyboardDirection::Backward
+                    },
+                },
+                show_cursor: keyboard.show_cursor(),
+            });
+        },
+        litchi_keynote::build::Effect::Object(object) => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            let object = native_object_build_effect(object)?;
+            settings.effect = builds::object_build_effect_identifier(object).to_owned();
+            settings.direction = builds::native_object_build_direction(object);
+            settings.object_effect = Some(object);
+        },
+        litchi_keynote::build::Effect::Unknown(value) => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            settings.effect = value.as_str().to_owned();
+        },
+        _ => {
+            return Err(Error::ParseError(
+                "Keynote effect variant is not supported by this adapter".to_owned(),
+            ));
+        },
+    }
+
+    if builds::typed_action_acceleration(settings) == Some(BuildAcceleration::Custom) {
+        settings.timing_curve = previous_timing_curve;
+    }
+    Ok(())
+}
+
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Reject future semantic build variants until their native parameters are modeled."
+)]
+fn native_emphasis_action(
+    emphasis: litchi_keynote::build::Emphasis,
+) -> Result<(KeynoteEmphasisAction, Option<u32>)> {
+    use litchi_keynote::build::{FlipDirection, JiggleIntensity};
+
+    match emphasis {
+        litchi_keynote::build::Emphasis::Blink(action) => Ok((
+            KeynoteEmphasisAction::Blink {
+                repeat_count: action.repeat_count(),
+                fade: action.fade(),
+            },
+            None,
+        )),
+        litchi_keynote::build::Emphasis::Bounce(action) => Ok((
+            KeynoteEmphasisAction::Bounce {
+                repeat_count: action.repeat_count(),
+                decay: action.decay(),
+            },
+            None,
+        )),
+        litchi_keynote::build::Emphasis::Flip(action) => Ok((
+            KeynoteEmphasisAction::Flip {
+                repeat_count: action.repeat_count(),
+                direction: match action.direction() {
+                    FlipDirection::LeftToRight => KeynoteFlipDirection::LeftToRight,
+                    FlipDirection::RightToLeft => KeynoteFlipDirection::RightToLeft,
+                },
+            },
+            Some(builds::native_flip_direction(match action.direction() {
+                FlipDirection::LeftToRight => KeynoteFlipDirection::LeftToRight,
+                FlipDirection::RightToLeft => KeynoteFlipDirection::RightToLeft,
+            })),
+        )),
+        litchi_keynote::build::Emphasis::Jiggle(action) => Ok((
+            KeynoteEmphasisAction::Jiggle {
+                intensity: match action.intensity() {
+                    JiggleIntensity::Small => KeynoteJiggleIntensity::Small,
+                    JiggleIntensity::Medium => KeynoteJiggleIntensity::Medium,
+                    JiggleIntensity::Large => KeynoteJiggleIntensity::Large,
+                },
+            },
+            None,
+        )),
+        litchi_keynote::build::Emphasis::Pop(action) => Ok((
+            KeynoteEmphasisAction::Pop {
+                scale_percent: action.scale_percent(),
+            },
+            None,
+        )),
+        litchi_keynote::build::Emphasis::Pulse(action) => Ok((
+            KeynoteEmphasisAction::Pulse {
+                repeat_count: action.repeat_count(),
+                scale_percent: action.scale_percent(),
+            },
+            None,
+        )),
+        litchi_keynote::build::Emphasis::Unknown(_) => Err(Error::ParseError(
+            "Keynote unknown emphasis actions cannot be written without native parameters"
+                .to_owned(),
+        )),
+        _ => Err(Error::ParseError(
+            "Keynote emphasis variant is not supported by this adapter".to_owned(),
+        )),
+    }
+}
+
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Reject future semantic build variants until their native parameters are modeled."
+)]
+fn native_object_build_effect(
+    effect: litchi_keynote::build::ObjectEffect,
+) -> Result<KeynoteObjectBuildEffect> {
+    use litchi_keynote::build::{HorizontalDirection, SwooshDirection};
+
+    match effect {
+        litchi_keynote::build::ObjectEffect::Dissolve => Ok(KeynoteObjectBuildEffect::Dissolve),
+        litchi_keynote::build::ObjectEffect::Shimmer => Ok(KeynoteObjectBuildEffect::Shimmer),
+        litchi_keynote::build::ObjectEffect::Skid(direction) => {
+            Ok(KeynoteObjectBuildEffect::Skid {
+                direction: match direction {
+                    HorizontalDirection::LeftToRight => {
+                        KeynoteHorizontalBuildDirection::LeftToRight
+                    },
+                    HorizontalDirection::RightToLeft => {
+                        KeynoteHorizontalBuildDirection::RightToLeft
+                    },
+                },
+            })
+        },
+        litchi_keynote::build::ObjectEffect::Swoosh(direction) => {
+            Ok(KeynoteObjectBuildEffect::Swoosh {
+                direction: match direction {
+                    SwooshDirection::Center => KeynoteSwooshDirection::Center,
+                    SwooshDirection::FromLeft => KeynoteSwooshDirection::FromLeft,
+                    SwooshDirection::FromRight => KeynoteSwooshDirection::FromRight,
+                },
+            })
+        },
+        litchi_keynote::build::ObjectEffect::Trace(direction) => {
+            Ok(KeynoteObjectBuildEffect::Trace {
+                direction: match direction {
+                    HorizontalDirection::LeftToRight => {
+                        KeynoteHorizontalBuildDirection::LeftToRight
+                    },
+                    HorizontalDirection::RightToLeft => {
+                        KeynoteHorizontalBuildDirection::RightToLeft
+                    },
+                },
+            })
+        },
+        _ => Err(Error::ParseError(
+            "Keynote object effect variant is not supported by this adapter".to_owned(),
+        )),
+    }
+}
+
+fn native_motion_path_from_semantic(
+    path: &litchi_keynote::build::Path,
+) -> Result<KeynoteMotionPath> {
+    let finite_f32 = |value: f64| -> Result<f32> {
+        if !value.is_finite() || value.abs() > f64::from(f32::MAX) {
+            return Err(Error::ParseError(
+                "Keynote Move path values must fit in finite native f32 coordinates".to_owned(),
+            ));
+        }
+        Ok(value as f32)
+    };
+    let point = |point: litchi_keynote::build::Point| -> Result<KeynoteMotionPathPoint> {
+        Ok(KeynoteMotionPathPoint::new(
+            finite_f32(point.x())?,
+            finite_f32(point.y())?,
+        ))
+    };
+    let subpaths = path
+        .subpaths()
+        .iter()
+        .map(|subpath| {
+            let nodes = subpath
+                .nodes()
+                .iter()
+                .map(|node| {
+                    Ok(KeynoteMotionPathNode {
+                        in_control_point: point(node.in_control_point())?,
+                        point: point(node.point())?,
+                        out_control_point: point(node.out_control_point())?,
+                        node_type: match node.kind() {
+                            litchi_keynote::build::NodeKind::Sharp => {
+                                KeynoteMotionPathNodeType::Sharp
+                            },
+                            litchi_keynote::build::NodeKind::Bezier => {
+                                KeynoteMotionPathNodeType::Bezier
+                            },
+                            litchi_keynote::build::NodeKind::Smooth => {
+                                KeynoteMotionPathNodeType::Smooth
+                            },
+                        },
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+            Ok(KeynoteMotionSubpath {
+                nodes,
+                closed: subpath.closed(),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let native = KeynoteMotionPath {
+        subpaths,
+        natural_width: finite_f32(path.natural_width())?,
+        natural_height: finite_f32(path.natural_height())?,
+        horizontal_flip: path.horizontal_flip(),
+        vertical_flip: path.vertical_flip(),
+    };
+    builds::validate_motion_path(&native)?;
+    Ok(native)
+}
+
+fn build_in_or_out(animation_type: &str) -> &'static str {
+    if animation_type == "Out" { "Out" } else { "In" }
 }
 
 /// One timing chunk owned by a Keynote build.
