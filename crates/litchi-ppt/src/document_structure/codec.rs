@@ -1,81 +1,83 @@
 //! MS-PPT validation for a document container's terminal records.
 
-use super::model::{CustomTableStylesPlacement, DocumentStructure};
+use super::model::DocumentStructure;
 use crate::consts::RecordType;
 use crate::package::{Error, Result};
 use crate::records::Record;
 
 impl DocumentStructure {
-    /// Validate the exact MS-PPT document tail.
+    /// Validate the exact MS-PPT document structure and its terminal records.
     pub(crate) fn parse(document: &Record) -> Result<Self> {
-        if document.record_type != RecordType::Document
-            || document.version != 0x0f
-            || document.instance != 0
-        {
-            return corrupted("DocumentContainer has an invalid record header");
-        }
-
-        let end_indices: Vec<_> = document
-            .children
-            .iter()
-            .enumerate()
-            .filter_map(|(index, record)| {
-                (record.record_type == RecordType::EndDocument).then_some(index)
-            })
-            .collect();
-        if end_indices.len() != 1 {
-            return corrupted("DocumentContainer must contain exactly one EndDocumentAtom");
-        }
-        let end_index = end_indices[0];
-        let end = &document.children[end_index];
-        if end.version != 0 || end.instance != 0 || end.data_length != 0 || !end.data.is_empty() {
-            return corrupted("EndDocumentAtom has an invalid record header or payload");
-        }
-
-        let table_style_indices: Vec<_> = document
-            .children
-            .iter()
-            .enumerate()
-            .filter_map(|(index, record)| {
-                (record.record_type == RecordType::RoundTripCustomTableStyles12Atom)
-                    .then_some(index)
-            })
-            .collect();
-        if table_style_indices.len() > 1 {
-            return corrupted(
-                "DocumentContainer contains duplicate RoundTripCustomTableStyles12Atom records",
-            );
-        }
-
-        let child_count = document.children.len();
-        let custom_table_styles = match table_style_indices.first().copied() {
-            None if end_index.checked_add(1) == Some(child_count) => None,
-            Some(table_index)
-                if table_index.checked_add(1) == Some(end_index)
-                    && end_index.checked_add(1) == Some(child_count) =>
-            {
-                Some(CustomTableStylesPlacement::BeforeEndDocument)
-            },
-            Some(table_index)
-                if end_index.checked_add(1) == Some(table_index)
-                    && table_index.checked_add(1) == Some(child_count) =>
-            {
-                Some(CustomTableStylesPlacement::AfterEndDocument)
-            },
-            _ => {
-                return corrupted(
-                    "EndDocumentAtom and optional custom table styles do not form the document tail",
-                );
-            },
-        };
-
-        Ok(Self {
-            end_document_child_index: end_index,
-            custom_table_styles,
-        })
+        super::validation::validate_document(document, super::model::Limits::default())
     }
 }
 
-fn corrupted<T>(message: &str) -> Result<T> {
-    Err(Error::Corrupted(message.to_string()))
+/// Serialize one validated `DocumentContainer` while retaining all opaque
+/// records and their source order.
+pub(super) fn encode_document(document: &Record) -> Result<Vec<u8>> {
+    if document.record_type != RecordType::Document {
+        return Err(Error::InvalidFormat(
+            "document-structure encoding requires a DocumentContainer root".into(),
+        ));
+    }
+    encode_record(document, true)
+}
+
+/// Refresh the wire payloads of the root and its known structural lists after
+/// a transaction-local child reorder.
+pub(super) fn synchronize(document: &mut Record) -> Result<()> {
+    if document.record_type != RecordType::Document {
+        return Err(Error::InvalidFormat(
+            "document-structure synchronization requires a DocumentContainer root".into(),
+        ));
+    }
+    for child in &mut document.children {
+        if child.record_type == RecordType::SlideListWithText {
+            sync_container(child)?;
+        }
+    }
+    sync_container(document)
+}
+
+fn sync_container(record: &mut Record) -> Result<()> {
+    let mut payload = Vec::new();
+    for child in &record.children {
+        payload.extend_from_slice(&encode_record(child, false)?);
+    }
+    record.data_length = u32::try_from(payload.len())
+        .map_err(|_| Error::InvalidFormat("PPT structural payload exceeds u32::MAX".into()))?;
+    record.data = payload;
+    Ok(())
+}
+
+fn encode_record(record: &Record, force_children: bool) -> Result<Vec<u8>> {
+    let payload = if force_children || record.record_type == RecordType::SlideListWithText {
+        let mut payload = Vec::new();
+        for child in &record.children {
+            payload.extend_from_slice(&encode_record(child, false)?);
+        }
+        payload
+    } else if record.children.is_empty() {
+        record.data.clone()
+    } else {
+        let mut payload = Vec::new();
+        for child in &record.children {
+            payload.extend_from_slice(&encode_record(child, false)?);
+        }
+        payload
+    };
+    let payload_len = u32::try_from(payload.len())
+        .map_err(|_| Error::InvalidFormat("PPT record payload exceeds u32::MAX".into()))?;
+    if record.version > 0x000f || record.instance > 0x0fff {
+        return Err(Error::InvalidFormat(
+            "PPT record version or instance is out of range".into(),
+        ));
+    }
+    let version_instance = record.version | (record.instance << 4);
+    let mut bytes = Vec::with_capacity(8usize.saturating_add(payload.len()));
+    bytes.extend_from_slice(&version_instance.to_le_bytes());
+    bytes.extend_from_slice(&record.record_type_raw.to_le_bytes());
+    bytes.extend_from_slice(&payload_len.to_le_bytes());
+    bytes.extend_from_slice(&payload);
+    Ok(bytes)
 }
