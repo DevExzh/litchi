@@ -14,13 +14,13 @@ use crate::shapes::{
     set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
     set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
     set_shape_text_layout, shape_effects, shape_fill, shape_line_endpoints, shape_line_segment,
-    shape_path_kind, shape_path_source, shape_preset, shape_shadow, shape_stroke,
+    shape_path_kind, shape_path_source, shape_preset, shape_shadow, shape_stroke, ShapePathKind,
     shape_text_layout,
 };
 use crate::text::TextStorageInfo;
 use crate::text::layout::Layout;
 use litchi_iwa_common::shape::effects::Effects;
-use litchi_iwa_common::shape::path::{Kind, Preset};
+use litchi_iwa_common::shape::path::Preset;
 
 use super::text_box_create::{
     TextBoxObjectIds, slide_text_storage_template, text_box_context, text_box_objects,
@@ -41,7 +41,7 @@ const DEFAULT_ROTATION_DEGREES: f32 = 0.0;
 pub struct KeynoteSlideShapeInfo {
     pub slide_index: usize,
     pub drawable_object_id: u64,
-    pub kind: Kind,
+    pub kind: ShapePathKind,
     /// Source-buildable preset and its native controls, when recognized.
     pub preset: Option<Preset>,
     /// Slide-space endpoints when this shape is a native straight line.
@@ -1289,7 +1289,7 @@ mod tests {
         let created = editor
             .add_slide_rectangle(0, "Built from typed objects", POSITION, SIZE)
             .unwrap();
-        assert_eq!(created.kind, Kind::Rectangle);
+        assert_eq!(created.kind, ShapePathKind::Rectangle);
         assert_eq!(created.preset, Some(Preset::Rectangle));
         assert_eq!(created.storage.text, "Built from typed objects");
         assert_eq!(
@@ -1457,7 +1457,7 @@ mod tests {
             .unwrap();
         let baseline = editor.to_bytes().unwrap();
         let created = editor.add_slide_line(0, LINE_START, LINE_END).unwrap();
-        assert_eq!(created.kind, Kind::Line);
+        assert_eq!(created.kind, ShapePathKind::Line);
         assert_eq!(created.preset, None);
         assert_eq!(created.storage.text, "");
         assert!(line_segments_match(
@@ -1504,7 +1504,7 @@ mod tests {
         let removed = editor
             .remove_slide_shape(0, created.drawable_object_id)
             .unwrap();
-        assert_eq!(removed.shape.kind, Kind::Line);
+        assert_eq!(removed.shape.kind, ShapePathKind::Line);
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
         let rectangle = editor
@@ -1879,7 +1879,7 @@ mod tests {
         let created = editor
             .add_slide_shape(0, "Rounded", POSITION, SIZE, Preset::ROUNDED_RECTANGLE)
             .unwrap();
-        assert_eq!(created.kind, Kind::RoundedRectangle);
+        assert_eq!(created.kind, ShapePathKind::RoundedRectangle);
         assert_eq!(created.preset, Some(Preset::ROUNDED_RECTANGLE));
 
         let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -1891,12 +1891,12 @@ mod tests {
         );
 
         for (preset, kind) in [
-            (Preset::Ellipse, Kind::Ellipse),
-            (Preset::LeftArrow, Kind::LeftArrow),
-            (Preset::RightArrow, Kind::RightArrow),
-            (Preset::DoubleArrow, Kind::DoubleArrow),
-            (Preset::PENTAGON, Kind::RegularPolygon),
-            (Preset::STAR, Kind::Star),
+            (Preset::Ellipse, ShapePathKind::Ellipse),
+            (Preset::LeftArrow, ShapePathKind::LeftArrow),
+            (Preset::RightArrow, ShapePathKind::RightArrow),
+            (Preset::DoubleArrow, ShapePathKind::DoubleArrow),
+            (Preset::PENTAGON, ShapePathKind::RegularPolygon),
+            (Preset::STAR, ShapePathKind::Star),
         ] {
             editor
                 .set_slide_shape_preset(0, created.drawable_object_id, preset)

@@ -6245,6 +6245,27 @@ explicit follow-up work. The Keynote build leaf likewise passes its focused
 semantic suite, strict Clippy, and formatting checks; its native adapter and
 CRUD migration remain open, so this slice makes no new native Keynote claim.
 
+The 2026-08-06 target-branch migration turn extends the same ownership direction.
+`litchi-iwa::shapes::ShapePathKind` remains the structural path-family owner,
+while `litchi-iwa-common::shape::path` owns only source-buildable path controls;
+`litchi-keynote::ChartSelector` resolves chart edits by checked position or exact
+visible name; `litchi-iwa-structured::StructuredData`
+owns shared immutable semantic snapshots with borrowed text iteration; and
+`litchi-pages::image::Options` owns validated image placement values. The archive
+ingress/egress handoff is also recorded in `litchi-iwa-archive`, including ordered
+logical opaque-entry storage, bounded legacy-package validation, and facade removal
+of the direct ZIP dependency; byte-level ZIP-record preservation remains an ADR
+0005 follow-up. The focused suites passed 113 common, 45 Keynote,
+30 Pages, and 7 structured tests; the integrated facade library check and the
+47-package boundary checker passed. Computer Use created and saved fresh native
+fixtures at `/tmp/litchi-native-next-turn-20260806.pages`,
+`/tmp/litchi-native-next-turn-20260806.numbers`, and
+`/tmp/litchi-native-next-turn-20260806.key`; each reopened in its native iWork
+application without a repair prompt, and Pages, Numbers, and Keynote were
+closed after verification. This is structural/API and native-open evidence, not
+a claim that the remaining monolithic semantic adapters or lazy physical catalog
+have been completed.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

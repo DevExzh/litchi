@@ -481,6 +481,9 @@ mod tests {
         )
         .unwrap();
         assert_eq!(structured.len(), 1);
-        assert_eq!(structured[0].paragraphs(), ["Pages body — café 東京 🚀"]);
+        assert_eq!(
+            structured[0].text_storages()[0].text(),
+            "Pages body — café 東京 🚀"
+        );
     }
 }

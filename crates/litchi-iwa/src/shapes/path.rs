@@ -3,7 +3,7 @@
 use prost::Message;
 
 use litchi_iwa_common::shape::path::{
-    CornerRadius, InnerRadiusRatio, Kind as ShapePathKind, PolygonSides, Preset, StarPoints,
+    CornerRadius, InnerRadiusRatio, PolygonSides, Preset, StarPoints,
 };
 
 use super::geometry::DrawableSize;
@@ -28,6 +28,32 @@ const NATIVE_ARROW_SHAFT_RATIO: f32 = 0.34;
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const SHAPE_INFO_SHAPE_FIELD: u32 = 1;
 const SHAPE_ARCHIVE_PATH_SOURCE_FIELD: u32 = 3;
+
+/// Structural path family used by an ordinary iWork shape.
+///
+/// Native preset families are distinguished from arbitrary paths so typed
+/// source-built shapes can round-trip without relying on localized names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ShapePathKind {
+    /// Native two-point straight line.
+    Line,
+    Rectangle,
+    RoundedRectangle,
+    Ellipse,
+    RegularPolygon,
+    Chevron,
+    LeftArrow,
+    RightArrow,
+    DoubleArrow,
+    Star,
+    Plus,
+    BezierPath,
+    PointPath,
+    ScalarPath,
+    Callout,
+    ConnectionLine,
+    EditableBezierPath,
+}
 
 pub(crate) fn shape_path_kind(shape: &tswp::ShapeInfoArchive) -> Result<ShapePathKind> {
     let path = shape.super_.pathsource.as_ref().ok_or_else(|| {

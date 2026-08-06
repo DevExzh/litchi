@@ -157,11 +157,11 @@ pub(crate) fn transform_length_delimited_field<F>(
 where
     F: FnOnce(&[u8]) -> Result<Vec<u8>>,
 {
-    Ok(common_wire::transform_length_delimited_field(
+    common_wire::transform_length_delimited_field(
         data,
         field_number,
         transform,
-    )?)
+    )
 }
 
 pub(crate) fn append_repeated_length_delimited_field(
@@ -250,11 +250,11 @@ pub(crate) fn transform_repeated_length_delimited_fields<F>(
 where
     F: FnMut(&[u8]) -> Result<Vec<u8>>,
 {
-    Ok(common_wire::transform_repeated_length_delimited_fields(
+    common_wire::transform_repeated_length_delimited_fields(
         data,
         field_number,
         transform,
-    )?)
+    )
 }
 
 pub(crate) fn transform_length_delimited_fields_at_path<F>(
@@ -265,9 +265,7 @@ pub(crate) fn transform_length_delimited_fields_at_path<F>(
 where
     F: FnMut(&[u8]) -> Result<Vec<u8>>,
 {
-    Ok(common_wire::transform_length_delimited_fields_at_path(
-        data, path, transform,
-    )?)
+    common_wire::transform_length_delimited_fields_at_path(data, path, transform)
 }
 
 pub(crate) fn remove_repeated_length_delimited_field_where<F>(
@@ -278,9 +276,9 @@ pub(crate) fn remove_repeated_length_delimited_field_where<F>(
 where
     F: FnMut(&[u8]) -> Result<bool>,
 {
-    Ok(common_wire::remove_repeated_length_delimited_field_where(
+    common_wire::remove_repeated_length_delimited_field_where(
         data,
         field_number,
         remove,
-    )?)
+    )
 }
