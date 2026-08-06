@@ -29,8 +29,7 @@ use super::date_time::{
 };
 use super::date_time_field::{TextDateTimeField, TextDateTimeFieldId};
 use super::drop_cap::{
-    ParagraphDropCap, ParagraphDropCapPlacement, ParagraphStart, paragraph_drop_cap,
-    paragraph_drop_caps, remove_paragraph_drop_cap, set_paragraph_drop_cap,
+    paragraph_drop_cap, paragraph_drop_caps, remove_paragraph_drop_cap, set_paragraph_drop_cap,
 };
 use super::font::TextFont;
 use super::highlight::{
@@ -125,6 +124,7 @@ use super::text_comment_types::{
     TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
     TextCommentReplyId,
 };
+use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
 use litchi_iwa_text::date_time::{DisplayText, Settings};
 use litchi_iwa_text::position::{TextPosition, TextRange};
 use litchi_iwa_text::storage::Storage;
@@ -2137,32 +2137,32 @@ impl IWorkTextEditor {
         Ok(changed)
     }
 
-    /// List plain-text Drop Caps in paragraph-start order.
-    pub fn paragraph_drop_caps(&self, object_id: u64) -> Result<Vec<ParagraphDropCapPlacement>> {
+    /// List plain-text drop caps in paragraph order.
+    pub fn paragraph_drop_caps(&self, object_id: u64) -> Result<Vec<Placement>> {
         paragraph_drop_caps(&self.package, object_id)
     }
 
-    /// Read the Drop Cap attached to one typed paragraph start.
+    /// Read the drop cap attached to one typed paragraph position.
     pub fn paragraph_drop_cap(
         &self,
         object_id: u64,
-        paragraph_start: ParagraphStart,
-    ) -> Result<Option<ParagraphDropCap>> {
-        paragraph_drop_cap(&self.package, object_id, paragraph_start)
+        paragraph: TextPosition,
+    ) -> Result<Option<DropCap>> {
+        paragraph_drop_cap(&self.package, object_id, paragraph)
     }
 
     /// Atomically create or replace a plain-text Drop Cap.
     pub fn set_paragraph_drop_cap(
         &mut self,
         object_id: u64,
-        paragraph_start: ParagraphStart,
-        drop_cap: ParagraphDropCap,
+        paragraph: TextPosition,
+        drop_cap: DropCap,
     ) -> Result<()> {
         let mut staged = self.package.clone();
-        set_paragraph_drop_cap(&mut staged, object_id, paragraph_start, drop_cap)?;
+        set_paragraph_drop_cap(&mut staged, object_id, paragraph, drop_cap)?;
         let bytes = staged.to_bytes()?;
         let verified = IWorkPackage::from_bytes(&bytes)?;
-        if paragraph_drop_cap(&verified, object_id, paragraph_start)? != Some(drop_cap) {
+        if paragraph_drop_cap(&verified, object_id, paragraph)? != Some(drop_cap) {
             return Err(Error::InvalidFormat(
                 "iWork Drop Cap update failed round-trip validation".to_owned(),
             ));
@@ -2171,18 +2171,18 @@ impl IWorkTextEditor {
         Ok(())
     }
 
-    /// Atomically remove a Drop Cap while retaining its paragraph boundary.
+    /// Atomically remove a drop cap while retaining its paragraph boundary.
     pub fn remove_paragraph_drop_cap(
         &mut self,
         object_id: u64,
-        paragraph_start: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
-        let changed = remove_paragraph_drop_cap(&mut staged, object_id, paragraph_start)?;
+        let changed = remove_paragraph_drop_cap(&mut staged, object_id, paragraph)?;
         if changed {
             let bytes = staged.to_bytes()?;
             let verified = IWorkPackage::from_bytes(&bytes)?;
-            if paragraph_drop_cap(&verified, object_id, paragraph_start)?.is_some() {
+            if paragraph_drop_cap(&verified, object_id, paragraph)?.is_some() {
                 return Err(Error::InvalidFormat(
                     "iWork Drop Cap removal failed round-trip validation".to_owned(),
                 ));

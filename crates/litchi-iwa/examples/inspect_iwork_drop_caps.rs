@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!(
                 "storage={} paragraph_utf16={} {:?}",
                 storage.object_id,
-                placement.paragraph_start.utf16_index(),
+                placement.paragraph.utf16_index(),
                 placement.drop_cap
             );
         }

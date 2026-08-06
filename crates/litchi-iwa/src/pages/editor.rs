@@ -7,6 +7,9 @@ use std::path::Path;
 use litchi_iwa_common::comment::{
     DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId,
 };
+use litchi_iwa_text::columns::Columns;
+use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
+use litchi_iwa_text::position::TextPosition;
 use litchi_pages::document_options::Options as DocumentOptions;
 use litchi_pages::footnote::{
     Format as FootnoteFormat, Gap as FootnoteGap, Kind as FootnoteKind,
@@ -14,7 +17,6 @@ use litchi_pages::footnote::{
 };
 use litchi_pages::page_layout::{Layout as PageLayout, Orientation as PageOrientation};
 use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Settings, Start};
-use litchi_iwa_text::columns::Columns;
 use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
@@ -40,18 +42,17 @@ use crate::shapes::{
 use crate::text::layout::Layout;
 use crate::text::{
     AppliedParagraphStyle, IWorkTextEditor, NamedParagraphStyle, ParagraphBackground,
-    ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
-    ParagraphDropCapPlacement, ParagraphFlow, ParagraphFollowingStyle, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
-    ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLevel,
-    ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberScale,
-    ParagraphListNumberTiering, ParagraphListNumbering, ParagraphSpacing, ParagraphStart,
-    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextComment, TextCommentBody,
-    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
-    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
+    ParagraphFollowingStyle, ParagraphIndents, ParagraphLineSpacing, ParagraphList,
+    ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
+    ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
+    ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
+    ParagraphListNumbering, ParagraphSpacing, ParagraphTabStops, ParagraphWritingDirection,
+    TextAlignment, TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
+    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
+    TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
+    TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
+    TextOutline, TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -2078,10 +2079,7 @@ impl PagesEditor {
     }
 
     /// List every Drop Cap in an ordinary text box.
-    pub fn text_box_paragraph_drop_caps(
-        &self,
-        drawable_object_id: u64,
-    ) -> Result<Vec<ParagraphDropCapPlacement>> {
+    pub fn text_box_paragraph_drop_caps(&self, drawable_object_id: u64) -> Result<Vec<Placement>> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.paragraph_drop_caps(graph.storage_id)
     }
@@ -2090,27 +2088,24 @@ impl PagesEditor {
     pub fn text_box_paragraph_drop_cap(
         &self,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
-    ) -> Result<Option<ParagraphDropCap>> {
+        paragraph: TextPosition,
+    ) -> Result<Option<DropCap>> {
         let graph = self.text_box_graph(drawable_object_id)?;
-        self.text
-            .paragraph_drop_cap(graph.storage_id, paragraph_start)
+        self.text.paragraph_drop_cap(graph.storage_id, paragraph)
     }
 
     /// Atomically create or replace a text-box Drop Cap.
     pub fn set_text_box_paragraph_drop_cap(
         &mut self,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
-        drop_cap: ParagraphDropCap,
+        paragraph: TextPosition,
+        drop_cap: DropCap,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
-        staged.set_paragraph_drop_cap(graph.storage_id, paragraph_start, drop_cap)?;
+        staged.set_paragraph_drop_cap(graph.storage_id, paragraph, drop_cap)?;
         let verified = Self::from_package(staged.package().clone())?;
-        if verified.text_box_paragraph_drop_cap(drawable_object_id, paragraph_start)?
-            != Some(drop_cap)
-        {
+        if verified.text_box_paragraph_drop_cap(drawable_object_id, paragraph)? != Some(drop_cap) {
             return Err(Error::InvalidFormat(
                 "Pages text-box Drop Cap update failed validation".to_owned(),
             ));
@@ -2123,11 +2118,11 @@ impl PagesEditor {
     pub fn remove_text_box_paragraph_drop_cap(
         &mut self,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
-        let changed = staged.remove_paragraph_drop_cap(graph.storage_id, paragraph_start)?;
+        let changed = staged.remove_paragraph_drop_cap(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

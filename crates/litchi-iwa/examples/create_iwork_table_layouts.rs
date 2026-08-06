@@ -14,13 +14,14 @@ use litchi_iwa::text::{
     ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
     ParagraphListNumberPunctuation, ParagraphListNumberScale, ParagraphListNumberSequence,
     ParagraphListNumberTiering, ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart,
-    ParagraphListTextGap, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
-    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize,
-    TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphListTextGap, ParagraphSpacing, ParagraphSpacingPoints, ParagraphTabAlignment,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, TextAlignment,
+    TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
+    TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough,
+    TextStyle, TextUnderline,
 };
 use litchi_iwa_common::table::cell::layout::{Inset, Insets, Layout, TextWrap, VerticalAlignment};
+use litchi_iwa_text::position::TextPosition;
 use litchi_numbers::cell::Value as CellValue;
 
 const ROW: usize = 1;
@@ -565,35 +566,32 @@ fn layout(alignment: VerticalAlignment) -> Result<Layout, litchi_iwa::Error> {
 
 fn mixed_paragraph_lists() -> Result<Vec<ParagraphListPlacement>, litchi_iwa::Error> {
     Ok(vec![
-        ParagraphListPlacement::new(ParagraphStart::ZERO, ParagraphList::None),
-        ParagraphListPlacement::new(ParagraphStart::from_utf16_index(13)?, ParagraphList::Bullet),
-        ParagraphListPlacement::new(
-            ParagraphStart::from_utf16_index(32)?,
-            ParagraphList::Numbered,
-        ),
+        ParagraphListPlacement::new(TextPosition::ZERO, ParagraphList::None),
+        ParagraphListPlacement::new(TextPosition::from_utf16_index(13)?, ParagraphList::Bullet),
+        ParagraphListPlacement::new(TextPosition::from_utf16_index(32)?, ParagraphList::Numbered),
     ])
 }
 
 fn nested_paragraph_levels() -> Result<Vec<ParagraphListLevelPlacement>, litchi_iwa::Error> {
     Ok(vec![
-        ParagraphListLevelPlacement::new(ParagraphStart::ZERO, ParagraphListLevel::ZERO),
+        ParagraphListLevelPlacement::new(TextPosition::ZERO, ParagraphListLevel::ZERO),
         ParagraphListLevelPlacement::new(
-            ParagraphStart::from_utf16_index(13)?,
+            TextPosition::from_utf16_index(13)?,
             ParagraphListLevel::ONE,
         ),
         ParagraphListLevelPlacement::new(
-            ParagraphStart::from_utf16_index(32)?,
+            TextPosition::from_utf16_index(32)?,
             ParagraphListLevel::ZERO,
         ),
     ])
 }
 
-fn numbered_paragraph_start() -> Result<ParagraphStart, litchi_iwa::Error> {
-    ParagraphStart::from_utf16_index(32)
+fn numbered_paragraph_start() -> Result<TextPosition, litchi_iwa::Error> {
+    TextPosition::from_utf16_index(32)
 }
 
-fn bullet_paragraph_start() -> Result<ParagraphStart, litchi_iwa::Error> {
-    ParagraphStart::from_utf16_index(13)
+fn bullet_paragraph_start() -> Result<TextPosition, litchi_iwa::Error> {
+    TextPosition::from_utf16_index(13)
 }
 
 fn custom_bullet() -> Result<ParagraphListBullet, litchi_iwa::Error> {
@@ -963,7 +961,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         COLUMN,
-        ParagraphStart::from_utf16_index(13)?,
+        TextPosition::from_utf16_index(13)?,
         ParagraphListLevel::ONE,
     )?;
     editor.set_table_cell_paragraph_list_numbering(
@@ -1076,7 +1074,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         COLUMN,
-        ParagraphStart::from_utf16_index(13)?,
+        TextPosition::from_utf16_index(13)?,
         ParagraphListLevel::ONE,
     )?;
     editor.set_table_cell_paragraph_list_numbering(
@@ -1299,7 +1297,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         COLUMN,
-        ParagraphStart::from_utf16_index(13)?,
+        TextPosition::from_utf16_index(13)?,
         ParagraphListLevel::ONE,
     )?;
     editor.set_slide_table_cell_paragraph_list_numbering(

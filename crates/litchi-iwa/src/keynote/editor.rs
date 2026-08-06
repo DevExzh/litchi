@@ -9,6 +9,8 @@ use litchi_iwa_common::comment::{
     DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId,
 };
 use litchi_iwa_text::columns::Columns;
+use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
+use litchi_iwa_text::position::TextPosition;
 use prost::Message;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
@@ -32,17 +34,16 @@ use crate::shapes::{
 use crate::text::layout::Layout;
 use crate::text::{
     IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,
-    ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphFlow,
-    ParagraphIndents, ParagraphLineSpacing, ParagraphList, ParagraphListBullet,
-    ParagraphListBulletGeometry, ParagraphListIndentation, ParagraphListLabelColor,
-    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
-    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering, ParagraphSpacing,
-    ParagraphStart, ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextComment, TextCommentBody,
-    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
-    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    ParagraphDefaultTabInterval, ParagraphFlow, ParagraphIndents, ParagraphLineSpacing,
+    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
+    ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
+    ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
+    ParagraphListNumbering, ParagraphSpacing, ParagraphTabStops, ParagraphWritingDirection,
+    TextAlignment, TextBackground, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
+    TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
+    TextCommentReplyId, TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink,
+    TextHyperlinkId, TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures,
+    TextOutline, TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -3737,7 +3738,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<Vec<ParagraphDropCapPlacement>> {
+    ) -> Result<Vec<Placement>> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_drop_caps(graph.storage_id)
     }
@@ -3747,11 +3748,10 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
-    ) -> Result<Option<ParagraphDropCap>> {
+        paragraph: TextPosition,
+    ) -> Result<Option<DropCap>> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
-        self.text
-            .paragraph_drop_cap(graph.storage_id, paragraph_start)
+        self.text.paragraph_drop_cap(graph.storage_id, paragraph)
     }
 
     /// Atomically create or replace a text-box Drop Cap.
@@ -3759,18 +3759,15 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
-        drop_cap: ParagraphDropCap,
+        paragraph: TextPosition,
+        drop_cap: DropCap,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
-        staged.set_paragraph_drop_cap(graph.storage_id, paragraph_start, drop_cap)?;
+        staged.set_paragraph_drop_cap(graph.storage_id, paragraph, drop_cap)?;
         let verified = Self::from_package(staged.package().clone())?;
-        if verified.slide_text_box_paragraph_drop_cap(
-            slide_index,
-            drawable_object_id,
-            paragraph_start,
-        )? != Some(drop_cap)
+        if verified.slide_text_box_paragraph_drop_cap(slide_index, drawable_object_id, paragraph)?
+            != Some(drop_cap)
         {
             return Err(Error::InvalidFormat(
                 "Keynote text-box Drop Cap update failed validation".to_owned(),
@@ -3785,11 +3782,11 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
-        let changed = staged.remove_paragraph_drop_cap(graph.storage_id, paragraph_start)?;
+        let changed = staged.remove_paragraph_drop_cap(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }

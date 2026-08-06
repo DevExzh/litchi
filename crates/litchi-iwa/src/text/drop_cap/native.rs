@@ -7,11 +7,11 @@ use crate::protobuf::{tsp, tss, tswp};
 use crate::wire::{parse_wire_fields, repeated_length_delimited_payloads};
 use crate::{Error, IWorkPackage, IWorkThemeArchive, Result};
 
-use super::types::{
-    DropCapCharacterCount, DropCapCharacterScale, DropCapCornerRadius, DropCapLineCount,
-    DropCapOutdent, DropCapPadding, DropCapRaisedLines, DropCapWrap, ParagraphDropCap,
-};
 use crate::text::style_registry::{object_archive, object_archive_name};
+use litchi_iwa_text::paragraph::drop_cap::{
+    CharacterCount, CharacterScale, CornerRadius, DropCap, LineCount, Outdent, Padding,
+    RaisedLines, Wrap,
+};
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const DROP_CAP_STYLE_MESSAGE_TYPE: u32 = 10_024;
@@ -80,10 +80,7 @@ pub(super) fn locate_style(package: &IWorkPackage, style_id: u64) -> Result<Drop
     })
 }
 
-pub(super) fn plain_text_model(
-    style_id: u64,
-    location: &DropCapStyleLocation,
-) -> Result<ParagraphDropCap> {
+pub(super) fn plain_text_model(style_id: u64, location: &DropCapStyleLocation) -> Result<DropCap> {
     let style = &location.style;
     let properties = style.drop_cap_properties.as_ref().ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -167,7 +164,7 @@ pub(super) fn variation_object(
     identifier: u64,
     parent_style_id: u64,
     stylesheet_id: u64,
-    drop_cap: ParagraphDropCap,
+    drop_cap: DropCap,
 ) -> Result<ArchiveObject> {
     let data = tswp::DropCapStyleArchive {
         super_: tss::StyleArchive {
@@ -340,7 +337,26 @@ pub(super) fn stylesheet_id(style: &tswp::DropCapStyleArchive, style_id: u64) ->
         })
 }
 
-fn model_from_archive(model: &tswp::DropCapArchive) -> Result<ParagraphDropCap> {
+fn native_wrap_value(wrap: Wrap) -> i32 {
+    match wrap {
+        Wrap::Rectangular => 0,
+        Wrap::Contour => 1,
+        Wrap::None => 2,
+    }
+}
+
+fn wrap_from_native(value: i32) -> Result<Wrap> {
+    match value {
+        0 => Ok(Wrap::Rectangular),
+        1 => Ok(Wrap::Contour),
+        2 => Ok(Wrap::None),
+        _ => Err(Error::InvalidFormat(format!(
+            "unsupported native iWork Drop Cap wrap type {value}"
+        ))),
+    }
+}
+
+fn model_from_archive(model: &tswp::DropCapArchive) -> Result<DropCap> {
     if model.r#type != Some(TEXT_DROP_CAP_TYPE)
         || model.shape_enabled != Some(false)
         || model.deprecated_outdent.is_some()
@@ -359,35 +375,29 @@ fn model_from_archive(model: &tswp::DropCapArchive) -> Result<ParagraphDropCap> 
         .map_err(|_| {
         Error::InvalidFormat("native iWork Drop Cap raised-line count exceeds u8".to_owned())
     })?;
-    Ok(ParagraphDropCap {
-        lines: DropCapLineCount::new(lines)?,
-        characters: DropCapCharacterCount::new(required(
-            model.number_of_characters,
-            "character count",
-        )?)?,
-        raised_lines: DropCapRaisedLines::new(raised_lines)?,
-        wrap: DropCapWrap::from_native_value(required(model.wrap_type, "wrap type")?)?,
-        padding: DropCapPadding::from_points(required(model.padding, "padding")?)?,
-        outdent: DropCapOutdent::from_ratio(required(model.outdent, "outdent")?)?,
-        corner_radius: DropCapCornerRadius::from_ratio(required(
-            model.corner_radius,
-            "corner radius",
-        )?)?,
-        character_scale: DropCapCharacterScale::from_ratio(required(
+    Ok(DropCap {
+        lines: LineCount::new(lines)?,
+        characters: CharacterCount::new(required(model.number_of_characters, "character count")?)?,
+        raised_lines: RaisedLines::new(raised_lines)?,
+        wrap: wrap_from_native(required(model.wrap_type, "wrap type")?)?,
+        padding: Padding::from_points(required(model.padding, "padding")?)?,
+        outdent: Outdent::from_ratio(required(model.outdent, "outdent")?)?,
+        corner_radius: CornerRadius::from_ratio(required(model.corner_radius, "corner radius")?)?,
+        character_scale: CharacterScale::from_ratio(required(
             model.character_scale,
             "character scale",
         )?)?,
     })
 }
 
-fn model_archive(drop_cap: ParagraphDropCap) -> tswp::DropCapArchive {
+fn model_archive(drop_cap: DropCap) -> tswp::DropCapArchive {
     tswp::DropCapArchive {
         r#type: Some(TEXT_DROP_CAP_TYPE),
         number_of_lines: Some(u32::from(drop_cap.lines.get())),
         number_of_raised_lines: Some(u32::from(drop_cap.raised_lines.get())),
         outdent: Some(drop_cap.outdent.ratio()),
         padding: Some(drop_cap.padding.points()),
-        wrap_type: Some(drop_cap.wrap.native_value()),
+        wrap_type: Some(native_wrap_value(drop_cap.wrap)),
         shape_enabled: Some(false),
         corner_radius: Some(drop_cap.corner_radius.ratio()),
         character_scale: Some(drop_cap.character_scale.ratio()),
@@ -481,14 +491,11 @@ mod tests {
 
     #[test]
     fn canonical_plain_text_model_round_trips() {
-        let expected = ParagraphDropCap::new(
-            DropCapLineCount::new(4).unwrap(),
-            DropCapCharacterCount::new(2).unwrap(),
-        )
-        .with_raised_lines(DropCapRaisedLines::new(1).unwrap())
-        .with_wrap(DropCapWrap::Contour)
-        .with_padding(DropCapPadding::from_points(6.0).unwrap())
-        .with_outdent(DropCapOutdent::from_ratio(0.25).unwrap());
+        let expected = DropCap::new(LineCount::new(4).unwrap(), CharacterCount::new(2).unwrap())
+            .with_raised_lines(RaisedLines::new(1).unwrap())
+            .with_wrap(Wrap::Contour)
+            .with_padding(Padding::from_points(6.0).unwrap())
+            .with_outdent(Outdent::from_ratio(0.25).unwrap());
         let object = variation_object(9, 7, 3, expected).unwrap();
         let message = object.messages[0].clone();
         let location = DropCapStyleLocation {
@@ -504,14 +511,10 @@ mod tests {
 
     #[test]
     fn style_replacement_uses_exact_message_anchor_with_sibling_payload() {
-        let original_model = ParagraphDropCap::new(
-            DropCapLineCount::new(3).unwrap(),
-            DropCapCharacterCount::new(1).unwrap(),
-        );
-        let replacement_model = ParagraphDropCap::new(
-            DropCapLineCount::new(5).unwrap(),
-            DropCapCharacterCount::new(2).unwrap(),
-        );
+        let original_model =
+            DropCap::new(LineCount::new(3).unwrap(), CharacterCount::new(1).unwrap());
+        let replacement_model =
+            DropCap::new(LineCount::new(5).unwrap(), CharacterCount::new(2).unwrap());
         let original = variation_object(9, 7, 3, original_model).unwrap();
         let original_message = original.messages[0].clone();
         let sibling = tswp::ParagraphStyleArchive::default().encode_to_vec();
@@ -574,11 +577,11 @@ mod tests {
 
     #[test]
     fn shaped_and_noncanonical_models_are_rejected() {
-        let mut shaped = model_archive(ParagraphDropCap::default());
+        let mut shaped = model_archive(DropCap::default());
         shaped.shape_enabled = Some(true);
         assert!(model_from_archive(&shaped).is_err());
 
-        let mut missing_scale = model_archive(ParagraphDropCap::default());
+        let mut missing_scale = model_archive(DropCap::default());
         missing_scale.character_scale = None;
         assert!(model_from_archive(&missing_scale).is_err());
     }

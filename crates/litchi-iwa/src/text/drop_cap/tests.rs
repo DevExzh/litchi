@@ -4,15 +4,17 @@ use crate::numbers::NumbersDocumentBuilder;
 use crate::pages::PagesEditor;
 use crate::protobuf::tswp;
 use crate::shapes::{DrawablePoint, DrawableSize};
-use crate::text::{IWorkTextEditor, ParagraphDropCapPlacement};
+use crate::text::IWorkTextEditor;
+use litchi_iwa_text::paragraph::drop_cap::{
+    CharacterCount, DropCap, LineCount, Outdent, Padding, Placement, RaisedLines, Wrap,
+};
+use litchi_iwa_text::position::TextPosition;
 use prost::Message;
 
-use super::*;
-
-fn model(lines: u8, characters: u32) -> ParagraphDropCap {
-    ParagraphDropCap::new(
-        DropCapLineCount::new(lines).unwrap(),
-        DropCapCharacterCount::new(characters).unwrap(),
+fn model(lines: u8, characters: u32) -> DropCap {
+    DropCap::new(
+        LineCount::new(lines).unwrap(),
+        CharacterCount::new(characters).unwrap(),
     )
 }
 
@@ -34,13 +36,13 @@ fn scratch_pages_supports_multi_paragraph_drop_cap_crud() {
         .add_text_box(4, "😀 Alpha\nBeta paragraph", position, size)
         .unwrap();
     let first = model(4, 2)
-        .with_wrap(DropCapWrap::Contour)
-        .with_padding(DropCapPadding::from_points(6.0).unwrap());
-    let second_start = ParagraphStart::from_utf16_index(9).unwrap();
-    let second = model(5, 1).with_raised_lines(DropCapRaisedLines::new(2).unwrap());
+        .with_wrap(Wrap::Contour)
+        .with_padding(Padding::from_points(6.0).unwrap());
+    let second_start = TextPosition::from_utf16_index(9).unwrap();
+    let second = model(5, 1).with_raised_lines(RaisedLines::new(2).unwrap());
 
     editor
-        .set_text_box_paragraph_drop_cap(created.drawable_object_id, ParagraphStart::ZERO, first)
+        .set_text_box_paragraph_drop_cap(created.drawable_object_id, TextPosition::ZERO, first)
         .unwrap();
     editor
         .set_text_box_paragraph_drop_cap(created.drawable_object_id, second_start, second)
@@ -50,18 +52,18 @@ fn scratch_pages_supports_multi_paragraph_drop_cap_crud() {
             .text_box_paragraph_drop_caps(created.drawable_object_id)
             .unwrap(),
         vec![
-            ParagraphDropCapPlacement {
-                paragraph_start: ParagraphStart::ZERO,
+            Placement {
+                paragraph: TextPosition::ZERO,
                 drop_cap: first,
             },
-            ParagraphDropCapPlacement {
-                paragraph_start: second_start,
+            Placement {
+                paragraph: second_start,
                 drop_cap: second,
             },
         ]
     );
 
-    let updated = second.with_outdent(DropCapOutdent::from_ratio(0.25).unwrap());
+    let updated = second.with_outdent(Outdent::from_ratio(0.25).unwrap());
     editor
         .set_text_box_paragraph_drop_cap(created.drawable_object_id, second_start, updated)
         .unwrap();
@@ -75,12 +77,12 @@ fn scratch_pages_supports_multi_paragraph_drop_cap_crud() {
 
     assert!(
         editor
-            .remove_text_box_paragraph_drop_cap(created.drawable_object_id, ParagraphStart::ZERO,)
+            .remove_text_box_paragraph_drop_cap(created.drawable_object_id, TextPosition::ZERO,)
             .unwrap()
     );
     assert!(
         !editor
-            .remove_text_box_paragraph_drop_cap(created.drawable_object_id, ParagraphStart::ZERO,)
+            .remove_text_box_paragraph_drop_cap(created.drawable_object_id, TextPosition::ZERO,)
             .unwrap()
     );
 }
@@ -89,10 +91,10 @@ fn scratch_pages_supports_multi_paragraph_drop_cap_crud() {
 fn scratch_numbers_and_keynote_support_drop_cap_crud() {
     let (position, size) = text_box_geometry();
     let expected = model(6, 2)
-        .with_raised_lines(DropCapRaisedLines::new(3).unwrap())
-        .with_wrap(DropCapWrap::Contour)
-        .with_padding(DropCapPadding::from_points(8.0).unwrap())
-        .with_outdent(DropCapOutdent::from_ratio(0.4).unwrap());
+        .with_raised_lines(RaisedLines::new(3).unwrap())
+        .with_wrap(Wrap::Contour)
+        .with_padding(Padding::from_points(8.0).unwrap())
+        .with_outdent(Outdent::from_ratio(0.4).unwrap());
 
     let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
@@ -103,7 +105,7 @@ fn scratch_numbers_and_keynote_support_drop_cap_crud() {
         .set_sheet_text_box_paragraph_drop_cap(
             sheet_id,
             numbers_box.drawable_object_id,
-            ParagraphStart::ZERO,
+            TextPosition::ZERO,
             expected,
         )
         .unwrap();
@@ -113,7 +115,7 @@ fn scratch_numbers_and_keynote_support_drop_cap_crud() {
             .sheet_text_box_paragraph_drop_cap(
                 sheet_id,
                 numbers_box.drawable_object_id,
-                ParagraphStart::ZERO,
+                TextPosition::ZERO,
             )
             .unwrap(),
         Some(expected)
@@ -127,7 +129,7 @@ fn scratch_numbers_and_keynote_support_drop_cap_crud() {
         .set_slide_text_box_paragraph_drop_cap(
             0,
             keynote_box.drawable_object_id,
-            ParagraphStart::ZERO,
+            TextPosition::ZERO,
             expected,
         )
         .unwrap();
@@ -136,7 +138,7 @@ fn scratch_numbers_and_keynote_support_drop_cap_crud() {
             .remove_slide_text_box_paragraph_drop_cap(
                 0,
                 keynote_box.drawable_object_id,
-                ParagraphStart::ZERO,
+                TextPosition::ZERO,
             )
             .unwrap()
     );
@@ -151,10 +153,10 @@ fn scratch_numbers_and_keynote_support_drop_cap_crud() {
 #[test]
 fn shared_numbers_style_uses_copy_on_write() {
     let (position, size) = text_box_geometry();
-    let original = model(4, 1).with_padding(DropCapPadding::from_points(3.0).unwrap());
+    let original = model(4, 1).with_padding(Padding::from_points(3.0).unwrap());
     let updated = model(7, 2)
-        .with_wrap(DropCapWrap::Contour)
-        .with_outdent(DropCapOutdent::from_ratio(0.3).unwrap());
+        .with_wrap(Wrap::Contour)
+        .with_outdent(Outdent::from_ratio(0.3).unwrap());
     let mut editor = NumbersDocumentBuilder::new().build().unwrap();
     let sheet_id = editor.sheets().unwrap()[0].object_id;
     let source = editor
@@ -164,7 +166,7 @@ fn shared_numbers_style_uses_copy_on_write() {
         .set_sheet_text_box_paragraph_drop_cap(
             sheet_id,
             source.drawable_object_id,
-            ParagraphStart::ZERO,
+            TextPosition::ZERO,
             original,
         )
         .unwrap();
@@ -176,7 +178,7 @@ fn shared_numbers_style_uses_copy_on_write() {
             .sheet_text_box_paragraph_drop_cap(
                 sheet_id,
                 duplicate.drawable_object_id,
-                ParagraphStart::ZERO,
+                TextPosition::ZERO,
             )
             .unwrap(),
         Some(original)
@@ -186,7 +188,7 @@ fn shared_numbers_style_uses_copy_on_write() {
         .set_sheet_text_box_paragraph_drop_cap(
             sheet_id,
             duplicate.drawable_object_id,
-            ParagraphStart::ZERO,
+            TextPosition::ZERO,
             updated,
         )
         .unwrap();
@@ -195,7 +197,7 @@ fn shared_numbers_style_uses_copy_on_write() {
             .sheet_text_box_paragraph_drop_cap(
                 sheet_id,
                 source.drawable_object_id,
-                ParagraphStart::ZERO,
+                TextPosition::ZERO,
             )
             .unwrap(),
         Some(original)
@@ -205,7 +207,7 @@ fn shared_numbers_style_uses_copy_on_write() {
             .sheet_text_box_paragraph_drop_cap(
                 sheet_id,
                 duplicate.drawable_object_id,
-                ParagraphStart::ZERO,
+                TextPosition::ZERO,
             )
             .unwrap(),
         Some(updated)
@@ -215,7 +217,7 @@ fn shared_numbers_style_uses_copy_on_write() {
         .remove_sheet_text_box_paragraph_drop_cap(
             sheet_id,
             duplicate.drawable_object_id,
-            ParagraphStart::ZERO,
+            TextPosition::ZERO,
         )
         .unwrap();
     let reopened = crate::numbers::NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -224,7 +226,7 @@ fn shared_numbers_style_uses_copy_on_write() {
             .sheet_text_box_paragraph_drop_cap(
                 sheet_id,
                 source.drawable_object_id,
-                ParagraphStart::ZERO,
+                TextPosition::ZERO,
             )
             .unwrap(),
         Some(original)
@@ -234,7 +236,7 @@ fn shared_numbers_style_uses_copy_on_write() {
             .sheet_text_box_paragraph_drop_cap(
                 sheet_id,
                 duplicate.drawable_object_id,
-                ParagraphStart::ZERO,
+                TextPosition::ZERO,
             )
             .unwrap(),
         None
@@ -242,14 +244,14 @@ fn shared_numbers_style_uses_copy_on_write() {
 }
 
 #[test]
-fn invalid_paragraph_start_is_transactional() {
+fn invalid_paragraph_is_transactional() {
     let mut editor = PagesEditor::create_with_text("Body").unwrap();
     let (position, size) = text_box_geometry();
     let created = editor
         .add_text_box(4, "Not a boundary", position, size)
         .unwrap();
     let before = editor.to_bytes().unwrap();
-    let invalid = ParagraphStart::from_utf16_index(1).unwrap();
+    let invalid = TextPosition::from_utf16_index(1).unwrap();
     assert!(
         editor
             .set_text_box_paragraph_drop_cap(created.drawable_object_id, invalid, model(3, 1))
@@ -275,9 +277,9 @@ fn create_remove_restores_storage_object_exactly() {
     let before_messages = before.messages.clone();
 
     let mut text = IWorkTextEditor::from_package(pages.package().clone());
-    text.set_paragraph_drop_cap(storage_id, ParagraphStart::ZERO, model(3, 1))
+    text.set_paragraph_drop_cap(storage_id, TextPosition::ZERO, model(3, 1))
         .unwrap();
-    text.remove_paragraph_drop_cap(storage_id, ParagraphStart::ZERO)
+    text.remove_paragraph_drop_cap(storage_id, TextPosition::ZERO)
         .unwrap();
 
     let archive = text.package().archive(&archive_name).unwrap();
@@ -316,13 +318,13 @@ fn mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
 
     let mut editor = IWorkTextEditor::from_package(package);
     editor
-        .set_paragraph_drop_cap(storage_id, ParagraphStart::ZERO, model(3, 1))
+        .set_paragraph_drop_cap(storage_id, TextPosition::ZERO, model(3, 1))
         .unwrap();
     editor
-        .set_paragraph_drop_cap(storage_id, ParagraphStart::ZERO, model(4, 2))
+        .set_paragraph_drop_cap(storage_id, TextPosition::ZERO, model(4, 2))
         .unwrap();
     editor
-        .remove_paragraph_drop_cap(storage_id, ParagraphStart::ZERO)
+        .remove_paragraph_drop_cap(storage_id, TextPosition::ZERO)
         .unwrap();
 
     let package = editor.into_package();

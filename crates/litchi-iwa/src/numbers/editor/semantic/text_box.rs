@@ -5,6 +5,8 @@
 use super::*;
 use crate::text::layout::Layout;
 use litchi_iwa_text::columns::Columns;
+use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
+use litchi_iwa_text::position::TextPosition;
 
 impl NumbersEditor {
     /// List ordinary text boxes owned by a reachable Numbers sheet.
@@ -2015,7 +2017,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<Vec<ParagraphDropCapPlacement>> {
+    ) -> Result<Vec<Placement>> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).paragraph_drop_caps(graph.storage_id)
     }
@@ -2025,11 +2027,11 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
-    ) -> Result<Option<ParagraphDropCap>> {
+        paragraph: TextPosition,
+    ) -> Result<Option<DropCap>> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone())
-            .paragraph_drop_cap(graph.storage_id, paragraph_start)
+            .paragraph_drop_cap(graph.storage_id, paragraph)
     }
 
     /// Atomically create or replace a text-box Drop Cap.
@@ -2037,18 +2039,15 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
-        drop_cap: ParagraphDropCap,
+        paragraph: TextPosition,
+        drop_cap: DropCap,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
-        text.set_paragraph_drop_cap(graph.storage_id, paragraph_start, drop_cap)?;
+        text.set_paragraph_drop_cap(graph.storage_id, paragraph, drop_cap)?;
         let verified = Self::from_package(text.into_package())?;
-        if verified.sheet_text_box_paragraph_drop_cap(
-            sheet_id,
-            drawable_object_id,
-            paragraph_start,
-        )? != Some(drop_cap)
+        if verified.sheet_text_box_paragraph_drop_cap(sheet_id, drawable_object_id, paragraph)?
+            != Some(drop_cap)
         {
             return Err(Error::InvalidFormat(
                 "Numbers text-box Drop Cap update failed validation".to_owned(),
@@ -2063,11 +2062,11 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
-        let changed = text.remove_paragraph_drop_cap(graph.storage_id, paragraph_start)?;
+        let changed = text.remove_paragraph_drop_cap(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }

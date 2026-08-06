@@ -20,6 +20,7 @@ use litchi_numbers::cell::data_format::{
     Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,
     Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,
 };
+use litchi_iwa_text::position::TextPosition;
 use prost::Message;
 
 use super::bnc::{BncCell, CachedScalar, StoredValue};
@@ -60,17 +61,16 @@ use litchi_iwa_common::table::cell::conditional_highlight::Rule;
 use crate::text::layout::Layout;
 use crate::text::{
     IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,
-    ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphFlow,
-    ParagraphIndents, ParagraphLineSpacing, ParagraphList, ParagraphListBullet,
-    ParagraphListBulletGeometry, ParagraphListIndentation, ParagraphListLabelColor,
-    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
-    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering,
-    ParagraphListPlacement, ParagraphSpacing, ParagraphStart, ParagraphTabStops,
+    ParagraphDefaultTabInterval, ParagraphFlow, ParagraphIndents, ParagraphLineSpacing,
+    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
+    ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
+    ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
+    ParagraphListNumbering, ParagraphListPlacement, ParagraphSpacing, ParagraphTabStops,
     ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextComment, TextCommentBody,
     TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
     TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
+    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextRange, TextScript,
     TextShadow, TextStorageInfo, TextStyle,
 };
 use litchi_iwa_common::table::lock::State as TableLockState;

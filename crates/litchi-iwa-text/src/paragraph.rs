@@ -2,6 +2,7 @@
 
 pub mod border;
 pub mod direction;
+pub mod drop_cap;
 pub mod flow;
 pub mod list;
 pub mod tabs;

@@ -67,11 +67,6 @@ pub use bookmark_types::{
     TextBookmark, TextBookmarkId, TextBookmarkName, TextBookmarkSettings, TextBookmarkVisibility,
 };
 pub use date_time_field::{TextDateTimeField, TextDateTimeFieldId};
-pub use drop_cap::{
-    DropCapCharacterCount, DropCapCharacterScale, DropCapCornerRadius, DropCapLineCount,
-    DropCapOutdent, DropCapPadding, DropCapRaisedLines, DropCapWrap, ParagraphDropCap,
-    ParagraphDropCapPlacement, ParagraphStart,
-};
 pub use editor::{IWorkTextEditor, TextStorageInfo};
 pub use font::{Font, Name, NameError, TextFont, TextFontName};
 pub use highlight_types::{TextHighlight, TextHighlightId};
@@ -164,6 +159,12 @@ impl From<litchi_iwa_text::position::Error> for crate::Error {
 
 impl From<litchi_iwa_text::paragraph::list::Error> for crate::Error {
     fn from(error: litchi_iwa_text::paragraph::list::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_text::paragraph::drop_cap::Error> for crate::Error {
+    fn from(error: litchi_iwa_text::paragraph::drop_cap::Error) -> Self {
         Self::InvalidFormat(error.to_string())
     }
 }

@@ -6,21 +6,23 @@ use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Width};
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 use litchi_iwa::text::{
-    DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
-    DropCapWrap, ParagraphBackground, ParagraphBorder, ParagraphBorders,
-    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphFlow,
-    ParagraphFollowingStyle, ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphList, ParagraphListLevel,
-    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphStyleName,
-    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextCommentBody, TextCommentReplyBody,
-    TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage, TextLigatures, TextOutline,
-    TextPointSize, TextPosition, TextRange, TextScript, TextShadow, TextStrikethrough, TextStyle,
-    TextUnderline,
+    ParagraphBackground, ParagraphBorder, ParagraphBorders, ParagraphDecimalTabCharacter,
+    ParagraphDefaultTabInterval, ParagraphFlow, ParagraphFollowingStyle, ParagraphHyphenation,
+    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
+    ParagraphList, ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints,
+    ParagraphStyleName, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
+    ParagraphTabStop, ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextCommentBody,
+    TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage,
+    TextLigatures, TextOutline, TextPointSize, TextRange, TextScript, TextShadow,
+    TextStrikethrough, TextStyle, TextUnderline,
 };
 use litchi_iwa_text::columns::{Columns, Count, Gap};
 use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
+use litchi_iwa_text::paragraph::drop_cap::{
+    CharacterCount, DropCap, LineCount, Outdent, Padding, RaisedLines, Wrap,
+};
+use litchi_iwa_text::position::TextPosition;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -171,7 +173,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if let Some(newline) = text.find('\n') {
         let start_index = text[..=newline].encode_utf16().count();
-        let start = ParagraphStart::from_utf16_index(start_index)?;
+        let start = TextPosition::from_utf16_index(start_index)?;
         editor.set_text_box_paragraph_list_level(
             created.drawable_object_id,
             start,
@@ -197,12 +199,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.set_text_box_paragraph_drop_cap(
         created.drawable_object_id,
-        ParagraphStart::ZERO,
-        ParagraphDropCap::new(DropCapLineCount::new(4)?, DropCapCharacterCount::new(2)?)
-            .with_raised_lines(DropCapRaisedLines::new(1)?)
-            .with_wrap(DropCapWrap::Contour)
-            .with_padding(DropCapPadding::from_points(6.0)?)
-            .with_outdent(DropCapOutdent::from_ratio(0.25)?),
+        TextPosition::ZERO,
+        DropCap::new(LineCount::new(4)?, CharacterCount::new(2)?)
+            .with_raised_lines(RaisedLines::new(1)?)
+            .with_wrap(Wrap::Contour)
+            .with_padding(Padding::from_points(6.0)?)
+            .with_outdent(Outdent::from_ratio(0.25)?),
     )?;
     editor.set_text_box_paragraph_tab_stops(
         created.drawable_object_id,
