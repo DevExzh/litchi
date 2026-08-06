@@ -424,6 +424,16 @@ follow contextual `Snapshot`/`Transaction`/`Commit`/`Patch` facades with stale,
 atomic, relationship/orphan, and MCE validation. These owners never activate
 OLE, ActiveX, media, external links, macros, or collaboration behavior.
 
+The fifth continuation completes additional external and embedded-object seams.
+OGraph now publishes source-checked chart-package transactions with retained
+CFB/compression envelopes; DOC smart-tag host tables and DOCX web settings gain
+typed edits with FIB/OPC topology validation. XLSX and XLSB external links,
+PPTX content parts, and slide-owned PPTX OLE objects expose the same layered
+snapshot/transaction/patch boundary with opaque XML, BIFF12, MCE, and binary
+payload preservation. All targets remain inert: no link refresh, DDE/OLE
+activation, web fetch, content execution, rendering, or formula recalculation
+is introduced.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

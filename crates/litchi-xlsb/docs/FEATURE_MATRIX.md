@@ -78,7 +78,7 @@ formula results are recalculated or that external, macro, or embedded content is
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| External workbook links | ✅ | ✅ | 🟡 | Typed external-workbook, DDE, and OLE link targets, sheet names, external-name formulas/scopes/properties, item flags, and row-major cached matrices are supported. New links are serialized with validated relationship topology; unsupported link forms are refused. |
+| External workbook links | ✅ | ✅ | 🟡 | `external_link::{Snapshot, Transaction, Commit, Patch}` adds source-checked workbook/DDE/OLE metadata, external-name, flag, and cached-matrix edits while preserving opaque BIFF12 records and validated relationship topology; unsupported link forms are refused. |
 | External formulas and cached values | 🟡 | ✅ | 🟡 | The five permitted external token structures and checked Xnum/worksheet-dimension rules are covered. Paths, names, formulas, and cached values are inert and are never resolved or recalculated. |
 | DDE and OLE links | 🟡 | ✅ | 🟡 | DDE/OLE topics, program IDs, flags, and items are typed metadata only; no conversation, COM activation, refresh, or external launch occurs. |
 | External data connections | ✅ | ✅ | ✅ | The BIFF12 External Data Connections part supports DB/command types, refresh and credential metadata, ODBC/OLE DB/OLAP/Web properties, typed parameters, and Web query-table metadata. Connection strings, commands, URLs, paths, and credentials are never contacted or executed. |
