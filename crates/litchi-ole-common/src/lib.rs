@@ -7,3 +7,4 @@ pub mod object;
 pub mod property_set;
 pub mod smart_tags;
 pub mod toolbar;
+pub mod vba_signature;
