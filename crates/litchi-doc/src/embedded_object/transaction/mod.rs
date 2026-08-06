@@ -4,5 +4,6 @@
 //! validate a candidate snapshot before publishing it atomically.
 
 mod commit;
+mod inventory;
 mod mutate;
 mod open;

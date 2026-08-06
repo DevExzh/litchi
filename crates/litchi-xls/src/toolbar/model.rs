@@ -1,7 +1,7 @@
 //! Semantic models for the bounded XLS Office Toolbars stream.
 
 use crate::{Error, Result};
-use litchi_ole_common::toolbar::{ControlHeader, Header};
+use litchi_ole_common::toolbar::{ControlHeader, Data, ExtraInfo, GeneralInfo, Header};
 
 use super::validation;
 
@@ -122,26 +122,146 @@ impl ToolbarSet {
     }
 }
 
-/// A bounded, inert toolbar control.
+/// The four-byte `[MS-XLS]` `TBCCmd` prefix.
 ///
-/// Only `ActiveX` (`tct = 0x16`) controls are representable because that
-/// control type has no `TBCData` payload.  The shared control header retains
-/// all flags, undefined bits, and future values exactly as decoded.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Control {
-    header: ControlHeader,
+/// The command identifier is intentionally retained as a signed value and
+/// the command-type byte is validated only against the wire-level reserved
+/// bits. The command tables themselves belong to `[MS-CTXLS]`, so this owner
+/// does not silently reinterpret an identifier it cannot classify.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Command {
+    bytes: [u8; 4],
 }
 
-impl Control {
-    /// Construct a fixed-header control with no variable `TBCData`.
-    pub fn new(header: ControlHeader) -> Result<Self> {
-        let value = Self { header };
+impl Command {
+    /// Construct a command while enforcing the reserved-bit rules from
+    /// `[MS-XLS]` section 2.6.5.
+    pub fn new(command_id: i16, command_type: u8, hide_drawing: bool) -> Result<Self> {
+        if command_type > 0x1F {
+            return Err(validation::invalid("TBCCmd command type exceeds five bits"));
+        }
+        let id = command_id.to_le_bytes();
+        let mut flags = (command_type & 0x1F) << 2;
+        if hide_drawing {
+            flags |= 1;
+        }
+        Self::from_bytes([id[0], id[1], flags, 0])
+    }
+
+    /// Decode a command without losing any of its four wire bytes.
+    pub fn from_bytes(bytes: [u8; 4]) -> Result<Self> {
+        let value = Self { bytes };
+        value.validate()?;
+        Ok(value)
+    }
+
+    /// Return the exact serialized command bytes.
+    pub const fn bytes(self) -> [u8; 4] {
+        self.bytes
+    }
+
+    /// Return the signed command identifier.
+    pub const fn command_id(self) -> i16 {
+        i16::from_le_bytes([self.bytes[0], self.bytes[1]])
+    }
+
+    /// Return the command type from the packed command flags.
+    pub const fn command_type(self) -> u8 {
+        (self.bytes[2] >> 2) & 0x1F
+    }
+
+    /// Return the `fHideDrawing` bit.
+    pub const fn hide_drawing(self) -> bool {
+        self.bytes[2] & 1 != 0
+    }
+
+    fn validate(self) -> Result<()> {
+        if self.bytes[2] & 0x02 != 0 {
+            return Err(validation::invalid("TBCCmd reserved1 must be zero"));
+        }
+        if self.bytes[2] & 0x80 != 0 {
+            return Err(validation::invalid("TBCCmd reserved2 must be zero"));
+        }
+        if self.bytes[3] != 0 {
+            return Err(validation::invalid("TBCCmd reserved3 must be zero"));
+        }
+        if !matches!(
+            self.command_type(),
+            0x00 | 0x01 | 0x02 | 0x03 | 0x05 | 0x07 | 0x08 | 0x10 | 0x14
+        ) {
+            return Err(validation::invalid(format!(
+                "TBCCmd command type 0x{:02X} is not defined",
+                self.command_type()
+            )));
+        }
+        if self.hide_drawing() && !matches!(self.command_type(), 0x10 | 0x14) {
+            return Err(validation::invalid(
+                "TBCCmd fHideDrawing requires a drawing command type",
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// A bounded, inert toolbar control.
+///
+/// ActiveX (`tct = 0x16`) controls retain their historical fixed-header
+/// representation. Every other control retains the shared `TBCData` general
+/// metadata and its type-specific tail, plus an optional `TBCCmd`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Control<'a> {
+    header: ControlHeader,
+    command: Option<Command>,
+    data: Option<Data<'a>>,
+}
+
+impl<'a> Control<'a> {
+    /// Construct a fixed-header ActiveX control with no variable data.
+    ///
+    /// The `'static` result keeps the existing constructor ergonomic for
+    /// programmatically-created ActiveX controls while decoded data can
+    /// continue borrowing the source XCB stream.
+    pub fn new(header: ControlHeader) -> Result<Control<'static>> {
+        Control::<'static>::from_parts(header, None, None)
+    }
+
+    /// Construct a control from its optional command and shared data.
+    pub fn from_parts(
+        header: ControlHeader,
+        command: Option<Command>,
+        data: Option<Data<'a>>,
+    ) -> Result<Self> {
+        let value = Self {
+            header,
+            command,
+            data,
+        };
         value.validate()?;
         Ok(value)
     }
 
     pub const fn header(&self) -> &ControlHeader {
         &self.header
+    }
+
+    /// Return the optional `[MS-XLS]` command prefix.
+    pub const fn command(&self) -> Option<Command> {
+        self.command
+    }
+
+    /// Return the shared `TBCData`, when this is not an ActiveX control.
+    pub const fn data(&self) -> Option<&Data<'a>> {
+        self.data.as_ref()
+    }
+
+    /// Return the shared general metadata, when present.
+    pub fn general(&self) -> Option<&GeneralInfo<'a>> {
+        self.data.as_ref().map(Data::general)
+    }
+
+    /// Return the optional shared `TBCExtraInfo` metadata directly.
+    pub fn extra(&self) -> Option<&ExtraInfo<'a>> {
+        self.general().and_then(GeneralInfo::extra)
     }
 
     /// Return whether this is the fixed-header ActiveX control form.
@@ -153,8 +273,21 @@ impl Control {
         validation::validate_control(self)
     }
 
-    pub(super) fn from_decoded(header: ControlHeader) -> Result<Self> {
-        Self::new(header)
+    pub(super) fn from_decoded(
+        header: ControlHeader,
+        command: Option<Command>,
+        data: Option<Data<'a>>,
+    ) -> Result<Self> {
+        Self::from_parts(header, command, data)
+    }
+
+    /// Move this decoded control into an owned representation.
+    pub fn into_owned(self) -> Control<'static> {
+        Control {
+            header: self.header,
+            command: self.command,
+            data: self.data.map(Data::into_owned),
+        }
     }
 }
 
@@ -164,7 +297,7 @@ pub struct Toolbar<'a> {
     header: Header<'a>,
     visual_data: Option<VisualData>,
     application_id: i32,
-    controls: Vec<Control>,
+    controls: Vec<Control<'a>>,
 }
 
 impl<'a> Toolbar<'a> {
@@ -178,7 +311,7 @@ impl<'a> Toolbar<'a> {
         header: Header<'a>,
         visual_data: Option<VisualData>,
         application_id: i32,
-        controls: Vec<Control>,
+        controls: Vec<Control<'a>>,
     ) -> Result<Self> {
         let value = Self {
             header,
@@ -197,7 +330,7 @@ impl<'a> Toolbar<'a> {
     }
 
     /// Replace the fixed-header control list.
-    pub fn with_controls(mut self, controls: Vec<Control>) -> Self {
+    pub fn with_controls(mut self, controls: Vec<Control<'a>>) -> Self {
         self.controls = controls;
         self
     }
@@ -214,7 +347,7 @@ impl<'a> Toolbar<'a> {
         self.application_id
     }
 
-    pub fn controls(&self) -> &[Control] {
+    pub fn controls(&self) -> &[Control<'a>] {
         &self.controls
     }
 
@@ -228,7 +361,11 @@ impl<'a> Toolbar<'a> {
             header: self.header.into_owned(),
             visual_data: self.visual_data,
             application_id: self.application_id,
-            controls: self.controls,
+            controls: self
+                .controls
+                .into_iter()
+                .map(|control| control.into_owned())
+                .collect(),
         }
     }
 }

@@ -27,6 +27,7 @@ pub(crate) mod ppt_record_type {
 
 mod codec;
 mod model;
+mod semantic;
 #[cfg(test)]
 mod tests;
 
@@ -43,9 +44,14 @@ pub(crate) use codec::{
     create_dg_container_with_shapes, create_dgg_container, create_dgg_container_with_blips,
 };
 
+pub(crate) use semantic::{GroupChild, GroupShape};
+
+#[cfg(test)]
+pub(crate) use codec::wire::Drawing as EscherDrawing;
 #[cfg(test)]
 pub(crate) use codec::{
     build_client_data_with_hyperlink, build_client_data_with_placeholder,
     build_client_textbox_formatted, build_client_textbox_with_interactions, build_shape_properties,
-    create_dg_container_with_tables, create_user_shape_container,
+    create_dg_container_with_group, create_dg_container_with_tables, create_group_shape_container,
+    create_user_shape_container,
 };

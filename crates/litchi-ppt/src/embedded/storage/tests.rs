@@ -24,6 +24,91 @@ fn every_storage_kind_and_compression_roundtrips_exactly() {
 }
 
 #[test]
+fn snapshot_projects_wire_metadata_without_copying_or_normalizing_bytes() {
+    let storage = Storage::compressed(Kind::OleObject, 4096, vec![0x78, 0x9c, 1, 2, 3, 4]).unwrap();
+    let snapshot = storage.snapshot();
+    let metadata = snapshot.metadata();
+
+    assert_eq!(
+        snapshot.stored_bytes().as_ptr(),
+        storage.stored_bytes().as_ptr()
+    );
+    assert_eq!(snapshot.kind(), Kind::OleObject);
+    assert_eq!(snapshot.compression(), Compression::Zlib);
+    assert_eq!(snapshot.declared_uncompressed_len(), Some(4096));
+    assert_eq!(snapshot.stored_payload_len(), 6);
+    assert_eq!(snapshot.record_payload_len(), 10);
+    assert_eq!(snapshot.record_len(), 18);
+    assert!(snapshot.contains_data());
+    assert_eq!(metadata.kind(), Kind::OleObject);
+    assert_eq!(metadata.compression(), Compression::Zlib);
+    assert_eq!(metadata.declared_uncompressed_len(), Some(4096));
+    assert_eq!(metadata.stored_payload_len(), 6);
+    assert_eq!(metadata.record_payload_len(), 10);
+    assert_eq!(metadata.record_len(), 18);
+    assert!(metadata.contains_data());
+    assert_eq!(
+        snapshot.to_record_bytes().unwrap(),
+        storage.to_record_bytes().unwrap()
+    );
+    assert_eq!(snapshot.to_record().unwrap(), storage.to_record().unwrap());
+    assert_eq!(snapshot.to_storage().unwrap(), storage);
+    assert_eq!(storage.metadata(), metadata);
+}
+
+#[test]
+fn editor_commits_a_new_snapshot_and_keeps_the_source_unchanged() {
+    let source = Storage::uncompressed(Kind::OleObject, b"original OLE2 bytes".to_vec()).unwrap();
+    let source_record = source.to_record_bytes().unwrap();
+    let mut editor = source.edit();
+
+    editor.set_kind(Kind::ActiveXControl);
+    editor
+        .replace_uncompressed(b"replacement OLE2 bytes".to_vec())
+        .unwrap();
+    let committed = editor.commit().unwrap();
+
+    assert_eq!(source.kind(), Kind::OleObject);
+    assert_eq!(source.stored_bytes(), b"original OLE2 bytes");
+    assert_eq!(source.to_record_bytes().unwrap(), source_record);
+    assert_eq!(committed.kind(), Kind::ActiveXControl);
+    assert_eq!(committed.compression(), Compression::Uncompressed);
+    assert_eq!(committed.stored_bytes(), b"replacement OLE2 bytes");
+}
+
+#[test]
+fn invalid_editor_replacement_is_failure_atomic() {
+    let source = Storage::uncompressed(Kind::VbaProject, b"stable bytes".to_vec()).unwrap();
+    let mut editor = source.edit();
+    let before = editor.snapshot().metadata();
+    let before_bytes = editor.snapshot().stored_bytes().to_vec();
+
+    assert!(
+        editor
+            .replace_compressed(MAX_DECLARED_BYTES + 1, vec![1, 2, 3])
+            .is_err()
+    );
+    assert_eq!(editor.snapshot().metadata(), before);
+    assert_eq!(editor.snapshot().stored_bytes(), before_bytes);
+    assert_eq!(editor.kind(), Kind::VbaProject);
+    assert_eq!(editor.compression(), Compression::Uncompressed);
+
+    let committed = editor.commit().unwrap();
+    assert_eq!(committed, source);
+}
+
+#[test]
+fn moved_editor_and_borrowed_snapshot_preserve_exact_record_bytes() {
+    let source = Storage::uncompressed(Kind::OleObject, vec![9, 8, 7, 6]).unwrap();
+    let record = source.to_record_bytes().unwrap();
+    let borrowed = super::Ref::parse_at(&record, 0, Kind::OleObject).unwrap();
+    assert_eq!(borrowed.snapshot().to_record_bytes().unwrap(), record);
+
+    let committed = source.into_edit().commit().unwrap();
+    assert_eq!(committed.to_record_bytes().unwrap(), record);
+}
+
+#[test]
 fn constructors_reject_contradictory_or_oversized_state() {
     assert!(Storage::compressed(Kind::VbaProject, MAX_DECLARED_BYTES + 1, Vec::new()).is_err());
     assert!(Storage::uncompressed(Kind::OleObject, Vec::new()).is_ok());

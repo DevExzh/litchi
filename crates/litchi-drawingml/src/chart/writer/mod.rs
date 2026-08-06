@@ -6,6 +6,9 @@
 
 mod codec;
 mod model;
+mod semantic;
+mod validation;
+mod xml;
 
 #[cfg(test)]
 mod tests;

@@ -1,11 +1,11 @@
 //! Binary codec for the bounded XLS Office Toolbars (`XCB`) stream.
 
 use crate::{Error, Result};
-use litchi_ole_common::toolbar::{ControlHeader, Error as SharedError, Header};
+use litchi_ole_common::toolbar::{ControlHeader, Data, Error as SharedError, Header};
 
 use super::model::{APPLICATION_TOOLBAR_ID, VISUAL_DATA_LEN};
 use super::validation::{self, MAX_CONTROLS};
-use super::{Control, Toolbar, ToolbarSet, VisualData, Wrapper};
+use super::{Command, Control, Toolbar, ToolbarSet, VisualData, Wrapper};
 
 const CTBS_LEN: usize = 14;
 const APPLICATION_ID_LEN: usize = 4;
@@ -112,7 +112,8 @@ fn parse_toolbar_candidates<'a>(
     let toolbar_data = offset
         .checked_add(header_len)
         .ok_or_else(|| validation::invalid("CTB toolbar offset overflows"))?;
-    let mut candidates = Vec::with_capacity(2);
+    let mut candidates = Vec::new();
+    let mut first_error = None;
     for visual_len in [0usize, VISUAL_DATA_LEN] {
         let app_offset = toolbar_data
             .checked_add(visual_len)
@@ -132,20 +133,6 @@ fn parse_toolbar_candidates<'a>(
         if application_id != APPLICATION_TOOLBAR_ID {
             continue;
         }
-        let mut cursor = end;
-        let mut controls = Vec::with_capacity(count);
-        for _ in 0..count {
-            let control_bytes = data
-                .get(cursor..)
-                .ok_or_else(|| Error::UnexpectedEndOfStream("XCB TBC header".to_string()))?;
-            let (control_header, consumed) =
-                ControlHeader::parse_prefix(control_bytes).map_err(map_shared)?;
-            let control = Control::from_decoded(control_header)?;
-            cursor = cursor
-                .checked_add(consumed)
-                .ok_or_else(|| validation::invalid("TBC offset overflows"))?;
-            controls.push(control);
-        }
         let visual_data = if visual_len == 0 {
             None
         } else {
@@ -156,17 +143,24 @@ fn parse_toolbar_candidates<'a>(
                 validation::invalid("XCB rVisualData must be 60 bytes")
             })?))
         };
-        let toolbar = Toolbar::from_parts(
-            header.clone(),
-            visual_data,
-            application_id,
-            controls.clone(),
-        )?;
-        candidates.push((toolbar, cursor));
-        if candidates.len() > 1 {
-            return Err(validation::unsupported(
-                "CTB optional rVisualData has ambiguous boundaries",
-            ));
+        match parse_controls(data, end, count) {
+            Ok(control_candidates) => {
+                for (controls, cursor) in control_candidates {
+                    let toolbar =
+                        Toolbar::from_parts(header.clone(), visual_data, application_id, controls)?;
+                    candidates.push((toolbar, cursor));
+                    if candidates.len() > validation::MAX_BOUNDARY_CANDIDATES {
+                        return Err(validation::unsupported(
+                            "XCB TBC boundaries exceed the bounded candidate limit",
+                        ));
+                    }
+                }
+            },
+            Err(error) => {
+                if first_error.is_none() {
+                    first_error = Some(error);
+                }
+            },
         }
     }
 
@@ -177,11 +171,190 @@ fn parse_toolbar_candidates<'a>(
         if data.len() < minimum {
             return Err(Error::UnexpectedEndOfStream("XCB CTB ectbid".to_string()));
         }
-        return Err(validation::invalid(
-            "CTB ectbid must be 0x00000FFF or the optional visual-data block is truncated",
-        ));
+        return Err(first_error.unwrap_or_else(|| {
+            validation::invalid(
+                "CTB ectbid must be 0x00000FFF or the optional visual-data block is truncated",
+            )
+        }));
     }
     Ok(candidates)
+}
+
+fn parse_controls<'a>(
+    data: &'a [u8],
+    offset: usize,
+    remaining: usize,
+) -> Result<Vec<(Vec<Control<'a>>, usize)>> {
+    if remaining == 0 {
+        return Ok(vec![(Vec::new(), offset)]);
+    }
+
+    let control_bytes = data
+        .get(offset..)
+        .ok_or_else(|| Error::UnexpectedEndOfStream("XCB TBC header".to_string()))?;
+    let (control_header, consumed) =
+        ControlHeader::parse_prefix(control_bytes).map_err(map_shared)?;
+    let data_offset = offset
+        .checked_add(consumed)
+        .ok_or_else(|| validation::invalid("TBC header offset overflows"))?;
+
+    if control_header.control_type().raw() == 0x16 {
+        let control = Control::from_decoded(control_header, None, None)?;
+        let tails = parse_controls(data, data_offset, remaining - 1)?;
+        return Ok(prepend(control, tails));
+    }
+
+    let mut candidates = Vec::new();
+    let mut first_error = None;
+
+    let command_count = if validation::command_allowed(&control_header) {
+        2
+    } else {
+        1
+    };
+    for command_index in 0..command_count {
+        let command_len = if command_index == 0 { 0 } else { 4 };
+        let data_start = data_offset
+            .checked_add(command_len)
+            .ok_or_else(|| validation::invalid("TBCCmd offset overflows"))?;
+        let command = if command_len == 0 {
+            None
+        } else {
+            let command_bytes: [u8; 4] = match data.get(data_offset..data_start) {
+                Some(bytes) => match bytes.try_into() {
+                    Ok(bytes) => bytes,
+                    Err(_) => {
+                        if first_error.is_none() {
+                            first_error = Some(validation::invalid("TBCCmd must be four bytes"));
+                        }
+                        continue;
+                    },
+                },
+                None => {
+                    if first_error.is_none() {
+                        first_error = Some(Error::UnexpectedEndOfStream("XCB TBCCmd".to_string()));
+                    }
+                    continue;
+                },
+            };
+            match Command::from_bytes(command_bytes) {
+                Ok(command) => Some(command),
+                Err(error) => {
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                    continue;
+                },
+            }
+        };
+
+        let boundaries = find_boundaries(data, data_start, remaining > 1)?;
+        for boundary in boundaries {
+            let payload = match data.get(data_start..boundary) {
+                Some(payload) => payload,
+                None => {
+                    if first_error.is_none() {
+                        first_error = Some(validation::invalid("TBCData boundary is out of range"));
+                    }
+                    continue;
+                },
+            };
+            let control_data = match Data::parse(payload) {
+                Ok(value) => value,
+                Err(error) => {
+                    if first_error.is_none() {
+                        first_error = Some(map_shared(error));
+                    }
+                    continue;
+                },
+            };
+            let tails = match parse_controls(data, boundary, remaining - 1) {
+                Ok(tails) => tails,
+                Err(error) => {
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                    continue;
+                },
+            };
+            let control = match Control::from_decoded(
+                control_header.clone(),
+                command,
+                Some(control_data.clone()),
+            ) {
+                Ok(control) => control,
+                Err(error) => {
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                    continue;
+                },
+            };
+            for (tail, end) in tails {
+                let mut controls = Vec::with_capacity(tail.len() + 1);
+                controls.push(control.clone());
+                controls.extend(tail);
+                candidates.push((controls, end));
+                if candidates.len() > validation::MAX_BOUNDARY_CANDIDATES {
+                    return Err(validation::unsupported(
+                        "XCB TBC boundaries exceed the bounded candidate limit",
+                    ));
+                }
+            }
+        }
+    }
+
+    if candidates.is_empty() {
+        Err(first_error.unwrap_or_else(|| {
+            validation::invalid("TBCData has no unambiguous TBCHeader boundary")
+        }))
+    } else {
+        Ok(candidates)
+    }
+}
+
+fn prepend<'a>(
+    control: Control<'a>,
+    tails: Vec<(Vec<Control<'a>>, usize)>,
+) -> Vec<(Vec<Control<'a>>, usize)> {
+    tails
+        .into_iter()
+        .map(|(tail, end)| {
+            let mut controls = Vec::with_capacity(tail.len() + 1);
+            controls.push(control.clone());
+            controls.extend(tail);
+            (controls, end)
+        })
+        .collect()
+}
+
+fn find_boundaries(data: &[u8], start: usize, has_next_control: bool) -> Result<Vec<usize>> {
+    let signature = if has_next_control { 0x03 } else { 0x02 };
+    let mut boundaries = Vec::new();
+    if !has_next_control {
+        boundaries.push(data.len());
+    }
+
+    let end = data.len().saturating_sub(1);
+    for position in start..end {
+        if data[position] != signature || data[position + 1] != 0x01 {
+            continue;
+        }
+        let valid = if has_next_control {
+            ControlHeader::parse_prefix(&data[position..]).is_ok()
+        } else {
+            Header::parse_prefix(&data[position..]).is_ok()
+        };
+        if valid {
+            boundaries.push(position);
+            if boundaries.len() > validation::MAX_BOUNDARY_CANDIDATES {
+                return Err(validation::unsupported(
+                    "XCB TBC boundary signatures exceed the bounded candidate limit",
+                ));
+            }
+        }
+    }
+    Ok(boundaries)
 }
 
 fn encode_toolbar_set(output: &mut Vec<u8>, value: &ToolbarSet) {
@@ -203,6 +376,12 @@ fn encode_toolbar(output: &mut Vec<u8>, value: &Toolbar<'_>) {
     output.extend_from_slice(&value.application_id().to_le_bytes());
     for control in value.controls() {
         output.extend_from_slice(&control.header().to_bytes());
+        if let Some(command) = control.command() {
+            output.extend_from_slice(&command.bytes());
+        }
+        if let Some(data) = control.data() {
+            output.extend_from_slice(&data.to_bytes());
+        }
     }
 }
 

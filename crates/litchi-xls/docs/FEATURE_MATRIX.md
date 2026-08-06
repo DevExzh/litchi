@@ -74,7 +74,7 @@ rendering, external I/O, macro execution, or certificate trust.
 | Real-time data and RTD topics | 🟡 | ✅ | 🟡 | RTD topic/cell metadata and cached values are inert; no server connection, refresh, or execution occurs. |
 | Revision log and shared-workbook collaboration | 🟡 | ✅ | 🟡 | Revision streams and selected revision records are parsed as typed metadata; conflict resolution, shared locking, and collaboration behavior are not implemented. |
 | Custom views and workbook environment options | 🟡 | ✅ | 🟡 | Custom views, link-update modes, object-display modes, access/write strings, backup flags, and related behavior options are exposed as metadata. They do not cause host actions. |
-| Office Toolbars stream (`XCB`) | 🟡 | ✅ | ✅ | `Workbook::toolbar` reads and `Writer::set_toolbar` emits typed `CTBWRAPPER`/`CTBS`/`CTB` metadata through the root `XCB` stream, preserving reserved fields and optional visual bytes. Only fixed-header ActiveX controls are representable; controls requiring variable `TBCData` are rejected without guessing boundaries, and macros/UI are never executed. |
+| Office Toolbars stream (`XCB`) | 🟡 | ✅ | ✅ | `Workbook::toolbar` reads and `Writer::set_toolbar` emits typed `CTBWRAPPER`/`CTBS`/`CTB` metadata through the root `XCB` stream, preserving reserved fields, optional visual bytes, `TBCCmd`, and bounded shared `TBCGeneralInfo`/`TBCExtraInfo` payloads for non-ActiveX controls. Ambiguous or malformed variable boundaries are rejected, and macros/UI/ActiveX are never executed. |
 
 ## Pivots, charts, drawings, and external references
 

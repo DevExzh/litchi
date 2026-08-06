@@ -16,6 +16,10 @@ pub struct Editor {
     workbook: Vec<u8>,
     sheets: Vec<Vec<OleObjectRecord>>,
     form_controls: Vec<Vec<FormControl>>,
+    /// Number of form-control Obj records already present in each source
+    /// worksheet. Newly authored controls are appended at the worksheet EOF;
+    /// existing controls remain in their original byte representation.
+    preserved_control_counts: Vec<usize>,
 }
 
 impl Editor {
@@ -27,12 +31,14 @@ impl Editor {
         let (sheets, form_controls) = parse_workbook(&workbook)?;
         let targets = targets_for_sheets(&sheets)?;
         let package = ObjectEditor::open(bytes, targets, limits)?;
+        let preserved_control_counts = form_controls.iter().map(Vec::len).collect();
         Ok(Self {
             package,
             workbook_path,
             workbook,
             sheets,
             form_controls,
+            preserved_control_counts,
         })
     }
 
@@ -52,6 +58,39 @@ impl Editor {
             .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))
     }
 
+    /// Adds a typed worksheet form-control Obj record transactionally.
+    ///
+    /// The operation authors only the BIFF `Obj` metadata. It does not load,
+    /// instantiate, or execute any external control/runtime content. Unknown
+    /// subrecords supplied by the caller are serialized unchanged, and all
+    /// controls already present in the source worksheet remain byte-identical.
+    pub fn add_form_control(&mut self, worksheet: usize, control: FormControl) -> Result<()> {
+        control.validate()?;
+        let object_id = control.object_id();
+        if self
+            .sheets
+            .iter()
+            .flatten()
+            .any(|value| value.object_id() == object_id)
+            || self
+                .form_controls
+                .iter()
+                .flatten()
+                .any(|value| value.object_id() == object_id)
+        {
+            return Err(invalid(OBJ, "duplicate workbook object ID"));
+        }
+        let mut candidate = self.clone();
+        candidate
+            .form_controls
+            .get_mut(worksheet)
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet index {worksheet}")))?
+            .push(control);
+        candidate.commit()?;
+        *self = candidate;
+        Ok(())
+    }
+
     pub fn add(
         &mut self,
         worksheet: usize,
@@ -67,6 +106,11 @@ impl Editor {
             .iter()
             .flatten()
             .any(|value| value.object_id() == object.object_id())
+            || self
+                .form_controls
+                .iter()
+                .flatten()
+                .any(|value| value.object_id() == object.object_id())
         {
             return Err(invalid(OBJ, "duplicate workbook object ID"));
         }
@@ -158,11 +202,17 @@ impl Editor {
     }
 
     fn commit(&mut self) -> Result<()> {
-        validate_objects(&self.sheets)?;
-        let workbook = rewrite_workbook(&self.workbook, &self.sheets)?;
+        validate_entries(&self.sheets, &self.form_controls)?;
+        let workbook = rewrite_workbook(
+            &self.workbook,
+            &self.sheets,
+            &self.form_controls,
+            &self.preserved_control_counts,
+        )?;
         self.package
             .put_stream(&self.workbook_path, workbook.clone())?;
         self.workbook = workbook;
+        self.preserved_control_counts = self.form_controls.iter().map(Vec::len).collect();
         Ok(())
     }
 }
@@ -232,7 +282,7 @@ fn parse_workbook(input: &[u8]) -> Result<(Vec<Vec<OleObjectRecord>>, Vec<Vec<Fo
         sheets.push(objects);
         form_controls.push(controls);
     }
-    validate_objects(&sheets)?;
+    validate_entries(&sheets, &form_controls)?;
     Ok((sheets, form_controls))
 }
 
@@ -269,10 +319,15 @@ fn parse_sheet(input: &[u8]) -> Result<(Vec<OleObjectRecord>, Vec<FormControl>)>
     Ok((objects, controls))
 }
 
-fn validate_objects(sheets: &[Vec<OleObjectRecord>]) -> Result<()> {
+fn validate_entries(
+    sheets: &[Vec<OleObjectRecord>],
+    form_controls: &[Vec<FormControl>],
+) -> Result<()> {
     let mut ids = HashSet::new();
-    for (index, object) in sheets.iter().flatten().enumerate() {
-        if index >= 4_096 {
+    let mut count = 0usize;
+    for object in sheets.iter().flatten() {
+        count += 1;
+        if count > 4_096 {
             return Err(invalid(OBJ, "workbook object count exceeds limit"));
         }
         object.validate()?;
@@ -280,10 +335,24 @@ fn validate_objects(sheets: &[Vec<OleObjectRecord>]) -> Result<()> {
             return Err(invalid(OBJ, "duplicate workbook object ID"));
         }
     }
+    for control in form_controls.iter().flatten() {
+        count += 1;
+        if count > 4_096 {
+            return Err(invalid(OBJ, "workbook object count exceeds limit"));
+        }
+        if !ids.insert(control.object_id()) {
+            return Err(invalid(OBJ, "duplicate workbook object ID"));
+        }
+    }
     Ok(())
 }
 
-fn rewrite_workbook(input: &[u8], sheets: &[Vec<OleObjectRecord>]) -> Result<Vec<u8>> {
+fn rewrite_workbook(
+    input: &[u8],
+    sheets: &[Vec<OleObjectRecord>],
+    form_controls: &[Vec<FormControl>],
+    preserved_control_counts: &[usize],
+) -> Result<Vec<u8>> {
     let (refs, starts) = bindings(input)?;
     let first = starts.first().map_or(input.len(), |value| value.0);
     let mut output = input[..first].to_vec();
@@ -298,6 +367,12 @@ fn rewrite_workbook(input: &[u8], sheets: &[Vec<OleObjectRecord>]) -> Result<Vec
                 sheets
                     .get(worksheet)
                     .ok_or_else(|| invalid(BOUNDSHEET, "worksheet list missing"))?,
+                form_controls
+                    .get(worksheet)
+                    .ok_or_else(|| invalid(BOUNDSHEET, "form-control list missing"))?,
+                *preserved_control_counts
+                    .get(worksheet)
+                    .ok_or_else(|| invalid(BOUNDSHEET, "form-control baseline missing"))?,
             )?);
             worksheet += 1;
         } else {
@@ -320,7 +395,12 @@ fn rewrite_workbook(input: &[u8], sheets: &[Vec<OleObjectRecord>]) -> Result<Vec
     Ok(output)
 }
 
-fn rewrite_sheet(input: &[u8], objects: &[OleObjectRecord]) -> Result<Vec<u8>> {
+fn rewrite_sheet(
+    input: &[u8],
+    objects: &[OleObjectRecord],
+    form_controls: &[FormControl],
+    preserved_control_count: usize,
+) -> Result<Vec<u8>> {
     let records = ranges(input)?;
     let mut output = Vec::new();
     let mut next = 0usize;
@@ -351,6 +431,17 @@ fn rewrite_sheet(input: &[u8], objects: &[OleObjectRecord]) -> Result<Vec<u8>> {
                 }
             }
             next = objects.len();
+            for control in form_controls
+                .get(preserved_control_count..)
+                .ok_or_else(|| {
+                    invalid(OBJ, "form-control baseline exceeds current control count")
+                })?
+            {
+                output.extend_from_slice(&control.to_record_bytes()?);
+                if let Some(txo) = &control.text_object {
+                    output.extend_from_slice(txo);
+                }
+            }
         }
         output.extend_from_slice(&input[value.0..value.1]);
     }

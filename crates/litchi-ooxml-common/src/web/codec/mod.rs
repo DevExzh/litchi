@@ -13,32 +13,37 @@ mod xml;
 mod tests;
 
 #[cfg(test)]
-pub(super) use semantic::{parse_add_in, parse_panes, write_add_in, write_panes};
+pub(in crate::web) use semantic::{parse_add_in, parse_panes, write_add_in, write_panes};
 
+#[allow(unused_imports)]
+pub(in crate::web) use super::validation::{
+    add_escaped_xml_budget, add_reference_budget, charge_authored_metadata, validate_add_in_budget,
+    validate_binding, validate_extension_list, validate_external_uri_reference,
+    validate_image_content_type, validate_model, validate_model_with, validate_panes,
+    validate_panes_budget, validate_snapshot_resources_with, validate_store_reference,
+    validate_task_pane, validate_task_pane_with,
+};
 #[allow(
     unused_imports,
     reason = "The private codec facade preserves the parent-facing package helper paths."
 )]
-pub(super) use package::{checked_internal_target, load_snapshot_resources, require_content_type};
+pub(in crate::web) use package::{
+    checked_internal_target, load_snapshot_resources, require_content_type,
+};
 #[allow(
     unused_imports,
     reason = "The private codec facade preserves the parent-facing relationship helper path."
 )]
-pub(super) use relationship::relationship_attr;
+pub(in crate::web) use relationship::relationship_attr;
 #[allow(
     unused_imports,
     reason = "The private codec facade preserves all helpers used by sibling web owners."
 )]
-pub(super) use semantic::{
-    ParsedPane, add_escaped_xml_budget, add_reference_budget, charge_authored_metadata,
-    escape_attr, format_f64, invalid, limit, parse_add_in_with, parse_add_in_with_budget,
-    parse_binding, parse_panes_with, parse_panes_with_budget, parse_property,
-    parse_store_reference, parse_task_pane, require_nonempty, validate_add_in_budget,
-    validate_binding, validate_extension_list, validate_external_uri_reference,
-    validate_image_content_type, validate_model, validate_model_with, validate_panes,
-    validate_panes_budget, validate_snapshot_resources_with, validate_store_reference,
-    validate_task_pane, validate_task_pane_with, write_add_in_with, write_panes_with,
-    write_store_reference,
+pub(in crate::web) use semantic::{
+    ParsedPane, enforce_count_with, escape_attr, format_f64, invalid, limit, parse_add_in_with,
+    parse_add_in_with_budget, parse_binding, parse_panes_with, parse_panes_with_budget,
+    parse_property, parse_store_reference, parse_task_pane, require_nonempty, write_add_in_with,
+    write_panes_with, write_store_reference,
 };
 #[allow(
     unused_imports,

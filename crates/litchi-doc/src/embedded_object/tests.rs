@@ -2,8 +2,9 @@
 
 use super::Limits;
 use super::codec::{discover_targets, validate_existing_fields};
-use super::model::{FieldMarker, Info};
+use super::model::{FieldMarker, Info, Kind};
 use super::storage::{OBJECT_POOL, is_object_storage_name};
+use crate::writer::Writer;
 use litchi_cfb::OleWriter;
 use std::io::Cursor;
 
@@ -117,4 +118,107 @@ fn field_validation_rejects_orphan_and_unclosed_markers() {
         )
         .is_err()
     );
+}
+
+fn base_doc() -> Vec<u8> {
+    let mut writer = Writer::new();
+    writer.add_paragraph("embedded metadata").unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn picture_data(marker: u32) -> Vec<u8> {
+    let mut value = 12u32.to_le_bytes().to_vec();
+    value.extend_from_slice(&marker.to_le_bytes());
+    value.extend_from_slice(&[0; 4]);
+    value
+}
+
+fn object_cfb(comp_obj: &[u8], ole: &[u8], obj_info: &[u8], unknown: &[u8]) -> Vec<u8> {
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["\u{1}CompObj"], comp_obj).unwrap();
+    writer.create_stream(&["\u{1}Ole"], ole).unwrap();
+    writer.create_stream(&["\u{3}ObjInfo"], obj_info).unwrap();
+    writer.create_stream(&["VendorMetadata"], unknown).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+#[test]
+fn inventory_exposes_inert_ole_metadata_and_unknown_streams() {
+    let mut comp_obj = crate::writer::ole_metadata::generate_compobj_stream();
+    comp_obj.extend_from_slice(&[0xA1, 0xB2, 0xC3]);
+    let ole = crate::writer::ole_metadata::generate_ole_stream();
+    let obj_info = [0x00, 0x92, 0x03, 0x00, 0x00, 0x00];
+    let unknown = [0x10, 0x20, 0x30, 0x40];
+    let mut editor = super::Editor::open(base_doc(), Limits::default()).unwrap();
+    editor
+        .add(super::WriteOptions::new(
+            77,
+            object_cfb(&comp_obj, &ole, &obj_info, &unknown),
+            picture_data(77),
+        ))
+        .unwrap();
+
+    let inventory = editor.inventory().unwrap();
+    let entry = inventory.get(77).expect("metadata entry");
+    let metadata = entry.metadata();
+    let comp_obj = metadata.comp_obj().expect("CompObj metadata");
+    assert_eq!(comp_obj.ansi_user_type(), "Microsoft Word Document");
+    assert!(comp_obj.has_reserved_ansi());
+    assert!(comp_obj.has_reserved_unicode());
+    assert!(comp_obj.bytes().ends_with(&[0xA1, 0xB2, 0xC3]));
+    assert_eq!(comp_obj.trailing(), &[0xA1, 0xB2, 0xC3]);
+    let ole_metadata = metadata.ole().expect("Ole metadata");
+    assert_eq!(ole_metadata.kind(), Kind::Embedded);
+    assert_eq!(ole_metadata.bytes(), ole);
+    assert!(metadata.is_activex());
+    assert_eq!(
+        metadata
+            .obj_info()
+            .expect("ObjInfo metadata")
+            .clipboard_format,
+        3
+    );
+    assert_eq!(metadata.unknown().len(), 1);
+    assert_eq!(metadata.unknown()[0].path(), &["VendorMetadata".to_owned()]);
+    assert_eq!(metadata.unknown()[0].bytes(), unknown);
+    assert!(metadata.has_unknown());
+
+    let snapshot = inventory.clone();
+    let invalid = super::WriteOptions::new(78, vec![0], picture_data(78));
+    assert!(editor.add(invalid).is_err());
+    assert_eq!(editor.inventory().unwrap(), snapshot);
+
+    let bytes = editor.finish().unwrap();
+    let reopened = super::Editor::open(bytes, Limits::default()).unwrap();
+    assert_eq!(reopened.inventory().unwrap(), snapshot);
+}
+
+#[test]
+fn malformed_known_metadata_remains_lossless_unknown_bytes() {
+    let malformed = [0xEE, 0xDD, 0xCC, 0xBB, 0xAA];
+    let ole = crate::writer::ole_metadata::generate_ole_stream();
+    let obj_info = [0x00, 0x82, 0x03, 0x00, 0x00, 0x00];
+    let mut editor = super::Editor::open(base_doc(), Limits::default()).unwrap();
+    editor
+        .add(super::WriteOptions::new(
+            88,
+            object_cfb(&malformed, &ole, &obj_info, &[]),
+            picture_data(88),
+        ))
+        .unwrap();
+
+    let inventory = editor.inventory().unwrap();
+    let entry = inventory.get(88).expect("metadata entry");
+    assert!(entry.metadata().comp_obj().is_none());
+    let unknown = entry
+        .metadata()
+        .unknown()
+        .iter()
+        .find(|value| value.name() == Some("\u{1}CompObj"))
+        .expect("malformed CompObj bytes");
+    assert_eq!(unknown.bytes(), malformed);
 }

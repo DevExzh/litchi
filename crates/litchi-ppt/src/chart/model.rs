@@ -5,7 +5,8 @@ use std::num::{NonZeroU32, NonZeroUsize};
 use litchi_ograph::chart::{Book, Refs};
 use litchi_ograph::{Package as GraphPackage, PackageRef};
 
-use crate::package::Error;
+use super::transaction::PackageEditor;
+use crate::package::{Error, Result as PackageResult};
 
 /// The producer grammar and host topology behind a chart object.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -112,6 +113,26 @@ impl Graph {
         &self.book
     }
 
+    /// Open a copy-on-write transaction over this chart's standalone OLE2
+    /// package.
+    ///
+    /// The read model remains unchanged. The returned editor can replace the
+    /// validated Graph chart stream and commit a new package, while preserving
+    /// the original package when no edit is staged.
+    pub fn edit_package(&self) -> PackageResult<PackageEditor> {
+        let package = self.package.as_ref().as_ref();
+        PackageEditor::with_limits(package.as_bytes().to_vec(), package.limits())
+    }
+
+    /// Move this Graph object into a package transaction without cloning its
+    /// validated OLE2 allocation.
+    pub fn into_package_editor(self) -> PackageResult<PackageEditor> {
+        let Self { package, .. } = self;
+        let package = *package;
+        let limits = package.as_ref().limits();
+        PackageEditor::with_limits(package.finish().into_bytes(), limits)
+    }
+
     pub(super) fn new(info: Info, package: Box<GraphPackage>, book: Book) -> Self {
         Self {
             info,
@@ -191,6 +212,20 @@ impl Chart {
         match self {
             Self::Excel(chart) => Some(chart),
             Self::Graph(_) => None,
+        }
+    }
+
+    /// Open a package transaction for a standalone Graph chart.
+    ///
+    /// Excel-hosted charts expose their validated Workbook inventory through
+    /// [`Excel::book`], but their surrounding workbook package belongs to the
+    /// Excel host and is intentionally not rewritten here.
+    pub fn edit_package(&self) -> PackageResult<PackageEditor> {
+        match self {
+            Self::Graph(chart) => chart.edit_package(),
+            Self::Excel(_) => Err(Error::InvalidFormat(
+                "only standalone Graph chart packages support this transaction".to_string(),
+            )),
         }
     }
 }

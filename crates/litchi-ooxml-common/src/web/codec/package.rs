@@ -2,8 +2,9 @@
 
 use super::super::model::{AddIn, Limits, SnapshotResource, SnapshotTarget};
 use super::super::package::{PackageGraphIndex, fold_part_name};
+use super::super::validation::validate_image_content_type;
 use super::super::{IMAGE_RELATIONSHIP_TYPE, STRICT_IMAGE_RELATIONSHIP_TYPE};
-use super::semantic::{invalid, limit, validate_image_content_type};
+use super::semantic::{invalid, limit};
 use crate::{Error, Result};
 use litchi_opc::{OpcPackage, PackURI, Part};
 use std::collections::{HashMap, HashSet};

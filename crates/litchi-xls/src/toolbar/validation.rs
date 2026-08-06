@@ -1,6 +1,7 @@
 //! Shared structural validation for the bounded XLS XCB model.
 
 use crate::{Error, Result};
+use litchi_ole_common::toolbar::ControlHeader;
 
 use super::model::APPLICATION_TOOLBAR_ID;
 use super::{Control, Toolbar, ToolbarSet, Wrapper};
@@ -8,6 +9,7 @@ use super::{Control, Toolbar, ToolbarSet, Wrapper};
 /// Bound allocations and recursive parsing for hostile XCB streams.
 pub(super) const MAX_TOOLBARS: usize = 4096;
 pub(super) const MAX_CONTROLS: usize = 1 << 15;
+pub(super) const MAX_BOUNDARY_CANDIDATES: usize = 4096;
 
 pub(super) fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidData(format!("XCB {}", message.into()))
@@ -46,12 +48,79 @@ pub(super) fn validate_toolbar_set(value: &ToolbarSet) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn validate_control(value: &Control) -> Result<()> {
-    if !value.is_active_x() {
-        return Err(unsupported(format!(
-            "TBCData for control type 0x{:02X} is not decoded",
-            value.header().control_type().raw()
+pub(super) fn command_allowed(header: &ControlHeader) -> bool {
+    !matches!(
+        header.control_id(),
+        0x0001 | 0x06CC | 0x03D8 | 0x03EC | 0x1051
+    ) && matches!(
+        header.control_type().raw(),
+        0x01 | 0x02 | 0x03 | 0x04 | 0x06 | 0x07 | 0x0A | 0x0C | 0x0D | 0x0E | 0x0F | 0x15
+    )
+}
+
+fn supported_control_type(raw: u8) -> bool {
+    matches!(
+        raw,
+        0x01 | 0x02
+            | 0x03
+            | 0x04
+            | 0x06
+            | 0x07
+            | 0x09
+            | 0x0A
+            | 0x0C
+            | 0x0D
+            | 0x0E
+            | 0x0F
+            | 0x10
+            | 0x12
+            | 0x13
+            | 0x14
+            | 0x15
+            | 0x16
+    )
+}
+
+pub(super) fn validate_control(value: &Control<'_>) -> Result<()> {
+    let raw = value.header().control_type().raw();
+    if !supported_control_type(raw) {
+        return Err(invalid(format!(
+            "TBCHeader control type 0x{:02X} is not defined",
+            raw
         )));
+    }
+
+    if value.is_active_x() {
+        if value.command().is_some() || value.data().is_some() {
+            return Err(invalid("ActiveX TBC must not contain TBCCmd or TBCData"));
+        }
+    } else {
+        let data = value.data().ok_or_else(|| {
+            unsupported(format!(
+                "TBCData is required for control type 0x{:02X}",
+                raw
+            ))
+        })?;
+        if (data.general().flags().save_text() || data.general().flags().save_misc_ui_strings())
+            && !value.header().specifics().save_ui_strings()
+        {
+            return Err(invalid(
+                "TBCGeneralInfo UI fields require TBCSFlags fSaveUIStrings",
+            ));
+        }
+        if matches!(raw, 0x07 | 0x0F | 0x12 | 0x13 | 0x15) && !data.specific().is_empty() {
+            return Err(invalid(format!(
+                "TBCData control-specific information is forbidden for type 0x{:02X}",
+                raw
+            )));
+        }
+        if value.command().is_some() && !command_allowed(value.header()) {
+            return Err(invalid(format!(
+                "TBCCmd is not permitted for control id 0x{:04X} and type 0x{:02X}",
+                value.header().control_id(),
+                raw
+            )));
+        }
     }
     Ok(())
 }

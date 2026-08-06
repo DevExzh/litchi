@@ -312,6 +312,19 @@ fn supports_every_time_node_atom_enum_value_and_ignores_reserved_fields() {
 }
 
 #[test]
+fn decodes_grouping_type_property_flag_from_time_node_atom() {
+    let mut bytes = write_time_node_atom(&TimeNodeAtom::default());
+    bytes[16..20].copy_from_slice(&TimeNodeKind::Sequential.as_u32().to_le_bytes());
+    bytes[36..40].copy_from_slice(&0x08u32.to_le_bytes());
+    let (record, consumed) = Record::parse(&bytes, 0).unwrap();
+    assert_eq!(consumed, bytes.len());
+    assert_eq!(
+        parse_time_node_atom(&record).unwrap().node_type,
+        Some(TimeNodeKind::Sequential)
+    );
+}
+
+#[test]
 fn round_trips_all_time_node_property_variants() {
     assert_eq!(RecordType::TimePropertyList.as_u16(), 0xF13D);
     assert_eq!(RecordType::TimeVariant.as_u16(), 0xF142);

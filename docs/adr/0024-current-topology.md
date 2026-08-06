@@ -121,17 +121,20 @@ The OLE2 owner now also has `parts/ole_controls`, which layers the inert
 tests without creating a control runtime or activation API.
 
 The shared `litchi-ole-common::toolbar` owner now layers the bounded,
-format-neutral `[MS-OSHARED]` `WString`, toolbar/control headers, flags, and
-dimensions into model and codec seams. It preserves borrowed payloads and
-reserved bits and remains inert: DOC/PPT/XLS command-bar lifecycle wiring and
-macro/UI execution are intentionally outside this common owner.
+format-neutral `[MS-OSHARED]` `WString`, toolbar/control headers, flags,
+dimensions, and typed `TBCGeneralInfo`/`TBCExtraInfo` payloads into model and
+codec seams. It preserves borrowed strings, typed merge modes, reserved bits,
+and format-specific tails without allocating decoded source data. It remains
+inert: DOC/PPT/XLS command-bar lifecycle wiring and macro/UI execution are
+intentionally outside this common owner.
 
 DOC now adds a contextual `parts/command_bars` owner on top of that common
 codec. Its public `CommandBars` facade reads and writes the optional FIB
 `fcCmds`/`lcbCmds` table range, exposing bounded macro-command, allocated-
-command, key-map, and CTBWRAPPER metadata without activating any command. The
-owner intentionally refuses variable TBC data and unknown Tcg records when a
-safe boundary cannot be recovered.
+command, key-map, and CTBWRAPPER metadata without activating any command. It
+also decodes bounded variable TBC data through the common model and rejects
+ambiguous boundaries or unknown Tcg records when a safe boundary cannot be
+recovered.
 
 ## ODF
 
@@ -187,10 +190,11 @@ domains, PPTX shape tags, XLS workbook codecs, XLSB conditional-formatting
 binary codecs, and XLSX data-validation codecs into contextual model, codec,
 validation, and test folders. XLS also exposes a bounded `toolbar` facade for
 the `[MS-XLS]` XCB stream. It reuses the shared `[MS-OSHARED]` toolbar model,
-preserves reserved and fixed visual bytes, and refuses variable or unknown
-control payloads without activating macros, UI, or ActiveX behavior. These
-owners remain format-local and prefix-free while shared wire logic stays in
-the common crates.
+preserves reserved and fixed visual bytes, and now round-trips `TBCCmd` plus
+bounded variable `TBCData` through the shared typed general metadata model.
+Ambiguous or unknown control payloads are still rejected without activating
+macros, UI, or ActiveX behavior. These owners remain format-local and
+prefix-free while shared wire logic stays in the common crates.
 
 The following continuation applies the same topology to the shared
 `property_set` binary codec, DOC image writing, PPT comparison and embedded

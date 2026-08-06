@@ -2,10 +2,224 @@
 
 use litchi_odraw::{Container, Record, RecordKind};
 
-use litchi_odraw::shape::Shape as OfficeArtShape;
-pub use litchi_odraw::shape::{Bounds, Kind};
+pub use litchi_odraw::shape::{Bounds, Flags, Kind, Native};
+use litchi_odraw::{
+    prop::{Id as OfficeArtPropertyId, Prop, Props, Value},
+    shape::Shape as OfficeArtShape,
+};
 
 use std::io;
+
+/// The stable identity carried by an OfficeArt `FSP` shape atom.
+///
+/// The value is deliberately kept separate from property and record
+/// identifiers. It remains lossless for producer-defined identifiers while
+/// giving callers a contextual selector for a projected shape tree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[repr(transparent)]
+pub struct ShapeId(u32);
+
+impl ShapeId {
+    /// Wraps the exact `spid` value from an OfficeArt shape atom.
+    #[inline]
+    pub const fn from_raw(raw: u32) -> Self {
+        Self(raw)
+    }
+
+    /// Returns the exact `spid` value.
+    #[inline]
+    pub const fn raw(self) -> u32 {
+        self.0
+    }
+}
+
+impl From<u32> for ShapeId {
+    fn from(value: u32) -> Self {
+        Self::from_raw(value)
+    }
+}
+
+impl From<ShapeId> for u32 {
+    fn from(value: ShapeId) -> Self {
+        value.raw()
+    }
+}
+
+/// The four signed coordinates of an OfficeArt `ChildAnchor` record.
+///
+/// A child anchor is expressed in the coordinate space supplied by the
+/// containing group's [`Bounds`]. Host-owned `ClientAnchor` bytes are kept in
+/// [`ClientAnchor`] instead of being guessed into this coordinate system.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Anchor {
+    /// Left coordinate in the containing group coordinate space.
+    pub left: i32,
+    /// Top coordinate in the containing group coordinate space.
+    pub top: i32,
+    /// Right coordinate in the containing group coordinate space.
+    pub right: i32,
+    /// Bottom coordinate in the containing group coordinate space.
+    pub bottom: i32,
+}
+
+impl Anchor {
+    /// Creates an anchor from its four signed OfficeArt coordinates.
+    #[inline]
+    pub const fn new(left: i32, top: i32, right: i32, bottom: i32) -> Self {
+        Self {
+            left,
+            top,
+            right,
+            bottom,
+        }
+    }
+
+    /// Returns the checked horizontal extent.
+    #[inline]
+    pub const fn width(&self) -> Option<i32> {
+        self.right.checked_sub(self.left)
+    }
+
+    /// Returns the checked vertical extent.
+    #[inline]
+    pub const fn height(&self) -> Option<i32> {
+        self.bottom.checked_sub(self.top)
+    }
+}
+
+impl From<litchi_odraw::prop::Anchor> for Anchor {
+    fn from(anchor: litchi_odraw::prop::Anchor) -> Self {
+        Self::new(anchor.left, anchor.top, anchor.right, anchor.bottom)
+    }
+}
+
+/// An owned Word host-anchor record.
+///
+/// `[MS-ODRAW]` leaves `ClientAnchor` interpretation to the host format. DOC
+/// commonly stores a four-byte index into `PlcfSpa`, while inline drawings may
+/// use an empty payload. The complete record is retained so producer-specific
+/// payloads remain lossless without pretending to be universal coordinates.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClientAnchor {
+    bytes: Box<[u8]>,
+}
+
+impl ClientAnchor {
+    fn from_record(record: &Record<'_>) -> Self {
+        Self {
+            bytes: record_bytes(record),
+        }
+    }
+
+    /// Returns the exact OfficeArt record bytes, including its header.
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Returns the host-owned payload without the OfficeArt record header.
+    pub fn payload(&self) -> &[u8] {
+        &self.bytes[8..]
+    }
+
+    /// Returns DOC's common four-byte `PlcfSpa` index representation.
+    ///
+    /// Other host payload lengths remain available through [`Self::payload`].
+    pub fn index(&self) -> Option<u32> {
+        self.payload().try_into().ok().map(u32::from_le_bytes)
+    }
+
+    /// Returns whether the host record has no payload bytes.
+    pub fn is_empty(&self) -> bool {
+        self.payload().is_empty()
+    }
+}
+
+/// The property-table owner of an unknown OfficeArt property.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PropertyTable {
+    /// The primary `OfficeArtFOPT` table.
+    Primary,
+    /// The secondary `OfficeArtSecondaryFOPT` table.
+    Secondary,
+    /// The tertiary `OfficeArtTertiaryFOPT` table.
+    Tertiary,
+}
+
+/// One unknown `FOPTE` entry retained without a lossy property projection.
+///
+/// The six-byte descriptor and, for complex properties, its exact complex
+/// payload are owned together. This permits snapshot use after the source OLE
+/// stream is released and keeps future `[MS-ODRAW]` extensions inspectable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownProperty {
+    table: PropertyTable,
+    bytes: Box<[u8]>,
+}
+
+impl UnknownProperty {
+    fn from_prop(table: PropertyTable, prop: &Prop<'_>) -> Option<Self> {
+        if !matches!(prop.id(), OfficeArtPropertyId::Unknown(_)) {
+            return None;
+        }
+
+        let complex = match prop.value() {
+            Value::Simple(_) => None,
+            Value::Complex(data) => Some(*data),
+            Value::Array(array) => Some(array.raw_data()),
+        };
+        let mut bytes = Vec::with_capacity(6 + complex.map_or(0, <[u8]>::len));
+        bytes.extend_from_slice(&prop.raw_opid().to_le_bytes());
+        bytes.extend_from_slice(&prop.raw_value().to_le_bytes());
+        if let Some(data) = complex {
+            bytes.extend_from_slice(data);
+        }
+
+        Some(Self {
+            table,
+            bytes: bytes.into_boxed_slice(),
+        })
+    }
+
+    /// Returns the property-table owner.
+    pub const fn table(&self) -> PropertyTable {
+        self.table
+    }
+
+    /// Returns the unflagged property identifier.
+    pub fn raw_id(&self) -> u16 {
+        self.raw_opid() & 0x3FFF
+    }
+
+    /// Returns the exact `opid`, including `fBid` and `fComplex` flags.
+    pub fn raw_opid(&self) -> u16 {
+        u16::from_le_bytes([self.bytes[0], self.bytes[1]])
+    }
+
+    /// Returns the exact four-byte `op` value.
+    pub fn raw_value(&self) -> i32 {
+        i32::from_le_bytes([self.bytes[2], self.bytes[3], self.bytes[4], self.bytes[5]])
+    }
+
+    /// Returns whether the property is a complex property.
+    pub fn is_complex(&self) -> bool {
+        self.raw_opid() & 0x8000 != 0
+    }
+
+    /// Returns whether the property is a BLIP-store reference.
+    pub fn is_blip(&self) -> bool {
+        self.raw_opid() & 0x4000 != 0
+    }
+
+    /// Returns the exact descriptor and optional complex payload bytes.
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Returns the complex payload, or an empty slice for simple properties.
+    pub fn data(&self) -> &[u8] {
+        &self.bytes[6..]
+    }
+}
 
 /// One unknown OfficeArt record retained from a Word shape container.
 ///
@@ -20,14 +234,8 @@ pub struct UnknownRecord {
 
 impl UnknownRecord {
     pub(crate) fn from_record(record: &Record<'_>) -> Self {
-        let version_instance = u16::from(record.version()) | (record.instance() << 4);
-        let mut bytes = Vec::with_capacity(8 + record.data().len());
-        bytes.extend_from_slice(&version_instance.to_le_bytes());
-        bytes.extend_from_slice(&record.raw_kind().to_le_bytes());
-        bytes.extend_from_slice(&record.len().to_le_bytes());
-        bytes.extend_from_slice(record.data());
         Self {
-            bytes: bytes.into_boxed_slice(),
+            bytes: record_bytes(record),
         }
     }
 
@@ -62,7 +270,7 @@ impl UnknownRecord {
 /// The model is owned because textbox text is resolved from separate Word
 /// stories after OfficeArt parsing. Shape children and unknown-record payloads
 /// are consequently independent of the OLE stream borrowed during decoding.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shape {
     /// Format-neutral OfficeArt shape family.
     pub shape_type: Kind,
@@ -82,9 +290,55 @@ pub struct Shape {
     pub native_shape_type: Option<u16>,
     /// Typed `FSPGR` coordinate-space bounds for group shapes.
     pub group_bounds: Option<Bounds>,
+    /// Typed `ChildAnchor` coordinates for a shape nested in a group.
+    pub anchor: Option<Anchor>,
+    /// Host-owned `ClientAnchor` record, retained without reinterpretation.
+    pub client_anchor: Option<ClientAnchor>,
+    /// Exact flags from the OfficeArt `FSP` shape atom.
+    pub flags: Flags,
     /// Unknown records directly owned by this shape's OfficeArt container.
     pub unknown_records: Vec<UnknownRecord>,
+    /// Unknown property entries from the shape's primary, secondary, and
+    /// tertiary OfficeArt property tables.
+    pub unknown_properties: Vec<UnknownProperty>,
     pub(crate) text_link: bool,
+}
+
+/// A borrowed group projection over one [`Shape`].
+///
+/// The group view does not duplicate the owned snapshot. It only exposes the
+/// topology-specific operations that are meaningful after checking the
+/// containing shape's group flag.
+#[derive(Debug, Clone, Copy)]
+pub struct Group<'a> {
+    shape: &'a Shape,
+}
+
+impl<'a> Group<'a> {
+    /// Returns the group's stable OfficeArt identity.
+    pub const fn identity(self) -> ShapeId {
+        ShapeId::from_raw(self.shape.shape_id)
+    }
+
+    /// Returns the group's `spid` value.
+    pub const fn shape_id(self) -> u32 {
+        self.shape.shape_id
+    }
+
+    /// Returns the group's child-coordinate space.
+    pub const fn bounds(self) -> Option<&'a Bounds> {
+        self.shape.group_bounds.as_ref()
+    }
+
+    /// Returns direct children in OfficeArt source order.
+    pub fn children(self) -> &'a [Shape] {
+        &self.shape.children
+    }
+
+    /// Finds the first descendant with the requested identity in source order.
+    pub fn find(self, identity: ShapeId) -> Option<&'a Shape> {
+        self.shape.find(identity)
+    }
 }
 
 impl Shape {
@@ -119,9 +373,77 @@ impl Shape {
             line_color: shape.props().get_line_color(),
             native_shape_type: Some(shape.native_kind().raw()),
             group_bounds: shape.group_bounds().copied(),
+            anchor: shape.anchor().copied().map(Anchor::from),
+            client_anchor: shape.client_anchor().map(ClientAnchor::from_record),
+            flags: shape.flags(),
             unknown_records: collect_unknown_records(shape)?,
+            unknown_properties: collect_unknown_properties(shape)?,
             text_link,
         })
+    }
+
+    /// Returns the shape's stable OfficeArt identity.
+    #[inline]
+    pub const fn identity(&self) -> ShapeId {
+        ShapeId::from_raw(self.shape_id)
+    }
+
+    /// Returns the exact `spid` value.
+    #[inline]
+    pub const fn id(&self) -> u32 {
+        self.shape_id
+    }
+
+    /// Returns the typed OfficeArt flags from `FSP`.
+    #[inline]
+    pub const fn shape_flags(&self) -> Flags {
+        self.flags
+    }
+
+    /// Returns whether the shape is a group according to its OfficeArt flag.
+    #[inline]
+    pub const fn is_group_shape(&self) -> bool {
+        self.is_group
+    }
+
+    /// Returns the typed child anchor, if the shape is nested in a group.
+    #[inline]
+    pub const fn anchor(&self) -> Option<&Anchor> {
+        self.anchor.as_ref()
+    }
+
+    /// Returns the host-owned client anchor without interpreting its payload.
+    #[inline]
+    pub const fn client_anchor(&self) -> Option<&ClientAnchor> {
+        self.client_anchor.as_ref()
+    }
+
+    /// Returns a typed group view when this shape is a group.
+    #[inline]
+    pub fn group(&self) -> Option<Group<'_>> {
+        self.is_group.then_some(Group { shape: self })
+    }
+
+    /// Returns direct children in OfficeArt source order.
+    #[inline]
+    pub fn children(&self) -> &[Shape] {
+        &self.children
+    }
+
+    /// Finds the first shape with the requested identity in depth-first source
+    /// order. A caller that needs to diagnose producer-invalid duplicate IDs
+    /// should inspect every node through [`Self::children`].
+    pub fn find(&self, identity: ShapeId) -> Option<&Shape> {
+        if self.identity() == identity {
+            return Some(self);
+        }
+        self.children.iter().find_map(|child| child.find(identity))
+    }
+
+    /// Returns unknown property entries in their property-table order.
+    #[inline]
+    pub fn unknown_properties(&self) -> &[UnknownProperty] {
+        &self.unknown_properties
     }
 }
 
@@ -140,6 +462,36 @@ fn collect_unknown_records(shape: &OfficeArtShape<'_>) -> io::Result<Vec<Unknown
         collect_unknown_children(container, &mut records)?;
     }
     Ok(records)
+}
+
+fn collect_unknown_properties(shape: &OfficeArtShape<'_>) -> io::Result<Vec<UnknownProperty>> {
+    let mut properties = Vec::new();
+    for child in shape.meta().children() {
+        let child = child.map_err(invalid_data)?;
+        let table = match child.kind() {
+            RecordKind::Opt => PropertyTable::Primary,
+            RecordKind::SecondaryOpt => PropertyTable::Secondary,
+            RecordKind::TertiaryOpt => PropertyTable::Tertiary,
+            _ => continue,
+        };
+        let props = Props::parse(&child).map_err(invalid_data)?;
+        properties.extend(
+            props
+                .iter()
+                .filter_map(|prop| UnknownProperty::from_prop(table, prop)),
+        );
+    }
+    Ok(properties)
+}
+
+fn record_bytes(record: &Record<'_>) -> Box<[u8]> {
+    let version_instance = u16::from(record.version()) | (record.instance() << 4);
+    let mut bytes = Vec::with_capacity(8usize.saturating_add(record.data().len()));
+    bytes.extend_from_slice(&version_instance.to_le_bytes());
+    bytes.extend_from_slice(&record.raw_kind().to_le_bytes());
+    bytes.extend_from_slice(&record.len().to_le_bytes());
+    bytes.extend_from_slice(record.data());
+    bytes.into_boxed_slice()
 }
 
 fn collect_unknown_children(

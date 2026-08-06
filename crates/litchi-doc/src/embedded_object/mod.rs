@@ -13,4 +13,7 @@ mod transaction;
 mod tests;
 
 pub use litchi_ole_common::object::Limits;
-pub use model::{Editor, Info, Reference, WriteOptions};
+pub use model::{
+    Clipboard, CompObj, Editor, Entry, Info, Inventory, Kind, Metadata, Ole, Reference, Unknown,
+    WriteOptions,
+};

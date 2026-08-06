@@ -102,6 +102,10 @@ pub(super) fn validate_toolbar_wrapper(value: &ToolbarWrapper<'_>) -> Result<()>
     if value.toolbar_controls.len() > usize::try_from(i32::MAX).unwrap_or(usize::MAX) {
         return Err(corrupted("CTBWRAPPER cbDTBC exceeds i32::MAX"));
     }
+    validate_count(value.delta_controls.len(), "CTBWRAPPER rtbdc")?;
+    for control in &value.delta_controls {
+        control.validate()?;
+    }
     for customization in &value.customizations {
         validate_customization(customization, value.customizations.len())?;
     }
@@ -142,6 +146,52 @@ pub(super) fn validate_customization(
     Ok(())
 }
 
+pub(super) fn validate_control(value: &Control<'_>) -> Result<()> {
+    if matches!(
+        value.header.control_type(),
+        litchi_ole_common::toolbar::ControlType::Unknown(_)
+    ) {
+        return Err(corrupted("TBCHeader has an unsupported control type"));
+    }
+    let control_id = value.header.control_id();
+    let command_required = control_id != 0x0001 && control_id != 0x1051;
+    if command_required != value.command.is_some() {
+        return Err(corrupted(
+            "TBC Cid presence does not match the toolbar control identifier",
+        ));
+    }
+    if let Some(command) = value.command {
+        if !command.is_fci() && !command.is_allocated() {
+            return Err(corrupted("TBC Cid has an unsupported Cmt value"));
+        }
+    }
+
+    if matches!(
+        value.header.control_type(),
+        litchi_ole_common::toolbar::ControlType::ActiveX
+    ) {
+        if value.data.is_some() {
+            return Err(corrupted("ActiveX TBC controls must not contain TBCData"));
+        }
+        return Ok(());
+    }
+
+    let Some(data) = value.data.as_ref() else {
+        return Err(corrupted("non-ActiveX TBC controls require TBCData"));
+    };
+    let general_flags = data.general().flags();
+    if (general_flags.save_text()
+        || general_flags.save_misc_ui_strings()
+        || general_flags.save_misc_custom())
+        && !value.header.specifics().save_ui_strings()
+    {
+        return Err(corrupted(
+            "TBCGeneralInfo strings require TBCSFlags.fSaveUIStrings",
+        ));
+    }
+    Ok(())
+}
+
 pub(super) fn validate_toolbar(toolbar: &Toolbar<'_>, customization_count: usize) -> Result<()> {
     if toolbar.toolbar_index < 0 {
         return Err(corrupted("CTB iWCTB must be nonnegative"));
@@ -149,10 +199,15 @@ pub(super) fn validate_toolbar(toolbar: &Toolbar<'_>, customization_count: usize
     if usize::try_from(toolbar.toolbar_index).ok() >= Some(customization_count) {
         return Err(corrupted("CTB iWCTB is outside rCustomizations"));
     }
-    if toolbar.control_count != 0 || toolbar.header.control_count() != 0 {
-        return Err(corrupted(
-            "CTB toolbar controls are unsupported unless both counts are zero",
-        ));
+    if toolbar.control_count < 0 {
+        return Err(corrupted("CTB cCtls must be nonnegative"));
+    }
+    if usize::try_from(toolbar.control_count).ok() != Some(toolbar.controls.len()) {
+        return Err(corrupted("CTB cCtls does not match the rTBC control count"));
+    }
+    validate_count(toolbar.controls.len(), "CTB rTBC")?;
+    for control in &toolbar.controls {
+        control.validate()?;
     }
     if toolbar.reserved != 0 {
         return Err(corrupted("CTB reserved field must be zero"));

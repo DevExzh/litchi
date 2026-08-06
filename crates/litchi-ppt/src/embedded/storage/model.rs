@@ -1,7 +1,9 @@
 use crate::package::{Error, Result};
 
-const MAX_STORED_BYTES: usize = 128 * 1_048_576;
-const MAX_DECLARED_BYTES: u32 = 256 * 1_048_576;
+/// Maximum bytes in one persisted `ExOleObjStg` record payload.
+pub const MAX_STORED_BYTES: usize = 128 * 1_048_576;
+/// Maximum producer-declared decompressed size for a compressed payload.
+pub const MAX_DECLARED_BYTES: u32 = 256 * 1_048_576;
 
 /// The PowerPoint record context that owns a persisted payload.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -46,20 +48,14 @@ pub(crate) struct Ref<'a> {
     pub(crate) data: &'a [u8],
 }
 
-/// Payload-free fields shared by owned and borrowed storage representations.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Metadata {
-    pub(crate) kind: Kind,
-    pub(crate) compression: Compression,
-    pub(crate) declared_uncompressed_len: Option<u32>,
-    pub(crate) stored_payload_len: usize,
-    pub(crate) contains_data: bool,
-}
-
 impl Compression {
     /// Whether this storage requires zlib decoding.
     pub const fn is_zlib(self) -> bool {
         matches!(self, Self::Zlib)
+    }
+
+    pub(crate) const fn prefix_len(self) -> usize {
+        if self.is_zlib() { 4 } else { 0 }
     }
 }
 
@@ -81,7 +77,7 @@ impl Storage {
         declared_uncompressed_len: Option<u32>,
         data: Vec<u8>,
     ) -> Result<Self> {
-        let prefix_len = usize::from(compression.is_zlib()) * 4;
+        let prefix_len = compression.prefix_len();
         let stored_len = data
             .len()
             .checked_add(prefix_len)
@@ -136,25 +132,8 @@ impl Storage {
     pub fn into_stored_bytes(self) -> Vec<u8> {
         self.data
     }
-
-    #[cfg(test)]
-    pub(crate) fn metadata(&self) -> Metadata {
-        Metadata {
-            kind: self.kind,
-            compression: self.compression,
-            declared_uncompressed_len: self.declared_uncompressed_len,
-            stored_payload_len: self.data.len(),
-            contains_data: match self.compression {
-                Compression::Uncompressed => !self.data.is_empty(),
-                Compression::Zlib => self.declared_uncompressed_len.is_some_and(|len| len != 0),
-            },
-        }
-    }
 }
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::Corrupted(message.into()))
 }
-
-pub(super) const MAX_DECLARED: u32 = MAX_DECLARED_BYTES;
-pub(super) const MAX_STORED: usize = MAX_STORED_BYTES;

@@ -214,3 +214,66 @@ fn control_header_preserves_unknown_type_and_rejects_bad_construction() {
     wire[0] = 0x02;
     assert!(ControlHeader::parse(&wire).is_err());
 }
+
+#[test]
+fn general_info_and_extra_data_roundtrip_without_allocating_decoded_strings() {
+    let extra = ok(ExtraInfo::new(
+        text(""),
+        0,
+        text("tag"),
+        text("Macro"),
+        text("argument"),
+        MergeMode::Server,
+        MenuMerge::None,
+    ));
+    let flags = GeneralFlags::default()
+        .with_save_text(true)
+        .with_save_misc_ui_strings(true)
+        .with_save_misc_custom(true)
+        .with_disabled(true);
+    let general = ok(GeneralInfo::new(
+        flags,
+        Some(text("Caption")),
+        Some(text("Description")),
+        Some(text("Tooltip")),
+        Some(extra),
+    ));
+    let value = ok(Data::new(general, vec![0xA5, 0x03, 0x01]));
+    let bytes = value.to_bytes();
+    let (decoded, consumed) = ok(Data::parse_prefix(&bytes, 3));
+
+    assert_eq!(consumed, bytes.len());
+    assert_eq!(decoded.general().flags().raw(), flags.raw());
+    assert_eq!(decoded.general().custom_text().unwrap().text(), "Caption");
+    assert_eq!(decoded.general().tooltip().unwrap().text(), "Tooltip");
+    assert_eq!(
+        decoded.general().extra().unwrap().on_action().text(),
+        "Macro"
+    );
+    assert_eq!(
+        decoded.general().extra().unwrap().merge(),
+        MergeMode::Server
+    );
+    assert_eq!(
+        decoded.general().extra().unwrap().menu_merge(),
+        MenuMerge::None
+    );
+    assert_eq!(decoded.specific(), &[0xA5, 0x03, 0x01]);
+    assert_eq!(decoded.to_bytes(), bytes);
+    assert_eq!(decoded.into_owned().to_bytes(), bytes);
+}
+
+#[test]
+fn general_info_rejects_fields_without_their_presence_flags() {
+    assert!(
+        GeneralInfo::new(
+            GeneralFlags::default(),
+            Some(text("unexpected")),
+            None,
+            None,
+            None,
+        )
+        .is_err()
+    );
+    assert!(GeneralInfo::parse(&[GeneralFlags::default().with_save_text(true).raw()]).is_err());
+}

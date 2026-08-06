@@ -392,8 +392,8 @@ pub use phonetic_info::{
     PhoneticAlignment, PhoneticFormat, PhoneticInfo, PhoneticRange, PhoneticType,
 };
 pub use pivot_olap::{
-    HiddenMemberSet, PivotFieldOlapExt, PivotHierarchy, PivotHierarchyAxis, PivotItemOlapFlags,
-    PivotPageItemOlapExt, PivotViewOlapHeader,
+    HiddenMemberSet, OlapSequence, PivotFieldOlapExt, PivotHierarchy, PivotHierarchyAxis,
+    PivotItemOlapFlags, PivotPageItemOlapExt, PivotViewOlapHeader,
 };
 pub use plot_growth::{FixedPoint, PlotGrowth};
 pub use print_flags::{GridSet, PrintRowCol};

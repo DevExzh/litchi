@@ -5508,6 +5508,31 @@ with one ignored), XLS (862), XLSB (413), and XLSX (653). Formatting, diff,
 and the 46-package boundary check pass. This is layered-owner and bounded
 metadata evidence, not a claim of complete OLE2, OOXML, or ODF conformance.
 
+## Shared TBCData and continued OLE2 owner migration
+
+The next OLE2 wave moves the flag-controlled `[MS-OSHARED]` `TBCGeneralInfo`
+and `TBCExtraInfo` structures into `litchi-ole-common::toolbar`. Borrowed
+`WString` values, typed OLE host/server and menu-merge modes, disabled/UI
+flags, and exact format-specific tails are retained without activating
+commands, macros, ActiveX, or UI behavior. DOC command bars and XLS XCB
+owners consume this common model at their format-specific record boundaries;
+ambiguous or malformed variable payloads remain rejected rather than guessed.
+
+The same continuation deepens the legacy owners with typed DOC embedded-object
+inventory metadata, OfficeArt shape/group projections, FIB and TAP seams, PPT
+chart transactions, Escher records, animation timing properties, and
+failure-atomic embedded-storage snapshots. XLS form-control/OLE-object,
+list-object, pivot/OLAP, and toolbar owners gain bounded typed metadata and
+authoring operations. `litchi-ooxml-common` web extensions and
+`litchi-drawingml` chart writing are split into contextual semantic, wire/XML,
+package, validation, and test layers. Unsupported records remain lossless or
+explicitly inert, and all facades retain prefix-free names.
+
+These changes are specification-backed migration evidence for `[MS-DOC]`,
+`[MS-ODRAW]`, `[MS-OGRAPH]`, `[MS-OSHARED]`, `[MS-PPT]`, `[MS-XLS]`, and
+DrawingML/OOXML. They do not claim complete format conformance or runtime
+control execution.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

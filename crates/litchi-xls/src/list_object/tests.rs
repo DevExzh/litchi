@@ -2,6 +2,48 @@ use super::codec::{append_frt, parse_string};
 use super::*;
 use crate::Result;
 
+#[test]
+fn table_flags_preserve_known_and_future_bits() {
+    let raw = 0xA1FF_FFFE;
+    let flags = TableFlags::from_raw(raw);
+    assert_eq!(flags.raw(), raw);
+    assert!(flags.auto_filter());
+    assert!(flags.persists_auto_filter());
+    assert!(flags.shows_insert_row());
+    assert!(flags.insert_row_inserts_cells());
+    assert!(flags.loads_deleted_row_ids());
+    assert!(flags.shows_total_row());
+    assert!(flags.needs_commit());
+    assert!(flags.is_single_cell());
+    assert!(flags.applies_auto_filter());
+    assert!(flags.forces_insert_row_visible());
+    assert!(flags.uses_compressed_xml());
+    assert!(flags.loads_provider_name());
+    assert!(flags.loads_changed_row_ids());
+    assert_eq!(flags.version_nibble(), 0xF);
+    assert!(flags.loads_entry_id());
+    assert!(flags.loads_invalid_cells());
+    assert!(flags.has_good_build());
+    assert!(flags.is_published());
+    assert_ne!(flags.unknown_bits(), 0);
+}
+
+#[test]
+fn table_feature_flags_are_typed_and_round_trip_through_feature11() {
+    let value = table(2, 3)
+        .with_table_flags(
+            TableFlags::default_table()
+                .with_show_insert_row(true)
+                .with_unknown_bits(0x8000_0000),
+        )
+        .unwrap();
+    let records = value.to_feature_record_bytes().unwrap();
+    let parsed = parse_feature_records(&value, &records).unwrap();
+    assert!(parsed.table_flags().shows_insert_row());
+    assert_eq!(parsed.table_flags().unknown_bits(), 0x8000_0000);
+    assert_eq!(parsed.to_feature_record_bytes().unwrap(), records);
+}
+
 fn table(column_count: usize, name_len: usize) -> ListObject {
     let columns = (0..column_count)
         .map(|index| {

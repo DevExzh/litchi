@@ -4,6 +4,7 @@
 //! are kept separate from the snapshot transaction and OLE storage boundary.
 
 mod encode;
+mod metadata;
 mod parse;
 mod primitives;
 mod validation;

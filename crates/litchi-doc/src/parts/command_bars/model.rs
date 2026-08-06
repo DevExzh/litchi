@@ -4,6 +4,10 @@ use crate::package::Result;
 use litchi_ole_common::toolbar::Header;
 use std::borrow::Cow;
 
+mod controls;
+
+pub use controls::{CommandId, Control};
+
 /// A lossless DOC `Xst` string (MS-DOC 2.9.353).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XString<'a> {
@@ -569,7 +573,7 @@ impl<'a> Customization<'a> {
     }
 }
 
-/// A custom toolbar (`CTB`) with controls intentionally bounded to zero.
+/// A custom toolbar (`CTB`) and its typed toolbar controls.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Toolbar<'a> {
     pub(super) name: XString<'a>,
@@ -579,6 +583,7 @@ pub struct Toolbar<'a> {
     pub(super) reserved: u16,
     pub(super) unused: u16,
     pub(super) control_count: i32,
+    pub(super) controls: Vec<Control<'a>>,
 }
 
 impl<'a> Toolbar<'a> {
@@ -598,6 +603,7 @@ impl<'a> Toolbar<'a> {
             reserved,
             unused,
             control_count: 0,
+            controls: Vec::new(),
         };
         value.validate(1)?;
         Ok(value)
@@ -631,12 +637,34 @@ impl<'a> Toolbar<'a> {
         self.control_count
     }
 
+    /// Return the controls in their on-disk order.
+    pub fn controls(&self) -> &[Control<'a>] {
+        &self.controls
+    }
+
+    /// Replace the controls and update the CTB count atomically.
+    pub fn with_controls(mut self, controls: Vec<Control<'a>>) -> Result<Self> {
+        self.control_count =
+            i32::try_from(controls.len()).map_err(|_| corrupted("CTB cCtls exceeds i32::MAX"))?;
+        self.controls = controls;
+        self.validate(1)?;
+        Ok(self)
+    }
+
+    /// Append one control and update the CTB count.
+    pub fn push_control(&mut self, control: Control<'a>) -> Result<()> {
+        self.controls.push(control);
+        self.control_count = i32::try_from(self.controls.len())
+            .map_err(|_| corrupted("CTB cCtls exceeds i32::MAX"))?;
+        self.validate(1)
+    }
+
     pub(super) fn validate(&self, customization_count: usize) -> Result<()> {
         super::validation::validate_toolbar(self, customization_count)
     }
 }
 
-/// A `CTBWRAPPER` containing customizations and lossless opaque TBC bytes.
+/// A `CTBWRAPPER` containing customizations and lossless `rtbdc` TBC bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolbarWrapper<'a> {
     pub(super) reserved1: u8,
@@ -646,6 +674,7 @@ pub struct ToolbarWrapper<'a> {
     pub(super) reserved5: u16,
     pub(super) cb_tbd: u16,
     pub(super) toolbar_controls: Cow<'a, [u8]>,
+    pub(super) delta_controls: Vec<Control<'a>>,
     pub(super) customizations: Vec<Customization<'a>>,
 }
 
@@ -659,6 +688,7 @@ impl<'a> ToolbarWrapper<'a> {
             reserved5: 0x000C,
             cb_tbd: 0x0012,
             toolbar_controls: Cow::Owned(Vec::new()),
+            delta_controls: Vec::new(),
             customizations,
         };
         value.validate().map(|()| value)
@@ -666,6 +696,11 @@ impl<'a> ToolbarWrapper<'a> {
 
     pub fn toolbar_controls(&self) -> &[u8] {
         &self.toolbar_controls
+    }
+
+    /// Return typed controls referenced by the wrapper's `rtbdc` array.
+    pub fn delta_controls(&self) -> &[Control<'a>] {
+        &self.delta_controls
     }
 
     pub fn customizations(&self) -> &[Customization<'a>] {

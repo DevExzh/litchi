@@ -1,11 +1,11 @@
 //! Escher facade and byte-level regression tests.
 
-use super::super::shapes::shape_type;
 use super::*;
 use crate::shapes::geometry::{
     GeometryRect, ShapePathType, extract_geometry_rect, extract_segment_info, extract_shape_path,
     extract_vertices,
 };
+use crate::writer::shapes::shape_type;
 use crate::writer::text_format::{Paragraph, TextRun};
 use litchi_odraw::prop::Props;
 use litchi_odraw::shape::Flags;

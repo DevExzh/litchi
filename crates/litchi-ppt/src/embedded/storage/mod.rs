@@ -5,11 +5,15 @@
 //! this module owns only the PowerPoint record that points at those bytes.
 
 mod codec;
+mod editor;
 mod model;
+mod snapshot;
 
 #[cfg(test)]
 mod tests;
 
-pub use model::{Compression, Kind, Storage};
+pub use editor::Editor;
+pub use model::{Compression, Kind, MAX_DECLARED_BYTES, MAX_STORED_BYTES, Storage};
+pub use snapshot::{Metadata, Snapshot};
 
-pub(crate) use model::{Metadata, Ref};
+pub(crate) use model::Ref;

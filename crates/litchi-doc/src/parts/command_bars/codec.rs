@@ -1,15 +1,12 @@
 //! Lossless binary codec and FIB/table-stream seam for command bars.
 
+mod control;
+
 use super::model::*;
 use super::validation::validate_count;
 use crate::package::{Error as PackageError, Result};
-use crate::parts::fib::FileInformationBlock;
-use crate::writer::fib::FibBuilder;
 use litchi_ole_common::toolbar::Header;
 use std::borrow::Cow;
-
-/// `FibRgFcLcb97` index of `fcCmds`/`lcbCmds` (MS-DOC 2.5).
-pub const FIB_INDEX_CMDS: usize = 24;
 
 const TCG_VERSION: u8 = 0xFF;
 const TCG_TERMINATOR: u8 = 0x40;
@@ -23,29 +20,7 @@ const ACD_SIZE: usize = 4;
 const KME_SIZE: usize = 14;
 const TB_DELTA_SIZE: usize = 18;
 const CTB_DATA_OVERHEAD: usize = 112;
-
-/// Parse the optional command-bar table addressed by `fcCmds`/`lcbCmds`.
-pub fn parse<'a>(
-    fib: &FileInformationBlock,
-    table_stream: &'a [u8],
-) -> Result<Option<CommandBars<'a>>> {
-    let Some((offset, length)) = fib.get_table_pointer(FIB_INDEX_CMDS) else {
-        return Ok(None);
-    };
-    if length == 0 {
-        return Ok(None);
-    }
-
-    let start = usize::try_from(offset).map_err(|_| corrupted("fcCmds exceeds usize"))?;
-    let length = usize::try_from(length).map_err(|_| corrupted("lcbCmds exceeds usize"))?;
-    let end = start
-        .checked_add(length)
-        .ok_or_else(|| corrupted("fcCmds/lcbCmds range overflows"))?;
-    let data = table_stream
-        .get(start..end)
-        .ok_or_else(|| corrupted("Tcg extends beyond the table stream"))?;
-    parse_bytes(data).map(Some)
-}
+const MAX_BITMAP_SIZE: i32 = 65_576;
 
 /// Parse exactly one complete `Tcg` payload.
 pub fn parse_bytes<'a>(data: &'a [u8]) -> Result<CommandBars<'a>> {
@@ -112,22 +87,6 @@ pub fn to_bytes(value: &CommandBars<'_>) -> Result<Vec<u8>> {
     }
     output.push(value.terminator);
     Ok(output)
-}
-
-/// Append a command-bar table and update its FIB pointer atomically with the
-/// in-memory table-stream operation.
-pub fn write(
-    fib: &mut FibBuilder,
-    table_stream: &mut Vec<u8>,
-    value: &CommandBars<'_>,
-) -> Result<()> {
-    let data = to_bytes(value)?;
-    let offset = u32::try_from(table_stream.len())
-        .map_err(|_| corrupted("table-stream offset exceeds u32::MAX"))?;
-    let length = u32::try_from(data.len()).map_err(|_| corrupted("Tcg length exceeds u32::MAX"))?;
-    fib.set_cmds(offset, length);
-    table_stream.extend_from_slice(&data);
-    Ok(())
 }
 
 impl<'a> XString<'a> {
@@ -250,6 +209,7 @@ fn parse_toolbar_wrapper<'a>(reader: &mut Reader<'a>) -> Result<ToolbarWrapper<'
     let customization_count = positive_count(reader.i16("CTBWRAPPER cCust")?, "CTBWRAPPER cCust")?;
     let controls_len = nonnegative_i32(reader.i32("CTBWRAPPER cbDTBC")?, "cbDTBC")?;
     let controls = reader.take(controls_len, "CTBWRAPPER rtbdc")?;
+    let delta_controls = control::parse_many(controls)?;
 
     let mut customizations = Vec::with_capacity(customization_count);
     for _ in 0..customization_count {
@@ -263,6 +223,7 @@ fn parse_toolbar_wrapper<'a>(reader: &mut Reader<'a>) -> Result<ToolbarWrapper<'
         reserved5,
         cb_tbd,
         toolbar_controls: Cow::Borrowed(controls),
+        delta_controls,
         customizations,
     };
     value.validate()?;
@@ -335,15 +296,13 @@ fn parse_toolbar<'a>(data: &'a [u8], customization_count: usize) -> Result<(Tool
     let unused = body_reader.u16("CTB unused")?;
     body_reader.finish()?;
 
-    let control_count = reader.i32("CTB cCtls")?;
-    if control_count < 0 {
-        return Err(corrupted("CTB cCtls must be nonnegative"));
+    let control_count = nonnegative_i32(reader.i32("CTB cCtls")?, "CTB cCtls")?;
+    validate_count(control_count, "CTB cCtls")?;
+    let mut controls = Vec::with_capacity(control_count);
+    for _ in 0..control_count {
+        controls.push(control::parse_one(&mut reader)?);
     }
-    if control_count != 0 {
-        return Err(unsupported(
-            "CTB rTBC controls are not decoded because TBCData is a variable UI record family",
-        ));
-    }
+    let control_bytes = reader.position();
 
     let value = Toolbar {
         name,
@@ -352,10 +311,12 @@ fn parse_toolbar<'a>(data: &'a [u8], customization_count: usize) -> Result<(Tool
         toolbar_index,
         reserved,
         unused,
-        control_count,
+        control_count: i32::try_from(control_count)
+            .map_err(|_| corrupted("CTB cCtls exceeds i32::MAX"))?,
+        controls,
     };
     validate_count(customization_count, "CTB cCust")?;
-    Ok((value, name_size + 4 + body_len + 4))
+    Ok((value, name_size + control_bytes))
 }
 
 fn parse_delta(reader: &mut Reader<'_>) -> Result<ToolbarDelta> {
@@ -461,6 +422,7 @@ fn encode_customization(output: &mut Vec<u8>, value: &Customization<'_>) -> Resu
 }
 
 fn encode_toolbar(output: &mut Vec<u8>, value: &Toolbar<'_>) -> Result<()> {
+    value.validate(1)?;
     let toolbar = value.header.to_bytes();
     let cb_tbd = toolbar
         .len()
@@ -474,7 +436,55 @@ fn encode_toolbar(output: &mut Vec<u8>, value: &Toolbar<'_>) -> Result<()> {
     output.extend_from_slice(&value.toolbar_index.to_le_bytes());
     output.extend_from_slice(&value.reserved.to_le_bytes());
     output.extend_from_slice(&value.unused.to_le_bytes());
-    output.extend_from_slice(&value.control_count.to_le_bytes());
+    output.extend_from_slice(
+        &i32::try_from(value.controls.len())
+            .map_err(|_| corrupted("CTB cCtls exceeds i32::MAX"))?
+            .to_le_bytes(),
+    );
+    for control in &value.controls {
+        encode_control(output, control)?;
+    }
+    Ok(())
+}
+
+/// Serialize one complete DOC toolbar-control record.
+pub fn to_control_bytes(value: &Control<'_>) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    encode_control(&mut output, value)?;
+    Ok(output)
+}
+
+impl<'a> Control<'a> {
+    /// Serialize one complete DOC toolbar-control record.
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        to_control_bytes(self)
+    }
+}
+
+impl<'a> ToolbarWrapper<'a> {
+    /// Attach typed rtbdc controls while retaining their serialized bytes.
+    pub fn with_delta_controls(mut self, controls: Vec<Control<'a>>) -> Result<Self> {
+        validate_count(controls.len(), "CTBWRAPPER rtbdc")?;
+        let mut encoded = Vec::new();
+        for control in &controls {
+            encode_control(&mut encoded, control)?;
+        }
+        self.toolbar_controls = Cow::Owned(encoded);
+        self.delta_controls = controls;
+        self.validate()?;
+        Ok(self)
+    }
+}
+
+fn encode_control(output: &mut Vec<u8>, value: &Control<'_>) -> Result<()> {
+    value.validate()?;
+    output.extend_from_slice(&value.header.to_bytes());
+    if let Some(command) = value.command {
+        output.extend_from_slice(&command.raw().to_le_bytes());
+    }
+    if let Some(data) = &value.data {
+        output.extend_from_slice(&data.to_bytes());
+    }
     Ok(())
 }
 

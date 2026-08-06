@@ -1,6 +1,6 @@
 use super::model::{
-    ButtonFlags, ControlFlags, ControlHeader, Error, Flags, GeneralFlags, Header, Restrictions,
-    SpecificFlags, WString,
+    ButtonFlags, ControlFlags, ControlHeader, Data, Error, ExtraInfo, Flags, GeneralFlags,
+    GeneralInfo, Header, Restrictions, SpecificFlags, WString,
 };
 
 const TOOLBAR_SIGNATURE: u8 = 0x02;
@@ -38,6 +38,156 @@ impl<'a> WString<'a> {
         let mut output = Vec::with_capacity(1 + self.encoded_len());
         output.push(self.len() as u8);
         output.extend_from_slice(self.encoded_bytes());
+        output
+    }
+}
+
+impl<'a> ExtraInfo<'a> {
+    /// Parse one `TBCExtraInfo` and return the number of bytes consumed.
+    pub fn parse_prefix(data: &'a [u8]) -> Result<(Self, usize), Error> {
+        let mut cursor = Cursor::new(data);
+        let (help_file, consumed) = WString::parse_prefix(cursor.remaining())?;
+        cursor.advance(consumed)?;
+        let help_context = cursor.i32("TBCExtraInfo idHelpContext")?;
+        let (tag, consumed) = WString::parse_prefix(cursor.remaining())?;
+        cursor.advance(consumed)?;
+        let (on_action, consumed) = WString::parse_prefix(cursor.remaining())?;
+        cursor.advance(consumed)?;
+        let (param, consumed) = WString::parse_prefix(cursor.remaining())?;
+        cursor.advance(consumed)?;
+        let merge = cursor.u8("TBCExtraInfo tbcu")?;
+        let menu_merge = cursor.u8("TBCExtraInfo tbmg")?;
+        let value = Self::from_decoded(
+            help_file,
+            help_context,
+            tag,
+            on_action,
+            param,
+            merge,
+            menu_merge,
+        );
+        value.validate()?;
+        Ok((value, cursor.position()))
+    }
+
+    /// Parse exactly one `TBCExtraInfo` structure.
+    pub fn parse(data: &'a [u8]) -> Result<Self, Error> {
+        let (value, consumed) = Self::parse_prefix(data)?;
+        if consumed != data.len() {
+            return Err(Error::invalid("TBCExtraInfo has trailing bytes"));
+        }
+        Ok(value)
+    }
+
+    /// Serialize `TBCExtraInfo` deterministically.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut output = Vec::with_capacity(
+            self.help_file().encoded_len()
+                + self.tag().encoded_len()
+                + self.on_action().encoded_len()
+                + self.param().encoded_len()
+                + 20,
+        );
+        output.extend_from_slice(&self.help_file().to_bytes());
+        output.extend_from_slice(&self.help_context().to_le_bytes());
+        output.extend_from_slice(&self.tag().to_bytes());
+        output.extend_from_slice(&self.on_action().to_bytes());
+        output.extend_from_slice(&self.param().to_bytes());
+        output.push(self.merge().raw());
+        output.push(self.menu_merge().raw());
+        output
+    }
+}
+
+impl<'a> GeneralInfo<'a> {
+    /// Parse one `TBCGeneralInfo` and return the number of bytes consumed.
+    pub fn parse_prefix(data: &'a [u8]) -> Result<(Self, usize), Error> {
+        let mut cursor = Cursor::new(data);
+        let flags = GeneralFlags::from_raw(cursor.u8("TBCGeneralInfo bFlags")?);
+        let custom_text = if flags.save_text() {
+            let (value, consumed) = WString::parse_prefix(cursor.remaining())?;
+            cursor.advance(consumed)?;
+            Some(value)
+        } else {
+            None
+        };
+        let (description, tooltip) = if flags.save_misc_ui_strings() {
+            let (description, consumed) = WString::parse_prefix(cursor.remaining())?;
+            cursor.advance(consumed)?;
+            let (tooltip, consumed) = WString::parse_prefix(cursor.remaining())?;
+            cursor.advance(consumed)?;
+            (Some(description), Some(tooltip))
+        } else {
+            (None, None)
+        };
+        let extra = if flags.save_misc_custom() {
+            let (value, consumed) = ExtraInfo::parse_prefix(cursor.remaining())?;
+            cursor.advance(consumed)?;
+            Some(value)
+        } else {
+            None
+        };
+        let value = Self::from_decoded(flags, custom_text, description, tooltip, extra);
+        value.validate()?;
+        Ok((value, cursor.position()))
+    }
+
+    /// Parse exactly one `TBCGeneralInfo` structure.
+    pub fn parse(data: &'a [u8]) -> Result<Self, Error> {
+        let (value, consumed) = Self::parse_prefix(data)?;
+        if consumed != data.len() {
+            return Err(Error::invalid("TBCGeneralInfo has trailing bytes"));
+        }
+        Ok(value)
+    }
+
+    /// Serialize `TBCGeneralInfo` deterministically.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut output = Vec::new();
+        output.push(self.flags().raw());
+        if let Some(value) = self.custom_text() {
+            output.extend_from_slice(&value.to_bytes());
+        }
+        if let Some(value) = self.description() {
+            output.extend_from_slice(&value.to_bytes());
+        }
+        if let Some(value) = self.tooltip() {
+            output.extend_from_slice(&value.to_bytes());
+        }
+        if let Some(value) = self.extra() {
+            output.extend_from_slice(&value.to_bytes());
+        }
+        output
+    }
+}
+
+impl<'a> Data<'a> {
+    /// Parse `TBCData` when the surrounding owner has identified the
+    /// format-specific tail length.
+    pub fn parse_prefix(data: &'a [u8], specific_len: usize) -> Result<(Self, usize), Error> {
+        let (general, general_len) = GeneralInfo::parse_prefix(data)?;
+        let end = general_len
+            .checked_add(specific_len)
+            .ok_or_else(|| Error::invalid("TBCData specific length overflows usize"))?;
+        if data.len() < end {
+            return Err(Error::Truncated("TBCData specific information"));
+        }
+        Ok((Self::from_decoded(general, &data[general_len..end]), end))
+    }
+
+    /// Parse exactly one `TBCData` payload and retain all remaining bytes as
+    /// its format-specific tail.
+    pub fn parse(data: &'a [u8]) -> Result<Self, Error> {
+        let (general, general_len) = GeneralInfo::parse_prefix(data)?;
+        Ok(Self::from_decoded(general, &data[general_len..]))
+    }
+
+    /// Serialize the common metadata followed by the retained specific tail.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let general = self.general().to_bytes();
+        let mut output = Vec::with_capacity(general.len() + self.specific().len());
+        output.extend_from_slice(&general);
+        output.extend_from_slice(self.specific());
         output
     }
 }
@@ -352,5 +502,10 @@ impl<'a> Cursor<'a> {
     fn u32(&mut self, field: &'static str) -> Result<u32, Error> {
         let value = self.take(4, field)?;
         Ok(u32::from_le_bytes([value[0], value[1], value[2], value[3]]))
+    }
+
+    fn i32(&mut self, field: &'static str) -> Result<i32, Error> {
+        let value = self.take(4, field)?;
+        Ok(i32::from_le_bytes([value[0], value[1], value[2], value[3]]))
     }
 }

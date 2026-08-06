@@ -5,7 +5,8 @@ use crate::consts::RecordType;
 use crate::package::{Error, Result};
 use crate::records::Record;
 
-use super::model::{Compression, Kind, MAX_DECLARED, MAX_STORED, Metadata, Ref, Storage};
+use super::model::{Compression, Kind, MAX_DECLARED_BYTES, MAX_STORED_BYTES, Ref, Storage};
+use super::snapshot::{Metadata, Snapshot};
 
 impl<'a> Ref<'a> {
     /// Resolve one strict `ExOleObjStg` record directly from presentation bytes.
@@ -28,7 +29,7 @@ impl<'a> Ref<'a> {
         if version != 0 || record_type != RecordType::ExternalOleObjectStg.as_u16() {
             return corrupted("persisted storage is not a strict ExOleObjStg record");
         }
-        if stored_len > MAX_STORED {
+        if stored_len > MAX_STORED_BYTES {
             return corrupted("ExOleObjStg exceeds 128 MiB stored data");
         }
         let payload_end = header_end
@@ -52,7 +53,7 @@ impl<'a> Ref<'a> {
                         Error::Corrupted("compressed ExOleObjStg is missing its size prefix".into())
                     })?;
                 let declared_uncompressed_len = u32::from_le_bytes(*prefix);
-                if declared_uncompressed_len > MAX_DECLARED {
+                if declared_uncompressed_len > MAX_DECLARED_BYTES {
                     return corrupted("compressed ExOleObjStg declares more than 256 MiB");
                 }
                 Ok(Self {
@@ -69,16 +70,7 @@ impl<'a> Ref<'a> {
     }
 
     pub(crate) fn metadata(self) -> Metadata {
-        Metadata {
-            kind: self.kind,
-            compression: self.compression,
-            declared_uncompressed_len: self.declared_uncompressed_len,
-            stored_payload_len: self.data.len(),
-            contains_data: match self.compression {
-                Compression::Uncompressed => !self.data.is_empty(),
-                Compression::Zlib => self.declared_uncompressed_len.is_some_and(|len| len != 0),
-            },
-        }
+        self.snapshot().metadata()
     }
 
     /// Reject a caller-specific stored-size ceiling before payload allocation.
@@ -162,7 +154,7 @@ impl Storage {
         if record.version != 0
             || record.record_type_raw != RecordType::ExternalOleObjectStg.as_u16()
             || usize::try_from(record.data_length).ok() != Some(record.data.len())
-            || record.data.len() > MAX_STORED
+            || record.data.len() > MAX_STORED_BYTES
         {
             return corrupted("ExOleObjStg has an invalid header or stored size");
         }
@@ -212,40 +204,47 @@ impl Storage {
 
     /// Encode the complete record without an intermediate parsed view.
     pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
-        let (instance, prefix_len, declared) = match self.compression {
-            Compression::Uncompressed => (0u16, 0usize, None),
+        self.snapshot().to_record_bytes()
+    }
+}
+
+impl<'a> Snapshot<'a> {
+    /// Encode the complete `ExOleObjStg` record represented by this view.
+    pub fn to_record_bytes(self) -> Result<Vec<u8>> {
+        let (instance, declared) = match self.compression() {
+            Compression::Uncompressed => (0u16, None),
             Compression::Zlib => (
                 1u16,
-                4usize,
-                Some(self.declared_uncompressed_len.ok_or_else(|| {
+                Some(self.declared_uncompressed_len().ok_or_else(|| {
                     Error::Corrupted("compressed ExOleObjStg is missing its size".into())
                 })?),
             ),
         };
-        let data_len = self
-            .data
-            .len()
-            .checked_add(prefix_len)
-            .ok_or_else(|| Error::Corrupted("ExOleObjStg payload size overflows".into()))?;
-        if data_len > MAX_STORED {
+        let data_len = self.record_payload_len();
+        if data_len > MAX_STORED_BYTES {
             return corrupted("ExOleObjStg exceeds 128 MiB stored data");
         }
         if let Some(declared) = declared {
-            if declared > MAX_DECLARED {
+            if declared > MAX_DECLARED_BYTES {
                 return corrupted("compressed ExOleObjStg declares more than 256 MiB");
             }
         }
         let length = u32::try_from(data_len)
             .map_err(|_| Error::Corrupted("ExOleObjStg payload exceeds u32".into()))?;
-        let mut bytes = Vec::with_capacity(data_len.saturating_add(8));
+        let mut bytes = Vec::with_capacity(self.record_len());
         bytes.extend_from_slice(&(instance << 4).to_le_bytes());
         bytes.extend_from_slice(&RecordType::ExternalOleObjectStg.as_u16().to_le_bytes());
         bytes.extend_from_slice(&length.to_le_bytes());
         if let Some(declared) = declared {
             bytes.extend_from_slice(&declared.to_le_bytes());
         }
-        bytes.extend_from_slice(&self.data);
+        bytes.extend_from_slice(self.stored_bytes());
         Ok(bytes)
+    }
+
+    /// Parse the encoded view as a complete PowerPoint record.
+    pub fn to_record(self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
     }
 }
 

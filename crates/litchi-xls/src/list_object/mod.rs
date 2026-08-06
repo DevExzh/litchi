@@ -8,6 +8,7 @@
 mod codec;
 mod model;
 mod package;
+mod table_metadata;
 
 #[cfg(test)]
 mod tests;
@@ -39,5 +40,7 @@ pub use model::{
     WebEditMode, WebFieldInfo, WebInvalidCell, WebReadingOrder, WebTableField, WebTableMetadata,
     XmlColumnMapping, XmlDataType, XmlTableField, XmlTableMetadata,
 };
+#[allow(unreachable_pub)]
+pub use table_metadata::TableFlags;
 
 pub(crate) use package::{ListObjectCollector, feature_header_record};

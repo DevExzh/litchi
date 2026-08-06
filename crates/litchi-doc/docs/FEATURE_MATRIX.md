@@ -73,7 +73,7 @@ shared Office codecs are counted only where the DOC API exposes them.
 | Document variables, attached-template and web-export metadata | 🟡 | ✅ | ✅ | Stored settings and relationship-like metadata are available where exposed; templates and web targets are not loaded and web layout is not generated |
 | Mail-merge settings, sources, filters, and recipients (Pms, Pmfs, Rfs, ODSO) | 🟡 | ✅ | ✅ | Word 97 and Word 2002+ source descriptors, SQL/connection text, recipient filtering, sorting, inclusion, and field mappings are typed bounded metadata; data sources are never contacted and no merge is run |
 | Legacy form fields and FFData | ✅ | ✅ | ✅ | Text, checkbox, dropdown, defaults, selections, help/status text, and verbatim entry/exit macro names are typed; macros and host form behavior are inert |
-| ActiveX/OCX control semantics | ❌ | ❌ | ❌ | Inert [MS-DOC] OcxInfo/RgxOcxInfo metadata is available through `parts::ole_controls`, including lossless Word-padded entry bytes; ObjectPool payloads still have no public control lifecycle, property, event, or rendering API |
+| ActiveX/OCX control semantics | 🟡 | ❌ | ❌ | Inert [MS-DOC] OcxInfo/RgxOcxInfo metadata and typed ObjectPool `CompObj`/`Ole`/`ObjInfo` inventory are available, including lossless unknown streams and malformed metadata; lifecycle, property, event, rendering, and activation APIs remain intentionally absent |
 | Document protection settings and range-level protected bookmarks | 🟡 | ✅ | ✅ | Protection modes, hashes, SttbfBkmkProt ranges, editor assignments, and usernames are typed; editing policy is not enforced |
 | Document statistics and DOP version metadata | ✅ | ✅ | ✅ | Word/character/paragraph/line/page counts where stored, versioned DOP records, compatibility options, typography, macro-security metadata, and related state are exposed within bounded models |
 
@@ -93,7 +93,7 @@ shared Office codecs are counted only where the DOC API exposes them.
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Command bars, keymaps, menus, toolbars, and UI customizations | 🟡 | ✅ | ✅ | Bounded `CommandBars` metadata covers the FIB `Tcg` seam, inert `PlfMcd`/`PlfAcd`/`PlfKme` records, and a lossless CTBWRAPPER shell; variable control-data and unknown Tcg records are refused, and macros/UI are never executed |
+| Command bars, keymaps, menus, toolbars, and UI customizations | 🟡 | ✅ | ✅ | Bounded `CommandBars` metadata covers the FIB `Tcg` seam, inert `PlfMcd`/`PlfAcd`/`PlfKme` records, typed shared `TBCGeneralInfo`/`TBCExtraInfo`, and lossless CTBWRAPPER/TBC tails; ambiguous variable boundaries and unknown Tcg records are refused, and macros/UI are never executed |
 | Routing slips and route-slip protection | 🟡 | ✅ | ✅ | Typed, lossless `RouteSlip`/`RouteSlipInfo` metadata is parsed and serialized through the FIB/table-stream seam; `Document` does not yet own the route-slip lifecycle or enforce its protection policy |
 | Macro or control execution | ❌ | ❌ | ❌ | VBA source, macro names, form metadata, OLE objects, and control payloads are passive data only |
 | External document/database/include resolution | ❌ | ❌ | ❌ | RD, include/link/DDE, mail-merge paths, SQL, connection strings, and referenced subdocuments are never opened, contacted, imported, or refreshed |

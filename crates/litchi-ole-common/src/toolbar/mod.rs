@@ -12,6 +12,7 @@ mod model;
 mod tests;
 
 pub use self::model::{
-    ButtonFlags, ButtonState, ControlFlags, ControlHeader, ControlType, Dimensions, Error, Flags,
-    GeneralFlags, Header, HyperlinkType, Restrictions, SpecificFlags, TextIcon, Type, WString,
+    ButtonFlags, ButtonState, ControlFlags, ControlHeader, ControlType, Data, Dimensions, Error,
+    ExtraInfo, Flags, GeneralFlags, GeneralInfo, Header, HyperlinkType, MenuMerge, MergeMode,
+    Restrictions, SpecificFlags, TextIcon, Type, WString,
 };
