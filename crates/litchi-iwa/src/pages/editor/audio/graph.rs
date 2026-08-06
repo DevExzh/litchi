@@ -450,7 +450,7 @@ pub(super) fn body_audio_graph(
     }
     data_references.sort_unstable();
     data_references.dedup();
-    if !data_references.contains(&(info.audio_data_identifier, drawable_object_id)) {
+    if !data_references.contains(&(info.audio_data_identifier.get(), drawable_object_id)) {
         return Err(Error::InvalidFormat(format!(
             "Pages audio {drawable_object_id} data {} is missing from archive metadata",
             info.audio_data_identifier
@@ -485,12 +485,14 @@ fn audio_info(
             "Pages audio {identifier} is not owned by the body storage"
         )));
     }
-    let audio_data_identifier = audio
-        .movie_data
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!("Pages audio {identifier} has no data reference"))
-        })?
-        .identifier;
+    let audio_data_identifier = MediaAssetId::try_from(
+        audio
+            .movie_data
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("Pages audio {identifier} has no data reference"))
+            })?
+            .identifier,
+    )?;
     let position = geometry_from_drawable(&audio.super_)?
         .position
         .ok_or_else(|| Error::InvalidFormat(format!("Pages audio {identifier} has no position")))?;

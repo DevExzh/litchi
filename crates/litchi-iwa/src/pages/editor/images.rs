@@ -12,6 +12,7 @@ use crate::data_reference_registry::{
 };
 use crate::image_adjustments::replace_image_adjustments;
 use crate::image_caption::{CaptionObjectIds, DrawableCaptionKind};
+use crate::media::MediaAssetId;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
@@ -28,8 +29,8 @@ pub struct PagesImageInfo {
     pub drawable_object_id: u64,
     /// UTF-16 index of the object-replacement character in the body text.
     pub anchor_character_index: u32,
-    pub image_data_identifier: u64,
-    pub thumbnail_data_identifier: Option<u64>,
+    pub image_data_identifier: MediaAssetId,
+    pub thumbnail_data_identifier: Option<MediaAssetId>,
     pub geometry: DrawableGeometry,
     /// Shared drawable metadata, including accessibility description and lock state.
     pub properties: DrawableProperties,
@@ -73,7 +74,7 @@ impl PagesImageOptions {
 pub struct RemovedPagesImage {
     pub image: PagesImageInfo,
     /// Assets culled because the removed image held their final package reference.
-    pub removed_data_identifiers: Vec<u64>,
+    pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
 impl PagesEditor {
@@ -125,7 +126,7 @@ impl PagesEditor {
             ids,
             self.body_storage_id,
             style_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             geometry,
             options.natural_size,
             root.left_margin.unwrap_or_default(),
@@ -155,7 +156,7 @@ impl PagesEditor {
         add_component_data_reference(
             &mut staged,
             DOCUMENT_OBJECT_ID,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             ids.drawable,
         )?;
         let style_archive = find_object_archive(&staged, style_id)?;
@@ -626,7 +627,8 @@ impl PagesEditor {
             .iter()
             .map(|(data, _)| *data)
             .collect::<HashSet<_>>();
-        for identifier in data_identifiers {
+        for raw_identifier in data_identifiers {
+            let identifier = MediaAssetId::try_from(raw_identifier)?;
             if media
                 .asset(identifier)
                 .is_some_and(|asset| !asset.is_referenced())

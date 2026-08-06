@@ -90,7 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             Some("pages") => {
                 let mut app = PagesEditor::open(input)?;
-                let previous = app.replace_media(raw_data_identifier, &replacement)?;
+                let previous = app.replace_media(data_identifier, &replacement)?;
                 app.save(output)?;
                 previous
             },

@@ -2320,7 +2320,9 @@ fn scratch_document_supports_native_chart_background_fill_crud() {
     );
     assert_eq!(
         reopened
-            .extract_media(image.data_identifier().unwrap().get())
+            .extract_media(
+                crate::MediaAssetId::try_from(image.data_identifier().unwrap().get()).unwrap(),
+            )
             .unwrap(),
         image_bytes
     );
@@ -2403,7 +2405,9 @@ fn scratch_document_supports_inherited_series_fill_crud() {
     );
     assert_eq!(
         reopened
-            .extract_media(image.data_identifier().unwrap().get())
+            .extract_media(
+                crate::MediaAssetId::try_from(image.data_identifier().unwrap().get()).unwrap(),
+            )
             .unwrap(),
         image_bytes
     );

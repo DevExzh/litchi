@@ -648,20 +648,26 @@ fn image_info(
 ) -> Result<PagesImageInfo> {
     let image: tsd::ImageArchive =
         decode_typed_package_object(package, identifier, IMAGE_MESSAGE_TYPE, "TSD.ImageArchive")?;
-    let image_data_identifier = image
-        .data
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Pages image {identifier} has no primary data reference"
-            ))
-        })?
-        .identifier;
+    let image_data_identifier = MediaAssetId::try_from(
+        image
+            .data
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Pages image {identifier} has no primary data reference"
+                ))
+            })?
+            .identifier,
+    )?;
+    let thumbnail_data_identifier = image
+        .thumbnail_data
+        .map(|reference| MediaAssetId::try_from(reference.identifier))
+        .transpose()?;
     let image_adjustments: ImageAdjustments = image_adjustments_from_archive(&image)?;
     Ok(PagesImageInfo {
         drawable_object_id: identifier,
         anchor_character_index,
         image_data_identifier,
-        thumbnail_data_identifier: image.thumbnail_data.map(|reference| reference.identifier),
+        thumbnail_data_identifier,
         geometry: geometry_from_drawable(&image.super_)?,
         properties: drawable_properties(&image.super_),
         image_adjustments,

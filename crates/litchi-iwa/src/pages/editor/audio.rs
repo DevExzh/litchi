@@ -29,7 +29,7 @@ pub struct PagesAudioInfo {
     pub drawable_object_id: u64,
     /// UTF-16 index of the object-replacement character in the body text.
     pub anchor_character_index: u32,
-    pub audio_data_identifier: u64,
+    pub audio_data_identifier: MediaAssetId,
     /// Center point of Pages' zero-size audio control, in document points.
     pub position: DrawablePoint,
     /// Shared drawable metadata, including accessibility description and lock state.
@@ -44,7 +44,7 @@ pub struct PagesAudioInfo {
 pub struct RemovedPagesAudio {
     pub audio: PagesAudioInfo,
     /// Assets culled because the removed clip held their final package reference.
-    pub removed_data_identifiers: Vec<u64>,
+    pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
 impl PagesEditor {
@@ -152,15 +152,14 @@ impl PagesEditor {
                 Error::InvalidFormat("Pages audio creation failed validation".to_owned())
             })?;
         let created_graph = body_audio_graph(&verified, ids.drawable)?;
-        let created_audio_data_identifier = MediaAssetId::try_from(created.audio_data_identifier)?;
         let expected_anchor = u32::try_from(anchor_character_index)
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
         if created.anchor_character_index != expected_anchor
-            || created_audio_data_identifier != asset.data_identifier
+            || created.audio_data_identifier != asset.data_identifier
             || created.position != options.position()
             || created.duration.as_secs_f32() != duration_seconds
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(asset.data_identifier.get())? != data
+            || verified.extract_media(asset.data_identifier)? != data
         {
             return Err(Error::InvalidFormat(
                 "Pages audio creation produced an inconsistent graph".to_owned(),
@@ -425,8 +424,7 @@ impl PagesEditor {
         replacement: &[u8],
     ) -> Result<Vec<u8>> {
         let source = body_audio_graph(self, drawable_object_id)?;
-        let data_identifier = MediaAssetId::try_from(source.info.audio_data_identifier)?;
-        self.replace_media(data_identifier.get(), replacement)
+        self.replace_media(source.info.audio_data_identifier, replacement)
     }
 
     /// Remove body audio, its attachment/private graph, and unshared asset.
@@ -477,14 +475,14 @@ impl PagesEditor {
             .iter()
             .map(|(data, _)| *data)
             .collect::<HashSet<_>>();
-        for identifier in data_identifiers {
-            let identifier = MediaAssetId::try_from(identifier)?;
+        for raw_identifier in data_identifiers {
+            let identifier = MediaAssetId::try_from(raw_identifier)?;
             if media
                 .asset(identifier)
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier.get());
+                removed_data_identifiers.push(identifier);
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -498,7 +496,7 @@ impl PagesEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_assets
                     .iter()
-                    .any(|asset| asset.data_identifier.get() == *identifier)
+                    .any(|asset| asset.data_identifier == *identifier)
             })
         {
             return Err(Error::InvalidFormat(

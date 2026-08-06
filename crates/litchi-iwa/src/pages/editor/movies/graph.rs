@@ -447,8 +447,8 @@ pub(super) fn body_movie_graph(
     data_references.sort_unstable();
     data_references.dedup();
     for identifier in [
-        info.movie_data_identifier,
-        info.poster_image_data_identifier,
+        info.movie_data_identifier.get(),
+        info.poster_image_data_identifier.get(),
     ] {
         if !data_references.contains(&(identifier, drawable_object_id)) {
             return Err(Error::InvalidFormat(format!(
@@ -484,16 +484,22 @@ fn movie_info(
             "Pages movie {identifier} is not owned by the body storage"
         )));
     }
-    let movie_data_identifier = movie
-        .movie_data
-        .ok_or_else(|| Error::InvalidFormat(format!("Pages movie {identifier} has no video data")))?
-        .identifier;
-    let poster_image_data_identifier = movie
-        .poster_image_data
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!("Pages movie {identifier} has no poster data"))
-        })?
-        .identifier;
+    let movie_data_identifier = MediaAssetId::try_from(
+        movie
+            .movie_data
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("Pages movie {identifier} has no video data"))
+            })?
+            .identifier,
+    )?;
+    let poster_image_data_identifier = MediaAssetId::try_from(
+        movie
+            .poster_image_data
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("Pages movie {identifier} has no poster data"))
+            })?
+            .identifier,
+    )?;
     let playback = media_playback_settings(&movie).map_err(|error| {
         Error::InvalidFormat(format!(
             "Pages movie {identifier} has invalid playback settings: {error}"

@@ -2697,8 +2697,7 @@ impl PagesEditor {
         reachable_embedded_assets(self.package(), [section_id])
     }
 
-    pub fn extract_media(&self, data_identifier: u64) -> Result<Vec<u8>> {
-        let data_identifier = MediaAssetId::try_from(data_identifier)?;
+    pub fn extract_media(&self, data_identifier: MediaAssetId) -> Result<Vec<u8>> {
         if !self
             .media_assets()?
             .iter()
@@ -2712,8 +2711,11 @@ impl PagesEditor {
     }
 
     /// Replace a referenced materialized asset without changing its data identifier.
-    pub fn replace_media(&mut self, data_identifier: u64, replacement: &[u8]) -> Result<Vec<u8>> {
-        let data_identifier = MediaAssetId::try_from(data_identifier)?;
+    pub fn replace_media(
+        &mut self,
+        data_identifier: MediaAssetId,
+        replacement: &[u8],
+    ) -> Result<Vec<u8>> {
         if !self
             .media_assets()?
             .iter()

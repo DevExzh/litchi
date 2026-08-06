@@ -1416,7 +1416,12 @@ mod tests {
             .unwrap();
         let identifier = image.data_identifier().unwrap();
         assert_eq!(image.fill_size(), SIZE);
-        assert_eq!(editor.extract_media(identifier.get()).unwrap(), image_bytes);
+        assert_eq!(
+            editor
+                .extract_media(crate::MediaAssetId::try_from(identifier.get()).unwrap())
+                .unwrap(),
+            image_bytes
+        );
         assert_eq!(editor.media_assets().unwrap().len(), 1);
 
         let advanced = image
@@ -1434,7 +1439,10 @@ mod tests {
         );
         assert_eq!(
             editor
-                .replace_media(identifier.get(), &replacement_bytes)
+                .replace_media(
+                    crate::MediaAssetId::try_from(identifier.get()).unwrap(),
+                    &replacement_bytes,
+                )
                 .unwrap(),
             image_bytes
         );
