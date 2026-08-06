@@ -49,7 +49,7 @@ impl PagesDocument {
     }
 
     /// Open a Pages document under caller-selected bundle ingress ceilings.
-    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
+    pub(crate) fn open_with_limits<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
         let bundle = Bundle::open_with_limits(path, limits)?;
 
         let object_index = ObjectIndex::from_bundle(&bundle)?;
@@ -78,7 +78,7 @@ impl PagesDocument {
 
     /// Open a Pages document from bytes under caller-selected ingress
     /// ceilings.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
+    pub(crate) fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
         let bundle = Bundle::from_bytes_with_limits(bytes, limits)?;
 
         let object_index = ObjectIndex::from_bundle(&bundle)?;
@@ -114,12 +114,6 @@ impl PagesDocument {
     /// [`Self::from_bytes`]; it does not accept a previously parsed archive.
     pub fn from_archive_bytes(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes(bytes)
-    }
-
-    /// Create a Pages document from archive bytes under caller-selected
-    /// ingress ceilings.
-    pub fn from_archive_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, limits)
     }
 
     /// Decode the native root reference while keeping protobuf details below

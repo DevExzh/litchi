@@ -510,7 +510,7 @@ impl PagesDocumentBuilder {
     }
 
     /// Build the underlying package for lower-level IWA manipulation.
-    pub fn build_package(self) -> Result<IWorkPackage> {
+    pub(crate) fn build_package(self) -> Result<IWorkPackage> {
         crate::text::TextLanguageTag::new(self.language.as_str())?;
         if self.locale.trim().is_empty() {
             return Err(crate::Error::InvalidFormat(
