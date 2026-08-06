@@ -17,4 +17,4 @@ pub use codec::{
     Error, MAX_AUTHOR_UNITS, MAX_COLUMNS, MAX_ROWS, MAX_TEXT_RUNS, MAX_TEXT_UNITS, Result,
 };
 pub use codec::{read, write};
-pub use model::{Comment, CommentRun};
+pub use model::{Record, Run};

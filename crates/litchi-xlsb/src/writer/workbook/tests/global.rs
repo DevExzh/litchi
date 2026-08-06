@@ -3,7 +3,7 @@
 use super::super::WorkbookWriter;
 use crate::calc::{Delta, Mode, Opts, Threads};
 use crate::package::SharedStringRun;
-use crate::package::comments::Comment;
+use crate::package::comments::Record;
 use crate::raw::kind;
 use crate::writer::{MutableChartSheet, MutableWorksheet};
 use litchi_core::sheet::WorkbookTrait;
@@ -644,14 +644,14 @@ fn structured_tables_round_trip_through_save_and_read() {
 fn comments_survive_package_roundtrip() {
     let mut workbook = WorkbookWriter::new();
     let mut sheet = MutableWorksheet::new("Notes");
-    let mut first = Comment::new(2, 3, "Author".to_string(), "formatted note".to_string());
+    let mut first = Record::new(2, 3, "Author".to_string(), "formatted note".to_string());
     first.runs = vec![SharedStringRun {
         character_index: 0,
         font_id: 0,
     }];
     first.guid = [7; 16];
     sheet.add_comment(first);
-    sheet.add_comment(Comment::new(
+    sheet.add_comment(Record::new(
         4,
         1,
         "Author".to_string(),

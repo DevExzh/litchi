@@ -10,7 +10,7 @@
 use litchi::sheet::CellValue;
 use litchi::xlsb::hyperlinks::Hyperlink;
 use litchi::xlsb::merged_cells::MergedCell;
-use litchi::xlsb::package::comments::Comment;
+use litchi::xlsb::package::comments::Record;
 use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 
@@ -147,7 +147,7 @@ fn create_advanced_sheet(workbook: &mut WorkbookWriter) -> Result<(), Box<dyn st
     sheet.add_hyperlink(link);
 
     // Comment
-    let comment = Comment::new(
+    let comment = Record::new(
         2,
         1,
         "Manager".to_string(),

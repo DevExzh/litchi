@@ -1,7 +1,7 @@
 //! Mutable XLSB worksheet state and CRUD model.
 
 use crate::conditional_formatting::Formatting;
-use crate::package::comments::Comment;
+use crate::package::comments::Record;
 use crate::package::data_validation::{Settings, Validation};
 use crate::package::error::{Error, Result};
 use crate::package::formula::{Compiler, Group, GroupKind, ParsedFormula, Parser, Range};
@@ -75,7 +75,7 @@ pub struct MutableWorksheet {
     pub(crate) max_col: u32,
     pub(crate) merged_cells: Vec<MergedCell>,
     pub(crate) hyperlinks: Vec<Hyperlink>,
-    pub(crate) comments: Vec<Comment>,
+    pub(crate) comments: Vec<Record>,
     /// Column information (0-based column index).
     pub(crate) columns: BTreeMap<u32, ColumnInfo>,
     /// Row information (0-based row index).
@@ -663,13 +663,13 @@ impl MutableWorksheet {
     ///
     /// ```ignore
     /// use litchi_xlsb::writer::MutableWorksheet;
-    /// use litchi_xlsb::package::comments::Comment;
+    /// use litchi_xlsb::package::comments::Record;
     ///
     /// let mut sheet = MutableWorksheet::new("Sheet1");
-    /// let comment = Comment::new(0, 0, "John".to_string(), "Important note".to_string());
+    /// let comment = Record::new(0, 0, "John".to_string(), "Important note".to_string());
     /// sheet.add_comment(comment);
     /// ```
-    pub fn add_comment(&mut self, comment: Comment) {
+    pub fn add_comment(&mut self, comment: Record) {
         self.comments.push(comment);
     }
 
@@ -998,7 +998,7 @@ impl MutableWorksheet {
         self.drawing_rel_id = rel_id;
     }
 
-    pub fn comments(&self) -> &[Comment] {
+    pub fn comments(&self) -> &[Record] {
         &self.comments
     }
 

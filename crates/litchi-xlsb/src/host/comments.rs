@@ -2,7 +2,7 @@
 //!
 //! The reusable comments stream and BIFF12 rich-string codec live in
 //! [`crate::comments`]. This boundary retains the historical host
-//! `Comment` model, including its `SharedStringRun` type, while keeping
+//! `Record` model, including its `SharedStringRun` type, while keeping
 //! package and host error mapping in the owning `litchi_xlsb` layers.
 
 use crate::package::error::{Error, Result};
@@ -10,11 +10,11 @@ use crate::package::shared_strings::SharedStringRun;
 use crate::raw::Writer;
 use std::io::Write;
 
-/// Comment information.
+/// Comment record information.
 ///
 /// Represents a cell comment with author and text.
 #[derive(Debug, Clone)]
-pub struct Comment {
+pub struct Record {
     /// Row (0-based).
     pub row: u32,
     /// Column (0-based).
@@ -33,15 +33,15 @@ pub struct Comment {
     pub visible: bool,
 }
 
-impl Comment {
+impl Record {
     /// Create a new comment.
     ///
     /// # Example
     ///
     /// ```rust
-    /// use litchi_xlsb::package::comments::Comment;
+    /// use litchi_xlsb::package::comments::Record;
     ///
-    /// let comment = Comment::new(0, 0, "John".to_string(), "This is a note".to_string());
+    /// let comment = Record::new(0, 0, "John".to_string(), "This is a note".to_string());
     /// ```
     pub fn new(row: u32, col: u32, author: String, text: String) -> Self {
         Self {
@@ -62,7 +62,7 @@ impl Comment {
     }
 }
 
-pub(crate) fn read_comments(bytes: &[u8]) -> Result<Vec<Comment>> {
+pub(crate) fn read_comments(bytes: &[u8]) -> Result<Vec<Record>> {
     let owner_comments = crate::comments::read(bytes).map_err(map_owner_error)?;
     let mut comments = Vec::new();
     comments
@@ -72,7 +72,7 @@ pub(crate) fn read_comments(bytes: &[u8]) -> Result<Vec<Comment>> {
             source,
         })?;
     for owner_comment in owner_comments {
-        let crate::comments::Comment {
+        let crate::comments::Record {
             row,
             col,
             author,
@@ -94,7 +94,7 @@ pub(crate) fn read_comments(bytes: &[u8]) -> Result<Vec<Comment>> {
                 font_id: run.font_id,
             });
         }
-        comments.push(Comment {
+        comments.push(Record {
             row,
             col,
             author,
@@ -108,7 +108,7 @@ pub(crate) fn read_comments(bytes: &[u8]) -> Result<Vec<Comment>> {
     Ok(comments)
 }
 
-pub(crate) fn write_comments<W: Write>(writer: &mut Writer<W>, comments: &[Comment]) -> Result<()> {
+pub(crate) fn write_comments<W: Write>(writer: &mut Writer<W>, comments: &[Record]) -> Result<()> {
     let mut owner_comments = Vec::new();
     owner_comments
         .try_reserve(comments.len())
@@ -124,12 +124,12 @@ pub(crate) fn write_comments<W: Write>(writer: &mut Writer<W>, comments: &[Comme
                 source,
             })?;
         for run in &comment.runs {
-            runs.push(crate::comments::CommentRun {
+            runs.push(crate::comments::Run {
                 character_index: run.character_index,
                 font_id: run.font_id,
             });
         }
-        owner_comments.push(crate::comments::Comment {
+        owner_comments.push(crate::comments::Record {
             row: comment.row,
             col: comment.col,
             author: comment.author.clone(),
@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn test_comment_creation() {
-        let comment = Comment::new(0, 0, "John".to_string(), "Note".to_string());
+        let comment = Record::new(0, 0, "John".to_string(), "Note".to_string());
         assert_eq!(comment.row, 0);
         assert_eq!(comment.col, 0);
         assert_eq!(comment.author, "John");

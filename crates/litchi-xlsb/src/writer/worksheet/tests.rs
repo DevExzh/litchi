@@ -1,7 +1,7 @@
 use super::model::{AutoFilter, ColumnInfo, RowInfo};
 use super::*;
 use crate::conditional_formatting::Formatting;
-use crate::package::comments::Comment;
+use crate::package::comments::Record;
 use crate::package::data_validation::Validation;
 use crate::package::error::Error;
 use crate::package::formula::{Group, GroupKind, ParsedFormula, Range};
@@ -232,7 +232,7 @@ fn test_hyperlinks_mut() {
 #[test]
 fn test_add_comment() {
     let mut sheet = MutableWorksheet::new("Sheet1");
-    let comment = Comment::new(0, 0, "Author".to_string(), "Comment text".to_string());
+    let comment = Record::new(0, 0, "Author".to_string(), "Comment text".to_string());
     sheet.add_comment(comment);
 
     assert_eq!(sheet.comments().len(), 1);

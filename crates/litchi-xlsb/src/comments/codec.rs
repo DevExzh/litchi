@@ -4,8 +4,8 @@
 //! from [MS-XLSB] sections 2.4.30 and 2.4.341, with collection boundaries
 //! from sections 2.4.31, 2.4.32, 2.4.33, and 2.4.340/2.4.387--2.4.390.
 
-use super::model::{Comment, CommentRun};
-use crate::raw::{Cursor, Record, Records, Writer, kind};
+use super::model::{Record, Run};
+use crate::raw::{Cursor, Record as RawRecord, Records, Writer, kind};
 use std::collections::{HashMap, HashSet, TryReserveError};
 use std::io::Write;
 use thiserror::Error;
@@ -67,7 +67,7 @@ pub enum Error {
 }
 
 /// Read one complete XLSB comments stream.
-pub fn read(bytes: &[u8]) -> Result<Vec<Comment>> {
+pub fn read(bytes: &[u8]) -> Result<Vec<Record>> {
     let records = collect_records(bytes)?;
     let mut pos = 0;
     expect(&records, &mut pos, kind::BEGIN_COMMENTS)?;
@@ -189,7 +189,7 @@ pub fn read(bytes: &[u8]) -> Result<Vec<Comment>> {
         let mut guid = [0; 16];
         guid.copy_from_slice(&begin.payload()[20..36]);
         reserve(&mut comments, 1, "comments")?;
-        comments.push(Comment {
+        comments.push(Record {
             row,
             col,
             author: authors[author_raw as usize].clone(),
@@ -232,7 +232,7 @@ pub fn read(bytes: &[u8]) -> Result<Vec<Comment>> {
 }
 
 /// Write one complete XLSB comments stream.
-pub fn write<W: Write>(writer: &mut Writer<W>, comments: &[Comment]) -> Result<()> {
+pub fn write<W: Write>(writer: &mut Writer<W>, comments: &[Record]) -> Result<()> {
     writer.write_record(kind::BEGIN_COMMENTS, &[])?;
     writer.write_record(kind::BEGIN_COMMENT_AUTHORS, &[])?;
 
@@ -308,7 +308,7 @@ pub fn write<W: Write>(writer: &mut Writer<W>, comments: &[Comment]) -> Result<(
     Ok(())
 }
 
-fn collect_records(bytes: &[u8]) -> Result<Vec<Record<'_>>> {
+fn collect_records(bytes: &[u8]) -> Result<Vec<RawRecord<'_>>> {
     let mut records = Vec::new();
     for record in Records::new(bytes) {
         reserve(&mut records, 1, "comments records")?;
@@ -317,7 +317,7 @@ fn collect_records(bytes: &[u8]) -> Result<Vec<Record<'_>>> {
     Ok(records)
 }
 
-fn expect(records: &[Record<'_>], pos: &mut usize, expected: crate::raw::Kind) -> Result<()> {
+fn expect(records: &[RawRecord<'_>], pos: &mut usize, expected: crate::raw::Kind) -> Result<()> {
     let record = records
         .get(*pos)
         .ok_or(Error::InvalidRecordType(expected.get()))?;
@@ -351,7 +351,7 @@ fn read_u32(data: &[u8], offset: usize) -> u32 {
 
 struct RichString {
     text: String,
-    runs: Vec<CommentRun>,
+    runs: Vec<Run>,
     is_rich: bool,
     is_extended: bool,
 }
@@ -405,7 +405,7 @@ impl RichString {
                     });
                 }
                 previous = Some(character_index);
-                runs.push(CommentRun {
+                runs.push(Run {
                     character_index,
                     font_id: u16::from_le_bytes([chunk[2], chunk[3]]),
                 });
@@ -491,7 +491,7 @@ impl RichString {
         let mut runs = self.runs.clone();
         if runs.is_empty() && text_len != 0 {
             reserve(&mut runs, 1, "comment rich-string runs")?;
-            runs.push(CommentRun {
+            runs.push(Run {
                 character_index: 0,
                 font_id: 0,
             });
@@ -527,7 +527,7 @@ impl RichString {
     }
 }
 
-fn validate_runs(runs: &[CommentRun], text_len: usize) -> Result<()> {
+fn validate_runs(runs: &[Run], text_len: usize) -> Result<()> {
     if runs.len() > MAX_TEXT_RUNS {
         return Err(Error::Encoding("too many RichStr runs".to_string()));
     }
@@ -611,7 +611,7 @@ fn allocation(resource: &'static str, source: TryReserveError) -> Error {
 mod tests {
     use super::*;
 
-    fn comment_stream(comment: &Comment) -> Vec<u8> {
+    fn comment_stream(comment: &Record) -> Vec<u8> {
         let mut bytes = Vec::new();
         write(&mut Writer::new(&mut bytes), std::slice::from_ref(comment)).unwrap();
         bytes
@@ -619,13 +619,13 @@ mod tests {
 
     #[test]
     fn round_trips_rich_comment_text() {
-        let mut comment = Comment::new(2, 3, "Sven".to_string(), "A😀B".to_string());
+        let mut comment = Record::new(2, 3, "Sven".to_string(), "A😀B".to_string());
         comment.runs = vec![
-            CommentRun {
+            Run {
                 character_index: 0,
                 font_id: 4,
             },
-            CommentRun {
+            Run {
                 character_index: 3,
                 font_id: 9,
             },
@@ -683,7 +683,7 @@ mod tests {
 
     #[test]
     fn rejects_invalid_comment_text_flags_and_duplicate_cells() {
-        let comment = Comment::new(0, 0, "A".to_string(), "text".to_string());
+        let comment = Record::new(0, 0, "A".to_string(), "text".to_string());
         let bytes = comment_stream(&comment);
         let mut duplicate = Vec::new();
         write(

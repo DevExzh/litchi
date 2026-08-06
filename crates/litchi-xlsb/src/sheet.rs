@@ -2,7 +2,7 @@
 
 use crate::conditional_formatting::Formatting;
 use crate::package::cell::Cell;
-use crate::package::comments::Comment;
+use crate::package::comments::Record;
 use crate::package::data_validation::{Settings, Validation};
 use crate::package::hyperlinks::Hyperlink;
 use crate::package::merged_cells::MergedCell;
@@ -125,7 +125,7 @@ pub struct Worksheet {
     max_col: u32,
     merged_cells: Vec<MergedCell>,
     hyperlinks: Vec<Hyperlink>,
-    comments: Vec<Comment>,
+    comments: Vec<Record>,
     column_infos: Vec<ColumnInfo>,
     row_infos: Vec<RowInfo>,
     auto_filter: Option<AutoFilter>,
@@ -194,7 +194,7 @@ impl Worksheet {
     }
 
     /// Add a comment
-    pub fn add_comment(&mut self, comment: Comment) {
+    pub fn add_comment(&mut self, comment: Record) {
         self.comments.push(comment);
     }
 
@@ -264,7 +264,7 @@ impl Worksheet {
     }
 
     /// Get all comments
-    pub fn comments(&self) -> &[Comment] {
+    pub fn comments(&self) -> &[Record] {
         &self.comments
     }
 
