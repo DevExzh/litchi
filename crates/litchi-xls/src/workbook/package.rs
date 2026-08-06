@@ -289,6 +289,21 @@ impl<R: Read + Seek> Workbook<R> {
         }
     }
 
+    /// Read the optional Office Toolbars (`XCB`) stream as inert typed metadata.
+    ///
+    /// The returned value owns decoded strings and visual bytes because the
+    /// compound-file stream buffer is temporary. No command, macro, UI, or
+    /// ActiveX behavior is activated while reading this stream.
+    pub fn toolbar(&mut self) -> Result<Option<crate::Wrapper<'static>>> {
+        match self.ole_file.open_stream(&["XCB"]) {
+            Ok(data) => crate::toolbar::parse(&data)
+                .map(|value| Some(value.into_owned()))
+                .map_err(|error| Error::InvalidData(format!("XCB toolbar: {error}"))),
+            Err(litchi_cfb::OleError::StreamNotFound) => Ok(None),
+            Err(error) => Err(error.into()),
+        }
+    }
+
     pub fn user_defined_properties(&mut self) -> Result<Option<Section>> {
         Ok(self
             .document_summary_information()?

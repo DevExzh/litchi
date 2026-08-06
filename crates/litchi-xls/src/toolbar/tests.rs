@@ -71,6 +71,20 @@ fn optional_visual_data_is_lossless_and_views_are_bounded() {
 }
 
 #[test]
+fn parsed_toolbar_can_be_owned_for_workbook_lifetime() {
+    let value = Wrapper::new(vec![toolbar(true)]).expect("wrapper");
+    let bytes = to_bytes(&value).expect("encode");
+    let owned = parse(&bytes).expect("decode").into_owned();
+
+    assert_eq!(owned.toolbars()[0].header().name().text(), "Custom toolbar");
+    assert_eq!(
+        owned.toolbars()[0].visual_data().unwrap().bytes(),
+        &[0xA5; 60]
+    );
+    assert_eq!(to_bytes(&owned).expect("re-encode"), bytes);
+}
+
+#[test]
 fn multiple_toolbars_keep_optional_records_separate() {
     let value = Wrapper::new(vec![toolbar(false), toolbar(true)]).expect("wrapper");
     let bytes = to_bytes(&value).expect("encode");

@@ -5425,6 +5425,32 @@ Formatting, diff, and the 46-package boundary check pass. This is bounded
 feature and topology evidence, not a claim of complete OLE2, OOXML, or ODF
 conformance.
 
+## Layered OLE2 and OOXML owner continuation with XCB package integration
+
+The next migration wave keeps the semantic contextualization rule moving
+through shared and format-local owners. `litchi-ole-common` now separates the
+property-set binary codec into wire, VARIANT-semantic, validation, and test
+owners. DOC image writing, PPT document-comparison and embedded-object owners,
+ODraw image data, OGraph package assembly, XLS query tables, DOCX field tests,
+PPTX tag packages and animation XML parsing, XLSB workbook-writer tests, XLSX
+raw worksheet editing and workbook snapshots, ODS sheet traversal, and ODT
+field codecs now use nested facades instead of dense single-file owners.
+
+The bounded XLS toolbar codec is now connected to the format facade: the
+`Workbook::toolbar` reader opens the optional root `XCB` stream into owned
+metadata, while `Writer::set_toolbar` and `clear_toolbar` deterministically
+create or remove that stream. The shared toolbar model owns the lifetime
+conversion; all command, macro, UI, and ActiveX behavior remains inert.
+
+Strict all-target checks pass for DOC, DOCX, DrawingML, ODraw, ODS, ODT,
+OGraph, OLE common, PPT, PPTX, XLS, XLSB, and XLSX. With lint caps, the
+library matrix passes DOC (847 with two ignored), DOCX (644), DrawingML (92),
+ODraw (59), ODS (67), ODT (520), OGraph (40), OLE common (33), PPT (882 with
+one ignored), PPTX (309), XLS (856), XLSB (413), and XLSX (648). The package
+XCB integration tests pass 2/2. Formatting, diff, and the 46-package boundary
+check pass. This remains bounded owner and feature evidence, not a claim of
+complete OLE2, OOXML, or ODF conformance.
+
 ## Evidence levels
 
 For each applicable object/scenario, track:

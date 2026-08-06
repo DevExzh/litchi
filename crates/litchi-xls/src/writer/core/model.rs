@@ -1284,6 +1284,8 @@ pub struct Writer {
     pub(super) web_publications: Vec<crate::WebPub>,
     pub(super) xf_extensions: Vec<crate::XfExt>,
     pub(super) style_extensions: Vec<crate::StyleExt>,
+    /// Optional inert Office Toolbars (`XCB`) stream.
+    pub(super) toolbar: Option<crate::Wrapper<'static>>,
     pub(super) encryption: Option<WriterEncryption>,
 }
 

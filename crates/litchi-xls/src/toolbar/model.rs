@@ -221,6 +221,16 @@ impl<'a> Toolbar<'a> {
     pub fn validate(&self) -> Result<()> {
         validation::validate_toolbar(self)
     }
+
+    /// Move this decoded toolbar into an owned representation.
+    pub fn into_owned(self) -> Toolbar<'static> {
+        Toolbar {
+            header: self.header.into_owned(),
+            visual_data: self.visual_data,
+            application_id: self.application_id,
+            controls: self.controls,
+        }
+    }
 }
 
 /// The single `[MS-XLS]` `CTBWRAPPER` stored in an `XCB` stream.
@@ -259,5 +269,13 @@ impl<'a> Wrapper<'a> {
 
     pub fn validate(&self) -> Result<()> {
         validation::validate_wrapper(self)
+    }
+
+    /// Move this decoded wrapper into an owned representation.
+    pub fn into_owned(self) -> Wrapper<'static> {
+        Wrapper {
+            toolbar_set: self.toolbar_set,
+            toolbars: self.toolbars.into_iter().map(Toolbar::into_owned).collect(),
+        }
     }
 }

@@ -1314,6 +1314,20 @@ impl<'a> Header<'a> {
         &self.name
     }
 
+    /// Move a decoded toolbar header into an owned representation.
+    ///
+    /// This is used by format facades whose compound-file stream buffer is
+    /// shorter-lived than the public workbook/document object.
+    pub fn into_owned(self) -> Header<'static> {
+        Header {
+            control_count: self.control_count,
+            restrictions: self.restrictions,
+            rows_default: self.rows_default,
+            flags: self.flags,
+            name: self.name.into_owned(),
+        }
+    }
+
     pub(crate) fn validate(&self) -> Result<(), Error> {
         if self.control_count < 0 {
             return Err(Error::invalid("TB cCL cannot be negative"));

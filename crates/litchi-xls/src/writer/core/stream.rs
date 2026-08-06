@@ -20,6 +20,8 @@ const DEFAULT_WRITE_ACCESS_USER: &str = "litchi";
 pub(crate) struct WorkbookStreams {
     /// The main Workbook BIFF stream.
     pub workbook: Vec<u8>,
+    /// Optional Office Toolbars (`XCB`) stream.
+    pub toolbar: Option<Vec<u8>>,
     /// Pivot cache streams: `(stream_id, data)`.  Each goes into
     /// `_SX_DB_CUR/{stream_id:04X}`.
     pub pivot_caches: Vec<(u16, Vec<u8>)>,
@@ -1553,6 +1555,7 @@ pub(crate) fn generate_workbook_stream(
 
     Ok(WorkbookStreams {
         workbook: stream,
+        toolbar: None,
         pivot_caches,
     })
 }

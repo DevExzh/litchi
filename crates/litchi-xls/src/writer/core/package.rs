@@ -90,6 +90,9 @@ impl Writer {
                 ole_writer.create_stream(&["_SX_DB_CUR", &name], data)?;
             }
         }
+        if let Some(toolbar) = &streams.toolbar {
+            ole_writer.create_stream(&["XCB"], toolbar)?;
+        }
         Ok(())
     }
 
@@ -148,6 +151,11 @@ impl Writer {
             &self.worksheets,
             &self.string_map,
         )?;
+        streams.toolbar = self
+            .toolbar
+            .as_ref()
+            .map(crate::toolbar::to_bytes)
+            .transpose()?;
         if let Some(encryption) = &self.encryption {
             streams.workbook = encrypt_workbook_for_write(streams.workbook, encryption)?;
         }

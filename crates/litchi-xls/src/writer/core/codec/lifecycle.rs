@@ -37,8 +37,30 @@ impl Writer {
             web_publications: Vec::new(),
             xf_extensions: Vec::new(),
             style_extensions: Vec::new(),
+            toolbar: None,
             encryption: None,
         }
+    }
+
+    /// Configure the inert Office Toolbars (`XCB`) stream for the next write.
+    ///
+    /// The toolbar graph is serialized as metadata only. Controls, macros,
+    /// ActiveX payloads, and UI commands are never activated.
+    pub fn set_toolbar(&mut self, toolbar: crate::Wrapper<'_>) -> Result<()> {
+        let toolbar = toolbar.into_owned();
+        toolbar.validate()?;
+        self.toolbar = Some(toolbar);
+        Ok(())
+    }
+
+    /// Remove the optional Office Toolbars (`XCB`) stream from future writes.
+    pub fn clear_toolbar(&mut self) {
+        self.toolbar = None;
+    }
+
+    /// Return the configured inert Office Toolbars metadata, if any.
+    pub fn toolbar(&self) -> Option<&crate::Wrapper<'static>> {
+        self.toolbar.as_ref()
     }
 
     /// Configure BIFF8 password-to-open encryption for subsequent writes.

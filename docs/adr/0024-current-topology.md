@@ -192,6 +192,16 @@ control payloads without activating macros, UI, or ActiveX behavior. These
 owners remain format-local and prefix-free while shared wire logic stays in
 the common crates.
 
+The following continuation applies the same topology to the shared
+`property_set` binary codec, DOC image writing, PPT comparison and embedded
+objects, ODraw images, OGraph package assembly, XLS query tables, DOCX field
+tests, PPTX tag packages and animation XML, XLSB workbook-writer tests, XLSX
+raw worksheet and snapshot editors, ODS sheet traversal, and ODT field
+codecs. The XLS toolbar owner is now package-integrated: its `Workbook` and
+`Writer` facades own the optional root `XCB` stream while the common toolbar
+model owns borrowed-to-owned lifetime conversion. All control and command
+behavior remains inert.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR
