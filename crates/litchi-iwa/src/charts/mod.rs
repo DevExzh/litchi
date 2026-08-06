@@ -48,7 +48,7 @@ pub(crate) mod legend_shadow;
 pub(crate) mod legend_stroke;
 pub(crate) mod legend_style;
 pub(crate) mod lighting_3d;
-pub mod metadata_extractor;
+pub(crate) mod metadata_extractor;
 pub(crate) mod non_style;
 pub(crate) mod number_format;
 pub(crate) mod object_container;
@@ -116,7 +116,7 @@ pub use litchi_iwa_common::chart::pie::{
 };
 pub use litchi_iwa_common::chart::series_labels::{Index, Visibility};
 pub use litchi_iwa_common::chart::{Direction, DirectionKind};
-pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
+pub use metadata_extractor::ChartMetadata;
 pub use pie_label_distance::ChartPieLabelDistance;
 pub use pie_start_angle::ChartPieStartAngle;
 pub use pie_wedge_explosion::{ChartPieWedgeExplosion, ChartPieWedgeIndex};

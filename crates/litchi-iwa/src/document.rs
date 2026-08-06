@@ -221,11 +221,6 @@ impl Document {
         self.state.object_index.resolve_id(&self.state.bundle, id)
     }
 
-    /// Get the immutable typed object index backing this document.
-    pub fn object_index(&self) -> &ObjectIndex {
-        &self.state.object_index
-    }
-
     /// Borrow all validated object identities in deterministic numeric order.
     pub fn object_id_iter(&self) -> impl Iterator<Item = ObjectId> + '_ {
         self.state.object_index.iter_object_ids()
@@ -236,6 +231,15 @@ impl Document {
     /// Use [`Self::object_id_iter`] when an owned collection is unnecessary.
     pub fn object_ids(&self) -> Vec<ObjectId> {
         self.object_id_iter().collect()
+    }
+
+    /// Extract chart metadata without exposing the archive object index.
+    pub fn charts(&self) -> Result<Vec<crate::charts::ChartMetadata>> {
+        crate::charts::metadata_extractor::ChartMetadataExtractor::new(
+            &self.state.bundle,
+            &self.state.object_index,
+        )
+        .extract_all_charts()
     }
 
     /// Get the application type

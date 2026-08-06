@@ -140,7 +140,7 @@ mod image_caption;
 pub mod media;
 /// Native movie and audio playback wire adapter.
 pub(crate) mod media_playback;
-pub mod object_index;
+mod object_index;
 mod package;
 mod package_metadata;
 mod protobuf;

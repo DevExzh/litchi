@@ -307,11 +307,6 @@ impl PagesDocument {
         self.validation_report().as_result()
     }
 
-    /// Get the object index
-    pub fn object_index(&self) -> &ObjectIndex {
-        &self.state.object_index
-    }
-
     /// Get document statistics after resolving the document sections.
     pub fn stats(&self) -> Result<PagesDocumentStats> {
         let total_objects = self.state.object_index.object_count();
@@ -366,7 +361,7 @@ mod tests {
         );
 
         let doc = doc_result.unwrap();
-        assert!(!doc.object_index().object_ids().is_empty());
+        assert!(doc.stats().unwrap().total_objects > 0);
         assert!(doc.validate().is_ok());
     }
 
@@ -452,7 +447,7 @@ mod tests {
         );
 
         let structured =
-            crate::structured::extract_sections(document.bundle(), document.object_index())
+            crate::structured::extract_sections(document.bundle(), &document.state.object_index)
                 .unwrap();
         assert_eq!(structured.len(), 1);
         assert_eq!(structured[0].paragraphs, ["Pages body — café 東京 🚀"]);

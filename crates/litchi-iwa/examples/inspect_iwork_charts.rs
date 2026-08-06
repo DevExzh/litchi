@@ -2,9 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::bundle::Bundle;
-use litchi_iwa::charts::ChartMetadataExtractor;
-use litchi_iwa::object_index::ObjectIndex;
+use litchi_iwa::Document;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -15,9 +13,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let bundle = Bundle::open(input)?;
-    let index = ObjectIndex::from_bundle(&bundle)?;
-    let charts = ChartMetadataExtractor::new(&bundle, &index).extract_all_charts()?;
+    let document = Document::open(input)?;
+    let charts = document.charts()?;
     for chart in &charts {
         println!(
             "object={} kind={:?} series={} default_data={} title={:?}",

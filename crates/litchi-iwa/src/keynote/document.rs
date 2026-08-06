@@ -737,11 +737,6 @@ impl KeynoteDocument {
         &self.state.bundle
     }
 
-    /// Get the object index
-    pub fn object_index(&self) -> &ObjectIndex {
-        &self.state.object_index
-    }
-
     /// Return a bounded, deterministic validation report for this snapshot.
     pub fn validation_report(&self) -> crate::bundle::BundleValidationReport {
         self.state.bundle.validation_report()
@@ -851,7 +846,7 @@ mod tests {
         );
 
         let doc = doc_result.unwrap();
-        assert!(!doc.object_index().object_ids().is_empty());
+        assert!(doc.stats().unwrap().total_objects > 0);
         assert!(doc.validate().is_ok());
     }
 

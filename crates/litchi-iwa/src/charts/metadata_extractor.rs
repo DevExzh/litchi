@@ -73,14 +73,14 @@ impl ChartMetadata {
 }
 
 /// Extractor for chart metadata
-pub struct ChartMetadataExtractor<'a> {
+pub(crate) struct ChartMetadataExtractor<'a> {
     bundle: &'a Bundle,
     object_index: &'a ObjectIndex,
 }
 
 impl<'a> ChartMetadataExtractor<'a> {
     /// Create a new chart metadata extractor
-    pub fn new(bundle: &'a Bundle, object_index: &'a ObjectIndex) -> Self {
+    pub(crate) fn new(bundle: &'a Bundle, object_index: &'a ObjectIndex) -> Self {
         Self {
             bundle,
             object_index,
@@ -88,7 +88,7 @@ impl<'a> ChartMetadataExtractor<'a> {
     }
 
     /// Extract metadata from all charts in the document
-    pub fn extract_all_charts(&self) -> Result<Vec<ChartMetadata>> {
+    pub(crate) fn extract_all_charts(&self) -> Result<Vec<ChartMetadata>> {
         let mut charts = Vec::new();
 
         for chart_type in [LEGACY_CHART_MESSAGE_TYPE, CHART_DRAWABLE_MESSAGE_TYPE] {
@@ -194,31 +194,6 @@ impl<'a> ChartMetadataExtractor<'a> {
         read_chart_non_style_title(message.data.as_slice())
     }
 
-    /// Extract metadata from a specific chart by object ID
-    pub fn extract_chart_by_id(&self, chart_id: u64) -> Result<Option<ChartMetadata>> {
-        if let Some(resolved) = self.object_index.resolve_ref_id(self.bundle, chart_id)? {
-            return self.extract_chart_metadata(&resolved);
-        }
-
-        Ok(None)
-    }
-
-    /// Get all chart titles in the document
-    pub fn get_all_chart_titles(&self) -> Result<Vec<String>> {
-        let charts = self.extract_all_charts()?;
-        Ok(charts.into_iter().filter_map(|c| c.title).collect())
-    }
-
-    /// Get total number of charts in the document
-    pub fn chart_count(&self) -> Result<usize> {
-        let mut count = 0;
-
-        for chart_type in [LEGACY_CHART_MESSAGE_TYPE, CHART_DRAWABLE_MESSAGE_TYPE] {
-            count += self.object_index.iter_entries_by_type(chart_type).count();
-        }
-
-        Ok(count)
-    }
 }
 
 #[cfg(test)]
