@@ -661,7 +661,7 @@ mod tests {
         let table_id = editor.tables().unwrap()[0].object_id;
         let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
         editor
-            .set_cell(table_id, 3, 4, CellValue::Number(7.0))
+            .set_cell(table_id, 3, 4, CellValue::number(7.0).unwrap())
             .unwrap();
         editor
             .set_formula_with_cached_value(
@@ -669,7 +669,7 @@ mod tests {
                 region.row(),
                 region.column(),
                 FormulaExpression::cell(FormulaCellReference::relative(3, 4)),
-                FormulaCachedValue::Number(7.0),
+                FormulaCachedValue::number(7.0).unwrap(),
             )
             .unwrap();
         editor.merge_cells(table_id, region).unwrap();
@@ -697,7 +697,7 @@ mod tests {
             Some(&CellValue::Formula("=D3".to_owned()))
         );
         editor
-            .set_cell(table_id, 2, 3, CellValue::Number(11.0))
+            .set_cell(table_id, 2, 3, CellValue::number(11.0).unwrap())
             .unwrap();
         assert_eq!(cached_formula_number(&editor, table_id, 1, 1), 11.0);
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -717,7 +717,12 @@ mod tests {
             .unwrap();
         let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
         editor
-            .set_cell(target_table.object_id, 1, 0, CellValue::Number(7.0))
+            .set_cell(
+                target_table.object_id,
+                1,
+                0,
+                CellValue::number(7.0).unwrap(),
+            )
             .unwrap();
         editor
             .set_formula_with_cached_value(
@@ -728,7 +733,7 @@ mod tests {
                     target_table.object_id,
                     FormulaCellReference::relative(1, 0),
                 ),
-                FormulaCachedValue::Number(7.0),
+                FormulaCachedValue::number(7.0).unwrap(),
             )
             .unwrap();
         editor.merge_cells(source_table_id, region).unwrap();
@@ -794,10 +799,20 @@ mod tests {
             .unwrap();
         let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
         editor
-            .set_cell(target_table.object_id, 1, 0, CellValue::Number(7.0))
+            .set_cell(
+                target_table.object_id,
+                1,
+                0,
+                CellValue::number(7.0).unwrap(),
+            )
             .unwrap();
         editor
-            .set_cell(target_table.object_id, 2, 0, CellValue::Number(3.0))
+            .set_cell(
+                target_table.object_id,
+                2,
+                0,
+                CellValue::number(3.0).unwrap(),
+            )
             .unwrap();
         editor
             .set_formula_with_cached_value(
@@ -812,7 +827,7 @@ mod tests {
                         FormulaCellReference::relative(2, 0),
                     )],
                 ),
-                FormulaCachedValue::Number(10.0),
+                FormulaCachedValue::number(10.0).unwrap(),
             )
             .unwrap();
         editor.merge_cells(source_table_id, region).unwrap();
@@ -871,10 +886,20 @@ mod tests {
             .unwrap();
         let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
         editor
-            .set_cell(target_table.object_id, 1, 0, CellValue::Number(7.0))
+            .set_cell(
+                target_table.object_id,
+                1,
+                0,
+                CellValue::number(7.0).unwrap(),
+            )
             .unwrap();
         editor
-            .set_cell(target_table.object_id, 2, 0, CellValue::Number(3.0))
+            .set_cell(
+                target_table.object_id,
+                2,
+                0,
+                CellValue::number(3.0).unwrap(),
+            )
             .unwrap();
         editor
             .set_formula_with_cached_value(
@@ -889,7 +914,7 @@ mod tests {
                         FormulaCellReference::relative(2, 0),
                     )],
                 ),
-                FormulaCachedValue::Number(10.0),
+                FormulaCachedValue::number(10.0).unwrap(),
             )
             .unwrap();
         editor.merge_cells(source_table_id, region).unwrap();
@@ -981,10 +1006,20 @@ mod tests {
             .unwrap();
         let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
         editor
-            .set_cell(target_table.object_id, 1, 0, CellValue::Number(7.0))
+            .set_cell(
+                target_table.object_id,
+                1,
+                0,
+                CellValue::number(7.0).unwrap(),
+            )
             .unwrap();
         editor
-            .set_cell(target_table.object_id, 2, 0, CellValue::Number(3.0))
+            .set_cell(
+                target_table.object_id,
+                2,
+                0,
+                CellValue::number(3.0).unwrap(),
+            )
             .unwrap();
         editor
             .set_formula_with_cached_value(
@@ -999,7 +1034,7 @@ mod tests {
                         FormulaAxisReference::relative(2),
                     )],
                 ),
-                FormulaCachedValue::Number(10.0),
+                FormulaCachedValue::number(10.0).unwrap(),
             )
             .unwrap();
         editor.merge_cells(source_table_id, region).unwrap();
@@ -1066,10 +1101,20 @@ mod tests {
             .unwrap();
         let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
         editor
-            .set_cell(target_table.object_id, 0, 1, CellValue::Number(7.0))
+            .set_cell(
+                target_table.object_id,
+                0,
+                1,
+                CellValue::number(7.0).unwrap(),
+            )
             .unwrap();
         editor
-            .set_cell(target_table.object_id, 0, 2, CellValue::Number(3.0))
+            .set_cell(
+                target_table.object_id,
+                0,
+                2,
+                CellValue::number(3.0).unwrap(),
+            )
             .unwrap();
         editor
             .set_formula_with_cached_value(
@@ -1084,7 +1129,7 @@ mod tests {
                         FormulaAxisReference::relative(2),
                     )],
                 ),
-                FormulaCachedValue::Number(10.0),
+                FormulaCachedValue::number(10.0).unwrap(),
             )
             .unwrap();
         editor.merge_cells(source_table_id, region).unwrap();
@@ -1539,7 +1584,7 @@ mod tests {
             .unwrap();
         let pages_table_id = pages.tables().unwrap()[0].model_object_id;
         pages
-            .set_table_cell(pages_table_id, 3, 4, CellValue::Number(7.0))
+            .set_table_cell(pages_table_id, 3, 4, CellValue::number(7.0).unwrap())
             .unwrap();
         pages
             .set_table_formula(
@@ -1547,7 +1592,7 @@ mod tests {
                 region.row(),
                 region.column(),
                 FormulaExpression::cell(FormulaCellReference::relative(3, 4)),
-                FormulaCachedValue::Number(7.0),
+                FormulaCachedValue::number(7.0).unwrap(),
             )
             .unwrap();
         pages.merge_table_cells(pages_table_id, region).unwrap();
@@ -1592,7 +1637,7 @@ mod tests {
                 keynote_table.model_object_id,
                 3,
                 4,
-                CellValue::Number(7.0),
+                CellValue::number(7.0).unwrap(),
             )
             .unwrap();
         keynote
@@ -1602,7 +1647,7 @@ mod tests {
                 region.row(),
                 region.column(),
                 FormulaExpression::cell(FormulaCellReference::relative(3, 4)),
-                FormulaCachedValue::Number(7.0),
+                FormulaCachedValue::number(7.0).unwrap(),
             )
             .unwrap();
         keynote

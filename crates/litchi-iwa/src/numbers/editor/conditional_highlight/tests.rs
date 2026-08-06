@@ -2,21 +2,11 @@ use super::*;
 use crate::numbers::NumbersDocumentBuilder;
 use crate::shapes::{RgbColorSpace, RgbaColor};
 use litchi_iwa_common::table::cell::conditional_highlight::{
-    Date, Offset,
-    OffsetDirection, Period,
-    PeriodUnit, DateRange,
-    Number, Range,
-    Style, Text,
+    Date, DateRange, Number, Offset, OffsetDirection, Period, PeriodUnit, Range, Style, Text,
 };
 
-fn rule(
-    condition: Condition,
-    color: RgbaColor,
-) -> Rule {
-    Rule::new(
-        condition,
-        Style::with_fill(color),
-    )
+fn rule(condition: Condition, color: RgbaColor) -> Rule {
+    Rule::new(condition, Style::with_fill(color))
 }
 
 fn applied_rule(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> Option<u32> {
@@ -82,18 +72,9 @@ fn scratch_document_conditional_highlights_create_replace_and_delete() {
     let range = Range::new(zero, hundred).unwrap();
     let initial = [
         rule(Condition::LessThan(zero), red),
-        rule(
-            Condition::GreaterThanOrEqualTo(hundred),
-            green,
-        ),
-        rule(
-            Condition::Between(range),
-            green,
-        ),
-        rule(
-            Condition::NotBetween(range),
-            red,
-        ),
+        rule(Condition::GreaterThanOrEqualTo(hundred), green),
+        rule(Condition::Between(range), green),
+        rule(Condition::NotBetween(range), red),
     ];
 
     let created = editor
@@ -209,15 +190,7 @@ fn shared_conditional_child_rejects_deletion_transactionally() {
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     let zero = Number::new(0.0).unwrap();
     editor
-        .set_cell_conditional_highlighting(
-            table_id,
-            1,
-            1,
-            &[rule(
-                Condition::LessThan(zero),
-                red,
-            )],
-        )
+        .set_cell_conditional_highlighting(table_id, 1, 1, &[rule(Condition::LessThan(zero), red)])
         .unwrap();
     let graph = info_in_package(&editor.package, table_id, 1, 1)
         .unwrap()
@@ -271,10 +244,7 @@ fn equal_size_replacement_preserves_conditional_graph_identity() {
     let zero = Number::new(0.0).unwrap();
     let initial = [
         rule(Condition::LessThan(zero), red),
-        rule(
-            Condition::GreaterThan(zero),
-            green,
-        ),
+        rule(Condition::GreaterThan(zero), green),
     ];
     editor
         .set_cell_conditional_highlighting(table_id, 1, 1, &initial)
@@ -291,14 +261,8 @@ fn equal_size_replacement_preserves_conditional_graph_identity() {
     .unwrap();
 
     let replacement = [
-        rule(
-            Condition::LessThanOrEqualTo(zero),
-            green,
-        ),
-        rule(
-            Condition::GreaterThanOrEqualTo(zero),
-            red,
-        ),
+        rule(Condition::LessThanOrEqualTo(zero), green),
+        rule(Condition::GreaterThanOrEqualTo(zero), red),
     ];
     editor
         .set_cell_conditional_highlighting(table_id, 1, 1, &replacement)
@@ -338,10 +302,7 @@ fn variable_size_replacement_retains_and_reclaims_conditional_children() {
     let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
     let zero = Number::new(0.0).unwrap();
     let one = Number::new(1.0).unwrap();
-    let initial = [rule(
-        Condition::LessThan(zero),
-        red,
-    )];
+    let initial = [rule(Condition::LessThan(zero), red)];
     editor
         .set_cell_conditional_highlighting(table_id, 1, 1, &initial)
         .unwrap();
@@ -357,14 +318,8 @@ fn variable_size_replacement_retains_and_reclaims_conditional_children() {
     .unwrap();
 
     let grown = [
-        rule(
-            Condition::LessThanOrEqualTo(zero),
-            green,
-        ),
-        rule(
-            Condition::GreaterThanOrEqualTo(one),
-            red,
-        ),
+        rule(Condition::LessThanOrEqualTo(zero), green),
+        rule(Condition::GreaterThanOrEqualTo(one), red),
         rule(Condition::EqualTo(one), green),
     ];
     editor
@@ -433,19 +388,13 @@ fn shared_conditional_graph_replacement_is_copy_on_write() {
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
     let zero = Number::new(0.0).unwrap();
-    let initial = [rule(
-        Condition::LessThan(zero),
-        red,
-    )];
+    let initial = [rule(Condition::LessThan(zero), red)];
     editor
         .set_cell_conditional_highlighting(table_id, 1, 1, &initial)
         .unwrap();
     let shared = share_conditional_highlight(&mut editor, table_id, 1, 1, 2);
 
-    let replacement = [rule(
-        Condition::GreaterThanOrEqualTo(zero),
-        green,
-    )];
+    let replacement = [rule(Condition::GreaterThanOrEqualTo(zero), green)];
     editor
         .set_cell_conditional_highlighting(table_id, 1, 1, &replacement)
         .unwrap();
@@ -489,10 +438,7 @@ fn shared_conditional_copy_on_write_rolls_back_after_late_failure() {
     let table_id = editor.tables().unwrap()[0].object_id;
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     let zero = Number::new(0.0).unwrap();
-    let rules = [rule(
-        Condition::LessThan(zero),
-        red,
-    )];
+    let rules = [rule(Condition::LessThan(zero), red)];
     editor
         .set_cell_conditional_highlighting(table_id, 1, 1, &rules)
         .unwrap();
@@ -629,10 +575,7 @@ fn blank_predicates_round_trip_and_apply_to_empty_and_populated_cells() {
     let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
     let rules = [
         rule(Condition::CellIsBlank, red),
-        rule(
-            Condition::CellIsNotBlank,
-            green,
-        ),
+        rule(Condition::CellIsNotBlank, green),
     ];
 
     for column in [1, 2] {
@@ -680,21 +623,18 @@ fn relative_date_predicates_round_trip_apply_and_observe_day_boundaries() {
         (3, today + SECONDS_PER_DAY + midday),
     ] {
         editor
-            .set_cell(table_id, 1, column, CellValue::Date(value))
+            .set_cell(table_id, 1, column, CellValue::date(value).unwrap())
             .unwrap();
     }
     editor
-        .set_cell(table_id, 1, 4, CellValue::Number(today + midday))
+        .set_cell(table_id, 1, 4, CellValue::number(today + midday).unwrap())
         .unwrap();
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
     let blue = RgbaColor::new(0.1, 0.2, 0.9, 1.0, RgbColorSpace::Srgb).unwrap();
     let rules = [
         rule(Condition::DateIsToday, red),
-        rule(
-            Condition::DateIsYesterday,
-            green,
-        ),
+        rule(Condition::DateIsYesterday, green),
         rule(Condition::DateIsTomorrow, blue),
     ];
 
@@ -767,15 +707,9 @@ fn relative_date_predicates_round_trip_apply_and_observe_day_boundaries() {
     }
 
     for (condition, start) in [
-        (
-            Condition::DateIsYesterday,
-            today - SECONDS_PER_DAY,
-        ),
+        (Condition::DateIsYesterday, today - SECONDS_PER_DAY),
         (Condition::DateIsToday, today),
-        (
-            Condition::DateIsTomorrow,
-            today + SECONDS_PER_DAY,
-        ),
+        (Condition::DateIsTomorrow, today + SECONDS_PER_DAY),
     ] {
         assert!(condition_matches_at(
             &condition,
@@ -818,12 +752,8 @@ fn date_period_predicates_round_trip_all_units_and_use_calendar_boundaries() {
         conditions.extend([
             Condition::DateIsInNext(period),
             Condition::DateIsInLast(period),
-            Condition::DateIsOffsetFromToday(
-                Offset::new(period, Direction::Ago),
-            ),
-            Condition::DateIsOffsetFromToday(
-                Offset::new(period, Direction::FromNow),
-            ),
+            Condition::DateIsOffsetFromToday(Offset::new(period, Direction::Ago)),
+            Condition::DateIsOffsetFromToday(Offset::new(period, Direction::FromNow)),
         ]);
     }
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
@@ -898,9 +828,7 @@ fn date_period_predicates_round_trip_all_units_and_use_calendar_boundaries() {
     };
     let month = Period::new(1, Unit::Months).unwrap();
     let leap_day = date_to_apple_seconds(NaiveDate::from_ymd_opt(2024, 2, 29).unwrap());
-    let exact = Condition::DateIsOffsetFromToday(
-        Offset::new(month, Direction::FromNow),
-    );
+    let exact = Condition::DateIsOffsetFromToday(Offset::new(month, Direction::FromNow));
     assert!(condition_matches_at(
         &exact,
         &ConditionalCellValue::Date(leap_day),
@@ -919,10 +847,7 @@ fn volatile_date_predicates_register_native_dependency_owners_and_tiles() {
 
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     let period = Period::new(2, Unit::Days).unwrap();
-    let volatile_rule = rule(
-        Condition::DateIsInNext(period),
-        red,
-    );
+    let volatile_rule = rule(Condition::DateIsInNext(period), red);
     let mut editor = NumbersDocumentBuilder::new()
         .table_dimensions(2, 3)
         .build()
@@ -1209,7 +1134,7 @@ fn fixed_date_predicates_round_trip_apply_and_preserve_native_graphs() {
         (3, upper.apple_seconds() + midday),
     ] {
         editor
-            .set_cell(table_id, 1, column, CellValue::Date(value))
+            .set_cell(table_id, 1, column, CellValue::date(value).unwrap())
             .unwrap();
         editor
             .set_cell_conditional_highlighting(table_id, 1, column, &rules)
@@ -1220,7 +1145,7 @@ fn fixed_date_predicates_round_trip_apply_and_preserve_native_graphs() {
             table_id,
             1,
             4,
-            CellValue::Date(exact.apple_seconds() + midday),
+            CellValue::date(exact.apple_seconds() + midday).unwrap(),
         )
         .unwrap();
     editor
@@ -1231,7 +1156,7 @@ fn fixed_date_predicates_round_trip_apply_and_preserve_native_graphs() {
             table_id,
             1,
             5,
-            CellValue::Number(exact.apple_seconds() + midday),
+            CellValue::number(exact.apple_seconds() + midday).unwrap(),
         )
         .unwrap();
     editor
@@ -1400,20 +1325,14 @@ fn numeric_sign_predicates_round_trip_and_exclude_zero_and_non_numbers() {
     let table_id = editor.tables().unwrap()[0].object_id;
     for (column, value) in [(1, 3.0), (2, -3.0), (3, 0.0)] {
         editor
-            .set_cell(table_id, 1, column, CellValue::Number(value))
+            .set_cell(table_id, 1, column, CellValue::number(value).unwrap())
             .unwrap();
     }
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
     let rules = [
-        rule(
-            Condition::NumberIsPositive,
-            red,
-        ),
-        rule(
-            Condition::NumberIsNegative,
-            green,
-        ),
+        rule(Condition::NumberIsPositive, red),
+        rule(Condition::NumberIsNegative, green),
     ];
     for column in 1..=3 {
         editor
@@ -1501,7 +1420,7 @@ fn boolean_predicates_round_trip_and_match_only_the_exact_boolean() {
     for (column, value) in [
         (1, CellValue::Boolean(true)),
         (2, CellValue::Boolean(false)),
-        (3, CellValue::Number(1.0)),
+        (3, CellValue::number(1.0).unwrap()),
         (4, CellValue::Text("TRUE".to_owned())),
     ] {
         editor.set_cell(table_id, 1, column, value).unwrap();
@@ -1510,10 +1429,7 @@ fn boolean_predicates_round_trip_and_match_only_the_exact_boolean() {
     let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
     let rules = [
         rule(Condition::BooleanIsTrue, red),
-        rule(
-            Condition::BooleanIsFalse,
-            green,
-        ),
+        rule(Condition::BooleanIsFalse, green),
     ];
     for column in 1..=4 {
         editor
@@ -1628,14 +1544,8 @@ fn checkbox_predicates_round_trip_and_require_native_checkbox_format() {
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     let green = RgbaColor::new(0.1, 0.8, 0.2, 1.0, RgbColorSpace::Srgb).unwrap();
     let rules = [
-        rule(
-            Condition::CheckboxIsChecked,
-            red,
-        ),
-        rule(
-            Condition::CheckboxIsNotChecked,
-            green,
-        ),
+        rule(Condition::CheckboxIsChecked, red),
+        rule(Condition::CheckboxIsNotChecked, green),
     ];
     for column in 1..=4 {
         editor
@@ -1732,15 +1642,7 @@ fn blank_predicates_reject_noncanonical_formula_graphs() {
     let table_id = editor.tables().unwrap()[0].object_id;
     let red = RgbaColor::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap();
     editor
-        .set_cell_conditional_highlighting(
-            table_id,
-            0,
-            0,
-            &[rule(
-                Condition::CellIsBlank,
-                red,
-            )],
-        )
+        .set_cell_conditional_highlighting(table_id, 0, 0, &[rule(Condition::CellIsBlank, red)])
         .unwrap();
     let info = info_in_package(&editor.package, table_id, 0, 0)
         .unwrap()
@@ -1804,38 +1706,14 @@ fn text_predicates_are_case_insensitive_and_round_trip_from_scratch() {
         .unwrap();
     let text = |value| Text::new(value).unwrap();
     let condition_cases = [
-        (
-            Condition::TextEqualTo(text("organic grain")),
-            "Dairy",
-        ),
-        (
-            Condition::TextNotEqualTo(text("dairy")),
-            "Dairy",
-        ),
-        (
-            Condition::TextStartsWith(text("ORGANIC")),
-            "Dairy",
-        ),
-        (
-            Condition::TextDoesNotStartWith(text("dairy")),
-            "Dairy Milk",
-        ),
-        (
-            Condition::TextEndsWith(text("grain")),
-            "Dairy",
-        ),
-        (
-            Condition::TextDoesNotEndWith(text("rice")),
-            "Organic Rice",
-        ),
-        (
-            Condition::TextContains(text("NIC GR")),
-            "Dairy",
-        ),
-        (
-            Condition::TextDoesNotContain(text("rice")),
-            "Organic Rice",
-        ),
+        (Condition::TextEqualTo(text("organic grain")), "Dairy"),
+        (Condition::TextNotEqualTo(text("dairy")), "Dairy"),
+        (Condition::TextStartsWith(text("ORGANIC")), "Dairy"),
+        (Condition::TextDoesNotStartWith(text("dairy")), "Dairy Milk"),
+        (Condition::TextEndsWith(text("grain")), "Dairy"),
+        (Condition::TextDoesNotEndWith(text("rice")), "Organic Rice"),
+        (Condition::TextContains(text("NIC GR")), "Dairy"),
+        (Condition::TextDoesNotContain(text("rice")), "Organic Rice"),
     ];
     for (condition, nonmatching) in &condition_cases {
         assert!(condition_matches(
