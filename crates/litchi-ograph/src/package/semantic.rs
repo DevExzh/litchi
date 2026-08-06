@@ -131,6 +131,21 @@ impl Package {
         }
     }
 
+    /// Converts this validated package into an exact source snapshot for
+    /// contextual typed edits.
+    pub fn snapshot(self) -> super::snapshot::Snapshot {
+        super::snapshot::Snapshot::from_package(self)
+    }
+
+    /// Starts a source-checked transaction over the standalone Graph chart.
+    pub fn edit(self) -> Result<super::transaction::Transaction> {
+        self.snapshot().edit()
+    }
+
+    pub(super) fn into_snapshot_parts(self) -> (Vec<u8>, Topology, WorkbookLayout, Limits) {
+        (self.bytes, self.topology, self.workbook, self.limits)
+    }
+
     /// Validated stream topology.
     pub const fn topology(&self) -> Topology {
         self.topology

@@ -23,4 +23,7 @@ pub mod record;
 
 pub use error::{Error, Result};
 pub use limits::Limits;
-pub use package::{Package, PackageRef, Payload, Topology, Workbook, WorkbookRef};
+pub use package::{
+    Commit, Package, PackageRef, Patch, Payload, Snapshot, Topology, Transaction, Workbook,
+    WorkbookRef,
+};
