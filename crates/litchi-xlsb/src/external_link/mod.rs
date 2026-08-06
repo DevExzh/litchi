@@ -11,6 +11,11 @@ use thiserror::Error as ThisError;
 mod codec;
 mod model;
 mod package;
+mod transaction;
+mod validation;
+
+#[cfg(test)]
+mod tests;
 
 /// Result type for the standalone XLSB external-link codec.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -63,12 +68,18 @@ pub const DATA_ITEM_REQUIRED_TRAILING_FLAG: u8 = 1;
 
 /// Maximum bytes accepted or emitted for one external-link part stream.
 pub const MAX_LINK_PART_BYTES: usize = 32 * 1024 * 1024;
+/// Maximum number of opaque BIFF12 records retained by one source snapshot.
+pub const MAX_UNKNOWN_RECORDS: usize = 65_535;
+/// Maximum aggregate bytes retained for opaque BIFF12 records.
+pub const MAX_UNKNOWN_BYTES: usize = 8 * 1024 * 1024;
 pub use codec::{
     parse_external_link, parse_external_link_model, parse_external_link_with_relationship,
 };
 pub use model::{
     AreaReference, CachedValue, CellLocation, CellReference, DdeItem, DefinedName, Entries,
-    ErrorValue, Kind, Link, NameFormula, NameFormulaKind, OleItem, Parsed, SheetRange, ValueMatrix,
-    validate_number,
+    ErrorValue, Kind, Link, NameFormula, NameFormulaKind, OleItem, Parsed, SheetRange,
+    UnknownRecord, ValueMatrix, validate_number,
 };
 pub use package::write_external_link_stream;
+pub use transaction::{Commit, Patch, Snapshot, Transaction, apply, read};
+pub use validation::validate_link;

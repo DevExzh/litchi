@@ -5,6 +5,90 @@
 
 use super::model::validate_defined_name;
 use super::*;
+use std::sync::Arc;
+
+/// A parsed source stream with the opaque records needed for lossless edits.
+#[derive(Debug, Clone)]
+pub(crate) struct Source {
+    pub(crate) parsed: Parsed,
+    pub(crate) bytes: Arc<[u8]>,
+    pub(crate) unknown_records: Vec<UnknownRecord>,
+}
+
+/// Parse one stream and retain every record not modeled by this owner.
+pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
+    let parsed = parse_external_link(data)?;
+    let bytes: Arc<[u8]> = Arc::from(data.to_vec());
+    let limits = crate::raw::Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
+    let mut unknown_records = Vec::new();
+    let mut unknown_bytes = 0usize;
+    let mut after_known = 0usize;
+
+    for record in crate::raw::Records::with_limits(data, limits) {
+        let record = record?;
+        let is_known = is_modeled_record(record.kind());
+        if is_known {
+            after_known = after_known
+                .checked_add(1)
+                .ok_or_else(|| invalid("modeled external-link record count overflow"))?;
+            continue;
+        }
+        if unknown_records.len() >= MAX_UNKNOWN_RECORDS {
+            return Err(Error::InvalidLength {
+                expected: MAX_UNKNOWN_RECORDS,
+                found: unknown_records.len() + 1,
+            });
+        }
+        let offset = record.offset();
+        let (_, header_len) = crate::raw::Header::parse(&data[offset..], limits)?;
+        let end = offset
+            .checked_add(header_len)
+            .and_then(|end| end.checked_add(record.len()))
+            .ok_or_else(|| invalid("opaque external-link record range overflow"))?;
+        let raw: Arc<[u8]> = Arc::from(data[offset..end].to_vec());
+        unknown_bytes = unknown_bytes
+            .checked_add(raw.len())
+            .ok_or_else(|| invalid("opaque external-link byte count overflow"))?;
+        if unknown_bytes > MAX_UNKNOWN_BYTES {
+            return Err(Error::InvalidLength {
+                expected: MAX_UNKNOWN_BYTES,
+                found: unknown_bytes,
+            });
+        }
+        unknown_records.push(UnknownRecord::new(
+            u16::from(record.kind()),
+            after_known,
+            raw,
+            header_len,
+        ));
+    }
+
+    Ok(Source {
+        parsed,
+        bytes,
+        unknown_records,
+    })
+}
+
+pub(crate) fn is_modeled_record(kind: crate::raw::Kind) -> bool {
+    matches!(
+        kind,
+        crate::raw::kind::BEGIN_SUP_BOOK
+            | crate::raw::kind::SUP_TABS
+            | crate::raw::kind::SUP_NAME_START
+            | crate::raw::kind::SUP_NAME_FORMULA
+            | crate::raw::kind::SUP_NAME_BITS
+            | crate::raw::kind::SUP_NAME_VALUE_START
+            | crate::raw::kind::SUP_NAME_VALUE_END
+            | crate::raw::kind::SUP_NAME_NUM
+            | crate::raw::kind::SUP_NAME_ERROR
+            | crate::raw::kind::SUP_NAME_STRING
+            | crate::raw::kind::SUP_NAME_NIL
+            | crate::raw::kind::SUP_NAME_BOOL
+            | crate::raw::kind::SUP_NAME_END
+            | crate::raw::kind::END_SUP_BOOK
+    )
+}
 
 /// Parse one complete XLSB External Link part stream.
 pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
@@ -290,13 +374,10 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
                 saw_end = true;
             },
             _ => {
-                if sup_name_state == 4
-                    || (link_type == Some(EXTERNAL_REFERENCE_WORKBOOK) && sup_name_state != 0)
-                {
-                    return Err(invalid(
-                        "unexpected record inside an external name or cache",
-                    ));
-                }
+                // Future and producer-specific records are opaque. Their
+                // presence does not satisfy any required modeled record, so
+                // the state machine still rejects malformed ownership while
+                // the lossless layer can retain the exact wire image.
             },
         }
     }
@@ -398,9 +479,9 @@ fn parse_external_sheet_names(data: &[u8], limits: crate::raw::Limits) -> Result
     let mut cursor = crate::raw::Cursor::with_limits(data, "BrtSupTabs", limits);
     let count = usize::try_from(cursor.read_u32()?)
         .map_err(|_| invalid("external sheet-name count overflow"))?;
-    if count >= MAX_COLLECTION_ITEMS {
+    if count > MAX_COLLECTION_ITEMS {
         return Err(invalid(format!(
-            "external sheet-name count {count} exceeds 65,534"
+            "external sheet-name count {count} exceeds 65,535"
         )));
     }
     let mut names = Vec::new();

@@ -7,6 +7,7 @@ use super::{
     MAX_XLSB_EXTERNAL_CACHE_ROWS, MAX_XLSB_EXTERNAL_CACHED_VALUES, Result,
 };
 use std::collections::HashSet;
+use std::sync::Arc;
 
 pub(crate) const EXT_PTG_ERROR: u8 = 0x1C;
 pub(crate) const EXT_PTG_REFERENCE: u8 = 0x3A;
@@ -643,6 +644,12 @@ impl DdeItem {
         self
     }
 
+    /// Remove the inert cache while retaining the item metadata.
+    pub fn without_cached_values(mut self) -> Self {
+        self.cached_values = None;
+        self
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -720,6 +727,12 @@ impl OleItem {
         self
     }
 
+    /// Remove the inert cache while retaining the item metadata.
+    pub fn without_cached_values(mut self) -> Self {
+        self.cached_values = None;
+        self
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -754,6 +767,59 @@ pub enum Entries {
     Workbook(Vec<DefinedName>),
     Dde(Vec<DdeItem>),
     Ole(Vec<OleItem>),
+}
+
+/// One unmodeled BIFF12 record retained by a source-bound snapshot.
+///
+/// The complete wire image is kept, including its original variable-length
+/// record header. Edits therefore preserve future records and producer
+/// extensions without interpreting, activating, or reserializing them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownRecord {
+    kind: u16,
+    after_known: usize,
+    bytes: Arc<[u8]>,
+    payload_start: usize,
+}
+
+impl UnknownRecord {
+    pub(crate) fn new(
+        kind: u16,
+        after_known: usize,
+        bytes: Arc<[u8]>,
+        payload_start: usize,
+    ) -> Self {
+        Self {
+            kind,
+            after_known,
+            bytes,
+            payload_start,
+        }
+    }
+
+    /// Numeric BIFF12 record kind.
+    #[must_use]
+    pub const fn kind(&self) -> u16 {
+        self.kind
+    }
+
+    /// Number of modeled records preceding this opaque record in source.
+    #[must_use]
+    pub const fn after_known(&self) -> usize {
+        self.after_known
+    }
+
+    /// Complete source wire image, including the record header.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Borrow the opaque record payload without reconstructing its header.
+    #[must_use]
+    pub fn payload(&self) -> &[u8] {
+        &self.bytes[self.payload_start..]
+    }
 }
 
 /// Typed metadata and inert caches from one XLSB External Link part.
