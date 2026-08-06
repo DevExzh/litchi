@@ -92,7 +92,8 @@ query, macro, chart, pivot, or external content is executed.
 | ActiveX and form-control metadata | 🟡 | ✅ | 🟡 | ActiveX relationships, control metadata, and supported VBA-linked payload references are bounded and inert. Controls are not instantiated, rendered, or run. |
 | OOXML digital signatures | 🟡 | 🟡 | 🟡 | The shared OPC graph/signature adapter can inspect and edit supported XML signatures at package level; this crate's workbook model does not validate certificate trust, revocation, or every producer signature profile. |
 | OOXML package encryption | 🟡 | 🟡 | 🟡 | Supported OOXML encryption profiles are available through the shared litchi-crypto::ooxml facade rather than ordinary Workbook edits. Unsupported profiles fail explicitly; encryption does not make formula or macro behavior safe. |
-| Ribbon, task panes, and custom UI XML | 🟡 | 🟡 | 🟡 | Package parts and relationships are bounded/pass-through where exposed; UI activation and arbitrary extension semantics are not implemented. |
+| Persisted Office Add-in task panes and web-extension parts | ✅ | ✅ | ✅ | The layered `task_panes::{package,transaction}` owner exposes typed MS-OWEXML task-pane/add-in CRUD through clone-staged `Package::edit_task_panes`; existing relationship IDs, unrelated package graph entries, and supported opaque extension XML are retained. Add-in activation and provider behavior remain inert. |
+| Ribbon and custom UI XML | 🟡 | 🟡 | 🟡 | Ribbon/customUI parts and relationships remain bounded/pass-through where exposed; UI activation and arbitrary extension semantics are not implemented. |
 | Unknown package parts and extension XML | 🟡 | ✅ | 🟡 | OPC graph editing preserves supported opaque parts and validates relationship topology. Typed writers do not claim lossless preservation through every semantic mutation of unknown XML. |
 
 ## Explicit gaps

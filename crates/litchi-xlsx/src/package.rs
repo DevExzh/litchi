@@ -101,6 +101,31 @@ impl Package {
         crate::timeline::Transaction::new(&mut self.0, &workbook)
     }
 
+    /// Load the inert Office Add-in task-pane graph, when present.
+    pub fn task_panes(&self) -> Result<Option<litchi_ooxml_common::web::Panes>> {
+        crate::task_panes::load(&self.0)
+    }
+
+    /// Start a clone-staged transaction for the package-level task-pane graph.
+    ///
+    /// Existing XML conformance is retained automatically. New graphs use
+    /// Transitional SpreadsheetML relationships unless the explicit
+    /// [`Self::edit_task_panes_with`] entry point is selected.
+    pub fn edit_task_panes(&mut self) -> Result<crate::task_panes::Transaction<'_>> {
+        let conformance = crate::task_panes::existing_conformance(&self.0)?;
+        crate::task_panes::Transaction::new(&mut self.0, conformance)
+    }
+
+    /// Start a task-pane transaction with an explicit XML relationship
+    /// conformance. The staged graph is published only by
+    /// [`crate::task_panes::Transaction::commit`].
+    pub fn edit_task_panes_with(
+        &mut self,
+        conformance: litchi_ooxml_common::web::Conformance,
+    ) -> Result<crate::task_panes::Transaction<'_>> {
+        crate::task_panes::Transaction::new(&mut self.0, conformance)
+    }
+
     /// Atomically save the package to a filesystem path.
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
         writer::save(&self.0, path)

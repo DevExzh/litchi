@@ -57,6 +57,7 @@ mod slicer_cache;
 pub mod sort;
 pub mod style;
 pub mod table;
+pub mod task_panes;
 pub mod threaded_comments;
 pub mod timeline;
 #[allow(dead_code, unreachable_pub, unused_imports)]
