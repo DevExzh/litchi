@@ -207,7 +207,9 @@ pub use comments::IWorkDrawableCommentEditor;
 pub use document::Document;
 pub use drawable_order::DrawableLayerMove;
 pub use identity::IWorkDocumentIdentity;
-pub use media::{EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaManager, MediaStats};
+pub use media::{
+    EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaAssetId, MediaManager, MediaStats,
+};
 pub(crate) use package::IWorkPackage;
 pub use shapes::DrawableTitleCaption;
 pub use structured::StructuredData;
