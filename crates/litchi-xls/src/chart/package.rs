@@ -9,6 +9,7 @@ use litchi_biff::{Limits as BiffLimits, Records};
 use litchi_ograph::chart::{Kind as GraphChartKind, Ref as GraphChartRef, Refs as GraphCharts};
 use litchi_ole_common::object::{Editor as ObjectEditor, Limits as ObjectLimits, Targets};
 
+use super::chart_area;
 #[cfg(test)]
 use super::codec::serialize_chart;
 use super::codec::{parse_chart, patch_chart_data};
@@ -191,6 +192,47 @@ impl Editor {
         let workbook = replace_chart_sheet_stream(
             &self.workbook,
             location.sheet_index(),
+            stored.start,
+            stored.end,
+            &patched,
+            self.limits,
+        )?;
+        self.install_workbook(workbook).map(drop)
+    }
+
+    /// Replaces only the fixed chart-area geometry of one existing chart.
+    ///
+    /// The BIFF `Chart` record remains the same length and at the same offset;
+    /// unknown records, formulas, caches, and the worksheet OfficeArt object
+    /// are not reconstructed. For an embedded chart this changes only the
+    /// inert chart-substream geometry; it does not resize or move the host
+    /// object.
+    pub fn set_chart_area(&mut self, selector: Selector<'_>, rect: chart_area::Rect) -> Result<()> {
+        let location = self
+            .resolve(selector)?
+            .ok_or_else(|| invalid_error(CHART, "chart selector was not found"))?;
+        let index = self
+            .charts
+            .iter()
+            .position(|value| value.entry.location == location)
+            .ok_or_else(|| invalid_error(CHART, "chart location was not found"))?;
+        let stored = self
+            .charts
+            .get(index)
+            .ok_or_else(|| invalid_error(CHART, "chart inventory index is invalid"))?;
+        let mut transaction = stored.entry.chart.edit_chart_area()?;
+        transaction.set_rect(rect)?;
+        let commit = transaction.commit()?;
+        let Some(change) = commit.patch().change() else {
+            return Ok(());
+        };
+        let source = self
+            .workbook
+            .get(stored.start..stored.end)
+            .ok_or_else(|| invalid_error(CHART, "chart source range is invalid"))?;
+        let patched = chart_area::patch(source, change, self.limits)?;
+        let workbook = patch_chart_stream(
+            &self.workbook,
             stored.start,
             stored.end,
             &patched,
@@ -1163,6 +1205,26 @@ fn replace_chart_sheet_stream(
         };
         output[value.body_start..value.body_start + 4].copy_from_slice(&new_offset.to_le_bytes());
     }
+    if output.len() > limits.max_workbook_bytes {
+        return invalid(CHART, "rewritten Workbook exceeds chart editor limit");
+    }
+    Ok(output)
+}
+
+fn patch_chart_stream(
+    input: &[u8],
+    start: usize,
+    end: usize,
+    replacement: &[u8],
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    if start > end || end > input.len() || replacement.len() != end.saturating_sub(start) {
+        return Err(Error::UnsafeEdit(
+            "chart-area replacement changed the source stream allocation".into(),
+        ));
+    }
+    let mut output = input.to_vec();
+    output[start..end].copy_from_slice(replacement);
     if output.len() > limits.max_workbook_bytes {
         return invalid(CHART, "rewritten Workbook exceeds chart editor limit");
     }

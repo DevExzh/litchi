@@ -5,6 +5,7 @@
 //! hosting in the package module. Chart formulas and cached values remain
 //! inert. Unsupported records are retained rather than normalized or evaluated.
 
+pub mod chart_area;
 pub mod frt;
 
 mod codec;

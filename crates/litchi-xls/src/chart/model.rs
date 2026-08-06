@@ -879,6 +879,26 @@ impl Default for Chart {
 }
 
 impl Chart {
+    /// Returns the fixed-point geometry from the BIFF `Chart` record.
+    ///
+    /// The snapshot is a lossless view of the four wire values. Semantic
+    /// checks are applied when [`Snapshot::edit`](crate::chart::chart_area::Snapshot::edit)
+    /// is opened, so a malformed producer record remains readable but cannot
+    /// be mutated through this owner.
+    pub fn chart_area(&self) -> super::chart_area::Snapshot {
+        super::chart_area::Snapshot::from_wire(super::chart_area::Rect {
+            x: self.x,
+            y: self.y,
+            width: self.width,
+            height: self.height,
+        })
+    }
+
+    /// Opens a source-checked transaction over the fixed chart-area record.
+    pub fn edit_chart_area(&self) -> Result<super::chart_area::Transaction> {
+        self.chart_area().edit()
+    }
+
     /// Replaces one existing series formula without changing chart topology.
     pub fn set_formula(&mut self, series: usize, role: Role, formula: Formula) -> Result<()> {
         self.set_formula_with(series, role, formula, Limits::default())

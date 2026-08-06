@@ -128,11 +128,12 @@ pub(super) fn parse_chart(input: &[u8], limits: Limits) -> Result<Chart> {
                 depth -= 1;
             },
             CHART => {
-                exact(data, 16, CHART)?;
-                chart.x = i32_at(data, 0)?;
-                chart.y = i32_at(data, 4)?;
-                chart.width = i32_at(data, 8)?;
-                chart.height = i32_at(data, 12)?;
+                let area = super::chart_area::decode(data)?;
+                let rect = area.rect();
+                chart.x = rect.x;
+                chart.y = rect.y;
+                chart.width = rect.width;
+                chart.height = rect.height;
             },
             SHT_PROPS => {
                 exact(data, 4, SHT_PROPS)?;
@@ -1032,10 +1033,7 @@ pub(super) fn serialize_chart(chart: &Chart, limits: Limits) -> Result<Vec<u8>> 
     }
     let mut out = chart_encoder(limits)?;
     push_record(&mut out, BOF, &chart_bof())?;
-    let mut geometry = Vec::new();
-    for value in [chart.x, chart.y, chart.width, chart.height] {
-        geometry.extend(value.to_le_bytes());
-    }
+    let geometry = super::chart_area::encode(&chart.chart_area())?;
     push_record(&mut out, CHART, &geometry)?;
     push_record(&mut out, BEGIN, &[])?;
     push_record(&mut out, SHT_PROPS, &chart.sheet_properties.to_le_bytes())?;
