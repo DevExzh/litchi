@@ -55,7 +55,7 @@
 //! - MS-CFB specification: Section 2.6 (Compound File Directory Sectors)
 //! - MS-DOC specification: Section 2.3 (File Structure)
 
-use super::super::consts::*;
+use super::super::consts::{DIRENTRY_SIZE, NOSTREAM, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM};
 use super::super::file::OleError;
 use crate::directory_name::{DirectoryNameData, directory_name_data as parse_directory_name};
 use fixedbitset::FixedBitSet;
@@ -70,19 +70,12 @@ enum NodeColor {
     Black = 1,
 }
 
-#[allow(clippy::type_complexity)]
-fn directory_name_data(name: &str) -> Result<(SmallVec<[u16; 32]>, SmallVec<[u16; 32]>), OleError> {
-    let DirectoryNameData { utf16, comparison } =
-        parse_directory_name(name).map_err(|error| OleError::InvalidData(error.to_string()))?;
-    Ok((utf16, comparison))
-}
-
 /// Directory entry builder
 #[derive(Debug, Clone)]
 struct DirectoryEntryBuilder {
     /// Entry name
     name: String,
-    /// Entry type (STGTY_STORAGE, STGTY_STREAM, etc.)
+    /// Entry type (`STGTY_STORAGE`, `STGTY_STREAM`, etc.)
     entry_type: u8,
     /// Starting sector
     start_sector: u32,
@@ -101,7 +94,10 @@ struct DirectoryEntryBuilder {
     node_color: NodeColor,
 }
 
-#[allow(dead_code)] // These methods are part of the public API for future use
+#[allow(
+    dead_code,
+    reason = "builder API kept complete for symmetry and future use"
+)]
 impl DirectoryEntryBuilder {
     /// Create a new root entry
     fn root(start_sector: u32, size: u64) -> Self {
@@ -197,7 +193,7 @@ impl DirectoryEntryBuilder {
         }
 
         // Name length in bytes (including null terminator)
-        let name_len_bytes = u16::try_from((self.name_utf16.len() + 1) * 2).map_err(|_| {
+        let name_len_bytes = u16::try_from((self.name_utf16.len() + 1) * 2).map_err(|_err| {
             OleError::InvalidData("CFB directory name length exceeds u16".to_string())
         })?;
         data[64..66].copy_from_slice(&name_len_bytes.to_le_bytes());
@@ -248,7 +244,10 @@ pub(crate) struct DirectoryBuilder {
     children: HashMap<u32, Vec<u32>>,
 }
 
-#[allow(dead_code)] // These methods are part of the public API for future use
+#[allow(
+    dead_code,
+    reason = "builder API kept complete for symmetry and future use"
+)]
 impl DirectoryBuilder {
     /// Create a new directory builder with root entry
     pub(crate) fn new(ministream_start: u32, ministream_size: u64) -> Self {
@@ -305,7 +304,7 @@ impl DirectoryBuilder {
             // create new storage
             let entry = DirectoryEntryBuilder::storage(component.clone())?;
             self.ensure_unique_child(parent_sid, &entry)?;
-            let sid = u32::try_from(self.entries.len()).map_err(|_| {
+            let sid = u32::try_from(self.entries.len()).map_err(|_err| {
                 OleError::InvalidData("CFB directory contains too many entries".to_string())
             })?;
             self.entries.push(entry);
@@ -347,7 +346,7 @@ impl DirectoryBuilder {
         };
         let entry = DirectoryEntryBuilder::stream(name, start_sector, size)?;
         self.ensure_unique_child(parent_sid, &entry)?;
-        let sid = u32::try_from(self.entries.len()).map_err(|_| {
+        let sid = u32::try_from(self.entries.len()).map_err(|_err| {
             OleError::InvalidData("CFB directory contains too many entries".to_string())
         })?;
         self.entries.push(entry);
@@ -378,7 +377,7 @@ impl DirectoryBuilder {
     pub(crate) fn add_storage(&mut self, name: String) -> Result<u32, OleError> {
         let entry = DirectoryEntryBuilder::storage(name)?;
         self.ensure_unique_child(0, &entry)?;
-        let sid = u32::try_from(self.entries.len()).map_err(|_| {
+        let sid = u32::try_from(self.entries.len()).map_err(|_err| {
             OleError::InvalidData("CFB directory contains too many entries".to_string())
         })?;
         self.entries.push(entry);
@@ -418,7 +417,7 @@ impl DirectoryBuilder {
             .map_err(|source| OleError::allocation("directory storage IDs", source))?;
         for (sid, entry) in self.entries.iter().enumerate() {
             if entry.entry_type == STGTY_ROOT || entry.entry_type == STGTY_STORAGE {
-                storage_sids.push(u32::try_from(sid).map_err(|_| {
+                storage_sids.push(u32::try_from(sid).map_err(|_err| {
                     OleError::InvalidData("CFB directory contains too many entries".to_string())
                 })?);
             }
@@ -550,11 +549,11 @@ impl DirectoryBuilder {
                         sid = parent;
                         Self::rotate_left(root, sid, parents, entries);
                     }
-                    let parent = parents[sid as usize];
-                    let grandparent = parents[parent as usize];
-                    entries[parent as usize].node_color = NodeColor::Black;
-                    entries[grandparent as usize].node_color = NodeColor::Red;
-                    Self::rotate_right(root, grandparent, parents, entries);
+                    let rotated_parent = parents[sid as usize];
+                    let rotated_grandparent = parents[rotated_parent as usize];
+                    entries[rotated_parent as usize].node_color = NodeColor::Black;
+                    entries[rotated_grandparent as usize].node_color = NodeColor::Red;
+                    Self::rotate_right(root, rotated_grandparent, parents, entries);
                 }
             } else {
                 let uncle = entries[grandparent as usize].sid_left;
@@ -568,11 +567,11 @@ impl DirectoryBuilder {
                         sid = parent;
                         Self::rotate_right(root, sid, parents, entries);
                     }
-                    let parent = parents[sid as usize];
-                    let grandparent = parents[parent as usize];
-                    entries[parent as usize].node_color = NodeColor::Black;
-                    entries[grandparent as usize].node_color = NodeColor::Red;
-                    Self::rotate_left(root, grandparent, parents, entries);
+                    let rotated_parent = parents[sid as usize];
+                    let rotated_grandparent = parents[rotated_parent as usize];
+                    entries[rotated_parent as usize].node_color = NodeColor::Black;
+                    entries[rotated_grandparent as usize].node_color = NodeColor::Red;
+                    Self::rotate_left(root, rotated_grandparent, parents, entries);
                 }
             }
         }
@@ -691,9 +690,9 @@ impl DirectoryBuilder {
                     "CFB sibling tree contains adjacent red nodes".to_string(),
                 ));
             }
-            let black_depth = black_depth + usize::from(entry.node_color == NodeColor::Black);
-            stack.push((entry.sid_right, Some(sid), upper, black_depth));
-            stack.push((entry.sid_left, lower, Some(sid), black_depth));
+            let child_black_depth = black_depth + usize::from(entry.node_color == NodeColor::Black);
+            stack.push((entry.sid_right, Some(sid), upper, child_black_depth));
+            stack.push((entry.sid_left, lower, Some(sid), child_black_depth));
         }
         if visited.count_ones(..) != child_sids.len() {
             return Err(OleError::InvalidData(
@@ -709,8 +708,23 @@ impl DirectoryBuilder {
     }
 }
 
+#[allow(
+    clippy::type_complexity,
+    reason = "the paired UTF-16 name and comparison-key SmallVecs are clearer inline than behind a type alias"
+)]
+fn directory_name_data(name: &str) -> Result<(SmallVec<[u16; 32]>, SmallVec<[u16; 32]>), OleError> {
+    let DirectoryNameData { utf16, comparison } =
+        parse_directory_name(name).map_err(|error| OleError::InvalidData(error.to_string()))?;
+    Ok((utf16, comparison))
+}
+
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]

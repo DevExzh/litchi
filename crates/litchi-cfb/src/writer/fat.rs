@@ -12,7 +12,7 @@
 //! - End of chain is marked with ENDOFCHAIN (0xFFFFFFFE)
 //! - Free sectors are marked with FREESECT (0xFFFFFFFF)
 
-use super::super::consts::*;
+use super::super::consts::{DIFSECT, ENDOFCHAIN, FATSECT, FREESECT, MAXREGSECT};
 use super::super::file::OleError;
 
 /// FAT builder for sector allocation
@@ -35,7 +35,10 @@ pub(super) struct FatBuilder {
     sector_size: usize,
 }
 
-#[allow(dead_code)] // These methods are part of the public API for future use
+#[allow(
+    dead_code,
+    reason = "builder API kept complete for symmetry and future use"
+)]
 impl FatBuilder {
     /// Create a new FAT builder
     ///
@@ -84,13 +87,14 @@ impl FatBuilder {
         }
 
         let num_sectors = size.div_ceil(self.sector_size);
-        let sector_count = u32::try_from(num_sectors).map_err(|_| {
+        let sector_count = u32::try_from(num_sectors).map_err(|_err| {
             OleError::InvalidData("CFB sector count exceeds MAXREGSECT".to_string())
         })?;
         let start_sector = self.next_sector;
         let end_sector = checked_sector_end(start_sector, sector_count)?;
-        let new_len = usize::try_from(end_sector)
-            .map_err(|_| OleError::InvalidData("CFB FAT length does not fit usize".to_string()))?;
+        let new_len = usize::try_from(end_sector).map_err(|_err| {
+            OleError::InvalidData("CFB FAT length does not fit usize".to_string())
+        })?;
 
         if new_len > self.fat.len() {
             self.fat
@@ -143,8 +147,9 @@ impl FatBuilder {
         let start = self.next_sector;
         let end = checked_sector_end(start, count)?;
 
-        let needed_len = usize::try_from(end)
-            .map_err(|_| OleError::InvalidData("CFB FAT length does not fit usize".to_string()))?;
+        let needed_len = usize::try_from(end).map_err(|_err| {
+            OleError::InvalidData("CFB FAT length does not fit usize".to_string())
+        })?;
         if self.fat.len() < needed_len {
             self.fat
                 .try_reserve_exact(needed_len - self.fat.len())
@@ -240,15 +245,15 @@ impl FatBuilder {
             match next {
                 ENDOFCHAIN | FREESECT | FATSECT | DIFSECT => {},
                 0..MAXREGSECT => {
-                    let next = usize::try_from(next).map_err(|_| {
+                    let next_index = usize::try_from(next).map_err(|_err| {
                         OleError::InvalidData("CFB FAT reference does not fit usize".to_string())
                     })?;
-                    if next >= self.fat.len() {
+                    if next_index >= self.fat.len() {
                         return Err(OleError::InvalidData(format!(
                             "invalid next FAT sector {next} at sector {current}"
                         )));
                     }
-                    if next <= current {
+                    if next_index <= current {
                         return Err(OleError::InvalidData(format!(
                             "backward FAT reference from sector {current} to {next}"
                         )));
@@ -268,6 +273,12 @@ impl FatBuilder {
     /// Get sector size
     pub(super) fn sector_size(&self) -> usize {
         self.sector_size
+    }
+}
+
+impl Default for FatBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -292,14 +303,13 @@ fn filled_sector(size: usize, resource: &'static str) -> Result<Vec<u8>, OleErro
     Ok(sector)
 }
 
-impl Default for FatBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]

@@ -6,7 +6,10 @@
 //!
 //! See `[MS-CFB]: Compound File Binary File Format` for the format spec.
 
-#![allow(missing_docs)]
+#![allow(
+    missing_docs,
+    reason = "the VT_* property-type constants mirror self-explanatory MS-CFB specification names"
+)]
 #![allow(
     non_ascii_idents,
     reason = "zerocopy's RawDirectoryEntry derive expansion emits internal identifiers outside this crate's source"

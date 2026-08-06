@@ -3,7 +3,7 @@
 //! Generates the 512-byte OLE2 file header with proper magic bytes,
 //! version information, and FAT/directory locations.
 
-use super::super::consts::*;
+use super::super::consts::{ENDOFCHAIN, FREESECT, MAGIC};
 use super::super::file::OleError;
 
 /// OLE2 header builder
@@ -14,9 +14,9 @@ pub(super) struct HeaderBuilder {
     first_dir_sector: u32,
     /// Number of directory sectors (csectDir). For 512-byte sector files, must be 0.
     num_dir_sectors: u32,
-    /// First sector of MiniFAT
+    /// First sector of `MiniFAT`
     first_minifat_sector: u32,
-    /// Number of MiniFAT sectors
+    /// Number of `MiniFAT` sectors
     num_minifat_sectors: u32,
     /// First sector of DIFAT
     first_difat_sector: u32,
@@ -58,7 +58,7 @@ impl HeaderBuilder {
         self.first_dir_sector = sector;
     }
 
-    /// Set MiniFAT information
+    /// Set `MiniFAT` information
     pub(super) fn set_minifat(&mut self, first_sector: u32, num_sectors: u32) {
         self.first_minifat_sector = first_sector;
         self.num_minifat_sectors = num_sectors;
@@ -81,7 +81,7 @@ impl HeaderBuilder {
     /// The first 109 FAT sector IDs are stored in the header.
     pub(super) fn set_fat_sectors(&mut self, sectors: &[u32]) -> Result<(), OleError> {
         let count = u32::try_from(sectors.len())
-            .map_err(|_| OleError::InvalidData("too many CFB FAT sectors".to_string()))?;
+            .map_err(|_err| OleError::InvalidData("too many CFB FAT sectors".to_string()))?;
         let header_count = sectors.len().min(109);
         let mut header_sectors = Vec::new();
         header_sectors
@@ -175,6 +175,11 @@ impl HeaderBuilder {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]

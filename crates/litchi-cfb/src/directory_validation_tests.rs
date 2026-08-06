@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use crate::consts::{DIRENTRY_SIZE, NOSTREAM};
 use crate::file::OleFile;
 use crate::writer::DirectoryBuilder;
@@ -61,10 +67,10 @@ fn accepts_non_black_tree_roots_but_rejects_invalid_ordering() {
     assert!(validate(&red_root).is_ok());
 
     let mut reversed = valid_directory(3);
-    let tree_root = read_sid(&reversed, 0, 76);
-    let left = read_sid(&reversed, tree_root, 68);
-    let right = read_sid(&reversed, tree_root, 72);
-    let root_offset = tree_root as usize * DIRENTRY_SIZE;
+    let reversed_root = read_sid(&reversed, 0, 76);
+    let left = read_sid(&reversed, reversed_root, 68);
+    let right = read_sid(&reversed, reversed_root, 72);
+    let root_offset = reversed_root as usize * DIRENTRY_SIZE;
     reversed[root_offset + 68..root_offset + 72].copy_from_slice(&right.to_le_bytes());
     reversed[root_offset + 72..root_offset + 76].copy_from_slice(&left.to_le_bytes());
     assert!(validate(&reversed).is_err());

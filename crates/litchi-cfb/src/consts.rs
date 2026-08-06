@@ -30,21 +30,21 @@ pub const SECTOR_SIZE_V4: usize = 4096;
 
 // Sector IDs (from AAF specifications)
 /// Maximum regular sector ID
-pub const MAXREGSECT: u32 = 0xFFFFFFFA; // -6
+pub const MAXREGSECT: u32 = 0xFFFF_FFFA; // -6
 /// Denotes a DIFAT sector in a FAT
-pub const DIFSECT: u32 = 0xFFFFFFFC; // -4
+pub const DIFSECT: u32 = 0xFFFF_FFFC; // -4
 /// Denotes a FAT sector in a FAT
-pub const FATSECT: u32 = 0xFFFFFFFD; // -3
+pub const FATSECT: u32 = 0xFFFF_FFFD; // -3
 /// End of a virtual stream chain
-pub const ENDOFCHAIN: u32 = 0xFFFFFFFE; // -2
+pub const ENDOFCHAIN: u32 = 0xFFFF_FFFE; // -2
 /// Unallocated sector
-pub const FREESECT: u32 = 0xFFFFFFFF; // -1
+pub const FREESECT: u32 = 0xFFFF_FFFF; // -1
 
 // Directory Entry IDs (from AAF specifications)
 /// Maximum directory entry ID
-pub const MAXREGSID: u32 = 0xFFFFFFFA; // -6
+pub const MAXREGSID: u32 = 0xFFFF_FFFA; // -6
 /// Unallocated directory entry
-pub const NOSTREAM: u32 = 0xFFFFFFFF; // -1
+pub const NOSTREAM: u32 = 0xFFFF_FFFF; // -1
 
 // Object types in storage (from AAF specifications)
 /// Empty directory entry
@@ -53,15 +53,15 @@ pub const STGTY_EMPTY: u8 = 0;
 pub const STGTY_STORAGE: u8 = 1;
 /// Element is a stream object
 pub const STGTY_STREAM: u8 = 2;
-/// Element is an ILockBytes object
+/// Element is an `ILockBytes` object
 pub const STGTY_LOCKBYTES: u8 = 3;
-/// Element is an IPropertyStorage object
+/// Element is an `IPropertyStorage` object
 pub const STGTY_PROPERTY: u8 = 4;
 /// Element is a root storage
 pub const STGTY_ROOT: u8 = 5;
 
 /// Unknown size for a stream (used when size is not known in advance)
-pub const UNKNOWN_SIZE: u32 = 0x7FFFFFFF;
+pub const UNKNOWN_SIZE: u32 = 0x7FFF_FFFF;
 
 // Property types
 pub const VT_EMPTY: u16 = 0;

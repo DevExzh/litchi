@@ -11,7 +11,7 @@
 //! - For 512-byte sectors: 127 FAT sector IDs + 1 next pointer (128 * 4 = 512)
 //! - For 4096-byte sectors: 1023 FAT sector IDs + 1 next pointer (1024 * 4 = 4096)
 
-use super::super::consts::*;
+use super::super::consts::{ENDOFCHAIN, MAXREGSECT};
 use super::super::file::OleError;
 
 /// DIFAT builder for large file support
@@ -31,7 +31,10 @@ pub(super) struct DifatBuilder {
     sector_size: usize,
 }
 
-#[allow(dead_code)] // These methods are part of the public API for future use
+#[allow(
+    dead_code,
+    reason = "builder API kept complete for symmetry and future use"
+)]
 impl DifatBuilder {
     /// Create a new DIFAT builder
     ///
@@ -88,7 +91,7 @@ impl DifatBuilder {
         let ids_per_difat_sector = (self.sector_size / 4) - 1;
 
         u32::try_from(self.fat_sector_ids.len().div_ceil(ids_per_difat_sector))
-            .map_err(|_| OleError::InvalidData("too many CFB DIFAT sectors".to_string()))
+            .map_err(|_err| OleError::InvalidData("too many CFB DIFAT sectors".to_string()))
     }
 
     /// Generate DIFAT sectors as bytes
@@ -118,7 +121,7 @@ impl DifatBuilder {
         let ids_per_difat_sector = (self.sector_size / 4) - 1;
         let num_difat_sectors = self.calculate_difat_sector_count()?;
         checked_sector_end(first_difat_sector, num_difat_sectors)?;
-        let count = usize::try_from(num_difat_sectors).map_err(|_| {
+        let count = usize::try_from(num_difat_sectors).map_err(|_err| {
             OleError::InvalidData("DIFAT sector count does not fit usize".to_string())
         })?;
 
@@ -138,7 +141,7 @@ impl DifatBuilder {
             // Write next DIFAT sector pointer (last u32 in sector)
             let next_pointer_offset = self.sector_size - 4;
             let next_difat_sector = if difat_idx + 1 < count {
-                let next_offset = u32::try_from(difat_idx + 1).map_err(|_| {
+                let next_offset = u32::try_from(difat_idx + 1).map_err(|_err| {
                     OleError::InvalidData("DIFAT sector offset exceeds u32".to_string())
                 })?;
                 first_difat_sector.checked_add(next_offset).ok_or_else(|| {
@@ -185,6 +188,11 @@ fn filled_sector(size: usize) -> Result<Vec<u8>, OleError> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]

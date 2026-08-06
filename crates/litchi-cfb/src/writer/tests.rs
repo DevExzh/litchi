@@ -3,6 +3,12 @@
 //! These tests verify that the OLE writer can create valid OLE2 files
 //! that can be read back by the OLE reader.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::super::file::OleFile;
 use super::core::OleWriter;
 use std::io::Cursor;
@@ -149,8 +155,8 @@ fn test_write_with_minifat() {
     let mut writer = OleWriter::new();
 
     for i in 0..10 {
-        let name = format!("Stream{}", i);
-        let data = vec![i as u8; 100 + i * 50]; // Different sizes < 4096
+        let name = format!("Stream{i}");
+        let data = vec![u8::try_from(i).unwrap(); 100 + i * 50]; // Different sizes < 4096
         writer.create_stream(&[&name], &data).unwrap();
     }
 
@@ -163,10 +169,10 @@ fn test_write_with_minifat() {
 
     // Verify all streams
     for i in 0..10 {
-        let name = format!("Stream{}", i);
+        let name = format!("Stream{i}");
         let stream_data = ole.open_stream(&[&name]).unwrap();
         assert_eq!(stream_data.len(), 100 + i * 50);
-        assert!(stream_data.iter().all(|&b| b == i as u8));
+        assert!(stream_data.iter().all(|&b| b == u8::try_from(i).unwrap()));
     }
 }
 
@@ -390,7 +396,7 @@ fn test_write_to_file() {
     assert_eq!(data, b"File content");
 
     // Clean up
-    let _ = fs::remove_file(&temp_path);
+    drop(fs::remove_file(&temp_path));
 }
 
 #[test]

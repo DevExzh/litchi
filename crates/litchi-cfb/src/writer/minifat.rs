@@ -1,8 +1,8 @@
-//! MiniFAT (Mini File Allocation Table) generation for OLE2 files
+//! `MiniFAT` (Mini File Allocation Table) generation for OLE2 files
 //!
-//! The MiniFAT is used for small streams (< 4096 bytes) to avoid wasting
+//! The `MiniFAT` is used for small streams (< 4096 bytes) to avoid wasting
 //! space in regular sectors. Small streams are stored in a ministream
-//! (stored in the root entry), and the MiniFAT tracks mini sector allocation.
+//! (stored in the root entry), and the `MiniFAT` tracks mini sector allocation.
 //!
 //! # Implementation Notes
 //!
@@ -10,26 +10,26 @@
 //! - Mini sectors are typically 64 bytes each
 //! - Streams < 4096 bytes use the ministream
 //! - The ministream itself is stored in regular sectors
-//! - The MiniFAT is stored in regular sectors but tracks mini sectors
+//! - The `MiniFAT` is stored in regular sectors but tracks mini sectors
 
-use super::super::consts::*;
+use super::super::consts::{ENDOFCHAIN, FREESECT, MAXREGSECT};
 use super::super::file::OleError;
 
 const MINI_STREAM_CUTOFF: usize = 4096;
 
-/// MiniFAT builder for small stream allocation
+/// `MiniFAT` builder for small stream allocation
 ///
 /// Manages mini sector allocation and builds the Mini File Allocation Table
 /// for small streams in an OLE compound document.
 ///
 /// # Performance Optimizations
 ///
-/// - Pre-allocates MiniFAT entries to avoid frequent reallocations
+/// - Pre-allocates `MiniFAT` entries to avoid frequent reallocations
 /// - Uses efficient mini sector chain building
 /// - Tracks ministream size for efficient writing
 #[derive(Debug)]
 pub(super) struct MiniFatBuilder {
-    /// The MiniFAT table (maps mini sector ID to next mini sector in chain)
+    /// The `MiniFAT` table (maps mini sector ID to next mini sector in chain)
     minifat: Vec<u32>,
     /// Next available mini sector
     next_mini_sector: u32,
@@ -39,9 +39,12 @@ pub(super) struct MiniFatBuilder {
     ministream_data: Vec<u8>,
 }
 
-#[allow(dead_code)] // These methods are part of the public API for future use
+#[allow(
+    dead_code,
+    reason = "builder API kept complete for symmetry and future use"
+)]
 impl MiniFatBuilder {
-    /// Create a new MiniFAT builder
+    /// Create a new `MiniFAT` builder
     ///
     /// # Arguments
     ///
@@ -67,7 +70,7 @@ impl MiniFatBuilder {
     ///
     /// # Performance
     ///
-    /// This method pre-allocates all MiniFAT entries and ministream space needed.
+    /// This method pre-allocates all `MiniFAT` entries and ministream space needed.
     pub(super) fn allocate_mini_chain(&mut self, data: &[u8]) -> Result<u32, OleError> {
         if data.is_empty() {
             return Ok(ENDOFCHAIN);
@@ -87,15 +90,16 @@ impl MiniFatBuilder {
         }
 
         let num_mini_sectors = data.len().div_ceil(self.mini_sector_size);
-        let sector_count = u32::try_from(num_mini_sectors)
-            .map_err(|_| OleError::InvalidData("CFB mini sector count exceeds u32".to_string()))?;
+        let sector_count = u32::try_from(num_mini_sectors).map_err(|_err| {
+            OleError::InvalidData("CFB mini sector count exceeds u32".to_string())
+        })?;
         let end_mini_sector = checked_end(self.next_mini_sector, sector_count)?;
 
         let start_mini_sector = self.next_mini_sector;
-        let start_index = usize::try_from(start_mini_sector).map_err(|_| {
+        let start_index = usize::try_from(start_mini_sector).map_err(|_err| {
             OleError::InvalidData("CFB mini sector index does not fit usize".to_string())
         })?;
-        let new_minifat_len = usize::try_from(end_mini_sector).map_err(|_| {
+        let new_minifat_len = usize::try_from(end_mini_sector).map_err(|_err| {
             OleError::InvalidData("CFB MiniFAT length does not fit usize".to_string())
         })?;
         let padded_size = num_mini_sectors
@@ -131,10 +135,10 @@ impl MiniFatBuilder {
         for (index, current_mini_sector) in
             (start_index..new_minifat_len).zip(start_mini_sector..end_mini_sector)
         {
-            let next_value = if current_mini_sector != last_mini_sector {
-                current_mini_sector + 1
-            } else {
+            let next_value = if current_mini_sector == last_mini_sector {
                 ENDOFCHAIN
+            } else {
+                current_mini_sector + 1
             };
             self.minifat[index] = next_value;
         }
@@ -162,11 +166,12 @@ impl MiniFatBuilder {
 
     /// Get the ministream size
     pub(super) fn ministream_size(&self) -> Result<u64, OleError> {
-        u64::try_from(self.ministream_data.len())
-            .map_err(|_| OleError::InvalidData("CFB ministream size does not fit u64".to_string()))
+        u64::try_from(self.ministream_data.len()).map_err(|_err| {
+            OleError::InvalidData("CFB ministream size does not fit u64".to_string())
+        })
     }
 
-    /// Generate MiniFAT sectors as bytes
+    /// Generate `MiniFAT` sectors as bytes
     ///
     /// # Arguments
     ///
@@ -174,7 +179,7 @@ impl MiniFatBuilder {
     ///
     /// # Returns
     ///
-    /// * `Vec<Vec<u8>>` - Vector of MiniFAT sectors
+    /// * `Vec<Vec<u8>>` - Vector of `MiniFAT` sectors
     pub(super) fn generate_minifat_sectors(
         &self,
         sector_size: usize,
@@ -219,12 +224,12 @@ impl MiniFatBuilder {
         self.next_mini_sector
     }
 
-    /// Check if MiniFAT has any allocations
+    /// Check if `MiniFAT` has any allocations
     pub(super) fn is_empty(&self) -> bool {
         self.minifat.is_empty()
     }
 
-    /// Get the MiniFAT table
+    /// Get the `MiniFAT` table
     pub(super) fn minifat(&self) -> &[u32] {
         &self.minifat
     }
@@ -252,6 +257,11 @@ fn checked_end(start: u32, count: u32) -> Result<u32, OleError> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]
