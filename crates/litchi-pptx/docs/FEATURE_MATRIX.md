@@ -79,7 +79,7 @@ for DrawingML, charts, diagrams, ink, math, and 3D extensions, [MS-OWEXML] for w
 | Transitions and slide advance timing | ✅ | ✅ | ✅ | Typed effect/option combinations, direction/axis/corner/origin/shape/ripple/spoke variants, inherited slide/layout/master transitions, duration, speed, click, and timed advance |
 | PowerPoint 2010 transition extensions | ✅ | ✅ | ✅ | Compatibility-choice ripple effects, typed direction and duration, deterministic fade fallback, bounded unknown-child retention, and safe prefix handling |
 | Slide-show laser traces | ✅ | ✅ | ✅ | Typed inert p14:laserTraceLst coordinates and time offsets with validated extension storage; traces are never replayed or rendered |
-| Slide-show event records | ✅ | ✅ | ✅ | Typed inert p14:showEvtLst trigger/media event inventory and storage; events are never replayed or executed |
+| Slide-show event records | ✅ | ✅ | ✅ | `presentation_properties::metadata::events::{Snapshot, Transaction, Commit, Patch}` provides bounded source-checked trigger/media event CRUD with opaque extension preservation; events are never replayed or executed |
 
 ## Comments, embedded content, and extensibility
 

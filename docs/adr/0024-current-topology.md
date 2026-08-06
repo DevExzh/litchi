@@ -434,6 +434,15 @@ payload preservation. All targets remain inert: no link refresh, DDE/OLE
 activation, web fetch, content execution, rendering, or formula recalculation
 is introduced.
 
+The sixth continuation moves more shared semantic mutation below host facades.
+DOCX mail-merge settings and recipient metadata, PPTX slide-show events, and
+XLSX external connections now use source-checked typed transactions with
+relationship and opaque-XML preservation. `litchi-drawingml::chart` owns the
+host-neutral chart snapshot/editor boundary for typed series, axis, label, and
+metadata edits; concrete packages retain only placement and relationship
+ownership. None of these owners contacts a data source, replays an event,
+calculates or renders a chart, or activates an external provider.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

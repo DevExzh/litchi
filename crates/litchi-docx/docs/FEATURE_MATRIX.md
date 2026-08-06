@@ -114,6 +114,7 @@ verification is integrity-oriented and does not establish certificate trust.
 | Information Rights Management and protected content | 🟡 | ✅ | 🟡 | [MS-OFFCRYPTO] DataSpaces, publishing-license, certificate, sensitivity-label, and integrity metadata have bounded shared codecs; rights services, license evaluation, protected-content decryption, and access enforcement are never performed |
 | VBA projects in DOCM/DOTM | 🟡 | 🟡 | 🟡 | Bounded vbaProject.bin CFB/MS-OVBA project/module metadata and cache-free source payload authoring are available with package/content-type graph maintenance; VBA is never compiled or executed |
 | Web extensions and Office Add-ins | 🟡 | ✅ | 🟡 | Typed task-pane/web-extension graph editing with bounded links, bindings, snapshots, extension lists, and shared payloads; callbacks, commands, remote services, and add-in code are inert |
+| Mail-merge settings and recipient metadata | ✅ | ✅ | ✅ | `mail_merge::{Snapshot, Transaction, Commit, Patch}` provides bounded source-checked settings, recipient, and field-map edits with opaque XML preservation and reversible atomic publication; data sources are never contacted and no merge is run |
 | External relationships and linked content | 🟡 | ✅ | ✅ | Relationship targets and link metadata can be inspected or authored, but Litchi does not fetch, resolve, open, refresh, or execute external targets |
 
 ## [MS-DOCX] part and extension audit
