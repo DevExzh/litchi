@@ -321,6 +321,12 @@ impl Document {
         &self.sheets
     }
 
+    /// Clone the shared sheet allocation without cloning any semantic values.
+    #[must_use]
+    pub fn shared_sheets(&self) -> Arc<[Sheet]> {
+        Arc::clone(&self.sheets)
+    }
+
     /// Select a sheet by checked zero-based position.
     #[must_use]
     pub fn sheet(&self, index: usize) -> Option<&Sheet> {
