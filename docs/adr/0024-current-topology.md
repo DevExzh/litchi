@@ -443,6 +443,14 @@ metadata edits; concrete packages retain only placement and relationship
 ownership. None of these owners contacts a data source, replays an event,
 calculates or renders a chart, or activates an external provider.
 
+The seventh continuation extracts another shared package boundary and closes
+more OOXML host seams. `litchi-ooxml-common::custom_xml` now owns bounded
+source-checked Custom XML Data Storage item/properties CRUD; DOCX glossary
+catalogs, PPTX notes graphs, and XLSB host connections publish contextual
+transactions with opaque XML/BIFF12 retention and relationship validation.
+These services remain inert and never retrieve schemas, render notes, contact
+providers, execute add-ins, or refresh external data.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

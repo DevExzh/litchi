@@ -49,7 +49,7 @@ for DrawingML, charts, diagrams, ink, math, and 3D extensions, [MS-OWEXML] for w
 | Custom slide shows | ✅ | ✅ | ✅ | Typed named subsets and graph-safe ordered CRUD |
 | Slide masters and layouts | ✅ | ✅ | ✅ | Semantic master/layout reading with shape and placeholder inventory, typed layout references, matching/type metadata, relationship validation, new-master and layout authoring, placeholder add/replace, and unreferenced-layout removal |
 | Handout master | ✅ | ✅ | ✅ | Root relationship resolution, handout settings, and header/footer metadata |
-| Speaker notes and notes masters | ✅ | ✅ | ✅ | Complete notes graph load/store with notes master, notes slides, backlinks, resources, and themes |
+| Speaker notes and notes masters | ✅ | ✅ | ✅ | `notes::{Snapshot, Transaction, Commit, Patch}` provides bounded source-checked notes-slide/master/theme/text lifecycle edits over the complete notes graph, retaining opaque XML and relationships; notes are inert and never rendered |
 | Themes, color maps, and overrides | ✅ | ✅ | ✅ | Master-, layout-, and slide-scoped theme resolution, typed color maps and overrides, 12-slot color schemes, major/minor font schemes, attachment, replacement, removal, and orphan cleanup; fmtScheme authoring is not covered |
 | Headers, footers, and visibility settings | ✅ | ✅ | ✅ | Presentation and slide header/footer flags and related inherited settings are typed and serialized; layout is not calculated |
 
