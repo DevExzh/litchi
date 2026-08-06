@@ -345,6 +345,15 @@ standalone package builder/facade, and ODT no longer depends on the peer ODC
 family crate; package topology and embedded-object mutation remain in their
 owning family crates.
 
+The current migration adds typed relationship identifiers in
+`litchi-ooxml-common`, shared DrawingML colors in `litchi-drawingml`, ODS
+embedded-chart transactions, ODP/ODT annotation owners, DOCX paragraph
+collapse snapshots, PPTX shape classification, XLSB cell-watch snapshots,
+and inert OLEDS object-link metadata in `litchi-ole-common`. Each owner keeps
+semantic values, bounded codecs, package integration, validation, and focused
+tests in nested modules; edits are clone-staged and source-checked, while
+unknown XML, BIFF12 records, and OLE wire tails remain opaque and inactive.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR
