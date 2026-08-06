@@ -51,7 +51,7 @@ query, macro, chart, pivot, or external content is executed.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | Hyperlinks | ✅ | ✅ | ✅ | External and internal hyperlink metadata, locations, display text, and relationships are typed; targets are never followed. |
-| Legacy comments and VML note placeholders | 🟡 | 🟡 | 🟡 | Legacy comment/VML material is handled only to the bounded extent required by threaded-comment and package preservation paths; there is no claim of a complete legacy comment-rendering model. |
+| Legacy comments and VML note placeholders | 🟡 | ✅ | ✅ | The contextual `workbook::comments::{snapshot,transaction,patch}` owner provides checked cell/author CRUD for classic notes, exact semantic no-ops, relationship-safe source-checked patches, and inert VML shape-ID retention. VML layout and rendering remain outside the owner. |
 | Threaded comments, persons, and mentions | ✅ | ✅ | ✅ | Threaded comment threads, persons, mentions, replies, legacy placeholders, relationship IDs, and CRUD are supported as metadata; no collaboration service is contacted. |
 | Data validation | ✅ | ✅ | ✅ | Validation ranges, list/custom/date/time/whole/decimal/text-length rules, formulas, prompts, and error messages are typed and writable within supported schemas. |
 | Conditional formatting | ✅ | ✅ | ✅ | Rules, differential formats, ranges, formula expressions, color scales, data bars, icon sets, and supported extension forms are typed and serialized; conditions are not evaluated. |

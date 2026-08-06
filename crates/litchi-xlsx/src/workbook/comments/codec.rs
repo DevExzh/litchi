@@ -1,6 +1,6 @@
 //! Bounded XML codec for classic SpreadsheetML comments.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt::Write as FmtWrite;
 
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
@@ -470,13 +470,19 @@ pub fn validate_comments(value: &Comments) -> Result<()> {
             "classic comments count exceeds the configured resource bound",
         ));
     }
+    let mut cells = HashSet::with_capacity(value.comments.len());
     for (cell_ref, comment) in &value.comments {
         if cell_ref != &comment.cell_ref {
             return Err(invalid(
                 "classic comment map key does not match comment cell_ref",
             ));
         }
-        litchi_sheet::Cell::from_a1(cell_ref)?;
+        let cell = litchi_sheet::Cell::from_a1(cell_ref)?;
+        if !cells.insert(cell) {
+            return Err(invalid(format!(
+                "classic comments contain duplicate semantic cell '{cell_ref}'"
+            )));
+        }
         if comment.author_id as usize >= value.authors.len() {
             return Err(invalid(format!(
                 "comment '{cell_ref}' references missing author {}",
@@ -489,16 +495,8 @@ pub fn validate_comments(value: &Comments) -> Result<()> {
                 comment.author_id
             )));
         }
-        if comment.text.len() > MAX_TEXT_BYTES {
-            return Err(invalid(
-                "classic comments text exceeds the configured resource bound",
-            ));
-        }
-        if comment.author.len() > MAX_TEXT_BYTES {
-            return Err(invalid(
-                "classic comments author exceeds the configured resource bound",
-            ));
-        }
+        super::validation::text(&comment.text, "text")?;
+        super::validation::text(&comment.author, "author")?;
         if let Some(shape_id) = comment.shape_id {
             let _ = shape_id;
         }
