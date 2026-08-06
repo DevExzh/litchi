@@ -273,7 +273,7 @@ impl NumbersDocumentBuilder {
     }
 
     /// Build the underlying package for lower-level IWA manipulation.
-    pub fn build_package(self) -> Result<IWorkPackage> {
+    pub(crate) fn build_package(self) -> Result<IWorkPackage> {
         self.validate()?;
         let identity = IWorkDocumentIdentity::generate();
         let table_uuid = fresh_tsp_uuid();
