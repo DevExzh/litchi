@@ -37,6 +37,7 @@ use crate::object_index::{ObjectIndex, ResolvedObjectRef};
 use crate::protobuf::{tn, tsce, tsd, tst};
 use crate::{Error, Result};
 use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
+use litchi_numbers::cell::FiniteF64;
 use prost::Message;
 use std::collections::{HashMap, HashSet};
 
@@ -254,7 +255,12 @@ impl<'a> TableDataExtractor<'a> {
     pub(crate) fn has_table_models(object_index: &ObjectIndex) -> bool {
         [TABLE_MODEL_MESSAGE_TYPE, 6_000]
             .into_iter()
-            .any(|message_type| object_index.iter_entries_by_type(message_type).next().is_some())
+            .any(|message_type| {
+                object_index
+                    .iter_entries_by_type(message_type)
+                    .next()
+                    .is_some()
+            })
     }
 
     /// Create a new table data extractor
@@ -528,7 +534,9 @@ impl<'a> TableDataExtractor<'a> {
                     reply_ids: comment
                         .replies
                         .iter()
-                        .map(|reply| StorageId::from_raw(reply.identifier).map_err(crate::Error::from))
+                        .map(|reply| {
+                            StorageId::from_raw(reply.identifier).map_err(crate::Error::from)
+                        })
                         .collect::<Result<Vec<_>>>()?
                         .into_boxed_slice(),
                     storage_uuid: comment
@@ -966,9 +974,9 @@ impl<'a> TableDataExtractor<'a> {
         let cell_type = data[1];
         let flags = read_u32_le(&data[8..12])?;
         let mut cursor = 12;
-        let mut decimal = None;
-        let mut number = None;
-        let mut date = None;
+        let mut decimal: Option<FiniteF64> = None;
+        let mut number: Option<FiniteF64> = None;
+        let mut date: Option<FiniteF64> = None;
         let mut string_id = None;
         let mut rich_text_id = None;
         let mut formula_id = None;
@@ -1003,7 +1011,7 @@ impl<'a> TableDataExtractor<'a> {
             }
             let field = take_field(data, &mut cursor, size)?;
             match flag {
-                0x000001 => decimal = Some(read_decimal128_le(field)?),
+                0x000001 => decimal = Some(read_finite_decimal128_le(field)?),
                 0x000002 => number = Some(read_f64_le(field)?),
                 0x000004 => date = Some(read_f64_le(field)?),
                 0x000008 => string_id = Some(read_u32_le(field)?),
@@ -1038,15 +1046,16 @@ impl<'a> TableDataExtractor<'a> {
             });
         }
 
+        let zero = finite_zero()?;
         let value = match cell_type {
             0 => CellValue::Empty,
-            2 | 10 => CellValue::Number(decimal.or(number).unwrap_or(0.0)),
+            2 | 10 => CellValue::Number(decimal.or(number).unwrap_or(zero)),
             3 => string_id
                 .and_then(|id| compact_table_get(cell_tables.strings, id).cloned())
                 .map_or(CellValue::Empty, CellValue::Text),
-            5 => CellValue::Date(date.unwrap_or(0.0)),
-            6 => CellValue::Boolean(number.unwrap_or(0.0) != 0.0),
-            7 => CellValue::Duration(number.unwrap_or(0.0)),
+            5 => CellValue::Date(date.unwrap_or(zero)),
+            6 => CellValue::Boolean(number.unwrap_or(zero).get() != 0.0),
+            7 => CellValue::Duration(number.unwrap_or(zero)),
             8 => CellValue::Error(
                 formula_error_id
                     .and_then(|id| compact_table_get(cell_tables.formula_errors, id).cloned())
@@ -1087,8 +1096,8 @@ impl<'a> TableDataExtractor<'a> {
             read_u32_le(&data[4..8])?
         };
         let mut cursor = header_length;
-        let mut number = None;
-        let mut date = None;
+        let mut number: Option<FiniteF64> = None;
+        let mut date: Option<FiniteF64> = None;
         let mut string_id = None;
         let mut rich_text_id = None;
         let mut formula_id = None;
@@ -1157,15 +1166,16 @@ impl<'a> TableDataExtractor<'a> {
             });
         }
 
+        let zero = finite_zero()?;
         let value = match cell_type {
             0 => CellValue::Empty,
-            2 => CellValue::Number(number.unwrap_or(0.0)),
+            2 => CellValue::Number(number.unwrap_or(zero)),
             3 => string_id
                 .and_then(|id| compact_table_get(cell_tables.strings, id).cloned())
                 .map_or(CellValue::Empty, CellValue::Text),
-            5 => CellValue::Date(date.unwrap_or(0.0)),
-            6 => CellValue::Boolean(number.unwrap_or(0.0) != 0.0),
-            7 => CellValue::Duration(number.unwrap_or(0.0)),
+            5 => CellValue::Date(date.unwrap_or(zero)),
+            6 => CellValue::Boolean(number.unwrap_or(zero).get() != 0.0),
+            7 => CellValue::Duration(number.unwrap_or(zero)),
             8 => CellValue::Error(
                 formula_error_id
                     .and_then(|id| compact_table_get(cell_tables.formula_errors, id).cloned())
@@ -1977,11 +1987,25 @@ fn read_u32_le(data: &[u8]) -> Result<u32> {
     Ok(u32::from_le_bytes(bytes))
 }
 
-fn read_f64_le(data: &[u8]) -> Result<f64> {
+fn read_f64_le(data: &[u8]) -> Result<FiniteF64> {
     let bytes: [u8; 8] = data
         .try_into()
         .map_err(|_| Error::ParseError("Expected an eight-byte Numbers field".to_string()))?;
-    Ok(f64::from_le_bytes(bytes))
+    FiniteF64::new(f64::from_le_bytes(bytes)).map_err(|_| {
+        Error::ParseError("Numbers scalar field must contain a finite value".to_string())
+    })
+}
+
+fn read_finite_decimal128_le(data: &[u8]) -> Result<FiniteF64> {
+    FiniteF64::new(read_decimal128_le(data)?).map_err(|_| {
+        Error::ParseError("Numbers decimal128 field must contain a finite value".to_string())
+    })
+}
+
+fn finite_zero() -> Result<FiniteF64> {
+    FiniteF64::new(0.0).map_err(|_| {
+        Error::InvalidFormat("Numbers zero scalar is unexpectedly non-finite".to_string())
+    })
 }
 
 #[cfg(test)]
