@@ -17,14 +17,20 @@ pub const MAX_COLOR_TRANSFORMS: usize = 32;
 /// Maximum gradient stops accepted by the Word 2010 schema.
 pub const MAX_GRADIENT_STOPS: usize = 10;
 
+const MAX_WORD_COORDINATE: u64 = i32::MAX as u64;
+const MAX_POSITIVE_ANGLE: u32 = 21_600_000;
+const MIN_PERCENTAGE: i32 = -100_000;
+const MAX_PERCENTAGE: i32 = 100_000;
+const MAX_POSITIVE_PERCENTAGE: u32 = i32::MAX as u32;
+
 /// Ordered Word 2010 run-property effects.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[must_use]
-pub struct RunEffects {
+pub struct Effects {
     pub(super) values: Vec<Effect>,
 }
 
-impl RunEffects {
+impl Effects {
     /// Create an empty effect collection.
     #[inline]
     pub const fn new() -> Self {
@@ -848,8 +854,10 @@ impl Color {
                         "positive DrawingML color transform exceeds 100000".into(),
                     ));
                 },
-                ColorTransform::HueMod(value) if *value > 1_000_000 => {
-                    return Err(Error::Invalid("hueMod exceeds 1000000".into()));
+                ColorTransform::HueMod(value) if *value > MAX_POSITIVE_PERCENTAGE => {
+                    return Err(Error::Invalid(
+                        "hueMod exceeds the positive percentage bound".into(),
+                    ));
                 },
                 ColorTransform::Saturation(value)
                 | ColorTransform::SaturationOffset(value)
@@ -1021,7 +1029,7 @@ fn validate_required_color(value: &Option<Color>, name: &str) -> Result<()> {
 }
 
 fn validate_coordinate(value: Option<u64>, name: &str) -> Result<()> {
-    if value.is_some_and(|value| value > i32::MAX as u64) {
+    if value.is_some_and(|value| value > MAX_WORD_COORDINATE) {
         return Err(Error::Invalid(format!(
             "{name} exceeds the Word coordinate bound"
         )));
@@ -1030,7 +1038,7 @@ fn validate_coordinate(value: Option<u64>, name: &str) -> Result<()> {
 }
 
 fn validate_angle(value: Option<u32>, name: &str) -> Result<()> {
-    if value.is_some_and(|value| value > i32::MAX as u32) {
+    if value.is_some_and(|value| value > MAX_POSITIVE_ANGLE) {
         return Err(Error::Invalid(format!(
             "{name} exceeds the XML angle bound"
         )));
@@ -1046,13 +1054,19 @@ fn validate_fixed_percentage(value: Option<u32>, name: &str) -> Result<()> {
 }
 
 fn validate_positive_percentage(value: Option<u32>, name: &str) -> Result<()> {
-    if value.is_some_and(|value| value > 100_000) {
-        return Err(Error::Invalid(format!("{name} exceeds 100000")));
+    if value.is_some_and(|value| value > MAX_POSITIVE_PERCENTAGE) {
+        return Err(Error::Invalid(format!(
+            "{name} exceeds the positive percentage bound"
+        )));
     }
     Ok(())
 }
 
 fn validate_signed_percentage(value: Option<i32>, name: &str) -> Result<()> {
-    let _ = (value, name);
+    if value.is_some_and(|value| !(MIN_PERCENTAGE..=MAX_PERCENTAGE).contains(&value)) {
+        return Err(Error::Invalid(format!(
+            "{name} is outside -100000..=100000"
+        )));
+    }
     Ok(())
 }

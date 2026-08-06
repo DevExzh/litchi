@@ -15,7 +15,7 @@ mod package;
 mod tests;
 
 pub use crate::run_effects;
-pub use crate::run_effects::RunEffects;
+pub use crate::run_effects::Effects;
 pub use collapsed::{Collapsed, Commit, Patch, Snapshot, Transaction};
 pub use extensions::{Extensions, Id, Ids};
 pub use model::{

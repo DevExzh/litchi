@@ -116,7 +116,7 @@ pub use paragraph::{
     Collapsed, Paragraph, Run, RunBreak, RunBreakClear, RunBreakType, RunProperties, RunUnderline,
     RunUnderlineColor,
 };
-pub use run_effects::{Effect, OpaqueExtension, RunEffects};
+pub use run_effects::{Effect, Effects, OpaqueExtension};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
 pub use table::{Cell, Row, Table, VMergeState};
 pub use writer::*;

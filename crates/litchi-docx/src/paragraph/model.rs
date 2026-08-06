@@ -2,6 +2,7 @@
 
 use crate::UnderlineStyle;
 use crate::color::Theme;
+use crate::run_effects::Effects;
 use litchi_core::{VerticalPosition, XmlSlice};
 use std::sync::Arc;
 
@@ -164,7 +165,7 @@ pub struct ParagraphSpacing {
 ///
 /// This struct stores all commonly accessed formatting properties
 /// to avoid repeated XML parsing.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct RunProperties {
     /// Whether the run is bold
     pub bold: Option<bool>,
@@ -176,6 +177,8 @@ pub struct RunProperties {
     pub underline: Option<UnderlineStyle>,
     /// Vertical position (superscript/subscript)
     pub vertical_position: Option<VerticalPosition>,
+    /// Typed Word 2010 visual effects attached directly to the run.
+    pub effects: Effects,
 }
 
 /// A direct color applied to a WordprocessingML underline.

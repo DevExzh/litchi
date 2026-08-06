@@ -4,18 +4,18 @@ use std::fmt::Write as FmtWrite;
 
 use crate::error::{Error, Result};
 use litchi_core::xml::escape_xml;
+use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
-use quick_xml::{Reader, XmlVersion};
 
 use super::model::{
     Bevel, BevelPreset, Camera, Color, ColorTransform, CompoundLine, Effect, EffectKind, Fill,
     Glow, Gradient, GradientStop, LightRig, LightRigDirection, LightRigType, LineCap, LineDash,
     LineJoin, PathKind, PenAlignment, PresetCamera, PresetMaterial, Props3d, RectAlignment,
-    Reflection, RelativeRect, RgbColor, RunEffects, Scene3d, SchemeColor, SchemeColorValue, Shade,
-    Shadow, SphereCoords, TextFill, TextOutline,
+    Reflection, RelativeRect, RgbColor, Scene3d, SchemeColor, SchemeColorValue, Shade, Shadow,
+    SphereCoords, TextFill, TextOutline,
 };
 
 /// Word 2010 run-effect namespace.
@@ -25,7 +25,7 @@ const MAX_DEPTH: usize = 64;
 const MAX_NODES: usize = 8_192;
 
 /// Parse a complete `w:r` or `w:rPr` fragment.
-pub fn parse(xml: &[u8]) -> Result<RunEffects> {
+pub fn parse(xml: &[u8]) -> Result<super::model::Effects> {
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::InvalidFormat(format!(
             "Word run effects XML exceeds {MAX_XML_BYTES} bytes"
@@ -37,7 +37,7 @@ pub fn parse(xml: &[u8]) -> Result<RunEffects> {
     let mut root_seen = false;
     let mut rpr_depth = None::<usize>;
     let mut stack = Vec::<Frame>::new();
-    let mut effects = RunEffects::new();
+    let mut effects = super::model::Effects::new();
 
     loop {
         let start = usize::try_from(reader.buffer_position())
@@ -132,14 +132,14 @@ pub fn parse(xml: &[u8]) -> Result<RunEffects> {
                     rpr_depth = None;
                 }
             },
-            Event::Text(text) => {
+            Event::Text(text) if rpr_depth.is_some() => {
                 if !text.into_inner().iter().all(u8::is_ascii_whitespace) {
                     return Err(Error::InvalidFormat(
                         "Word run effects XML cannot contain non-whitespace text".into(),
                     ));
                 }
             },
-            Event::CData(text) => {
+            Event::CData(text) if rpr_depth.is_some() => {
                 if !text.into_inner().iter().all(u8::is_ascii_whitespace) {
                     return Err(Error::InvalidFormat(
                         "Word run effects XML cannot contain non-whitespace text".into(),
@@ -166,7 +166,7 @@ pub fn parse(xml: &[u8]) -> Result<RunEffects> {
 }
 
 /// Write direct effects as `w14:*` children of an existing `w:rPr` element.
-pub(crate) fn write(value: &RunEffects, output: &mut String) -> Result<()> {
+pub(crate) fn write(value: &super::model::Effects, output: &mut String) -> Result<()> {
     value.validate()?;
     for effect in value.iter() {
         match effect {
@@ -201,7 +201,12 @@ fn is_word2010(namespace: &ResolveResult<'_>) -> bool {
         || matches!(namespace, ResolveResult::Unknown(prefix) if prefix.as_slice() == b"w14")
 }
 
-fn consume_direct(value: &mut RunEffects, local: &[u8], is_w14: bool, xml: &[u8]) -> Result<()> {
+fn consume_direct(
+    value: &mut super::model::Effects,
+    local: &[u8],
+    is_w14: bool,
+    xml: &[u8],
+) -> Result<()> {
     let kind = match (is_w14, local) {
         (true, b"glow") => Some(EffectKind::Glow),
         (true, b"shadow") => Some(EffectKind::Shadow),
@@ -229,27 +234,37 @@ struct Node {
 }
 
 fn parse_node(xml: &[u8]) -> Result<Node> {
-    let mut reader = Reader::from_reader(xml);
+    let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
     let mut stack = Vec::<Node>::new();
     let mut root = None;
     let mut depth = 0usize;
     loop {
-        match reader.read_event() {
-            Ok(Event::Start(element)) => {
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) => {
+                require_word2010(&namespace, element.local_name().as_ref())?;
                 depth += 1;
                 if depth > MAX_DEPTH {
                     return Err(Error::InvalidFormat(
                         "run effect XML is nested too deeply".into(),
                     ));
                 }
-                stack.push(node_from_start(&element, reader.decoder())?);
+                stack.push(node_from_start(&element, decoder, &resolver)?);
             },
-            Ok(Event::Empty(element)) => {
-                let node = node_from_start(&element, reader.decoder())?;
+            Event::Empty(element) => {
+                require_word2010(&namespace, element.local_name().as_ref())?;
+                let node = node_from_start(&element, decoder, &resolver)?;
                 attach_node(&mut stack, &mut root, node)?;
             },
-            Ok(Event::End(_)) => {
+            Event::End(_) => {
                 let node = stack.pop().ok_or_else(|| {
                     Error::InvalidFormat("run effect XML has an unexpected end".into())
                 })?;
@@ -258,28 +273,27 @@ fn parse_node(xml: &[u8]) -> Result<Node> {
                 })?;
                 attach_node(&mut stack, &mut root, node)?;
             },
-            Ok(Event::Text(text)) => {
+            Event::Text(text) => {
                 if !text.into_inner().iter().all(u8::is_ascii_whitespace) {
                     return Err(Error::InvalidFormat(
                         "run effect XML has unexpected text".into(),
                     ));
                 }
             },
-            Ok(Event::CData(text)) => {
+            Event::CData(text) => {
                 if !text.into_inner().iter().all(u8::is_ascii_whitespace) {
                     return Err(Error::InvalidFormat(
                         "run effect XML has unexpected text".into(),
                     ));
                 }
             },
-            Ok(Event::Eof) => break,
-            Ok(Event::Decl(_) | Event::DocType(_) | Event::PI(_)) => {
+            Event::Eof => break,
+            Event::Decl(_) | Event::DocType(_) | Event::PI(_) => {
                 return Err(Error::InvalidFormat(
                     "run effect XML has forbidden prolog content".into(),
                 ));
             },
-            Ok(_) => {},
-            Err(error) => return Err(Error::Xml(error.to_string())),
+            _ => {},
         }
     }
     if !stack.is_empty() || depth != 0 {
@@ -290,13 +304,21 @@ fn parse_node(xml: &[u8]) -> Result<Node> {
     root.ok_or_else(|| Error::InvalidFormat("run effect XML has no root".into()))
 }
 
-fn node_from_start(element: &BytesStart<'_>, decoder: Decoder) -> Result<Node> {
+fn node_from_start(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &quick_xml::name::NamespaceResolver,
+) -> Result<Node> {
     let mut attrs = Vec::new();
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let key = attribute.key.as_ref();
         let local = String::from_utf8_lossy(attribute.key.local_name().as_ref()).into_owned();
         let is_namespace = key == b"xmlns" || key.starts_with(b"xmlns:");
+        if !is_namespace {
+            let (namespace, _) = resolver.resolve_attribute(attribute.key);
+            require_word2010(&namespace, attribute.key.local_name().as_ref())?;
+        }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(|error| Error::Xml(error.to_string()))?
@@ -308,6 +330,16 @@ fn node_from_start(element: &BytesStart<'_>, decoder: Decoder) -> Result<Node> {
         attrs,
         children: Vec::new(),
     })
+}
+
+fn require_word2010(namespace: &ResolveResult<'_>, local: &[u8]) -> Result<()> {
+    if is_word2010(namespace) {
+        return Ok(());
+    }
+    Err(Error::InvalidFormat(format!(
+        "run effect element or attribute '{}' is not in the Word 2010 namespace",
+        String::from_utf8_lossy(local)
+    )))
 }
 
 fn attach_node(stack: &mut [Node], root: &mut Option<Node>, node: Node) -> Result<()> {

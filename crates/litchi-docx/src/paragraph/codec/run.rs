@@ -2,7 +2,7 @@
 
 use crate::UnderlineStyle;
 use crate::error::{Error, Result};
-use crate::run_effects::RunEffects;
+use crate::run_effects::Effects;
 use litchi_core::VerticalPosition;
 use litchi_ooxml_common::xml::{decode_xml_reference, extract_omml_formulas};
 use quick_xml::events::Event;
@@ -157,8 +157,8 @@ impl Run {
     /// The result is a detached semantic snapshot. Unsupported direct
     /// extension children remain bounded and ordered as
     /// [`crate::run_effects::OpaqueExtension`] values.
-    pub fn run_effects(&self) -> Result<RunEffects> {
-        RunEffects::parse(self.xml_bytes())
+    pub fn effects(&self) -> Result<Effects> {
+        Effects::parse(self.xml_bytes())
     }
 
     /// Check if this run is strikethrough.
@@ -267,6 +267,7 @@ impl Run {
             }
         }
 
+        props.effects = Effects::parse(self.xml_bytes())?;
         Ok((text, props))
     }
 
@@ -316,8 +317,8 @@ impl Run {
                     update_run_properties(&mut props, &e)?;
                 },
                 Ok(Event::End(e)) if e.local_name().as_ref() == b"rPr" => {
-                    // Exit early once we've finished parsing rPr
-                    return Ok(props);
+                    // The effects snapshot is parsed from the same run fragment below.
+                    break;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(Error::Xml(e.to_string())),
@@ -325,6 +326,7 @@ impl Run {
             }
         }
 
+        props.effects = Effects::parse(self.xml_bytes())?;
         Ok(props)
     }
 

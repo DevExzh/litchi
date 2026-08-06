@@ -1,7 +1,7 @@
 //! Run types and implementation for DOCX documents.
 use crate::OfficeMath;
 use crate::error::{Error, Result};
-use crate::run_effects::RunEffects;
+use crate::run_effects::Effects;
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
 
@@ -150,12 +150,17 @@ impl MutableRun {
     }
 
     /// Borrow the typed Word 2010 visual effects attached to this new run.
-    pub fn run_effects(&self) -> &RunEffects {
+    pub fn effects(&self) -> &Effects {
         &self.properties.effects
     }
 
+    /// Mutably borrow this run's visual effects for validated semantic edits.
+    pub fn effects_mut(&mut self) -> &mut Effects {
+        &mut self.properties.effects
+    }
+
     /// Replace the visual effects for this run after validating their schema.
-    pub fn set_run_effects(&mut self, effects: RunEffects) -> Result<&mut Self> {
+    pub fn set_effects(&mut self, effects: Effects) -> Result<&mut Self> {
         effects.validate()?;
         self.properties.effects = effects;
         Ok(self)
@@ -429,7 +434,7 @@ pub(crate) struct RunProperties {
     pub(crate) has_break: bool,
     pub(crate) no_proof: bool,
     pub(crate) web_hidden: bool,
-    pub(crate) effects: RunEffects,
+    pub(crate) effects: Effects,
 }
 
 impl RunProperties {

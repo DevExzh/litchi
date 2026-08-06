@@ -4,13 +4,13 @@ use crate::error::{Error, Result};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
-use super::{Effect, MAX_EFFECTS, MAX_OPAQUE_BYTES, OpaqueExtension, RunEffects};
+use super::{Effect, Effects, MAX_EFFECTS, MAX_OPAQUE_BYTES, OpaqueExtension};
 
 const MAX_OPAQUE_DEPTH: usize = 64;
 const MAX_OPAQUE_NODES: usize = 8_192;
 
 /// Validate one complete run-effects collection.
-pub(crate) fn validate(value: &RunEffects) -> Result<()> {
+pub(crate) fn validate(value: &Effects) -> Result<()> {
     if value.values.len() > MAX_EFFECTS {
         return Err(Error::Invalid(format!(
             "Word run effects exceed {MAX_EFFECTS} children"
