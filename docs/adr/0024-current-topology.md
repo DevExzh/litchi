@@ -414,6 +414,16 @@ retains unknown extension XML and treats WebVTT/media targets as inert. No
 owner activates collaboration, playback, SmartArt layout, external links, or
 formula/revision replay.
 
+The fourth continuation extends the same boundary to OLE2 and remaining OOXML
+payload owners. Shared OLE smart tags and toolbar controls now have bounded
+source-checked property-bag/control transactions; DOC embedded ObjectPool
+entries, legacy-PPT external media, and BIFF8 external links publish inert
+metadata and lifecycle edits with opaque payload preservation. DOCX settings
+extensions, PPTX change metadata and ActiveX controls, and XLSX OLE objects
+follow contextual `Snapshot`/`Transaction`/`Commit`/`Patch` facades with stale,
+atomic, relationship/orphan, and MCE validation. These owners never activate
+OLE, ActiveX, media, external links, macros, or collaboration behavior.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

@@ -82,7 +82,7 @@ compound files, OfficeArt, OLE activation metadata, native charts, encryption, a
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Audio and video external-object metadata | 🟡 | ✅ | 🟡 | Embedded and linked WAV/AIFF, MIDI, CD audio, AVI/movie, MCI, and external path metadata are validated; sound collections have bounded authoring, while broader movie and linked-media authoring remains limited |
+| Audio and video external-object metadata | 🟡 | ✅ | 🟡 | Embedded and linked WAV/AIFF, MIDI, CD audio, AVI/movie, MCI, and external path metadata are validated; `external_media::{Snapshot, Transaction, Commit, Patch}` adds inert source-checked path/flag edits and media lifecycle operations while broader movie and linked-media authoring remains limited |
 | Media playback, rendering, and external activation | ❌ | N/A | N/A | Media bytes and targets are stored or exposed as inert data; no audio/video playback, browser launch, resource fetch, interpolation, or rendering is performed |
 | Embedded OLE objects and ActiveX controls | ✅ | ✅ | ✅ | Embedded and linked OLE/control frames, ProgIDs, storages, compressed or uncompressed payloads, add/remove/reorder operations, and package-preserving edits; payloads are never activated |
 | Custom XML data storage | ✅ | ✅ | ✅ | Bounded, lossless MsoDataStore item/property XML with item GUIDs, schema references, known-family classification, and IRM markers; schema URIs are never resolved |
