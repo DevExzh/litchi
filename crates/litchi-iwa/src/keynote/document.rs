@@ -46,8 +46,8 @@ impl KeynoteDocument {
         Self::open_with_limits(path, BundleLimits::default())
     }
 
-    /// Open a Keynote document under caller-selected bundle ingress ceilings.
-    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
+    /// Crate-internal low-level ingress with caller-selected bundle ceilings.
+    pub(crate) fn open_with_limits<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
         let bundle = Bundle::open_with_limits(path, limits)?;
         Self::verify_application(&bundle)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
@@ -71,9 +71,8 @@ impl KeynoteDocument {
         Self::from_bytes_with_limits(bytes, BundleLimits::default())
     }
 
-    /// Open a Keynote document from bytes under caller-selected ingress
-    /// ceilings.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
+    /// Crate-internal low-level ingress from bytes with caller-selected ceilings.
+    pub(crate) fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
         let bundle = Bundle::from_bytes_with_limits(bytes, limits)?;
         Self::verify_application(&bundle)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
@@ -104,9 +103,11 @@ impl KeynoteDocument {
         Self::from_bytes(bytes)
     }
 
-    /// Create a Keynote document from archive bytes under caller-selected
-    /// ingress ceilings.
-    pub fn from_archive_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
+    /// Crate-internal low-level ingress from archive bytes with caller-selected ceilings.
+    pub(crate) fn from_archive_bytes_with_limits(
+        bytes: &[u8],
+        limits: BundleLimits,
+    ) -> Result<Self> {
         Self::from_bytes_with_limits(bytes, limits)
     }
 
