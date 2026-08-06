@@ -19,11 +19,11 @@ use super::hyperlink_storage::{
     remove_range, validate_range,
 };
 use super::hyperlink_types::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
-use super::position::{TextPosition, TextRange};
 use super::smart_field_object::{
     ensure_no_metadata_reference, require_exclusive_storage_reference,
 };
 use super::storage_wire::{StorageLocation, text_utf16_len};
+use litchi_iwa_text::position::{TextPosition, TextRange};
 
 /// Read every native hyperlink in a storage, ordered by text position.
 pub(crate) fn text_hyperlinks(
@@ -341,8 +341,8 @@ fn collect_hyperlinks(
         hyperlinks.push(TextHyperlink::new(
             TextHyperlinkId::from_native(identifier),
             TextRange::new(
-                TextPosition::from_native(boundary.index),
-                TextPosition::from_native(end),
+                TextPosition::from_utf16_code_units(boundary.index),
+                TextPosition::from_utf16_code_units(end),
             )?,
             target,
         ));

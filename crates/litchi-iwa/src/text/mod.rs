@@ -26,7 +26,6 @@ mod hyperlink_object;
 mod hyperlink_storage;
 mod hyperlink_types;
 mod language;
-mod language_types;
 mod number_attachment;
 mod number_attachment_object;
 mod number_attachment_storage;
@@ -42,7 +41,6 @@ mod paragraph_style_delete;
 mod paragraph_style_redefine;
 mod paragraph_style_rename;
 mod paragraph_tabs;
-mod position;
 mod smart_field_object;
 mod storage_wire;
 pub mod style;
@@ -82,9 +80,12 @@ pub use editor::{IWorkTextEditor, TextStorageInfo};
 pub use font::{Font, Name, NameError, TextFont, TextFontName};
 pub use highlight_types::{TextHighlight, TextHighlightId};
 pub use hyperlink_types::{TextHyperlink, TextHyperlinkId, TextHyperlinkTarget};
-pub use language_types::{TextLanguage, TextLanguageRun, TextLanguageTag};
 pub use litchi_iwa_common::text::layout;
+pub use litchi_iwa_text::language::{
+    Error as TextLanguageError, TextLanguage, TextLanguageRun, TextLanguageTag,
+};
 pub use litchi_iwa_text::paragraph;
+pub use litchi_iwa_text::position::{Error as TextPositionError, TextPosition, TextRange};
 pub use number_attachment_types::{
     TextNumberAttachment, TextNumberAttachmentFormat, TextNumberAttachmentId,
     TextNumberAttachmentKind, TextNumberAttachmentSettings, TextNumberAttachmentText,
@@ -125,7 +126,6 @@ pub use paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabAlignment,
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
 };
-pub use position::{TextPosition, TextRange};
 pub use text_comment_types::{
     TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
     TextCommentReplyId,
@@ -146,5 +146,17 @@ pub use style::{
 impl From<litchi_iwa_text::NameError> for crate::Error {
     fn from(error: litchi_iwa_text::NameError) -> Self {
         Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_text::language::Error> for crate::Error {
+    fn from(error: litchi_iwa_text::language::Error) -> Self {
+        Self::ParseError(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_text::position::Error> for crate::Error {
+    fn from(error: litchi_iwa_text::position::Error) -> Self {
+        Self::ParseError(error.to_string())
     }
 }

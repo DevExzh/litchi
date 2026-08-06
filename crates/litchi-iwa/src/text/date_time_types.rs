@@ -2,7 +2,7 @@
 
 use crate::{Error, Result};
 
-use super::position::TextRange;
+use litchi_iwa_text::position::TextRange;
 
 const MAX_DATE_TIME_FORMAT_BYTES: usize = 4 * 1_024;
 const MAX_DATE_TIME_LOCALE_BYTES: usize = 512;

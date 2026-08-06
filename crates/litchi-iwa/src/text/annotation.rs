@@ -22,8 +22,8 @@ use super::highlight_storage::{
     locate_storage_with_archive, patch_highlight_table, raw_boundaries, remove_range,
     validate_range,
 };
-use super::position::{TextPosition, TextRange};
 use super::storage_wire::{StorageLocation, text_utf16_len};
+use litchi_iwa_text::position::{TextPosition, TextRange};
 
 const OBJECT_IDENTIFIER_INCREMENT: u64 = 1;
 
@@ -465,8 +465,8 @@ fn collect_annotations(
         annotations.push(AnnotationRecord {
             object_id: identifier,
             range: TextRange::new(
-                TextPosition::from_native(boundary.index),
-                TextPosition::from_native(end),
+                TextPosition::from_utf16_code_units(boundary.index),
+                TextPosition::from_utf16_code_units(end),
             )?,
             graph,
         });

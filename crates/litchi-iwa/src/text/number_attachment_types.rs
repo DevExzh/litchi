@@ -2,7 +2,7 @@
 
 use crate::{Error, Result};
 
-use super::position::TextPosition;
+use litchi_iwa_text::position::TextPosition;
 
 const MAX_ATTACHMENT_TEXT_BYTES: usize = 16 * 1_024;
 

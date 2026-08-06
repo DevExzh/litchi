@@ -10,12 +10,12 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::position::TextRange;
 use super::storage_wire::{
     LocatedStorage, StorageLocation, locate_storage as locate_native_storage,
     locate_storage_with_archive as locate_native_storage_with_archive, text_utf16_len,
     update_parsed_archive, validate_sorted_boundaries,
 };
+use litchi_iwa_text::position::TextRange;
 
 pub(super) const HIGHLIGHT_TABLE_FIELD: u32 = 23;
 pub(super) const TABLE_ENTRIES_FIELD: u32 = 1;

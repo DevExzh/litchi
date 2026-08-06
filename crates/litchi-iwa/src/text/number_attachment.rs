@@ -21,10 +21,10 @@ use super::number_attachment_storage::{
 use super::number_attachment_types::{
     TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings,
 };
-use super::position::TextPosition;
 use super::smart_field_object::{
     ensure_no_metadata_reference, require_exclusive_storage_reference,
 };
+use litchi_iwa_text::position::TextPosition;
 
 const OBJECT_REPLACEMENT_CHARACTER: &str = "\u{fffc}";
 
@@ -55,7 +55,7 @@ pub(crate) fn text_number_attachments(
         }
         attachments.push(TextNumberAttachment::new(
             TextNumberAttachmentId::from_native(entry.object_id),
-            TextPosition::from_native(entry.index),
+            TextPosition::from_utf16_code_units(entry.index),
             settings,
         ));
     }

@@ -9,7 +9,7 @@ use super::annotation::{
     remove_unreferenced_annotation_objects, update_annotation,
 };
 use super::highlight_types::{TextHighlight, TextHighlightId};
-use super::position::TextRange;
+use litchi_iwa_text::position::TextRange;
 
 /// Read every native plain highlight in a storage, ordered by text position.
 pub(crate) fn text_highlights(

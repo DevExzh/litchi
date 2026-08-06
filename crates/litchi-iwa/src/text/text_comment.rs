@@ -10,11 +10,11 @@ use super::annotation_reply::{
     add_annotation_reply, annotation_replies, remove_annotation_reply, update_annotation_reply,
 };
 use super::highlight_object::AnnotationReplyGraph;
-use super::position::TextRange;
 use super::text_comment_types::{
     TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
     TextCommentReplyId,
 };
+use litchi_iwa_text::position::TextRange;
 
 /// Read every native ranged text comment in a storage, ordered by position.
 pub(crate) fn text_comments(package: &IWorkPackage, storage_id: u64) -> Result<Vec<TextComment>> {

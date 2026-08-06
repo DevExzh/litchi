@@ -10,7 +10,9 @@
 pub mod character;
 pub mod columns;
 pub mod font;
+pub mod language;
 pub mod paragraph;
+pub mod position;
 pub mod storage;
 
 pub use character::{
@@ -19,3 +21,5 @@ pub use character::{
     TextUnderline,
 };
 pub use font::{Font, Name, NameError};
+pub use language::{Error as LanguageError, TextLanguage, TextLanguageRun, TextLanguageTag};
+pub use position::{Error as PositionError, TextPosition, TextRange};

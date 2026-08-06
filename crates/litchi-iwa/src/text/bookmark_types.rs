@@ -2,7 +2,7 @@
 
 use crate::{Error, Result};
 
-use super::position::TextRange;
+use litchi_iwa_text::position::TextRange;
 
 const MAX_BOOKMARK_NAME_BYTES: usize = 1_024;
 

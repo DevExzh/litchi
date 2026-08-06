@@ -1,9 +1,9 @@
 //! Strict public types for native ranged iWork text comments.
 
-use litchi_iwa_common::comment::Uuid;
 use crate::{Error, Result};
+use litchi_iwa_common::comment::Uuid;
 
-use super::position::TextRange;
+use litchi_iwa_text::position::TextRange;
 
 /// Identifier of a native ranged text-comment annotation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

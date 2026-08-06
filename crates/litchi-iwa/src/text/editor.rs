@@ -49,7 +49,6 @@ use super::language::{
     remove_text_language_boundary, reset_text_languages, set_text_language, text_language,
     text_languages,
 };
-use super::language_types::{TextLanguage, TextLanguageRun};
 use super::number_attachment::{
     insert_text_number_attachment, remove_text_number_attachment,
     remove_unreferenced_number_attachment_objects, text_number_attachments,
@@ -110,7 +109,6 @@ use super::paragraph_style_apply::AppliedParagraphStyle;
 use super::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
 };
-use super::position::{TextPosition, TextRange};
 use super::storage_wire::{
     locate_text_storage, locate_text_storage_with_archive, locate_text_storages,
     update_parsed_archive,
@@ -129,6 +127,8 @@ use super::text_comment_types::{
     TextComment, TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody,
     TextCommentReplyId,
 };
+use litchi_iwa_text::position::{TextPosition, TextRange};
+use litchi_iwa_text::{TextLanguage, TextLanguageRun};
 
 /// A discoverable text storage within an iWork package.
 #[derive(Debug, Clone, PartialEq, Eq)]

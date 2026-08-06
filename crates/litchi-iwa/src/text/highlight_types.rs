@@ -2,7 +2,7 @@
 
 use crate::{Error, Result};
 
-use super::position::TextRange;
+use litchi_iwa_text::position::TextRange;
 
 /// Identifier of a native text-highlight object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

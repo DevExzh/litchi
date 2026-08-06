@@ -2,7 +2,7 @@
 
 use crate::{Error, Result};
 
-use super::position::TextRange;
+use litchi_iwa_text::position::TextRange;
 
 const MAX_HYPERLINK_TARGET_BYTES: usize = 8 * 1_024;
 

@@ -22,11 +22,11 @@ use super::hyperlink_storage::{
     ensure_range_available, locate_storage, locate_storage_with_archive, patch_ranged_object_table,
     raw_boundaries, remove_range, validate_range,
 };
-use super::position::{TextPosition, TextRange};
 use super::smart_field_object::{
     ensure_no_metadata_reference, require_exclusive_storage_reference,
 };
 use super::storage_wire::{StorageLocation, text_utf16_len};
+use litchi_iwa_text::position::{TextPosition, TextRange};
 
 const SMART_FIELD_TABLE: RangedObjectTable = RangedObjectTable::SmartField;
 
@@ -366,8 +366,8 @@ fn collect_date_time_fields(
         fields.push(TextDateTimeField::new(
             TextDateTimeFieldId::from_native(identifier),
             TextRange::new(
-                TextPosition::from_native(boundary.index),
-                TextPosition::from_native(end),
+                TextPosition::from_utf16_code_units(boundary.index),
+                TextPosition::from_utf16_code_units(end),
             )?,
             settings,
         ));
