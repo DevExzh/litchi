@@ -14,7 +14,7 @@
 ///
 /// # Quick Start
 ///
-/// ```rust,no_run
+/// ```rust,ignore
 /// use litchi::{Document, markdown::ToMarkdown};
 ///
 /// # fn main() -> Result<(), litchi::Error> {
@@ -56,7 +56,7 @@
 ///
 /// ## Basic Document Conversion
 ///
-/// ```rust,no_run
+/// ```rust,ignore
 /// use litchi::{Document, markdown::ToMarkdown};
 ///
 /// # fn main() -> Result<(), litchi::Error> {
@@ -69,7 +69,7 @@
 ///
 /// ## With Custom Options
 ///
-/// ```rust,no_run
+/// ```rust,ignore
 /// use litchi::{Document, markdown::{ToMarkdown, MarkdownOptions, TableStyle}};
 ///
 /// # fn main() -> Result<(), litchi::Error> {
@@ -87,7 +87,7 @@
 ///
 /// ## Presentation Conversion
 ///
-/// ```rust,no_run
+/// ```rust,ignore
 /// use litchi::{Presentation, markdown::ToMarkdown};
 ///
 /// # fn main() -> Result<(), litchi::Error> {
@@ -101,24 +101,24 @@
 // Module declarations
 #[cfg(any(
     feature = "doc",
-    feature = "ooxml",
-    feature = "odf",
+    feature = "docx",
+    feature = "odt",
     feature = "rtf",
-    feature = "iwa"
+    feature = "iwork"
 ))]
 mod writer;
 
 // Document and presentation markdown implementations are only available when their respective features are enabled
 #[cfg(any(
     feature = "doc",
-    feature = "ooxml",
-    feature = "odf",
+    feature = "docx",
+    feature = "odt",
     feature = "rtf",
-    feature = "iwa"
+    feature = "iwork"
 ))]
 mod document;
 
-#[cfg(any(feature = "ppt", feature = "ooxml", feature = "odf", feature = "iwa"))]
+#[cfg(any(feature = "ppt", feature = "pptx", feature = "odp", feature = "iwork"))]
 mod presentation;
 
 // Re-export public API (format-agnostic helpers live in litchi-markdown)

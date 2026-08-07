@@ -19,13 +19,13 @@
 #[derive(Debug)]
 pub enum DetectedFormat {
     // OOXML formats with parsed OPC package
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     Docx(crate::opc::OpcPackage),
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "pptx")]
     Pptx(crate::opc::OpcPackage),
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "xlsx")]
     Xlsx(crate::opc::OpcPackage),
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "xlsb")]
     Xlsb(crate::opc::OpcPackage),
 
     // OLE2 formats with parsed OleFile
@@ -37,22 +37,22 @@ pub enum DetectedFormat {
     Xls(litchi_cfb::OleFile<std::io::Cursor<Vec<u8>>>),
 
     // iWork formats with validated ZIP archive data (lazy parsing)
-    #[cfg(feature = "iwa")]
+    #[cfg(feature = "iwork")]
     Pages(Vec<u8>),
-    #[cfg(feature = "iwa")]
+    #[cfg(feature = "iwork")]
     Keynote(Vec<u8>),
-    #[cfg(feature = "iwa")]
+    #[cfg(feature = "iwork")]
     Numbers(Vec<u8>),
 
     // ODF formats with validated ZIP archive data (lazy parsing)
-    #[cfg(feature = "odf")]
+    #[cfg(feature = "odt")]
     Odt(Vec<u8>),
-    #[cfg(feature = "odf")]
+    #[cfg(feature = "odp")]
     Odp(Vec<u8>),
-    #[cfg(feature = "odf")]
+    #[cfg(feature = "ods")]
     Ods(Vec<u8>),
     /// Flat OpenDocument XML with its detected family.
-    #[cfg(feature = "odf")]
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
     FlatOdf(litchi_core::detection::FileFormat, Vec<u8>),
 
     // RTF format (plain text, no parsing structure needed)
@@ -76,7 +76,10 @@ pub enum DetectedFormat {
 /// * `Some(DetectedFormat)` - Format detected with a reusable owner or byte buffer
 /// * `None` - Format not recognized
 pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
-    #[cfg(any(feature = "ooxml", feature = "odf"))]
+    #[cfg(any(
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+        any(feature = "odt", feature = "ods", feature = "odp")
+    ))]
     use litchi_core::detection::FileFormat;
     use litchi_core::detection::simd_utils::check_office_signatures;
 
@@ -88,7 +91,7 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
         return None;
     }
 
-    #[cfg(feature = "odf")]
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
     if let Some(format) = litchi_odf_common::detect::flat(&bytes) {
         return Some(DetectedFormat::FlatOdf(format, bytes));
     }
@@ -127,7 +130,7 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
     // Check ZIP candidates in the same order as the ordinary detector.
     if mask.is_zip() {
         // A successful OOXML probe returns the parsed OPC owner directly.
-        #[cfg(feature = "ooxml")]
+        #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
         {
             if let Ok(package) = crate::opc::OpcPackage::from_bytes(&bytes) {
                 // Use existing OOXML detection logic
@@ -135,9 +138,13 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
                     crate::detection_smart::ooxml::detect_ooxml_format_from_package(&package)
                 {
                     return match format {
+                        #[cfg(feature = "docx")]
                         FileFormat::Docx => Some(DetectedFormat::Docx(package)),
+                        #[cfg(feature = "pptx")]
                         FileFormat::Pptx => Some(DetectedFormat::Pptx(package)),
+                        #[cfg(feature = "xlsx")]
                         FileFormat::Xlsx => Some(DetectedFormat::Xlsx(package)),
+                        #[cfg(feature = "xlsb")]
                         FileFormat::Xlsb => Some(DetectedFormat::Xlsb(package)),
                         _ => None,
                     };
@@ -145,17 +152,20 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
             }
         }
 
-        #[cfg(feature = "odf")]
+        #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
         if let Some(format) = litchi_odf_common::detect::bytes(&bytes) {
             return match format {
+                #[cfg(feature = "odt")]
                 FileFormat::Odt => Some(DetectedFormat::Odt(bytes)),
+                #[cfg(feature = "odp")]
                 FileFormat::Odp => Some(DetectedFormat::Odp(bytes)),
+                #[cfg(feature = "ods")]
                 FileFormat::Ods => Some(DetectedFormat::Ods(bytes)),
                 _ => None,
             };
         }
 
-        #[cfg(feature = "iwa")]
+        #[cfg(feature = "iwork")]
         if let Ok(Some(format)) = litchi_iwa::detect::bytes(&bytes) {
             return Some(match format {
                 litchi_iwa::detect::Format::Pages => DetectedFormat::Pages(bytes),

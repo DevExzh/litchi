@@ -193,7 +193,7 @@ pub(crate) fn protection(sheet: &Worksheet) -> Result<crate::sheet_protection::M
 }
 
 /// Parse the worksheet's ordinary sheet-view collection.
-pub(crate) fn views(sheet: &Worksheet) -> Result<Option<crate::sheet_view::Views>> {
+pub(crate) fn views(sheet: &Worksheet) -> Result<Option<crate::sheet_view::Collection>> {
     crate::sheet_view::parse_worksheet_views(xml(sheet)?)
 }
 

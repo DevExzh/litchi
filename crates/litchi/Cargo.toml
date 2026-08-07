@@ -43,107 +43,103 @@ exclude = [
 ]
 
 [features]
-default = ["doc", "ppt", "xls", "ooxml", "ooxml_encryption", "eval_engine"]
-full = [
-    "iwa",
-    "odf",
-    "doc",
-    "ppt",
-    "xls",
-    "ooxml",
-    "ooxml_encryption",
-    "rtf",
-    "formula",
-    "imgconv",
-    "eval_engine",
-    "fonts",
-    "sign",
-]
-# Format support features
-iwa = ["dep:litchi-iwa"]
-odf = [
-    "dep:litchi-odf-common",
-    "dep:litchi-odp",
-    "dep:litchi-ods",
-    "dep:litchi-odt",
-]
-doc = ["dep:litchi-cfb", "dep:litchi-doc", "dep:litchi-ole-common", "sign"]
-ppt = ["dep:litchi-cfb", "dep:litchi-ole-common", "dep:litchi-ppt", "sign"]
-xls = ["dep:litchi-cfb", "dep:litchi-ole-common", "dep:litchi-xls", "sign"]
-ooxml = [
-    "dep:litchi-docx",
-    "dep:litchi-drawingml",
-    "dep:litchi-ooxml-common",
-    "dep:litchi-opc",
-    "dep:litchi-pptx",
-    "dep:litchi-xlsb",
-    "dep:litchi-xlsx",
-    "sign",
-]
-ooxml_encryption = ["ooxml", "dep:litchi-crypto", "litchi-docx/encryption"]
-rtf = ["dep:litchi-rtf"]
-# Additional functionality features
-formula = ["dep:litchi-formula", "litchi-doc?/formula", "litchi-ppt?/formula"]
-imgconv = ["dep:litchi-imgconv", "dep:litchi-odraw"]
-fonts = ["dep:litchi-fonts", "litchi-docx?/fonts"]
+default = []
+
+# Format leaves
+doc = ["dep:litchi-doc", "cfb", "ole"]
+docx = ["dep:litchi-docx", "opc"]
+ppt = ["dep:litchi-ppt", "cfb", "ole"]
+pptx = ["dep:litchi-pptx", "opc", "ooxml-common", "drawingml"]
+xls = ["dep:litchi-xls", "cfb", "ole", "sheet"]
+xlsx = ["dep:litchi-xlsx", "opc", "ooxml-common", "drawingml", "sheet"]
+xlsb = ["dep:litchi-xlsb", "opc", "ooxml-common", "sheet"]
+rtf = ["dep:litchi-rtf", "dep:chrono"]
+odt = ["dep:litchi-odt", "odf-common"]
+ods = ["dep:litchi-ods", "odf-common", "sheet"]
+odp = ["dep:litchi-odp", "odf-common"]
+iwork = ["dep:litchi-iwa", "sheet"]
+
+# Low-level and opt-in capabilities
+cfb = ["dep:litchi-cfb"]
+ole = ["dep:litchi-ole-common"]
+opc = ["dep:litchi-opc"]
+ooxml-common = ["dep:litchi-ooxml-common"]
+drawingml = ["dep:litchi-drawingml"]
+odf-common = ["dep:litchi-odf-common"]
+sheet = ["dep:litchi-sheet", "dep:fast-float2"]
 sign = ["dep:litchi-sign"]
-eval_engine = ["dep:litchi-eval"]
-# Formula I/O is caller-injected through litchi-eval::Fetch; no runtime is selected here.
-eval_engine_web_functions = ["eval_engine", "litchi-eval/web_functions"]
+encryption = ["dep:litchi-crypto", "litchi-docx?/encryption"]
+formula = ["dep:litchi-formula", "litchi-doc?/formula", "litchi-ppt?/formula"]
+fonts = ["dep:litchi-fonts", "litchi-docx?/fonts"]
+images = ["dep:litchi-imgconv", "dep:litchi-odraw"]
+eval = ["dep:litchi-eval"]
+web-functions = ["eval", "litchi-eval/web_functions"]
+markdown = ["dep:litchi-markdown", "dep:memchr", "dep:rayon"]
+yaml = ["dep:serde-saphyr"]
+
+# Format and convenience aggregates
+legacy = ["doc", "ppt", "xls", "cfb", "ole"]
+ooxml = ["docx", "pptx", "xlsx", "xlsb", "opc", "ooxml-common", "drawingml"]
+odf = ["odt", "ods", "odp", "odf-common"]
+word = ["doc", "docx", "rtf", "odt"]
+slides = ["ppt", "pptx", "odp"]
+spreadsheets = ["xls", "xlsx", "xlsb", "ods", "sheet"]
+office = ["legacy", "ooxml", "odf", "rtf", "iwork"]
+all-formats = ["office"]
+all = [
+    "all-formats",
+    "cfb",
+    "ole",
+    "opc",
+    "ooxml-common",
+    "drawingml",
+    "odf-common",
+    "sheet",
+    "sign",
+    "encryption",
+    "formula",
+    "fonts",
+    "images",
+    "eval",
+    "web-functions",
+    "markdown",
+    "yaml",
+]
 
 [dependencies]
-aho-corasick = "1.1" # Fast string searching for fast byte pattern matching
-atoi_simd = "0.18" # SIMD-optimized conversion of byte slices to integers
-base64 = "0.22" # Base64 encoding/decoding for embedded binary data in XML
-bitflags = { version = "2.10", features = ["std", "serde"] } # Bit flags for efficient flag combinations
-bytes = { version = "1", features = ["serde"] } # Efficient byte buffer operations with zero-copy slicing
-chrono = { version = "0", features = ["serde"] } # Date and time types for Office timestamps
-fast-float2 = "0.2" # Fast string-to-float conversion with correct rounding
-fixedbitset = "0.5" # Fixed-size bitset for efficient visited tracking with better cache locality
-flate2 = { version = "1", features = ["zlib-rs"], default-features = false } # Compression/decompression for Office file formats
-itoa = "1.0" # Fast integer-to-string conversion
-litchi-cfb = { workspace = true, optional = true } # Compound File Binary substrate shared by independently gated legacy formats
-litchi-core = { workspace = true } # Common types, traits, and utilities (carved out in workspace split)
-litchi-crypto = { workspace = true, features = ["ooxml"], optional = true } # Canonical runtime-neutral Office cryptography, gated by `ooxml_encryption`
-litchi-doc = { workspace = true, optional = true } # Legacy Word binary parser/writer (.doc), independently gated by `doc`
-litchi-docx = { workspace = true, optional = true } # Standalone WordprocessingML package and semantic APIs, gated by `ooxml`
-litchi-drawingml = { workspace = true, optional = true } # Shared DrawingML chart and diagram vocabulary, gated by `ooxml`
-litchi-eval = { workspace = true, optional = true } # Formula evaluator engine (carved out in workspace split, gated by `eval_engine` feature)
-litchi-fonts = { workspace = true, optional = true } # Font discovery, loading, and subsetting (carved out in workspace split, gated by `fonts` feature)
-litchi-formula = { workspace = true, optional = true } # Formula parser/converter (carved out in workspace split, gated by `formula` feature)
-litchi-imgconv = { workspace = true, optional = true } # EMF/WMF/PICT image conversion (carved out in workspace split, gated by `imgconv` feature)
-litchi-iwa = { workspace = true, optional = true } # Apple iWork (.pages, .numbers, .key) parser (carved out in workspace split, gated by `iwa` feature)
-litchi-markdown = { workspace = true } # Format-agnostic Markdown emission helpers (carved out in workspace split)
-litchi-odf-common = { workspace = true, optional = true } # Format-neutral OpenDocument vocabulary and detection
-litchi-odp = { workspace = true, optional = true } # OpenDocument Presentation (.odp) parser, gated by `odf`
-litchi-ods = { workspace = true, optional = true } # OpenDocument Spreadsheet (.ods) parser, gated by `odf`
-litchi-odt = { workspace = true, optional = true } # OpenDocument Text (.odt) parser, gated by `odf`
-litchi-odraw = { workspace = true, optional = true } # Host-neutral OfficeArt image grammar exposed by the image facade
-litchi-ole-common = { workspace = true, optional = true } # Shared OLE2 property-set and object grammar for legacy formats
-litchi-ooxml-common = { workspace = true, optional = true } # Shared OOXML vocabulary exposed by the umbrella facade
-litchi-opc = { workspace = true, optional = true } # Open Packaging Conventions package graph used by standalone OOXML families
-litchi-ppt = { workspace = true, optional = true } # Legacy PowerPoint binary parser/writer (.ppt), independently gated by `ppt`
-litchi-pptx = { workspace = true, optional = true } # Canonical PresentationML capabilities, gated by `ooxml`
-litchi-rtf = { workspace = true, optional = true } # RTF parser and writer (carved out in workspace split, gated by `rtf` feature)
-litchi-sign = { workspace = true, optional = true } # Trust-neutral Office signature authoring and verification
-litchi-xls = { workspace = true, optional = true } # Legacy Excel BIFF parser/writer, independently gated by `xls`
-litchi-xlsb = { workspace = true, optional = true } # Canonical BIFF12 record capabilities, gated by `ooxml`
-litchi-xlsx = { workspace = true, optional = true } # Standalone SpreadsheetML package and semantic APIs, gated by `ooxml`
-memchr = "2.7" # SIMD-accelerated string searching for fast byte pattern matching
-once_cell = "1" # Lazy statics and one-time initialization for global state
-parking_lot = { version = "0.12", features = ["hardware-lock-elision"] } # Lock-free synchronization primitives for concurrent programming
-phf = { version = "0.14", features = ["macros"] } # Perfect hash functions for compile-time static maps
-rand = "0.10" # Cryptographically secure random numbers for salts in protection hashes
-rayon = "1.11" # Data parallelism library for parallel iterators and work-stealing
-roaring = "0" # Compressed bitmap data structure for efficient set operations
-ryu = "1.0" # Fast float-to-string conversion with minimal allocations
-serde = { version = "1", features = ["derive"] } # Serialization/deserialization framework
-serde-saphyr = "0" # YAML serialization support
-sha2 = "0.11" # SHA-512 hashing for OOXML password protection
-smallvec = "1.15" # Stack-allocated vectors for small collections to avoid heap allocations
-thiserror = "2.0" # Convenient derive macros for error types
-zerocopy = { version = "0.8", features = ["std"] } # Safe zero-cost type conversions between bytes and structured data
-zerocopy-derive = "0.8" # Derive macros for zerocopy traits
+chrono = { version = "0", features = ["serde"], optional = true } # RTF metadata timestamps
+fast-float2 = { version = "0.2", optional = true } # Text-sheet numeric parsing
+litchi-cfb = { workspace = true, optional = true } # Compound File Binary substrate
+litchi-core = { workspace = true } # Common types, traits, and utilities
+litchi-crypto = { workspace = true, features = ["ooxml"], optional = true } # Office encryption support
+litchi-doc = { workspace = true, optional = true } # Legacy Word binary support
+litchi-docx = { workspace = true, optional = true } # WordprocessingML support
+litchi-drawingml = { workspace = true, optional = true } # Shared DrawingML vocabulary
+litchi-eval = { workspace = true, optional = true } # Formula evaluation
+litchi-fonts = { workspace = true, optional = true } # Font support
+litchi-formula = { workspace = true, optional = true } # Formula parsing and conversion
+litchi-imgconv = { workspace = true, optional = true } # Legacy image conversion
+litchi-iwa = { workspace = true, optional = true } # Apple iWork support
+litchi-markdown = { workspace = true, optional = true } # Markdown emission
+litchi-odf-common = { workspace = true, optional = true } # Shared OpenDocument vocabulary
+litchi-odp = { workspace = true, optional = true } # OpenDocument Presentation support
+litchi-ods = { workspace = true, optional = true } # OpenDocument Spreadsheet support
+litchi-odt = { workspace = true, optional = true } # OpenDocument Text support
+litchi-odraw = { workspace = true, optional = true } # OfficeArt image grammar
+litchi-ole-common = { workspace = true, optional = true } # Shared OLE2 vocabulary
+litchi-ooxml-common = { workspace = true, optional = true } # Shared OOXML vocabulary
+litchi-opc = { workspace = true, optional = true } # Open Packaging Conventions support
+litchi-ppt = { workspace = true, optional = true } # Legacy PowerPoint binary support
+litchi-pptx = { workspace = true, optional = true } # PresentationML support
+litchi-rtf = { workspace = true, optional = true } # Rich Text Format support
+litchi-sheet = { workspace = true, optional = true } # Shared spreadsheet vocabulary
+litchi-sign = { workspace = true, optional = true } # Office signature support
+litchi-xls = { workspace = true, optional = true } # Legacy Excel BIFF support
+litchi-xlsb = { workspace = true, optional = true } # BIFF12 support
+litchi-xlsx = { workspace = true, optional = true } # SpreadsheetML support
+memchr = { version = "2.7", optional = true } # Markdown escaping
+rayon = { version = "1.11", optional = true } # Parallel Markdown rendering
+serde-saphyr = { version = "0", optional = true } # YAML metadata serialization
 
 [build-dependencies]
 # (none) — iwa proto compilation lives in `crates/litchi-iwa/build.rs`.
@@ -157,47 +153,47 @@ zip = { version = "8", default-features = false, features = ["deflate"] }
 
 [[example]]
 name = "docx_with_fonts"
-required-features = ["ooxml", "fonts"]
+required-features = ["docx", "fonts"]
 
 [[example]]
 name = "core_props_office"
-required-features = ["ooxml"]
+required-features = ["opc", "ooxml-common"]
 
 [[example]]
 name = "minimal_font_test"
-required-features = ["ooxml", "fonts"]
+required-features = ["docx", "fonts"]
 
 [[example]]
 name = "pptx_with_fonts"
-required-features = ["ooxml", "fonts"]
+required-features = ["pptx", "fonts"]
 
 [[example]]
 name = "pptx_open_password_encryption"
-required-features = ["ooxml_encryption"]
+required-features = ["pptx", "encryption"]
 
 [[example]]
 name = "odp_reader_test"
-required-features = ["odf"]
+required-features = ["odp"]
 
 [[example]]
 name = "odp_writer_test"
-required-features = ["odf"]
+required-features = ["odp"]
 
 [[example]]
 name = "odt_mutable_page_styles_demo"
-required-features = ["odf"]
+required-features = ["odt"]
 
 [[example]]
 name = "odt_page_styles_demo"
-required-features = ["odf"]
+required-features = ["odt"]
 
 [[example]]
 name = "odt_reader_test"
-required-features = ["odf"]
+required-features = ["odt"]
 
 [[example]]
 name = "odt_writer_test"
-required-features = ["odf"]
+required-features = ["odt"]
 
 [[example]]
 name = "odraw_native_smoke"
@@ -245,7 +241,7 @@ required-features = ["doc"]
 
 [[example]]
 name = "comprehensive_docx_test"
-required-features = ["ooxml"]
+required-features = ["docx"]
 
 [[example]]
 name = "debug_fat"
@@ -261,7 +257,7 @@ required-features = ["doc"]
 
 [[example]]
 name = "debug_parse_concat"
-required-features = ["ooxml", "eval_engine"]
+required-features = ["docx"]
 
 [[example]]
 name = "doc_headers_footers"
@@ -313,11 +309,11 @@ required-features = ["doc"]
 
 [[example]]
 name = "docx_template_test"
-required-features = ["ooxml"]
+required-features = ["docx"]
 
 [[example]]
 name = "dump_xlsb_structure"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "minimal_doc_mre"
@@ -325,7 +321,7 @@ required-features = ["doc"]
 
 [[example]]
 name = "office_crud_demo"
-required-features = ["ooxml"]
+required-features = ["docx", "pptx", "xlsx", "ooxml-common"]
 
 [[example]]
 name = "ppt_shapes_showcase_advanced"
@@ -337,320 +333,320 @@ required-features = ["ppt"]
 
 [[example]]
 name = "pptx_advanced_features"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_animations"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_charts_comprehensive"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_charts_demo"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_charts_smartart_combined"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_comprehensive_test"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_customshow"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_customshow_comprehensive"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_debug"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_feature_test"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_features_demo"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_handout"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_handout_comprehensive"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_isolate_issue"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_media_only"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_minimal_only"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_minimal_test"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_protection"
-required-features = ["ooxml_encryption"]
+required-features = ["pptx", "encryption"]
 
 [[example]]
 name = "pptx_simple_demo"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_smartart"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_smartart_comprehensive"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_smartart_demo"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "pptx_writer_showcase"
-required-features = ["ooxml"]
+required-features = ["pptx"]
 
 [[example]]
 name = "profile_all_formats"
-required-features = ["full"]
+required-features = ["all"]
 
 [[example]]
 name = "profile_test1"
-required-features = ["ooxml", "formula"]
+required-features = ["all"]
 
 [[example]]
 name = "read_office_files"
-required-features = ["ooxml"]
+required-features = ["docx", "pptx", "xlsx", "ooxml-common"]
 
 [[example]]
 name = "read_xlsb"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "sheet_eval_arithmetic"
-required-features = ["ooxml", "eval_engine"]
+required-features = ["xlsx", "eval"]
 
 [[example]]
 name = "sheet_eval_complex_chains"
-required-features = ["ooxml", "eval_engine"]
+required-features = ["xlsx", "eval"]
 
 [[example]]
 name = "sheet_eval_criteria_aggregates"
-required-features = ["ooxml", "eval_engine"]
+required-features = ["xlsx", "eval"]
 
 [[example]]
 name = "sheet_eval_datetime"
-required-features = ["ooxml", "eval_engine"]
+required-features = ["xlsx", "eval"]
 
 [[example]]
 name = "sheet_eval_functions_basic"
-required-features = ["ooxml", "eval_engine"]
+required-features = ["xlsx", "eval"]
 
 [[example]]
 name = "sheet_eval_lookups"
-required-features = ["ooxml", "eval_engine"]
+required-features = ["xlsx", "eval"]
 
 [[example]]
 name = "sheet_eval_mvp"
-required-features = ["ooxml", "eval_engine"]
+required-features = ["xlsx", "eval"]
 
 [[example]]
 name = "sheet_eval_stat_financial"
-required-features = ["ooxml", "eval_engine"]
+required-features = ["xlsx", "eval"]
 
 [[example]]
 name = "text_formats_api_demo"
-required-features = ["ooxml"]
+required-features = ["sheet"]
 
 [[example]]
 name = "text_formats_demo"
-required-features = ["ooxml"]
+required-features = ["sheet"]
 
 [[example]]
 name = "text_formats_roundtrip"
-required-features = ["ooxml"]
+required-features = ["sheet"]
 
 [[example]]
 name = "text_formats_simple"
-required-features = ["ooxml"]
+required-features = ["sheet"]
 
 [[example]]
 name = "to_markdown"
-required-features = ["full"]
+required-features = ["all"]
 
 [[example]]
 name = "write_xlsb"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_reader"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_all_three"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_autofilter"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_col_row_sizes"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_comprehensive_features"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_conditional_formatting"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_data_validation"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_empty"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_hyperlinks"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_internal_hyperlinks"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_merge_cells"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_merged_and_hyperlinks"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_merged_hyperlinks"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_minimal"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_minimal_hyperlink"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_minimal_merged"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_named_ranges"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_nr_hyperlink"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_nr_merged"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_one_cell"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_one_named_range"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_one_number"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_sheet_protection"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_two_cells"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_test_two_rows"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsb_writer"
-required-features = ["ooxml"]
+required-features = ["xlsb"]
 
 [[example]]
 name = "xlsx_array_formulas"
-required-features = ["ooxml"]
+required-features = ["xlsx"]
 
 [[example]]
 name = "xlsx_charts"
-required-features = ["ooxml"]
+required-features = ["xlsx"]
 
 [[example]]
 name = "xlsx_charts_comprehensive"
-required-features = ["ooxml"]
+required-features = ["xlsx"]
 
 [[example]]
 name = "xlsx_comprehensive_features"
-required-features = ["ooxml"]
+required-features = ["xlsx"]
 
 [[example]]
 name = "xlsx_page_breaks_views"
-required-features = ["ooxml"]
+required-features = ["xlsx"]
 
 [[example]]
 name = "xlsx_pivot_test"
-required-features = ["ooxml"]
+required-features = ["xlsx"]
 
 [[example]]
 name = "xlsx_print_setup"
-required-features = ["ooxml"]
+required-features = ["xlsx"]
 
 [[example]]
 name = "xlsx_rich_text"
-required-features = ["ooxml"]
+required-features = ["xlsx"]
 
 [[example]]
 name = "xlsx_sparklines"
-required-features = ["ooxml"]
+required-features = ["xlsx"]
 
 [[example]]
 name = "xlsx_tables"
-required-features = ["ooxml"]
+required-features = ["xlsx"]
 
 [[example]]
 name = "xlsx_threaded_comments_test"
-required-features = ["ooxml"]
+required-features = ["xlsx"]
 
 [[example]]
 name = "xlsx_typed_page_and_shapes"
-required-features = ["ooxml"]
+required-features = ["xlsx"]
 
 [[example]]
 name = "xlsx_writer"
-required-features = ["ooxml"]
+required-features = ["xlsx"]

@@ -19,16 +19,16 @@ pub(super) enum DocumentImpl {
     #[cfg(feature = "doc")]
     Doc(doc::Document, litchi_core::Metadata),
     /// Modern .docx format
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     Docx(Box<crate::docx::Package>, litchi_core::Metadata),
     /// Apple Pages format
-    #[cfg(feature = "iwa")]
+    #[cfg(feature = "iwork")]
     Pages(crate::iwa::pages::PagesDocument),
     /// RTF format
     #[cfg(feature = "rtf")]
     Rtf(litchi_rtf::RtfDocument<'static>),
     /// OpenDocument Text format
-    #[cfg(feature = "odf")]
+    #[cfg(feature = "odt")]
     Odt(litchi_odt::Document),
 }
 

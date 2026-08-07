@@ -7,23 +7,13 @@ use crate::merged_cells::MergedCell;
 use crate::package::data_validation::{Settings, Validation};
 use crate::package::error::{Error, Result};
 use crate::package::formula::{Compiler, Group, GroupKind, ParsedFormula, Parser, Range};
-use crate::package::sheet_view::SheetView;
 use crate::package::web_extension_bindings::Binding;
 use litchi_core::sheet::CellValue;
+use litchi_sheet::view::{Pane, Position, Selection, Split, State, View};
+use litchi_sheet::{Cell, Rect};
 use std::collections::{BTreeMap, HashSet};
 
 use super::wire::{CellData, ColumnInfo, RowInfo, formula_requires_workbook_context};
-
-/// Freeze panes configuration.
-///
-/// Freezes rows and columns in place while scrolling.
-#[derive(Debug, Clone)]
-pub(crate) struct FreezePanes {
-    /// Number of rows to freeze from the top.
-    pub(crate) freeze_rows: u32,
-    /// Number of columns to freeze from the left.
-    pub(crate) freeze_cols: u32,
-}
 
 /// Auto-filter configuration for a rectangular range.
 ///
@@ -85,9 +75,7 @@ pub struct MutableWorksheet {
     /// Optional sheet protection configuration.
     pub(crate) sheet_protection: Option<SheetProtection>,
     /// Optional worksheet view configuration (zoom, pane, selections).
-    pub(crate) sheet_view: Option<SheetView>,
-    /// Optional freeze panes configuration.
-    pub(crate) freeze_panes: Option<FreezePanes>,
+    pub(crate) view: Option<View>,
     /// Data validation rules.
     pub(crate) data_validations: Vec<Validation>,
     pub(crate) data_validation_settings: Settings,
@@ -148,8 +136,7 @@ impl MutableWorksheet {
             rows: BTreeMap::new(),
             auto_filter: None,
             sheet_protection: None,
-            sheet_view: None,
-            freeze_panes: None,
+            view: None,
             data_validations: Vec::new(),
             data_validation_settings: Settings::default(),
             data_validation14_settings: Settings::default(),
@@ -594,15 +581,15 @@ impl MutableWorksheet {
     /// Set the worksheet view (zoom scales, pane, selections, tab-selected flag).
     ///
     /// The view model is shared with XLSX worksheets; see
-    /// [`crate::views::SheetView`]. Pane and selection settings conflict
-    /// with [`Self::freeze_panes`]; combining both fails at save time.
-    pub fn set_sheet_view(&mut self, view: SheetView) {
-        self.sheet_view = Some(view);
+    /// [`litchi_sheet::view::View`].
+    pub fn set_view(&mut self, view: View) {
+        self.view = Some(view);
     }
 
-    /// Worksheet view configured through [`Self::set_sheet_view`].
-    pub fn sheet_view(&self) -> Option<&SheetView> {
-        self.sheet_view.as_ref()
+    /// Current worksheet view, including any pane configured by
+    /// [`Self::freeze_panes`].
+    pub fn view(&self) -> Option<&View> {
+        self.view.as_ref()
     }
 
     /// Freeze panes at the specified position.
@@ -611,18 +598,59 @@ impl MutableWorksheet {
     /// `freeze_cols` the number of columns frozen from the left. The frozen
     /// pane uses the first scrolling cell as its selection anchor, mirroring
     /// the XLSX writer.
-    pub fn freeze_panes(&mut self, freeze_rows: u32, freeze_cols: u32) {
-        if freeze_rows > 0 || freeze_cols > 0 {
-            self.freeze_panes = Some(FreezePanes {
-                freeze_rows,
-                freeze_cols,
-            });
+    pub fn freeze_panes(&mut self, freeze_rows: u32, freeze_cols: u32) -> Result<()> {
+        if freeze_rows == 0 && freeze_cols == 0 {
+            return Ok(());
         }
+
+        let position = match (freeze_cols > 0, freeze_rows > 0) {
+            (true, true) => Position::BottomRight,
+            (true, false) => Position::TopRight,
+            (false, true) => Position::BottomLeft,
+            (false, false) => unreachable!("zero freeze panes return early"),
+        };
+        let top_left = Cell::at(freeze_rows, freeze_cols).map_err(|error| Error::Unrecognized {
+            typ: "worksheet view".to_string(),
+            val: error.to_string(),
+        })?;
+        let horizontal = (freeze_cols > 0)
+            .then(|| Split::new(f64::from(freeze_cols)))
+            .transpose()
+            .map_err(|error| Error::Unrecognized {
+                typ: "worksheet view".to_string(),
+                val: error.to_string(),
+            })?;
+        let vertical = (freeze_rows > 0)
+            .then(|| Split::new(f64::from(freeze_rows)))
+            .transpose()
+            .map_err(|error| Error::Unrecognized {
+                typ: "worksheet view".to_string(),
+                val: error.to_string(),
+            })?;
+        let selection = Selection::new(position, top_left, 0, vec![Rect::single(top_left)])
+            .map_err(|error| Error::Unrecognized {
+                typ: "worksheet view".to_string(),
+                val: error.to_string(),
+            })?;
+
+        let view = self.view.get_or_insert_with(View::default);
+        view.pane = Some(Pane {
+            position,
+            state: State::Frozen,
+            horizontal,
+            vertical,
+            top_left,
+        });
+        view.selections = vec![selection];
+        Ok(())
     }
 
     /// Remove freeze panes.
     pub fn unfreeze_panes(&mut self) {
-        self.freeze_panes = None;
+        if let Some(view) = &mut self.view {
+            view.pane = None;
+            view.selections.clear();
+        }
     }
 
     /// Add a merged cell range

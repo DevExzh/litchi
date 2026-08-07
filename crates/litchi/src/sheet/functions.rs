@@ -6,7 +6,7 @@ use super::types::Result;
 /// Open a workbook from a file path.
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
-#[cfg(feature = "ooxml")]
+#[cfg(feature = "xlsx")]
 pub fn open_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn WorkbookTrait>> {
     let package = crate::opc::OpcPackage::open(path)?;
     let workbook = crate::xlsx::Package::from_opc(package)
@@ -19,7 +19,7 @@ pub fn open_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workb
 /// Open a workbook from bytes.
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
-#[cfg(feature = "ooxml")]
+#[cfg(feature = "xlsx")]
 pub fn open_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes);
@@ -80,7 +80,7 @@ pub fn open_xls_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn Workbook
 /// Open an XLSB workbook from a file path.
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
-#[cfg(feature = "ooxml")]
+#[cfg(feature = "xlsb")]
 pub fn open_xlsb_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<crate::xlsb::Workbook> {
     let workbook = crate::xlsb::Package::open(path)
         .map_err(crate::map_ooxml_error)?
@@ -92,7 +92,7 @@ pub fn open_xlsb_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<crate::x
 /// Open an XLSB workbook from bytes.
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
-#[cfg(feature = "ooxml")]
+#[cfg(feature = "xlsb")]
 pub fn open_xlsb_workbook_from_bytes(bytes: &[u8]) -> Result<crate::xlsb::Workbook> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes);
@@ -106,7 +106,7 @@ pub fn open_xlsb_workbook_from_bytes(bytes: &[u8]) -> Result<crate::xlsb::Workbo
 /// Open an XLSB workbook as a trait object from a file path.
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
-#[cfg(feature = "ooxml")]
+#[cfg(feature = "xlsb")]
 pub fn open_xlsb_workbook_dyn<P: AsRef<std::path::Path>>(
     path: P,
 ) -> Result<Box<dyn WorkbookTrait>> {
@@ -117,7 +117,7 @@ pub fn open_xlsb_workbook_dyn<P: AsRef<std::path::Path>>(
 /// Open an XLSB workbook as a trait object from bytes.
 ///
 /// **Note**: This requires the `ooxml` feature to be enabled.
-#[cfg(feature = "ooxml")]
+#[cfg(feature = "xlsb")]
 pub fn open_xlsb_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes.to_vec());

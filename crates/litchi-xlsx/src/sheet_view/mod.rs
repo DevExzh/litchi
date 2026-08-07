@@ -7,8 +7,7 @@ mod tests;
 
 pub use codec::parse_worksheet_views;
 pub use model::{
-    CellReference, Extension, Pane, PanePosition, PaneState, PivotArea, PivotAreaType,
-    PivotSelection, PivotSelectionAxis, RangeReference, Selection, Sqref, View, ViewType, Views,
+    Collection, Entry, Extension, PivotArea, PivotAreaType, PivotSelection, PivotSelectionAxis,
 };
 
 use crate::error::Error;

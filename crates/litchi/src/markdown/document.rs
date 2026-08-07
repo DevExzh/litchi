@@ -1,5 +1,5 @@
 use super::writer::MarkdownWriter;
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 use crate::document::Table;
 use crate::document::{Document, Paragraph, Run};
 /// ToMarkdown implementations for Document types.
@@ -46,9 +46,9 @@ impl ToMarkdown for Document {
                         },
                         #[cfg(any(
                             feature = "doc",
-                            feature = "ooxml",
+                            feature = "docx",
                             feature = "rtf",
-                            feature = "odf"
+                            feature = "odt"
                         ))]
                         DocumentElement::Table(table) => {
                             let _ = writer.write_table(table);
@@ -83,9 +83,9 @@ impl ToMarkdown for Document {
                     },
                     #[cfg(any(
                         feature = "doc",
-                        feature = "ooxml",
+                        feature = "docx",
                         feature = "rtf",
-                        feature = "odf"
+                        feature = "odt"
                     ))]
                     DocumentElement::Table(table) => {
                         writer.write_table(&table)?;
@@ -117,7 +117,7 @@ impl ToMarkdown for Run {
     }
 }
 
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 impl ToMarkdown for Table {
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
         let mut writer = MarkdownWriter::new(*options);

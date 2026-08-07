@@ -38,22 +38,22 @@
 //! ```
 
 // Submodule declarations
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 mod cell_merge;
 mod doc;
 mod element;
 mod paragraph;
 mod run;
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 mod table;
 mod types;
 
 // Re-exports
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 pub use cell_merge::CellMerge;
 pub use doc::Document;
 pub use element::DocumentElement;
 pub use paragraph::Paragraph;
 pub use run::Run;
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 pub use table::{Cell, Row, Table};

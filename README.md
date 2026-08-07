@@ -28,8 +28,8 @@ OOXML ownership is split by responsibility: `litchi-opc` owns the package graph,
 `litchi-ooxml-common` owns shared OOXML vocabulary and package services,
 `litchi-docx`, `litchi-pptx`, `litchi-xlsx`, and `litchi-xlsb` own their format
 semantics, and `litchi-fonts` owns font discovery, subsetting, embedding, and
-obfuscation. The `litchi` facade exposes these standalone namespaces when the
-`ooxml` feature is enabled.
+obfuscation. The `litchi` facade exposes each namespace only when its matching
+opt-in feature is enabled.
 
 ## Quick Start
 
@@ -83,16 +83,16 @@ pkg.save("output.pptx")?;
 ### Additional Format Support
 
 ```rust
-// OpenDocument formats (requires "odf" feature)
-#[cfg(feature = "odf")]
+// OpenDocument text (requires "odt")
+#[cfg(feature = "odt")]
 {
     use litchi::odt::Document;
     let odt = Document::open("document.odt")?;
     let text = odt.text()?;
 }
 
-// Apple iWork formats (requires "iwa" feature)
-#[cfg(feature = "iwa")]
+// Apple iWork formats (requires "iwork" feature)
+#[cfg(feature = "iwork")]
 {
     use litchi::iwa;
     let pages = iwa::Document::open("document.pages")?;
@@ -116,32 +116,31 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-litchi = "0.0.1"
+litchi = { version = "0", features = ["docx"] }
 
 # Or use the development version
-litchi = { git = "https://github.com/DevExzh/litchi.git" }
+litchi = { git = "https://github.com/DevExzh/litchi.git", features = ["docx"] }
 ```
 
 ### Optional Features
 
-By default, Microsoft Office format support is enabled (`doc`, `ppt`, `xls`,
-`ooxml`), along with `ooxml_encryption` and `eval_engine`. Enable additional
-features as needed:
+Default features are empty. Choose precisely the file formats and capabilities
+your application uses; `default-features = false` is therefore optional, but
+can make that intent explicit.
 
 ```toml
 [dependencies]
-# Enable all features
-litchi = { version = "0.0.1", features = ["full"] }
+# Legacy PowerPoint, OOXML PowerPoint, and signing support.
+litchi = { version = "0", features = ["ppt", "pptx", "sign"] }
 
-# Or enable specific features
-litchi = { version = "0.0.1", features = ["odf"] }  # OpenDocument support
-litchi = { version = "0.0.1", features = ["iwa"] }  # Apple iWork support
-litchi = { version = "0.0.1", features = ["rtf"] }  # RTF support
-litchi = { version = "0.0.1", features = ["formula"] }  # Formula parsing and LaTeX conversion
-litchi = { version = "0.0.1", features = ["imgconv"] }  # Image conversion support
+# A minimal spreadsheet reader/writer surface.
+litchi = { version = "0", default-features = false, features = ["xlsx"] }
 ```
 
-**Note about `iwa`:** iWork files are essentially bundles of serialized Protocol Buffer messages, so enabling `iwa` requires a system `protoc` installation (used by `prost-build`).
+Formats never imply signing. Add `sign` only when your application needs
+signature support.
+
+**Note about `iwork`:** iWork files are essentially bundles of serialized Protocol Buffer messages, so enabling `iwork` requires a system `protoc` installation (used by `prost-build`).
 
 - **Linux (Debian/Ubuntu)**: install `protobuf-compiler`
 - **macOS**: install `protobuf` (e.g. via Homebrew)
@@ -151,25 +150,19 @@ litchi = { version = "0.0.1", features = ["imgconv"] }  # Image conversion suppo
 
 - **Linux (Debian/Ubuntu)**: install `pkg-config libfreetype6-dev libfontconfig1-dev`
 
-**Available Features:**
-- `full` - Enable all supported formats and functionality
-- `doc` (default) - Legacy Word binary format (.doc)
-- `ppt` (default) - Legacy PowerPoint binary format (.ppt)
-- `xls` (default) - Legacy Excel BIFF format (.xls)
-- `ooxml` (default) - Modern Office formats (.docx, .xlsx, .pptx)
-- `ooxml_encryption` (default) - OOXML encryption/decryption support
-- `odf` - OpenDocument formats (.odt, .ods, .odp)
-- `iwa` - Apple iWork formats (.pages, .numbers, .key)
-- `rtf` - Rich Text Format (.rtf)
-- `fonts` - Font embedding support
-- `formula` - MathType and Office MathML to LaTeX conversion
-- `imgconv` - Image format conversion (EMF, WMF, PICT to PNG/JPEG/WebP)
-- `eval_engine` (default) - Spreadsheet formula evaluation engine
+**Feature groups:**
+
+- Format leaves: `doc`, `docx`, `ppt`, `pptx`, `xls`, `xlsx`, `xlsb`, `rtf`, `odt`, `ods`, `odp`, `iwork`.
+- Infrastructure: `cfb`, `ole`, `opc`, `ooxml-common`, `drawingml`, `odf-common`, `sheet`.
+- Capabilities: `sign`, `encryption`, `formula`, `fonts`, `images`, `eval`, `web-functions`, `markdown`, `yaml`.
+- Aggregates: `legacy`, `ooxml`, `odf`, `word`, `slides`, `spreadsheets`, `office`, `all-formats`, `all`.
+
+Use leaf features for lean applications; aggregates are convenience bundles.
 
 Legacy binary formats have independent owners: `litchi-doc`, `litchi-ppt`,
 and `litchi-xls`. Their canonical umbrella modules are `litchi::doc`,
-`litchi::ppt`, and `litchi::xls`; the retired `litchi-ole` crate and `ole`
-feature/module do not remain as compatibility aliases.
+`litchi::ppt`, and `litchi::xls`. The low-level `ole` feature exposes shared
+OLE vocabulary; it is not a legacy format owner or compatibility facade.
 
 ## Documentation
 

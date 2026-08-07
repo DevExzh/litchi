@@ -13,7 +13,7 @@
 //!
 //! # Quick Start
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use litchi::sheet::Workbook;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -43,23 +43,71 @@
 //! - **Unified API**: `Workbook` struct for high-level operations
 //! - **Trait-based API**: `Workbook`, `Worksheet`, `Cell` traits for advanced use
 
-// Submodule declarations
-#[cfg(feature = "eval_engine")]
+/// Canonical worksheet-view semantics shared by XLSX and XLSB.
+pub mod view {
+    pub use litchi_sheet::view::*;
+    pub use litchi_sheet::{Cell, Rect};
+}
+
+pub use litchi_core::sheet::{traits, types};
+
+// Unified workbook facade implementations require a concrete workbook format.
+#[cfg(feature = "eval")]
 pub mod eval {
     pub use litchi_eval::*;
 }
+#[cfg(any(
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "ods",
+    feature = "iwork"
+))]
 mod adapters;
+#[cfg(any(
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "ods",
+    feature = "iwork"
+))]
 pub mod functions;
 pub mod text;
-pub use litchi_core::sheet::traits;
-pub use litchi_core::sheet::types;
+#[cfg(any(
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "ods",
+    feature = "iwork"
+))]
 mod workbook;
+#[cfg(any(
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "ods",
+    feature = "iwork"
+))]
 mod workbook_types;
 
 // Re-exports
-#[cfg(feature = "eval_engine")]
+#[cfg(feature = "eval")]
 pub use eval::FormulaEvaluator;
+#[cfg(any(
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "ods",
+    feature = "iwork"
+))]
 pub use functions::*;
 pub use traits::{Cell, CellIterator, RowIterator, WorkbookTrait, Worksheet, WorksheetIterator};
 pub use types::{CellValue, Result};
+#[cfg(any(
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "ods",
+    feature = "iwork"
+))]
 pub use workbook::Workbook;

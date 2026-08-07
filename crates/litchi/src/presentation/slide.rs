@@ -11,10 +11,10 @@ pub enum Slide {
     /// Modern PPTX slide with extracted data
     Pptx(SlideData),
     /// Apple Keynote slide
-    #[cfg(feature = "iwa")]
+    #[cfg(feature = "iwork")]
     Keynote(crate::iwa::keynote::KeynoteSlide),
     /// OpenDocument Presentation slide
-    #[cfg(feature = "odf")]
+    #[cfg(feature = "odp")]
     Odp(litchi_odp::Slide),
 }
 
@@ -36,7 +36,7 @@ impl Slide {
         match self {
             Slide::Ppt(data) => Ok(data.text.clone()),
             Slide::Pptx(data) => Ok(data.text.clone()),
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             Slide::Keynote(slide) => {
                 // Combine title and content
                 let mut text = String::new();
@@ -49,7 +49,7 @@ impl Slide {
                 text.push_str(&slide.text_content.join("\n"));
                 Ok(text)
             },
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odp")]
             Slide::Odp(slide) => Ok(slide.all_text()),
         }
     }
@@ -75,9 +75,9 @@ impl Slide {
         match self {
             Slide::Ppt(data) => Some(data.slide_number),
             Slide::Pptx(_) => None,
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             Slide::Keynote(slide) => Some(slide.index + 1), // Convert 0-based to 1-based
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odp")]
             Slide::Odp(_) => None, // Slide numbers not currently exposed for ODP
         }
     }
@@ -103,9 +103,9 @@ impl Slide {
         match self {
             Slide::Ppt(data) => Some(data.shape_count),
             Slide::Pptx(_) => None,
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             Slide::Keynote(_) => None, // Shape count not currently exposed for Keynote
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odp")]
             Slide::Odp(_) => None, // Shape count not currently exposed for ODP
         }
     }
@@ -131,15 +131,15 @@ impl Slide {
         match self {
             Slide::Ppt(_) => Ok(None),
             Slide::Pptx(data) => Ok(data.name.clone()),
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             Slide::Keynote(slide) => Ok(slide.title.clone()),
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odp")]
             Slide::Odp(_slide) => Ok(None), // ODP slides don't have names in the current API
         }
     }
 }
 
-#[cfg(all(test, feature = "ooxml", feature = "ppt"))]
+#[cfg(all(test, feature = "pptx", feature = "ppt"))]
 mod tests {
     use super::super::Presentation;
     use std::path::PathBuf;
@@ -149,7 +149,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_slide_text_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path).expect("Failed to open PPT");
@@ -161,7 +161,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_slide_text_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");
@@ -173,7 +173,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_slide_number_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path).expect("Failed to open PPT");
@@ -187,7 +187,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_slide_shape_count_ppt() {
         // Use SampleShow.ppt to avoid metadata overflow issues
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
@@ -201,7 +201,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_slide_name_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");

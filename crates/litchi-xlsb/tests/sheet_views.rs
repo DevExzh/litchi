@@ -6,10 +6,11 @@
 
 use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_opc::{OpcPackage, PackURI};
-use litchi_xlsb::Workbook;
-use litchi_xlsb::package::sheet_view::{
-    SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
+use litchi_sheet::view::{
+    Color, Display, Mode, Pane, Position, Scale, Selection, Split, State, View, Window, Zoom,
 };
+use litchi_sheet::{Cell, Rect};
+use litchi_xlsb::Workbook;
 use litchi_xlsb::raw::{Kind, Records, kind};
 use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
@@ -56,10 +57,26 @@ fn sheet_records(package_bytes: &[u8]) -> Vec<(Kind, Vec<u8>)> {
     records(&part_blob(package_bytes, "/xl/worksheets/sheet1.bin"))
 }
 
-fn first_view(package_bytes: &[u8]) -> SheetView {
+fn cell(reference: &str) -> Cell {
+    Cell::from_a1(reference).unwrap()
+}
+
+fn rect(reference: &str) -> Rect {
+    Rect::from_a1(reference).unwrap()
+}
+
+fn scale(value: u16) -> Scale {
+    Scale::new(value).unwrap()
+}
+
+fn split(value: f64) -> Split {
+    Split::new(value).unwrap()
+}
+
+fn first_view(package_bytes: &[u8]) -> View {
     let workbook = Workbook::new(Cursor::new(package_bytes)).unwrap();
     let worksheet = workbook.worksheet(0).unwrap();
-    let views = worksheet.sheet_views();
+    let views = worksheet.views();
     assert_eq!(views.len(), 1);
     views[0].clone()
 }
@@ -100,17 +117,18 @@ fn default_view_matches_legacy_writer_bytes() {
     );
 
     let view = first_view(&bytes);
-    assert_eq!(view.tab_selected, Some(true));
-    assert_eq!(view.zoom_scale, Some(100));
-    assert_eq!(view.view_type, Some(SheetViewType::Normal));
-    assert_eq!(view.top_left_cell.as_deref(), Some("A1"));
+    assert!(view.tab_selected);
+    assert_eq!(view.zoom.current, scale(100));
+    assert_eq!(view.mode, Mode::Normal);
+    assert_eq!(view.origin, cell("A1"));
+    assert_eq!(view.color, Color::DEFAULT);
     assert!(view.pane.is_none());
     assert!(view.selections.is_empty());
 }
 
 #[test]
 fn freeze_panes_round_trip() {
-    let bytes = workbook_bytes(|sheet| sheet.freeze_panes(2, 1));
+    let bytes = workbook_bytes(|sheet| sheet.freeze_panes(2, 1).unwrap());
 
     let sheet = sheet_records(&bytes);
     let pane = sheet
@@ -126,34 +144,48 @@ fn freeze_panes_round_trip() {
 
     let view = first_view(&bytes);
     let pane = view.pane.expect("view has a pane");
-    assert_eq!(pane.state, Some(SheetPaneState::Frozen));
-    assert_eq!(pane.x_split, Some(1.0));
-    assert_eq!(pane.y_split, Some(2.0));
-    assert_eq!(pane.top_left_cell.as_deref(), Some("B3"));
-    assert_eq!(pane.active_pane, Some(SheetPanePosition::BottomRight));
+    assert_eq!(pane.state, State::Frozen);
+    assert_eq!(pane.horizontal, Some(split(1.0)));
+    assert_eq!(pane.vertical, Some(split(2.0)));
+    assert_eq!(pane.top_left, cell("B3"));
+    assert_eq!(pane.position, Position::BottomRight);
     assert_eq!(view.selections.len(), 1);
     let selection = &view.selections[0];
-    assert_eq!(selection.pane, Some(SheetPanePosition::BottomRight));
-    assert_eq!(selection.active_cell.as_deref(), Some("B3"));
-    assert_eq!(selection.sqref.as_deref(), Some("B3"));
+    assert_eq!(selection.position(), Position::BottomRight);
+    assert_eq!(selection.active_cell(), cell("B3"));
+    assert_eq!(selection.active_range(), 0);
+    assert_eq!(selection.ranges(), [Rect::single(cell("B3"))]);
 }
 
 #[test]
 fn freeze_rows_only_uses_bottom_left_pane() {
-    let bytes = workbook_bytes(|sheet| sheet.freeze_panes(3, 0));
+    let bytes = workbook_bytes(|sheet| sheet.freeze_panes(3, 0).unwrap());
     let view = first_view(&bytes);
     let pane = view.pane.expect("view has a pane");
-    assert_eq!(pane.state, Some(SheetPaneState::Frozen));
-    assert_eq!(pane.x_split, None);
-    assert_eq!(pane.y_split, Some(3.0));
-    assert_eq!(pane.top_left_cell.as_deref(), Some("A4"));
-    assert_eq!(pane.active_pane, Some(SheetPanePosition::BottomLeft));
+    assert_eq!(pane.state, State::Frozen);
+    assert_eq!(pane.horizontal, None);
+    assert_eq!(pane.vertical, Some(split(3.0)));
+    assert_eq!(pane.top_left, cell("A4"));
+    assert_eq!(pane.position, Position::BottomLeft);
 }
 
 #[test]
-fn unfreeze_panes_removes_pane_records() {
+fn unfreeze_panes_removes_pane_records_and_preserves_unrelated_view_state() {
     let bytes = workbook_bytes(|sheet| {
-        sheet.freeze_panes(1, 1);
+        let mut view = View::default();
+        view.window = Window::new(7);
+        view.mode = Mode::PageLayout;
+        view.display.grid_lines = false;
+        view.display.right_to_left = true;
+        view.zoom = Zoom {
+            current: scale(150),
+            normal: Some(scale(75)),
+            page_layout: Some(scale(60)),
+            page_break_preview: Some(scale(200)),
+        };
+        view.origin = cell("C7");
+        sheet.set_view(view);
+        sheet.freeze_panes(1, 1).unwrap();
         sheet.unfreeze_panes();
     });
     let sheet = sheet_records(&bytes);
@@ -162,75 +194,138 @@ fn unfreeze_panes_removes_pane_records() {
             .iter()
             .any(|(record_kind, _)| *record_kind == kind::PANE)
     );
+    let view = first_view(&bytes);
+    assert_eq!(view.window, Window::new(7));
+    assert_eq!(view.mode, Mode::PageLayout);
+    assert!(!view.display.grid_lines);
+    assert!(view.display.right_to_left);
+    assert_eq!(view.zoom.current, scale(150));
+    assert_eq!(view.zoom.normal, Some(scale(75)));
+    assert_eq!(view.zoom.page_layout, Some(scale(60)));
+    assert_eq!(view.zoom.page_break_preview, Some(scale(200)));
+    assert_eq!(view.origin, cell("C7"));
+    assert!(view.pane.is_none());
 }
 
 #[test]
 fn explicit_sheet_view_round_trip() {
     let bytes = workbook_bytes(|sheet| {
-        sheet.set_sheet_view(SheetView {
-            tab_selected: Some(false),
-            show_grid_lines: Some(false),
-            right_to_left: Some(true),
-            view_type: Some(SheetViewType::PageBreakPreview),
-            top_left_cell: Some("C7".to_string()),
-            zoom_scale: Some(150),
-            zoom_scale_normal: Some(75),
-            pane: Some(SheetPane {
-                x_split: Some(2.0),
-                y_split: None,
-                top_left_cell: Some("C1".to_string()),
-                active_pane: Some(SheetPanePosition::TopRight),
-                state: Some(SheetPaneState::FrozenSplit),
-            }),
-            selections: vec![SheetSelection {
-                pane: Some(SheetPanePosition::TopRight),
-                active_cell: Some("D5".to_string()),
-                active_cell_id: Some(1),
-                sqref: Some("A1:B2 D5".to_string()),
-            }],
-            ..SheetView::default()
+        let mut view = View::default();
+        view.tab_selected = false;
+        view.display.grid_lines = false;
+        view.display.right_to_left = true;
+        view.mode = Mode::PageBreakPreview;
+        view.origin = cell("C7");
+        view.zoom = Zoom {
+            current: scale(150),
+            normal: Some(scale(75)),
+            ..view.zoom
+        };
+        view.pane = Some(Pane {
+            horizontal: Some(split(2.0)),
+            vertical: None,
+            top_left: cell("C1"),
+            position: Position::TopRight,
+            state: State::FrozenSplit,
         });
+        view.selections = vec![
+            Selection::new(
+                Position::TopRight,
+                cell("D5"),
+                1,
+                vec![rect("A1:B2"), Rect::single(cell("D5"))],
+            )
+            .unwrap(),
+        ];
+        sheet.set_view(view);
     });
 
     let view = first_view(&bytes);
-    assert_eq!(view.tab_selected, Some(false));
-    assert_eq!(view.show_grid_lines, Some(false));
-    assert_eq!(view.right_to_left, Some(true));
-    assert_eq!(view.view_type, Some(SheetViewType::PageBreakPreview));
-    assert_eq!(view.top_left_cell.as_deref(), Some("C7"));
-    assert_eq!(view.zoom_scale, Some(150));
-    assert_eq!(view.zoom_scale_normal, Some(75));
+    assert!(!view.tab_selected);
+    assert!(!view.display.grid_lines);
+    assert!(view.display.right_to_left);
+    assert_eq!(view.mode, Mode::PageBreakPreview);
+    assert_eq!(view.origin, cell("C7"));
+    assert_eq!(view.zoom.current, scale(150));
+    assert_eq!(view.zoom.normal, Some(scale(75)));
 
     let pane = view.pane.expect("view has a pane");
-    assert_eq!(pane.state, Some(SheetPaneState::FrozenSplit));
-    assert_eq!(pane.x_split, Some(2.0));
-    assert_eq!(pane.y_split, None);
-    assert_eq!(pane.top_left_cell.as_deref(), Some("C1"));
-    assert_eq!(pane.active_pane, Some(SheetPanePosition::TopRight));
+    assert_eq!(pane.state, State::FrozenSplit);
+    assert_eq!(pane.horizontal, Some(split(2.0)));
+    assert_eq!(pane.vertical, None);
+    assert_eq!(pane.top_left, cell("C1"));
+    assert_eq!(pane.position, Position::TopRight);
 
     assert_eq!(view.selections.len(), 1);
     let selection = &view.selections[0];
-    assert_eq!(selection.pane, Some(SheetPanePosition::TopRight));
-    assert_eq!(selection.active_cell.as_deref(), Some("D5"));
-    assert_eq!(selection.active_cell_id, Some(1));
-    assert_eq!(selection.sqref.as_deref(), Some("A1:B2 D5"));
+    assert_eq!(selection.position(), Position::TopRight);
+    assert_eq!(selection.active_cell(), cell("D5"));
+    assert_eq!(selection.active_range(), 1);
+    assert_eq!(
+        selection.ranges(),
+        [rect("A1:B2"), Rect::single(cell("D5"))]
+    );
 }
 
 #[test]
-fn freeze_panes_conflict_with_explicit_pane_fails() {
-    let mut workbook = WorkbookWriter::new();
+fn freeze_panes_updates_canonical_view_without_losing_non_pane_state() {
     let mut sheet = MutableWorksheet::new("Sheet1");
-    sheet.set_sheet_view(SheetView {
-        pane: Some(SheetPane {
-            state: Some(SheetPaneState::Split),
-            ..SheetPane::default()
-        }),
-        ..SheetView::default()
-    });
-    sheet.freeze_panes(1, 1);
-    workbook.add_worksheet(sheet);
-    let mut output = Cursor::new(Vec::new());
-    assert!(workbook.save(&mut output).is_err());
+    let mut view = View::default();
+    view.window = Window::new(9);
+    view.color = Color::new(64).unwrap();
+    view.mode = Mode::PageLayout;
+    view.display = Display {
+        window_protection: true,
+        show_formulas: true,
+        grid_lines: false,
+        row_column_headers: false,
+        zero_values: false,
+        right_to_left: true,
+        ruler: false,
+        outline_symbols: false,
+        default_grid_color: false,
+        white_space: false,
+    };
+    view.zoom = Zoom {
+        current: scale(150),
+        normal: Some(scale(75)),
+        page_layout: Some(scale(60)),
+        page_break_preview: Some(scale(200)),
+    };
+    view.origin = cell("C7");
+    sheet.set_view(view);
+    sheet.freeze_panes(1, 1).unwrap();
+    let view = sheet.view().expect("freeze panes creates a canonical view");
+    assert_eq!(view.window, Window::new(9));
+    assert_eq!(view.color, Color::new(64).unwrap());
+    assert_eq!(view.mode, Mode::PageLayout);
+    assert_eq!(
+        view.display,
+        Display {
+            window_protection: true,
+            show_formulas: true,
+            grid_lines: false,
+            row_column_headers: false,
+            zero_values: false,
+            right_to_left: true,
+            ruler: false,
+            outline_symbols: false,
+            default_grid_color: false,
+            white_space: false,
+        }
+    );
+    assert_eq!(view.zoom.current, scale(150));
+    assert_eq!(view.zoom.normal, Some(scale(75)));
+    assert_eq!(view.zoom.page_layout, Some(scale(60)));
+    assert_eq!(view.zoom.page_break_preview, Some(scale(200)));
+    assert_eq!(view.origin, cell("C7"));
+
+    let pane = view.pane.as_ref().expect("freeze panes installs a pane");
+    assert_eq!(pane.position, Position::BottomRight);
+    assert_eq!(pane.state, State::Frozen);
+    assert_eq!(pane.horizontal, Some(split(1.0)));
+    assert_eq!(pane.vertical, Some(split(1.0)));
+    assert_eq!(pane.top_left, cell("B2"));
 }
 
 #[test]
@@ -239,25 +334,25 @@ fn reads_excel_fixture_views_and_selections() {
     let workbook = Workbook::new(File::open(&path).unwrap()).unwrap();
 
     let first = workbook.worksheet(0).unwrap();
-    let views = first.sheet_views();
+    let views = first.views();
     assert_eq!(views.len(), 1);
     let view = &views[0];
-    assert_eq!(view.tab_selected, Some(true));
-    assert_eq!(view.show_grid_lines, Some(true));
-    assert_eq!(view.zoom_scale, Some(100));
-    assert_eq!(view.view_type, Some(SheetViewType::Normal));
+    assert!(view.tab_selected);
+    assert!(view.display.grid_lines);
+    assert_eq!(view.zoom.current, scale(100));
+    assert_eq!(view.mode, Mode::Normal);
     assert!(view.pane.is_none());
     assert_eq!(view.selections.len(), 1);
     let selection = &view.selections[0];
-    assert_eq!(selection.pane, Some(SheetPanePosition::TopLeft));
-    assert_eq!(selection.active_cell.as_deref(), Some("A1"));
-    assert_eq!(selection.active_cell_id, Some(0));
-    assert_eq!(selection.sqref.as_deref(), Some("A1"));
+    assert_eq!(selection.position(), Position::TopLeft);
+    assert_eq!(selection.active_cell(), cell("A1"));
+    assert_eq!(selection.active_range(), 0);
+    assert_eq!(selection.ranges(), [Rect::single(cell("A1"))]);
 
     let second = workbook.worksheet(1).unwrap();
-    let views = second.sheet_views();
+    let views = second.views();
     assert_eq!(views.len(), 1);
-    assert_eq!(views[0].tab_selected, Some(false));
+    assert!(!views[0].tab_selected);
 }
 
 #[test]
@@ -268,7 +363,7 @@ fn untouched_worksheet_stream_round_trips_byte_identical() {
     // Force the read path across every worksheet, then save unmodified.
     for index in 0..workbook.worksheet_names().len() {
         let worksheet = workbook.worksheet(index).unwrap();
-        assert_eq!(worksheet.sheet_views().len(), 1);
+        assert_eq!(worksheet.views().len(), 1);
     }
     let mut output = Cursor::new(Vec::new());
     workbook.save(&mut output).unwrap();

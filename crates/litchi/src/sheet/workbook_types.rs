@@ -1,7 +1,7 @@
 //! Unified workbook types and format detection.
 
 use litchi_core::Error;
-#[cfg(any(feature = "odf", feature = "ooxml"))]
+#[cfg(any(feature = "ods", any(feature = "xlsx", feature = "xlsb")))]
 use litchi_core::FileFormat;
 use std::io::{Read, Seek, SeekFrom};
 
@@ -13,13 +13,13 @@ type Result<T> = std::result::Result<T, Error>;
 /// but instead use the methods on `UnifiedWorkbook`.
 #[allow(clippy::large_enum_variant)]
 pub(super) enum WorkbookImpl {
-    #[cfg(feature = "iwa")]
+    #[cfg(feature = "iwork")]
     Numbers(crate::iwa::numbers::NumbersDocument),
 
     // OOXML-based formats
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "xlsx")]
     Xlsx(super::adapters::Workbook),
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "xlsb")]
     Xlsb(crate::xlsb::Workbook),
 
     // Legacy OLE-based Excel
@@ -31,11 +31,11 @@ pub(super) enum WorkbookImpl {
 
     /// Parsed ODS package retained for the dedicated facade to expose richer
     /// worksheet APIs as they become available.
-    #[cfg(feature = "odf")]
+    #[cfg(feature = "ods")]
     Ods(std::cell::RefCell<litchi_ods::Spreadsheet>),
 
     // For other formats, we just indicate they're not yet fully unified
-    #[cfg(any(feature = "xls", feature = "ooxml"))]
+    #[cfg(any(feature = "xls", any(feature = "xlsx", feature = "xlsb")))]
     #[allow(dead_code)]
     Other,
 }
@@ -102,7 +102,11 @@ pub fn detect_workbook_format_from_signature<R: Read + Seek>(
 /// Refine ZIP-based workbook format detection (XLSX vs XLSB vs Numbers)
 #[allow(dead_code)]
 // For format detection, it is better to use the smart detection function, but the function is still useful for other purposes
-#[cfg(any(feature = "iwa", feature = "ooxml", feature = "odf"))]
+#[cfg(any(
+    feature = "iwork",
+    any(feature = "xlsx", feature = "xlsb"),
+    feature = "ods"
+))]
 pub fn refine_workbook_format<R: Read + Seek>(
     reader: &mut R,
     initial_format: WorkbookFormat,
@@ -118,17 +122,17 @@ pub fn refine_workbook_format<R: Read + Seek>(
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
 
-        #[cfg(feature = "ooxml")]
+        #[cfg(any(feature = "xlsx", feature = "xlsb"))]
         if crate::detection_smart::ooxml::detect_zip_format(&data) == Some(FileFormat::Xlsb) {
             return Ok(WorkbookFormat::Xlsb);
         }
 
-        #[cfg(feature = "odf")]
+        #[cfg(feature = "ods")]
         if litchi_odf_common::detect::bytes(&data) == Some(FileFormat::Ods) {
             return Ok(WorkbookFormat::Ods);
         }
 
-        #[cfg(feature = "iwa")]
+        #[cfg(feature = "iwork")]
         if litchi_iwa::detect::bytes(&data).ok().flatten()
             == Some(litchi_iwa::detect::Format::Numbers)
         {
@@ -234,7 +238,11 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(feature = "iwa", feature = "ooxml", feature = "odf"))]
+    #[cfg(any(
+        feature = "iwork",
+        any(feature = "xlsx", feature = "xlsb"),
+        feature = "ods"
+    ))]
     fn refinement_restores_a_nonzero_cursor() {
         let mut reader = Cursor::new(b"PK\x03\x04not-a-valid-package".as_slice());
         reader.set_position(5);

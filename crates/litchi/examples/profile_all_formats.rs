@@ -245,7 +245,7 @@ fn profile_presentation(name: &str, data: &[u8], iterations: u32) -> FileStats {
 }
 
 /// Profile a spreadsheet file (XLS, XLSX, XLSB, ODS, Numbers)
-#[cfg(any(feature = "xls", feature = "ooxml", feature = "odf", feature = "iwa"))]
+#[cfg(any(feature = "xls", feature = "ooxml", feature = "odf", feature = "iwork"))]
 fn profile_spreadsheet(name: &str, data: &[u8], iterations: u32) -> FileStats {
     use litchi::sheet::Workbook;
 
@@ -301,7 +301,7 @@ fn profile_spreadsheet(name: &str, data: &[u8], iterations: u32) -> FileStats {
     }
 }
 
-#[cfg(not(any(feature = "xls", feature = "ooxml", feature = "odf", feature = "iwa")))]
+#[cfg(not(any(feature = "xls", feature = "ooxml", feature = "odf", feature = "iwork")))]
 fn profile_spreadsheet(name: &str, data: &[u8], _iterations: u32) -> FileStats {
     FileStats {
         name: name.to_string(),

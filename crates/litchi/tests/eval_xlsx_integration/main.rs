@@ -1,4 +1,4 @@
-#![cfg(all(feature = "eval_engine", feature = "ooxml"))]
+#![cfg(all(feature = "eval", feature = "xlsx"))]
 
 mod aggregate_logical;
 mod financial;

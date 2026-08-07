@@ -29,7 +29,6 @@ pub mod sheet;
 pub mod slicer;
 pub mod styles;
 pub mod timeline;
-pub mod views;
 pub mod workbook;
 pub mod writer;
 

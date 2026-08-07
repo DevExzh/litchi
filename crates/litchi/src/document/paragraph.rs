@@ -1,7 +1,7 @@
 //! Paragraph implementation for Word documents.
 
 use super::Run;
-#[cfg(any(feature = "doc", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "odt"))]
 use litchi_core::Error;
 use litchi_core::Result;
 
@@ -14,13 +14,13 @@ use litchi_doc as doc;
 pub enum Paragraph {
     #[cfg(feature = "doc")]
     Doc(doc::Paragraph),
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     Docx(crate::docx::Paragraph),
-    #[cfg(feature = "iwa")]
+    #[cfg(feature = "iwork")]
     Pages(String),
     #[cfg(feature = "rtf")]
     Rtf(litchi_rtf::ParagraphContent<'static>),
-    #[cfg(feature = "odf")]
+    #[cfg(feature = "odt")]
     Odt(litchi_odt::elements::text::Paragraph),
 }
 
@@ -30,16 +30,16 @@ impl Paragraph {
         match self {
             #[cfg(feature = "doc")]
             Paragraph::Doc(p) => p.text().map(|s| s.to_string()).map_err(Error::from),
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "docx")]
             Paragraph::Docx(p) => p
                 .text()
                 .map(|s| s.to_string())
                 .map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             Paragraph::Pages(text) => Ok(text.clone()),
             #[cfg(feature = "rtf")]
             Paragraph::Rtf(p) => Ok(p.text()),
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odt")]
             Paragraph::Odt(p) => p
                 .text()
                 .map_err(|e| Error::ParseError(format!("Failed to get paragraph text: {}", e))),
@@ -54,12 +54,12 @@ impl Paragraph {
                 let runs = p.runs().map_err(Error::from)?;
                 Ok(runs.into_iter().map(Run::Doc).collect())
             },
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "docx")]
             Paragraph::Docx(p) => {
                 let runs = p.runs().map_err(crate::map_ooxml_error)?;
                 Ok(runs.into_iter().map(Run::Docx).collect())
             },
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             Paragraph::Pages(text) => {
                 // Pages paragraphs are simple strings without run-level formatting
                 // Return a single run with the entire text
@@ -67,7 +67,7 @@ impl Paragraph {
             },
             #[cfg(feature = "rtf")]
             Paragraph::Rtf(p) => Ok(p.runs().iter().map(|r| Run::Rtf(r.clone())).collect()),
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odt")]
             Paragraph::Odt(p) => {
                 let runs = p
                     .runs()
@@ -78,7 +78,7 @@ impl Paragraph {
     }
 }
 
-#[cfg(all(test, any(all(feature = "ooxml", feature = "doc"), feature = "rtf")))]
+#[cfg(all(test, any(all(feature = "docx", feature = "doc"), feature = "rtf")))]
 mod tests {
     use super::super::Document;
     use std::path::PathBuf;
@@ -88,7 +88,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "doc"))]
+    #[cfg(all(feature = "docx", feature = "doc"))]
     fn test_paragraph_text_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -102,7 +102,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "doc"))]
+    #[cfg(all(feature = "docx", feature = "doc"))]
     fn test_paragraph_text_doc() {
         let path = test_data_path().join("ole/doc/FancyFoot.doc");
         let doc = Document::open(&path).expect("Failed to open DOC");
@@ -115,7 +115,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "doc"))]
+    #[cfg(all(feature = "docx", feature = "doc"))]
     fn test_paragraph_runs_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -130,7 +130,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "doc"))]
+    #[cfg(all(feature = "docx", feature = "doc"))]
     fn test_paragraph_runs_doc() {
         let path = test_data_path().join("ole/doc/FancyFoot.doc");
         let doc = Document::open(&path).expect("Failed to open DOC");

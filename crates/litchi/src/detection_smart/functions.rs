@@ -12,7 +12,7 @@ use litchi_core::detection::FileFormat;
 use litchi_core::detection::simd_utils::{check_office_signatures, signature_matches};
 use litchi_core::detection::{rtf, utils};
 
-#[cfg(feature = "odf")]
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
 use litchi_odf_common::detect as odf;
 
 /// Detect file format from a file path.
@@ -78,7 +78,7 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
         return None;
     }
 
-    #[cfg(feature = "odf")]
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
     if let Some(result) = odf::flat(bytes) {
         return Some(result);
     }
@@ -101,13 +101,13 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
         }
 
         // Then try ODF detection
-        #[cfg(feature = "odf")]
+        #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
         if let Some(result) = odf::bytes(bytes) {
             return Some(result);
         }
 
         // Finally try iWork detection
-        #[cfg(feature = "iwa")]
+        #[cfg(feature = "iwork")]
         if let Ok(Some(result)) =
             litchi_iwa::detect::bytes(bytes).map(|result| result.map(iwork_format))
         {
@@ -163,11 +163,15 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
             return ole2::detect_ole2_format_from_reader(reader);
         }
 
-        #[cfg(any(feature = "ooxml", feature = "odf", feature = "iwa"))]
+        #[cfg(any(
+            any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+            any(feature = "odt", feature = "ods", feature = "odp"),
+            feature = "iwork"
+        ))]
         if header_len >= utils::ZIP_SIGNATURE.len()
             && signature_matches(&header[..header_len], utils::ZIP_SIGNATURE)
         {
-            #[cfg(feature = "ooxml")]
+            #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
             {
                 reader.seek(SeekFrom::Start(0)).ok()?;
                 if let Some(format) = ooxml::detect_zip_format_from_reader(reader) {
@@ -175,7 +179,7 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
                 }
             }
 
-            #[cfg(feature = "odf")]
+            #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
             {
                 reader.seek(SeekFrom::Start(0)).ok()?;
                 if let Some(format) = odf::reader(reader) {
@@ -183,7 +187,7 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
                 }
             }
 
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             {
                 reader.seek(SeekFrom::Start(0)).ok()?;
                 if let Ok(Some(format)) =
@@ -196,7 +200,7 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
             return None;
         }
 
-        #[cfg(feature = "odf")]
+        #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
         if header[..header_len]
             .iter()
             .copied()
@@ -218,7 +222,7 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
 }
 
 /// Detect iWork format from file path.
-#[cfg(feature = "iwa")]
+#[cfg(feature = "iwork")]
 pub fn detect_iwork_format_from_path<P: AsRef<Path>>(path: P) -> Option<FileFormat> {
     litchi_iwa::detect::path(path.as_ref())
         .ok()
@@ -226,7 +230,7 @@ pub fn detect_iwork_format_from_path<P: AsRef<Path>>(path: P) -> Option<FileForm
         .map(iwork_format)
 }
 
-#[cfg(feature = "iwa")]
+#[cfg(feature = "iwork")]
 fn iwork_format(format: litchi_iwa::detect::Format) -> FileFormat {
     match format {
         litchi_iwa::detect::Format::Pages => FileFormat::Pages,
@@ -240,7 +244,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[cfg(feature = "odf")]
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
     fn detects_flat_odf_bytes_and_reader() {
         let xml = br#"<?xml version="1.0"?><o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="application/vnd.oasis.opendocument.chart"><o:body><o:chart/></o:body></o:document>"#;
         assert_eq!(detect_file_format_from_bytes(xml), Some(FileFormat::Odc));
@@ -254,7 +258,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     fn test_detect_docx_from_bytes() {
         // Create a minimal ZIP file that looks like a DOCX
         let zip_data = create_minimal_docx_zip();
@@ -264,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     fn detects_xml_binary_and_macro_enabled_ooxml_families() {
         let cases = [
             (
@@ -329,7 +333,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "iwa")]
+    #[cfg(feature = "iwork")]
     fn iwork_leaf_detection_maps_bytes_reader_smart_and_path() {
         let bytes = iwork_package(None);
         assert_eq!(
@@ -359,7 +363,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "iwa", feature = "odf"))]
+    #[cfg(all(feature = "iwork", feature = "ods"))]
     fn odf_precedes_iwork_consistently_for_mixed_packages() {
         let bytes = iwork_package(Some("application/vnd.oasis.opendocument.spreadsheet"));
         assert_eq!(detect_file_format_from_bytes(&bytes), Some(FileFormat::Ods));
@@ -378,7 +382,7 @@ mod tests {
         ));
     }
 
-    #[cfg(feature = "iwa")]
+    #[cfg(feature = "iwork")]
     fn iwork_package(mimetype: Option<&str>) -> Vec<u8> {
         use litchi_iwa::archive::{Archive, ArchiveObject, RawMessage};
         use std::io::{Cursor, Write};
@@ -422,7 +426,7 @@ mod tests {
     }
 
     // Helper function to create a minimal DOCX-like ZIP for testing
-    #[cfg(feature = "ooxml")]
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     fn create_minimal_docx_zip() -> Vec<u8> {
         create_minimal_ooxml_zip(
             "word/document.xml",
@@ -430,7 +434,7 @@ mod tests {
         )
     }
 
-    #[cfg(feature = "ooxml")]
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     fn create_minimal_ooxml_zip(part_name: &str, content_type: &str) -> Vec<u8> {
         use crate::opc::PackURI;
         use crate::opc::phys_pkg::PhysPkgWriter;

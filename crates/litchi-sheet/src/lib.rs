@@ -6,6 +6,9 @@
 
 #![forbid(unsafe_code)]
 
+/// Format-neutral worksheet view state.
+pub mod view;
+
 use std::borrow::Cow;
 use std::fmt;
 use std::str::FromStr;

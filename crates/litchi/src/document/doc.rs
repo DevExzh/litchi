@@ -1,7 +1,7 @@
 //! Word document implementation.
 
 use super::Paragraph;
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 use super::Table;
 use super::types::DocumentImpl;
 use litchi_core::{Error, Result};
@@ -27,7 +27,7 @@ fn rtf_timestamp_to_naive(
     chrono::NaiveDate::from_ymd_opt(year, month, day)?.and_hms_opt(hour, minute, second)
 }
 
-#[cfg(all(test, feature = "odf"))]
+#[cfg(all(test, feature = "odt"))]
 mod flat_odt_tests {
     use super::Document;
     use crate::detection_smart::{DetectedFormat, detect_format_smart};
@@ -229,7 +229,7 @@ impl Document {
                     inner: DocumentImpl::Rtf(doc),
                 })
             },
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "docx")]
             DetectedFormat::Docx(opc_package) => {
                 // OPC package already parsed - reuse it!
                 let package = Box::new(
@@ -251,7 +251,7 @@ impl Document {
                     inner: DocumentImpl::Docx(package, metadata),
                 })
             },
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             DetectedFormat::Pages(data) => {
                 let doc = crate::iwa::pages::PagesDocument::from_bytes(&data).map_err(|e| {
                     Error::ParseError(format!("Failed to open Pages document from bytes: {}", e))
@@ -261,7 +261,7 @@ impl Document {
                     inner: DocumentImpl::Pages(doc),
                 })
             },
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odt")]
             DetectedFormat::FlatOdf(format, data) => {
                 let _ = data;
                 Err(Error::Unsupported(format!(
@@ -269,7 +269,7 @@ impl Document {
                     format
                 )))
             },
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odt")]
             DetectedFormat::Odt(data) => {
                 let doc = litchi_odt::Document::from_bytes(data).map_err(|e| {
                     Error::ParseError(format!("Failed to parse ODT document from bytes: {}", e))
@@ -305,18 +305,18 @@ impl Document {
         match &self.inner {
             #[cfg(feature = "doc")]
             DocumentImpl::Doc(doc, _) => doc.text().map_err(Error::from),
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "docx")]
             DocumentImpl::Docx(package, _) => package
                 .document()
                 .and_then(|document| document.text())
                 .map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             DocumentImpl::Pages(doc) => doc.text().map_err(|e| {
                 Error::ParseError(format!("Failed to extract text from Pages: {}", e))
             }),
             #[cfg(feature = "rtf")]
             DocumentImpl::Rtf(doc) => Ok(doc.text()),
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odt")]
             DocumentImpl::Odt(doc) => doc
                 .text()
                 .map_err(|e| Error::ParseError(format!("Failed to extract text from ODT: {}", e))),
@@ -339,12 +339,12 @@ impl Document {
         match &self.inner {
             #[cfg(feature = "doc")]
             DocumentImpl::Doc(doc, _) => doc.paragraph_count().map_err(Error::from),
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "docx")]
             DocumentImpl::Docx(package, _) => package
                 .document()
                 .and_then(|document| document.paragraph_count())
                 .map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             DocumentImpl::Pages(doc) => {
                 // Pages documents are organized by sections
                 let sections = doc
@@ -354,7 +354,7 @@ impl Document {
             },
             #[cfg(feature = "rtf")]
             DocumentImpl::Rtf(doc) => Ok(doc.paragraph_count()),
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odt")]
             DocumentImpl::Odt(doc) => doc
                 .paragraph_count()
                 .map_err(|e| Error::ParseError(format!("Failed to get paragraph count: {}", e))),
@@ -381,7 +381,7 @@ impl Document {
                 let paras = doc.paragraphs().map_err(Error::from)?;
                 Ok(paras.into_iter().map(Paragraph::Doc).collect())
             },
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "docx")]
             DocumentImpl::Docx(package, _) => {
                 let paras = package
                     .document()
@@ -389,7 +389,7 @@ impl Document {
                     .map_err(crate::map_ooxml_error)?;
                 Ok(paras.into_iter().map(Paragraph::Docx).collect())
             },
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             DocumentImpl::Pages(doc) => {
                 // Pages documents have sections, each with paragraphs
                 let sections = doc
@@ -429,7 +429,7 @@ impl Document {
                     .collect();
                 Ok(paras.into_iter().map(Paragraph::Rtf).collect())
             },
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odt")]
             DocumentImpl::Odt(doc) => {
                 let paras = doc
                     .paragraphs()
@@ -452,7 +452,7 @@ impl Document {
     /// }
     /// # Ok::<(), litchi::common::Error>(())
     /// ```
-    #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+    #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
     pub fn tables(&self) -> Result<Vec<Table>> {
         match &self.inner {
             #[cfg(feature = "doc")]
@@ -463,7 +463,7 @@ impl Document {
                     .map(|table| Table::Doc(Box::new(table)))
                     .collect())
             },
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "docx")]
             DocumentImpl::Docx(package, _) => {
                 let tables = package
                     .document()
@@ -474,7 +474,7 @@ impl Document {
                     .map(|t| Table::Docx(Box::new(t)))
                     .collect())
             },
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             DocumentImpl::Pages(_doc) => {
                 // Pages tables are not currently supported in the paragraph/table extraction API
                 // Tables in Pages are embedded as structured data which requires different extraction
@@ -491,7 +491,7 @@ impl Document {
                     .map(|table| Table::Rtf(Box::new(table.clone().into_owned())))
                     .collect())
             },
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odt")]
             DocumentImpl::Odt(doc) => {
                 let tables = doc
                     .tables()
@@ -542,7 +542,7 @@ impl Document {
                     })
                     .collect())
             },
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "docx")]
             DocumentImpl::Docx(package, _) => {
                 use super::DocumentElement;
                 use crate::docx::Element;
@@ -562,7 +562,7 @@ impl Document {
                     })
                     .collect())
             },
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             DocumentImpl::Pages(doc) => {
                 use super::DocumentElement;
                 // Pages documents have sections with paragraphs
@@ -619,7 +619,7 @@ impl Document {
 
                 Ok(elements)
             },
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odt")]
             DocumentImpl::Odt(doc) => {
                 use super::DocumentElement;
                 use litchi_odt::elements::parser::OrderElement;
@@ -697,9 +697,9 @@ impl Document {
         match &self.inner {
             #[cfg(feature = "doc")]
             DocumentImpl::Doc(_, metadata) => Ok(metadata.clone()),
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "docx")]
             DocumentImpl::Docx(_, metadata) => Ok(metadata.clone()),
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             DocumentImpl::Pages(doc) => {
                 // Extract metadata from Pages bundle metadata
                 let bundle_metadata = doc.bundle().metadata();
@@ -724,7 +724,7 @@ impl Document {
             },
             #[cfg(feature = "rtf")]
             DocumentImpl::Rtf(doc) => Ok(rtf_metadata(doc)),
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odt")]
             DocumentImpl::Odt(doc) => doc
                 .metadata()
                 .map_err(|e| Error::ParseError(format!("Failed to get metadata: {}", e))),
@@ -732,7 +732,7 @@ impl Document {
     }
 }
 
-#[cfg(all(test, any(feature = "doc", feature = "ooxml", feature = "rtf")))]
+#[cfg(all(test, any(feature = "doc", feature = "docx", feature = "rtf")))]
 mod tests {
     use super::*;
     use std::path::PathBuf;
@@ -742,7 +742,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn test_document_open_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path);
@@ -766,7 +766,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn test_document_from_bytes_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let bytes = std::fs::read(&path).expect("Failed to read file");
@@ -779,7 +779,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn owned_docx_facade_survives_moves_and_repeated_reads() {
         fn move_document(document: Document) -> Document {
             document
@@ -894,7 +894,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn test_document_text_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -922,7 +922,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn test_document_paragraph_count_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -946,7 +946,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn test_document_paragraphs_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -973,7 +973,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn test_document_tables_docx() {
         let path = test_data_path().join("ooxml/docx/table_footnotes.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -987,7 +987,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn test_document_elements_docx() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -1008,7 +1008,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn test_document_metadata_docx() {
         let path = test_data_path().join("ooxml/docx/documentProperties.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -1047,7 +1047,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn test_document_complex_lists_docx() {
         let path = test_data_path().join("ooxml/docx/ComplexNumberedLists.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -1062,7 +1062,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn test_document_footnotes_docx() {
         let path = test_data_path().join("ooxml/docx/footnotes.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -1071,7 +1071,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn test_document_endnotes_docx() {
         let path = test_data_path().join("ooxml/docx/endnotes.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -1080,7 +1080,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn test_document_headers_docx() {
         let path = test_data_path().join("ooxml/docx/Headers.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -1090,7 +1090,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn test_document_header_footer_docx() {
         let path = test_data_path().join("ooxml/docx/headerFooter.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -1099,7 +1099,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn test_document_comment_docx() {
         let path = test_data_path().join("ooxml/docx/comment.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");
@@ -1107,7 +1107,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     fn test_document_drawing_docx() {
         let path = test_data_path().join("ooxml/docx/drawing.docx");
         let doc = Document::open(&path).expect("Failed to open DOCX");

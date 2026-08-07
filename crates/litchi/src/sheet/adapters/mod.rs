@@ -1,7 +1,7 @@
 //! Local bridges from standalone spreadsheet models to the umbrella traits.
 
-#[cfg(feature = "ooxml")]
+#[cfg(feature = "xlsx")]
 mod xlsx;
 
-#[cfg(feature = "ooxml")]
+#[cfg(feature = "xlsx")]
 pub(super) use xlsx::Workbook;

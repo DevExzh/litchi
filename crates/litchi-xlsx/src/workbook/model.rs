@@ -553,7 +553,7 @@ impl Worksheet {
     }
 
     /// Parse the worksheet's ordinary sheet-view collection.
-    pub fn views(&self) -> Result<Option<crate::sheet_view::Views>> {
+    pub fn views(&self) -> Result<Option<crate::sheet_view::Collection>> {
         worksheet::views(self)
     }
 

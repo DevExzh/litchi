@@ -77,6 +77,6 @@ where
     /// Inert Office Add-in bindings from the worksheet WEBEXTENSIONS collection.
     pub web_extension_bindings: Vec<Binding>,
     /// Sheet views from the worksheet WSVIEWS collection.
-    pub sheet_views: Vec<crate::package::sheet_view::SheetView>,
+    pub views: Vec<litchi_sheet::view::View>,
     pub(super) saw_web_extension_collection: bool,
 }

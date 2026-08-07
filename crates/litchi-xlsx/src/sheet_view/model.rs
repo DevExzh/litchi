@@ -1,63 +1,10 @@
 //! Typed worksheet-view models for SpreadsheetML.
 
 use crate::error::Result;
+use litchi_sheet::Rect;
+use litchi_sheet::view::{Position, View};
 
 use super::invalid;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ViewType {
-    Normal,
-    PageBreakPreview,
-    PageLayout,
-}
-impl ViewType {
-    pub(super) fn parse(value: &str) -> Result<Self> {
-        match value {
-            "normal" => Ok(Self::Normal),
-            "pageBreakPreview" => Ok(Self::PageBreakPreview),
-            "pageLayout" => Ok(Self::PageLayout),
-            _ => Err(invalid(format!("invalid worksheet-view type '{value}'"))),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PanePosition {
-    BottomRight,
-    TopRight,
-    BottomLeft,
-    TopLeft,
-}
-impl PanePosition {
-    pub(super) fn parse(value: &str) -> Result<Self> {
-        match value {
-            "bottomRight" => Ok(Self::BottomRight),
-            "topRight" => Ok(Self::TopRight),
-            "bottomLeft" => Ok(Self::BottomLeft),
-            "topLeft" => Ok(Self::TopLeft),
-            _ => Err(invalid(format!("invalid worksheet-view pane '{value}'"))),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PaneState {
-    Split,
-    Frozen,
-    FrozenSplit,
-}
-impl PaneState {
-    pub(super) fn parse(value: &str) -> Result<Self> {
-        match value {
-            "split" => Ok(Self::Split),
-            "frozen" => Ok(Self::Frozen),
-            "frozenSplit" => Ok(Self::FrozenSplit),
-            _ => Err(invalid(format!(
-                "invalid worksheet-view pane state '{value}'"
-            ))),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PivotSelectionAxis {
@@ -106,30 +53,6 @@ impl PivotAreaType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CellReference(pub(super) String);
-impl CellReference {
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RangeReference(pub(super) String);
-impl RangeReference {
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Sqref(pub(super) Vec<RangeReference>);
-impl Sqref {
-    pub fn ranges(&self) -> &[RangeReference] {
-        &self.0
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Extension {
     pub(super) uri: String,
     pub(super) markup: Vec<u8>,
@@ -144,54 +67,6 @@ impl Extension {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Pane {
-    pub(super) x_split: Option<f64>,
-    pub(super) y_split: Option<f64>,
-    pub(super) top_left_cell: Option<CellReference>,
-    pub(super) active_pane: PanePosition,
-    pub(super) state: PaneState,
-}
-impl Pane {
-    pub fn x_split(&self) -> Option<f64> {
-        self.x_split
-    }
-    pub fn y_split(&self) -> Option<f64> {
-        self.y_split
-    }
-    pub fn top_left_cell(&self) -> Option<&CellReference> {
-        self.top_left_cell.as_ref()
-    }
-    pub fn active_pane(&self) -> PanePosition {
-        self.active_pane
-    }
-    pub fn state(&self) -> PaneState {
-        self.state
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Selection {
-    pub(super) pane: PanePosition,
-    pub(super) active_cell: CellReference,
-    pub(super) active_cell_id: u32,
-    pub(super) sqref: Sqref,
-}
-impl Selection {
-    pub fn pane(&self) -> PanePosition {
-        self.pane
-    }
-    pub fn active_cell(&self) -> &CellReference {
-        &self.active_cell
-    }
-    pub fn active_cell_id(&self) -> u32 {
-        self.active_cell_id
-    }
-    pub fn sqref(&self) -> &Sqref {
-        &self.sqref
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PivotArea {
     pub(super) field: Option<i32>,
@@ -202,7 +77,7 @@ pub struct PivotArea {
     pub(super) grand_column: bool,
     pub(super) cache_index: bool,
     pub(super) outline: bool,
-    pub(super) offset: Option<RangeReference>,
+    pub(super) offset: Option<Rect>,
     pub(super) collapsed_levels_are_subtotals: bool,
     pub(super) axis: Option<PivotSelectionAxis>,
     pub(super) field_position: Option<u32>,
@@ -233,8 +108,8 @@ impl PivotArea {
     pub fn outline(&self) -> bool {
         self.outline
     }
-    pub fn offset(&self) -> Option<&RangeReference> {
-        self.offset.as_ref()
+    pub fn offset(&self) -> Option<Rect> {
+        self.offset
     }
     pub fn collapsed_levels_are_subtotals(&self) -> bool {
         self.collapsed_levels_are_subtotals
@@ -253,7 +128,7 @@ impl PivotArea {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PivotSelection {
-    pub(super) pane: PanePosition,
+    pub(super) pane: Position,
     pub(super) show_header: bool,
     pub(super) label: bool,
     pub(super) data: bool,
@@ -273,7 +148,7 @@ pub struct PivotSelection {
     pub(super) area: PivotArea,
 }
 impl PivotSelection {
-    pub fn pane(&self) -> PanePosition {
+    pub fn pane(&self) -> Position {
         self.pane
     }
     pub fn show_header(&self) -> bool {
@@ -330,94 +205,15 @@ impl PivotSelection {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct View {
-    pub(super) workbook_view_id: u32,
-    pub(super) window_protection: bool,
-    pub(super) show_formulas: bool,
-    pub(super) show_grid_lines: bool,
-    pub(super) show_row_col_headers: bool,
-    pub(super) show_zeros: bool,
-    pub(super) right_to_left: bool,
-    pub(super) tab_selected: bool,
-    pub(super) show_ruler: bool,
-    pub(super) show_outline_symbols: bool,
-    pub(super) default_grid_color: bool,
-    pub(super) show_white_space: bool,
-    pub(super) view_type: ViewType,
-    pub(super) top_left_cell: Option<CellReference>,
-    pub(super) color_id: u32,
-    pub(super) zoom_scale: u16,
-    pub(super) zoom_scale_normal: u16,
-    pub(super) zoom_scale_sheet_layout_view: u16,
-    pub(super) zoom_scale_page_layout_view: u16,
-    pub(super) pane: Option<Pane>,
-    pub(super) selections: Vec<Selection>,
+pub struct Entry {
+    pub(super) view: View,
     pub(super) pivot_selections: Vec<PivotSelection>,
     pub(super) extensions: Vec<Extension>,
+    pub(super) retained_xml: Vec<u8>,
 }
-impl View {
-    pub fn workbook_view_id(&self) -> u32 {
-        self.workbook_view_id
-    }
-    pub fn window_protection(&self) -> bool {
-        self.window_protection
-    }
-    pub fn show_formulas(&self) -> bool {
-        self.show_formulas
-    }
-    pub fn show_grid_lines(&self) -> bool {
-        self.show_grid_lines
-    }
-    pub fn show_row_col_headers(&self) -> bool {
-        self.show_row_col_headers
-    }
-    pub fn show_zeros(&self) -> bool {
-        self.show_zeros
-    }
-    pub fn right_to_left(&self) -> bool {
-        self.right_to_left
-    }
-    pub fn tab_selected(&self) -> bool {
-        self.tab_selected
-    }
-    pub fn show_ruler(&self) -> bool {
-        self.show_ruler
-    }
-    pub fn show_outline_symbols(&self) -> bool {
-        self.show_outline_symbols
-    }
-    pub fn default_grid_color(&self) -> bool {
-        self.default_grid_color
-    }
-    pub fn show_white_space(&self) -> bool {
-        self.show_white_space
-    }
-    pub fn view_type(&self) -> ViewType {
-        self.view_type
-    }
-    pub fn top_left_cell(&self) -> Option<&CellReference> {
-        self.top_left_cell.as_ref()
-    }
-    pub fn color_id(&self) -> u32 {
-        self.color_id
-    }
-    pub fn zoom_scale(&self) -> u16 {
-        self.zoom_scale
-    }
-    pub fn zoom_scale_normal(&self) -> u16 {
-        self.zoom_scale_normal
-    }
-    pub fn zoom_scale_sheet_layout_view(&self) -> u16 {
-        self.zoom_scale_sheet_layout_view
-    }
-    pub fn zoom_scale_page_layout_view(&self) -> u16 {
-        self.zoom_scale_page_layout_view
-    }
-    pub fn pane(&self) -> Option<&Pane> {
-        self.pane.as_ref()
-    }
-    pub fn selections(&self) -> &[Selection] {
-        &self.selections
+impl Entry {
+    pub fn view(&self) -> &View {
+        &self.view
     }
     pub fn pivot_selections(&self) -> &[PivotSelection] {
         &self.pivot_selections
@@ -425,16 +221,20 @@ impl View {
     pub fn extensions(&self) -> &[Extension] {
         &self.extensions
     }
+    /// Complete MCE-processed `sheetView` markup retained for source fidelity.
+    pub fn retained_xml(&self) -> &[u8] {
+        &self.retained_xml
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Views {
-    pub(super) views: Vec<View>,
+pub struct Collection {
+    pub(super) entries: Vec<Entry>,
     pub(super) extensions: Vec<Extension>,
 }
-impl Views {
-    pub fn views(&self) -> &[View] {
-        &self.views
+impl Collection {
+    pub fn entries(&self) -> &[Entry] {
+        &self.entries
     }
     pub fn extensions(&self) -> &[Extension] {
         &self.extensions

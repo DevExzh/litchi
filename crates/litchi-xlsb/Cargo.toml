@@ -16,6 +16,7 @@ litchi-drawingml = { workspace = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
 litchi-sign = { workspace = true }
+litchi-sheet = { workspace = true }
 litchi-spreadsheet-drawing = { workspace = true }
 litchi-vba = { workspace = true }
 quick-xml = { workspace = true }

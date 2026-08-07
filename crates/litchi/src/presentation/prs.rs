@@ -47,7 +47,7 @@ pub struct Presentation {
     pub(super) cached_metadata: Option<litchi_core::Metadata>,
 }
 
-#[cfg(all(test, feature = "odf"))]
+#[cfg(all(test, feature = "odp"))]
 mod flat_odp_tests {
     use super::Presentation;
     use crate::detection_smart::{DetectedFormat, detect_format_smart};
@@ -172,7 +172,7 @@ impl Presentation {
                     cached_metadata,
                 })
             },
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "pptx")]
             DetectedFormat::Pptx(opc_package) => {
                 // OPC package already parsed - reuse it!
                 let cached_metadata = crate::ooxml_common::properties::read(&opc_package)
@@ -189,7 +189,7 @@ impl Presentation {
                     cached_metadata,
                 })
             },
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             DetectedFormat::Keynote(data) => {
                 let doc = crate::iwa::keynote::KeynoteDocument::from_bytes(&data).map_err(|e| {
                     Error::ParseError(format!("Failed to open Keynote from bytes: {}", e))
@@ -207,7 +207,7 @@ impl Presentation {
                     cached_metadata,
                 })
             },
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odp")]
             DetectedFormat::FlatOdf(format, data) => {
                 let _ = data;
                 Err(Error::Unsupported(format!(
@@ -215,7 +215,7 @@ impl Presentation {
                     format
                 )))
             },
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odp")]
             DetectedFormat::Odp(data) => {
                 let doc = litchi_odp::Presentation::from_bytes(data).map_err(|e| {
                     Error::ParseError(format!(
@@ -255,7 +255,7 @@ impl Presentation {
         match &self.inner {
             #[cfg(feature = "ppt")]
             PresentationImpl::Ppt(pres) => pres.text().map_err(Error::from),
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "pptx")]
             PresentationImpl::Pptx(package) => {
                 // PPTX presentations need to extract text from all slides
                 let pres = package.presentation().map_err(crate::map_ooxml_error)?;
@@ -269,11 +269,11 @@ impl Presentation {
                 }
                 Ok(texts.join("\n\n"))
             },
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             PresentationImpl::Keynote(doc) => doc.text().map_err(|e| {
                 Error::ParseError(format!("Failed to extract text from Keynote: {}", e))
             }),
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odp")]
             PresentationImpl::Odp(doc) => doc
                 .text()
                 .map_err(|e| Error::ParseError(format!("Failed to extract ODP text: {}", e))),
@@ -296,20 +296,20 @@ impl Presentation {
         match &self.inner {
             #[cfg(feature = "ppt")]
             PresentationImpl::Ppt(pres) => Ok(pres.slide_count()),
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "pptx")]
             PresentationImpl::Pptx(package) => package
                 .presentation()
                 .map_err(crate::map_ooxml_error)?
                 .slide_count()
                 .map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             PresentationImpl::Keynote(doc) => {
                 let slides = doc
                     .slides()
                     .map_err(|e| Error::ParseError(format!("Failed to get slides: {}", e)))?;
                 Ok(slides.len())
             },
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odp")]
             PresentationImpl::Odp(doc) => doc
                 .slide_count()
                 .map_err(|e| Error::ParseError(format!("Failed to get ODP slide count: {}", e))),
@@ -350,7 +350,7 @@ impl Presentation {
                     })
                     .collect()
             },
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "pptx")]
             PresentationImpl::Pptx(package) => {
                 use super::types::SlideData;
                 let pres = package.presentation().map_err(crate::map_ooxml_error)?;
@@ -365,14 +365,14 @@ impl Presentation {
                     })
                     .collect()
             },
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             PresentationImpl::Keynote(doc) => {
                 let keynote_slides = doc
                     .slides()
                     .map_err(|e| Error::ParseError(format!("Failed to get slides: {}", e)))?;
                 Ok(keynote_slides.into_iter().map(Slide::Keynote).collect())
             },
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odp")]
             PresentationImpl::Odp(doc) => {
                 let odp_slides = doc
                     .slides()
@@ -401,16 +401,16 @@ impl Presentation {
         match &self.inner {
             #[cfg(feature = "ppt")]
             PresentationImpl::Ppt(_) => Ok(None),
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "pptx")]
             PresentationImpl::Pptx(package) => package
                 .presentation()
                 .map_err(crate::map_ooxml_error)?
                 .slide_size()
                 .map(|(width, _)| Some(width))
                 .map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odp")]
             PresentationImpl::Odp(_) => Ok(None), // ODP doesn't expose slide dimensions in unified API yet
         }
     }
@@ -434,16 +434,16 @@ impl Presentation {
         match &self.inner {
             #[cfg(feature = "ppt")]
             PresentationImpl::Ppt(_) => Ok(None),
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "pptx")]
             PresentationImpl::Pptx(package) => package
                 .presentation()
                 .map_err(crate::map_ooxml_error)?
                 .slide_size()
                 .map(|(_, height)| Some(height))
                 .map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwa")]
+            #[cfg(feature = "iwork")]
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
-            #[cfg(feature = "odf")]
+            #[cfg(feature = "odp")]
             PresentationImpl::Odp(_) => Ok(None), // ODP doesn't expose slide dimensions in unified API yet
         }
     }
@@ -495,7 +495,7 @@ impl Presentation {
         // return early.
         #[cfg(all(
             feature = "ppt",
-            not(any(feature = "ooxml", feature = "iwa", feature = "odf"))
+            not(any(feature = "pptx", feature = "iwork", feature = "odp"))
         ))]
         {
             let PresentationImpl::Ppt(pres) = &self.inner;
@@ -507,7 +507,7 @@ impl Presentation {
         // formats.
         #[cfg(not(all(
             feature = "ppt",
-            not(any(feature = "ooxml", feature = "iwa", feature = "odf"))
+            not(any(feature = "pptx", feature = "iwork", feature = "odp"))
         )))]
         {
             #[cfg(feature = "ppt")]
@@ -526,7 +526,7 @@ impl Presentation {
     }
 }
 
-#[cfg(all(test, feature = "ooxml", feature = "ppt"))]
+#[cfg(all(test, feature = "pptx", feature = "ppt"))]
 mod tests {
     use super::*;
     use std::path::PathBuf;
@@ -536,7 +536,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_open_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path);
@@ -544,7 +544,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_open_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path);
@@ -552,7 +552,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_from_bytes_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let bytes = std::fs::read(&path).expect("Failed to read file");
@@ -565,7 +565,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_from_bytes_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let bytes = std::fs::read(&path).expect("Failed to read file");
@@ -578,7 +578,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_text_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");
@@ -587,7 +587,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_text_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path).expect("Failed to open PPT");
@@ -595,7 +595,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_slide_count_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");
@@ -604,7 +604,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_slide_count_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path).expect("Failed to open PPT");
@@ -613,7 +613,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_slides_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");
@@ -627,7 +627,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_slides_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path).expect("Failed to open PPT");
@@ -640,7 +640,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_slide_dimensions_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");
@@ -649,7 +649,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_metadata_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");
@@ -659,7 +659,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_metadata_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path).expect("Failed to open PPT");
@@ -668,7 +668,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_open_nonexistent_file() {
         let path = test_data_path().join("nonexistent_file.pptx");
         let result = Presentation::open(&path);
@@ -676,7 +676,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_from_bytes_invalid_data() {
         let bytes = b"This is not a valid presentation file".to_vec();
         let result = Presentation::from_bytes(bytes);
@@ -684,7 +684,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_charts_pptx() {
         // Test presentations with various chart types
         let chart_files = [
@@ -709,7 +709,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_connectors_pptx() {
         let test_files = [
             "ooxml/pptx/connectorConnection.pptx",
@@ -727,7 +727,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_text_shapes_ppt() {
         // Use SampleShow.ppt to avoid metadata overflow issues in some test files
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
@@ -742,7 +742,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_extract_text_for_markdown_ppt() {
         let path = test_data_path().join("ole/ppt/SampleShow.ppt");
         let pres = Presentation::open(&path).expect("Failed to open PPT");
@@ -754,7 +754,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(feature = "ooxml", feature = "ppt"))]
+    #[cfg(all(feature = "pptx", feature = "ppt"))]
     fn test_presentation_extract_text_for_markdown_pptx() {
         let path = test_data_path().join("ooxml/pptx/sample.pptx");
         let pres = Presentation::open(&path).expect("Failed to open PPTX");

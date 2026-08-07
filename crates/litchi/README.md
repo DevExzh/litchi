@@ -4,17 +4,17 @@ High-performance Rust library for parsing Microsoft Office, OpenDocument, and Ap
 
 ## Overview
 
-`litchi` is the user-facing umbrella crate of the [Litchi workspace](https://github.com/DevExzh/litchi). It auto-detects file formats and delegates parsing to independently owned format crates (`litchi-doc`, `litchi-ppt`, `litchi-xls`, `litchi-docx`, `litchi-pptx`, `litchi-xlsb`, `litchi-xlsx`, `litchi-opc`, `litchi-ooxml-common`, `litchi-odf`, `litchi-iwa`, `litchi-rtf`, and friends). Most users should depend on this crate rather than the format-specific ones. Canonical low-level legacy-format entry points are the standalone `litchi-doc`, `litchi-ppt`, and `litchi-xls` crates; the umbrella keeps only the `ppt` and `xls` facades for their enabled features.
+`litchi` is the user-facing umbrella crate of the [Litchi workspace](https://github.com/DevExzh/litchi). It auto-detects file formats and delegates parsing to independently owned format crates (`litchi-doc`, `litchi-ppt`, `litchi-xls`, `litchi-docx`, `litchi-pptx`, `litchi-xlsb`, `litchi-xlsx`, `litchi-opc`, `litchi-ooxml-common`, `litchi-odf`, `litchi-iwa`, `litchi-rtf`, and friends). Most users should depend on this crate rather than the format-specific ones. Canonical low-level legacy-format entry points are the standalone `litchi-doc`, `litchi-ppt`, and `litchi-xls` crates; the umbrella exposes `doc`, `ppt`, and `xls` facades only for their enabled features.
 
 Shared OOXML chart and SmartArt grammar is available through the concise
-`litchi::drawing::{chart, diagram}` facade when the `ooxml` feature is enabled.
+`litchi::drawing::{chart, diagram}` facade when the `drawingml` feature is enabled.
 Concrete formats retain their package-specific anchors and relationships.
 
 ## Usage
 
 ```toml
 [dependencies]
-litchi = "0.0.1"
+litchi = { version = "0", features = ["docx", "pptx", "xlsx"] }
 ```
 
 ```rust
@@ -42,24 +42,30 @@ fn main() -> Result<(), litchi::Error> {
 
 ## Feature Flags
 
-Default: `doc`, `ppt`, `xls`, `ooxml`, `ooxml_encryption`, `eval_engine`.
+Default features are empty. Enable only what the application needs; spelling
+`default-features = false` is optional but valid.
 
-| Flag | Adds support for |
-|------|------------------|
-| `doc` | Legacy Word `.doc` |
-| `ppt` | Legacy PowerPoint `.ppt` |
-| `xls` | Legacy Excel BIFF `.xls` |
-| `ooxml` | `.docx`, `.xlsx`, `.xlsb`, `.pptx` |
-| `ooxml_encryption` | Password-protected OOXML files |
-| `odf` | `.odt`, `.ods`, `.odp` |
-| `iwa` | Apple `.pages`, `.numbers`, `.key` |
-| `rtf` | Rich Text Format |
-| `formula` | MathType / OMML to LaTeX conversion |
-| `imgconv` | EMF / WMF / PICT image conversion |
-| `fonts` | Font discovery and subsetting |
-| `eval_engine` | Spreadsheet formula evaluation (`=SUM(A1:A10)`) |
-| `markdown` | Markdown emission helpers |
-| `full` | Enables every feature above |
+```toml
+# Legacy and OOXML PowerPoint, plus signing support.
+litchi = { version = "0", features = ["ppt", "pptx", "sign"] }
+
+# A minimal OOXML spreadsheet dependency.
+litchi = { version = "0", default-features = false, features = ["xlsx"] }
+```
+
+Format leaves: `doc`, `docx`, `ppt`, `pptx`, `xls`, `xlsx`, `xlsb`, `rtf`,
+`odt`, `ods`, `odp`, and `iwork`.
+
+Infrastructure: `cfb`, `ole`, `opc`, `ooxml-common`, `drawingml`,
+`odf-common`, and `sheet`.
+
+Capabilities: `sign`, `encryption`, `formula`, `fonts`, `images`, `eval`,
+`web-functions`, `markdown`, and `yaml`.
+
+Convenience aggregates: `legacy`, `ooxml`, `odf`, `word`, `slides`,
+`spreadsheets`, `office`, `all-formats`, and `all`.
+
+Formats do not implicitly enable signing; add `sign` explicitly when needed.
 
 ## License
 

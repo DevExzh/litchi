@@ -7,7 +7,7 @@ pub use semantic::{MutableWorksheet, SheetProtection};
 pub use wire::CellData;
 
 #[allow(unused_imports)]
-pub(super) use semantic::{AutoFilter, FreezePanes};
+pub(super) use semantic::AutoFilter;
 #[allow(unused_imports)]
 pub(crate) use wire::ContextualFormulaRestore;
 #[allow(unused_imports)]

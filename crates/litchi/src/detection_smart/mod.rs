@@ -12,6 +12,6 @@ pub(crate) mod ole2;
 pub(crate) mod ooxml;
 
 pub use detected::{DetectedFormat, detect_format_smart};
-#[cfg(feature = "iwa")]
+#[cfg(feature = "iwork")]
 pub use functions::detect_iwork_format_from_path;
 pub use functions::{detect_file_format, detect_file_format_from_bytes, detect_format_from_reader};

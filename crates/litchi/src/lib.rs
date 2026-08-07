@@ -14,7 +14,7 @@
 //!
 //! # Quick Start - Word Documents (Read)
 //!
-//! ```no_run
+//! ```ignore
 //! use litchi::Document;
 //!
 //! # fn main() -> Result<(), litchi::Error> {
@@ -53,7 +53,7 @@
 //!
 //! # Quick Start - Word Documents (Write)
 //!
-//! ```no_run
+//! ```ignore
 //! use litchi::docx::Package;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -73,7 +73,7 @@
 //!
 //! # Quick Start - PowerPoint Presentations (Read)
 //!
-//! ```no_run
+//! ```ignore
 //! use litchi::Presentation;
 //!
 //! # fn main() -> Result<(), litchi::Error> {
@@ -97,7 +97,7 @@
 //!
 //! # Quick Start - PowerPoint Presentations (Write)
 //!
-//! ```no_run
+//! ```ignore
 //! use litchi::pptx::Package;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -117,7 +117,7 @@
 //!
 //! # Quick Start - Excel Workbooks (Write)
 //!
-//! ```no_run
+//! ```ignore
 //! use litchi::xlsx::Workbook;
 //! use litchi::sheet::WorkbookTrait;
 //!
@@ -178,27 +178,37 @@ pub mod common {
     // Re-export the smart-detection entry points beside the core vocabulary.
     #[cfg(any(
         feature = "doc",
+        feature = "docx",
         feature = "ppt",
+        feature = "pptx",
         feature = "xls",
-        feature = "ooxml",
-        feature = "iwa",
-        feature = "odf",
-        feature = "rtf"
+        feature = "xlsx",
+        feature = "xlsb",
+        feature = "rtf",
+        feature = "odt",
+        feature = "ods",
+        feature = "odp",
+        feature = "iwork"
     ))]
     pub use crate::detection_smart::{detect_file_format, detect_file_format_from_bytes};
 
     /// Detection re-exports — merges `litchi-core`'s signature detection with
     /// the umbrella's smart-detection entry points.
     pub mod detection {
-        #[cfg(feature = "iwa")]
+        #[cfg(feature = "iwork")]
         pub use crate::detection_smart::detect_iwork_format_from_path;
         #[cfg(any(
             feature = "doc",
             feature = "ppt",
             feature = "xls",
-            feature = "ooxml",
-            feature = "iwa",
-            feature = "odf",
+            feature = "docx",
+            feature = "pptx",
+            feature = "xlsx",
+            feature = "xlsb",
+            feature = "iwork",
+            feature = "odt",
+            feature = "ods",
+            feature = "odp",
             feature = "rtf"
         ))]
         pub use crate::detection_smart::{
@@ -212,17 +222,24 @@ pub mod common {
 // Smart format detection (depends on per-format crates; can't live in litchi-core).
 #[cfg(any(
     feature = "doc",
+    feature = "docx",
     feature = "ppt",
+    feature = "pptx",
     feature = "xls",
-    feature = "ooxml",
-    feature = "iwa",
-    feature = "odf",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "iwork",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
     feature = "rtf"
 ))]
 pub mod detection_smart;
 
+#[cfg(feature = "yaml")]
 mod metadata_ext;
 
+#[cfg(feature = "yaml")]
 pub use metadata_ext::MetadataYaml;
 
 /// Unified Word document API
@@ -231,10 +248,10 @@ pub use metadata_ext::MetadataYaml;
 /// Use [`Document::open()`] to get started.
 #[cfg(any(
     feature = "doc",
-    feature = "ooxml",
+    feature = "docx",
     feature = "rtf",
-    feature = "odf",
-    feature = "iwa"
+    feature = "odt",
+    feature = "iwork"
 ))]
 pub mod document;
 
@@ -243,8 +260,8 @@ pub mod document;
 /// Provides functionality to parse and convert Office Drawing formats
 /// (EMF, WMF, PICT) to modern image standards (PNG, JPEG, WebP).
 ///
-/// **Note**: This requires the `imgconv` feature to be enabled.
-#[cfg(feature = "imgconv")]
+/// **Note**: This requires the `images` feature to be enabled.
+#[cfg(feature = "images")]
 pub mod images;
 
 /// Unified PowerPoint presentation API
@@ -253,24 +270,44 @@ pub mod images;
 /// Use [`Presentation::open()`] to get started.
 ///
 /// **Note**: This requires at least one presentation-format feature to be enabled.
-#[cfg(any(feature = "ppt", feature = "ooxml", feature = "odf", feature = "iwa"))]
+#[cfg(any(feature = "ppt", feature = "pptx", feature = "odp", feature = "iwork"))]
 pub mod presentation;
 
 /// Unified Excel/Spreadsheet API (.xls, .xlsx, .xlsb, .ods, .numbers)
 ///
 /// Requires the corresponding feature flags:
 /// - `xls` for .xls
-/// - `ooxml` for .xlsx and .xlsb
-/// - `odf` for .ods
-/// - `iwa` for .numbers
-#[cfg(any(feature = "xls", feature = "ooxml", feature = "odf", feature = "iwa"))]
+/// - `xlsx` for .xlsx
+/// - `xlsb` for .xlsb
+/// - `ods` for .ods
+/// - `iwork` for .numbers
+#[cfg(feature = "sheet")]
 pub mod sheet;
 
 /// Markdown conversion module
 ///
 /// Provides functionality to convert Office documents and presentations to Markdown.
 /// Use the [`markdown::ToMarkdown`] trait on Document or Presentation types.
+#[cfg(feature = "markdown")]
 pub mod markdown;
+
+/// Compound File Binary (CFB) container primitives.
+#[cfg(feature = "cfb")]
+pub mod cfb {
+    pub use litchi_cfb::*;
+}
+
+/// Shared OLE property-set and metadata primitives.
+#[cfg(feature = "ole")]
+pub mod ole {
+    pub use litchi_ole_common::*;
+}
+
+/// Legacy Word binary parser and writer (`.doc`).
+#[cfg(feature = "doc")]
+pub mod doc {
+    pub use litchi_doc::*;
+}
 
 /// Legacy PowerPoint binary parser and writer (`.ppt`).
 ///
@@ -299,49 +336,49 @@ pub mod xls {
 /// This is the concise, host-neutral facade for drawing types shared by OOXML
 /// documents, presentations, and workbooks.
 ///
-/// **Note**: This requires the `ooxml` feature to be enabled.
-#[cfg(feature = "ooxml")]
+/// **Note**: This requires the `drawingml` feature to be enabled.
+#[cfg(feature = "drawingml")]
 pub mod drawing {
     pub use litchi_drawingml::*;
 }
 
 /// WordprocessingML (`.docx`) package and semantic APIs.
-#[cfg(feature = "ooxml")]
+#[cfg(feature = "docx")]
 pub mod docx {
     pub use litchi_docx::*;
 }
 
 /// PresentationML (`.pptx`) package and semantic APIs.
-#[cfg(feature = "ooxml")]
+#[cfg(feature = "pptx")]
 pub mod pptx {
     pub use litchi_pptx::*;
 }
 
 /// SpreadsheetML (`.xlsx`) package and semantic APIs.
-#[cfg(feature = "ooxml")]
+#[cfg(feature = "xlsx")]
 pub mod xlsx {
     pub use litchi_xlsx::*;
 }
 
 /// Binary SpreadsheetML (`.xlsb`) package and semantic APIs.
-#[cfg(feature = "ooxml")]
+#[cfg(feature = "xlsb")]
 pub mod xlsb {
     pub use litchi_xlsb::*;
 }
 
 /// Open Packaging Conventions package graph used by the standalone OOXML owners.
-#[cfg(feature = "ooxml")]
+#[cfg(feature = "opc")]
 pub mod opc {
     pub use litchi_opc::*;
 }
 
 /// Shared OOXML vocabulary and package services.
-#[cfg(feature = "ooxml")]
+#[cfg(feature = "ooxml-common")]
 pub mod ooxml_common {
     pub use litchi_ooxml_common::*;
 }
 
-#[cfg(feature = "ooxml")]
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 pub(crate) fn map_ooxml_error<E: std::fmt::Display>(error: E) -> litchi_core::Error {
     // The unified facade has no concrete OOXML error variant, but these
     // failures are format/graph validation failures rather than generic
@@ -354,7 +391,7 @@ pub(crate) fn map_ooxml_error<E: std::fmt::Display>(error: E) -> litchi_core::Er
 /// The concrete format packages retain responsibility for locating encrypted
 /// records; this facade exposes the canonical bounded cryptographic codecs and
 /// OOXML encrypted-package service without a CFB type in their APIs.
-#[cfg(feature = "ooxml_encryption")]
+#[cfg(feature = "encryption")]
 pub mod crypto {
     pub use litchi_crypto::*;
 }
@@ -385,32 +422,32 @@ pub mod formula {
 /// (Pages, Keynote, Numbers) which use the IWA (iWork Archive) format.
 /// Use [`iwa::Document::open()`] to get started.
 ///
-/// **Note**: This requires the `iwa` feature to be enabled.
-#[cfg(feature = "iwa")]
+/// **Note**: This requires the `iwork` feature to be enabled.
+#[cfg(feature = "iwork")]
 pub mod iwa {
     pub use litchi_iwa::*;
 }
 
 /// OpenDocument Presentation (`.odp`) package and semantic APIs.
-#[cfg(feature = "odf")]
+#[cfg(feature = "odp")]
 pub mod odp {
     pub use litchi_odp::*;
 }
 
 /// OpenDocument Spreadsheet (`.ods`) package and semantic APIs.
-#[cfg(feature = "odf")]
+#[cfg(feature = "ods")]
 pub mod ods {
     pub use litchi_ods::*;
 }
 
 /// OpenDocument Text (`.odt`) package and semantic APIs.
-#[cfg(feature = "odf")]
+#[cfg(feature = "odt")]
 pub mod odt {
     pub use litchi_odt::*;
 }
 
 /// Shared OpenDocument vocabulary and detection services.
-#[cfg(feature = "odf")]
+#[cfg(feature = "odf-common")]
 pub mod odf_common {
     pub use litchi_odf_common::*;
 }
@@ -438,22 +475,34 @@ pub mod fonts {
     pub use litchi_fonts::*;
 }
 
+/// Spreadsheet formula evaluation primitives.
+#[cfg(feature = "eval")]
+pub mod eval {
+    pub use litchi_eval::*;
+}
+
 // Re-export high-level APIs
 pub use common::{Error, Result};
 
 #[cfg(any(
     feature = "doc",
-    feature = "ooxml",
+    feature = "docx",
     feature = "rtf",
-    feature = "odf",
-    feature = "iwa"
+    feature = "odt",
+    feature = "iwork"
 ))]
 pub use document::{Document, DocumentElement};
 
-#[cfg(any(feature = "ppt", feature = "ooxml", feature = "odf", feature = "iwa"))]
+#[cfg(any(feature = "ppt", feature = "pptx", feature = "odp", feature = "iwork"))]
 pub use presentation::Presentation;
 
-#[cfg(any(feature = "xls", feature = "ooxml", feature = "odf", feature = "iwa"))]
+#[cfg(any(
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "ods",
+    feature = "iwork"
+))]
 pub use sheet::Workbook;
 
 // Re-export commonly used types
@@ -461,16 +510,29 @@ pub use common::{FileFormat, Length, PlaceholderType, RGBColor, ShapeType};
 
 #[cfg(any(
     feature = "doc",
+    feature = "docx",
     feature = "ppt",
+    feature = "pptx",
     feature = "xls",
-    feature = "ooxml",
-    feature = "iwa",
-    feature = "odf",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "iwork",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
     feature = "rtf"
 ))]
 pub use common::{detect_file_format, detect_file_format_from_bytes};
 
-#[cfg(all(test, feature = "ooxml"))]
+#[cfg(all(
+    test,
+    feature = "docx",
+    feature = "pptx",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "opc",
+    feature = "ooxml-common"
+))]
 mod standalone_ooxml_facade_tests {
     #[test]
     fn exposes_each_standalone_owner_without_an_outer_namespace() {
@@ -483,7 +545,13 @@ mod standalone_ooxml_facade_tests {
     }
 }
 
-#[cfg(all(test, feature = "odf"))]
+#[cfg(all(
+    test,
+    feature = "odp",
+    feature = "ods",
+    feature = "odt",
+    feature = "odf-common"
+))]
 mod standalone_odf_facade_tests {
     #[test]
     fn exposes_each_standalone_owner_without_an_outer_namespace() {

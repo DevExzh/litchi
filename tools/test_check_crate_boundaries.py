@@ -21,6 +21,11 @@ def valid_snapshot(policy: boundaries.Policy) -> boundaries.Snapshot:
     }
     features = {name: frozenset() for name in policy.packages}
     features["litchi-core"] = frozenset(item.name for item in policy.core_feature_debt)
+    facade_optional_dependencies = frozenset(
+        edge.dependency
+        for edge in edges
+        if edge.dependent == "litchi" and edge.dependency != "litchi-core"
+    )
     return boundaries.Snapshot(
         packages=policy.packages,
         manifests=frozenset(),
@@ -28,6 +33,15 @@ def valid_snapshot(policy: boundaries.Policy) -> boundaries.Snapshot:
         dependencies=frozen_dependencies,
         normal_dependencies=frozen_dependencies,
         features=features,
+        feature_definitions={
+            "litchi": {
+                "default": frozenset(),
+                "all": frozenset(
+                    f"dep:{dependency}" for dependency in facade_optional_dependencies
+                ),
+            }
+        },
+        normal_optional_dependencies={"litchi": facade_optional_dependencies},
     )
 
 
@@ -190,6 +204,13 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertIn(edge, self.policy.canonical_edges)
             self.assertNotIn(edge, self.policy.migration_edges)
 
+    def test_shared_worksheet_view_edges_are_canonical(self) -> None:
+        for dependent in ("litchi", "litchi-xlsb", "litchi-xlsx"):
+            with self.subTest(dependent=dependent):
+                edge = boundaries.Edge(dependent, "litchi-sheet")
+                self.assertIn(edge, self.policy.canonical_edges)
+                self.assertNotIn(edge, self.policy.migration_edges)
+
     def test_resolved_migration_edge_requires_policy_cleanup(self) -> None:
         snapshot = valid_snapshot(self.policy)
         edge = boundaries.Edge("litchi-pptx", "litchi-drawingml")
@@ -264,12 +285,81 @@ class BoundaryPolicyTests(unittest.TestCase):
     def test_retired_umbrella_feature_cannot_return(self) -> None:
         snapshot = valid_snapshot(self.policy)
         features = dict(snapshot.features)
-        features["litchi"] |= frozenset({"ole"})
+        features["litchi"] |= frozenset({"full"})
         snapshot = replace(snapshot, features=features)
 
         violations = boundaries.audit_snapshot(snapshot, self.policy)
 
-        self.assertIn("retired litchi facade features returned: ole", violations)
+        self.assertIn("retired litchi facade features returned: full", violations)
+
+    def test_litchi_facade_rejects_non_optional_normal_dependencies(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        normal_dependencies = dict(snapshot.normal_dependencies)
+        normal_dependencies["litchi"] |= frozenset({"litchi-xlsb"})
+        optional_dependencies = dict(snapshot.normal_optional_dependencies)
+        optional_dependencies["litchi"] -= frozenset({"litchi-xlsb"})
+        snapshot = replace(
+            snapshot,
+            normal_dependencies=normal_dependencies,
+            normal_optional_dependencies=optional_dependencies,
+        )
+
+        violations = boundaries.audit_litchi_facade(snapshot)
+
+        self.assertIn(
+            "litchi facade has non-optional normal dependencies: litchi-xlsb",
+            violations,
+        )
+
+    def test_litchi_facade_requires_an_empty_default_feature(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        definitions = dict(snapshot.feature_definitions)
+        definitions["litchi"] = dict(definitions["litchi"])
+        definitions["litchi"]["default"] = frozenset({"dep:litchi-xlsb"})
+        snapshot = replace(snapshot, feature_definitions=definitions)
+
+        self.assertEqual(
+            boundaries.audit_litchi_facade(snapshot),
+            ["litchi default feature must be exactly empty"],
+        )
+
+    def test_litchi_facade_rejects_stale_and_unknown_feature_contracts(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        definitions = dict(snapshot.feature_definitions)
+        definitions["litchi"] = {
+            "default": frozenset(),
+            "all": frozenset({"unknown-capability", "dep:litchi-missing"}),
+        }
+        snapshot = replace(snapshot, feature_definitions=definitions)
+
+        violations = boundaries.audit_litchi_facade(snapshot)
+
+        self.assertEqual(violations, sorted(violations))
+        self.assertIn(
+            "litchi facade feature references unknown features: "
+            "all -> unknown-capability",
+            violations,
+        )
+        self.assertIn(
+            "litchi facade has stale dep: feature references: litchi-missing",
+            violations,
+        )
+        self.assertIn("litchi all feature omits optional dependencies: ", violations[0] if violations else "")
+
+    def test_litchi_all_feature_may_cover_optional_dependencies_via_aggregates(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        optional_dependencies = snapshot.normal_optional_dependencies["litchi"]
+        definitions = dict(snapshot.feature_definitions)
+        definitions["litchi"] = {
+            "default": frozenset(),
+            "all": frozenset({"formats"}),
+            "formats": frozenset(
+                f"dep:{dependency}" for dependency in optional_dependencies
+            ),
+        }
+        snapshot = replace(snapshot, feature_definitions=definitions)
+
+        self.assertEqual(boundaries.audit_litchi_facade(snapshot), [])
 
     def test_violations_have_deterministic_order(self) -> None:
         snapshot = valid_snapshot(self.policy)
@@ -331,6 +421,109 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [
                     "retired XLSB package::xlsx path: "
                     "crates/litchi-xlsb/src/writer.rs:1"
+                ],
+            )
+
+    def test_retired_shallow_sheet_view_owners_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for _, retired in boundaries.RETIRED_SHEET_VIEW_OWNER_SOURCES:
+                path = root / retired
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("// retired owner\n", encoding="utf-8")
+            retired_tree = root / boundaries.RETIRED_XLSX_SHEET_VIEW_OWNER_TREE
+            retired_tree.mkdir(parents=True)
+
+            violations = boundaries.audit_spreadsheet_sheet_view_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "retired litchi-xlsb sheet-view owner source returned: "
+                    "crates/litchi-xlsb/src/views.rs",
+                    "retired litchi-xlsx sheet-view owner source returned: "
+                    "crates/litchi-xlsx/src/views.rs",
+                    "retired litchi-xlsx sheet-view owner tree returned: "
+                    "crates/litchi-xlsx/src/views",
+                ],
+            )
+
+    def test_legacy_xlsb_sheet_view_names_and_methods_are_forbidden(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / boundaries.XLSB_SOURCE_ROOT / "legacy_sheet_view.rs"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                "\n".join(
+                    [
+                        *boundaries.LEGACY_XLSB_SHEET_VIEW_NAMES,
+                        "pub fn set_sheet_view() {}",
+                        "pub(crate) fn sheet_views() {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_spreadsheet_sheet_view_source_topology(root)
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertEqual(
+                violations,
+                [
+                    f"litchi-xlsb legacy sheet-view name {name}: "
+                    "crates/litchi-xlsb/src/legacy_sheet_view.rs:"
+                    f"{index}"
+                    for index, name in enumerate(
+                        boundaries.LEGACY_XLSB_SHEET_VIEW_NAMES, start=1
+                    )
+                ]
+                + [
+                    "litchi-xlsb legacy sheet-view public method set_sheet_view: "
+                    "crates/litchi-xlsb/src/legacy_sheet_view.rs:7",
+                    "litchi-xlsb legacy sheet-view public method sheet_views: "
+                    "crates/litchi-xlsb/src/legacy_sheet_view.rs:8",
+                ],
+            )
+
+    def test_sheet_view_hosts_cannot_define_canonical_view_types(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for path in (
+                boundaries.XLSB_SHEET_VIEW_ADAPTER,
+                boundaries.XLSX_SHEET_VIEW_MODEL,
+            ):
+                absolute_path = root / path
+                absolute_path.parent.mkdir(parents=True, exist_ok=True)
+                absolute_path.write_text(
+                    "\n".join(
+                        [
+                            *(f"pub struct {name};" for name in boundaries.CANONICAL_SHEET_VIEW_TYPES),
+                            "pub struct Entry;",
+                            "pub struct Collection;",
+                            "pub struct PivotSelection;",
+                            "pub struct Extension;",
+                        ]
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+
+            violations = boundaries.audit_spreadsheet_sheet_view_source_topology(root)
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertEqual(
+                violations,
+                [
+                    f"{host} sheet-view {role} defines canonical view type {name}: "
+                    f"{path}:{index}"
+                    for host, path, role in (
+                        ("litchi-xlsb", boundaries.XLSB_SHEET_VIEW_ADAPTER, "adapter"),
+                        ("litchi-xlsx", boundaries.XLSX_SHEET_VIEW_MODEL, "model"),
+                    )
+                    for index, name in enumerate(
+                        boundaries.CANONICAL_SHEET_VIEW_TYPES, start=1
+                    )
                 ],
             )
 

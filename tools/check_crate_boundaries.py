@@ -8,7 +8,7 @@ import json
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -45,9 +45,58 @@ COMMON_FAMILY_GUARDS = {
     "litchi-opc": OOXML_FORMATS,
 }
 RETIRED_MONOLITHS = frozenset({"litchi-ooxml", "litchi-ole"})
-RETIRED_FACADE_FEATURES = frozenset({"ole"})
+RETIRED_FACADE_FEATURES = frozenset(
+    {
+        "eval_engine",
+        "eval_engine_web_functions",
+        "full",
+        "imgconv",
+        "iwa",
+        "ooxml_encryption",
+    }
+)
 XLSB_SOURCE_ROOT = Path("crates/litchi-xlsb/src")
 XLSX_SOURCE_ROOT = Path("crates/litchi-xlsx/src")
+RETIRED_SHEET_VIEW_OWNER_SOURCES = (
+    ("litchi-xlsb", XLSB_SOURCE_ROOT / "views.rs"),
+    ("litchi-xlsx", XLSX_SOURCE_ROOT / "views.rs"),
+)
+RETIRED_XLSX_SHEET_VIEW_OWNER_TREE = XLSX_SOURCE_ROOT / "views"
+XLSB_SHEET_VIEW_ADAPTER = XLSB_SOURCE_ROOT / "host/sheet_view.rs"
+XLSX_SHEET_VIEW_MODEL = XLSX_SOURCE_ROOT / "sheet_view/model.rs"
+LEGACY_XLSB_SHEET_VIEW_NAMES = (
+    "SheetPane",
+    "SheetPanePosition",
+    "SheetPaneState",
+    "SheetSelection",
+    "SheetView",
+    "SheetViewType",
+)
+LEGACY_XLSB_SHEET_VIEW_NAME = re.compile(
+    r"\b(?:" + "|".join(LEGACY_XLSB_SHEET_VIEW_NAMES) + r")\b"
+)
+LEGACY_XLSB_SHEET_VIEW_METHOD = re.compile(
+    r"^\s*pub(?:\([^)]*\))?\s+fn\s+(?:set_sheet_view|sheet_views)\b"
+)
+CANONICAL_SHEET_VIEW_TYPES = (
+    "Display",
+    "Mode",
+    "Pane",
+    "Position",
+    "Selection",
+    "State",
+    "View",
+    "Zoom",
+)
+LOCAL_CANONICAL_SHEET_VIEW_TYPE = re.compile(
+    r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:struct|enum|type|union)\s+(?:"
+    + "|".join(CANONICAL_SHEET_VIEW_TYPES)
+    + r")\b"
+)
+FACADE_PACKAGE = "litchi"
+FACADE_REQUIRED_NORMAL_DEPENDENCIES = frozenset({"litchi-core"})
+FACADE_DEFAULT_FEATURE = "default"
+FACADE_ALL_FEATURE = "all"
 PUBLIC_XLSX_MODULE = re.compile(r"^\s*pub(?:\([^)]*\))?\s+mod\s+xlsx\s*;")
 PACKAGE_XLSX_PATH = re.compile(r"(?<![A-Za-z0-9_])package::xlsx\b")
 RETIRED_XLSX_CHART_FILES = (
@@ -167,6 +216,12 @@ class Snapshot:
     dependencies: dict[str, frozenset[str]]
     normal_dependencies: dict[str, frozenset[str]]
     features: dict[str, frozenset[str]]
+    feature_definitions: dict[str, dict[str, frozenset[str]]] = field(
+        default_factory=dict
+    )
+    normal_optional_dependencies: dict[str, frozenset[str]] = field(
+        default_factory=dict
+    )
 
 
 class PolicyError(ValueError):
@@ -420,6 +475,8 @@ def snapshot_from_metadata(data: dict[str, Any]) -> Snapshot:
     dependencies: dict[str, frozenset[str]] = {}
     normal_dependencies: dict[str, frozenset[str]] = {}
     features: dict[str, frozenset[str]] = {}
+    feature_definitions: dict[str, dict[str, frozenset[str]]] = {}
+    normal_optional_dependencies: dict[str, frozenset[str]] = {}
     manifests: set[Path] = set()
     for package in packages:
         name = package["name"]
@@ -432,6 +489,15 @@ def snapshot_from_metadata(data: dict[str, Any]) -> Snapshot:
             if (item.get("kind") or "normal") == "normal"
         )
         features[name] = frozenset(package["features"])
+        feature_definitions[name] = {
+            feature: frozenset(references)
+            for feature, references in package["features"].items()
+        }
+        normal_optional_dependencies[name] = frozenset(
+            item["name"]
+            for item in package["dependencies"]
+            if (item.get("kind") or "normal") == "normal" and item.get("optional")
+        )
         for dependency in package["dependencies"]:
             if dependency["name"] not in names:
                 continue
@@ -451,6 +517,8 @@ def snapshot_from_metadata(data: dict[str, Any]) -> Snapshot:
         dependencies=dependencies,
         normal_dependencies=normal_dependencies,
         features=features,
+        feature_definitions=feature_definitions,
+        normal_optional_dependencies=normal_optional_dependencies,
     )
 
 
@@ -594,6 +662,116 @@ def audit_snapshot(snapshot: Snapshot, policy: Policy) -> list[str]:
             + ", ".join(sorted(stale_feature_debt))
         )
 
+    violations.extend(audit_litchi_facade(snapshot))
+
+    return sorted(set(violations))
+
+
+def _facade_all_dependencies(
+    feature_definitions: dict[str, frozenset[str]],
+) -> frozenset[str]:
+    """Resolve direct and aggregate feature ownership from litchi's `all` feature."""
+
+    dependencies: set[str] = set()
+    pending = [FACADE_ALL_FEATURE]
+    visited: set[str] = set()
+    while pending:
+        feature = pending.pop()
+        if feature in visited:
+            continue
+        visited.add(feature)
+        for reference in feature_definitions.get(feature, frozenset()):
+            if reference.startswith("dep:"):
+                dependencies.add(reference.removeprefix("dep:"))
+            elif "/" not in reference:
+                pending.append(reference)
+    return frozenset(dependencies)
+
+
+def audit_litchi_facade(snapshot: Snapshot) -> list[str]:
+    """Enforce litchi's all-optional, feature-owned facade contract."""
+
+    if FACADE_PACKAGE not in snapshot.packages:
+        return []
+
+    normal_dependencies = snapshot.normal_dependencies.get(FACADE_PACKAGE, frozenset())
+    optional_dependencies = snapshot.normal_optional_dependencies.get(
+        FACADE_PACKAGE, frozenset()
+    )
+    feature_definitions = snapshot.feature_definitions.get(FACADE_PACKAGE, {})
+    violations: list[str] = []
+
+    required = normal_dependencies - optional_dependencies
+    unexpected_required = required - FACADE_REQUIRED_NORMAL_DEPENDENCIES
+    if unexpected_required:
+        violations.append(
+            "litchi facade has non-optional normal dependencies: "
+            + ", ".join(sorted(unexpected_required))
+        )
+    missing_required = FACADE_REQUIRED_NORMAL_DEPENDENCIES - required
+    if missing_required:
+        violations.append(
+            "litchi facade is missing required normal dependencies: "
+            + ", ".join(sorted(missing_required))
+        )
+
+    if feature_definitions.get(FACADE_DEFAULT_FEATURE) != frozenset():
+        violations.append("litchi default feature must be exactly empty")
+    if FACADE_ALL_FEATURE not in feature_definitions:
+        violations.append("litchi facade is missing the all feature")
+
+    owned_dependencies: set[str] = set()
+    stale_dependencies: set[str] = set()
+    unknown_feature_references: list[str] = []
+    unknown_dependency_references: list[str] = []
+    for feature, references in sorted(feature_definitions.items()):
+        for reference in sorted(references):
+            if reference.startswith("dep:"):
+                dependency = reference.removeprefix("dep:")
+                if dependency in optional_dependencies:
+                    owned_dependencies.add(dependency)
+                else:
+                    stale_dependencies.add(dependency)
+                continue
+            if "/" in reference:
+                dependency = reference.split("/", maxsplit=1)[0].removesuffix("?")
+                if dependency not in normal_dependencies:
+                    unknown_dependency_references.append(
+                        f"{feature} -> {reference}"
+                    )
+                continue
+            if reference not in feature_definitions:
+                unknown_feature_references.append(f"{feature} -> {reference}")
+
+    missing_ownership = optional_dependencies - owned_dependencies
+    if missing_ownership:
+        violations.append(
+            "litchi facade optional dependencies lack dep: feature ownership: "
+            + ", ".join(sorted(missing_ownership))
+        )
+    if stale_dependencies:
+        violations.append(
+            "litchi facade has stale dep: feature references: "
+            + ", ".join(sorted(stale_dependencies))
+        )
+    if unknown_feature_references:
+        violations.append(
+            "litchi facade feature references unknown features: "
+            + ", ".join(unknown_feature_references)
+        )
+    if unknown_dependency_references:
+        violations.append(
+            "litchi facade feature references unknown dependencies: "
+            + ", ".join(unknown_dependency_references)
+        )
+
+    omitted_from_all = optional_dependencies - _facade_all_dependencies(feature_definitions)
+    if omitted_from_all:
+        violations.append(
+            "litchi all feature omits optional dependencies: "
+            + ", ".join(sorted(omitted_from_all))
+        )
+
     return sorted(set(violations))
 
 
@@ -649,6 +827,65 @@ def audit_xlsb_source_topology(root: Path = ROOT) -> list[str]:
                         "retired XLSB package::xlsx path: "
                         f"{path.relative_to(root)}:{line_number}"
                     )
+
+    return sorted(set(violations))
+
+
+def audit_spreadsheet_sheet_view_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep canonical worksheet-view ownership out of OOXML format hosts."""
+
+    violations: list[str] = []
+    for host, path in RETIRED_SHEET_VIEW_OWNER_SOURCES:
+        absolute_path = root / path
+        if absolute_path.exists():
+            violations.append(
+                f"retired {host} sheet-view owner source returned: "
+                f"{path}"
+            )
+
+    retired_tree = root / RETIRED_XLSX_SHEET_VIEW_OWNER_TREE
+    if retired_tree.exists():
+        violations.append(
+            "retired litchi-xlsx sheet-view owner tree returned: "
+            + str(RETIRED_XLSX_SHEET_VIEW_OWNER_TREE)
+        )
+
+    xlsb_source_root = root / XLSB_SOURCE_ROOT
+    if xlsb_source_root.is_dir():
+        for path in sorted(xlsb_source_root.rglob("*.rs")):
+            for line_number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), start=1
+            ):
+                for match in LEGACY_XLSB_SHEET_VIEW_NAME.finditer(line):
+                    violations.append(
+                        f"litchi-xlsb legacy sheet-view name {match.group(0)}: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+                method = LEGACY_XLSB_SHEET_VIEW_METHOD.search(line)
+                if method:
+                    violations.append(
+                        "litchi-xlsb legacy sheet-view public method "
+                        f"{method.group(0).rsplit(None, 1)[-1]}: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+
+    for host, path, role in (
+        ("litchi-xlsb", XLSB_SHEET_VIEW_ADAPTER, "adapter"),
+        ("litchi-xlsx", XLSX_SHEET_VIEW_MODEL, "model"),
+    ):
+        absolute_path = root / path
+        if not absolute_path.is_file():
+            continue
+        for line_number, line in enumerate(
+            absolute_path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            match = LOCAL_CANONICAL_SHEET_VIEW_TYPE.match(line)
+            if match:
+                type_name = match.group(0).rsplit(None, 1)[-1]
+                violations.append(
+                    f"{host} sheet-view {role} defines canonical view type {type_name}: "
+                    f"{path}:{line_number}"
+                )
 
     return sorted(set(violations))
 
@@ -801,6 +1038,7 @@ def main(argv: list[str] | None = None) -> int:
         audit_manifest_inventory(snapshot)
         + audit_snapshot(snapshot, policy)
         + audit_xlsb_source_topology()
+        + audit_spreadsheet_sheet_view_source_topology()
         + audit_spreadsheet_chart_source_topology()
         + audit_spreadsheet_shape_source_topology()
     )

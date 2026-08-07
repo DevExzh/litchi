@@ -1,5 +1,6 @@
+#[cfg(feature = "yaml")]
 use crate::MetadataYaml;
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 use crate::document::{Cell, Table};
 use crate::document::{Paragraph, Run};
 /// Low-level writer for Markdown generation.
@@ -10,17 +11,17 @@ use crate::document::{Paragraph, Run};
 /// **Note**: Some functionality requires the `doc` or `ooxml` feature to be enabled.
 use litchi_core::{Error, Metadata, Result};
 use litchi_markdown::MarkdownOptions;
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 use litchi_markdown::TableStyle;
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 use memchr::memchr;
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::fmt::Write as FmtWrite;
 
 /// Minimum number of table rows to justify parallel processing overhead.
 /// Tables are typically smaller than documents, so we use a lower threshold.
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 const TABLE_PARALLEL_THRESHOLD: usize = 20;
 
 /// Information about a detected list item.
@@ -46,7 +47,7 @@ enum ListType {
 }
 
 /// Information about cell span (colspan and rowspan) for HTML rendering.
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct CellSpan {
     /// Number of columns this cell spans (horizontal merge)
@@ -57,7 +58,7 @@ struct CellSpan {
     skip: bool,
 }
 
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 impl CellSpan {
     /// Create a new cell span with default values (no merge).
     fn new() -> Self {
@@ -97,13 +98,13 @@ pub(crate) struct MarkdownWriter {
 ///
 /// This struct caches cell span data to avoid repeated parsing during span analysis.
 /// Text content is extracted separately for better performance.
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 #[derive(Debug, Clone)]
 struct CellData {
     /// Horizontal span (gridSpan/colspan)
     grid_span: usize,
     /// Vertical merge state (OOXML only)
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "docx")]
     v_merge: Option<crate::docx::VMergeState>,
 }
 
@@ -118,7 +119,7 @@ struct CellData {
 ///
 /// **Performance**: Optimized to extract all cell data in a single pass, avoiding repeated
 /// parsing. For large tables, uses parallel processing to extract cell data concurrently.
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "odt", feature = "rtf"))]
 fn analyze_table_spans(table: &Table, use_parallel: bool) -> Result<Vec<Vec<CellSpan>>> {
     let rows = table.rows()?;
     if rows.is_empty() {
@@ -143,7 +144,7 @@ fn analyze_table_spans(table: &Table, use_parallel: bool) -> Result<Vec<Vec<Cell
                         .map(|cell| {
                             Ok(CellData {
                                 grid_span: cell.grid_span().unwrap_or(1),
-                                #[cfg(feature = "ooxml")]
+                                #[cfg(feature = "docx")]
                                 v_merge: cell.v_merge().ok().flatten(),
                             })
                         })
@@ -160,7 +161,7 @@ fn analyze_table_spans(table: &Table, use_parallel: bool) -> Result<Vec<Vec<Cell
                         .map(|cell| {
                             Ok(CellData {
                                 grid_span: cell.grid_span().unwrap_or(1),
-                                #[cfg(feature = "ooxml")]
+                                #[cfg(feature = "docx")]
                                 v_merge: cell.v_merge().ok().flatten(),
                             })
                         })
@@ -206,7 +207,7 @@ fn analyze_table_spans(table: &Table, use_parallel: bool) -> Result<Vec<Vec<Cell
             }
 
             // Get vertical merge state (vMerge)
-            #[cfg(feature = "ooxml")]
+            #[cfg(feature = "docx")]
             {
                 use crate::docx::VMergeState;
 
@@ -256,7 +257,7 @@ fn analyze_table_spans(table: &Table, use_parallel: bool) -> Result<Vec<Vec<Cell
 ///
 /// **Performance**: For large tables, uses parallel processing to extract cell data concurrently.
 /// This avoids repeated XML parsing during table rendering.
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "odt", feature = "rtf"))]
 fn extract_table_cell_data(table: &Table, use_parallel: bool) -> Result<Vec<Vec<String>>> {
     let rows = table.rows()?;
     if rows.is_empty() {
@@ -306,15 +307,15 @@ impl MarkdownWriter {
     /// once and deriving text from them when needed.
     #[cfg(any(
         feature = "doc",
-        feature = "ooxml",
-        feature = "odf",
+        feature = "docx",
+        feature = "odt",
         feature = "rtf",
-        feature = "iwa"
+        feature = "iwork"
     ))]
     #[allow(irrefutable_let_patterns)]
     pub fn write_paragraph(&mut self, para: &Paragraph) -> Result<()> {
         // First check for paragraph-level formulas (display math)
-        #[cfg(feature = "ooxml")]
+        #[cfg(feature = "docx")]
         {
             use crate::document::Paragraph;
             if let Paragraph::Docx(docx_para) = para {
@@ -436,7 +437,7 @@ impl MarkdownWriter {
     /// Write a paragraph that contains display-level formulas.
     ///
     /// This handles paragraphs where formulas are direct children of the paragraph (not within runs).
-    #[cfg(all(feature = "ooxml", feature = "formula"))]
+    #[cfg(all(feature = "docx", feature = "formula"))]
     fn write_paragraph_with_display_formulas(
         &mut self,
         para: &Paragraph,
@@ -478,7 +479,7 @@ impl MarkdownWriter {
     }
 
     /// Fallback for when formula feature is not enabled.
-    #[cfg(all(feature = "ooxml", not(feature = "formula")))]
+    #[cfg(all(feature = "docx", not(feature = "formula")))]
     fn write_paragraph_with_display_formulas(
         &mut self,
         para: &Paragraph,
@@ -570,10 +571,10 @@ impl MarkdownWriter {
     /// text and properties simultaneously, providing 2x speedup over separate calls.
     #[cfg(any(
         feature = "doc",
-        feature = "ooxml",
-        feature = "odf",
+        feature = "docx",
+        feature = "odt",
         feature = "rtf",
-        feature = "iwa"
+        feature = "iwork"
     ))]
     #[allow(irrefutable_let_patterns)]
     pub fn write_run(&mut self, run: &Run) -> Result<()> {
@@ -585,7 +586,7 @@ impl MarkdownWriter {
 
         // OPTIMIZATION: Get text AND properties in a single XML parse
         // This is 2x faster than calling text() then get_properties()
-        #[cfg(feature = "ooxml")]
+        #[cfg(feature = "docx")]
         let (text, bold, italic, strikethrough, vertical_pos) =
             if let crate::document::Run::Docx(docx_run) = run {
                 let (text, props) = docx_run
@@ -616,7 +617,7 @@ impl MarkdownWriter {
                 )
             };
 
-        #[cfg(all(feature = "doc", not(feature = "ooxml")))]
+        #[cfg(all(feature = "doc", not(feature = "docx")))]
         let (text, bold, italic, strikethrough, vertical_pos) = {
             let text = run.text()?;
             if text.is_empty() {
@@ -633,8 +634,8 @@ impl MarkdownWriter {
 
         // For rtf, odf features (without doc/ooxml)
         #[cfg(all(
-            not(any(feature = "doc", feature = "ooxml")),
-            any(feature = "rtf", feature = "odf", feature = "iwa")
+            not(any(feature = "doc", feature = "docx")),
+            any(feature = "rtf", feature = "odt", feature = "iwork")
         ))]
         let (text, bold, italic, strikethrough) = {
             let text = run.text()?;
@@ -651,7 +652,7 @@ impl MarkdownWriter {
 
         // Handle vertical position (superscript/subscript)
         // Note: vertical_position() is available when doc or ooxml features are enabled
-        #[cfg(any(feature = "doc", feature = "ooxml"))]
+        #[cfg(any(feature = "doc", feature = "docx"))]
         {
             use litchi_core::VerticalPosition;
 
@@ -731,7 +732,7 @@ impl MarkdownWriter {
         }
 
         // Pre-calculate buffer size for non-vertical-position formatting
-        #[cfg(not(any(feature = "doc", feature = "ooxml")))]
+        #[cfg(not(any(feature = "doc", feature = "docx")))]
         {
             let mut needed_capacity = text.len();
             if strikethrough {
@@ -790,7 +791,7 @@ impl MarkdownWriter {
     /// Write a table to the buffer.
     ///
     /// **Note**: This method requires the `doc` or `ooxml` feature to be enabled.
-    #[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
+    #[cfg(any(feature = "doc", feature = "docx", feature = "odt", feature = "rtf"))]
     pub fn write_table(&mut self, table: &Table) -> Result<()> {
         // Check if table has merged cells
         let has_merged_cells = self.table_has_merged_cells(table)?;
@@ -819,7 +820,7 @@ impl MarkdownWriter {
     /// - Vertical merges (vMerge/rowspan > 1)
     ///
     /// **Performance**: Efficient analysis that reuses existing span computation.
-    #[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
+    #[cfg(any(feature = "doc", feature = "docx", feature = "odt", feature = "rtf"))]
     fn table_has_merged_cells(&self, table: &Table) -> Result<bool> {
         let rows = table.rows()?;
         if rows.is_empty() {
@@ -836,7 +837,7 @@ impl MarkdownWriter {
                 }
 
                 // Check vertical merge (vMerge) - only available for OOXML
-                #[cfg(feature = "ooxml")]
+                #[cfg(feature = "docx")]
                 {
                     if cell.v_merge().ok().flatten().is_some() {
                         return Ok(true);
@@ -853,7 +854,7 @@ impl MarkdownWriter {
     /// **Performance**: Uses efficient single-pass escaping and minimizes allocations.
     /// For large tables (20+ rows), uses parallel processing to render rows concurrently.
     /// Pre-extracts all cell data in a single optimized pass to avoid repeated parsing.
-    #[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
+    #[cfg(any(feature = "doc", feature = "docx", feature = "odt", feature = "rtf"))]
     fn write_markdown_table(&mut self, table: &Table) -> Result<()> {
         // OPTIMIZATION: Extract all cell data in a single pass (with parallelization for large tables)
         let cell_data = extract_table_cell_data(table, self.options.use_parallel)?;
@@ -929,7 +930,7 @@ impl MarkdownWriter {
     ///
     /// **Performance**: Single-pass escaping without intermediate allocations.
     /// Uses SIMD-accelerated memchr for fast searching.
-    #[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
+    #[cfg(any(feature = "doc", feature = "docx", feature = "odt", feature = "rtf"))]
     fn write_markdown_escaped(&mut self, text: &str) {
         Self::escape_markdown_to_buffer(&mut self.buffer, text);
     }
@@ -940,7 +941,7 @@ impl MarkdownWriter {
     ///
     /// **Performance**: Single-pass escaping without intermediate allocations.
     /// Uses SIMD-accelerated memchr for fast searching.
-    #[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
+    #[cfg(any(feature = "doc", feature = "docx", feature = "odt", feature = "rtf"))]
     fn escape_markdown_to_buffer(buffer: &mut String, text: &str) {
         let bytes = text.as_bytes();
         let mut pos = 0;
@@ -993,7 +994,7 @@ impl MarkdownWriter {
     /// **Styling**:
     /// - Styled tables (`styled = true`): Include indentation, line feeds, and CSS class
     /// - Minimal tables (`styled = false`): No indentation, no line feeds for compact output
-    #[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
+    #[cfg(any(feature = "doc", feature = "docx", feature = "odt", feature = "rtf"))]
     fn write_html_table(&mut self, table: &Table, styled: bool) -> Result<()> {
         // OPTIMIZATION: Extract all cell data in a single pass (with parallelization for large tables)
         let cell_data = extract_table_cell_data(table, self.options.use_parallel)?;
@@ -1204,7 +1205,7 @@ impl MarkdownWriter {
     /// **Performance**: Single-pass escaping that writes directly to the buffer,
     /// avoiding the 4 intermediate string allocations from chained `replace()` calls.
     /// Uses SIMD-accelerated memchr for fast searching.
-    #[cfg(any(feature = "doc", feature = "ooxml", feature = "odf", feature = "rtf"))]
+    #[cfg(any(feature = "doc", feature = "docx", feature = "odt", feature = "rtf"))]
     fn escape_html_to_buffer(buffer: &mut String, text: &str) {
         let bytes = text.as_bytes();
         let mut pos = 0;
@@ -1271,6 +1272,7 @@ impl MarkdownWriter {
     ///
     /// If metadata is available and include_metadata is enabled,
     /// this writes the metadata as YAML front matter at the beginning of the document.
+    #[cfg(feature = "yaml")]
     pub fn write_metadata(&mut self, metadata: &Metadata) -> Result<()> {
         if !self.options.include_metadata {
             return Ok(());
@@ -1383,15 +1385,15 @@ impl MarkdownWriter {
     /// Returns the markdown representation of the formula if one is found, None otherwise.
     #[cfg(any(
         feature = "doc",
-        feature = "ooxml",
-        feature = "odf",
+        feature = "docx",
+        feature = "odt",
         feature = "rtf",
-        feature = "iwa"
+        feature = "iwork"
     ))]
     #[allow(irrefutable_let_patterns)]
     fn extract_formula_from_run(&self, _run: &Run) -> Result<Option<String>> {
         // Try OOXML OMML formulas first
-        #[cfg(feature = "ooxml")]
+        #[cfg(feature = "docx")]
         if let crate::document::Run::Docx(docx_run) = _run
             && let Some(omml_xml) = docx_run.omml_formula().map_err(crate::map_ooxml_error)?
         {
@@ -1455,7 +1457,7 @@ impl MarkdownWriter {
     }
 
     /// Convert OMML XML to LaTeX string
-    #[cfg(all(feature = "ooxml", feature = "formula"))]
+    #[cfg(all(feature = "docx", feature = "formula"))]
     #[allow(dead_code)] // Used conditionally based on feature flags
     fn convert_omml_to_latex(&self, omml_xml: &str) -> String {
         use litchi_formula::omml_to_latex;
@@ -1468,7 +1470,7 @@ impl MarkdownWriter {
     }
 
     /// Convert OMML XML to LaTeX string (fallback when formula feature is disabled)
-    #[cfg(all(feature = "ooxml", not(feature = "formula")))]
+    #[cfg(all(feature = "docx", not(feature = "formula")))]
     #[allow(dead_code)] // Used conditionally based on feature flags
     fn convert_omml_to_latex(&self, _omml_xml: &str) -> String {
         "[Formula support disabled - enable 'formula' feature]".to_string()
@@ -1503,10 +1505,10 @@ impl MarkdownWriter {
     #[allow(dead_code)] // Used in fallback paths
     #[cfg(any(
         feature = "doc",
-        feature = "ooxml",
-        feature = "odf",
+        feature = "docx",
+        feature = "odt",
         feature = "rtf",
-        feature = "iwa"
+        feature = "iwork"
     ))]
     fn write_list_item(&mut self, _para: &Paragraph, list_info: &ListItemInfo) -> Result<()> {
         // Add indentation for nested lists
@@ -1561,10 +1563,10 @@ impl MarkdownWriter {
     /// For OOXML runs, this method is optimized to extract only text efficiently.
     #[cfg(any(
         feature = "doc",
-        feature = "ooxml",
-        feature = "odf",
+        feature = "docx",
+        feature = "odt",
         feature = "rtf",
-        feature = "iwa"
+        feature = "iwork"
     ))]
     fn extract_text_from_runs(&self, runs: &[Run]) -> Result<String> {
         // Pre-allocate capacity based on number of runs
@@ -1585,10 +1587,10 @@ impl MarkdownWriter {
     /// **Performance**: Takes pre-parsed runs to avoid re-parsing XML.
     #[cfg(any(
         feature = "doc",
-        feature = "ooxml",
-        feature = "odf",
+        feature = "docx",
+        feature = "odt",
         feature = "rtf",
-        feature = "iwa"
+        feature = "iwork"
     ))]
     fn write_list_item_from_runs(&mut self, runs: &[Run], list_info: &ListItemInfo) -> Result<()> {
         // Add indentation for nested lists

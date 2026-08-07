@@ -32,7 +32,7 @@ where
 
         // Walk the worksheet preamble up to BrtWsDim (worksheet dimensions),
         // capturing the sheet-view collection while skipping everything else.
-        let mut sheet_views = Vec::new();
+        let mut views = Vec::new();
         loop {
             let typ = iter.read_type()?;
             let _ = iter.fill_buffer(&mut buf)?;
@@ -40,7 +40,7 @@ where
                 break;
             }
             if typ == kind::BEGIN_WS_VIEWS {
-                sheet_views = crate::package::sheet_view::read_sheet_views(&mut iter, &mut buf)?;
+                views = crate::package::sheet_view::read_views(&mut iter, &mut buf)?;
             }
         }
         if buf.len() != 16 {
@@ -65,7 +65,7 @@ where
             if typ == kind::COL_INFO {
                 column_infos.push(Self::parse_column_info(&buf, cell_xf_count)?);
             } else if typ == kind::BEGIN_WS_VIEWS {
-                sheet_views = crate::package::sheet_view::read_sheet_views(&mut iter, &mut buf)?;
+                views = crate::package::sheet_view::read_views(&mut iter, &mut buf)?;
             }
         }
 
@@ -92,7 +92,7 @@ where
             data_validation14_settings: None,
             conditional_formattings: Vec::new(),
             web_extension_bindings: Vec::new(),
-            sheet_views,
+            views,
             saw_web_extension_collection: false,
         })
     }

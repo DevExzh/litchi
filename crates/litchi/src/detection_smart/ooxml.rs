@@ -5,10 +5,10 @@
 //! Uses SIMD-accelerated signature matching for improved performance.
 
 use litchi_core::detection::FileFormat;
-#[cfg(feature = "ooxml")]
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 use std::io::{Read, Seek};
 
-#[cfg(feature = "ooxml")]
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 use litchi_core::detection::simd_utils::signature_matches;
 
 /// Detect ZIP-based OOXML formats from byte content.
@@ -17,7 +17,7 @@ use litchi_core::detection::simd_utils::signature_matches;
 ///
 /// # Note
 /// This function requires the `ooxml` feature to be enabled.
-#[cfg(feature = "ooxml")]
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 pub fn detect_zip_format(bytes: &[u8]) -> Option<FileFormat> {
     // Check if it starts with ZIP signature using SIMD
     if bytes.len() < 4 || !signature_matches(bytes, litchi_core::detection::utils::ZIP_SIGNATURE) {
@@ -31,7 +31,7 @@ pub fn detect_zip_format(bytes: &[u8]) -> Option<FileFormat> {
 
 /// Stub implementation when `ooxml` feature is disabled.
 /// Always returns None since OOXML parsing is not available.
-#[cfg(not(feature = "ooxml"))]
+#[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
 pub fn detect_zip_format(_bytes: &[u8]) -> Option<FileFormat> {
     None
 }
@@ -41,7 +41,7 @@ pub fn detect_zip_format(_bytes: &[u8]) -> Option<FileFormat> {
 ///
 /// # Note
 /// This function requires the `ooxml` feature to be enabled.
-#[cfg(feature = "ooxml")]
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 pub fn detect_zip_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileFormat> {
     // Try to open as OOXML package - this will validate the format and structure
     let package = match crate::opc::OpcPackage::from_reader(reader) {
@@ -58,7 +58,7 @@ pub fn detect_zip_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<F
 ///
 /// # Note
 /// This function requires the `ooxml` feature to be enabled.
-#[cfg(feature = "ooxml")]
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 pub fn detect_ooxml_format_from_package(package: &crate::opc::OpcPackage) -> Option<FileFormat> {
     fn is_word_main(content_type: &str) -> bool {
         content_type.contains("wordprocessingml.document.main")

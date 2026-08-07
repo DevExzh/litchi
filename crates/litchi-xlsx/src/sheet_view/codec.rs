@@ -3,6 +3,10 @@
 use crate::error::{Error, Result};
 use crate::raw::namespace::{is_spreadsheetml_name, relationship_attribute_value};
 use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_sheet::view::{
+    Color, Display, Mode, Pane, Position, Scale, Selection, Split, State, View, Window,
+};
+use litchi_sheet::{Cell, Rect};
 use quick_xml::Writer;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -17,6 +21,7 @@ const MAX_VIEWS: usize = 1024;
 const MAX_SELECTION_RANGES: usize = 32_767;
 const MAX_RETAINED_MARKUP: usize = 4 * 1024 * 1024;
 const MAX_PIVOT_AREA_MARKUP: usize = 1024 * 1024;
+const MAX_RETAINED_SHEET_VIEW_XML: usize = 4 * 1024 * 1024;
 const MAX_RELATIONSHIP_ID_BYTES: usize = 1024;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -46,20 +51,25 @@ struct Capture {
     writer: Writer<Vec<u8>>,
     payload: CapturePayload,
 }
+struct SheetViewCapture {
+    bytes: usize,
+    writer: Writer<Vec<u8>>,
+}
 
 struct Parser {
     stack: Vec<Context>,
-    collection: Option<Views>,
-    current_view: Option<View>,
+    collection: Option<Collection>,
+    current_view: Option<Entry>,
     current_pivot: Option<PivotBuilder>,
     capture: Option<Capture>,
+    sheet_view_capture: Option<SheetViewCapture>,
     seen_collection: bool,
     sheet_views_phase: u8,
     view_phase: u8,
     retained: usize,
 }
 struct PivotBuilder {
-    pane: PanePosition,
+    pane: Position,
     show_header: bool,
     label: bool,
     data: bool,
@@ -80,7 +90,7 @@ struct PivotBuilder {
 }
 
 /// Parse the worksheet's single `sheetViews` collection without resolving UI state or relationships.
-pub fn parse_worksheet_views(xml: &[u8]) -> Result<Option<Views>> {
+pub fn parse_worksheet_views(xml: &[u8]) -> Result<Option<Collection>> {
     let processed =
         process_markup_compatibility(xml, &Capabilities::default(), &Limits::default())?;
     let mut reader = NsReader::from_reader(processed.xml.as_ref());
@@ -91,6 +101,7 @@ pub fn parse_worksheet_views(xml: &[u8]) -> Result<Option<Views>> {
         current_view: None,
         current_pivot: None,
         capture: None,
+        sheet_view_capture: None,
         seen_collection: false,
         sheet_views_phase: 0,
         view_phase: 0,
@@ -109,6 +120,9 @@ pub fn parse_worksheet_views(xml: &[u8]) -> Result<Option<Views>> {
             {
                 return Err(invalid("custom XML entities are rejected"));
             }
+        }
+        if parser.sheet_view_capture.is_some() && !matches!(&event, Event::Eof) {
+            parser.capture_sheet_view_event(event.clone())?;
         }
         if parser.capture.is_some() {
             parser.capture_event(event)?;
@@ -152,6 +166,7 @@ impl Parser {
             },
             (Context::SheetViews, true, b"sheetView") => {
                 self.begin_view(element, decoder)?;
+                self.begin_sheet_view_capture(element, false)?;
                 self.stack.push(Context::SheetView);
             },
             (Context::SheetViews, true, b"extLst") => {
@@ -240,6 +255,7 @@ impl Parser {
             },
             (Context::SheetViews, true, b"sheetView") => {
                 self.begin_view(element, decoder)?;
+                self.begin_sheet_view_capture(element, true)?;
                 self.finish_view()?;
             },
             (Context::SheetViews, true, b"extLst") => self.begin_ext_list(Owner::Collection)?,
@@ -329,8 +345,8 @@ impl Parser {
         }
         self.seen_collection = true;
         self.sheet_views_phase = 0;
-        self.collection = Some(Views {
-            views: Vec::new(),
+        self.collection = Some(Collection {
+            entries: Vec::new(),
             extensions: Vec::new(),
         });
         Ok(())
@@ -339,7 +355,7 @@ impl Parser {
         if self
             .collection
             .as_ref()
-            .is_none_or(|value| value.views.is_empty())
+            .is_none_or(|value| value.entries.is_empty())
         {
             return Err(invalid("sheetViews must contain at least one sheetView"));
         }
@@ -356,7 +372,7 @@ impl Parser {
             .collection
             .as_ref()
             .ok_or_else(|| invalid("sheetView outside sheetViews"))?;
-        if collection.views.len() >= MAX_VIEWS {
+        if collection.entries.len() >= MAX_VIEWS {
             return Err(invalid("too many worksheet views"));
         }
         self.view_phase = 0;
@@ -367,15 +383,64 @@ impl Parser {
         if self.current_pivot.is_some() {
             return Err(invalid("unterminated pivotSelection"));
         }
-        let view = self
+        let retained_xml = self
+            .sheet_view_capture
+            .take()
+            .ok_or_else(|| invalid("sheetView retained markup is missing"))?
+            .writer
+            .into_inner();
+        let mut view = self
             .current_view
             .take()
             .ok_or_else(|| invalid("sheetView end without start"))?;
+        view.retained_xml = retained_xml;
         self.collection
             .as_mut()
             .ok_or_else(|| invalid("sheetView outside collection"))?
-            .views
+            .entries
             .push(view);
+        Ok(())
+    }
+    fn begin_sheet_view_capture(&mut self, element: &BytesStart<'_>, empty: bool) -> Result<()> {
+        if self.sheet_view_capture.is_some() {
+            return Err(invalid("nested sheetView retained markup"));
+        }
+        if element.len() > MAX_RETAINED_SHEET_VIEW_XML {
+            return Err(invalid(
+                "worksheet-view retained sheetView XML exceeds resource limit",
+            ));
+        }
+        let mut writer = Writer::new(Vec::new());
+        if empty {
+            writer
+                .write_event(Event::Empty(element.clone()))
+                .map_err(xml_error)?;
+        } else {
+            writer
+                .write_event(Event::Start(element.clone()))
+                .map_err(xml_error)?;
+        }
+        self.sheet_view_capture = Some(SheetViewCapture {
+            bytes: element.len(),
+            writer,
+        });
+        Ok(())
+    }
+    fn capture_sheet_view_event(&mut self, event: Event<'static>) -> Result<()> {
+        let capture = self
+            .sheet_view_capture
+            .as_mut()
+            .ok_or_else(|| invalid("sheetView retained markup is missing"))?;
+        capture.bytes = capture
+            .bytes
+            .checked_add(event.as_ref().len())
+            .ok_or_else(|| invalid("worksheet-view retained sheetView XML size overflow"))?;
+        if capture.bytes > MAX_RETAINED_SHEET_VIEW_XML {
+            return Err(invalid(
+                "worksheet-view retained sheetView XML exceeds resource limit",
+            ));
+        }
+        capture.writer.write_event(event).map_err(xml_error)?;
         Ok(())
     }
     fn begin_ext_list(&mut self, owner: Owner) -> Result<()> {
@@ -403,10 +468,10 @@ impl Parser {
             .current_view
             .as_mut()
             .ok_or_else(|| invalid("pane outside sheetView"))?;
-        if view.pane.is_some() {
+        if view.view.pane.is_some() {
             return Err(invalid("duplicate worksheet-view pane"));
         }
-        view.pane = Some(parse_pane(element, decoder)?);
+        view.view.pane = Some(parse_pane(element, decoder)?);
         Ok(())
     }
     fn add_selection(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
@@ -418,10 +483,12 @@ impl Parser {
             .current_view
             .as_mut()
             .ok_or_else(|| invalid("selection outside sheetView"))?;
-        if view.selections.len() >= 4 {
+        if view.view.selections.len() >= 4 {
             return Err(invalid("sheetView exceeds four selections"));
         }
-        view.selections.push(parse_selection(element, decoder)?);
+        view.view
+            .selections
+            .push(parse_selection(element, decoder)?);
         Ok(())
     }
     fn begin_pivot(
@@ -560,88 +627,92 @@ impl Parser {
     }
 }
 
-fn parse_view(element: &BytesStart<'_>, decoder: Decoder) -> Result<View> {
-    Ok(View {
-        workbook_view_id: required_u32(element, b"workbookViewId", decoder)?,
+fn parse_view(element: &BytesStart<'_>, decoder: Decoder) -> Result<Entry> {
+    let color_id = optional_u32(element, b"colorId", decoder)?.unwrap_or(64);
+    if color_id > 64 {
+        return Err(invalid("worksheet-view colorId exceeds 64"));
+    }
+
+    let mut view = View::default();
+    view.window = Window::new(required_u32(element, b"workbookViewId", decoder)?);
+    view.display = Display {
         window_protection: bool_attr(element, b"windowProtection", decoder)?.unwrap_or(false),
         show_formulas: bool_attr(element, b"showFormulas", decoder)?.unwrap_or(false),
-        show_grid_lines: bool_attr(element, b"showGridLines", decoder)?.unwrap_or(true),
-        show_row_col_headers: bool_attr(element, b"showRowColHeaders", decoder)?.unwrap_or(true),
-        show_zeros: bool_attr(element, b"showZeros", decoder)?.unwrap_or(true),
+        grid_lines: bool_attr(element, b"showGridLines", decoder)?.unwrap_or(true),
+        row_column_headers: bool_attr(element, b"showRowColHeaders", decoder)?.unwrap_or(true),
+        zero_values: bool_attr(element, b"showZeros", decoder)?.unwrap_or(true),
         right_to_left: bool_attr(element, b"rightToLeft", decoder)?.unwrap_or(false),
-        tab_selected: bool_attr(element, b"tabSelected", decoder)?.unwrap_or(false),
-        show_ruler: bool_attr(element, b"showRuler", decoder)?.unwrap_or(true),
-        show_outline_symbols: bool_attr(element, b"showOutlineSymbols", decoder)?.unwrap_or(true),
+        ruler: bool_attr(element, b"showRuler", decoder)?.unwrap_or(true),
+        outline_symbols: bool_attr(element, b"showOutlineSymbols", decoder)?.unwrap_or(true),
         default_grid_color: bool_attr(element, b"defaultGridColor", decoder)?.unwrap_or(true),
-        show_white_space: bool_attr(element, b"showWhiteSpace", decoder)?.unwrap_or(true),
-        view_type: ViewType::parse(
-            attr(element, b"view", decoder)?
-                .as_deref()
-                .unwrap_or("normal"),
-        )?,
-        top_left_cell: optional_cell(element, b"topLeftCell", decoder)?,
-        color_id: optional_u32(element, b"colorId", decoder)?.unwrap_or(64),
-        zoom_scale: current_zoom(element, b"zoomScale", decoder)?.unwrap_or(100),
-        zoom_scale_normal: remembered_zoom(element, b"zoomScaleNormal", decoder)?.unwrap_or(0),
-        zoom_scale_sheet_layout_view: remembered_zoom(
-            element,
-            b"zoomScaleSheetLayoutView",
-            decoder,
-        )?
-        .unwrap_or(0),
-        zoom_scale_page_layout_view: remembered_zoom(element, b"zoomScalePageLayoutView", decoder)?
-            .unwrap_or(0),
-        pane: None,
-        selections: Vec::new(),
+        white_space: bool_attr(element, b"showWhiteSpace", decoder)?.unwrap_or(true),
+    };
+    view.tab_selected = bool_attr(element, b"tabSelected", decoder)?.unwrap_or(false);
+    view.mode = parse_mode(
+        attr(element, b"view", decoder)?
+            .as_deref()
+            .unwrap_or("normal"),
+    )?;
+    if let Some(origin) = optional_cell(element, b"topLeftCell", decoder)? {
+        view.origin = origin;
+    }
+    view.color =
+        Color::new(color_id as u8).map_err(|_| invalid("worksheet-view colorId exceeds 64"))?;
+    view.zoom.current = current_zoom(element, b"zoomScale", decoder)?.unwrap_or_default();
+    view.zoom.normal = remembered_zoom(element, b"zoomScaleNormal", decoder)?;
+    view.zoom.page_break_preview = remembered_zoom(element, b"zoomScaleSheetLayoutView", decoder)?;
+    view.zoom.page_layout = remembered_zoom(element, b"zoomScalePageLayoutView", decoder)?;
+    view.selections.clear();
+
+    Ok(Entry {
+        view,
         pivot_selections: Vec::new(),
         extensions: Vec::new(),
-    })
-    .and_then(|view| {
-        if view.color_id > 64 {
-            Err(invalid("worksheet-view colorId exceeds 64"))
-        } else {
-            Ok(view)
-        }
+        retained_xml: Vec::new(),
     })
 }
 fn parse_pane(element: &BytesStart<'_>, decoder: Decoder) -> Result<Pane> {
-    Ok(Pane {
-        x_split: nonnegative_f64(element, b"xSplit", decoder)?,
-        y_split: nonnegative_f64(element, b"ySplit", decoder)?,
-        top_left_cell: optional_cell(element, b"topLeftCell", decoder)?,
-        active_pane: PanePosition::parse(
-            attr(element, b"activePane", decoder)?
-                .as_deref()
-                .unwrap_or("topLeft"),
-        )?,
-        state: PaneState::parse(
-            attr(element, b"state", decoder)?
-                .as_deref()
-                .unwrap_or("split"),
-        )?,
-    })
+    let mut pane = Pane::default();
+    pane.horizontal = nonnegative_f64(element, b"xSplit", decoder)?;
+    pane.vertical = nonnegative_f64(element, b"ySplit", decoder)?;
+    if let Some(top_left) = optional_cell(element, b"topLeftCell", decoder)? {
+        pane.top_left = top_left;
+    }
+    pane.position = parse_position(
+        attr(element, b"activePane", decoder)?
+            .as_deref()
+            .unwrap_or("topLeft"),
+    )?;
+    pane.state = parse_state(
+        attr(element, b"state", decoder)?
+            .as_deref()
+            .unwrap_or("split"),
+    )?;
+    Ok(pane)
 }
 fn parse_selection(element: &BytesStart<'_>, decoder: Decoder) -> Result<Selection> {
+    let defaults = Selection::default();
     let active_cell =
-        optional_cell(element, b"activeCell", decoder)?.unwrap_or(CellReference("A1".into()));
-    let sqref = match attr(element, b"sqref", decoder)? {
+        optional_cell(element, b"activeCell", decoder)?.unwrap_or(defaults.active_cell());
+    let ranges = match attr(element, b"sqref", decoder)? {
         Some(value) => parse_sqref(&value)?,
-        None => Sqref(vec![RangeReference("A1".into())]),
+        None => defaults.ranges().to_vec(),
     };
-    let active_cell_id = optional_u32(element, b"activeCellId", decoder)?.unwrap_or(0);
-    if active_cell_id as usize >= sqref.0.len() {
+    let active_range = optional_u32(element, b"activeCellId", decoder)?.unwrap_or(0) as usize;
+    if active_range >= ranges.len() {
         return Err(invalid("worksheet-view activeCellId is outside sqref"));
     }
-    Ok(Selection {
-        pane: PanePosition::parse(
+    Selection::new(
+        parse_position(
             attr(element, b"pane", decoder)?
                 .as_deref()
                 .unwrap_or("topLeft"),
         )?,
         active_cell,
-        active_cell_id,
-        sqref,
-    })
+        active_range,
+        ranges,
+    )
+    .map_err(|_| invalid("invalid worksheet-view selection"))
 }
 fn parse_pivot(
     element: &BytesStart<'_>,
@@ -653,7 +724,7 @@ fn parse_pivot(
         validate_relationship_id(value)?;
     }
     Ok(PivotBuilder {
-        pane: PanePosition::parse(
+        pane: parse_position(
             attr(element, b"pane", decoder)?
                 .as_deref()
                 .unwrap_or("topLeft"),
@@ -776,7 +847,11 @@ fn optional_i32(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Resu
         })
         .transpose()
 }
-fn nonnegative_f64(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<f64>> {
+fn nonnegative_f64(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+) -> Result<Option<Split>> {
     attr(element, name, decoder)?
         .map(|v| {
             let n = v
@@ -787,16 +862,18 @@ fn nonnegative_f64(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> R
                     "worksheet-view split must be finite and nonnegative",
                 ))
             } else {
-                Ok(n)
+                Split::new(n)
+                    .map_err(|_| invalid("worksheet-view split must be finite and nonnegative"))
             }
         })
         .transpose()
 }
-fn current_zoom(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<u16>> {
+fn current_zoom(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<Scale>> {
     optional_u32(element, name, decoder)?
         .map(|v| {
             if (10..=400).contains(&v) {
-                Ok(v as u16)
+                Scale::new(v as u16)
+                    .map_err(|_| invalid("current worksheet-view zoom must be 10 through 400"))
             } else {
                 Err(invalid(
                     "current worksheet-view zoom must be 10 through 400",
@@ -805,54 +882,42 @@ fn current_zoom(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Resu
         })
         .transpose()
 }
-fn remembered_zoom(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<u16>> {
-    optional_u32(element, name, decoder)?
-        .map(|v| {
-            if v == 0 || (10..=400).contains(&v) {
-                Ok(v as u16)
-            } else {
-                Err(invalid(
-                    "remembered worksheet-view zoom must be zero or 10 through 400",
-                ))
-            }
-        })
-        .transpose()
-}
-fn optional_cell(
+fn remembered_zoom(
     element: &BytesStart<'_>,
     name: &[u8],
     decoder: Decoder,
-) -> Result<Option<CellReference>> {
+) -> Result<Option<Scale>> {
+    match optional_u32(element, name, decoder)? {
+        None | Some(0) => Ok(None),
+        Some(value) if (10..=400).contains(&value) => Scale::new(value as u16)
+            .map(Some)
+            .map_err(|_| invalid("remembered worksheet-view zoom must be zero or 10 through 400")),
+        Some(_) => Err(invalid(
+            "remembered worksheet-view zoom must be zero or 10 through 400",
+        )),
+    }
+}
+fn optional_cell(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<Cell>> {
     attr(element, name, decoder)?
-        .map(|v| {
-            validate_cell(&v)?;
-            Ok(CellReference(v))
-        })
+        .map(|v| parse_cell(&v))
         .transpose()
 }
-fn validate_cell(value: &str) -> Result<()> {
+fn parse_cell(value: &str) -> Result<Cell> {
     if value == "#REF!" {
         return Err(invalid("worksheet-view references cannot be #REF!"));
     }
-    litchi_sheet::Cell::from_a1(value)
-        .map(|_| ())
-        .map_err(Error::from)
+    Cell::from_a1(value).map_err(Error::from)
 }
-fn parse_range(value: &str) -> Result<RangeReference> {
+fn parse_range(value: &str) -> Result<Rect> {
     if value.is_empty() || value.split(':').count() > 2 {
         return Err(invalid(format!("invalid worksheet range '{value}'")));
     }
-    let mut parts = value.split(':');
-    let Some(start) = parts.next() else {
-        return Err(invalid(format!("invalid worksheet range '{value}'")));
-    };
-    validate_cell(start)?;
-    if let Some(end) = parts.next() {
-        validate_cell(end)?;
+    if value.split(':').any(|part| part == "#REF!") {
+        return Err(invalid("worksheet-view references cannot be #REF!"));
     }
-    Ok(RangeReference(value.into()))
+    Rect::from_a1(value).map_err(Error::from)
 }
-fn parse_sqref(value: &str) -> Result<Sqref> {
+fn parse_sqref(value: &str) -> Result<Vec<Rect>> {
     let mut ranges = Vec::new();
     for token in value.split_whitespace() {
         if ranges.len() >= MAX_SELECTION_RANGES {
@@ -863,7 +928,34 @@ fn parse_sqref(value: &str) -> Result<Sqref> {
     if ranges.is_empty() {
         return Err(invalid("worksheet-view sqref is empty"));
     }
-    Ok(Sqref(ranges))
+    Ok(ranges)
+}
+fn parse_mode(value: &str) -> Result<Mode> {
+    match value {
+        "normal" => Ok(Mode::Normal),
+        "pageBreakPreview" => Ok(Mode::PageBreakPreview),
+        "pageLayout" => Ok(Mode::PageLayout),
+        _ => Err(invalid(format!("invalid worksheet-view type '{value}'"))),
+    }
+}
+fn parse_position(value: &str) -> Result<Position> {
+    match value {
+        "bottomRight" => Ok(Position::BottomRight),
+        "topRight" => Ok(Position::TopRight),
+        "bottomLeft" => Ok(Position::BottomLeft),
+        "topLeft" => Ok(Position::TopLeft),
+        _ => Err(invalid(format!("invalid worksheet-view pane '{value}'"))),
+    }
+}
+fn parse_state(value: &str) -> Result<State> {
+    match value {
+        "split" => Ok(State::Split),
+        "frozen" => Ok(State::Frozen),
+        "frozenSplit" => Ok(State::FrozenSplit),
+        _ => Err(invalid(format!(
+            "invalid worksheet-view pane state '{value}'"
+        ))),
+    }
 }
 fn validate_relationship_id(value: &str) -> Result<()> {
     if value.is_empty()

@@ -2,9 +2,7 @@
 
 use crate::package::error::{Error, Result};
 use crate::package::formula::{Group, GroupKind, ParsedFormula, Range};
-use crate::package::sheet_view::{
-    MAX_SHEET_VIEW_SELECTIONS, SheetPane, SheetPanePosition, SheetPaneState, SheetSelection,
-};
+use crate::package::sheet_view::MAX_SHEET_VIEW_SELECTIONS;
 use crate::raw::{Writer, kind};
 use litchi_core::sheet::CellValue;
 use std::collections::BTreeMap;
@@ -61,67 +59,36 @@ impl MutableWorksheet {
     /// [MS-XLSB] 2.4.307/2.4.308: BrtBeginWsViews / BrtBeginWsView, optionally
     /// followed by BrtPane (2.4.723) and BrtSel (2.4.790) records.
     pub(super) fn write_ws_views<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
-        let mut view = self.sheet_view.clone().unwrap_or_default();
-        let configured = self.sheet_view.is_some() || self.freeze_panes.is_some();
-
-        if let Some(freeze) = &self.freeze_panes {
-            if view.pane.is_some() || !view.selections.is_empty() {
+        if let Some(view) = &self.view {
+            if view.selections.len() > MAX_SHEET_VIEW_SELECTIONS {
                 return Err(Error::Unrecognized {
-                    typ: "worksheet sheet view".to_string(),
-                    val: "freeze panes and explicit sheet-view pane selections cannot both be set"
-                        .to_string(),
+                    typ: "worksheet view".to_string(),
+                    val: "a view cannot contain more than four selections".to_string(),
                 });
             }
-            let y_split = freeze.freeze_rows;
-            let x_split = freeze.freeze_cols;
-            let active_pane = match (x_split > 0, y_split > 0) {
-                (true, true) => SheetPanePosition::BottomRight,
-                (true, false) => SheetPanePosition::TopRight,
-                (false, true) => SheetPanePosition::BottomLeft,
-                (false, false) => unreachable!("freeze panes require a nonzero split"),
-            };
-            let top_left_cell = crate::package::utils::cell_reference(y_split, x_split);
-            view.pane = Some(SheetPane {
-                x_split: (x_split > 0).then_some(f64::from(x_split)),
-                y_split: (y_split > 0).then_some(f64::from(y_split)),
-                top_left_cell: Some(top_left_cell.clone()),
-                active_pane: Some(active_pane),
-                state: Some(SheetPaneState::Frozen),
-            });
-            view.selections.push(SheetSelection {
-                pane: Some(active_pane),
-                active_cell: Some(top_left_cell.clone()),
-                active_cell_id: None,
-                sqref: Some(top_left_cell),
-            });
-        }
-
-        if view.selections.len() > MAX_SHEET_VIEW_SELECTIONS {
-            return Err(Error::Unrecognized {
-                typ: "worksheet sheet view".to_string(),
-                val: "a sheet view cannot contain more than four selections".to_string(),
-            });
         }
 
         writer.write_record(kind::BEGIN_WS_VIEWS, &[])?;
-
-        // BrtBeginWsView (30 bytes according to spec)
-        let view_data =
-            crate::package::sheet_view::write_ws_view_payload(configured.then_some(&view))?;
-        writer.write_record(kind::BEGIN_WS_VIEW, &view_data)?;
-
-        if let Some(pane) = view.pane.as_ref() {
-            let pane_data = crate::package::sheet_view::write_pane_payload(pane)?;
-            writer.write_record(kind::PANE, &pane_data)?;
+        writer.write_record(
+            kind::BEGIN_WS_VIEW,
+            &crate::package::sheet_view::write_view_payload(self.view.as_ref())?,
+        )?;
+        if let Some(view) = &self.view {
+            if let Some(pane) = &view.pane {
+                writer.write_record(
+                    kind::PANE,
+                    &crate::package::sheet_view::write_pane_payload(pane)?,
+                )?;
+            }
+            for selection in &view.selections {
+                writer.write_record(
+                    kind::SEL,
+                    &crate::package::sheet_view::write_selection_payload(selection)?,
+                )?;
+            }
         }
-        for selection in &view.selections {
-            let selection_data = crate::package::sheet_view::write_selection_payload(selection)?;
-            writer.write_record(kind::SEL, &selection_data)?;
-        }
-
         writer.write_record(kind::END_WS_VIEW, &[])?;
         writer.write_record(kind::END_WS_VIEWS, &[])?;
-
         Ok(())
     }
 

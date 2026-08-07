@@ -34,13 +34,13 @@ pub(super) enum PresentationImpl {
     #[cfg(feature = "ppt")]
     Ppt(ppt::Presentation),
     /// Modern .pptx format
-    #[cfg(feature = "ooxml")]
+    #[cfg(feature = "pptx")]
     Pptx(Box<crate::pptx::Package>),
     /// Apple Keynote format
-    #[cfg(feature = "iwa")]
+    #[cfg(feature = "iwork")]
     Keynote(crate::iwa::keynote::KeynoteDocument),
     /// OpenDocument Presentation format
-    #[cfg(feature = "odf")]
+    #[cfg(feature = "odp")]
     Odp(litchi_odp::Presentation),
 }
 

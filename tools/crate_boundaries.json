@@ -25,8 +25,8 @@
       "litchi-ppt",
       "litchi-pptx",
       "litchi-rtf",
+      "litchi-sheet",
       "litchi-sign",
-      "litchi-spreadsheet-drawing",
       "litchi-xls",
       "litchi-xlsb",
       "litchi-xlsx"
@@ -233,6 +233,7 @@
       "litchi-drawingml",
       "litchi-ooxml-common",
       "litchi-opc",
+      "litchi-sheet",
       "litchi-sign",
       "litchi-spreadsheet-drawing",
       "litchi-vba"

@@ -7,12 +7,12 @@ use crate::merged_cells::MergedCell;
 use crate::package::cell::Cell;
 use crate::package::data_validation::{Settings, Validation};
 use crate::package::scenarios::Manager;
-use crate::package::sheet_view::SheetView;
 use crate::package::web_extension_bindings::Binding;
 use crate::slicer;
 use litchi_core::sheet::{
     Cell as SheetCell, CellIterator, CellValue, Result, RowIterator, Worksheet as SheetWorksheet,
 };
+use litchi_sheet::view::View;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
@@ -136,7 +136,7 @@ pub struct Worksheet {
     data_validation14_settings: Option<Settings>,
     conditional_formattings: Vec<Formatting>,
     web_extension_bindings: Vec<Binding>,
-    sheet_views: Vec<SheetView>,
+    views: Vec<View>,
     scenarios: Option<Manager>,
     slicers: Option<slicer::Views>,
     timelines: Option<crate::timeline::Views>,
@@ -163,7 +163,7 @@ impl Worksheet {
             data_validation14_settings: None,
             conditional_formattings: Vec::new(),
             web_extension_bindings: Vec::new(),
-            sheet_views: Vec::new(),
+            views: Vec::new(),
             scenarios: None,
             slicers: None,
             timelines: None,
@@ -237,8 +237,8 @@ impl Worksheet {
         self.web_extension_bindings = bindings;
     }
 
-    pub(crate) fn set_sheet_views(&mut self, sheet_views: Vec<SheetView>) {
-        self.sheet_views = sheet_views;
+    pub(crate) fn set_views(&mut self, views: Vec<View>) {
+        self.views = views;
     }
 
     pub(crate) fn set_scenarios(&mut self, scenarios: Option<Manager>) {
@@ -321,9 +321,9 @@ impl Worksheet {
     /// Sheet views (zoom, panes, selections) in worksheet stream order.
     ///
     /// The view model is shared with XLSX worksheets; see
-    /// [`crate::views::SheetView`].
-    pub fn sheet_views(&self) -> &[SheetView] {
-        &self.sheet_views
+    /// [`litchi_sheet::view::View`].
+    pub fn views(&self) -> &[View] {
+        &self.views
     }
 
     /// The worksheet's inert Scenario Manager snapshot, if present.

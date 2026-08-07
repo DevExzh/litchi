@@ -62,7 +62,6 @@ pub mod threaded_comments;
 pub mod timeline;
 #[allow(dead_code, unreachable_pub, unused_imports)]
 mod timelines;
-pub mod views;
 pub mod volatile_dependencies;
 pub mod web;
 pub mod workbook;
@@ -192,7 +191,6 @@ pub use threaded_comments::{
     parse_persons, validate_comments, validate_graph, validate_guid, validate_people,
     validate_timestamp, write_comments, write_persons,
 };
-pub use views::{Pane, PanePosition, PaneState, Selection, ViewType};
 pub use workbook::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit, Edit,
     Flavor, JoinError, JoinFailure, NewSheet, PackageChange, Patch, RowEdit, Selector, State,

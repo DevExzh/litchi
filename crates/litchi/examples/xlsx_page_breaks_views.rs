@@ -1,11 +1,11 @@
-//! Transactional worksheet data plus typed page/view/sort model example.
+//! Transactional worksheet data plus a typed page-view model example.
 //!
-//! Page-break and worksheet-view package attachment remains outside the
-//! standalone transaction. The model values are still constructed and
-//! validated while the source tables are published through `Workbook::edit`.
+//! Page-break package attachment remains outside the standalone transaction.
+//! The shared view value is still constructed and validated while source tables
+//! are published through `Workbook::edit`.
 
-use litchi_xlsx::views::View;
-use litchi_xlsx::{Number, SortCondition, SortState, ViewType, Workbook};
+use litchi::sheet::view::{Mode, Scale, View};
+use litchi::xlsx::{Number, Workbook};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -13,22 +13,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .nth(1)
         .unwrap_or_else(|| "page-breaks.xlsx".to_string());
 
-    let page_view = View {
-        view_type: Some(ViewType::PageLayout),
-        show_grid_lines: Some(false),
-        zoom_scale: Some(120),
-        top_left_cell: Some("A10".to_string()),
-        ..Default::default()
-    };
-    let mut sort_state = SortState::new("A1:C11");
-    sort_state.column_sort = Some(true);
-    sort_state.case_sensitive = Some(false);
-    let mut primary = SortCondition::new("C2:C11");
-    primary.descending = Some(true);
-    sort_state.conditions.push(primary);
-    let mut secondary = SortCondition::new("A2:A11");
-    secondary.descending = Some(false);
-    sort_state.conditions.push(secondary);
+    let mut page_view = View::default();
+    page_view.mode = Mode::PageBreakPreview;
+    page_view.zoom.current = Scale::new(85)?;
     let page_breaks = [("row", 21_u32), ("row", 41), ("column", 3)];
 
     let workbook = Workbook::create()?;
@@ -79,6 +66,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let workbook = edit.commit()?.into_workbook();
     workbook.save(&output_file)?;
     println!("Saved {output_file}");
-    println!("Typed view: {page_view:?}; sort: {sort_state:?}; breaks: {page_breaks:?}");
+    println!("Typed view: {page_view:?}; breaks: {page_breaks:?}");
     Ok(())
 }

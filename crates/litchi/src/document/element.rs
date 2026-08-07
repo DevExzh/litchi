@@ -1,7 +1,7 @@
 //! Document element types for representing ordered content.
 
 use super::Paragraph;
-#[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 use super::Table;
 
 /// An element in a document's natural content order.
@@ -30,7 +30,7 @@ pub enum DocumentElement {
     /// A paragraph element (boxed to reduce enum size)
     Paragraph(Box<Paragraph>),
     /// A table element (boxed to reduce enum size from 12KB to ~224 bytes)
-    #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+    #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
     Table(Box<Table>),
 }
 
@@ -40,13 +40,13 @@ impl DocumentElement {
     pub fn is_paragraph(&self) -> bool {
         match self {
             DocumentElement::Paragraph(_) => true,
-            #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+            #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
             DocumentElement::Table(_) => false,
         }
     }
 
     /// Check if this element is a table.
-    #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+    #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
     #[inline]
     pub fn is_table(&self) -> bool {
         match self {
@@ -62,7 +62,7 @@ impl DocumentElement {
     pub fn as_paragraph(&self) -> Option<&Paragraph> {
         match self {
             DocumentElement::Paragraph(p) => Some(p),
-            #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+            #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
             DocumentElement::Table(_) => None,
         }
     }
@@ -70,7 +70,7 @@ impl DocumentElement {
     /// Get a reference to the table, if this is a table element.
     ///
     /// Returns `None` if this is a paragraph element.
-    #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+    #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
     #[inline]
     pub fn as_table(&self) -> Option<&Table> {
         match self {
@@ -86,7 +86,7 @@ impl DocumentElement {
     pub fn into_paragraph(self) -> Option<Paragraph> {
         match self {
             DocumentElement::Paragraph(p) => Some(*p),
-            #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+            #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
             DocumentElement::Table(_) => None,
         }
     }
@@ -94,7 +94,7 @@ impl DocumentElement {
     /// Consume this element and return the table, if this is a table element.
     ///
     /// Returns `None` if this is a paragraph element.
-    #[cfg(any(feature = "doc", feature = "ooxml", feature = "rtf", feature = "odf"))]
+    #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
     #[inline]
     pub fn into_table(self) -> Option<Table> {
         match self {
@@ -104,7 +104,7 @@ impl DocumentElement {
     }
 }
 
-#[cfg(all(test, feature = "ooxml"))]
+#[cfg(all(test, feature = "docx"))]
 mod tests {
     use super::*;
 
