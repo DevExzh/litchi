@@ -26,15 +26,29 @@
     reason = "Validated limit profiles deliberately retain the public parameter name."
 )]
 
+use std::cell::Cell;
 use std::collections::HashSet;
 use std::io::Read;
+use std::mem::size_of;
 
+use litchi_iwa_common::wire::{
+    WireDescent, WirePreflight, WireVisit, preflight_wire_tree_with_limits,
+};
+use litchi_iwa_common::{Error as WireError, LimitKind as WireLimitKind, WireLimits};
+use litchi_iwa_protos::archive_codec;
 use litchi_iwa_protos::tsp;
-use prost::Message;
 
-use crate::{Error, LimitKind, Limits, Result};
+use crate::{Error, HeaderKind, HeaderOperation, LimitKind, Limits, Result};
 
 const MAX_VARINT_BYTES: usize = 10;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HeaderNode {
+    ArchiveInfo,
+    MessageInfo,
+    FieldInfo,
+    FieldPath,
+}
 
 /// Metadata for one object in an IWA component.
 #[derive(Debug, Clone, PartialEq)]
@@ -73,7 +87,17 @@ impl ArchiveInfo {
     pub fn decode_with_limits(data: &[u8], limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         check_header_length(data.len(), limits)?;
-        let archive_info = Self::from(tsp::ArchiveInfo::decode(data)?);
+        let preflight = preflight_header(data, HeaderKind::ArchiveInfo, limits)?;
+        let decoded =
+            archive_codec::decode_archive_info(data, buffa_decode_options(preflight, limits))
+                .map_err(|error| {
+                    Error::header_codec(
+                        HeaderKind::ArchiveInfo,
+                        HeaderOperation::Decode,
+                        error.to_string(),
+                    )
+                })?;
+        let archive_info = Self::from(decoded);
         archive_info.validate_with_limits(limits)?;
         Ok(archive_info)
     }
@@ -203,7 +227,17 @@ impl MessageInfo {
     pub fn decode_with_limits(data: &[u8], limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         check_header_length(data.len(), limits)?;
-        let message_info = Self::from(tsp::MessageInfo::decode(data)?);
+        let preflight = preflight_header(data, HeaderKind::MessageInfo, limits)?;
+        let decoded =
+            archive_codec::decode_message_info(data, buffa_decode_options(preflight, limits))
+                .map_err(|error| {
+                    Error::header_codec(
+                        HeaderKind::MessageInfo,
+                        HeaderOperation::Decode,
+                        error.to_string(),
+                    )
+                })?;
+        let message_info = Self::from(decoded);
         message_info.validate_with_limits(limits)?;
         Ok(message_info)
     }
@@ -407,7 +441,7 @@ impl ArchiveObject {
             ));
         }
         self.archive_info.validate_with_limits(limits)?;
-        let header_length = tsp::ArchiveInfo::from(&self.archive_info).encoded_len();
+        let header_length = archive_info_encoded_len(&self.archive_info)?;
         check_header_length(header_length, limits)?;
         let prefix_length = varint_len(header_length)?;
         let mut payload_length = 0;
@@ -883,14 +917,259 @@ fn check_header_length(length: usize, limits: Limits) -> Result<()> {
 
 fn encode_archive_info(info: &ArchiveInfo, limits: Limits) -> Result<Vec<u8>> {
     let encoded_info = tsp::ArchiveInfo::from(info);
-    let header_length = encoded_info.encoded_len();
+    let header_length = usize::try_from(
+        archive_codec::archive_info_encoded_len(&encoded_info).map_err(|error| {
+            Error::header_codec(
+                HeaderKind::ArchiveInfo,
+                HeaderOperation::Encode,
+                error.to_string(),
+            )
+        })?,
+    )
+    .map_err(|_| Error::invalid_archive(0, "ArchiveInfo header length exceeds usize"))?;
     check_header_length(header_length, limits)?;
     let mut header = Vec::new();
     header
         .try_reserve_exact(header_length)
         .map_err(|_| Error::allocation("IWA ArchiveInfo header", header_length))?;
-    encoded_info.encode(&mut header)?;
+    let maximum = u32::try_from(limits.max_header_bytes())
+        .map_err(|_| Error::invalid_archive(0, "header byte limit exceeds u32"))?;
+    archive_codec::encode_archive_info(&encoded_info, maximum, &mut header).map_err(|error| {
+        Error::header_codec(
+            HeaderKind::ArchiveInfo,
+            HeaderOperation::Encode,
+            error.to_string(),
+        )
+    })?;
     Ok(header)
+}
+
+fn archive_info_encoded_len(info: &ArchiveInfo) -> Result<usize> {
+    let compatibility = tsp::ArchiveInfo::from(info);
+    usize::try_from(
+        archive_codec::archive_info_encoded_len(&compatibility).map_err(|error| {
+            Error::header_codec(
+                HeaderKind::ArchiveInfo,
+                HeaderOperation::Encode,
+                error.to_string(),
+            )
+        })?,
+    )
+    .map_err(|_| Error::invalid_archive(0, "ArchiveInfo header length exceeds usize"))
+}
+
+fn buffa_decode_options(preflight: WirePreflight, limits: Limits) -> archive_codec::DecodeOptions {
+    archive_codec::DecodeOptions::new(
+        limits.max_header_bytes(),
+        preflight.fields(),
+        limits.max_header_memory_bytes(),
+        u32::try_from(limits.max_header_nesting()).unwrap_or(u32::MAX),
+    )
+}
+
+fn preflight_header(data: &[u8], header: HeaderKind, limits: Limits) -> Result<WirePreflight> {
+    let root = match header {
+        HeaderKind::ArchiveInfo => HeaderNode::ArchiveInfo,
+        HeaderKind::MessageInfo => HeaderNode::MessageInfo,
+    };
+    let scanned_bytes = limits
+        .max_header_bytes()
+        .saturating_mul(4)
+        .min(WireLimits::MAX_INPUT_BYTES);
+    let wire_limits = WireLimits::default()
+        .with_input_bytes(scanned_bytes)
+        .and_then(|profile| profile.with_fields(limits.max_header_fields()))
+        .and_then(|profile| profile.with_nesting(limits.max_header_nesting()))
+        .map_err(|error| map_wire_error(error, header))?;
+    let decoded_memory = Cell::new(0usize);
+    let metadata_items = Cell::new(0usize);
+    let message_infos = Cell::new(0usize);
+
+    let preflight = preflight_wire_tree_with_limits(data, wire_limits, |visit| {
+        let node = node_at_path(root, visit.path());
+        if node == Some(HeaderNode::ArchiveInfo)
+            && visit.field().number() == 2
+            && visit.field().wire_type() == 2
+        {
+            message_infos.set(message_infos.get().saturating_add(1));
+        }
+        decoded_memory.set(
+            decoded_memory
+                .get()
+                .saturating_add(field_memory_charge(node, visit)),
+        );
+        metadata_items.set(
+            metadata_items
+                .get()
+                .saturating_add(metadata_item_charge(node, visit)?),
+        );
+        Ok(descent_for(node, visit.field().number()))
+    })
+    .map_err(|error| map_wire_error(error, header))?;
+
+    if message_infos.get() > limits.max_messages_per_object() {
+        return Err(limit(
+            LimitKind::MessagesPerObject,
+            message_infos.get(),
+            limits.max_messages_per_object(),
+        ));
+    }
+    if decoded_memory.get() > limits.max_header_memory_bytes() {
+        return Err(limit(
+            LimitKind::HeaderMemoryBytes,
+            decoded_memory.get(),
+            limits.max_header_memory_bytes(),
+        ));
+    }
+    if metadata_items.get() > limits.max_metadata_items() {
+        return Err(limit(
+            LimitKind::MetadataItems,
+            metadata_items.get(),
+            limits.max_metadata_items(),
+        ));
+    }
+    Ok(preflight)
+}
+
+fn node_at_path(root: HeaderNode, path: &[u32]) -> Option<HeaderNode> {
+    path.iter()
+        .try_fold(root, |node, field| match (node, field) {
+            (HeaderNode::ArchiveInfo, 2) => Some(HeaderNode::MessageInfo),
+            (HeaderNode::MessageInfo, 4) => Some(HeaderNode::FieldInfo),
+            (HeaderNode::MessageInfo, 9 | 10) | (HeaderNode::FieldInfo, 1) => {
+                Some(HeaderNode::FieldPath)
+            },
+            _ => None,
+        })
+}
+
+const fn descent_for(node: Option<HeaderNode>, field: u32) -> WireDescent {
+    if matches!(
+        (node, field),
+        (Some(HeaderNode::ArchiveInfo), 2)
+            | (Some(HeaderNode::MessageInfo), 4 | 9 | 10)
+            | (Some(HeaderNode::FieldInfo), 1)
+    ) {
+        WireDescent::Descend
+    } else {
+        WireDescent::Skip
+    }
+}
+
+fn field_memory_charge(node: Option<HeaderNode>, visit: WireVisit<'_, '_>) -> usize {
+    let field = visit.field();
+    let number = field.number();
+    let wire_type = field.wire_type();
+    let scalar = |width: usize| match wire_type {
+        0 => width.saturating_mul(2),
+        2 => field
+            .payload()
+            .len()
+            .saturating_mul(width)
+            .saturating_mul(2),
+        _ => 0,
+    };
+    let message = |width: usize| {
+        if wire_type == 2 {
+            width.saturating_mul(2).saturating_add(size_of::<&[u8]>())
+        } else {
+            0
+        }
+    };
+
+    match (node, number) {
+        (Some(HeaderNode::ArchiveInfo), 2) => message(size_of::<MessageInfo>()),
+        (Some(HeaderNode::MessageInfo), 2 | 8 | 11) => scalar(size_of::<u32>()),
+        (Some(HeaderNode::MessageInfo), 5 | 6) | (Some(HeaderNode::FieldInfo), 4 | 5) => {
+            scalar(size_of::<u64>())
+        },
+        (Some(HeaderNode::MessageInfo), 4) => message(size_of::<tsp::FieldInfo>()),
+        (Some(HeaderNode::MessageInfo), 9 | 10) | (Some(HeaderNode::FieldInfo), 1) => {
+            message(size_of::<tsp::FieldPath>())
+        },
+        (Some(HeaderNode::FieldInfo), 7) | (Some(HeaderNode::FieldPath), 1) => {
+            scalar(size_of::<u32>())
+        },
+        (Some(HeaderNode::FieldInfo), 8) if wire_type == 2 => field.payload().len(),
+        (Some(HeaderNode::ArchiveInfo), 1 | 3)
+        | (Some(HeaderNode::MessageInfo), 1 | 3 | 7)
+        | (Some(HeaderNode::FieldInfo), 2 | 3 | 6) => 0,
+        _ => field
+            .raw()
+            .len()
+            .saturating_add(2 * size_of::<[usize; 6]>()),
+    }
+}
+
+fn metadata_item_charge(
+    node: Option<HeaderNode>,
+    visit: WireVisit<'_, '_>,
+) -> litchi_iwa_common::Result<usize> {
+    let field = visit.field();
+    let repeated = || repeated_varint_count(field);
+    match (node, field.number()) {
+        // ArchiveInfo validation includes one item for each MessageInfo.
+        (Some(HeaderNode::MessageInfo), 2 | 5 | 6 | 8 | 11)
+        | (Some(HeaderNode::FieldInfo), 4 | 5 | 7)
+        | (Some(HeaderNode::FieldPath), 1) => repeated(),
+        // A FieldInfo is counted once in the repeated collection and once
+        // again when its nested metadata is traversed by validation.
+        (Some(HeaderNode::MessageInfo), 4) if field.wire_type() == 2 => Ok(2),
+        (Some(HeaderNode::ArchiveInfo), 2)
+        | (Some(HeaderNode::MessageInfo), 9 | 10)
+        | (Some(HeaderNode::FieldInfo), 8)
+            if field.wire_type() == 2 =>
+        {
+            Ok(1)
+        },
+        _ => Ok(0),
+    }
+}
+
+fn repeated_varint_count(
+    field: litchi_iwa_common::wire::WireFieldView<'_>,
+) -> litchi_iwa_common::Result<usize> {
+    match field.wire_type() {
+        0 => Ok(1),
+        2 => {
+            let mut remaining = field.payload();
+            let mut count = 0usize;
+            while !remaining.is_empty() {
+                let (_, length) = litchi_iwa_common::decode_varint_from_bytes(remaining)
+                    .map_err(|error| WireError::InvalidFormat(error.to_string()))?;
+                remaining = &remaining[length..];
+                count = count.saturating_add(1);
+            }
+            Ok(count)
+        },
+        _ => Ok(0),
+    }
+}
+
+fn map_wire_error(error: WireError, header: HeaderKind) -> Error {
+    match error {
+        WireError::LimitExceeded {
+            kind: WireLimitKind::Fields,
+            observed,
+            limit: maximum,
+        } => limit(LimitKind::HeaderFields, observed, maximum),
+        WireError::LimitExceeded {
+            kind: WireLimitKind::Nesting,
+            observed,
+            limit: maximum,
+        } => limit(LimitKind::HeaderNesting, observed, maximum),
+        WireError::LimitExceeded {
+            kind: WireLimitKind::InputBytes,
+            observed,
+            limit: maximum,
+        } => limit(LimitKind::HeaderBytes, observed, maximum),
+        WireError::Allocation { resource, amount } => Error::allocation(resource, amount),
+        other @ (WireError::InvalidFormat(_)
+        | WireError::LimitExceeded { .. }
+        | WireError::InvalidLimit { .. }) => {
+            Error::header_codec(header, HeaderOperation::Decode, other.to_string())
+        },
+    }
 }
 
 fn read_bounded<R: Read>(

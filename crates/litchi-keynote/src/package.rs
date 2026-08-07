@@ -429,7 +429,7 @@ impl Package {
             .find_map(|message| kn::SlideArchive::decode(message.data.as_slice()).ok())
         {
             if let Some(name) = slide.name.filter(|name| !name.is_empty()) {
-                builder.set_title(Some(name));
+                builder.set_name(Some(name));
             }
             for build in &slide.builds {
                 builder.push_build(self.extract_build(build.identifier)?);

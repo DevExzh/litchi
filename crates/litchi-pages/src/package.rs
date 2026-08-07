@@ -276,12 +276,12 @@ impl Metadata {
             metadata.build_version = parse_build_version(data)?;
         }
         if let Some(data) = metadata_entry(&catalog, "Metadata/DocumentIdentifier")? {
-            let identifier = std::str::from_utf8(data).map_err(|error| {
+            let identifier_text = std::str::from_utf8(data).map_err(|error| {
                 PackageError::InvalidFormat(format!(
                     "Pages DocumentIdentifier is not valid UTF-8: {error}"
                 ))
             })?;
-            let identifier = identifier.trim();
+            let identifier = identifier_text.trim();
             if identifier.is_empty() {
                 return Err(PackageError::InvalidFormat(
                     "Pages DocumentIdentifier must not be empty".to_owned(),
@@ -313,8 +313,8 @@ impl Metadata {
         self.revision = property_string(&properties, "revision");
         self.format_version = property_string(&properties, "fileFormatVersion");
 
-        if let Some(application) = properties.get("Application") {
-            let Value::String(application) = application else {
+        if let Some(application_value) = properties.get("Application") {
+            let Value::String(application) = application_value else {
                 return Err(PackageError::InvalidFormat(
                     "Pages Properties.plist Application must be a string".to_owned(),
                 ));
@@ -384,12 +384,12 @@ fn metadata_entry<'a>(catalog: &'a Catalog, name: &str) -> PackageResult<Option<
 }
 
 fn parse_build_version(data: &[u8]) -> PackageResult<Option<String>> {
-    let value = Value::from_reader(std::io::Cursor::new(data)).map_err(|error| {
+    let property_list = Value::from_reader(std::io::Cursor::new(data)).map_err(|error| {
         PackageError::InvalidFormat(format!(
             "failed to parse Pages BuildVersionHistory.plist: {error}"
         ))
     })?;
-    let Value::Array(versions) = value else {
+    let Value::Array(versions) = property_list else {
         return Err(PackageError::InvalidFormat(
             "Pages BuildVersionHistory.plist must contain an array at its root".to_owned(),
         ));
@@ -397,8 +397,8 @@ fn parse_build_version(data: &[u8]) -> PackageResult<Option<String>> {
 
     let mut latest = None;
     for (index, version) in versions.iter().enumerate() {
-        let value = match version {
-            Value::String(value) => value.clone(),
+        let version_string = match version {
+            Value::String(text) => text.clone(),
             Value::Dictionary(values) => values
                 .get("Version")
                 .or_else(|| values.get("Build"))
@@ -408,13 +408,20 @@ fn parse_build_version(data: &[u8]) -> PackageResult<Option<String>> {
                         "Pages BuildVersionHistory.plist[{index}] dictionary has no string Version or Build"
                     ))
                 })?,
-            _ => {
+            Value::Array(_)
+            | Value::Boolean(_)
+            | Value::Data(_)
+            | Value::Date(_)
+            | Value::Real(_)
+            | Value::Integer(_)
+            | Value::Uid(_)
+            | _ => {
                 return Err(PackageError::InvalidFormat(format!(
                     "Pages BuildVersionHistory.plist[{index}] must be a string or dictionary"
                 )));
             },
         };
-        latest = Some(value);
+        latest = Some(version_string);
     }
     Ok(latest)
 }
@@ -423,15 +430,14 @@ fn property_string(properties: &plist::Dictionary, key: &str) -> Option<String> 
     properties.get(key).and_then(value_as_string)
 }
 
-fn value_as_string(value: &Value) -> Option<String> {
-    match value {
-        Value::String(value) => Some(value.clone()),
-        Value::Integer(value) => value.as_signed().map(|value| value.to_string()),
-        Value::Real(value) => Some(value.to_string()),
-        Value::Boolean(value) => Some(value.to_string()),
-        Value::Date(value) => Some(format!("{value:?}")),
-        Value::Data(_) | Value::Array(_) | Value::Dictionary(_) | Value::Uid(_) => None,
-        _ => None,
+fn value_as_string(property: &Value) -> Option<String> {
+    match property {
+        Value::String(text) => Some(text.clone()),
+        Value::Integer(integer) => integer.as_signed().map(|number| number.to_string()),
+        Value::Real(number) => Some(number.to_string()),
+        Value::Boolean(boolean) => Some(boolean.to_string()),
+        Value::Date(date) => Some(format!("{date:?}")),
+        Value::Data(_) | Value::Array(_) | Value::Dictionary(_) | Value::Uid(_) | _ => None,
     }
 }
 
@@ -504,31 +510,28 @@ fn decode_document(
     body_identifier: Option<NonZeroU64>,
     max_text_bytes: usize,
 ) -> PackageResult<Document> {
-    let body = match body_identifier {
-        Some(identifier) => {
-            let object = find_object(components, identifier.get()).ok_or_else(|| {
-                PackageError::InvalidFormat(format!(
-                    "Pages body storage object {identifier} is missing"
-                ))
-            })?;
-            let storage = decode_body_storage(&object.messages, identifier, max_text_bytes)?;
-            Some(Body::with_max_text_bytes(vec![storage], max_text_bytes)?)
-        },
-        None => {
-            let storages = extract_storages(components, max_text_bytes)?;
-            (!storages.is_empty())
-                .then(|| Body::with_max_text_bytes(storages, max_text_bytes))
-                .transpose()?
-        },
+    let body = if let Some(identifier) = body_identifier {
+        let object = find_object(components, identifier.get()).ok_or_else(|| {
+            PackageError::InvalidFormat(format!(
+                "Pages body storage object {identifier} is missing"
+            ))
+        })?;
+        let storage = decode_body_storage(&object.messages, identifier, max_text_bytes)?;
+        Some(Body::with_max_text_bytes(vec![storage], max_text_bytes)?)
+    } else {
+        let storages = extract_storages(components, max_text_bytes)?;
+        (!storages.is_empty())
+            .then(|| Body::with_max_text_bytes(storages, max_text_bytes))
+            .transpose()?
     };
     let root = body.map_or_else(Root::empty, Root::with_body);
     Document::from_root_with_max_text_bytes(root, max_text_bytes).map_err(Into::into)
 }
 
-fn find_object<'a>(
-    components: &'a ComponentCatalog,
+fn find_object(
+    components: &ComponentCatalog,
     identifier: u64,
-) -> Option<&'a litchi_iwa_core::ArchiveObject> {
+) -> Option<&litchi_iwa_core::ArchiveObject> {
     components
         .iter()
         .find_map(|component| component.archive().object(identifier))
@@ -587,7 +590,7 @@ fn extract_storages(
                     }
                     .into());
                 }
-                text_bytes = text_bytes.checked_add(storage.len()).ok_or_else(|| {
+                text_bytes = text_bytes.checked_add(storage.len()).ok_or({
                     PackageError::Semantic(SemanticError::TextTooLarge {
                         limit: max_text_bytes,
                     })
@@ -617,10 +620,10 @@ fn unique_message_payload<'a>(
     })
 }
 
-fn unique_text_payload<'a>(
-    messages: &'a [litchi_iwa_core::RawMessage],
+fn unique_text_payload(
+    messages: &[litchi_iwa_core::RawMessage],
     identifier: NonZeroU64,
-) -> PackageResult<&'a [u8]> {
+) -> PackageResult<&[u8]> {
     let mut payload = None;
     for message in messages {
         if matches!(message.type_, 2001 | 2022)

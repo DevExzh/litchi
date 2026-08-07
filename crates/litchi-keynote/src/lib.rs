@@ -8,6 +8,7 @@
 
 mod error;
 mod package;
+mod selector;
 mod time;
 
 pub mod background;
@@ -25,6 +26,7 @@ pub use chart::ChartSelector;
 pub use document::Document;
 pub use error::{Error, Result};
 pub use package::{Limits, Package, ReadError, Stats};
+pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use show::{Mode, Settings, Show, Size};
 pub use slide::media::MovieKind;
 pub use slide::{Slide, Transition};

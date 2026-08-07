@@ -16,11 +16,11 @@ pub struct Limits {
 impl Limits {
     /// Hard ceiling for bytes read from one bundle file or nested `Index.zip`.
     pub const MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
-    /// Hard ceiling for non-directory ZIP members in one archive.
+    /// Hard ceiling for physical ZIP members, including directory records.
     pub const MAX_ENTRIES: usize = 100_000;
     /// Hard ceiling for one raw ZIP member name.
     pub const MAX_MEMBER_NAME_BYTES: u64 = 4 * 1024;
-    /// Hard ceiling for aggregate central-directory variable metadata.
+    /// Hard ceiling for aggregate raw ZIP header variable metadata.
     pub const MAX_METADATA_BYTES: u64 = 64 * 1024 * 1024;
     /// Hard ceiling for one declared compressed ZIP member.
     pub const MAX_COMPRESSED_ENTRY_BYTES: u64 = 512 * 1024 * 1024;
@@ -64,7 +64,7 @@ impl Limits {
         self.max_input_bytes
     }
 
-    /// Maximum number of non-directory ZIP members.
+    /// Maximum number of physical ZIP members, including directory records.
     #[must_use]
     pub const fn max_entries(self) -> usize {
         self.max_entries

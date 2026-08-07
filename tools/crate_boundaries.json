@@ -108,6 +108,7 @@
     "litchi-iwa-cache": [],
     "litchi-iwa-common": [],
     "litchi-iwa-core": [
+      "litchi-iwa-common",
       "litchi-iwa-protos"
     ],
     "litchi-iwa-detect": [

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use thiserror::Error;
 
+use crate::selector::{SectionSelector, SelectorError, SelectorResult};
 use crate::{Section, SectionType};
 use litchi_iwa_text::storage::Storage;
 
@@ -260,10 +261,80 @@ impl Document {
         &self.sections
     }
 
+    /// Clone the shared immutable section allocation.
+    ///
+    /// This is a constant-time snapshot operation; no section or text payload
+    /// is cloned.
+    #[must_use]
+    pub fn shared_sections(&self) -> Arc<[Section]> {
+        Arc::clone(&self.sections)
+    }
+
+    /// Select one section by exact semantic name or checked source position.
+    ///
+    /// Name matching is exact and case-sensitive. A missing name or an
+    /// out-of-range position returns `Ok(None)`; no selector can index or
+    /// expose a native package identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SelectorError::AmbiguousSectionName`] when more than one
+    /// section has the requested exact name.
+    pub fn select_section<'a, S>(&self, selector: S) -> SelectorResult<Option<&Section>>
+    where
+        S: Into<SectionSelector<'a>>,
+    {
+        match selector.into() {
+            SectionSelector::Name(name) => {
+                let mut matches = self
+                    .sections
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, section)| section.name() == Some(name));
+                let Some((first, section)) = matches.next() else {
+                    return Ok(None);
+                };
+                if let Some((duplicate, _)) = matches.next() {
+                    return Err(SelectorError::AmbiguousSectionName {
+                        name: name.into(),
+                        first,
+                        duplicate,
+                    });
+                }
+                Ok(Some(section))
+            },
+            SectionSelector::Position(position) => Ok(self.sections.get(position.get())),
+        }
+    }
+
+    /// Select one section by its exact semantic name.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SelectorError::AmbiguousSectionName`] when more than one
+    /// section has the requested exact name.
+    pub fn section_named(&self, name: &str) -> SelectorResult<Option<&Section>> {
+        self.select_section(SectionSelector::Name(name))
+    }
+
+    /// Select one section by checked zero-based source position.
+    ///
+    /// # Errors
+    ///
+    /// Valid positions cannot fail. The result preserves the common selector
+    /// contract for callers that switch between names and source positions.
+    pub fn section_at(&self, position: usize) -> SelectorResult<Option<&Section>> {
+        self.select_section(SectionSelector::index(position))
+    }
+
     /// Select one section by checked zero-based position.
+    ///
+    /// This compatibility helper delegates to [`Self::section_at`]. New code
+    /// can use [`Self::select_section`] to share one name-or-position lookup
+    /// boundary.
     #[must_use]
     pub fn section(&self, index: usize) -> Option<&Section> {
-        self.sections.get(index)
+        self.section_at(index).ok().flatten()
     }
 
     /// Return the number of semantic sections.
@@ -364,6 +435,120 @@ mod tests {
         let snapshot = document.clone();
 
         assert!(Arc::ptr_eq(&document.sections, &snapshot.sections));
+        assert!(Arc::ptr_eq(&document.sections, &document.shared_sections()));
         assert_eq!(snapshot.plain_text(), "Pages body");
+    }
+
+    fn named_section(index: usize, name: &str) -> Section {
+        let mut builder = Section::builder(index, SectionType::Body);
+        builder
+            .set_name(Some(name))
+            .unwrap_or_else(|error| panic!("section name should be valid: {error}"));
+        builder.build()
+    }
+
+    #[test]
+    fn selector_lookup_is_exact_checked_and_raw_id_free() {
+        let document = Document::from_sections(vec![
+            named_section(0, "Introduction"),
+            named_section(1, "Appendix"),
+        ])
+        .unwrap_or_else(|error| panic!("document should be valid: {error}"));
+
+        assert_eq!(
+            document
+                .select_section("Appendix")
+                .unwrap_or_else(|error| panic!("name should resolve: {error}"))
+                .map(Section::index),
+            Some(1)
+        );
+        assert_eq!(
+            document
+                .select_section(0)
+                .unwrap_or_else(|error| panic!("position should resolve: {error}"))
+                .and_then(Section::name),
+            Some("Introduction")
+        );
+        assert!(
+            document
+                .select_section("introduction")
+                .unwrap_or_else(|error| panic!("missing name is not an error: {error}"))
+                .is_none()
+        );
+        assert!(
+            document
+                .select_section(usize::MAX)
+                .unwrap_or_else(|error| panic!("out-of-range position is not an error: {error}"))
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn duplicate_exact_names_are_typed_ambiguity_errors() {
+        let document = Document::from_sections(vec![
+            named_section(0, "Repeated"),
+            named_section(1, "Repeated"),
+        ])
+        .unwrap_or_else(|error| panic!("document should be valid: {error}"));
+
+        assert!(matches!(
+            document.section_named("Repeated"),
+            Err(SelectorError::AmbiguousSectionName {
+                name,
+                first: 0,
+                duplicate: 1
+            }) if name.as_ref() == "Repeated"
+        ));
+        assert_eq!(
+            document
+                .section_at(1)
+                .unwrap_or_else(|error| panic!("position should remain unambiguous: {error}"))
+                .map(Section::index),
+            Some(1)
+        );
+        assert_eq!(document.section(1).map(Section::index), Some(1));
+    }
+
+    #[test]
+    fn name_selection_preserves_empty_unicode_and_selector_lifetimes() {
+        let unnamed = Section::new(0, SectionType::Body);
+        let document = Document::from_sections(vec![
+            unnamed,
+            named_section(1, ""),
+            named_section(2, "Résumé"),
+            named_section(3, "résumé"),
+        ])
+        .unwrap_or_else(|error| panic!("document should be valid: {error}"));
+
+        assert_eq!(
+            document
+                .select_section("")
+                .unwrap_or_else(|error| panic!("empty display name should resolve: {error}"))
+                .map(Section::index),
+            Some(1)
+        );
+        assert_eq!(document.section(0).and_then(Section::name), None);
+        assert_eq!(
+            document
+                .select_section("Résumé")
+                .unwrap_or_else(|error| panic!("Unicode name should resolve exactly: {error}"))
+                .map(Section::index),
+            Some(2)
+        );
+        assert_eq!(
+            document
+                .select_section("résumé")
+                .unwrap_or_else(|error| panic!("case-distinct name should resolve: {error}"))
+                .map(Section::index),
+            Some(3)
+        );
+
+        let selected = {
+            let borrowed_name = String::from("Résumé");
+            document
+                .select_section(borrowed_name.as_str())
+                .unwrap_or_else(|error| panic!("borrowed name should resolve: {error}"))
+        };
+        assert_eq!(selected.map(Section::index), Some(2));
     }
 }

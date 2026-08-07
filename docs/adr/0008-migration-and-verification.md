@@ -6634,6 +6634,70 @@ and date. Black-box format-crate tests open every fixture both by path and from
 borrowed archive bytes, validate its semantic projection, and retain ZIP
 integrity as a repeatable native compatibility gate.
 
+## Production Buffa header seam and native preservation gate
+
+The next 2026-08-07 migration slice promotes the constrained archive-header
+sidecar into the first production Buffa path. Exact-version Buffa 0.9.1 lazy
+views decode and encode `TSP.ArchiveInfo`, `MessageInfo`, `FieldInfo`, and
+`FieldPath`; production `litchi-iwa-core` no longer imports `prost::Message` or
+calls Prost encode/decode. A schema-directed common wire-tree preflight charges
+aggregate scanned work, fields, nesting, message count, decoded memory, and
+packed or unpacked metadata before the lazy adapter allocates. The adapter then
+projects deferred children directly and fallibly, forces required
+`MessageInfo.type`, `MessageInfo.length`, and `FieldInfo.path` presence, and
+does not call `to_owned_message`. Buffa-generated values and errors remain
+private behind neutral core types. Original hostile or noncanonical header
+bytes remain the no-op preservation authority, including closed-enum negative
+and noncanonical wire forms.
+
+Physical package ingress now applies the constrained ZIP index before copying
+raw local or central metadata, counts directory records against the physical
+member limit, checks both physical name spellings and combined variable
+metadata, rejects compressed size before materialization, and rejects a legacy
+`Index.zip` declared size before decompression. Borrowed package input is
+checked before its one owned snapshot allocation, and nested limit failures
+remain typed. A corpus-locked preservation test rebuilds every decompressed IWA
+component exactly: Numbers covers 37 components, 622 objects, 631 messages, and
+373,043 bytes; Pages covers 7, 570, 576, and 360,855; Keynote covers 25, 959,
+965, and 443,469 respectively.
+
+At the semantic boundary, Numbers now decodes BNC type 9 as the native
+discriminated union: rich-text or string identifiers produce text, otherwise
+decimal or number fields produce a number. One allocation-free borrowed cell
+view shares validation and scalar classification with the owned editor, while
+metadata-only format application cannot silently convert the stored value.
+Pages and Keynote expose exact-name or typed-position section/slide selectors
+without raw IDs; names are distinct from headings and visible slide titles,
+and duplicate names are typed ambiguities. Keynote maps the native navigator
+name. The current Pages native projection intentionally exposes position
+selection only until a real section-name field is identified; it never invents
+identity from body text.
+
+Computer Use opened the exact outputs produced by the migrated no-op example
+in the real Numbers, Pages, and Keynote applications without repair prompts.
+Numbers exposed the expected 22-by-7 table, marker, and value `42`; Pages
+exposed the three expected body lines; Keynote exposed the title, body marker,
+and date. Each application then duplicated and saved its own
+`buffa-native-save` package under
+`/private/tmp/litchi-buffa-noop.u5gndX/`. Those three app-authored packages
+were fed back through the Buffa/Snappy/ZIP no-op path successfully, producing
+three round-trip artifacts while preserving every decompressed IWA component
+exactly.
+
+Verification for this slice includes 130 common tests, 10 Buffa/Prost codec
+tests, 1 core unit plus 21 hostile-framing tests, 35 archive units plus the
+native preservation gate, 100 core tests, 75 Numbers units plus its native
+fixture, 39 Pages units plus its native fixture, 51 Keynote units plus five
+integration tests, and 18 focused monolith compatibility tests. Strict Clippy
+passes for the production Buffa/common/core seam, the archive crate, and Pages;
+the dependency checker reports 62 packages, 214 internal declarations, and
+zero debt. Remaining migration debt is explicit: the generated Buffa sidecar
+is about 2.7 MiB because Buffa selects file-level roots, format payload decoders
+still use Prost, the monolithic `litchi-iwa` crate still exists, and native
+Pages section-name extraction is not yet implemented. Buffa 0.9.1 also retains
+internal infallible `Vec` growth, so these finite preflight budgets are not an
+exact process-RSS or global out-of-memory guarantee.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

@@ -435,8 +435,20 @@ impl Catalog {
     /// or configured physical limit is invalid.
     pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
         let checked_limits = limits.validate()?;
-        let source: Arc<[u8]> = bytes.to_vec().into();
-        Self::from_source_with_checked_limits(source, checked_limits)
+        let input_size = u64::try_from(bytes.len()).map_err(|_error| {
+            Error::InvalidBundle("borrowed ZIP input length does not fit u64".to_owned())
+        })?;
+        checked_limits.check_input_size(input_size, "borrowed ZIP input")?;
+        let mut source_bytes = Vec::new();
+        source_bytes
+            .try_reserve_exact(bytes.len())
+            .map_err(|_error| Error::Allocation {
+                resource: "borrowed ZIP source bytes",
+                amount: bytes.len(),
+            })?;
+        source_bytes.extend_from_slice(bytes);
+        let shared_source: Arc<[u8]> = source_bytes.into();
+        Self::from_source_with_checked_limits(shared_source, checked_limits)
     }
 
     /// Parse a package from an immutable positional source under the default
@@ -1467,6 +1479,16 @@ fn collect_legacy(
     let prefix = index_name.strip_suffix("Index.zip").ok_or_else(|| {
         Error::InvalidBundle(format!("invalid legacy package index name: {index_name}"))
     })?;
+    let declared_index_size = archive
+        .physical_entries()
+        .find(|entry| entry.name() == index_name)
+        .ok_or_else(|| {
+            Error::InvalidBundle(format!(
+                "legacy package index has no physical member: {index_name}"
+            ))
+        })?
+        .uncompressed_size();
+    limits.check_input_size(declared_index_size, "legacy iWork Index.zip")?;
     let index_data = archive.read(index_name)?;
     let index_size = u64::try_from(index_data.len()).map_err(|error| {
         Error::InvalidBundle(format!(
@@ -1475,8 +1497,13 @@ fn collect_legacy(
     })?;
     limits.check_input_size(index_size, "legacy iWork Index.zip")?;
     let index_source: Arc<[u8]> = index_data.into();
-    let index = ZipArchive::new_with_limits(index_source.as_ref(), limits)
-        .map_err(|error| Error::InvalidBundle(format!("legacy package index: {error}")))?;
+    let index = ZipArchive::new_with_limits(index_source.as_ref(), limits).map_err(|error| {
+        if matches!(&error, Error::Limit { .. }) {
+            error
+        } else {
+            Error::InvalidBundle(format!("legacy package index: {error}"))
+        }
+    })?;
 
     let mut entries = Vec::new();
     let mut seen = HashSet::new();
@@ -1890,6 +1917,21 @@ mod tests {
     }
 
     #[test]
+    fn borrowed_source_respects_input_limits_before_copying() -> Result<()> {
+        let (bytes, _central_offset, _central_end) = physical_zip(0);
+        let limits = Limits::new(1, 10, 100, 100, 100)?;
+
+        assert!(matches!(
+            Catalog::from_bytes_with_limits(&bytes, limits),
+            Err(Error::Limit {
+                kind: crate::LimitKind::InputBytes,
+                ..
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn shared_source_preserves_opaque_zip_bytes_exactly() -> Result<()> {
         let (bytes, _central_offset, _central_end) = physical_zip(99);
         let source: Arc<[u8]> = bytes.into();
@@ -2019,6 +2061,56 @@ mod tests {
             catalog.iter().map(Entry::name).collect::<Vec<_>>(),
             ["Index/Document.iwa", "Data/a"]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn preserves_nested_index_limit_error_type() -> Result<()> {
+        let index = zip(&[
+            ("Index/Document.iwa", b"iwa"),
+            ("Index/CalculationEngine.iwa", b"iwa"),
+        ])?;
+        let bytes = zip(&[("legacy.pages/Index.zip", &index)])?;
+        let input = u64::try_from(bytes.len()).map_err(|_error| {
+            Error::InvalidBundle("test legacy package length does not fit u64".to_owned())
+        })?;
+        let limits = Limits::new(input, 1, input, input, 1024)?;
+
+        assert!(matches!(
+            Catalog::from_bytes_with_limits(&bytes, limits),
+            Err(Error::Limit {
+                kind: crate::LimitKind::Entries,
+                observed: 2,
+                maximum: 1,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_declared_nested_index_size_before_decompression() -> Result<()> {
+        let repeated = vec![0u8; 64 * 1024];
+        let index = zip(&[("Index/Document.iwa", repeated.as_slice())])?;
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_deflated("legacy.pages/Index.zip", &index)?;
+        let bytes = writer.finish_to_bytes()?;
+        assert!(bytes.len() < index.len());
+        let input = u64::try_from(bytes.len()).map_err(|_error| {
+            Error::InvalidBundle("test legacy package length does not fit u64".to_owned())
+        })?;
+        let nested = u64::try_from(index.len()).map_err(|_error| {
+            Error::InvalidBundle("test nested index length does not fit u64".to_owned())
+        })?;
+        let limits = Limits::new(input, 10, nested, nested, 1024)?;
+
+        assert!(matches!(
+            Catalog::from_bytes_with_limits(&bytes, limits),
+            Err(Error::Limit {
+                kind: crate::LimitKind::InputBytes,
+                observed,
+                maximum,
+            }) if observed == nested && maximum == input
+        ));
         Ok(())
     }
 

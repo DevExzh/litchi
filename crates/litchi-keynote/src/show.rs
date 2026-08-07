@@ -1,6 +1,8 @@
 //! Keynote show settings and immutable presentation snapshots.
 
-use crate::{Error, Result, Seconds, Slide};
+use crate::{
+    Error, Result, Seconds, Slide, SlideSelector, SlideSelectorError, SlideSelectorResult,
+};
 
 const NORMAL_MODE: i32 = 0;
 const SELF_PLAYING_MODE: i32 = 1;
@@ -347,10 +349,45 @@ impl Show {
         self.slides.len()
     }
 
+    /// Resolve a slide selector against this immutable snapshot.
+    ///
+    /// Name matching is exact and case sensitive; title content is never used
+    /// as an identity fallback. Position resolution is bounds checked and
+    /// selectors never expose native object IDs.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SlideSelectorError::DuplicateSlideName`] if multiple slides
+    /// carry the requested exact navigator name.
+    pub fn select_slide<'a>(
+        &self,
+        selector: impl Into<SlideSelector<'a>>,
+    ) -> SlideSelectorResult<Option<&Slide>> {
+        match selector.into() {
+            SlideSelector::Name(name) => {
+                let mut matches = self
+                    .slides
+                    .iter()
+                    .filter(|slide| slide.name() == Some(name));
+                let Some(slide) = matches.next() else {
+                    return Ok(None);
+                };
+                if matches.next().is_some() {
+                    return Err(SlideSelectorError::DuplicateSlideName { name: name.into() });
+                }
+                Ok(Some(slide))
+            },
+            SlideSelector::Position(position) => Ok(self.slides.get(position.get())),
+        }
+    }
+
     /// Select a slide by checked zero-based position.
+    ///
+    /// This compatibility helper delegates to [`Self::select_slide`]. New
+    /// code can pass a [`SlideSelector`] to make the lookup domain explicit.
     #[must_use]
     pub fn slide(&self, index: usize) -> Option<&Slide> {
-        self.slides.get(index)
+        self.select_slide(index).ok().flatten()
     }
 
     /// Borrow validated show settings.
@@ -466,6 +503,61 @@ mod tests {
         assert_eq!(show.title(), Some("Deck"));
         assert_eq!(show.slide_count(), 1);
         assert_eq!(show.slide(0).map(Slide::index), Some(0));
+        assert_eq!(
+            show.select_slide(SlideSelector::index(0))
+                .map(|slide| slide.map(Slide::index)),
+            Ok(Some(0))
+        );
         assert!(show.slide(1).is_none());
+        assert_eq!(show.select_slide(SlideSelector::index(1)), Ok(None));
+    }
+
+    #[test]
+    fn content_titles_are_not_used_as_slide_identity() {
+        let mut first = Slide::builder(0);
+        first.set_name(Some("Agenda".to_owned()));
+        first.set_title(Some("Repeated title".to_owned()));
+        let mut second = Slide::builder(1);
+        second.set_title(Some("Repeated title".to_owned()));
+
+        let mut builder = Show::builder();
+        builder.push_slide(first.build());
+        builder.push_slide(second.build());
+        let show = builder.build();
+
+        let named = show.select_slide(SlideSelector::name("Agenda"));
+        assert_eq!(named.map(|slide| slide.map(Slide::index)), Ok(Some(0)));
+        assert_eq!(show.select_slide("Repeated title"), Ok(None));
+    }
+
+    #[test]
+    fn duplicate_names_are_reported_instead_of_picking_one() {
+        let mut first = Slide::builder(0);
+        first.set_name(Some("Agenda".to_owned()));
+        let mut second = Slide::builder(1);
+        second.set_name(Some("Agenda".to_owned()));
+        let mut builder = Show::builder();
+        builder.push_slide(first.build());
+        builder.push_slide(second.build());
+        let show = builder.build();
+
+        assert_eq!(
+            show.select_slide("Agenda"),
+            Err(SlideSelectorError::DuplicateSlideName {
+                name: "Agenda".into()
+            })
+        );
+    }
+
+    #[test]
+    fn slides_prefer_names_and_retain_unambiguous_position_selectors() {
+        let unnamed = Slide::builder(7).build();
+        let mut named = Slide::builder(8);
+        named.set_name(Some("Agenda".to_owned()));
+        let named = named.build();
+
+        assert_eq!(unnamed.selector(), SlideSelector::index(7));
+        assert_eq!(named.selector(), SlideSelector::name("Agenda"));
+        assert_eq!(named.position_selector(), SlideSelector::index(8));
     }
 }

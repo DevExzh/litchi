@@ -211,6 +211,8 @@ pub fn hex_encode_to_string(bytes: &[u8], output: &mut String, lowercase: bool) 
 
         // NEON is always available on aarch64 as fallback
         #[cfg(not(target_feature = "sve"))]
+        // SAFETY: NEON is part of the aarch64 baseline. The helper bounds-checks
+        // every input load and appends only bytes from the ASCII hex tables.
         unsafe {
             hex_encode_neon(bytes, output, lowercase);
         }
@@ -227,6 +229,7 @@ pub fn hex_encode_to_string(bytes: &[u8], output: &mut String, lowercase: bool) 
 ///
 /// This is the fallback implementation used when no SIMD instructions are available.
 /// It's also competitive for very small inputs (<16 bytes).
+#[cfg(any(test, not(target_arch = "aarch64")))]
 #[inline]
 fn hex_encode_scalar(bytes: &[u8], output: &mut String, lowercase: bool) {
     let hex_table = if lowercase {

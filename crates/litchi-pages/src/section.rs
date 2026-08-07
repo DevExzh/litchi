@@ -1,5 +1,6 @@
 pub mod pagination;
 
+use crate::selector::SectionSelector;
 use litchi_iwa_text::storage::Storage;
 use thiserror::Error;
 
@@ -308,6 +309,8 @@ pub struct Section {
     index: usize,
     /// Semantic kind of the section.
     section_type: SectionType,
+    /// Optional producer-visible section name.
+    name: Option<Box<str>>,
     /// Optional section heading.
     heading: Option<Box<str>>,
     /// Paragraph values extracted from the section.
@@ -325,6 +328,7 @@ impl Section {
         Self {
             index,
             section_type,
+            name: None,
             heading: None,
             paragraphs: Box::new([]),
             text_storages: Box::new([]),
@@ -348,6 +352,30 @@ impl Section {
     #[must_use]
     pub const fn section_type(&self) -> SectionType {
         self.section_type
+    }
+
+    /// Returns the optional producer-visible section name.
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// Return a semantic selector, preferring the producer-visible name.
+    ///
+    /// Exact-name resolution can report ambiguity when malformed or authored
+    /// input repeats a name. Use [`Self::position_selector`] when a stable,
+    /// snapshot-local selector is required.
+    #[must_use]
+    pub fn selector(&self) -> SectionSelector<'_> {
+        self.name
+            .as_deref()
+            .map_or_else(|| self.position_selector(), SectionSelector::name)
+    }
+
+    /// Return a typed selector for this section's zero-based source position.
+    #[must_use]
+    pub const fn position_selector(&self) -> SectionSelector<'static> {
+        SectionSelector::index(self.index)
     }
 
     /// Returns the optional section heading.
@@ -458,6 +486,7 @@ impl Section {
 pub struct Builder {
     index: usize,
     section_type: SectionType,
+    name: Option<Box<str>>,
     heading: Option<Box<str>>,
     paragraphs: Vec<String>,
     text_storages: Vec<Storage>,
@@ -471,11 +500,28 @@ impl Builder {
         Self {
             index,
             section_type,
+            name: None,
             heading: None,
             paragraphs: Vec::new(),
             text_storages: Vec::new(),
             page_count: None,
         }
+    }
+
+    /// Sets or clears the producer-visible section name.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NameContainsNul`] when the name contains a native
+    /// string terminator. The current value is preserved when validation
+    /// fails.
+    pub fn set_name(&mut self, input: Option<impl Into<Box<str>>>) -> Result<()> {
+        let name = input.map(Into::into);
+        if name.as_deref().is_some_and(|value| value.contains('\0')) {
+            return Err(Error::NameContainsNul);
+        }
+        self.name = name;
+        Ok(())
     }
 
     /// Sets or clears the section heading.
@@ -504,6 +550,7 @@ impl Builder {
         Section {
             index: self.index,
             section_type: self.section_type,
+            name: self.name,
             heading: self.heading,
             paragraphs: self.paragraphs.into_boxed_slice(),
             text_storages: self.text_storages.into_boxed_slice(),
@@ -655,6 +702,9 @@ mod tests {
         assert!(empty.is_empty());
 
         let mut builder = Section::builder(0, SectionType::Body);
+        builder
+            .set_name(Some("Chapter One"))
+            .unwrap_or_else(|error| panic!("valid section name: {error}"));
         builder.set_heading(Some("Introduction".to_owned()));
         builder.push_paragraph("First paragraph".to_owned());
         builder.push_text_storage(Storage::from_text("Storage text".to_owned()));
@@ -663,6 +713,15 @@ mod tests {
 
         assert!(!section.is_empty());
         assert_eq!(section.section_type(), SectionType::Body);
+        assert_eq!(section.name(), Some("Chapter One"));
+        assert_eq!(section.selector(), SectionSelector::name("Chapter One"));
+        assert_eq!(
+            section
+                .position_selector()
+                .as_position()
+                .map(|value| value.get()),
+            Some(0)
+        );
         assert_eq!(section.page_count(), Some(3));
         assert_eq!(section.heading(), Some("Introduction"));
         assert_eq!(section.paragraphs(), ["First paragraph"]);
@@ -683,6 +742,33 @@ mod tests {
             "Introduction\nFirst paragraph\nStorage text"
         );
         assert_eq!(section.checked_text_len(), Some(section.plain_text().len()));
+    }
+
+    #[test]
+    fn unnamed_sections_select_by_typed_position() {
+        let section = Section::new(7, SectionType::Body);
+        assert_eq!(section.selector(), section.position_selector());
+        assert_eq!(
+            section
+                .selector()
+                .as_position()
+                .map(|position| position.get()),
+            Some(7)
+        );
+    }
+
+    #[test]
+    fn section_builder_rejects_invalid_names_without_mutation() {
+        let mut builder = Section::builder(0, SectionType::Body);
+        builder
+            .set_name(Some("Valid"))
+            .unwrap_or_else(|error| panic!("valid section name: {error}"));
+
+        assert_eq!(
+            builder.set_name(Some("invalid\0name")),
+            Err(Error::NameContainsNul)
+        );
+        assert_eq!(builder.build().name(), Some("Valid"));
     }
 
     #[test]

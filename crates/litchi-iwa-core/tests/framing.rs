@@ -9,7 +9,8 @@
 )]
 
 use litchi_iwa_core::{
-    Archive, ArchiveLimits, ArchiveObject, Error, LimitKind, RawMessage, SnappyLimits, SnappyStream,
+    Archive, ArchiveLimits, ArchiveObject, Error, HeaderKind, HeaderOperation, LimitKind,
+    RawMessage, SnappyLimits, SnappyStream,
 };
 use prost::Message;
 use std::io::{self, Cursor, Read};
@@ -481,7 +482,11 @@ fn reader_headers_are_bounded_and_truncation_is_structured() -> Result<(), Error
     let mut truncated = Cursor::new(vec![0x80]);
     assert!(matches!(
         litchi_iwa_core::ArchiveInfo::parse(&mut truncated),
-        Err(Error::Protobuf(_))
+        Err(Error::HeaderCodec {
+            header: HeaderKind::ArchiveInfo,
+            operation: HeaderOperation::Decode,
+            ..
+        })
     ));
 
     let mut oversized = Cursor::new(vec![0, 0]);
@@ -546,6 +551,105 @@ fn unknown_and_noncanonical_header_bytes_round_trip_byte_for_byte() -> Result<()
     let parsed = Archive::parse(&modified)?;
     assert_eq!(parsed.objects[0].messages[0].data, vec![0, 1, 2, 255]);
     assert_eq!(parsed.to_bytes()?, modified);
+    Ok(())
+}
+
+#[test]
+fn hostile_native_header_bytes_remain_the_no_op_authority() -> Result<(), Error> {
+    let header = [
+        0x08, 0xaa, 0x00, 0x90, 0x03, 0x09, 0x12, 0x8f, 0x00, 0x08, 0x87, 0x00, 0x98, 0x06, 0x96,
+        0x01, 0x18, 0x8b, 0x00, 0xa2, 0x06, 0x81, 0x00, 0xff, 0x9a, 0x03, 0x82, 0x00, 0xde, 0xad,
+        0x18, 0x81, 0x00,
+    ];
+    let mut source = vec![header.len() as u8];
+    source.extend_from_slice(&header);
+    source.extend_from_slice(&[0x5a; 11]);
+
+    let archive = Archive::parse(&source)?;
+    assert_eq!(archive.objects[0].archive_info.identifier, Some(42));
+    assert_eq!(archive.objects[0].messages[0].type_, 7);
+    assert_eq!(archive.to_bytes()?, source);
+    Ok(())
+}
+
+#[test]
+fn buffa_preflight_rejects_malformed_deferred_children() {
+    // ArchiveInfo identifier=1, followed by one MessageInfo containing a
+    // truncated tag varint. A root-only lazy decode would otherwise defer
+    // this failure until child access.
+    let malformed = [0x08, 0x01, 0x12, 0x01, 0x80];
+    assert!(matches!(
+        litchi_iwa_core::ArchiveInfo::decode(&malformed),
+        Err(Error::HeaderCodec {
+            header: HeaderKind::ArchiveInfo,
+            operation: HeaderOperation::Decode,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn buffa_preflight_enforces_field_nesting_and_memory_budgets() -> Result<(), Error> {
+    let nested = litchi_iwa_protos::tsp::ArchiveInfo {
+        identifier: Some(1),
+        message_infos: vec![litchi_iwa_protos::tsp::MessageInfo {
+            r#type: 7,
+            length: 0,
+            field_infos: vec![litchi_iwa_protos::tsp::FieldInfo {
+                path: litchi_iwa_protos::tsp::FieldPath { path: vec![1, 2] },
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+        should_merge: None,
+    }
+    .encode_to_vec();
+    assert!(litchi_iwa_core::ArchiveInfo::decode(&nested).is_ok());
+
+    let nesting_limits = ArchiveLimits::default().with_header_nesting(2)?;
+    assert!(matches!(
+        litchi_iwa_core::ArchiveInfo::decode_with_limits(&nested, nesting_limits),
+        Err(Error::Limit {
+            kind: LimitKind::HeaderNesting,
+            ..
+        })
+    ));
+
+    let fields = [0x08, 0x01, 0x20, 0x00, 0x20, 0x00];
+    let field_limits = ArchiveLimits::default().with_header_fields(2)?;
+    assert!(matches!(
+        litchi_iwa_core::ArchiveInfo::decode_with_limits(&fields, field_limits),
+        Err(Error::Limit {
+            kind: LimitKind::HeaderFields,
+            ..
+        })
+    ));
+
+    let one_empty_message = [0x08, 0x01, 0x12, 0x00];
+    let memory_limits = ArchiveLimits::default().with_header_memory_bytes(1)?;
+    assert!(matches!(
+        litchi_iwa_core::ArchiveInfo::decode_with_limits(&one_empty_message, memory_limits),
+        Err(Error::Limit {
+            kind: LimitKind::HeaderMemoryBytes,
+            ..
+        })
+    ));
+    Ok(())
+}
+
+#[test]
+fn buffa_preflight_counts_packed_metadata_before_decode() -> Result<(), Error> {
+    // required type=1, packed version=[1, 2], required length=0
+    let message_info = [0x08, 0x01, 0x12, 0x02, 0x01, 0x02, 0x18, 0x00];
+    let limits = ArchiveLimits::default().with_metadata_items(1)?;
+    assert!(matches!(
+        litchi_iwa_core::MessageInfo::decode_with_limits(&message_info, limits),
+        Err(Error::Limit {
+            kind: LimitKind::MetadataItems,
+            observed: 2,
+            maximum: 1,
+        })
+    ));
     Ok(())
 }
 

@@ -91,6 +91,7 @@ pub const FIELD_LAYOUT: &[(u32, usize)] = &[
     (0x0008_0000, 4),
     (0x0010_0000, 4),
 ];
+const FIELD_COUNT: usize = FIELD_LAYOUT.len();
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
@@ -133,6 +134,21 @@ pub struct BncCell {
     tail: Vec<u8>,
 }
 
+/// Allocation-free semantic view over one encoded BNC cell.
+pub(crate) struct BncCellView<'a> {
+    cell_type: u8,
+    fields: [Option<&'a [u8]>; FIELD_COUNT],
+    cached_scalar: Option<CachedScalar>,
+    tail: &'a [u8],
+}
+
+#[derive(Clone, Copy)]
+struct DecodedScalarFields {
+    decimal: Option<FiniteF64>,
+    number: Option<FiniteF64>,
+    date: Option<FiniteF64>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StoredValue {
     Empty,
@@ -165,54 +181,20 @@ impl BncCell {
     /// version, contains an unknown field flag, or decodes a non-finite
     /// scalar.
     pub fn parse(data: &[u8]) -> Result<Self> {
-        if data.len() < BNC_HEADER_LEN {
-            return Err(Error::ParseError(
-                "Truncated Numbers BNC cell header".to_string(),
-            ));
-        }
-        if data[0] != BNC_VERSION {
-            return Err(Error::ParseError(format!(
-                "Numbers cell storage version {} is not writable BNC v5",
-                data[0]
-            )));
-        }
-
+        let view = BncCellView::parse(data)?;
         let mut prefix = [0; BNC_PREFIX_LEN];
         prefix.copy_from_slice(&data[..BNC_PREFIX_LEN]);
-        let mut flag_bytes = [0; 4];
-        flag_bytes.copy_from_slice(&data[BNC_PREFIX_LEN..BNC_HEADER_LEN]);
-        let flags = u32::from_le_bytes(flag_bytes);
-        let known_flags = FIELD_LAYOUT.iter().fold(0, |mask, (flag, _)| mask | flag);
-        if flags & !known_flags != 0 {
-            return Err(Error::ParseError(format!(
-                "Numbers BNC cell uses unknown flags 0x{:08x}",
-                flags & !known_flags
-            )));
-        }
-
-        let mut cursor = BNC_HEADER_LEN;
         let mut fields = BTreeMap::new();
-        for &(flag, size) in FIELD_LAYOUT {
-            if flags & flag == 0 {
-                continue;
+        for ((flag, _size), field_bytes) in FIELD_LAYOUT.iter().zip(view.fields) {
+            if let Some(bytes) = field_bytes {
+                fields.insert(*flag, bytes.to_vec());
             }
-            let end = cursor.checked_add(size).ok_or_else(|| {
-                Error::ParseError("Numbers BNC field offset overflow".to_string())
-            })?;
-            let bytes = data.get(cursor..end).ok_or_else(|| {
-                Error::ParseError(format!("Truncated Numbers BNC field 0x{flag:08x}"))
-            })?;
-            fields.insert(flag, bytes.to_vec());
-            cursor = end;
         }
-
-        let cell = Self {
+        Ok(Self {
             prefix,
             fields,
-            tail: data[cursor..].to_vec(),
-        };
-        cell.validate_finite_scalar()?;
-        Ok(cell)
+            tail: view.tail.to_vec(),
+        })
     }
 
     /// Creates the smallest writable BNC cell.
@@ -227,34 +209,12 @@ impl BncCell {
         }
     }
 
+    #[must_use]
     pub fn stored_value(&self) -> StoredValue {
-        if let Some(identifier) = self.u32_field(FORMULA_FLAG) {
-            return StoredValue::Formula(identifier);
-        }
-        match self.prefix[1] {
-            CELL_TYPE_EMPTY => StoredValue::Empty,
-            CELL_TYPE_NUMBER | CELL_TYPE_ALTERNATE_NUMBER => StoredValue::Number,
-            CELL_TYPE_TEXT => self
-                .u32_field(STRING_FLAG)
-                .map_or(StoredValue::Empty, StoredValue::Text),
-            CELL_TYPE_DATE => StoredValue::Date,
-            CELL_TYPE_BOOLEAN => StoredValue::Boolean,
-            CELL_TYPE_DURATION => StoredValue::Duration,
-            CELL_TYPE_ERROR => StoredValue::Error,
-            CELL_TYPE_RICH_TEXT_OR_NUMBER => {
-                if let Some(identifier) = self.u32_field(RICH_TEXT_FLAG) {
-                    StoredValue::RichText(identifier)
-                } else if let Some(identifier) = self.u32_field(STRING_FLAG) {
-                    StoredValue::Text(identifier)
-                } else {
-                    StoredValue::Number
-                }
-            },
-            other => StoredValue::Unsupported(other),
-        }
+        stored_value_from(self.prefix[1], |flag| self.u32_field(flag))
     }
 
-    /// Replaces the cell value with a number using its current data format.
+    /// Replaces the cell value with a number.
     ///
     /// # Errors
     ///
@@ -377,43 +337,8 @@ impl BncCell {
     /// Returns an error when a numeric field has an invalid byte width, a
     /// decimal128 field cannot be decoded, or a scalar is non-finite.
     pub fn cached_scalar(&self) -> Result<Option<CachedScalar>> {
-        let scalar = match self.prefix[1] {
-            CELL_TYPE_NUMBER | CELL_TYPE_RICH_TEXT_OR_NUMBER | CELL_TYPE_ALTERNATE_NUMBER => self
-                .fields
-                .get(&DECIMAL_FLAG)
-                .map(|value| decode_decimal128_le(value).map(CachedScalar::Number))
-                .or_else(|| {
-                    self.fields
-                        .get(&NUMBER_FLAG)
-                        .map(|value| read_f64_le(value).map(CachedScalar::Number))
-                })
-                .transpose()?
-                .or(Some(CachedScalar::Unsupported(self.prefix[1]))),
-            CELL_TYPE_TEXT | CELL_TYPE_ERROR => Some(CachedScalar::Unsupported(self.prefix[1])),
-            CELL_TYPE_DATE => self
-                .fields
-                .get(&DATE_FLAG)
-                .map(|value| read_f64_le(value).map(CachedScalar::Date))
-                .transpose()?
-                .or(Some(CachedScalar::Unsupported(CELL_TYPE_DATE))),
-            CELL_TYPE_BOOLEAN => self
-                .fields
-                .get(&NUMBER_FLAG)
-                .map(|value| {
-                    read_f64_le(value).map(|number| CachedScalar::Boolean(number.get() != 0.0))
-                })
-                .transpose()?
-                .or(Some(CachedScalar::Unsupported(CELL_TYPE_BOOLEAN))),
-            CELL_TYPE_DURATION => self
-                .fields
-                .get(&NUMBER_FLAG)
-                .map(|value| read_f64_le(value).map(CachedScalar::Duration))
-                .transpose()?
-                .or(Some(CachedScalar::Unsupported(CELL_TYPE_DURATION))),
-            CELL_TYPE_EMPTY => None,
-            other => Some(CachedScalar::Unsupported(other)),
-        };
-        Ok(scalar)
+        let fields = decode_scalar_fields(|flag| self.fields.get(&flag).map(Vec::as_slice))?;
+        Ok(cached_scalar_from(self.prefix[1], fields))
     }
 
     /// Replaces a formula's cached result with a number.
@@ -519,10 +444,35 @@ impl BncCell {
     ///
     /// Returns an error when an interactive format has no control-cell
     /// identifier, when a non-interactive format has one, or when a text
-    /// format would discard a non-text scalar.
+    /// format would discard a non-text scalar, or a required scalar conversion
+    /// is not finite. This compatibility entry point performs the same native
+    /// scalar conversions as Numbers; metadata-only application is kept as a
+    /// separate internal operation so extraction never infers semantic value
+    /// from display metadata.
     pub fn set_data_format_identifier(
         &mut self,
         identifier: u32,
+        kind: CellDataFormatKind,
+        control_identifier: Option<u32>,
+    ) -> Result<()> {
+        self.validate_data_format_request(kind, control_identifier)?;
+        self.convert_scalar_for_data_format(kind)?;
+        self.set_data_format_metadata_identifier(identifier, kind, control_identifier)
+    }
+
+    fn set_data_format_metadata_identifier(
+        &mut self,
+        identifier: u32,
+        kind: CellDataFormatKind,
+        control_identifier: Option<u32>,
+    ) -> Result<()> {
+        self.validate_data_format_request(kind, control_identifier)?;
+        self.apply_data_format_identifier(identifier, kind, control_identifier);
+        Ok(())
+    }
+
+    fn validate_data_format_request(
+        &self,
         kind: CellDataFormatKind,
         control_identifier: Option<u32>,
     ) -> Result<()> {
@@ -561,7 +511,26 @@ impl BncCell {
                 ));
             },
         }
-        self.convert_scalar_for_data_format(kind)?;
+        if matches!(
+            kind,
+            CellDataFormatKind::Text | CellDataFormatKind::PopUpMenu
+        ) && !matches!(
+            self.stored_value(),
+            StoredValue::Empty | StoredValue::Text(_)
+        ) {
+            return Err(Error::InvalidFormat(
+                "Text-based format can only be applied safely to an empty or text cell".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn apply_data_format_identifier(
+        &mut self,
+        identifier: u32,
+        kind: CellDataFormatKind,
+        control_identifier: Option<u32>,
+    ) {
         if !matches!(
             kind,
             CellDataFormatKind::Checkbox
@@ -693,7 +662,6 @@ impl BncCell {
             .copy_from_slice(&explicit_flags.to_le_bytes());
         self.fields
             .insert(CELL_FORMAT_KIND_FLAG, format_kind.to_le_bytes().to_vec());
-        Ok(())
     }
 
     pub fn clear_explicit_format(&mut self) {
@@ -715,17 +683,6 @@ impl BncCell {
     }
 
     fn convert_scalar_for_data_format(&mut self, kind: CellDataFormatKind) -> Result<()> {
-        if matches!(
-            kind,
-            CellDataFormatKind::Text | CellDataFormatKind::PopUpMenu
-        ) && !matches!(
-            self.stored_value(),
-            StoredValue::Empty | StoredValue::Text(_)
-        ) {
-            return Err(Error::InvalidFormat(
-                "Text-based format can only be applied safely to an empty or text cell".to_owned(),
-            ));
-        }
         let formula_identifier = self.u32_field(FORMULA_FLAG);
         match (kind, self.cached_scalar()?) {
             (
@@ -868,18 +825,154 @@ impl BncCell {
             )
         })
     }
+}
 
-    fn validate_finite_scalar(&self) -> Result<()> {
-        if let Some(value) = self.fields.get(&DECIMAL_FLAG) {
-            decode_decimal128_le(value)?;
+impl<'a> BncCellView<'a> {
+    /// Parses the value-bearing portion of a BNC cell without allocating.
+    pub(crate) fn parse(data: &'a [u8]) -> Result<Self> {
+        if data.len() < BNC_HEADER_LEN {
+            return Err(Error::ParseError(
+                "Truncated Numbers BNC cell header".to_string(),
+            ));
         }
-        if let Some(value) = self.fields.get(&NUMBER_FLAG) {
-            read_f64_le(value)?;
+        if data[0] != BNC_VERSION {
+            return Err(Error::ParseError(format!(
+                "Numbers cell storage version {} is not writable BNC v5",
+                data[0]
+            )));
         }
-        if let Some(value) = self.fields.get(&DATE_FLAG) {
-            read_f64_le(value)?;
+
+        let mut flag_bytes = [0; 4];
+        flag_bytes.copy_from_slice(&data[BNC_PREFIX_LEN..BNC_HEADER_LEN]);
+        let flags = u32::from_le_bytes(flag_bytes);
+        let known_flags = FIELD_LAYOUT.iter().fold(0, |mask, (flag, _)| mask | flag);
+        if flags & !known_flags != 0 {
+            return Err(Error::ParseError(format!(
+                "Numbers BNC cell uses unknown flags 0x{:08x}",
+                flags & !known_flags
+            )));
         }
-        Ok(())
+
+        let mut cursor = BNC_HEADER_LEN;
+        let mut fields = [None; FIELD_COUNT];
+        for (index, &(flag, size)) in FIELD_LAYOUT.iter().enumerate() {
+            if flags & flag == 0 {
+                continue;
+            }
+            let end = cursor.checked_add(size).ok_or_else(|| {
+                Error::ParseError("Numbers BNC field offset overflow".to_string())
+            })?;
+            fields[index] = Some(data.get(cursor..end).ok_or_else(|| {
+                Error::ParseError(format!("Truncated Numbers BNC field 0x{flag:08x}"))
+            })?);
+            cursor = end;
+        }
+
+        let decoded_scalar_fields = decode_scalar_fields(|flag| field_from_layout(&fields, flag))?;
+        Ok(Self {
+            cell_type: data[1],
+            fields,
+            cached_scalar: cached_scalar_from(data[1], decoded_scalar_fields),
+            tail: &data[cursor..],
+        })
+    }
+
+    #[must_use]
+    pub(crate) fn stored_value(&self) -> StoredValue {
+        stored_value_from(self.cell_type, |flag| self.u32_field(flag))
+    }
+
+    #[must_use]
+    pub(crate) fn cached_scalar(&self) -> Option<CachedScalar> {
+        self.cached_scalar
+    }
+
+    pub(crate) fn formula_error_identifier(&self) -> Option<u32> {
+        self.u32_field(FORMULA_ERROR_FLAG)
+    }
+
+    pub(crate) fn comment_identifier(&self) -> Option<u32> {
+        self.u32_field(COMMENT_FLAG)
+    }
+
+    fn field(&self, requested_flag: u32) -> Option<&'a [u8]> {
+        field_from_layout(&self.fields, requested_flag)
+    }
+
+    fn u32_field(&self, flag: u32) -> Option<u32> {
+        let bytes: [u8; 4] = self.field(flag)?.try_into().ok()?;
+        Some(u32::from_le_bytes(bytes))
+    }
+}
+
+fn field_from_layout<'a>(
+    fields: &[Option<&'a [u8]>; FIELD_COUNT],
+    requested_flag: u32,
+) -> Option<&'a [u8]> {
+    let index = usize::try_from(requested_flag.trailing_zeros()).ok()?;
+    FIELD_LAYOUT
+        .get(index)
+        .filter(|(flag, _size)| *flag == requested_flag)?;
+    fields.get(index).copied().flatten()
+}
+
+fn stored_value_from(cell_type: u8, mut u32_field: impl FnMut(u32) -> Option<u32>) -> StoredValue {
+    if let Some(identifier) = u32_field(FORMULA_FLAG) {
+        return StoredValue::Formula(identifier);
+    }
+    match cell_type {
+        CELL_TYPE_EMPTY => StoredValue::Empty,
+        CELL_TYPE_NUMBER | CELL_TYPE_ALTERNATE_NUMBER => StoredValue::Number,
+        CELL_TYPE_TEXT => u32_field(STRING_FLAG).map_or(StoredValue::Empty, StoredValue::Text),
+        CELL_TYPE_DATE => StoredValue::Date,
+        CELL_TYPE_BOOLEAN => StoredValue::Boolean,
+        CELL_TYPE_DURATION => StoredValue::Duration,
+        CELL_TYPE_ERROR => StoredValue::Error,
+        CELL_TYPE_RICH_TEXT_OR_NUMBER => {
+            if let Some(identifier) = u32_field(RICH_TEXT_FLAG) {
+                StoredValue::RichText(identifier)
+            } else if let Some(identifier) = u32_field(STRING_FLAG) {
+                StoredValue::Text(identifier)
+            } else {
+                StoredValue::Number
+            }
+        },
+        other => StoredValue::Unsupported(other),
+    }
+}
+
+fn decode_scalar_fields<'a>(
+    mut field: impl FnMut(u32) -> Option<&'a [u8]>,
+) -> Result<DecodedScalarFields> {
+    Ok(DecodedScalarFields {
+        decimal: field(DECIMAL_FLAG).map(decode_decimal128_le).transpose()?,
+        number: field(NUMBER_FLAG).map(read_f64_le).transpose()?,
+        date: field(DATE_FLAG).map(read_f64_le).transpose()?,
+    })
+}
+
+fn cached_scalar_from(cell_type: u8, fields: DecodedScalarFields) -> Option<CachedScalar> {
+    match cell_type {
+        CELL_TYPE_NUMBER | CELL_TYPE_RICH_TEXT_OR_NUMBER | CELL_TYPE_ALTERNATE_NUMBER => fields
+            .decimal
+            .or(fields.number)
+            .map(CachedScalar::Number)
+            .or(Some(CachedScalar::Unsupported(cell_type))),
+        CELL_TYPE_TEXT | CELL_TYPE_ERROR => Some(CachedScalar::Unsupported(cell_type)),
+        CELL_TYPE_DATE => fields
+            .date
+            .map(CachedScalar::Date)
+            .or(Some(CachedScalar::Unsupported(CELL_TYPE_DATE))),
+        CELL_TYPE_BOOLEAN => fields
+            .number
+            .map(|number| CachedScalar::Boolean(number.get() != 0.0))
+            .or(Some(CachedScalar::Unsupported(CELL_TYPE_BOOLEAN))),
+        CELL_TYPE_DURATION => fields
+            .number
+            .map(CachedScalar::Duration)
+            .or(Some(CachedScalar::Unsupported(CELL_TYPE_DURATION))),
+        CELL_TYPE_EMPTY => None,
+        other => Some(CachedScalar::Unsupported(other)),
     }
 }
 
@@ -1017,6 +1110,14 @@ mod tests {
 
     fn finite(value: f64) -> FiniteF64 {
         FiniteF64::new(value).expect("finite test scalar")
+    }
+
+    fn value_fields(cell: &BncCell) -> Vec<(u32, Vec<u8>)> {
+        cell.fields
+            .iter()
+            .filter(|(flag, _value)| VALUE_FLAGS & **flag != 0)
+            .map(|(flag, value)| (*flag, value.clone()))
+            .collect()
     }
 
     #[test]
@@ -1424,6 +1525,54 @@ mod tests {
         empty.clear_explicit_format();
         assert_eq!(empty.stored_value(), StoredValue::Number);
         assert_eq!(empty.control_cell_spec_identifier(), None);
+    }
+
+    #[test]
+    fn display_format_changes_preserve_value_encoding_through_round_trips() {
+        let mut number = BncCell::minimal();
+        number.set_number(1.5).unwrap();
+        number.set_formula_reference(12);
+        let original_number = value_fields(&number);
+
+        for (identifier, kind) in [
+            (7, CellDataFormatKind::DateTime),
+            (9, CellDataFormatKind::Duration),
+            (4, CellDataFormatKind::Currency),
+            (2, CellDataFormatKind::NumberOrPercentage),
+        ] {
+            number
+                .set_data_format_metadata_identifier(identifier, kind, None)
+                .unwrap();
+            assert_eq!(value_fields(&number), original_number);
+            assert_eq!(number.stored_value(), StoredValue::Formula(12));
+            assert_eq!(
+                number.cached_scalar().unwrap(),
+                Some(CachedScalar::Number(finite(1.5)))
+            );
+
+            let reparsed = BncCell::parse(&number.encode()).unwrap();
+            assert_eq!(value_fields(&reparsed), original_number);
+            number = reparsed;
+        }
+        number.clear_explicit_format();
+        assert_eq!(value_fields(&number), original_number);
+
+        let mut date = BncCell::minimal();
+        date.set_date(789_332_889.0).unwrap();
+        let original_date = value_fields(&date);
+        date.set_data_format_metadata_identifier(2, CellDataFormatKind::NumberOrPercentage, None)
+            .unwrap();
+        assert_eq!(value_fields(&date), original_date);
+        assert_eq!(date.stored_value(), StoredValue::Date);
+
+        let mut duration = BncCell::minimal();
+        duration.set_duration(3_723.5).unwrap();
+        let original_duration = value_fields(&duration);
+        duration
+            .set_data_format_metadata_identifier(7, CellDataFormatKind::DateTime, None)
+            .unwrap();
+        assert_eq!(value_fields(&duration), original_duration);
+        assert_eq!(duration.stored_value(), StoredValue::Duration);
     }
 
     #[test]

@@ -13,7 +13,7 @@ pub enum LimitKind {
     Entries,
     /// Bytes in one raw ZIP member name.
     MemberNameBytes,
-    /// Aggregate central-directory variable metadata bytes.
+    /// Aggregate raw ZIP header variable metadata bytes.
     MetadataBytes,
     /// Declared compressed size of one ZIP member.
     CompressedEntryBytes,

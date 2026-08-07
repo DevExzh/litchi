@@ -12,6 +12,9 @@ pub enum LimitKind {
     ObjectBytes,
     MessageBytes,
     HeaderBytes,
+    HeaderFields,
+    HeaderNesting,
+    HeaderMemoryBytes,
     MetadataItems,
     SnappyChunkBytes,
     SnappyStreamBytes,
@@ -30,6 +33,9 @@ impl fmt::Display for LimitKind {
             Self::ObjectBytes => "object byte",
             Self::MessageBytes => "message byte",
             Self::HeaderBytes => "header byte",
+            Self::HeaderFields => "header fields",
+            Self::HeaderNesting => "header nesting depth",
+            Self::HeaderMemoryBytes => "decoded header memory bytes",
             Self::MetadataItems => "metadata item",
             Self::SnappyChunkBytes => "Snappy decompressed chunk bytes",
             Self::SnappyStreamBytes => "Snappy decompressed stream bytes",
@@ -38,6 +44,38 @@ impl fmt::Display for LimitKind {
             Self::SnappyFrames => "Snappy frames",
         };
         formatter.write_str(name)
+    }
+}
+
+/// Protobuf header whose private codec rejected an operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeaderKind {
+    ArchiveInfo,
+    MessageInfo,
+}
+
+impl fmt::Display for HeaderKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::ArchiveInfo => "TSP.ArchiveInfo",
+            Self::MessageInfo => "TSP.MessageInfo",
+        })
+    }
+}
+
+/// Direction of a failed private header-codec operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeaderOperation {
+    Decode,
+    Encode,
+}
+
+impl fmt::Display for HeaderOperation {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Decode => "decode",
+            Self::Encode => "encode",
+        })
     }
 }
 
@@ -57,14 +95,15 @@ pub enum Error {
         maximum: usize,
     },
 
-    #[error("invalid IWA protobuf header: {0}")]
-    Protobuf(#[from] prost::DecodeError),
+    #[error("could not {operation} IWA {header} header: {reason}")]
+    HeaderCodec {
+        header: HeaderKind,
+        operation: HeaderOperation,
+        reason: String,
+    },
 
     #[error("IWA archive reader error: {0}")]
     Io(#[from] std::io::Error),
-
-    #[error("could not encode IWA protobuf header: {0}")]
-    ProtobufEncode(#[from] prost::EncodeError),
 
     #[error("invalid IWA Snappy stream: {message}")]
     Snappy { message: String },
@@ -103,6 +142,18 @@ impl Error {
         Self::Allocation {
             resource,
             requested,
+        }
+    }
+
+    pub(crate) fn header_codec(
+        header: HeaderKind,
+        operation: HeaderOperation,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self::HeaderCodec {
+            header,
+            operation,
+            reason: reason.into(),
         }
     }
 }

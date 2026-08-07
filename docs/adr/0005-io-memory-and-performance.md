@@ -59,10 +59,30 @@ decompression, cache misses, lock/contention time, CPU utilization, and scaling.
 Optimization decisions require profiles, flame graphs, and statistical evidence;
 intuition alone is not accepted.
 
-Generated IWA protobuf bindings are also kept minimal: prost runtime type-name
-metadata is disabled because no production path consumes it. This reduces
-generated code and static-data footprint without changing the wire format or
-the typed schema boundary.
+Generated IWA protobuf bindings are also kept minimal. Prost runtime type-name
+metadata remains disabled because no production path consumes it, while the
+first production archive-header seam uses exact-version Buffa 0.9.1 lazy views
+behind a private codec. This is a staged runtime migration, not permission to
+generate the complete schema corpus eagerly for every format.
+
+Buffa lazy decoding of untrusted IWA bytes is always preceded by a
+schema-directed common wire-tree preflight. One aggregate policy bounds scanned
+bytes, fields, nesting, repeated metadata items, deferred-message occurrences,
+and a conservative decoded-memory envelope before a lazy view is constructed.
+The adapter then visits every deferred archive-header child exactly once,
+checks proto2 required presence, and projects directly into the existing
+physical metadata with fallible destination reservations; generated
+`to_owned_message` is not a production ingress path. Buffa 0.9.1 still uses
+ordinary infallible `Vec` growth for some internal lazy metadata, so the
+preflight bounds hostile amplification but does not claim typed recovery from
+global allocator exhaustion or a language-level exact resident-memory bound.
+Strict contracts requiring either property must use a streaming handwritten
+cursor or a corrected Buffa runtime.
+
+Lazy re-encoding is not the preservation boundary. Original source-backed
+header bytes and common raw spans remain authoritative for exact no-ops,
+unknown fields, duplicate occurrences, and non-canonical encodings. Buffa
+encoding is used only for the canonical header created after a semantic change.
 
 Borrowed IWA wire readers use the common source-bound `WireView<'a>` and
 `WireFieldView<'a>` when interpreting recognized fields: one borrowed source

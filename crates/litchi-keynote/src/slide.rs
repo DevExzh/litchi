@@ -8,7 +8,7 @@ pub mod table;
 
 use litchi_iwa_text::storage::Storage;
 
-use crate::{Build, Effect, Seconds};
+use crate::{Build, Effect, Seconds, SlideSelector};
 
 /// A semantic transition attached to one slide.
 #[derive(Debug, Clone, PartialEq)]
@@ -41,6 +41,7 @@ impl Transition {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Slide {
     index: usize,
+    name: Option<Box<str>>,
     title: Option<Box<str>>,
     text_content: Box<[String]>,
     notes: Option<Box<str>>,
@@ -60,6 +61,32 @@ impl Slide {
     #[must_use]
     pub const fn index(&self) -> usize {
         self.index
+    }
+
+    /// Return the optional developer-facing navigator name.
+    ///
+    /// This is distinct from [`Self::title`], which is visible slide content.
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// Return a semantic selector, preferring the navigator name when present.
+    ///
+    /// Name resolution can report ambiguity when malformed or producer-authored
+    /// input repeats a name. Use [`Self::position_selector`] when an
+    /// unambiguous snapshot-local selector is required.
+    #[must_use]
+    pub fn selector(&self) -> SlideSelector<'_> {
+        self.name
+            .as_deref()
+            .map_or_else(|| self.position_selector(), SlideSelector::name)
+    }
+
+    /// Return a typed selector for this slide's zero-based source position.
+    #[must_use]
+    pub const fn position_selector(&self) -> SlideSelector<'static> {
+        SlideSelector::index(self.index)
     }
 
     /// Return the optional slide title.
@@ -144,6 +171,7 @@ impl Slide {
 #[derive(Debug, Default)]
 pub struct Builder {
     index: usize,
+    name: Option<Box<str>>,
     title: Option<Box<str>>,
     text_content: Vec<String>,
     notes: Option<Box<str>>,
@@ -160,6 +188,16 @@ impl Builder {
             index,
             ..Self::default()
         }
+    }
+
+    /// Set or clear the developer-facing navigator name.
+    ///
+    /// Empty producer names are normalized to absence. The name remains
+    /// separate from visible title content.
+    pub fn set_name(&mut self, name: Option<String>) {
+        self.name = name
+            .filter(|candidate| !candidate.is_empty())
+            .map(String::into_boxed_str);
     }
 
     /// Set or clear the title without exposing mutable attached state.
@@ -197,6 +235,7 @@ impl Builder {
     pub fn build(self) -> Slide {
         Slide {
             index: self.index,
+            name: self.name,
             title: self.title,
             text_content: self.text_content.into_boxed_slice(),
             notes: self.notes,

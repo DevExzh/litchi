@@ -141,9 +141,23 @@ Pages document state follows the same raw/semantic split:
 `litchi_pages::document::{Root, Body, Document}` owns an immutable, bounded
 semantic snapshot, while `litchi-iwa` decodes native root and body payloads
 before constructing it. The semantic model exposes borrowed section views and
-checked zero-based selection; native object identifiers and protobuf messages
-do not appear in its ordinary signatures. Snapshot cloning shares the IWA
-state and never reparses or mutates the source document.
+exact-name or typed `litchi_core::Position` selection; duplicate names are a
+typed ambiguity instead of an arbitrary first match. Every section can produce
+an unambiguous snapshot-local position selector, while a producer-visible name
+is preferred when one is actually present. The native Pages adapter does not
+synthesize section names from headings when the current schema projection has
+no name, and native object identifiers and protobuf messages do not appear in
+ordinary signatures. Snapshot cloning shares the semantic section allocation
+and never reparses or mutates the source document.
+
+Keynote uses the same selector contract through
+`litchi_keynote::SlideSelector::{Name, Position}`. A slide's developer-facing
+navigator name is distinct from its visible title; duplicate exact names are a
+typed error and a checked source position remains the deterministic fallback.
+The first production Buffa archive-header adapter is below both facades:
+generated lazy views, decode contexts, and codec errors remain private, while
+the existing neutral compatibility structs and semantic values form the crate
+boundary.
 
 The same focused-module rule applies to neutral visual values:
 `litchi_iwa_common::color::{RgbColorSpace, Rgba}` owns the validated RGBA

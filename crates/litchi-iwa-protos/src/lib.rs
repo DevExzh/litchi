@@ -23,7 +23,7 @@ mod generated {
     include!(concat!(env!("OUT_DIR"), "/iwa_protos.rs"));
 }
 
-/// Private Buffa eager/lazy view sidecar for future archive adapters.
+/// Private Buffa eager/lazy view sidecar for archive adapters.
 ///
 /// The sidecar is deliberately not an untrusted-ingress API. In Buffa 0.9.1,
 /// deferred lazy message access rebuilds its decode context with recursion and
@@ -32,7 +32,6 @@ mod generated {
 /// allocations can therefore escape that initial element-memory accounting.
 /// Archive adapters must establish their own complete resource policy before
 /// accepting untrusted payloads through this path.
-#[cfg(test)]
 #[doc(hidden)]
 mod buffa_generated {
     #![allow(
@@ -64,6 +63,14 @@ mod buffa_generated {
 
     include!(concat!(env!("OUT_DIR"), "/buffa/iwa_buffa_protos.rs"));
 }
+
+/// Internal archive-header codec implemented by the private Buffa sidecar.
+///
+/// This module intentionally exchanges only the existing Prost compatibility
+/// structs. Buffa-generated types remain an implementation detail and cannot
+/// leak into the public format APIs.
+#[doc(hidden)]
+pub mod archive_codec;
 
 pub use generated::{
     kn, knsos, tn, tnsos, tp, tpsos, tsa, tsasos, tsce, tsch, tschsos, tsck, tscksos, tsd, tsdsos,

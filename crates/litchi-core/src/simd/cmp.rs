@@ -2176,6 +2176,9 @@ pub fn simd_eq_u8(a: &[u8], b: &[u8], result: &mut [u8]) {
 
     #[cfg(target_arch = "aarch64")]
     {
+        // SAFETY: NEON is part of the aarch64 baseline, and the length checks
+        // above ensure that every load and store performed by the helper is in
+        // bounds.
         unsafe { simd_eq_u8_neon_impl(a, b, result) };
     }
 
@@ -2227,6 +2230,8 @@ pub fn is_all_zero(bytes: &[u8]) -> bool {
 
     #[cfg(target_arch = "aarch64")]
     {
+        // SAFETY: NEON is part of the aarch64 baseline, and the helper checks
+        // each vector load against the slice length.
         unsafe { is_all_zero_neon(bytes) }
     }
 
@@ -2237,6 +2242,7 @@ pub fn is_all_zero(bytes: &[u8]) -> bool {
 }
 
 // Scalar fallback
+#[cfg(any(test, not(target_arch = "aarch64")))]
 #[inline]
 fn is_all_zero_scalar(bytes: &[u8]) -> bool {
     bytes.iter().all(|&b| b == 0)
@@ -2394,6 +2400,7 @@ unsafe fn is_all_zero_sve(bytes: &[u8]) -> bool {
 
 // Scalar fallback implementations
 
+#[cfg(any(test, not(target_arch = "aarch64")))]
 #[inline]
 fn simd_eq_u8_scalar(a: &[u8], b: &[u8], result: &mut [u8]) {
     for i in 0..a.len() {
@@ -2786,10 +2793,9 @@ mod tests {
             0, 1, 7, 8, 15, 16, 17, 31, 32, 33, 63, 64, 65, 127, 128, 255, 256,
         ] {
             // All zeros
-            assert!(
-                is_all_zero(&vec![0u8; size]),
-                "is_all_zero failed for size {size}"
-            );
+            let zeros = vec![0u8; size];
+            assert!(is_all_zero(&zeros), "is_all_zero failed for size {size}");
+            assert_eq!(is_all_zero(&zeros), is_all_zero_scalar(&zeros));
 
             // Single non-zero at start
             if size > 0 {
@@ -2799,6 +2805,7 @@ mod tests {
                     !is_all_zero(&data),
                     "is_all_zero false positive for size {size}"
                 );
+                assert_eq!(is_all_zero(&data), is_all_zero_scalar(&data));
             }
 
             // Single non-zero at end
@@ -2809,6 +2816,7 @@ mod tests {
                     !is_all_zero(&data),
                     "is_all_zero false positive for size {size}"
                 );
+                assert_eq!(is_all_zero(&data), is_all_zero_scalar(&data));
             }
 
             // Single non-zero in middle
@@ -2819,14 +2827,17 @@ mod tests {
                     !is_all_zero(&data),
                     "is_all_zero false positive for size {size}"
                 );
+                assert_eq!(is_all_zero(&data), is_all_zero_scalar(&data));
             }
 
             // All non-zero
             if size > 0 {
+                let ones = vec![1u8; size];
                 assert!(
-                    !is_all_zero(&vec![1u8; size]),
+                    !is_all_zero(&ones),
                     "is_all_zero false positive for all ones"
                 );
+                assert_eq!(is_all_zero(&ones), is_all_zero_scalar(&ones));
             }
         }
     }

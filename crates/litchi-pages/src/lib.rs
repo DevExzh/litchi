@@ -17,9 +17,11 @@ pub mod movie;
 mod package;
 pub mod page_layout;
 pub mod section;
+pub mod selector;
 
 pub use document::{
     Body, DEFAULT_MAX_TEXT_BYTES, Document, Error, MAX_BODY_STORAGES, MAX_SECTIONS, Result, Root,
 };
 pub use package::{Limits, Package, PackageError, PackageResult, Stats};
 pub use section::{Section, SectionType};
+pub use selector::{SectionSelector, SelectorError, SelectorResult};

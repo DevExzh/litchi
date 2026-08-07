@@ -82,6 +82,11 @@ directly.
 The physical IWA substrate is layered beneath the application crate:
 `litchi-iwa-protos` owns the generated raw schemas, and `litchi-iwa-core`
 depends on it for bounded archive framing and checksum-free Snappy encoding.
+The core also depends downward on `litchi-iwa-common` for the sole shared
+source-bound wire-tree preflight. That edge does not move archive or Snappy
+ownership into common: common validates raw spans under aggregate byte, field,
+and nesting budgets, while core supplies the archive-header schema policy and
+projects the result into its physical metadata values.
 `litchi-iwa` consumes the core's typed, slice-based codecs directly; its former
 633-line duplicate Snappy implementation and 172-line varint kernel are gone.
 The raw schema build deliberately omits prost's runtime type-name metadata:
@@ -98,6 +103,15 @@ borrowed source plus compact private spans instead of per-field byte owners;
 the older `WireField` mutation representation remains only while its callers
 are migrated. The facade's private `wire.rs` is a callback/error adapter and
 does not copy parsed fields or maintain a second wire representation.
+
+Archive-header protobuf interpretation is the first production Buffa seam.
+`litchi-iwa-protos` keeps Buffa 0.9.1 generated eager/lazy types private behind
+an internal codec and continues to expose the existing generated compatibility
+types during migration. `litchi-iwa-core` performs schema-directed wire-tree
+preflight before invoking that codec; neither Buffa views nor protobuf values
+enter Pages, Numbers, or Keynote semantic APIs. The original encoded header
+remains core-owned preservation state, so a lazy semantic projection never
+becomes the byte-authoritative save representation.
 
 The archive-neutral package-entry substrate now lives in
 `litchi-iwa-package`. It owns only ordered, uniquely named entry storage, its

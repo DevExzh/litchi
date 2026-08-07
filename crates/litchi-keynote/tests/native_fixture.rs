@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use litchi_keynote::Package;
+use litchi_keynote::{Package, SlideSelector};
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/keynote/basic.key")
@@ -10,6 +10,13 @@ fn assert_expected_slide(package: &Package) -> Result<(), Box<dyn std::error::Er
     package.validate()?;
     let show = package.show()?;
     assert_eq!(show.slide_count(), 1);
+    let selected = show
+        .select_slide(SlideSelector::index(0))?
+        .ok_or_else(|| std::io::Error::other("native Keynote fixture has no first slide"))?;
+    assert_eq!(selected.index(), 0);
+    if let Some(name) = selected.name() {
+        assert_eq!(show.select_slide(name)?, Some(selected));
+    }
 
     let text = show.all_text().join("\n");
     assert!(text.contains("Litchi native Keynote fixture"));

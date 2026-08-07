@@ -177,6 +177,171 @@ impl<'a> WireFieldView<'a> {
     }
 }
 
+/// Decision returned by a bounded wire-tree preflight visitor.
+///
+/// Length-delimited protobuf fields are ambiguous at the wire level: their
+/// payload may be a message, a string, bytes, or packed scalars. The visitor
+/// supplies the missing schema knowledge by selecting only payloads that are
+/// deferred submessages in the caller's generated model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "WireDescent remains explicit when imported by schema adapters"
+)]
+pub enum WireDescent {
+    /// Treat this field as an opaque scalar payload.
+    Skip,
+    /// Validate this length-delimited payload as a nested wire message.
+    Descend,
+}
+
+/// One parser-produced field presented during a bounded wire-tree preflight.
+///
+/// The containing-message path contains the field numbers followed from the
+/// root to reach this field's message. It is empty for root fields. The path
+/// is borrowed only for the visitor call. The field may be retained, but it
+/// remains bound to the exact source slice parsed by the scanner and cannot be
+/// paired with caller-supplied bytes.
+#[derive(Debug, Clone, Copy)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "WireVisit names the wire-specific callback value at schema boundaries"
+)]
+pub struct WireVisit<'source, 'path> {
+    path: &'path [u32],
+    field: WireFieldView<'source>,
+}
+
+impl<'source, 'path> WireVisit<'source, 'path> {
+    /// Field-number path of the message containing this field.
+    #[must_use]
+    pub const fn path(self) -> &'path [u32] {
+        self.path
+    }
+
+    /// Nested-message depth of the message containing this field.
+    #[must_use]
+    pub const fn depth(self) -> usize {
+        self.path.len()
+    }
+
+    /// Source-bound field currently being visited.
+    #[must_use]
+    pub const fn field(self) -> WireFieldView<'source> {
+        self.field
+    }
+}
+
+/// Resource totals from a completed bounded wire-tree preflight.
+///
+/// `scanned_bytes` counts the bytes inspected in every selected message. A
+/// nested payload is therefore charged again when the visitor asks to scan it,
+/// matching the aggregate work performed by subsequent deferred decodes
+/// rather than merely checking the size of the root allocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "WirePreflight distinguishes this report from format-level package preflights"
+)]
+pub struct WirePreflight {
+    scanned_bytes: usize,
+    fields: usize,
+    messages: usize,
+    max_depth: usize,
+}
+
+impl WirePreflight {
+    /// Aggregate message bytes inspected, including selected descendants.
+    #[must_use]
+    pub const fn scanned_bytes(self) -> usize {
+        self.scanned_bytes
+    }
+
+    /// Aggregate fields parsed across the root and selected descendants.
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+
+    /// Number of messages scanned, including the root message.
+    #[must_use]
+    pub const fn messages(self) -> usize {
+        self.messages
+    }
+
+    /// Deepest selected message, where the root message has depth zero.
+    #[must_use]
+    pub const fn max_depth(self) -> usize {
+        self.max_depth
+    }
+}
+
+struct WirePreflightContext {
+    limits: WireLimits,
+    scanned_bytes: usize,
+    fields: usize,
+    messages: usize,
+    max_depth: usize,
+}
+
+impl WirePreflightContext {
+    const fn new(limits: WireLimits) -> Self {
+        Self {
+            limits,
+            scanned_bytes: 0,
+            fields: 0,
+            messages: 0,
+            max_depth: 0,
+        }
+    }
+
+    fn finish(self) -> WirePreflight {
+        WirePreflight {
+            scanned_bytes: self.scanned_bytes,
+            fields: self.fields,
+            messages: self.messages,
+            max_depth: self.max_depth,
+        }
+    }
+
+    fn charge_message(&mut self, bytes: usize, depth: usize) -> Result<()> {
+        if depth > self.limits.max_nesting() {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::Nesting,
+                observed: depth,
+                limit: self.limits.max_nesting(),
+            });
+        }
+        let observed = self.scanned_bytes.saturating_add(bytes);
+        if observed > self.limits.max_input_bytes() {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::InputBytes,
+                observed,
+                limit: self.limits.max_input_bytes(),
+            });
+        }
+        self.scanned_bytes = observed;
+        self.messages = self.messages.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("protobuf preflight message count overflow".to_owned())
+        })?;
+        self.max_depth = self.max_depth.max(depth);
+        Ok(())
+    }
+
+    fn charge_field(&mut self) -> Result<()> {
+        let observed = self.fields.saturating_add(1);
+        if observed > self.limits.max_fields() {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed,
+                limit: self.limits.max_fields(),
+            });
+        }
+        self.fields = observed;
+        Ok(())
+    }
+}
+
 /// Compact private field metadata retained by [`WireView`].
 ///
 /// The configured input ceiling is below `u32::MAX`, so four-byte offsets are
@@ -615,6 +780,107 @@ pub fn parse_wire_view(source: &[u8]) -> Result<WireView<'_>> {
 /// Parse a borrowed source into a source-bound wire view under finite limits.
 pub fn parse_wire_view_with_limits(source: &[u8], limits: WireLimits) -> Result<WireView<'_>> {
     WireView::parse_with_limits(source, limits)
+}
+
+/// Preflight a root message and every schema-selected deferred submessage
+/// under the default finite resource profile.
+///
+/// The visitor runs once for each structurally valid field in depth-first wire
+/// order. Return [`WireDescent::Descend`] only for fields that the schema
+/// declares to be messages. The containing-message [`WireVisit::path`] lets a
+/// caller distinguish the same field number in different message types.
+///
+/// All selected messages share one aggregate byte, field, and nesting budget.
+/// This closes the budget reset that would result from independently parsing
+/// each deferred payload after a lazy top-level decode.
+pub fn preflight_wire_tree<'source, F>(source: &'source [u8], visitor: F) -> Result<WirePreflight>
+where
+    F: for<'path> FnMut(WireVisit<'source, 'path>) -> Result<WireDescent>,
+{
+    preflight_wire_tree_with_limits(source, WireLimits::default(), visitor)
+}
+
+/// Preflight a root message and every schema-selected deferred submessage
+/// under one explicit finite resource profile.
+///
+/// The scanner does not expose offsets or accept caller-created fields. Each
+/// [`WireVisit`] is built directly from the message slice currently being
+/// parsed, and descent is possible only during that visit. Nested byte ranges
+/// and depths therefore cannot be forged or detached from their source.
+///
+/// Input bytes are charged for every scanned message, including overlapping
+/// ancestor and descendant slices. Field count is likewise aggregate across
+/// the whole selected tree. The path stack is grown with fallible allocation
+/// and never exceeds [`WireLimits::max_nesting`].
+pub fn preflight_wire_tree_with_limits<'source, F>(
+    source: &'source [u8],
+    limits: WireLimits,
+    mut visitor: F,
+) -> Result<WirePreflight>
+where
+    F: for<'path> FnMut(WireVisit<'source, 'path>) -> Result<WireDescent>,
+{
+    let mut context = WirePreflightContext::new(limits);
+    let mut path = Vec::new();
+    preflight_wire_message(source, 0, &mut path, &mut context, &mut visitor)?;
+    Ok(context.finish())
+}
+
+fn preflight_wire_message<'source, F>(
+    source: &'source [u8],
+    depth: usize,
+    path: &mut Vec<u32>,
+    context: &mut WirePreflightContext,
+    visitor: &mut F,
+) -> Result<()>
+where
+    F: for<'path> FnMut(WireVisit<'source, 'path>) -> Result<WireDescent>,
+{
+    context.charge_message(source.len(), depth)?;
+    let mut offset = 0usize;
+    while offset < source.len() {
+        let field = parse_wire_field(source, offset)?;
+        offset = field.end;
+        context.charge_field()?;
+        let field_view = WireFieldView {
+            source,
+            span: span_from_field(field)?,
+        };
+        if visitor(WireVisit {
+            path: path.as_slice(),
+            field: field_view,
+        })? == WireDescent::Skip
+        {
+            continue;
+        }
+        if field_view.wire_type() != 2 {
+            return Err(Error::InvalidFormat(format!(
+                "protobuf field {} cannot be descended because it is not length-delimited",
+                field_view.number()
+            )));
+        }
+        let child_depth = depth
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("protobuf nesting depth overflow".to_owned()))?;
+        if child_depth > context.limits.max_nesting() {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::Nesting,
+                observed: child_depth,
+                limit: context.limits.max_nesting(),
+            });
+        }
+        path.try_reserve(1)
+            .map_err(|_allocation| Error::Allocation {
+                resource: "wire preflight path",
+                amount: path.len() + 1,
+            })?;
+        path.push(field_view.number());
+        let child_result =
+            preflight_wire_message(field_view.payload(), child_depth, path, context, visitor);
+        path.pop();
+        child_result?;
+    }
+    Ok(())
 }
 
 /// Overlay singular protobuf fields while retaining every untouched byte.
@@ -2598,6 +2864,212 @@ mod tests {
             patch_length_delimited_field(&data, 1, true, Some(b"cd")).unwrap(),
             [0x0a, 0x82, 0x00, b'c', b'd']
         );
+    }
+
+    fn descend_test_schema(path: &[u32], field: WireFieldView<'_>) -> bool {
+        field.wire_type() == 2
+            && ((path.is_empty() && field.number() == 2) || (path == [2] && field.number() == 4))
+    }
+
+    #[test]
+    fn wire_tree_preflight_visits_selected_messages_with_shared_totals() {
+        let leaf = varint_field(7, 70);
+        let mut child = varint_field(3, 30);
+        append_length_delimited_field(&mut child, 4, &leaf).unwrap();
+        let mut source = varint_field(1, 10);
+        append_length_delimited_field(&mut source, 2, &child).unwrap();
+        append_length_delimited_field(&mut source, 9, &[0x80]).unwrap();
+
+        let mut visited = Vec::new();
+        let report = preflight_wire_tree(&source, |visit| {
+            let field = visit.field();
+            visited.push((visit.path().to_vec(), field.number(), field.wire_type()));
+            Ok(if descend_test_schema(visit.path(), field) {
+                WireDescent::Descend
+            } else {
+                WireDescent::Skip
+            })
+        })
+        .unwrap();
+
+        assert_eq!(
+            visited,
+            vec![
+                (vec![], 1, 0),
+                (vec![], 2, 2),
+                (vec![2], 3, 0),
+                (vec![2], 4, 2),
+                (vec![2, 4], 7, 0),
+                (vec![], 9, 2),
+            ]
+        );
+        assert_eq!(report.fields(), 6);
+        assert_eq!(report.messages(), 3);
+        assert_eq!(report.max_depth(), 2);
+        assert_eq!(
+            report.scanned_bytes(),
+            source.len() + child.len() + leaf.len()
+        );
+    }
+
+    #[test]
+    fn wire_tree_preflight_shares_field_budget_across_siblings() {
+        let child = varint_field(1, 1);
+        let mut source = Vec::new();
+        append_length_delimited_field(&mut source, 2, &child).unwrap();
+        append_length_delimited_field(&mut source, 2, &child).unwrap();
+        let limits = WireLimits::default().with_fields(3).unwrap();
+
+        assert!(matches!(
+            preflight_wire_tree_with_limits(&source, limits, |visit| Ok(if visit.depth() == 0 {
+                WireDescent::Descend
+            } else {
+                WireDescent::Skip
+            })),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed: 4,
+                limit: 3,
+            })
+        ));
+    }
+
+    #[test]
+    fn wire_tree_preflight_shares_aggregate_scan_byte_budget() {
+        let child = varint_field(1, 1);
+        let mut source = Vec::new();
+        append_length_delimited_field(&mut source, 2, &child).unwrap();
+        let aggregate = source.len() + child.len();
+        let limits = WireLimits::default()
+            .with_input_bytes(aggregate - 1)
+            .unwrap();
+
+        assert!(matches!(
+            preflight_wire_tree_with_limits(&source, limits, |visit| Ok(
+                if visit.depth() == 0 {
+                    WireDescent::Descend
+                } else {
+                    WireDescent::Skip
+                }
+            )),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::InputBytes,
+                observed,
+                limit,
+            }) if observed == aggregate && limit == aggregate - 1
+        ));
+    }
+
+    #[test]
+    fn wire_tree_preflight_rejects_adversarial_depth_before_descent() {
+        let mut source = varint_field(9, 1);
+        for _ in 0..4 {
+            let mut parent = Vec::new();
+            append_length_delimited_field(&mut parent, 1, &source).unwrap();
+            source = parent;
+        }
+        let limits = WireLimits::default().with_nesting(3).unwrap();
+
+        assert!(matches!(
+            preflight_wire_tree_with_limits(&source, limits, |visit| Ok(
+                if visit.field().wire_type() == 2 {
+                    WireDescent::Descend
+                } else {
+                    WireDescent::Skip
+                }
+            )),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::Nesting,
+                observed: 4,
+                limit: 3,
+            })
+        ));
+    }
+
+    #[test]
+    fn wire_tree_preflight_validates_only_selected_deferred_messages() {
+        let mut source = Vec::new();
+        append_length_delimited_field(&mut source, 2, &[0x08]).unwrap();
+
+        let skipped = preflight_wire_tree(&source, |_| Ok(WireDescent::Skip)).unwrap();
+        assert_eq!(skipped.fields(), 1);
+        assert!(preflight_wire_tree(&source, |_| Ok(WireDescent::Descend)).is_err());
+
+        let scalar = varint_field(1, 7);
+        assert!(matches!(
+            preflight_wire_tree(&scalar, |_| Ok(WireDescent::Descend)),
+            Err(Error::InvalidFormat(message))
+                if message.contains("not length-delimited")
+        ));
+    }
+
+    #[test]
+    fn wire_tree_preflight_matches_recursive_legacy_field_parsing() {
+        fn collect_legacy(
+            source: &[u8],
+            path: &mut Vec<u32>,
+            collected: &mut Vec<(Vec<u32>, u32, u8, Vec<u8>)>,
+        ) {
+            for field in parse_wire_fields(source).unwrap() {
+                let field_view = WireView::parse(field.raw(source).unwrap())
+                    .unwrap()
+                    .get(0)
+                    .unwrap();
+                collected.push((
+                    path.clone(),
+                    field.number(),
+                    field.wire_type(),
+                    field.raw(source).unwrap().to_vec(),
+                ));
+                if descend_test_schema(path, field_view) {
+                    path.push(field.number());
+                    collect_legacy(field.payload(source).unwrap(), path, collected);
+                    path.pop();
+                }
+            }
+        }
+
+        let leaf = varint_field(8, 800);
+        let mut child = varint_field(3, 300);
+        append_length_delimited_field(&mut child, 4, &leaf).unwrap();
+        child.extend([0x95, 0x00, 1, 2, 3, 4]);
+        let mut source = vec![0x88, 0x00, 0x01];
+        append_length_delimited_field(&mut source, 2, &child).unwrap();
+        source.extend([0x29, 1, 2, 3, 4, 5, 6, 7, 8]);
+
+        let mut legacy = Vec::new();
+        collect_legacy(&source, &mut Vec::new(), &mut legacy);
+        let mut preflight = Vec::new();
+        let report = preflight_wire_tree(&source, |visit| {
+            let field = visit.field();
+            preflight.push((
+                visit.path().to_vec(),
+                field.number(),
+                field.wire_type(),
+                field.raw().to_vec(),
+            ));
+            Ok(if descend_test_schema(visit.path(), field) {
+                WireDescent::Descend
+            } else {
+                WireDescent::Skip
+            })
+        })
+        .unwrap();
+
+        assert_eq!(preflight, legacy);
+        assert_eq!(report.fields(), legacy.len());
+
+        for malformed in [
+            vec![0x08],
+            vec![0x0a, 0x02, 0x08],
+            vec![0x0b, 0x0c],
+            vec![0x0e],
+        ] {
+            assert_eq!(
+                preflight_wire_tree(&malformed, |_| Ok(WireDescent::Skip)).is_ok(),
+                parse_wire_fields(&malformed).is_ok()
+            );
+        }
     }
 
     #[test]

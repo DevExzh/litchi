@@ -1,7 +1,7 @@
 use std::ops::Range;
 
 use litchi_iwa_core::{Archive, SnappyStream};
-use soapberry_zip::office::ArchiveReader;
+use soapberry_zip::office::{ArchiveLimits as ZipLimits, ArchiveReader};
 use soapberry_zip::{ZipArchive as RawZipArchive, ZipFileHeaderRecord};
 
 use crate::catalog::Component;
@@ -111,8 +111,10 @@ impl<'data> ZipArchive<'data> {
             Error::InvalidBundle("ZIP input length does not fit u64".to_owned())
         })?;
         validated_limits.check_input_size(input_size, "ZIP input")?;
+        let zip_limits = validated_limits.zip_limits();
+        let reader = ArchiveReader::new_with_limits(data, zip_limits)?;
         let raw_archive = RawZipArchive::from_slice(data)?;
-        let physical_entries = parse_physical_entries(data, &raw_archive)?;
+        let physical_entries = parse_physical_entries(data, &raw_archive, zip_limits)?;
         let mut central_order = Vec::new();
         central_order
             .try_reserve_exact(physical_entries.len())
@@ -138,7 +140,7 @@ impl<'data> ZipArchive<'data> {
                 Error::InvalidBundle("ZIP central directory offset has an invalid base".to_owned())
             })?;
         Ok(Self {
-            reader: ArchiveReader::new_with_limits(data, validated_limits.zip_limits())?,
+            reader,
             physical_entries,
             central_order,
             data,
@@ -192,15 +194,27 @@ impl<'data> ZipArchive<'data> {
 fn parse_physical_entries(
     data: &[u8],
     archive: &soapberry_zip::ZipSliceArchive<&[u8]>,
+    limits: ZipLimits,
 ) -> Result<Vec<PhysicalEntry>> {
     let mut entries = Vec::new();
+    let mut metadata_bytes = 0u64;
     for result in archive.entries() {
         let entry = result?;
+        if entries.len() >= limits.max_files {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Entries,
+                observed: u64::try_from(entries.len())
+                    .unwrap_or(u64::MAX)
+                    .saturating_add(1),
+                maximum: u64::try_from(limits.max_files).unwrap_or(u64::MAX),
+            });
+        }
+        let parsed = parse_physical_entry(data, &entry, limits, &mut metadata_bytes)?;
         entries.try_reserve(1).map_err(|_error| Error::Allocation {
             resource: "physical ZIP entry metadata",
             amount: 1,
         })?;
-        entries.push(parse_physical_entry(data, &entry)?);
+        entries.push(parsed);
     }
 
     entries.sort_unstable_by_key(|entry| entry.local_record.start);
@@ -223,7 +237,12 @@ fn parse_physical_entries(
     Ok(entries)
 }
 
-fn parse_physical_entry(data: &[u8], entry: &ZipFileHeaderRecord<'_>) -> Result<PhysicalEntry> {
+fn parse_physical_entry(
+    data: &[u8],
+    entry: &ZipFileHeaderRecord<'_>,
+    limits: ZipLimits,
+    metadata_bytes: &mut u64,
+) -> Result<PhysicalEntry> {
     let local_start = checked_offset(entry.local_header_offset(), "local header")?;
     let central_start =
         checked_offset(entry.central_directory_offset(), "central directory record")?;
@@ -236,6 +255,7 @@ fn parse_physical_entry(data: &[u8], entry: &ZipFileHeaderRecord<'_>) -> Result<
     }
     let local_name_len = usize::from(read_u16(local_fixed, 26, "local file name length")?);
     let local_extra_len = usize::from(read_u16(local_fixed, 28, "local extra length")?);
+    check_member_name_limit(local_name_len, limits.max_member_name_bytes)?;
     let local_variable_len = local_name_len.checked_add(local_extra_len).ok_or_else(|| {
         Error::InvalidBundle("ZIP local header length overflows usize".to_owned())
     })?;
@@ -245,23 +265,6 @@ fn parse_physical_entry(data: &[u8], entry: &ZipFileHeaderRecord<'_>) -> Result<
     let local_header = checked_slice(data, local_start, local_header_len, "local file header")?;
     let local_name_start = 30;
     let local_extra_start = local_name_start + local_name_len;
-    let local_header_metadata = PhysicalHeader {
-        version_needed: read_u16(local_fixed, 4, "local version")?,
-        flags: read_u16(local_fixed, 6, "local flags")?,
-        compression_method: read_u16(local_fixed, 8, "local compression method")?,
-        last_mod_time: read_u16(local_fixed, 10, "local modification time")?,
-        last_mod_date: read_u16(local_fixed, 12, "local modification date")?,
-        name: copy_slice(
-            &local_header[local_name_start..local_name_start + local_name_len],
-            "local file name",
-        )?,
-        extra: copy_slice(
-            &local_header[local_extra_start..local_extra_start + local_extra_len],
-            "local extra fields",
-        )?,
-        comment: Box::default(),
-    };
-
     let central_fixed = checked_slice(data, central_start, 46, "central directory record")?;
     if read_u32(central_fixed, 0, "central directory signature")? != 0x0201_4b50 {
         return Err(Error::InvalidBundle(
@@ -272,6 +275,7 @@ fn parse_physical_entry(data: &[u8], entry: &ZipFileHeaderRecord<'_>) -> Result<
     let central_extra_len = usize::from(read_u16(central_fixed, 30, "central extra length")?);
     let central_comment_len =
         usize::from(read_u16(central_fixed, 32, "central file comment length")?);
+    check_member_name_limit(central_name_len, limits.max_member_name_bytes)?;
     let central_variable_len = central_name_len
         .checked_add(central_extra_len)
         .and_then(|length| length.checked_add(central_comment_len))
@@ -290,6 +294,58 @@ fn parse_physical_entry(data: &[u8], entry: &ZipFileHeaderRecord<'_>) -> Result<
     let central_name_start = 46;
     let central_extra_start = central_name_start + central_name_len;
     let central_comment_start = central_extra_start + central_extra_len;
+
+    let local_metadata_bytes = u64::try_from(local_variable_len).map_err(|_error| {
+        Error::InvalidBundle("ZIP local metadata length does not fit u64".to_owned())
+    })?;
+    let central_metadata_bytes = u64::try_from(central_variable_len).map_err(|_error| {
+        Error::InvalidBundle("ZIP central metadata length does not fit u64".to_owned())
+    })?;
+    let entry_metadata_bytes = local_metadata_bytes
+        .checked_add(central_metadata_bytes)
+        .ok_or_else(|| {
+            Error::InvalidBundle("ZIP physical metadata length overflows u64".to_owned())
+        })?;
+    let observed_metadata = metadata_bytes
+        .checked_add(entry_metadata_bytes)
+        .ok_or_else(|| {
+            Error::InvalidBundle("ZIP physical metadata total overflows u64".to_owned())
+        })?;
+    if observed_metadata > limits.max_metadata_bytes {
+        return Err(Error::Limit {
+            kind: crate::LimitKind::MetadataBytes,
+            observed: observed_metadata,
+            maximum: limits.max_metadata_bytes,
+        });
+    }
+
+    let compressed_size = entry.compressed_size_hint();
+    if compressed_size > limits.max_compressed_size {
+        return Err(Error::Limit {
+            kind: crate::LimitKind::CompressedEntryBytes,
+            observed: compressed_size,
+            maximum: limits.max_compressed_size,
+        });
+    }
+
+    // Materialize raw header metadata only after every size derived from this
+    // physical record has passed its checked resource budget.
+    let local_header_metadata = PhysicalHeader {
+        version_needed: read_u16(local_fixed, 4, "local version")?,
+        flags: read_u16(local_fixed, 6, "local flags")?,
+        compression_method: read_u16(local_fixed, 8, "local compression method")?,
+        last_mod_time: read_u16(local_fixed, 10, "local modification time")?,
+        last_mod_date: read_u16(local_fixed, 12, "local modification date")?,
+        name: copy_slice(
+            &local_header[local_name_start..local_name_start + local_name_len],
+            "local file name",
+        )?,
+        extra: copy_slice(
+            &local_header[local_extra_start..local_extra_start + local_extra_len],
+            "local extra fields",
+        )?,
+        comment: Box::default(),
+    };
     let central_header = PhysicalHeader {
         version_needed: read_u16(central_fixed, 6, "central version")?,
         flags: read_u16(central_fixed, 8, "central flags")?,
@@ -309,11 +365,11 @@ fn parse_physical_entry(data: &[u8], entry: &ZipFileHeaderRecord<'_>) -> Result<
             "central file comment",
         )?,
     };
+    *metadata_bytes = observed_metadata;
 
     let compressed_start = local_start.checked_add(local_header_len).ok_or_else(|| {
         Error::InvalidBundle("ZIP compressed data offset overflows usize".to_owned())
     })?;
-    let compressed_size = entry.compressed_size_hint();
     let compressed_len = usize::try_from(compressed_size).map_err(|_error| {
         Error::InvalidBundle("ZIP compressed member length does not fit usize".to_owned())
     })?;
@@ -346,6 +402,20 @@ fn parse_physical_entry(data: &[u8], entry: &ZipFileHeaderRecord<'_>) -> Result<
         uncompressed_size: entry.uncompressed_size_hint(),
         crc32: entry.crc32(),
     })
+}
+
+fn check_member_name_limit(observed: usize, maximum: u64) -> Result<()> {
+    let observed_bytes = u64::try_from(observed).map_err(|_error| {
+        Error::InvalidBundle("ZIP member name length does not fit u64".to_owned())
+    })?;
+    if observed_bytes > maximum {
+        return Err(Error::Limit {
+            kind: crate::LimitKind::MemberNameBytes,
+            observed: observed_bytes,
+            maximum,
+        });
+    }
+    Ok(())
 }
 
 fn checked_offset(offset: u64, label: &str) -> Result<usize> {
@@ -477,5 +547,242 @@ pub(crate) fn is_iwa_name(name: &str) -> bool {
     )]
     {
         name.ends_with(".iwa")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use soapberry_zip::office::{ArchiveLimits as ZipLimits, StreamingArchiveWriter};
+
+    use super::*;
+    use crate::LimitKind;
+
+    fn push_u16(bytes: &mut Vec<u8>, value: u16) {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn push_u32(bytes: &mut Vec<u8>, value: u32) {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn checked_u16(value: usize) -> u16 {
+        u16::try_from(value)
+            .unwrap_or_else(|error| panic!("test ZIP field does not fit u16: {error}"))
+    }
+
+    fn checked_u32(value: usize) -> u32 {
+        u32::try_from(value)
+            .unwrap_or_else(|error| panic!("test ZIP field does not fit u32: {error}"))
+    }
+
+    fn physical_zip(
+        local_name: &[u8],
+        local_extra: &[u8],
+        central_name: &[u8],
+        central_extra: &[u8],
+        central_comment: &[u8],
+        data: &[u8],
+    ) -> Vec<u8> {
+        let crc32 = soapberry_zip::crc32(data);
+        let mut bytes = Vec::new();
+
+        push_u32(&mut bytes, 0x0403_4b50);
+        push_u16(&mut bytes, 20);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u32(&mut bytes, crc32);
+        push_u32(&mut bytes, checked_u32(data.len()));
+        push_u32(&mut bytes, checked_u32(data.len()));
+        push_u16(&mut bytes, checked_u16(local_name.len()));
+        push_u16(&mut bytes, checked_u16(local_extra.len()));
+        bytes.extend_from_slice(local_name);
+        bytes.extend_from_slice(local_extra);
+        bytes.extend_from_slice(data);
+
+        let central_offset = bytes.len();
+        push_u32(&mut bytes, 0x0201_4b50);
+        push_u16(&mut bytes, 20);
+        push_u16(&mut bytes, 20);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u32(&mut bytes, crc32);
+        push_u32(&mut bytes, checked_u32(data.len()));
+        push_u32(&mut bytes, checked_u32(data.len()));
+        push_u16(&mut bytes, checked_u16(central_name.len()));
+        push_u16(&mut bytes, checked_u16(central_extra.len()));
+        push_u16(&mut bytes, checked_u16(central_comment.len()));
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u32(&mut bytes, 0);
+        push_u32(&mut bytes, 0);
+        bytes.extend_from_slice(central_name);
+        bytes.extend_from_slice(central_extra);
+        bytes.extend_from_slice(central_comment);
+        let central_size = bytes.len() - central_offset;
+
+        push_u32(&mut bytes, 0x0605_4b50);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 0);
+        push_u16(&mut bytes, 1);
+        push_u16(&mut bytes, 1);
+        push_u32(&mut bytes, checked_u32(central_size));
+        push_u32(&mut bytes, checked_u32(central_offset));
+        push_u16(&mut bytes, 0);
+        bytes
+    }
+
+    fn raw_limits() -> ZipLimits {
+        ZipLimits {
+            max_files: usize::MAX,
+            max_member_name_bytes: u64::MAX,
+            max_metadata_bytes: u64::MAX,
+            max_compressed_size: u64::MAX,
+            max_entry_size: u64::MAX,
+            max_total_size: u64::MAX,
+        }
+    }
+
+    #[test]
+    fn raw_layout_rejects_local_member_name_before_materialization() -> Result<()> {
+        let bytes = physical_zip(b"local", b"", b"a", b"", b"", b"x");
+        let archive = RawZipArchive::from_slice(bytes.as_slice())?;
+        let mut limits = raw_limits();
+        limits.max_member_name_bytes = 4;
+
+        assert!(matches!(
+            parse_physical_entries(&bytes, &archive, limits),
+            Err(Error::Limit {
+                kind: LimitKind::MemberNameBytes,
+                observed: 5,
+                maximum: 4,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn raw_layout_charges_local_and_central_metadata_before_materialization() -> Result<()> {
+        let bytes = physical_zip(b"a", b"xy", b"a", b"z", b"q", b"x");
+        let archive = RawZipArchive::from_slice(bytes.as_slice())?;
+        let mut limits = raw_limits();
+        limits.max_metadata_bytes = 5;
+
+        assert!(matches!(
+            parse_physical_entries(&bytes, &archive, limits),
+            Err(Error::Limit {
+                kind: LimitKind::MetadataBytes,
+                observed: 6,
+                maximum: 5,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn raw_layout_rejects_compressed_size_before_materialization() -> Result<()> {
+        let bytes = physical_zip(b"a", b"", b"a", b"", b"", b"xy");
+        let archive = RawZipArchive::from_slice(bytes.as_slice())?;
+        let mut limits = raw_limits();
+        limits.max_compressed_size = 1;
+
+        assert!(matches!(
+            parse_physical_entries(&bytes, &archive, limits),
+            Err(Error::Limit {
+                kind: LimitKind::CompressedEntryBytes,
+                observed: 2,
+                maximum: 1,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn constrained_index_precedes_physical_layout_materialization() -> Result<()> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("Index/A.iwa", b"a")?;
+        writer.write_stored("Index/B.iwa", b"b")?;
+        let mut bytes = writer.finish_to_bytes()?;
+        let second_offset = {
+            let archive = RawZipArchive::from_slice(bytes.as_slice())?;
+            let mut entries = archive.entries();
+            let _first = entries.next().ok_or_else(|| {
+                Error::InvalidBundle("test ZIP lacks its first entry".to_owned())
+            })??;
+            let second = entries.next().ok_or_else(|| {
+                Error::InvalidBundle("test ZIP lacks its second entry".to_owned())
+            })??;
+            usize::try_from(second.local_header_offset()).map_err(|_error| {
+                Error::InvalidBundle("test ZIP local offset does not fit usize".to_owned())
+            })?
+        };
+        bytes[second_offset..second_offset + 4].copy_from_slice(&0u32.to_le_bytes());
+        let input = u64::try_from(bytes.len())
+            .map_err(|_error| Error::InvalidBundle("test ZIP size does not fit u64".to_owned()))?;
+        let limits = Limits::new(input, 1, input, input, 1024)?;
+
+        assert!(matches!(
+            ZipArchive::new_with_limits(&bytes, limits),
+            Err(Error::Limit {
+                kind: LimitKind::Entries,
+                observed: 2,
+                maximum: 1,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn physical_member_limit_counts_directory_records() -> Result<()> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("Index/", b"")?;
+        writer.write_stored("Data/", b"")?;
+        let bytes = writer.finish_to_bytes()?;
+        let archive = RawZipArchive::from_slice(bytes.as_slice())?;
+        let mut limits = raw_limits();
+        limits.max_files = 1;
+
+        assert!(matches!(
+            parse_physical_entries(&bytes, &archive, limits),
+            Err(Error::Limit {
+                kind: LimitKind::Entries,
+                observed: 2,
+                maximum: 1,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn nested_index_applies_raw_local_member_name_limit() -> Result<()> {
+        let maximum_name = usize::try_from(Limits::MAX_MEMBER_NAME_BYTES).map_err(|_error| {
+            Error::InvalidBundle("test member name limit does not fit usize".to_owned())
+        })?;
+        let long_local_name = vec![b'a'; maximum_name + 1];
+        let index = physical_zip(
+            &long_local_name,
+            b"",
+            b"Index/Document.iwa",
+            b"",
+            b"",
+            b"iwa",
+        );
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("legacy.pages/Index.zip", &index)?;
+        let bytes = writer.finish_to_bytes()?;
+        let archive = ZipArchive::new_with_limits(&bytes, Limits::default())?;
+
+        assert!(matches!(
+            parse_iwa_components(&archive, Limits::default()),
+            Err(Error::Limit {
+                kind: LimitKind::MemberNameBytes,
+                observed,
+                maximum: Limits::MAX_MEMBER_NAME_BYTES,
+            }) if observed == Limits::MAX_MEMBER_NAME_BYTES + 1
+        ));
+        Ok(())
     }
 }

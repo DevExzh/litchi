@@ -18,6 +18,9 @@ pub struct Limits {
     max_object_bytes: usize,
     max_message_bytes: usize,
     max_header_bytes: usize,
+    max_header_fields: usize,
+    max_header_nesting: usize,
+    max_header_memory_bytes: usize,
     max_metadata_items: usize,
 }
 
@@ -36,6 +39,12 @@ impl Limits {
     pub const MAX_MESSAGE_BYTES: usize = 512 * 1024 * 1024;
     /// Hard ceiling for one encoded `TSP.ArchiveInfo` header.
     pub const MAX_HEADER_BYTES: usize = 16 * 1024 * 1024;
+    /// Hard ceiling for fields inspected across one header wire tree.
+    pub const MAX_HEADER_FIELDS: usize = 1_000_000;
+    /// Hard ceiling for nested messages in one header wire tree.
+    pub const MAX_HEADER_NESTING: usize = 64;
+    /// Hard ceiling for decoded allocations reachable from one header.
+    pub const MAX_HEADER_MEMORY_BYTES: usize = 512 * 1024 * 1024;
     /// Hard ceiling for repeated metadata items in one object header.
     pub const MAX_METADATA_ITEMS: usize = 1_000_000;
 
@@ -133,6 +142,43 @@ impl Limits {
         self.validate()
     }
 
+    /// Tighten the parsed-field budget for one encoded header tree.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is zero or exceeds the hard ceiling.
+    pub fn with_header_fields(mut self, value: usize) -> Result<Self> {
+        check(LimitKind::HeaderFields, value, Self::MAX_HEADER_FIELDS)?;
+        self.max_header_fields = value;
+        self.validate()
+    }
+
+    /// Tighten the nested-message depth budget for one encoded header tree.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is zero or exceeds the hard ceiling.
+    pub fn with_header_nesting(mut self, value: usize) -> Result<Self> {
+        check(LimitKind::HeaderNesting, value, Self::MAX_HEADER_NESTING)?;
+        self.max_header_nesting = value;
+        self.validate()
+    }
+
+    /// Tighten the decoded allocation budget for one encoded header tree.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is zero or exceeds the hard ceiling.
+    pub fn with_header_memory_bytes(mut self, value: usize) -> Result<Self> {
+        check(
+            LimitKind::HeaderMemoryBytes,
+            value,
+            Self::MAX_HEADER_MEMORY_BYTES,
+        )?;
+        self.max_header_memory_bytes = value;
+        self.validate()
+    }
+
     /// Tighten the repeated metadata-item budget in one object header.
     ///
     /// # Errors
@@ -180,6 +226,21 @@ impl Limits {
     }
 
     #[must_use]
+    pub const fn max_header_fields(self) -> usize {
+        self.max_header_fields
+    }
+
+    #[must_use]
+    pub const fn max_header_nesting(self) -> usize {
+        self.max_header_nesting
+    }
+
+    #[must_use]
+    pub const fn max_header_memory_bytes(self) -> usize {
+        self.max_header_memory_bytes
+    }
+
+    #[must_use]
     pub const fn max_metadata_items(self) -> usize {
         self.max_metadata_items
     }
@@ -198,6 +259,9 @@ impl Limits {
             || self.max_object_bytes == 0
             || self.max_message_bytes == 0
             || self.max_header_bytes == 0
+            || self.max_header_fields == 0
+            || self.max_header_nesting == 0
+            || self.max_header_memory_bytes == 0
             || self.max_metadata_items == 0
         {
             return Err(Error::invalid_limits("all IWA limits must be non-zero"));
@@ -236,6 +300,9 @@ impl Default for Limits {
             max_object_bytes: Self::MAX_OBJECT_BYTES,
             max_message_bytes: Self::MAX_MESSAGE_BYTES,
             max_header_bytes: Self::MAX_HEADER_BYTES,
+            max_header_fields: Self::MAX_HEADER_FIELDS,
+            max_header_nesting: 16,
+            max_header_memory_bytes: 64 * 1024 * 1024,
             max_metadata_items: Self::MAX_METADATA_ITEMS,
         }
     }
