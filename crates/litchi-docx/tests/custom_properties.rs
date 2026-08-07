@@ -70,3 +70,44 @@ fn malformed_custom_props_are_not_treated_as_absent() {
 
     assert!(Package::from_opc_package(opc).is_err());
 }
+
+#[test]
+fn word_reserved_custom_properties_are_host_scoped_and_transactional() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let valid_path = directory.path().join("word-reserved-props.docx");
+    let mut valid = Package::new().expect("new DOCX package");
+    valid
+        .custom_props_mut()
+        .insert(
+            "ClassificationContentMarkingHeaderFontProps",
+            "#ffFF00,23,Calibri",
+        )
+        .expect("valid Word header font properties");
+    valid
+        .save(&valid_path)
+        .expect("save Word reserved properties");
+    assert_eq!(
+        Package::open(&valid_path)
+            .expect("reopen Word reserved properties")
+            .custom_props()
+            .get("ClassificationContentMarkingHeaderFontProps"),
+        Some(&Value::Text("#ffFF00,23,Calibri".to_owned()))
+    );
+
+    let invalid_path = directory.path().join("non-word-reserved-props.docx");
+    let mut invalid = Package::new().expect("new DOCX package");
+    invalid
+        .custom_props_mut()
+        .insert(
+            "ClassificationContentMarkingHeaderLocations",
+            r"Office\:Suite:10",
+        )
+        .expect("valid PowerPoint location syntax");
+    assert!(invalid.save(&invalid_path).is_err());
+    assert!(
+        invalid
+            .opc_package()
+            .iter_parts()
+            .all(|part| part.content_type() != ct::OFC_CUSTOM_PROPERTIES)
+    );
+}

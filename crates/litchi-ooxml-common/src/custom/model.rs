@@ -5,6 +5,8 @@ use chrono::{DateTime, Utc};
 use std::collections::BTreeMap;
 use unicode_normalization::UnicodeNormalization;
 
+use super::Host;
+use super::reserved;
 use super::schema::{
     FORMAT_ID, MAX_NAME_BYTES, MAX_NAME_CHARS, MAX_PROPERTIES, MAX_TEXT_BYTES,
     MAX_TOTAL_NAME_BYTES, MAX_TOTAL_TEXT_BYTES, checked_increment, checked_total, invalid, limit,
@@ -193,6 +195,16 @@ impl Props {
         }
     }
 
+    /// Validates properties reserved by Microsoft Office for a particular host.
+    ///
+    /// Use this before emitting a package when the host is known. [`Self::read`]
+    /// and [`Self::write`] perform the host-independent checks automatically;
+    /// [`Self::read_for`] and [`Self::write_for`] additionally enforce the
+    /// host-specific sensitivity-label property scope.
+    pub fn validate_for(&self, host: Host) -> Result<()> {
+        reserved::validate(self, Some(host))
+    }
+
     /// Inserts or replaces a property.
     ///
     /// New PIDs are allocated monotonically with checked arithmetic. The old
@@ -206,6 +218,7 @@ impl Props {
         let value = value.into();
         validate_name(&name)?;
         validate_value(&value)?;
+        reserved::validate_property(&name, &value, None)?;
 
         if let Some(property) = self.properties.get_mut(&name) {
             let old_text = value_text_bytes(&property.value);
@@ -338,6 +351,7 @@ impl Props {
     ) -> Result<()> {
         validate_name(&name)?;
         validate_value(&value)?;
+        reserved::validate_property(&name, &value, None)?;
         if pid < 2 {
             return Err(invalid(format!(
                 "custom property '{name}' has PID {pid}; PIDs must be at least 2"

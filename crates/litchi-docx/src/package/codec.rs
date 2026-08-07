@@ -245,7 +245,7 @@ impl Package {
 
         validate_document_main_content_type(main_part.content_type())?;
 
-        let custom_props = CustomProps::read(&opc)?;
+        let custom_props = CustomProps::read_for(&opc, CustomPropsHost::Word)?;
         let properties = Slot::load(&opc)?;
 
         Ok(Self {
@@ -309,7 +309,7 @@ impl Package {
 
         validate_document_main_content_type(main_part.content_type())?;
 
-        let custom_props = CustomProps::read(&opc)?;
+        let custom_props = CustomProps::read_for(&opc, CustomPropsHost::Word)?;
         let properties = Slot::load(&opc)?;
 
         Ok(Self {
@@ -353,7 +353,7 @@ impl Package {
 
         validate_document_main_content_type(main_part.content_type())?;
 
-        let custom_props = CustomProps::read(&opc)?;
+        let custom_props = CustomProps::read_for(&opc, CustomPropsHost::Word)?;
         let properties = Slot::load(&opc)?;
 
         Ok(Self {
@@ -1047,7 +1047,8 @@ impl Package {
             }
 
             // Update or remove the custom-properties package graph atomically.
-            self.custom_props.write(&mut self.opc)?;
+            self.custom_props
+                .write_for(&mut self.opc, CustomPropsHost::Word)?;
 
             // Embed fonts if feature enabled and requested in options
             #[cfg(feature = "fonts")]

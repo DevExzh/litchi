@@ -204,6 +204,10 @@ pub enum Error {
     #[error("DrawingML error: {0}")]
     Drawing(#[from] litchi_drawingml::Error),
 
+    /// Shared custom document-property graph or value validation failed.
+    #[error("PPTX custom document-property error: {0}")]
+    CustomProperties(#[from] litchi_ooxml_common::Error),
+
     /// Optional system-font discovery, subsetting, or EOT preparation failed.
     #[cfg(feature = "fonts")]
     #[error("PPTX font embedding error: {0}")]

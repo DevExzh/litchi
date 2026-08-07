@@ -31,6 +31,14 @@ semantics, and `litchi-fonts` owns font discovery, subsetting, embedding, and
 obfuscation. The `litchi` facade exposes each namespace only when its matching
 opt-in feature is enabled.
 
+PPTX and XLSX custom document properties use the shared typed
+`litchi_ooxml_common::custom::Props` and `Value` model for parsing and writing,
+following vendored `MS-OI29500` §3.11. A missing custom-properties part is an
+empty `Props`; mutations are transactional and invalidate package signatures.
+Property values are inert data: Litchi never executes macros, VBA, control
+payloads, actions, formulas, or links. Macro, VBA, and control payloads may be
+retained or inspected as inert data only and will never be executed.
+
 ## Quick Start
 
 ### Reading Documents

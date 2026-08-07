@@ -18,6 +18,7 @@ pub mod animations;
 pub mod backgrounds;
 pub mod chart;
 pub mod comments;
+pub mod custom;
 mod error;
 pub mod font;
 pub mod format;

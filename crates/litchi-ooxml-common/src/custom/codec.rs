@@ -13,6 +13,7 @@ use super::model::{
     Props, Value, WireKind, fold_name, validate_name, validate_value, validate_xml_text,
     value_text_bytes,
 };
+use super::reserved;
 use super::schema::*;
 use crate::{Error, Result};
 
@@ -247,6 +248,7 @@ pub(crate) fn decode(xml: &[u8]) -> Result<Props> {
             "custom-properties XML must contain one complete Properties root",
         ));
     }
+    validate_collection(&props)?;
     Ok(props)
 }
 
@@ -310,6 +312,7 @@ pub(crate) fn encode(props: &Props) -> Result<Vec<u8>> {
 }
 
 fn validate_collection(props: &Props) -> Result<()> {
+    reserved::validate(props, None)?;
     if props.properties.len() > MAX_PROPERTIES {
         return Err(limit(
             "custom properties",

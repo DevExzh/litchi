@@ -6,6 +6,7 @@ use litchi_opc::{OpcPackage, PackURI};
 
 use super::codec;
 use super::model::Props;
+use super::reserved::Host;
 use super::schema::{PART_NAME, PART_TARGET, invalid};
 use crate::{Error, Result};
 
@@ -22,6 +23,17 @@ impl Props {
         };
         let part = package.get_part(&part_name)?;
         codec::decode(part.blob())
+    }
+
+    /// Reads custom properties and validates reserved names for `host`.
+    ///
+    /// The host-independent parser preserves opaque Microsoft Information
+    /// Protection SDK metadata. This method additionally rejects reserved
+    /// sensitivity-marking properties that belong to a different host.
+    pub fn read_for(package: &OpcPackage, host: Host) -> Result<Self> {
+        let properties = Self::read(package)?;
+        properties.validate_for(host)?;
+        Ok(properties)
     }
 
     /// Writes this collection to a package.
@@ -72,6 +84,12 @@ impl Props {
             },
         }
         Ok(())
+    }
+
+    /// Validates reserved names for `host` and writes this collection.
+    pub fn write_for(&self, package: &mut OpcPackage, host: Host) -> Result<()> {
+        self.validate_for(host)?;
+        self.write(package)
     }
 }
 

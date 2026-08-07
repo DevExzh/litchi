@@ -32,7 +32,7 @@ pub(super) use crate::{font, glossary, web as docx_web};
 pub(super) use litchi_drawingml::diagram::{
     DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
 };
-pub(super) use litchi_ooxml_common::custom::Props as CustomProps;
+pub(super) use litchi_ooxml_common::custom::{Host as CustomPropsHost, Props as CustomProps};
 pub(super) use litchi_ooxml_common::custom_xml::{
     self, Item as CustomXmlItem, MAX_ITEMS, NewItem as NewCustomXmlItem,
     NewProps as NewCustomXmlProps, Props as CustomXmlProps,

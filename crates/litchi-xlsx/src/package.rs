@@ -14,10 +14,12 @@ pub mod template;
 use std::io::{Read, Write};
 use std::path::Path;
 
+use litchi_ooxml_common::custom::Host;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 
 use crate::Workbook;
+use crate::custom::Props;
 use crate::error::{Result, invalid};
 use crate::writer;
 
@@ -71,6 +73,44 @@ impl Package {
     /// Consume this package and materialize its immutable workbook snapshot.
     pub fn into_workbook(self) -> Result<Workbook> {
         Workbook::from_package(self.0)
+    }
+
+    /// Read the inert typed package-level custom document properties.
+    ///
+    /// An absent custom-properties relationship and part produce the shared
+    /// empty [`Props`] value. The custom-properties package graph follows
+    /// MS-OI29500 section 3.11.
+    ///
+    /// Values are metadata only: this method does not evaluate formulas or
+    /// execute macros, controls, VBA, links, external code, or payloads.
+    pub fn custom_props(&self) -> Result<Props> {
+        Ok(Props::read_for(&self.0, Host::Excel)?)
+    }
+
+    /// Atomically publish inert typed package-level custom document properties.
+    ///
+    /// An empty collection removes the custom-properties graph. The change is
+    /// clone-staged and only replaces this facade's OPC package after the
+    /// shared OOXML owner has validated and serialized the complete graph.
+    /// Changed metadata invalidates existing package signatures.
+    pub fn put_custom_props(&mut self, props: Props) -> Result<()> {
+        self.stage(|package| {
+            props.write_for(package, Host::Excel)?;
+            Ok(())
+        })
+    }
+
+    /// Atomically remove the package-level custom document properties.
+    ///
+    /// This idempotent operation rejects corrupt, external, or duplicate
+    /// graphs instead of treating them as absent. The custom-properties graph
+    /// is defined by MS-OI29500 section 3.11.
+    pub fn remove_custom_props(&mut self) -> Result<()> {
+        self.stage(|package| {
+            Props::read_for(package, Host::Excel)?;
+            Props::new().write_for(package, Host::Excel)?;
+            Ok(())
+        })
     }
 
     /// Serialize the package into owned bytes.
@@ -161,6 +201,13 @@ impl Package {
     /// Atomically save the package to a filesystem path.
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
         writer::save(&self.0, path)
+    }
+
+    fn stage<T>(&mut self, mutation: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
+        let mut staged = self.0.clone();
+        let value = mutation(&mut staged)?;
+        self.0 = staged;
+        Ok(value)
     }
 }
 

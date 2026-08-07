@@ -211,12 +211,24 @@ impl Package {
         &mut self,
         operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
     ) -> Result<T> {
-        self.flush_presentation()?;
         let before = self.opc.clone();
-        match operation(&mut self.opc) {
+        let presentation_before = self.mutable_pres.clone();
+        #[cfg(feature = "fonts")]
+        let font_embedding_dirty_before = self.font_embedding_dirty;
+
+        let result = (|| {
+            self.flush_presentation()?;
+            operation(&mut self.opc)
+        })();
+        match result {
             Ok(value) => Ok(value),
             Err(error) => {
                 self.opc = before;
+                self.mutable_pres = presentation_before;
+                #[cfg(feature = "fonts")]
+                {
+                    self.font_embedding_dirty = font_embedding_dirty_before;
+                }
                 Err(error)
             },
         }

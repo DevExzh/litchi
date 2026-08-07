@@ -3,6 +3,7 @@
 use litchi_opc::OpcPackage;
 use litchi_opc::packuri::PackURI;
 
+use crate::custom::{Host, Props};
 use crate::parts::PresentationPart;
 use crate::presentation::Presentation;
 use crate::writer::MutablePresentation;
@@ -17,6 +18,34 @@ pub struct Package {
 }
 
 impl Package {
+    /// Read the package's inert custom document properties.
+    ///
+    /// A package without a custom-properties part returns an empty collection.
+    /// The shared OOXML owner validates the complete package-level relationship
+    /// graph and preserves its bounded value semantics. See MS-OI29500 3.11,
+    /// "Reserved Custom File Properties".
+    pub fn custom_props(&self) -> Result<Props> {
+        Ok(Props::read_for(&self.opc, Host::PowerPoint)?)
+    }
+
+    /// Replace the package's inert custom document properties transactionally.
+    ///
+    /// Empty properties remove the package-level relationship and target part.
+    /// The shared OOXML owner validates and stages the graph before publication,
+    /// preserving no-op and signature-invalidation behavior. See MS-OI29500
+    /// 3.11, "Reserved Custom File Properties".
+    pub fn put_custom_props(&mut self, props: Props) -> Result<()> {
+        self.edit_typed(move |opc| Ok(props.write_for(opc, Host::PowerPoint)?))
+    }
+
+    /// Remove every inert custom document property transactionally.
+    ///
+    /// This is idempotent. See MS-OI29500 3.11, "Reserved Custom File
+    /// Properties".
+    pub fn remove_custom_props(&mut self) -> Result<()> {
+        self.put_custom_props(Props::new())
+    }
+
     /// Borrow the canonical presentation graph when no mutable state is stale.
     pub fn presentation(&self) -> Result<Presentation<'_>> {
         self.ensure_graph_current("presentation")?;

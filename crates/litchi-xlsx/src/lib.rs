@@ -17,6 +17,7 @@ pub mod color;
 pub mod column;
 pub mod conditional_formatting;
 pub mod connections;
+pub mod custom;
 pub mod custom_data;
 pub mod data_consolidation;
 pub mod data_validation;

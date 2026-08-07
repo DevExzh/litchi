@@ -1,3 +1,4 @@
+use super::Host;
 use super::codec::{decode, encode};
 use super::model::{Props, Value};
 use super::package::custom_part_name;
@@ -17,6 +18,10 @@ const PREFIX: &str = concat!(
     r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" "#,
     r#"xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">"#
 );
+const HEADER_FONT: &str = "ClassificationContentMarkingHeaderFontProps";
+const HEADER_SHAPES: &str = "ClassificationContentMarkingHeaderShapeIds";
+const HEADER_TEXT: &str = "ClassificationContentMarkingHeaderText";
+const HEADER_LOCATIONS: &str = "ClassificationContentMarkingHeaderLocations";
 
 fn property(pid: i32, name: &str, value: &str) -> String {
     format!(r#"<property fmtid="{FORMAT_ID}" pid="{pid}" name="{name}">{value}</property>"#)
@@ -364,4 +369,130 @@ fn illegal_xml_characters_are_rejected_before_writing() {
     let mut props = Props::new();
     assert!(props.insert("Bad\0Name", "value").is_err());
     assert!(props.insert("BadText", "value\u{1}").is_err());
+}
+
+#[test]
+fn reserved_sensitivity_properties_follow_the_explicit_specification() {
+    let mut properties = Props::new();
+    properties
+        .insert("Sensitivity", "D9F23AE3-A239-45EA-BF23-0123456789AB")
+        .expect("GUID label ID");
+    properties
+        .insert("MSIP_Label_not-a-guid_SetDate", Value::I32(7))
+        .expect("opaque SDK metadata is preserved");
+    properties
+        .validate_for(Host::Excel)
+        .expect("Excel sensitivity metadata");
+
+    assert!(properties.insert("Sensitivity", "not-a-guid").is_err());
+    assert!(Props::new().insert("Sensitivity", 7_i32).is_err());
+    let mut mixed_case = Props::new();
+    mixed_case
+        .insert("sEnSiTiViTy", "d9f23ae3-a239-45ea-bf23-0123456789ab")
+        .expect("case-insensitive reserved name");
+    mixed_case
+        .validate_for(Host::Excel)
+        .expect("case-insensitive reserved validation");
+    assert!(Props::new().insert("sensitivity", "not-a-guid").is_err());
+    let malformed = document(&property(
+        2,
+        "Sensitivity",
+        "<vt:lpwstr>not-a-guid</vt:lpwstr>",
+    ));
+    assert!(decode(malformed.as_bytes()).is_err());
+}
+
+#[test]
+fn word_marking_properties_require_their_documented_text_grammar() {
+    let mut properties = Props::new();
+    properties
+        .insert(HEADER_FONT, "#ffFF00,23,Calibri")
+        .expect("font properties");
+    properties
+        .insert(HEADER_SHAPES, "1,A,f")
+        .expect("base shape IDs");
+    properties
+        .insert("cLaSsIfIcAtIoNcOnTeNtMaRkInGhEaDeRsHaPeIdS-1", "2")
+        .expect("first fragment");
+    properties
+        .insert("ClassificationContentMarkingHeaderShapeIds-2", "B")
+        .expect("second fragment");
+    properties
+        .insert(HEADER_TEXT, "Header")
+        .expect("header text");
+    properties.validate_for(Host::Word).expect("Word markings");
+    let output = String::from_utf8(encode(&properties).expect("encode"))
+        .expect("custom-properties XML is UTF-8");
+    assert!(output.contains(r#"name="cLaSsIfIcAtIoNcOnTeNtMaRkInGhEaDeRsHaPeIdS-1""#));
+
+    let mut mixed_case = Props::new();
+    mixed_case
+        .insert(
+            "cLaSsIfIcAtIoNcOnTeNtMaRkInGhEaDeRfOnTpRoPs",
+            "#ffFF00,23,Calibri",
+        )
+        .expect("case-insensitive Word property");
+    mixed_case
+        .validate_for(Host::Word)
+        .expect("case-insensitive Word validation");
+    assert!(mixed_case.validate_for(Host::PowerPoint).is_err());
+    assert!(
+        Props::new()
+            .insert(
+                "classificationcontentmarkingheaderfontprops",
+                "#12345G,11,Calibri",
+            )
+            .is_err()
+    );
+
+    assert!(properties.validate_for(Host::PowerPoint).is_err());
+    assert!(
+        Props::new()
+            .insert(HEADER_FONT, "#12345G,11,Calibri")
+            .is_err()
+    );
+    assert!(Props::new().insert(HEADER_SHAPES, "1,0x2").is_err());
+    assert!(
+        Props::new()
+            .insert("ClassificationContentMarkingHeaderShapeIds-0x1", "1")
+            .is_err()
+    );
+
+    let mut missing_first_fragment = Props::new();
+    missing_first_fragment
+        .insert(HEADER_SHAPES, "1")
+        .expect("base shape IDs");
+    missing_first_fragment
+        .insert("ClassificationContentMarkingHeaderShapeIds-2", "2")
+        .expect("fragment parses before collection validation");
+    assert!(missing_first_fragment.validate_for(Host::Word).is_err());
+    assert!(encode(&missing_first_fragment).is_err());
+}
+
+#[test]
+fn powerpoint_locations_require_escaped_names_and_host_boundaries() {
+    let mut properties = Props::new();
+    properties
+        .insert(HEADER_LOCATIONS, r"Office Theme:10\Second\:Theme:11")
+        .expect("design master locations");
+    properties
+        .insert(HEADER_TEXT, "Header")
+        .expect("header text");
+    properties
+        .validate_for(Host::PowerPoint)
+        .expect("PowerPoint markings");
+    assert!(properties.validate_for(Host::Word).is_err());
+
+    assert!(
+        Props::new()
+            .insert(HEADER_LOCATIONS, r"Office\q:10")
+            .is_err()
+    );
+
+    let mut package = OpcPackage::new();
+    properties
+        .write_for(&mut package, Host::PowerPoint)
+        .expect("host-aware write");
+    Props::read_for(&package, Host::PowerPoint).expect("host-aware read");
+    assert!(Props::read_for(&package, Host::Word).is_err());
 }

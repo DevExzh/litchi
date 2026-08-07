@@ -140,7 +140,7 @@ impl Package {
             .map_err(|error| Error::PartNotFound(format!("main document part: {error}")))?;
         validate_document_main_content_type(main_part.content_type())?;
         let properties = Slot::load(&candidate)?;
-        let custom_props = CustomProps::read(&candidate)?;
+        let custom_props = CustomProps::read_for(&candidate, CustomPropsHost::Word)?;
 
         self.opc = candidate;
         self.properties = properties;

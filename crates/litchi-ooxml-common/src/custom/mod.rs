@@ -8,9 +8,11 @@
 mod codec;
 mod model;
 mod package;
+mod reserved;
 mod schema;
 
 #[cfg(test)]
 mod tests;
 
 pub use model::{Props, Value};
+pub use reserved::Host;
