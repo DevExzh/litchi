@@ -244,7 +244,10 @@ fn raw_opc_rejects_automatic_font_embedding_policy() {
     source.save(file.path()).unwrap();
 
     let mut opened = Package::open(file.path()).unwrap();
-    opened.opc.with_fonts(litchi_opc::FontEmbedding::Subset);
+    let _ = opened.document_mut().unwrap();
+    opened
+        .set_font_embedding(litchi_fonts::embedding::Mode::Subset)
+        .unwrap();
     assert!(matches!(
         opened.edit_opc(|_| Ok(())),
         Err(Error::UnsafeEdit {

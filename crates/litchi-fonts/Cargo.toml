@@ -8,12 +8,29 @@ license.workspace      = true
 repository.workspace   = true
 rust-version.workspace = true
 
+[features]
+default = []
+# OpenType cmap mapping and font-program reduction through allsorts.
+subset = ["dep:allsorts"]
+# Native system-font resolution through font-kit/fontconfig.
+discovery = ["dep:font-kit"]
+# The conventional system-resolution and subsetting workflow.
+automatic = ["discovery", "subset"]
+
 [dependencies]
-allsorts    = { workspace = true }
-font-kit    = { workspace = true }
+allsorts    = { workspace = true, optional = true }
+font-kit    = { workspace = true, optional = true }
 litchi-core = { workspace = true }
 roaring     = { workspace = true }
 thiserror   = { workspace = true }
+
+[[example]]
+name = "load_font"
+required-features = ["discovery"]
+
+[[example]]
+name = "subset_glyphs"
+required-features = ["automatic"]
 
 [lints]
 workspace = true

@@ -62,6 +62,11 @@ Infrastructure: `cfb`, `ole`, `opc`, `ooxml-common`, `drawingml`,
 Capabilities: `sign`, `encryption`, `formula`, `fonts`, `images`, `eval`,
 `web-functions`, `markdown`, and `yaml`.
 
+`fonts` enables automatic system-font discovery and the shared
+`litchi::fonts::embedding::Mode` publication policy. It forwards font embedding
+to whichever of the independent `docx` and `pptx` leaves are enabled; enable a
+format leaf alongside `fonts` to author a package with embedded fonts.
+
 Convenience aggregates: `legacy`, `ooxml`, `odf`, `iwork`, `word`, `slides`,
 `spreadsheets`, `office`, `all-formats`, and `all`.
 

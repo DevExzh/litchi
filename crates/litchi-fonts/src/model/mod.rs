@@ -217,6 +217,7 @@ impl License {
     /// Versions zero and one define only the permission nibble, so later bits
     /// are ignored. Versions zero through two permit multiple permission bits;
     /// their effective value is the least restrictive permission present.
+    #[cfg(feature = "discovery")]
     pub(crate) fn from_os2(version: u16, bits: u16) -> Result<Self, LicenseError> {
         let assigned = if version <= 1 { bits & 0x000F } else { bits };
         let reserved = assigned & !Self::DEFINED;
@@ -464,6 +465,8 @@ pub enum FontError {
     InvalidLicense(#[from] LicenseError),
     #[error("Subsetting failed: {0}")]
     SubsettingFailed(String),
+    #[error("font subsetting requires the `subset` feature")]
+    SubsettingUnavailable,
     #[error("font embedding failed: {0}")]
     EmbeddingFailed(String),
     #[error("font '{name}' forbids outline embedding")]
@@ -474,6 +477,8 @@ pub enum FontError {
     MissingProperties { name: String },
     #[error("font embedding requires one standalone OpenType face")]
     RequiresStandaloneFace,
+    #[error("font program is {actual} bytes, exceeding the {limit}-byte limit")]
+    ProgramTooLarge { limit: u64, actual: u64 },
     #[error("font allocation for {resource} failed: {source}")]
     Allocation {
         resource: &'static str,
@@ -509,6 +514,7 @@ mod tests {
         assert_eq!(license.bits(), 0x0108);
     }
 
+    #[cfg(feature = "discovery")]
     #[test]
     fn legacy_os2_license_rules_are_version_aware() {
         let version_one = License::from_os2(1, 0x030C).expect("legacy license");

@@ -4,6 +4,9 @@ use crate::error::{Error, Result};
 
 use super::slide::MutableSlide;
 
+#[cfg(feature = "fonts")]
+use litchi_fonts::{CollectGlyphs, GlyphMap};
+
 /// First legal slide ID used by the writer.
 pub const FIRST_SLIDE_ID: u32 = 256;
 
@@ -223,5 +226,18 @@ impl MutablePresentation {
         xml.push_str(&self.slide_height.to_string());
         xml.push_str("\" type=\"screen4x3\"/><p:notesSz cx=\"6858000\" cy=\"9144000\"/><p:defaultTextStyle/></p:presentation>");
         Ok(xml)
+    }
+}
+
+#[cfg(feature = "fonts")]
+impl CollectGlyphs for MutablePresentation {
+    fn collect_glyphs(&self) -> GlyphMap {
+        let mut glyphs = GlyphMap::new();
+        for slide in &self.slides {
+            for (request, used) in slide.collect_glyphs() {
+                *glyphs.entry(request).or_default() |= used;
+            }
+        }
+        glyphs
     }
 }

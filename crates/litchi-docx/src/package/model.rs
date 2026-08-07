@@ -124,6 +124,9 @@ pub struct Package {
     pub(super) custom_props: CustomProps,
     /// Whether the custom-property facade has unmaterialized changes.
     pub(super) custom_props_dirty: bool,
+    /// Optional managed font-publication policy.
+    #[cfg(feature = "fonts")]
+    pub(super) font_embedding: Option<litchi_fonts::embedding::Mode>,
     /// Encryption profile of the opened outer package, retained to prevent an
     /// accidental plaintext downgrade on save.
     #[cfg(feature = "encryption")]
@@ -186,11 +189,8 @@ use litchi_fonts::CollectGlyphs;
 #[cfg(feature = "fonts")]
 impl Package {
     pub(super) fn embed_fonts(&mut self) -> Result<()> {
-        let options = self.opc.save_options().clone();
-        let subset = match options.fonts {
-            litchi_opc::FontEmbedding::None => return Ok(()),
-            litchi_opc::FontEmbedding::Full => false,
-            litchi_opc::FontEmbedding::Subset => true,
+        let Some(mode) = self.font_embedding else {
+            return Ok(());
         };
         let glyphs = {
             let document = self.mutable_doc.as_ref().ok_or(Error::UnsafeEdit {
@@ -207,18 +207,15 @@ impl Package {
             }
             document.collect_glyphs()
         };
-        self.embed_fonts_with_glyphs(glyphs, subset)
+        self.embed_fonts_with_glyphs(glyphs, mode)
     }
 }
 
 #[cfg(feature = "fonts")]
 impl Package {
     pub(super) fn embed_fonts_for_document(&mut self, document: &MutableDocument) -> Result<()> {
-        let options = self.opc.save_options().clone();
-        let subset = match options.fonts {
-            litchi_opc::FontEmbedding::None => return Ok(()),
-            litchi_opc::FontEmbedding::Full => false,
-            litchi_opc::FontEmbedding::Subset => true,
+        let Some(mode) = self.font_embedding else {
+            return Ok(());
         };
         if !document.glyphs_are_complete() {
             return Err(Error::UnsafeEdit {
@@ -227,15 +224,15 @@ impl Package {
                 reason: "the mutable document preserves unscanned source XML; embedding could omit fonts or subset away live glyphs",
             });
         }
-        self.embed_fonts_with_glyphs(document.collect_glyphs(), subset)
+        self.embed_fonts_with_glyphs(document.collect_glyphs(), mode)
     }
 
     pub(super) fn embed_fonts_with_glyphs(
         &mut self,
         glyphs: litchi_fonts::GlyphMap,
-        subset: bool,
+        mode: litchi_fonts::embedding::Mode,
     ) -> Result<()> {
-        let prepared = litchi_fonts::prepare(glyphs, subset)
+        let prepared = litchi_fonts::embedding::prepare(glyphs, mode)
             .map_err(|error| Error::Other(error.to_string()))?;
         if prepared.is_empty() {
             return Ok(());
@@ -661,29 +658,30 @@ impl Package {
 
     /// Select the font publication policy used by managed save operations.
     #[cfg(feature = "fonts")]
-    pub fn set_font_embedding(
-        &mut self,
-        embedding: litchi_opc::FontEmbedding,
-    ) -> Result<&mut Self> {
-        if embedding != litchi_opc::FontEmbedding::None && self.mutable_doc.is_none() {
+    pub fn set_font_embedding(&mut self, mode: litchi_fonts::embedding::Mode) -> Result<&mut Self> {
+        if self.mutable_doc.is_none() {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",
                 operation: "set_font_embedding",
                 reason: "font discovery requires a complete mutable document model",
             });
         }
-
-        if self.opc.save_options().fonts != embedding {
-            self.opc.with_fonts(embedding);
-        }
+        self.font_embedding = Some(mode);
         Ok(self)
     }
 
     /// Select the font publication policy and return this package by value.
     #[cfg(feature = "fonts")]
-    pub fn with_font_embedding(mut self, embedding: litchi_opc::FontEmbedding) -> Result<Self> {
-        self.set_font_embedding(embedding)?;
+    pub fn with_font_embedding(mut self, mode: litchi_fonts::embedding::Mode) -> Result<Self> {
+        self.set_font_embedding(mode)?;
         Ok(self)
+    }
+
+    /// Disable managed font publication for subsequent saves.
+    #[cfg(feature = "fonts")]
+    pub fn clear_font_embedding(&mut self) -> &mut Self {
+        self.font_embedding = None;
+        self
     }
 }
 

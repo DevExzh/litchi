@@ -12,13 +12,34 @@ use crate::model::{
 /// Resolves a typed family/style request against the host system font source.
 pub struct Loader {
     source: SystemSource,
+    max_font_program_bytes: usize,
 }
 
 impl Loader {
+    /// Conservative default for a single in-memory font program.
+    pub const DEFAULT_MAX_FONT_PROGRAM_BYTES: usize = 64 * 1024 * 1024;
+
     pub fn new() -> Self {
         Self {
             source: SystemSource::new(),
+            max_font_program_bytes: Self::DEFAULT_MAX_FONT_PROGRAM_BYTES,
         }
+    }
+
+    /// Construct a system resolver with a caller-selected font-program limit.
+    pub fn with_max_font_program_bytes(max_font_program_bytes: usize) -> Self {
+        Self {
+            source: SystemSource::new(),
+            max_font_program_bytes,
+        }
+    }
+
+    pub const fn max_font_program_bytes(&self) -> usize {
+        self.max_font_program_bytes
+    }
+
+    pub fn set_max_font_program_bytes(&mut self, max_font_program_bytes: usize) {
+        self.max_font_program_bytes = max_font_program_bytes;
     }
 
     pub fn load_system_font(&self, family_name: &str) -> Result<FontData, FontError> {
@@ -27,6 +48,10 @@ impl Loader {
 
     /// Load the best system face for one typed family/style request.
     pub fn load(&self, request: &Request) -> Result<FontData, FontError> {
+        crate::embedding::Resolver::resolve(self, request)
+    }
+
+    fn resolve_system(&self, request: &Request) -> Result<FontData, FontError> {
         let mut properties = Properties::new();
         properties.style = if request.style().is_italic() {
             FontStyle::Italic
@@ -48,6 +73,7 @@ impl Loader {
 
         match handle {
             Handle::Path { path, font_index } => {
+                self.ensure_program_size(std::fs::metadata(&path)?.len())?;
                 let data = std::fs::read(&path)?;
                 let properties = Self::extract_font_properties(&data, font_index)?;
                 Ok(FontData {
@@ -58,6 +84,7 @@ impl Loader {
                 })
             },
             Handle::Memory { bytes, font_index } => {
+                self.ensure_program_size(u64::try_from(bytes.len()).unwrap_or(u64::MAX))?;
                 let properties = Self::extract_font_properties(&bytes, font_index)?;
                 Ok(FontData {
                     name: request.family().to_owned(),
@@ -69,41 +96,96 @@ impl Loader {
         }
     }
 
+    fn ensure_program_size(&self, actual: u64) -> Result<(), FontError> {
+        let limit = u64::try_from(self.max_font_program_bytes).unwrap_or(u64::MAX);
+        if actual > limit {
+            return Err(FontError::ProgramTooLarge { limit, actual });
+        }
+        Ok(())
+    }
+
     /// Extract font properties from font data for Office embedding
     fn extract_font_properties(
         data: &[u8],
         font_index: u32,
     ) -> Result<Option<FontProperties>, FontError> {
-        use allsorts::binary::read::ReadScope;
-        use allsorts::error::ParseError;
-        use allsorts::tables::{FontTableProvider, OpenTypeData, OpenTypeFont};
+        match sfnt_table(data, font_index, *b"OS/2") {
+            Ok(Some(os2_table)) => parse_os2_properties(os2_table).map(Some),
+            Ok(None) | Err(FontError::InvalidData) => Ok(None),
+            Err(error) => Err(error),
+        }
+    }
+}
 
-        let scope = ReadScope::new(data);
-        let Some(font_file) = scope.read::<OpenTypeFont<'_>>().ok() else {
-            return Ok(None);
-        };
+impl crate::embedding::Resolver for Loader {
+    fn resolve(&self, request: &Request) -> Result<FontData, FontError> {
+        self.resolve_system(request)
+    }
+}
+
+fn sfnt_table(data: &[u8], font_index: u32, wanted: [u8; 4]) -> Result<Option<&[u8]>, FontError> {
+    let face = if data.starts_with(b"ttcf") {
+        let count = usize::try_from(read_be_u32(data, 8)?).map_err(|_| FontError::InvalidData)?;
         let index =
             usize::try_from(font_index).map_err(|_| FontError::InvalidFaceIndex(font_index))?;
-        if index != 0 && matches!(&font_file.data, OpenTypeData::Single(_)) {
+        if index >= count {
             return Err(FontError::InvalidFaceIndex(font_index));
         }
-        let provider = font_file
-            .table_provider(index)
-            .map_err(|error| match error {
-                ParseError::BadIndex => FontError::InvalidFaceIndex(font_index),
-                _ => FontError::InvalidData,
-            })?;
+        let offset = 12usize
+            .checked_add(index.checked_mul(4).ok_or(FontError::InvalidData)?)
+            .ok_or(FontError::InvalidData)?;
+        usize::try_from(read_be_u32(data, offset)?).map_err(|_| FontError::InvalidData)?
+    } else {
+        if font_index != 0 {
+            return Err(FontError::InvalidFaceIndex(font_index));
+        }
+        0
+    };
 
-        // Get OS/2 table raw bytes
-        let Some(os2_table) = provider
-            .table_data(allsorts::tag::OS_2)
-            .map_err(|_| FontError::InvalidData)?
-        else {
-            return Ok(None);
-        };
-        let os2_table: &[u8] = os2_table.as_ref();
-        parse_os2_properties(os2_table).map(Some)
+    let signature = slice(data, face, 4)?;
+    if !matches!(signature, b"\0\x01\0\0" | b"OTTO" | b"true" | b"typ1") {
+        return Err(FontError::InvalidData);
     }
+    let table_count = usize::from(read_be_u16(
+        data,
+        face.checked_add(4).ok_or(FontError::InvalidData)?,
+    )?);
+    let directory = face.checked_add(12).ok_or(FontError::InvalidData)?;
+    for table in 0..table_count {
+        let record = directory
+            .checked_add(table.checked_mul(16).ok_or(FontError::InvalidData)?)
+            .ok_or(FontError::InvalidData)?;
+        if slice(data, record, 16)?[..4] != wanted {
+            continue;
+        }
+        let offset =
+            usize::try_from(read_be_u32(data, record + 8)?).map_err(|_| FontError::InvalidData)?;
+        let length =
+            usize::try_from(read_be_u32(data, record + 12)?).map_err(|_| FontError::InvalidData)?;
+        return slice(data, offset, length).map(Some);
+    }
+    Ok(None)
+}
+
+fn slice(data: &[u8], offset: usize, length: usize) -> Result<&[u8], FontError> {
+    let end = offset.checked_add(length).ok_or(FontError::InvalidData)?;
+    data.get(offset..end).ok_or(FontError::InvalidData)
+}
+
+fn read_be_u16(data: &[u8], offset: usize) -> Result<u16, FontError> {
+    Ok(u16::from_be_bytes(
+        slice(data, offset, 2)?
+            .try_into()
+            .map_err(|_| FontError::InvalidData)?,
+    ))
+}
+
+fn read_be_u32(data: &[u8], offset: usize) -> Result<u32, FontError> {
+    Ok(u32::from_be_bytes(
+        slice(data, offset, 4)?
+            .try_into()
+            .map_err(|_| FontError::InvalidData)?,
+    ))
 }
 
 /// Adopt a uniquely owned font-kit allocation, copying only when it is shared.
@@ -287,6 +369,18 @@ mod tests {
         assert_eq!(owned, retained.as_slice());
         assert_ne!(owned.as_ptr(), shared_allocation);
         assert_eq!(retained.as_slice().as_ptr(), shared_allocation);
+    }
+
+    #[test]
+    fn rejects_font_programs_before_parsing_them() {
+        let loader = Loader::with_max_font_program_bytes(4);
+        assert!(matches!(
+            loader.ensure_program_size(5),
+            Err(FontError::ProgramTooLarge {
+                limit: 4,
+                actual: 5
+            })
+        ));
     }
 
     #[test]

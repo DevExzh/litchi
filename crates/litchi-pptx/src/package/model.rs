@@ -10,8 +10,10 @@ use crate::{Error, Result};
 
 /// Main entry point for PresentationML package ownership.
 pub struct Package {
-    pub(super) opc: OpcPackage,
-    pub(super) mutable_pres: Option<MutablePresentation>,
+    pub(crate) opc: OpcPackage,
+    pub(crate) mutable_pres: Option<MutablePresentation>,
+    #[cfg(feature = "fonts")]
+    pub(crate) font_embedding_dirty: bool,
 }
 
 impl Package {
@@ -30,6 +32,25 @@ impl Package {
             operation: "presentation_mut",
             reason: "the lossless facade cannot hydrate an opened package into the mutable writer",
         })
+    }
+
+    /// Read the presentation-owned embedded-font collection.
+    pub fn fonts(&self) -> Result<Option<crate::font::Fonts>> {
+        self.ensure_graph_current("fonts")?;
+        crate::font::load(&self.opc)
+    }
+
+    /// Replace the complete presentation-owned embedded-font collection.
+    ///
+    /// This is the explicit, inert font-resource API. It remains independent
+    /// from the optional system-font discovery policy used at managed save.
+    pub fn put_fonts(&mut self, fonts: crate::font::Fonts) -> Result<bool> {
+        self.edit_typed(move |opc| crate::font::put(opc, fonts))
+    }
+
+    /// Remove all presentation-owned embedded fonts and orphaned resources.
+    pub fn remove_fonts(&mut self) -> Result<Option<crate::font::Fonts>> {
+        self.edit_typed(crate::font::remove)
     }
 
     /// Whether a mutable model is currently pending managed publication.

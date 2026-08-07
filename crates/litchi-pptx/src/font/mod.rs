@@ -1,5 +1,7 @@
 //! Typed PresentationML embedded fonts and inert OPC resources.
 
+#[cfg(feature = "fonts")]
+mod automatic;
 mod codec;
 mod model;
 mod package;

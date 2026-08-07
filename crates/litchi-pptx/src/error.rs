@@ -204,6 +204,11 @@ pub enum Error {
     #[error("DrawingML error: {0}")]
     Drawing(#[from] litchi_drawingml::Error),
 
+    /// Optional system-font discovery, subsetting, or EOT preparation failed.
+    #[cfg(feature = "fonts")]
+    #[error("PPTX font embedding error: {0}")]
+    Font(#[from] litchi_fonts::FontError),
+
     /// Writing into the requested text sink failed.
     #[error("could not encode PresentationML text")]
     Write,

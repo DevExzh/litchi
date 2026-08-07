@@ -260,6 +260,7 @@
     ],
     "litchi-pptx": [
       "litchi-drawingml",
+      "litchi-fonts",
       "litchi-ooxml-common",
       "litchi-opc"
     ],

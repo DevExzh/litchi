@@ -122,7 +122,8 @@ impl Package {
     /// so it cannot later erase the edit.
     pub fn edit_opc<T>(&mut self, edit: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
         self.ensure_opc_current("edit_opc")?;
-        if self.opc.save_options().fonts != litchi_opc::FontEmbedding::None {
+        #[cfg(feature = "fonts")]
+        if self.font_embedding.is_some() {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",
                 operation: "edit_opc",
@@ -134,13 +135,6 @@ impl Package {
         candidate.unsign();
         let value = edit(&mut candidate)?;
 
-        if candidate.save_options().fonts != litchi_opc::FontEmbedding::None {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "edit_opc",
-                reason: "raw OPC transactions cannot configure automatic font embedding; use the managed font facade",
-            });
-        }
         let main_part = candidate
             .main_document_part()
             .map_err(|error| Error::PartNotFound(format!("main document part: {error}")))?;

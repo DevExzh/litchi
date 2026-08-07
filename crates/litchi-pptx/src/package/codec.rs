@@ -157,6 +157,8 @@ impl Package {
         Ok(Self {
             opc: package,
             mutable_pres: Some(MutablePresentation::new()),
+            #[cfg(feature = "fonts")]
+            font_embedding_dirty: false,
         })
     }
 
@@ -187,6 +189,8 @@ impl Package {
         Ok(Self {
             opc,
             mutable_pres: None,
+            #[cfg(feature = "fonts")]
+            font_embedding_dirty: false,
         })
     }
 
@@ -219,7 +223,13 @@ impl Package {
     }
 
     pub(super) fn flush_presentation(&mut self) -> Result<()> {
-        if !self.is_modified() {
+        let presentation_modified = self.is_modified();
+        #[cfg(feature = "fonts")]
+        let fonts_requested = self.opc.save_options().fonts != litchi_opc::FontEmbedding::None
+            && (presentation_modified || self.font_embedding_dirty);
+        #[cfg(not(feature = "fonts"))]
+        let fonts_requested = false;
+        if !presentation_modified && !fonts_requested {
             return Ok(());
         }
         let Some(presentation) = self.mutable_pres.as_ref().cloned() else {
@@ -229,10 +239,24 @@ impl Package {
             });
         };
         let before = self.opc.clone();
-        match self.materialize_presentation(&presentation) {
+        let result = (|| {
+            if presentation_modified {
+                self.materialize_presentation(&presentation)?;
+            }
+            #[cfg(feature = "fonts")]
+            self.embed_fonts_for_presentation(&presentation)?;
+            Ok(())
+        })();
+        match result {
             Ok(()) => {
-                if let Some(presentation) = self.mutable_pres.as_mut() {
-                    presentation.mark_clean();
+                #[cfg(feature = "fonts")]
+                if fonts_requested {
+                    self.font_embedding_dirty = false;
+                }
+                if presentation_modified {
+                    if let Some(presentation) = self.mutable_pres.as_mut() {
+                        presentation.mark_clean();
+                    }
                 }
                 Ok(())
             },

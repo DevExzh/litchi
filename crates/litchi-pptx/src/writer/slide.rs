@@ -7,6 +7,9 @@ use crate::{Error, Result};
 
 use super::shape::{MutableShape, escape_xml};
 
+#[cfg(feature = "fonts")]
+use litchi_fonts::{CollectGlyphs, GlyphMap};
+
 /// Mutable slide state owned by [`super::MutablePresentation`].
 #[derive(Debug, Clone)]
 pub struct MutableSlide {
@@ -240,6 +243,19 @@ impl MutableSlide {
             });
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "fonts")]
+impl CollectGlyphs for MutableSlide {
+    fn collect_glyphs(&self) -> GlyphMap {
+        let mut glyphs = GlyphMap::new();
+        for shape in &self.shapes {
+            for (request, used) in shape.collect_glyphs() {
+                *glyphs.entry(request).or_default() |= used;
+            }
+        }
+        glyphs
     }
 }
 

@@ -1,13 +1,5 @@
 //! PowerPoint EOT publication.
 
-use allsorts::{
-    binary::read::ReadScope,
-    tables::{
-        FontTableProvider, HeadTable, NameTable, OpenTypeData, OpenTypeFont,
-        os2::{FsSelectionFlag, Os2},
-    },
-};
-
 use super::Prepared;
 use crate::FontError;
 
@@ -29,57 +21,25 @@ pub fn data(font: &mut Prepared) -> Result<Vec<u8>> {
     const EOT_FIXED_BYTES: usize = 82;
     const SUBSET: u32 = 0x0000_0001;
 
-    let scope = ReadScope::new(&font.data);
-    let file = scope
-        .read::<OpenTypeFont<'_>>()
-        .map_err(|error| invalid(format!("invalid OpenType font: {error}")))?;
-    if !matches!(&file.data, OpenTypeData::Single(_)) {
-        return Err(invalid(
-            "PowerPoint EOT authoring currently requires one standalone OpenType face",
-        ));
-    }
-    let provider = file
-        .table_provider(0)
-        .map_err(|error| invalid(format!("invalid standalone OpenType face: {error}")))?;
-
-    let os2_data = provider
-        .table_data(allsorts::tag::OS_2)
-        .map_err(|error| invalid(format!("invalid OS/2 table: {error}")))?
-        .ok_or_else(|| invalid("OpenType font has no OS/2 table"))?;
-    let os2_bytes: &[u8] = os2_data.as_ref();
-    let os2 = ReadScope::new(os2_bytes)
-        .read_dep::<Os2>(os2_bytes.len())
-        .map_err(|error| invalid(format!("invalid OS/2 table: {error}")))?;
+    let sfnt = Sfnt::parse(&font.data)?;
+    let os2 = Os2::parse(
+        sfnt.table(*b"OS/2")
+            .ok_or_else(|| invalid("OpenType font has no OS/2 table"))?,
+    )?;
     let license = font.properties.license();
     super::validate_license(&font.name, license)?;
 
-    let head_data = provider
-        .table_data(allsorts::tag::HEAD)
-        .map_err(|error| invalid(format!("invalid head table: {error}")))?
+    let head = sfnt
+        .table(*b"head")
         .ok_or_else(|| invalid("OpenType font has no head table"))?;
-    let head = ReadScope::new(head_data.as_ref())
-        .read::<HeadTable>()
-        .map_err(|error| invalid(format!("invalid head table: {error}")))?;
-
-    let name_data = provider
-        .table_data(allsorts::tag::NAME)
-        .map_err(|error| invalid(format!("invalid name table: {error}")))?
+    let check_sum_adjustment = be_u32(head, 8, "head checkSumAdjustment")?;
+    let names = sfnt
+        .table(*b"name")
         .ok_or_else(|| invalid("OpenType font has no name table"))?;
-    let names = ReadScope::new(name_data.as_ref())
-        .read::<NameTable<'_>>()
-        .map_err(|error| invalid(format!("invalid name table: {error}")))?;
-    let family = names
-        .string_for_id(NameTable::FONT_FAMILY_NAME)
-        .unwrap_or_else(|| font.name.clone());
-    let style = names
-        .string_for_id(NameTable::FONT_SUBFAMILY_NAME)
-        .unwrap_or_else(|| "Regular".into());
-    let version = names
-        .string_for_id(NameTable::VERSION_STRING)
-        .unwrap_or_default();
-    let full = names
-        .string_for_id(NameTable::FULL_FONT_NAME)
-        .unwrap_or_else(|| font.name.clone());
+    let family = name_string(names, 1).unwrap_or_else(|| font.name.clone());
+    let style = name_string(names, 2).unwrap_or_else(|| "Regular".into());
+    let version = name_string(names, 5).unwrap_or_default();
+    let full = name_string(names, 4).unwrap_or_else(|| font.name.clone());
     let names = [&family, &style, &version, &full];
 
     let name_bytes = names
@@ -120,26 +80,24 @@ pub fn data(font: &mut Prepared) -> Result<Vec<u8>> {
     push_u32(&mut header, font_size);
     push_u32(&mut header, EOT_VERSION_1);
     push_u32(&mut header, if font.subsetted { SUBSET } else { 0 });
-    header.extend_from_slice(&os2.panose);
+    header.extend_from_slice(os2.panose());
     header.push(font.properties.charset().map_or(1, crate::Charset::code));
-    header.push(u8::from(os2.fs_selection.contains(FsSelectionFlag::ITALIC)));
-    push_u32(&mut header, u32::from(os2.us_weight_class));
+    header.push(u8::from(os2.italic()));
+    push_u32(&mut header, u32::from(os2.weight()));
     push_u16(&mut header, license.bits());
     push_u16(&mut header, EOT_MAGIC);
     for range in [
-        os2.ul_unicode_range1,
-        os2.ul_unicode_range2,
-        os2.ul_unicode_range3,
-        os2.ul_unicode_range4,
+        os2.unicode_ranges()[0],
+        os2.unicode_ranges()[1],
+        os2.unicode_ranges()[2],
+        os2.unicode_ranges()[3],
     ] {
         push_u32(&mut header, range);
     }
-    let (code_page1, code_page2) = os2.version1.as_ref().map_or((0, 0), |value| {
-        (value.ul_code_page_range1, value.ul_code_page_range2)
-    });
+    let (code_page1, code_page2) = os2.code_pages();
     push_u32(&mut header, code_page1);
     push_u32(&mut header, code_page2);
-    push_u32(&mut header, head.check_sum_adjustment);
+    push_u32(&mut header, check_sum_adjustment);
     for _ in 0..4 {
         push_u32(&mut header, 0);
     }
@@ -171,6 +129,216 @@ pub fn data(font: &mut Prepared) -> Result<Vec<u8>> {
         return Err(invalid("constructed EOT payload has an inconsistent size"));
     }
     Ok(output)
+}
+
+struct Sfnt<'a> {
+    data: &'a [u8],
+    directory: usize,
+    table_count: usize,
+}
+
+impl<'a> Sfnt<'a> {
+    fn parse(data: &'a [u8]) -> Result<Self> {
+        let signature = data
+            .get(..4)
+            .ok_or_else(|| invalid("OpenType font is missing an sfnt signature"))?;
+        if signature == b"ttcf" {
+            return Err(invalid(
+                "PowerPoint EOT authoring currently requires one standalone OpenType face",
+            ));
+        }
+        if !matches!(signature, b"\0\x01\0\0" | b"OTTO" | b"true" | b"typ1") {
+            return Err(invalid("invalid standalone OpenType sfnt signature"));
+        }
+        let table_count = usize::from(be_u16(data, 4, "sfnt table count")?);
+        let directory_len = table_count
+            .checked_mul(16)
+            .and_then(|length| 12usize.checked_add(length))
+            .ok_or_else(|| invalid("sfnt table directory overflows"))?;
+        if data.len() < directory_len {
+            return Err(invalid("truncated sfnt table directory"));
+        }
+        Ok(Self {
+            data,
+            directory: 12,
+            table_count,
+        })
+    }
+
+    fn table(&self, wanted: [u8; 4]) -> Option<&'a [u8]> {
+        for index in 0..self.table_count {
+            let record = self.directory + index * 16;
+            if self.data.get(record..record + 4)? != wanted {
+                continue;
+            }
+            let offset =
+                usize::try_from(be_u32(self.data, record + 8, "sfnt table offset").ok()?).ok()?;
+            let length =
+                usize::try_from(be_u32(self.data, record + 12, "sfnt table length").ok()?).ok()?;
+            let end = offset.checked_add(length)?;
+            return self.data.get(offset..end);
+        }
+        None
+    }
+}
+
+struct Os2<'a> {
+    bytes: &'a [u8],
+    version: u16,
+}
+
+impl<'a> Os2<'a> {
+    fn parse(bytes: &'a [u8]) -> Result<Self> {
+        let version = be_u16(bytes, 0, "OS/2 version")?;
+        let minimum = match version {
+            0 => 78,
+            1 => 86,
+            2..=4 => 96,
+            5 => 100,
+            _ => {
+                return Err(invalid(format!(
+                    "unsupported OpenType OS/2 table version {version}"
+                )));
+            },
+        };
+        if bytes.len() < minimum {
+            return Err(invalid(format!(
+                "truncated OpenType OS/2 version {version} table"
+            )));
+        }
+        Ok(Self { bytes, version })
+    }
+
+    fn panose(&self) -> &'a [u8] {
+        &self.bytes[32..42]
+    }
+
+    fn italic(&self) -> bool {
+        u16::from_be_bytes(
+            self.bytes[62..64]
+                .try_into()
+                .expect("validated OS/2 length"),
+        ) & 1
+            != 0
+    }
+
+    fn weight(&self) -> u16 {
+        u16::from_be_bytes(self.bytes[4..6].try_into().expect("validated OS/2 length"))
+    }
+
+    fn unicode_ranges(&self) -> [u32; 4] {
+        [
+            u32::from_be_bytes(
+                self.bytes[42..46]
+                    .try_into()
+                    .expect("validated OS/2 length"),
+            ),
+            u32::from_be_bytes(
+                self.bytes[46..50]
+                    .try_into()
+                    .expect("validated OS/2 length"),
+            ),
+            u32::from_be_bytes(
+                self.bytes[50..54]
+                    .try_into()
+                    .expect("validated OS/2 length"),
+            ),
+            u32::from_be_bytes(
+                self.bytes[54..58]
+                    .try_into()
+                    .expect("validated OS/2 length"),
+            ),
+        ]
+    }
+
+    fn code_pages(&self) -> (u32, u32) {
+        if self.version == 0 {
+            return (0, 0);
+        }
+        (
+            u32::from_be_bytes(
+                self.bytes[78..82]
+                    .try_into()
+                    .expect("validated OS/2 length"),
+            ),
+            u32::from_be_bytes(
+                self.bytes[82..86]
+                    .try_into()
+                    .expect("validated OS/2 length"),
+            ),
+        )
+    }
+}
+
+fn name_string(table: &[u8], wanted: u16) -> Option<String> {
+    let count = usize::from(be_u16(table, 2, "name record count").ok()?);
+    let strings = usize::from(be_u16(table, 4, "name string offset").ok()?);
+    let records_end = 6usize.checked_add(count.checked_mul(12)?)?;
+    if records_end > table.len() || strings > table.len() {
+        return None;
+    }
+
+    let mut selected = None;
+    for index in 0..count {
+        let record = 6 + index * 12;
+        let platform = be_u16(table, record, "name platform").ok()?;
+        let encoding = be_u16(table, record + 2, "name encoding").ok()?;
+        if be_u16(table, record + 6, "name id").ok()? != wanted {
+            continue;
+        }
+        let length = usize::from(be_u16(table, record + 8, "name string length").ok()?);
+        let offset = usize::from(be_u16(table, record + 10, "name string offset").ok()?);
+        let start = strings.checked_add(offset)?;
+        let end = start.checked_add(length)?;
+        let value = table.get(start..end)?;
+        let rank = match platform {
+            3 if encoding <= 10 => 0,
+            0 => 1,
+            _ => 2,
+        };
+        let decoded = match platform {
+            0 | 3 if value.len() % 2 == 0 => {
+                let units = value
+                    .chunks_exact(2)
+                    .map(|bytes| u16::from_be_bytes([bytes[0], bytes[1]]))
+                    .collect::<Vec<_>>();
+                String::from_utf16(&units).ok()
+            },
+            _ => std::str::from_utf8(value).ok().map(str::to_owned),
+        }?;
+        if selected.as_ref().is_none_or(|(best, _)| rank < *best) {
+            selected = Some((rank, decoded));
+        }
+    }
+    selected.map(|(_, value)| value)
+}
+
+fn be_u16(bytes: &[u8], offset: usize, field: &str) -> Result<u16> {
+    let value = bytes
+        .get(
+            offset
+                ..offset
+                    .checked_add(2)
+                    .ok_or_else(|| invalid(format!("{field} offset overflows")))?,
+        )
+        .ok_or_else(|| invalid(format!("truncated {field}")))?;
+    Ok(u16::from_be_bytes(
+        value.try_into().expect("two-byte slice"),
+    ))
+}
+
+fn be_u32(bytes: &[u8], offset: usize, field: &str) -> Result<u32> {
+    let value = bytes
+        .get(
+            offset
+                ..offset
+                    .checked_add(4)
+                    .ok_or_else(|| invalid(format!("{field} offset overflows")))?,
+        )
+        .ok_or_else(|| invalid(format!("truncated {field}")))?;
+    Ok(u32::from_be_bytes(
+        value.try_into().expect("four-byte slice"),
+    ))
 }
 
 fn utf16_bytes(value: &str) -> Result<usize> {
@@ -254,10 +422,10 @@ mod tests {
         set_u16(&mut head, 18, 1000);
 
         let name = name_table(&[
-            (NameTable::FONT_FAMILY_NAME, "Litchi Test"),
-            (NameTable::FONT_SUBFAMILY_NAME, "Regular"),
-            (NameTable::FULL_FONT_NAME, "Litchi Test Regular"),
-            (NameTable::VERSION_STRING, "Version 1.0"),
+            (1, "Litchi Test"),
+            (2, "Regular"),
+            (4, "Litchi Test Regular"),
+            (5, "Version 1.0"),
         ]);
         sfnt(&[(b"OS/2", os2), (b"head", head), (b"name", name)])
     }

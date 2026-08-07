@@ -3,6 +3,9 @@
 use crate::format::TextFormat;
 use crate::{Error, Result};
 
+#[cfg(feature = "fonts")]
+use litchi_fonts::{CollectGlyphs, GlyphMap, Request, Style};
+
 /// The bounded set of shape kinds emitted by the standalone writer slice.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -323,6 +326,33 @@ impl MutableShape {
 
     pub(crate) fn mark_clean(&mut self) {
         self.modified = false;
+    }
+}
+
+#[cfg(feature = "fonts")]
+impl CollectGlyphs for MutableShape {
+    fn collect_glyphs(&self) -> GlyphMap {
+        let mut glyphs = GlyphMap::new();
+        let ShapeType::TextBox { text, format, .. } = &self.shape_type else {
+            return glyphs;
+        };
+        let Some(family) = format.font.as_deref() else {
+            return glyphs;
+        };
+        if text.is_empty() {
+            return glyphs;
+        }
+        let style = match (format.bold == Some(true), format.italic == Some(true)) {
+            (false, false) => Style::Regular,
+            (true, false) => Style::Bold,
+            (false, true) => Style::Italic,
+            (true, true) => Style::BoldItalic,
+        };
+        glyphs
+            .entry(Request::new(family, style))
+            .or_default()
+            .extend(text.chars());
+        glyphs
     }
 }
 

@@ -200,6 +200,8 @@ impl Package {
             properties,
             custom_props,
             custom_props_dirty: false,
+            #[cfg(feature = "fonts")]
+            font_embedding: None,
             #[cfg(feature = "encryption")]
             source_encryption: None,
         })
@@ -253,6 +255,8 @@ impl Package {
             properties,
             custom_props,
             custom_props_dirty: false,
+            #[cfg(feature = "fonts")]
+            font_embedding: None,
             #[cfg(feature = "encryption")]
             source_encryption: None,
         })
@@ -315,6 +319,8 @@ impl Package {
             properties,
             custom_props,
             custom_props_dirty: false,
+            #[cfg(feature = "fonts")]
+            font_embedding: None,
             #[cfg(feature = "encryption")]
             source_encryption: None,
         })
@@ -357,6 +363,8 @@ impl Package {
             properties,
             custom_props,
             custom_props_dirty: false,
+            #[cfg(feature = "fonts")]
+            font_embedding: None,
             #[cfg(feature = "encryption")]
             source_encryption: None,
         })
