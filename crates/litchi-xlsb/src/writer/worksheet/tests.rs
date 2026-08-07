@@ -1,12 +1,12 @@
 use super::model::{AutoFilter, ColumnInfo, RowInfo};
 use super::*;
 use crate::conditional_formatting::Formatting;
+use crate::hyperlinks::Hyperlink;
+use crate::merged_cells::MergedCell;
 use crate::package::comments::Record;
 use crate::package::data_validation::Validation;
 use crate::package::error::Error;
 use crate::package::formula::{Group, GroupKind, ParsedFormula, Range};
-use crate::package::hyperlinks::Hyperlink;
-use crate::package::merged_cells::MergedCell;
 use crate::package::web_extension_bindings::Binding;
 use crate::raw::Records;
 use crate::raw::{Writer, kind};

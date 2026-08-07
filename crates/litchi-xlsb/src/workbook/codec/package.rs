@@ -1,6 +1,7 @@
 //! Package-facing workbook resolution and merged-cell mutation.
 
 use super::super::model::Workbook;
+use crate::merged_cells::{MAX_MERGED_CELL_RANGES, MergedCell};
 use crate::named_ranges::validate_name;
 use crate::package::error::Result;
 use crate::package::external_link::{
@@ -10,7 +11,6 @@ use crate::package::external_link::{
     OLE_ITEM_DISPLAY_AS_ICON, OleItem, ValueMatrix,
 };
 use crate::package::formula::ExternalBook;
-use crate::package::merged_cells::{MAX_MERGED_CELL_RANGES, MergedCell};
 use crate::raw::{Records, kind};
 use litchi_core::binary;
 use litchi_ooxml_common::external_link::EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES;

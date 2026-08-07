@@ -346,11 +346,11 @@ fn ensure_exclusive_inbound_relationship(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::merged_cells::MergedCell;
     use crate::package::Workbook;
     use crate::package::connections::{
         CommandType, Connection, CredentialMethod, DbProperties, Properties, SourceType,
     };
-    use crate::package::merged_cells::MergedCell;
     use crate::writer::{MutableWorksheet, WorkbookWriter};
     use std::io::Cursor;
 

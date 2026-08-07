@@ -2,12 +2,12 @@
 
 use super::model::{CellsReader, Dimensions, ParsedFormulaCell};
 use crate::conditional_formatting::{Formatting, parse_classic_header};
+use crate::hyperlinks::Hyperlink;
+use crate::merged_cells::MergedCell;
 use crate::package::cell::{Cell, CellHeader};
 use crate::package::data_validation::parse_collection_settings;
 use crate::package::error::{Error, Result};
 use crate::package::formula::{Context, Group, GroupKind, ParsedFormula};
-use crate::package::hyperlinks::Hyperlink;
-use crate::package::merged_cells::MergedCell;
 use crate::package::records::Stream;
 use crate::package::shared_strings::SharedString;
 use crate::package::web_extension_bindings::Binding;

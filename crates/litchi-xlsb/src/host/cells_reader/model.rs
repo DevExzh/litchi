@@ -1,11 +1,11 @@
 //! Typed state owned by the XLSB worksheet cell reader.
 
 use crate::conditional_formatting::Formatting;
+use crate::hyperlinks::Hyperlink;
+use crate::merged_cells::MergedCell;
 use crate::package::cell::CellHeader;
 use crate::package::data_validation::{Settings, Validation};
 use crate::package::formula::{Context, Group, ParsedFormula};
-use crate::package::hyperlinks::Hyperlink;
-use crate::package::merged_cells::MergedCell;
 use crate::package::records::Stream;
 use crate::package::shared_strings::SharedString;
 use crate::package::web_extension_bindings::Binding;

@@ -37,8 +37,6 @@ pub use crate::timeline::package as timelines;
 pub mod connections;
 #[path = "../host/data_validation.rs"]
 pub mod data_validation;
-#[path = "../host/date_utils.rs"]
-pub mod date_utils;
 #[path = "../host/drawing.rs"]
 pub mod drawing;
 #[path = "../host/drawing_image.rs"]
@@ -55,10 +53,6 @@ pub(crate) mod external_link_write;
 pub mod formula;
 #[path = "../host/frt.rs"]
 pub(crate) mod frt;
-#[path = "../host/hyperlinks.rs"]
-pub mod hyperlinks;
-#[path = "../host/merged_cells.rs"]
-pub mod merged_cells;
 #[path = "../host/named_ranges.rs"]
 pub mod named_ranges;
 #[path = "../host/pivot/mod.rs"]

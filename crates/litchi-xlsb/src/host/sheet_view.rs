@@ -154,8 +154,8 @@ fn parse_view_cell(reference: &str, context: &str) -> Result<(u32, u32)> {
         return Err(malformed(context, format!("invalid cell '{reference}'")));
     }
     let (row, col) = parse_cell_reference(reference)?;
-    if row > crate::package::merged_cells::MAX_MERGED_CELL_ROW
-        || col > crate::package::merged_cells::MAX_MERGED_CELL_COLUMN
+    if row > crate::merged_cells::MAX_MERGED_CELL_ROW
+        || col > crate::merged_cells::MAX_MERGED_CELL_COLUMN
     {
         return Err(malformed(
             context,
