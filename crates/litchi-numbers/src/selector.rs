@@ -34,6 +34,12 @@ impl<'a> From<&'a str> for SheetSelector<'a> {
     }
 }
 
+impl From<usize> for SheetSelector<'_> {
+    fn from(index: usize) -> Self {
+        Self::index(index)
+    }
+}
+
 /// Selects one table by its exact visible name or checked zero-based catalog
 /// position without allocating for the selector itself.
 #[allow(
@@ -91,10 +97,12 @@ mod tests {
     }
 
     #[test]
-    fn borrowed_names_convert_without_allocating() {
+    fn borrowed_names_and_indexes_convert_without_allocating() {
         let sheet: SheetSelector<'_> = "Summary".into();
+        let sheet_index: SheetSelector<'_> = 1.into();
         let table: TableSelector<'_> = "Revenue".into();
         assert_eq!(sheet, SheetSelector::Name("Summary"));
+        assert_eq!(sheet_index, SheetSelector::Index(1));
         assert_eq!(table, TableSelector::Name("Revenue"));
     }
 }

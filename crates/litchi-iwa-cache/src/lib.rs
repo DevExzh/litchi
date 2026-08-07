@@ -289,6 +289,7 @@ impl<V> Flight<V> {
 struct State<K, V> {
     entries: HashMap<K, Entry<V>>,
     flights: HashMap<K, Arc<Flight<V>>>,
+    active_flights: usize,
     total_weight: usize,
     next_recency: usize,
 }
@@ -298,6 +299,7 @@ impl<K, V> Default for State<K, V> {
         Self {
             entries: HashMap::new(),
             flights: HashMap::new(),
+            active_flights: 0,
             total_weight: 0,
             next_recency: 0,
         }
@@ -313,6 +315,14 @@ where
         if let Some(entry) = self.entries.get_mut(key) {
             entry.last_used = recency;
         }
+    }
+
+    fn finish_flight(&mut self) {
+        debug_assert_ne!(
+            self.active_flights, 0,
+            "a parser flight must be registered before it can finish"
+        );
+        self.active_flights = self.active_flights.saturating_sub(1);
     }
 
     fn next_recency(&mut self) -> usize {
@@ -416,7 +426,7 @@ impl<K, V> WeightedCache<K, V>
 where
     K: Eq + Hash + Clone,
 {
-    /// Default bound for distinct active parser generations.
+    /// Default bound for concurrently running parser generations.
     pub const DEFAULT_MAX_FLIGHTS: usize = 64;
 
     /// Construct a cache with a positive total-weight budget.
@@ -431,7 +441,9 @@ where
     /// Construct a cache with explicit value-weight and active-flight budgets.
     ///
     /// Bounding active flights prevents a burst of distinct slow parser keys
-    /// from growing an unbounded wait registry before any value is cacheable.
+    /// from growing unbounded parser work before any value is cacheable.
+    /// Detached flights continue to consume this budget until their parser
+    /// completes.
     ///
     /// # Errors
     ///
@@ -457,7 +469,7 @@ where
         self.max_weight
     }
 
-    /// Return the maximum number of distinct active parser generations.
+    /// Return the maximum number of concurrently running parser generations.
     #[must_use]
     pub const fn max_flights(&self) -> usize {
         self.max_flights
@@ -477,6 +489,7 @@ where
             state: Mutex::new(State {
                 entries: state.entries.clone(),
                 flights: HashMap::new(),
+                active_flights: 0,
                 total_weight: state.total_weight,
                 next_recency: state.next_recency,
             }),
@@ -527,7 +540,8 @@ where
     /// budget. Least-recently-used completed entries are evicted until the
     /// new value fits. Replacing a key makes that key most recently used.
     /// Any active parser for the key is detached, so it cannot overwrite this
-    /// explicit value when it completes.
+    /// explicit value when it completes; the detached parser still consumes an
+    /// active-parser slot until it finishes.
     ///
     /// # Errors
     ///
@@ -565,7 +579,8 @@ where
     /// Invalidate one completed value and any active parser generation for its key.
     ///
     /// An invalidated parser may still finish for callers that already joined
-    /// it, but its result is not published into this cache generation.
+    /// it, but its result is not published into this cache generation. It still
+    /// consumes one active-parser slot until it finishes.
     ///
     /// Returns `true` when a completed value or active parser was removed.
     pub fn invalidate(&self, key: &K) -> bool {
@@ -581,7 +596,7 @@ where
     ///
     /// Existing parser callers are still completed normally, but their values
     /// cannot repopulate the cache after this call. A later lookup can start a
-    /// fresh parser generation even if an older one is still running.
+    /// fresh parser generation once the active-parser budget permits it.
     pub fn clear(&self) {
         let mut state = lock(&self.state);
         state.entries.clear();
@@ -705,9 +720,9 @@ where
         if let Some(requested_weight) = weight {
             self.validate_weight(requested_weight)?;
         }
-        if state.flights.len() >= self.max_flights {
+        if state.active_flights >= self.max_flights {
             return Err(CacheError::FlightsLimit {
-                active: state.flights.len(),
+                active: state.active_flights,
                 limit: self.max_flights,
             }
             .into());
@@ -717,6 +732,7 @@ where
         }
         let flight = Arc::new(Flight::new(weight));
         state.flights.insert(key.clone(), Arc::clone(&flight));
+        state.active_flights += 1;
         Ok(Lookup::Parse { key, flight })
     }
 
@@ -802,6 +818,9 @@ where
                 .is_some_and(|registered| Arc::ptr_eq(registered, flight));
             if current {
                 state.flights.remove(&key);
+            }
+            state.finish_flight();
+            if current {
                 if state.entries.try_reserve(1).is_err() {
                     FlightOutcome::Cache(CacheError::Allocation(AllocationError {
                         kind: AllocationKind::Entries,
@@ -845,6 +864,7 @@ where
         {
             state.flights.remove(key);
         }
+        state.finish_flight();
         drop(state);
         flight.complete(outcome);
     }

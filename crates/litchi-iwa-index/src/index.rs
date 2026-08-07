@@ -133,7 +133,9 @@ impl IndexBuilder {
     /// # Errors
     ///
     /// Returns [`IndexError::UnknownSource`] or [`IndexError::UnknownTarget`]
-    /// when a reference endpoint was not registered.
+    /// when a reference endpoint was not registered, or
+    /// [`IndexError::Allocation`] when derived immutable snapshot storage
+    /// cannot be reserved.
     pub fn build(self) -> Result<ObjectIndex, IndexError> {
         self.build_with_target_validation(true)
     }
@@ -150,8 +152,9 @@ impl IndexBuilder {
     /// # Errors
     ///
     /// Returns [`IndexError::UnknownSource`] when a reference source was not
-    /// registered. Duplicate and allocation failures are reported while
-    /// references are added, before this method is called.
+    /// registered, or [`IndexError::Allocation`] when derived immutable
+    /// snapshot storage cannot be reserved. Duplicate references are reported
+    /// while references are added, before this method is called.
     pub fn build_allow_missing_targets(self) -> Result<ObjectIndex, IndexError> {
         self.build_with_target_validation(false)
     }
@@ -173,14 +176,32 @@ impl IndexBuilder {
         self.objects.sort_unstable_by_key(ObjectRecord::id);
         self.references.sort_unstable();
 
-        let mut fragment_pairs = Vec::with_capacity(self.objects.len());
+        let mut fragment_pairs = Vec::new();
+        fragment_pairs
+            .try_reserve_exact(self.objects.len())
+            .map_err(|_error| IndexError::Allocation {
+                kind: AllocationKind::FragmentObjectPairs,
+                requested: self.objects.len(),
+            })?;
         for object in &self.objects {
             fragment_pairs.push((object.fragment(), object.id()));
         }
         fragment_pairs.sort_unstable();
 
-        let mut fragment_object_ids = Vec::with_capacity(fragment_pairs.len());
-        let mut fragment_entries = Vec::with_capacity(self.fragments.len());
+        let mut fragment_object_ids = Vec::new();
+        fragment_object_ids
+            .try_reserve_exact(fragment_pairs.len())
+            .map_err(|_error| IndexError::Allocation {
+                kind: AllocationKind::FragmentObjectIds,
+                requested: fragment_pairs.len(),
+            })?;
+        let mut fragment_entries = Vec::new();
+        fragment_entries
+            .try_reserve_exact(self.fragments.len())
+            .map_err(|_error| IndexError::Allocation {
+                kind: AllocationKind::FragmentEntries,
+                requested: self.fragments.len(),
+            })?;
         let mut pair_position = 0;
         for &fragment in &self.fragments {
             let start = pair_position;

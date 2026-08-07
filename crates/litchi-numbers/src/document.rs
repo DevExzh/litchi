@@ -4,8 +4,8 @@ use std::collections::HashSet;
 use std::fmt;
 use std::sync::Arc;
 
-use crate::Sheet;
 use crate::cell::Value;
+use crate::{Sheet, SheetSelector};
 
 /// Maximum number of ordered sheets retained by one semantic document.
 pub const MAX_SHEETS: usize = 4096;
@@ -327,16 +327,30 @@ impl Document {
         Arc::clone(&self.sheets)
     }
 
-    /// Select a sheet by checked zero-based position.
-    #[must_use]
-    pub fn sheet(&self, index: usize) -> Option<&Sheet> {
-        self.sheets.get(index)
-    }
-
-    /// Select a sheet by its unique semantic name.
-    #[must_use]
-    pub fn sheet_named(&self, name: &str) -> Option<&Sheet> {
-        self.sheets.iter().find(|sheet| sheet.name() == name)
+    /// Select a sheet by its exact visible name or checked zero-based position.
+    ///
+    /// Names and positions identify the immutable semantic snapshot; native
+    /// object identifiers are not part of this lookup boundary. Missing names
+    /// and out-of-range positions return `Ok(None)`.
+    ///
+    /// ```rust,ignore
+    /// let summary = document.sheet("Summary")?;
+    /// let first = document.sheet(0)?;
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Validated immutable documents currently make this lookup infallible.
+    /// The result keeps the selector API compatible with future validation
+    /// rules that may need to report an ambiguous or invalid selector.
+    pub fn sheet<'a, S>(&self, selector: S) -> Result<Option<&Sheet>>
+    where
+        S: Into<SheetSelector<'a>>,
+    {
+        match selector.into() {
+            SheetSelector::Name(name) => Ok(self.sheets.iter().find(|sheet| sheet.name() == name)),
+            SheetSelector::Index(index) => Ok(self.sheets.get(index)),
+        }
     }
 
     /// Return the number of semantic sheets.
@@ -377,7 +391,12 @@ mod tests {
         assert!(document.is_empty());
         assert_eq!(document.sheet_count(), 0);
         assert!(document.sheets().is_empty());
-        assert!(document.sheet(0).is_none());
+        assert!(
+            document
+                .sheet(0)
+                .unwrap_or_else(|error| panic!("empty document lookup failed: {error}"))
+                .is_none()
+        );
     }
 
     #[test]
@@ -410,10 +429,67 @@ mod tests {
 
         assert!(Arc::ptr_eq(&document.sheets, &snapshot.sheets));
         assert_eq!(snapshot.sheet_count(), 2);
-        assert_eq!(snapshot.sheet(0).map(Sheet::name), Some("Sheet 1"));
-        assert_eq!(snapshot.sheet(1).map(Sheet::name), Some("Sheet 2"));
-        assert!(snapshot.sheet(2).is_none());
-        assert_eq!(snapshot.sheet_named("Sheet 2").map(Sheet::index), Some(1));
+        assert_eq!(
+            snapshot
+                .sheet(0)
+                .unwrap_or_else(|error| panic!("index lookup failed: {error}"))
+                .map(Sheet::name),
+            Some("Sheet 1")
+        );
+        assert_eq!(
+            snapshot
+                .sheet(1)
+                .unwrap_or_else(|error| panic!("index lookup failed: {error}"))
+                .map(Sheet::name),
+            Some("Sheet 2")
+        );
+        assert!(
+            snapshot
+                .sheet(2)
+                .unwrap_or_else(|error| panic!("index lookup failed: {error}"))
+                .is_none()
+        );
+        assert_eq!(
+            snapshot
+                .sheet("Sheet 2")
+                .unwrap_or_else(|error| panic!("name lookup failed: {error}"))
+                .map(Sheet::index),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn sheet_lookup_is_selector_first_and_returns_none_when_missing() {
+        let document =
+            Document::from_sheets(vec![Sheet::new("Summary", 0), Sheet::new("Archive", 1)])
+                .unwrap_or_else(|error| panic!("document should be valid: {error}"));
+
+        assert_eq!(
+            document
+                .sheet("Summary")
+                .unwrap_or_else(|error| panic!("name lookup failed: {error}"))
+                .map(Sheet::index),
+            Some(0)
+        );
+        assert_eq!(
+            document
+                .sheet(1)
+                .unwrap_or_else(|error| panic!("index lookup failed: {error}"))
+                .map(Sheet::name),
+            Some("Archive")
+        );
+        assert!(
+            document
+                .sheet("Missing")
+                .unwrap_or_else(|error| panic!("name lookup failed: {error}"))
+                .is_none()
+        );
+        assert!(
+            document
+                .sheet(2)
+                .unwrap_or_else(|error| panic!("index lookup failed: {error}"))
+                .is_none()
+        );
     }
 
     #[test]

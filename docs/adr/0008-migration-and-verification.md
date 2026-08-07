@@ -6590,6 +6590,50 @@ header-column/header-row/footer configuration and the `HEADER`, `BODY`, and
 application menus and the final app list contained only Finder, Terminal, and
 ChatGPT.
 
+This 2026-08-07 slice establishes the first constrained Buffa migration gate
+without weakening the current production reader. Prost continues to generate
+the complete compatibility surface while exact-version Buffa 0.9.1 eager and
+lazy views are generated in a separate output directory for
+`TSPMessages.proto` and `TSPArchiveMessages.proto`. The private, test-only
+sidecar proves eager wire parity and lazy `ArchiveInfo` round trips. It is not
+exposed to format crates or untrusted ingress: Buffa 0.9.1 does not charge all
+deferred lazy-message range metadata to the configured element-memory budget,
+and deferred children are not fully validated until access. The source-backed
+raw wire layer therefore remains the preservation boundary, and Buffa coverage
+will expand only with bounded format adapters. Limiting the committed seam to
+the archive headers also avoids compiling the measured 73 MiB full-corpus
+generated sidecar on every build.
+
+Physical iWork ingress now maps every ZIP-indexing ceiling, including member
+names, central-directory metadata, compressed entry size, uncompressed entry
+size, aggregate size, and file count. Backend limit failures remain typed.
+Keynote rejects oversized paths before allocating the source buffer, reads from
+the same opened handle under a bounded loop, rejects growth past the selected
+ceiling, and rejects an oversized borrowed slice before copying. The immutable
+IWA index reserves its derived fragment tables fallibly, while the weighted
+cache counts detached parsers until completion so invalidation cannot bypass
+`max_flights`.
+
+The Numbers document facade now accepts exact-name or checked-position sheet
+selectors without exposing native identifiers. A real Numbers fixture also
+exposed producer-padded row offset tables: missing-sentinel padding is accepted,
+but any populated slot beyond the declared table width remains a typed format
+error. The focused format suite passed 159 tests, the archive suite passed 26,
+the cache/index suites passed 16, the Buffa/Prost parity suite and strict
+generated-boundary Clippy passed, and the dependency-direction checker reports
+62 packages, 213 internal declarations, and zero debt items. Format and archive
+tests required `--cap-lints warn` only because of the existing five unused
+scalar SIMD fallbacks in `litchi-core`; the changed focused leaf boundaries are
+otherwise green.
+
+Computer Use created checked-in native Pages, Numbers, and Keynote fixtures,
+saved and closed them, then reopened each file in the corresponding real iWork
+application without a repair prompt. Accessibility state confirmed the Pages
+three-line marker, Numbers cells `B2` and `B3`, and the Keynote title, subtitle,
+and date. Black-box format-crate tests open every fixture both by path and from
+borrowed archive bytes, validate its semantic projection, and retain ZIP
+integrity as a repeatable native compatibility gate.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

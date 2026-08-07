@@ -18,6 +18,12 @@ impl Limits {
     pub const MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
     /// Hard ceiling for non-directory ZIP members in one archive.
     pub const MAX_ENTRIES: usize = 100_000;
+    /// Hard ceiling for one raw ZIP member name.
+    pub const MAX_MEMBER_NAME_BYTES: u64 = 4 * 1024;
+    /// Hard ceiling for aggregate central-directory variable metadata.
+    pub const MAX_METADATA_BYTES: u64 = 64 * 1024 * 1024;
+    /// Hard ceiling for one declared compressed ZIP member.
+    pub const MAX_COMPRESSED_ENTRY_BYTES: u64 = 512 * 1024 * 1024;
     /// Hard ceiling for one declared uncompressed ZIP member.
     pub const MAX_ENTRY_BYTES: u64 = 512 * 1024 * 1024;
     /// Hard ceiling for one declared ZIP archive total.
@@ -224,6 +230,21 @@ impl Limits {
     pub(crate) const fn zip_limits(self) -> soapberry_zip::office::ArchiveLimits {
         soapberry_zip::office::ArchiveLimits {
             max_files: self.max_entries,
+            max_member_name_bytes: if self.max_input_bytes < Self::MAX_MEMBER_NAME_BYTES {
+                self.max_input_bytes
+            } else {
+                Self::MAX_MEMBER_NAME_BYTES
+            },
+            max_metadata_bytes: if self.max_input_bytes < Self::MAX_METADATA_BYTES {
+                self.max_input_bytes
+            } else {
+                Self::MAX_METADATA_BYTES
+            },
+            max_compressed_size: if self.max_input_bytes < Self::MAX_COMPRESSED_ENTRY_BYTES {
+                self.max_input_bytes
+            } else {
+                Self::MAX_COMPRESSED_ENTRY_BYTES
+            },
             max_entry_size: self.max_entry_bytes,
             max_total_size: self.max_total_bytes,
         }
@@ -240,5 +261,34 @@ impl Default for Limits {
             max_iwa_stream_bytes: Self::MAX_IWA_STREAM_BYTES,
             iwa_profile: ArchiveLimits::default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Limits;
+
+    #[test]
+    fn zip_policy_maps_every_backend_resource_ceiling() {
+        let defaults = Limits::default().zip_limits();
+        assert_eq!(defaults.max_files, Limits::MAX_ENTRIES);
+        assert_eq!(
+            defaults.max_member_name_bytes,
+            Limits::MAX_MEMBER_NAME_BYTES
+        );
+        assert_eq!(defaults.max_metadata_bytes, Limits::MAX_METADATA_BYTES);
+        assert_eq!(
+            defaults.max_compressed_size,
+            Limits::MAX_COMPRESSED_ENTRY_BYTES
+        );
+        assert_eq!(defaults.max_entry_size, Limits::MAX_ENTRY_BYTES);
+        assert_eq!(defaults.max_total_size, Limits::MAX_TOTAL_BYTES);
+
+        let tight = Limits::new(7, 1, 1, 1, 1)
+            .unwrap_or_else(|error| panic!("tight limits should be valid: {error}"))
+            .zip_limits();
+        assert_eq!(tight.max_member_name_bytes, 7);
+        assert_eq!(tight.max_metadata_bytes, 7);
+        assert_eq!(tight.max_compressed_size, 7);
     }
 }

@@ -4,7 +4,8 @@
 //! package member in its original byte stream. The archive, Snappy, detection,
 //! and protobuf layers remain in their focused IWA infrastructure crates.
 
-use std::io::Cursor;
+use std::fs::File;
+use std::io::{Cursor, Read};
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
@@ -96,10 +97,11 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::open`] while enforcing `limits` at
-    /// the physical ZIP and IWA boundaries.
+    /// Returns the same errors as [`Self::open`] while enforcing `limits`
+    /// before materializing the complete source and at the physical ZIP and
+    /// IWA boundaries.
     pub fn open_with_limits(path: impl AsRef<Path>, limits: Limits) -> ReadResult<Self> {
-        let source: Arc<[u8]> = std::fs::read(path)?.into();
+        let source = read_source(path.as_ref(), limits)?;
         Self::from_source(source, limits)
     }
 
@@ -119,7 +121,13 @@ impl Package {
     /// Returns an error when the ZIP, Snappy/IWA components, document root,
     /// or requested resource profile is invalid.
     pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> ReadResult<Self> {
-        let source: Arc<[u8]> = bytes.to_vec().into();
+        check_input_size(
+            u64::try_from(bytes.len()).map_err(|_error| {
+                ReadError::InvalidFormat("Keynote input length does not fit u64".to_owned())
+            })?,
+            limits,
+        )?;
+        let source = copy_source(bytes)?;
         Self::from_source(source, limits)
     }
 
@@ -627,6 +635,85 @@ impl Package {
     }
 }
 
+fn read_source(path: &Path, limits: Limits) -> ReadResult<Arc<[u8]>> {
+    let mut file = File::open(path)?;
+    let length = file.metadata()?.len();
+    check_input_size(length, limits)?;
+
+    let maximum = usize::try_from(limits.max_input_bytes()).map_err(|_error| {
+        ReadError::InvalidFormat("Keynote input limit does not fit usize".to_owned())
+    })?;
+    let capacity = usize::try_from(length).map_err(|_error| {
+        ReadError::InvalidFormat("Keynote input length does not fit usize".to_owned())
+    })?;
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(capacity).map_err(|_error| {
+        ReadError::Archive(litchi_iwa_archive::Error::Allocation {
+            resource: "Keynote package input",
+            amount: capacity,
+        })
+    })?;
+
+    let mut buffer = [0u8; 8 * 1024];
+    loop {
+        let remaining = maximum.checked_sub(bytes.len()).ok_or_else(|| {
+            ReadError::InvalidFormat("Keynote input length exceeds usize".to_owned())
+        })?;
+        if remaining == 0 {
+            let mut extra = [0u8; 1];
+            if file.read(&mut extra)? != 0 {
+                return Err(input_limit_error(
+                    limits.max_input_bytes().saturating_add(1),
+                    limits,
+                ));
+            }
+            break;
+        }
+
+        let read_limit = remaining.min(buffer.len());
+        let read = file.read(&mut buffer[..read_limit])?;
+        if read == 0 {
+            break;
+        }
+        bytes.try_reserve(read).map_err(|_error| {
+            ReadError::Archive(litchi_iwa_archive::Error::Allocation {
+                resource: "Keynote package input",
+                amount: read,
+            })
+        })?;
+        bytes.extend_from_slice(&buffer[..read]);
+    }
+
+    Ok(bytes.into())
+}
+
+fn copy_source(bytes: &[u8]) -> ReadResult<Arc<[u8]>> {
+    let mut source = Vec::new();
+    source.try_reserve_exact(bytes.len()).map_err(|_error| {
+        ReadError::Archive(litchi_iwa_archive::Error::Allocation {
+            resource: "Keynote package input",
+            amount: bytes.len(),
+        })
+    })?;
+    source.extend_from_slice(bytes);
+    Ok(source.into())
+}
+
+fn check_input_size(size: u64, limits: Limits) -> ReadResult<()> {
+    if size > limits.max_input_bytes() {
+        return Err(input_limit_error(size, limits));
+    }
+    Ok(())
+}
+
+fn input_limit_error(observed: u64, limits: Limits) -> ReadError {
+    ReadError::Archive(litchi_iwa_archive::Error::Limit {
+        kind: litchi_iwa_archive::LimitKind::InputBytes,
+        observed,
+        maximum: limits.max_input_bytes(),
+    })
+}
+
 fn settings_from_show(show: &kn::ShowArchive) -> ReadResult<Settings> {
     let size = Size::new(show.size.width, show.size.height)
         .map_err(|error| ReadError::Decode(format!("invalid Keynote show size: {error}")))?;
@@ -673,9 +760,23 @@ fn property(dictionary: &plist::Dictionary, key: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
     use super::*;
+    use tempfile::NamedTempFile;
 
     fn assert_send_sync<T: Send + Sync>() {}
+
+    fn assert_input_limit(error: &ReadError, observed: u64, maximum: u64) {
+        assert!(matches!(
+            error,
+            ReadError::Archive(litchi_iwa_archive::Error::Limit {
+                kind: litchi_iwa_archive::LimitKind::InputBytes,
+                observed: actual_observed,
+                maximum: actual_maximum,
+            }) if *actual_observed == observed && *actual_maximum == maximum
+        ));
+    }
 
     #[test]
     fn package_handles_are_send_sync() {
@@ -683,8 +784,29 @@ mod tests {
     }
 
     #[test]
-    fn malformed_input_is_rejected_at_the_bounded_archive_boundary() {
-        let limits = Limits::new(1, 1, 1, 1, 1).expect("small checked limits");
-        assert!(Package::from_bytes_with_limits(&[0, 1], limits).is_err());
+    fn borrowed_input_exceeding_limit_is_rejected_before_copy()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let limits = Limits::new(1, 1, 1, 1, 1)?;
+        let Err(error) = Package::from_bytes_with_limits(&[0, 1], limits) else {
+            panic!("oversized borrowed input should fail");
+        };
+
+        assert_input_limit(&error, 2, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn path_input_exceeding_limit_is_rejected_before_materialization()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut file = NamedTempFile::new()?;
+        file.write_all(&[0, 1])?;
+
+        let limits = Limits::new(1, 1, 1, 1, 1)?;
+        let Err(error) = Package::open_with_limits(file.path(), limits) else {
+            panic!("oversized path input should fail");
+        };
+
+        assert_input_limit(&error, 2, 1);
+        Ok(())
     }
 }

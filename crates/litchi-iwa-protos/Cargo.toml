@@ -12,7 +12,11 @@ rust-version.workspace = true
 prost = { workspace = true }
 
 [build-dependencies]
+buffa-build = "=0.9.1"
 prost-build = { workspace = true }
+
+[dev-dependencies]
+buffa = "=0.9.1"
 
 [lints]
 workspace = true

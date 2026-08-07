@@ -18,6 +18,12 @@ pub enum AllocationKind {
     ObjectCatalog,
     /// The temporary reference duplicate catalog.
     ReferenceCatalog,
+    /// The temporary `(fragment, object)` ordering pairs assembled at build time.
+    FragmentObjectPairs,
+    /// The immutable object-identity storage grouped by fragment.
+    FragmentObjectIds,
+    /// The immutable fragment lookup entries assembled at build time.
+    FragmentEntries,
 }
 
 impl fmt::Display for AllocationKind {
@@ -29,6 +35,9 @@ impl fmt::Display for AllocationKind {
             Self::FragmentCatalog => "fragment duplicate catalog",
             Self::ObjectCatalog => "object duplicate catalog",
             Self::ReferenceCatalog => "reference duplicate catalog",
+            Self::FragmentObjectPairs => "fragment/object ordering pairs",
+            Self::FragmentObjectIds => "fragment object identity storage",
+            Self::FragmentEntries => "fragment lookup entries",
         };
         formatter.write_str(name)
     }
@@ -38,11 +47,12 @@ impl fmt::Display for AllocationKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum IndexError {
-    /// The builder could not reserve storage for one more item.
+    /// The builder could not reserve one of its record catalogs or derived
+    /// snapshot tables.
     Allocation {
         /// The storage that failed to reserve.
         kind: AllocationKind,
-        /// The requested item count after the attempted insertion.
+        /// The item count the storage was required to accommodate.
         requested: usize,
     },
     /// A fragment identity was registered more than once.

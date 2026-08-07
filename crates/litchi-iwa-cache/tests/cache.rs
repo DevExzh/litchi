@@ -179,6 +179,43 @@ fn active_parser_flights_are_bounded() {
 }
 
 #[test]
+fn invalidated_flight_still_counts_against_active_parser_limit() {
+    let cache = Arc::new(
+        WeightedCache::<&'static str, usize>::new_with_limits(4, 1)
+            .unwrap_or_else(|error| panic!("test cache construction failed: {error}")),
+    );
+    let parser_started = Arc::new(Barrier::new(2));
+    let release_parser = Arc::new(Barrier::new(2));
+    let owner_cache = Arc::clone(&cache);
+    let owner_started = Arc::clone(&parser_started);
+    let owner_release = Arc::clone(&release_parser);
+    let owner = thread::spawn(move || {
+        owner_cache.get_or_insert_with("first", 1, || {
+            owner_started.wait();
+            owner_release.wait();
+            1
+        })
+    });
+
+    parser_started.wait();
+    assert!(cache.invalidate(&"first"));
+    assert!(matches!(
+        cache.get_or_insert_with("second", 1, || 2),
+        Err(GetOrInsertError::Cache(CacheError::FlightsLimit {
+            active: 1,
+            limit: 1,
+        }))
+    ));
+
+    release_parser.wait();
+    assert_eq!(*join_success(owner), 1);
+    let fresh = cache
+        .get_or_insert_with("second", 1, || 2)
+        .unwrap_or_else(|error| panic!("fresh parse unexpectedly failed: {error}"));
+    assert_eq!(*fresh, 2);
+}
+
+#[test]
 fn reported_weights_are_validated_after_parsing() {
     let cache = cache(4);
     assert!(matches!(

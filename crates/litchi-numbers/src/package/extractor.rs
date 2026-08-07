@@ -850,6 +850,8 @@ impl<'a> TableDataExtractor<'a> {
     ///
     /// The offset table is an array of little-endian `u16` values. `0xffff`
     /// marks a missing column; wide rows store offsets in four-byte units.
+    /// Native producers may pad the table past the semantic table width, but
+    /// every padded slot must retain the missing-column sentinel.
     fn parse_cell_offsets(
         offsets_buffer: &[u8],
         storage_length: usize,
@@ -864,19 +866,30 @@ impl<'a> TableDataExtractor<'a> {
         }
 
         let slot_count = offsets_buffer.len() / 2;
-        if slot_count > column_count {
-            return Err(Error::InvalidFormat(format!(
-                "Numbers row has {slot_count} offset slots but table width is {column_count}"
-            )));
-        }
         if expected_cells > slot_count {
             return Err(Error::ParseError(format!(
                 "Numbers row declares {expected_cells} cells but has only {slot_count} offset slots"
             )));
         }
+        if expected_cells > column_count {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers row declares {expected_cells} cells but table width is {column_count}"
+            )));
+        }
+        if let Some((column, _bytes)) = offsets_buffer
+            .chunks_exact(2)
+            .enumerate()
+            .skip(column_count)
+            .find(|(_column, bytes)| u16::from_le_bytes([bytes[0], bytes[1]]) != u16::MAX)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers cell offset at column {column} is outside the declared table width {column_count}"
+            )));
+        }
 
         let present_cells = offsets_buffer
             .chunks_exact(2)
+            .take(column_count)
             .filter(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]) != u16::MAX)
             .count();
         if present_cells != expected_cells {
@@ -891,7 +904,11 @@ impl<'a> TableDataExtractor<'a> {
             .try_reserve_exact(expected_cells)
             .map_err(|_| allocation_error("Numbers cell ranges", expected_cells))?;
         let mut previous = None;
-        for (column, bytes) in offsets_buffer.chunks_exact(2).enumerate() {
+        for (column, bytes) in offsets_buffer
+            .chunks_exact(2)
+            .take(column_count)
+            .enumerate()
+        {
             let raw_offset = u16::from_le_bytes([bytes[0], bytes[1]]);
             if raw_offset == u16::MAX {
                 continue;
@@ -1992,4 +2009,34 @@ fn finite_zero() -> Result<FiniteF64> {
     FiniteF64::new(0.0).map_err(|_| {
         Error::InvalidFormat("Numbers zero scalar is unexpectedly non-finite".to_string())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, TableDataExtractor};
+
+    #[test]
+    fn padded_missing_cell_offset_slots_are_accepted() {
+        let offsets = [
+            0, 0, // column 0 starts at byte 0
+            0xff, 0xff, // native tile-width padding
+            0xff, 0xff,
+        ];
+        let cells = TableDataExtractor::parse_cell_offsets(&offsets, 1, false, 1, 1)
+            .unwrap_or_else(|error| panic!("missing padded slots were rejected: {error}"));
+        assert_eq!(cells, vec![(0, 0..1)]);
+    }
+
+    #[test]
+    fn populated_cell_offset_slots_outside_table_width_are_rejected() {
+        let offsets = [0, 0, 0, 0];
+        let error = match TableDataExtractor::parse_cell_offsets(&offsets, 1, false, 1, 1) {
+            Ok(cells) => panic!("populated padded slot produced cells: {cells:?}"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            Error::InvalidFormat(message) if message.contains("outside the declared table width")
+        ));
+    }
 }

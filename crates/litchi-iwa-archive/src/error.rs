@@ -11,6 +11,12 @@ pub enum LimitKind {
     OutputBytes,
     /// Non-directory ZIP members in one central directory.
     Entries,
+    /// Bytes in one raw ZIP member name.
+    MemberNameBytes,
+    /// Aggregate central-directory variable metadata bytes.
+    MetadataBytes,
+    /// Declared compressed size of one ZIP member.
+    CompressedEntryBytes,
     /// Declared uncompressed size of one ZIP member.
     EntryBytes,
     /// Aggregate declared uncompressed ZIP size.
@@ -25,6 +31,9 @@ impl fmt::Display for LimitKind {
             Self::InputBytes => "input bytes",
             Self::OutputBytes => "output bytes",
             Self::Entries => "ZIP entries",
+            Self::MemberNameBytes => "ZIP member name bytes",
+            Self::MetadataBytes => "ZIP metadata bytes",
+            Self::CompressedEntryBytes => "ZIP compressed entry bytes",
             Self::EntryBytes => "ZIP entry bytes",
             Self::TotalBytes => "ZIP total bytes",
             Self::IwaStreamBytes => "IWA stream bytes",
@@ -98,6 +107,26 @@ pub enum Error {
 
 impl From<soapberry_zip::Error> for Error {
     fn from(error: soapberry_zip::Error) -> Self {
+        if let soapberry_zip::ErrorKind::LimitExceeded {
+            resource,
+            actual,
+            maximum,
+        } = error.kind()
+        {
+            let kind = match resource {
+                soapberry_zip::LimitResource::FileCount => LimitKind::Entries,
+                soapberry_zip::LimitResource::MemberNameBytes => LimitKind::MemberNameBytes,
+                soapberry_zip::LimitResource::MetadataBytes => LimitKind::MetadataBytes,
+                soapberry_zip::LimitResource::CompressedSize => LimitKind::CompressedEntryBytes,
+                soapberry_zip::LimitResource::EntrySize => LimitKind::EntryBytes,
+                soapberry_zip::LimitResource::TotalSize => LimitKind::TotalBytes,
+            };
+            return Self::Limit {
+                kind,
+                observed: *actual,
+                maximum: *maximum,
+            };
+        }
         Self::Zip {
             message: error.to_string(),
         }
@@ -106,3 +135,52 @@ impl From<soapberry_zip::Error> for Error {
 
 /// Result alias for physical iWork ingress operations.
 pub type Result<T> = std::result::Result<T, Error>;
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, LimitKind};
+
+    #[test]
+    fn backend_limit_errors_remain_typed() {
+        let mappings = [
+            (soapberry_zip::LimitResource::FileCount, LimitKind::Entries),
+            (
+                soapberry_zip::LimitResource::MemberNameBytes,
+                LimitKind::MemberNameBytes,
+            ),
+            (
+                soapberry_zip::LimitResource::MetadataBytes,
+                LimitKind::MetadataBytes,
+            ),
+            (
+                soapberry_zip::LimitResource::CompressedSize,
+                LimitKind::CompressedEntryBytes,
+            ),
+            (
+                soapberry_zip::LimitResource::EntrySize,
+                LimitKind::EntryBytes,
+            ),
+            (
+                soapberry_zip::LimitResource::TotalSize,
+                LimitKind::TotalBytes,
+            ),
+        ];
+
+        for (resource, expected_kind) in mappings {
+            let backend: soapberry_zip::Error = soapberry_zip::ErrorKind::LimitExceeded {
+                resource,
+                actual: 9,
+                maximum: 8,
+            }
+            .into();
+            assert!(matches!(
+                Error::from(backend),
+                Error::Limit {
+                    kind,
+                    observed: 9,
+                    maximum: 8,
+                } if kind == expected_kind
+            ));
+        }
+    }
+}
