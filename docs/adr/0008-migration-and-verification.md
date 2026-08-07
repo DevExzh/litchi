@@ -6993,9 +6993,96 @@ SHA-256
 Numbers closed and reopened it without a repair or conversion prompt and
 retained both table markers and the reordered sheet/table UI.
 
-Remaining Numbers debt is explicit: the root structured facade has not yet
-been switched from `litchi-iwa`, the focused table decoder still materializes
-the wider generated Prost graph, aggregate sidecar allocations need deeper
-schema preflight, and nearly all mutation paths remain in the migration host.
+Remaining Numbers debt is explicit: the legacy aggregate structured API has
+not yet been switched from its `litchi-iwa` adapter, the focused table decoder
+still materializes the wider generated Prost graph, aggregate sidecar
+allocations need deeper schema preflight, and nearly all mutation paths remain
+in the migration host.
 The focused order/orphan parity gate is therefore evidence for the next host
 edge removal, not a claim that the monolith may already be deleted.
+
+## 2026-08-08 Numbers compatibility-ingress prerequisite gate
+
+The global compatibility projection now has a byte-owned entry point separate
+from strict rooted `Package` construction:
+`compatibility_tables_from_bytes[_with_options]`. It parses and validates one
+immutable package snapshot, proves unambiguous Numbers ownership with the
+focused manual-wire detector on the unique canonical type-1 payload, builds
+the compact index, and runs the global table projection without constructing
+the strict rooted workbook. Formula-name enrichment may resolve root sheets
+and drawables lazily only after a non-empty formula sidecar is selected. A
+bounded schema-directed preflight covers the canonical detector shape;
+wire-type guards preserve ambiguous field-number collisions such as the
+Numbers calculation-engine reference. Numbers-shaped noncanonical siblings
+cannot establish or mask ownership or multiply detector work. A regression
+with a valid Numbers root referencing a missing sheet proves that strict
+`Package::from_bytes` fails while the rooted-independent empty compatibility
+projection succeeds.
+Pages and Keynote roots return the typed `NotNumbers` category; unknown and
+canonically mixed application payloads fail closed.
+
+Index and candidate admission are stricter at the focused boundary. Object
+identifier zero is rejected as the native null sentinel. A primary type-6000
+object no longer consults a secondary type-6001 payload, and duplicate
+canonical or legacy model payloads are rejected. Formula-label lookup likewise
+selects one canonical model payload, with a unique legacy fallback, instead of
+scanning arbitrary siblings. The table ceiling wins before
+decoding an additional canonical candidate, an intentional allocation-safety
+precedence. Package protobuf errors retain the decoder as an error source
+behind a Numbers-owned wrapper whose display text contains no native content.
+
+Formula-reference maps moved from eager extractor construction to lazy
+initialization after a non-empty formula sidecar is selected. The builder uses
+the compact binary-search index, fallible map growth, `Arc<str>` sheet/table
+names, and a caller ceiling for unique source-derived formula-enrichment
+entries, including the table-name cache, categories, and owners. The fixed
+`Grand Total` fallback is not input-derived and is exempt. Topology discovery,
+candidate visits, cumulative source text, and encoded category bytes use
+separate package-wide hard ceilings.
+
+Type-6383 category bytes are now schema-preflighted before Buffa access. The
+recursive topology scan and per-node UUID/CellValue scans share one aggregate
+field/message work counter; every routed scalar field, wire kind, and string is
+validated before label retention. A private generated projection contains only
+an empty node envelope, UUID, and four scalar wrappers. Recursive children are
+streamed directly from source bytes, avoiding both an input-width generated
+fragment vector and per-node heap ownership. Ignored row, aggregate,
+formatting, and error payloads remain opaque. An O(depth) iterator stack walks
+children, while duplicate UUID labels retain the former last-wins behavior.
+Raw-wire depth, aggregate wire bytes, nested-field work, empty fanout, wide
+children, malformed projected siblings, duplicate labels, and Buffa/Prost
+differential behavior cover this boundary.
+
+Path ingress also opens once (nonblocking on Unix), rejects non-regular
+descriptors, fills bounded `Vec` spare capacity directly through the standard
+reader path, caps its initial allocation independently from an advisory logical
+length, and stops after a one-byte over-limit lookahead. Descriptor metadata is
+compared after the read so truncation, growth, or an observable in-place
+modification fails atomically. Tests cover exact length, growth after metadata,
+an already-oversized input, a changed descriptor version, and a non-regular
+source.
+
+The focused suite now covers direct application smuggling, mixed roots, null
+identities, rooted-independent compatibility behavior, secondary candidate
+promotion, duplicate canonical/legacy payloads, lazy formula enrichment,
+pre-decode formula limits, application-field wire collisions, descriptor
+growth, and `Package: Send + Sync`. The checked-in native fixture exercises
+both the package method and the new byte entry point. The derived Buffa
+projection generates five files and 146,678 bytes under a 160 KiB build gate;
+its generated types remain private.
+Computer Use reopened the unchanged native order oracle in Numbers without a
+repair prompt, verified navigator order `SecondCreated`, `FirstCreated`, table
+`B-only-table` with marker `B-only`, and the `A-old-table`/`A-new-table` layout,
+then closed without saving.
+
+The legacy aggregate API is deliberately not rerouted by this slice. Its
+parsed `Bundle` does not retain a shareable source/catalog or the selected
+physical profile; reopening would fail byte and directory inputs, permit
+time-of-check/time-of-use drift, duplicate decoding, and change rooted/global
+error timing. Aggregate compatibility budgets for cells, sidecars, text,
+formula work/rendering, and a typed host-error bridge remain open gates.
+Formula metadata is currently initialized for a non-empty formula sidecar;
+deferring it until a rendered cell contains a cross-table or category node is
+also still required before the aggregate host edge moves. Other table models,
+formula owners, sidecars, and formula ASTs still use generated Prost values and
+need their own complete pre-decode envelopes.

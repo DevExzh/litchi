@@ -5,10 +5,18 @@ use crate::{MAX_SHEETS as HARD_MAX_SHEETS, MAX_TABLES as HARD_MAX_TABLES};
 
 /// Hard ceiling for native IWA objects indexed by one Numbers package.
 pub const MAX_OBJECTS: usize = 1_000_000;
-/// Hard ceiling for rooted graph-reference occurrences traversed by one package.
+/// Hard ceiling for the caller-selected reference setting.
+///
+/// The selected value independently limits rooted graph-reference occurrences
+/// during strict construction and unique source-derived entries retained by
+/// one formula-enrichment build. Formula wire, work, text, and depth limits are
+/// fixed adapter-owned safeguards.
 pub const MAX_REFERENCES: usize = 1_000_000;
 
-/// A semantic Numbers resource governed by [`SemanticLimits`].
+/// A Numbers resource reported by a semantic-limit error.
+///
+/// `Objects`, `Sheets`, `Tables`, and `References` can be selected through
+/// [`SemanticLimits`]. Formula-scan resources are fixed adapter-owned ceilings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SemanticLimitKind {
@@ -18,8 +26,18 @@ pub enum SemanticLimitKind {
     Sheets,
     /// Tables retained by either semantic projection.
     Tables,
-    /// Rooted graph-reference occurrences traversed by the document reader.
+    /// Caller-selected rooted graph references or unique source-derived
+    /// retained formula-enrichment entries.
     References,
+    /// Fixed aggregate bytes of type-6383 category metadata scanned by formula
+    /// enrichment.
+    FormulaWireBytes,
+    /// Fixed aggregate formula-discovery and category-preflight work.
+    FormulaWork,
+    /// Fixed aggregate source text admitted to formula enrichment.
+    TextBytes,
+    /// Fixed nesting depth of one formula-category tree.
+    FormulaDepth,
 }
 
 impl fmt::Display for SemanticLimitKind {
@@ -29,6 +47,10 @@ impl fmt::Display for SemanticLimitKind {
             Self::Sheets => "sheets",
             Self::Tables => "tables",
             Self::References => "references",
+            Self::FormulaWireBytes => "formula wire bytes",
+            Self::FormulaWork => "formula work",
+            Self::TextBytes => "text bytes",
+            Self::FormulaDepth => "formula depth",
         })
     }
 }
@@ -73,7 +95,11 @@ impl SemanticLimits {
     pub const MAX_SHEETS: usize = HARD_MAX_SHEETS;
     /// Hard ceiling for semantic tables.
     pub const MAX_TABLES: usize = HARD_MAX_TABLES;
-    /// Hard ceiling for rooted graph-reference occurrences.
+    /// Hard ceiling for the caller-selected reference setting.
+    ///
+    /// The selected value independently limits rooted graph-reference
+    /// occurrences during strict construction and unique source-derived
+    /// entries retained by one formula-enrichment build.
     pub const MAX_REFERENCES: usize = MAX_REFERENCES;
 
     /// Build a checked semantic resource profile.
@@ -142,7 +168,8 @@ impl SemanticLimits {
         self.tables
     }
 
-    /// Maximum number of rooted graph-reference occurrences traversed.
+    /// Caller-selected cap independently applied to rooted references and
+    /// unique source-derived retained formula-enrichment entries.
     #[must_use]
     pub const fn max_references(self) -> usize {
         self.references

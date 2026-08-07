@@ -1,9 +1,10 @@
 //! Numbers semantic value models.
 //!
-//! Archive parsing, protobuf decoding, and package mutation remain owned by
-//! the Numbers implementation. This crate starts the downward migration with
-//! the dependency-free cell vocabulary used by Numbers, Pages table editing,
-//! and the shared structured extractor.
+//! This crate owns archive-free Numbers semantics and bounded native package
+//! reading. [`Package::document`] exposes the strict rooted workbook, while
+//! [`compatibility_tables_from_bytes`] is an explicitly allocating global
+//! projection for historical structured-data migration, including detached
+//! table models.
 //!
 //! The native cell wire codec is intentionally excluded from the supported
 //! API. The semantic cell API remains available through [`cell`].
@@ -40,9 +41,10 @@ pub use formula::{
 pub use litchi_iwa_common::table::title::Settings;
 pub use package::{
     Error as PackageError, Limits as PackageLimits, MAX_OBJECTS, MAX_REFERENCES, Package,
-    ReadOptions as PackageReadOptions, Result as PackageResult, SemanticLimitKind,
-    SemanticLimits as PackageSemanticLimits, SemanticLimitsError as PackageSemanticLimitsError,
-    SemanticPath as PackageSemanticPath,
+    ProtobufError as PackageProtobufError, ReadOptions as PackageReadOptions,
+    Result as PackageResult, SemanticLimitKind, SemanticLimits as PackageSemanticLimits,
+    SemanticLimitsError as PackageSemanticLimitsError, SemanticPath as PackageSemanticPath,
+    compatibility_tables_from_bytes, compatibility_tables_from_bytes_with_options,
 };
 pub use selector::{SheetSelector, TableSelector};
 pub use sheet::{Builder as SheetBuilder, SelectorError as TableSelectorError, Sheet};

@@ -987,6 +987,25 @@ the supported `litchi-numbers` and root `litchi::numbers` APIs expose neither a
 Direct use of the wire crate is an explicit opt-in to unstable native storage
 details.
 
+Direct `litchi-numbers::Package` ingress now depends on the focused
+`litchi-iwa-detect` leaf to prove that the root payload belongs to Numbers
+before any TN schema is decoded. A schema-directed wire-tree preflight bounds
+the one canonical detector payload under the selected physical profile;
+arbitrary root siblings are not application candidates. The same application
+proof protects the rooted-independent compatibility-table byte entry point.
+This remains a downward format-owner-to-infrastructure edge, matching the
+existing Keynote package boundary; it does not route through `litchi-iwa` or
+expose detector, protobuf, component, or object identifiers in the supported
+Numbers API.
+
+The private protobuf leaf also owns a derived Buffa projection for the Numbers
+GroupNode category path. Generated code contains only an empty node envelope,
+UUID, and four scalar wrappers. The bounded adapter streams recursive children
+and CellValue routing from preflighted source bytes, so it retains neither an
+input-width child index nor unknown fields. Generated Buffa types remain
+private, traversal memory is proportional to depth, and source IWA bytes remain
+authoritative.
+
 `litchi-iwa` is now the sole declared iWork migration host, not a canonical
 dependency layer. Every one of its internal workspace edges is an ordered
 migration-debt item with a reason and a deletion condition. The host may be

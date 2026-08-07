@@ -79,6 +79,11 @@ impl Index {
                 let identifier = object_entry.archive_info.identifier.ok_or_else(|| {
                     Error::InvalidFormat("Numbers IWA object has no identifier".to_owned())
                 })?;
+                if identifier == 0 {
+                    return Err(Error::InvalidFormat(
+                        "Numbers IWA object uses the null identifier".to_owned(),
+                    ));
+                }
                 let object = u32::try_from(object_index).map_err(|_error| {
                     Error::InvalidFormat(
                         "Numbers component object count exceeds compact indexing".to_owned(),

@@ -1,0 +1,41 @@
+// Wire-only Buffa projection derived from these canonical IWA declarations:
+//
+// - `TSPMessages.proto`: `TSP.UUID` fields 1 and 2;
+// - `TSCEArchives.proto`: the scalar value field of Boolean, Date, Number,
+//   and String cell values.
+//
+// GroupNode fields 1 (UUID), 3 (child), and 7 (CellValue), plus CellValue
+// branches 2 through 5, are routed by the bounded streaming adapter. Keeping
+// recursive/repeated routing out of the generated schema prevents Buffa from
+// materializing an input-width pointer vector before traversal. The empty
+// GroupNodeCategory shell still lets Buffa validate each node envelope while
+// treating every routed field as opaque.
+//
+// This deliberately does not describe a complete GroupNode, CellValue, or
+// formatting schema. Caller-owned IWA bytes remain authoritative.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Uuid {
+  required uint64 lower = 1;
+  required uint64 upper = 2;
+}
+
+message BooleanCellValue {
+  required bool value = 1;
+}
+
+message DateCellValue {
+  required double value = 1;
+}
+
+message NumberCellValue {
+  optional double value = 1;
+}
+
+message StringCellValue {
+  required string value = 1;
+}
+
+message GroupNodeCategory {}

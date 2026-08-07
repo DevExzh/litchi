@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use litchi_numbers::{Package, cell::Value};
+use litchi_numbers::{Package, cell::Value, compatibility_tables_from_bytes};
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/numbers/basic.numbers")
@@ -45,6 +45,10 @@ fn native_numbers_fixture_opens_from_path_and_bytes() -> Result<(), Box<dyn std:
     let bytes = std::fs::read(path)?;
     let from_bytes = Package::from_bytes(&bytes)?;
     assert_expected_cells(&from_bytes)?;
+    assert_eq!(
+        compatibility_tables_from_bytes(&bytes)?,
+        from_bytes.extract_structured_tables()?
+    );
     assert_eq!(
         from_bytes.document().sheet_count(),
         package.document().sheet_count()

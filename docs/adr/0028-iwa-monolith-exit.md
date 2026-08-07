@@ -147,9 +147,62 @@ and tables whose rooted order is `B-only-table`, `A-new-table`,
 both sequences and one materialized marker cell per table.
 
 This closes the focused Numbers order/orphan implementation gap, not the
-monolith deletion gate. The root structured facade still routes Numbers
-through the migration-host adapter, mutation ownership remains largely in
+monolith deletion gate. The legacy aggregate structured API
+(`litchi_iwa::Document::extract_structured_data`) still routes Numbers through
+the migration-host adapter, mutation ownership remains largely in
 `litchi-iwa`, and the larger Numbers table graph still uses generated Prost
-messages. The host adapter can be removed only after the root facade consumes
-the focused projection and the remaining compatibility tests move to focused
-owners.
+messages. The host adapter can be removed only after a source-owning aggregate
+coordinator consumes the focused projection and the remaining compatibility
+tests move to focused owners.
+
+## 2026-08-08 Numbers compatibility-ingress hardening
+
+The focused format owner now exposes
+`compatibility_tables_from_bytes[_with_options]` as a distinct global
+projection ingress. It validates the same immutable byte snapshot, builds the
+compact object index, and extracts compatibility tables without first
+constructing the strict rooted workbook. This preserves the deliberate
+rooted/global distinction for detached tables and malformed unrelated rooted
+topology while giving a future source-owning aggregate coordinator a direct
+format API.
+
+Both direct package and compatibility ingress prove an unambiguous Numbers
+root from the unique canonical type-1 payload through `litchi-iwa-detect`
+before TN decoding; application-shaped siblings cannot mask it. The focused
+index now rejects null object identifier zero in addition to missing and
+duplicate identities. Global candidate extraction decodes only the payload
+that supplied the object's primary classification, so a primary type-6000
+metadata object cannot be promoted by a secondary type-6001 payload; duplicate
+canonical or legacy model payloads fail closed. The caller's table ceiling is
+intentionally charged before decoding another canonical candidate, preventing
+malformed over-budget input from forcing an otherwise disallowed model
+allocation.
+
+Formula-reference enrichment is no longer built by every table extractor. It
+is initialized only after a non-empty formula sidecar is selected, resolves
+objects through the compact index instead of repeated archive scans, uses
+fallible map growth and shared table/sheet names, and charges the configurable
+reference budget only for unique source-derived retained entries. Discovery
+work, encoded category bytes, and cumulative source text use fixed package-wide
+caps; category depth has a fixed per-tree cap. Each category payload is
+schema-preflighted before a private Buffa projection validates an empty node
+envelope plus UUID and scalar wrappers. Recursive children and CellValue
+branches stream from the
+preflighted source rather than entering generated repeated-fragment storage;
+an O(depth) iterator stack walks children and ignored native fields stay
+opaque. Filesystem open is nonblocking on Unix, rejects non-regular descriptors,
+obtains metadata from the opened descriptor, fills the bounded destination
+buffer through the standard spare-capacity reader path, and verifies the
+descriptor version afterward. This closes the earlier stat/open race and
+rejects observable in-place mutation. Protobuf failures retain their source
+chain behind a format-owned, content-free wrapper.
+
+This is a cutover prerequisite, not the cutover. Reopening a legacy
+`litchi_iwa::Document` through `Package` would still break in-memory and
+directory-backed inputs, violate immutable snapshot semantics, duplicate
+physical parsing, and impose strict rooted failures on the historical global
+API. A shared immutable catalog/source coordinator and package-wide
+compatibility budgets for cells, sidecars, text, formulas, and error mapping
+remain required before deleting `structured/numbers.rs`. The remaining table
+model, formula-owner, sidecar, and AST Prost decoders still need focused
+pre-decode envelopes or projections.

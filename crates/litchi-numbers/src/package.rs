@@ -34,13 +34,16 @@ mod table;
 
 use std::collections::HashSet;
 use std::fmt;
-use std::fs::File;
+use std::fs::{Metadata, OpenOptions};
 use std::io::{self, Read};
 use std::path::Path;
 use std::sync::Arc;
 
 use litchi_iwa_archive::ComponentCatalog;
+use litchi_iwa_common::WireLimits;
+use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};
 use litchi_iwa_core::{Archive, RawMessage};
+use litchi_iwa_detect::{Format, detect_application_from_document};
 use litchi_iwa_protos::{tn, tst, tswp};
 use prost::Message;
 use thiserror::Error;
@@ -63,6 +66,7 @@ const DOCUMENT_MESSAGE_TYPE: u32 = 1;
 const SHEET_MESSAGE_TYPE: u32 = 2;
 const FORM_BASED_SHEET_MESSAGE_TYPE: u32 = 3;
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
+const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
 const LEGACY_TABLE_INFO_MESSAGE_TYPE: u32 = 6_003;
 
 /// Content-free semantic location associated with a Numbers read failure.
@@ -95,6 +99,27 @@ impl fmt::Display for SemanticPath {
     }
 }
 
+/// Format-owned wrapper for a malformed native protobuf payload.
+///
+/// The generated decoder type remains private to the package adapter while
+/// [`std::error::Error::source`] preserves the diagnostic chain for tooling.
+#[derive(Debug)]
+pub struct ProtobufError {
+    source: prost::DecodeError,
+}
+
+impl fmt::Display for ProtobufError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("malformed Numbers protobuf payload")
+    }
+}
+
+impl std::error::Error for ProtobufError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
 /// Errors returned while parsing a native Numbers package.
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -106,8 +131,11 @@ pub enum Error {
     #[error(transparent)]
     Archive(#[from] litchi_iwa_archive::Error),
     /// A native protobuf payload could not be decoded.
-    #[error("could not decode Numbers protobuf payload: {0}")]
-    Protobuf(String),
+    #[error("could not decode Numbers protobuf payload")]
+    Protobuf(#[source] ProtobufError),
+    /// The package is a recognized iWork document owned by another application.
+    #[error("package is not a Numbers document")]
+    NotNumbers,
     /// A native IWA value could not be decoded or validated.
     #[error(transparent)]
     Common(#[from] litchi_iwa_common::Error),
@@ -129,7 +157,7 @@ pub enum Error {
         kind: SemanticLimitKind,
         /// Observed or requested amount.
         observed: usize,
-        /// Configured maximum.
+        /// Caller-selected or fixed adapter-owned maximum.
         maximum: usize,
         /// Content-free semantic location where the limit was encountered.
         path: SemanticPath,
@@ -145,8 +173,8 @@ pub enum Error {
 }
 
 impl Error {
-    fn protobuf(error: &prost::DecodeError) -> Self {
-        Self::Protobuf(error.to_string())
+    fn protobuf(error: prost::DecodeError) -> Self {
+        Self::Protobuf(ProtobufError { source: error })
     }
 }
 
@@ -286,40 +314,10 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns a typed error before allocating beyond either selected profile,
-    /// or when the package cannot become a strict rooted semantic document.
+    /// Returns a typed error when either selected profile is exceeded, or when
+    /// the package cannot become a strict rooted semantic document.
     pub fn open_with_options(path: impl AsRef<Path>, options: ReadOptions) -> Result<Self> {
-        let source_path = path.as_ref();
-        let limits = options.archive();
-        let metadata = std::fs::metadata(source_path)?;
-        if metadata.len() > limits.max_input_bytes() {
-            return Err(Error::InputTooLarge {
-                observed: metadata.len(),
-                maximum: limits.max_input_bytes(),
-            });
-        }
-
-        let maximum = usize::try_from(limits.max_input_bytes()).map_err(|_error| {
-            Error::InvalidFormat("Numbers input ceiling does not fit usize".to_owned())
-        })?;
-        let file = File::open(source_path)?;
-        let mut bytes = Vec::new();
-        bytes
-            .try_reserve_exact(usize::try_from(metadata.len()).unwrap_or(maximum))
-            .map_err(|_error| {
-                Error::Common(litchi_iwa_common::Error::Allocation {
-                    resource: "Numbers package input",
-                    amount: usize::try_from(metadata.len()).unwrap_or(maximum),
-                })
-            })?;
-        file.take(limits.max_input_bytes().saturating_add(1))
-            .read_to_end(&mut bytes)?;
-        if bytes.len() > maximum {
-            return Err(Error::InputTooLarge {
-                observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
-                maximum: limits.max_input_bytes(),
-            });
-        }
+        let bytes = read_source(path.as_ref(), options.archive())?;
         Self::from_bytes_with_options(&bytes, options)
     }
 
@@ -355,6 +353,7 @@ impl Package {
     /// contains ambiguous rooted ownership, or cannot be decoded as Numbers.
     pub fn from_bytes_with_options(bytes: &[u8], options: ReadOptions) -> Result<Self> {
         let components = Components::from_bytes(bytes, options.archive())?;
+        validate_numbers_application(&components, options.archive())?;
         let semantic = options.semantic();
         let index = Index::from_components(&components, semantic.max_objects())?;
         let root = Self::root_document(&components)?;
@@ -429,11 +428,11 @@ impl Package {
     /// a referenced table sidecar is invalid, allocation fails, or the selected
     /// semantic table ceiling would be exceeded.
     pub fn extract_structured_tables(&self) -> Result<Vec<crate::Table>> {
-        if !TableDataExtractor::has_table_models(&self.state.index) {
-            return Ok(Vec::new());
-        }
-        TableDataExtractor::new(&self.state.components, &self.state.index)
-            .extract_all_semantic_tables(self.state.options.semantic().max_tables())
+        project_compatibility_tables(
+            &self.state.components,
+            &self.state.index,
+            self.state.options.semantic(),
+        )
     }
 
     /// Return the count of indexed IWA objects retained by this package.
@@ -494,8 +493,7 @@ impl Package {
                 "Numbers document root has no canonical document payload".to_owned(),
             )
         })?;
-        tn::DocumentArchive::decode(message.data.as_slice())
-            .map_err(|error| Error::protobuf(&error))
+        tn::DocumentArchive::decode(message.data.as_slice()).map_err(Error::protobuf)
     }
 
     fn decode_sheets(
@@ -515,7 +513,7 @@ impl Package {
 
         let mut budget = SemanticBudget::new(limits);
         budget.charge_references(document.sheets.len(), SemanticPath::Document)?;
-        let extractor = TableDataExtractor::new(components, index);
+        let extractor = TableDataExtractor::new(components, index, limits.max_references());
         let mut sheets = Vec::new();
         sheets
             .try_reserve_exact(document.sheets.len())
@@ -639,6 +637,117 @@ impl Package {
     }
 }
 
+/// Extract the allocating, legacy-compatible global table projection from
+/// complete Numbers package bytes under default limits.
+///
+/// This entry point validates Numbers application ownership and indexes the
+/// physical package, but deliberately does not construct the strict rooted
+/// [`Document`]. It therefore remains usable for migration callers that need
+/// detached historical table models even when unrelated rooted topology is
+/// incomplete. New application code should normally use [`Package::document`].
+///
+/// # Errors
+///
+/// Returns a typed error when the bytes are not an unambiguous Numbers package,
+/// physical or semantic limits are exceeded, or a selected table is malformed.
+pub fn compatibility_tables_from_bytes(bytes: &[u8]) -> Result<Vec<crate::Table>> {
+    compatibility_tables_from_bytes_with_options(bytes, ReadOptions::default())
+}
+
+/// Extract the allocating global compatibility projection under explicit
+/// physical and semantic limits.
+///
+/// This path does not construct the strict rooted [`Document`]. It may lazily
+/// resolve source sheet and drawable names when enriching a non-empty formula
+/// sidecar. The object and table portions of [`SemanticLimits`] are consumed
+/// directly; its reference ceiling applies to unique source-derived
+/// formula-enrichment entries. Formula discovery separately has fixed
+/// aggregate category-wire, work, and text ceilings plus a fixed
+/// category-depth ceiling. The sheet ceiling applies only when constructing a
+/// strict [`Package`].
+///
+/// # Errors
+///
+/// Returns a typed error when application ownership, package ingress, object
+/// indexing, table decoding, or a selected resource ceiling fails.
+pub fn compatibility_tables_from_bytes_with_options(
+    bytes: &[u8],
+    options: ReadOptions,
+) -> Result<Vec<crate::Table>> {
+    let components = Components::from_bytes(bytes, options.archive())?;
+    validate_numbers_application(&components, options.archive())?;
+    let semantic = options.semantic();
+    let index = Index::from_components(&components, semantic.max_objects())?;
+    project_compatibility_tables(&components, &index, semantic)
+}
+
+fn validate_numbers_application(components: &Components, archive_limits: Limits) -> Result<()> {
+    let root = components
+        .get_archive("Index/Document.iwa")
+        .and_then(|archive| archive.object(1))
+        .ok_or_else(|| {
+            Error::InvalidFormat("package has no canonical iWork document root".to_owned())
+        })?;
+    let canonical = unique_message(
+        &root.messages,
+        DOCUMENT_MESSAGE_TYPE,
+        SemanticPath::Document,
+        "document",
+    )?
+    .ok_or_else(|| {
+        Error::InvalidFormat("iWork document root has no canonical document payload".to_owned())
+    })?;
+    preflight_application_payload(&canonical.data, archive_limits)?;
+    let application = detect_application_from_document(&canonical.data).ok_or_else(|| {
+        Error::InvalidFormat(
+            "canonical iWork document payload has no unambiguous application shape".to_owned(),
+        )
+    })?;
+    match application {
+        Format::Numbers => Ok(()),
+        Format::Pages | Format::Keynote => Err(Error::NotNumbers),
+    }
+}
+
+fn preflight_application_payload(payload: &[u8], archive_limits: Limits) -> Result<()> {
+    let source_ceiling = payload.len().min(archive_limits.max_iwa_stream_bytes());
+    let input_bytes = source_ceiling
+        .saturating_mul(3)
+        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    let fields = source_ceiling
+        .saturating_mul(2)
+        .clamp(1, WireLimits::default().max_fields());
+    let wire_limits = WireLimits::default()
+        .with_input_bytes(input_bytes)?
+        .with_fields(fields)?;
+    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+        let field = visit.field().number();
+        let descend = match visit.path() {
+            [] => matches!(field, 2 | 3 | 4 | 5 | 6 | 8 | 15) && visit.field().wire_type() == 2,
+            [3 | 8 | 15] => field == 1 && visit.field().wire_type() == 2,
+            _ => false,
+        };
+        Ok(if descend {
+            WireDescent::Descend
+        } else {
+            WireDescent::Skip
+        })
+    })?;
+    Ok(())
+}
+
+fn project_compatibility_tables(
+    components: &Components,
+    index: &Index,
+    limits: SemanticLimits,
+) -> Result<Vec<crate::Table>> {
+    if !TableDataExtractor::has_table_models(index) {
+        return Ok(Vec::new());
+    }
+    TableDataExtractor::new(components, index, limits.max_references())
+        .extract_all_semantic_tables(limits.max_tables())
+}
+
 fn checked_charge(
     current: usize,
     amount: usize,
@@ -695,11 +804,12 @@ fn decode_sheet_payload(messages: &[RawMessage], path: SemanticPath) -> Result<t
         (Some(_), Some(_)) => Err(Error::InvalidFormat(format!(
             "Numbers {path} has ambiguous sheet payload ownership"
         ))),
-        (Some(message), None) => tn::SheetArchive::decode(message.data.as_slice())
-            .map_err(|error| Error::protobuf(&error)),
+        (Some(message), None) => {
+            tn::SheetArchive::decode(message.data.as_slice()).map_err(Error::protobuf)
+        },
         (None, Some(message)) => tn::FormBasedSheetArchive::decode(message.data.as_slice())
             .map(|form_archive| form_archive.super_)
-            .map_err(|error| Error::protobuf(&error)),
+            .map_err(Error::protobuf),
         (None, None) => Err(Error::InvalidFormat(format!(
             "Numbers {path} has no canonical sheet payload"
         ))),
@@ -710,11 +820,150 @@ fn allocation_error(resource: &'static str, amount: usize) -> Error {
     Error::Common(litchi_iwa_common::Error::Allocation { resource, amount })
 }
 
+fn read_source(path: &Path, limits: Limits) -> Result<Vec<u8>> {
+    let mut open_options = OpenOptions::new();
+    open_options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        open_options.custom_flags(libc::O_NONBLOCK);
+    }
+    let mut file = open_options.open(path)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_file() {
+        return Err(Error::InvalidFormat(
+            "Numbers package source is not a regular file".to_owned(),
+        ));
+    }
+    let reported_length = metadata.len();
+    let bytes = read_source_with_reported_length(&mut file, reported_length, limits)?;
+    ensure_source_unchanged(&metadata, &file.metadata()?)?;
+    Ok(bytes)
+}
+
+fn ensure_source_unchanged(before: &Metadata, after: &Metadata) -> Result<()> {
+    let modified = matches!(
+        (before.modified(), after.modified()),
+        (Ok(before_modified), Ok(after_modified)) if before_modified != after_modified
+    );
+    if before.len() != after.len() || modified {
+        return Err(Error::InvalidFormat(
+            "Numbers package source changed while it was being read".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn read_source_with_reported_length(
+    reader: &mut impl Read,
+    reported_length: u64,
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    if reported_length > limits.max_input_bytes() {
+        return Err(input_too_large(reported_length, limits));
+    }
+
+    let maximum = usize::try_from(limits.max_input_bytes()).map_err(|_error| {
+        Error::InvalidFormat("Numbers input ceiling does not fit usize".to_owned())
+    })?;
+    let reported_capacity = usize::try_from(reported_length).map_err(|_error| {
+        Error::InvalidFormat("Numbers input length does not fit usize".to_owned())
+    })?;
+    // File metadata is advisory: a sparse or concurrently truncated source
+    // must not force one allocation proportional to its reported logical size.
+    let capacity = reported_capacity.min(64 * 1024);
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(capacity)
+        .map_err(|_error| allocation_error("Numbers package input", capacity))?;
+    loop {
+        let remaining = maximum
+            .checked_sub(bytes.len())
+            .ok_or_else(|| Error::InvalidFormat("Numbers input length exceeds usize".to_owned()))?;
+        if remaining == 0 {
+            let mut extra = [0u8; 1];
+            if reader.read(&mut extra)? != 0 {
+                return Err(input_too_large(
+                    limits.max_input_bytes().saturating_add(1),
+                    limits,
+                ));
+            }
+            break;
+        }
+
+        if bytes.len() == bytes.capacity() {
+            // Probe EOF before growing beyond the descriptor's advisory
+            // length. If one byte exists, retain it and grow geometrically.
+            let mut extra = [0u8; 1];
+            if reader.read(&mut extra)? == 0 {
+                break;
+            }
+            let growth = bytes.capacity().max(8 * 1024).min(remaining);
+            let target = bytes.len().checked_add(growth).ok_or_else(|| {
+                Error::InvalidFormat("Numbers input length exceeds usize".to_owned())
+            })?;
+            reserve_source_growth(&mut bytes, target, maximum)?;
+            bytes.push(extra[0]);
+            continue;
+        }
+
+        let writable = bytes.capacity().saturating_sub(bytes.len()).min(remaining);
+        let read_limit = u64::try_from(writable).map_err(|_error| {
+            Error::InvalidFormat("Numbers input read size does not fit u64".to_owned())
+        })?;
+        // The standard `read_to_end` implementation fills `Vec` spare capacity
+        // directly. Limiting it to the already-reserved region avoids both a
+        // zero-fill pass and an infallible growth step.
+        let read = reader.by_ref().take(read_limit).read_to_end(&mut bytes)?;
+        if read < writable {
+            break;
+        }
+    }
+    Ok(bytes)
+}
+
+fn reserve_source_growth(bytes: &mut Vec<u8>, required: usize, maximum: usize) -> Result<()> {
+    if required <= bytes.capacity() {
+        return Ok(());
+    }
+    let doubled = bytes.capacity().checked_mul(2).unwrap_or(maximum);
+    let target = required.max(doubled).min(maximum);
+    let additional = target
+        .checked_sub(bytes.len())
+        .ok_or_else(|| Error::InvalidFormat("Numbers input length exceeds usize".to_owned()))?;
+    bytes
+        .try_reserve_exact(additional)
+        .map_err(|_error| allocation_error("Numbers package input", target))
+}
+
+const fn input_too_large(observed: u64, limits: Limits) -> Error {
+    Error::InputTooLarge {
+        observed,
+        maximum: limits.max_input_bytes(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use litchi_iwa_core::{ArchiveObject, RawMessage, SnappyStream};
+    use litchi_iwa_protos::{kn, tp, tsa, tsk};
     use soapberry_zip::office::StreamingArchiveWriter;
+    use std::io::Write;
+
+    fn reference(identifier: u64) -> litchi_iwa_protos::tsp::Reference {
+        litchi_iwa_protos::tsp::Reference {
+            identifier,
+            ..Default::default()
+        }
+    }
+
+    fn shared_document() -> tsa::DocumentArchive {
+        tsa::DocumentArchive {
+            super_: tsk::DocumentArchive::default(),
+            ..Default::default()
+        }
+    }
 
     fn package_bytes(root: &tn::DocumentArchive) -> Result<Vec<u8>> {
         package_bytes_from_archive(Archive {
@@ -759,6 +1008,9 @@ mod tests {
 
     #[test]
     fn parses_a_minimal_package_into_shared_empty_semantics() -> Result<()> {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<Package>();
+
         let package = Package::from_bytes(&package_bytes(&tn::DocumentArchive::default())?)?;
         let snapshot = package.snapshot();
 
@@ -770,6 +1022,361 @@ mod tests {
         assert_eq!(package.read_options(), ReadOptions::default());
         assert_eq!(package.text()?, "");
         assert!(Arc::ptr_eq(&package.state, &snapshot.state));
+        Ok(())
+    }
+
+    #[test]
+    fn direct_package_requires_unambiguous_numbers_application_ownership() -> Result<()> {
+        let mut pages = tp::DocumentArchive {
+            super_: shared_document(),
+            ..Default::default()
+        };
+        pages.floating_drawables = Some(reference(7));
+        let keynote = kn::DocumentArchive {
+            show: reference(8),
+            super_: shared_document(),
+            ..Default::default()
+        };
+        for foreign_payload in [pages.encode_to_vec(), keynote.encode_to_vec()] {
+            let bytes = package_bytes_from_archive(Archive {
+                objects: vec![object(1, DOCUMENT_MESSAGE_TYPE, foreign_payload)?],
+            })?;
+            assert!(matches!(
+                Package::from_bytes(&bytes),
+                Err(Error::NotNumbers)
+            ));
+            assert!(matches!(
+                compatibility_tables_from_bytes(&bytes),
+                Err(Error::NotNumbers)
+            ));
+        }
+
+        let unknown = package_bytes_from_archive(Archive {
+            objects: vec![object(1, DOCUMENT_MESSAGE_TYPE, vec![0x08, 0x01])?],
+        })?;
+        assert!(matches!(
+            Package::from_bytes(&unknown),
+            Err(Error::InvalidFormat(_))
+        ));
+
+        let mut mixed_payload = tn::DocumentArchive::default().encode_to_vec();
+        mixed_payload.extend_from_slice(&pages.encode_to_vec());
+        let mixed_root = object(1, DOCUMENT_MESSAGE_TYPE, mixed_payload)?;
+        let mixed = package_bytes_from_archive(Archive {
+            objects: vec![mixed_root],
+        })?;
+        assert!(matches!(
+            Package::from_bytes(&mixed),
+            Err(Error::InvalidFormat(_))
+        ));
+
+        let unrelated_sibling = ArchiveObject::new(
+            1,
+            vec![
+                RawMessage {
+                    type_: DOCUMENT_MESSAGE_TYPE,
+                    data: tn::DocumentArchive::default().encode_to_vec(),
+                },
+                RawMessage {
+                    type_: 10_000,
+                    data: pages.encode_to_vec(),
+                },
+            ],
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let unrelated = package_bytes_from_archive(Archive {
+            objects: vec![unrelated_sibling],
+        })?;
+        assert!(Package::from_bytes(&unrelated).is_ok());
+
+        #[allow(deprecated, reason = "Regression for a supported native field")]
+        let numbers_with_calculation_engine = tn::DocumentArchive {
+            calculation_engine: Some(reference(7)),
+            ..Default::default()
+        };
+        let calculation_engine = package_bytes(&numbers_with_calculation_engine)?;
+        assert!(Package::from_bytes(&calculation_engine).is_ok());
+        assert!(compatibility_tables_from_bytes(&calculation_engine)?.is_empty());
+
+        let mut numbers_with_scalar_collisions = tn::DocumentArchive::default().encode_to_vec();
+        numbers_with_scalar_collisions.extend_from_slice(&[0x10, 0x01, 0x78, 0x01]);
+        let scalar_collisions = package_bytes_from_archive(Archive {
+            objects: vec![object(
+                1,
+                DOCUMENT_MESSAGE_TYPE,
+                numbers_with_scalar_collisions,
+            )?],
+        })?;
+        assert!(Package::from_bytes(&scalar_collisions).is_ok());
+
+        let noncanonical_numbers = package_bytes_from_archive(Archive {
+            objects: vec![object(
+                1,
+                TABLE_INFO_MESSAGE_TYPE,
+                tn::DocumentArchive::default().encode_to_vec(),
+            )?],
+        })?;
+        assert!(matches!(
+            compatibility_tables_from_bytes(&noncanonical_numbers),
+            Err(Error::InvalidFormat(_))
+        ));
+
+        let masked_unknown = ArchiveObject::new(
+            1,
+            vec![
+                RawMessage {
+                    type_: DOCUMENT_MESSAGE_TYPE,
+                    data: vec![0x08, 0x01],
+                },
+                RawMessage {
+                    type_: TABLE_INFO_MESSAGE_TYPE,
+                    data: tn::DocumentArchive::default().encode_to_vec(),
+                },
+            ],
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let masked = package_bytes_from_archive(Archive {
+            objects: vec![masked_unknown],
+        })?;
+        assert!(matches!(
+            compatibility_tables_from_bytes(&masked),
+            Err(Error::InvalidFormat(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn compatibility_projection_does_not_require_rooted_sheet_construction() -> Result<()> {
+        let root = tn::DocumentArchive {
+            sheets: vec![reference(2)],
+            ..Default::default()
+        };
+        let bytes = package_bytes(&root)?;
+
+        assert!(matches!(
+            Package::from_bytes(&bytes),
+            Err(Error::InvalidFormat(_))
+        ));
+        assert!(compatibility_tables_from_bytes(&bytes)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn formula_reference_enrichment_is_not_built_without_formula_tables() -> Result<()> {
+        let group = tst::group_by_archive::GroupNodeArchive {
+            child: vec![tst::group_by_archive::GroupNodeArchive::default()],
+            ..Default::default()
+        };
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive::default().encode_to_vec(),
+                )?,
+                object(2, 6_383, group.encode_to_vec())?,
+            ],
+        })?;
+        let semantic = SemanticLimits::new(2, crate::MAX_SHEETS, crate::MAX_TABLES, 1)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+
+        let package = Package::from_bytes_with_options(
+            &bytes,
+            ReadOptions::new(Limits::default(), semantic),
+        )?;
+        assert!(package.document().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn compact_index_rejects_the_null_object_identifier() -> Result<()> {
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive::default().encode_to_vec(),
+                )?,
+                object(0, 99_999, Vec::new())?,
+            ],
+        })?;
+        assert!(matches!(
+            Package::from_bytes(&bytes),
+            Err(Error::InvalidFormat(_))
+        ));
+        assert!(matches!(
+            compatibility_tables_from_bytes(&bytes),
+            Err(Error::InvalidFormat(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn legacy_primary_candidates_cannot_promote_secondary_canonical_payloads() -> Result<()> {
+        let candidate = ArchiveObject::new(
+            2,
+            vec![
+                RawMessage {
+                    type_: 6_000,
+                    data: tst::TableInfoArchive::default().encode_to_vec(),
+                },
+                RawMessage {
+                    type_: TABLE_MODEL_MESSAGE_TYPE,
+                    data: tst::TableModelArchive::default().encode_to_vec(),
+                },
+            ],
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive::default().encode_to_vec(),
+                )?,
+                candidate,
+            ],
+        })?;
+
+        assert!(compatibility_tables_from_bytes(&bytes)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn duplicate_canonical_candidate_payloads_fail_closed() -> Result<()> {
+        let candidate = ArchiveObject::new(
+            2,
+            vec![
+                RawMessage {
+                    type_: TABLE_MODEL_MESSAGE_TYPE,
+                    data: tst::TableModelArchive::default().encode_to_vec(),
+                },
+                RawMessage {
+                    type_: TABLE_MODEL_MESSAGE_TYPE,
+                    data: tst::TableModelArchive::default().encode_to_vec(),
+                },
+            ],
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive::default().encode_to_vec(),
+                )?,
+                candidate,
+            ],
+        })?;
+
+        assert!(matches!(
+            compatibility_tables_from_bytes(&bytes),
+            Err(Error::InvalidFormat(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn duplicate_legacy_candidate_payloads_fail_closed() -> Result<()> {
+        let candidate = ArchiveObject::new(
+            2,
+            vec![
+                RawMessage {
+                    type_: TABLE_INFO_MESSAGE_TYPE,
+                    data: tst::TableInfoArchive::default().encode_to_vec(),
+                },
+                RawMessage {
+                    type_: TABLE_INFO_MESSAGE_TYPE,
+                    data: tst::TableInfoArchive::default().encode_to_vec(),
+                },
+            ],
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive::default().encode_to_vec(),
+                )?,
+                candidate,
+            ],
+        })?;
+
+        assert!(matches!(
+            compatibility_tables_from_bytes(&bytes),
+            Err(Error::InvalidFormat(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn path_reader_bounds_descriptor_growth_and_reported_length() -> Result<()> {
+        let defaults = Limits::default();
+        let limits = Limits::new(
+            4,
+            defaults.max_entries(),
+            defaults.max_entry_bytes(),
+            defaults.max_total_bytes(),
+            defaults.max_iwa_stream_bytes(),
+        )?;
+
+        let mut exact = io::Cursor::new([1, 2, 3, 4]);
+        assert_eq!(
+            read_source_with_reported_length(&mut exact, 4, limits)?,
+            vec![1, 2, 3, 4]
+        );
+
+        let mut grew = io::Cursor::new([1, 2, 3, 4, 5]);
+        assert!(matches!(
+            read_source_with_reported_length(&mut grew, 4, limits),
+            Err(Error::InputTooLarge {
+                observed: 5,
+                maximum: 4,
+            })
+        ));
+
+        let mut oversized = io::Cursor::new([1, 2, 3, 4, 5]);
+        assert!(matches!(
+            read_source_with_reported_length(&mut oversized, 5, limits),
+            Err(Error::InputTooLarge {
+                observed: 5,
+                maximum: 4,
+            })
+        ));
+
+        #[cfg(unix)]
+        assert!(matches!(
+            read_source(Path::new(env!("CARGO_MANIFEST_DIR")), limits),
+            Err(Error::InvalidFormat(_))
+        ));
+
+        let mut changed = tempfile::NamedTempFile::new()?;
+        changed.write_all(&[1])?;
+        changed.flush()?;
+        let before = changed.as_file().metadata()?;
+        changed.write_all(&[2])?;
+        changed.flush()?;
+        let after = changed.as_file().metadata()?;
+        assert!(matches!(
+            ensure_source_unchanged(&before, &after),
+            Err(Error::InvalidFormat(_))
+        ));
+
+        let version_before = changed.as_file().metadata()?;
+        let changed_time = version_before
+            .modified()?
+            .checked_add(std::time::Duration::from_secs(1))
+            .ok_or_else(|| Error::InvalidFormat("test timestamp overflow".to_owned()))?;
+        changed
+            .as_file()
+            .set_times(std::fs::FileTimes::new().set_modified(changed_time))?;
+        let version_after = changed.as_file().metadata()?;
+        assert_eq!(version_before.len(), version_after.len());
+        assert!(matches!(
+            ensure_source_unchanged(&version_before, &version_after),
+            Err(Error::InvalidFormat(_))
+        ));
         Ok(())
     }
 
@@ -806,6 +1413,10 @@ mod tests {
         })?;
         assert!(matches!(
             Package::from_bytes(&duplicate_bytes),
+            Err(Error::InvalidFormat(_))
+        ));
+        assert!(matches!(
+            compatibility_tables_from_bytes(&duplicate_bytes),
             Err(Error::InvalidFormat(_))
         ));
         Ok(())
