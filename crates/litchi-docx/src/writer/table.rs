@@ -2,6 +2,7 @@
 use crate::error::{Error, Result};
 use crate::namespace::normalize_xml_integer;
 use crate::paragraph::extensions::Ids;
+use crate::revision::conflict::Metadata as ConflictMetadata;
 use crate::table::VMergeState;
 use litchi_core::xml::escape_xml;
 use std::collections::HashSet;
@@ -12,9 +13,11 @@ pub use super::super::format::TableBorderStyle;
 // Import paragraph types
 use super::paragraph::MutableParagraph;
 use super::revision::{
-    CellRevisionKind, RevisionMetadata, RowRevisionKind, TableCellMergeRevisionState,
-    TableRevisionKind,
+    CellRevisionKind, ConflictKind, RevisionMetadata, RowRevisionKind, TableCellMergeRevisionState,
+    TableRevisionKind, conflict_element_name, write_conflict_attributes,
 };
+
+const MAX_PROPERTY_CONFLICT_MARKERS: usize = 1_024;
 
 /// Border definition for table or cell.
 #[derive(Debug, Clone)]
@@ -79,6 +82,70 @@ struct CellMergeChange {
     metadata: RevisionMetadata,
     original: TableCellMergeRevisionState,
     current: TableCellMergeRevisionState,
+}
+
+#[derive(Debug, Clone)]
+struct PropertyConflictMarker {
+    kind: ConflictKind,
+    metadata: ConflictMetadata,
+}
+
+fn add_property_conflict_marker(
+    markers: &mut Vec<PropertyConflictMarker>,
+    kind: ConflictKind,
+    metadata: ConflictMetadata,
+    owner: &'static str,
+) -> Result<()> {
+    if markers.len() >= MAX_PROPERTY_CONFLICT_MARKERS {
+        return Err(Error::InvalidFormat(format!(
+            "{owner} exceeds the limit of {MAX_PROPERTY_CONFLICT_MARKERS} conflict markers"
+        )));
+    }
+    if markers
+        .iter()
+        .any(|marker| marker.metadata.id == metadata.id)
+    {
+        return Err(Error::InvalidFormat(format!(
+            "duplicate {owner} revision ID {}",
+            metadata.id.get()
+        )));
+    }
+    markers.try_reserve(1).map_err(|source| Error::Allocation {
+        resource: "row property conflict marker",
+        source,
+    })?;
+    markers.push(PropertyConflictMarker { kind, metadata });
+    Ok(())
+}
+
+fn write_property_container_start(
+    xml: &mut String,
+    element: &'static str,
+    has_conflicts: bool,
+) -> Result<()> {
+    if has_conflicts {
+        write!(
+            xml,
+            "<w:{element} xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" \
+             xmlns:w14=\"http://schemas.microsoft.com/office/word/2010/wordml\" \
+             mc:Ignorable=\"w14\">"
+        )?;
+    } else {
+        write!(xml, "<w:{element}>")?;
+    }
+    Ok(())
+}
+
+fn write_property_conflict_markers(
+    xml: &mut String,
+    markers: &[PropertyConflictMarker],
+) -> Result<()> {
+    for marker in markers {
+        write!(xml, "<w14:{}", conflict_element_name(marker.kind))?;
+        write_conflict_attributes(&marker.metadata, xml)?;
+        xml.push_str("/>");
+    }
+    Ok(())
 }
 
 /// A mutable table.
@@ -251,38 +318,40 @@ impl MutableTable {
 
     fn validate_revision_ids(&self) -> Result<()> {
         let mut ids = HashSet::new();
-        let mut insert = |metadata: &RevisionMetadata| {
-            if ids.insert(metadata.id()) {
+        let mut insert = |id: i64| {
+            if ids.insert(id) {
                 Ok(())
             } else {
                 Err(Error::InvalidFormat(format!(
-                    "duplicate table subtree revision ID {}",
-                    metadata.id()
+                    "duplicate table subtree revision ID {id}"
                 )))
             }
         };
         if let Some((_, metadata)) = &self.revision {
-            insert(metadata)?;
+            insert(i64::from(metadata.id()))?;
         }
         if let Some(change) = &self.property_change {
-            insert(&change.metadata)?;
+            insert(i64::from(change.metadata.id()))?;
         }
         for row in &self.rows {
             if let Some((_, metadata)) = &row.revision {
-                insert(metadata)?;
+                insert(i64::from(metadata.id()))?;
             }
             if let Some(change) = &row.property_change {
-                insert(&change.metadata)?;
+                insert(i64::from(change.metadata.id()))?;
+            }
+            for marker in &row.property_conflicts {
+                insert(i64::from(marker.metadata.id.get()))?;
             }
             for cell in &row.cells {
                 if let Some((_, metadata)) = &cell.revision {
-                    insert(metadata)?;
+                    insert(i64::from(metadata.id()))?;
                 }
                 if let Some(change) = &cell.merge_change {
-                    insert(&change.metadata)?;
+                    insert(i64::from(change.metadata.id()))?;
                 }
                 if let Some(change) = &cell.property_change {
-                    insert(&change.metadata)?;
+                    insert(i64::from(change.metadata.id()))?;
                 }
             }
         }
@@ -342,6 +411,7 @@ pub struct MutableRow {
     pub(crate) extension_ids: Ids,
     revision: Option<(RowRevisionKind, RevisionMetadata)>,
     property_change: Option<PropertyChange<Option<String>>>,
+    property_conflicts: Vec<PropertyConflictMarker>,
 }
 
 impl MutableRow {
@@ -352,6 +422,7 @@ impl MutableRow {
             extension_ids: Ids::new(),
             revision: None,
             property_change: None,
+            property_conflicts: Vec::new(),
         };
         for _ in 0..cols {
             row.cells.push(MutableCell::new());
@@ -423,7 +494,10 @@ impl MutableRow {
                 "row property revision already exists".into(),
             ));
         }
-        if previous.revision.is_some() || previous.property_change.is_some() {
+        if previous.revision.is_some()
+            || previous.property_change.is_some()
+            || !previous.property_conflicts.is_empty()
+        {
             return Err(Error::InvalidFormat(
                 "previous row properties must not contain revision metadata".into(),
             ));
@@ -440,6 +514,29 @@ impl MutableRow {
         self.revision.as_ref().map(|(kind, _)| *kind)
     }
 
+    /// Append an inert Word 2010 conflict marker to this row's properties.
+    pub fn add_property_conflict(
+        &mut self,
+        kind: ConflictKind,
+        metadata: ConflictMetadata,
+    ) -> Result<&mut Self> {
+        let metadata = ConflictMetadata::new(metadata.id, metadata.author, metadata.date)?;
+        self.ensure_local_conflict_id_available(metadata.id.get())?;
+        add_property_conflict_marker(&mut self.property_conflicts, kind, metadata, "row property")?;
+        Ok(self)
+    }
+
+    /// Number of Word 2010 conflict markers on this row's properties.
+    pub fn property_conflict_count(&self) -> usize {
+        self.property_conflicts.len()
+    }
+
+    /// Remove all Word 2010 conflict markers from this row's properties.
+    pub fn clear_property_conflicts(&mut self) -> &mut Self {
+        self.property_conflicts.clear();
+        self
+    }
+
     fn ensure_local_id_available(&self, id: u32) -> Result<()> {
         if self
             .revision
@@ -449,6 +546,32 @@ impl MutableRow {
                 .property_change
                 .as_ref()
                 .is_some_and(|value| value.metadata.id() == id)
+            || self
+                .property_conflicts
+                .iter()
+                .any(|marker| i64::from(marker.metadata.id.get()) == i64::from(id))
+        {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate row revision ID {id}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn ensure_local_conflict_id_available(&self, id: i32) -> Result<()> {
+        let id = i64::from(id);
+        if self
+            .revision
+            .as_ref()
+            .is_some_and(|(_, value)| i64::from(value.id()) == id)
+            || self
+                .property_change
+                .as_ref()
+                .is_some_and(|value| i64::from(value.metadata.id()) == id)
+            || self
+                .property_conflicts
+                .iter()
+                .any(|marker| i64::from(marker.metadata.id.get()) == id)
         {
             return Err(Error::InvalidFormat(format!(
                 "duplicate row revision ID {id}"
@@ -462,8 +585,12 @@ impl MutableRow {
         crate::paragraph::extensions::append_row_attributes(&self.extension_ids, xml)?;
         xml.push('>');
 
-        if self.division_id.is_some() || self.revision.is_some() || self.property_change.is_some() {
-            xml.push_str("<w:trPr>");
+        if self.division_id.is_some()
+            || self.revision.is_some()
+            || self.property_change.is_some()
+            || !self.property_conflicts.is_empty()
+        {
+            write_property_container_start(xml, "trPr", !self.property_conflicts.is_empty())?;
             if let Some(division_id) = &self.division_id {
                 write!(xml, "<w:divId w:val=\"{}\"/>", escape_xml(division_id))?;
             }
@@ -481,6 +608,7 @@ impl MutableRow {
                 }
                 xml.push_str("</w:trPr></w:trPrChange>");
             }
+            write_property_conflict_markers(xml, &self.property_conflicts)?;
             xml.push_str("</w:trPr>");
         }
 
@@ -496,7 +624,8 @@ impl MutableRow {
 
 #[cfg(test)]
 mod tests {
-    use super::MutableRow;
+    use super::{ConflictKind, MutableRow, RevisionMetadata};
+    use crate::revision::conflict::{Id, Metadata};
     use crate::table::Row;
 
     #[test]
@@ -526,6 +655,45 @@ mod tests {
         let mut row = MutableRow::new(0);
         assert!(row.set_division_id("+").is_err());
         assert_eq!(row.division_id(), None);
+    }
+
+    #[test]
+    fn writes_ordered_row_property_conflicts_after_property_change() {
+        let mut previous = MutableRow::new(0);
+        previous.set_division_id("7").unwrap();
+
+        let mut row = MutableRow::new(0);
+        row.set_division_id("8").unwrap();
+        row.set_property_change(RevisionMetadata::new("40", "editor").unwrap(), &previous)
+            .unwrap();
+        row.add_property_conflict(
+            ConflictKind::Delete,
+            Metadata::new(Id::new(-2).unwrap(), "alice".to_owned(), None).unwrap(),
+        )
+        .unwrap();
+        row.add_property_conflict(
+            ConflictKind::Insert,
+            Metadata::new(
+                Id::new(41).unwrap(),
+                "bob".to_owned(),
+                Some("2026-08-08T12:00:00Z".to_owned()),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let mut xml = String::new();
+        row.to_xml(&mut xml).unwrap();
+        let change = xml.find("</w:trPrChange>").unwrap();
+        let deletion = xml.find("<w14:conflictDel").unwrap();
+        let insertion = xml.find("<w14:conflictIns").unwrap();
+        assert!(change < deletion && deletion < insertion);
+        assert!(xml.contains("mc:Ignorable=\"w14\""));
+        assert!(xml.contains("<w14:conflictDel w:id=\"-2\" w:author=\"alice\"/>"));
+        assert!(xml.contains(
+            "<w14:conflictIns w:id=\"41\" w:author=\"bob\" w:date=\"2026-08-08T12:00:00Z\"/>"
+        ));
+        assert_eq!(row.property_conflict_count(), 2);
     }
 }
 

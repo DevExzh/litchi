@@ -3,6 +3,12 @@
 use super::super::model::*;
 
 impl Package {
+    /// Refuse a conflict-story snapshot when facade-owned state has not yet
+    /// been materialized into the OPC graph.
+    pub(crate) fn ensure_conflict_opc_current(&self, operation: &'static str) -> Result<()> {
+        self.ensure_opc_current(operation)
+    }
+
     /// Get the underlying OPC package.
     ///
     /// This provides access to lower-level package operations.
@@ -121,12 +127,34 @@ impl Package {
     /// is reloaded. Committing a raw edit disables the legacy document writer
     /// so it cannot later erase the edit.
     pub fn edit_opc<T>(&mut self, edit: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
-        self.ensure_opc_current("edit_opc")?;
+        self.edit_opc_candidate("edit_opc", true, edit)
+    }
+
+    /// Atomically publish a crate-owned semantic OPC edit.
+    ///
+    /// Unlike [`Self::edit_opc`], this invalidates and later rebuilds the
+    /// mutable document facade without classifying the coherent edit as raw.
+    /// A prior raw edit remains raw and cannot be laundered through this path.
+    pub(crate) fn edit_semantic_opc<T>(
+        &mut self,
+        operation: &'static str,
+        edit: impl FnOnce(&mut OpcPackage) -> Result<T>,
+    ) -> Result<T> {
+        self.edit_opc_candidate(operation, false, edit)
+    }
+
+    fn edit_opc_candidate<T>(
+        &mut self,
+        operation: &'static str,
+        raw: bool,
+        edit: impl FnOnce(&mut OpcPackage) -> Result<T>,
+    ) -> Result<T> {
+        self.ensure_opc_current(operation)?;
         #[cfg(feature = "fonts")]
-        if self.font_embedding.is_some() {
+        if raw && self.font_embedding.is_some() {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",
-                operation: "edit_opc",
+                operation,
                 reason: "raw OPC editing cannot honor an automatic font policy; use the managed font facade",
             });
         }
@@ -147,7 +175,9 @@ impl Package {
         self.custom_props = custom_props;
         self.custom_props_dirty = false;
         self.mutable_doc = None;
-        self.raw_edit_committed = true;
+        if raw {
+            self.raw_edit_committed = true;
+        }
         Ok(value)
     }
 }

@@ -63,6 +63,17 @@ safe supported subset. This does not provide existing-workbook array resize/add 
 full Excel formula compiler; formula tokens and cached values are inert and never evaluated or
 executed.
 
+For DOCX W14 conflict revisions, the DOCX matrix records bounded namespace-aware and MCE-aware
+reading/modeling across supported story parts for `[MS-DOCX]` 2.2.5 and 2.6.1.3-11. Typed conflict
+records and custom-XML conflict ranges support source-preserving, source-checked transactions and
+atomic package publication. New-document writers support non-nested inline and range markup and
+table-row property conflicts, but not paragraph-mark `rPr`, numbering `numPr`, or math `ctrlPr`
+conflict properties; nested tracked/conflict wrappers and arbitrary crossing or cross-paragraph
+custom-XML conflict-range coordination are also absent, as is accept/reject resolution. Exact
+no-op transactions leave original package bytes and existing signatures untouched; changed
+packages are not described as retaining stale signatures. Conflict content is inert: no revision
+is applied and no macro, action, control, or embedded code is activated or executed.
+
 iWork parsing is split by concrete application format: `litchi-pages` owns
 Pages (`.pages`), `litchi-keynote` owns Keynote (`.key`), and `litchi-numbers`
 owns Numbers (`.numbers`). Their shared IWA archive, protocol, and package

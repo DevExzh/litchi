@@ -217,9 +217,13 @@ fn is_word2010_namespace(namespace: &ResolveResult<'_>) -> bool {
 }
 
 /// Append paragraph extension attributes to a generated `w:p` start tag.
-pub(crate) fn append_paragraph_attributes(value: &Extensions, xml: &mut String) -> Result<()> {
+pub(crate) fn append_paragraph_attributes(
+    value: &Extensions,
+    requires_w14: bool,
+    xml: &mut String,
+) -> Result<()> {
     value.validate()?;
-    if value.is_empty() {
+    if value.is_empty() && !requires_w14 {
         return Ok(());
     }
     append_namespace_attributes(xml)?;

@@ -55,8 +55,9 @@ pub use paragraph::{ListType, MutableParagraph};
 
 // Re-export run types
 pub use revision::{
-    CellRevisionKind, MutableRevision, RevisionContentControl, RevisionKind, RevisionMetadata,
-    RowRevisionKind, TableCellMergeRevisionState, TableRevisionKind,
+    CellRevisionKind, ConflictKind, MutableConflict, MutableCustomXmlConflictRange,
+    MutableRevision, RevisionContentControl, RevisionKind, RevisionMetadata, RowRevisionKind,
+    TableCellMergeRevisionState, TableRevisionKind,
 };
 pub use run::{MutableRun, RunContent};
 

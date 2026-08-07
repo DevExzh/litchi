@@ -3,6 +3,7 @@ use crate::error::{Error, Result};
 use crate::namespace::normalize_xml_integer;
 use crate::paragraph::collapsed::Collapsed;
 use crate::paragraph::extensions::Extensions;
+use crate::revision::conflict::Metadata as ConflictMetadata;
 use crate::{OfficeMath, OfficeMathParagraph};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as FmtWrite;
@@ -16,7 +17,8 @@ use super::hyperlink::MutableHyperlink;
 use super::image::MutableInlineImage;
 use super::ole_object::MutableOleObject;
 use super::revision::{
-    MutableRevision, ParagraphPropertyChange, RevisionKind, RevisionMetadata, RevisionTextMode,
+    ConflictKind, MutableConflict, MutableCustomXmlConflictRange, MutableRevision,
+    ParagraphPropertyChange, RevisionKind, RevisionMetadata, RevisionTextMode,
 };
 use super::run::MutableRun;
 use super::section::SectionProperties;
@@ -51,6 +53,10 @@ pub(crate) enum ParagraphElement {
     SmartTag(MutableSmartTag),
     /// Typed tracked-change wrapper.
     Revision(MutableRevision),
+    /// Word 2010 co-authoring conflict wrapper.
+    Conflict(MutableConflict),
+    /// Atomic Word 2010 custom-XML conflict range marker pair.
+    CustomXmlConflictRange(MutableCustomXmlConflictRange),
 }
 
 impl ParagraphElement {
@@ -137,6 +143,12 @@ impl ParagraphElement {
             },
             Self::Revision(revision) => {
                 revision.write_placeholder(xml, hyperlink_index, image_index)
+            },
+            Self::Conflict(conflict) => {
+                conflict.write_placeholder(xml, hyperlink_index, image_index)
+            },
+            Self::CustomXmlConflictRange(range) => {
+                range.write_placeholder(xml, hyperlink_index, image_index)
             },
         }
     }
@@ -247,6 +259,12 @@ impl ParagraphElement {
             Self::Revision(revision) => {
                 revision.write_with_rels(xml, rel_mapper, hyperlink_index, image_index)
             },
+            Self::Conflict(conflict) => {
+                conflict.write_with_rels(xml, rel_mapper, hyperlink_index, image_index)
+            },
+            Self::CustomXmlConflictRange(range) => {
+                range.write_with_rels(xml, rel_mapper, hyperlink_index, image_index)
+            },
         }
     }
 
@@ -280,8 +298,14 @@ impl ParagraphElement {
             Self::Run(run) => text.push_str(&run.get_text()),
             Self::SmartTag(tag) => tag.append_run_text(text),
             Self::Revision(revision) => revision.append_run_text(text),
+            Self::Conflict(conflict) => conflict.append_run_text(text),
+            Self::CustomXmlConflictRange(range) => range.append_run_text(text),
             _ => {},
         }
+    }
+
+    fn requires_w14_conflict_namespace(&self) -> bool {
+        matches!(self, Self::Conflict(_) | Self::CustomXmlConflictRange(_))
     }
 }
 
@@ -553,6 +577,38 @@ impl MutableParagraph {
         }
     }
 
+    /// Add an inert Word 2010 co-authoring conflict wrapper.
+    pub fn add_conflict(
+        &mut self,
+        kind: ConflictKind,
+        metadata: ConflictMetadata,
+    ) -> Result<&mut MutableConflict> {
+        let conflict = MutableConflict::new(kind, metadata)?;
+        self.elements.push(ParagraphElement::Conflict(conflict));
+        match self.elements.last_mut() {
+            Some(ParagraphElement::Conflict(conflict)) => Ok(conflict),
+            _ => unreachable!(),
+        }
+    }
+
+    /// Add an atomic custom-XML conflict range.
+    ///
+    /// The matching end marker is owned by the returned range and cannot be
+    /// emitted independently or with a different ID.
+    pub fn add_custom_xml_conflict_range(
+        &mut self,
+        kind: ConflictKind,
+        metadata: ConflictMetadata,
+    ) -> Result<&mut MutableCustomXmlConflictRange> {
+        let range = MutableCustomXmlConflictRange::new(kind, metadata)?;
+        self.elements
+            .push(ParagraphElement::CustomXmlConflictRange(range));
+        match self.elements.last_mut() {
+            Some(ParagraphElement::CustomXmlConflictRange(range)) => Ok(range),
+            _ => unreachable!(),
+        }
+    }
+
     /// Record the paragraph properties that existed before this formatting revision.
     pub fn set_property_change(
         &mut self,
@@ -681,8 +737,13 @@ impl MutableParagraph {
     }
 
     pub(crate) fn to_xml(&self, xml: &mut String) -> Result<()> {
+        self.validate_conflict_children()?;
         xml.push_str("<w:p");
-        crate::paragraph::extensions::append_paragraph_attributes(&self.extension_values, xml)?;
+        crate::paragraph::extensions::append_paragraph_attributes(
+            &self.extension_values,
+            self.requires_w14_conflict_namespace(),
+            xml,
+        )?;
         xml.push('>');
 
         // Write paragraph properties
@@ -845,8 +906,13 @@ impl MutableParagraph {
         hyperlink_counter: &mut usize,
         image_counter: &mut usize,
     ) -> Result<()> {
+        self.validate_conflict_children()?;
         xml.push_str("<w:p");
-        crate::paragraph::extensions::append_paragraph_attributes(&self.extension_values, xml)?;
+        crate::paragraph::extensions::append_paragraph_attributes(
+            &self.extension_values,
+            self.requires_w14_conflict_namespace(),
+            xml,
+        )?;
         xml.push('>');
 
         // Write paragraph properties (same as to_xml)
@@ -993,6 +1059,25 @@ impl MutableParagraph {
         }
 
         xml.push_str("</w:p>");
+        Ok(())
+    }
+
+    fn requires_w14_conflict_namespace(&self) -> bool {
+        self.elements
+            .iter()
+            .any(ParagraphElement::requires_w14_conflict_namespace)
+    }
+
+    fn validate_conflict_children(&self) -> Result<()> {
+        for element in &self.elements {
+            match element {
+                ParagraphElement::Conflict(conflict) => conflict.validate_passive_children()?,
+                ParagraphElement::CustomXmlConflictRange(range) => {
+                    range.validate_passive_children()?;
+                },
+                _ => {},
+            }
+        }
         Ok(())
     }
 }

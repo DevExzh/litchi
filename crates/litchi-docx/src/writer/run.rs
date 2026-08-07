@@ -232,6 +232,30 @@ impl MutableRun {
         self
     }
 
+    /// Validate content before this run is serialized inside inert conflict
+    /// markup. The public run builder is intentionally broader than the
+    /// conflict content model, so conflict wrappers must call this before
+    /// emitting any XML.
+    pub(crate) fn validate_passive_conflict_content(&self) -> Result<()> {
+        match &self.content {
+            RunContent::Text(_)
+            | RunContent::Symbol(_)
+            | RunContent::Tab
+            | RunContent::PageBreak => Ok(()),
+            RunContent::PageNumber(_) | RunContent::PageCount => Err(Error::InvalidFormat(
+                "conflict runs cannot contain field instructions or computed page fields".into(),
+            )),
+            RunContent::FootnoteReference(_) | RunContent::EndnoteReference(_) => {
+                Err(Error::InvalidFormat(
+                    "conflict runs cannot contain cross-story note references".into(),
+                ))
+            },
+            RunContent::OfficeMath(_) => Err(Error::InvalidFormat(
+                "conflict runs cannot contain raw or foreign Office Math markup".into(),
+            )),
+        }
+    }
+
     pub(crate) fn to_xml_mode(&self, xml: &mut String, mode: RevisionTextMode) -> Result<()> {
         xml.push_str("<w:r>");
 

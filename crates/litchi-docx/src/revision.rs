@@ -39,6 +39,8 @@ use quick_xml::events::Event;
 use smallvec::SmallVec;
 use std::fmt;
 
+pub mod conflict;
+
 /// Type of tracked change.
 ///
 /// Represents the different types of revisions that can be tracked
