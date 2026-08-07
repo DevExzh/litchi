@@ -126,7 +126,8 @@
       "litchi-iwa-core",
       "litchi-iwa-detect",
       "litchi-iwa-protos",
-      "litchi-iwa-text"
+      "litchi-iwa-text",
+      "litchi-iwa-text-wire"
     ],
     "litchi-markdown": [
       "litchi-core"

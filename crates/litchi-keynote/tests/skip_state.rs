@@ -412,9 +412,16 @@ fn commit_preserves_unrelated_wire_and_zip_bytes_and_patch_is_reversible()
         inverse.source_fingerprint(),
         commit.patch().target_fingerprint()
     );
+    assert_eq!(inverse.inverse(), commit.patch().clone());
     let reverted = commit.package().apply(&inverse)?;
     assert_eq!(reverted.package().source_bytes(), bytes);
     assert!(!reverted.package().show()?.slides()[0].is_skipped());
+    let forwarded_again = reverted.package().apply(commit.patch())?;
+    assert_eq!(
+        forwarded_again.package().source_bytes(),
+        commit.package().source_bytes()
+    );
+    assert_eq!(forwarded_again.patch(), commit.patch());
 
     let unrelated_bytes = synthetic_package(FirstNodeEncoding::Canonical, "Different", "Agenda")?;
     let unrelated = Package::from_bytes(&unrelated_bytes)?;
@@ -426,6 +433,38 @@ fn commit_preserves_unrelated_wire_and_zip_bytes_and_patch_is_reversible()
     assert!(!redacted_debug.contains("Index/"));
     assert!(!redacted_debug.contains("fingerprint"));
     assert!(!redacted_debug.contains("bytes"));
+    Ok(())
+}
+
+#[test]
+fn include_commit_changes_true_to_false_and_is_deterministic()
+-> Result<(), Box<dyn std::error::Error>> {
+    let bytes = synthetic_package(FirstNodeEncoding::Canonical, "Intro", "Agenda")?;
+    let package = Package::from_bytes(&bytes)?;
+    assert!(package.show()?.slides()[1].is_skipped());
+
+    let mut edit = package.edit();
+    edit.include_slide(1usize)?;
+    let commit = edit.commit()?;
+    assert!(!commit.package().show()?.slides()[1].is_skipped());
+    assert_eq!(package.source_bytes(), bytes);
+    assert!(!commit.patch().is_noop());
+    assert_eq!(commit.patch().position(), Position::new(1));
+    assert!(commit.patch().before());
+    assert!(!commit.patch().after());
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().touched_components(), 1);
+    assert!(commit.diagnostics().full_reparse_performed());
+
+    let mut repeated_edit = package.edit();
+    repeated_edit.include_slide(1usize)?;
+    let repeated = repeated_edit.commit()?;
+    assert_eq!(
+        repeated.package().source_bytes(),
+        commit.package().source_bytes()
+    );
+    assert_eq!(repeated.patch(), commit.patch());
+    assert_eq!(repeated.diagnostics(), commit.diagnostics());
     Ok(())
 }
 
@@ -444,7 +483,10 @@ fn malformed_required_skip_field_and_payload_ambiguity_are_rejected()
         let bytes = synthetic_package(encoding, "Intro", "Agenda")?;
         let package = Package::from_bytes(&bytes)?;
         assert!(
-            matches!(package.show(), Err(ReadError::Decode(_))),
+            matches!(
+                package.show(),
+                Err(ReadError::Decode(_) | ReadError::InvalidFormat(_))
+            ),
             "malformed encoding should fail strict semantic decode: {encoding:?}"
         );
     }

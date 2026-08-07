@@ -6,6 +6,8 @@ pub mod media;
 pub mod movie;
 pub mod table;
 
+use std::collections::TryReserveError;
+
 use litchi_iwa_text::storage::Storage;
 
 use crate::{Build, Effect, Seconds, SlideSelector};
@@ -144,15 +146,15 @@ impl Slide {
             all.push(title.to_string());
         }
         all.extend(self.text_content.iter().cloned());
-        if let Some(notes) = &self.notes {
-            all.push(notes.to_string());
-        }
         all.extend(
             self.text_storages
                 .iter()
                 .filter(|storage| !storage.is_empty())
                 .map(|storage| storage.text().to_owned()),
         );
+        if let Some(notes) = &self.notes {
+            all.push(notes.to_string());
+        }
         all
     }
 
@@ -223,6 +225,17 @@ impl Builder {
         self.notes = notes.map(String::into_boxed_str);
     }
 
+    pub(crate) fn try_reserve_text_storages(
+        &mut self,
+        additional: usize,
+    ) -> Result<(), TryReserveError> {
+        self.text_storages.try_reserve_exact(additional)
+    }
+
+    pub(crate) fn try_reserve_builds(&mut self, additional: usize) -> Result<(), TryReserveError> {
+        self.builds.try_reserve_exact(additional)
+    }
+
     /// Append one text block in source order.
     pub fn push_text(&mut self, text: String) {
         self.text_content.push(text);
@@ -257,5 +270,37 @@ impl Builder {
             builds: self.builds.into_boxed_slice(),
             transition: self.transition,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::AnimationType;
+
+    #[test]
+    fn builder_reservations_preserve_slide_content() -> Result<(), TryReserveError> {
+        let mut builder = Slide::builder(4);
+        builder.try_reserve_text_storages(0)?;
+        builder.try_reserve_builds(0)?;
+        builder.try_reserve_text_storages(1)?;
+        builder.try_reserve_builds(1)?;
+
+        builder.set_title(Some("title".to_owned()));
+        builder.set_notes(Some("notes".to_owned()));
+        builder.push_text("first".to_owned());
+        builder.push_text("second".to_owned());
+        builder.push_text_storage(Storage::from_text("rich".to_owned()));
+        builder.push_build(Build::new(AnimationType::Appear, Seconds::ZERO));
+
+        let slide = builder.build();
+        assert_eq!(slide.text_content(), ["first", "second"]);
+        assert_eq!(slide.text_storages()[0].text(), "rich");
+        assert_eq!(slide.builds()[0].animation_type(), &AnimationType::Appear);
+        assert_eq!(
+            slide.all_text(),
+            ["title", "first", "second", "rich", "notes"]
+        );
+        Ok(())
     }
 }

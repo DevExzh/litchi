@@ -96,6 +96,12 @@ impl ComponentCatalog {
             .ok()
             .map(|index| &self.components[index])
     }
+
+    /// Return the component at a compact catalog ordinal, if it exists.
+    #[must_use]
+    pub fn get_index(&self, index: usize) -> Option<&Component> {
+        self.components.get(index)
+    }
 }
 
 impl IntoIterator for ComponentCatalog {
@@ -125,6 +131,44 @@ mod tests {
             )?],
         };
         Ok(SnappyStream::compress(&archive.to_bytes()?)?)
+    }
+
+    fn indexed_catalog() -> Result<ComponentCatalog> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("Index/Alpha.iwa", &iwa_bytes(1, 6000)?)?;
+        writer.write_stored("Index/Bravo.iwa", &iwa_bytes(2, 6001)?)?;
+        writer.write_stored("Index/Charlie.iwa", &iwa_bytes(3, 6002)?)?;
+        ComponentCatalog::from_bytes(&writer.finish_to_bytes()?)
+    }
+
+    #[test]
+    fn gets_first_component_by_index() -> Result<()> {
+        let catalog = indexed_catalog()?;
+
+        assert_eq!(
+            catalog.get_index(0).map(Component::name),
+            Some("Index/Alpha.iwa")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn gets_in_range_component_by_index() -> Result<()> {
+        let catalog = indexed_catalog()?;
+
+        assert_eq!(
+            catalog.get_index(1).map(Component::name),
+            Some("Index/Bravo.iwa")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn returns_none_for_out_of_range_component_index() -> Result<()> {
+        let catalog = indexed_catalog()?;
+
+        assert!(catalog.get_index(catalog.len()).is_none());
+        Ok(())
     }
 
     #[test]

@@ -49,7 +49,12 @@ pub use build::{AnimationType, Build};
 pub use chart::ChartSelector;
 pub use document::Document;
 pub use error::{Error, Result};
-pub use package::{Commit, Diagnostics, Edit, EditError, Limits, Package, Patch, ReadError, Stats};
+pub use package::{
+    Commit, Diagnostics, Edit, EditError, Limits, MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES,
+    MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package, Patch, PayloadLimitKind,
+    ReadError, ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError, SemanticPath,
+    Stats, TextStorageFailure,
+};
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use show::{Mode, Settings, Show, Size};
 pub use slide::media::MovieKind;

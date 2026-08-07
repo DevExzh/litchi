@@ -726,6 +726,38 @@ member. Full reopen and semantic readback precede publication. Native Keynote
 open, save-as, close, and reopen verification remains a required gate for this
 and future Keynote mutations.
 
+Keynote text extraction follows the same strict ownership rule. The adapter
+walks only the document-referenced show, ordered slide-tree nodes, slides,
+placeholders, shapes, and speaker notes. A drawable must contain exactly one
+recognized placeholder or shape owner, and its referenced storage must contain
+exactly one schema-proven type-2001 storage payload. Type 2022 is not guessed
+to be storage because native fixtures use that identity for incompatible
+payloads. Valid protobuf bytes in an unrelated message are never guessed to be
+text. Title and speaker-note slots
+remain plain strings because that is their semantic model; body and other
+drawable storages retain archive-free `Storage` fragment ranges. `Package::text`
+then emits the title, visible body/drawable content, and speaker notes in the
+same presentation order as `Show` and `Slide`, without exposing or sorting on
+native identities.
+
+`ReadOptions` combines the existing checked physical archive profile with a
+checked `SemanticLimits` profile. Objects, slides, traversed graph references,
+decoded text storages, retained fragment ranges, and aggregate semantic UTF-8
+bytes have independent non-zero ceilings bounded by format-wide maxima. Focused
+show/slide/build preflights enforce slide counts, used build/drawable reference
+counts, and retained name/effect identifiers before those specific generated
+vectors or semantic owners are materialized. They also require the document,
+show, slide-node, slide, build, placeholder, shape, and note envelope fields
+consumed by this adapter. Exceeded semantic and native-payload ceilings carry a
+content-free semantic path plus observed and maximum counts. Duplicate object
+identities, duplicate typed payloads, wrong wire kinds, invalid UTF-8,
+ambiguous text owners, missing references, and malformed known payloads fail
+before a semantic snapshot is published. Physical/object-index limits apply at
+package construction; the remaining semantic profile applies lazily on first
+semantic access or explicit validation. Complete allocation-envelope
+preflights for every ignored nested generated field remain migration debt until
+the larger Keynote graph moves to focused bounded projections.
+
 Bitflags represent small orthogonal settings, Roaring bitmaps represent large
 sparse integer sets, enums represent exclusive states, and inheritance uses an
 explicit tri-state. The facade exposes named operations rather than bit math.

@@ -323,7 +323,8 @@ impl Package {
         if fingerprint(&patch.target) != patch.target_fingerprint {
             return Err(EditError::PatchConflict);
         }
-        let candidate = Package::from_source(Arc::clone(&patch.target), self.state.limits)?;
+        let candidate =
+            Package::from_source_with_options(Arc::clone(&patch.target), self.state.options)?;
         candidate.validate()?;
         let target_slide =
             candidate
@@ -437,7 +438,7 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
 
     let catalog = Catalog::from_shared_bytes_with_limits(
         Arc::clone(&source.state.source),
-        source.state.limits,
+        source.state.options.archive(),
     )?;
     let entry = catalog
         .iter()
@@ -451,9 +452,11 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
         });
     }
 
-    let archive_limits = source.state.limits.effective_archive_limits()?;
-    let stream =
-        SnappyStream::decompress_with_limits(entry.data(), source.state.limits.snappy_limits()?)?;
+    let archive_limits = source.state.options.archive().effective_archive_limits()?;
+    let stream = SnappyStream::decompress_with_limits(
+        entry.data(),
+        source.state.options.archive().snappy_limits()?,
+    )?;
     let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)?;
     let object = archive
         .object(record.node_identifier)
@@ -510,10 +513,10 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
     let compressed = SnappyStream::compress(&rewritten_archive)?;
     let output = catalog.reassemble_to_bytes(
         &[EntryEdit::new(component_name, &compressed)],
-        source.state.limits,
+        source.state.options.archive(),
     )?;
 
-    let candidate = Package::from_source(output.into(), source.state.limits)?;
+    let candidate = Package::from_source_with_options(output.into(), source.state.options)?;
     candidate.validate()?;
     let readback =
         candidate

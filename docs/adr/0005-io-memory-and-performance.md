@@ -100,6 +100,29 @@ semantic text rather than eager validation of every unrelated known child.
 The caller-owned source remains authoritative, and no owned Buffa projection
 or lazy re-encoding participates in preservation.
 
+Keynote is the first concrete format owner to consume that projection in a
+production package path. Ingress counts all parsed IWA objects before one
+fallible exact reservation, stores only `(identifier, component, object)`
+locators, sorts them once, rejects duplicate identities, and performs later
+lookups by binary search. Slide records, semantic slides, builds, and text
+storages reserve fallibly from validated source counts. The text adapter is
+invoked only for graph-reachable typed storage payloads and receives the
+smaller of the physical message ceiling, the wire hard ceiling, and the
+remaining package-wide semantic text and fragment budgets. Streaming wire
+preflights count slides and used build/drawable references before generated
+Prost vectors are materialized; they also charge retained slide names and
+build/transition identifiers before semantic ownership conversion. Aggregate
+storage, fragment-range, reference, and UTF-8 counters include a content-free
+semantic path in every limit failure. Common-wire byte, field, nesting, and
+work ceilings are translated into the same format-owned counted diagnostic.
+Text extraction performs a checked sizing pass and one fallible destination
+reservation instead of building a temporary vector of cloned strings. These
+are bounded allocation and lookup-shape guarantees for the migrated fields;
+ignored nested fields still materialized by the generated Prost graph remain
+bounded only by the physical message profile and require a later focused
+projection. No throughput or RSS improvement is claimed without a
+representative benchmark.
+
 Core archive metadata is projected into core-owned `FieldPath`, `FieldInfo`,
 and closed-enum wrappers. Optional presence and unknown signed enum values are
 retained exactly. Preflight charges both the transient Buffa representation and

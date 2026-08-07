@@ -6878,3 +6878,72 @@ application gates.
 - Representative performance and resource budgets as defined by ADR 0005.
 - Generated low-level schemas/records are deterministic, checked in, reviewed,
   and cite the source specification. Ergonomic facades remain handwritten.
+
+## 2026-08-08 Keynote reachable-storage and semantic-budget slice
+
+`litchi-keynote::Package` is now a production consumer of the focused
+`TSWP.StorageArchive.text` Buffa projection. The package no longer scans every
+message and speculatively Prost-decodes it as text. It requires the exact
+document, show, slide-node, slide, placeholder/shape, note, and storage message
+types while walking only reachable native references. A valid storage encoding
+under an unrelated type is ignored, and duplicate storage payloads, ambiguous
+placeholder/shape ownership, missing typed payloads, wrong text wire kinds,
+and malformed known payloads fail closed. Only schema-proven type 2001 is
+classified as `StorageArchive`; an incompatible native type-2022 sibling is
+left opaque. Body and independent drawable text remain
+`litchi-iwa-text::Storage` values with fragment ranges; title and notes move
+into their existing plain-string semantic slots without a second text copy.
+Plain-text order is title, visible body/drawable content, then speaker notes.
+
+`ReadOptions` composes the retained physical archive limits with checked
+format-owned limits for at most 1,000,000 native objects, 65,536 slides,
+1,000,000 traversed references, 1,000,000 decoded storages, 1,000,000 retained
+fragment ranges, and 64 MiB of aggregate semantic text. Callers may select
+smaller non-zero limits but cannot exceed the hard ceilings. The package counts
+objects before allocating a locator table, reserves the exact bounded capacity
+fallibly, sorts compact locators once, rejects duplicate global identities,
+and uses binary search for later reference resolution. Streaming show/slide/
+build preflights apply slide, used-reference, name, and effect-identifier limits
+before their corresponding generated vectors or semantic ownership conversions.
+Required envelope presence is validated for every known graph payload consumed
+by the adapter. Semantic and common-wire limit failures preserve resource kind,
+observed/maximum counts, and a content-free semantic path. Slide records,
+slide/build/storage vectors, and final plain-text output also reserve fallibly
+after checked sizing. Skip-state commits and patch application retain both
+physical and semantic profiles when reopening candidates.
+
+The new adversarial integration target has thirteen passing tests. It proves
+exact-limit acceptance and typed over-limit rejection for objects, slides,
+references, storage count, fragment ranges, and aggregate UTF-8;
+pre-materialization build/transition identifier rejection; package-ingress
+rejection of duplicate identities; strict storage type/wire and owner
+cardinality; exclusion of both a valid unreachable false-positive storage and
+an incompatible type-2022 sibling; required proto2 envelope rejection;
+deterministic concurrent first access;
+preservation of synthetic fragment ranges; and native type-2001 Buffa/Prost
+differential text on the checked-in Keynote fixture. The complete Keynote
+all-target suite passes 84 tests. Strict Clippy passes for the Keynote
+library, rich-storage and skip-state targets, the selector-free inspection
+example, and the archive library; rustdoc and the workspace boundary gates
+remain separate required checks before publication.
+
+Computer Use created a new presentation in Keynote 14.4 (7043.0.93) containing
+a title, a two-line body with a formatting boundary, an independent text box,
+a footer, and presenter notes. Keynote saved, closed, and reopened
+`/private/tmp/litchi-keynote-buffa-native-20260808.key` without a repair,
+recovery, or conversion sheet and exposed every authored value after reopen.
+The artifact is 519,374 bytes with SHA-256
+`b40162d851b29de328f8ee04f32ee2e090852169c2028b29d96da7dd3cd2063b`.
+The focused `inspect_text` example reported one slide, 964 objects, and all six
+semantic text values. The archive-owner preserve-mode example emitted an exact
+519,374-byte no-op with the same hash. Because this slice is read-only, no
+Litchi-authored semantic output was presented to Keynote; source bytes remain
+the preservation authority.
+
+Remaining Keynote debt is explicit: the larger graph still uses generated
+Prost messages, formatting/style tables are not yet a semantic rich-text
+model, the slide-node skip path remains raw-wire rather than Buffa-projected,
+and complete allocation-envelope preflight for ignored nested generated fields
+still depends on the physical message ceiling. Most legacy Keynote mutations,
+examples, fuzz targets, and parity tests remain in `litchi-iwa`. The monolith
+deletion gate therefore remains open.

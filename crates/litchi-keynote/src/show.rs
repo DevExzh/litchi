@@ -1,5 +1,7 @@
 //! Keynote show settings and immutable presentation snapshots.
 
+use std::collections::TryReserveError;
+
 use crate::{
     Error, Result, Seconds, Slide, SlideSelector, SlideSelectorError, SlideSelectorResult,
 };
@@ -440,6 +442,13 @@ impl Builder {
         self.title = title.map(String::into_boxed_str);
     }
 
+    pub(crate) fn try_reserve_slides(
+        &mut self,
+        additional: usize,
+    ) -> std::result::Result<(), TryReserveError> {
+        self.slides.try_reserve_exact(additional)
+    }
+
     /// Append one slide in source order.
     pub fn push_slide(&mut self, slide: Slide) {
         self.slides.push(slide);
@@ -510,6 +519,22 @@ mod tests {
         );
         assert!(show.slide(1).is_none());
         assert_eq!(show.select_slide(SlideSelector::index(1)), Ok(None));
+    }
+
+    #[test]
+    fn builder_reservations_preserve_slide_order() -> std::result::Result<(), TryReserveError> {
+        let mut builder = Show::builder();
+        builder.try_reserve_slides(0)?;
+        builder.try_reserve_slides(2)?;
+        builder.push_slide(Slide::builder(3).build());
+        builder.push_slide(Slide::builder(5).build());
+
+        let show = builder.build();
+        assert_eq!(
+            show.slides().iter().map(Slide::index).collect::<Vec<_>>(),
+            vec![3, 5]
+        );
+        Ok(())
     }
 
     #[test]

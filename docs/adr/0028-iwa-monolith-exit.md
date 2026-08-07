@@ -85,3 +85,29 @@ and print its ordered debt list. Source/API audits must prove that supported
 Pages, Numbers, Keynote, and root facades expose no monolith or BNC bridge.
 Each removed debt item also requires focused tests and, where output changes,
 real Pages, Numbers, or Keynote application verification.
+
+## 2026-08-08 Keynote storage projection progress
+
+The concrete Keynote package now satisfies the rich-storage and aggregate-limit
+portion of deletion gate 3. It builds a private sorted index over all native
+objects, rejects duplicate identities, traverses only the strict reachable
+document/show/slide graph, and projects referenced schema-proven type-2001 text
+payloads through the bounded Buffa adapter in `litchi-iwa-text-wire`.
+Incompatible native type-2022 siblings remain opaque. Body and ordinary
+drawable storages retain semantic fragment ranges; unrelated messages that
+happen to decode as storage are excluded. A checked format-owned profile limits
+objects, slides, traversed references, decoded storages, retained fragment
+ranges, and aggregate retained UTF-8 bytes,
+while the original physical limits remain available and are preserved across
+skip-state commits and patch application.
+
+This does not delete the monolith. Generated Prost values still decode the
+larger Keynote graph, most editor operations and compatibility tests remain in
+`litchi-iwa`, and the durable patch and atomic filesystem-save gates remain
+open. Ignored nested fields in those generated graph messages still rely on
+the physical message ceiling rather than a complete semantic allocation
+envelope. The migrated text path is nevertheless production-owned: focused tests
+cover inclusive and exceeded budgets, duplicate types and identities, wrong
+types and wire kinds, ambiguous ownership, false-positive payloads, concurrent
+first access, native Prost/Buffa differential output, and exact reversible
+skip-state behavior.
