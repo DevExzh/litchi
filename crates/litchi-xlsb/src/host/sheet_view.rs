@@ -6,7 +6,7 @@
 //! (2.4.659), and `BrtEndWsViews` (2.4.660).
 //!
 //! The typed model is shared with the XLSX implementation
-//! ([`crate::package::xlsx::views`]), so sheet views behave identically across both
+//! ([`crate::views`]), so sheet views behave identically across both
 //! formats: pane/frozen-split state, zoom scales, selections, and the
 //! tab-selected flag.
 
@@ -14,7 +14,7 @@ use crate::package::error::{Error, Result};
 use crate::package::utils::{cell_reference, parse_cell_reference};
 use crate::raw::{Cursor, Writer, kind};
 
-pub use crate::package::xlsx::views::{
+pub use crate::views::{
     SheetPane, SheetPanePosition, SheetPaneState, SheetSelection, SheetView, SheetViewType,
 };
 

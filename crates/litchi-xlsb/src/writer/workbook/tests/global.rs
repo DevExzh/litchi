@@ -260,8 +260,8 @@ fn external_link_constructors_refuse_malformed_metadata() {
 
 #[test]
 fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
+    use crate::chart::{Anchor, Chart};
     use crate::package::chartsheet::{Color, ColorType, PageSetup, Protection, State, View};
-    use crate::package::xlsx::{Chart, ChartAnchor};
     use crate::sheet::StrongProtection;
 
     let chart = Chart::bar_chart_with_cache(
@@ -270,7 +270,7 @@ fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
         &["North", "South"],
         "Data!$B$2:$B$3",
         &[42.0, 55.0],
-        ChartAnchor::new(0, 0, 10, 20),
+        Anchor::new(0, 0, 10, 20),
     )
     .unwrap();
     let mut chart_sheet = MutableChartSheet::new("Sales Chart", chart);
@@ -367,14 +367,14 @@ fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
 
 #[test]
 fn chart_sheet_validation_is_lossless_or_refuse() {
+    use crate::chart::{Anchor, Chart};
     use crate::package::chartsheet::{Color, ColorType};
-    use crate::package::xlsx::{Chart, ChartAnchor};
 
     let chart = Chart::bar_chart(
         "T",
         "Data!$A$1:$A$2",
         "Data!$B$1:$B$2",
-        ChartAnchor::new(0, 0, 5, 5),
+        Anchor::new(0, 0, 5, 5),
     )
     .unwrap();
     let mut workbook = WorkbookWriter::new();

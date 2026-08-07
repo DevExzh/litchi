@@ -1,10 +1,10 @@
 //! Typed XLSB chart-sheet authoring (MS-XLSB 2.1.7.7).
 
+use crate::chart::Chart;
 use crate::package::chartsheet::{
     ChartSheet, Color, ColorType, PageSetup, Protection, State, View,
 };
 use crate::package::error::{Error, Result};
-use crate::package::xlsx::Chart;
 use crate::raw::Writer;
 use crate::raw::kind as rt;
 use crate::sheet::StrongProtection;

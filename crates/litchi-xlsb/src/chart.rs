@@ -30,7 +30,7 @@ const WORKSHEET_COLUMN_COUNT: u32 = 16_384;
 
 /// Storage target for a chart's external-data relationship.
 #[derive(Debug, Clone)]
-pub enum ChartExternalDataTarget {
+pub enum ExternalDataTarget {
     /// A part embedded in the containing OOXML package
     Embedded {
         /// Complete bytes of the embedded object
@@ -49,11 +49,11 @@ pub enum ChartExternalDataTarget {
 
 /// Package payload and relationship type for chart external data.
 #[derive(Debug, Clone)]
-pub struct ChartExternalDataPart {
+pub struct ExternalDataPart {
     /// Relationship type, normally package or OLE object
     pub relationship_type: String,
     /// Embedded or linked relationship target
-    pub target: ChartExternalDataTarget,
+    pub target: ExternalDataTarget,
 }
 
 /// Target of a relationship owned by a chart or chart user-shapes part.
@@ -88,14 +88,14 @@ pub struct Relationship {
 
 /// Lossless chart user-shapes XML and its direct relationship targets.
 #[derive(Debug, Clone)]
-pub struct ChartUserShapesPart {
+pub struct UserShapesPart {
     /// Complete chart user-shapes XML document
     pub xml: Vec<u8>,
     /// Relationships owned by the chart user-shapes part
     pub relationships: Vec<Relationship>,
 }
 
-impl ChartUserShapesPart {
+impl UserShapesPart {
     /// Create a relationship-free user-shapes drawing part.
     pub fn new(xml: Vec<u8>) -> Self {
         Self {
@@ -105,12 +105,12 @@ impl ChartUserShapesPart {
     }
 }
 
-impl ChartExternalDataPart {
+impl ExternalDataPart {
     /// Create an embedded OOXML spreadsheet payload.
     pub fn embedded_workbook(data: Vec<u8>) -> Self {
         Self {
             relationship_type: litchi_opc::constants::relationship_type::PACKAGE.to_string(),
-            target: ChartExternalDataTarget::Embedded {
+            target: ExternalDataTarget::Embedded {
                 data,
                 content_type: litchi_opc::constants::content_type::OFC_PACKAGE.to_string(),
                 extension: "xlsx".to_string(),
@@ -122,7 +122,7 @@ impl ChartExternalDataPart {
     pub fn linked_package(target: impl Into<String>) -> Self {
         Self {
             relationship_type: litchi_opc::constants::relationship_type::PACKAGE.to_string(),
-            target: ChartExternalDataTarget::Linked {
+            target: ExternalDataTarget::Linked {
                 target: target.into(),
             },
         }
@@ -159,7 +159,7 @@ pub(crate) fn is_chart_user_shapes_relationship_type(relationship_type: &str) ->
 ///
 /// Specifies the position and size of a chart using cell anchors and offsets.
 #[derive(Debug, Clone)]
-pub struct ChartAnchor {
+pub struct Anchor {
     /// Starting column (0-based)
     pub from_col: u32,
     /// Offset from the left edge of from_col (in EMUs)
@@ -178,7 +178,7 @@ pub struct ChartAnchor {
     pub to_row_offset: i64,
 }
 
-impl ChartAnchor {
+impl Anchor {
     /// Create a new chart anchor from cell positions.
     ///
     /// # Arguments
@@ -192,7 +192,7 @@ impl ChartAnchor {
     ///
     /// ```rust,ignore
     /// // Chart spanning from B2 to H15
-    /// let anchor = ChartAnchor::new(1, 1, 7, 14);
+    /// let anchor = Anchor::new(1, 1, 7, 14);
     /// ```
     pub fn new(from_col: u32, from_row: u32, to_col: u32, to_row: u32) -> Self {
         Self {
@@ -232,13 +232,13 @@ impl ChartAnchor {
     }
 }
 
-impl Default for ChartAnchor {
+impl Default for Anchor {
     fn default() -> Self {
         Self::new(0, 0, 10, 15)
     }
 }
 
-pub(crate) fn validate_chart_anchor(anchor: &ChartAnchor) -> Result<()> {
+pub(crate) fn validate_chart_anchor(anchor: &Anchor) -> Result<()> {
     if anchor.to_row < anchor.from_row || anchor.to_col < anchor.from_col {
         return Err(Error::InvalidFormat(
             "chart anchor cannot be descending".to_string(),
@@ -334,18 +334,18 @@ pub struct Chart {
     /// The chart model containing all chart data and configuration
     pub chart: ChartModel,
     /// Position and size of the chart in the worksheet
-    pub anchor: ChartAnchor,
+    pub anchor: Anchor,
     /// Optional package payload targeted by `chart.external_data`
-    pub external_data_part: Option<ChartExternalDataPart>,
+    pub external_data_part: Option<ExternalDataPart>,
     /// Optional chart user-shapes drawing and its direct related resources
-    pub user_shapes_part: Option<ChartUserShapesPart>,
+    pub user_shapes_part: Option<UserShapesPart>,
     /// Other direct relationships owned by the chart part
     pub additional_relationships: Vec<Relationship>,
 }
 
 impl Chart {
     /// Create a new worksheet chart.
-    pub fn new(chart: ChartModel, anchor: ChartAnchor) -> Self {
+    pub fn new(chart: ChartModel, anchor: Anchor) -> Self {
         Self {
             chart,
             anchor,
@@ -358,14 +358,14 @@ impl Chart {
     /// Attach an embedded OOXML workbook as the chart's external data.
     pub fn with_embedded_workbook(mut self, data: Vec<u8>) -> Self {
         self.chart.external_data = Some(litchi_drawingml::chart::ExternalData::pending());
-        self.external_data_part = Some(ChartExternalDataPart::embedded_workbook(data));
+        self.external_data_part = Some(ExternalDataPart::embedded_workbook(data));
         self
     }
 
     /// Attach a package-backed external-data relationship.
     pub fn with_external_data_part(
         mut self,
-        part: ChartExternalDataPart,
+        part: ExternalDataPart,
         auto_update: Option<bool>,
     ) -> Self {
         let mut metadata = litchi_drawingml::chart::ExternalData::pending();
@@ -376,7 +376,7 @@ impl Chart {
     }
 
     /// Attach a chart user-shapes drawing part.
-    pub fn with_user_shapes_part(mut self, part: ChartUserShapesPart) -> Self {
+    pub fn with_user_shapes_part(mut self, part: UserShapesPart) -> Self {
         self.chart.user_shapes = Some(litchi_drawingml::chart::UserShapes::pending());
         self.user_shapes_part = Some(part);
         self
@@ -404,10 +404,10 @@ impl Chart {
     pub fn into_pivot_chart(mut self, pivot_table_name: &str) -> Result<Self> {
         self.chart.pivot_source = Some(litchi_drawingml::chart::model::PivotSource::new(
             pivot_table_name,
-            crate::package::xlsx::pivot_chart::DEFAULT_PIVOT_CHART_FORMAT_ID,
+            crate::pivot_chart::DEFAULT_PIVOT_CHART_FORMAT_ID,
         ));
         let extension = litchi_drawingml::chart::ExtensionList::from_xml(
-            crate::package::xlsx::pivot_chart::default_pivot_options_extension_xml(),
+            crate::pivot_chart::default_pivot_options_extension_xml(),
         )?;
         for_each_series_mut(&mut self.chart, |series| {
             if series.extension_list.is_none() {
@@ -433,15 +433,10 @@ impl Chart {
     ///     "Sales Data",
     ///     "Sheet1!$A$2:$A$10",
     ///     "Sheet1!$B$2:$B$10",
-    ///     ChartAnchor::new(1, 1, 7, 14),
+    ///     Anchor::new(1, 1, 7, 14),
     /// );
     /// ```
-    pub fn bar_chart(
-        title: &str,
-        categories: &str,
-        values: &str,
-        anchor: ChartAnchor,
-    ) -> Result<Self> {
+    pub fn bar_chart(title: &str, categories: &str, values: &str, anchor: Anchor) -> Result<Self> {
         Self::bar_chart_with_cache(title, categories, &[], values, &[], anchor)
     }
 
@@ -452,7 +447,7 @@ impl Chart {
         cached_categories: &[&str],
         values: &str,
         cached_values: &[f64],
-        anchor: ChartAnchor,
+        anchor: Anchor,
     ) -> Result<Self> {
         let mut chart = ChartModel::new();
         chart.title = Some(TitleText::Literal(RichText::new(title)));
@@ -488,12 +483,7 @@ impl Chart {
     }
 
     /// Create a simple line chart from data ranges.
-    pub fn line_chart(
-        title: &str,
-        categories: &str,
-        values: &str,
-        anchor: ChartAnchor,
-    ) -> Result<Self> {
+    pub fn line_chart(title: &str, categories: &str, values: &str, anchor: Anchor) -> Result<Self> {
         Self::line_chart_with_cache(title, categories, &[], values, &[], anchor)
     }
 
@@ -504,7 +494,7 @@ impl Chart {
         cached_categories: &[&str],
         values: &str,
         cached_values: &[f64],
-        anchor: ChartAnchor,
+        anchor: Anchor,
     ) -> Result<Self> {
         let mut chart = ChartModel::new();
         chart.title = Some(TitleText::Literal(RichText::new(title)));
@@ -540,12 +530,7 @@ impl Chart {
     }
 
     /// Create a simple pie chart from data ranges.
-    pub fn pie_chart(
-        title: &str,
-        categories: &str,
-        values: &str,
-        anchor: ChartAnchor,
-    ) -> Result<Self> {
+    pub fn pie_chart(title: &str, categories: &str, values: &str, anchor: Anchor) -> Result<Self> {
         Self::pie_chart_with_cache(title, categories, &[], values, &[], anchor)
     }
 
@@ -555,7 +540,7 @@ impl Chart {
         cached_categories: &[&str],
         values: &str,
         cached_values: &[f64],
-        anchor: ChartAnchor,
+        anchor: Anchor,
     ) -> Result<Self> {
         let mut chart = ChartModel::new();
         chart.title = Some(TitleText::Literal(RichText::new(title)));
@@ -585,12 +570,7 @@ impl Chart {
     }
 
     /// Create a simple area chart from data ranges.
-    pub fn area_chart(
-        title: &str,
-        categories: &str,
-        values: &str,
-        anchor: ChartAnchor,
-    ) -> Result<Self> {
+    pub fn area_chart(title: &str, categories: &str, values: &str, anchor: Anchor) -> Result<Self> {
         Self::area_chart_with_cache(title, categories, &[], values, &[], anchor)
     }
 
@@ -601,7 +581,7 @@ impl Chart {
         cached_categories: &[&str],
         values: &str,
         cached_values: &[f64],
-        anchor: ChartAnchor,
+        anchor: Anchor,
     ) -> Result<Self> {
         let mut chart = ChartModel::new();
         chart.title = Some(TitleText::Literal(RichText::new(title)));
@@ -641,7 +621,7 @@ impl Chart {
         title: &str,
         x_values: &str,
         y_values: &str,
-        anchor: ChartAnchor,
+        anchor: Anchor,
     ) -> Result<Self> {
         Self::scatter_chart_with_cache(title, x_values, &[], y_values, &[], anchor)
     }
@@ -652,7 +632,7 @@ impl Chart {
         cached_x_values: &[f64],
         y_values: &str,
         cached_y_values: &[f64],
-        anchor: ChartAnchor,
+        anchor: Anchor,
     ) -> Result<Self> {
         let mut chart = ChartModel::new();
         chart.title = Some(TitleText::Literal(RichText::new(title)));
@@ -771,7 +751,7 @@ impl Chart {
 }
 
 /// Parse a chart from chart XML and drawing anchor.
-pub fn parse_chart_from_xml(chart_xml: &[u8], anchor: ChartAnchor) -> Result<Chart> {
+pub fn parse_chart_from_xml(chart_xml: &[u8], anchor: Anchor) -> Result<Chart> {
     let chart = litchi_drawingml::chart::reader::read(chart_xml)?;
     Ok(Chart::new(chart, anchor))
 }

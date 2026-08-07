@@ -117,14 +117,14 @@ impl WorkbookWriter {
     }
 
     fn normalized_pivot_chart(
-        chart: &crate::package::xlsx::Chart,
+        chart: &crate::chart::Chart,
         host_sheet_name: &str,
         authored_pivot_tables: &[(String, String)],
-    ) -> Result<crate::package::xlsx::Chart> {
+    ) -> Result<crate::chart::Chart> {
         let Some(source) = chart.chart.pivot_source.as_ref() else {
             return Ok(chart.clone());
         };
-        let name = crate::package::xlsx::pivot_chart::resolve_authored_pivot_source_name(
+        let name = crate::pivot_chart::resolve_authored_pivot_source_name(
             &source.name,
             host_sheet_name,
             authored_pivot_tables,

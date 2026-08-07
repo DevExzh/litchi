@@ -181,7 +181,7 @@ pub struct SheetDrawing {
     /// Embedded image parts resolved from picture objects.
     pub images: Vec<EmbeddedImage>,
     /// Detailed standard DrawingML shapes, groups, and connectors.
-    pub shapes: Vec<crate::package::xlsx::AnchoredObject>,
+    pub shapes: Vec<crate::shapes::AnchoredObject>,
 }
 
 /// One embedded image part resolved through a drawing picture.
@@ -211,12 +211,12 @@ pub struct EmbeddedChart {
     /// (MS-XLSB 2.1.7.5 defers to ISO/IEC 29500-1:2016 section 21.2).
     pub chart: litchi_drawingml::chart::Chart,
     /// Embedded or linked external-data payload declared by the chart.
-    pub external_data_part: Option<crate::package::xlsx::ChartExternalDataPart>,
+    pub external_data_part: Option<crate::chart::ExternalDataPart>,
     /// Chart user-shapes XML and its directly related inert resources.
-    pub user_shapes_part: Option<crate::package::xlsx::ChartUserShapesPart>,
+    pub user_shapes_part: Option<crate::chart::UserShapesPart>,
     /// Other relationships owned by the Chart part, including resources
     /// referenced by preserved extension fragments.
-    pub additional_relationships: Vec<crate::package::xlsx::Relationship>,
+    pub additional_relationships: Vec<crate::chart::Relationship>,
 }
 
 fn invalid(message: impl Into<String>) -> Error {

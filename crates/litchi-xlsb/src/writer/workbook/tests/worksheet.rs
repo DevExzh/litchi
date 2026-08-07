@@ -744,8 +744,8 @@ fn array_constant_survives_package_roundtrip() {
 
 #[test]
 fn worksheet_charts_round_trip_through_binary_drawing_graphs() {
+    use crate::chart::{Anchor, Chart};
     use crate::package::drawing::AnchorKind;
-    use crate::package::xlsx::{Chart, ChartAnchor};
     use litchi_drawingml::chart::plot_area::TypeGroup;
 
     let bar = Chart::bar_chart_with_cache(
@@ -754,14 +754,14 @@ fn worksheet_charts_round_trip_through_binary_drawing_graphs() {
         &["Q1", "Q2", "Q3"],
         "Charts!$B$2:$B$4",
         &[10.0, 20.0, 30.0],
-        ChartAnchor::with_offsets(1, 10, 1, 20, 8, 30, 15, 40),
+        Anchor::with_offsets(1, 10, 1, 20, 8, 30, 15, 40),
     )
     .unwrap();
     let line = Chart::line_chart(
         "Trend",
         "Charts!$A$2:$A$4",
         "Charts!$B$2:$B$4",
-        ChartAnchor::new(9, 1, 16, 15),
+        Anchor::new(9, 1, 16, 15),
     )
     .unwrap();
 
@@ -776,7 +776,7 @@ fn worksheet_charts_round_trip_through_binary_drawing_graphs() {
         "Share",
         "Summary!$A$1:$A$3",
         "Summary!$B$1:$B$3",
-        ChartAnchor::new(0, 0, 7, 12),
+        Anchor::new(0, 0, 7, 12),
     )
     .unwrap();
     let mut summary = MutableWorksheet::new("Summary");
@@ -855,9 +855,9 @@ fn worksheet_charts_round_trip_through_binary_drawing_graphs() {
 
 #[test]
 fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
-    use crate::package::xlsx::{
-        Chart, ChartAnchor, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart,
-        Relationship, RelationshipTarget,
+    use crate::chart::{
+        Anchor, Chart, ExternalDataPart, ExternalDataTarget, Relationship, RelationshipTarget,
+        UserShapesPart,
     };
     use litchi_drawingml::chart::{ExtensionList, ShapeProperties};
 
@@ -865,7 +865,7 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
         "Resources",
         "Data!$A$1:$A$2",
         "Data!$B$1:$B$2",
-        ChartAnchor::new(1, 1, 8, 15),
+        Anchor::new(1, 1, 8, 15),
     )
     .unwrap();
     worksheet_chart.chart.shape_properties = Some(
@@ -898,10 +898,10 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
                 },
             })
             .with_external_data_part(
-                ChartExternalDataPart::embedded_workbook(b"PK chart workbook".to_vec()),
+                ExternalDataPart::embedded_workbook(b"PK chart workbook".to_vec()),
                 Some(false),
             )
-            .with_user_shapes_part(ChartUserShapesPart {
+            .with_user_shapes_part(UserShapesPart {
                 xml: br#"<c:userShapes xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:cdr="http://schemas.openxmlformats.org/drawingml/2006/chartDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><cdr:relSizeAnchor><cdr:from><cdr:x>0</cdr:x><cdr:y>0</cdr:y></cdr:from><cdr:to><cdr:x>1</cdr:x><cdr:y>1</cdr:y></cdr:to><cdr:pic><a:blip r:embed="rId5"/></cdr:pic></cdr:relSizeAnchor></c:userShapes>"#.to_vec(),
                 relationships: vec![Relationship {
                     relationship_id: "rId5".to_string(),
@@ -918,11 +918,11 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
         "Linked",
         "Data!$A$1:$A$2",
         "Data!$B$1:$B$2",
-        ChartAnchor::new(0, 0, 5, 10),
+        Anchor::new(0, 0, 5, 10),
     )
     .unwrap()
     .with_external_data_part(
-        ChartExternalDataPart::linked_package("https://example.test/data.xlsx"),
+        ExternalDataPart::linked_package("https://example.test/data.xlsx"),
         Some(true),
     );
 
@@ -940,7 +940,7 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
 
     let worksheet_chart = &reader.sheet_drawing(0).unwrap().charts[0];
     match &worksheet_chart.external_data_part.as_ref().unwrap().target {
-        ChartExternalDataTarget::Embedded { data, .. } => {
+        ExternalDataTarget::Embedded { data, .. } => {
             assert_eq!(data, b"PK chart workbook");
         },
         other => panic!("unexpected worksheet chart external data: {other:?}"),
@@ -984,7 +984,7 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
         .unwrap()
         .target
     {
-        ChartExternalDataTarget::Linked { target } => {
+        ExternalDataTarget::Linked { target } => {
             assert_eq!(target, "https://example.test/data.xlsx");
         },
         other => panic!("unexpected chart-sheet external data: {other:?}"),
@@ -995,16 +995,14 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
 
 #[test]
 fn worksheet_chart_validation_and_crud_are_lossless_or_refuse() {
-    use crate::package::xlsx::{
-        Chart, ChartAnchor, ChartUserShapesPart, Relationship, RelationshipTarget,
-    };
+    use crate::chart::{Anchor, Chart, Relationship, RelationshipTarget, UserShapesPart};
 
     let mut sheet = MutableWorksheet::new("Charts");
     let valid = Chart::bar_chart(
         "Valid",
         "Charts!$A$1:$A$2",
         "Charts!$B$1:$B$2",
-        ChartAnchor::new(1, 1, 8, 15),
+        Anchor::new(1, 1, 8, 15),
     )
     .unwrap();
     sheet.add_chart(valid.clone()).unwrap();
@@ -1020,7 +1018,7 @@ fn worksheet_chart_validation_and_crud_are_lossless_or_refuse() {
     assert!(sheet.add_chart(mismatched_external_data).is_err());
     assert_eq!(sheet.charts().len(), 1);
 
-    let invalid_user_shapes = valid.clone().with_user_shapes_part(ChartUserShapesPart::new(
+    let invalid_user_shapes = valid.clone().with_user_shapes_part(UserShapesPart::new(
             br#"<c:userShapes xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><a:blip r:embed="rId5"/></c:userShapes>"#.to_vec(),
         ));
     assert!(sheet.add_chart(invalid_user_shapes).is_err());
@@ -1045,10 +1043,9 @@ fn worksheet_chart_validation_and_crud_are_lossless_or_refuse() {
 
 #[test]
 fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
+    use crate::chart::{Anchor, Chart};
     use crate::package::drawing::{AnchorKind, Object};
-    use crate::package::xlsx::{
-        Chart, ChartAnchor, DrawingObject, Emu, EmuExtent, EmuOffset, Preset, ShapeAnchor,
-    };
+    use crate::shapes::{DrawingObject, Emu, EmuExtent, EmuOffset, Preset, ShapeAnchor};
     use crate::writer::{Image, ImageFormat};
 
     const PNG_1X1: &[u8] = &[
@@ -1066,17 +1063,17 @@ fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
         0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3B,
     ];
 
-    let png_anchor = ChartAnchor::with_offsets(1, 10, 2, 20, 5, 30, 8, 40);
+    let png_anchor = Anchor::with_offsets(1, 10, 2, 20, 5, 30, 8, 40);
     let png = Image::new(PNG_1X1.to_vec(), ImageFormat::Png, png_anchor)
         .unwrap()
         .with_description("Logo & <mark>")
         .unwrap();
-    let svg = Image::new(SVG.to_vec(), ImageFormat::Svg, ChartAnchor::new(6, 2, 9, 8)).unwrap();
+    let svg = Image::new(SVG.to_vec(), ImageFormat::Svg, Anchor::new(6, 2, 9, 8)).unwrap();
     let chart = Chart::line_chart(
         "Trend",
         "Pictures!$A$1:$A$2",
         "Pictures!$B$1:$B$2",
-        ChartAnchor::new(10, 2, 17, 16),
+        Anchor::new(10, 2, 17, 16),
     )
     .unwrap();
 
@@ -1103,14 +1100,7 @@ fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
         .unwrap();
     let mut image_only = MutableWorksheet::new("Image only");
     image_only
-        .add_image(
-            Image::new(
-                GIF_1X1.to_vec(),
-                ImageFormat::Gif,
-                ChartAnchor::new(0, 0, 2, 3),
-            )
-            .unwrap(),
-        )
+        .add_image(Image::new(GIF_1X1.to_vec(), ImageFormat::Gif, Anchor::new(0, 0, 2, 3)).unwrap())
         .unwrap();
     let mut workbook = WorkbookWriter::new();
     workbook.add_worksheet(sheet);
@@ -1191,14 +1181,14 @@ fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
 
 #[test]
 fn worksheet_image_validation_and_crud_are_lossless_or_refuse() {
-    use crate::package::xlsx::ChartAnchor;
+    use crate::chart::Anchor;
     use crate::writer::{Image, ImageFormat};
 
     assert!(
         Image::new(
             b"not a png".to_vec(),
             ImageFormat::Png,
-            ChartAnchor::new(0, 0, 1, 1),
+            Anchor::new(0, 0, 1, 1),
         )
         .is_err()
     );
@@ -1206,7 +1196,7 @@ fn worksheet_image_validation_and_crud_are_lossless_or_refuse() {
         Image::new(
             b"<not-svg/>".to_vec(),
             ImageFormat::Svg,
-            ChartAnchor::new(0, 0, 1, 1),
+            Anchor::new(0, 0, 1, 1),
         )
         .is_err()
     );
@@ -1214,7 +1204,7 @@ fn worksheet_image_validation_and_crud_are_lossless_or_refuse() {
         Image::new(
             b"GIF89a".to_vec(),
             ImageFormat::Gif,
-            ChartAnchor::new(2, 2, 1, 1),
+            Anchor::new(2, 2, 1, 1),
         )
         .is_err()
     );
@@ -1222,7 +1212,7 @@ fn worksheet_image_validation_and_crud_are_lossless_or_refuse() {
     let valid = Image::new(
         b"GIF89a".to_vec(),
         ImageFormat::Gif,
-        ChartAnchor::new(0, 0, 1, 1),
+        Anchor::new(0, 0, 1, 1),
     )
     .unwrap();
     let mut sheet = MutableWorksheet::new("Pictures");
@@ -1246,13 +1236,11 @@ fn worksheet_image_validation_and_crud_are_lossless_or_refuse() {
 
 #[test]
 fn worksheet_shapes_groups_and_connectors_round_trip() {
-    use crate::package::xlsx::writer::{
-        ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ShapeSpec,
-    };
-    use crate::package::xlsx::{
+    use crate::shapes::{
         CellMarker, DrawingObject, EditAs, Emu, EmuExtent, EmuOffset, GroupTransform, Preset,
         ShapeAnchor, TextSize,
     };
+    use crate::writer::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ShapeSpec};
 
     fn marker(column: u32, row: u32) -> CellMarker {
         CellMarker {
@@ -1392,10 +1380,8 @@ fn worksheet_shapes_groups_and_connectors_round_trip() {
 
 #[test]
 fn worksheet_shape_crud_and_save_validation_are_lossless_or_refuse() {
-    use crate::package::xlsx::writer::{
-        ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ShapeSpec,
-    };
-    use crate::package::xlsx::{CellMarker, Columns, EditAs, Emu, Preset, ShapeAnchor, TextSize};
+    use crate::shapes::{CellMarker, Columns, EditAs, Emu, Preset, ShapeAnchor, TextSize};
+    use crate::writer::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ShapeSpec};
 
     fn anchor(from: (u32, u32), to: (u32, u32)) -> ShapeAnchor {
         let marker = |(column, row)| CellMarker {

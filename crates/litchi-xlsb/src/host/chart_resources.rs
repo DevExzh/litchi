@@ -4,11 +4,10 @@
 //! relationship grammars as XLSX. This module validates, authors, and resolves
 //! those inert resources without opening linked targets or embedded payloads.
 
-use crate::package::error::{Error, Result};
-use crate::package::xlsx::{
-    Chart, ChartExternalDataPart, ChartExternalDataTarget, ChartUserShapesPart, Relationship,
-    RelationshipTarget,
+use crate::chart::{
+    Chart, ExternalDataPart, ExternalDataTarget, Relationship, RelationshipTarget, UserShapesPart,
 };
+use crate::package::error::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rel};
 use litchi_opc::part::Part;
 use litchi_opc::{BlobPart, ContentType, OpcPackage, PackURI};
@@ -31,8 +30,8 @@ pub(crate) struct AuthoredChartGraph {
 
 pub(crate) struct ResolvedChartGraph {
     pub chart: litchi_drawingml::chart::Chart,
-    pub external_data_part: Option<ChartExternalDataPart>,
-    pub user_shapes_part: Option<ChartUserShapesPart>,
+    pub external_data_part: Option<ExternalDataPart>,
+    pub user_shapes_part: Option<UserShapesPart>,
     pub additional_relationships: Vec<Relationship>,
 }
 
@@ -120,7 +119,7 @@ fn validate_chart_resource_metadata(chart: &Chart) -> Result<(Option<String>, Op
         }
     }
 
-    for id in crate::package::xlsx::chart::chart_fragment_relationship_ids(&chart.chart)? {
+    for id in crate::chart::chart_fragment_relationship_ids(&chart.chart)? {
         if !chart_ids.contains(id.as_str()) {
             return Err(invalid(format!(
                 "chart fragment references undeclared relationship {id:?}"
@@ -158,7 +157,7 @@ pub(crate) fn author_chart_graph(chart: &Chart, chart_index: usize) -> Result<Au
 
     let external_data_id = if let Some(external) = &chart.external_data_part {
         let (target, is_external) = match &external.target {
-            ChartExternalDataTarget::Embedded {
+            ExternalDataTarget::Embedded {
                 data,
                 content_type,
                 extension,
@@ -171,7 +170,7 @@ pub(crate) fn author_chart_graph(chart: &Chart, chart_index: usize) -> Result<Au
                 ));
                 (format!("../embeddings/{filename}"), false)
             },
-            ChartExternalDataTarget::Linked { target } => (target.clone(), true),
+            ExternalDataTarget::Linked { target } => (target.clone(), true),
         };
         Some(add_chart_relationship(
             &mut chart_part,
@@ -260,9 +259,7 @@ pub(crate) fn parse_chart_resources(
                 "chart external data references missing relationship {id:?}"
             ))
         })?;
-        if !crate::package::xlsx::chart::is_chart_external_data_relationship_type(
-            relationship.reltype(),
-        ) {
+        if !crate::chart::is_chart_external_data_relationship_type(relationship.reltype()) {
             return Err(invalid(format!(
                 "chart external-data relationship {id:?} has invalid type {:?}",
                 relationship.reltype()
@@ -271,28 +268,26 @@ pub(crate) fn parse_chart_resources(
         consumed.insert(id.to_string());
         let target = if relationship.is_external() {
             validate_external_target(relationship.target_ref())?;
-            ChartExternalDataTarget::Linked {
+            ExternalDataTarget::Linked {
                 target: relationship.target_ref().to_string(),
             }
         } else {
             let part = package.get_part(&relationship.target_partname()?)?;
-            let expected = crate::package::xlsx::chart::chart_external_data_content_type(
-                relationship.reltype(),
-            )
-            .expect("external-data relationship type was validated");
+            let expected = crate::chart::chart_external_data_content_type(relationship.reltype())
+                .expect("external-data relationship type was validated");
             if part.content_type() != expected || part.rels().iter().next().is_some() {
                 return Err(invalid(
                     "embedded chart external-data part has invalid content type or relationships",
                 ));
             }
             add_resource_bytes(&mut total, part.blob().len())?;
-            ChartExternalDataTarget::Embedded {
+            ExternalDataTarget::Embedded {
                 data: part.blob().to_vec(),
                 content_type: part.content_type().to_string(),
                 extension: validated_part_extension(part.partname())?,
             }
         };
-        Some(ChartExternalDataPart {
+        Some(ExternalDataPart {
             relationship_type: relationship.reltype().to_string(),
             target,
         })
@@ -311,9 +306,8 @@ pub(crate) fn parse_chart_resources(
                 "chart user shapes reference missing relationship {id:?}"
             ))
         })?;
-        if !crate::package::xlsx::chart::is_chart_user_shapes_relationship_type(
-            relationship.reltype(),
-        ) || relationship.is_external()
+        if !crate::chart::is_chart_user_shapes_relationship_type(relationship.reltype())
+            || relationship.is_external()
         {
             return Err(invalid(format!(
                 "chart user-shapes relationship {id:?} has invalid type or target mode"
@@ -334,8 +328,7 @@ pub(crate) fn parse_chart_resources(
             return Err(limit("combined chart relationship count"));
         }
         add_resource_bytes(&mut total, part.blob().len())?;
-        let referenced =
-            crate::package::xlsx::chart::chart_user_shapes_relationship_ids(part.blob())?;
+        let referenced = crate::chart::chart_user_shapes_relationship_ids(part.blob())?;
         if referenced.len() != part.rels().iter().count()
             || !referenced.iter().all(|id| part.rels().get(id).is_some())
         {
@@ -351,7 +344,7 @@ pub(crate) fn parse_chart_resources(
                 .expect("user-shapes relationship presence was validated");
             relationships.push(resolve_relationship(package, relationship, &mut total)?);
         }
-        Some(ChartUserShapesPart {
+        Some(UserShapesPart {
             xml: part.blob().to_vec(),
             relationships,
         })
@@ -369,7 +362,7 @@ pub(crate) fn parse_chart_resources(
     for relationship in remaining {
         additional.push(resolve_relationship(package, relationship, &mut total)?);
     }
-    let fragment_ids = crate::package::xlsx::chart::chart_fragment_relationship_ids(&chart)?;
+    let fragment_ids = crate::chart::chart_fragment_relationship_ids(&chart)?;
     if !fragment_ids.iter().all(|id| {
         additional
             .iter()
@@ -388,18 +381,17 @@ pub(crate) fn parse_chart_resources(
     })
 }
 
-fn validate_external_data(value: &ChartExternalDataPart, total: &mut usize) -> Result<()> {
+fn validate_external_data(value: &ExternalDataPart, total: &mut usize) -> Result<()> {
     validate_relationship_type(&value.relationship_type)?;
-    let expected =
-        crate::package::xlsx::chart::chart_external_data_content_type(&value.relationship_type)
-            .ok_or_else(|| {
-                invalid(format!(
-                    "unsupported chart external-data relationship type {:?}",
-                    value.relationship_type
-                ))
-            })?;
+    let expected = crate::chart::chart_external_data_content_type(&value.relationship_type)
+        .ok_or_else(|| {
+            invalid(format!(
+                "unsupported chart external-data relationship type {:?}",
+                value.relationship_type
+            ))
+        })?;
     match &value.target {
-        ChartExternalDataTarget::Embedded {
+        ExternalDataTarget::Embedded {
             data,
             content_type,
             extension,
@@ -411,17 +403,17 @@ fn validate_external_data(value: &ChartExternalDataPart, total: &mut usize) -> R
                 )));
             }
         },
-        ChartExternalDataTarget::Linked { target } => validate_external_target(target)?,
+        ExternalDataTarget::Linked { target } => validate_external_target(target)?,
     }
     Ok(())
 }
 
-fn validate_user_shapes(value: &ChartUserShapesPart, total: &mut usize) -> Result<()> {
+fn validate_user_shapes(value: &UserShapesPart, total: &mut usize) -> Result<()> {
     if value.xml.len() > MAX_USER_SHAPES_XML_BYTES {
         return Err(limit("chart user-shapes XML bytes"));
     }
     add_resource_bytes(total, value.xml.len())?;
-    let referenced = crate::package::xlsx::chart::chart_user_shapes_relationship_ids(&value.xml)?;
+    let referenced = crate::chart::chart_user_shapes_relationship_ids(&value.xml)?;
     let mut declared = HashSet::with_capacity(value.relationships.len());
     for relationship in &value.relationships {
         validate_relationship(relationship, total)?;
@@ -607,7 +599,7 @@ fn validated_chart_xml(
     external_data_id: Option<&str>,
     user_shapes_id: Option<&str>,
 ) -> Result<Vec<u8>> {
-    let xml = crate::package::xlsx::chart::generate_chart_xml_with_external_data_id(
+    let xml = crate::chart::generate_chart_xml_with_external_data_id(
         &chart.chart,
         external_data_id,
         user_shapes_id,
@@ -699,7 +691,7 @@ fn limit(what: &str) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::package::xlsx::{Chart, ChartAnchor};
+    use crate::chart::{Anchor, Chart};
     use litchi_drawingml::chart::ExternalData;
 
     #[test]
@@ -708,11 +700,11 @@ mod tests {
             "Missing",
             "Data!$A$1:$A$2",
             "Data!$B$1:$B$2",
-            ChartAnchor::new(0, 0, 5, 5),
+            Anchor::new(0, 0, 5, 5),
         )
         .unwrap();
         worksheet_chart.chart.external_data = Some(ExternalData::new("rId1"));
-        let xml = crate::package::xlsx::chart::generate_chart_xml(&worksheet_chart.chart).unwrap();
+        let xml = crate::chart::generate_chart_xml(&worksheet_chart.chart).unwrap();
         let uri = PackURI::new("/xl/charts/chart1.xml").unwrap();
         let mut package = OpcPackage::new();
         package.add_part(Box::new(BlobPart::new(

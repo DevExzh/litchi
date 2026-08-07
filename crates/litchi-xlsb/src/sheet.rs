@@ -321,7 +321,7 @@ impl Worksheet {
     /// Sheet views (zoom, panes, selections) in worksheet stream order.
     ///
     /// The view model is shared with XLSX worksheets; see
-    /// [`crate::package::xlsx::views::SheetView`].
+    /// [`crate::views::SheetView`].
     pub fn sheet_views(&self) -> &[SheetView] {
         &self.sheet_views
     }

@@ -1,7 +1,7 @@
 //! Typed worksheet image payloads used by XLSB Drawings parts.
 
+use crate::chart::Anchor;
 use crate::package::error::{Error, Result};
-use crate::package::xlsx::ChartAnchor;
 use litchi_opc::constants::content_type as ct;
 use std::sync::Arc;
 
@@ -150,17 +150,13 @@ impl ImageFormat {
 pub struct Image {
     data: Arc<[u8]>,
     format: ImageFormat,
-    anchor: ChartAnchor,
+    anchor: Anchor,
     description: Option<String>,
 }
 
 impl Image {
     /// Create and validate an embedded worksheet image.
-    pub fn new(
-        data: impl Into<Arc<[u8]>>,
-        format: ImageFormat,
-        anchor: ChartAnchor,
-    ) -> Result<Self> {
+    pub fn new(data: impl Into<Arc<[u8]>>, format: ImageFormat, anchor: Anchor) -> Result<Self> {
         let image = Self {
             data: data.into(),
             format,
@@ -189,7 +185,7 @@ impl Image {
     }
 
     /// Two-cell image anchor, using zero-based rows and columns and EMU offsets.
-    pub const fn anchor(&self) -> &ChartAnchor {
+    pub const fn anchor(&self) -> &Anchor {
         &self.anchor
     }
 
@@ -199,7 +195,7 @@ impl Image {
     }
 
     pub(crate) fn validate(&self) -> Result<()> {
-        crate::package::xlsx::chart::validate_chart_anchor(&self.anchor)?;
+        crate::chart::validate_chart_anchor(&self.anchor)?;
         self.format.validate_payload(&self.data)?;
         if let Some(description) = &self.description {
             if description.len() > MAX_XLSB_IMAGE_DESCRIPTION_BYTES {
@@ -292,8 +288,8 @@ fn validate_svg(data: &[u8]) -> bool {
 mod tests {
     use super::*;
 
-    fn anchor() -> ChartAnchor {
-        ChartAnchor::new(0, 0, 1, 1)
+    fn anchor() -> Anchor {
+        Anchor::new(0, 0, 1, 1)
     }
 
     #[test]

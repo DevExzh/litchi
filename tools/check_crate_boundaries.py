@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -45,6 +46,9 @@ COMMON_FAMILY_GUARDS = {
 }
 RETIRED_MONOLITHS = frozenset({"litchi-ooxml", "litchi-ole"})
 RETIRED_FACADE_FEATURES = frozenset({"ole"})
+XLSB_SOURCE_ROOT = Path("crates/litchi-xlsb/src")
+PUBLIC_XLSX_MODULE = re.compile(r"^\s*pub(?:\([^)]*\))?\s+mod\s+xlsx\s*;")
+PACKAGE_XLSX_PATH = re.compile(r"(?<![A-Za-z0-9_])package::xlsx\b")
 
 
 @dataclass(frozen=True, order=True)
@@ -548,6 +552,44 @@ def audit_manifest_inventory(snapshot: Snapshot) -> list[str]:
     return violations
 
 
+def audit_xlsb_source_topology(root: Path = ROOT) -> list[str]:
+    """Reject retired XLSX implementation paths from the XLSB crate."""
+
+    source_root = root / XLSB_SOURCE_ROOT
+    violations: list[str] = []
+    host_xlsx = source_root / "host" / "xlsx"
+    if host_xlsx.exists():
+        violations.append(
+            "retired XLSB host XLSX source returned: "
+            + str(host_xlsx.relative_to(root))
+        )
+
+    package_root = source_root / "package"
+    if package_root.is_dir():
+        for path in sorted(package_root.rglob("*.rs")):
+            for line_number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), start=1
+            ):
+                if PUBLIC_XLSX_MODULE.match(line):
+                    violations.append(
+                        "retired XLSB package XLSX module: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            for line_number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), start=1
+            ):
+                if PACKAGE_XLSX_PATH.search(line):
+                    violations.append(
+                        "retired XLSB package::xlsx path: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+
+    return sorted(set(violations))
+
+
 def debt_report(policy: Policy, explain: bool) -> list[str]:
     lines = ["ordered migration debt:"]
     items: list[tuple[int, str, str, str]] = []
@@ -593,7 +635,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     snapshot = snapshot_from_metadata(cargo_metadata())
-    violations = audit_manifest_inventory(snapshot) + audit_snapshot(snapshot, policy)
+    violations = (
+        audit_manifest_inventory(snapshot)
+        + audit_snapshot(snapshot, policy)
+        + audit_xlsb_source_topology()
+    )
     if violations:
         for violation in sorted(set(violations)):
             print(f"crate-boundary error: {violation}", file=sys.stderr)

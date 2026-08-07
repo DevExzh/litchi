@@ -58,7 +58,7 @@ impl TryFrom<&str> for OleObjectAspect {
     }
 }
 
-use litchi_drawingml::geom::Preset;
+pub use litchi_drawingml::geom::Preset;
 pub use litchi_drawingml::text::body::{Body, Insets, Paragraph, Properties, Run};
 use litchi_drawingml::text::parse_bool;
 pub use litchi_drawingml::text::{

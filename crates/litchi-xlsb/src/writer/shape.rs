@@ -7,7 +7,7 @@
 //! coordinate transform, and [`ConnectionShapeSpec`] authors `xdr:cxnSp`
 //! connectors whose `a:stCxn`/`a:endCxn` sites reference other shapes by
 //! name. All three deliberately reuse the typed read model from
-//! [`crate::package::xlsx::shapes`] (`ShapeAnchor`,
+//! [`crate::shapes`] (`ShapeAnchor`,
 //! `Properties`, `GroupTransform`, paragraphs and runs) so
 //! anything authored here round-trips through the shape inventory with
 //! identical semantics.
@@ -26,7 +26,7 @@ use litchi_core::xml::escape::escape_xml;
 use litchi_drawingml::geom::Preset;
 use litchi_drawingml::text::body::writer::write_contents as write_text_body_contents;
 
-use crate::package::xlsx::shapes::{
+use crate::shapes::{
     CellMarker, EditAs, EmuExtent, EmuOffset, Geometry, GroupTransform, Paragraph, Properties, Run,
     ShapeAnchor,
 };

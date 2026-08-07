@@ -3,12 +3,10 @@
 //! XLSB reuses the ordinary SpreadsheetDrawing and DrawingML Chart XML
 //! grammars. Only the worksheet link is binary (`BrtDrawing`).
 
+use crate::chart::Chart;
 use crate::package::error::{Error, Result};
-use crate::package::xlsx::Chart;
-use crate::package::xlsx::writer::shape::{
-    ConnectionShapeSpec, GroupSpec, ShapeEmitter, ShapeSpec,
-};
 use crate::writer::Image;
+use crate::writer::shape::{ConnectionShapeSpec, GroupSpec, ShapeEmitter, ShapeSpec};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as _;
 
@@ -18,7 +16,7 @@ const CHART_SHEET_EXTENT_X: u64 = 8_582_025;
 const CHART_SHEET_EXTENT_Y: u64 = 5_838_825;
 
 pub(crate) fn validate_chart(chart: &Chart) -> Result<()> {
-    crate::package::xlsx::chart::validate_chart_anchor(&chart.anchor)?;
+    crate::chart::validate_chart_anchor(&chart.anchor)?;
     crate::package::chart_resources::validate_chart_resources(chart)
 }
 
@@ -95,12 +93,7 @@ pub(crate) fn serialize_drawing(
         write_image_anchor(&mut xml, image, index)?;
         ensure_drawing_size(xml.len())?;
     }
-    crate::package::xlsx::chart::write_worksheet_chart_anchors(
-        &mut xml,
-        charts,
-        images.len(),
-        images.len(),
-    )?;
+    crate::chart::write_worksheet_chart_anchors(&mut xml, charts, images.len(), images.len())?;
     let mut object_count = 0usize;
     for shape in shapes {
         shape
@@ -150,7 +143,7 @@ pub(crate) fn serialize_drawing(
     ensure_drawing_size(xml.len())?;
     // The detailed shared reader verifies the complete shape/group/connector
     // grammar in addition to the lightweight XLSB drawing inventory below.
-    crate::package::xlsx::shapes::parse_drawing_shapes(&xml)?
+    crate::shapes::parse_drawing_shapes(&xml)?
         .ok_or_else(|| Error::Encoding("authored drawing lacks an xdr:wsDr root".to_string()))?;
     let bytes = xml.into_bytes();
     // The XLSB drawing inventory reader is the package-load oracle.

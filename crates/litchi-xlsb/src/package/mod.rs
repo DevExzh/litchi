@@ -73,8 +73,6 @@ pub mod vba_project;
 pub(crate) mod walker;
 #[path = "../host/web_extension_bindings.rs"]
 pub mod web_extension_bindings;
-#[path = "../host/xlsx/mod.rs"]
-pub mod xlsx;
 
 pub use cell::Cell;
 pub use error::{Error as PackageError, Result as PackageResult};

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import copy
 import json
+import tempfile
 import unittest
 from dataclasses import replace
+from pathlib import Path
 
 from tools import check_crate_boundaries as boundaries
 
@@ -258,6 +260,57 @@ class BoundaryPolicyTests(unittest.TestCase):
 
         self.assertEqual(violations, sorted(violations))
         self.assertIn("workspace packages lack topology policy: a-new, z-new", violations)
+
+    def test_xlsb_host_xlsx_source_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "crates/litchi-xlsb/src/host/xlsx/mod.rs"
+            path.parent.mkdir(parents=True)
+            path.write_text("// retired host\n", encoding="utf-8")
+
+            violations = boundaries.audit_xlsb_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "retired XLSB host XLSX source returned: "
+                    "crates/litchi-xlsb/src/host/xlsx"
+                ],
+            )
+
+    def test_xlsb_package_public_xlsx_module_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "crates/litchi-xlsb/src/package/mod.rs"
+            path.parent.mkdir(parents=True)
+            path.write_text("pub mod xlsx;\n", encoding="utf-8")
+
+            violations = boundaries.audit_xlsb_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "retired XLSB package XLSX module: "
+                    "crates/litchi-xlsb/src/package/mod.rs:1"
+                ],
+            )
+
+    def test_xlsb_package_xlsx_paths_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "crates/litchi-xlsb/src/writer.rs"
+            path.parent.mkdir(parents=True)
+            path.write_text("use crate::package::xlsx::Chart;\n", encoding="utf-8")
+
+            violations = boundaries.audit_xlsb_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "retired XLSB package::xlsx path: "
+                    "crates/litchi-xlsb/src/writer.rs:1"
+                ],
+            )
 
 
 if __name__ == "__main__":

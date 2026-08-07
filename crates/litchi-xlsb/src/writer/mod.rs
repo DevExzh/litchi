@@ -40,6 +40,7 @@
 mod shared_strings;
 
 /// Styles writer (fonts, fills, borders, number formats)
+pub(crate) mod shape;
 mod styles;
 
 /// Mutable worksheet with CRUD operations
@@ -60,6 +61,7 @@ pub(crate) mod bin_range;
 pub(crate) mod data_validation;
 
 // Re-export main types for public API
+pub use crate::chart::{Anchor as ChartAnchor, Chart};
 pub use crate::external_link::{
     AreaReference, CachedValue, CellLocation, CellReference, DdeItem, DefinedName, ErrorValue,
     Kind, Link, MAX_XLSB_EXTERNAL_CACHE_COLUMNS, MAX_XLSB_EXTERNAL_CACHE_ROWS,
@@ -67,16 +69,14 @@ pub use crate::external_link::{
     ValueMatrix,
 };
 pub use crate::package::drawing_image::{Image, ImageFormat};
-pub use crate::package::xlsx::writer::{
-    ConnectionEndSpec, ConnectionShapeSpec, DrawingObjectSpec, Geometry, GroupSpec, ShapeSpec,
-};
-pub use crate::package::xlsx::{
-    Autofit, Body, CellMarker, Chart, ChartAnchor, Columns, Coordinate32, Direction, EditAs, Emu,
-    EmuExtent, EmuOffset, GroupTransform, Insets, Paragraph, Preset, Properties, Run, ShapeAnchor,
-    TextSize, Underline, VerticalAnchor, Wrap,
-};
 pub use crate::pivot_view::Part;
+pub use crate::shapes::{
+    Autofit, Body, CellMarker, Columns, Coordinate32, Direction, EditAs, Emu, EmuExtent, EmuOffset,
+    Geometry, GroupTransform, Insets, Paragraph, Preset, Properties, Run, ShapeAnchor, TextSize,
+    Underline, VerticalAnchor, Wrap,
+};
 pub use chartsheet::MutableChartSheet;
+pub use shape::{ConnectionEndSpec, ConnectionShapeSpec, DrawingObjectSpec, GroupSpec, ShapeSpec};
 pub use shared_strings::MutableSharedStringsWriter;
 pub use styles::{DxfStyle, StylesWriter};
 pub use workbook::WorkbookWriter;

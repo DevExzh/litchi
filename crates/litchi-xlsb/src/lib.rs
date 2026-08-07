@@ -9,6 +9,7 @@
 
 pub mod calc;
 pub mod cell_watches;
+pub mod chart;
 pub mod comments;
 pub mod conditional_formatting;
 pub mod data_validation;
@@ -19,13 +20,16 @@ pub mod hyperlinks;
 pub mod merged_cells;
 pub mod named_ranges;
 pub mod package;
+mod pivot_chart;
 pub mod pivot_view;
 pub mod raw;
+pub mod shapes;
 pub mod shared_workbook;
 pub mod sheet;
 pub mod slicer;
 pub mod styles;
 pub mod timeline;
+pub mod views;
 pub mod workbook;
 pub mod writer;
 

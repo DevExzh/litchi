@@ -107,17 +107,17 @@ pub struct MutableWorksheet {
     /// Losslessly preserved PivotTable definition parts hosted on this sheet.
     pub(crate) pivot_table_views: Vec<crate::pivot_view::Part>,
     /// Typed DrawingML charts anchored on this sheet.
-    pub(crate) charts: Vec<crate::package::xlsx::Chart>,
+    pub(crate) charts: Vec<crate::chart::Chart>,
     /// Typed image parts anchored in the same Drawings part.
     pub(crate) images: Vec<crate::writer::Image>,
     /// Cached sum of encoded image bytes for constant-time safety checks.
     pub(crate) image_bytes: usize,
     /// Top-level DrawingML shapes and text boxes.
-    pub(crate) shapes: Vec<crate::package::xlsx::writer::ShapeSpec>,
+    pub(crate) shapes: Vec<crate::writer::ShapeSpec>,
     /// Top-level DrawingML shape groups.
-    pub(crate) groups: Vec<crate::package::xlsx::writer::GroupSpec>,
+    pub(crate) groups: Vec<crate::writer::GroupSpec>,
     /// Top-level DrawingML connection shapes.
-    pub(crate) connections: Vec<crate::package::xlsx::writer::ConnectionShapeSpec>,
+    pub(crate) connections: Vec<crate::writer::ConnectionShapeSpec>,
     /// Relationship ID allocated for the sheet's Drawings part.
     pub(crate) drawing_rel_id: Option<String>,
     /// Relationship IDs allocated for `tables` by the workbook writer, in
@@ -594,7 +594,7 @@ impl MutableWorksheet {
     /// Set the worksheet view (zoom scales, pane, selections, tab-selected flag).
     ///
     /// The view model is shared with XLSX worksheets; see
-    /// [`crate::package::xlsx::views::SheetView`]. Pane and selection settings conflict
+    /// [`crate::views::SheetView`]. Pane and selection settings conflict
     /// with [`Self::freeze_panes`]; combining both fails at save time.
     pub fn set_sheet_view(&mut self, view: SheetView) {
         self.sheet_view = Some(view);
@@ -789,7 +789,7 @@ impl MutableWorksheet {
     /// relationship in the binary `BrtDrawing` record. Pivot charts are
     /// resolved against PivotTable views attached to this workbook at save
     /// time.
-    pub fn add_chart(&mut self, chart: crate::package::xlsx::Chart) -> Result<()> {
+    pub fn add_chart(&mut self, chart: crate::chart::Chart) -> Result<()> {
         if self.charts.len() >= crate::package::drawing_write::MAX_CHARTS_PER_SHEET {
             return Err(Error::InvalidFormula(
                 "worksheet chart count exceeds the safety limit".to_string(),
@@ -801,12 +801,12 @@ impl MutableWorksheet {
     }
 
     /// Typed DrawingML charts in drawing order.
-    pub fn charts(&self) -> &[crate::package::xlsx::Chart] {
+    pub fn charts(&self) -> &[crate::chart::Chart] {
         &self.charts
     }
 
     /// Remove one chart by drawing order.
-    pub fn remove_chart(&mut self, index: usize) -> Result<crate::package::xlsx::Chart> {
+    pub fn remove_chart(&mut self, index: usize) -> Result<crate::chart::Chart> {
         if index >= self.charts.len() {
             return Err(Error::InvalidFormula(format!(
                 "chart index {index} is out of bounds for {} charts",
@@ -881,7 +881,7 @@ impl MutableWorksheet {
     }
 
     /// Add a standard DrawingML shape or text box.
-    pub fn add_shape(&mut self, shape: crate::package::xlsx::writer::ShapeSpec) -> Result<()> {
+    pub fn add_shape(&mut self, shape: crate::writer::ShapeSpec) -> Result<()> {
         shape
             .validate(self.drawing_shape_count())
             .map_err(Error::InvalidFormula)?;
@@ -893,25 +893,22 @@ impl MutableWorksheet {
     pub fn add_text_box(
         &mut self,
         name: impl Into<String>,
-        anchor: crate::package::xlsx::ShapeAnchor,
-        preset: crate::package::xlsx::Preset,
+        anchor: crate::shapes::ShapeAnchor,
+        preset: crate::shapes::Preset,
         text: &str,
     ) -> Result<()> {
-        self.add_shape(crate::package::xlsx::writer::ShapeSpec::text_box(
+        self.add_shape(crate::writer::ShapeSpec::text_box(
             name, anchor, preset, text,
         ))
     }
 
     /// Authored top-level shapes in drawing order.
-    pub fn shapes(&self) -> &[crate::package::xlsx::writer::ShapeSpec] {
+    pub fn shapes(&self) -> &[crate::writer::ShapeSpec] {
         &self.shapes
     }
 
     /// Remove one top-level shape.
-    pub fn remove_shape(
-        &mut self,
-        index: usize,
-    ) -> Result<crate::package::xlsx::writer::ShapeSpec> {
+    pub fn remove_shape(&mut self, index: usize) -> Result<crate::writer::ShapeSpec> {
         if index >= self.shapes.len() {
             return Err(Error::InvalidFormula(format!(
                 "shape index {index} is out of bounds for {} shapes",
@@ -924,7 +921,7 @@ impl MutableWorksheet {
     }
 
     /// Add a nested DrawingML shape group.
-    pub fn add_group(&mut self, group: crate::package::xlsx::writer::GroupSpec) -> Result<()> {
+    pub fn add_group(&mut self, group: crate::writer::GroupSpec) -> Result<()> {
         group
             .validate(self.drawing_shape_count())
             .map_err(Error::InvalidFormula)?;
@@ -933,15 +930,12 @@ impl MutableWorksheet {
     }
 
     /// Authored top-level shape groups in drawing order.
-    pub fn groups(&self) -> &[crate::package::xlsx::writer::GroupSpec] {
+    pub fn groups(&self) -> &[crate::writer::GroupSpec] {
         &self.groups
     }
 
     /// Remove one top-level shape group.
-    pub fn remove_group(
-        &mut self,
-        index: usize,
-    ) -> Result<crate::package::xlsx::writer::GroupSpec> {
+    pub fn remove_group(&mut self, index: usize) -> Result<crate::writer::GroupSpec> {
         if index >= self.groups.len() {
             return Err(Error::InvalidFormula(format!(
                 "group index {index} is out of bounds for {} groups",
@@ -954,10 +948,7 @@ impl MutableWorksheet {
     }
 
     /// Add a DrawingML connection shape.
-    pub fn add_connection(
-        &mut self,
-        connection: crate::package::xlsx::writer::ConnectionShapeSpec,
-    ) -> Result<()> {
+    pub fn add_connection(&mut self, connection: crate::writer::ConnectionShapeSpec) -> Result<()> {
         connection
             .validate(self.drawing_shape_count())
             .map_err(Error::InvalidFormula)?;
@@ -966,7 +957,7 @@ impl MutableWorksheet {
     }
 
     /// Authored top-level connection shapes in drawing order.
-    pub fn connections(&self) -> &[crate::package::xlsx::writer::ConnectionShapeSpec] {
+    pub fn connections(&self) -> &[crate::writer::ConnectionShapeSpec] {
         &self.connections
     }
 
@@ -974,7 +965,7 @@ impl MutableWorksheet {
     pub fn remove_connection(
         &mut self,
         index: usize,
-    ) -> Result<crate::package::xlsx::writer::ConnectionShapeSpec> {
+    ) -> Result<crate::writer::ConnectionShapeSpec> {
         if index >= self.connections.len() {
             return Err(Error::InvalidFormula(format!(
                 "connection index {index} is out of bounds for {} connection shapes",

@@ -9,7 +9,7 @@ use std::io::Cursor;
 
 #[test]
 fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
-    use crate::package::xlsx::{Chart, ChartAnchor};
+    use crate::chart::{Anchor, Chart};
 
     let mut begin_view = vec![0u8; 32];
     begin_view[28..32].copy_from_slice(&1u32.to_le_bytes());
@@ -36,7 +36,7 @@ fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
         "Revenue",
         "Pivot Host!$A$2:$A$3",
         "Pivot Host!$B$2:$B$3",
-        ChartAnchor::new(3, 0, 10, 14),
+        Anchor::new(3, 0, 10, 14),
     )
     .unwrap()
     .into_pivot_chart(view_name)
@@ -95,13 +95,13 @@ fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
 
 #[test]
 fn pivot_chart_refuses_a_missing_view_binding() {
-    use crate::package::xlsx::{Chart, ChartAnchor};
+    use crate::chart::{Anchor, Chart};
 
     let chart = Chart::line_chart(
         "Revenue",
         "Host!$A$1:$A$2",
         "Host!$B$1:$B$2",
-        ChartAnchor::new(2, 0, 8, 12),
+        Anchor::new(2, 0, 8, 12),
     )
     .unwrap()
     .into_pivot_chart("MissingPivot")
