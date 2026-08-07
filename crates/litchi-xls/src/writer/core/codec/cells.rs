@@ -240,6 +240,21 @@ impl Writer {
             .get_mut(sheet)
             .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {}", sheet)))?;
 
+        if worksheet
+            .cells
+            .get(&(u32::from(pos.row()), u16::from(pos.col())))
+            .and_then(|cell| cell.formula_metadata.as_ref())
+            .is_some_and(|metadata| {
+                metadata.shared_owner().is_some() || metadata.array_owner().is_some()
+            })
+        {
+            return Err(Error::InvalidData(format!(
+                "cell ({}, {}) belongs to a formula group and cannot be overwritten independently",
+                pos.row(),
+                pos.col()
+            )));
+        }
+
         worksheet.add_cell(
             WritableCell::new(pos, value, format_id, None).with_formula_metadata(formula_metadata),
         );

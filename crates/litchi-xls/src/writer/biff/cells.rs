@@ -218,6 +218,7 @@ pub(crate) fn write_formula_with_metadata<W: Write>(
     })?;
     crate::formula_metadata::validate_for_write(&metadata)?;
     let shared_owner = metadata.shared_owner();
+    let array_owner = metadata.array_owner();
     let shared_tokens = match shared_owner {
         Some(owner) => Some(
             owner
@@ -226,9 +227,47 @@ pub(crate) fn write_formula_with_metadata<W: Write>(
         ),
         None => None,
     };
-    let formula_tokens = match shared_tokens.as_ref() {
-        Some(tokens) => tokens.as_slice(),
-        None => tokens,
+    let array_tokens = match array_owner {
+        Some(owner) => {
+            let col_u8 = u8::try_from(col).map_err(|_| {
+                Error::InvalidFormula(format!(
+                    "array-formula column {col} exceeds the BIFF8 limit"
+                ))
+            })?;
+            let range = owner.range();
+            if row_u16 < range.first().row()
+                || row_u16 > range.last().row()
+                || col_u8 < range.first().col()
+                || col_u8 > range.last().col()
+            {
+                return Err(Error::InvalidFormula(format!(
+                    "cell ({row_u16}, {col}) is outside its array-formula range"
+                )));
+            }
+            Some(owner.anchor_tokens())
+        },
+        None => None,
+    };
+    let formula_tokens = match (shared_tokens.as_ref(), array_tokens.as_ref()) {
+        (Some(tokens), None) => tokens.as_slice(),
+        (None, Some(tokens)) => tokens.as_slice(),
+        (None, None) => tokens,
+        (Some(_), Some(_)) => {
+            return Err(Error::InvalidFormula(
+                "a Formula record cannot own both ShrFmla and Array metadata".to_string(),
+            ));
+        },
+    };
+    // Materialize and validate the complete Array payload before emitting its
+    // anchor Formula, so semantic failures cannot leave an orphan Formula in
+    // the caller's stream.
+    let array_payload = match array_owner {
+        Some(owner)
+            if owner.anchor().row() == row_u16 && u16::from(owner.anchor().col()) == col =>
+        {
+            Some(owner.to_payload()?)
+        },
+        _ => None,
     };
     let flags = crate::formula_metadata::encode_flags(&metadata, formula_tokens)?;
     // A BIFF record payload is limited to 8,224 bytes. FORMULA contributes
@@ -260,6 +299,9 @@ pub(crate) fn write_formula_with_metadata<W: Write>(
         && u16::from(owner.anchor().col()) == col
     {
         write_shared_formula(writer, owner)?;
+    }
+    if let Some(payload) = array_payload {
+        write_record(writer, 0x0221, &payload)?;
     }
     Ok(())
 }
@@ -388,5 +430,38 @@ mod tests {
         super::write_formula_with_metadata(&mut bytes, 1, 0, 15, &[], metadata).unwrap();
         assert_eq!(bytes.len(), 4 + 22 + 5);
         assert_eq!(&bytes[4 + 22..], &[0x01, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn array_members_emit_empty_ptg_exp_formulas_and_only_anchor_emits_array() {
+        let range = Range::try_new(0, 0, 1, 0).unwrap();
+        let owner =
+            crate::formula_metadata::array::Owner::from_compiled(range, vec![0x1e, 7, 0]).unwrap();
+        let metadata = crate::FormulaMetadata::new()
+            .with_always_calculate(true)
+            .with_array(owner);
+
+        let mut anchor = Vec::new();
+        super::write_formula_with_metadata(&mut anchor, 0, 0, 15, &[], metadata.clone()).unwrap();
+        assert_eq!(&anchor[..4], &[0x06, 0x00, 27, 0]);
+        assert_eq!(&anchor[10..18], &[3, 0, 0, 0, 0, 0, 0xff, 0xff]);
+        assert_eq!(u16::from_le_bytes([anchor[18], anchor[19]]) & 0x0008, 0);
+        assert_eq!(&anchor[26..31], &[0x01, 0, 0, 0, 0]);
+        assert_eq!(
+            &anchor[31..],
+            &[
+                0x21, 0x02, 17, 0, // Array header
+                0, 0, 1, 0, 0, 0, // Ref
+                1, 0, // fAlwaysCalc, reserved=0
+                0, 0, 0, 0, // unused
+                3, 0, // cce
+                0x1e, 7, 0, // rgce
+            ]
+        );
+
+        let mut participant = Vec::new();
+        super::write_formula_with_metadata(&mut participant, 1, 0, 15, &[], metadata).unwrap();
+        assert_eq!(participant.len(), 31);
+        assert_eq!(&participant[26..], &[0x01, 0, 0, 0, 0]);
     }
 }

@@ -748,13 +748,37 @@ impl Writer {
                 "duplicate data-table anchor cell".to_string(),
             ));
         }
-        if let Some(cell) = worksheet.cells.get(&(anchor_row, anchor_col)) {
+        if worksheet.cells.iter().any(|(&(row, col), cell)| {
+            (u32::from(range.first_row())..=u32::from(range.last_row())).contains(&row)
+                && (u16::from(range.first_col())..=u16::from(range.last_col())).contains(&col)
+                && cell
+                    .formula_metadata
+                    .as_ref()
+                    .is_some_and(|metadata| metadata.array_owner().is_some())
+        }) {
+            return Err(Error::InvalidData(
+                "data-table range overlaps an array-formula group".to_string(),
+            ));
+        }
+        let anchor_missing = if let Some(cell) = worksheet.cells.get(&(anchor_row, anchor_col)) {
             if !matches!(cell.value, CellValue::Blank) {
                 return Err(Error::InvalidData(
                     "data-table anchor cell already carries a value".to_string(),
                 ));
             }
+            false
         } else {
+            true
+        };
+        worksheet
+            .data_tables
+            .try_reserve(1)
+            .map_err(|_| Error::Allocation("reserving worksheet data-table storage"))?;
+        if anchor_missing {
+            worksheet
+                .cells
+                .try_reserve(1)
+                .map_err(|_| Error::Allocation("reserving data-table anchor cell"))?;
             worksheet.add_cell(WritableCell::new(anchor_pos, CellValue::Blank, 0, None));
         }
         worksheet.data_tables.push((anchor_row, anchor_col, table));

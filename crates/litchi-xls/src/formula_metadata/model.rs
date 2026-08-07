@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use super::array::Owner as ArrayOwner;
 use super::shared::Owner;
 
 /// Calculation and preservation metadata surrounding one BIFF8 cell formula.
@@ -16,6 +17,7 @@ pub struct Metadata {
     clear_errors: bool,
     calculation_cache: u32,
     shared_owner: Option<Arc<Owner>>,
+    array_owner: Option<Arc<ArrayOwner>>,
 }
 
 impl Metadata {
@@ -29,6 +31,7 @@ impl Metadata {
             clear_errors: false,
             calculation_cache: 0,
             shared_owner: None,
+            array_owner: None,
         }
     }
 
@@ -60,7 +63,24 @@ impl Metadata {
     pub fn with_shared(mut self, owner: Owner) -> Self {
         self.shared_formula = true;
         self.shared_owner = Some(Arc::new(owner));
+        self.array_owner = None;
         self
+    }
+
+    /// Bind this Formula record to one checked, inert BIFF8 array-formula
+    /// owner. This clears shared-formula ownership because the wire formats
+    /// are mutually exclusive.
+    pub(crate) fn with_array(mut self, owner: ArrayOwner) -> Self {
+        self.shared_formula = false;
+        self.shared_owner = None;
+        self.array_owner = Some(Arc::new(owner));
+        self
+    }
+
+    pub(crate) fn attach_array(&mut self, owner: Arc<ArrayOwner>) {
+        self.shared_formula = false;
+        self.shared_owner = None;
+        self.array_owner = Some(owner);
     }
 
     /// Set whether formula error checking is disabled for this cell.
@@ -100,6 +120,12 @@ impl Metadata {
         self.shared_owner.as_deref()
     }
 
+    /// The checked owner of the following `Array` record, if this Formula is
+    /// an array-formula participant.
+    pub fn array_owner(&self) -> Option<&ArrayOwner> {
+        self.array_owner.as_deref()
+    }
+
     pub(crate) const fn from_wire(flags: u16, calculation_cache: u32) -> Self {
         Self {
             always_calculate: flags & 0x0001 != 0,
@@ -108,6 +134,7 @@ impl Metadata {
             clear_errors: flags & 0x0020 != 0,
             calculation_cache,
             shared_owner: None,
+            array_owner: None,
         }
     }
 

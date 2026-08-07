@@ -40,16 +40,14 @@ pub(super) fn parse_shared_formula_template(
     record_type: u16,
     data: &[u8],
 ) -> Result<SharedFormulaTemplate> {
-    let (fixed_size, length_offset, relative) = match record_type {
-        0x04bc => (10usize, 8usize, true),
-        0x0221 => (14usize, 12usize, false),
-        _ => {
-            return Err(Error::UnexpectedRecordType {
-                expected: 0x04bc,
-                found: record_type,
-            });
-        },
-    };
+    if record_type != 0x04bc {
+        return Err(Error::UnexpectedRecordType {
+            expected: 0x04bc,
+            found: record_type,
+        });
+    }
+    let fixed_size = 10usize;
+    let length_offset = 8usize;
     if data.len() < fixed_size {
         return Err(Error::InvalidLength {
             expected: fixed_size,
@@ -95,7 +93,7 @@ pub(super) fn parse_shared_formula_template(
         first_col,
         last_col,
         tokens,
-        relative,
+        relative: true,
     })
 }
 

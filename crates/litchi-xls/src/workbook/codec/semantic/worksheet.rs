@@ -4,7 +4,9 @@ use super::super::validation::cell_record_xf;
 use super::super::wire::{SharedFormulaTemplate, parse_shared_formula_template};
 use crate::cell::Cell;
 use crate::error::{Error, Result};
-use crate::formula::{FormulaContext, ptg_exp_anchor};
+use crate::formula::{FormulaContext, ptg_exp_anchor, render_formula};
+use crate::formula_metadata::Cell as FormulaCell;
+use crate::formula_metadata::array::{self, Owner as ArrayFormula};
 use crate::number_format::Formatting;
 use crate::records::{
     BoundSheetRecord, CellRecord, DimensionsRecord, Encoding, FormulaValue, SharedStringProperties,
@@ -16,9 +18,164 @@ use crate::{
     pivot_table, protection, utils, view,
 };
 use litchi_biff::Records;
-use std::collections::HashMap;
+use litchi_core::sheet::Cell as _;
+use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek};
 use std::sync::Arc;
+
+#[derive(Clone, Copy)]
+struct FormulaLink {
+    row: u16,
+    col: u16,
+    anchor: Option<(u16, u16)>,
+    shared: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CompanionKind {
+    Array,
+    Table,
+    Shared,
+    Sub,
+}
+
+impl FormulaLink {
+    fn from_record(record: &CellRecord) -> Option<Self> {
+        let CellRecord::Formula {
+            row,
+            col,
+            formula,
+            metadata,
+            ..
+        } = record
+        else {
+            return None;
+        };
+        Some(Self {
+            row: *row,
+            col: *col,
+            anchor: ptg_exp_anchor(formula),
+            shared: metadata.shared_formula(),
+        })
+    }
+}
+
+fn add_cell(
+    worksheet: &mut Worksheet,
+    cell: Cell,
+    duplicate_cells: &mut HashSet<(u16, u16)>,
+    maximum: usize,
+) -> Result<()> {
+    let position = (cell.row() as u16, cell.column() as u16);
+    if worksheet
+        .get_cell(u32::from(position.0), u32::from(position.1))
+        .is_some()
+    {
+        if !duplicate_cells.contains(&position) && duplicate_cells.len() >= maximum {
+            return Err(Error::InvalidRecord {
+                record_type: 0x0006,
+                message: "duplicate cell count exceeds the configured limit".to_string(),
+            });
+        }
+        duplicate_cells
+            .try_reserve(1)
+            .map_err(|_| Error::Allocation("tracking duplicate worksheet cells"))?;
+        duplicate_cells.insert(position);
+    }
+    worksheet.add_cell(cell);
+    Ok(())
+}
+
+fn claim_companion(
+    predecessor: Option<FormulaLink>,
+    kind: CompanionKind,
+    record_type: u16,
+    claims: &mut HashMap<(u16, u16), CompanionKind>,
+    maximum: usize,
+) -> Result<FormulaLink> {
+    let predecessor = predecessor.ok_or_else(|| Error::InvalidRecord {
+        record_type,
+        message: format!("{kind:?} must immediately follow its Formula record"),
+    })?;
+    let anchor = (predecessor.row, predecessor.col);
+    if let Some(existing) = claims.get(&anchor) {
+        return Err(Error::InvalidRecord {
+            record_type,
+            message: format!(
+                "Formula at ({}, {}) already owns a {existing:?} companion",
+                anchor.0, anchor.1
+            ),
+        });
+    }
+    if claims.len() >= maximum {
+        return Err(Error::InvalidRecord {
+            record_type,
+            message: "Formula companion count exceeds the configured limit".to_string(),
+        });
+    }
+    claims
+        .try_reserve(1)
+        .map_err(|_| Error::Allocation("tracking Formula companion ownership"))?;
+    claims.insert(anchor, kind);
+    Ok(predecessor)
+}
+
+fn column_mask(first: u8, last: u8, word: usize) -> u64 {
+    let word_first = word * 64;
+    let word_last = word_first + 63;
+    let first = usize::from(first).max(word_first);
+    let last = usize::from(last).min(word_last);
+    if first > last {
+        return 0;
+    }
+    let width = last - first + 1;
+    let bits = if width == 64 {
+        u64::MAX
+    } else {
+        (1u64 << width) - 1
+    };
+    bits << (first - word_first)
+}
+
+fn claim_array_range(occupancy: &mut HashMap<u16, [u64; 4]>, owner: &ArrayFormula) -> Result<()> {
+    let range = owner.range();
+    let first_row = range.first().row();
+    let last_row = range.last().row();
+    let masks: [u64; 4] =
+        std::array::from_fn(|word| column_mask(range.first().col(), range.last().col(), word));
+    let mut missing_rows = 0usize;
+    for row in first_row..=last_row {
+        if let Some(columns) = occupancy.get(&row) {
+            if columns
+                .iter()
+                .zip(masks)
+                .any(|(occupied, mask)| occupied & mask != 0)
+            {
+                return Err(Error::InvalidRecord {
+                    record_type: 0x0221,
+                    message: "Array owner overlaps an existing Array range".to_string(),
+                });
+            }
+        } else {
+            missing_rows = missing_rows
+                .checked_add(1)
+                .ok_or_else(|| Error::InvalidRecord {
+                    record_type: 0x0221,
+                    message: "Array occupancy row count overflows".to_string(),
+                })?;
+        }
+    }
+    occupancy
+        .try_reserve(missing_rows)
+        .map_err(|_| Error::Allocation("indexing Array range occupancy"))?;
+    for row in first_row..=last_row {
+        let columns = occupancy.entry(row).or_insert([0; 4]);
+        for (occupied, mask) in columns.iter_mut().zip(masks) {
+            *occupied |= mask;
+        }
+    }
+    Ok(())
+}
 
 impl<R: Read + Seek> Workbook<R> {
     /// Parse a worksheet from its position in the workbook stream
@@ -124,6 +281,16 @@ impl<R: Read + Seek> Workbook<R> {
             crate::row_block_index::RowBlockIndexCollector::new(stream_len, current_position);
         let mut pending_string_formula: Option<CellRecord> = None;
         let mut shared_formulas = HashMap::<(u16, u16), SharedFormulaTemplate>::new();
+        let array_limits = array::Limits::default();
+        let tracking_limit = array_limits.max_cells();
+        let mut array_formulas = Vec::<Arc<ArrayFormula>>::new();
+        let mut array_formula_by_anchor = HashMap::<(u16, u16), Arc<ArrayFormula>>::new();
+        let mut array_occupancy = HashMap::<u16, [u64; 4]>::new();
+        let mut ptg_exp_cells = HashMap::<(u16, u16), FormulaLink>::new();
+        let mut duplicate_cells = HashSet::<(u16, u16)>::new();
+        let mut companion_claims = HashMap::<(u16, u16), CompanionKind>::new();
+        let mut immediately_preceding_formula: Option<FormulaLink> = None;
+        let mut dimensions: Option<DimensionsRecord> = None;
         let mut remaining_data_validations: Option<usize> = None;
 
         while let Some(record_result) = records_iter.next() {
@@ -160,6 +327,7 @@ impl<R: Read + Seek> Workbook<R> {
                 record.kind().get(),
                 record.payload(),
             );
+            let preceding_formula = immediately_preceding_formula.take();
 
             if matches!(remaining_data_validations, Some(1..))
                 && record.kind().get() != crate::data_validation::DV_RECORD_TYPE
@@ -218,7 +386,7 @@ impl<R: Read + Seek> Workbook<R> {
                         {
                             cell.set_rendered_formula(Some(rendered));
                         }
-                        worksheet.add_cell(cell);
+                        add_cell(&mut worksheet, cell, &mut duplicate_cells, tracking_limit)?;
                     }
                     continue;
                 }
@@ -295,7 +463,29 @@ impl<R: Read + Seek> Workbook<R> {
                     worksheet.set_sheet_ext(crate::sheet_ext::SheetExt::parse(record.payload())?);
                 }
                 crate::data_table::TABLE_RECORD_TYPE => { // Table
+                    claim_companion(
+                        preceding_formula,
+                        CompanionKind::Table,
+                        crate::data_table::TABLE_RECORD_TYPE,
+                        &mut companion_claims,
+                        tracking_limit,
+                    )?;
                     worksheet.add_data_table(crate::data_table::DataTable::parse(record.payload())?);
+                }
+                0x0091 => { // SUB
+                    claim_companion(
+                        preceding_formula,
+                        CompanionKind::Sub,
+                        0x0091,
+                        &mut companion_claims,
+                        tracking_limit,
+                    )?;
+                }
+                0x0207 => {
+                    return Err(Error::InvalidRecord {
+                        record_type: 0x0207,
+                        message: "String record has no pending string-valued Formula".to_string(),
+                    });
                 }
                 crate::web_pub::WEB_PUB_RECORD_TYPE => { // WebPub
                     worksheet
@@ -368,9 +558,14 @@ impl<R: Read + Seek> Workbook<R> {
                         .set_phonetic_info(crate::phonetic_info::PhoneticInfo::parse(&payload)?);
                 }
                 0x0200 => { // Dimensions
-                    if let Ok(dimensions) = DimensionsRecord::parse(record.payload()) {
-                        worksheet.set_dimensions(dimensions.first_row, dimensions.last_row,
-                                               dimensions.first_col, dimensions.last_col);
+                    if let Ok(parsed_dimensions) = DimensionsRecord::parse(record.payload()) {
+                        worksheet.set_dimensions(
+                            parsed_dimensions.first_row,
+                            parsed_dimensions.last_row,
+                            parsed_dimensions.first_col,
+                            parsed_dimensions.last_col,
+                        );
+                        dimensions = Some(parsed_dimensions);
                     }
                 }
                 // Cell records
@@ -384,6 +579,23 @@ impl<R: Read + Seek> Workbook<R> {
                 => {
                     let cell_record = CellRecord::parse(record.kind().get(), record.payload(), encoding)?;
                     formatting.validate_cell_xf(cell_record_xf(&cell_record))?;
+                    if let Some(link) = FormulaLink::from_record(&cell_record) {
+                        let position = (link.row, link.col);
+                        if link.anchor.is_some() {
+                            if ptg_exp_cells.len() >= tracking_limit {
+                                return Err(Error::InvalidRecord {
+                                    record_type: 0x0006,
+                                    message: "PtgExp Formula count exceeds the configured limit"
+                                        .to_string(),
+                                });
+                            }
+                            ptg_exp_cells
+                                .try_reserve(1)
+                                .map_err(|_| Error::Allocation("tracking PtgExp Formula cells"))?;
+                            ptg_exp_cells.insert(position, link);
+                        }
+                        immediately_preceding_formula = Some(link);
+                    }
                     if matches!(
                         &cell_record,
                         CellRecord::Formula {
@@ -410,16 +622,56 @@ impl<R: Read + Seek> Workbook<R> {
                                 {
                                     cell.set_rendered_formula(Some(rendered));
                                 }
-                        worksheet.add_cell(cell);
+                        add_cell(
+                            &mut worksheet,
+                            cell,
+                            &mut duplicate_cells,
+                            tracking_limit,
+                        )?;
                     }
                 }
 
-                0x04BC | 0x0221 => { // ShrFmla or Array
+                0x04BC => { // ShrFmla
+                    let predecessor = claim_companion(
+                        preceding_formula,
+                        CompanionKind::Shared,
+                        0x04BC,
+                        &mut companion_claims,
+                        tracking_limit,
+                    )?;
                     let template = parse_shared_formula_template(
                         record.kind().get(),
                         record.payload(),
                     )?;
                     let anchor = (template.first_row, template.first_col);
+                    if (predecessor.row, predecessor.col) != anchor
+                        || predecessor.anchor != Some(anchor)
+                        || !predecessor.shared
+                    {
+                        return Err(Error::InvalidRecord {
+                            record_type: 0x04BC,
+                            message: "ShrFmla must follow its fShrFmla/PtgExp anchor Formula"
+                                .to_string(),
+                        });
+                    }
+                    if shared_formulas.contains_key(&anchor)
+                        || array_formula_by_anchor.contains_key(&anchor)
+                    {
+                        return Err(Error::InvalidRecord {
+                            record_type: 0x04BC,
+                            message: "Formula anchor already owns an Array or ShrFmla record"
+                                .to_string(),
+                        });
+                    }
+                    if shared_formulas.len() >= tracking_limit {
+                        return Err(Error::InvalidRecord {
+                            record_type: 0x04BC,
+                            message: "ShrFmla owner count exceeds the configured limit".to_string(),
+                        });
+                    }
+                    shared_formulas
+                        .try_reserve(1)
+                        .map_err(|_| Error::Allocation("tracking ShrFmla owners"))?;
                     let rendered = template.render(formula_context, anchor.0, anchor.1);
                     shared_formulas.insert(anchor, template);
                     if let Some(cell) = worksheet.get_cell_mut(
@@ -428,6 +680,60 @@ impl<R: Read + Seek> Workbook<R> {
                     ) {
                         cell.set_rendered_formula(rendered);
                     }
+                }
+
+                0x0221 => { // Array
+                    let predecessor = claim_companion(
+                        preceding_formula,
+                        CompanionKind::Array,
+                        0x0221,
+                        &mut companion_claims,
+                        tracking_limit,
+                    )?;
+                    let owner = Arc::new(array::parse_payload(
+                        record.payload(),
+                        array_limits,
+                    )?);
+                    let anchor = owner.anchor();
+                    let anchor_position = (anchor.row(), u16::from(anchor.col()));
+                    if (predecessor.row, predecessor.col) != anchor_position
+                        || predecessor.anchor != Some(anchor_position)
+                    {
+                        return Err(Error::InvalidRecord {
+                            record_type: 0x0221,
+                            message: "Array anchor Formula must be at RefU top-left and contain its exact standalone PtgExp".to_string(),
+                        });
+                    }
+                    if predecessor.shared {
+                        return Err(Error::InvalidRecord {
+                            record_type: 0x0221,
+                            message: "Array anchor Formula must have fShrFmla cleared".to_string(),
+                        });
+                    }
+                    if array_formula_by_anchor.contains_key(&anchor_position)
+                        || shared_formulas.contains_key(&anchor_position)
+                    {
+                        return Err(Error::InvalidRecord {
+                            record_type: 0x0221,
+                            message: "Array owner duplicates or overlaps an existing Array range"
+                                .to_string(),
+                        });
+                    }
+                    if array_formulas.len() >= tracking_limit {
+                        return Err(Error::InvalidRecord {
+                            record_type: 0x0221,
+                            message: "Array owner count exceeds the configured limit".to_string(),
+                        });
+                    }
+                    array_formulas
+                        .try_reserve(1)
+                        .map_err(|_| Error::Allocation("tracking Array owners"))?;
+                    array_formula_by_anchor
+                        .try_reserve(1)
+                        .map_err(|_| Error::Allocation("indexing Array owners"))?;
+                    claim_array_range(&mut array_occupancy, &owner)?;
+                    array_formula_by_anchor.insert(anchor_position, Arc::clone(&owner));
+                    array_formulas.push(owner);
                 }
 
                 0x00BD => { // MulRk
@@ -439,7 +745,12 @@ impl<R: Read + Seek> Workbook<R> {
                             formula_context,
                             Some(&formatting),
                         ) {
-                            worksheet.add_cell(cell);
+                            add_cell(
+                                &mut worksheet,
+                                cell,
+                                &mut duplicate_cells,
+                                tracking_limit,
+                            )?;
                         }
                     }
                 }
@@ -453,7 +764,12 @@ impl<R: Read + Seek> Workbook<R> {
                             formula_context,
                             Some(&formatting),
                         ) {
-                            worksheet.add_cell(cell);
+                            add_cell(
+                                &mut worksheet,
+                                cell,
+                                &mut duplicate_cells,
+                                tracking_limit,
+                            )?;
                         }
                     }
                 }
@@ -506,6 +822,96 @@ impl<R: Read + Seek> Workbook<R> {
                 message: "worksheet ended before all DV records declared by DVAL".to_string(),
             });
         }
+
+        for (position, link) in &ptg_exp_cells {
+            let Some(anchor) = link.anchor else {
+                continue;
+            };
+            let resolved_array = !link.shared
+                && array_formula_by_anchor.get(&anchor).is_some_and(|owner| {
+                    owner.range().contains(FormulaCell::new(
+                        position.0,
+                        u8::try_from(position.1).unwrap_or(u8::MAX),
+                    ))
+                });
+            let resolved_shared = link.shared
+                && shared_formulas
+                    .get(&anchor)
+                    .is_some_and(|owner| owner.contains(position.0, position.1));
+            if !resolved_array && !resolved_shared {
+                return Err(Error::InvalidRecord {
+                    record_type: 0x0006,
+                    message: format!(
+                        "Formula at ({}, {}) contains an orphan PtgExp",
+                        position.0, position.1
+                    ),
+                });
+            }
+        }
+
+        if !array_formulas.is_empty() && dimensions.is_none() {
+            return Err(Error::InvalidRecord {
+                record_type: 0x0221,
+                message: "Array formulas require worksheet Dimensions".to_string(),
+            });
+        }
+
+        for owner in &array_formulas {
+            let range = owner.range();
+            if let Some(dimensions) = &dimensions
+                && (u32::from(range.first().row()) < dimensions.first_row
+                    || u32::from(range.last().row()) >= dimensions.last_row
+                    || u32::from(range.first().col()) < dimensions.first_col
+                    || u32::from(range.last().col()) >= dimensions.last_col)
+            {
+                return Err(Error::InvalidRecord {
+                    record_type: 0x0221,
+                    message: "Array range is outside worksheet Dimensions".to_string(),
+                });
+            }
+            let anchor = owner.anchor();
+            let anchor_position = (anchor.row(), u16::from(anchor.col()));
+            let rendered: Option<Arc<str>> =
+                render_formula(owner.tokens(), formula_context).map(Arc::from);
+            for coordinate in owner.cells() {
+                let position = (coordinate.row(), u16::from(coordinate.col()));
+                let link = ptg_exp_cells
+                    .get(&position)
+                    .ok_or_else(|| Error::InvalidRecord {
+                        record_type: 0x0221,
+                        message: format!(
+                            "Array range cell ({}, {}) has no Formula/PtgExp record",
+                            position.0, position.1
+                        ),
+                    })?;
+                if duplicate_cells.contains(&position)
+                    || link.anchor != Some(anchor_position)
+                    || link.shared
+                {
+                    return Err(Error::InvalidRecord {
+                        record_type: 0x0221,
+                        message: format!(
+                            "Array range cell ({}, {}) is not exactly one Formula/PtgExp to its anchor",
+                            position.0, position.1
+                        ),
+                    });
+                }
+                let cell = worksheet
+                    .get_cell_mut(u32::from(position.0), u32::from(position.1))
+                    .ok_or_else(|| Error::InvalidRecord {
+                        record_type: 0x0221,
+                        message: "Array Formula cell was not materialized".to_string(),
+                    })?;
+                cell.set_rendered_formula_arc(rendered.clone());
+                if !cell.set_array_formula(Arc::clone(owner)) {
+                    return Err(Error::InvalidRecord {
+                        record_type: 0x0221,
+                        message: "Array owner cannot attach to a non-Formula cell".to_string(),
+                    });
+                }
+            }
+        }
+        worksheet.set_array_formulas(array_formulas);
         for table in pivot_table_collector.finish()? {
             worksheet.add_pivot_table(table);
         }

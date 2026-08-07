@@ -651,6 +651,130 @@ fn shared_formula_round_trips_with_inert_relative_references() {
 }
 
 #[test]
+fn array_formula_staging_is_atomic_complete_and_protected() {
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer.write_number(sheet, 1, 1, 7.0).unwrap();
+    let occupied = FormulaRange::try_new(0, 0, 1, 1).unwrap();
+    assert!(matches!(
+        writer.write_array_formula(sheet, occupied, "A1+1"),
+        Err(Error::InvalidData(_))
+    ));
+    assert_eq!(writer.worksheets[sheet].cells.len(), 1);
+
+    let range = FormulaRange::try_new(3, 2, 4, 3).unwrap();
+    writer
+        .write_array_formula_with_format(sheet, range, "A1+1", 0)
+        .unwrap();
+    assert_eq!(writer.worksheets[sheet].cells.len(), 5);
+    let owners: Vec<_> = [(3, 2), (3, 3), (4, 2), (4, 3)]
+        .into_iter()
+        .map(|key| {
+            let cell = writer.worksheets[sheet].cells.get(&key).unwrap();
+            assert!(matches!(&cell.value, CellValue::Formula(value) if value.is_empty()));
+            cell.formula_metadata
+                .as_ref()
+                .and_then(crate::FormulaMetadata::array_owner)
+                .unwrap()
+        })
+        .collect();
+    assert!(owners.iter().all(|owner| std::ptr::eq(*owner, owners[0])));
+    assert_eq!(owners[0].range(), range);
+    assert_eq!(owners[0].cell_count(), 4);
+    assert!(owners[0].always_calculate());
+
+    let before = writer.worksheets[sheet].cells.len();
+    assert!(matches!(
+        writer.write_string(sheet, 4, 3, "break the group"),
+        Err(Error::InvalidData(_))
+    ));
+    assert_eq!(writer.worksheets[sheet].cells.len(), before);
+}
+
+#[test]
+fn array_formula_rejects_data_tables_and_cell_limit_without_mutation() {
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    let table = crate::DataTable::one_variable(
+        crate::DataTableRange::new(1, 2, 1, 2).unwrap(),
+        false,
+        crate::DataTableInputCell::Deleted,
+    );
+    writer.add_data_table(sheet, 0, 0, table).unwrap();
+    let before = writer.worksheets[sheet].cells.len();
+    assert!(matches!(
+        writer.write_array_formula(sheet, FormulaRange::try_new(1, 1, 2, 2).unwrap(), "A1+1"),
+        Err(Error::InvalidData(_))
+    ));
+    assert_eq!(writer.worksheets[sheet].cells.len(), before);
+
+    assert!(matches!(
+        writer.write_array_formula(
+            sheet,
+            FormulaRange::try_new(0, 0, u32::from(u16::MAX), u16::from(u8::MAX)).unwrap(),
+            "A1+1"
+        ),
+        Err(Error::InvalidFormula(_))
+    ));
+    assert_eq!(writer.worksheets[sheet].cells.len(), before);
+
+    writer
+        .write_array_formula(sheet, FormulaRange::try_new(4, 4, 4, 5).unwrap(), "A1+1")
+        .unwrap();
+}
+
+#[test]
+fn data_table_after_array_formula_is_rejected_atomically_and_retryable() {
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer
+        .write_array_formula(sheet, FormulaRange::try_new(1, 1, 2, 2).unwrap(), "A1+1")
+        .unwrap();
+    let overlapping = crate::DataTable::one_variable(
+        crate::DataTableRange::new(1, 2, 1, 2).unwrap(),
+        false,
+        crate::DataTableInputCell::Deleted,
+    );
+    let before = writer.worksheets[sheet].cells.len();
+    assert!(matches!(
+        writer.add_data_table(sheet, 0, 0, overlapping),
+        Err(Error::InvalidData(_))
+    ));
+    assert_eq!(writer.worksheets[sheet].cells.len(), before);
+    assert!(!writer.worksheets[sheet].cells.contains_key(&(0, 0)));
+    assert!(writer.worksheets[sheet].data_tables.is_empty());
+
+    let disjoint = crate::DataTable::one_variable(
+        crate::DataTableRange::new(5, 6, 5, 6).unwrap(),
+        false,
+        crate::DataTableInputCell::Deleted,
+    );
+    writer.add_data_table(sheet, 0, 0, disjoint).unwrap();
+    assert_eq!(writer.worksheets[sheet].data_tables.len(), 1);
+}
+
+#[test]
+fn array_formula_explicit_limits_fail_without_mutation_and_can_retry() {
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    let range = FormulaRange::try_new(0, 0, 0, 1).unwrap();
+    let one_cell = crate::formula_metadata::array::Limits::default()
+        .with_max_cells(1)
+        .unwrap();
+    assert!(matches!(
+        writer.write_array_formula_with_limits(sheet, range, "A1+1", one_cell),
+        Err(Error::InvalidFormula(_))
+    ));
+    assert!(writer.worksheets[sheet].cells.is_empty());
+
+    let two_cells = one_cell.with_max_cells(2).unwrap();
+    writer
+        .write_array_formula_with_format_and_limits(sheet, range, "A1+1", 0, two_cells)
+        .unwrap();
+    assert_eq!(writer.worksheets[sheet].cells.len(), 2);
+}
+
+#[test]
 fn test_write_multiple_cells() {
     let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();

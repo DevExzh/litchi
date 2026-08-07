@@ -9,12 +9,12 @@ use super::{
     DataValidationOptions, DataValidationRange, DataValidationTableOptions, PageSetupOptions,
 };
 use crate::writer::biff::AutoFilterConditionWrite;
-use crate::writer::formula::{FormulaTokenizer, encode_ptg_tokens};
+use crate::writer::formula::{FormulaTokenizer, compile_array_formula, encode_ptg_tokens};
 use crate::{Error, Result};
 
 use super::model::Writer;
 
-use crate::formula_metadata::{Cell as FormulaCell, Owner, Range as FormulaRange};
+use crate::formula_metadata::{Cell as FormulaCell, Owner, Range as FormulaRange, array};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum PivotCellXfRole {
@@ -635,6 +635,160 @@ impl Writer {
             );
         }
 
+        Ok(())
+    }
+
+    /// Write one inert BIFF8 array formula over a complete rectangle.
+    ///
+    /// The upper-left cell owns the following `Array` record. Every cell in
+    /// `range` is staged as a Formula containing the owner's exact `PtgExp`;
+    /// sparse participation is intentionally not supported. The expression
+    /// is compiled by the bounded, non-executing array compiler and cached
+    /// results remain the canonical BIFF8 Empty value. Authored Array records
+    /// request recalculation by default, but this crate never evaluates them.
+    pub fn write_array_formula(
+        &mut self,
+        sheet: usize,
+        range: FormulaRange,
+        formula: &str,
+    ) -> Result<()> {
+        self.write_array_formula_with_format_and_limits(
+            sheet,
+            range,
+            formula,
+            0,
+            array::Limits::default(),
+        )
+    }
+
+    /// Write an inert BIFF8 array formula with explicit resource limits.
+    pub fn write_array_formula_with_limits(
+        &mut self,
+        sheet: usize,
+        range: FormulaRange,
+        formula: &str,
+        limits: array::Limits,
+    ) -> Result<()> {
+        self.write_array_formula_with_format_and_limits(sheet, range, formula, 0, limits)
+    }
+
+    /// Write a formatted, inert BIFF8 array formula over a complete rectangle.
+    pub fn write_array_formula_with_format(
+        &mut self,
+        sheet: usize,
+        range: FormulaRange,
+        formula: &str,
+        format_id: u16,
+    ) -> Result<()> {
+        self.write_array_formula_with_format_and_limits(
+            sheet,
+            range,
+            formula,
+            format_id,
+            array::Limits::default(),
+        )
+    }
+
+    /// Write a formatted, inert BIFF8 array formula with explicit limits.
+    pub fn write_array_formula_with_format_and_limits(
+        &mut self,
+        sheet: usize,
+        range: FormulaRange,
+        formula: &str,
+        format_id: u16,
+        limits: array::Limits,
+    ) -> Result<()> {
+        if self.fmt.get_format(format_id).is_none() {
+            return Err(Error::InvalidFormat(format_id));
+        }
+
+        let worksheet = self
+            .worksheets
+            .get(sheet)
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        let first = range.first();
+        let last = range.last();
+        let row_count = usize::from(last.row() - first.row()) + 1;
+        let col_count = usize::from(last.col() - first.col()) + 1;
+        let cell_count = row_count.checked_mul(col_count).ok_or_else(|| {
+            Error::InvalidFormula("array-formula rectangle cardinality overflow".to_string())
+        })?;
+        if cell_count > limits.max_cells() {
+            return Err(Error::InvalidFormula(format!(
+                "array-formula rectangle contains {cell_count} cells, exceeding the limit of {}",
+                limits.max_cells()
+            )));
+        }
+        let tokens = compile_array_formula(formula, limits)?;
+
+        let in_range = |row: u32, col: u16| {
+            (u32::from(first.row())..=u32::from(last.row())).contains(&row)
+                && (u16::from(first.col())..=u16::from(last.col())).contains(&col)
+        };
+        if let Some(&(row, col)) = worksheet
+            .cells
+            .keys()
+            .find(|&&(row, col)| in_range(row, col))
+        {
+            return Err(Error::InvalidData(format!(
+                "array-formula cell ({row}, {col}) is already occupied"
+            )));
+        }
+        for &(anchor_row, anchor_col, table) in &worksheet.data_tables {
+            if in_range(anchor_row, anchor_col) {
+                return Err(Error::InvalidData(format!(
+                    "array-formula range overlaps data-table anchor ({anchor_row}, {anchor_col})"
+                )));
+            }
+            let table_range = table.range();
+            let overlaps_rows = u32::from(first.row()) <= u32::from(table_range.last_row())
+                && u32::from(table_range.first_row()) <= u32::from(last.row());
+            let overlaps_cols =
+                first.col() <= table_range.last_col() && table_range.first_col() <= last.col();
+            if overlaps_rows && overlaps_cols {
+                return Err(Error::InvalidData(
+                    "array-formula range overlaps a data-table formula group".to_string(),
+                ));
+            }
+        }
+
+        let owner = if limits == array::Limits::default() {
+            array::Owner::from_compiled(range, tokens)?
+        } else {
+            array::Owner::from_compiled_with_limits(range, tokens, limits)?
+        };
+        let metadata = crate::FormulaMetadata::new()
+            .with_always_calculate(true)
+            .with_array(owner);
+        let mut candidates = Vec::new();
+        candidates
+            .try_reserve_exact(cell_count)
+            .map_err(|_| Error::Allocation("reserving array-formula cells"))?;
+        for row in first.row()..=last.row() {
+            for col in first.col()..=last.col() {
+                candidates.push(
+                    WritableCell::new(
+                        CellPos { row, col },
+                        CellValue::Formula(String::new()),
+                        format_id,
+                        None,
+                    )
+                    .with_formula_metadata(Some(metadata.clone())),
+                );
+            }
+        }
+
+        let worksheet = self
+            .worksheets
+            .get_mut(sheet)
+            .ok_or_else(|| Error::WorksheetNotFound(format!("Sheet {sheet}")))?;
+        worksheet
+            .cells
+            .try_reserve(cell_count)
+            .map_err(|_| Error::Allocation("reserving array-formula worksheet cells"))?;
+        for cell in candidates {
+            worksheet.add_cell(cell);
+        }
         Ok(())
     }
 }

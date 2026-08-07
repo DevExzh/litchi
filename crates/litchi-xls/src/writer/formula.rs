@@ -676,6 +676,456 @@ impl Default for FormulaTokenizer {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ArrayOperandClass {
+    Reference,
+    Value,
+    Array,
+}
+
+/// Compile the deliberately conservative, non-executing BIFF8 formula subset
+/// accepted for newly authored Array records.
+pub(crate) fn compile_array_formula(
+    formula: &str,
+    limits: crate::formula_metadata::array::Limits,
+) -> Result<Vec<u8>, Error> {
+    if formula.len() > limits.max_formula_bytes() {
+        return Err(Error::InvalidFormula(format!(
+            "array formula exceeds the {}-byte input limit",
+            limits.max_formula_bytes()
+        )));
+    }
+    let formula = formula.trim();
+    let expression = formula.strip_prefix('=').unwrap_or(formula).trim();
+    if expression.is_empty() {
+        return Err(Error::InvalidFormula(
+            "array formula cannot be empty".to_string(),
+        ));
+    }
+    let mut scalars = 0usize;
+    let mut nesting = 0usize;
+    let mut in_string = false;
+    let mut string_units = 0usize;
+    let mut chars = expression.chars().peekable();
+    while let Some(ch) = chars.next() {
+        scalars = scalars.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormula("array formula scalar count overflows".to_string())
+        })?;
+        if scalars > limits.max_formula_scalars() {
+            return Err(Error::InvalidFormula(format!(
+                "array formula exceeds the {}-scalar input limit",
+                limits.max_formula_scalars()
+            )));
+        }
+        if in_string {
+            if ch == '"' {
+                if chars.peek() == Some(&'"') {
+                    chars.next();
+                    scalars = scalars.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormula("array formula scalar count overflows".to_string())
+                    })?;
+                    if scalars > limits.max_formula_scalars() {
+                        return Err(Error::InvalidFormula(format!(
+                            "array formula exceeds the {}-scalar input limit",
+                            limits.max_formula_scalars()
+                        )));
+                    }
+                    string_units = string_units.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormula("array string length overflows".to_string())
+                    })?;
+                } else {
+                    in_string = false;
+                    string_units = 0;
+                }
+            } else {
+                string_units = string_units.checked_add(ch.len_utf16()).ok_or_else(|| {
+                    Error::InvalidFormula("array string length overflows".to_string())
+                })?;
+            }
+            if string_units > limits.max_string_utf16_units() {
+                return Err(Error::InvalidFormula(format!(
+                    "array string literal exceeds the {}-UTF-16-unit limit",
+                    limits.max_string_utf16_units()
+                )));
+            }
+            continue;
+        }
+        match ch {
+            '"' => in_string = true,
+            '(' => {
+                nesting = nesting.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormula("array formula nesting overflows".to_string())
+                })?;
+                if nesting > limits.max_nesting_depth() {
+                    return Err(Error::InvalidFormula(format!(
+                        "array formula exceeds the operator-depth limit of {}",
+                        limits.max_nesting_depth()
+                    )));
+                }
+            },
+            ')' => {
+                nesting = nesting.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormula(
+                        "array formula has an unmatched closing parenthesis".to_string(),
+                    )
+                })?;
+            },
+            '[' | ']' | '!' | '{' | '}' | ';' | '\'' | '\0' => {
+                return Err(Error::UnsupportedFeature(
+                    "external, structured, and code-bearing references are forbidden in authored array formulas"
+                        .to_string(),
+                ));
+            },
+            _ => {},
+        }
+    }
+
+    let tokens = FormulaTokenizer::new().tokenize(expression)?;
+    if tokens.is_empty() {
+        return Err(Error::InvalidFormula(
+            "array formula cannot be empty".to_string(),
+        ));
+    }
+    if tokens.len() > limits.max_tokens() {
+        return Err(Error::InvalidFormula(format!(
+            "array formula emits {} tokens, exceeding the limit of {}",
+            tokens.len(),
+            limits.max_tokens()
+        )));
+    }
+    if tokens.iter().any(|token| {
+        matches!(token, Ptg::Num(value) if !value.is_finite() || value.is_subnormal() || (*value == 0.0 && value.is_sign_negative()))
+            || matches!(token, Ptg::Area3d(..))
+    }) {
+        return Err(Error::UnsupportedFeature(
+            "non-finite, subnormal, negative-zero numbers and external or 3-D references are forbidden in authored array formulas"
+                .to_string(),
+        ));
+    }
+
+    // Normalize the tokenizer's `Ref Ref Range` form to the canonical area
+    // token so operand classes can be assigned without exposing raw tokens.
+    let mut normalized = Vec::new();
+    normalized
+        .try_reserve_exact(tokens.len())
+        .map_err(|_| Error::Allocation("normalizing array-formula tokens"))?;
+    for token in tokens {
+        if matches!(token, Ptg::Range) {
+            let Some(Ptg::Ref(last)) = normalized.pop() else {
+                return Err(Error::InvalidFormula(
+                    "array formula contains a non-rectangular range expression".to_string(),
+                ));
+            };
+            let Some(Ptg::Ref(first)) = normalized.pop() else {
+                return Err(Error::InvalidFormula(
+                    "array formula contains a non-rectangular range expression".to_string(),
+                ));
+            };
+            normalized.push(Ptg::Area(Area::new(first, last)?));
+        } else {
+            normalized.push(token);
+        }
+    }
+
+    let classes = array_operand_classes(
+        &normalized,
+        limits.max_operator_depth(),
+        limits.max_operands(),
+    )?;
+    try_encode_array_tokens(&normalized, &classes, limits.max_token_bytes())
+}
+
+fn array_operand_classes(
+    tokens: &[Ptg],
+    max_depth: usize,
+    max_operands: usize,
+) -> Result<Vec<Option<ArrayOperandClass>>, Error> {
+    let mut classes = Vec::new();
+    classes
+        .try_reserve_exact(tokens.len())
+        .map_err(|_| Error::Allocation("classifying array-formula operands"))?;
+    classes.resize(tokens.len(), None);
+    let mut stack: Vec<Option<usize>> = Vec::new();
+    stack
+        .try_reserve_exact(tokens.len())
+        .map_err(|_| Error::Allocation("classifying array-formula expression depth"))?;
+    let mut operand_count = 0usize;
+
+    for (index, token) in tokens.iter().enumerate() {
+        match token {
+            Ptg::Int(_)
+            | Ptg::Num(_)
+            | Ptg::Str(_)
+            | Ptg::Bool(_)
+            | Ptg::Ref(_)
+            | Ptg::Area(_)
+            | Ptg::MissArg => {
+                operand_count = operand_count.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormula("array-formula operand count overflows".to_string())
+                })?;
+                if operand_count > max_operands {
+                    return Err(Error::InvalidFormula(format!(
+                        "array formula exceeds the operand limit of {max_operands}"
+                    )));
+                }
+                stack.push(Some(index));
+            },
+            Ptg::UnaryPlus | Ptg::UnaryMinus | Ptg::Percent | Ptg::Paren => {
+                let operand = stack.pop().ok_or_else(|| {
+                    Error::InvalidFormula("array formula is missing an operand".to_string())
+                })?;
+                assign_array_class(tokens, &mut classes, operand, false);
+                stack.push(None);
+            },
+            Ptg::Add
+            | Ptg::Sub
+            | Ptg::Mul
+            | Ptg::Div
+            | Ptg::Power
+            | Ptg::Concat
+            | Ptg::Lt
+            | Ptg::Le
+            | Ptg::Eq
+            | Ptg::Ge
+            | Ptg::Gt
+            | Ptg::Ne => {
+                let right = stack.pop().ok_or_else(|| {
+                    Error::InvalidFormula("array formula is missing its right operand".to_string())
+                })?;
+                let left = stack.pop().ok_or_else(|| {
+                    Error::InvalidFormula("array formula is missing its left operand".to_string())
+                })?;
+                assign_array_class(tokens, &mut classes, left, false);
+                assign_array_class(tokens, &mut classes, right, false);
+                stack.push(None);
+            },
+            Ptg::Func(function, arguments) => {
+                operand_count = operand_count.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormula("array-formula operand count overflows".to_string())
+                })?;
+                if operand_count > max_operands {
+                    return Err(Error::InvalidFormula(format!(
+                        "array formula exceeds the operand limit of {max_operands}"
+                    )));
+                }
+                let argument_count = usize::from(*arguments);
+                if let Some(expected) = crate::formula::fixed_function_arity(*function)
+                    && argument_count != expected
+                {
+                    return Err(Error::InvalidFormula(format!(
+                        "array function {function} requires {expected} arguments"
+                    )));
+                }
+                if argument_count > stack.len() {
+                    return Err(Error::InvalidFormula(
+                        "array function is missing an argument".to_string(),
+                    ));
+                }
+                for argument in (0..argument_count).rev() {
+                    let operand = stack.pop().ok_or_else(|| {
+                        Error::InvalidFormula("array function is missing an argument".to_string())
+                    })?;
+                    let reference = matches!(*function, 0 | 4 | 5 | 6 | 7)
+                        || (*function == 102 && argument == 1);
+                    assign_array_class(tokens, &mut classes, operand, reference);
+                }
+                stack.push(None);
+            },
+            Ptg::Range | Ptg::Area3d(..) => {
+                return Err(Error::UnsupportedFeature(
+                    "unsupported reference token in authored array formula".to_string(),
+                ));
+            },
+        }
+        if stack.len() > max_depth {
+            return Err(Error::InvalidFormula(format!(
+                "array formula exceeds the operator-depth limit of {max_depth}"
+            )));
+        }
+    }
+    if stack.len() != 1 {
+        return Err(Error::InvalidFormula(
+            "array formula does not reduce to one expression".to_string(),
+        ));
+    }
+    assign_array_class(tokens, &mut classes, stack.pop().flatten(), false);
+    Ok(classes)
+}
+
+fn assign_array_class(
+    tokens: &[Ptg],
+    classes: &mut [Option<ArrayOperandClass>],
+    operand: Option<usize>,
+    reference: bool,
+) {
+    let Some(index) = operand else { return };
+    classes[index] = match tokens[index] {
+        Ptg::Ref(_) => Some(if reference {
+            ArrayOperandClass::Reference
+        } else {
+            ArrayOperandClass::Value
+        }),
+        Ptg::Area(_) => Some(if reference {
+            ArrayOperandClass::Reference
+        } else {
+            ArrayOperandClass::Array
+        }),
+        _ => classes[index],
+    };
+}
+
+fn try_encode_array_tokens(
+    tokens: &[Ptg],
+    classes: &[Option<ArrayOperandClass>],
+    byte_limit: usize,
+) -> Result<Vec<u8>, Error> {
+    let mut length = 0usize;
+    for token in tokens {
+        let token_length = match token {
+            Ptg::Int(_) => 3,
+            Ptg::Num(value) => {
+                if !value.is_finite()
+                    || value.is_subnormal()
+                    || (*value == 0.0 && value.is_sign_negative())
+                {
+                    return Err(Error::UnsupportedFeature(
+                        "invalid BIFF8 Xnum value in authored array formula".to_string(),
+                    ));
+                }
+                9
+            },
+            Ptg::Str(value) => {
+                let units = value.encode_utf16().count();
+                let width = if value.encode_utf16().all(|unit| unit <= 0xff) {
+                    1
+                } else {
+                    2
+                };
+                3usize
+                    .checked_add(units.checked_mul(width).ok_or_else(|| {
+                        Error::InvalidFormula("array string token length overflows".to_string())
+                    })?)
+                    .ok_or_else(|| {
+                        Error::InvalidFormula("array string token length overflows".to_string())
+                    })?
+            },
+            Ptg::Bool(_) => 2,
+            Ptg::Ref(_) => 5,
+            Ptg::Area(_) => 9,
+            Ptg::Add
+            | Ptg::Sub
+            | Ptg::Mul
+            | Ptg::Div
+            | Ptg::Power
+            | Ptg::Concat
+            | Ptg::Lt
+            | Ptg::Le
+            | Ptg::Eq
+            | Ptg::Ge
+            | Ptg::Gt
+            | Ptg::Ne
+            | Ptg::Range
+            | Ptg::UnaryPlus
+            | Ptg::UnaryMinus
+            | Ptg::Percent
+            | Ptg::Paren
+            | Ptg::MissArg => 1,
+            Ptg::Func(_, _) => 4,
+            Ptg::Area3d(..) => 11,
+        };
+        length = length.checked_add(token_length).ok_or_else(|| {
+            Error::InvalidFormula("array token stream length overflows".to_string())
+        })?;
+        if length > byte_limit {
+            return Err(Error::InvalidFormula(format!(
+                "array token stream exceeds the {byte_limit}-byte limit"
+            )));
+        }
+    }
+
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(length)
+        .map_err(|_| Error::Allocation("encoding array-formula tokens"))?;
+    for (index, token) in tokens.iter().enumerate() {
+        match token {
+            Ptg::Int(value) => {
+                bytes.push(0x1e);
+                bytes.extend_from_slice(&value.to_le_bytes());
+            },
+            Ptg::Num(value) => {
+                bytes.push(0x1f);
+                bytes.extend_from_slice(&value.to_le_bytes());
+            },
+            Ptg::Str(value) => {
+                let units = value.encode_utf16().count();
+                let compressed = value.encode_utf16().all(|unit| unit <= 0xff);
+                bytes.push(0x17);
+                bytes.push(units as u8);
+                if compressed {
+                    bytes.push(0);
+                    bytes.extend(value.encode_utf16().map(|unit| unit as u8));
+                } else {
+                    bytes.push(1);
+                    for unit in value.encode_utf16() {
+                        bytes.extend_from_slice(&unit.to_le_bytes());
+                    }
+                }
+            },
+            Ptg::Bool(value) => bytes.extend_from_slice(&[0x1d, u8::from(*value)]),
+            Ptg::Ref(reference) => {
+                bytes.push(match classes[index].unwrap_or(ArrayOperandClass::Value) {
+                    ArrayOperandClass::Reference => 0x24,
+                    ArrayOperandClass::Value => 0x44,
+                    ArrayOperandClass::Array => 0x64,
+                });
+                bytes.extend_from_slice(&reference.row().to_le_bytes());
+                bytes.extend_from_slice(&reference.col_flags().to_le_bytes());
+            },
+            Ptg::Area(area) => {
+                bytes.push(match classes[index].unwrap_or(ArrayOperandClass::Array) {
+                    ArrayOperandClass::Reference => 0x25,
+                    ArrayOperandClass::Value => 0x45,
+                    ArrayOperandClass::Array => 0x65,
+                });
+                let first = area.first();
+                let last = area.last();
+                bytes.extend_from_slice(&first.row().to_le_bytes());
+                bytes.extend_from_slice(&last.row().to_le_bytes());
+                bytes.extend_from_slice(&first.col_flags().to_le_bytes());
+                bytes.extend_from_slice(&last.col_flags().to_le_bytes());
+            },
+            Ptg::Add => bytes.push(0x03),
+            Ptg::Sub => bytes.push(0x04),
+            Ptg::Mul => bytes.push(0x05),
+            Ptg::Div => bytes.push(0x06),
+            Ptg::Power => bytes.push(0x07),
+            Ptg::Concat => bytes.push(0x08),
+            Ptg::Lt => bytes.push(0x09),
+            Ptg::Le => bytes.push(0x0a),
+            Ptg::Eq => bytes.push(0x0b),
+            Ptg::Ge => bytes.push(0x0c),
+            Ptg::Gt => bytes.push(0x0d),
+            Ptg::Ne => bytes.push(0x0e),
+            Ptg::UnaryPlus => bytes.push(0x12),
+            Ptg::UnaryMinus => bytes.push(0x13),
+            Ptg::Percent => bytes.push(0x14),
+            Ptg::Paren => bytes.push(0x15),
+            Ptg::MissArg => bytes.push(0x16),
+            Ptg::Func(function, arguments) => {
+                bytes.extend_from_slice(&[0x42, *arguments]);
+                bytes.extend_from_slice(&function.to_le_bytes());
+            },
+            Ptg::Range | Ptg::Area3d(..) => {
+                return Err(Error::UnsupportedFeature(
+                    "unsupported token in authored array formula".to_string(),
+                ));
+            },
+        }
+    }
+    Ok(bytes)
+}
+
 /// Encode Ptg tokens to binary format for BIFF8
 pub fn encode_ptg_tokens(tokens: &[Ptg]) -> Vec<u8> {
     let mut bytes = Vec::new();
@@ -1241,5 +1691,31 @@ mod tests {
         );
         assert!(matches!(tokens[2], Ptg::Range));
         assert!(matches!(tokens[3], Ptg::Func(4, 1)));
+    }
+
+    #[test]
+    fn array_compiler_assigns_operand_classes_and_rejects_external_syntax() {
+        let limits = crate::formula_metadata::array::Limits::default();
+        let scalar = compile_array_formula("A1+1", limits).unwrap();
+        assert_eq!(scalar[0], 0x44);
+        let aggregate = compile_array_formula("SUM(A1:B2)", limits).unwrap();
+        assert_eq!(aggregate[0], 0x25);
+        assert_eq!(aggregate[9], 0x42);
+        let vector = compile_array_formula("A1:A2*B1:B2", limits).unwrap();
+        assert_eq!(vector[0], 0x65);
+        assert_eq!(vector[9], 0x65);
+        for hostile in [
+            "[book.xls]Sheet1!A1",
+            "'Sheet 1'!A1",
+            "CALL(\"x\")",
+            "DDE(\"server\",\"topic\")",
+            "MADEUP(A1)",
+        ] {
+            assert!(compile_array_formula(hostile, limits).is_err(), "{hostile}");
+        }
+
+        let subnormal = format!("{:.324}", f64::from_bits(1));
+        assert!(compile_array_formula(&subnormal, limits).is_err());
+        assert!(try_encode_array_tokens(&[Ptg::Num(-0.0)], &[None], 1_800).is_err());
     }
 }

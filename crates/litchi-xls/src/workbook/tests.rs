@@ -132,8 +132,24 @@ fn dval_data(rule_count: u32) -> Vec<u8> {
     data
 }
 
+fn dimensions_data(first_row: u32, last_row: u32, first_col: u16, last_col: u16) -> Vec<u8> {
+    let mut data = Vec::new();
+    data.extend_from_slice(&first_row.to_le_bytes());
+    data.extend_from_slice(&last_row.to_le_bytes());
+    data.extend_from_slice(&first_col.to_le_bytes());
+    data.extend_from_slice(&last_col.to_le_bytes());
+    data.extend_from_slice(&0u16.to_le_bytes());
+    data
+}
+
 fn string_formula_data(row: u16, col: u16) -> Vec<u8> {
     let mut data = formula_data(row, col, &[]);
+    data[6] = 0;
+    data
+}
+
+fn string_formula_data_with_tokens(row: u16, col: u16, tokens: &[u8]) -> Vec<u8> {
+    let mut data = formula_data(row, col, tokens);
     data[6] = 0;
     data
 }
@@ -148,6 +164,19 @@ fn formula_data(row: u16, col: u16, tokens: &[u8]) -> Vec<u8> {
     data.extend_from_slice(&0u32.to_le_bytes());
     data.extend_from_slice(&(tokens.len() as u16).to_le_bytes());
     data.extend_from_slice(tokens);
+    data
+}
+
+fn array_data(first_row: u16, last_row: u16, first_col: u8, last_col: u8) -> Vec<u8> {
+    let tokens = [0x1e, 7, 0];
+    let mut data = Vec::new();
+    data.extend_from_slice(&first_row.to_le_bytes());
+    data.extend_from_slice(&last_row.to_le_bytes());
+    data.extend_from_slice(&[first_col, last_col]);
+    data.extend_from_slice(&0u16.to_le_bytes());
+    data.extend_from_slice(&0u32.to_le_bytes());
+    data.extend_from_slice(&(tokens.len() as u16).to_le_bytes());
+    data.extend_from_slice(&tokens);
     data
 }
 
@@ -342,7 +371,13 @@ fn worksheet_resolves_string_formula_across_intervening_array_record() {
     string_data.extend_from_slice(b"array");
 
     let mut stream = Vec::new();
-    push_record(&mut stream, 0x0006, &string_formula_data(4, 5));
+    push_record(&mut stream, 0x0200, &dimensions_data(4, 5, 5, 6));
+    let anchor = [0x01, 4, 0, 5, 0];
+    push_record(
+        &mut stream,
+        0x0006,
+        &string_formula_data_with_tokens(4, 5, &anchor),
+    );
     push_record(&mut stream, 0x0221, &array);
     push_record(&mut stream, 0x0207, &string_data);
     push_record(&mut stream, 0x000A, &[]);
@@ -368,6 +403,8 @@ fn worksheet_resolves_string_formula_across_intervening_array_record() {
         cell.value(),
         litchi_core::sheet::CellValue::String(value) if value == "array"
     ));
+    assert!(cell.is_array_formula());
+    assert_eq!(worksheet.array_formulas().len(), 1);
 }
 
 #[test]
@@ -602,9 +639,13 @@ fn worksheet_expands_shared_formula_relative_references() {
     shared.extend_from_slice(&template);
 
     let mut stream = Vec::new();
-    push_record(&mut stream, 0x0006, &formula_data(0, 1, &anchor));
+    let mut owner_formula = formula_data(0, 1, &anchor);
+    owner_formula[14..16].copy_from_slice(&0x0008u16.to_le_bytes());
+    push_record(&mut stream, 0x0006, &owner_formula);
     push_record(&mut stream, 0x04bc, &shared);
-    push_record(&mut stream, 0x0006, &formula_data(1, 1, &anchor));
+    let mut participant_formula = formula_data(1, 1, &anchor);
+    participant_formula[14..16].copy_from_slice(&0x0008u16.to_le_bytes());
+    push_record(&mut stream, 0x0006, &participant_formula);
     push_record(&mut stream, 0x000a, &[]);
     let mut records = Records::new(&stream);
     let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
@@ -643,6 +684,7 @@ fn worksheet_resolves_array_formula_for_every_cell() {
     array.extend_from_slice(&template);
 
     let mut stream = Vec::new();
+    push_record(&mut stream, 0x0200, &dimensions_data(0, 2, 2, 3));
     push_record(&mut stream, 0x0006, &formula_data(0, 2, &anchor));
     push_record(&mut stream, 0x0221, &array);
     push_record(&mut stream, 0x0006, &formula_data(1, 2, &anchor));
@@ -664,4 +706,227 @@ fn worksheet_resolves_array_formula_for_every_cell() {
 
     assert_eq!(worksheet.get_cell(0, 2).unwrap().formula(), Some("=7"));
     assert_eq!(worksheet.get_cell(1, 2).unwrap().formula(), Some("=7"));
+    assert!(worksheet.get_cell(0, 2).unwrap().is_array_formula());
+    assert!(worksheet.get_cell(1, 2).unwrap().is_array_formula());
+    assert!(worksheet.array_formula_at(1, 2).is_some());
+    assert_eq!(worksheet.array_formulas().len(), 1);
+    let first = worksheet.get_cell(0, 2).unwrap();
+    let second = worksheet.get_cell(1, 2).unwrap();
+    let owner = worksheet.array_formulas().next().unwrap();
+    assert!(std::ptr::eq(
+        first.formula().unwrap(),
+        second.formula().unwrap()
+    ));
+    assert!(std::ptr::eq(first.array_formula().unwrap(), owner));
+    assert!(std::ptr::eq(second.array_formula().unwrap(), owner));
+    assert!(std::ptr::eq(
+        first.formula_metadata().unwrap().array_owner().unwrap(),
+        owner,
+    ));
+}
+
+#[test]
+fn worksheet_rejects_orphan_and_incomplete_array_ptg_exp_links() {
+    let anchor = [0x01, 0, 0, 2, 0];
+    let orphan = {
+        let mut stream = Vec::new();
+        push_record(&mut stream, 0x0200, &dimensions_data(0, 2, 2, 3));
+        push_record(&mut stream, 0x0006, &formula_data(0, 2, &anchor));
+        push_record(&mut stream, 0x000a, &[]);
+        stream
+    };
+
+    let incomplete = {
+        let template = [0x1e, 7, 0];
+        let mut array = Vec::new();
+        array.extend_from_slice(&0u16.to_le_bytes());
+        array.extend_from_slice(&1u16.to_le_bytes());
+        array.extend_from_slice(&[2, 2]);
+        array.extend_from_slice(&0u16.to_le_bytes());
+        array.extend_from_slice(&0u32.to_le_bytes());
+        array.extend_from_slice(&(template.len() as u16).to_le_bytes());
+        array.extend_from_slice(&template);
+        let mut stream = Vec::new();
+        push_record(&mut stream, 0x0006, &formula_data(0, 2, &anchor));
+        push_record(&mut stream, 0x0221, &array);
+        push_record(&mut stream, 0x000a, &[]);
+        stream
+    };
+
+    for stream in [orphan, incomplete] {
+        let mut records = Records::new(&stream);
+        assert!(
+            Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+                &mut records,
+                stream.len() as u64,
+                0,
+                0,
+                &Encoding::Utf16Le,
+                "Sheet1",
+                Arc::new(Vec::new()),
+                Arc::new(Vec::new()),
+                None,
+                Arc::new(Formatting::default()),
+            )
+            .is_err()
+        );
+    }
+}
+
+#[test]
+fn worksheet_rejects_array_without_dimensions_and_second_formula_companion() {
+    let anchor = [0x01, 0, 0, 2, 0];
+    let template = [0x1e, 7, 0];
+    let mut array = Vec::new();
+    array.extend_from_slice(&0u16.to_le_bytes());
+    array.extend_from_slice(&0u16.to_le_bytes());
+    array.extend_from_slice(&[2, 2]);
+    array.extend_from_slice(&0u16.to_le_bytes());
+    array.extend_from_slice(&0u32.to_le_bytes());
+    array.extend_from_slice(&(template.len() as u16).to_le_bytes());
+    array.extend_from_slice(&template);
+
+    let without_dimensions = {
+        let mut stream = Vec::new();
+        push_record(&mut stream, 0x0006, &formula_data(0, 2, &anchor));
+        push_record(&mut stream, 0x0221, &array);
+        push_record(&mut stream, 0x000a, &[]);
+        stream
+    };
+
+    let with_second_companion = {
+        let mut shared = Vec::new();
+        shared.extend_from_slice(&0u16.to_le_bytes());
+        shared.extend_from_slice(&0u16.to_le_bytes());
+        shared.extend_from_slice(&[2, 2, 0, 1]);
+        shared.extend_from_slice(&(template.len() as u16).to_le_bytes());
+        shared.extend_from_slice(&template);
+        let mut stream = Vec::new();
+        push_record(&mut stream, 0x0200, &dimensions_data(0, 1, 2, 3));
+        push_record(&mut stream, 0x0006, &formula_data(0, 2, &anchor));
+        push_record(&mut stream, 0x0221, &array);
+        push_record(&mut stream, 0x04bc, &shared);
+        push_record(&mut stream, 0x000a, &[]);
+        stream
+    };
+
+    let cross_kind_same_anchor = {
+        let mut stream = Vec::new();
+        push_record(&mut stream, 0x0200, &dimensions_data(0, 1, 2, 3));
+        push_record(&mut stream, 0x0006, &formula_data(0, 2, &anchor));
+        push_record(&mut stream, 0x0221, &array);
+        push_record(&mut stream, 0x0006, &formula_data(0, 2, &anchor));
+        push_record(&mut stream, 0x0091, &[]);
+        push_record(&mut stream, 0x000a, &[]);
+        stream
+    };
+
+    for stream in [
+        without_dimensions,
+        with_second_companion,
+        cross_kind_same_anchor,
+    ] {
+        let mut records = Records::new(&stream);
+        assert!(
+            Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+                &mut records,
+                stream.len() as u64,
+                0,
+                0,
+                &Encoding::Utf16Le,
+                "Sheet1",
+                Arc::new(Vec::new()),
+                Arc::new(Vec::new()),
+                None,
+                Arc::new(Formatting::default()),
+            )
+            .is_err()
+        );
+    }
+}
+
+#[test]
+fn worksheet_rejects_formula_companions_without_an_adjacent_formula() {
+    for record_type in [0x0221, crate::data_table::TABLE_RECORD_TYPE, 0x04bc, 0x0091] {
+        let mut stream = Vec::new();
+        push_record(&mut stream, record_type, &[]);
+        push_record(&mut stream, 0x000a, &[]);
+        let mut records = Records::new(&stream);
+        assert!(
+            Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+                &mut records,
+                stream.len() as u64,
+                0,
+                0,
+                &Encoding::Utf16Le,
+                "Sheet1",
+                Arc::new(Vec::new()),
+                Arc::new(Vec::new()),
+                None,
+                Arc::new(Formatting::default()),
+            )
+            .is_err()
+        );
+    }
+}
+
+#[test]
+fn worksheet_indexes_many_array_ranges_and_rejects_indexed_overlap() {
+    let mut nonoverlap = Vec::new();
+    push_record(&mut nonoverlap, 0x0200, &dimensions_data(0, 64, 0, 8));
+    for row in 0u16..64 {
+        for col in 0u8..8 {
+            let row_bytes = row.to_le_bytes();
+            let anchor = [0x01, row_bytes[0], row_bytes[1], col, 0];
+            push_record(
+                &mut nonoverlap,
+                0x0006,
+                &formula_data(row, u16::from(col), &anchor),
+            );
+            push_record(&mut nonoverlap, 0x0221, &array_data(row, row, col, col));
+        }
+    }
+    push_record(&mut nonoverlap, 0x000a, &[]);
+    let mut records = Records::new(&nonoverlap);
+    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+        &mut records,
+        nonoverlap.len() as u64,
+        0,
+        0,
+        &Encoding::Utf16Le,
+        "Sheet1",
+        Arc::new(Vec::new()),
+        Arc::new(Vec::new()),
+        None,
+        Arc::new(Formatting::default()),
+    )
+    .unwrap();
+    assert_eq!(worksheet.array_formulas().len(), 512);
+
+    let first_anchor = [0x01, 0, 0, 0, 0];
+    let second_anchor = [0x01, 0, 0, 1, 0];
+    let mut overlap = Vec::new();
+    push_record(&mut overlap, 0x0200, &dimensions_data(0, 1, 0, 3));
+    push_record(&mut overlap, 0x0006, &formula_data(0, 0, &first_anchor));
+    push_record(&mut overlap, 0x0221, &array_data(0, 0, 0, 1));
+    push_record(&mut overlap, 0x0006, &formula_data(0, 1, &first_anchor));
+    push_record(&mut overlap, 0x0006, &formula_data(0, 1, &second_anchor));
+    push_record(&mut overlap, 0x0221, &array_data(0, 0, 1, 2));
+    push_record(&mut overlap, 0x000a, &[]);
+    let mut records = Records::new(&overlap);
+    assert!(
+        Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            &mut records,
+            overlap.len() as u64,
+            0,
+            0,
+            &Encoding::Utf16Le,
+            "Sheet1",
+            Arc::new(Vec::new()),
+            Arc::new(Vec::new()),
+            None,
+            Arc::new(Formatting::default()),
+        )
+        .is_err()
+    );
 }

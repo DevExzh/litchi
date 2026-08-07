@@ -372,7 +372,7 @@ pub(crate) fn render_shared_formula(
 
 /// Return the shared/array formula anchor encoded by a standalone `PtgExp`.
 pub(crate) fn ptg_exp_anchor(tokens: &[u8]) -> Option<(u16, u16)> {
-    if tokens.len() != 5 || tokens[0] & 0x7f != 0x01 {
+    if tokens.len() != 5 || tokens[0] != 0x01 || tokens[4] != 0 {
         return None;
     }
     Some((
@@ -887,6 +887,12 @@ fn column_name(mut column: usize) -> String {
 }
 
 include!("formula_function_metadata.rs");
+
+/// Return the exact fixed arity of a built-in BIFF function, or `None` for
+/// variable-arity and unknown functions.
+pub(crate) fn fixed_function_arity(index: u16) -> Option<usize> {
+    function_metadata(index)?.fixed_arity()
+}
 
 #[cfg(test)]
 mod tests {

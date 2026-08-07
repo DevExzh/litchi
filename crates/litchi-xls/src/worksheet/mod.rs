@@ -7,6 +7,7 @@ use crate::cell::Cell;
 use crate::comments::Comment;
 use crate::conditional_format::ConditionalFormatting;
 use crate::error::{Error, Result};
+use crate::formula_metadata::array::Owner as ArrayFormula;
 use crate::hyperlinks::Hyperlink;
 use crate::layout::{Column, Row};
 use crate::merged_cells::MergedCellRange;
@@ -31,6 +32,7 @@ use super::data_validation::{DataValidationRule, DataValidationSettings};
 pub struct Worksheet {
     name: String,
     cells: BTreeMap<(u32, u32), Cell>,
+    array_formulas: Vec<Arc<ArrayFormula>>,
     max_row: u32,
     max_col: u32,
     /// Shared string table (Arc for zero-copy sharing across worksheets)
@@ -93,6 +95,7 @@ impl Worksheet {
         Worksheet {
             name,
             cells: BTreeMap::new(),
+            array_formulas: Vec::new(),
             max_row: 0,
             max_col: 0,
             shared_strings: None,
@@ -138,6 +141,7 @@ impl Worksheet {
         Worksheet {
             name,
             cells: BTreeMap::new(),
+            array_formulas: Vec::new(),
             max_row: 0,
             max_col: 0,
             shared_strings: Some(shared_strings),
@@ -240,6 +244,20 @@ impl Worksheet {
 
     pub(crate) fn get_cell_mut(&mut self, row: u32, col: u32) -> Option<&mut Cell> {
         self.cells.get_mut(&(row, col))
+    }
+
+    /// Structurally valid BIFF8 Array owners in workbook record order.
+    pub fn array_formulas(&self) -> impl ExactSizeIterator<Item = &ArrayFormula> {
+        self.array_formulas.iter().map(Arc::as_ref)
+    }
+
+    /// Return the Array owner covering a zero-based worksheet coordinate.
+    pub fn array_formula_at(&self, row: u32, col: u32) -> Option<&ArrayFormula> {
+        self.get_cell(row, col)?.array_formula()
+    }
+
+    pub(crate) fn set_array_formulas(&mut self, owners: Vec<Arc<ArrayFormula>>) {
+        self.array_formulas = owners;
     }
 
     // -- Merged cells --

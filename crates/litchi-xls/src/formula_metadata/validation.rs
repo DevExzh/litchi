@@ -33,6 +33,15 @@ pub(crate) fn encode_flags(metadata: &Metadata, tokens: &[u8]) -> Result<u16> {
 }
 
 pub(crate) fn validate_for_write(metadata: &Metadata) -> Result<()> {
+    if let Some(owner) = metadata.array_owner() {
+        if metadata.shared_formula() || metadata.shared_owner().is_some() {
+            return Err(Error::InvalidData(
+                "Formula metadata cannot own both Array and ShrFmla records".to_string(),
+            ));
+        }
+        return owner.validate();
+    }
+
     match (metadata.shared_formula(), metadata.shared_owner()) {
         (true, Some(owner)) => owner.validate(),
         (true, None) => Err(Error::UnsupportedFeature(
@@ -46,7 +55,7 @@ pub(crate) fn validate_for_write(metadata: &Metadata) -> Result<()> {
 }
 
 pub(crate) const fn is_ptg_exp(tokens: &[u8]) -> bool {
-    tokens.len() == 5 && tokens[0] & 0x7F == 0x01
+    tokens.len() == 5 && tokens[0] == 0x01 && tokens[4] == 0
 }
 
 pub(crate) fn invalid(message: impl Into<String>) -> Error {

@@ -56,6 +56,13 @@ formulas, `PtgNameX` references, DDE/OLE, targets, macros, and controls are neve
 resolved, fetched, activated, or executed. New-workbook authoring refuses `PtgNameX`, while
 source data can remain inertly preserved.
 
+For BIFF8 array formulas, the XLS matrix records a strict typed `Array` owner/parser, complete
+rectangle and `PtgExp` Formula binding, bounded `Array`/`RgbExtra` preservation and validation,
+and required Formula-to-Array writer ordering. Conservative textual authoring accepts only its
+safe supported subset. This does not provide existing-workbook array resize/add transactions or a
+full Excel formula compiler; formula tokens and cached values are inert and never evaluated or
+executed.
+
 iWork parsing is split by concrete application format: `litchi-pages` owns
 Pages (`.pages`), `litchi-keynote` owns Keynote (`.key`), and `litchi-numbers`
 owns Numbers (`.numbers`). Their shared IWA archive, protocol, and package

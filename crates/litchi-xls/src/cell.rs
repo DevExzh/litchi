@@ -2,10 +2,12 @@
 
 use crate::formula::{FormulaContext, render_formula};
 use crate::formula_metadata::Metadata;
+use crate::formula_metadata::array::Owner as ArrayFormula;
 use crate::number_format::Formatting;
 use crate::records::{BoolErrValue, CellRecord, FormulaValue};
 use crate::utils;
 use litchi_core::sheet::{Cell as CellTrait, CellValue};
+use std::sync::Arc;
 
 /// XLS cell implementation
 #[derive(Debug, Clone)]
@@ -13,7 +15,7 @@ pub struct Cell {
     row: u32,
     col: u32,
     value: CellValue,
-    formula: Option<String>,
+    formula: Option<Arc<str>>,
     formula_bytes: Option<Vec<u8>>,
     formula_metadata: Option<Metadata>,
     shared_string_index: Option<u32>,
@@ -41,7 +43,7 @@ impl Cell {
             row,
             col,
             value,
-            formula: Some(formula),
+            formula: Some(Arc::from(formula)),
             formula_bytes: None,
             formula_metadata: None,
             shared_string_index: None,
@@ -176,7 +178,7 @@ impl Cell {
             row,
             col,
             value,
-            formula,
+            formula: formula.map(Arc::from),
             formula_bytes,
             formula_metadata,
             shared_string_index,
@@ -213,8 +215,33 @@ impl Cell {
         self.formula_metadata.as_ref()
     }
 
+    /// BIFF8 Array owner covering this Formula cell, when present.
+    ///
+    /// Array formulas are represented as inert metadata. Litchi never executes
+    /// the token stream or external content referenced by it.
+    pub fn array_formula(&self) -> Option<&ArrayFormula> {
+        self.formula_metadata.as_ref()?.array_owner()
+    }
+
+    /// Whether this cell participates in a structurally valid BIFF8 Array.
+    pub fn is_array_formula(&self) -> bool {
+        self.array_formula().is_some()
+    }
+
     pub(crate) fn set_rendered_formula(&mut self, formula: Option<String>) {
+        self.formula = formula.map(Arc::from);
+    }
+
+    pub(crate) fn set_rendered_formula_arc(&mut self, formula: Option<Arc<str>>) {
         self.formula = formula;
+    }
+
+    pub(crate) fn set_array_formula(&mut self, owner: Arc<ArrayFormula>) -> bool {
+        let Some(metadata) = self.formula_metadata.as_mut() else {
+            return false;
+        };
+        metadata.attach_array(owner);
+        true
     }
 }
 

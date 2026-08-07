@@ -1,9 +1,12 @@
+use std::collections::HashMap;
 use std::io::{self, ErrorKind};
 
 const INDEX_RECORD_TYPE: u16 = 0x020b;
 const ROW_RECORD_TYPE: u16 = 0x0208;
 const TABLE_RECORD_TYPE: u16 = 0x0236;
 const SHARED_FORMULA_RECORD_TYPE: u16 = 0x04BC;
+const ARRAY_RECORD_TYPE: u16 = 0x0221;
+const FORMULA_RECORD_TYPE: u16 = 0x0006;
 const DBCELL_RECORD_TYPE: u16 = 0x00d7;
 const MAX_ROWS_PER_BLOCK: usize = 32;
 const MAX_ROW_BLOCKS: usize = 2048;
@@ -201,9 +204,13 @@ fn decode_staged_rows(bytes: &[u8]) -> io::Result<Vec<RowBlockLayoutRow>> {
                 bytes[offset..record_end].to_vec(),
                 Vec::new(),
             ));
-        } else if matches!(record_type, TABLE_RECORD_TYPE | SHARED_FORMULA_RECORD_TYPE) {
-            // Table and ShrFmla records follow their anchor Formula and share
-            // its layout row; their payloads do not start with the row.
+        } else if matches!(
+            record_type,
+            TABLE_RECORD_TYPE | SHARED_FORMULA_RECORD_TYPE | ARRAY_RECORD_TYPE
+        ) {
+            // Table, ShrFmla, and Array records follow their anchor Formula
+            // and share its layout row; their payloads do not start with the
+            // row.
             reached_cells = true;
             let row_index = last_cell_row
                 .ok_or_else(|| invalid("staged continuation has no preceding cell record"))?;
@@ -239,7 +246,220 @@ fn validate_rows(rows: &[RowBlockLayoutRow]) -> io::Result<()> {
         validate_cell_records(row)?;
         previous = Some(row.row);
     }
+    validate_array_formula_groups(rows)?;
     Ok(())
+}
+
+#[derive(Clone, Copy)]
+struct FormulaLayout {
+    cell: (u16, u16),
+    ptg_exp: Option<(u16, u16)>,
+    shared: bool,
+}
+
+#[derive(Clone, Copy)]
+struct ArrayLayout {
+    first_row: u16,
+    last_row: u16,
+    first_col: u16,
+    last_col: u16,
+}
+
+impl ArrayLayout {
+    const fn anchor(self) -> (u16, u16) {
+        (self.first_row, self.first_col)
+    }
+
+    const fn contains(self, cell: (u16, u16)) -> bool {
+        cell.0 >= self.first_row
+            && cell.0 <= self.last_row
+            && cell.1 >= self.first_col
+            && cell.1 <= self.last_col
+    }
+
+    fn cell_count(self) -> io::Result<usize> {
+        let rows = usize::from(self.last_row - self.first_row)
+            .checked_add(1)
+            .ok_or_else(overflow)?;
+        let columns = usize::from(self.last_col - self.first_col)
+            .checked_add(1)
+            .ok_or_else(overflow)?;
+        rows.checked_mul(columns).ok_or_else(overflow)
+    }
+}
+
+/// Validate the cross-record ownership that cannot be proven by checking one
+/// BIFF frame at a time. MS-XLS requires the Array record to immediately
+/// follow the upper-left Formula, and every cell in Ref to contain one
+/// standalone PtgExp Formula targeting that anchor.
+fn validate_array_formula_groups(rows: &[RowBlockLayoutRow]) -> io::Result<()> {
+    let mut arrays = Vec::new();
+    let mut owners = HashMap::new();
+
+    // First pass: inventory owners and prove direct Formula/Array adjacency
+    // without retaining one semantic entry for every Formula record.
+    for row in rows {
+        let mut offset = 0usize;
+        let mut preceding_formula = None;
+        while offset < row.cell_records.len() {
+            let header_end = offset.checked_add(4).ok_or_else(overflow)?;
+            let record_type =
+                u16::from_le_bytes([row.cell_records[offset], row.cell_records[offset + 1]]);
+            let payload_len = usize::from(u16::from_le_bytes([
+                row.cell_records[offset + 2],
+                row.cell_records[offset + 3],
+            ]));
+            let record_end = header_end.checked_add(payload_len).ok_or_else(overflow)?;
+            let payload = &row.cell_records[header_end..record_end];
+
+            if record_type == FORMULA_RECORD_TYPE {
+                let formula = decode_formula_layout(payload)?;
+                preceding_formula = Some(formula);
+            } else if record_type == ARRAY_RECORD_TYPE {
+                let formula = preceding_formula.take().ok_or_else(|| {
+                    invalid("Array record is not immediately preceded by its anchor Formula")
+                })?;
+                let array = decode_array_layout(payload)?;
+                if formula.cell != array.anchor() || formula.ptg_exp != Some(array.anchor()) {
+                    return Err(invalid(
+                        "Array record is displaced from its upper-left PtgExp Formula",
+                    ));
+                }
+                if formula.shared {
+                    return Err(invalid("array-formula anchor Formula has fShrFmla set"));
+                }
+                if owners.contains_key(&array.anchor()) {
+                    return Err(invalid("duplicate Array owner for one anchor"));
+                }
+                arrays
+                    .try_reserve(1)
+                    .map_err(|_| invalid("allocating the Array layout registry failed"))?;
+                let index = arrays.len();
+                arrays.push(array);
+                owners
+                    .try_reserve(1)
+                    .map_err(|_| invalid("allocating the Array owner index failed"))?;
+                owners.insert(array.anchor(), index);
+            } else {
+                preceding_formula = None;
+            }
+            offset = record_end;
+        }
+    }
+
+    let mut counts = Vec::new();
+    counts
+        .try_reserve_exact(arrays.len())
+        .map_err(|_| invalid("allocating Array participant counts failed"))?;
+    counts.resize(arrays.len(), 0usize);
+    let mut previous_formula_cell = None;
+
+    // Second pass: Formula coordinates in a staged row table are row-major.
+    // Strict monotonicity therefore detects duplicate and reordered Formula
+    // records with constant memory. Only Array-owner-proportional counters
+    // remain allocated; an array-free sheet is validated entirely by
+    // streaming its Formula records.
+    for row in rows {
+        let mut offset = 0usize;
+        while offset < row.cell_records.len() {
+            let header_end = offset.checked_add(4).ok_or_else(overflow)?;
+            let record_type =
+                u16::from_le_bytes([row.cell_records[offset], row.cell_records[offset + 1]]);
+            let payload_len = usize::from(u16::from_le_bytes([
+                row.cell_records[offset + 2],
+                row.cell_records[offset + 3],
+            ]));
+            let record_end = header_end.checked_add(payload_len).ok_or_else(overflow)?;
+            if record_type != FORMULA_RECORD_TYPE {
+                offset = record_end;
+                continue;
+            }
+            let formula = decode_formula_layout(&row.cell_records[header_end..record_end])?;
+            if previous_formula_cell.is_some_and(|previous| formula.cell <= previous) {
+                return Err(invalid(
+                    "Formula records are duplicated or not in row-major order",
+                ));
+            }
+            previous_formula_cell = Some(formula.cell);
+            if let Some(anchor) = formula.ptg_exp {
+                let Some(&owner_index) = owners.get(&anchor) else {
+                    if formula.shared {
+                        offset = record_end;
+                        continue;
+                    }
+                    return Err(invalid(
+                        "standalone PtgExp Formula has no Array or ShrFmla owner",
+                    ));
+                };
+                let owner = arrays[owner_index];
+                if formula.shared || !owner.contains(formula.cell) {
+                    return Err(invalid(
+                        "array-formula participant does not match its Array owner",
+                    ));
+                }
+                counts[owner_index] = counts[owner_index].checked_add(1).ok_or_else(overflow)?;
+            }
+            offset = record_end;
+        }
+    }
+
+    for (array, participant_count) in arrays.into_iter().zip(counts) {
+        if participant_count != array.cell_count()? {
+            return Err(invalid(
+                "Array range is not covered by exactly one PtgExp Formula per cell",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn decode_formula_layout(payload: &[u8]) -> io::Result<FormulaLayout> {
+    if payload.len() < 22 {
+        return Err(invalid("Formula record is shorter than its fixed fields"));
+    }
+    let row = u16::from_le_bytes([payload[0], payload[1]]);
+    let col = u16::from_le_bytes([payload[2], payload[3]]);
+    let flags = u16::from_le_bytes([payload[14], payload[15]]);
+    let token_len = usize::from(u16::from_le_bytes([payload[20], payload[21]]));
+    let token_end = 22usize.checked_add(token_len).ok_or_else(overflow)?;
+    if token_end > payload.len() {
+        return Err(invalid("Formula token stream exceeds its record payload"));
+    }
+    let tokens = &payload[22..token_end];
+    let ptg_exp = if tokens.first() == Some(&0x01) {
+        if tokens.len() != 5 || token_end != payload.len() {
+            return Err(invalid(
+                "PtgExp Formula is not one exact standalone five-byte token",
+            ));
+        }
+        Some((
+            u16::from_le_bytes([tokens[1], tokens[2]]),
+            u16::from_le_bytes([tokens[3], tokens[4]]),
+        ))
+    } else {
+        None
+    };
+    Ok(FormulaLayout {
+        cell: (row, col),
+        ptg_exp,
+        shared: flags & 0x0008 != 0,
+    })
+}
+
+fn decode_array_layout(payload: &[u8]) -> io::Result<ArrayLayout> {
+    let owner = crate::formula_metadata::array::parse_payload(
+        payload,
+        crate::formula_metadata::array::Limits::default(),
+    )
+    .map_err(|error| invalid(&format!("invalid Array payload: {error}")))?;
+    let range = owner.range();
+    let layout = ArrayLayout {
+        first_row: range.first().row(),
+        last_row: range.last().row(),
+        first_col: u16::from(range.first().col()),
+        last_col: u16::from(range.last().col()),
+    };
+    Ok(layout)
 }
 
 fn logical_blocks(rows: &[RowBlockLayoutRow]) -> io::Result<Vec<std::ops::Range<usize>>> {
@@ -318,9 +538,12 @@ fn validate_cell_records(row: &RowBlockLayoutRow) -> io::Result<()> {
         if record_end > row.cell_records.len() {
             return Err(invalid("cell record buffer ends inside a BIFF payload"));
         }
-        if matches!(record_type, TABLE_RECORD_TYPE | SHARED_FORMULA_RECORD_TYPE) {
-            // Table and ShrFmla records carry continuation metadata rather
-            // than the anchor cell's row.
+        if matches!(
+            record_type,
+            TABLE_RECORD_TYPE | SHARED_FORMULA_RECORD_TYPE | ARRAY_RECORD_TYPE
+        ) {
+            // Table, ShrFmla, and Array records carry continuation metadata
+            // rather than the anchor cell's row.
             offset = record_end;
             continue;
         }
@@ -470,6 +693,34 @@ mod tests {
         bytes
     }
 
+    fn formula_record(row: u16, column: u16, anchor: (u16, u16), shared: bool) -> Vec<u8> {
+        let mut bytes = vec![0x06, 0x00, 27, 0];
+        bytes.extend_from_slice(&row.to_le_bytes());
+        bytes.extend_from_slice(&column.to_le_bytes());
+        bytes.extend_from_slice(&0u16.to_le_bytes());
+        bytes.extend_from_slice(&[3, 0, 0, 0, 0, 0, 0xff, 0xff]);
+        bytes.extend_from_slice(&(if shared { 0x0008u16 } else { 0 }).to_le_bytes());
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+        bytes.extend_from_slice(&5u16.to_le_bytes());
+        bytes.push(0x01);
+        bytes.extend_from_slice(&anchor.0.to_le_bytes());
+        bytes.extend_from_slice(&anchor.1.to_le_bytes());
+        bytes
+    }
+
+    fn array_record(first: (u16, u8), last: (u16, u8)) -> Vec<u8> {
+        let tokens = [0x1e, 1, 0];
+        let mut bytes = vec![0x21, 0x02, 17, 0];
+        bytes.extend_from_slice(&first.0.to_le_bytes());
+        bytes.extend_from_slice(&last.0.to_le_bytes());
+        bytes.extend_from_slice(&[first.1, last.1]);
+        bytes.extend_from_slice(&0u16.to_le_bytes());
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+        bytes.extend_from_slice(&(tokens.len() as u16).to_le_bytes());
+        bytes.extend_from_slice(&tokens);
+        bytes
+    }
+
     #[test]
     fn generates_exact_single_block_bytes() {
         let rows = vec![
@@ -568,5 +819,132 @@ mod tests {
             &plan.row_table()[58..],
             &[0xd7, 0x00, 0x06, 0x00, 58, 0, 0, 0, 20, 0]
         );
+    }
+
+    #[test]
+    fn keeps_array_with_its_anchor_in_checked_row_blocks() {
+        let mut anchor_records = formula_record(0, 0, (0, 0), false);
+        anchor_records.extend_from_slice(&array_record((0, 0), (1, 0)));
+        let rows = vec![
+            RowBlockLayoutRow::new(0, row_record(0), anchor_records.clone()),
+            RowBlockLayoutRow::new(1, row_record(1), formula_record(1, 0, (0, 0), false)),
+        ];
+        let plan = RowBlockLayoutPlan::generate(100, 40, 8, rows.clone()).unwrap();
+        assert!(
+            plan.row_table()
+                .windows(4)
+                .any(|bytes| bytes == [0x21, 0x02, 17, 0])
+        );
+
+        let mut staged = Vec::new();
+        for row in &rows {
+            staged.extend_from_slice(row.row_record());
+        }
+        for row in &rows {
+            staged.extend_from_slice(row.cell_records());
+        }
+        let regenerated = RowBlockLayoutPlan::generate_from_staged(100, 40, 8, &staged).unwrap();
+        assert_eq!(regenerated, plan);
+    }
+
+    #[test]
+    fn rejects_orphan_displaced_duplicate_and_incomplete_arrays() {
+        let orphan = RowBlockLayoutRow::new(0, row_record(0), array_record((0, 0), (0, 0)));
+        assert!(RowBlockLayoutPlan::generate(0, 8, 0, vec![orphan]).is_err());
+
+        let mut displaced = formula_record(0, 1, (0, 1), false);
+        displaced.extend_from_slice(&array_record((0, 0), (0, 0)));
+        assert!(
+            RowBlockLayoutPlan::generate(
+                0,
+                8,
+                0,
+                vec![RowBlockLayoutRow::new(0, row_record(0), displaced)]
+            )
+            .is_err()
+        );
+
+        let mut duplicate = formula_record(0, 0, (0, 0), false);
+        duplicate.extend_from_slice(&array_record((0, 0), (0, 0)));
+        duplicate.extend_from_slice(&array_record((0, 0), (0, 0)));
+        assert!(
+            RowBlockLayoutPlan::generate(
+                0,
+                8,
+                0,
+                vec![RowBlockLayoutRow::new(0, row_record(0), duplicate)]
+            )
+            .is_err()
+        );
+
+        let mut incomplete = formula_record(0, 0, (0, 0), false);
+        incomplete.extend_from_slice(&array_record((0, 0), (1, 0)));
+        assert!(
+            RowBlockLayoutPlan::generate(
+                0,
+                8,
+                0,
+                vec![
+                    RowBlockLayoutRow::new(0, row_record(0), incomplete),
+                    RowBlockLayoutRow::new(1, row_record(1), Vec::new()),
+                ]
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_orphan_ptg_exp_without_any_array_record() {
+        let row = RowBlockLayoutRow::new(0, row_record(0), formula_record(0, 0, (0, 0), false));
+        assert!(RowBlockLayoutPlan::generate(0, 8, 0, vec![row]).is_err());
+    }
+
+    #[test]
+    fn tolerates_ignored_array_reserved_bits_from_preserved_source() {
+        let mut records = formula_record(0, 0, (0, 0), false);
+        let mut array = array_record((0, 0), (0, 0));
+        array[11] = 0x80;
+        records.extend_from_slice(&array);
+        let row = RowBlockLayoutRow::new(0, row_record(0), records);
+        assert!(RowBlockLayoutPlan::generate(0, 8, 0, vec![row]).is_ok());
+    }
+
+    #[test]
+    fn rejects_duplicate_and_reordered_formulas_without_allocating_an_owner_registry() {
+        let mut first = formula_record(0, 0, (0, 0), false);
+        first[26] = 0x1e;
+        let mut duplicate = first.clone();
+        first.append(&mut duplicate);
+        let row = RowBlockLayoutRow::new(0, row_record(0), first);
+        assert!(RowBlockLayoutPlan::generate(0, 8, 0, vec![row]).is_err());
+
+        let mut later = formula_record(0, 1, (0, 1), false);
+        later[26] = 0x1e;
+        let mut earlier = formula_record(0, 0, (0, 0), false);
+        earlier[26] = 0x1e;
+        later.extend_from_slice(&earlier);
+        let row = RowBlockLayoutRow::new(0, row_record(0), later);
+        assert!(RowBlockLayoutPlan::generate(0, 8, 0, vec![row]).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_array_rpn_and_unmatched_rgb_extra() {
+        let mut lone_add = array_record((0, 0), (0, 0));
+        lone_add[2..4].copy_from_slice(&15u16.to_le_bytes());
+        lone_add[16..18].copy_from_slice(&1u16.to_le_bytes());
+        lone_add.truncate(19);
+        lone_add[18] = 0x03;
+        let mut records = formula_record(0, 0, (0, 0), false);
+        records.extend_from_slice(&lone_add);
+        let row = RowBlockLayoutRow::new(0, row_record(0), records);
+        assert!(RowBlockLayoutPlan::generate(0, 8, 0, vec![row]).is_err());
+
+        let mut extra = array_record((0, 0), (0, 0));
+        extra[2..4].copy_from_slice(&18u16.to_le_bytes());
+        extra.push(0);
+        let mut records = formula_record(0, 0, (0, 0), false);
+        records.extend_from_slice(&extra);
+        let row = RowBlockLayoutRow::new(0, row_record(0), records);
+        assert!(RowBlockLayoutPlan::generate(0, 8, 0, vec![row]).is_err());
     }
 }

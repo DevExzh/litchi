@@ -5,6 +5,7 @@
 //! cache without pretending to evaluate formulas or rebuild Excel's dependency
 //! graph.
 
+pub mod array;
 mod codec;
 mod model;
 pub mod shared;
