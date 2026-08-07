@@ -422,9 +422,9 @@ pub(super) fn delete_table_sort_column(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::{
-        NumbersDocumentBuilder, ColumnDeletion, ColumnInsertion, RowDeletion,
-        RowInsertion,
+    use crate::numbers::NumbersDocumentBuilder;
+    use litchi_numbers::table::topology::{
+        ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion,
     };
 
     #[test]
@@ -526,10 +526,7 @@ mod tests {
         );
 
         editor
-            .remove_table_row(
-                test_table_selector(&editor, table_id),
-                RowDeletion::body(0),
-            )
+            .remove_table_row(test_table_selector(&editor, table_id), RowDeletion::body(0))
             .unwrap();
         editor
             .remove_table_column(

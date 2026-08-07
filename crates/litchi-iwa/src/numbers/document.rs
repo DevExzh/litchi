@@ -88,17 +88,19 @@ impl NumbersDocument {
     ) -> Result<Self> {
         let archive_sheets = Self::decode_sheets(&bundle, &object_index, &root_document)?;
         let mut semantic_sheets = Vec::new();
-        semantic_sheets.try_reserve(archive_sheets.len()).map_err(|_| {
-            crate::Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-                resource: "Numbers semantic sheets",
-                amount: archive_sheets.len(),
-            })
-        })?;
+        semantic_sheets
+            .try_reserve(archive_sheets.len())
+            .map_err(|_| {
+                crate::Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                    resource: "Numbers semantic sheets",
+                    amount: archive_sheets.len(),
+                })
+            })?;
         for sheet in archive_sheets {
             semantic_sheets.push(sheet.into_semantic()?);
         }
-        let semantic_document = litchi_numbers::Document::from_sheets(semantic_sheets)
-            .map_err(|error| {
+        let semantic_document =
+            litchi_numbers::Document::from_sheets(semantic_sheets).map_err(|error| {
                 Error::InvalidFormat(format!(
                     "Numbers semantic document is invalid at ingress: {error}"
                 ))

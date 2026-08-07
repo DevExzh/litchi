@@ -33,11 +33,7 @@ impl PagesEditor {
     ///
     /// The operation fails unchanged when a surviving formula still references
     /// the deleted row or native topology cannot be rewritten safely.
-    pub fn remove_table_row(
-        &mut self,
-        model_object_id: u64,
-        deletion: RowDeletion,
-    ) -> Result<()> {
+    pub fn remove_table_row(&mut self, model_object_id: u64, deletion: RowDeletion) -> Result<()> {
         self.edit_table_topology(model_object_id, TableTopologyMutation::RemoveRow(deletion))
     }
 

@@ -2,7 +2,8 @@
 
 use super::*;
 use crate::table_lock::{
-    set_table_lock_state as set_native_table_lock_state, table_lock_state as read_native_table_lock_state,
+    set_table_lock_state as set_native_table_lock_state,
+    table_lock_state as read_native_table_lock_state,
 };
 use litchi_iwa_common::table::lock::State as TableLockState;
 

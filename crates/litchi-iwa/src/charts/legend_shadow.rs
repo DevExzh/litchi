@@ -165,8 +165,8 @@ mod tests {
         Appearance, BlurRadius, Offset, Pattern, RgbColorSpace, RgbaColor, ShapeFill, Stroke,
         Width, fill_to_native, stroke_to_native,
     };
-    use litchi_iwa_common::shape::shadow::{Angle, Opacity};
     use crate::wire::{append_length_delimited_field, append_varint_field, parse_wire_fields};
+    use litchi_iwa_common::shape::shadow::{Angle, Opacity};
 
     const UNMAPPED_OUTER_FIELD: u32 = 4_096;
     const UNMAPPED_GENERATED_FIELD: u32 = 4_097;

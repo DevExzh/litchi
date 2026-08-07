@@ -28,10 +28,10 @@ pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
     FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
 };
+pub use litchi_iwa_common::table::title::Settings;
 pub use selector::{SheetSelector, TableSelector};
 pub use sheet::{Builder as SheetBuilder, SelectorError as TableSelectorError, Sheet};
 pub use table::dimension::{Dimension, Points, Size};
-pub use litchi_iwa_common::table::title::Settings;
 pub use table::topology::{ColumnDeletion, RowDeletion};
 pub use table::{
     AddressError, Builder as TableBuilder, Cell, CellPosition, CellRange, CoordinateError,

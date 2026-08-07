@@ -2,11 +2,11 @@
 
 use super::series_value_labels::value_label_series_count;
 use super::*;
+use crate::charts::Index;
 use crate::charts::series_error_bars::{
     chart_series_error_bars as read_native_error_bars,
     set_chart_series_error_bars as set_native_error_bars,
 };
-use crate::charts::Index;
 use litchi_iwa_common::chart::error_bar::Series;
 
 impl KeynoteEditor {

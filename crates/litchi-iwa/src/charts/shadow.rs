@@ -16,12 +16,12 @@ use crate::charts::style::{
     GENERATED_CHART_STYLE_EXTENSION_FIELD, chart_style_slot, generated_chart_style_extension,
 };
 use crate::protobuf::tsch;
-use litchi_iwa_common::shape::shadow::{Angle, Opacity};
 use crate::shapes::{
     Appearance, BlurRadius, Drop, Offset, RgbaColor, Shadow, shadow_from_native, shadow_to_native,
 };
 use crate::wire::{patch_length_delimited_field, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
+use litchi_iwa_common::shape::shadow::{Angle, Opacity};
 
 /// `tschchartinfodefaultcombinelayers` in `TSCH.Generated.ChartStyleArchive`.
 const CHART_COMBINE_LAYERS_FIELD: u32 = 13;

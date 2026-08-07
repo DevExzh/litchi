@@ -3150,11 +3150,7 @@ mod tests {
         );
         let baseline = editor.to_bytes().unwrap();
         editor
-            .set_sheet_chart_gap_spacing(
-                sheet_id,
-                source.drawable_object_id,
-                Spacing::DEFAULT,
-            )
+            .set_sheet_chart_gap_spacing(sheet_id, source.drawable_object_id, Spacing::DEFAULT)
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 

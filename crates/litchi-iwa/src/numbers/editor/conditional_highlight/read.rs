@@ -5,11 +5,7 @@ use prost::Message;
 use super::native::DatePeriodPredicateKind;
 use super::*;
 use litchi_iwa_common::table::cell::conditional_highlight::{
-    Offset, OffsetDirection,
-    Period, PeriodUnit,
-    Number, Range,
-    Rule, Style,
-    Text,
+    Number, Offset, OffsetDirection, Period, PeriodUnit, Range, Rule, Style, Text,
 };
 
 const CONDITIONAL_STYLE_SET_MESSAGE_TYPE: u32 = 6_010;
@@ -274,17 +270,13 @@ fn decode_date_period_predicate(
         PeriodUnit::Years,
     ];
     for unit in units {
-        let period = Period::new(count, unit)
-            .map_err(|_| unsupported_rule_graph())?;
+        let period = Period::new(count, unit).map_err(|_| unsupported_rule_graph())?;
         if let Some(condition) = kind.period_condition(period)
             && formula::validate(formula, NativePredicateKind::DatePeriod(kind), &condition).is_ok()
         {
             return Ok(condition);
         }
-        for direction in [
-            OffsetDirection::Ago,
-            OffsetDirection::FromNow,
-        ] {
+        for direction in [OffsetDirection::Ago, OffsetDirection::FromNow] {
             let offset = Offset::new(period, direction);
             if let Some(condition) = kind.offset_condition(offset)
                 && formula::validate(formula, NativePredicateKind::DatePeriod(kind), &condition)
@@ -344,8 +336,7 @@ fn decode_fixed_date_predicate(
     let lower = decode_date_argument(predicate.param_value1.as_ref())?;
     if kind.is_range() {
         let upper = decode_date_argument(predicate.param_value2.as_ref())?;
-        let range = DateRange::new(lower, upper)
-            .map_err(|_| unsupported_rule_graph())?;
+        let range = DateRange::new(lower, upper).map_err(|_| unsupported_rule_graph())?;
         return kind
             .range_condition(range)
             .ok_or_else(unsupported_rule_graph);
@@ -393,18 +384,12 @@ fn decode_numeric_predicate(
         None
     };
     match (kind, second) {
-        (NumericPredicateKind::Between, Some(upper)) => {
-            Ok(Condition::Between(
-                Range::new(first, upper)
-                    .map_err(|_| unsupported_rule_graph())?,
-            ))
-        },
-        (NumericPredicateKind::NotBetween, Some(upper)) => {
-            Ok(Condition::NotBetween(
-                Range::new(first, upper)
-                    .map_err(|_| unsupported_rule_graph())?,
-            ))
-        },
+        (NumericPredicateKind::Between, Some(upper)) => Ok(Condition::Between(
+            Range::new(first, upper).map_err(|_| unsupported_rule_graph())?,
+        )),
+        (NumericPredicateKind::NotBetween, Some(upper)) => Ok(Condition::NotBetween(
+            Range::new(first, upper).map_err(|_| unsupported_rule_graph())?,
+        )),
         (_, None) => kind
             .single_condition(first)
             .ok_or_else(unsupported_rule_graph),
@@ -431,14 +416,11 @@ fn decode_text_predicate(
         .and_then(|argument| argument.arg_value.as_ref())
         .and_then(|value| value.string_value.as_deref())
         .ok_or_else(unsupported_rule_graph)?;
-    let text =
-        Text::new(value).map_err(|_| unsupported_rule_graph())?;
+    let text = Text::new(value).map_err(|_| unsupported_rule_graph())?;
     Ok(kind.condition(text))
 }
 
-fn decode_number_argument(
-    argument: Option<&tst::FormulaPredArgArchive>,
-) -> Result<Number> {
+fn decode_number_argument(argument: Option<&tst::FormulaPredArgArchive>) -> Result<Number> {
     let value = argument
         .filter(|argument| argument.arg_type == PREDICATE_ARGUMENT_NUMBER)
         .and_then(|argument| argument.arg_value.as_ref())
@@ -447,9 +429,7 @@ fn decode_number_argument(
     Number::new(value).map_err(|_| unsupported_rule_graph())
 }
 
-fn decode_date_argument(
-    argument: Option<&tst::FormulaPredArgArchive>,
-) -> Result<Date> {
+fn decode_date_argument(argument: Option<&tst::FormulaPredArgArchive>) -> Result<Date> {
     let value = argument
         .filter(|argument| argument.arg_type == PREDICATE_ARGUMENT_DATE)
         .and_then(|argument| argument.arg_value.as_ref())

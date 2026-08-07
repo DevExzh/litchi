@@ -215,8 +215,8 @@ pub(crate) use package::IWorkPackage;
 pub use shapes::DrawableTitleCaption;
 pub use structured::StructuredData;
 pub use text::{
-    Fragment, ParagraphStyle, Run, Storage, TextDecorations, TextPointSize, TextStrikethrough,
-    TextStyle, TextUnderline,
+    Format, Fragment, Run, Storage, TextDecorations, TextPointSize, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
 pub(crate) use theme::{IWorkThemeArchive, IWorkThemeExtensions};
 

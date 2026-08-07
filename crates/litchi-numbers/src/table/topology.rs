@@ -127,12 +127,18 @@ mod tests {
         assert_eq!(RowInsertion::header(2), RowInsertion::Header { index: 2 });
         assert_eq!(RowInsertion::body(3), RowInsertion::Body { index: 3 });
         assert_eq!(RowInsertion::footer(4), RowInsertion::Footer { index: 4 });
-        assert_eq!(ColumnInsertion::header(5), ColumnInsertion::Header { index: 5 });
+        assert_eq!(
+            ColumnInsertion::header(5),
+            ColumnInsertion::Header { index: 5 }
+        );
         assert_eq!(ColumnInsertion::body(6), ColumnInsertion::Body { index: 6 });
         assert_eq!(RowDeletion::header(2), RowDeletion::Header { index: 2 });
         assert_eq!(RowDeletion::body(3), RowDeletion::Body { index: 3 });
         assert_eq!(RowDeletion::footer(4), RowDeletion::Footer { index: 4 });
-        assert_eq!(ColumnDeletion::header(5), ColumnDeletion::Header { index: 5 });
+        assert_eq!(
+            ColumnDeletion::header(5),
+            ColumnDeletion::Header { index: 5 }
+        );
         assert_eq!(ColumnDeletion::body(6), ColumnDeletion::Body { index: 6 });
     }
 }

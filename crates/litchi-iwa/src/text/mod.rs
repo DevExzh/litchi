@@ -40,7 +40,6 @@ mod paragraph_tabs;
 mod smart_field_object;
 mod storage_id;
 mod storage_wire;
-pub mod style;
 pub(crate) mod style_registry;
 mod text_comment;
 
@@ -87,6 +86,16 @@ pub use litchi_iwa_text::number_attachment::{
     TextNumberAttachmentKind, TextNumberAttachmentSettings, TextNumberAttachmentText,
 };
 pub use litchi_iwa_text::paragraph;
+pub use litchi_iwa_text::appearance::{Background, Outline, ParagraphBackground, Shadow};
+pub use litchi_iwa_text::character::{
+    Error as CharacterError, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
+    TextDecorations, TextLigatures, TextPointSize, TextScript, TextStrikethrough, TextStyle,
+    TextUnderline,
+};
+pub use litchi_iwa_text::paragraph::format::{
+    Alignment, Border, Borders, Format, IndentPoints, Indents, LineSpacing, LineSpacingMultiple,
+    LineSpacingPoints, Spacing, SpacingPoints,
+};
 pub use litchi_iwa_text::paragraph::style::{
     NamedParagraphStyle, ParagraphFollowingStyle, ParagraphStyleId, ParagraphStyleName,
 };
@@ -125,16 +134,15 @@ pub use paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabAlignment,
     ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
 };
-pub use style::{
-    Background, CharacterError, Outline, ParagraphBackground, ParagraphBorder, ParagraphBorders,
-    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
-    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyle, Shadow,
-    TextAlignment, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
-    TextLigatures, TextPointSize, TextScript, TextStrikethrough, TextStyle, TextUnderline,
-};
 
 impl From<litchi_iwa_text::appearance::Error> for crate::Error {
     fn from(error: litchi_iwa_text::appearance::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_text::paragraph::format::Error> for crate::Error {
+    fn from(error: litchi_iwa_text::paragraph::format::Error) -> Self {
         Self::InvalidFormat(error.to_string())
     }
 }

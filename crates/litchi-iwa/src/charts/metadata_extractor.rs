@@ -193,7 +193,6 @@ impl<'a> ChartMetadataExtractor<'a> {
         }
         read_chart_non_style_title(message.data.as_slice())
     }
-
 }
 
 #[cfg(test)]

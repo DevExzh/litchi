@@ -48,14 +48,14 @@ use crate::table_appearance::TableAppearance;
 use litchi_iwa_common::table::cell::conditional_highlight::Rule;
 use litchi_iwa_common::table::lock::State as TableLockState;
 use crate::text::{
-    IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,
-    ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphFlow,
-    ParagraphIndents, ParagraphLineSpacing, ParagraphList, ParagraphListBullet,
+    Alignment, Borders, IWorkTextEditor, Indents, LineSpacing, ParagraphBackground,
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
+    ParagraphDropCapPlacement, ParagraphFlow, ParagraphList, ParagraphListBullet,
     ParagraphListBulletGeometry, ParagraphListIndentation, ParagraphListLabelColor,
     ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
     ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering,
-    ParagraphListPlacement, ParagraphSpacing, ParagraphStart, ParagraphTabStops,
-    ParagraphWritingDirection, TextAlignment, Background, TextBaselineShift,
+    ParagraphListPlacement, Spacing, ParagraphStart, ParagraphTabStops,
+    ParagraphWritingDirection, Background, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
     TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
     TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,

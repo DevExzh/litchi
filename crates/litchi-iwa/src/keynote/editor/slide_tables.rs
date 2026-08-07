@@ -55,8 +55,6 @@ pub type KeynoteTableCellUpdate = litchi_numbers::cell::Update;
 pub use crate::shapes::RgbaColor as KeynoteTableCellTextColor;
 pub use crate::text::Background as KeynoteTableCellTextBackground;
 pub use crate::text::Outline as KeynoteTableCellTextOutline;
-pub use crate::text::ParagraphIndents as KeynoteTableCellParagraphIndents;
-pub use crate::text::ParagraphLineSpacing as KeynoteTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphList as KeynoteTableCellParagraphList;
 pub use crate::text::ParagraphListBullet as KeynoteTableCellParagraphListBullet;
 pub use crate::text::ParagraphListBulletGeometry as KeynoteTableCellParagraphListBulletGeometry;
@@ -69,10 +67,8 @@ pub use crate::text::ParagraphListNumberScale as KeynoteTableCellParagraphListNu
 pub use crate::text::ParagraphListNumberTiering as KeynoteTableCellParagraphListNumberTiering;
 pub use crate::text::ParagraphListNumbering as KeynoteTableCellParagraphListNumbering;
 pub use crate::text::ParagraphListPlacement as KeynoteTableCellParagraphListPlacement;
-pub use crate::text::ParagraphSpacing as KeynoteTableCellParagraphSpacing;
 pub use crate::text::ParagraphTabStops as KeynoteTableCellParagraphTabStops;
 pub use crate::text::Shadow as KeynoteTableCellTextShadow;
-pub use crate::text::TextAlignment as KeynoteTableCellTextAlignment;
 pub use crate::text::TextBaselineShift as KeynoteTableCellTextBaselineShift;
 pub use crate::text::TextCapitalization as KeynoteTableCellTextCapitalization;
 pub use crate::text::TextCharacterSpacing as KeynoteTableCellTextCharacterSpacing;
@@ -1628,7 +1624,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<KeynoteTableCellTextAlignment> {
+    ) -> Result<Alignment> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_text_alignment_in_package(
             self.package(),
@@ -1645,7 +1641,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        alignment: KeynoteTableCellTextAlignment,
+        alignment: Alignment,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -1700,7 +1696,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<KeynoteTableCellParagraphLineSpacing> {
+    ) -> Result<LineSpacing> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_line_spacing_in_package(
             self.package(),
@@ -1717,7 +1713,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        spacing: KeynoteTableCellParagraphLineSpacing,
+        spacing: LineSpacing,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -1776,7 +1772,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<KeynoteTableCellParagraphSpacing> {
+    ) -> Result<Spacing> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_spacing_in_package(
             self.package(),
@@ -1793,7 +1789,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        spacing: KeynoteTableCellParagraphSpacing,
+        spacing: Spacing,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2709,7 +2705,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<KeynoteTableCellParagraphIndents> {
+    ) -> Result<Indents> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_indents_in_package(
             self.package(),
@@ -2726,7 +2722,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        indents: KeynoteTableCellParagraphIndents,
+        indents: Indents,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();

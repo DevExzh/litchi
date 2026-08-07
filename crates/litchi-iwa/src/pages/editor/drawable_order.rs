@@ -1,7 +1,7 @@
 //! Native back-to-front ordering for Pages document drawables.
 
-use prost::Message;
 use litchi_iwa_common::comment::DrawableId;
+use prost::Message;
 
 use super::*;
 use crate::drawable_order::{
@@ -21,10 +21,7 @@ impl PagesEditor {
     ///
     /// The supplied slice must be a permutation of [`Self::body_drawable_order`].
     /// Reference payloads and unrelated native wire fields are retained verbatim.
-    pub fn set_body_drawable_order(
-        &mut self,
-        ordered_drawable_ids: &[DrawableId],
-    ) -> Result<()> {
+    pub fn set_body_drawable_order(&mut self, ordered_drawable_ids: &[DrawableId]) -> Result<()> {
         let current = self.body_drawable_order()?;
         if current == ordered_drawable_ids {
             return Ok(());

@@ -16,9 +16,7 @@ pub(super) fn semantic_settings(
 ) -> Result<litchi_keynote::build::Settings> {
     let duration = litchi_keynote::Seconds::new(settings.duration).map_err(semantic_error)?;
     let mut semantic = litchi_keynote::build::Settings::new(semantic_effect(settings)?, duration);
-    semantic
-        .set_start(settings.start)
-        .map_err(semantic_error)?;
+    semantic.set_start(settings.start).map_err(semantic_error)?;
     semantic
         .set_delay(litchi_keynote::Seconds::new(settings.delay).map_err(semantic_error)?)
         .map_err(semantic_error)?;
@@ -26,9 +24,7 @@ pub(super) fn semantic_settings(
     Ok(semantic)
 }
 
-fn semantic_effect(
-    settings: &KeynoteBuildSettings,
-) -> Result<litchi_keynote::build::Effect> {
+fn semantic_effect(settings: &KeynoteBuildSettings) -> Result<litchi_keynote::build::Effect> {
     use litchi_keynote::build::{
         Action, Effect, Emphasis, FlipDirection, HorizontalDirection, Keyboard, KeyboardDirection,
         Motion, ObjectEffect, Opacity, Rotation, RotationDirection, Scale, SwooshDirection,
@@ -104,13 +100,19 @@ fn semantic_effect(
                         KeynoteFlipDirection::RightToLeft => FlipDirection::RightToLeft,
                     },
                 ),
-                KeynoteEmphasisAction::Jiggle { intensity } => Ok(Emphasis::jiggle(match intensity {
-                    KeynoteJiggleIntensity::Small => litchi_keynote::build::JiggleIntensity::Small,
-                    KeynoteJiggleIntensity::Medium => {
-                        litchi_keynote::build::JiggleIntensity::Medium
-                    },
-                    KeynoteJiggleIntensity::Large => litchi_keynote::build::JiggleIntensity::Large,
-                })),
+                KeynoteEmphasisAction::Jiggle { intensity } => {
+                    Ok(Emphasis::jiggle(match intensity {
+                        KeynoteJiggleIntensity::Small => {
+                            litchi_keynote::build::JiggleIntensity::Small
+                        },
+                        KeynoteJiggleIntensity::Medium => {
+                            litchi_keynote::build::JiggleIntensity::Medium
+                        },
+                        KeynoteJiggleIntensity::Large => {
+                            litchi_keynote::build::JiggleIntensity::Large
+                        },
+                    }))
+                },
                 KeynoteEmphasisAction::Pop { scale_percent } => Emphasis::pop(scale_percent),
                 KeynoteEmphasisAction::Pulse {
                     repeat_count,
@@ -132,7 +134,10 @@ fn semantic_effect(
                 keyboard.show_cursor,
             ))
         },
-        DISSOLVE_BUILD_EFFECT | SHIMMER_BUILD_EFFECT | SKID_BUILD_EFFECT | SWOOSH_BUILD_EFFECT
+        DISSOLVE_BUILD_EFFECT
+        | SHIMMER_BUILD_EFFECT
+        | SKID_BUILD_EFFECT
+        | SWOOSH_BUILD_EFFECT
         | TRACE_BUILD_EFFECT => {
             let object = settings.object_effect.ok_or_else(|| {
                 Error::ParseError("Keynote object build is missing its typed parameters".to_owned())
@@ -140,19 +145,33 @@ fn semantic_effect(
             Effect::object(match object {
                 KeynoteObjectBuildEffect::Dissolve => ObjectEffect::Dissolve,
                 KeynoteObjectBuildEffect::Shimmer => ObjectEffect::Shimmer,
-                KeynoteObjectBuildEffect::Skid { direction } => ObjectEffect::Skid(match direction {
-                    KeynoteHorizontalBuildDirection::LeftToRight => HorizontalDirection::LeftToRight,
-                    KeynoteHorizontalBuildDirection::RightToLeft => HorizontalDirection::RightToLeft,
-                }),
-                KeynoteObjectBuildEffect::Swoosh { direction } => ObjectEffect::Swoosh(match direction {
-                    KeynoteSwooshDirection::Center => SwooshDirection::Center,
-                    KeynoteSwooshDirection::FromLeft => SwooshDirection::FromLeft,
-                    KeynoteSwooshDirection::FromRight => SwooshDirection::FromRight,
-                }),
-                KeynoteObjectBuildEffect::Trace { direction } => ObjectEffect::Trace(match direction {
-                    KeynoteHorizontalBuildDirection::LeftToRight => HorizontalDirection::LeftToRight,
-                    KeynoteHorizontalBuildDirection::RightToLeft => HorizontalDirection::RightToLeft,
-                }),
+                KeynoteObjectBuildEffect::Skid { direction } => {
+                    ObjectEffect::Skid(match direction {
+                        KeynoteHorizontalBuildDirection::LeftToRight => {
+                            HorizontalDirection::LeftToRight
+                        },
+                        KeynoteHorizontalBuildDirection::RightToLeft => {
+                            HorizontalDirection::RightToLeft
+                        },
+                    })
+                },
+                KeynoteObjectBuildEffect::Swoosh { direction } => {
+                    ObjectEffect::Swoosh(match direction {
+                        KeynoteSwooshDirection::Center => SwooshDirection::Center,
+                        KeynoteSwooshDirection::FromLeft => SwooshDirection::FromLeft,
+                        KeynoteSwooshDirection::FromRight => SwooshDirection::FromRight,
+                    })
+                },
+                KeynoteObjectBuildEffect::Trace { direction } => {
+                    ObjectEffect::Trace(match direction {
+                        KeynoteHorizontalBuildDirection::LeftToRight => {
+                            HorizontalDirection::LeftToRight
+                        },
+                        KeynoteHorizontalBuildDirection::RightToLeft => {
+                            HorizontalDirection::RightToLeft
+                        },
+                    })
+                },
             })
         },
         "apple:bc-appear" | "appear" => Effect::Appear,

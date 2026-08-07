@@ -26,15 +26,14 @@ pub(super) fn encode(
             let (period, direction) = date_period_operands(condition)?;
             date::period_nodes(kind, period, direction, formula_owner_uuid)?
         },
-        (
-            NativePredicateKind::FixedDate(kind),
-            Condition::DateIsBetween(range),
-        ) => date::fixed_nodes(
-            kind,
-            range.lower().apple_seconds(),
-            Some(range.upper().apple_seconds()),
-            formula_owner_uuid,
-        ),
+        (NativePredicateKind::FixedDate(kind), Condition::DateIsBetween(range)) => {
+            date::fixed_nodes(
+                kind,
+                range.lower().apple_seconds(),
+                Some(range.upper().apple_seconds()),
+                formula_owner_uuid,
+            )
+        },
         (NativePredicateKind::FixedDate(kind), _) => date::fixed_nodes(
             kind,
             condition
@@ -47,8 +46,7 @@ pub(super) fn encode(
         (NativePredicateKind::NumericSign(kind), _) => sign::nodes(kind, formula_owner_uuid)?,
         (
             NativePredicateKind::Numeric(kind),
-            Condition::Between(range)
-            | Condition::NotBetween(range),
+            Condition::Between(range) | Condition::NotBetween(range),
         ) => range_nodes(
             kind,
             range.lower().get(),
@@ -130,15 +128,14 @@ pub(super) fn validate(
             let (period, direction) = date_period_operands(condition)?;
             date::validate_period(formula, kind, period, direction)
         },
-        (
-            NativePredicateKind::FixedDate(kind),
-            Condition::DateIsBetween(range),
-        ) => date::validate_fixed(
-            formula,
-            kind,
-            range.lower().apple_seconds(),
-            Some(range.upper().apple_seconds()),
-        ),
+        (NativePredicateKind::FixedDate(kind), Condition::DateIsBetween(range)) => {
+            date::validate_fixed(
+                formula,
+                kind,
+                range.lower().apple_seconds(),
+                Some(range.upper().apple_seconds()),
+            )
+        },
         (NativePredicateKind::FixedDate(kind), _) => date::validate_fixed(
             formula,
             kind,
@@ -151,8 +148,7 @@ pub(super) fn validate(
         (NativePredicateKind::NumericSign(kind), _) => sign::validate(formula, kind),
         (
             NativePredicateKind::Numeric(kind),
-            Condition::Between(range)
-            | Condition::NotBetween(range),
+            Condition::Between(range) | Condition::NotBetween(range),
         ) => validate_range(formula, kind, range.lower().get(), range.upper().get()),
         (NativePredicateKind::Numeric(kind), _) => {
             let value = condition
@@ -181,16 +177,11 @@ fn date_period_operands(
     condition: &Condition,
 ) -> Result<(
     litchi_iwa_common::table::cell::conditional_highlight::Period,
-    Option<
-        litchi_iwa_common::table::cell::conditional_highlight::OffsetDirection,
-    >,
+    Option<litchi_iwa_common::table::cell::conditional_highlight::OffsetDirection>,
 )> {
     match condition {
-        Condition::DateIsInNext(period)
-        | Condition::DateIsInLast(period) => Ok((*period, None)),
-        Condition::DateIsOffsetFromToday(offset) => {
-            Ok((offset.period(), Some(offset.direction())))
-        },
+        Condition::DateIsInNext(period) | Condition::DateIsInLast(period) => Ok((*period, None)),
+        Condition::DateIsOffsetFromToday(offset) => Ok((offset.period(), Some(offset.direction()))),
         _ => Err(invalid_formula()),
     }
 }

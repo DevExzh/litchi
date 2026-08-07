@@ -174,9 +174,7 @@ impl NumbersTable {
     }
 
     /// Iterate over cell comments without exposing the backing map.
-    pub fn iter_comments(
-        &self,
-    ) -> impl Iterator<Item = ((usize, usize), &Comment)> + '_ {
+    pub fn iter_comments(&self) -> impl Iterator<Item = ((usize, usize), &Comment)> + '_ {
         self.comments
             .iter()
             .map(|(position, comment)| (*position, comment))
@@ -193,12 +191,7 @@ impl NumbersTable {
     ///
     /// Returns an error when the coordinate cannot be represented, lies
     /// outside fixed archive dimensions, or comment storage cannot grow.
-    pub fn set_comment(
-        &mut self,
-        row: usize,
-        col: usize,
-        comment: Comment,
-    ) -> crate::Result<()> {
+    pub fn set_comment(&mut self, row: usize, col: usize, comment: Comment) -> crate::Result<()> {
         self.try_set_comment(row, col, comment)
     }
 
@@ -313,10 +306,7 @@ impl NumbersTable {
     /// and format-owned comment sidecar independently.
     pub(crate) fn into_semantic_parts(
         self,
-    ) -> crate::Result<(
-        litchi_numbers::Table,
-        Box<[((usize, usize), Comment)]>,
-    )> {
+    ) -> crate::Result<(litchi_numbers::Table, Box<[((usize, usize), Comment)]>)> {
         let Self {
             model, comments, ..
         } = self;

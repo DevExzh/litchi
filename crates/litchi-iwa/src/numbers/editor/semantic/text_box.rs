@@ -1556,7 +1556,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<ParagraphBorders> {
+    ) -> Result<Borders> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).paragraph_borders(graph.storage_id)
     }
@@ -1566,7 +1566,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        borders: ParagraphBorders,
+        borders: Borders,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -1694,7 +1694,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<TextAlignment> {
+    ) -> Result<Alignment> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).paragraph_alignment(graph.storage_id)
     }
@@ -1704,7 +1704,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        alignment: TextAlignment,
+        alignment: Alignment,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -1739,7 +1739,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<ParagraphLineSpacing> {
+    ) -> Result<LineSpacing> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).paragraph_line_spacing(graph.storage_id)
     }
@@ -1749,7 +1749,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        spacing: ParagraphLineSpacing,
+        spacing: LineSpacing,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -1785,7 +1785,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<ParagraphSpacing> {
+    ) -> Result<Spacing> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).paragraph_spacing(graph.storage_id)
     }
@@ -1795,7 +1795,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        spacing: ParagraphSpacing,
+        spacing: Spacing,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -1830,7 +1830,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<ParagraphIndents> {
+    ) -> Result<Indents> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).paragraph_indents(graph.storage_id)
     }
@@ -1840,7 +1840,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        indents: ParagraphIndents,
+        indents: Indents,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());

@@ -6,12 +6,12 @@ use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Width};
 use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 use litchi_iwa::text::{
-    Background, Outline, ParagraphBackground, ParagraphBorder, ParagraphBorders,
+    Background, Outline, ParagraphBackground, Border, Borders,
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow, ParagraphHyphenation,
-    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingPoints,
-    ParagraphList, ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints,
+    IndentPoints, Indents, LineSpacing, LineSpacingPoints,
+    ParagraphList, ParagraphListLevel, Spacing, SpacingPoints,
     ParagraphStyleName, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
-    ParagraphTabStop, ParagraphTabStops, ParagraphWritingDirection, Shadow, TextAlignment,
+    ParagraphTabStop, ParagraphTabStops, ParagraphWritingDirection, Shadow, Alignment,
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextCommentBody,
     TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage,
     TextLigatures, TextPointSize, TextRange, TextScript, TextStrikethrough, TextStyle,
@@ -138,7 +138,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_text_box_paragraph_borders(
         sheet_id,
         created.drawable_object_id,
-        ParagraphBorders::Bordered(ParagraphBorder::new(
+        Borders::Bordered(Border::new(
             RgbaColor::black(),
             Width::new(3.0)?,
             Pattern::Solid,
@@ -165,28 +165,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_text_box_paragraph_alignment(
         sheet_id,
         created.drawable_object_id,
-        TextAlignment::Right,
+        Alignment::Right,
     )?;
     editor.set_sheet_text_box_paragraph_line_spacing(
         sheet_id,
         created.drawable_object_id,
-        ParagraphLineSpacing::Exactly(ParagraphLineSpacingPoints::from_points(24.0)?),
+        LineSpacing::Exactly(LineSpacingPoints::from_points(24.0)?),
     )?;
     editor.set_sheet_text_box_paragraph_spacing(
         sheet_id,
         created.drawable_object_id,
-        ParagraphSpacing::new(
-            ParagraphSpacingPoints::from_points(11.0)?,
-            ParagraphSpacingPoints::from_points(17.0)?,
+        Spacing::new(
+            SpacingPoints::from_points(11.0)?,
+            SpacingPoints::from_points(17.0)?,
         ),
     )?;
     editor.set_sheet_text_box_paragraph_indents(
         sheet_id,
         created.drawable_object_id,
-        ParagraphIndents::new(
-            ParagraphIndentPoints::from_points(23.0)?,
-            ParagraphIndentPoints::from_points(13.0)?,
-            ParagraphIndentPoints::from_points(2.833_333_3)?,
+        Indents::new(
+            IndentPoints::from_points(23.0)?,
+            IndentPoints::from_points(13.0)?,
+            IndentPoints::from_points(2.833_333_3)?,
         ),
     )?;
     editor.set_sheet_text_box_paragraph_list(
@@ -323,7 +323,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_text_box_paragraph_alignment(
         sheet_id,
         named_style_box.drawable_object_id,
-        TextAlignment::Center,
+        Alignment::Center,
     )?;
     editor.redefine_applied_sheet_text_box_named_paragraph_style(
         sheet_id,

@@ -285,10 +285,7 @@ fn sequential_rule_style_identifiers(
         .collect()
 }
 
-fn paragraph_style_object(
-    identifier: u64,
-    rule: &Rule,
-) -> Result<ArchiveObject> {
+fn paragraph_style_object(identifier: u64, rule: &Rule) -> Result<ArchiveObject> {
     let style = rule.style;
     let text_override_count = u32::from(style.bold()) + u32::from(style.text_color().is_some());
     let data = tswp::ParagraphStyleArchive {
@@ -307,10 +304,7 @@ fn paragraph_style_object(
     style_object(identifier, PARAGRAPH_STYLE_MESSAGE_TYPE, data)
 }
 
-fn cell_style_object(
-    identifier: u64,
-    rule: &Rule,
-) -> Result<ArchiveObject> {
+fn cell_style_object(identifier: u64, rule: &Rule) -> Result<ArchiveObject> {
     let fill = rule.style.fill().map(|color| tsd::FillArchive {
         color: Some(crate::shapes::color_to_native(color)),
         ..Default::default()

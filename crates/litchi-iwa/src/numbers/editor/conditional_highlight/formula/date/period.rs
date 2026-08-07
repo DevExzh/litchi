@@ -6,8 +6,7 @@ use crate::numbers::editor::conditional_highlight::native::{
     DATE_DURATION_FROM_WEEKS_DAYS_FUNCTION_INDEX, DatePeriodPredicateKind,
 };
 use litchi_iwa_common::table::cell::conditional_highlight::{
-    Offset, OffsetDirection,
-    Period, PeriodUnit,
+    Offset, OffsetDirection, Period, PeriodUnit,
 };
 
 const ZERO: f64 = 0.0;
@@ -30,18 +29,11 @@ pub(in crate::numbers::editor::conditional_highlight::formula) fn quantity_node_
     unit: PeriodUnit,
 ) -> i32 {
     match (kind, unit) {
-        (DatePeriodPredicateKind::InNext, PeriodUnit::Days) => {
-            NEXT_DAYS_QUANTITY_INDEX
-        },
+        (DatePeriodPredicateKind::InNext, PeriodUnit::Days) => NEXT_DAYS_QUANTITY_INDEX,
         (DatePeriodPredicateKind::InNext, _) => NEXT_OTHER_QUANTITY_INDEX,
-        (DatePeriodPredicateKind::InLast, PeriodUnit::Days) => {
-            LAST_DAYS_QUANTITY_INDEX
-        },
+        (DatePeriodPredicateKind::InLast, PeriodUnit::Days) => LAST_DAYS_QUANTITY_INDEX,
         (DatePeriodPredicateKind::InLast, _) => LAST_OTHER_QUANTITY_INDEX,
-        (
-            DatePeriodPredicateKind::OffsetFromToday,
-            PeriodUnit::Days,
-        ) => OFFSET_DAYS_QUANTITY_INDEX,
+        (DatePeriodPredicateKind::OffsetFromToday, PeriodUnit::Days) => OFFSET_DAYS_QUANTITY_INDEX,
         (DatePeriodPredicateKind::OffsetFromToday, _) => OFFSET_OTHER_QUANTITY_INDEX,
     }
 }
@@ -56,10 +48,7 @@ pub(in crate::numbers::editor::conditional_highlight::formula) fn nodes(
         DatePeriodPredicateKind::InNext => range_nodes(period, true, formula_owner_uuid),
         DatePeriodPredicateKind::InLast => range_nodes(period, false, formula_owner_uuid),
         DatePeriodPredicateKind::OffsetFromToday => exact_nodes(
-            Offset::new(
-                period,
-                direction.ok_or_else(invalid_formula)?,
-            ),
+            Offset::new(period, direction.ok_or_else(invalid_formula)?),
             formula_owner_uuid,
         ),
     }

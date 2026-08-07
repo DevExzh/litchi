@@ -2,10 +2,7 @@
 
 use super::*;
 use litchi_iwa_common::table::cell::conditional_highlight::{
-    Condition, Date,
-    Offset, Period,
-    DateRange, Number,
-    Text,
+    Condition, Date, DateRange, Number, Offset, Period, Text,
 };
 
 pub(super) const PREDICATE_QUALIFIER_NONE: i32 = 0;
@@ -68,9 +65,7 @@ pub(super) enum NumericPredicateKind {
 }
 
 impl NumericPredicateKind {
-    pub(super) const fn from_condition(
-        condition: &Condition,
-    ) -> Option<Self> {
+    pub(super) const fn from_condition(condition: &Condition) -> Option<Self> {
         match condition {
             Condition::CellIsBlank
             | Condition::CellIsNotBlank
@@ -93,13 +88,9 @@ impl NumericPredicateKind {
             Condition::EqualTo(_) => Some(Self::EqualTo),
             Condition::NotEqualTo(_) => Some(Self::NotEqualTo),
             Condition::GreaterThan(_) => Some(Self::GreaterThan),
-            Condition::GreaterThanOrEqualTo(_) => {
-                Some(Self::GreaterThanOrEqualTo)
-            },
+            Condition::GreaterThanOrEqualTo(_) => Some(Self::GreaterThanOrEqualTo),
             Condition::LessThan(_) => Some(Self::LessThan),
-            Condition::LessThanOrEqualTo(_) => {
-                Some(Self::LessThanOrEqualTo)
-            },
+            Condition::LessThanOrEqualTo(_) => Some(Self::LessThanOrEqualTo),
             Condition::Between(_) => Some(Self::Between),
             Condition::NotBetween(_) => Some(Self::NotBetween),
             Condition::TextEqualTo(_)
@@ -117,21 +108,14 @@ impl NumericPredicateKind {
         self as i32
     }
 
-    pub(super) const fn single_condition(
-        self,
-        number: Number,
-    ) -> Option<Condition> {
+    pub(super) const fn single_condition(self, number: Number) -> Option<Condition> {
         match self {
             Self::EqualTo => Some(Condition::EqualTo(number)),
             Self::NotEqualTo => Some(Condition::NotEqualTo(number)),
             Self::GreaterThan => Some(Condition::GreaterThan(number)),
-            Self::GreaterThanOrEqualTo => {
-                Some(Condition::GreaterThanOrEqualTo(number))
-            },
+            Self::GreaterThanOrEqualTo => Some(Condition::GreaterThanOrEqualTo(number)),
             Self::LessThan => Some(Condition::LessThan(number)),
-            Self::LessThanOrEqualTo => Some(
-                Condition::LessThanOrEqualTo(number),
-            ),
+            Self::LessThanOrEqualTo => Some(Condition::LessThanOrEqualTo(number)),
             Self::Between | Self::NotBetween => None,
         }
     }
@@ -234,10 +218,7 @@ impl FixedDatePredicateKind {
         self as i32
     }
 
-    pub(super) const fn condition(
-        self,
-        date: Date,
-    ) -> Option<Condition> {
+    pub(super) const fn condition(self, date: Date) -> Option<Condition> {
         match self {
             Self::Equal => Some(Condition::DateIs(date)),
             Self::Before => Some(Condition::DateIsBefore(date)),
@@ -246,10 +227,7 @@ impl FixedDatePredicateKind {
         }
     }
 
-    pub(super) const fn range_condition(
-        self,
-        range: DateRange,
-    ) -> Option<Condition> {
+    pub(super) const fn range_condition(self, range: DateRange) -> Option<Condition> {
         match self {
             Self::Between => Some(Condition::DateIsBetween(range)),
             Self::Equal | Self::Before | Self::After => None,
@@ -274,10 +252,7 @@ impl DatePeriodPredicateKind {
         self as i32
     }
 
-    pub(super) const fn period_condition(
-        self,
-        period: Period,
-    ) -> Option<Condition> {
+    pub(super) const fn period_condition(self, period: Period) -> Option<Condition> {
         match self {
             Self::InNext => Some(Condition::DateIsInNext(period)),
             Self::InLast => Some(Condition::DateIsInLast(period)),
@@ -285,14 +260,9 @@ impl DatePeriodPredicateKind {
         }
     }
 
-    pub(super) const fn offset_condition(
-        self,
-        offset: Offset,
-    ) -> Option<Condition> {
+    pub(super) const fn offset_condition(self, offset: Offset) -> Option<Condition> {
         match self {
-            Self::OffsetFromToday => {
-                Some(Condition::DateIsOffsetFromToday(offset))
-            },
+            Self::OffsetFromToday => Some(Condition::DateIsOffsetFromToday(offset)),
             Self::InNext | Self::InLast => None,
         }
     }
@@ -387,25 +357,16 @@ impl TextPredicateKind {
         self as i32
     }
 
-    pub(super) fn condition(
-        self,
-        text: Text,
-    ) -> Condition {
+    pub(super) fn condition(self, text: Text) -> Condition {
         match self {
             Self::EqualTo => Condition::TextEqualTo(text),
             Self::NotEqualTo => Condition::TextNotEqualTo(text),
             Self::StartsWith => Condition::TextStartsWith(text),
-            Self::DoesNotStartWith => {
-                Condition::TextDoesNotStartWith(text)
-            },
+            Self::DoesNotStartWith => Condition::TextDoesNotStartWith(text),
             Self::EndsWith => Condition::TextEndsWith(text),
-            Self::DoesNotEndWith => {
-                Condition::TextDoesNotEndWith(text)
-            },
+            Self::DoesNotEndWith => Condition::TextDoesNotEndWith(text),
             Self::Contains => Condition::TextContains(text),
-            Self::DoesNotContain => {
-                Condition::TextDoesNotContain(text)
-            },
+            Self::DoesNotContain => Condition::TextDoesNotContain(text),
         }
     }
 
@@ -496,30 +457,16 @@ impl NativePredicateKind {
         }
         NumericPredicateKind::from_condition(condition).map_or_else(
             || match condition {
-                Condition::TextEqualTo(_) => {
-                    Self::Text(TextPredicateKind::EqualTo)
-                },
-                Condition::TextNotEqualTo(_) => {
-                    Self::Text(TextPredicateKind::NotEqualTo)
-                },
-                Condition::TextStartsWith(_) => {
-                    Self::Text(TextPredicateKind::StartsWith)
-                },
+                Condition::TextEqualTo(_) => Self::Text(TextPredicateKind::EqualTo),
+                Condition::TextNotEqualTo(_) => Self::Text(TextPredicateKind::NotEqualTo),
+                Condition::TextStartsWith(_) => Self::Text(TextPredicateKind::StartsWith),
                 Condition::TextDoesNotStartWith(_) => {
                     Self::Text(TextPredicateKind::DoesNotStartWith)
                 },
-                Condition::TextEndsWith(_) => {
-                    Self::Text(TextPredicateKind::EndsWith)
-                },
-                Condition::TextDoesNotEndWith(_) => {
-                    Self::Text(TextPredicateKind::DoesNotEndWith)
-                },
-                Condition::TextContains(_) => {
-                    Self::Text(TextPredicateKind::Contains)
-                },
-                Condition::TextDoesNotContain(_) => {
-                    Self::Text(TextPredicateKind::DoesNotContain)
-                },
+                Condition::TextEndsWith(_) => Self::Text(TextPredicateKind::EndsWith),
+                Condition::TextDoesNotEndWith(_) => Self::Text(TextPredicateKind::DoesNotEndWith),
+                Condition::TextContains(_) => Self::Text(TextPredicateKind::Contains),
+                Condition::TextDoesNotContain(_) => Self::Text(TextPredicateKind::DoesNotContain),
                 _ => unreachable!("every public predicate has a native kind"),
             },
             Self::Numeric,

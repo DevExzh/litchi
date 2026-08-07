@@ -34,12 +34,12 @@ use crate::shapes::{
 use crate::text::layout::Layout;
 use crate::text::{
     Background as TextAppearanceBackground, IWorkTextEditor, Outline, ParagraphBackground,
-    ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
-    ParagraphIndents, ParagraphLineSpacing, ParagraphList, ParagraphListBullet,
+    Borders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
+    Indents, LineSpacing, ParagraphList, ParagraphListBullet,
     ParagraphListBulletGeometry, ParagraphListIndentation, ParagraphListLabelColor,
     ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
-    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering, ParagraphSpacing,
-    ParagraphTabStops, ParagraphWritingDirection, Shadow, TextAlignment, TextBaselineShift,
+    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering, Spacing,
+    ParagraphTabStops, ParagraphWritingDirection, Shadow, Alignment, TextBaselineShift,
     TextCapitalization, TextCharacterSpacing, TextComment, TextCommentBody, TextCommentId,
     TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations, TextFont,
     TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
@@ -3285,7 +3285,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<ParagraphBorders> {
+    ) -> Result<Borders> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_borders(graph.storage_id)
     }
@@ -3295,7 +3295,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        borders: ParagraphBorders,
+        borders: Borders,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -3422,7 +3422,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<TextAlignment> {
+    ) -> Result<Alignment> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_alignment(graph.storage_id)
     }
@@ -3432,7 +3432,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        alignment: TextAlignment,
+        alignment: Alignment,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -3469,7 +3469,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<ParagraphLineSpacing> {
+    ) -> Result<LineSpacing> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_line_spacing(graph.storage_id)
     }
@@ -3479,7 +3479,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        spacing: ParagraphLineSpacing,
+        spacing: LineSpacing,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -3516,7 +3516,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<ParagraphSpacing> {
+    ) -> Result<Spacing> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_spacing(graph.storage_id)
     }
@@ -3526,7 +3526,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        spacing: ParagraphSpacing,
+        spacing: Spacing,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -3561,7 +3561,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<ParagraphIndents> {
+    ) -> Result<Indents> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_indents(graph.storage_id)
     }
@@ -3571,7 +3571,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        indents: ParagraphIndents,
+        indents: Indents,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -5567,15 +5567,13 @@ pub use slide_shapes::{KeynoteSlideShapeInfo, RemovedKeynoteSlideShape};
 pub use slide_tables::{
     KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableCellConditionalHighlightInfo,
     KeynoteTableCellInset, KeynoteTableCellInsets, KeynoteTableCellLayout,
-    KeynoteTableCellParagraphIndents, KeynoteTableCellParagraphLineSpacing,
     KeynoteTableCellParagraphList, KeynoteTableCellParagraphListBullet,
     KeynoteTableCellParagraphListBulletGeometry, KeynoteTableCellParagraphListIndentation,
     KeynoteTableCellParagraphListLabelColor, KeynoteTableCellParagraphListLevel,
     KeynoteTableCellParagraphListLevelPlacement, KeynoteTableCellParagraphListNumberFormat,
     KeynoteTableCellParagraphListNumberScale, KeynoteTableCellParagraphListNumberTiering,
     KeynoteTableCellParagraphListNumbering, KeynoteTableCellParagraphListPlacement,
-    KeynoteTableCellParagraphSpacing, KeynoteTableCellParagraphTabStops,
-    KeynoteTableCellTextAlignment, KeynoteTableCellTextBackground,
+    KeynoteTableCellParagraphTabStops, KeynoteTableCellTextBackground,
     KeynoteTableCellTextBaselineShift, KeynoteTableCellTextCapitalization,
     KeynoteTableCellTextCharacterSpacing, KeynoteTableCellTextColor,
     KeynoteTableCellTextDecorations, KeynoteTableCellTextFont, KeynoteTableCellTextLigatures,

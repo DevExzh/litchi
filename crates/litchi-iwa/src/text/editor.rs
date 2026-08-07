@@ -103,12 +103,12 @@ use super::storage_wire::{
     locate_text_storage, locate_text_storage_with_archive, locate_text_storages,
     update_parsed_archive,
 };
-use super::style::{
-    Background, Outline, ParagraphBackground, ParagraphBorders, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphSpacing, Shadow, TextAlignment, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures, TextScript,
-    TextStyle,
+use litchi_iwa_text::appearance::{Background, Outline, ParagraphBackground, Shadow};
+use litchi_iwa_text::character::{
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
+    TextScript, TextStyle,
 };
+use litchi_iwa_text::paragraph::format::{Alignment, Borders, Indents, LineSpacing, Spacing};
 use super::text_comment::{
     add_text_comment, add_text_comment_reply, remove_text_comment, remove_text_comment_reply,
     text_comment_replies, text_comments, update_text_comment, update_text_comment_reply,
@@ -1706,7 +1706,7 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective paragraph borders across a uniform paragraph layout box.
-    pub fn paragraph_borders(&self, object_id: TextStorageId) -> Result<ParagraphBorders> {
+    pub fn paragraph_borders(&self, object_id: TextStorageId) -> Result<Borders> {
         let object_id = object_id.get();
         paragraph_borders(&self.package, object_id)
     }
@@ -1715,7 +1715,7 @@ impl IWorkTextEditor {
     pub fn set_paragraph_borders(
         &mut self,
         object_id: TextStorageId,
-        borders: ParagraphBorders,
+        borders: Borders,
     ) -> Result<()> {
         let object_id = object_id.get();
         let mut staged = self.package.clone();
@@ -2045,7 +2045,7 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective uniform paragraph alignment of a text storage.
-    pub fn paragraph_alignment(&self, object_id: TextStorageId) -> Result<TextAlignment> {
+    pub fn paragraph_alignment(&self, object_id: TextStorageId) -> Result<Alignment> {
         let object_id = object_id.get();
         paragraph_alignment(&self.package, object_id)
     }
@@ -2057,7 +2057,7 @@ impl IWorkTextEditor {
     pub fn set_paragraph_alignment(
         &mut self,
         object_id: TextStorageId,
-        alignment: TextAlignment,
+        alignment: Alignment,
     ) -> Result<()> {
         let object_id = object_id.get();
         let mut staged = self.package.clone();
@@ -2087,7 +2087,7 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective uniform line spacing of a text storage.
-    pub fn paragraph_line_spacing(&self, object_id: TextStorageId) -> Result<ParagraphLineSpacing> {
+    pub fn paragraph_line_spacing(&self, object_id: TextStorageId) -> Result<LineSpacing> {
         let object_id = object_id.get();
         paragraph_line_spacing(&self.package, object_id)
     }
@@ -2096,7 +2096,7 @@ impl IWorkTextEditor {
     pub fn set_paragraph_line_spacing(
         &mut self,
         object_id: TextStorageId,
-        spacing: ParagraphLineSpacing,
+        spacing: LineSpacing,
     ) -> Result<()> {
         let object_id = object_id.get();
         let mut staged = self.package.clone();
@@ -2126,7 +2126,7 @@ impl IWorkTextEditor {
     }
 
     /// Read the effective before/after spacing of a uniformly styled text storage.
-    pub fn paragraph_spacing(&self, object_id: TextStorageId) -> Result<ParagraphSpacing> {
+    pub fn paragraph_spacing(&self, object_id: TextStorageId) -> Result<Spacing> {
         let object_id = object_id.get();
         paragraph_spacing(&self.package, object_id)
     }
@@ -2135,7 +2135,7 @@ impl IWorkTextEditor {
     pub fn set_paragraph_spacing(
         &mut self,
         object_id: TextStorageId,
-        spacing: ParagraphSpacing,
+        spacing: Spacing,
     ) -> Result<()> {
         let object_id = object_id.get();
         let mut staged = self.package.clone();
@@ -2165,7 +2165,7 @@ impl IWorkTextEditor {
     }
 
     /// Read effective first-line, left, and right indentation of a uniform storage.
-    pub fn paragraph_indents(&self, object_id: TextStorageId) -> Result<ParagraphIndents> {
+    pub fn paragraph_indents(&self, object_id: TextStorageId) -> Result<Indents> {
         let object_id = object_id.get();
         paragraph_indents(&self.package, object_id)
     }
@@ -2174,7 +2174,7 @@ impl IWorkTextEditor {
     pub fn set_paragraph_indents(
         &mut self,
         object_id: TextStorageId,
-        indents: ParagraphIndents,
+        indents: Indents,
     ) -> Result<()> {
         let object_id = object_id.get();
         let mut staged = self.package.clone();

@@ -13,12 +13,13 @@ use crate::text::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
     decimal_character_from_native,
 };
-use crate::text::style::{
-    ParagraphBackground, ParagraphBorders, ParagraphIndentPoints, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment, Background,
+use litchi_iwa_text::appearance::{Background, Outline, ParagraphBackground, Shadow};
+use litchi_iwa_text::character::{
     TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
-    Outline, TextPointSize, TextScript, Shadow, TextStrikethrough, TextStyle,
-    TextUnderline,
+    TextPointSize, TextScript, TextStrikethrough, TextStyle, TextUnderline,
+};
+use litchi_iwa_text::paragraph::format::{
+    Alignment, Borders, IndentPoints, Indents, LineSpacing, Spacing, SpacingPoints,
 };
 use crate::{Error, IWorkPackage, Result};
 use litchi_iwa_text::paragraph::style::{ParagraphFollowingStyle, raw::from_native_id};
@@ -285,7 +286,7 @@ pub(super) fn paragraph_background(
 pub(super) fn paragraph_borders(
     package: &IWorkPackage,
     first_style_id: u64,
-) -> Result<ParagraphBorders> {
+) -> Result<Borders> {
     let value = walk(package, first_style_id, None, |value, style| {
         let Some(properties) = style.para_properties.as_ref() else {
             return Ok(InheritanceControl::Continue);
@@ -365,7 +366,7 @@ pub(super) fn paragraph_writing_direction(
     Ok(value.unwrap_or_default())
 }
 
-pub(super) fn alignment(package: &IWorkPackage, first_style_id: u64) -> Result<TextAlignment> {
+pub(super) fn alignment(package: &IWorkPackage, first_style_id: u64) -> Result<Alignment> {
     let value = walk(package, first_style_id, None, |value, style| {
         let Some(alignment) = style
             .para_properties
@@ -374,22 +375,22 @@ pub(super) fn alignment(package: &IWorkPackage, first_style_id: u64) -> Result<T
         else {
             return Ok(InheritanceControl::Continue);
         };
-        *value = Some(TextAlignment::from_native_value(alignment)?);
+        *value = Some(super::alignment_from_native(alignment)?);
         Ok(InheritanceControl::Complete)
     })?;
-    Ok(value.unwrap_or(TextAlignment::Natural))
+    Ok(value.unwrap_or(Alignment::Natural))
 }
 
 pub(super) fn line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
-) -> Result<ParagraphLineSpacing> {
+) -> Result<LineSpacing> {
     let value = walk(package, first_style_id, None, |value, style| {
         let Some(properties) = style.para_properties.as_ref() else {
             return Ok(InheritanceControl::Continue);
         };
         if properties.line_spacing_null == Some(true) {
-            *value = Some(ParagraphLineSpacing::default());
+            *value = Some(LineSpacing::default());
             return Ok(InheritanceControl::Complete);
         }
         let Some(spacing) = properties.line_spacing.as_ref() else {
@@ -401,7 +402,7 @@ pub(super) fn line_spacing(
     Ok(value.unwrap_or_default())
 }
 
-pub(super) fn spacing(package: &IWorkPackage, first_style_id: u64) -> Result<ParagraphSpacing> {
+pub(super) fn spacing(package: &IWorkPackage, first_style_id: u64) -> Result<Spacing> {
     let (before, after) = walk(
         package,
         first_style_id,
@@ -411,13 +412,13 @@ pub(super) fn spacing(package: &IWorkPackage, first_style_id: u64) -> Result<Par
                 if before.is_none() {
                     *before = properties
                         .space_before
-                        .map(ParagraphSpacingPoints::from_points)
+                        .map(SpacingPoints::from_points)
                         .transpose()?;
                 }
                 if after.is_none() {
                     *after = properties
                         .space_after
-                        .map(ParagraphSpacingPoints::from_points)
+                        .map(SpacingPoints::from_points)
                         .transpose()?;
                 }
             }
@@ -428,13 +429,13 @@ pub(super) fn spacing(package: &IWorkPackage, first_style_id: u64) -> Result<Par
             })
         },
     )?;
-    Ok(ParagraphSpacing::new(
-        before.unwrap_or(ParagraphSpacingPoints::ZERO),
-        after.unwrap_or(ParagraphSpacingPoints::ZERO),
+    Ok(Spacing::new(
+        before.unwrap_or(SpacingPoints::ZERO),
+        after.unwrap_or(SpacingPoints::ZERO),
     ))
 }
 
-pub(super) fn indents(package: &IWorkPackage, first_style_id: u64) -> Result<ParagraphIndents> {
+pub(super) fn indents(package: &IWorkPackage, first_style_id: u64) -> Result<Indents> {
     let (first_line, left, right) = walk(
         package,
         first_style_id,
@@ -444,19 +445,19 @@ pub(super) fn indents(package: &IWorkPackage, first_style_id: u64) -> Result<Par
                 if first_line.is_none() {
                     *first_line = properties
                         .first_line_indent
-                        .map(ParagraphIndentPoints::from_points)
+                        .map(IndentPoints::from_points)
                         .transpose()?;
                 }
                 if left.is_none() {
                     *left = properties
                         .left_indent
-                        .map(ParagraphIndentPoints::from_points)
+                        .map(IndentPoints::from_points)
                         .transpose()?;
                 }
                 if right.is_none() {
                     *right = properties
                         .right_indent
-                        .map(ParagraphIndentPoints::from_points)
+                        .map(IndentPoints::from_points)
                         .transpose()?;
                 }
             }
@@ -469,10 +470,10 @@ pub(super) fn indents(package: &IWorkPackage, first_style_id: u64) -> Result<Par
             )
         },
     )?;
-    Ok(ParagraphIndents::new(
-        first_line.unwrap_or(ParagraphIndentPoints::ZERO),
-        left.unwrap_or(ParagraphIndentPoints::ZERO),
-        right.unwrap_or(ParagraphIndentPoints::ZERO),
+    Ok(Indents::new(
+        first_line.unwrap_or(IndentPoints::ZERO),
+        left.unwrap_or(IndentPoints::ZERO),
+        right.unwrap_or(IndentPoints::ZERO),
     ))
 }
 

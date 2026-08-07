@@ -65,8 +65,6 @@ pub use litchi_iwa_common::table::cell::layout::{
     Inset as PagesTableCellInset, Insets as PagesTableCellInsets, Layout as PagesTableCellLayout,
     TextWrap as PagesTableCellTextWrap, VerticalAlignment as PagesTableCellVerticalAlignment,
 };
-pub use crate::text::ParagraphIndents as PagesTableCellParagraphIndents;
-pub use crate::text::ParagraphLineSpacing as PagesTableCellParagraphLineSpacing;
 pub use crate::text::ParagraphList as PagesTableCellParagraphList;
 pub use crate::text::ParagraphListBullet as PagesTableCellParagraphListBullet;
 pub use crate::text::ParagraphListBulletGeometry as PagesTableCellParagraphListBulletGeometry;
@@ -79,9 +77,7 @@ pub use crate::text::ParagraphListNumberScale as PagesTableCellParagraphListNumb
 pub use crate::text::ParagraphListNumberTiering as PagesTableCellParagraphListNumberTiering;
 pub use crate::text::ParagraphListNumbering as PagesTableCellParagraphListNumbering;
 pub use crate::text::ParagraphListPlacement as PagesTableCellParagraphListPlacement;
-pub use crate::text::ParagraphSpacing as PagesTableCellParagraphSpacing;
 pub use crate::text::ParagraphTabStops as PagesTableCellParagraphTabStops;
-pub use crate::text::TextAlignment as PagesTableCellTextAlignment;
 pub use crate::text::Background as PagesTableCellTextBackground;
 pub use crate::text::TextBaselineShift as PagesTableCellTextBaselineShift;
 pub use crate::text::TextCapitalization as PagesTableCellTextCapitalization;

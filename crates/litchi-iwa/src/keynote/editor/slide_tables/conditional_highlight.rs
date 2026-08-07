@@ -31,9 +31,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<
-        Option<Vec<litchi_iwa_common::table::cell::conditional_highlight::Rule>>,
-    > {
+    ) -> Result<Option<Vec<litchi_iwa_common::table::cell::conditional_highlight::Rule>>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_conditional_highlight_rules_in_package(
             self.package(),

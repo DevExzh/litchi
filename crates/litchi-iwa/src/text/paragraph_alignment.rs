@@ -26,12 +26,12 @@ use super::paragraph_style_rename;
 use super::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
 };
-use super::style::{
-    ParagraphBackground, ParagraphBorders, ParagraphIndents, ParagraphLineSpacing,
-    Background, Outline, ParagraphSpacing, Shadow, TextAlignment, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures, TextScript,
-    TextStyle,
+use litchi_iwa_text::appearance::{Background, Outline, ParagraphBackground, Shadow};
+use litchi_iwa_text::character::{
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
+    TextScript, TextStyle,
 };
+use litchi_iwa_text::paragraph::format::{Alignment, Borders, Indents, LineSpacing, Spacing};
 use super::style_registry::{
     object_archive_name, register_private_style, unregister_private_style,
 };
@@ -52,14 +52,14 @@ enum ParagraphProperty<'a> {
     CharacterShadow(Shadow),
     CharacterBackground(Background),
     ParagraphBackground(ParagraphBackground),
-    Borders(ParagraphBorders),
+    Borders(Borders),
     Flow(ParagraphFlow),
     WritingDirection(ParagraphWritingDirection),
     FollowingStyle(ParagraphFollowingStyle),
-    Alignment(TextAlignment),
-    LineSpacing(ParagraphLineSpacing),
-    Spacing(ParagraphSpacing),
-    Indents(ParagraphIndents),
+    Alignment(Alignment),
+    LineSpacing(LineSpacing),
+    Spacing(Spacing),
+    Indents(Indents),
     DecimalTabCharacter(ParagraphDecimalTabCharacter),
     DefaultTabInterval(ParagraphDefaultTabInterval),
     TabStops(Cow<'a, ParagraphTabStops>),
@@ -439,7 +439,7 @@ pub(super) fn reset_paragraph_background(
 pub(super) fn paragraph_borders(
     package: &IWorkPackage,
     storage_id: u64,
-) -> Result<ParagraphBorders> {
+) -> Result<Borders> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_paragraph_borders(package, storage.style_id)
 }
@@ -447,7 +447,7 @@ pub(super) fn paragraph_borders(
 pub(super) fn set_paragraph_borders(
     package: &mut IWorkPackage,
     storage_id: u64,
-    borders: ParagraphBorders,
+    borders: Borders,
 ) -> Result<()> {
     if paragraph_borders(package, storage_id)? == borders {
         return Ok(());
@@ -512,7 +512,7 @@ pub(super) fn reset_paragraph_writing_direction(
 pub(super) fn paragraph_alignment(
     package: &IWorkPackage,
     storage_id: u64,
-) -> Result<TextAlignment> {
+) -> Result<Alignment> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_alignment(package, storage.style_id)
 }
@@ -520,7 +520,7 @@ pub(super) fn paragraph_alignment(
 pub(super) fn set_paragraph_alignment(
     package: &mut IWorkPackage,
     storage_id: u64,
-    alignment: TextAlignment,
+    alignment: Alignment,
 ) -> Result<()> {
     if paragraph_alignment(package, storage_id)? == alignment {
         return Ok(());
@@ -538,7 +538,7 @@ pub(super) fn reset_paragraph_alignment(
 pub(super) fn paragraph_line_spacing(
     package: &IWorkPackage,
     storage_id: u64,
-) -> Result<ParagraphLineSpacing> {
+) -> Result<LineSpacing> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_line_spacing(package, storage.style_id)
 }
@@ -546,7 +546,7 @@ pub(super) fn paragraph_line_spacing(
 pub(super) fn set_paragraph_line_spacing(
     package: &mut IWorkPackage,
     storage_id: u64,
-    spacing: ParagraphLineSpacing,
+    spacing: LineSpacing,
 ) -> Result<()> {
     if paragraph_line_spacing(package, storage_id)? == spacing {
         return Ok(());
@@ -564,7 +564,7 @@ pub(super) fn reset_paragraph_line_spacing(
 pub(super) fn paragraph_spacing(
     package: &IWorkPackage,
     storage_id: u64,
-) -> Result<ParagraphSpacing> {
+) -> Result<Spacing> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_spacing(package, storage.style_id)
 }
@@ -572,7 +572,7 @@ pub(super) fn paragraph_spacing(
 pub(super) fn set_paragraph_spacing(
     package: &mut IWorkPackage,
     storage_id: u64,
-    spacing: ParagraphSpacing,
+    spacing: Spacing,
 ) -> Result<()> {
     if paragraph_spacing(package, storage_id)? == spacing {
         return Ok(());
@@ -587,7 +587,7 @@ pub(super) fn reset_paragraph_spacing(package: &mut IWorkPackage, storage_id: u6
 pub(super) fn paragraph_indents(
     package: &IWorkPackage,
     storage_id: u64,
-) -> Result<ParagraphIndents> {
+) -> Result<Indents> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_indents(package, storage.style_id)
 }
@@ -595,7 +595,7 @@ pub(super) fn paragraph_indents(
 pub(super) fn set_paragraph_indents(
     package: &mut IWorkPackage,
     storage_id: u64,
-    indents: ParagraphIndents,
+    indents: Indents,
 ) -> Result<()> {
     if paragraph_indents(package, storage_id)? == indents {
         return Ok(());

@@ -6,6 +6,7 @@
 
 use super::*;
 use litchi_numbers::table::dimension::{Dimension, Size};
+use crate::text::{Alignment, Indents, LineSpacing, Spacing};
 
 pub(crate) fn set_table_cell_in_package(
     package: &mut IWorkPackage,
@@ -51,7 +52,7 @@ pub(crate) fn table_cell_text_alignment_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TextAlignment> {
+) -> Result<Alignment> {
     cell_paragraph_style::alignment(package, table_id, row, column)
 }
 
@@ -60,7 +61,7 @@ pub(crate) fn set_table_cell_text_alignment_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    alignment: TextAlignment,
+    alignment: Alignment,
 ) -> Result<()> {
     cell_paragraph_style::set_alignment(package, table_id, row, column, alignment)
 }
@@ -79,7 +80,7 @@ pub(crate) fn table_cell_paragraph_line_spacing_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<ParagraphLineSpacing> {
+) -> Result<LineSpacing> {
     cell_paragraph_style::line_spacing(package, table_id, row, column)
 }
 
@@ -88,7 +89,7 @@ pub(crate) fn set_table_cell_paragraph_line_spacing_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    spacing: ParagraphLineSpacing,
+    spacing: LineSpacing,
 ) -> Result<()> {
     cell_paragraph_style::set_line_spacing(package, table_id, row, column, spacing)
 }
@@ -107,7 +108,7 @@ pub(crate) fn table_cell_paragraph_spacing_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<ParagraphSpacing> {
+) -> Result<Spacing> {
     cell_paragraph_style::spacing(package, table_id, row, column)
 }
 
@@ -116,7 +117,7 @@ pub(crate) fn set_table_cell_paragraph_spacing_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    spacing: ParagraphSpacing,
+    spacing: Spacing,
 ) -> Result<()> {
     cell_paragraph_style::set_spacing(package, table_id, row, column, spacing)
 }
@@ -479,7 +480,7 @@ pub(crate) fn table_cell_paragraph_indents_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<ParagraphIndents> {
+) -> Result<Indents> {
     cell_paragraph_style::indents(package, table_id, row, column)
 }
 
@@ -488,7 +489,7 @@ pub(crate) fn set_table_cell_paragraph_indents_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    indents: ParagraphIndents,
+    indents: Indents,
 ) -> Result<()> {
     cell_paragraph_style::set_indents(package, table_id, row, column, indents)
 }

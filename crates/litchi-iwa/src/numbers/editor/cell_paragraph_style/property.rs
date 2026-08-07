@@ -10,15 +10,15 @@ use crate::text::paragraph_alignment::native::{
     inherited_text_style,
 };
 use crate::text::{
-    ParagraphIndents, ParagraphLineSpacing, ParagraphSpacing, ParagraphTabStops, TextAlignment,
-    Background, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations,
-    TextFont, TextLigatures, Outline, TextScript, Shadow, TextStyle,
+    Background, Outline, Indents, LineSpacing, Spacing,
+    ParagraphTabStops, Shadow, Alignment, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextScript, TextStyle,
 };
 use crate::{Error, IWorkPackage, Result};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(super) enum CellParagraphProperty {
-    Alignment(TextAlignment),
+    Alignment(Alignment),
     Background(Background),
     BaselineShift(TextBaselineShift),
     Capitalization(TextCapitalization),
@@ -26,13 +26,13 @@ pub(super) enum CellParagraphProperty {
     Color(RgbaColor),
     Decorations(TextDecorations),
     Font(TextFont),
-    Indents(ParagraphIndents),
+    Indents(Indents),
     Ligatures(TextLigatures),
-    LineSpacing(ParagraphLineSpacing),
+    LineSpacing(LineSpacing),
     Outline(Outline),
     Script(TextScript),
     Shadow(Shadow),
-    Spacing(ParagraphSpacing),
+    Spacing(Spacing),
     TabStops(ParagraphTabStops),
     TextStyle(TextStyle),
 }

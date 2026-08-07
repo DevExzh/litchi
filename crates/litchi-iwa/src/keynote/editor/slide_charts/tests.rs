@@ -13,10 +13,9 @@ use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
 
 use crate::charts::{
     Axis, Bound, Bounds, ChartCornerRadius, ChartDonutInnerRadius, ChartFont, ChartFontSize,
-    ChartLegendFill,
-    ChartLegendFont, ChartLegendFontSize, ChartLegendFrame, ChartLegendRect, ChartLegendShadow,
-    ChartLegendStroke, ChartPieLabelDistance, ChartPieStartAngle, ChartPieWedgeExplosion,
-    ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
+    ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame, ChartLegendRect,
+    ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance, ChartPieStartAngle,
+    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
     ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
     ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
     ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Index,

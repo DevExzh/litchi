@@ -10,6 +10,7 @@ use litchi_numbers::cell::data_format::{
     Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,
 };
 use litchi_numbers::table::merge::Region;
+use crate::text::{Alignment, Indents, LineSpacing, Spacing};
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1203,7 +1204,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellTextAlignment> {
+    ) -> Result<Alignment> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_text_alignment_in_package(
             self.package(),
@@ -1219,7 +1220,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        alignment: PagesTableCellTextAlignment,
+        alignment: Alignment,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -1270,7 +1271,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellParagraphLineSpacing> {
+    ) -> Result<LineSpacing> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_line_spacing_in_package(
             self.package(),
@@ -1286,7 +1287,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        spacing: PagesTableCellParagraphLineSpacing,
+        spacing: LineSpacing,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -1337,7 +1338,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellParagraphSpacing> {
+    ) -> Result<Spacing> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_spacing_in_package(
             self.package(),
@@ -1353,7 +1354,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        spacing: PagesTableCellParagraphSpacing,
+        spacing: Spacing,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
@@ -2205,7 +2206,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<PagesTableCellParagraphIndents> {
+    ) -> Result<Indents> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_indents_in_package(
             self.package(),
@@ -2221,7 +2222,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        indents: PagesTableCellParagraphIndents,
+        indents: Indents,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();

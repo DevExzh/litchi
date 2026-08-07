@@ -42,14 +42,14 @@ use crate::shapes::{
 use crate::text::layout::Layout;
 use crate::text::{
     AppliedParagraphStyle, Background as TextAppearanceBackground, IWorkTextEditor,
-    NamedParagraphStyle, Outline, ParagraphBackground, ParagraphBorders,
+    NamedParagraphStyle, Outline, ParagraphBackground, Borders,
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
-    ParagraphFollowingStyle, ParagraphIndents, ParagraphLineSpacing, ParagraphList,
+    ParagraphFollowingStyle, Indents, LineSpacing, ParagraphList,
     ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
     ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
-    ParagraphListNumbering, ParagraphSpacing, ParagraphTabStops, ParagraphWritingDirection, Shadow,
-    TextAlignment, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextComment,
+    ParagraphListNumbering, Spacing, ParagraphTabStops, ParagraphWritingDirection, Shadow,
+    Alignment, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextComment,
     TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId,
     TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId,
     TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextRange, TextScript,
@@ -1496,7 +1496,7 @@ impl PagesEditor {
     }
 
     /// Read the effective Text → Layout paragraph borders.
-    pub fn text_box_paragraph_borders(&self, drawable_object_id: u64) -> Result<ParagraphBorders> {
+    pub fn text_box_paragraph_borders(&self, drawable_object_id: u64) -> Result<Borders> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.paragraph_borders(graph.storage_id)
     }
@@ -1505,7 +1505,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_borders(
         &mut self,
         drawable_object_id: u64,
-        borders: ParagraphBorders,
+        borders: Borders,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1812,7 +1812,7 @@ impl PagesEditor {
     }
 
     /// Read the effective paragraph alignment of a reachable ordinary text box.
-    pub fn text_box_paragraph_alignment(&self, drawable_object_id: u64) -> Result<TextAlignment> {
+    pub fn text_box_paragraph_alignment(&self, drawable_object_id: u64) -> Result<Alignment> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.paragraph_alignment(graph.storage_id)
     }
@@ -1821,7 +1821,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_alignment(
         &mut self,
         drawable_object_id: u64,
-        alignment: TextAlignment,
+        alignment: Alignment,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1851,7 +1851,7 @@ impl PagesEditor {
     pub fn text_box_paragraph_line_spacing(
         &self,
         drawable_object_id: u64,
-    ) -> Result<ParagraphLineSpacing> {
+    ) -> Result<LineSpacing> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.paragraph_line_spacing(graph.storage_id)
     }
@@ -1860,7 +1860,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_line_spacing(
         &mut self,
         drawable_object_id: u64,
-        spacing: ParagraphLineSpacing,
+        spacing: LineSpacing,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1890,7 +1890,7 @@ impl PagesEditor {
     }
 
     /// Read effective before/after paragraph spacing of an ordinary text box.
-    pub fn text_box_paragraph_spacing(&self, drawable_object_id: u64) -> Result<ParagraphSpacing> {
+    pub fn text_box_paragraph_spacing(&self, drawable_object_id: u64) -> Result<Spacing> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.paragraph_spacing(graph.storage_id)
     }
@@ -1899,7 +1899,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_spacing(
         &mut self,
         drawable_object_id: u64,
-        spacing: ParagraphSpacing,
+        spacing: Spacing,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1926,7 +1926,7 @@ impl PagesEditor {
     }
 
     /// Read effective first-line, left, and right indentation of an ordinary text box.
-    pub fn text_box_paragraph_indents(&self, drawable_object_id: u64) -> Result<ParagraphIndents> {
+    pub fn text_box_paragraph_indents(&self, drawable_object_id: u64) -> Result<Indents> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.paragraph_indents(graph.storage_id)
     }
@@ -1935,7 +1935,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_indents(
         &mut self,
         drawable_object_id: u64,
-        indents: ParagraphIndents,
+        indents: Indents,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -4685,15 +4685,14 @@ pub use images::{PagesImageInfo, RemovedPagesImage};
 pub use movies::{PagesMovieInfo, RemovedPagesMovie};
 pub use tables::{
     PagesCellValue, PagesTable, PagesTableCellConditionalHighlightInfo, PagesTableCellInset,
-    PagesTableCellInsets, PagesTableCellLayout, PagesTableCellParagraphIndents,
-    PagesTableCellParagraphLineSpacing, PagesTableCellParagraphList,
+    PagesTableCellInsets, PagesTableCellLayout, PagesTableCellParagraphList,
     PagesTableCellParagraphListBullet, PagesTableCellParagraphListBulletGeometry,
     PagesTableCellParagraphListIndentation, PagesTableCellParagraphListLabelColor,
     PagesTableCellParagraphListLevel, PagesTableCellParagraphListLevelPlacement,
     PagesTableCellParagraphListNumberFormat, PagesTableCellParagraphListNumberScale,
     PagesTableCellParagraphListNumberTiering, PagesTableCellParagraphListNumbering,
-    PagesTableCellParagraphListPlacement, PagesTableCellParagraphSpacing,
-    PagesTableCellParagraphTabStops, PagesTableCellTextAlignment, PagesTableCellTextBackground,
+    PagesTableCellParagraphListPlacement, PagesTableCellParagraphTabStops,
+    PagesTableCellTextBackground,
     PagesTableCellTextBaselineShift, PagesTableCellTextCapitalization,
     PagesTableCellTextCharacterSpacing, PagesTableCellTextColor, PagesTableCellTextDecorations,
     PagesTableCellTextFont, PagesTableCellTextLigatures, PagesTableCellTextOutline,

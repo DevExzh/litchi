@@ -1444,11 +1444,11 @@ mod tests {
     use super::*;
     use crate::numbers::cell::CellValue;
     use crate::numbers::{NumbersDocument, NumbersDocumentBuilder, NumbersEditor};
+    use litchi_numbers::cell::data_format::control::Range;
     use litchi_numbers::cell::data_format::custom::{
         Condition, ConditionValue, Custom, DateTime as CustomDateTime, DateTimePattern, Name,
         Number as CustomNumber, NumberPattern, NumberRule, Text as CustomText,
     };
-    use litchi_numbers::cell::data_format::control::Range;
     use litchi_numbers::cell::data_format::duration::{Style, Unit, UnitRange};
     use litchi_numbers::cell::data_format::number::{
         CurrencyCode, CurrencyStyle, DecimalPlaces, FixedDecimalPlaces, FractionAccuracy,

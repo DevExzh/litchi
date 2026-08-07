@@ -4,6 +4,7 @@
 
 use super::*;
 use litchi_numbers::table::merge::Region;
+use crate::text::{Alignment, Indents, LineSpacing, Spacing};
 
 impl NumbersEditor {
     /// List absolute pivot categories backed by valid calculation-engine
@@ -871,7 +872,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellTextAlignment> {
+    ) -> Result<Alignment> {
         cell_paragraph_style::alignment(&self.package, table_id, row, column)
     }
 
@@ -881,7 +882,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        alignment: NumbersTableCellTextAlignment,
+        alignment: Alignment,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_alignment(&mut staged, table_id, row, column, alignment)?;
@@ -916,7 +917,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellParagraphLineSpacing> {
+    ) -> Result<LineSpacing> {
         cell_paragraph_style::line_spacing(&self.package, table_id, row, column)
     }
 
@@ -926,7 +927,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        spacing: NumbersTableCellParagraphLineSpacing,
+        spacing: LineSpacing,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_line_spacing(&mut staged, table_id, row, column, spacing)?;
@@ -961,7 +962,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellParagraphSpacing> {
+    ) -> Result<Spacing> {
         cell_paragraph_style::spacing(&self.package, table_id, row, column)
     }
 
@@ -971,7 +972,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        spacing: NumbersTableCellParagraphSpacing,
+        spacing: Spacing,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_spacing(&mut staged, table_id, row, column, spacing)?;
@@ -1682,7 +1683,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellParagraphIndents> {
+    ) -> Result<Indents> {
         cell_paragraph_style::indents(&self.package, table_id, row, column)
     }
 
@@ -1692,7 +1693,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        indents: NumbersTableCellParagraphIndents,
+        indents: Indents,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_indents(&mut staged, table_id, row, column, indents)?;

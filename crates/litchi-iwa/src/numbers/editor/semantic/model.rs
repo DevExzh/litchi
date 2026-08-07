@@ -75,13 +75,13 @@ pub struct NumbersPivotCategoryInfo {
 }
 
 /// Horizontal text alignment shared by native Numbers table cells.
-pub type NumbersTableCellTextAlignment = TextAlignment;
+pub type NumbersTableCellTextAlignment = Alignment;
 /// Typed first-line, left, and right indents for a Numbers table cell.
-pub type NumbersTableCellParagraphIndents = ParagraphIndents;
+pub type NumbersTableCellParagraphIndents = Indents;
 /// Typed native line spacing applied to a whole Numbers table cell.
-pub type NumbersTableCellParagraphLineSpacing = ParagraphLineSpacing;
+pub type NumbersTableCellParagraphLineSpacing = LineSpacing;
 /// Typed before/after paragraph spacing applied to a whole Numbers table cell.
-pub type NumbersTableCellParagraphSpacing = ParagraphSpacing;
+pub type NumbersTableCellParagraphSpacing = Spacing;
 /// Canonical native list preset applied uniformly to a Numbers table cell.
 pub type NumbersTableCellParagraphList = ParagraphList;
 /// A validated custom text-bullet marker in a Numbers table cell.
