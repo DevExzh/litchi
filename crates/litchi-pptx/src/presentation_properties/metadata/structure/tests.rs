@@ -6,7 +6,9 @@ use crate::presentation_properties::metadata::custom_show::Show;
 use crate::presentation_properties::metadata::sections::Section;
 
 const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+const PS: &str = "http://purl.oclc.org/ooxml/presentationml/main";
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const RS: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 const P14: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
 const SECTION_URI: &str = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}";
 const SECTION_ONE: &str = "{11111111-1111-1111-1111-111111111111}";
@@ -27,7 +29,9 @@ fn fixture() -> OpcPackage {
             r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <p:presentation xmlns:p="{P}" xmlns:r="{R}" xmlns:p14="{P14}" xmlns:x="urn:future">
   <p:sldIdLst>
-    <p:sldId id="256" r:id="rIdSlideOne"/>
+    <p:sldId id="256" r:id="rIdSlideOne">
+      <p:extLst><p:ext uri="{{slide-opaque}}"><x:future>keep-slide-extension</x:future></p:ext></p:extLst>
+    </p:sldId>
     <p:sldId id="257" r:id="rIdSlideTwo"/>
     <p:sldId id="258" r:id="rIdSlideThree"/>
   </p:sldIdLst>
@@ -94,6 +98,128 @@ fn presentation_xml(package: &OpcPackage) -> Vec<u8> {
         .unwrap()
         .blob()
         .to_vec()
+}
+
+fn set_presentation_xml(package: &mut OpcPackage, xml: Vec<u8>) {
+    package
+        .get_part_mut(&PackURI::new("/ppt/presentation.xml").unwrap())
+        .unwrap()
+        .set_blob(xml);
+}
+
+#[test]
+fn non_empty_slide_id_is_shared_by_ordering_custom_shows_and_sections() {
+    let package = fixture();
+    let graph = load(&package).unwrap();
+
+    assert_eq!(
+        graph
+            .slides
+            .iter()
+            .map(|slide| slide.slide_id)
+            .collect::<Vec<_>>(),
+        [256, 257, 258]
+    );
+    assert_eq!(
+        graph.custom_shows.get_by_id(7).unwrap().slide_ids,
+        [256, 258]
+    );
+    assert_eq!(
+        graph.sections.get_by_id(SECTION_ONE).unwrap().slide_ids,
+        [256, 258]
+    );
+}
+
+#[test]
+fn non_empty_slide_id_uses_the_same_duplicate_and_relationship_validation() {
+    let cases = [
+        (
+            r#"<p:sldId id="257" r:id="rIdSlideTwo"/>"#,
+            r#"<p:sldId id="256" r:id="rIdSlideTwo"/>"#,
+        ),
+        (
+            r#"<p:sldId id="257" r:id="rIdSlideTwo"/>"#,
+            r#"<p:sldId id="257" r:id="rIdSlideOne"/>"#,
+        ),
+        (
+            r#"<p:sldId id="256" r:id="rIdSlideOne">"#,
+            r#"<p:sldId id="256" r:id="rIdMissing">"#,
+        ),
+    ];
+
+    for (source, replacement) in cases {
+        let mut package = fixture();
+        let xml = String::from_utf8(presentation_xml(&package)).unwrap();
+        let malformed = xml.replacen(source, replacement, 1).into_bytes();
+        set_presentation_xml(&mut package, malformed);
+        assert!(load(&package).is_err());
+    }
+}
+
+#[test]
+fn structure_names_are_resolved_and_accept_transitional_and_strict_aliases() {
+    for (presentationml, relationships) in [(P, R), (PS, RS)] {
+        let xml = format!(
+            r#"<main:presentation xmlns:main="{presentationml}" xmlns:rel="{relationships}"><main:sldIdLst><main:sldId id="256" rel:id="slide"/></main:sldIdLst><main:custShowLst><main:custShow name="show" id="1"><main:sldLst><main:sld rel:id="slide"/></main:sldLst></main:custShow></main:custShowLst></main:presentation>"#
+        );
+        let (slides, shows) = codec::parse_core(xml.as_bytes()).unwrap();
+        assert_eq!(slides, [(256, "slide".to_owned())]);
+        assert_eq!(shows.len(), 1);
+        assert_eq!(shows[0].relationship_ids, ["slide"]);
+    }
+}
+
+#[test]
+fn structure_parser_rejects_namespace_lookalikes_and_arbitrary_id_prefixes() {
+    let cases = [
+        (
+            r#"<p:sldId id="257" r:id="rIdSlideTwo"/>"#,
+            r#"<x:sldId id="257" r:id="rIdSlideTwo"/>"#,
+        ),
+        (
+            r#"<p:sldId id="257" r:id="rIdSlideTwo"/>"#,
+            r#"<p:sldId id="257" x:id="rIdSlideTwo"/>"#,
+        ),
+        (
+            "<p:sldIdLst>",
+            r#"<x:sldIdLst xmlns:x="urn:not-presentation">"#,
+        ),
+    ];
+
+    for (source, replacement) in cases {
+        let mut package = fixture();
+        let xml = String::from_utf8(presentation_xml(&package)).unwrap();
+        set_presentation_xml(
+            &mut package,
+            xml.replacen(source, replacement, 1).into_bytes(),
+        );
+        assert!(load(&package).is_err());
+    }
+}
+
+#[test]
+fn presentation_slide_id_enforces_the_full_schema_range() {
+    for id in ["255", "2147483648", "4294967295"] {
+        let xml = format!(
+            r#"<p:presentation xmlns:p="{P}" xmlns:r="{R}"><p:sldIdLst><p:sldId id="{id}" r:id="slide"/></p:sldIdLst></p:presentation>"#
+        );
+        assert!(
+            codec::parse_core(xml.as_bytes()).is_err(),
+            "accepted slide ID {id}"
+        );
+    }
+
+    for id in ["256", "2147483647"] {
+        let xml = format!(
+            r#"<p:presentation xmlns:p="{P}" xmlns:r="{R}"><p:sldIdLst><p:sldId id="{id}" r:id="slide"/></p:sldIdLst></p:presentation>"#
+        );
+        assert_eq!(
+            codec::parse_core(xml.as_bytes()).unwrap().0[0]
+                .0
+                .to_string(),
+            id
+        );
+    }
 }
 
 #[test]

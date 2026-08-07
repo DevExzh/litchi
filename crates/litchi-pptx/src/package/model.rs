@@ -142,6 +142,90 @@ impl Package {
         self.edit_typed(move |opc| crate::tag::remove(opc, &slide_name))
     }
 
+    /// Read the source-bound Designer tags owned by one stable slide ID.
+    pub fn slide_designer_tags<'a>(
+        &self,
+        slide: impl Into<crate::slide::Key<'a>>,
+    ) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
+        self.slide_designer_tags_with_limits(slide, crate::shape::designer::Limits::default())
+    }
+
+    /// Read slide-ID Designer tags under caller-supplied resource bounds.
+    pub fn slide_designer_tags_with_limits<'a>(
+        &self,
+        slide: impl Into<crate::slide::Key<'a>>,
+        limits: crate::shape::designer::Limits,
+    ) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
+        self.ensure_graph_current("slide_designer_tags")?;
+        let (_, slide_id) = self.resolve_slide_identity(slide.into())?;
+        crate::presentation_properties::metadata::designer_tags::load_snapshot_with_limits(
+            &self.opc, slide_id, limits,
+        )
+    }
+
+    /// Create or replace Designer tags on one stable slide ID atomically.
+    pub fn put_slide_designer_tags<'a>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'a>>,
+        tags: crate::shape::designer::Tags,
+    ) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
+        self.put_slide_designer_tags_with_limits(
+            slide,
+            tags,
+            crate::shape::designer::Limits::default(),
+        )
+    }
+
+    /// Create or replace slide-ID Designer tags under explicit bounds.
+    pub fn put_slide_designer_tags_with_limits<'a>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'a>>,
+        tags: crate::shape::designer::Tags,
+        limits: crate::shape::designer::Limits,
+    ) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
+        self.ensure_graph_current("put_slide_designer_tags")?;
+        let (_, slide_id) = self.resolve_slide_identity(slide.into())?;
+        let mut edit =
+            crate::presentation_properties::metadata::designer_tags::load_snapshot_with_limits(
+                &self.opc, slide_id, limits,
+            )?
+            .edit()?;
+        edit.set(tags)?;
+        let commit = edit.commit()?;
+        let changed = commit.is_changed();
+        self.publish_designer(changed, move |opc| commit.apply(opc))
+    }
+
+    /// Remove Designer tags from one stable slide ID atomically.
+    pub fn remove_slide_designer_tags<'a>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'a>>,
+    ) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
+        self.remove_slide_designer_tags_with_limits(
+            slide,
+            crate::shape::designer::Limits::default(),
+        )
+    }
+
+    /// Remove slide-ID Designer tags under explicit resource bounds.
+    pub fn remove_slide_designer_tags_with_limits<'a>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'a>>,
+        limits: crate::shape::designer::Limits,
+    ) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
+        self.ensure_graph_current("remove_slide_designer_tags")?;
+        let (_, slide_id) = self.resolve_slide_identity(slide.into())?;
+        let mut edit =
+            crate::presentation_properties::metadata::designer_tags::load_snapshot_with_limits(
+                &self.opc, slide_id, limits,
+            )?
+            .edit()?;
+        edit.remove();
+        let commit = edit.commit()?;
+        let changed = commit.is_changed();
+        self.publish_designer(changed, move |opc| commit.apply(opc))
+    }
+
     /// Read the typed document-level math defaults from presentation properties.
     pub fn math_properties(
         &self,
@@ -310,6 +394,113 @@ impl Package {
         self.edit_typed(move |opc| crate::shape::designer::remove(opc, &slide_name, shape))
     }
 
+    /// Read one shape's source-bound PowerPoint 2020 Designer properties.
+    pub fn shape_designer_properties<'s, 'k>(
+        &self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<crate::shape::designer::PropertiesSnapshot> {
+        self.shape_designer_properties_with_limits(
+            slide,
+            shape,
+            crate::shape::designer::Limits::default(),
+        )
+    }
+
+    /// Read shape Designer properties under caller-supplied resource bounds.
+    pub fn shape_designer_properties_with_limits<'s, 'k>(
+        &self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+        limits: crate::shape::designer::Limits,
+    ) -> Result<crate::shape::designer::PropertiesSnapshot> {
+        self.ensure_graph_current("shape_designer_properties")?;
+        let (slide_name, _) = self.resolve_slide_identity(slide.into())?;
+        crate::shape::designer::load_properties_with_limits(&self.opc, &slide_name, shape, limits)
+    }
+
+    /// Create or replace one shape's Designer drawing properties atomically.
+    pub fn put_shape_designer_properties<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+        properties: crate::shape::designer::DrawingProperties,
+    ) -> Result<crate::shape::designer::PropertiesSnapshot> {
+        self.ensure_graph_current("put_shape_designer_properties")?;
+        let (slide_name, _) = self.resolve_slide_identity(slide.into())?;
+        let shape = shape.into();
+        let before = crate::shape::designer::load_properties(&self.opc, &slide_name, shape)?;
+        let changed = before.properties() != Some(&properties);
+        self.publish_designer(changed, move |opc| {
+            crate::shape::designer::put_properties(opc, &slide_name, shape, properties)
+        })
+    }
+
+    /// Create or replace shape Designer properties under explicit bounds.
+    pub fn put_shape_designer_properties_with_limits<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+        properties: crate::shape::designer::DrawingProperties,
+        limits: crate::shape::designer::Limits,
+    ) -> Result<crate::shape::designer::PropertiesSnapshot> {
+        self.ensure_graph_current("put_shape_designer_properties")?;
+        let (slide_name, _) = self.resolve_slide_identity(slide.into())?;
+        let mut edit = crate::shape::designer::load_properties_with_limits(
+            &self.opc,
+            &slide_name,
+            shape,
+            limits,
+        )?
+        .edit();
+        edit.set(properties)?;
+        let commit = edit.commit()?;
+        let changed = !commit.is_noop();
+        self.publish_designer(changed, move |opc| {
+            crate::shape::designer::apply_properties(opc, commit)
+        })
+    }
+
+    /// Remove one shape's Designer drawing properties atomically.
+    pub fn remove_shape_designer_properties<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<crate::shape::designer::PropertiesSnapshot> {
+        self.ensure_graph_current("remove_shape_designer_properties")?;
+        let (slide_name, _) = self.resolve_slide_identity(slide.into())?;
+        let shape = shape.into();
+        let before = crate::shape::designer::load_properties(&self.opc, &slide_name, shape)?;
+        let changed = before.is_present();
+        self.publish_designer(changed, move |opc| {
+            crate::shape::designer::remove_properties(opc, &slide_name, shape)
+        })
+    }
+
+    /// Remove shape Designer properties under explicit resource bounds.
+    pub fn remove_shape_designer_properties_with_limits<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Key<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+        limits: crate::shape::designer::Limits,
+    ) -> Result<crate::shape::designer::PropertiesSnapshot> {
+        self.ensure_graph_current("remove_shape_designer_properties")?;
+        let (slide_name, _) = self.resolve_slide_identity(slide.into())?;
+        let mut edit = crate::shape::designer::load_properties_with_limits(
+            &self.opc,
+            &slide_name,
+            shape,
+            limits,
+        )?
+        .edit();
+        edit.remove();
+        let commit = edit.commit()?;
+        let changed = !commit.is_noop();
+        self.publish_designer(changed, move |opc| {
+            crate::shape::designer::apply_properties(opc, commit)
+        })
+    }
+
     /// Read all contextual 3D-model owners on one slide in source order.
     pub fn model3ds<'a>(
         &self,
@@ -455,6 +646,57 @@ impl Package {
             });
         }
         Ok(())
+    }
+
+    fn publish_designer<T>(
+        &mut self,
+        changed: bool,
+        operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
+    ) -> Result<T> {
+        let value = self.edit_typed(operation)?;
+        if changed {
+            self.mutable_pres = None;
+        }
+        Ok(value)
+    }
+
+    fn resolve_slide_identity(&self, key: crate::slide::Key<'_>) -> Result<(PackURI, u32)> {
+        let presentation = self.presentation()?;
+        let references = presentation.slide_references()?;
+        match key {
+            crate::slide::Key::Index(index) => {
+                let reference = references.get(index).ok_or(Error::SlideIndexOutOfBounds {
+                    index,
+                    len: references.len(),
+                })?;
+                let slide = presentation
+                    .slide(index)?
+                    .ok_or(Error::SlideIndexOutOfBounds {
+                        index,
+                        len: references.len(),
+                    })?;
+                Ok((slide.part().part().partname().clone(), reference.id()))
+            },
+            crate::slide::Key::Name(name) => {
+                let slides = presentation.slides()?;
+                let mut selected = None;
+                let mut matches = 0usize;
+                for (reference, slide) in references.iter().zip(slides) {
+                    if slide.name()? == name {
+                        matches = matches.saturating_add(1);
+                        selected = Some((slide.part().part().partname().clone(), reference.id()));
+                    }
+                }
+                match (matches, selected) {
+                    (0, _) => Err(Error::SlideNameNotFound(name.to_owned())),
+                    (1, Some(value)) => Ok(value),
+                    _ => Err(Error::AmbiguousSlideName {
+                        name: name.to_owned(),
+                        matches,
+                    }),
+                }
+            },
+        }
     }
 
     fn resolve_slide(&self, key: crate::slide::Key<'_>) -> Result<PackURI> {

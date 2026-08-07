@@ -11,6 +11,7 @@ mod slide_patch;
 pub mod changes;
 pub mod color_map;
 pub mod custom_show;
+pub mod designer_tags;
 pub mod events;
 pub mod guides;
 pub mod handout;

@@ -1,8 +1,10 @@
 //! Mutable presentation orchestration.
 
 use crate::error::{Error, Result};
+use crate::shape::designer::TAGS_EXTENSION_URI;
 
-use super::slide::MutableSlide;
+use super::shape::escape_xml;
+use super::slide::{MutableSlide, PreparedDesigner as PreparedSlideDesigner};
 
 #[cfg(feature = "fonts")]
 use litchi_fonts::{CollectGlyphs, GlyphMap};
@@ -201,24 +203,65 @@ impl MutablePresentation {
         self.generate_presentation_xml_with(&relationship_ids)
     }
 
+    pub(crate) fn preflight_designer(&self) -> Result<PreparedDesigner> {
+        let mut slides = Vec::new();
+        slides
+            .try_reserve_exact(self.slides.len())
+            .map_err(|source| Error::Allocation {
+                resource: "mutable presentation Designer metadata",
+                source,
+            })?;
+        for slide in &self.slides {
+            slides.push(slide.preflight_designer()?);
+        }
+        Ok(PreparedDesigner { slides })
+    }
+
     pub(crate) fn generate_presentation_xml_with(
         &self,
         relationship_ids: &[String],
+    ) -> Result<String> {
+        let designer = self.preflight_designer()?;
+        self.generate_presentation_xml_with_designer(relationship_ids, &designer)
+    }
+
+    pub(crate) fn generate_presentation_xml_with_designer(
+        &self,
+        relationship_ids: &[String],
+        designer: &PreparedDesigner,
     ) -> Result<String> {
         if relationship_ids.len() != self.slides.len() {
             return Err(Error::Invalid(
                 "presentation relationship count does not match slide count".into(),
             ));
         }
+        if designer.slides.len() != self.slides.len() {
+            return Err(Error::Invalid(
+                "precompiled Designer slide count does not match presentation slide count".into(),
+            ));
+        }
         let mut xml = String::from(
             r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst><p:notesMasterIdLst><p:notesMasterId r:id="rIdNotesMaster"/></p:notesMasterIdLst><p:sldIdLst>"#,
         );
-        for (slide, relationship_id) in self.slides.iter().zip(relationship_ids) {
+        for ((slide, relationship_id), prepared) in self
+            .slides
+            .iter()
+            .zip(relationship_ids)
+            .zip(&designer.slides)
+        {
             xml.push_str("<p:sldId id=\"");
             xml.push_str(&slide.slide_id().to_string());
             xml.push_str("\" r:id=\"");
-            xml.push_str(relationship_id);
-            xml.push_str("\"/>");
+            xml.push_str(&escape_xml(relationship_id));
+            if let Some(tags) = prepared.tags.as_deref() {
+                xml.push_str("\"><p:extLst><p:ext uri=\"");
+                xml.push_str(TAGS_EXTENSION_URI);
+                xml.push_str("\">");
+                xml.push_str(tags);
+                xml.push_str("</p:ext></p:extLst></p:sldId>");
+            } else {
+                xml.push_str("\"/>");
+            }
         }
         xml.push_str("</p:sldIdLst><p:sldSz cx=\"");
         xml.push_str(&self.slide_width.to_string());
@@ -226,6 +269,17 @@ impl MutablePresentation {
         xml.push_str(&self.slide_height.to_string());
         xml.push_str("\" type=\"screen4x3\"/><p:notesSz cx=\"6858000\" cy=\"9144000\"/><p:defaultTextStyle/></p:presentation>");
         Ok(xml)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct PreparedDesigner {
+    slides: Vec<PreparedSlideDesigner>,
+}
+
+impl PreparedDesigner {
+    pub(crate) fn slides(&self) -> &[PreparedSlideDesigner] {
+        &self.slides
     }
 }
 

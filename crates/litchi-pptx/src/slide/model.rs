@@ -101,6 +101,38 @@ impl<'a> Slide<'a> {
         package::slide_shape_design_element(self.package, &self.part, shape)
     }
 
+    /// Read one shape's source-bound Designer drawing properties.
+    pub fn shape_designer_properties<'k>(
+        &self,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<crate::shape::designer::PropertiesSnapshot> {
+        self.shape_designer_properties_with_limits(shape, crate::shape::designer::Limits::default())
+    }
+
+    /// Read shape Designer properties under caller-supplied resource bounds.
+    pub fn shape_designer_properties_with_limits<'k>(
+        &self,
+        shape: impl Into<crate::shape::Key<'k>>,
+        limits: crate::shape::designer::Limits,
+    ) -> Result<crate::shape::designer::PropertiesSnapshot> {
+        package::slide_shape_designer_properties(self.package, &self.part, shape, limits)
+    }
+
+    /// Read the source-bound Designer tags owned by this slide's stable ID.
+    pub fn designer_tags(
+        &self,
+    ) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
+        self.designer_tags_with_limits(crate::shape::designer::Limits::default())
+    }
+
+    /// Read this slide's Designer tags under caller-supplied resource bounds.
+    pub fn designer_tags_with_limits(
+        &self,
+        limits: crate::shape::designer::Limits,
+    ) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
+        package::slide_designer_tags(self.package, &self.part, limits)
+    }
+
     /// Read all contextual 3D-model owners on this slide in source order.
     pub fn model3ds(&self) -> Result<Vec<crate::model3d::Model>> {
         crate::model3d::package::load_all(self.package, self.part.part().partname())

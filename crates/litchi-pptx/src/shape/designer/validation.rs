@@ -18,6 +18,33 @@ pub(super) fn validate_value(value: bool) -> Result<()> {
     Ok(())
 }
 
+pub(super) fn validate_tag_text(
+    value: &str,
+    limits: super::model::Limits,
+    resource: &'static str,
+) -> Result<()> {
+    if value.len() > limits.string_bytes() {
+        return Err(Error::Limit {
+            resource,
+            limit: limits.string_bytes(),
+        });
+    }
+    if value.chars().all(is_xml_10_char) {
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "{resource} contains a character forbidden by XML 1.0"
+        )))
+    }
+}
+
+fn is_xml_10_char(value: char) -> bool {
+    matches!(
+        value,
+        '\u{9}' | '\u{A}' | '\u{D}' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..='\u{10FFFF}'
+    )
+}
+
 pub(super) fn count_node(nodes: &mut usize) -> Result<()> {
     *nodes = nodes.checked_add(1).ok_or(Error::Limit {
         resource: "designer shape XML nodes",

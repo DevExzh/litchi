@@ -2,6 +2,7 @@
 
 use crate::backgrounds::SlideBackground;
 use crate::format::TextFormat;
+use crate::shape::designer::{Limits as DesignerLimits, Tags};
 use crate::transition::Transition;
 use crate::{Error, Result};
 
@@ -19,6 +20,8 @@ pub struct MutableSlide {
     pub(crate) notes: Option<String>,
     pub(crate) transition: Option<Transition>,
     pub(crate) background: Option<SlideBackground>,
+    designer_tags: Option<Tags>,
+    designer_limits: DesignerLimits,
     pub(crate) modified: bool,
 }
 
@@ -31,6 +34,8 @@ impl MutableSlide {
             notes: None,
             transition: None,
             background: None,
+            designer_tags: None,
+            designer_limits: DesignerLimits::default(),
             modified: false,
         }
     }
@@ -39,6 +44,42 @@ impl MutableSlide {
     #[inline]
     pub fn slide_id(&self) -> u32 {
         self.slide_id
+    }
+
+    /// Borrow the optional Designer tags owned by this stable slide ID.
+    #[inline]
+    pub fn designer_tags(&self) -> Option<&Tags> {
+        self.designer_tags.as_ref()
+    }
+
+    /// Set Designer tags under safe default resource bounds.
+    pub fn set_designer_tags(&mut self, tags: Tags) -> Result<&mut Self> {
+        self.set_designer_tags_with_limits(tags, DesignerLimits::default())
+    }
+
+    /// Set Designer tags under caller-supplied resource bounds.
+    pub fn set_designer_tags_with_limits(
+        &mut self,
+        tags: Tags,
+        limits: DesignerLimits,
+    ) -> Result<&mut Self> {
+        // Validate the complete wire value before changing mutable state.
+        crate::shape::designer::write_tags(&tags, limits)?;
+        // Limits configure validation for future materialization. They are not
+        // serialized presentation state and therefore must not make a writer
+        // publication dirty by themselves.
+        let changed = self.designer_tags.as_ref() != Some(&tags);
+        self.designer_tags = Some(tags);
+        self.designer_limits = limits;
+        self.modified |= changed;
+        Ok(self)
+    }
+
+    /// Remove Designer tags from this slide ID.
+    pub fn clear_designer_tags(&mut self) -> bool {
+        let removed = self.designer_tags.take().is_some();
+        self.modified |= removed;
+        removed
     }
 
     pub(crate) fn set_slide_id(&mut self, slide_id: u32) {
@@ -143,11 +184,62 @@ impl MutableSlide {
         height: i64,
         fill_color: Option<String>,
     ) {
+        self.push_rectangle(x, y, width, height, fill_color);
+    }
+
+    /// Add a rectangle with inert Designer drawing properties.
+    pub fn add_rectangle_with_designer_properties(
+        &mut self,
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+        fill_color: Option<String>,
+        properties: crate::shape::designer::DrawingProperties,
+    ) -> Result<&mut MutableShape> {
+        self.add_rectangle_with_designer_properties_and_limits(
+            x,
+            y,
+            width,
+            height,
+            fill_color,
+            properties,
+            DesignerLimits::default(),
+        )
+    }
+
+    /// Add a rectangle with inert Designer drawing properties and explicit bounds.
+    pub fn add_rectangle_with_designer_properties_and_limits(
+        &mut self,
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+        fill_color: Option<String>,
+        properties: crate::shape::designer::DrawingProperties,
+        limits: DesignerLimits,
+    ) -> Result<&mut MutableShape> {
+        // Reject an invalid value before adding a shape so the operation is
+        // atomic from the caller's perspective.
+        crate::shape::designer::write_properties(&properties, None, limits)?;
+        self.push_rectangle(x, y, width, height, fill_color)
+            .set_designer_properties_with_limits(properties, limits)
+    }
+
+    fn push_rectangle(
+        &mut self,
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+        fill_color: Option<String>,
+    ) -> &mut MutableShape {
         let shape_id = (self.shapes.len() as u32).saturating_add(3);
         self.shapes.push(MutableShape::new_rectangle(
             shape_id, x, y, width, height, fill_color,
         ));
         self.modified = true;
+        self.shapes.last_mut().expect("shape was just pushed")
     }
 
     /// Add a filled or unfilled ellipse.
@@ -159,11 +251,62 @@ impl MutableSlide {
         height: i64,
         fill_color: Option<String>,
     ) {
+        self.push_ellipse(x, y, width, height, fill_color);
+    }
+
+    /// Add an ellipse with inert Designer drawing properties.
+    pub fn add_ellipse_with_designer_properties(
+        &mut self,
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+        fill_color: Option<String>,
+        properties: crate::shape::designer::DrawingProperties,
+    ) -> Result<&mut MutableShape> {
+        self.add_ellipse_with_designer_properties_and_limits(
+            x,
+            y,
+            width,
+            height,
+            fill_color,
+            properties,
+            DesignerLimits::default(),
+        )
+    }
+
+    /// Add an ellipse with inert Designer drawing properties and explicit bounds.
+    pub fn add_ellipse_with_designer_properties_and_limits(
+        &mut self,
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+        fill_color: Option<String>,
+        properties: crate::shape::designer::DrawingProperties,
+        limits: DesignerLimits,
+    ) -> Result<&mut MutableShape> {
+        // Reject an invalid value before adding a shape so the operation is
+        // atomic from the caller's perspective.
+        crate::shape::designer::write_properties(&properties, None, limits)?;
+        self.push_ellipse(x, y, width, height, fill_color)
+            .set_designer_properties_with_limits(properties, limits)
+    }
+
+    fn push_ellipse(
+        &mut self,
+        x: i64,
+        y: i64,
+        width: i64,
+        height: i64,
+        fill_color: Option<String>,
+    ) -> &mut MutableShape {
         let shape_id = (self.shapes.len() as u32).saturating_add(3);
         self.shapes.push(MutableShape::new_ellipse(
             shape_id, x, y, width, height, fill_color,
         ));
         self.modified = true;
+        self.shapes.last_mut().expect("shape was just pushed")
     }
 
     /// Borrow authored shapes in source order.
@@ -190,6 +333,44 @@ impl MutableSlide {
 
     /// Generate one complete slide part.
     pub fn generate_slide_xml(&self) -> Result<String> {
+        let designer = self.preflight_designer()?;
+        self.generate_slide_xml_with(&designer)
+    }
+
+    pub(crate) fn preflight_designer(&self) -> Result<PreparedDesigner> {
+        let mut shape_properties = Vec::new();
+        shape_properties
+            .try_reserve_exact(self.shapes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "mutable slide Designer properties",
+                source,
+            })?;
+        for shape in &self.shapes {
+            shape_properties.push(shape.preflight_designer_properties()?);
+        }
+        let tags = self
+            .designer_tags
+            .as_ref()
+            .map(|tags| {
+                crate::shape::designer::write_tags(tags, self.designer_limits).and_then(|bytes| {
+                    String::from_utf8(bytes).map_err(|_| {
+                        Error::Invalid("Designer serializer produced non-UTF-8 XML".into())
+                    })
+                })
+            })
+            .transpose()?;
+        Ok(PreparedDesigner {
+            shape_properties,
+            tags,
+        })
+    }
+
+    pub(crate) fn generate_slide_xml_with(&self, designer: &PreparedDesigner) -> Result<String> {
+        if designer.shape_properties.len() != self.shapes.len() {
+            return Err(Error::Invalid(
+                "precompiled Designer shape count does not match slide shape count".into(),
+            ));
+        }
         let mut xml = format!(
             r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld name="Slide {}"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>"#,
             self.slide_id
@@ -204,8 +385,8 @@ impl MutableSlide {
                     .to_xml()?;
             xml.push_str(&title);
         }
-        for shape in &self.shapes {
-            xml.push_str(&shape.to_xml()?);
+        for (shape, properties) in self.shapes.iter().zip(&designer.shape_properties) {
+            xml.push_str(&shape.to_xml_with_designer(properties.as_deref())?);
         }
         xml.push_str("</p:spTree></p:cSld>");
         if let Some(transition) = &self.transition {
@@ -244,6 +425,12 @@ impl MutableSlide {
         }
         Ok(())
     }
+}
+
+#[derive(Debug)]
+pub(crate) struct PreparedDesigner {
+    pub(crate) shape_properties: Vec<Option<String>>,
+    pub(crate) tags: Option<String>,
 }
 
 #[cfg(feature = "fonts")]

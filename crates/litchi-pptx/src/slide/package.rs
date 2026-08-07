@@ -9,8 +9,10 @@
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 
-use crate::Result;
-use crate::parts::{SlideLayoutPart, SlideMasterPart, SlidePart, related_part_by_type};
+use crate::parts::{
+    PresentationPart, SlideLayoutPart, SlideMasterPart, SlidePart, related_part_by_type,
+};
+use crate::{Error, Result};
 
 pub(crate) fn slide_tags<'a>(
     package: &'a OpcPackage,
@@ -44,6 +46,65 @@ pub(crate) fn slide_shape_design_element<'a, 'k>(
     shape: impl Into<crate::shape::Key<'k>>,
 ) -> Result<Option<crate::shape::designer::Snapshot>> {
     crate::shape::designer::load(package, part.part().partname(), shape)
+}
+
+pub(crate) fn slide_shape_designer_properties<'a, 'k>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+    shape: impl Into<crate::shape::Key<'k>>,
+    limits: crate::shape::designer::Limits,
+) -> Result<crate::shape::designer::PropertiesSnapshot> {
+    crate::shape::designer::load_properties_with_limits(
+        package,
+        part.part().partname(),
+        shape,
+        limits,
+    )
+}
+
+pub(crate) fn slide_designer_tags<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+    limits: crate::shape::designer::Limits,
+) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
+    let presentation = PresentationPart::from_package(package)?;
+    let mut selected = None;
+    for reference in presentation.slide_references()? {
+        let relationship = presentation
+            .part()
+            .rels()
+            .get(reference.relationship_id())
+            .ok_or_else(|| {
+                Error::Relationship(format!(
+                    "slide ID {} references missing relationship '{}'",
+                    reference.id(),
+                    reference.relationship_id()
+                ))
+            })?;
+        if relationship.is_external()
+            || !crate::parts::is_relationship_type(relationship.reltype(), rt::SLIDE, "slide")
+        {
+            return Err(Error::Relationship(format!(
+                "slide ID {} does not reference an internal slide",
+                reference.id()
+            )));
+        }
+        let target = relationship.target_partname()?;
+        let target_part = package.get_part(&target)?;
+        crate::parts::validate_content_type(target_part, ct::PML_SLIDE)?;
+        if target == *part.part().partname() {
+            if selected.replace(reference.id()).is_some() {
+                return Err(Error::Invalid(
+                    "slide part is bound to multiple stable slide IDs".into(),
+                ));
+            }
+        }
+    }
+    let slide_id = selected
+        .ok_or_else(|| Error::Invalid("slide part has no exact stable slide-ID binding".into()))?;
+    crate::presentation_properties::metadata::designer_tags::load_snapshot_with_limits(
+        package, slide_id, limits,
+    )
 }
 
 pub(crate) fn slide_tag_inventory<'a>(

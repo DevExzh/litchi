@@ -12,6 +12,8 @@ use crate::presentation_properties::metadata::{escape_xml, new_guid};
 use crate::{Error, Result};
 use litchi_opc::OpcPackage;
 use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, QName, ResolveResult};
+use quick_xml::reader::NsReader;
 use quick_xml::{Reader, XmlVersion};
 use std::collections::{HashMap, HashSet};
 
@@ -25,6 +27,7 @@ const SECTION_URI: &str = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}";
 const MAX_BYTES: usize = 8 * 1024 * 1024;
 const MAX_NODES: usize = 100_000;
 const MAX_DEPTH: usize = 128;
+const MAX_SLIDE_ID: u32 = 2_147_483_647;
 
 /// Load and validate the presentation structure graph.
 pub fn load(package: &OpcPackage) -> Result<Graph> {
@@ -456,47 +459,84 @@ fn resolve_custom_shows(
 }
 
 #[derive(Default)]
-struct RawShow {
-    id: u32,
-    name: String,
-    relationship_ids: Vec<String>,
+pub(super) struct RawShow {
+    pub(super) id: u32,
+    pub(super) name: String,
+    pub(super) relationship_ids: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CoreElement {
+    Presentation,
+    SlideIdList,
+    SlideId,
+    CustomShowList,
+    CustomShow,
+    SlideList,
+    Slide,
+    Other,
+}
+
+#[derive(Debug)]
+struct Attribute {
+    namespace: Option<Vec<u8>>,
+    local: Vec<u8>,
+    value: String,
 }
 
 #[allow(clippy::type_complexity)]
-fn parse_core(xml: &[u8]) -> Result<(Vec<(u32, String)>, Vec<RawShow>)> {
-    let mut reader = Reader::from_reader(xml);
+pub(super) fn parse_core(xml: &[u8]) -> Result<(Vec<(u32, String)>, Vec<RawShow>)> {
+    let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(true);
-    let mut ancestors = Vec::<String>::new();
+    let mut ancestors = Vec::<CoreElement>::new();
     let mut slides = Vec::new();
     let mut shows = Vec::new();
     let mut current_show: Option<RawShow> = None;
     let mut nodes = 0usize;
     loop {
         let decoder = reader.decoder();
-        match reader.read_event() {
-            Ok(Event::Start(element)) => {
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) => {
                 nodes += 1;
                 resource(nodes, ancestors.len())?;
-                let local = local_name(element.name().as_ref())?;
-                if local == "custShow" {
+                let kind = core_element(&namespace, element.name())?;
+                if is_direct_slide_reference(&ancestors, kind) {
+                    slides.push(parse_slide_reference(&element, decoder, &reader)?);
+                } else if kind == CoreElement::CustomShow {
+                    if ancestors.as_slice()
+                        != [CoreElement::Presentation, CoreElement::CustomShowList]
+                    {
+                        return Err(invalid("custom show has invalid presentation ancestry"));
+                    }
                     if current_show.is_some() {
                         return Err(invalid("nested custom shows are rejected"));
                     }
-                    current_show = Some(parse_show(&element, decoder)?);
+                    current_show = Some(parse_show(&element, decoder, &reader)?);
                 }
-                ancestors.push(local);
+                ancestors.push(kind);
             },
-            Ok(Event::Empty(element)) => {
+            Event::Empty(element) => {
                 nodes += 1;
                 resource(nodes, ancestors.len())?;
-                let local = local_name(element.name().as_ref())?;
-                if local == "sldId"
-                    && ancestors.len() == 2
-                    && ancestors.last().map(String::as_str) == Some("sldIdLst")
+                let kind = core_element(&namespace, element.name())?;
+                if is_direct_slide_reference(&ancestors, kind) {
+                    slides.push(parse_slide_reference(&element, decoder, &reader)?);
+                } else if kind == CoreElement::Slide
+                    && ancestors.as_slice()
+                        == [
+                            CoreElement::Presentation,
+                            CoreElement::CustomShowList,
+                            CoreElement::CustomShow,
+                            CoreElement::SlideList,
+                        ]
                 {
-                    slides.push(parse_slide_reference(&element, decoder)?);
-                } else if local == "sld" && ancestors.last().map(String::as_str) == Some("sldLst") {
-                    let relationship_id = relationship_id(&element, decoder)?;
+                    let relationship_id = relationship_id(&element, decoder, &reader)?;
                     current_show
                         .as_mut()
                         .ok_or_else(|| invalid("custom-show slide appears outside a custom show"))?
@@ -504,15 +544,15 @@ fn parse_core(xml: &[u8]) -> Result<(Vec<(u32, String)>, Vec<RawShow>)> {
                         .push(relationship_id);
                 }
             },
-            Ok(Event::End(element)) => {
-                let local = local_name(element.name().as_ref())?;
+            Event::End(element) => {
+                let kind = core_element(&namespace, element.name())?;
                 let open = ancestors
                     .pop()
                     .ok_or_else(|| invalid("unexpected closing element"))?;
-                if open != local {
+                if open != kind {
                     return Err(invalid("mismatched presentation element"));
                 }
-                if local == "custShow" {
+                if kind == CoreElement::CustomShow {
                     shows.push(
                         current_show
                             .take()
@@ -520,11 +560,10 @@ fn parse_core(xml: &[u8]) -> Result<(Vec<(u32, String)>, Vec<RawShow>)> {
                     );
                 }
             },
-            Ok(Event::DocType(_) | Event::PI(_)) => {
+            Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTDs and processing instructions are rejected"));
             },
-            Ok(Event::Eof) => break,
-            Err(error) => return Err(Error::Xml(error.to_string())),
+            Event::Eof => break,
             _ => {},
         }
     }
@@ -534,8 +573,45 @@ fn parse_core(xml: &[u8]) -> Result<(Vec<(u32, String)>, Vec<RawShow>)> {
     Ok((slides, shows))
 }
 
-fn parse_show(element: &BytesStart<'_>, decoder: quick_xml::encoding::Decoder) -> Result<RawShow> {
-    let attributes = attributes(element, decoder)?;
+fn core_element(namespace: &ResolveResult<'_>, name: QName<'_>) -> Result<CoreElement> {
+    let presentationml = match namespace {
+        ResolveResult::Bound(Namespace(value)) => {
+            matches!(*value, value if value == P.as_bytes() || value == PS.as_bytes())
+        },
+        ResolveResult::Unbound => false,
+        ResolveResult::Unknown(prefix) => {
+            return Err(invalid(format!(
+                "unresolved presentation XML namespace prefix '{}'",
+                String::from_utf8_lossy(prefix.as_ref())
+            )));
+        },
+    };
+    if !presentationml {
+        return Ok(CoreElement::Other);
+    }
+    Ok(match name.local_name().as_ref() {
+        b"presentation" => CoreElement::Presentation,
+        b"sldIdLst" => CoreElement::SlideIdList,
+        b"sldId" => CoreElement::SlideId,
+        b"custShowLst" => CoreElement::CustomShowList,
+        b"custShow" => CoreElement::CustomShow,
+        b"sldLst" => CoreElement::SlideList,
+        b"sld" => CoreElement::Slide,
+        _ => CoreElement::Other,
+    })
+}
+
+fn is_direct_slide_reference(ancestors: &[CoreElement], kind: CoreElement) -> bool {
+    kind == CoreElement::SlideId
+        && ancestors == [CoreElement::Presentation, CoreElement::SlideIdList]
+}
+
+fn parse_show(
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    reader: &NsReader<&[u8]>,
+) -> Result<RawShow> {
+    let attributes = attributes_ns(element, decoder, reader)?;
     let id = required(&attributes, "id")?
         .parse::<u32>()
         .map_err(|_| invalid("invalid custom-show ID"))?;
@@ -553,13 +629,14 @@ fn parse_show(element: &BytesStart<'_>, decoder: quick_xml::encoding::Decoder) -
 fn parse_slide_reference(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
+    reader: &NsReader<&[u8]>,
 ) -> Result<(u32, String)> {
-    let attributes = attributes(element, decoder)?;
+    let attributes = attributes_ns(element, decoder, reader)?;
     let id = required_unqualified(&attributes, "id")?
         .parse::<u32>()
         .map_err(|_| invalid("invalid presentation slide ID"))?;
-    if id < 256 {
-        return Err(invalid("presentation slide ID is below 256"));
+    if !(256..=MAX_SLIDE_ID).contains(&id) {
+        return Err(invalid("presentation slide ID is outside 256..=2147483647"));
     }
     Ok((id, required_qualified(&attributes, "id")?.to_owned()))
 }
@@ -567,9 +644,47 @@ fn parse_slide_reference(
 fn relationship_id(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
+    reader: &NsReader<&[u8]>,
 ) -> Result<String> {
-    let attributes = attributes(element, decoder)?;
+    let attributes = attributes_ns(element, decoder, reader)?;
     Ok(required_qualified(&attributes, "id")?.to_owned())
+}
+
+fn attributes_ns(
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    reader: &NsReader<&[u8]>,
+) -> Result<Vec<Attribute>> {
+    let mut values = Vec::new();
+    let mut seen = HashSet::new();
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        let namespace = match namespace {
+            ResolveResult::Bound(Namespace(value)) => Some(value.to_vec()),
+            ResolveResult::Unbound => None,
+            ResolveResult::Unknown(prefix) => {
+                return Err(invalid(format!(
+                    "unresolved presentation XML attribute prefix '{}'",
+                    String::from_utf8_lossy(prefix.as_ref())
+                )));
+            },
+        };
+        let local = local.as_ref().to_vec();
+        if !seen.insert((namespace.clone(), local.clone())) {
+            return Err(invalid("duplicate presentation XML attribute"));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .into_owned();
+        values.push(Attribute {
+            namespace,
+            local,
+            value,
+        });
+    }
+    Ok(values)
 }
 
 fn attributes(
@@ -595,23 +710,28 @@ fn attributes(
     Ok(values)
 }
 
-fn required<'a>(values: &'a [(String, String)], local: &str) -> Result<&'a str> {
+fn required<'a>(values: &'a [Attribute], local: &str) -> Result<&'a str> {
     values
         .iter()
-        .find(|(name, _)| name == local)
-        .map(|(_, value)| value.as_str())
+        .find(|attribute| attribute.namespace.is_none() && attribute.local == local.as_bytes())
+        .map(|attribute| attribute.value.as_str())
         .ok_or_else(|| invalid(format!("missing attribute '{local}'")))
 }
 
-fn required_unqualified<'a>(values: &'a [(String, String)], local: &str) -> Result<&'a str> {
+fn required_unqualified<'a>(values: &'a [Attribute], local: &str) -> Result<&'a str> {
     required(values, local)
 }
 
-fn required_qualified<'a>(values: &'a [(String, String)], local: &str) -> Result<&'a str> {
+fn required_qualified<'a>(values: &'a [Attribute], local: &str) -> Result<&'a str> {
     values
         .iter()
-        .find(|(name, _)| name.rsplit_once(':').map(|(_, item)| item) == Some(local))
-        .map(|(_, value)| value.as_str())
+        .find(|attribute| {
+            attribute.local == local.as_bytes()
+                && attribute.namespace.as_deref().is_some_and(|namespace| {
+                    namespace == R.as_bytes() || namespace == RS.as_bytes()
+                })
+        })
+        .map(|attribute| attribute.value.as_str())
         .ok_or_else(|| invalid(format!("missing relationship attribute '{local}'")))
 }
 
@@ -644,7 +764,7 @@ fn validate_graph_shape(graph: &Graph) -> Result<()> {
     let mut rel_ids = HashSet::new();
     let mut part_names = HashSet::new();
     for slide in &graph.slides {
-        if slide.slide_id < 256 || !slide_ids.insert(slide.slide_id) {
+        if !(256..=MAX_SLIDE_ID).contains(&slide.slide_id) || !slide_ids.insert(slide.slide_id) {
             return Err(invalid("invalid or duplicate presentation slide ID"));
         }
         if !rel_ids.insert(slide.relationship_id.as_str())
@@ -1053,5 +1173,18 @@ mod tests {
                 .windows(b"<!--keep-->".len())
                 .any(|window| window == b"<!--keep-->")
         );
+    }
+
+    #[test]
+    fn non_empty_slide_ids_are_recorded_once_and_indirect_lookalikes_are_ignored() {
+        let xml = br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:future"><p:sldIdLst><p:sldId id="256" r:id="rIdOne"><p:extLst><p:ext uri="{opaque}"><x:future><p:sldId id="999" r:id="rIdNested"/></x:future></p:ext></p:extLst></p:sldId><p:extLst><p:sldId id="998" r:id="rIdIndirect"/></p:extLst><p:sldId id="257" r:id="rIdTwo"/></p:sldIdLst><p:extLst><p:sldId id="997" r:id="rIdOutside"/></p:extLst></p:presentation>"#;
+
+        let (slides, shows) = parse_core(xml).unwrap();
+
+        assert_eq!(
+            slides,
+            vec![(256, "rIdOne".to_owned()), (257, "rIdTwo".to_owned())]
+        );
+        assert!(shows.is_empty());
     }
 }

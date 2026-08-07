@@ -306,6 +306,8 @@ impl Package {
     }
 
     fn materialize_presentation(&mut self, presentation: &MutablePresentation) -> Result<()> {
+        // Compile all fallible p202 payloads before changing any OPC state.
+        let designer = presentation.preflight_designer()?;
         let presentation_name = pack_uri(PRESENTATION_PART)?;
         let old_slide_relationships: Vec<String> = {
             let part = self.opc.get_part(&presentation_name)?;
@@ -344,7 +346,12 @@ impl Package {
         }
 
         let mut relationship_ids = Vec::with_capacity(presentation.slide_count());
-        for (index, slide) in presentation.slides().iter().enumerate() {
+        for (index, (slide, prepared)) in presentation
+            .slides()
+            .iter()
+            .zip(designer.slides())
+            .enumerate()
+        {
             let target = format!("slides/slide{}.xml", index.saturating_add(1));
             let relationship_id = self
                 .opc
@@ -356,7 +363,7 @@ impl Package {
             let mut slide_part = BlobPart::new(
                 slide_name,
                 ct::PML_SLIDE.to_string(),
-                slide.generate_slide_xml()?.into_bytes(),
+                slide.generate_slide_xml_with(prepared)?.into_bytes(),
             );
             slide_part.relate_to("../slideLayouts/slideLayout1.xml", rt::SLIDE_LAYOUT);
             if slide.has_notes() {
@@ -381,7 +388,8 @@ impl Package {
             }
         }
 
-        let xml = presentation.generate_presentation_xml_with(&relationship_ids)?;
+        let xml =
+            presentation.generate_presentation_xml_with_designer(&relationship_ids, &designer)?;
         self.opc
             .get_part_mut(&presentation_name)?
             .set_blob(xml.into_bytes());

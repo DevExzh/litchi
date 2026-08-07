@@ -1,6 +1,9 @@
 //! Mutable, package-independent slide-shape authoring values.
 
 use crate::format::TextFormat;
+use crate::shape::designer::{
+    DrawingProperties, Limits as DesignerLimits, PROPERTIES_EXTENSION_URI,
+};
 use crate::{Error, Result};
 
 #[cfg(feature = "fonts")]
@@ -58,6 +61,8 @@ pub enum ShapeType {
 pub struct MutableShape {
     pub(crate) shape_id: u32,
     pub(crate) shape_type: ShapeType,
+    designer_properties: Option<DrawingProperties>,
+    designer_limits: DesignerLimits,
     pub(crate) modified: bool,
 }
 
@@ -80,6 +85,8 @@ impl MutableShape {
                 height,
                 format: TextFormat::default(),
             },
+            designer_properties: None,
+            designer_limits: DesignerLimits::default(),
             modified: false,
         }
     }
@@ -101,6 +108,8 @@ impl MutableShape {
                 height,
                 fill_color,
             },
+            designer_properties: None,
+            designer_limits: DesignerLimits::default(),
             modified: false,
         }
     }
@@ -122,6 +131,8 @@ impl MutableShape {
                 height,
                 fill_color,
             },
+            designer_properties: None,
+            designer_limits: DesignerLimits::default(),
             modified: false,
         }
     }
@@ -136,6 +147,42 @@ impl MutableShape {
     #[inline]
     pub fn shape_type(&self) -> &ShapeType {
         &self.shape_type
+    }
+
+    /// Borrow the optional inert PowerPoint Designer drawing properties.
+    #[inline]
+    pub fn designer_properties(&self) -> Option<&DrawingProperties> {
+        self.designer_properties.as_ref()
+    }
+
+    /// Set Designer drawing properties under safe default resource bounds.
+    pub fn set_designer_properties(&mut self, properties: DrawingProperties) -> Result<&mut Self> {
+        self.set_designer_properties_with_limits(properties, DesignerLimits::default())
+    }
+
+    /// Set Designer drawing properties under caller-supplied resource bounds.
+    pub fn set_designer_properties_with_limits(
+        &mut self,
+        properties: DrawingProperties,
+        limits: DesignerLimits,
+    ) -> Result<&mut Self> {
+        // Validate the complete wire value before changing mutable state.
+        crate::shape::designer::write_properties(&properties, None, limits)?;
+        // Limits configure validation for future materialization. They are not
+        // serialized presentation state and therefore must not make a writer
+        // publication dirty by themselves.
+        let changed = self.designer_properties.as_ref() != Some(&properties);
+        self.designer_properties = Some(properties);
+        self.designer_limits = limits;
+        self.modified |= changed;
+        Ok(self)
+    }
+
+    /// Remove Designer drawing properties, retaining unrelated shape state.
+    pub fn clear_designer_properties(&mut self) -> bool {
+        let removed = self.designer_properties.take().is_some();
+        self.modified |= removed;
+        removed
     }
 
     /// Replace text in a text box.
@@ -220,6 +267,21 @@ impl MutableShape {
 
     /// Return the shape as PresentationML owned by a slide part.
     pub(crate) fn to_xml(&self) -> Result<String> {
+        let designer = self.preflight_designer_properties()?;
+        self.to_xml_with_designer(designer.as_deref())
+    }
+
+    pub(crate) fn preflight_designer_properties(&self) -> Result<Option<String>> {
+        self.designer_properties
+            .as_ref()
+            .map(|properties| {
+                crate::shape::designer::write_properties(properties, None, self.designer_limits)
+                    .and_then(designer_string)
+            })
+            .transpose()
+    }
+
+    pub(crate) fn to_xml_with_designer(&self, designer: Option<&str>) -> Result<String> {
         let mut xml = String::new();
         match &self.shape_type {
             ShapeType::TextBox {
@@ -240,7 +302,9 @@ impl MutableShape {
                 ));
                 xml.push_str("<p:nvSpPr><p:cNvPr id=\"");
                 xml.push_str(&self.shape_id.to_string());
-                xml.push_str("\" name=\"TextBox\"/><p:cNvSpPr txBox=\"1\"/><p:nvPr/></p:nvSpPr>");
+                xml.push_str("\" name=\"TextBox\"/><p:cNvSpPr txBox=\"1\"/>");
+                write_non_visual_properties(&mut xml, designer);
+                xml.push_str("</p:nvSpPr>");
                 xml.push_str("<p:spPr><a:xfrm><a:off x=\"");
                 xml.push_str(&x.to_string());
                 xml.push_str("\" y=\"");
@@ -298,6 +362,7 @@ impl MutableShape {
                 *width,
                 *height,
                 fill_color.as_deref(),
+                designer,
             ),
             ShapeType::Ellipse {
                 x,
@@ -315,6 +380,7 @@ impl MutableShape {
                 *width,
                 *height,
                 fill_color.as_deref(),
+                designer,
             ),
         }
         Ok(xml)
@@ -371,13 +437,16 @@ fn write_preset_shape(
     width: i64,
     height: i64,
     fill_color: Option<&str>,
+    designer: Option<&str>,
 ) {
     xml.push_str(&shape_start(id, name, x, y, width, height));
     xml.push_str("<p:nvSpPr><p:cNvPr id=\"");
     xml.push_str(&id.to_string());
     xml.push_str("\" name=\"");
     xml.push_str(&escape_xml(name));
-    xml.push_str("\"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x=\"");
+    xml.push_str("\"/><p:cNvSpPr/>");
+    write_non_visual_properties(xml, designer);
+    xml.push_str("</p:nvSpPr><p:spPr><a:xfrm><a:off x=\"");
     xml.push_str(&x.to_string());
     xml.push_str("\" y=\"");
     xml.push_str(&y.to_string());
@@ -394,6 +463,23 @@ fn write_preset_shape(
         xml.push_str("\"/></a:solidFill>");
     }
     xml.push_str("</p:spPr></p:sp>");
+}
+
+fn write_non_visual_properties(xml: &mut String, designer: Option<&str>) {
+    let Some(designer) = designer else {
+        xml.push_str("<p:nvPr/>");
+        return;
+    };
+    xml.push_str("<p:nvPr><p:extLst><p:ext uri=\"");
+    xml.push_str(PROPERTIES_EXTENSION_URI);
+    xml.push_str("\">");
+    xml.push_str(designer);
+    xml.push_str("</p:ext></p:extLst></p:nvPr>");
+}
+
+fn designer_string(bytes: Vec<u8>) -> Result<String> {
+    String::from_utf8(bytes)
+        .map_err(|_| Error::Invalid("Designer serializer produced non-UTF-8 XML".into()))
 }
 
 pub(crate) fn escape_xml(value: &str) -> String {
