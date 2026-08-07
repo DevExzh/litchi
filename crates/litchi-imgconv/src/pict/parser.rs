@@ -123,13 +123,13 @@ impl PictHeader {
     }
 
     /// Get width of the picture
-    pub fn width(&self) -> i16 {
-        self.frame.3 - self.frame.1
+    pub fn width(&self) -> i32 {
+        i32::from(self.frame.3) - i32::from(self.frame.1)
     }
 
     /// Get height of the picture
-    pub fn height(&self) -> i16 {
-        self.frame.2 - self.frame.0
+    pub fn height(&self) -> i32 {
+        i32::from(self.frame.2) - i32::from(self.frame.0)
     }
 }
 
@@ -207,6 +207,21 @@ pub struct PictParser {
 impl PictParser {
     /// Create a new PICT parser from raw data
     pub fn new(data: &[u8]) -> Result<Self> {
+        Self::new_bounded(data, 100_000, 256 * 1024 * 1024)
+    }
+
+    /// Parse under explicit input and record ceilings.
+    pub fn new_bounded(data: &[u8], max_records: usize, max_bytes: usize) -> Result<Self> {
+        if max_records == 0 || max_bytes == 0 {
+            return Err(Error::ParseError(
+                "PICT parser limits must be greater than zero".into(),
+            ));
+        }
+        if data.len() > max_bytes {
+            return Err(Error::ParseError(format!(
+                "PICT input exceeds limit {max_bytes} bytes"
+            )));
+        }
         let header = PictHeader::parse(data)?;
 
         let data_start = if header.has_512_header { 512 } else { 0 };
@@ -218,11 +233,17 @@ impl PictParser {
         }
 
         let mut records = Vec::new();
+        let mut saw_end = false;
 
         // Parse records
         while offset < data.len() {
+            if records.len() >= max_records {
+                return Err(Error::ParseError(format!(
+                    "PICT record count exceeds limit {max_records}"
+                )));
+            }
             if offset + 2 > data.len() {
-                break;
+                return Err(Error::ParseError("Truncated PICT opcode".into()));
             }
 
             let opcode = U16::<BE>::read_from_bytes(&data[offset..offset + 2])
@@ -236,6 +257,7 @@ impl PictParser {
                     opcode,
                     data: Vec::new(),
                 });
+                saw_end = true;
                 break;
             }
 
@@ -243,7 +265,9 @@ impl PictParser {
             let data_size = Self::get_opcode_data_size(opcode, data, offset)?;
 
             if offset + data_size > data.len() {
-                break;
+                return Err(Error::ParseError(format!(
+                    "PICT opcode 0x{opcode:04X} extends beyond input"
+                )));
             }
 
             let record_data = data[offset..offset + data_size].to_vec();
@@ -253,6 +277,10 @@ impl PictParser {
                 opcode,
                 data: record_data,
             });
+        }
+
+        if !saw_end {
+            return Err(Error::ParseError("Missing PICT EndPic opcode".into()));
         }
 
         Ok(Self {
@@ -287,13 +315,13 @@ impl PictParser {
             // Default: try to read size field
             _ => {
                 if offset + 2 > data.len() {
-                    return Ok(0);
+                    return Err(Error::ParseError("Truncated PICT opcode size".into()));
                 }
                 // Many opcodes have a 2-byte size field
                 let size = U16::<BE>::read_from_bytes(&data[offset..offset + 2])
                     .map_err(|_| Error::ParseError("Failed to read size".into()))?
                     .get() as usize;
-                Ok(size.min(data.len() - offset))
+                Ok(size)
             }
         }
     }
@@ -305,12 +333,12 @@ impl PictParser {
 
     /// Get width
     pub fn width(&self) -> i32 {
-        self.header.width() as i32
+        self.header.width()
     }
 
     /// Get height
     pub fn height(&self) -> i32 {
-        self.header.height() as i32
+        self.header.height()
     }
 
     /// Get aspect ratio

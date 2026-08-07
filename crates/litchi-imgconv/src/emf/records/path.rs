@@ -7,8 +7,7 @@ use zerocopy::{FromBytes, IntoBytes};
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrBeginPath {
-    pub record_type: u32,
-    pub record_size: u32,
+    _private: [u8; 0],
 }
 
 /// EMR_ENDPATH
@@ -50,7 +49,5 @@ pub enum RegionMode {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSelectClipPath {
-    pub record_type: u32,
-    pub record_size: u32,
     pub mode: u32,
 }

@@ -1,81 +1,203 @@
-/// SVG Rendering State Management
-///
-/// Manages device context stack, transforms, clipping, and graphics state
+//! SVG playback state for classic EMF records.
+
 use super::path::PathBuilder;
-use crate::emf::records::*;
-use crate::svg_utils::write_num;
+use crate::emf::records::{
+    ColorRef, XForm, brush_style, font_weight, hatch_style, pen_style, stock_objects,
+};
+use crate::svg_utils::{write_num, write_xml_escaped};
+use std::collections::HashMap;
+use std::sync::Arc;
 
-// Import hatch style constants
-use crate::emf::records::hatch_style;
+#[derive(Debug, Clone)]
+pub enum GdiObject {
+    Pen(Pen),
+    Brush(Brush),
+    Font(Font),
+    Palette,
+}
 
-use xml_minifier::minified_xml_format;
-
-/// Complete rendering state
+/// Complete rendering state. The object table and definition table are not DC
+/// state and therefore intentionally do not participate in SaveDC/RestoreDC.
 pub struct RenderState {
-    /// Device context stack
     pub dc_stack: Vec<DeviceContext>,
-    /// Current device context
     pub dc: DeviceContext,
-    /// Current path being built
     pub path_builder: Option<PathBuilder>,
-    /// Whether we're recording a path
     pub in_path: bool,
+    pub objects: HashMap<u32, GdiObject>,
+    pub defs: Vec<String>,
+    next_definition: u64,
 }
 
 impl RenderState {
-    /// Create new rendering state
     pub fn new() -> Self {
+        Self::with_device_metrics(96.0, 96.0)
+    }
+
+    pub fn with_device_metrics(dpi_x: f64, dpi_y: f64) -> Self {
         Self {
             dc_stack: Vec::new(),
-            dc: DeviceContext::default(),
+            dc: DeviceContext::with_device_metrics(dpi_x, dpi_y),
             path_builder: None,
             in_path: false,
+            objects: HashMap::new(),
+            defs: Vec::new(),
+            next_definition: 0,
         }
     }
 
-    /// Push current DC to stack (SaveDC)
     pub fn push_dc(&mut self) {
         self.dc_stack.push(self.dc.clone());
     }
 
-    /// Pop DC from stack (RestoreDC)
-    pub fn pop_dc(&mut self, index: i32) {
-        if index < 0 {
-            // Relative index (-1 = most recent)
-            let idx = (-index as usize).saturating_sub(1);
-            if let Some(dc) = self
-                .dc_stack
-                .get(self.dc_stack.len().saturating_sub(idx + 1))
-                .cloned()
-            {
-                self.dc_stack
-                    .truncate(self.dc_stack.len().saturating_sub(idx + 1));
-                self.dc = dc;
-            }
-        } else if index > 0 {
-            // Absolute index (1-based)
-            let idx = (index as usize).saturating_sub(1);
-            if let Some(dc) = self.dc_stack.get(idx).cloned() {
-                self.dc_stack.truncate(idx);
-                self.dc = dc;
-            }
-        }
+    /// Restore the requested saved state and discard that state and every
+    /// state saved after it, as specified by RestoreDC.
+    pub fn pop_dc(&mut self, saved_dc: i32) -> bool {
+        let target = if saved_dc < 0 {
+            let distance = match saved_dc.checked_abs().and_then(|v| usize::try_from(v).ok()) {
+                Some(value) => value,
+                None => return false,
+            };
+            self.dc_stack.len().checked_sub(distance)
+        } else if saved_dc > 0 {
+            usize::try_from(saved_dc - 1).ok()
+        } else {
+            None
+        };
+        let Some(target) = target.filter(|&index| index < self.dc_stack.len()) else {
+            return false;
+        };
+        self.dc = self.dc_stack[target].clone();
+        self.dc_stack.truncate(target);
+        true
     }
 
-    /// Start building a path
     pub fn begin_path(&mut self) {
         self.path_builder = Some(PathBuilder::new());
         self.in_path = true;
     }
 
-    /// End path building
     pub fn end_path(&mut self) {
         self.in_path = false;
     }
 
-    /// Get current path and reset builder
     pub fn take_path(&mut self) -> Option<PathBuilder> {
+        self.in_path = false;
         self.path_builder.take()
+    }
+
+    pub fn abort_path(&mut self) {
+        self.in_path = false;
+        self.path_builder = None;
+    }
+
+    pub fn insert_object(&mut self, handle: u32, object: GdiObject) -> bool {
+        self.objects.insert(handle, object).is_none()
+    }
+
+    pub fn delete_object(&mut self, handle: u32) -> bool {
+        !stock_objects::is_stock_object(handle)
+            && !self.dc.references(handle)
+            && !self.dc_stack.iter().any(|dc| dc.references(handle))
+            && self.objects.remove(&handle).is_some()
+    }
+
+    pub fn select_object(&mut self, handle: u32) -> bool {
+        let object = if stock_objects::is_stock_object(handle) {
+            stock_object(handle)
+        } else {
+            self.objects.get(&handle).cloned()
+        };
+        match object {
+            Some(GdiObject::Pen(pen)) => {
+                self.dc.pen = pen;
+                self.dc.pen_handle = Some(handle);
+            },
+            Some(GdiObject::Brush(brush)) => {
+                self.dc.brush = brush;
+                self.dc.brush_handle = Some(handle);
+            },
+            Some(GdiObject::Font(font)) => {
+                self.dc.font = font;
+                self.dc.font_handle = Some(handle);
+            },
+            Some(GdiObject::Palette) => return false,
+            None => return false,
+        }
+        true
+    }
+
+    pub fn select_brush(&mut self, handle: u32) -> bool {
+        let object = if stock_objects::is_stock_object(handle) {
+            stock_object(handle)
+        } else {
+            self.objects.get(&handle).cloned()
+        };
+        if let Some(GdiObject::Brush(brush)) = object {
+            self.dc.brush = brush;
+            self.dc.brush_handle = Some(handle);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn fresh_id(&mut self, prefix: &str) -> String {
+        let id = format!("emf-{prefix}-{}", self.next_definition);
+        self.next_definition += 1;
+        id
+    }
+
+    pub fn add_definition(&mut self, definition: String) {
+        self.defs.push(definition);
+    }
+
+    pub fn prepare_brush_pattern(&mut self) {
+        if !self.dc.brush.needs_pattern() || self.dc.brush.pattern_id.is_some() {
+            return;
+        }
+        let id = self.fresh_id("hatch");
+        if let Some(definition) = self.dc.brush.svg_pattern(
+            &id,
+            self.dc.bg_color,
+            self.dc.bg_mode == 2,
+            self.dc.brush_org,
+        ) {
+            self.dc.brush.pattern_id = Some(id);
+            self.add_definition(definition);
+        }
+    }
+
+    pub fn install_clip(&mut self, path: &str, mode: u32) -> bool {
+        let previous = self.dc.clip_id.clone();
+        let id = self.fresh_id("clip");
+        let definition = match (mode, previous) {
+            (5, _) | (1 | 2, None) => format!(
+                "<clipPath id=\"{}\" clipPathUnits=\"userSpaceOnUse\"><path d=\"{}\"/></clipPath>",
+                id, path
+            ),
+            (1, Some(old)) => format!(
+                "<clipPath id=\"{}\" clipPathUnits=\"userSpaceOnUse\"><g clip-path=\"url(#{})\"><path d=\"{}\"/></g></clipPath>",
+                id, old, path
+            ),
+            // OR, XOR and DIFF need a stored copy of the old geometry or mask
+            // semantics; do not pretend a lossy clip is equivalent.
+            _ => return false,
+        };
+        self.add_definition(definition);
+        self.dc.clip_id = Some(id);
+        true
+    }
+
+    pub fn offset_clip(&mut self, x: f64, y: f64) {
+        let Some(old) = self.dc.clip_id.clone() else {
+            return;
+        };
+        let id = self.fresh_id("clip");
+        self.add_definition(format!(
+            "<clipPath id=\"{}\" clipPathUnits=\"userSpaceOnUse\"><g transform=\"translate({} {})\" clip-path=\"url(#{})\"><rect x=\"-1000000000\" y=\"-1000000000\" width=\"2000000000\" height=\"2000000000\"/></g></clipPath>",
+            id, x, y, old
+        ));
+        self.dc.clip_id = Some(id);
     }
 }
 
@@ -85,43 +207,46 @@ impl Default for RenderState {
     }
 }
 
-/// Device Context state
 #[derive(Debug, Clone)]
 pub struct DeviceContext {
-    /// Current position
+    /// Current position is maintained in logical coordinates. Each operation
+    /// transforms it using the state active for that operation.
     pub current_pos: (f64, f64),
-
-    /// Transform state
     pub world_transform: XForm,
     pub window_org: (i32, i32),
     pub window_ext: (i32, i32),
     pub viewport_org: (i32, i32),
     pub viewport_ext: (i32, i32),
+    pub brush_org: (i32, i32),
     pub map_mode: u32,
-
-    /// Drawing state
+    pub dpi: (f64, f64),
     pub pen: Pen,
+    pub pen_handle: Option<u32>,
     pub brush: Brush,
+    pub brush_handle: Option<u32>,
     pub font: Font,
-
-    /// Colors
+    pub font_handle: Option<u32>,
     pub text_color: ColorRef,
     pub bg_color: ColorRef,
-
-    /// Modes
-    pub bg_mode: u32, // BackgroundMode
-    pub poly_fill_mode: u32, // PolyFillMode
-    pub text_align: u32,     // TextAlign flags
-    pub rop2: u32,           // ROP2 mode
-    pub arc_direction: bool, // true = clockwise
+    pub bg_mode: u32,
+    pub poly_fill_mode: u32,
+    pub text_align: u32,
+    pub rop2: u32,
+    pub stretch_mode: u32,
+    pub arc_direction: bool,
     pub miter_limit: f64,
-
-    /// Clipping
-    pub clip_region: Option<Vec<(f64, f64, f64, f64)>>, // Rectangles
+    pub layout: u32,
+    pub clip_id: Option<String>,
 }
 
 impl Default for DeviceContext {
     fn default() -> Self {
+        Self::with_device_metrics(96.0, 96.0)
+    }
+}
+
+impl DeviceContext {
+    pub fn with_device_metrics(dpi_x: f64, dpi_y: f64) -> Self {
         Self {
             current_pos: (0.0, 0.0),
             world_transform: XForm::default(),
@@ -129,139 +254,138 @@ impl Default for DeviceContext {
             window_ext: (1, 1),
             viewport_org: (0, 0),
             viewport_ext: (1, 1),
-            map_mode: 1, // MM_TEXT
+            brush_org: (0, 0),
+            map_mode: 1,
+            dpi: (dpi_x.max(1.0), dpi_y.max(1.0)),
             pen: Pen::default(),
+            pen_handle: Some(stock_objects::BLACK_PEN),
             brush: Brush::default(),
+            brush_handle: Some(stock_objects::WHITE_BRUSH),
             font: Font::default(),
-            text_color: ColorRef::from_rgb(0, 0, 0), // Black
-            bg_color: ColorRef::from_rgb(255, 255, 255), // White
-            bg_mode: 2,                              // OPAQUE
-            poly_fill_mode: 1,                       // ALTERNATE
+            font_handle: Some(stock_objects::SYSTEM_FONT),
+            text_color: ColorRef::from_rgb(0, 0, 0),
+            bg_color: ColorRef::from_rgb(255, 255, 255),
+            bg_mode: 2,
+            poly_fill_mode: 1,
             text_align: 0,
-            rop2: 13,             // COPYPEN
-            arc_direction: false, // Counter-clockwise
+            rop2: 13,
+            stretch_mode: 3,
+            arc_direction: false,
             miter_limit: 10.0,
-            clip_region: None,
+            layout: 0,
+            clip_id: None,
         }
     }
-}
 
-impl DeviceContext {
-    /// Transform a point from logical to device coordinates
+    /// Transform logical to device coordinates in the required order:
+    /// world transform (logical -> page), then mapping transform (page -> device).
     pub fn transform_point(&self, x: f64, y: f64) -> (f64, f64) {
-        // Apply window/viewport mapping
-        let (wx, wy) = (x - self.window_org.0 as f64, y - self.window_org.1 as f64);
-        let scale_x = self.viewport_ext.0 as f64 / self.window_ext.0 as f64;
-        let scale_y = self.viewport_ext.1 as f64 / self.window_ext.1 as f64;
-        let vx = wx * scale_x + self.viewport_org.0 as f64;
-        let vy = wy * scale_y + self.viewport_org.1 as f64;
-
-        // Apply world transform
-        self.world_transform.transform_point(vx, vy)
+        let (page_x, page_y) = self.world_transform.transform_point(x, y);
+        let (scale_x, scale_y) = self.page_scale();
+        (
+            (page_x - f64::from(self.window_org.0)) * scale_x + f64::from(self.viewport_org.0),
+            (page_y - f64::from(self.window_org.1)) * scale_y + f64::from(self.viewport_org.1),
+        )
     }
 
-    /// Get SVG stroke attributes (optimized - no format! macros)
-    pub fn get_stroke_attrs(&self) -> String {
-        let mut attrs = String::with_capacity(64);
+    pub fn transform_vector(&self, x: f64, y: f64) -> (f64, f64) {
+        let origin = self.transform_point(0.0, 0.0);
+        let end = self.transform_point(x, y);
+        (end.0 - origin.0, end.1 - origin.1)
+    }
 
-        // Stroke color
-        if self.pen.style != pen_style::NULL {
-            attrs.push_str("stroke=\"");
-            attrs.push_str(&self.pen.color.to_svg_color());
-            attrs.push_str("\" ");
-
-            // Stroke width
-            if self.pen.width > 1.0 {
-                attrs.push_str("stroke-width=\"");
-                write_num(&mut attrs, self.pen.width);
-                attrs.push_str("\" ");
-            }
-
-            // Stroke dash array
-            if let Some(ref dash) = self.pen.dash_pattern {
-                attrs.push_str("stroke-dasharray=\"");
-                attrs.push_str(dash);
-                attrs.push_str("\" ");
-            }
-
-            // Line cap
-            if self.pen.end_cap != pen_style::ENDCAP_FLAT {
-                let cap = match self.pen.end_cap {
-                    pen_style::ENDCAP_ROUND => "round",
-                    pen_style::ENDCAP_SQUARE => "square",
-                    _ => "butt",
-                };
-                attrs.push_str("stroke-linecap=\"");
-                attrs.push_str(cap);
-                attrs.push_str("\" ");
-            }
-
-            // Line join
-            if self.pen.line_join != pen_style::JOIN_MITER {
-                let join = match self.pen.line_join {
-                    pen_style::JOIN_ROUND => "round",
-                    pen_style::JOIN_BEVEL => "bevel",
-                    _ => "miter",
-                };
-                attrs.push_str("stroke-linejoin=\"");
-                attrs.push_str(join);
-                attrs.push_str("\" ");
-            }
-
-            // Miter limit
-            if self.miter_limit != 10.0 {
-                attrs.push_str("stroke-miterlimit=\"");
-                write_num(&mut attrs, self.miter_limit);
-                attrs.push_str("\" ");
-            }
-        } else {
-            attrs.push_str("stroke=\"none\" ");
+    fn page_scale(&self) -> (f64, f64) {
+        let ratio = || {
+            let x = if self.window_ext.0 == 0 {
+                1.0
+            } else {
+                f64::from(self.viewport_ext.0) / f64::from(self.window_ext.0)
+            };
+            let y = if self.window_ext.1 == 0 {
+                1.0
+            } else {
+                f64::from(self.viewport_ext.1) / f64::from(self.window_ext.1)
+            };
+            (x, y)
+        };
+        match self.map_mode {
+            1 => (1.0, 1.0),
+            2 => (self.dpi.0 / 254.0, -self.dpi.1 / 254.0),
+            3 => (self.dpi.0 / 2540.0, -self.dpi.1 / 2540.0),
+            4 => (self.dpi.0 / 100.0, -self.dpi.1 / 100.0),
+            5 => (self.dpi.0 / 1000.0, -self.dpi.1 / 1000.0),
+            6 => (self.dpi.0 / 1440.0, -self.dpi.1 / 1440.0),
+            7 => {
+                let (x, y) = ratio();
+                let magnitude = x.abs().min(y.abs());
+                (magnitude.copysign(x), magnitude.copysign(y))
+            },
+            8 => ratio(),
+            _ => (1.0, 1.0),
         }
+    }
 
+    pub fn get_stroke_attrs(&self) -> String {
+        if self.pen.style == pen_style::NULL {
+            return "stroke=\"none\"".to_string();
+        }
+        let mut attrs = format!("stroke=\"{}\"", self.pen.color.to_svg_color());
+        if self.pen.width > 1.0 {
+            attrs.push_str(" stroke-width=\"");
+            write_num(&mut attrs, self.pen.width);
+            attrs.push('"');
+        }
+        if let Some(dash) = &self.pen.dash_pattern {
+            attrs.push_str(" stroke-dasharray=\"");
+            attrs.push_str(dash);
+            attrs.push('"');
+        }
+        let cap = match self.pen.end_cap {
+            pen_style::ENDCAP_ROUND => "round",
+            pen_style::ENDCAP_SQUARE => "square",
+            _ => "butt",
+        };
+        let join = match self.pen.line_join {
+            pen_style::JOIN_ROUND => "round",
+            pen_style::JOIN_BEVEL => "bevel",
+            _ => "miter",
+        };
+        attrs.push_str(&format!(
+            " stroke-linecap=\"{cap}\" stroke-linejoin=\"{join}\" stroke-miterlimit=\"{}\"",
+            self.miter_limit
+        ));
         attrs
     }
 
-    /// Get SVG fill attribute
     pub fn get_fill_attr(&self) -> String {
-        if self.brush.style == brush_style::NULL {
-            "fill=\"none\"".to_string()
-        } else if self.brush.style == brush_style::HATCHED {
-            // For hatched brushes, use pattern reference if available
-            if let Some(ref pattern_id) = self.brush.pattern_id {
-                format!("fill=\"url(#{})\"", pattern_id)
-            } else {
-                // Fallback to solid color if pattern not generated
-                let mut s = String::with_capacity(32);
-                s.push_str("fill=\"");
-                s.push_str(&self.brush.color.to_svg_color());
-                s.push('"');
-                s
-            }
+        let fill = if self.brush.style == brush_style::NULL {
+            "none".to_string()
+        } else if let Some(id) = &self.brush.pattern_id {
+            format!("url(#{id})")
         } else {
-            let mut s = String::with_capacity(32);
-            s.push_str("fill=\"");
-            s.push_str(&self.brush.color.to_svg_color());
-            s.push('"');
-            s
-        }
+            self.brush.color.to_svg_color()
+        };
+        format!("fill=\"{}\"", fill)
     }
 
-    /// Get SVG fill-rule attribute
     pub fn get_fill_rule(&self) -> Option<String> {
-        if self.poly_fill_mode == 1 {
-            Some("fill-rule=\"evenodd\"".to_string()) // ALTERNATE
-        } else {
-            None // WINDING is default
-        }
+        (self.poly_fill_mode == 1).then(|| "fill-rule=\"evenodd\"".to_string())
     }
 
-    /// Get SVG transform attribute
-    pub fn get_transform_attr(&self) -> Option<String> {
-        self.world_transform.to_svg_transform()
+    pub fn clip_attr(&self) -> String {
+        self.clip_id
+            .as_ref()
+            .map(|id| format!("clip-path=\"url(#{id})\""))
+            .unwrap_or_default()
+    }
+
+    fn references(&self, handle: u32) -> bool {
+        self.pen_handle == Some(handle)
+            || self.brush_handle == Some(handle)
+            || self.font_handle == Some(handle)
     }
 }
 
-/// Pen state
 #[derive(Debug, Clone)]
 pub struct Pen {
     pub style: u32,
@@ -269,260 +393,134 @@ pub struct Pen {
     pub color: ColorRef,
     pub end_cap: u32,
     pub line_join: u32,
-    pub dash_pattern: Option<String>,
+    pub dash_pattern: Option<Arc<str>>,
 }
 
 impl Default for Pen {
     fn default() -> Self {
-        Self {
-            style: pen_style::SOLID,
-            width: 1.0,
-            color: ColorRef::from_rgb(0, 0, 0), // Black
-            end_cap: pen_style::ENDCAP_FLAT,
-            line_join: pen_style::JOIN_MITER,
-            dash_pattern: None,
-        }
+        Self::from_create_pen(pen_style::SOLID, 1, ColorRef::from_rgb(0, 0, 0))
     }
 }
 
 impl Pen {
-    /// Create from EMR_CREATEPEN record
-    pub fn from_create_pen(pen_style: u32, width: u32, color: ColorRef) -> Self {
-        let base_style = pen_style & 0xFF;
-        let dash_pattern = match base_style {
-            pen_style::DASH => Some("5 2".to_string()),
-            pen_style::DOT => Some("1 1".to_string()),
-            pen_style::DASHDOT => Some("5 2 1 2".to_string()),
-            pen_style::DASHDOTDOT => Some("5 2 1 2 1 2".to_string()),
+    pub fn from_create_pen(style: u32, width: u32, color: ColorRef) -> Self {
+        let base = style & 0xff;
+        let unit = f64::from(width.max(1));
+        let dash_pattern = match base {
+            pen_style::DASH => Some(Arc::from(format!("{} {}", unit * 3.0, unit))),
+            pen_style::DOT => Some(Arc::from(format!("{} {}", unit, unit))),
+            pen_style::DASHDOT => Some(Arc::from(format!(
+                "{} {} {} {}",
+                unit * 3.0,
+                unit,
+                unit,
+                unit
+            ))),
+            pen_style::DASHDOTDOT => Some(
+                format!(
+                    "{} {} {} {} {} {}",
+                    unit * 3.0,
+                    unit,
+                    unit,
+                    unit,
+                    unit,
+                    unit
+                )
+                .into(),
+            ),
             _ => None,
         };
-
         Self {
-            style: base_style,
-            width: width as f64,
+            style: base,
+            width: unit,
             color,
-            end_cap: pen_style & 0x0F00,
-            line_join: pen_style & 0xF000,
+            end_cap: style & 0x0f00,
+            line_join: style & 0xf000,
             dash_pattern,
         }
     }
 }
 
-/// Brush state
 #[derive(Debug, Clone)]
 pub struct Brush {
     pub style: u32,
     pub color: ColorRef,
     pub hatch: Option<u32>,
-    pub pattern_id: Option<String>, // SVG pattern reference for hatched brushes
+    pub pattern_id: Option<String>,
 }
 
 impl Default for Brush {
     fn default() -> Self {
-        Self {
-            style: brush_style::SOLID,
-            color: ColorRef::from_rgb(255, 255, 255), // White
-            hatch: None,
-            pattern_id: None,
-        }
+        Self::from_create_brush(brush_style::SOLID, ColorRef::from_rgb(255, 255, 255), 0)
     }
 }
 
 impl Brush {
-    /// Create brush from EMR_CREATEBRUSHINDIRECT record
     pub fn from_create_brush(style: u32, color: ColorRef, hatch: u32) -> Self {
-        let hatch_opt = if style == brush_style::HATCHED {
-            Some(hatch)
-        } else {
-            None
-        };
-
         Self {
             style,
             color,
-            hatch: hatch_opt,
+            hatch: (style == brush_style::HATCHED).then_some(hatch),
             pattern_id: None,
         }
     }
 
-    /// Generate SVG pattern definition for hatched brush
-    ///
-    /// # Arguments
-    /// * `pattern_id` - Unique ID for the pattern
-    /// * `bg_color` - Background color for the pattern
-    ///
-    /// # Returns
-    /// SVG pattern definition string, or None if not a hatched brush
-    pub fn generate_svg_pattern(
-        &mut self,
-        pattern_id: String,
-        bg_color: &ColorRef,
-    ) -> Option<String> {
-        if self.style == brush_style::HATCHED {
-            if let Some(hatch) = self.hatch {
-                self.pattern_id = Some(pattern_id.clone());
-                Some(Self::hatch_to_svg_pattern(
-                    &pattern_id,
-                    &self.color.to_svg_color(),
-                    &bg_color.to_svg_color(),
-                    hatch,
-                ))
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
-    /// Convert hatch style to SVG pattern definition
-    fn hatch_to_svg_pattern(pattern_id: &str, color: &str, bg_color: &str, hatch: u32) -> String {
-        let pattern_size = 8.0;
-
-        match hatch {
-            hatch_style::HORIZONTAL => {
-                minified_xml_format!(
-                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
-  <rect width="{}" height="{}" fill="{}"/>
-  <line x1="0" y1="4" x2="8" y2="4" stroke="{}" stroke-width="1"/>
-</pattern>"#,
-                    pattern_id,
-                    pattern_size,
-                    pattern_size,
-                    pattern_size,
-                    pattern_size,
-                    bg_color,
-                    color
-                )
-            },
-            hatch_style::VERTICAL => {
-                minified_xml_format!(
-                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
-  <rect width="{}" height="{}" fill="{}"/>
-  <line x1="4" y1="0" x2="4" y2="8" stroke="{}" stroke-width="1"/>
-</pattern>"#,
-                    pattern_id,
-                    pattern_size,
-                    pattern_size,
-                    pattern_size,
-                    pattern_size,
-                    bg_color,
-                    color
-                )
-            },
-            hatch_style::FDIAGONAL => {
-                minified_xml_format!(
-                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
-  <rect width="{}" height="{}" fill="{}"/>
-  <line x1="0" y1="0" x2="8" y2="8" stroke="{}" stroke-width="1"/>
-  <line x1="-2" y1="6" x2="2" y2="10" stroke="{}" stroke-width="1"/>
-  <line x1="6" y1="-2" x2="10" y2="2" stroke="{}" stroke-width="1"/>
-</pattern>"#,
-                    pattern_id,
-                    pattern_size,
-                    pattern_size,
-                    pattern_size,
-                    pattern_size,
-                    bg_color,
-                    color,
-                    color,
-                    color
-                )
-            },
-            hatch_style::BDIAGONAL => {
-                minified_xml_format!(
-                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
-  <rect width="{}" height="{}" fill="{}"/>
-  <line x1="0" y1="8" x2="8" y2="0" stroke="{}" stroke-width="1"/>
-  <line x1="-2" y1="2" x2="2" y2="-2" stroke="{}" stroke-width="1"/>
-  <line x1="6" y1="10" x2="10" y2="6" stroke="{}" stroke-width="1"/>
-</pattern>"#,
-                    pattern_id,
-                    pattern_size,
-                    pattern_size,
-                    pattern_size,
-                    pattern_size,
-                    bg_color,
-                    color,
-                    color,
-                    color
-                )
-            },
-            hatch_style::CROSS => {
-                minified_xml_format!(
-                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
-  <rect width="{}" height="{}" fill="{}"/>
-  <line x1="0" y1="4" x2="8" y2="4" stroke="{}" stroke-width="1"/>
-  <line x1="4" y1="0" x2="4" y2="8" stroke="{}" stroke-width="1"/>
-</pattern>"#,
-                    pattern_id,
-                    pattern_size,
-                    pattern_size,
-                    pattern_size,
-                    pattern_size,
-                    bg_color,
-                    color,
-                    color
-                )
-            },
-            hatch_style::DIAGCROSS => {
-                minified_xml_format!(
-                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
-  <rect width="{}" height="{}" fill="{}"/>
-  <line x1="0" y1="0" x2="8" y2="8" stroke="{}" stroke-width="1"/>
-  <line x1="0" y1="8" x2="8" y2="0" stroke="{}" stroke-width="1"/>
-  <line x1="-2" y1="6" x2="2" y2="10" stroke="{}" stroke-width="1"/>
-  <line x1="6" y1="-2" x2="10" y2="2" stroke="{}" stroke-width="1"/>
-  <line x1="-2" y1="2" x2="2" y2="-2" stroke="{}" stroke-width="1"/>
-  <line x1="6" y1="10" x2="10" y2="6" stroke="{}" stroke-width="1"/>
-</pattern>"#,
-                    pattern_id,
-                    pattern_size,
-                    pattern_size,
-                    pattern_size,
-                    pattern_size,
-                    bg_color,
-                    color,
-                    color,
-                    color,
-                    color,
-                    color,
-                    color
-                )
-            },
-            _ => {
-                // Unknown hatch style, use solid color
-                minified_xml_format!(
-                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
-  <rect width="{}" height="{}" fill="{}"/>
-</pattern>"#,
-                    pattern_id,
-                    pattern_size,
-                    pattern_size,
-                    pattern_size,
-                    pattern_size,
-                    color
-                )
-            },
-        }
-    }
-
-    /// Check if this brush needs a pattern definition
     pub fn needs_pattern(&self) -> bool {
         self.style == brush_style::HATCHED && self.hatch.is_some()
     }
+
+    fn svg_pattern(
+        &self,
+        id: &str,
+        background: ColorRef,
+        opaque: bool,
+        origin: (i32, i32),
+    ) -> Option<String> {
+        let hatch = self.hatch?;
+        let mut content = String::new();
+        if opaque {
+            content.push_str(&format!(
+                "<rect width=\"8\" height=\"8\" fill=\"{}\"/>",
+                background.to_svg_color()
+            ));
+        }
+        let color = self.color.to_svg_color();
+        let line = |x1, y1, x2, y2| {
+            format!("<path d=\"M{x1} {y1}L{x2} {y2}\" stroke=\"{color}\" stroke-width=\"1\"/>")
+        };
+        match hatch {
+            hatch_style::HORIZONTAL => content.push_str(&line(0, 4, 8, 4)),
+            hatch_style::VERTICAL => content.push_str(&line(4, 0, 4, 8)),
+            hatch_style::FDIAGONAL => content.push_str(&line(0, 0, 8, 8)),
+            hatch_style::BDIAGONAL => content.push_str(&line(0, 8, 8, 0)),
+            hatch_style::CROSS => {
+                content.push_str(&line(0, 4, 8, 4));
+                content.push_str(&line(4, 0, 4, 8));
+            },
+            hatch_style::DIAGCROSS => {
+                content.push_str(&line(0, 0, 8, 8));
+                content.push_str(&line(0, 8, 8, 0));
+            },
+            _ => return None,
+        }
+        Some(format!(
+            "<pattern id=\"{}\" patternUnits=\"userSpaceOnUse\" width=\"8\" height=\"8\" x=\"{}\" y=\"{}\">{}</pattern>",
+            id, origin.0, origin.1, content
+        ))
+    }
 }
 
-/// Font state
 #[derive(Debug, Clone)]
 pub struct Font {
     pub height: f64,
     pub width: f64,
     pub escapement: f64,
+    pub orientation: f64,
     pub weight: i32,
     pub italic: bool,
     pub underline: bool,
     pub strike_out: bool,
+    pub charset: u8,
     pub face_name: String,
 }
 
@@ -532,42 +530,32 @@ impl Default for Font {
             height: 12.0,
             width: 0.0,
             escapement: 0.0,
+            orientation: 0.0,
             weight: font_weight::NORMAL,
             italic: false,
             underline: false,
             strike_out: false,
+            charset: 1,
             face_name: "Arial".to_string(),
         }
     }
 }
 
 impl Font {
-    /// Get SVG font attributes
     pub fn to_svg_attrs(&self) -> String {
-        let mut attrs = String::new();
-
-        // Font size (convert from logical height)
-        let size = self.height.abs();
-        if size > 0.0 {
-            attrs.push_str(&format!("font-size=\"{}\" ", size));
-        }
-
-        // Font family
-        if !self.face_name.is_empty() {
-            attrs.push_str(&format!("font-family=\"{}\" ", self.face_name));
-        }
-
-        // Font weight
+        let mut family = String::with_capacity(self.face_name.len());
+        write_xml_escaped(&mut family, &self.face_name);
+        let mut attrs = format!(
+            "font-size=\"{}\" font-family=\"{}\"",
+            self.height.abs().max(1.0),
+            family
+        );
         if self.weight != font_weight::NORMAL {
-            attrs.push_str(&format!("font-weight=\"{}\" ", self.weight));
+            attrs.push_str(&format!(" font-weight=\"{}\"", self.weight.clamp(1, 1000)));
         }
-
-        // Font style
         if self.italic {
-            attrs.push_str("font-style=\"italic\" ");
+            attrs.push_str(" font-style=\"italic\"");
         }
-
-        // Text decoration
         let mut decorations = Vec::new();
         if self.underline {
             decorations.push("underline");
@@ -576,9 +564,77 @@ impl Font {
             decorations.push("line-through");
         }
         if !decorations.is_empty() {
-            attrs.push_str(&format!("text-decoration=\"{}\" ", decorations.join(" ")));
+            attrs.push_str(&format!(" text-decoration=\"{}\"", decorations.join(" ")));
         }
-
         attrs
+    }
+}
+
+fn stock_object(handle: u32) -> Option<GdiObject> {
+    let gray = |value| {
+        Brush::from_create_brush(
+            brush_style::SOLID,
+            ColorRef::from_rgb(value, value, value),
+            0,
+        )
+    };
+    match handle {
+        stock_objects::WHITE_BRUSH => Some(GdiObject::Brush(gray(255))),
+        stock_objects::LTGRAY_BRUSH => Some(GdiObject::Brush(gray(192))),
+        stock_objects::GRAY_BRUSH => Some(GdiObject::Brush(gray(128))),
+        stock_objects::DKGRAY_BRUSH => Some(GdiObject::Brush(gray(64))),
+        stock_objects::BLACK_BRUSH | stock_objects::DC_BRUSH => Some(GdiObject::Brush(gray(0))),
+        stock_objects::NULL_BRUSH => Some(GdiObject::Brush(Brush::from_create_brush(
+            brush_style::NULL,
+            ColorRef::from_rgb(0, 0, 0),
+            0,
+        ))),
+        stock_objects::WHITE_PEN => Some(GdiObject::Pen(Pen::from_create_pen(
+            pen_style::SOLID,
+            1,
+            ColorRef::from_rgb(255, 255, 255),
+        ))),
+        stock_objects::BLACK_PEN | stock_objects::DC_PEN => Some(GdiObject::Pen(Pen::default())),
+        stock_objects::NULL_PEN => Some(GdiObject::Pen(Pen::from_create_pen(
+            pen_style::NULL,
+            1,
+            ColorRef::from_rgb(0, 0, 0),
+        ))),
+        stock_objects::OEM_FIXED_FONT
+        | stock_objects::ANSI_FIXED_FONT
+        | stock_objects::ANSI_VAR_FONT
+        | stock_objects::SYSTEM_FONT
+        | stock_objects::DEVICE_DEFAULT_FONT
+        | stock_objects::SYSTEM_FIXED_FONT
+        | stock_objects::DEFAULT_GUI_FONT => Some(GdiObject::Font(Font::default())),
+        stock_objects::DEFAULT_PALETTE => Some(GdiObject::Palette),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn world_transform_precedes_page_mapping() {
+        let mut dc = DeviceContext::default();
+        dc.map_mode = 8;
+        dc.window_ext = (10, 10);
+        dc.viewport_ext = (100, 100);
+        dc.world_transform.dx = 2.0;
+        assert_eq!(dc.transform_point(1.0, 1.0), (30.0, 10.0));
+    }
+
+    #[test]
+    fn restore_discards_restored_and_newer_states() {
+        let mut state = RenderState::new();
+        state.push_dc();
+        state.dc.current_pos = (1.0, 0.0);
+        state.push_dc();
+        state.dc.current_pos = (2.0, 0.0);
+        assert!(state.pop_dc(-2));
+        assert_eq!(state.dc.current_pos, (0.0, 0.0));
+        assert!(state.dc_stack.is_empty());
     }
 }

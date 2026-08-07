@@ -10,8 +10,6 @@ use zerocopy::{FromBytes, IntoBytes};
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrRectangle {
-    pub record_type: u32,
-    pub record_size: u32,
     pub rect: RectL,
 }
 
@@ -19,8 +17,6 @@ pub struct EmrRectangle {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrRoundRect {
-    pub record_type: u32,
-    pub record_size: u32,
     pub rect: RectL,
     pub corner: SizeL,
 }
@@ -29,8 +25,6 @@ pub struct EmrRoundRect {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrArc {
-    pub record_type: u32,
-    pub record_size: u32,
     pub rect: RectL,
     pub start: PointL,
     pub end: PointL,
@@ -40,8 +34,6 @@ pub struct EmrArc {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrAngleArc {
-    pub record_type: u32,
-    pub record_size: u32,
     pub center: PointL,
     pub radius: u32,
     pub start_angle: f32,
@@ -54,8 +46,6 @@ pub struct EmrAngleArc {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrLineTo {
-    pub record_type: u32,
-    pub record_size: u32,
     pub point: PointL,
 }
 
@@ -63,8 +53,6 @@ pub struct EmrLineTo {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetPixelV {
-    pub record_type: u32,
-    pub record_size: u32,
     pub point: PointL,
     pub color: ColorRef,
 }
@@ -75,8 +63,6 @@ pub struct EmrSetPixelV {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrPolyHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub bounds: RectL,
     pub count: u32,
     // Followed by count PointL structures
@@ -86,8 +72,6 @@ pub struct EmrPolyHeader {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrPolyPolyHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub bounds: RectL,
     pub num_polys: u32,
     pub count: u32,
@@ -100,8 +84,6 @@ pub struct EmrPolyPolyHeader {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrPoly16Header {
-    pub record_type: u32,
-    pub record_size: u32,
     pub bounds: RectL,
     pub count: u32,
     // Followed by count PointS structures
@@ -111,8 +93,6 @@ pub struct EmrPoly16Header {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrPolyPoly16Header {
-    pub record_type: u32,
-    pub record_size: u32,
     pub bounds: RectL,
     pub num_polys: u32,
     pub count: u32,
@@ -133,8 +113,6 @@ pub mod point_type {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrPolyDrawHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub bounds: RectL,
     pub count: u32,
     // Followed by count PointL structures, then count u8 point types
@@ -144,8 +122,6 @@ pub struct EmrPolyDrawHeader {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrPolyDraw16Header {
-    pub record_type: u32,
-    pub record_size: u32,
     pub bounds: RectL,
     pub count: u32,
     // Followed by count PointS structures, then count u8 point types
@@ -201,8 +177,6 @@ pub enum GradientFillMode {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrGradientFillHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub bounds: RectL,
     pub num_vertices: u32,
     pub num_triangles: u32,
@@ -255,8 +229,6 @@ pub enum FloodFillMode {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrExtFloodFill {
-    pub record_type: u32,
-    pub record_size: u32,
     pub start: PointL,
     pub color: ColorRef,
     pub mode: u32,
@@ -272,12 +244,13 @@ pub struct PolygonData<'a> {
 impl<'a> PolygonData<'a> {
     /// Create from 32-bit polygon record
     pub fn from_poly32(data: &'a [u8], offset: usize, count: usize) -> Option<Self> {
-        let points_size = count * 8; // 8 bytes per PointL
-        if data.len() < offset + points_size {
+        let points_size = count.checked_mul(8)?; // 8 bytes per PointL
+        let end = offset.checked_add(points_size)?;
+        if data.len() < end {
             return None;
         }
         Some(Self {
-            points: &data[offset..offset + points_size],
+            points: &data[offset..end],
             count,
             is_16bit: false,
         })
@@ -285,12 +258,13 @@ impl<'a> PolygonData<'a> {
 
     /// Create from 16-bit polygon record
     pub fn from_poly16(data: &'a [u8], offset: usize, count: usize) -> Option<Self> {
-        let points_size = count * 4; // 4 bytes per PointS
-        if data.len() < offset + points_size {
+        let points_size = count.checked_mul(4)?; // 4 bytes per PointS
+        let end = offset.checked_add(points_size)?;
+        if data.len() < end {
             return None;
         }
         Some(Self {
-            points: &data[offset..offset + points_size],
+            points: &data[offset..end],
             count,
             is_16bit: true,
         })

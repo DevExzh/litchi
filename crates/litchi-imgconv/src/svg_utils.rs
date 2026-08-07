@@ -112,7 +112,10 @@ pub fn write_xml_escaped(buf: &mut String, text: &str) {
             '>' => buf.push_str("&gt;"),
             '"' => buf.push_str("&quot;"),
             '\'' => buf.push_str("&apos;"),
-            _ => buf.push(ch),
+            '\u{9}' | '\u{a}' | '\u{d}' | '\u{20}'..='\u{d7ff}' | '\u{e000}'..='\u{10ffff}' => {
+                buf.push(ch);
+            },
+            _ => buf.push('\u{fffd}'),
         }
     }
 }
@@ -262,5 +265,12 @@ mod tests {
         let mut buf = String::new();
         write_xml_escaped(&mut buf, "Hello <world> & \"friends\"");
         assert_eq!(buf, "Hello &lt;world&gt; &amp; &quot;friends&quot;");
+    }
+
+    #[test]
+    fn xml_escaping_replaces_forbidden_control_characters() {
+        let mut buf = String::new();
+        write_xml_escaped(&mut buf, "a\0b\u{8}c\t\nd");
+        assert_eq!(buf, "a\u{fffd}b\u{fffd}c\t\nd");
     }
 }

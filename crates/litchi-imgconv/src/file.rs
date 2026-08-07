@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use litchi_core::error::{Error, Result};
 use litchi_odraw::image::{File, Kind};
 
-use crate::{Limits, Options, decode_data, to_jpeg, to_png, to_svg};
+use crate::{Limits, Options, decode_data, to_jpeg, to_png, to_svg, to_webp};
 
 /// Optional codec operations for an OfficeArt [`File`].
 ///
@@ -20,6 +20,9 @@ pub trait Convert {
 
     /// Converts this file to JPEG under explicit sizing and resource limits.
     fn jpeg(&self, options: Options) -> Result<Vec<u8>>;
+
+    /// Converts this file to WebP under explicit sizing and resource limits.
+    fn webp(&self, options: Options) -> Result<Vec<u8>>;
 
     /// Converts an EMF or WMF file to SVG under explicit limits.
     fn svg(&self, options: Options) -> Result<String>;
@@ -45,6 +48,10 @@ impl Convert for File<'_> {
         to_jpeg(&self.blip().map_err(office_art)?, options)
     }
 
+    fn webp(&self, options: Options) -> Result<Vec<u8>> {
+        to_webp(&self.blip().map_err(office_art)?, options)
+    }
+
     fn svg(&self, options: Options) -> Result<String> {
         to_svg(&self.blip().map_err(office_art)?, options)
     }
@@ -52,9 +59,16 @@ impl Convert for File<'_> {
     fn extract(&self, options: Options) -> Result<Vec<u8>> {
         match self.kind() {
             Kind::Emf | Kind::Wmf => self.svg(options).map(String::into_bytes),
-            Kind::Pict => self.png(options),
-            Kind::Jpeg | Kind::CmykJpeg | Kind::Png | Kind::Dib | Kind::Tiff => {
-                self.decode(options.limits).map(Cow::into_owned)
+            Kind::Pict | Kind::Dib | Kind::Tiff => self.png(options),
+            Kind::Jpeg | Kind::CmykJpeg | Kind::Png => {
+                let decoded = self.decode(options.limits)?;
+                if decoded.len() > options.limits.max_output_bytes {
+                    return Err(Error::ParseError(format!(
+                        "native image output exceeds limit {} bytes",
+                        options.limits.max_output_bytes
+                    )));
+                }
+                Ok(decoded.into_owned())
             },
             Kind::Error | Kind::Unknown | Kind::Other(_) => Err(Error::Unsupported(
                 "unknown OfficeArt images cannot be decoded".to_string(),
@@ -65,7 +79,7 @@ impl Convert for File<'_> {
     fn out_name(&self) -> String {
         let extension = match self.kind() {
             Kind::Emf | Kind::Wmf => "svg",
-            Kind::Pict => "png",
+            Kind::Pict | Kind::Dib | Kind::Tiff => "png",
             kind => kind.extension(),
         };
         let native = self.filename();
@@ -120,5 +134,16 @@ mod tests {
         );
         assert_eq!(file.extract(Options::default()).unwrap(), b"png");
         assert_eq!(file.out_name(), "CON_.png");
+    }
+
+    #[test]
+    fn native_extraction_honors_output_limit() {
+        let record = png_blip(b"png");
+        let file = File::new(Blip::parse(&record).unwrap(), None, 0);
+        let limits = Limits {
+            max_output_bytes: 2,
+            ..Limits::default()
+        };
+        assert!(file.extract(Options::default().limits(limits)).is_err());
     }
 }

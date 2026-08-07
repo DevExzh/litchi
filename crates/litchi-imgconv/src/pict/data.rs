@@ -23,7 +23,7 @@ use litchi_core::error::{Error, Result};
 /// # Performance Notes
 /// - Uses SIMD-friendly operations where possible
 /// - Avoids unnecessary allocations during decompression
-pub fn unpack_bits(compressed: &[u8], expected_size: usize) -> Result<Vec<u8>> {
+pub(super) fn unpack_bits(compressed: &[u8], expected_size: usize) -> Result<Vec<u8>> {
     let mut output = Vec::with_capacity(expected_size);
     let mut input_pos = 0;
     let mut bytes_done = 0;
@@ -97,24 +97,33 @@ pub fn unpack_bits(compressed: &[u8], expected_size: usize) -> Result<Vec<u8>> {
 /// # Returns
 /// RGBA color value as u32 (0xAARRGGBB format)
 #[inline(always)]
-pub fn get_bitmap_pixel(bitmap: &[u8], bounds: &super::types::PictRect, x: i32, y: i32) -> u32 {
-    let width = bounds.right - bounds.left;
-    let height = bounds.bottom - bounds.top;
+pub(super) fn get_bitmap_pixel(
+    bitmap: &[u8],
+    bounds: &super::types::PictRect,
+    x: i32,
+    y: i32,
+) -> u32 {
+    let width = i32::from(bounds.right) - i32::from(bounds.left);
+    let height = i32::from(bounds.bottom) - i32::from(bounds.top);
 
     // Check bounds
-    if x < 0 || y < 0 || x >= width as i32 || y >= height as i32 {
+    if x < 0 || y < 0 || x >= width || y >= height {
         return 0xFFFFFFFF; // White for out of bounds
     }
 
-    let stride = width as i32;
+    let stride = i64::from(width);
     let bit_offset = 7 - (x % 8);
-    let byte_pos = (y * stride / 8) + (x / 8);
+    let byte_pos = i64::from(y)
+        .checked_mul(stride)
+        .and_then(|bits| bits.checked_div(8))
+        .and_then(|bytes| bytes.checked_add(i64::from(x / 8)))
+        .and_then(|position| usize::try_from(position).ok());
 
-    if byte_pos >= bitmap.len() as i32 {
+    let Some(byte_pos) = byte_pos.filter(|&position| position < bitmap.len()) else {
         return 0xFFFFFFFF; // White for invalid position
-    }
+    };
 
-    let byte = bitmap[byte_pos as usize];
+    let byte = bitmap[byte_pos];
     let bit_set = (byte & (1 << bit_offset)) != 0;
 
     // PICT format: 1 = black, 0 = white
@@ -123,53 +132,6 @@ pub fn get_bitmap_pixel(bitmap: &[u8], bounds: &super::types::PictRect, x: i32, 
     } else {
         0xFFFFFFFF // White
     }
-}
-
-/// Stretch coordinates from destination rectangle to source rectangle
-///
-/// Used for scaling bitmap data when blitting from source to destination rectangles.
-/// This implements bilinear-like coordinate mapping for bitmap scaling.
-///
-/// # Arguments
-/// * `dst_rect` - Destination rectangle
-/// * `src_rect` - Source rectangle
-/// * `dst_x` - Destination X coordinate
-/// * `dst_y` - Destination Y coordinate
-/// * `src_x` - Output source X coordinate
-/// * `src_y` - Output source Y coordinate
-#[inline(always)]
-pub fn stretch_coordinates(
-    dst_rect: &super::types::PictRect,
-    src_rect: &super::types::PictRect,
-    dst_x: i32,
-    dst_y: i32,
-    src_x: &mut i32,
-    src_y: &mut i32,
-) {
-    let dst_width = dst_rect.right - dst_rect.left;
-    let dst_height = dst_rect.bottom - dst_rect.top;
-    let src_width = src_rect.right - src_rect.left;
-    let src_height = src_rect.bottom - src_rect.top;
-
-    if dst_width == 0 || dst_height == 0 || src_width == 0 || src_height == 0 {
-        *src_x = 0;
-        *src_y = 0;
-        return;
-    }
-
-    // Convert destination coordinates to relative positions
-    let x_rel = dst_x - dst_rect.left as i32;
-    let y_rel = dst_y - dst_rect.top as i32;
-
-    // Calculate ratios and scale
-    let x_ratio = src_width as f64 / dst_width as f64;
-    let y_ratio = src_height as f64 / dst_height as f64;
-
-    let x_scaled = x_rel as f64 * x_ratio;
-    let y_scaled = y_rel as f64 * y_ratio;
-
-    *src_x = src_rect.left as i32 + x_scaled as i32;
-    *src_y = src_rect.top as i32 + y_scaled as i32;
 }
 
 #[cfg(test)]

@@ -4,6 +4,7 @@ use crate::emf::records::types::*;
 /// This module provides high-performance parsing helpers that minimize allocations
 /// and maximize cache efficiency.
 use litchi_core::error::{Error, Result};
+use std::mem::size_of;
 use zerocopy::FromBytes;
 
 /// Fast parser for point arrays (POINTL)
@@ -11,7 +12,9 @@ use zerocopy::FromBytes;
 /// Uses zerocopy for maximum performance. The input slice should be properly aligned.
 #[inline]
 pub fn parse_pointl_array(data: &[u8], count: usize) -> Result<Vec<PointL>> {
-    let required_size = count * std::mem::size_of::<PointL>();
+    let required_size = count
+        .checked_mul(size_of::<PointL>())
+        .ok_or_else(|| Error::ParseError("POINTL array byte length overflow".into()))?;
 
     if data.len() < required_size {
         return Err(Error::ParseError(format!(
@@ -28,7 +31,7 @@ pub fn parse_pointl_array(data: &[u8], count: usize) -> Result<Vec<PointL>> {
     for _ in 0..count {
         if let Ok((point, _)) = PointL::read_from_prefix(&data[offset..]) {
             points.push(point);
-            offset += std::mem::size_of::<PointL>();
+            offset += size_of::<PointL>();
         } else {
             return Err(Error::ParseError("Failed to parse point".into()));
         }
@@ -40,7 +43,9 @@ pub fn parse_pointl_array(data: &[u8], count: usize) -> Result<Vec<PointL>> {
 /// Fast parser for 16-bit point arrays (POINTS)
 #[inline]
 pub fn parse_points_array(data: &[u8], count: usize) -> Result<Vec<PointS>> {
-    let required_size = count * std::mem::size_of::<PointS>();
+    let required_size = count
+        .checked_mul(size_of::<PointS>())
+        .ok_or_else(|| Error::ParseError("POINTS array byte length overflow".into()))?;
 
     if data.len() < required_size {
         return Err(Error::ParseError(format!(
@@ -56,7 +61,7 @@ pub fn parse_points_array(data: &[u8], count: usize) -> Result<Vec<PointS>> {
     for _ in 0..count {
         if let Ok((point, _)) = PointS::read_from_prefix(&data[offset..]) {
             points.push(point);
-            offset += std::mem::size_of::<PointS>();
+            offset += size_of::<PointS>();
         } else {
             return Err(Error::ParseError("Failed to parse 16-bit point".into()));
         }
@@ -70,7 +75,9 @@ pub fn parse_points_array(data: &[u8], count: usize) -> Result<Vec<PointS>> {
 /// Returns a Vec of u32 values representing counts for each polygon
 #[inline]
 pub fn parse_poly_counts(data: &[u8], num_polys: usize) -> Result<Vec<u32>> {
-    let required_size = num_polys * 4; // 4 bytes per u32
+    let required_size = num_polys
+        .checked_mul(4)
+        .ok_or_else(|| Error::ParseError("polygon count array byte length overflow".into()))?;
 
     if data.len() < required_size {
         return Err(Error::ParseError(format!(
@@ -158,19 +165,25 @@ pub fn parse_dib<'a>(
     px_size: usize,
 ) -> Result<DibData<'a>> {
     // Validate offsets
-    if bmi_offset + bmi_size > data.len() {
+    let bmi_end = bmi_offset
+        .checked_add(bmi_size)
+        .ok_or_else(|| Error::ParseError("DIB bitmap info range overflow".into()))?;
+    if bmi_end > data.len() {
         return Err(Error::ParseError(
             "DIB bitmap info extends beyond data".into(),
         ));
     }
-    if px_offset + px_size > data.len() {
+    let px_end = px_offset
+        .checked_add(px_size)
+        .ok_or_else(|| Error::ParseError("DIB pixel range overflow".into()))?;
+    if px_end > data.len() {
         return Err(Error::ParseError(
             "DIB pixel data extends beyond data".into(),
         ));
     }
 
-    let bmi_data = &data[bmi_offset..bmi_offset + bmi_size];
-    let px_data = &data[px_offset..px_offset + px_size];
+    let bmi_data = &data[bmi_offset..bmi_end];
+    let px_data = &data[px_offset..px_end];
 
     // Parse BITMAPINFOHEADER (minimum 40 bytes)
     if bmi_data.len() < 40 {

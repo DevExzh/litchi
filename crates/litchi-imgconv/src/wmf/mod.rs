@@ -24,6 +24,8 @@ pub use svg::WmfConverter as WmfSvgConverter;
 use image::ImageFormat;
 use litchi_core::error::Result;
 
+use crate::{InputFormat, Options, convert_metafile};
+
 /// Convert WMF data to a raster image in the specified format
 ///
 /// # Arguments
@@ -51,15 +53,24 @@ pub fn convert_wmf(
     width: Option<u32>,
     height: Option<u32>,
 ) -> Result<Vec<u8>> {
-    let parser = WmfParser::new(wmf_data)?;
-    let options = WmfToRasterOptions {
-        width,
-        height,
-        background_color: image::Rgba([255, 255, 255, 255]),
-    };
+    convert_wmf_with_options(
+        wmf_data,
+        format,
+        Options {
+            width,
+            height,
+            ..Options::default()
+        },
+    )
+}
 
-    let converter = WmfConverter::new(parser, options);
-    converter.convert_to_format(format)
+/// Converts WMF bytes to a bounded raster format under explicit options.
+pub fn convert_wmf_with_options(
+    wmf_data: &[u8],
+    format: ImageFormat,
+    options: Options,
+) -> Result<Vec<u8>> {
+    crate::codec::rasterize_raw_metafile(wmf_data, InputFormat::Wmf, format, options)
 }
 
 /// Convert WMF data to PNG format
@@ -108,11 +119,21 @@ pub fn convert_wmf_to_webp(
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub fn convert_wmf_to_svg(wmf_data: &[u8]) -> Result<String> {
-    let parser = WmfParser::new(wmf_data)?;
-    let converter = WmfSvgConverter::new(parser);
-    converter.to_svg()
+    convert_wmf_to_svg_with_options(wmf_data, Options::default())
 }
 
+/// Converts WMF bytes to bounded SVG under explicit options.
+pub fn convert_wmf_to_svg_with_options(wmf_data: &[u8], options: Options) -> Result<String> {
+    let converted = convert_metafile(
+        wmf_data,
+        InputFormat::Wmf,
+        crate::OutputFormat::Svg,
+        options,
+    )?;
+    crate::codec::reject_lossy_diagnostics(&converted.report)?;
+    String::from_utf8(converted.bytes)
+        .map_err(|_| litchi_core::error::Error::ParseError("SVG output was not UTF-8".to_string()))
+}
 /// Convert WMF data to SVG bytes
 pub fn convert_wmf_to_svg_bytes(wmf_data: &[u8]) -> Result<Vec<u8>> {
     Ok(convert_wmf_to_svg(wmf_data)?.into_bytes())

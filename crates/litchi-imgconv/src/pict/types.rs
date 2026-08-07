@@ -36,27 +36,27 @@ pub struct PictRegion {
 impl PictRect {
     /// Get width of rectangle
     #[inline(always)]
-    pub fn width(&self) -> i16 {
-        self.right - self.left
+    pub fn width(&self) -> i32 {
+        i32::from(self.right) - i32::from(self.left)
     }
 
     /// Get height of rectangle
     #[inline(always)]
-    pub fn height(&self) -> i16 {
-        self.bottom - self.top
+    pub fn height(&self) -> i32 {
+        i32::from(self.bottom) - i32::from(self.top)
     }
 }
 
 impl PictBitmap {
     /// Get bitmap width
     #[inline(always)]
-    pub fn width(&self) -> i16 {
+    pub fn width(&self) -> i32 {
         self.bounds.width()
     }
 
     /// Get bitmap height
     #[inline(always)]
-    pub fn height(&self) -> i16 {
+    pub fn height(&self) -> i32 {
         self.bounds.height()
     }
 }

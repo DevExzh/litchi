@@ -483,7 +483,6 @@ pub enum GdiObject {
 /// with EMR_DELETEOBJECT.
 pub struct ObjectTable {
     objects: HashMap<u32, GdiObject>,
-    next_free: u32,
 }
 
 impl ObjectTable {
@@ -491,16 +490,32 @@ impl ObjectTable {
     pub fn new() -> Self {
         Self {
             objects: HashMap::new(),
-            next_free: 0,
         }
     }
 
-    /// Create object and return its handle
+    /// Create an object at the first free non-stock handle.
+    ///
+    /// EMF creation records normally use [`insert`] because they carry an
+    /// explicit handle. This helper remains useful to callers constructing an
+    /// in-memory table.
     pub fn create_object(&mut self, object: GdiObject) -> u32 {
-        let handle = self.next_free;
+        let handle = (0..0x8000_0000)
+            .find(|candidate| !self.objects.contains_key(candidate))
+            .expect("GDI object handle space exhausted");
         self.objects.insert(handle, object);
-        self.next_free += 1;
         handle
+    }
+
+    /// Insert the object under the handle encoded by an EMF creation record.
+    /// Existing and stock handles cannot be replaced.
+    pub fn insert(&mut self, handle: u32, object: GdiObject) -> bool {
+        if crate::emf::records::stock_objects::is_stock_object(handle)
+            || self.objects.contains_key(&handle)
+        {
+            return false;
+        }
+        self.objects.insert(handle, object);
+        true
     }
 
     /// Get object by handle
@@ -510,7 +525,8 @@ impl ObjectTable {
 
     /// Delete object by handle
     pub fn delete(&mut self, handle: u32) -> bool {
-        self.objects.remove(&handle).is_some()
+        !crate::emf::records::stock_objects::is_stock_object(handle)
+            && self.objects.remove(&handle).is_some()
     }
 
     /// Check if handle exists
@@ -597,6 +613,13 @@ mod tests {
 
         assert!(table.delete(handle));
         assert!(!table.exists(handle));
+
+        assert!(table.insert(42, GdiObject::Pen(Pen::default())));
+        assert!(!table.insert(42, GdiObject::Pen(Pen::default())));
+        assert!(!table.insert(
+            crate::emf::records::stock_objects::BLACK_PEN,
+            GdiObject::Pen(Pen::default())
+        ));
     }
 
     #[test]

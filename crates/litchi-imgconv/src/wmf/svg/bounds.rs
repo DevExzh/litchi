@@ -1,988 +1,921 @@
-//! Bounding box calculation for WMF files without placeable headers
+//! Device-space bounding-box replay for WMF records.
 //!
-//! When a WMF file lacks a placeable header, we must scan all drawing records
-//! to determine the effective drawing area. This matches libwmf's wmf_scan behavior.
-//!
-//! # SIMD Acceleration
-//!
-//! The bounds calculation is accelerated using SIMD instructions when processing
-//! records with multiple points (POLYGON, POLYLINE, etc.):
-//!
-//! - **x86_64**: SSE2, SSE4.1, AVX2, AVX-512
-//! - **aarch64**: NEON
-//! - **Other**: Scalar fallback
+//! A WMF without a placeable header has no declared drawing rectangle.  The
+//! records therefore need to be replayed far enough to apply the active
+//! logical-to-device mapping before estimating the output bounds.  This is
+//! deliberately a safe, conservative replay: malformed records are ignored,
+//! and no input value can create a non-finite output bound.
 
-use super::super::constants::record;
+use super::super::constants::{record, text_align};
 use super::super::parser::WmfRecord;
+use super::state::MappingState;
 use litchi_core::binary::{read_i16_le, read_u16_le};
 
-#[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
+const FALLBACK_LEFT: f64 = 0.0;
+const FALLBACK_TOP: f64 = 0.0;
+const FALLBACK_RIGHT: f64 = 1000.0;
+const FALLBACK_BOTTOM: f64 = 1000.0;
+const MAX_COORDINATE: f64 = 1.0e12;
 
-#[cfg(target_arch = "aarch64")]
-use std::arch::aarch64::*;
+/// A normalized device-space rectangle.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) struct Bounds {
+    pub left: f64,
+    pub top: f64,
+    pub right: f64,
+    pub bottom: f64,
+}
 
-/// Calculate bounding box by scanning WMF records
-pub struct BoundsCalculator;
+impl Bounds {
+    pub(super) const fn fallback() -> Self {
+        Self {
+            left: FALLBACK_LEFT,
+            top: FALLBACK_TOP,
+            right: FALLBACK_RIGHT,
+            bottom: FALLBACK_BOTTOM,
+        }
+    }
+
+    pub(super) fn as_tuple(self) -> (f64, f64, f64, f64) {
+        (self.left, self.top, self.right, self.bottom)
+    }
+
+    fn include_point(&mut self, x: f64, y: f64) {
+        let Some((x, y)) = finite_point(x, y) else {
+            return;
+        };
+        self.left = self.left.min(x);
+        self.top = self.top.min(y);
+        self.right = self.right.max(x);
+        self.bottom = self.bottom.max(y);
+    }
+
+    fn include_rect(&mut self, left: f64, top: f64, right: f64, bottom: f64) {
+        self.include_point(left, top);
+        self.include_point(right, bottom);
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FontMetrics {
+    height: f64,
+    width: f64,
+    escapement: f64,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ReplayObject {
+    Other,
+    Font(FontMetrics),
+}
+
+impl Default for FontMetrics {
+    fn default() -> Self {
+        Self {
+            height: 12.0,
+            width: 0.0,
+            escapement: 0.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ReplayState {
+    mapping: MappingState,
+    current_position: (f64, f64),
+    font: FontMetrics,
+    objects: Vec<Option<ReplayObject>>,
+    text_align: u16,
+    text_char_extra: f64,
+}
+
+impl Default for ReplayState {
+    fn default() -> Self {
+        Self {
+            mapping: MappingState::default(),
+            current_position: (0.0, 0.0),
+            font: FontMetrics::default(),
+            objects: Vec::new(),
+            text_align: text_align::TA_LEFT | text_align::TA_TOP,
+            text_char_extra: 0.0,
+        }
+    }
+}
+
+/// SaveDC snapshots device-context selection and mapping, but not the shared
+/// GDI object table. Objects created or deleted inside a saved DC remain so
+/// after RestoreDC.
+#[derive(Debug, Clone)]
+struct ReplaySnapshot {
+    mapping: MappingState,
+    current_position: (f64, f64),
+    font: FontMetrics,
+    text_align: u16,
+    text_char_extra: f64,
+}
+
+impl ReplaySnapshot {
+    fn capture(state: &ReplayState) -> Self {
+        Self {
+            mapping: state.mapping,
+            current_position: state.current_position,
+            font: state.font,
+            text_align: state.text_align,
+            text_char_extra: state.text_char_extra,
+        }
+    }
+
+    fn restore_into(self, state: &mut ReplayState) {
+        state.mapping = self.mapping;
+        state.current_position = self.current_position;
+        state.font = self.font;
+        state.text_align = self.text_align;
+        state.text_char_extra = self.text_char_extra;
+    }
+}
+
+/// Calculates the effective device-space bounds of a WMF record stream.
+pub(super) struct BoundsCalculator;
 
 impl BoundsCalculator {
-    /// Scan WMF records to determine bounding box (matches libwmf wmf_scan)
-    pub fn scan_records(records: &[WmfRecord]) -> (i16, i16, i16, i16) {
-        let mut left = i16::MAX;
-        let mut top = i16::MAX;
-        let mut right = i16::MIN;
-        let mut bottom = i16::MIN;
-        let mut font_height = 0i16;
+    /// Scan records in playback order.  The result is always finite and has
+    /// normalized edges, even for reversed rectangles and `i16` extrema.
+    pub(super) fn scan_records(records: &[WmfRecord]) -> Bounds {
+        let mut state = ReplayState::default();
+        let mut saves = Vec::<ReplaySnapshot>::new();
+        let mut bounds: Option<Bounds> = None;
 
         for rec in records {
-            match rec.function {
-                record::RECTANGLE | record::ELLIPSE | record::ROUND_RECT
-                    if rec.params.len() >= 8 =>
-                {
-                    let b = read_i16_le(&rec.params, 0).unwrap_or(0);
-                    let r = read_i16_le(&rec.params, 2).unwrap_or(0);
-                    let t = read_i16_le(&rec.params, 4).unwrap_or(0);
-                    let l = read_i16_le(&rec.params, 6).unwrap_or(0);
-                    Self::update(&mut left, &mut top, &mut right, &mut bottom, l, t);
-                    Self::update(&mut left, &mut top, &mut right, &mut bottom, r, b);
-                },
-                record::POLYGON | record::POLYLINE if rec.params.len() >= 2 => {
-                    let count = read_i16_le(&rec.params, 0).unwrap_or(0) as usize;
-                    let actual_count = count.min((rec.params.len() - 2) / 4);
+            let function = record::canonical(rec.function);
+            match function {
+                record::SAVE_DC => saves.push(ReplaySnapshot::capture(&state)),
+                record::RESTORE_DC => Self::restore_dc(&mut state, &mut saves, rec),
 
-                    // Use SIMD acceleration for batch processing
-                    Self::update_from_points(
-                        &mut left,
-                        &mut top,
-                        &mut right,
-                        &mut bottom,
-                        &rec.params[2..],
-                        actual_count,
-                    );
+                record::SET_MAP_MODE => {
+                    if let Some(mode) = u16_at(rec, 0) {
+                        state.mapping.set_mode(mode);
+                    }
                 },
-                record::LINE_TO | record::MOVE_TO | record::SET_PIXEL_V
-                    if rec.params.len() >= 4 =>
-                {
-                    let y = read_i16_le(&rec.params, 0).unwrap_or(0);
-                    let x = read_i16_le(&rec.params, 2).unwrap_or(0);
-                    Self::update(&mut left, &mut top, &mut right, &mut bottom, x, y);
+                record::SET_LAYOUT => {
+                    if let Some(layout) = u16_at(rec, 0) {
+                        state.mapping.layout = layout;
+                    }
                 },
-                record::ARC | record::PIE | record::CHORD if rec.params.len() >= 16 => {
-                    let yend = read_i16_le(&rec.params, 0).unwrap_or(0);
-                    let xend = read_i16_le(&rec.params, 2).unwrap_or(0);
-                    let ystart = read_i16_le(&rec.params, 4).unwrap_or(0);
-                    let xstart = read_i16_le(&rec.params, 6).unwrap_or(0);
-                    let b = read_i16_le(&rec.params, 8).unwrap_or(0);
-                    let r = read_i16_le(&rec.params, 10).unwrap_or(0);
-                    let t = read_i16_le(&rec.params, 12).unwrap_or(0);
-                    let l = read_i16_le(&rec.params, 14).unwrap_or(0);
-                    Self::update(&mut left, &mut top, &mut right, &mut bottom, l, t);
-                    Self::update(&mut left, &mut top, &mut right, &mut bottom, r, b);
-                    Self::update(&mut left, &mut top, &mut right, &mut bottom, xstart, ystart);
-                    Self::update(&mut left, &mut top, &mut right, &mut bottom, xend, yend);
+                record::SET_WINDOW_ORG => {
+                    if let Some((x, y)) = point_at(rec, 0) {
+                        state.mapping.window_origin = (x, y);
+                    }
                 },
-                record::CREATE_FONT_INDIRECT if rec.params.len() >= 2 => {
-                    font_height = read_i16_le(&rec.params, 0).unwrap_or(0).abs();
+                record::SET_WINDOW_EXT => {
+                    if state.mapping.scalable_extents()
+                        && let Some((x, y)) = point_at(rec, 0)
+                    {
+                        state.mapping.window_extent = (finite_or_one(x), finite_or_one(y));
+                    }
                 },
-                record::TEXT_OUT if rec.params.len() >= 6 => {
-                    let len = read_u16_le(&rec.params, 0).unwrap_or(0) as usize;
-                    let off = 2 + len.div_ceil(2) * 2;
-                    if rec.params.len() >= off + 4 {
-                        let y = read_i16_le(&rec.params, off).unwrap_or(0);
-                        let x = read_i16_le(&rec.params, off + 2).unwrap_or(0);
-                        Self::update(&mut left, &mut top, &mut right, &mut bottom, x, y);
-                        Self::update(
-                            &mut left,
-                            &mut top,
-                            &mut right,
-                            &mut bottom,
-                            x,
-                            y + font_height,
+                record::SET_VIEWPORT_ORG => {
+                    if let Some((x, y)) = point_at(rec, 0) {
+                        state.mapping.viewport_origin = (x, y);
+                    }
+                },
+                record::SET_VIEWPORT_EXT => {
+                    if state.mapping.scalable_extents()
+                        && let Some((x, y)) = point_at(rec, 0)
+                    {
+                        state.mapping.viewport_extent = (finite_or_one(x), finite_or_one(y));
+                    }
+                },
+                record::OFFSET_WINDOW_ORG => {
+                    if let Some((x, y)) = point_at(rec, 0) {
+                        state.mapping.window_origin.0 =
+                            bounded_add(state.mapping.window_origin.0, x);
+                        state.mapping.window_origin.1 =
+                            bounded_add(state.mapping.window_origin.1, y);
+                    }
+                },
+                record::OFFSET_VIEWPORT_ORG => {
+                    if let Some((x, y)) = point_at(rec, 0) {
+                        state.mapping.viewport_origin.0 =
+                            bounded_add(state.mapping.viewport_origin.0, x);
+                        state.mapping.viewport_origin.1 =
+                            bounded_add(state.mapping.viewport_origin.1, y);
+                    }
+                },
+                record::SCALE_WINDOW_EXT => {
+                    if state.mapping.scalable_extents() {
+                        Self::scale_extents(rec, &mut state.mapping.window_extent);
+                    }
+                },
+                record::SCALE_VIEWPORT_EXT => {
+                    if state.mapping.scalable_extents() {
+                        Self::scale_extents(rec, &mut state.mapping.viewport_extent);
+                    }
+                },
+
+                record::CREATE_FONT_INDIRECT => Self::create_font(rec, &mut state),
+                record::CREATE_PEN_INDIRECT
+                | record::CREATE_BRUSH_INDIRECT
+                | record::CREATE_PALETTE
+                | record::CREATE_PATTERN_BRUSH
+                | record::CREATE_DIB_PATTERN_BRUSH
+                | record::CREATE_REGION => Self::insert_object(&mut state, ReplayObject::Other),
+                record::SELECT_OBJECT => Self::select_object(rec, &mut state),
+                record::DELETE_OBJECT => Self::delete_object(rec, &mut state),
+                record::SET_TEXT_ALIGN => {
+                    if let Some(align) = u16_at(rec, 0) {
+                        state.text_align = align;
+                    }
+                },
+                record::SET_TEXT_CHAR_EXTRA => {
+                    if let Some(extra) = i16_at(rec, 0) {
+                        state.text_char_extra = f64::from(extra);
+                    }
+                },
+
+                record::MOVE_TO => {
+                    if let Some(point) = point_at(rec, 0) {
+                        state.current_position = point;
+                    }
+                },
+                record::LINE_TO => {
+                    if let Some(end) = point_at(rec, 0) {
+                        Self::include_logical_point(
+                            &mut bounds,
+                            &state.mapping,
+                            state.current_position,
+                        );
+                        Self::include_logical_point(&mut bounds, &state.mapping, end);
+                        state.current_position = end;
+                    }
+                },
+                record::SET_PIXEL => {
+                    // ColorRef precedes the y/x pixel coordinates.
+                    if let Some(point) = point_at(rec, 4) {
+                        Self::include_logical_point(&mut bounds, &state.mapping, point);
+                    }
+                },
+                record::FLOOD_FILL => {
+                    // ColorRef precedes the y/x seed coordinates.
+                    if let Some(point) = point_at(rec, 4) {
+                        Self::include_logical_point(&mut bounds, &state.mapping, point);
+                    }
+                },
+                record::EXT_FLOOD_FILL => {
+                    // ColorRef precedes y/x; the flood mode follows the point.
+                    if let Some(point) = point_at(rec, 4) {
+                        Self::include_logical_point(&mut bounds, &state.mapping, point);
+                    }
+                },
+
+                record::RECTANGLE | record::ELLIPSE => {
+                    if let Some((left, top, right, bottom)) = rect_at(rec, 0) {
+                        Self::include_logical_rect(
+                            &mut bounds,
+                            &state.mapping,
+                            left,
+                            top,
+                            right,
+                            bottom,
                         );
                     }
                 },
-                record::EXT_TEXT_OUT if rec.params.len() >= 8 => {
-                    let y = read_i16_le(&rec.params, 0).unwrap_or(0);
-                    let x = read_i16_le(&rec.params, 2).unwrap_or(0);
-                    Self::update(&mut left, &mut top, &mut right, &mut bottom, x, y);
-                    Self::update(
-                        &mut left,
-                        &mut top,
-                        &mut right,
-                        &mut bottom,
-                        x,
-                        y + font_height,
-                    );
+                record::ROUND_RECT => {
+                    if let Some((left, top, right, bottom)) = rect_at(rec, 4) {
+                        Self::include_logical_rect(
+                            &mut bounds,
+                            &state.mapping,
+                            left,
+                            top,
+                            right,
+                            bottom,
+                        );
+                    }
+                },
+                record::ARC | record::PIE | record::CHORD => {
+                    if let Some((left, top, right, bottom)) = rect_at(rec, 8) {
+                        Self::include_logical_rect(
+                            &mut bounds,
+                            &state.mapping,
+                            left,
+                            top,
+                            right,
+                            bottom,
+                        );
+                    }
+                    // Broken producers occasionally provide endpoints outside
+                    // the enclosing rectangle; including them is conservative.
+                    for offset in [0, 4] {
+                        if let Some(point) = point_at(rec, offset) {
+                            Self::include_logical_point(&mut bounds, &state.mapping, point);
+                        }
+                    }
+                },
+                record::POLYGON | record::POLYLINE => {
+                    Self::include_points(rec, &state.mapping, &mut bounds, 2)
+                },
+                record::POLYPOLYGON => Self::include_polypolygon(rec, &state.mapping, &mut bounds),
+                record::TEXT_OUT => Self::include_text_out(rec, &mut state, &mut bounds),
+                record::EXT_TEXT_OUT => Self::include_ext_text_out(rec, &mut state, &mut bounds),
+
+                record::PAT_BLT => {
+                    Self::include_bitmap_destination(rec, &state.mapping, &mut bounds, 4, 6, 8, 10)
+                },
+                record::BIT_BLT | record::DIB_BIT_BLT => Self::include_bitmap_destination(
+                    rec,
+                    &state.mapping,
+                    &mut bounds,
+                    12,
+                    14,
+                    8,
+                    10,
+                ),
+                record::STRETCH_BLT | record::DIB_STRETCH_BLT => Self::include_bitmap_destination(
+                    rec,
+                    &state.mapping,
+                    &mut bounds,
+                    16,
+                    18,
+                    12,
+                    14,
+                ),
+                record::SET_DIB_TO_DEV => {
+                    // ColorUsage, ScanCount, StartScan, yDib, xDib, Height,
+                    // Width, yDest, xDest.
+                    Self::include_bitmap_destination(
+                        rec,
+                        &state.mapping,
+                        &mut bounds,
+                        14,
+                        16,
+                        10,
+                        12,
+                    )
+                },
+                record::STRETCH_DIB => {
+                    // ROP, usage, source dimensions/origin, destination
+                    // height/width/origin (all coordinates are WORD ordered).
+                    Self::include_bitmap_destination(
+                        rec,
+                        &state.mapping,
+                        &mut bounds,
+                        18,
+                        20,
+                        14,
+                        16,
+                    )
                 },
                 _ => {},
             }
         }
 
-        // Return bounds or default if empty
-        if left != i16::MAX && right != i16::MIN && top != i16::MAX && bottom != i16::MIN {
-            (left, top, right, bottom)
+        bounds
+            .unwrap_or_else(Bounds::fallback)
+            .normalized_or_fallback()
+    }
+
+    fn restore_dc(state: &mut ReplayState, saves: &mut Vec<ReplaySnapshot>, rec: &WmfRecord) {
+        let Some(level) = i16_at(rec, 0) else {
+            return;
+        };
+        let index = if level < 0 {
+            saves.len().checked_sub(level.unsigned_abs() as usize)
+        } else if level > 0 {
+            (level as usize)
+                .checked_sub(1)
+                .filter(|&index| index < saves.len())
         } else {
-            (0, 0, 1000, 1000)
+            None
+        };
+        if let Some(index) = index {
+            saves[index].clone().restore_into(state);
+            saves.truncate(index);
         }
     }
 
-    #[inline]
-    fn update(left: &mut i16, top: &mut i16, right: &mut i16, bottom: &mut i16, x: i16, y: i16) {
-        *left = (*left).min(x);
-        *top = (*top).min(y);
-        *right = (*right).max(x);
-        *bottom = (*bottom).max(y);
+    fn scale_extents(rec: &WmfRecord, extent: &mut (f64, f64)) {
+        // Win16 stack order is yDenom, yNum, xDenom, xNum.
+        let (Some(y_den), Some(y_num), Some(x_den), Some(x_num)) = (
+            i16_at(rec, 0),
+            i16_at(rec, 2),
+            i16_at(rec, 4),
+            i16_at(rec, 6),
+        ) else {
+            return;
+        };
+        if x_den != 0 {
+            extent.0 = bounded_product(extent.0, f64::from(x_num) / f64::from(x_den));
+        }
+        if y_den != 0 {
+            extent.1 = bounded_product(extent.1, f64::from(y_num) / f64::from(y_den));
+        }
+        extent.0 = finite_or_one(extent.0);
+        extent.1 = finite_or_one(extent.1);
     }
 
-    /// Update bounds from a sequence of points with SIMD acceleration
-    ///
-    /// Points are stored as interleaved x,y coordinates in the params buffer.
-    /// Format: [x0_lo, x0_hi, y0_lo, y0_hi, x1_lo, x1_hi, y1_lo, y1_hi, ...]
-    fn update_from_points(
-        left: &mut i16,
-        top: &mut i16,
-        right: &mut i16,
-        bottom: &mut i16,
-        params: &[u8],
-        count: usize,
+    fn create_font(rec: &WmfRecord, state: &mut ReplayState) {
+        let Some(height) = i16_at(rec, 0) else {
+            return;
+        };
+        let width = i16_at(rec, 2).unwrap_or(0);
+        let metrics = FontMetrics {
+            height: f64::from(height).abs().max(1.0),
+            width: f64::from(width).abs(),
+            escapement: f64::from(i16_at(rec, 4).unwrap_or(0)),
+        };
+        Self::insert_object(state, ReplayObject::Font(metrics));
+    }
+
+    fn insert_object(state: &mut ReplayState, object: ReplayObject) {
+        if let Some(index) = state.objects.iter().position(Option::is_none) {
+            state.objects[index] = Some(object);
+        } else {
+            state.objects.push(Some(object));
+        }
+    }
+
+    fn select_object(rec: &WmfRecord, state: &mut ReplayState) {
+        let Some(handle) = u16_at(rec, 0) else {
+            return;
+        };
+        if handle & 0x8000 == 0 {
+            if let Some(Some(ReplayObject::Font(font))) = state.objects.get(handle as usize) {
+                state.font = *font;
+            }
+        }
+    }
+
+    fn delete_object(rec: &WmfRecord, state: &mut ReplayState) {
+        if let Some(handle) = u16_at(rec, 0) {
+            if let Some(object) = state.objects.get_mut(handle as usize) {
+                *object = None;
+            }
+        }
+    }
+
+    fn include_points(
+        rec: &WmfRecord,
+        mapping: &MappingState,
+        bounds: &mut Option<Bounds>,
+        offset: usize,
     ) {
-        if count == 0 {
+        let Some(count) = u16_at(rec, 0) else {
+            return;
+        };
+        let count = usize::from(count).min(rec.params.len().saturating_sub(offset) / 4);
+        for index in 0..count {
+            if let Some(point) = array_point_at(rec, offset + index * 4) {
+                Self::include_logical_point(bounds, mapping, point);
+            }
+        }
+    }
+
+    fn include_polypolygon(rec: &WmfRecord, mapping: &MappingState, bounds: &mut Option<Bounds>) {
+        let Some(polygons) = u16_at(rec, 0) else {
+            return;
+        };
+        let polygons = usize::from(polygons);
+        let counts_len = polygons.saturating_mul(2);
+        if polygons == 0 || rec.params.len() < 2 + counts_len {
             return;
         }
+        let mut offset = 2 + counts_len;
+        for index in 0..polygons {
+            let Some(count) = u16_at(rec, 2 + index * 2) else {
+                return;
+            };
+            let count = usize::from(count).min(rec.params.len().saturating_sub(offset) / 4);
+            for point_index in 0..count {
+                if let Some(point) = array_point_at(rec, offset + point_index * 4) {
+                    Self::include_logical_point(bounds, mapping, point);
+                }
+            }
+            offset = offset.saturating_add(count.saturating_mul(4));
+        }
+    }
 
-        #[cfg(target_arch = "x86_64")]
-        {
-            // Runtime feature detection for x86_64
-            if is_x86_feature_detected!("avx2") {
-                unsafe {
-                    Self::update_from_points_avx2(left, top, right, bottom, params, count);
-                }
-            } else if is_x86_feature_detected!("sse4.1") {
-                unsafe {
-                    Self::update_from_points_sse41(left, top, right, bottom, params, count);
-                }
-            } else if is_x86_feature_detected!("sse2") {
-                unsafe {
-                    Self::update_from_points_sse2(left, top, right, bottom, params, count);
-                }
+    fn include_text_out(rec: &WmfRecord, state: &mut ReplayState, bounds: &mut Option<Bounds>) {
+        let Some(count) = u16_at(rec, 0) else {
+            return;
+        };
+        let count = usize::from(count);
+        let text_end = 2usize.saturating_add(count);
+        if text_end > rec.params.len() {
+            return;
+        }
+        let offset = text_end.saturating_add(count & 1);
+        if let Some(point) = point_at(rec, offset) {
+            let anchor = if state.text_align & text_align::TA_UPDATECP != 0 {
+                state.current_position
             } else {
-                Self::update_from_points_scalar(left, top, right, bottom, params, count);
+                point
+            };
+            Self::include_text(state, bounds, anchor, count);
+        }
+    }
+
+    fn include_ext_text_out(rec: &WmfRecord, state: &mut ReplayState, bounds: &mut Option<Bounds>) {
+        let Some(point) = point_at(rec, 0) else {
+            return;
+        };
+        let count = usize::from(u16_at(rec, 4).unwrap_or(0));
+        let options = u16_at(rec, 6).unwrap_or(0);
+        // The optional opaque/clipping rectangle itself paints output.
+        if options & 0x0002 != 0 {
+            // ExtTextOut embeds a Rect object in left, top, right, bottom
+            // order rather than Win16's reversed call-parameter order.
+            if let (Some(left), Some(top), Some(right), Some(bottom)) = (
+                i16_at(rec, 8),
+                i16_at(rec, 10),
+                i16_at(rec, 12),
+                i16_at(rec, 14),
+            ) {
+                Self::include_logical_rect(
+                    bounds,
+                    &state.mapping,
+                    f64::from(left),
+                    f64::from(top),
+                    f64::from(right),
+                    f64::from(bottom),
+                );
             }
         }
+        let text_offset: usize = if options & 0x0006 != 0 { 16 } else { 8 };
+        if count != 0 && rec.params.len() >= text_offset.saturating_add(count) {
+            let anchor = if state.text_align & text_align::TA_UPDATECP != 0 {
+                state.current_position
+            } else {
+                point
+            };
+            Self::include_text(state, bounds, anchor, count);
+        }
+    }
 
-        #[cfg(target_arch = "aarch64")]
+    fn include_text(
+        state: &mut ReplayState,
+        bounds: &mut Option<Bounds>,
+        anchor: (f64, f64),
+        count: usize,
+    ) {
+        let height = state.font.height.max(1.0);
+        let glyph_width = if state.font.width > 0.0 {
+            state.font.width
+        } else {
+            height * 0.6
+        };
+        let width = bounded_add(
+            glyph_width * count as f64,
+            state.text_char_extra * count.saturating_sub(1) as f64,
+        )
+        .abs();
+
+        let (mut left, mut right) = (anchor.0, bounded_add(anchor.0, width));
+        match state.text_align & text_align::HORIZONTAL_MASK {
+            text_align::TA_RIGHT => (left, right) = (bounded_add(anchor.0, -width), anchor.0),
+            text_align::TA_CENTER => {
+                let half = width / 2.0;
+                (left, right) = (bounded_add(anchor.0, -half), bounded_add(anchor.0, half));
+            },
+            _ => {},
+        }
+        let (top, bottom) = match state.text_align & text_align::VERTICAL_MASK {
+            text_align::TA_BOTTOM => (bounded_add(anchor.1, -height), anchor.1),
+            text_align::TA_BASELINE => (
+                bounded_add(anchor.1, -height * 0.8),
+                bounded_add(anchor.1, height * 0.2),
+            ),
+            _ => (anchor.1, bounded_add(anchor.1, height)),
+        };
+        Self::include_logical_rect(bounds, &state.mapping, left, top, right, bottom);
+
+        // The renderer applies escapement as a rotation about the text anchor.
+        // A radius around that anchor safely covers every rotated rectangle,
+        // including non-uniform logical-to-device mappings.
+        if state.font.escapement != 0.0 {
+            let (dx, dy) = state.mapping.vector(width, height);
+            let radius = dx.hypot(dy).abs();
+            let (x, y) = state.mapping.point_f64(anchor.0, anchor.1);
+            Self::include_device_rect(bounds, x - radius, y - radius, x + radius, y + radius);
+        }
+
+        if state.text_align & text_align::TA_UPDATECP != 0 {
+            state.current_position = (right, anchor.1);
+        }
+    }
+
+    fn include_bitmap_destination(
+        rec: &WmfRecord,
+        mapping: &MappingState,
+        bounds: &mut Option<Bounds>,
+        y_offset: usize,
+        x_offset: usize,
+        height_offset: usize,
+        width_offset: usize,
+    ) {
+        // Bitmap destination fields are ordered y, x, height, width.
+        let (Some(y), Some(x), Some(height), Some(width)) = (
+            i16_at(rec, y_offset),
+            i16_at(rec, x_offset),
+            i16_at(rec, height_offset),
+            i16_at(rec, width_offset),
+        ) else {
+            return;
+        };
+        let left = f64::from(x);
+        let top = f64::from(y);
+        Self::include_logical_rect(
+            bounds,
+            mapping,
+            left,
+            top,
+            bounded_add(left, f64::from(width)),
+            bounded_add(top, f64::from(height)),
+        );
+    }
+
+    fn include_logical_point(
+        bounds: &mut Option<Bounds>,
+        mapping: &MappingState,
+        (x, y): (f64, f64),
+    ) {
+        let (x, y) = mapping.point_f64(x, y);
+        Self::include_device_point(bounds, x, y);
+    }
+
+    fn include_logical_rect(
+        bounds: &mut Option<Bounds>,
+        mapping: &MappingState,
+        left: f64,
+        top: f64,
+        right: f64,
+        bottom: f64,
+    ) {
+        let (x1, y1) = mapping.point_f64(left, top);
+        let (x2, y2) = mapping.point_f64(right, bottom);
+        Self::include_device_rect(bounds, x1, y1, x2, y2);
+    }
+
+    fn include_device_point(bounds: &mut Option<Bounds>, x: f64, y: f64) {
+        let Some((x, y)) = finite_point(x, y) else {
+            return;
+        };
+        match bounds {
+            Some(bounds) => bounds.include_point(x, y),
+            None => {
+                *bounds = Some(Bounds {
+                    left: x,
+                    top: y,
+                    right: x,
+                    bottom: y,
+                })
+            },
+        }
+    }
+
+    fn include_device_rect(bounds: &mut Option<Bounds>, x1: f64, y1: f64, x2: f64, y2: f64) {
+        let (Some((x1, y1)), Some((x2, y2))) = (finite_point(x1, y1), finite_point(x2, y2)) else {
+            return;
+        };
+        let rect = Bounds {
+            left: x1.min(x2),
+            top: y1.min(y2),
+            right: x1.max(x2),
+            bottom: y1.max(y2),
+        };
+        match bounds {
+            Some(bounds) => bounds.include_rect(rect.left, rect.top, rect.right, rect.bottom),
+            None => *bounds = Some(rect),
+        }
+    }
+}
+
+impl Bounds {
+    fn normalized_or_fallback(self) -> Self {
+        if !(self.left.is_finite()
+            && self.top.is_finite()
+            && self.right.is_finite()
+            && self.bottom.is_finite())
         {
-            // NEON is always available on aarch64
-            unsafe {
-                Self::update_from_points_neon(left, top, right, bottom, params, count);
-            }
+            return Self::fallback();
         }
-
-        // Scalar fallback for other architectures
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-        {
-            Self::update_from_points_scalar(left, top, right, bottom, params, count);
+        Self {
+            left: self.left.min(self.right),
+            top: self.top.min(self.bottom),
+            right: self.left.max(self.right),
+            bottom: self.top.max(self.bottom),
         }
     }
+}
 
-    /// Scalar implementation for processing points
-    #[inline]
-    fn update_from_points_scalar(
-        left: &mut i16,
-        top: &mut i16,
-        right: &mut i16,
-        bottom: &mut i16,
-        params: &[u8],
-        count: usize,
-    ) {
-        for i in 0..count {
-            let x = read_i16_le(params, i * 4).unwrap_or(0);
-            let y = read_i16_le(params, i * 4 + 2).unwrap_or(0);
-            Self::update(left, top, right, bottom, x, y);
-        }
+#[inline]
+fn i16_at(rec: &WmfRecord, offset: usize) -> Option<i16> {
+    read_i16_le(&rec.params, offset).ok()
+}
+
+#[inline]
+fn u16_at(rec: &WmfRecord, offset: usize) -> Option<u16> {
+    read_u16_le(&rec.params, offset).ok()
+}
+
+/// WMF stores a point as y followed by x.
+#[inline]
+fn point_at(rec: &WmfRecord, offset: usize) -> Option<(f64, f64)> {
+    Some((
+        f64::from(i16_at(rec, offset + 2)?),
+        f64::from(i16_at(rec, offset)?),
+    ))
+}
+
+/// PointS objects embedded in polygon arrays are x followed by y.
+#[inline]
+fn array_point_at(rec: &WmfRecord, offset: usize) -> Option<(f64, f64)> {
+    Some((
+        f64::from(i16_at(rec, offset)?),
+        f64::from(i16_at(rec, offset + 2)?),
+    ))
+}
+
+/// WMF stores a rectangle as bottom, right, top, left.
+#[inline]
+fn rect_at(rec: &WmfRecord, offset: usize) -> Option<(f64, f64, f64, f64)> {
+    let bottom = f64::from(i16_at(rec, offset)?);
+    let right = f64::from(i16_at(rec, offset + 2)?);
+    let top = f64::from(i16_at(rec, offset + 4)?);
+    let left = f64::from(i16_at(rec, offset + 6)?);
+    Some((left, top, right, bottom))
+}
+
+#[inline]
+fn finite_point(x: f64, y: f64) -> Option<(f64, f64)> {
+    (x.is_finite() && y.is_finite()).then_some((
+        x.clamp(-MAX_COORDINATE, MAX_COORDINATE),
+        y.clamp(-MAX_COORDINATE, MAX_COORDINATE),
+    ))
+}
+
+#[inline]
+fn finite_or_one(value: f64) -> f64 {
+    if value.is_finite() {
+        value.clamp(-MAX_COORDINATE, MAX_COORDINATE)
+    } else {
+        1.0
     }
+}
 
-    /// SSE2 implementation (processes 4 points at a time using scalar loads)
-    ///
-    /// # Safety
-    ///
-    /// Caller must ensure that SSE2 instructions are available on the target CPU.
-    #[cfg(target_arch = "x86_64")]
-    #[target_feature(enable = "sse2")]
-    unsafe fn update_from_points_sse2(
-        left: &mut i16,
-        top: &mut i16,
-        right: &mut i16,
-        bottom: &mut i16,
-        params: &[u8],
-        count: usize,
-    ) {
-        // SAFETY: All SSE2 intrinsic operations are safe within this target_feature context
-        unsafe {
-            let mut min_x = _mm_set1_epi16(*left);
-            let mut min_y = _mm_set1_epi16(*top);
-            let mut max_x = _mm_set1_epi16(*right);
-            let mut max_y = _mm_set1_epi16(*bottom);
-
-            let mut i = 0;
-            // Process 4 points at a time
-            while i + 3 < count && (i * 4 + 16) <= params.len() {
-                // Load 4 points as individual i16 values
-                let x0 = read_i16_le(params, i * 4).unwrap_or(0);
-                let y0 = read_i16_le(params, i * 4 + 2).unwrap_or(0);
-                let x1 = read_i16_le(params, (i + 1) * 4).unwrap_or(0);
-                let y1 = read_i16_le(params, (i + 1) * 4 + 2).unwrap_or(0);
-                let x2 = read_i16_le(params, (i + 2) * 4).unwrap_or(0);
-                let y2 = read_i16_le(params, (i + 2) * 4 + 2).unwrap_or(0);
-                let x3 = read_i16_le(params, (i + 3) * 4).unwrap_or(0);
-                let y3 = read_i16_le(params, (i + 3) * 4 + 2).unwrap_or(0);
-
-                // Pack into SIMD vectors
-                let x_vals = _mm_set_epi16(0, 0, 0, 0, x3, x2, x1, x0);
-                let y_vals = _mm_set_epi16(0, 0, 0, 0, y3, y2, y1, y0);
-
-                min_x = _mm_min_epi16(min_x, x_vals);
-                max_x = _mm_max_epi16(max_x, x_vals);
-                min_y = _mm_min_epi16(min_y, y_vals);
-                max_y = _mm_max_epi16(max_y, y_vals);
-
-                i += 4;
-            }
-
-            // Reduce SIMD results
-            let mut temp_min_x = [0i16; 8];
-            let mut temp_max_x = [0i16; 8];
-            let mut temp_min_y = [0i16; 8];
-            let mut temp_max_y = [0i16; 8];
-            _mm_storeu_si128(temp_min_x.as_mut_ptr() as *mut __m128i, min_x);
-            _mm_storeu_si128(temp_max_x.as_mut_ptr() as *mut __m128i, max_x);
-            _mm_storeu_si128(temp_min_y.as_mut_ptr() as *mut __m128i, min_y);
-            _mm_storeu_si128(temp_max_y.as_mut_ptr() as *mut __m128i, max_y);
-
-            *left = temp_min_x.iter().copied().min().unwrap_or(*left);
-            *right = temp_max_x.iter().copied().max().unwrap_or(*right);
-            *top = temp_min_y.iter().copied().min().unwrap_or(*top);
-            *bottom = temp_max_y.iter().copied().max().unwrap_or(*bottom);
-
-            // Handle remaining points with scalar code
-            Self::update_from_points_scalar(left, top, right, bottom, &params[i * 4..], count - i);
-        }
+#[inline]
+fn bounded_add(left: f64, right: f64) -> f64 {
+    let value = left + right;
+    if value.is_finite() {
+        value.clamp(-MAX_COORDINATE, MAX_COORDINATE)
+    } else {
+        left.signum().max(right.signum()) * MAX_COORDINATE
     }
+}
 
-    /// SSE4.1 implementation (processes 8 points at a time using scalar loads)
-    ///
-    /// # Safety
-    ///
-    /// Caller must ensure that SSE4.1 instructions are available on the target CPU.
-    #[cfg(target_arch = "x86_64")]
-    #[target_feature(enable = "sse4.1")]
-    unsafe fn update_from_points_sse41(
-        left: &mut i16,
-        top: &mut i16,
-        right: &mut i16,
-        bottom: &mut i16,
-        params: &[u8],
-        count: usize,
-    ) {
-        // SAFETY: All SSE4.1 intrinsic operations are safe within this target_feature context
-        unsafe {
-            let mut min_x = _mm_set1_epi16(*left);
-            let mut min_y = _mm_set1_epi16(*top);
-            let mut max_x = _mm_set1_epi16(*right);
-            let mut max_y = _mm_set1_epi16(*bottom);
-
-            let mut i = 0;
-            // Process 8 points at a time
-            while i + 7 < count && (i * 4 + 32) <= params.len() {
-                // Load 8 points as individual i16 values
-                let x0 = read_i16_le(params, i * 4).unwrap_or(0);
-                let y0 = read_i16_le(params, i * 4 + 2).unwrap_or(0);
-                let x1 = read_i16_le(params, (i + 1) * 4).unwrap_or(0);
-                let y1 = read_i16_le(params, (i + 1) * 4 + 2).unwrap_or(0);
-                let x2 = read_i16_le(params, (i + 2) * 4).unwrap_or(0);
-                let y2 = read_i16_le(params, (i + 2) * 4 + 2).unwrap_or(0);
-                let x3 = read_i16_le(params, (i + 3) * 4).unwrap_or(0);
-                let y3 = read_i16_le(params, (i + 3) * 4 + 2).unwrap_or(0);
-                let x4 = read_i16_le(params, (i + 4) * 4).unwrap_or(0);
-                let y4 = read_i16_le(params, (i + 4) * 4 + 2).unwrap_or(0);
-                let x5 = read_i16_le(params, (i + 5) * 4).unwrap_or(0);
-                let y5 = read_i16_le(params, (i + 5) * 4 + 2).unwrap_or(0);
-                let x6 = read_i16_le(params, (i + 6) * 4).unwrap_or(0);
-                let y6 = read_i16_le(params, (i + 6) * 4 + 2).unwrap_or(0);
-                let x7 = read_i16_le(params, (i + 7) * 4).unwrap_or(0);
-                let y7 = read_i16_le(params, (i + 7) * 4 + 2).unwrap_or(0);
-
-                // Pack into SIMD vectors
-                let x_vals = _mm_set_epi16(x7, x6, x5, x4, x3, x2, x1, x0);
-                let y_vals = _mm_set_epi16(y7, y6, y5, y4, y3, y2, y1, y0);
-
-                min_x = _mm_min_epi16(min_x, x_vals);
-                max_x = _mm_max_epi16(max_x, x_vals);
-                min_y = _mm_min_epi16(min_y, y_vals);
-                max_y = _mm_max_epi16(max_y, y_vals);
-
-                i += 8;
-            }
-
-            // Reduce SIMD results
-            let mut temp_min_x = [0i16; 8];
-            let mut temp_max_x = [0i16; 8];
-            let mut temp_min_y = [0i16; 8];
-            let mut temp_max_y = [0i16; 8];
-            _mm_storeu_si128(temp_min_x.as_mut_ptr() as *mut __m128i, min_x);
-            _mm_storeu_si128(temp_max_x.as_mut_ptr() as *mut __m128i, max_x);
-            _mm_storeu_si128(temp_min_y.as_mut_ptr() as *mut __m128i, min_y);
-            _mm_storeu_si128(temp_max_y.as_mut_ptr() as *mut __m128i, max_y);
-
-            *left = temp_min_x.iter().copied().min().unwrap_or(*left);
-            *right = temp_max_x.iter().copied().max().unwrap_or(*right);
-            *top = temp_min_y.iter().copied().min().unwrap_or(*top);
-            *bottom = temp_max_y.iter().copied().max().unwrap_or(*bottom);
-
-            // Handle remaining points with scalar code
-            Self::update_from_points_scalar(left, top, right, bottom, &params[i * 4..], count - i);
-        }
-    }
-
-    /// AVX2 implementation (processes 16 points at a time using scalar loads)
-    ///
-    /// # Safety
-    ///
-    /// Caller must ensure that AVX2 instructions are available on the target CPU.
-    #[cfg(target_arch = "x86_64")]
-    #[target_feature(enable = "avx2")]
-    unsafe fn update_from_points_avx2(
-        left: &mut i16,
-        top: &mut i16,
-        right: &mut i16,
-        bottom: &mut i16,
-        params: &[u8],
-        count: usize,
-    ) {
-        // SAFETY: All AVX2 intrinsic operations are safe within this target_feature context
-        unsafe {
-            let mut min_x = _mm256_set1_epi16(*left);
-            let mut min_y = _mm256_set1_epi16(*top);
-            let mut max_x = _mm256_set1_epi16(*right);
-            let mut max_y = _mm256_set1_epi16(*bottom);
-
-            let mut i = 0;
-            // Process 16 points at a time
-            while i + 15 < count && (i * 4 + 64) <= params.len() {
-                // Load 16 points as individual i16 values
-                let x0 = read_i16_le(params, i * 4).unwrap_or(0);
-                let y0 = read_i16_le(params, i * 4 + 2).unwrap_or(0);
-                let x1 = read_i16_le(params, (i + 1) * 4).unwrap_or(0);
-                let y1 = read_i16_le(params, (i + 1) * 4 + 2).unwrap_or(0);
-                let x2 = read_i16_le(params, (i + 2) * 4).unwrap_or(0);
-                let y2 = read_i16_le(params, (i + 2) * 4 + 2).unwrap_or(0);
-                let x3 = read_i16_le(params, (i + 3) * 4).unwrap_or(0);
-                let y3 = read_i16_le(params, (i + 3) * 4 + 2).unwrap_or(0);
-                let x4 = read_i16_le(params, (i + 4) * 4).unwrap_or(0);
-                let y4 = read_i16_le(params, (i + 4) * 4 + 2).unwrap_or(0);
-                let x5 = read_i16_le(params, (i + 5) * 4).unwrap_or(0);
-                let y5 = read_i16_le(params, (i + 5) * 4 + 2).unwrap_or(0);
-                let x6 = read_i16_le(params, (i + 6) * 4).unwrap_or(0);
-                let y6 = read_i16_le(params, (i + 6) * 4 + 2).unwrap_or(0);
-                let x7 = read_i16_le(params, (i + 7) * 4).unwrap_or(0);
-                let y7 = read_i16_le(params, (i + 7) * 4 + 2).unwrap_or(0);
-                let x8 = read_i16_le(params, (i + 8) * 4).unwrap_or(0);
-                let y8 = read_i16_le(params, (i + 8) * 4 + 2).unwrap_or(0);
-                let x9 = read_i16_le(params, (i + 9) * 4).unwrap_or(0);
-                let y9 = read_i16_le(params, (i + 9) * 4 + 2).unwrap_or(0);
-                let x10 = read_i16_le(params, (i + 10) * 4).unwrap_or(0);
-                let y10 = read_i16_le(params, (i + 10) * 4 + 2).unwrap_or(0);
-                let x11 = read_i16_le(params, (i + 11) * 4).unwrap_or(0);
-                let y11 = read_i16_le(params, (i + 11) * 4 + 2).unwrap_or(0);
-                let x12 = read_i16_le(params, (i + 12) * 4).unwrap_or(0);
-                let y12 = read_i16_le(params, (i + 12) * 4 + 2).unwrap_or(0);
-                let x13 = read_i16_le(params, (i + 13) * 4).unwrap_or(0);
-                let y13 = read_i16_le(params, (i + 13) * 4 + 2).unwrap_or(0);
-                let x14 = read_i16_le(params, (i + 14) * 4).unwrap_or(0);
-                let y14 = read_i16_le(params, (i + 14) * 4 + 2).unwrap_or(0);
-                let x15 = read_i16_le(params, (i + 15) * 4).unwrap_or(0);
-                let y15 = read_i16_le(params, (i + 15) * 4 + 2).unwrap_or(0);
-
-                // Pack into SIMD vectors
-                let x_vals = _mm256_set_epi16(
-                    x15, x14, x13, x12, x11, x10, x9, x8, x7, x6, x5, x4, x3, x2, x1, x0,
-                );
-                let y_vals = _mm256_set_epi16(
-                    y15, y14, y13, y12, y11, y10, y9, y8, y7, y6, y5, y4, y3, y2, y1, y0,
-                );
-
-                min_x = _mm256_min_epi16(min_x, x_vals);
-                max_x = _mm256_max_epi16(max_x, x_vals);
-                min_y = _mm256_min_epi16(min_y, y_vals);
-                max_y = _mm256_max_epi16(max_y, y_vals);
-
-                i += 16;
-            }
-
-            // Reduce SIMD results
-            let mut temp_min_x = [0i16; 16];
-            let mut temp_max_x = [0i16; 16];
-            let mut temp_min_y = [0i16; 16];
-            let mut temp_max_y = [0i16; 16];
-            _mm256_storeu_si256(temp_min_x.as_mut_ptr() as *mut __m256i, min_x);
-            _mm256_storeu_si256(temp_max_x.as_mut_ptr() as *mut __m256i, max_x);
-            _mm256_storeu_si256(temp_min_y.as_mut_ptr() as *mut __m256i, min_y);
-            _mm256_storeu_si256(temp_max_y.as_mut_ptr() as *mut __m256i, max_y);
-
-            *left = temp_min_x.iter().copied().min().unwrap_or(*left);
-            *right = temp_max_x.iter().copied().max().unwrap_or(*right);
-            *top = temp_min_y.iter().copied().min().unwrap_or(*top);
-            *bottom = temp_max_y.iter().copied().max().unwrap_or(*bottom);
-
-            // Handle remaining points with SSE4.1
-            if i < count {
-                Self::update_from_points_sse41(
-                    left,
-                    top,
-                    right,
-                    bottom,
-                    &params[i * 4..],
-                    count - i,
-                );
-            }
-        }
-    }
-
-    /// NEON implementation for aarch64 (processes 8 points at a time using scalar loads)
-    ///
-    /// # Safety
-    ///
-    /// NEON is always available on aarch64, but this function is still marked unsafe
-    /// due to the use of intrinsics.
-    #[cfg(target_arch = "aarch64")]
-    #[target_feature(enable = "neon")]
-    unsafe fn update_from_points_neon(
-        left: &mut i16,
-        top: &mut i16,
-        right: &mut i16,
-        bottom: &mut i16,
-        params: &[u8],
-        count: usize,
-    ) {
-        // SAFETY: All NEON intrinsic operations are safe on aarch64
-        unsafe {
-            let mut min_x = vdupq_n_s16(*left);
-            let mut min_y = vdupq_n_s16(*top);
-            let mut max_x = vdupq_n_s16(*right);
-            let mut max_y = vdupq_n_s16(*bottom);
-
-            let mut i = 0;
-            // Process 8 points at a time
-            while i + 7 < count && (i * 4 + 32) <= params.len() {
-                // Load 8 points as individual i16 values
-                let x0 = read_i16_le(params, i * 4).unwrap_or(0);
-                let y0 = read_i16_le(params, i * 4 + 2).unwrap_or(0);
-                let x1 = read_i16_le(params, (i + 1) * 4).unwrap_or(0);
-                let y1 = read_i16_le(params, (i + 1) * 4 + 2).unwrap_or(0);
-                let x2 = read_i16_le(params, (i + 2) * 4).unwrap_or(0);
-                let y2 = read_i16_le(params, (i + 2) * 4 + 2).unwrap_or(0);
-                let x3 = read_i16_le(params, (i + 3) * 4).unwrap_or(0);
-                let y3 = read_i16_le(params, (i + 3) * 4 + 2).unwrap_or(0);
-                let x4 = read_i16_le(params, (i + 4) * 4).unwrap_or(0);
-                let y4 = read_i16_le(params, (i + 4) * 4 + 2).unwrap_or(0);
-                let x5 = read_i16_le(params, (i + 5) * 4).unwrap_or(0);
-                let y5 = read_i16_le(params, (i + 5) * 4 + 2).unwrap_or(0);
-                let x6 = read_i16_le(params, (i + 6) * 4).unwrap_or(0);
-                let y6 = read_i16_le(params, (i + 6) * 4 + 2).unwrap_or(0);
-                let x7 = read_i16_le(params, (i + 7) * 4).unwrap_or(0);
-                let y7 = read_i16_le(params, (i + 7) * 4 + 2).unwrap_or(0);
-
-                // Pack into SIMD vectors
-                let x_vals = vcombine_s16(
-                    vcreate_s16(
-                        (x0 as u16 as u64)
-                            | ((x1 as u16 as u64) << 16)
-                            | ((x2 as u16 as u64) << 32)
-                            | ((x3 as u16 as u64) << 48),
-                    ),
-                    vcreate_s16(
-                        (x4 as u16 as u64)
-                            | ((x5 as u16 as u64) << 16)
-                            | ((x6 as u16 as u64) << 32)
-                            | ((x7 as u16 as u64) << 48),
-                    ),
-                );
-                let y_vals = vcombine_s16(
-                    vcreate_s16(
-                        (y0 as u16 as u64)
-                            | ((y1 as u16 as u64) << 16)
-                            | ((y2 as u16 as u64) << 32)
-                            | ((y3 as u16 as u64) << 48),
-                    ),
-                    vcreate_s16(
-                        (y4 as u16 as u64)
-                            | ((y5 as u16 as u64) << 16)
-                            | ((y6 as u16 as u64) << 32)
-                            | ((y7 as u16 as u64) << 48),
-                    ),
-                );
-
-                min_x = vminq_s16(min_x, x_vals);
-                max_x = vmaxq_s16(max_x, x_vals);
-                min_y = vminq_s16(min_y, y_vals);
-                max_y = vmaxq_s16(max_y, y_vals);
-
-                i += 8;
-            }
-
-            // Reduce SIMD results
-            let mut temp_min_x = [0i16; 8];
-            let mut temp_max_x = [0i16; 8];
-            let mut temp_min_y = [0i16; 8];
-            let mut temp_max_y = [0i16; 8];
-            vst1q_s16(temp_min_x.as_mut_ptr(), min_x);
-            vst1q_s16(temp_max_x.as_mut_ptr(), max_x);
-            vst1q_s16(temp_min_y.as_mut_ptr(), min_y);
-            vst1q_s16(temp_max_y.as_mut_ptr(), max_y);
-
-            *left = temp_min_x.iter().copied().min().unwrap_or(*left);
-            *right = temp_max_x.iter().copied().max().unwrap_or(*right);
-            *top = temp_min_y.iter().copied().min().unwrap_or(*top);
-            *bottom = temp_max_y.iter().copied().max().unwrap_or(*bottom);
-
-            // Handle remaining points with scalar code
-            Self::update_from_points_scalar(left, top, right, bottom, &params[i * 4..], count - i);
-        }
+#[inline]
+fn bounded_product(left: f64, right: f64) -> f64 {
+    let value = left * right;
+    if value.is_finite() {
+        value.clamp(-MAX_COORDINATE, MAX_COORDINATE)
+    } else {
+        left.signum() * right.signum() * MAX_COORDINATE
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::super::constants::map_mode;
     use super::*;
+    use bytes::Bytes;
 
-    /// Helper to create params buffer from points
-    fn create_params_from_points(points: &[(i16, i16)]) -> Vec<u8> {
-        let mut params = Vec::with_capacity(points.len() * 4);
-        for &(x, y) in points {
-            params.extend_from_slice(&x.to_le_bytes());
-            params.extend_from_slice(&y.to_le_bytes());
+    fn record(function: u16, words: &[i16]) -> WmfRecord {
+        let mut params = Vec::with_capacity(words.len() * 2);
+        for word in words {
+            params.extend_from_slice(&word.to_le_bytes());
         }
-        params
-    }
-
-    #[test]
-    fn test_update_from_points_scalar() {
-        let points = vec![(10, 20), (30, 40), (-5, -10), (100, 200)];
-        let params = create_params_from_points(&points);
-
-        let mut left = i16::MAX;
-        let mut top = i16::MAX;
-        let mut right = i16::MIN;
-        let mut bottom = i16::MIN;
-
-        BoundsCalculator::update_from_points_scalar(
-            &mut left,
-            &mut top,
-            &mut right,
-            &mut bottom,
-            &params,
-            points.len(),
-        );
-
-        assert_eq!(left, -5);
-        assert_eq!(top, -10);
-        assert_eq!(right, 100);
-        assert_eq!(bottom, 200);
-    }
-
-    #[test]
-    fn test_update_from_points_empty() {
-        let mut left = 10i16;
-        let mut top = 20i16;
-        let mut right = 30i16;
-        let mut bottom = 40i16;
-
-        BoundsCalculator::update_from_points(&mut left, &mut top, &mut right, &mut bottom, &[], 0);
-
-        // Should remain unchanged
-        assert_eq!(left, 10);
-        assert_eq!(top, 20);
-        assert_eq!(right, 30);
-        assert_eq!(bottom, 40);
-    }
-
-    #[test]
-    fn test_update_from_points_single() {
-        let points = vec![(50, 60)];
-        let params = create_params_from_points(&points);
-
-        let mut left = i16::MAX;
-        let mut top = i16::MAX;
-        let mut right = i16::MIN;
-        let mut bottom = i16::MIN;
-
-        BoundsCalculator::update_from_points(
-            &mut left,
-            &mut top,
-            &mut right,
-            &mut bottom,
-            &params,
-            1,
-        );
-
-        assert_eq!(left, 50);
-        assert_eq!(top, 60);
-        assert_eq!(right, 50);
-        assert_eq!(bottom, 60);
-    }
-
-    #[test]
-    fn test_update_from_points_various_sizes() {
-        // Test different sizes to trigger different SIMD code paths
-        for count in [2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 31, 32, 33, 64, 100] {
-            let points: Vec<(i16, i16)> = (0..count)
-                .map(|i| {
-                    let x = (i as i16 * 13 + 7) % 1000 - 500;
-                    let y = (i as i16 * 17 + 11) % 1000 - 500;
-                    (x, y)
-                })
-                .collect();
-
-            let params = create_params_from_points(&points);
-
-            // Calculate using SIMD
-            let mut left_simd = i16::MAX;
-            let mut top_simd = i16::MAX;
-            let mut right_simd = i16::MIN;
-            let mut bottom_simd = i16::MIN;
-
-            BoundsCalculator::update_from_points(
-                &mut left_simd,
-                &mut top_simd,
-                &mut right_simd,
-                &mut bottom_simd,
-                &params,
-                count,
-            );
-
-            // Calculate using scalar
-            let mut left_scalar = i16::MAX;
-            let mut top_scalar = i16::MAX;
-            let mut right_scalar = i16::MIN;
-            let mut bottom_scalar = i16::MIN;
-
-            BoundsCalculator::update_from_points_scalar(
-                &mut left_scalar,
-                &mut top_scalar,
-                &mut right_scalar,
-                &mut bottom_scalar,
-                &params,
-                count,
-            );
-
-            assert_eq!(left_simd, left_scalar, "Left mismatch for count {}", count);
-            assert_eq!(top_simd, top_scalar, "Top mismatch for count {}", count);
-            assert_eq!(
-                right_simd, right_scalar,
-                "Right mismatch for count {}",
-                count
-            );
-            assert_eq!(
-                bottom_simd, bottom_scalar,
-                "Bottom mismatch for count {}",
-                count
-            );
-        }
-    }
-
-    #[test]
-    fn test_update_from_points_negative_coords() {
-        let points = vec![(-100, -200), (-50, -75), (0, 0), (50, 75)];
-        let params = create_params_from_points(&points);
-
-        let mut left = i16::MAX;
-        let mut top = i16::MAX;
-        let mut right = i16::MIN;
-        let mut bottom = i16::MIN;
-
-        BoundsCalculator::update_from_points(
-            &mut left,
-            &mut top,
-            &mut right,
-            &mut bottom,
-            &params,
-            points.len(),
-        );
-
-        assert_eq!(left, -100);
-        assert_eq!(top, -200);
-        assert_eq!(right, 50);
-        assert_eq!(bottom, 75);
-    }
-
-    #[test]
-    fn test_update_from_points_extreme_values() {
-        let points = vec![(i16::MIN, i16::MIN), (i16::MAX, i16::MAX), (0, 0), (-1, 1)];
-        let params = create_params_from_points(&points);
-
-        let mut left = i16::MAX;
-        let mut top = i16::MAX;
-        let mut right = i16::MIN;
-        let mut bottom = i16::MIN;
-
-        BoundsCalculator::update_from_points(
-            &mut left,
-            &mut top,
-            &mut right,
-            &mut bottom,
-            &params,
-            points.len(),
-        );
-
-        assert_eq!(left, i16::MIN);
-        assert_eq!(top, i16::MIN);
-        assert_eq!(right, i16::MAX);
-        assert_eq!(bottom, i16::MAX);
-    }
-
-    #[test]
-    fn test_update_from_points_with_initial_bounds() {
-        let points = vec![(20, 30), (40, 50)];
-        let params = create_params_from_points(&points);
-
-        let mut left = 10i16;
-        let mut top = 15i16;
-        let mut right = 60i16;
-        let mut bottom = 70i16;
-
-        BoundsCalculator::update_from_points(
-            &mut left,
-            &mut top,
-            &mut right,
-            &mut bottom,
-            &params,
-            points.len(),
-        );
-
-        // Should keep tighter bounds
-        assert_eq!(left, 10); // Kept initial smaller value
-        assert_eq!(top, 15); // Kept initial smaller value
-        assert_eq!(right, 60); // Kept initial larger value
-        assert_eq!(bottom, 70); // Kept initial larger value
-    }
-
-    /// Test direct SIMD implementations against scalar
-    #[cfg(target_arch = "x86_64")]
-    #[test]
-    fn test_x86_sse2_vs_scalar() {
-        let points: Vec<(i16, i16)> = (0..64)
-            .map(|i| ((i * 13 - 100) as i16, (i * 17 - 200) as i16))
-            .collect();
-        let params = create_params_from_points(&points);
-
-        let mut left_sse2 = i16::MAX;
-        let mut top_sse2 = i16::MAX;
-        let mut right_sse2 = i16::MIN;
-        let mut bottom_sse2 = i16::MIN;
-
-        unsafe {
-            BoundsCalculator::update_from_points_sse2(
-                &mut left_sse2,
-                &mut top_sse2,
-                &mut right_sse2,
-                &mut bottom_sse2,
-                &params,
-                points.len(),
-            );
-        }
-
-        let mut left_scalar = i16::MAX;
-        let mut top_scalar = i16::MAX;
-        let mut right_scalar = i16::MIN;
-        let mut bottom_scalar = i16::MIN;
-
-        BoundsCalculator::update_from_points_scalar(
-            &mut left_scalar,
-            &mut top_scalar,
-            &mut right_scalar,
-            &mut bottom_scalar,
-            &params,
-            points.len(),
-        );
-
-        assert_eq!(left_sse2, left_scalar);
-        assert_eq!(top_sse2, top_scalar);
-        assert_eq!(right_sse2, right_scalar);
-        assert_eq!(bottom_sse2, bottom_scalar);
-    }
-
-    #[cfg(target_arch = "x86_64")]
-    #[test]
-    fn test_x86_sse41_vs_scalar() {
-        if !is_x86_feature_detected!("sse4.1") {
-            eprintln!("SSE4.1 not available, skipping test");
-            return;
-        }
-
-        let points: Vec<(i16, i16)> = (0..64)
-            .map(|i| ((i * 13 - 100) as i16, (i * 17 - 200) as i16))
-            .collect();
-        let params = create_params_from_points(&points);
-
-        let mut left_sse41 = i16::MAX;
-        let mut top_sse41 = i16::MAX;
-        let mut right_sse41 = i16::MIN;
-        let mut bottom_sse41 = i16::MIN;
-
-        unsafe {
-            BoundsCalculator::update_from_points_sse41(
-                &mut left_sse41,
-                &mut top_sse41,
-                &mut right_sse41,
-                &mut bottom_sse41,
-                &params,
-                points.len(),
-            );
-        }
-
-        let mut left_scalar = i16::MAX;
-        let mut top_scalar = i16::MAX;
-        let mut right_scalar = i16::MIN;
-        let mut bottom_scalar = i16::MIN;
-
-        BoundsCalculator::update_from_points_scalar(
-            &mut left_scalar,
-            &mut top_scalar,
-            &mut right_scalar,
-            &mut bottom_scalar,
-            &params,
-            points.len(),
-        );
-
-        assert_eq!(left_sse41, left_scalar);
-        assert_eq!(top_sse41, top_scalar);
-        assert_eq!(right_sse41, right_scalar);
-        assert_eq!(bottom_sse41, bottom_scalar);
-    }
-
-    #[cfg(target_arch = "x86_64")]
-    #[test]
-    fn test_x86_avx2_vs_scalar() {
-        if !is_x86_feature_detected!("avx2") {
-            eprintln!("AVX2 not available, skipping test");
-            return;
-        }
-
-        let points: Vec<(i16, i16)> = (0..128)
-            .map(|i| ((i * 13 - 100) as i16, (i * 17 - 200) as i16))
-            .collect();
-        let params = create_params_from_points(&points);
-
-        let mut left_avx2 = i16::MAX;
-        let mut top_avx2 = i16::MAX;
-        let mut right_avx2 = i16::MIN;
-        let mut bottom_avx2 = i16::MIN;
-
-        unsafe {
-            BoundsCalculator::update_from_points_avx2(
-                &mut left_avx2,
-                &mut top_avx2,
-                &mut right_avx2,
-                &mut bottom_avx2,
-                &params,
-                points.len(),
-            );
-        }
-
-        let mut left_scalar = i16::MAX;
-        let mut top_scalar = i16::MAX;
-        let mut right_scalar = i16::MIN;
-        let mut bottom_scalar = i16::MIN;
-
-        BoundsCalculator::update_from_points_scalar(
-            &mut left_scalar,
-            &mut top_scalar,
-            &mut right_scalar,
-            &mut bottom_scalar,
-            &params,
-            points.len(),
-        );
-
-        assert_eq!(left_avx2, left_scalar);
-        assert_eq!(top_avx2, top_scalar);
-        assert_eq!(right_avx2, right_scalar);
-        assert_eq!(bottom_avx2, bottom_scalar);
-    }
-
-    /// Test scan_records with actual WMF record structures
-    #[test]
-    fn test_scan_records_polygon() {
-        use bytes::Bytes;
-
-        let points = vec![(10, 20), (30, 40), (-5, -10), (100, 200)];
-        let mut params = Vec::new();
-        params.extend_from_slice(&(points.len() as i16).to_le_bytes());
-        params.extend_from_slice(&create_params_from_points(&points));
-
-        let records = vec![WmfRecord {
-            size: 0,
-            function: record::POLYGON,
+        WmfRecord {
+            size: 3 + words.len() as u32,
+            function,
             params: Bytes::from(params),
-        }];
-
-        let (left, top, right, bottom) = BoundsCalculator::scan_records(&records);
-
-        assert_eq!(left, -5);
-        assert_eq!(top, -10);
-        assert_eq!(right, 100);
-        assert_eq!(bottom, 200);
+        }
     }
 
     #[test]
-    fn test_scan_records_multiple_shapes() {
-        use bytes::Bytes;
-
-        // Rectangle record
-        let rect_params = {
-            let mut p = Vec::new();
-            p.extend_from_slice(&50i16.to_le_bytes()); // bottom
-            p.extend_from_slice(&150i16.to_le_bytes()); // right
-            p.extend_from_slice(&10i16.to_le_bytes()); // top
-            p.extend_from_slice(&50i16.to_le_bytes()); // left
-            p
-        };
-
-        // Polygon record
-        let polygon_points = vec![(200, 300), (250, 350)];
-        let mut polygon_params = Vec::new();
-        polygon_params.extend_from_slice(&(polygon_points.len() as i16).to_le_bytes());
-        polygon_params.extend_from_slice(&create_params_from_points(&polygon_points));
-
-        let records = vec![
-            WmfRecord {
-                size: 0,
-                function: record::RECTANGLE,
-                params: Bytes::from(rect_params),
-            },
-            WmfRecord {
-                size: 0,
-                function: record::POLYGON,
-                params: Bytes::from(polygon_params),
-            },
+    fn maps_reversed_rectangles_to_normalized_device_bounds() {
+        let records = [
+            record(record::SET_MAP_MODE, &[map_mode::MM_ANISOTROPIC as i16]),
+            record(record::SET_WINDOW_EXT, &[100, 200]),
+            record(record::SET_VIEWPORT_EXT, &[-200, 400]),
+            // bottom, right, top, left (both axes deliberately reversed)
+            record(record::RECTANGLE, &[10, 20, 90, 180]),
         ];
-
-        let (left, top, right, bottom) = BoundsCalculator::scan_records(&records);
-
-        assert_eq!(left, 50);
-        assert_eq!(top, 10);
-        assert_eq!(right, 250);
-        assert_eq!(bottom, 350);
+        let bounds = BoundsCalculator::scan_records(&records);
+        assert_eq!(bounds.as_tuple(), (40.0, -180.0, 360.0, -20.0));
     }
 
     #[test]
-    fn test_scan_records_empty() {
-        let records = vec![];
-        let (left, top, right, bottom) = BoundsCalculator::scan_records(&records);
+    fn line_to_includes_the_saved_current_position() {
+        let records = [
+            record(record::MOVE_TO, &[20, 10]),
+            record(record::LINE_TO, &[40, 30]),
+        ];
+        assert_eq!(
+            BoundsCalculator::scan_records(&records).as_tuple(),
+            (10.0, 20.0, 30.0, 40.0)
+        );
+    }
 
-        // Should return default bounds
-        assert_eq!(left, 0);
-        assert_eq!(top, 0);
-        assert_eq!(right, 1000);
-        assert_eq!(bottom, 1000);
+    #[test]
+    fn polypolygon_and_arc_use_all_vector_extents() {
+        let records = [
+            record(
+                record::POLYPOLYGON,
+                &[2, 3, 3, 0, 0, 10, 10, 20, -5, 100, 100, 110, 110, 120, 90],
+            ),
+            record(record::ARC, &[7, 11, 3, 2, 20, 10, 30, -10]),
+        ];
+        assert_eq!(
+            BoundsCalculator::scan_records(&records).as_tuple(),
+            (-10.0, -5.0, 120.0, 110.0)
+        );
+    }
+
+    #[test]
+    fn text_and_opaque_ext_text_have_estimated_bounds() {
+        let records = [
+            record(record::CREATE_FONT_INDIRECT, &[-20, 10]),
+            record(record::SELECT_OBJECT, &[0]),
+            record(record::TEXT_OUT, &[3, 0x6261, 0x0063, 40, 50]),
+            // y/x, len/options, then opaque bottom/right/top/left
+            record(record::EXT_TEXT_OUT, &[5, 6, 1, 2, 50, 60, 10, 20, 0x0041]),
+        ];
+        assert_eq!(
+            BoundsCalculator::scan_records(&records).as_tuple(),
+            (6.0, 5.0, 80.0, 60.0)
+        );
+    }
+
+    #[test]
+    fn bitmap_destination_setpixel_and_floodfill_contribute() {
+        let records = [
+            // ROP (two words), y/x/height/width
+            record(record::PAT_BLT, &[0, 0, 20, 10, 30, 40]),
+            record(record::SET_PIXEL, &[0, 0, -2, -3]),
+            record(record::FLOOD_FILL, &[0, 0, 70, 80]),
+        ];
+        assert_eq!(
+            BoundsCalculator::scan_records(&records).as_tuple(),
+            (-3.0, -2.0, 80.0, 70.0)
+        );
+    }
+
+    #[test]
+    fn bitmap_destination_layouts_use_their_own_field_offsets() {
+        let records = [
+            // ROP, ySrc/xSrc, height/width, yDst/xDst
+            record(record::BIT_BLT, &[0, 0, 0, 0, 7, 11, 30, 20]),
+            // ROP, source height/width/origin, destination height/width/origin
+            record(record::STRETCH_BLT, &[0, 0, 1, 1, 0, 0, 8, 12, 40, 50]),
+            // ColorUsage, scan range, DIB origin, source height/width, destination origin
+            record(record::SET_DIB_TO_DEV, &[0, 0, 0, 0, 0, 9, 13, 60, 70]),
+            // ROP, ColorUsage, source rectangle, destination height/width/origin
+            record(record::STRETCH_DIB, &[0, 0, 0, 1, 1, 0, 0, 10, 14, 80, 90]),
+        ];
+        assert_eq!(
+            BoundsCalculator::scan_records(&records).as_tuple(),
+            (20.0, 30.0, 104.0, 90.0)
+        );
+    }
+
+    #[test]
+    fn extreme_coordinates_and_degenerate_mapping_stay_finite() {
+        let records = [
+            record(record::SET_MAP_MODE, &[map_mode::MM_ANISOTROPIC as i16]),
+            record(record::SET_WINDOW_EXT, &[0, 0]),
+            record(record::RECTANGLE, &[i16::MIN, i16::MIN, i16::MAX, i16::MAX]),
+        ];
+        let bounds = BoundsCalculator::scan_records(&records);
+        assert_eq!(bounds.as_tuple(), (-32768.0, -32768.0, 32767.0, 32767.0));
+        assert!(
+            bounds.left.is_finite()
+                && bounds.top.is_finite()
+                && bounds.right.is_finite()
+                && bounds.bottom.is_finite()
+        );
+    }
+
+    #[test]
+    fn save_restore_reinstates_mapping_before_later_draws() {
+        let records = [
+            record(record::SET_MAP_MODE, &[map_mode::MM_ANISOTROPIC as i16]),
+            record(record::SET_VIEWPORT_EXT, &[2, 2]),
+            record(record::SAVE_DC, &[]),
+            record(record::SET_VIEWPORT_EXT, &[10, 10]),
+            record(record::RESTORE_DC, &[-1]),
+            record(record::SET_PIXEL, &[0, 0, 3, 4]),
+        ];
+        assert_eq!(
+            BoundsCalculator::scan_records(&records).as_tuple(),
+            (8.0, 6.0, 8.0, 6.0)
+        );
     }
 }

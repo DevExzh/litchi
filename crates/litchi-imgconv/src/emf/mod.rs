@@ -28,6 +28,8 @@ pub use svg::EmfSvgConverter;
 use image::ImageFormat;
 use litchi_core::error::Result;
 
+use crate::{InputFormat, Options, convert_metafile};
+
 /// Convert EMF data to a raster image in the specified format
 ///
 /// # Arguments
@@ -55,15 +57,24 @@ pub fn convert_emf(
     width: Option<u32>,
     height: Option<u32>,
 ) -> Result<Vec<u8>> {
-    let parser = EmfParser::new(emf_data)?;
-    let options = EmfToRasterOptions {
-        width,
-        height,
-        background_color: image::Rgba([255, 255, 255, 255]),
-    };
+    convert_emf_with_options(
+        emf_data,
+        format,
+        Options {
+            width,
+            height,
+            ..Options::default()
+        },
+    )
+}
 
-    let converter = EmfConverter::new(parser, options);
-    converter.convert_to_format(format)
+/// Converts EMF bytes to a bounded raster format under explicit options.
+pub fn convert_emf_with_options(
+    emf_data: &[u8],
+    format: ImageFormat,
+    options: Options,
+) -> Result<Vec<u8>> {
+    crate::codec::rasterize_raw_metafile(emf_data, InputFormat::Emf, format, options)
 }
 
 /// Convert EMF data to PNG format
@@ -138,9 +149,20 @@ pub fn convert_emf_to_webp(
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub fn convert_emf_to_svg(emf_data: &[u8]) -> Result<String> {
-    let parser = EmfParser::new(emf_data)?;
-    let converter = EmfSvgConverter::new(&parser);
-    converter.convert()
+    convert_emf_to_svg_with_options(emf_data, Options::default())
+}
+
+/// Converts EMF bytes to bounded SVG under explicit options.
+pub fn convert_emf_to_svg_with_options(emf_data: &[u8], options: Options) -> Result<String> {
+    let converted = convert_metafile(
+        emf_data,
+        InputFormat::Emf,
+        crate::OutputFormat::Svg,
+        options,
+    )?;
+    crate::codec::reject_lossy_diagnostics(&converted.report)?;
+    String::from_utf8(converted.bytes)
+        .map_err(|_| litchi_core::error::Error::ParseError("SVG output was not UTF-8".to_string()))
 }
 
 /// Convert EMF data to SVG bytes

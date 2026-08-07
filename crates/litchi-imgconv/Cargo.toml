@@ -15,9 +15,13 @@ flate2       = { workspace = true }
 image        = { workspace = true }
 litchi-core  = { workspace = true }
 litchi-odraw = { workspace = true }
+resvg        = { workspace = true }
 ryu          = { workspace = true }
 xml-minifier = { workspace = true }
 zerocopy     = { workspace = true, features = ["derive"] }
+
+[dev-dependencies]
+quick-xml = { workspace = true }
 
 [lints]
 workspace = true

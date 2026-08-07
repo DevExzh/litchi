@@ -5,11 +5,9 @@
 //!   - [`litchi_imgconv::emf::convert_emf_to_svg`] (`emf/mod.rs`)
 //!   - [`litchi_imgconv::wmf::convert_wmf_to_svg`] (`wmf/mod.rs`)
 //!
-//! Both walk the parsed metafile records and emit a minimal SVG document
-//! using the building blocks in the [`litchi_imgconv::svg`] module
-//! (`SvgBuilder`, `SvgPath`, `SvgRect`, `SvgEllipse`, `SvgText`,
-//! `SvgImage`). Embedded raster blits become base64 `data:image/png` URLs
-//! so the resulting SVG is fully self-contained.
+//! Both walk the parsed metafile records and emit a bounded SVG document.
+//! Unsupported metafile operations are reported by the renderer rather than
+//! being replaced with a placeholder raster image.
 //!
 //! The PICT decoder does not currently expose a `convert_pict_to_svg`
 //! entry point - see `pict/mod.rs`, which only ships PNG/JPEG/WebP

@@ -10,8 +10,6 @@ use zerocopy::{FromBytes, IntoBytes};
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSelectObject {
-    pub record_type: u32,
-    pub record_size: u32,
     pub object_index: u32,
 }
 
@@ -19,8 +17,6 @@ pub struct EmrSelectObject {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrDeleteObject {
-    pub record_type: u32,
-    pub record_size: u32,
     pub object_index: u32,
 }
 
@@ -57,8 +53,6 @@ pub mod pen_style {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrCreatePen {
-    pub record_type: u32,
-    pub record_size: u32,
     pub object_index: u32,
     pub pen_style: u32,
     pub width: u32,   // Only x component used
@@ -70,8 +64,6 @@ pub struct EmrCreatePen {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrExtCreatePenHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub object_index: u32,
     pub off_bmi: u32,  // Offset to bitmap info
     pub cb_bmi: u32,   // Size of bitmap info
@@ -116,8 +108,6 @@ pub mod hatch_style {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrCreateBrushIndirect {
-    pub record_type: u32,
-    pub record_size: u32,
     pub object_index: u32,
     pub brush_style: u32,
     pub color: ColorRef,
@@ -128,8 +118,6 @@ pub struct EmrCreateBrushIndirect {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrCreateDIBPatternBrushPtHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub object_index: u32,
     pub usage: u32,    // DIB color table usage
     pub off_bmi: u32,  // Offset to bitmap info
@@ -143,8 +131,6 @@ pub struct EmrCreateDIBPatternBrushPtHeader {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrCreateMonoBrushHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub object_index: u32,
     pub usage: u32,    // DIB color table usage
     pub off_bmi: u32,  // Offset to bitmap info
@@ -213,8 +199,6 @@ pub const LF_FACESIZE: usize = 32;
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrExtCreateFontIndirectWHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub object_index: u32,
     // Followed by LOGFONTW structure
 }
@@ -245,8 +229,6 @@ pub struct LogFontW {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrCreatePaletteHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub object_index: u32,
     pub version: u16, // Always 0x0300
     pub num_entries: u16,
@@ -267,8 +249,6 @@ pub struct PaletteEntry {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSelectPalette {
-    pub record_type: u32,
-    pub record_size: u32,
     pub palette_index: u32,
 }
 
@@ -276,8 +256,6 @@ pub struct EmrSelectPalette {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetPaletteEntriesHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub palette_index: u32,
     pub start: u32,
     pub num_entries: u32,
@@ -288,8 +266,6 @@ pub struct EmrSetPaletteEntriesHeader {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrResizePalette {
-    pub record_type: u32,
-    pub record_size: u32,
     pub palette_index: u32,
     pub num_entries: u32,
 }
@@ -309,8 +285,6 @@ pub enum ColorSpaceType {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrCreateColorSpaceHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub color_space_index: u32,
     // Followed by LOGCOLORSPACEW structure
 }
@@ -319,8 +293,6 @@ pub struct EmrCreateColorSpaceHeader {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetColorSpace {
-    pub record_type: u32,
-    pub record_size: u32,
     pub color_space_index: u32,
 }
 
@@ -328,7 +300,5 @@ pub struct EmrSetColorSpace {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrDeleteColorSpace {
-    pub record_type: u32,
-    pub record_size: u32,
     pub color_space_index: u32,
 }

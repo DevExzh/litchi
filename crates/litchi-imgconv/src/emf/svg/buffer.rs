@@ -6,7 +6,7 @@ use super::state::DeviceContext;
 use crate::svg_utils::write_num;
 
 /// Buffer for grouping and optimizing SVG elements
-pub struct ElementBuffer {
+pub(super) struct ElementBuffer {
     /// Finalized elements ready for output
     pub elements: Vec<String>,
     /// Pending lines with same stroke for merging into polyline
@@ -16,7 +16,7 @@ pub struct ElementBuffer {
 }
 
 impl ElementBuffer {
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             elements: Vec::new(),
             pending_lines: Vec::new(),
@@ -25,7 +25,7 @@ impl ElementBuffer {
     }
 
     /// Add an element, possibly merging with buffered elements
-    pub fn add_element(&mut self, element: String, dc: &DeviceContext) {
+    pub(super) fn add_element(&mut self, element: String, dc: &DeviceContext) {
         // Check if this is a line element that can be merged
         if element.starts_with("<line ") {
             self.try_buffer_line(element, dc);
@@ -208,7 +208,7 @@ impl ElementBuffer {
     }
 
     /// Flush all pending buffered elements
-    pub fn flush(&mut self) {
+    pub(super) fn flush(&mut self) {
         if !self.pending_lines.is_empty() {
             self.flush_lines_as_path();
         }
