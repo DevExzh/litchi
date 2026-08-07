@@ -9,8 +9,12 @@ use crate::raw::parse_catalog;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, Part};
 
-use super::codec::parse_drawing_shapes;
-use super::model::*;
+use super::{Shapes, read};
+
+const MAX_WORKBOOK_BYTES: usize = 32 * 1024 * 1024;
+const MAX_DRAWING_PART_BYTES: usize = 32 * 1024 * 1024;
+const MAX_DRAWINGS_PER_WORKSHEET: usize = 64;
+const MAX_ANCHORS_PER_DRAWING: usize = 100_000;
 
 /// Load the shape inventory of every worksheet in a workbook package.
 ///
@@ -110,7 +114,7 @@ fn load_shapes_for_sheet(
         }
         let drawing_xml = std::str::from_utf8(drawing_part.blob())
             .map_err(|error| Error::Invalid(error.to_string()))?;
-        let Some(anchored) = parse_drawing_shapes(drawing_xml)? else {
+        let Some(anchored) = read(drawing_xml)? else {
             continue;
         };
         for object in anchored {
@@ -134,3 +138,6 @@ fn invalid(message: impl Into<String>) -> Error {
 fn limit(name: &str) -> Error {
     invalid(format!("XLSX drawing shape {name} limit exceeded"))
 }
+
+#[cfg(test)]
+mod tests;

@@ -1,4 +1,8 @@
-//! Typed semantic SpreadsheetDrawing shape models.
+//! Typed semantic `SpreadsheetDrawing` shape models.
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "Public re-exports and parser limits are kept beside their supporting model code."
+)]
 //!
 //! The model is context-first: anchors own objects, groups own direct children,
 //! and unknown markup remains inert and bounded rather than being discarded.
@@ -6,8 +10,16 @@
 use std::fmt;
 use std::str::FromStr;
 
-use crate::error::{Error, Result, invalid};
-use litchi_drawingml::geom::Preset;
+use crate::{Error, Result};
+
+#[allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "Public re-exports stay adjacent to their supporting imports."
+)]
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
+}
+pub use litchi_drawingml::geom::Preset;
 use litchi_drawingml::geometry::CustomGeometry;
 pub use litchi_drawingml::text::body::{Body, Insets, Paragraph, Properties, Run};
 pub use litchi_drawingml::text::{
@@ -24,6 +36,7 @@ pub enum Aspect {
 }
 
 impl Aspect {
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Content => "DVASPECT_CONTENT",
@@ -58,21 +71,24 @@ impl fmt::Display for Aspect {
     }
 }
 
+#[allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "Parser limits remain next to the model definitions that use them."
+)]
 pub(crate) const MAX_DRAWING_PART_BYTES: usize = 32 * 1024 * 1024;
-pub(crate) const MAX_WORKBOOK_BYTES: usize = 32 * 1024 * 1024;
-pub(crate) const MAX_DRAWINGS_PER_WORKSHEET: usize = 64;
 pub(crate) const MAX_ANCHORS_PER_DRAWING: usize = 100_000;
 pub(crate) const MAX_OBJECTS_PER_DRAWING: usize = 100_000;
 pub(crate) const MAX_GROUP_DEPTH: usize = 32;
 pub(crate) const MAX_XML_DEPTH: usize = 256;
 pub(crate) const MAX_TEXT_BYTES: usize = 1024 * 1024;
 
-/// An offset or extent in English Metric Units (EMU), the DrawingML length unit.
+/// An offset or extent in English Metric Units (EMU), the `DrawingML` length unit.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Emu(pub i64);
 
 impl Emu {
     /// The raw EMU value.
+    #[must_use]
     pub fn emu(self) -> i64 {
         self.0
     }
@@ -97,7 +113,8 @@ pub enum EditAs {
 }
 
 impl EditAs {
-    /// Return the exact SpreadsheetDrawingML token.
+    /// Return the exact `SpreadsheetDrawingML` token.
+    #[must_use]
     pub const fn token(self) -> &'static str {
         match self {
             Self::TwoCell => "twoCell",
@@ -197,7 +214,7 @@ pub enum Anchor {
     },
 }
 
-/// Mutually exclusive DrawingML geometry of a worksheet shape.
+/// Mutually exclusive `DrawingML` geometry of a worksheet shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Geometry {
     /// A schema-defined preset (`a:prstGeom`).
@@ -208,6 +225,7 @@ pub enum Geometry {
 
 impl Geometry {
     /// Return the preset when this is a preset geometry.
+    #[must_use]
     pub const fn preset(&self) -> Option<Preset> {
         match self {
             Self::Preset(preset) => Some(*preset),
@@ -216,6 +234,7 @@ impl Geometry {
     }
 
     /// Borrow the custom geometry when this is custom.
+    #[must_use]
     pub fn custom(&self) -> Option<&CustomGeometry> {
         match self {
             Self::Preset(_) => None,
@@ -224,6 +243,7 @@ impl Geometry {
     }
 
     /// Move out the custom geometry when this is custom.
+    #[must_use]
     pub fn into_custom(self) -> Option<CustomGeometry> {
         match self {
             Self::Preset(_) => None,
@@ -261,7 +281,7 @@ pub struct NonVisual {
     pub locked: bool,
 }
 
-/// A DrawingML shape (`xdr:sp`), typically a text box.
+/// A `DrawingML` shape (`xdr:sp`), typically a text box.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Shape {
     /// Non-visual identity and flags.
@@ -377,10 +397,12 @@ pub struct UnknownAttribute {
 }
 
 impl UnknownAttribute {
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -406,10 +428,14 @@ pub struct UnknownElement {
 }
 
 impl UnknownElement {
+    /// # Errors
+    ///
+    /// Returns an error when the XML fragment is empty or exceeds the drawing limit.
     pub fn new(xml: impl Into<Vec<u8>>) -> Result<Self> {
         Self::from_xml(xml.into())
     }
 
+    #[must_use]
     pub fn as_xml(&self) -> &[u8] {
         &self.xml
     }
@@ -434,10 +460,12 @@ pub struct Opaque {
 }
 
 impl Opaque {
+    #[must_use]
     pub fn attributes(&self) -> &[UnknownAttribute] {
         &self.attributes
     }
 
+    #[must_use]
     pub fn elements(&self) -> &[UnknownElement] {
         &self.elements
     }
@@ -468,10 +496,12 @@ pub struct Unknown {
 }
 
 impl Unknown {
+    #[must_use]
     pub fn as_xml(&self) -> &[u8] {
         self.element.as_xml()
     }
 
+    #[must_use]
     pub fn element(&self) -> &UnknownElement {
         &self.element
     }
@@ -487,7 +517,7 @@ impl Unknown {
 /// are covered by the image and chart support.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Object {
-    /// A DrawingML shape or text box.
+    /// A `DrawingML` shape or text box.
     Shape(Shape),
     /// A connection shape.
     ConnectionShape(ConnectionShape),

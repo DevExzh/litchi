@@ -204,6 +204,7 @@
       "litchi-core"
     ],
     "litchi-spreadsheet-drawing": [
+      "litchi-core",
       "litchi-drawingml",
       "litchi-ooxml-common",
       "litchi-opc"

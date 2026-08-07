@@ -1,11 +1,9 @@
-//! Regression tests for typed SpreadsheetDrawing models and bounded codecs.
+#![allow(clippy::unwrap_used, reason = "test assertions require direct values")]
+
+//! Regression tests for typed `SpreadsheetDrawing` models and bounded codecs.
 
 use super::*;
 use litchi_drawingml::geom::Preset;
-use litchi_opc::BlobPart;
-use litchi_opc::PackURI;
-use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{OpcPackage, Part};
 use std::mem::size_of;
 
 const XDR: &str = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
@@ -14,10 +12,6 @@ const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_A: &str = "http://purl.oclc.org/ooxml/drawingml/main";
 const C: &str = "http://schemas.openxmlformats.org/drawingml/2006/chart";
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-
-const POI_TEXT_BOXES: &[u8] =
-    include_bytes!("../../../../test-data/poi/test-data/spreadsheet/45540_form_Header.xlsx");
 
 fn marker(col: u32, col_off: i64, row: u32, row_off: i64) -> String {
     format!(
@@ -57,7 +51,7 @@ fn text_box_shape() -> &'static str {
 #[test]
 fn parses_two_cell_text_box() {
     let xml = drawing(&two_cell_anchor(text_box_shape()));
-    let objects = parse_drawing_shapes(&xml).unwrap().unwrap();
+    let objects = read(&xml).unwrap().unwrap();
     assert_eq!(objects.len(), 1);
     let anchored = &objects[0];
     assert_eq!(
@@ -92,7 +86,7 @@ fn parses_two_cell_text_box() {
     assert_eq!(shape.preset(), Some(Preset::RoundRect));
     let body = shape.text_body.as_ref().unwrap();
     let properties = &body.properties;
-    assert_eq!(properties.insets.left.as_emu(), Some(182880));
+    assert_eq!(properties.insets.left.as_emu(), Some(182_880));
     assert_eq!(properties.insets.bottom.as_emu(), Some(91440));
     assert_eq!(properties.vertical_anchor, VerticalAnchor::Center);
     assert!(properties.anchor_center);
@@ -117,9 +111,9 @@ fn parses_two_cell_text_box() {
 
 #[test]
 fn preset_attributes_apply_xml_schema_token_whitespace() {
-    let shape =
+    let shape_xml =
         text_box_shape().replace("prst=\"roundRect\"", "prst=\" &#x9;roundRect&#xA;&#xD; \"");
-    let objects = parse_drawing_shapes(&drawing(&two_cell_anchor(&shape)))
+    let objects = read(&drawing(&two_cell_anchor(&shape_xml)))
         .unwrap()
         .unwrap();
     let Object::Shape(shape) = &objects[0].object else {
@@ -138,15 +132,15 @@ fn parses_one_cell_connection_shape() {
              <xdr:ext cx=\"914400\" cy=\"457200\"/>{object}<xdr:clientData/></xdr:oneCellAnchor>",
         marker(0, 0, 0, 0)
     );
-    let objects = parse_drawing_shapes(&drawing(&anchor)).unwrap().unwrap();
+    let objects = read(&drawing(&anchor)).unwrap().unwrap();
     assert_eq!(objects.len(), 1);
     assert_eq!(
         objects[0].anchor,
         Anchor::OneCell {
             from: CellMarker::default(),
             extent: EmuExtent {
-                width: Emu(914400),
-                height: Emu(457200),
+                width: Emu(914_400),
+                height: Emu(457_200),
             },
         }
     );
@@ -184,7 +178,7 @@ fn connection_custom_geometry_is_typed_and_exclusive() {
              <xdr:ext cx=\"914400\" cy=\"457200\"/>{object}<xdr:clientData/></xdr:oneCellAnchor>",
         marker(0, 0, 0, 0)
     );
-    let objects = parse_drawing_shapes(&drawing(&anchor)).unwrap().unwrap();
+    let objects = read(&drawing(&anchor)).unwrap().unwrap();
     let Object::ConnectionShape(connection) = &objects[0].object else {
         panic!("expected a connection shape");
     };
@@ -200,7 +194,7 @@ fn rejects_unknown_preset() {
         "<xdr:absoluteAnchor><xdr:pos x=\"123\" y=\"456\"/>\
              <xdr:ext cx=\"789\" cy=\"101\"/>{object}<xdr:clientData/></xdr:absoluteAnchor>"
     );
-    let error = parse_drawing_shapes(&drawing(&anchor)).unwrap_err();
+    let error = read(&drawing(&anchor)).unwrap_err();
     assert!(error.to_string().contains("vendorWeird"));
 }
 
@@ -212,10 +206,10 @@ fn rejects_missing_presets_and_invalid_text_domains() {
         "<xdr:absoluteAnchor><xdr:pos x=\"123\" y=\"456\"/>\
              <xdr:ext cx=\"789\" cy=\"101\"/>{missing}<xdr:clientData/></xdr:absoluteAnchor>"
     );
-    let error = parse_drawing_shapes(&drawing(&anchor)).unwrap_err();
+    let error = read(&drawing(&anchor)).unwrap_err();
     assert!(error.to_string().contains("missing required prst"));
 
-    assert!(parse_drawing_shapes(&drawing("<xdr:twoCellAnchor editAs=\"vendor\"/>")).is_err());
+    assert!(read(&drawing("<xdr:twoCellAnchor editAs=\"vendor\"/>")).is_err());
 
     for attribute in [
         "anchor=\"middle\"",
@@ -230,7 +224,7 @@ fn rejects_missing_presets_and_invalid_text_domains() {
                  </xdr:nvSpPr><xdr:txBody><a:bodyPr {attribute}/><a:p/></xdr:txBody></xdr:sp>"
         );
         assert!(
-            parse_drawing_shapes(&drawing(&two_cell_anchor(&object))).is_err(),
+            read(&drawing(&two_cell_anchor(&object))).is_err(),
             "accepted {attribute}"
         );
     }
@@ -242,7 +236,7 @@ fn rejects_missing_presets_and_invalid_text_domains() {
                  <a:t>x</a:t></a:r></a:p></xdr:txBody></xdr:sp>"
         );
         assert!(
-            parse_drawing_shapes(&drawing(&two_cell_anchor(&object))).is_err(),
+            read(&drawing(&two_cell_anchor(&object))).is_err(),
             "accepted {run_properties}"
         );
     }
@@ -257,22 +251,22 @@ fn rejects_competing_shape_geometries() {
         "<xdr:absoluteAnchor><xdr:pos x=\"123\" y=\"456\"/>\
              <xdr:ext cx=\"789\" cy=\"101\"/>{object}<xdr:clientData/></xdr:absoluteAnchor>"
     );
-    let error = parse_drawing_shapes(&drawing(&anchor)).unwrap_err();
+    let error = read(&drawing(&anchor)).unwrap_err();
     assert!(error.to_string().contains("competing"));
 }
 
 #[test]
 fn retains_unknown_objects_attributes_and_drawingml_children() {
-    let unknown = "<xdr:futureShape vendorFlag=\"1\"><xdr:futureChild/></xdr:futureShape>";
+    let unknown_xml = "<xdr:futureShape vendorFlag=\"1\"><xdr:futureChild/></xdr:futureShape>";
     let known = "<xdr:sp><xdr:nvSpPr><xdr:cNvPr id=\"4\" name=\"Known\" vendor=\"keep\"/>\
             <xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr><a:prstGeom prst=\"rect\"/>\
             <a:futureDrawingML vendor=\"keep\"><a:futureNested/></a:futureDrawingML></xdr:spPr></xdr:sp>";
     let xml = drawing(&format!(
         "{}{}",
-        two_cell_anchor(unknown),
+        two_cell_anchor(unknown_xml),
         two_cell_anchor(known)
     ));
-    let objects = parse_drawing_shapes(&xml).unwrap().unwrap();
+    let objects = read(&xml).unwrap().unwrap();
     assert_eq!(objects.len(), 2);
     let Object::Unknown(unknown) = &objects[0].object else {
         panic!("expected an unknown drawing object");
@@ -302,20 +296,20 @@ fn geometry_keeps_the_custom_payload_off_the_hot_path() {
 
 #[test]
 fn parses_nested_groups() {
-    let inner = "<xdr:sp><xdr:nvSpPr><xdr:cNvPr id=\"21\" name=\"Inner\"/><xdr:cNvSpPr/>\
+    let inner_xml = "<xdr:sp><xdr:nvSpPr><xdr:cNvPr id=\"21\" name=\"Inner\"/><xdr:cNvSpPr/>\
             </xdr:nvSpPr><xdr:spPr><a:prstGeom prst=\"ellipse\"/></xdr:spPr></xdr:sp>";
     let nested_group = "<xdr:grpSp><xdr:nvGrpSpPr><xdr:cNvPr id=\"22\" name=\"Nested\"/>\
              <xdr:cNvGrpSpPr><a:grpSpLocks noChangeAspect=\"1\"/></xdr:cNvGrpSpPr></xdr:nvGrpSpPr>\
              <xdr:grpSpPr/><xdr:sp><xdr:nvSpPr><xdr:cNvPr id=\"23\" name=\"Deep\"/><xdr:cNvSpPr/>\
              </xdr:nvSpPr><xdr:spPr/></xdr:sp></xdr:grpSp>"
         .to_string();
-    let group = format!(
+    let group_xml = format!(
         "<xdr:grpSp><xdr:nvGrpSpPr><xdr:cNvPr id=\"20\" name=\"Group\"/><xdr:cNvGrpSpPr/>\
              </xdr:nvGrpSpPr><xdr:grpSpPr><a:xfrm><a:off x=\"1\" y=\"2\"/><a:ext cx=\"3\" cy=\"4\"/>\
              <a:chOff x=\"5\" y=\"6\"/><a:chExt cx=\"7\" cy=\"8\"/></a:xfrm></xdr:grpSpPr>\
-             {inner}{nested_group}</xdr:grpSp>"
+             {inner_xml}{nested_group}</xdr:grpSp>"
     );
-    let objects = parse_drawing_shapes(&drawing(&two_cell_anchor(&group)))
+    let objects = read(&drawing(&two_cell_anchor(&group_xml)))
         .unwrap()
         .unwrap();
     let Object::Group(group) = &objects[0].object else {
@@ -360,7 +354,7 @@ fn skips_pictures_and_charts_but_keeps_ole_objects() {
         two_cell_anchor(chart),
         two_cell_anchor(ole)
     );
-    let objects = parse_drawing_shapes(&drawing(&body)).unwrap().unwrap();
+    let objects = read(&drawing(&body)).unwrap().unwrap();
     assert_eq!(objects.len(), 1);
     let Object::OleObject(ole_object) = &objects[0].object else {
         panic!("expected an OLE object");
@@ -383,7 +377,7 @@ fn rejects_unknown_ole_object_aspect() {
             r:id=\"rId7\"/></a:graphicData></a:graphic></xdr:graphicFrame>";
     let xml = drawing(&two_cell_anchor(ole));
 
-    let error = parse_drawing_shapes(&xml).unwrap_err();
+    let error = read(&xml).unwrap_err();
 
     assert!(error.to_string().contains("DVASPECT_THUMBNAIL"));
 }
@@ -406,7 +400,7 @@ fn parses_strict_namespace_dialect() {
         strict_marker(0, 0),
         strict_marker(1, 1)
     );
-    let objects = parse_drawing_shapes(&xml).unwrap().unwrap();
+    let objects = read(&xml).unwrap().unwrap();
     let Object::Shape(shape) = &objects[0].object else {
         panic!("expected a shape");
     };
@@ -425,18 +419,10 @@ fn parses_strict_namespace_dialect() {
 #[test]
 fn tolerates_empty_drawing_and_non_drawing_root() {
     let empty = drawing("");
-    assert_eq!(
-        parse_drawing_shapes(&empty).unwrap().unwrap(),
-        Vec::<AnchoredObject>::new()
-    );
+    assert_eq!(read(&empty).unwrap().unwrap(), Vec::<AnchoredObject>::new());
     let empty_root = format!("<xdr:wsDr xmlns:xdr=\"{XDR}\"/>");
-    assert!(
-        parse_drawing_shapes(&empty_root)
-            .unwrap()
-            .unwrap()
-            .is_empty()
-    );
-    assert!(parse_drawing_shapes("<other/>").unwrap().is_none());
+    assert!(read(&empty_root).unwrap().unwrap().is_empty());
+    assert!(read("<other/>").unwrap().is_none());
 }
 
 #[test]
@@ -489,115 +475,6 @@ fn rejects_malformed_drawings() {
             )),
         ];
     for xml in cases {
-        assert!(parse_drawing_shapes(&xml).is_err(), "accepted {xml}");
+        assert!(read(&xml).is_err(), "accepted {xml}");
     }
-}
-
-fn package_with_shapes(drawing_xml: &str) -> OpcPackage {
-    let mut package = OpcPackage::new();
-    let mut workbook_part = BlobPart::new(
-        PackURI::new("/xl/workbook.xml").unwrap(),
-        ct::SML_SHEET_MAIN.to_string(),
-        format!(
-            "<workbook xmlns=\"{SML}\" xmlns:r=\"{R}\">\
-                 <sheets><sheet name=\"Data\" sheetId=\"1\" r:id=\"rId1\"/>\
-                 <sheet name=\"Empty\" sheetId=\"2\" r:id=\"rId2\"/></sheets></workbook>"
-        )
-        .into_bytes(),
-    );
-    workbook_part.relate_to("worksheets/sheet1.xml", rt::WORKSHEET);
-    workbook_part.relate_to("worksheets/sheet2.xml", rt::WORKSHEET);
-    let mut sheet_part = BlobPart::new(
-        PackURI::new("/xl/worksheets/sheet1.xml").unwrap(),
-        ct::SML_WORKSHEET.to_string(),
-        format!("<worksheet xmlns=\"{SML}\"><sheetData/></worksheet>").into_bytes(),
-    );
-    sheet_part.relate_to("../drawings/drawing1.xml", rt::DRAWING);
-    package.relate_to(
-        "xl/workbook.xml",
-        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
-    );
-    package.add_part(Box::new(workbook_part));
-    package.add_part(Box::new(sheet_part));
-    package.add_part(Box::new(BlobPart::new(
-        PackURI::new("/xl/worksheets/sheet2.xml").unwrap(),
-        ct::SML_WORKSHEET.to_string(),
-        format!("<worksheet xmlns=\"{SML}\"><sheetData/></worksheet>").into_bytes(),
-    )));
-    package.add_part(Box::new(BlobPart::new(
-        PackURI::new("/xl/drawings/drawing1.xml").unwrap(),
-        ct::OFC_DRAWING.to_string(),
-        drawing_xml.as_bytes().to_vec(),
-    )));
-    package
-}
-
-#[test]
-fn loads_shapes_through_the_package_graph() {
-    let package = package_with_shapes(&drawing(&two_cell_anchor(text_box_shape())));
-    let shapes = load_sheet_shapes(&package, "Data").unwrap();
-    assert_eq!(shapes.worksheet_name, "Data");
-    assert_eq!(shapes.worksheet_part_name, "/xl/worksheets/sheet1.xml");
-    assert_eq!(shapes.objects.len(), 1);
-    let Object::Shape(shape) = &shapes.objects[0].object else {
-        panic!("expected a shape");
-    };
-    assert_eq!(shape.non_visual.name.as_deref(), Some("Text Box 7"));
-
-    // Worksheets without shapes are omitted from the workbook inventory.
-    let all = load_shapes(&package).unwrap();
-    assert_eq!(all.len(), 1);
-    assert_eq!(all[0].worksheet_name, "Data");
-    assert!(
-        load_sheet_shapes(&package, "Empty")
-            .unwrap()
-            .objects
-            .is_empty()
-    );
-    assert!(load_sheet_shapes(&package, "Missing").is_err());
-}
-
-#[cfg(any())]
-#[test]
-fn workbook_accessor_loads_shapes() {
-    let package = package_with_shapes(&drawing(&two_cell_anchor(text_box_shape())));
-    let workbook = crate::workbook::Workbook::from_package(package).unwrap();
-    let shapes = workbook.shapes_on_sheet("Data").unwrap();
-    assert_eq!(shapes.objects.len(), 1);
-    assert!(workbook.shapes_on_sheet("Missing").is_err());
-}
-
-#[test]
-fn poi_fixture_text_boxes_parse() {
-    let package = OpcPackage::from_bytes(POI_TEXT_BOXES).unwrap();
-    let all = load_shapes(&package).unwrap();
-    let names: Vec<_> = all
-        .iter()
-        .flat_map(|sheet| sheet.objects.iter())
-        .filter_map(|anchored| match &anchored.object {
-            Object::Shape(shape) => Some(shape),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(names.len(), 4);
-    let text_box = names
-        .iter()
-        .find(|shape| shape.non_visual.name.as_deref() == Some("Text Box 35"))
-        .unwrap();
-    assert!(text_box.is_text_box);
-    assert!(text_box.non_visual.locked);
-    assert!(!text_box.non_visual.hidden);
-    assert_eq!(text_box.preset(), Some(Preset::Rect));
-    let body = text_box.text_body.as_ref().unwrap();
-    assert_eq!(body.properties.insets.left.as_emu(), Some(27432));
-    assert_eq!(body.text(), "State-Owned Enterprise");
-    let run = &body.paragraphs[0].runs[0];
-    assert_eq!(run.bold, Some(false));
-    assert_eq!(run.font_size.map(TextSize::get), Some(900));
-    // All four fixture text boxes anchor with two-cell anchors.
-    assert!(
-        all.iter()
-            .flat_map(|sheet| sheet.objects.iter())
-            .all(|anchored| matches!(anchored.anchor, Anchor::TwoCell { .. }))
-    );
 }

@@ -340,7 +340,7 @@ impl Workbook {
         let drawing_xml = std::str::from_utf8(drawing_part.blob()).map_err(|error| {
             crate::package::error::Error::Encoding(format!("Drawings part is not UTF-8: {error}"))
         })?;
-        let shapes = crate::shapes::parse_drawing_shapes(drawing_xml)?.unwrap_or_default();
+        let shapes = crate::shapes::read(drawing_xml)?.unwrap_or_default();
         let drawing = crate::package::drawing::parse_drawing_part(drawing_part.blob())?;
         let mut charts = Vec::new();
         let mut images = Vec::new();

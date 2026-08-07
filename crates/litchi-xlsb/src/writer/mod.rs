@@ -71,12 +71,12 @@ pub use crate::external_link::{
 pub use crate::package::drawing_image::{Image, ImageFormat};
 pub use crate::pivot_view::Part;
 pub use crate::shapes::{
-    Autofit, Body, CellMarker, Columns, Coordinate32, Direction, EditAs, Emu, EmuExtent, EmuOffset,
-    Geometry, GroupTransform, Insets, Paragraph, Preset, Properties, Run, ShapeAnchor, TextSize,
+    Anchor, Autofit, Body, CellMarker, Columns, Coordinate32, Direction, EditAs, Emu, EmuExtent,
+    EmuOffset, Geometry, GroupTransform, Insets, Paragraph, Preset, Properties, Run, TextSize,
     Underline, VerticalAnchor, Wrap,
 };
 pub use chartsheet::MutableChartSheet;
-pub use shape::{ConnectionEndSpec, ConnectionShapeSpec, DrawingObjectSpec, GroupSpec, ShapeSpec};
+pub use shape::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ObjectSpec, ShapeSpec};
 pub use shared_strings::MutableSharedStringsWriter;
 pub use styles::{DxfStyle, StylesWriter};
 pub use workbook::WorkbookWriter;

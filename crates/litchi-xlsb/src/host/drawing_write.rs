@@ -6,7 +6,7 @@
 use crate::chart::Chart;
 use crate::package::error::{Error, Result};
 use crate::writer::Image;
-use crate::writer::shape::{ConnectionShapeSpec, GroupSpec, ShapeEmitter, ShapeSpec};
+use crate::writer::shape::{ConnectionShapeSpec, Emitter, GroupSpec, ShapeSpec};
 use litchi_core::xml::escape_xml;
 use std::fmt::Write as _;
 
@@ -94,56 +94,30 @@ pub(crate) fn serialize_drawing(
         ensure_drawing_size(xml.len())?;
     }
     crate::chart::anchor::write_all(&mut xml, charts, images.len(), images.len())?;
-    let mut object_count = 0usize;
-    for shape in shapes {
-        shape
-            .validate(object_count)
-            .map_err(Error::InvalidFormula)?;
-        object_count += 1;
-    }
-    for group in groups {
-        group
-            .validate(object_count)
-            .map_err(Error::InvalidFormula)?;
-        object_count += 1;
-    }
-    for connection in connections {
-        connection
-            .validate(object_count)
-            .map_err(Error::InvalidFormula)?;
-        object_count += 1;
-    }
     let first_shape_id = images
         .len()
         .checked_add(charts.len())
         .and_then(|count| count.checked_add(1))
         .and_then(|id| u32::try_from(id).ok())
         .ok_or_else(|| Error::InvalidFormula("worksheet drawing object ID overflow".to_string()))?;
-    let mut emitter = ShapeEmitter::for_objects(first_shape_id, shapes, groups, connections)
-        .map_err(Error::InvalidFormula)?;
+    let mut emitter = Emitter::for_objects(first_shape_id, shapes, groups, connections)?;
     for shape in shapes {
-        emitter
-            .write_anchored_shape(&mut xml, shape)
-            .map_err(Error::InvalidFormula)?;
+        emitter.write_anchored_shape(&mut xml, shape)?;
         ensure_drawing_size(xml.len())?;
     }
     for group in groups {
-        emitter
-            .write_anchored_group(&mut xml, group)
-            .map_err(Error::InvalidFormula)?;
+        emitter.write_anchored_group(&mut xml, group)?;
         ensure_drawing_size(xml.len())?;
     }
     for connection in connections {
-        emitter
-            .write_anchored_connection(&mut xml, connection)
-            .map_err(Error::InvalidFormula)?;
+        emitter.write_anchored_connection(&mut xml, connection)?;
         ensure_drawing_size(xml.len())?;
     }
     xml.push_str("</xdr:wsDr>");
     ensure_drawing_size(xml.len())?;
     // The detailed shared reader verifies the complete shape/group/connector
     // grammar in addition to the lightweight XLSB drawing inventory below.
-    crate::shapes::parse_drawing_shapes(&xml)?
+    crate::shapes::read(&xml)?
         .ok_or_else(|| Error::Encoding("authored drawing lacks an xdr:wsDr root".to_string()))?;
     let bytes = xml.into_bytes();
     // The XLSB drawing inventory reader is the package-load oracle.

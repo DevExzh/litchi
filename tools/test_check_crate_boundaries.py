@@ -171,6 +171,7 @@ class BoundaryPolicyTests(unittest.TestCase):
     def test_spreadsheet_drawing_owner_and_host_edges_are_canonical(self) -> None:
         owner = "litchi-spreadsheet-drawing"
         dependencies = {
+            "litchi-core",
             "litchi-drawingml",
             "litchi-ooxml-common",
             "litchi-opc",
@@ -417,6 +418,127 @@ class BoundaryPolicyTests(unittest.TestCase):
                     "crates/litchi-xlsb/src/chart.rs:1",
                     "litchi-xlsx chart facade directly uses litchi_drawingml chart codec: "
                     "crates/litchi-xlsx/src/chart.rs:1",
+                ],
+            )
+
+    def test_retired_xlsx_shape_owner_sources_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for retired in boundaries.RETIRED_XLSX_SHAPE_FILES:
+                path = root / boundaries.XLSX_SOURCE_ROOT / retired
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("// retired owner\n", encoding="utf-8")
+
+            violations = boundaries.audit_spreadsheet_shape_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "retired XLSX shape owner source returned: "
+                    f"{boundaries.XLSX_SOURCE_ROOT / retired}"
+                    for retired in boundaries.RETIRED_XLSX_SHAPE_FILES
+                ],
+            )
+
+    def test_spreadsheet_shape_facades_must_remain_thin(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for facades in boundaries.SPREADSHEET_SHAPE_FACADES.values():
+                path = root / facades[0]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "// facade\n"
+                    * (boundaries.MAX_SPREADSHEET_SHAPE_FACADE_LINES + 1),
+                    encoding="utf-8",
+                )
+
+            violations = boundaries.audit_spreadsheet_shape_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "litchi-xlsb shape facade exceeds "
+                    f"{boundaries.MAX_SPREADSHEET_SHAPE_FACADE_LINES} lines: "
+                    "crates/litchi-xlsb/src/shapes.rs",
+                    "litchi-xlsx shape facade exceeds "
+                    f"{boundaries.MAX_SPREADSHEET_SHAPE_FACADE_LINES} lines: "
+                    "crates/litchi-xlsx/src/shapes/mod.rs",
+                ],
+            )
+
+    def test_shape_facades_cannot_define_local_types(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for host, facades in boundaries.SPREADSHEET_SHAPE_FACADES.items():
+                path = root / facades[0]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("pub struct Shape;\n", encoding="utf-8")
+
+            violations = boundaries.audit_spreadsheet_shape_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "litchi-xlsb shape facade defines local shape type: "
+                    "crates/litchi-xlsb/src/shapes.rs:1",
+                    "litchi-xlsx shape facade defines local shape type: "
+                    "crates/litchi-xlsx/src/shapes/mod.rs:1",
+                ],
+            )
+
+    def test_shape_facades_cannot_directly_use_xml_implementation_details(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for facades in boundaries.SPREADSHEET_SHAPE_FACADES.values():
+                path = root / facades[0]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "use quick_xml::Reader;\nwrite(\"<xdr:wsDr>\");\n",
+                    encoding="utf-8",
+                )
+
+            violations = boundaries.audit_spreadsheet_shape_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "litchi-xlsb shape facade directly emits xdr XML: "
+                    "crates/litchi-xlsb/src/shapes.rs:2",
+                    "litchi-xlsb shape facade directly uses quick_xml: "
+                    "crates/litchi-xlsb/src/shapes.rs:1",
+                    "litchi-xlsx shape facade directly emits xdr XML: "
+                    "crates/litchi-xlsx/src/shapes/mod.rs:2",
+                    "litchi-xlsx shape facade directly uses quick_xml: "
+                    "crates/litchi-xlsx/src/shapes/mod.rs:1",
+                ],
+            )
+
+    def test_legacy_host_shape_names_are_forbidden(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for host, source_root in (
+                ("litchi-xlsb", boundaries.XLSB_SOURCE_ROOT),
+                ("litchi-xlsx", boundaries.XLSX_SOURCE_ROOT),
+            ):
+                path = root / source_root / "shape_host.rs"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "\n".join(boundaries.LEGACY_HOST_SHAPE_NAMES) + "\n",
+                    encoding="utf-8",
+                )
+
+            violations = boundaries.audit_spreadsheet_shape_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    f"{host} legacy shape host name {name}: "
+                    f"{source_root}/shape_host.rs:{index}"
+                    for host, source_root in (
+                        ("litchi-xlsb", boundaries.XLSB_SOURCE_ROOT),
+                        ("litchi-xlsx", boundaries.XLSX_SOURCE_ROOT),
+                    )
+                    for index, name in enumerate(boundaries.LEGACY_HOST_SHAPE_NAMES, start=1)
                 ],
             )
 

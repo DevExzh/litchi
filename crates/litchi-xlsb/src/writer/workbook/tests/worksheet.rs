@@ -1044,7 +1044,7 @@ fn worksheet_chart_validation_and_crud_are_lossless_or_refuse() {
 fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
     use crate::chart::{Anchor, Chart};
     use crate::package::drawing::{AnchorKind, Object};
-    use crate::shapes::{DrawingObject, Emu, EmuExtent, EmuOffset, Preset, ShapeAnchor};
+    use crate::shapes::{Anchor as ObjectAnchor, Emu, EmuExtent, EmuOffset, Preset};
     use crate::writer::{Image, ImageFormat};
 
     const PNG_1X1: &[u8] = &[
@@ -1083,7 +1083,7 @@ fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
     sheet
         .add_text_box(
             "Caption",
-            ShapeAnchor::Absolute {
+            ObjectAnchor::Absolute {
                 position: EmuOffset {
                     x: Emu(100_000),
                     y: Emu(100_000),
@@ -1124,7 +1124,7 @@ fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
     assert_eq!(drawing.charts[0].rel_id, "rId3");
     assert_eq!(drawing.drawing.anchors.len(), 4);
     assert_eq!(drawing.shapes.len(), 1);
-    let DrawingObject::Shape(caption) = &drawing.shapes[0].object else {
+    let crate::shapes::Object::Shape(caption) = &drawing.shapes[0].object else {
         panic!("expected mixed-drawing caption");
     };
     assert_eq!(caption.non_visual.id, Some(4));
@@ -1236,8 +1236,8 @@ fn worksheet_image_validation_and_crud_are_lossless_or_refuse() {
 #[test]
 fn worksheet_shapes_groups_and_connectors_round_trip() {
     use crate::shapes::{
-        CellMarker, DrawingObject, EditAs, Emu, EmuExtent, EmuOffset, GroupTransform, Preset,
-        ShapeAnchor, TextSize,
+        Anchor, CellMarker, EditAs, Emu, EmuExtent, EmuOffset, GroupTransform, Object, Preset,
+        TextSize,
     };
     use crate::writer::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ShapeSpec};
 
@@ -1250,12 +1250,12 @@ fn worksheet_shapes_groups_and_connectors_round_trip() {
         }
     }
 
-    let two_cell = ShapeAnchor::TwoCell {
+    let two_cell = Anchor::TwoCell {
         from: marker(0, 0),
         to: marker(3, 4),
         edit_as: EditAs::OneCell,
     };
-    let child_anchor = ShapeAnchor::TwoCell {
+    let child_anchor = Anchor::TwoCell {
         from: marker(0, 0),
         to: marker(1, 1),
         edit_as: EditAs::TwoCell,
@@ -1265,7 +1265,7 @@ fn worksheet_shapes_groups_and_connectors_round_trip() {
     standalone.paragraphs[0].runs[0].bold = Some(true);
     standalone.paragraphs[0].runs[0].font_size = Some(TextSize::new(1_400).unwrap());
 
-    let group_anchor = ShapeAnchor::OneCell {
+    let group_anchor = Anchor::OneCell {
         from: marker(4, 1),
         extent: EmuExtent {
             width: Emu(4_000_000),
@@ -1296,7 +1296,7 @@ fn worksheet_shapes_groups_and_connectors_round_trip() {
 
     let connection = ConnectionShapeSpec::new(
         "Bridge",
-        ShapeAnchor::Absolute {
+        Anchor::Absolute {
             position: EmuOffset {
                 x: Emu(500_000),
                 y: Emu(500_000),
@@ -1333,7 +1333,7 @@ fn worksheet_shapes_groups_and_connectors_round_trip() {
     assert_eq!(drawing.drawing.anchors.len(), 3);
     assert_eq!(drawing.shapes.len(), 3);
 
-    let DrawingObject::Shape(shape) = &drawing.shapes[0].object else {
+    let Object::Shape(shape) = &drawing.shapes[0].object else {
         panic!("expected standalone shape");
     };
     assert_eq!(shape.non_visual.id, Some(1));
@@ -1348,21 +1348,21 @@ fn worksheet_shapes_groups_and_connectors_round_trip() {
         Some(true)
     );
 
-    let DrawingObject::Group(group) = &drawing.shapes[1].object else {
+    let Object::Group(group) = &drawing.shapes[1].object else {
         panic!("expected shape group");
     };
     assert_eq!(group.non_visual.id, Some(2));
     assert_eq!(group.children.len(), 2);
-    let DrawingObject::Shape(left) = &group.children[0] else {
+    let Object::Shape(left) = &group.children[0] else {
         panic!("expected left group child");
     };
-    let DrawingObject::Shape(right) = &group.children[1] else {
+    let Object::Shape(right) = &group.children[1] else {
         panic!("expected right group child");
     };
     assert_eq!(left.non_visual.id, Some(3));
     assert_eq!(right.non_visual.id, Some(4));
 
-    let DrawingObject::ConnectionShape(connection) = &drawing.shapes[2].object else {
+    let Object::ConnectionShape(connection) = &drawing.shapes[2].object else {
         panic!("expected connection shape");
     };
     assert_eq!(connection.non_visual.id, Some(5));
@@ -1379,17 +1379,17 @@ fn worksheet_shapes_groups_and_connectors_round_trip() {
 
 #[test]
 fn worksheet_shape_crud_and_save_validation_are_lossless_or_refuse() {
-    use crate::shapes::{CellMarker, Columns, EditAs, Emu, Preset, ShapeAnchor, TextSize};
+    use crate::shapes::{Anchor, CellMarker, Columns, EditAs, Emu, Preset, TextSize};
     use crate::writer::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ShapeSpec};
 
-    fn anchor(from: (u32, u32), to: (u32, u32)) -> ShapeAnchor {
+    fn anchor(from: (u32, u32), to: (u32, u32)) -> Anchor {
         let marker = |(column, row)| CellMarker {
             column,
             row,
             column_offset: Emu(0),
             row_offset: Emu(0),
         };
-        ShapeAnchor::TwoCell {
+        Anchor::TwoCell {
             from: marker(from),
             to: marker(to),
             edit_as: EditAs::TwoCell,

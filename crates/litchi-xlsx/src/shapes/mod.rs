@@ -1,16 +1,9 @@
-//! Semantic SpreadsheetDrawing shape ownership.
+//! Semantic SpreadsheetDrawing shape facade.
 //!
-//! Typed contextual values live in model, bounded XML parsing lives in codec,
-//! package relationship traversal lives in package, and focused regression
-//! coverage lives in tests.
+//! The shared owner provides the bounded XML grammar and semantic model;
+//! this host retains only workbook/package relationship traversal.
 
-mod codec;
-mod model;
 mod package;
 
-#[cfg(test)]
-mod tests;
-
-pub use codec::parse_drawing_shapes;
-pub use model::*;
+pub use litchi_spreadsheet_drawing::shape::*;
 pub use package::{load_shapes, load_sheet_shapes};

@@ -27,9 +27,8 @@ pub(super) fn xml_error(error: impl std::fmt::Display) -> Error {
 
 pub use codec::{parse_ole_objects, write_ole_objects};
 pub use model::{
-    OleObject, OleObjectAnchor, OleObjectAspect, OleObjectConformance, OleObjectMarker,
-    OleObjectProperties, OleObjectRelationshipKind, OleObjectResource, OleObjectTarget,
-    OleObjectUpdate, OleObjects,
+    Aspect, OleObject, OleObjectAnchor, OleObjectConformance, OleObjectMarker, OleObjectProperties,
+    OleObjectRelationshipKind, OleObjectResource, OleObjectTarget, OleObjectUpdate, OleObjects,
 };
 pub use package::{load_ole_objects, store_ole_objects};
 pub use patch::{Commit, Patch};

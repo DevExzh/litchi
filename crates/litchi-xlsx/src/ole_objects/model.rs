@@ -71,14 +71,14 @@ impl OleObjectConformance {
 
 /// How an OLE object is represented when rendered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum OleObjectAspect {
+pub enum Aspect {
     /// Render the embedded object's content (`DVASPECT_CONTENT`).
     Content,
     /// Render the embedded object's icon (`DVASPECT_ICON`).
     Icon,
 }
 
-impl OleObjectAspect {
+impl Aspect {
     /// Return the exact SpreadsheetML token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
@@ -89,7 +89,7 @@ impl OleObjectAspect {
     }
 }
 
-impl FromStr for OleObjectAspect {
+impl FromStr for Aspect {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
@@ -101,7 +101,7 @@ impl FromStr for OleObjectAspect {
     }
 }
 
-impl TryFrom<&str> for OleObjectAspect {
+impl TryFrom<&str> for Aspect {
     type Error = Error;
 
     fn try_from(value: &str) -> Result<Self> {
@@ -109,7 +109,7 @@ impl TryFrom<&str> for OleObjectAspect {
     }
 }
 
-impl fmt::Display for OleObjectAspect {
+impl fmt::Display for Aspect {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(self.as_str())
     }
@@ -207,7 +207,7 @@ pub struct OleObjectProperties {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OleObject {
     pub program_id: Option<String>,
-    pub data_or_view_aspect: Option<OleObjectAspect>,
+    pub data_or_view_aspect: Option<Aspect>,
     pub link: Option<String>,
     pub update: Option<OleObjectUpdate>,
     pub auto_load: Option<bool>,

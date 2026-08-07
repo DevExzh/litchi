@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 pub mod chart;
+pub mod shape;
 
 use thiserror::Error;
 
@@ -19,6 +20,12 @@ pub enum Error {
     /// XML or byte encoding could not be decoded or emitted.
     #[error("SpreadsheetML drawing encoding error: {0}")]
     Encoding(String),
+    /// Markup-compatibility preprocessing failed while reading drawing XML.
+    #[error("SpreadsheetML drawing markup compatibility error: {0}")]
+    Mce(#[from] litchi_ooxml_common::mce::Error),
+    /// Shared OOXML attribute or character-reference decoding failed.
+    #[error("SpreadsheetML drawing XML error: {0}")]
+    Xml(#[from] litchi_ooxml_common::XmlError),
     /// `DrawingML` chart decoding or validation failed.
     #[error("DrawingML error: {0}")]
     Drawing(#[from] litchi_drawingml::Error),

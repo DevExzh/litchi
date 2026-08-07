@@ -67,7 +67,7 @@ fn parse_object(node: &Node, conformance: OleObjectConformance) -> Result<OleObj
     }
     let program_id = optional(node, "", "progId").map(str::to_owned);
     let data_or_view_aspect = optional(node, "", "dvAspect")
-        .map(OleObjectAspect::try_from)
+        .map(Aspect::try_from)
         .transpose()?;
     let link = optional(node, "", "link").map(str::to_owned);
     let update = optional(node, "", "oleUpdate")
@@ -350,12 +350,8 @@ pub(super) fn patch_ole_objects_source(
             &mut edits,
             object_elements.as_slice(),
             "dvAspect",
-            before_object
-                .data_or_view_aspect
-                .map(OleObjectAspect::as_str),
-            after_object
-                .data_or_view_aspect
-                .map(OleObjectAspect::as_str),
+            before_object.data_or_view_aspect.map(Aspect::as_str),
+            after_object.data_or_view_aspect.map(Aspect::as_str),
         )?;
         patch_optional_attribute(
             source,

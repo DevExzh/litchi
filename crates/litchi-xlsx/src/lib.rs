@@ -131,10 +131,9 @@ pub use named_sheet_view::{
     store_worksheet_named_sheet_views, write_named_sheet_views,
 };
 pub use ole_objects::{
-    OleObject, OleObjectAnchor, OleObjectAspect, OleObjectConformance, OleObjectMarker,
-    OleObjectProperties, OleObjectRelationshipKind, OleObjectResource, OleObjectTarget,
-    OleObjectUpdate, OleObjects, load_ole_objects, parse_ole_objects, store_ole_objects,
-    write_ole_objects,
+    Aspect, OleObject, OleObjectAnchor, OleObjectConformance, OleObjectMarker, OleObjectProperties,
+    OleObjectRelationshipKind, OleObjectResource, OleObjectTarget, OleObjectUpdate, OleObjects,
+    load_ole_objects, parse_ole_objects, store_ole_objects, write_ole_objects,
 };
 pub use outline::{Outline, OutlineAt};
 pub use outline_properties::{OutlineProperties, parse_outline_properties};

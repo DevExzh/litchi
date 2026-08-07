@@ -80,6 +80,38 @@ DRAWINGML_CHART_CODEC = re.compile(
     r"reader|writer|read_chart|write_chart|ChartReader|ChartWriter)\b"
 )
 MAX_SPREADSHEET_CHART_FACADE_LINES = 200
+RETIRED_XLSX_SHAPE_FILES = (
+    Path("shapes/codec.rs"),
+    Path("shapes/model.rs"),
+    Path("shapes/tests.rs"),
+)
+SPREADSHEET_SHAPE_FACADES = {
+    "litchi-xlsb": (
+        XLSB_SOURCE_ROOT / "shapes.rs",
+        XLSB_SOURCE_ROOT / "writer/shape.rs",
+    ),
+    "litchi-xlsx": (
+        XLSX_SOURCE_ROOT / "shapes/mod.rs",
+        XLSX_SOURCE_ROOT / "writer/shape.rs",
+    ),
+}
+MAX_SPREADSHEET_SHAPE_FACADE_LINES = 200
+LEGACY_HOST_SHAPE_NAMES = (
+    "DrawingObject",
+    "DrawingObjectSpec",
+    "DrawingOleObject",
+    "OleObjectAspect",
+    "ShapeAnchor",
+    "ShapeEmitter",
+)
+LOCAL_HOST_SHAPE_TYPE = re.compile(
+    r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:struct|enum|type|union)\s+\w+\b"
+)
+LEGACY_HOST_SHAPE_NAME = re.compile(
+    r"\b(?:" + "|".join(LEGACY_HOST_SHAPE_NAMES) + r")\b"
+)
+QUICK_XML_USE = re.compile(r"\bquick_xml\b")
+XDR_XML_EMISSION = re.compile(r"(?<![A-Za-z0-9_])xdr:")
 
 
 @dataclass(frozen=True, order=True)
@@ -660,6 +692,66 @@ def audit_spreadsheet_chart_source_topology(root: Path = ROOT) -> list[str]:
     return sorted(set(violations))
 
 
+def audit_spreadsheet_shape_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep canonical spreadsheet-shape ownership out of OOXML format hosts."""
+
+    violations: list[str] = []
+    for retired in RETIRED_XLSX_SHAPE_FILES:
+        path = root / XLSX_SOURCE_ROOT / retired
+        if path.exists():
+            violations.append(
+                "retired XLSX shape owner source returned: "
+                + str(path.relative_to(root))
+            )
+
+    for host, facades in SPREADSHEET_SHAPE_FACADES.items():
+        for path in facades:
+            absolute_path = root / path
+            if not absolute_path.is_file():
+                continue
+            lines = absolute_path.read_text(encoding="utf-8").splitlines()
+            if len(lines) > MAX_SPREADSHEET_SHAPE_FACADE_LINES:
+                violations.append(
+                    f"{host} shape facade exceeds "
+                    f"{MAX_SPREADSHEET_SHAPE_FACADE_LINES} lines: {path}"
+                )
+            for line_number, line in enumerate(lines, start=1):
+                if LOCAL_HOST_SHAPE_TYPE.match(line):
+                    violations.append(
+                        f"{host} shape facade defines local shape type: "
+                        f"{path}:{line_number}"
+                    )
+                if QUICK_XML_USE.search(line):
+                    violations.append(
+                        f"{host} shape facade directly uses quick_xml: "
+                        f"{path}:{line_number}"
+                    )
+                if XDR_XML_EMISSION.search(line):
+                    violations.append(
+                        f"{host} shape facade directly emits xdr XML: "
+                        f"{path}:{line_number}"
+                    )
+
+    for host, source_root in (
+        ("litchi-xlsb", XLSB_SOURCE_ROOT),
+        ("litchi-xlsx", XLSX_SOURCE_ROOT),
+    ):
+        absolute_source_root = root / source_root
+        if not absolute_source_root.is_dir():
+            continue
+        for path in sorted(absolute_source_root.rglob("*.rs")):
+            for line_number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), start=1
+            ):
+                for match in LEGACY_HOST_SHAPE_NAME.finditer(line):
+                    violations.append(
+                        f"{host} legacy shape host name {match.group(0)}: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+
+    return sorted(set(violations))
+
+
 def debt_report(policy: Policy, explain: bool) -> list[str]:
     lines = ["ordered migration debt:"]
     items: list[tuple[int, str, str, str]] = []
@@ -710,6 +802,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_snapshot(snapshot, policy)
         + audit_xlsb_source_topology()
         + audit_spreadsheet_chart_source_topology()
+        + audit_spreadsheet_shape_source_topology()
     )
     if violations:
         for violation in sorted(set(violations)):

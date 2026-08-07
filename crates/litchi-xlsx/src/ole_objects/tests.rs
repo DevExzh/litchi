@@ -18,7 +18,7 @@ fn value() -> OleObjects {
     OleObjects {
         objects: vec![OleObject {
             program_id: Some("Package.2".into()),
-            data_or_view_aspect: Some(OleObjectAspect::Icon),
+            data_or_view_aspect: Some(Aspect::Icon),
             link: None,
             update: Some(OleObjectUpdate::OnCall),
             auto_load: Some(false),

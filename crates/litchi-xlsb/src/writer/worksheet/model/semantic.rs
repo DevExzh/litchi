@@ -884,7 +884,7 @@ impl MutableWorksheet {
     pub fn add_shape(&mut self, shape: crate::writer::ShapeSpec) -> Result<()> {
         shape
             .validate(self.drawing_shape_count())
-            .map_err(Error::InvalidFormula)?;
+            .map_err(|error| Error::InvalidFormula(error.to_string()))?;
         self.shapes.push(shape);
         Ok(())
     }
@@ -893,7 +893,7 @@ impl MutableWorksheet {
     pub fn add_text_box(
         &mut self,
         name: impl Into<String>,
-        anchor: crate::shapes::ShapeAnchor,
+        anchor: crate::shapes::Anchor,
         preset: crate::shapes::Preset,
         text: &str,
     ) -> Result<()> {
@@ -924,7 +924,7 @@ impl MutableWorksheet {
     pub fn add_group(&mut self, group: crate::writer::GroupSpec) -> Result<()> {
         group
             .validate(self.drawing_shape_count())
-            .map_err(Error::InvalidFormula)?;
+            .map_err(|error| Error::InvalidFormula(error.to_string()))?;
         self.groups.push(group);
         Ok(())
     }
@@ -951,7 +951,7 @@ impl MutableWorksheet {
     pub fn add_connection(&mut self, connection: crate::writer::ConnectionShapeSpec) -> Result<()> {
         connection
             .validate(self.drawing_shape_count())
-            .map_err(Error::InvalidFormula)?;
+            .map_err(|error| Error::InvalidFormula(error.to_string()))?;
         self.connections.push(connection);
         Ok(())
     }

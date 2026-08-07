@@ -1,4 +1,16 @@
-//! Bounded SpreadsheetDrawingML XML codec.
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    clippy::map_err_ignore,
+    clippy::match_same_arms,
+    clippy::shadow_reuse,
+    clippy::similar_names,
+    clippy::too_many_lines,
+    clippy::wildcard_enum_match_arm,
+    clippy::wildcard_imports,
+    reason = "The streaming parser keeps its grammar and stable diagnostics together."
+)]
+
+//! Bounded `SpreadsheetDrawingML` XML codec.
 //!
 //! Parsing is inert and namespace-aware. Every source is subject to byte,
 //! depth, text, object, group, and anchor budgets; unmodeled fragments are
@@ -13,10 +25,10 @@ use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 use quick_xml::writer::Writer;
 
-use crate::error::{Error, Result};
-use crate::raw::namespace::relationship_attribute_value;
+use crate::{Error, Result};
 use litchi_drawingml::geometry::reader::{CustomGeometryBuilder, GeometryElement};
 use litchi_drawingml::text::parse_bool;
+use litchi_ooxml_common::relationships::attribute_value;
 use litchi_ooxml_common::xml::{
     decode_xml_reference, is_drawingml_name, unqualified_attribute_value, xsd_token_atom,
 };
@@ -28,18 +40,33 @@ const SPREADSHEET_DRAWING_NAMESPACE: &[u8] =
 const STRICT_SPREADSHEET_DRAWING_NAMESPACE: &[u8] =
     b"http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing";
 
-/// Parse one SpreadsheetDrawing part into its anchored shape inventory.
+/// Parse one `SpreadsheetDrawing` part into its anchored shape inventory.
 ///
 /// Returns `Ok(None)` when the part has no `xdr:wsDr` root. Markup-
 /// compatibility processing is applied so `mc:AlternateContent` fallbacks
 /// resolve before parsing. Pictures and chart graphic frames are skipped;
 /// structurally invalid anchors are errors.
-pub fn parse_drawing_shapes(xml: &str) -> Result<Option<Vec<AnchoredObject>>> {
+///
+/// # Errors
+///
+/// Returns an error for malformed XML, invalid drawing markup, or configured limits.
+pub fn read(xml: &str) -> Result<Option<Vec<AnchoredObject>>> {
     if xml.len() > MAX_DRAWING_PART_BYTES {
         return Err(limit("drawing part bytes"));
     }
     let xml = litchi_ooxml_common::mce::process_str(xml)?;
     Parser::parse(xml.as_ref())
+}
+
+/// Decode a relationship-namespace attribute while rejecting duplicates.
+fn relationship_attribute_value(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<Option<String>> {
+    attribute_value(element, name, decoder, resolver)
+        .map_err(|error| Error::Invalid(error.to_string()))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -445,7 +472,10 @@ impl Parser {
         self.attach_object(object)
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "The parser grammar is intentionally kept in one exhaustive dispatch function."
+    )]
     fn start(
         &mut self,
         parent: Context,
@@ -910,7 +940,7 @@ impl Parser {
         Ok(Context::CustomGeometry(GeometryElement::CustomGeometry))
     }
 
-    /// Route one DrawingML child of the custom geometry subtree into the
+    /// Route one `DrawingML` child of the custom geometry subtree into the
     /// geometry builder; unknown children are skipped inertly.
     fn open_geometry_child(
         &mut self,
