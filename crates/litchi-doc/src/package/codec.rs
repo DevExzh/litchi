@@ -254,4 +254,35 @@ impl<R: Read + Seek> Package<R> {
             .document_summary_information()?
             .and_then(|stream| stream.section(USER_DEFINED_PROPERTIES_FMTID).cloned()))
     }
+
+    /// Reads inert `_PID_HLINKS` metadata and discovers DOC field-begin candidates.
+    ///
+    /// Stored targets and locations remain opaque strings. This method never
+    /// resolves, opens, normalizes, evaluates, or executes linked content.
+    /// Numeric `dwApp` matches are exposed only as
+    /// [`crate::HyperlinkAssociation::FieldCandidates`]; callers must use
+    /// [`crate::UserDefinedHyperlink::resolve_field`] to prove a `Field`
+    /// association before it can be reordered for writing.
+    pub fn user_defined_hyperlinks(&mut self) -> Result<Option<crate::UserDefinedHyperlinks>> {
+        self.user_defined_hyperlinks_with_limits(crate::user_defined_hyperlinks::Limits::default())
+    }
+
+    /// Reads inert `_PID_HLINKS` metadata with explicit shared overlay limits.
+    ///
+    /// Limits apply after generic property-set parsing and bound only the
+    /// reserved metadata overlay. Targets and locations remain opaque strings.
+    pub fn user_defined_hyperlinks_with_limits(
+        &mut self,
+        limits: crate::user_defined_hyperlinks::Limits,
+    ) -> Result<Option<crate::UserDefinedHyperlinks>> {
+        let Some(section) = self.user_defined_properties()? else {
+            return Ok(None);
+        };
+        let document = self.document()?;
+        crate::user_defined_hyperlinks::from_user_defined_section_with_limits(
+            &section,
+            document.fields_table(),
+            limits,
+        )
+    }
 }

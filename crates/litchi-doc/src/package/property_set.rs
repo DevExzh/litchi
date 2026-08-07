@@ -8,6 +8,7 @@
 //! not recoverable from that API.
 
 use super::{Error, Result};
+use crate::user_defined_hyperlinks::{Limits, MutationError, UserDefinedHyperlinks};
 use litchi_cfb::{OleError, OleFile};
 use litchi_ole_common::property_set::{
     self, Binding, PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
@@ -68,6 +69,35 @@ impl Snapshot {
     pub fn user_defined_properties(&self) -> Result<Option<Section>> {
         Ok(read_stream(&self.bytes, Binding::UserDefinedProperties)?
             .and_then(|stream| stream.section(USER_DEFINED_PROPERTIES_FMTID).cloned()))
+    }
+
+    /// Reads `_PID_HLINKS` using caller-supplied DOC field context.
+    ///
+    /// A property-set snapshot does not own WordDocument/Table streams, so it
+    /// cannot infer field associations on its own. Pass the parsed field table
+    /// from the same source artifact to discover
+    /// [`crate::HyperlinkAssociation::FieldCandidates`]. A numeric match is
+    /// never a proven field association until the caller selects it with
+    /// [`crate::UserDefinedHyperlink::resolve_field`].
+    pub fn user_defined_hyperlinks(
+        &self,
+        fields: Option<&crate::FieldsTable>,
+    ) -> Result<Option<UserDefinedHyperlinks>> {
+        self.user_defined_hyperlinks_with_limits(fields, Limits::default())
+    }
+
+    /// Reads `_PID_HLINKS` with explicit typed-overlay limits.
+    pub fn user_defined_hyperlinks_with_limits(
+        &self,
+        fields: Option<&crate::FieldsTable>,
+        limits: Limits,
+    ) -> Result<Option<UserDefinedHyperlinks>> {
+        let Some(section) = self.user_defined_properties()? else {
+            return Ok(None);
+        };
+        crate::user_defined_hyperlinks::from_user_defined_section_with_limits(
+            &section, fields, limits,
+        )
     }
 
     /// Starts an isolated, source-checked property-set transaction.
@@ -233,6 +263,64 @@ impl Transaction {
         self.editor.remove(Binding::UserDefinedProperties)?;
         self.changed = true;
         Ok(true)
+    }
+
+    /// Replaces `_PID_HLINKS` atomically through the shared typed owner.
+    ///
+    /// Only caller-resolved field entries are serialized in the MS-DOC section
+    /// 2.4.7 story/index order. All other entries remain inert and stable
+    /// relative to one another. A changed value containing unresolved field
+    /// candidates is refused; an exact raw no-op preserves it. This
+    /// transaction never writes PIDDSI `0x15`.
+    pub fn put_user_defined_hyperlinks(
+        &mut self,
+        hyperlinks: &UserDefinedHyperlinks,
+    ) -> std::result::Result<bool, MutationError> {
+        self.put_user_defined_hyperlinks_with_limits(hyperlinks, Limits::default())
+    }
+
+    /// Replaces `_PID_HLINKS` with explicit shared typed-overlay limits.
+    pub fn put_user_defined_hyperlinks_with_limits(
+        &mut self,
+        hyperlinks: &UserDefinedHyperlinks,
+        limits: Limits,
+    ) -> std::result::Result<bool, MutationError> {
+        let current = self
+            .user_defined_properties()
+            .map_err(MutationError::from)?;
+        if crate::user_defined_hyperlinks::unchanged_with_unresolved_candidates(
+            current.as_ref(),
+            hyperlinks,
+            limits,
+        )
+        .map_err(Error::from)
+        .map_err(MutationError::from)?
+        {
+            return Ok(false);
+        }
+        if hyperlinks.entries().iter().any(|entry| {
+            matches!(
+                entry.association(),
+                crate::HyperlinkAssociation::FieldCandidates(_)
+            )
+        }) {
+            return Err(MutationError::UnresolvedFieldCandidates);
+        }
+        self.edit_user_defined_properties(|section| {
+            crate::user_defined_hyperlinks::put(section, hyperlinks, limits)
+        })
+        .map_err(MutationError::from)
+    }
+
+    /// Removes only the named `_PID_HLINKS` user-defined property atomically.
+    ///
+    /// This never writes PIDDSI `0x15` and leaves unrelated user-defined
+    /// properties and dictionary entries intact.
+    pub fn remove_user_defined_hyperlinks(&mut self) -> Result<bool> {
+        self.edit_user_defined_properties(|section| {
+            crate::user_defined_hyperlinks::remove(section, Limits::default())?;
+            Ok(())
+        })
     }
 
     /// Publishes the transaction as an owned, source-checked package commit.

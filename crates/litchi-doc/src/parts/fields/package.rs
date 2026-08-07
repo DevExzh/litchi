@@ -179,6 +179,21 @@ pub struct FieldsTable {
 }
 
 impl FieldsTable {
+    /// Builds a field table from independently parsed story tables for focused
+    /// structural tests. Production parsing always uses [`Self::parse`].
+    #[cfg(test)]
+    pub(crate) fn from_story_tables(stories: Vec<FieldStoryTable>) -> Result<Self> {
+        for (index, story) in stories.iter().enumerate() {
+            if stories[index + 1..]
+                .iter()
+                .any(|candidate| candidate.story == story.story)
+            {
+                return Err(corrupted("duplicate Plcfld story table"));
+            }
+        }
+        Ok(Self { stories })
+    }
+
     /// Parse all seven story field tables from checked FIB ranges.
     pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Self> {
         let mut stories = Vec::with_capacity(FieldStory::ALL.len());

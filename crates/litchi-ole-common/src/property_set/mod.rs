@@ -14,6 +14,7 @@ mod codec;
 pub mod document_summary;
 mod model;
 pub mod summary_information;
+pub mod user_defined;
 
 #[cfg(test)]
 mod tests;

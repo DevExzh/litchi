@@ -80,6 +80,8 @@ pub mod section;
 pub mod shape;
 pub mod table;
 pub mod tracked_revision;
+/// Inert contextual metadata for the reserved user-defined `_PID_HLINKS` property.
+pub mod user_defined_hyperlinks;
 pub mod vba;
 
 /// Typed, inert MS-OFFCRYPTO DataSpaces and legacy-binary IRM metadata.
@@ -283,6 +285,10 @@ pub use shape::{Bounds, Kind as ShapeKind, Shape, UnknownRecord};
 pub use shape::{count_shapes, extract_drawing_shapes, extract_shape_text, extract_shapes};
 pub use table::{Cell, Row, Table};
 pub use tracked_revision::{Revision, RevisionEditor, RevisionMetadata};
+pub use user_defined_hyperlinks::{
+    FieldCandidate, HyperlinkAssociation, MutationError, ResolutionError, UserDefinedHyperlink,
+    UserDefinedHyperlinks,
+};
 pub use vba::VbaProjectStorage;
 pub use writer::{
     AutoNumberAlignment, BookmarkEntry, CharacterFormatting, CommentEntry, DisplayFieldRevision,

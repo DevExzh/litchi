@@ -258,9 +258,10 @@ fn parse_typed_property_context(
         return Err(invalid("Typed property value is truncated"));
     }
     let variant_type = read_u16(data, 0, "property variant type")?;
-    if read_u16(data, 2, "property reserved field")? != 0 {
-        return Err(invalid("Typed property reserved field must be zero"));
-    }
+    // MS-OLEPS writers set this word to zero, but readers preserve semantic
+    // compatibility by consuming retained nonzero padding. MS-OSHARED makes
+    // that requirement explicit for the outer VtHyperlinks packet.
+    read_u16(data, 2, "property reserved field")?;
     let value_offset = property_offset
         .checked_add(4)
         .ok_or_else(|| invalid("Property value offset overflow"))?;

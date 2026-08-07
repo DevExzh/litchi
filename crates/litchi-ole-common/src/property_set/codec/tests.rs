@@ -4,7 +4,7 @@ use super::super::binding::Binding;
 use super::super::model::{Guid, Section, Stream, Value};
 use super::binary::parse_typed_property;
 use super::{Editor, PropertySetReader};
-use litchi_cfb::consts::VT_I4;
+use litchi_cfb::consts::{VT_BLOB, VT_I4};
 use litchi_cfb::{OleFile, OleWriter};
 use std::io::Cursor;
 
@@ -14,6 +14,28 @@ fn typed_property_codec_preserves_scalar_values() {
     assert_eq!(
         parse_typed_property(&bytes, 1252, 0).expect("valid typed property"),
         Value::I4(42)
+    );
+}
+
+#[test]
+fn outer_typed_property_padding_is_ignored_while_blob_data_is_preserved() {
+    let bytes = [
+        VT_BLOB as u8,
+        0,
+        0xfe,
+        0xca,
+        4,
+        0,
+        0,
+        0,
+        0xde,
+        0xad,
+        0xbe,
+        0xef,
+    ];
+    assert_eq!(
+        parse_typed_property(&bytes, 1252, 0).expect("nonzero outer padding is ignored"),
+        Value::Blob(vec![0xde, 0xad, 0xbe, 0xef])
     );
 }
 
