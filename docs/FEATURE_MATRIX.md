@@ -45,6 +45,17 @@ The detailed matrices are the source of truth for per-format rows. Shared ODF im
 primarily in `litchi-odf` and its companion crates; shared Office package and drawing behavior lives
 in the crates named by the specification map below.
 
+For XLSB sparklines, the detailed XLSB matrix records the strict, bounded Worksheet-ABNF support
+for [MS-XLSB] §2.1.7.62 and records §2.4.228-230, §2.4.581-583, and §2.4.806. The common
+`SparklineType`, `AxisType`, and `EmptyCells` enums belong to `litchi-sheet`; XLSB owns the
+BIFF12 codec, source-bound `Commit` integration through `Workbook::apply_sparklines`, contextual
+validation against already-loaded bounded workbook metadata, and writer integration. `Limits`
+caps complete worksheet source ingress at 512 MiB by default, with a validated block bound that
+cannot exceed it. The raw guarded patch is intentionally not public. This is data-only support:
+formulas, `PtgNameX` references, DDE/OLE, targets, macros, and controls are never evaluated,
+resolved, fetched, activated, or executed. New-workbook authoring refuses `PtgNameX`, while
+source data can remain inertly preserved.
+
 iWork parsing is split by concrete application format: `litchi-pages` owns
 Pages (`.pages`), `litchi-keynote` owns Keynote (`.key`), and `litchi-numbers`
 owns Numbers (`.numbers`). Their shared IWA archive, protocol, and package

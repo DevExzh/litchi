@@ -561,3 +561,102 @@ fn writes_unsupported_group_definition_losslessly() {
     }
     assert_eq!(definition.as_deref(), Some(expected.as_slice()));
 }
+
+fn authored_sparkline_groups(
+    kinds: &[crate::sparkline::SparklineType],
+) -> crate::sparkline::Groups {
+    let groups = kinds
+        .iter()
+        .enumerate()
+        .map(|(index, kind)| {
+            let color = crate::sparkline::Color::rgb(12, 34, 56, 255, 0);
+            let item = crate::sparkline::Sparkline::new(
+                crate::sparkline::Location::new(index as u32, index as u32).unwrap(),
+                None,
+            );
+            crate::sparkline::Group::new(
+                *kind,
+                crate::sparkline::Colors::uniform(color),
+                vec![item],
+            )
+            .unwrap()
+        })
+        .collect();
+    crate::sparkline::Groups::new(groups).unwrap()
+}
+
+#[test]
+fn mutable_sparkline_set_clear_and_failures_are_atomic() {
+    use crate::sparkline::{Formula, Group, Limits, Location, Sparkline, SparklineType};
+
+    let original = authored_sparkline_groups(&[SparklineType::Line]);
+    let mut sheet = MutableWorksheet::new("Sheet1");
+    sheet.set_sparkline_groups(original.clone()).unwrap();
+    assert_eq!(sheet.sparkline_groups(), Some(&original));
+
+    let over_limit = authored_sparkline_groups(&[SparklineType::Column, SparklineType::Stacked]);
+    let limits = Limits::DEFAULT.with_groups(1).unwrap();
+    assert!(
+        sheet
+            .set_sparkline_groups_with_limits(over_limit, limits)
+            .is_err()
+    );
+    assert_eq!(sheet.sparkline_groups(), Some(&original));
+
+    let formula_item = Sparkline::new(
+        Location::new(3, 3).unwrap(),
+        Some(Formula::name(1).unwrap()),
+    );
+    let formula_groups = crate::sparkline::Groups::new(vec![
+        Group::new(
+            SparklineType::Line,
+            crate::sparkline::Colors::uniform(crate::sparkline::Color::rgb(0, 0, 0, 255, 0)),
+            vec![formula_item],
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+    sheet.set_sparkline_groups(formula_groups).unwrap();
+    assert!(sheet.sparkline_groups().is_some());
+
+    assert!(sheet.clear_sparkline_groups());
+    assert!(sheet.sparkline_groups().is_none());
+    assert!(!sheet.clear_sparkline_groups());
+}
+
+#[test]
+fn writer_stages_all_sparkline_groups_at_the_canonical_sheet_tail() {
+    use crate::sparkline::SparklineType;
+
+    let groups = authored_sparkline_groups(&[
+        SparklineType::Line,
+        SparklineType::Column,
+        SparklineType::Stacked,
+    ]);
+    let mut sheet = MutableWorksheet::new("Sheet1");
+    sheet.set_sparkline_groups(groups.clone()).unwrap();
+
+    let mut buffer = Vec::new();
+    let mut writer = Writer::new(&mut buffer);
+    let mut shared_strings = crate::writer::MutableSharedStringsWriter::new();
+    sheet.write(&mut writer, &mut shared_strings).unwrap();
+
+    let kinds = Records::new(&buffer)
+        .map(|record| record.unwrap().kind())
+        .collect::<Vec<_>>();
+    let mut expected_tail = vec![kind::BEGIN_SPARKLINE_GROUPS];
+    for _ in 0..3 {
+        expected_tail.extend_from_slice(&[
+            kind::BEGIN_SPARKLINE_GROUP,
+            kind::BEGIN_SPARKLINES,
+            kind::SPARKLINE,
+            kind::END_SPARKLINES,
+            kind::END_SPARKLINE_GROUP,
+        ]);
+    }
+    expected_tail.extend_from_slice(&[kind::END_SPARKLINE_GROUPS, kind::END_SHEET]);
+    assert!(kinds.ends_with(&expected_tail));
+
+    let reparsed = crate::sparkline::worksheet::read(&buffer).unwrap();
+    assert_eq!(reparsed.groups(), Some(&groups));
+}

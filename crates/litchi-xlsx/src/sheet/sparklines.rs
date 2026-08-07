@@ -12,63 +12,63 @@ use std::fmt::Write as FmtWrite;
 
 use crate::raw::namespace::is_spreadsheetml_name;
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
+pub use litchi_sheet::sparkline::{AxisType, EmptyCells, SparklineType};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Type {
-    Line,
-    Column,
-    WinLoss,
-}
+/// Backwards-compatible XLSX spelling for [`SparklineType`].
+pub type Type = SparklineType;
+/// Backwards-compatible XLSX spelling for [`EmptyCells`].
+pub type DisplayEmptyCellsAs = EmptyCells;
+/// Backwards-compatible XLSX spelling for [`AxisType`].
+pub type AxisMinMax = AxisType;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DisplayEmptyCellsAs {
-    Gap,
-    Zero,
-    Span,
-}
-
-impl DisplayEmptyCellsAs {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Gap => "gap",
-            Self::Zero => "zero",
-            Self::Span => "span",
-        }
-    }
-
-    fn parse(s: &str) -> Option<Self> {
-        match s {
-            "gap" => Some(Self::Gap),
-            "zero" => Some(Self::Zero),
-            "span" => Some(Self::Span),
-            _ => None,
-        }
+fn sparkline_type_as_str(value: SparklineType) -> &'static str {
+    match value {
+        SparklineType::Line => "line",
+        SparklineType::Column => "column",
+        SparklineType::WinLoss => "stacked",
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AxisMinMax {
-    Individual,
-    Group,
-    Custom,
+fn parse_sparkline_type(value: &str) -> Option<SparklineType> {
+    match value {
+        "line" => Some(SparklineType::Line),
+        "column" => Some(SparklineType::Column),
+        "stacked" => Some(SparklineType::WinLoss),
+        _ => None,
+    }
 }
 
-impl AxisMinMax {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Individual => "individual",
-            Self::Group => "group",
-            Self::Custom => "custom",
-        }
+fn empty_cells_as_str(value: EmptyCells) -> &'static str {
+    match value {
+        EmptyCells::Zero => "zero",
+        EmptyCells::Gap => "gap",
+        EmptyCells::Span => "span",
     }
+}
 
-    fn parse(s: &str) -> Option<Self> {
-        match s {
-            "individual" => Some(Self::Individual),
-            "group" => Some(Self::Group),
-            "custom" => Some(Self::Custom),
-            _ => None,
-        }
+fn parse_empty_cells(value: &str) -> Option<EmptyCells> {
+    match value {
+        "zero" => Some(EmptyCells::Zero),
+        "gap" => Some(EmptyCells::Gap),
+        "span" => Some(EmptyCells::Span),
+        _ => None,
+    }
+}
+
+fn axis_type_as_str(value: AxisType) -> &'static str {
+    match value {
+        AxisType::Individual => "individual",
+        AxisType::Group => "group",
+        AxisType::Custom => "custom",
+    }
+}
+
+fn parse_axis_type(value: &str) -> Option<AxisType> {
+    match value {
+        "individual" => Some(AxisType::Individual),
+        "group" => Some(AxisType::Group),
+        "custom" => Some(AxisType::Custom),
+        _ => None,
     }
 }
 
@@ -163,25 +163,6 @@ impl Default for GroupOptions {
     }
 }
 
-impl Type {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Line => "line",
-            Self::Column => "column",
-            Self::WinLoss => "stacked",
-        }
-    }
-
-    fn parse(s: &str) -> Option<Self> {
-        match s {
-            "line" => Some(Self::Line),
-            "column" => Some(Self::Column),
-            "stacked" => Some(Self::WinLoss),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Item {
     pub data_range: String,
@@ -241,7 +222,7 @@ pub fn write_groups_ext(xml: &mut String, groups: &[Group]) -> SheetResult<()> {
         // Excel omits the attribute for the default type (line).
         if group.sparkline_type != Type::Line {
             xml.push_str(" type=\"");
-            xml.push_str(group.sparkline_type.as_str());
+            xml.push_str(sparkline_type_as_str(group.sparkline_type));
             xml.push('"');
         }
 
@@ -249,7 +230,7 @@ pub fn write_groups_ext(xml: &mut String, groups: &[Group]) -> SheetResult<()> {
 
         if !has_attr("displayEmptyCellsAs") {
             xml.push_str(" displayEmptyCellsAs=\"");
-            xml.push_str(group.options.display_empty_cells_as.as_str());
+            xml.push_str(empty_cells_as_str(group.options.display_empty_cells_as));
             xml.push('"');
         }
         if group.options.date_axis && !has_attr("dateAxis") {
@@ -284,12 +265,12 @@ pub fn write_groups_ext(xml: &mut String, groups: &[Group]) -> SheetResult<()> {
         }
         if group.options.min_axis_type != AxisMinMax::Individual && !has_attr("minAxisType") {
             xml.push_str(" minAxisType=\"");
-            xml.push_str(group.options.min_axis_type.as_str());
+            xml.push_str(axis_type_as_str(group.options.min_axis_type));
             xml.push('"');
         }
         if group.options.max_axis_type != AxisMinMax::Individual && !has_attr("maxAxisType") {
             xml.push_str(" maxAxisType=\"");
-            xml.push_str(group.options.max_axis_type.as_str());
+            xml.push_str(axis_type_as_str(group.options.max_axis_type));
             xml.push('"');
         }
 
@@ -712,16 +693,21 @@ impl Parser {
                 "sparklineGroups must contain fewer than 231 sparklineGroup elements".into(),
             );
         }
-        let sparkline_type =
-            parse_enum_attribute(element, b"type", decoder, "sparkline type", Type::parse)?
-                .unwrap_or(Type::Line);
+        let sparkline_type = parse_enum_attribute(
+            element,
+            b"type",
+            decoder,
+            "sparkline type",
+            parse_sparkline_type,
+        )?
+        .unwrap_or(Type::Line);
         let mut group = Group::new(sparkline_type);
         group.options.display_empty_cells_as = parse_enum_attribute(
             element,
             b"displayEmptyCellsAs",
             decoder,
             "sparkline empty-cell mode",
-            DisplayEmptyCellsAs::parse,
+            parse_empty_cells,
         )?
         .unwrap_or(DisplayEmptyCellsAs::Zero);
         group.options.date_axis = sparkline_bool(element, b"dateAxis", decoder)?.unwrap_or(false);
@@ -742,7 +728,7 @@ impl Parser {
             b"minAxisType",
             decoder,
             "sparkline minimum-axis type",
-            AxisMinMax::parse,
+            parse_axis_type,
         )?
         .unwrap_or(AxisMinMax::Individual);
         group.options.max_axis_type = parse_enum_attribute(
@@ -750,7 +736,7 @@ impl Parser {
             b"maxAxisType",
             decoder,
             "sparkline maximum-axis type",
-            AxisMinMax::parse,
+            parse_axis_type,
         )?
         .unwrap_or(AxisMinMax::Individual);
         group.options.manual_min = sparkline_f64(element, b"manualMin", decoder)?;

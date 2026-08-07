@@ -71,6 +71,11 @@ pub enum Error {
         /// Original allocator failure.
         source: TryReserveError,
     },
+    /// Aggregate capacity arithmetic overflowed before allocation.
+    CapacityOverflow {
+        /// Resource whose aggregate capacity could not be represented.
+        resource: &'static str,
+    },
     /// Shared DrawingML parsing error.
     Drawing(litchi_drawingml::Error),
     /// Shared host-neutral OOXML package-service error.
@@ -144,6 +149,9 @@ impl fmt::Display for Error {
             },
             Error::Allocation { resource, source } => {
                 write!(f, "allocation failed for {resource}: {source}")
+            },
+            Error::CapacityOverflow { resource } => {
+                write!(f, "capacity overflow while planning {resource}")
             },
             Error::Drawing(error) => write!(f, "DrawingML error: {error}"),
             Error::Common(error) => write!(f, "shared OOXML error: {error}"),

@@ -7,13 +7,38 @@ use std::io::Write;
 use super::model::MutableWorksheet;
 
 impl MutableWorksheet {
+    /// Validate and fully encode the optional sparkline block without
+    /// publishing any worksheet or relationship state.
+    pub(crate) fn stage_sparkline_block(&self) -> Result<Option<Vec<u8>>> {
+        self.sparkline_groups
+            .as_ref()
+            .map(|groups| {
+                crate::sparkline::encode_block(groups, self.sparkline_limits).map_err(|error| {
+                    Error::InvalidFormula(format!("unable to encode sparkline groups: {error}"))
+                })
+            })
+            .transpose()
+    }
+
     /// Write worksheet to binary format
     ///
     /// Following Excel's required structure
+    #[cfg(test)]
     pub(crate) fn write<W: Write>(
         &self,
         writer: &mut Writer<W>,
         shared_strings: &mut crate::writer::MutableSharedStringsWriter,
+    ) -> Result<()> {
+        let sparkline_block = self.stage_sparkline_block()?;
+        self.write_with_sparkline_block(writer, shared_strings, sparkline_block.as_deref())
+    }
+
+    /// Serialize with a block staged during workbook-wide validation.
+    pub(crate) fn write_with_sparkline_block<W: Write>(
+        &self,
+        writer: &mut Writer<W>,
+        shared_strings: &mut crate::writer::MutableSharedStringsWriter,
+        sparkline_block: Option<&[u8]>,
     ) -> Result<()> {
         // Write BrtBeginSheet
         writer.write_record(kind::BEGIN_SHEET, &[])?;
@@ -101,6 +126,10 @@ impl MutableWorksheet {
                 ));
             }
             crate::package::table::write::write_list_parts(writer, &self.table_rel_ids)?;
+        }
+
+        if let Some(block) = sparkline_block {
+            writer.get_mut().write_all(block)?;
         }
 
         // Write BrtEndSheet

@@ -27,6 +27,7 @@ pub mod shapes;
 pub mod shared_workbook;
 pub mod sheet;
 pub mod slicer;
+pub mod sparkline;
 pub mod styles;
 pub mod timeline;
 pub mod workbook;

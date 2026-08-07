@@ -84,6 +84,10 @@ pub struct MutableWorksheet {
     pub(crate) conditional_formattings: Vec<Formatting>,
     /// Inert Office Add-in range bindings.
     pub(crate) web_extension_bindings: Vec<Binding>,
+    /// Optional sparkline block for a newly authored worksheet.
+    pub(crate) sparkline_groups: Option<crate::sparkline::Groups>,
+    /// Finite policy retained with `sparkline_groups` for final encoding.
+    pub(crate) sparkline_limits: crate::sparkline::Limits,
     /// Array and shared formula definitions. Cell records contain only a
     /// `PtgExp` reference to one of these definitions.
     pub(crate) formula_groups: Vec<Group>,
@@ -142,6 +146,8 @@ impl MutableWorksheet {
             data_validation14_settings: Settings::default(),
             conditional_formattings: Vec::new(),
             web_extension_bindings: Vec::new(),
+            sparkline_groups: None,
+            sparkline_limits: crate::sparkline::Limits::DEFAULT,
             formula_groups: Vec::new(),
             formula_group_sources: BTreeMap::new(),
             tables: Vec::new(),
@@ -1104,6 +1110,43 @@ impl MutableWorksheet {
     /// Office Add-in bindings that will be written to this worksheet.
     pub fn web_extension_bindings(&self) -> &[Binding] {
         &self.web_extension_bindings
+    }
+
+    /// The complete sparkline collection scheduled for this worksheet.
+    pub fn sparkline_groups(&self) -> Option<&crate::sparkline::Groups> {
+        self.sparkline_groups.as_ref()
+    }
+
+    /// Replace the complete sparkline collection using safe default limits.
+    ///
+    /// Formula tokens are structurally checked here and are proved against the
+    /// finalized workbook name/XTI context before any worksheet is serialized.
+    pub fn set_sparkline_groups(&mut self, groups: crate::sparkline::Groups) -> Result<&mut Self> {
+        self.set_sparkline_groups_with_limits(groups, crate::sparkline::Limits::DEFAULT)
+    }
+
+    /// Replace the complete sparkline collection under an explicit policy.
+    ///
+    /// Validation is completed before either the collection or its policy is
+    /// published, so every failure leaves the worksheet unchanged.
+    pub fn set_sparkline_groups_with_limits(
+        &mut self,
+        groups: crate::sparkline::Groups,
+        limits: crate::sparkline::Limits,
+    ) -> Result<&mut Self> {
+        groups.validate(limits).map_err(|error| {
+            Error::InvalidFormula(format!("invalid authored sparkline groups: {error}"))
+        })?;
+        self.sparkline_groups = Some(groups);
+        self.sparkline_limits = limits;
+        Ok(self)
+    }
+
+    /// Remove the complete authored sparkline collection.
+    pub fn clear_sparkline_groups(&mut self) -> bool {
+        let removed = self.sparkline_groups.take().is_some();
+        self.sparkline_limits = crate::sparkline::Limits::DEFAULT;
+        removed
     }
 
     /// Get the number of non-empty cells

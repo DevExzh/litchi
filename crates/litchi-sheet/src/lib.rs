@@ -6,6 +6,8 @@
 
 #![forbid(unsafe_code)]
 
+/// Format-neutral sparkline vocabulary.
+pub mod sparkline;
 /// Format-neutral worksheet view state.
 pub mod view;
 

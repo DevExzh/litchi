@@ -356,13 +356,15 @@ pub const OLE_SIZE: Kind = Kind(0x0225);
 pub const WEB_OPT: Kind = Kind(0x0229);
 pub const PHONETIC_INFO: Kind = Kind(0x0219);
 
-// Excel 2013+ records
+// Office 2010-era sparkline records
 pub const ABS_PATH15: Kind = Kind(0x0817);
 pub const BEGIN_SPARKLINE_GROUPS: Kind = Kind(0x0422);
 pub const END_SPARKLINE_GROUPS: Kind = Kind(0x0423);
 pub const BEGIN_SPARKLINE_GROUP: Kind = Kind(0x0411);
 pub const END_SPARKLINE_GROUP: Kind = Kind(0x0412);
 pub const SPARKLINE: Kind = Kind(0x0413);
+pub const BEGIN_SPARKLINES: Kind = Kind(0x0420);
+pub const END_SPARKLINES: Kind = Kind(0x0421);
 
 // PivotCache definition stream (MS-XLSB 2.1.7.38)
 pub const BEGIN_PIVOT_CACHE_DEF: Kind = Kind(179);

@@ -12,6 +12,7 @@ use crate::package::vba_project::{
 };
 use crate::package::web_extension_bindings::PackageAppRefs;
 use crate::raw::Records;
+use crate::sparkline;
 use litchi_ooxml_common::embedded;
 use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::web;
@@ -28,6 +29,61 @@ const CHART_SHEET_RELATIONSHIP_TYPES: &[&str] = &[
 ];
 
 impl Workbook {
+    /// Read the optional sparkline groups selected by zero-based worksheet
+    /// index using safe default limits.
+    pub fn sparklines(&self, worksheet_index: usize) -> Result<sparkline::Snapshot> {
+        self.sparklines_with_limits(worksheet_index, sparkline::Limits::DEFAULT)
+    }
+
+    /// Read the optional sparkline groups selected by zero-based worksheet
+    /// index using an explicit finite policy.
+    pub fn sparklines_with_limits(
+        &self,
+        worksheet_index: usize,
+        limits: sparkline::Limits,
+    ) -> Result<sparkline::Snapshot> {
+        let uri = self.worksheet_uri(worksheet_index)?;
+        let snapshot = sparkline::workbook::read_with_limits(&self.package, &uri, limits)?;
+        sparkline::workbook::validate_context(&snapshot, &self.formula_context)?;
+        Ok(snapshot)
+    }
+
+    /// Start a detached sparkline edit using safe default limits.
+    pub fn edit_sparklines(&self, worksheet_index: usize) -> Result<sparkline::Edit> {
+        self.edit_sparklines_with_limits(worksheet_index, sparkline::Limits::DEFAULT)
+    }
+
+    /// Start a detached sparkline edit using an explicit finite policy.
+    pub fn edit_sparklines_with_limits(
+        &self,
+        worksheet_index: usize,
+        limits: sparkline::Limits,
+    ) -> Result<sparkline::Edit> {
+        Ok(self.sparklines_with_limits(worksheet_index, limits)?.edit())
+    }
+
+    /// Validate workbook-dependent formula indexes and publish an exact-source
+    /// sparkline commit atomically to one worksheet.
+    ///
+    /// This is the only publication boundary for authored XLSB sparkline
+    /// bytes. It proves defined-name, external-name, and `Xti` references
+    /// against the current workbook before changing the package.
+    pub fn apply_sparklines(
+        &mut self,
+        worksheet_index: usize,
+        commit: sparkline::Commit,
+    ) -> Result<sparkline::Snapshot> {
+        let uri = self.worksheet_uri(worksheet_index)?;
+        sparkline::workbook::validate_commit_context(&commit, &self.formula_context)?;
+        sparkline::workbook::apply(&mut self.package, &uri, commit)
+    }
+
+    /// Read optional sparkline groups selected by worksheet name.
+    pub fn sparklines_by_name(&self, worksheet_name: &str) -> Result<sparkline::Snapshot> {
+        let index = self.worksheet_index(worksheet_name)?;
+        self.sparklines(index)
+    }
+
     /// Read the typed cell-watch and worksheet phonetic snapshot selected by
     /// zero-based worksheet index.
     pub fn cell_watches(&self, worksheet_index: usize) -> Result<cell_watches::Snapshot> {

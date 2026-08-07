@@ -140,6 +140,7 @@ pub struct Worksheet {
     scenarios: Option<Manager>,
     slicers: Option<slicer::Views>,
     timelines: Option<crate::timeline::Views>,
+    sparkline_groups: Option<crate::sparkline::Groups>,
 }
 
 impl Worksheet {
@@ -167,6 +168,7 @@ impl Worksheet {
             scenarios: None,
             slicers: None,
             timelines: None,
+            sparkline_groups: None,
         }
     }
 
@@ -251,6 +253,10 @@ impl Worksheet {
 
     pub(crate) fn set_timelines(&mut self, timelines: Option<crate::timeline::Views>) {
         self.timelines = timelines;
+    }
+
+    pub(crate) fn set_sparkline_groups(&mut self, groups: Option<crate::sparkline::Groups>) {
+        self.sparkline_groups = groups;
     }
 
     /// Get all merged cells
@@ -342,6 +348,14 @@ impl Worksheet {
     /// The worksheet's inert XLSB timeline views, if present.
     pub fn timelines(&self) -> Option<&crate::timeline::Views> {
         self.timelines.as_ref()
+    }
+
+    /// The worksheet's ordered, inert sparkline groups, if present.
+    ///
+    /// Formula tokens are retained as metadata and are never evaluated or
+    /// used to fetch an external target.
+    pub fn sparkline_groups(&self) -> Option<&crate::sparkline::Groups> {
+        self.sparkline_groups.as_ref()
     }
 }
 

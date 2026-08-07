@@ -48,6 +48,187 @@ fn row_and_column_formatting_survive_package_roundtrip() {
 }
 
 #[test]
+fn authored_sparkline_groups_reach_the_public_worksheet_model() {
+    use crate::sparkline::{
+        Color as SparkColor, Colors, Formula, Group, Groups, Location, Sparkline,
+    };
+    use litchi_sheet::sparkline::SparklineType;
+
+    let mut reference = vec![0x3A];
+    reference.extend_from_slice(&2u16.to_le_bytes());
+    reference.extend_from_slice(&0u32.to_le_bytes());
+    reference.extend_from_slice(&0u16.to_le_bytes());
+    let mut area = vec![0x3B];
+    area.extend_from_slice(&2u16.to_le_bytes());
+    area.extend_from_slice(&0u32.to_le_bytes());
+    area.extend_from_slice(&2u32.to_le_bytes());
+    area.extend_from_slice(&0u16.to_le_bytes());
+    area.extend_from_slice(&0u16.to_le_bytes());
+    let groups = Groups::new(vec![
+        Group::new(
+            SparklineType::Line,
+            Colors::uniform(SparkColor::rgb(20, 40, 60, 255, 0)),
+            vec![Sparkline::new(
+                Location::new(0, 0).unwrap(),
+                Some(Formula::new(reference, Vec::new()).unwrap()),
+            )],
+        )
+        .unwrap()
+        .with_date_axis(Formula::name(1).unwrap()),
+        Group::new(
+            SparklineType::Column,
+            Colors::uniform(SparkColor::rgb(20, 40, 60, 255, 0)),
+            vec![Sparkline::new(
+                Location::new(1, 1).unwrap(),
+                Some(Formula::new(area, Vec::new()).unwrap()),
+            )],
+        )
+        .unwrap(),
+        Group::new(
+            SparklineType::Stacked,
+            Colors::uniform(SparkColor::rgb(20, 40, 60, 255, 0)),
+            vec![Sparkline::new(Location::new(2, 2).unwrap(), None)],
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+
+    let mut workbook = WorkbookWriter::new();
+    workbook.add_named_range(
+        Definition::new("SparkData".to_string(), None)
+            .with_formula(area3d_formula(0, 0, 2, 0, 0).unwrap()),
+    );
+    let mut with_sparklines = MutableWorksheet::new("Sparklines");
+    with_sparklines
+        .set_sparkline_groups(groups.clone())
+        .unwrap();
+    workbook.add_worksheet(with_sparklines);
+    workbook.add_worksheet(MutableWorksheet::new("Plain"));
+
+    let mut output = Cursor::new(Vec::new());
+    workbook.save(&mut output).unwrap();
+    let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    assert_eq!(
+        reader.worksheet(0).unwrap().sparkline_groups(),
+        Some(&groups)
+    );
+    assert!(reader.worksheet(1).unwrap().sparkline_groups().is_none());
+}
+
+#[test]
+fn authored_sparkline_external_name_is_explicitly_unsupported_and_atomic() {
+    use crate::sparkline::{
+        Color as SparkColor, Colors, Formula, Group, Groups, Location, Sparkline,
+    };
+    use litchi_sheet::sparkline::SparklineType;
+
+    let mut name_x = vec![0x39];
+    name_x.extend_from_slice(&2u16.to_le_bytes());
+    name_x.extend_from_slice(&1u32.to_le_bytes());
+    let groups = Groups::new(vec![
+        Group::new(
+            SparklineType::Line,
+            Colors::uniform(SparkColor::rgb(0, 0, 0, 255, 0)),
+            vec![Sparkline::new(
+                Location::new(0, 0).unwrap(),
+                Some(Formula::new(name_x, Vec::new()).unwrap()),
+            )],
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+    let mut workbook = WorkbookWriter::new();
+    let mut sheet = MutableWorksheet::new("Sheet1");
+    sheet.set_sparkline_groups(groups.clone()).unwrap();
+    workbook.add_worksheet(sheet);
+    let before = format!("{:?}", workbook.worksheets[0]);
+    let shared_strings_before = workbook.shared_strings.len();
+
+    let mut output = Cursor::new(Vec::new());
+    let error = workbook.save(&mut output).unwrap_err();
+    assert!(matches!(
+        error,
+        crate::package::error::Error::UnsupportedFeature(message)
+            if message.contains("sparkline PtgNameX")
+    ));
+    assert!(output.get_ref().is_empty());
+    assert_eq!(format!("{:?}", workbook.worksheets[0]), before);
+    assert_eq!(workbook.shared_strings.len(), shared_strings_before);
+    assert_eq!(workbook.worksheets[0].sparkline_groups(), Some(&groups));
+
+    let corrected = Groups::new(vec![
+        Group::new(
+            SparklineType::Line,
+            Colors::uniform(SparkColor::rgb(0, 0, 0, 255, 0)),
+            vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+    workbook.worksheets[0]
+        .set_sparkline_groups(corrected)
+        .unwrap();
+    let mut first = Cursor::new(Vec::new());
+    workbook.save(&mut first).unwrap();
+    let mut second = Cursor::new(Vec::new());
+    workbook.save(&mut second).unwrap();
+    assert_eq!(first.into_inner(), second.into_inner());
+}
+
+#[test]
+fn sparkline_encoding_limit_failure_is_atomic_and_recoverable() {
+    use crate::sparkline::{
+        Color as SparkColor, Colors, Group, Groups, Limits, Location, Sparkline,
+    };
+    use litchi_sheet::sparkline::SparklineType;
+
+    let groups = Groups::new(vec![
+        Group::new(
+            SparklineType::Line,
+            Colors::uniform(SparkColor::rgb(1, 2, 3, 255, 0)),
+            vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+    let encode_failure_limits = Limits::DEFAULT.with_record_bytes(1).unwrap();
+    let mut sheet = MutableWorksheet::new("Sheet1");
+    sheet
+        .set_sparkline_groups_with_limits(groups.clone(), encode_failure_limits)
+        .unwrap();
+    let mut workbook = WorkbookWriter::new();
+    workbook.add_worksheet(sheet);
+    let before = format!("{:?}", workbook.worksheets[0]);
+    let shared_strings_before = workbook.shared_strings.len();
+
+    let mut failed = Cursor::new(Vec::new());
+    assert!(workbook.save(&mut failed).is_err());
+    assert!(failed.get_ref().is_empty());
+    assert_eq!(format!("{:?}", workbook.worksheets[0]), before);
+    assert_eq!(workbook.shared_strings.len(), shared_strings_before);
+
+    workbook.worksheets[0].set_sparkline_groups(groups).unwrap();
+    let mut first = Cursor::new(Vec::new());
+    workbook.save(&mut first).unwrap();
+    let mut second = Cursor::new(Vec::new());
+    workbook.save(&mut second).unwrap();
+    assert_eq!(first.into_inner(), second.into_inner());
+}
+
+#[test]
+fn sparkline_preflight_capacity_overflow_is_typed() {
+    let error =
+        super::super::package::checked_capacity("sparkline test collection", &[usize::MAX, 1])
+            .unwrap_err();
+    assert!(matches!(
+        error,
+        crate::package::error::Error::CapacityOverflow {
+            resource: "sparkline test collection"
+        }
+    ));
+}
+
+#[test]
 fn auto_filter_range_survives_package_roundtrip() {
     let mut workbook = WorkbookWriter::new();
     let mut sheet = MutableWorksheet::new("Filtered");
