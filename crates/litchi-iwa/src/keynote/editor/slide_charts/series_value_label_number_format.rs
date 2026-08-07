@@ -6,7 +6,7 @@ use crate::charts::series_value_label_number_format::{
     chart_series_value_label_number_formats as read_native_formats,
     set_chart_series_value_label_number_formats as set_native_formats,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesValueLabelNumberFormat};
+use crate::charts::{Index, NumberFormat};
 
 impl KeynoteEditor {
     /// Read every series' value-label number format in native series order.
@@ -14,7 +14,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<Vec<ChartSeriesValueLabelNumberFormat>> {
+    ) -> Result<Vec<NumberFormat>> {
         slide_chart_series_value_label_number_formats(self, slide_index, drawable_object_id)
     }
 
@@ -23,8 +23,8 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
-    ) -> Result<ChartSeriesValueLabelNumberFormat> {
+        series: Index,
+    ) -> Result<NumberFormat> {
         let formats =
             slide_chart_series_value_label_number_formats(self, slide_index, drawable_object_id)?;
         formats
@@ -38,7 +38,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        formats: &[ChartSeriesValueLabelNumberFormat],
+        formats: &[NumberFormat],
     ) -> Result<()> {
         set_slide_chart_series_value_label_number_formats(
             self,
@@ -53,8 +53,8 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
-        format: ChartSeriesValueLabelNumberFormat,
+        series: Index,
+        format: NumberFormat,
     ) -> Result<()> {
         let mut formats =
             slide_chart_series_value_label_number_formats(self, slide_index, drawable_object_id)?;
@@ -79,7 +79,7 @@ fn slide_chart_series_value_label_number_formats(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-) -> Result<Vec<ChartSeriesValueLabelNumberFormat>> {
+) -> Result<Vec<NumberFormat>> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
         graph.info.kind,
@@ -102,7 +102,7 @@ fn set_slide_chart_series_value_label_number_formats(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    formats: &[ChartSeriesValueLabelNumberFormat],
+    formats: &[NumberFormat],
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
@@ -151,12 +151,7 @@ fn set_slide_chart_series_value_label_number_formats(
     Ok(())
 }
 
-fn format_index_error(
-    suite: &str,
-    drawable_object_id: u64,
-    series: ChartSeriesIndex,
-    count: usize,
-) -> Error {
+fn format_index_error(suite: &str, drawable_object_id: u64, series: Index, count: usize) -> Error {
     Error::InvalidFormat(format!(
         "{suite} chart {drawable_object_id} series index {} exceeds series count {count}",
         series.zero_based()

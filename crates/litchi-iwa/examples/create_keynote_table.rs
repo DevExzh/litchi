@@ -2,11 +2,14 @@ use std::env;
 
 use litchi_iwa::keynote::{
     KeynoteDocumentBuilder, KeynoteTableCellUpdate, KeynoteTableCellValue,
-    KeynoteTableColumnInsertion, KeynoteTableDimensionSize, KeynoteTableFormulaCachedValue,
-    KeynoteTableFormulaCellReference, KeynoteTableFormulaExpression, KeynoteTableHeaderCount,
-    KeynoteTableHeaderSettings, KeynoteTableRowInsertion, KeynoteTableTitleSettings,
+    KeynoteTableDimensionSize, KeynoteTableTitleSettings,
 };
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_keynote::slide::table::formula::{
+    FormulaCachedValue, FormulaCellReference, FormulaExpression,
+};
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
+use litchi_numbers::table::topology::{ColumnInsertion, RowInsertion};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
@@ -41,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let value = if row == 0 || column == 0 {
                 KeynoteTableCellValue::Text(value.to_owned())
             } else {
-                KeynoteTableCellValue::Number(value.parse()?)
+                KeynoteTableCellValue::number(value.parse()?)?
             };
             updates.push(KeynoteTableCellUpdate::new(row, column, value));
         }
@@ -50,20 +53,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_table_header_settings(
         0,
         table.model_object_id,
-        KeynoteTableHeaderSettings {
-            header_rows: Some(KeynoteTableHeaderCount::ONE),
-            header_columns: Some(KeynoteTableHeaderCount::ONE),
-            footer_rows: Some(KeynoteTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;
     editor.set_slide_table_title_settings(
         0,
         table.model_object_id,
-        KeynoteTableTitleSettings {
-            visible: Some(true),
-            outlined: Some(true),
-        },
+        KeynoteTableTitleSettings::new(Some(true), Some(true)),
     )?;
     for (column, width) in [440.0, 390.0, 390.0].into_iter().enumerate() {
         editor.set_slide_table_column_width(
@@ -86,29 +86,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         3,
         1,
-        KeynoteTableFormulaExpression::function(
+        FormulaExpression::function(
             "SUM",
-            [KeynoteTableFormulaExpression::range(
-                KeynoteTableFormulaCellReference::relative(1, 1),
-                KeynoteTableFormulaCellReference::relative(2, 1),
+            [FormulaExpression::range(
+                FormulaCellReference::relative(1, 1),
+                FormulaCellReference::relative(2, 1),
             )],
         ),
-        KeynoteTableFormulaCachedValue::Number(218.0),
+        FormulaCachedValue::Number(218.0.try_into()?),
     )?;
-    editor.insert_slide_table_row(0, table.model_object_id, KeynoteTableRowInsertion::body(2))?;
-    editor.insert_slide_table_column(
-        0,
-        table.model_object_id,
-        KeynoteTableColumnInsertion::body(1),
-    )?;
+    editor.insert_slide_table_row(0, table.model_object_id, RowInsertion::body(2))?;
+    editor.insert_slide_table_column(0, table.model_object_id, ColumnInsertion::body(1))?;
     editor.set_slide_table_cells(
         0,
         table.model_object_id,
         [
             KeynoteTableCellUpdate::new(3, 0, KeynoteTableCellValue::Text("Central".to_owned())),
-            KeynoteTableCellUpdate::new(3, 1, KeynoteTableCellValue::Number(105.0)),
+            KeynoteTableCellUpdate::new(3, 1, KeynoteTableCellValue::number(105.0)?),
             KeynoteTableCellUpdate::new(3, 2, KeynoteTableCellValue::Text("review".to_owned())),
-            KeynoteTableCellUpdate::new(3, 3, KeynoteTableCellValue::Number(139.0)),
+            KeynoteTableCellUpdate::new(3, 3, KeynoteTableCellValue::number(139.0)?),
             KeynoteTableCellUpdate::new(0, 2, KeynoteTableCellValue::Text("Status".to_owned())),
         ],
     )?;

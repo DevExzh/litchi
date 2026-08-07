@@ -7,11 +7,10 @@ use crate::protobuf::{tsp, tswp};
 use crate::wire::{patch_length_delimited_field, patch_nested_fixed64_field, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
 
-use super::date_time_types::{
-    TextDateTimeFieldSettings, TextDateTimeFormat, TextDateTimeFormatterStyle, TextDateTimeInstant,
-    TextDateTimeLocaleIdentifier, TextDateTimeUpdatePlan,
-};
 use super::smart_field_object::{generated_text_attribute_uuid, validate_text_attribute_uuid};
+use litchi_iwa_text::date_time::{
+    Format, FormatterStyle, Instant, LocaleIdentifier, Settings, UpdatePlan,
+};
 
 const FORMAT_FIELD: u32 = 2;
 const LOCALE_FIELD: u32 = 3;
@@ -26,7 +25,7 @@ pub(super) const DATE_TIME_MESSAGE_TYPE: u32 = 2_034;
 pub(super) fn validate_date_time_object(
     identifier: u64,
     object: &ArchiveObject,
-) -> Result<Option<TextDateTimeFieldSettings>> {
+) -> Result<Option<Settings>> {
     let payloads = object
         .messages
         .iter()
@@ -56,64 +55,54 @@ pub(super) fn validate_date_time_object(
             ))
         })?;
     validate_text_attribute_uuid(identifier, "Date & Time", uuid)?;
-    Ok(Some(TextDateTimeFieldSettings {
-        format: field
-            .format
-            .map(|value| TextDateTimeFormat::new(value.into_boxed_str()))
-            .transpose()?,
-        locale_identifier: field
+    Ok(Some(Settings::new(
+        field.format.map(Format::try_from).transpose()?,
+        field
             .locale_identifier
-            .map(|value| TextDateTimeLocaleIdentifier::new(value.into_boxed_str()))
+            .map(LocaleIdentifier::try_from)
             .transpose()?,
-        date_style: field.date_style.map(TextDateTimeFormatterStyle::from_raw),
-        time_style: field.time_style.map(TextDateTimeFormatterStyle::from_raw),
-        update_plan: field.update_plan.map(TextDateTimeUpdatePlan::from_raw),
-        needs_update: field.needs_update,
-        instant: field
+        field.date_style.map(FormatterStyle::from_raw),
+        field.time_style.map(FormatterStyle::from_raw),
+        field.update_plan.map(UpdatePlan::from_raw),
+        field.needs_update,
+        field
             .date
-            .map(|date| TextDateTimeInstant::from_reference_date_seconds(date.seconds))
+            .map(|date| Instant::from_reference_date_seconds(date.seconds))
             .transpose()?,
-    }))
+    )?))
 }
 
-pub(super) fn new_date_time_object(
-    identifier: u64,
-    settings: &TextDateTimeFieldSettings,
-) -> Result<ArchiveObject> {
+pub(super) fn new_date_time_object(identifier: u64, settings: &Settings) -> Result<ArchiveObject> {
     let field = tswp::DateTimeSmartFieldArchive {
         super_: Some(tswp::SmartFieldArchive {
             text_attribute_uuid_string: Some(generated_text_attribute_uuid()?),
         }),
-        format: settings
-            .format
-            .as_ref()
-            .map(|value| value.as_str().to_owned()),
+        format: settings.format().map(|value| value.as_str().to_owned()),
         locale_identifier: settings
-            .locale_identifier
-            .as_ref()
+            .locale_identifier()
             .map(|value| value.as_str().to_owned()),
-        date_style: settings.date_style.map(TextDateTimeFormatterStyle::as_raw),
-        time_style: settings.time_style.map(TextDateTimeFormatterStyle::as_raw),
-        update_plan: settings.update_plan.map(TextDateTimeUpdatePlan::as_raw),
-        needs_update: settings.needs_update,
-        date: settings.instant.map(|instant| tsp::Date {
+        date_style: settings.date_style().map(FormatterStyle::as_raw),
+        time_style: settings.time_style().map(FormatterStyle::as_raw),
+        update_plan: settings.update_plan().map(UpdatePlan::as_raw),
+        needs_update: settings.needs_update(),
+        date: settings.instant().map(|instant| tsp::Date {
             seconds: instant.reference_date_seconds(),
         }),
     };
-    ArchiveObject::new(
+    Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: DATE_TIME_MESSAGE_TYPE,
             data: field.encode_to_vec(),
         }],
-    )
+    )?)
 }
 
 pub(super) fn patch_date_time_settings(
     package: &mut IWorkPackage,
     archive_name: &str,
     identifier: u64,
-    settings: &TextDateTimeFieldSettings,
+    settings: &Settings,
 ) -> Result<()> {
     package.update_archive(archive_name, |archive| {
         let object = archive.object_mut(identifier).ok_or_else(|| {
@@ -142,35 +131,31 @@ pub(super) fn patch_date_time_settings(
             &original.data,
             FORMAT_FIELD,
             current.format.is_some(),
-            settings
-                .format
-                .as_ref()
-                .map(|value| value.as_str().as_bytes()),
+            settings.format().map(|value| value.as_str().as_bytes()),
         )?;
         data = patch_length_delimited_field(
             &data,
             LOCALE_FIELD,
             current.locale_identifier.is_some(),
             settings
-                .locale_identifier
-                .as_ref()
+                .locale_identifier()
                 .map(|value| value.as_str().as_bytes()),
         )?;
         for (field_number, present, replacement) in [
             (
                 DATE_STYLE_FIELD,
                 current.date_style.is_some(),
-                settings.date_style.map(TextDateTimeFormatterStyle::as_raw),
+                settings.date_style().map(FormatterStyle::as_raw),
             ),
             (
                 TIME_STYLE_FIELD,
                 current.time_style.is_some(),
-                settings.time_style.map(TextDateTimeFormatterStyle::as_raw),
+                settings.time_style().map(FormatterStyle::as_raw),
             ),
             (
                 UPDATE_PLAN_FIELD,
                 current.update_plan.is_some(),
-                settings.update_plan.map(TextDateTimeUpdatePlan::as_raw),
+                settings.update_plan().map(UpdatePlan::as_raw),
             ),
         ] {
             data = patch_varint_field(&data, field_number, present, replacement.map(i32_varint))?;
@@ -179,9 +164,9 @@ pub(super) fn patch_date_time_settings(
             &data,
             NEEDS_UPDATE_FIELD,
             current.needs_update.is_some(),
-            settings.needs_update.map(u64::from),
+            settings.needs_update().map(u64::from),
         )?;
-        data = match (current.date, settings.instant) {
+        data = match (current.date, settings.instant()) {
             (Some(_), Some(instant)) => patch_nested_fixed64_field(
                 &data,
                 &[DATE_FIELD, DATE_SECONDS_FIELD],

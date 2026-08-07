@@ -12,6 +12,7 @@ use crate::shapes::{
     patch_wrapped_drawable_properties,
 };
 use crate::{DrawableTitleCaption, IWorkThemeArchive};
+use litchi_iwa_common::shape::image::ImageAdjustments;
 
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
@@ -101,19 +102,10 @@ pub(super) struct SlideImageGraph {
     pub(super) data_references: Vec<(u64, u64)>,
 }
 
-pub(super) fn image_creation_values(options: KeynoteSlideImageOptions) -> Result<DrawableGeometry> {
-    if !options.natural_size.width.is_finite()
-        || !options.natural_size.height.is_finite()
-        || options.natural_size.width <= 0.0
-        || options.natural_size.height <= 0.0
-    {
-        return Err(Error::ParseError(
-            "Keynote image natural size must be finite and greater than zero".to_owned(),
-        ));
-    }
+pub(super) fn image_creation_values(options: ImageOptions) -> Result<DrawableGeometry> {
     DrawableGeometry {
-        position: Some(options.position),
-        size: Some(options.size),
+        position: Some(options.position()),
+        size: Some(options.size()),
         flags: Some(DEFAULT_DRAWABLE_FLAGS),
         angle: Some(DEFAULT_IMAGE_ROTATION_DEGREES),
     }
@@ -549,6 +541,7 @@ fn image_info(
             ))
         })?
         .identifier;
+    let image_adjustments: ImageAdjustments = image_adjustments_from_archive(&image)?;
     Ok(KeynoteSlideImageInfo {
         slide_index,
         drawable_object_id: identifier,
@@ -564,7 +557,7 @@ fn image_info(
         thumbnail_data_identifier: image.thumbnail_data.map(|reference| reference.identifier),
         geometry: geometry_from_drawable(&image.super_)?,
         properties: drawable_properties(&image.super_),
-        image_adjustments: image_adjustments_from_archive(&image)?,
+        image_adjustments,
         original_size: image.original_size.map(drawable_size),
         natural_size: image.natural_size.map(drawable_size),
     })

@@ -2,12 +2,12 @@
 
 use prost::Message;
 
-use crate::charts::ChartAxis;
+use crate::charts::Axis;
 use crate::charts::axis_style::{
     GENERATED_CHART_AXIS_STYLE_EXTENSION_FIELD, axis_style_slot, generated_axis_style_extension,
 };
 use crate::protobuf::{tsch, tsd};
-use crate::shapes::{ShapeStroke, empty_stroke_archive, stroke_from_native, stroke_to_native};
+use crate::shapes::{Stroke, empty_stroke_archive, stroke_from_native, stroke_to_native};
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
 
@@ -24,12 +24,12 @@ pub enum ChartAxisGridline {
 }
 
 impl ChartAxisGridline {
-    const fn field(self, axis: ChartAxis) -> u32 {
+    const fn field(self, axis: Axis) -> u32 {
         match (self, axis) {
-            (Self::Major, ChartAxis::Category) => CATEGORY_MAJOR_GRIDLINE_STROKE_FIELD,
-            (Self::Major, ChartAxis::Value) => VALUE_MAJOR_GRIDLINE_STROKE_FIELD,
-            (Self::Minor, ChartAxis::Category) => CATEGORY_MINOR_GRIDLINE_STROKE_FIELD,
-            (Self::Minor, ChartAxis::Value) => VALUE_MINOR_GRIDLINE_STROKE_FIELD,
+            (Self::Major, Axis::Category) => CATEGORY_MAJOR_GRIDLINE_STROKE_FIELD,
+            (Self::Major, Axis::Value) => VALUE_MAJOR_GRIDLINE_STROKE_FIELD,
+            (Self::Minor, Axis::Category) => CATEGORY_MINOR_GRIDLINE_STROKE_FIELD,
+            (Self::Minor, Axis::Value) => VALUE_MINOR_GRIDLINE_STROKE_FIELD,
         }
     }
 
@@ -43,43 +43,35 @@ impl ChartAxisGridline {
     fn native(
         self,
         generated: &tsch::generated::ChartAxisStyleArchive,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Option<&tsd::StrokeArchive> {
         match (self, axis) {
-            (Self::Major, ChartAxis::Category) => {
+            (Self::Major, Axis::Category) => {
                 generated.tschchartaxiscategorymajorgridlinestroke.as_ref()
             },
-            (Self::Major, ChartAxis::Value) => {
-                generated.tschchartaxisvaluemajorgridlinestroke.as_ref()
-            },
-            (Self::Minor, ChartAxis::Category) => {
+            (Self::Major, Axis::Value) => generated.tschchartaxisvaluemajorgridlinestroke.as_ref(),
+            (Self::Minor, Axis::Category) => {
                 generated.tschchartaxiscategoryminorgridlinestroke.as_ref()
             },
-            (Self::Minor, ChartAxis::Value) => {
-                generated.tschchartaxisvalueminorgridlinestroke.as_ref()
-            },
+            (Self::Minor, Axis::Value) => generated.tschchartaxisvalueminorgridlinestroke.as_ref(),
         }
     }
 
     fn set_native(
         self,
         generated: &mut tsch::generated::ChartAxisStyleArchive,
-        axis: ChartAxis,
+        axis: Axis,
         stroke: Option<tsd::StrokeArchive>,
     ) {
         match (self, axis) {
-            (Self::Major, ChartAxis::Category) => {
+            (Self::Major, Axis::Category) => {
                 generated.tschchartaxiscategorymajorgridlinestroke = stroke
             },
-            (Self::Major, ChartAxis::Value) => {
-                generated.tschchartaxisvaluemajorgridlinestroke = stroke
-            },
-            (Self::Minor, ChartAxis::Category) => {
+            (Self::Major, Axis::Value) => generated.tschchartaxisvaluemajorgridlinestroke = stroke,
+            (Self::Minor, Axis::Category) => {
                 generated.tschchartaxiscategoryminorgridlinestroke = stroke
             },
-            (Self::Minor, ChartAxis::Value) => {
-                generated.tschchartaxisvalueminorgridlinestroke = stroke
-            },
+            (Self::Minor, Axis::Value) => generated.tschchartaxisvalueminorgridlinestroke = stroke,
         }
     }
 }
@@ -94,7 +86,7 @@ pub enum ChartAxisGridlineStroke {
     #[default]
     Inherited,
     NoStroke,
-    Stroke(ShapeStroke),
+    Stroke(Stroke),
 }
 
 /// Read the exact native gridline stroke state for one chart axis.
@@ -103,7 +95,7 @@ pub(crate) fn chart_axis_gridline_stroke(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
     gridline: ChartAxisGridline,
 ) -> Result<ChartAxisGridlineStroke> {
     axis_style_slot(
@@ -124,7 +116,7 @@ pub(crate) fn set_chart_axis_gridline_stroke(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
     gridline: ChartAxisGridline,
     stroke: ChartAxisGridlineStroke,
 ) -> Result<()> {
@@ -151,7 +143,7 @@ pub(crate) fn set_chart_axis_gridline_stroke(
     {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} {}-axis {} gridline stroke update failed validation",
-            axis.label(),
+            axis.as_str(),
             gridline.label(),
         )));
     }
@@ -160,7 +152,7 @@ pub(crate) fn set_chart_axis_gridline_stroke(
 
 fn read_axis_gridline_stroke(
     data: &[u8],
-    axis: ChartAxis,
+    axis: Axis,
     gridline: ChartAxisGridline,
 ) -> Result<ChartAxisGridlineStroke> {
     let Some(extension) = generated_axis_style_extension(data)? else {
@@ -178,7 +170,7 @@ fn read_axis_gridline_stroke(
 
 fn patch_axis_gridline_stroke(
     data: &[u8],
-    axis: ChartAxis,
+    axis: Axis,
     gridline: ChartAxisGridline,
     stroke: ChartAxisGridlineStroke,
 ) -> Result<Vec<u8>> {
@@ -228,14 +220,14 @@ fn native_stroke(stroke: ChartAxisGridlineStroke) -> Option<tsd::StrokeArchive> 
 
 fn validate_patched_axis_gridline_stroke(
     data: &[u8],
-    axis: ChartAxis,
+    axis: Axis,
     gridline: ChartAxisGridline,
     expected: ChartAxisGridlineStroke,
 ) -> Result<()> {
     if read_axis_gridline_stroke(data, axis, gridline)? != expected {
         return Err(Error::InvalidFormat(format!(
             "{}-axis {} gridline stroke wire patch failed validation",
-            axis.label(),
+            axis.as_str(),
             gridline.label(),
         )));
     }
@@ -246,7 +238,7 @@ fn validate_patched_axis_gridline_stroke(
 mod tests {
     use super::*;
     use crate::protobuf::tss;
-    use crate::shapes::{RgbColorSpace, RgbaColor, StrokePattern, StrokeWidth};
+    use crate::shapes::{Pattern, RgbColorSpace, RgbaColor, Width};
     use crate::wire::{append_length_delimited_field, append_varint_field, parse_wire_fields};
 
     const UNMAPPED_OUTER_FIELD: u32 = 4_096;
@@ -255,8 +247,8 @@ mod tests {
 
     #[test]
     fn gridline_strokes_are_exact_and_preserve_unknown_fields() {
-        let original_stroke = test_stroke(StrokePattern::Solid, 1.0);
-        let replacement = test_stroke(StrokePattern::MediumDash, 3.0);
+        let original_stroke = test_stroke(Pattern::Solid, 1.0);
+        let replacement = test_stroke(Pattern::MediumDash, 3.0);
         let mut extension = tsch::generated::ChartAxisStyleArchive {
             tschchartaxiscategorymajorgridlinestroke: Some(stroke_to_native(original_stroke)),
             tschchartaxiscategoryshowmajorgridlines: Some(true),
@@ -278,14 +270,13 @@ mod tests {
 
         let changed = patch_axis_gridline_stroke(
             &original,
-            ChartAxis::Category,
+            Axis::Category,
             ChartAxisGridline::Major,
             ChartAxisGridlineStroke::Stroke(replacement),
         )
         .unwrap();
         assert_eq!(
-            read_axis_gridline_stroke(&changed, ChartAxis::Category, ChartAxisGridline::Major,)
-                .unwrap(),
+            read_axis_gridline_stroke(&changed, Axis::Category, ChartAxisGridline::Major,).unwrap(),
             ChartAxisGridlineStroke::Stroke(replacement)
         );
         assert_eq!(
@@ -302,35 +293,34 @@ mod tests {
 
         let empty = patch_axis_gridline_stroke(
             &changed,
-            ChartAxis::Category,
+            Axis::Category,
             ChartAxisGridline::Major,
             ChartAxisGridlineStroke::NoStroke,
         )
         .unwrap();
         assert_eq!(
-            read_axis_gridline_stroke(&empty, ChartAxis::Category, ChartAxisGridline::Major,)
-                .unwrap(),
+            read_axis_gridline_stroke(&empty, Axis::Category, ChartAxisGridline::Major,).unwrap(),
             ChartAxisGridlineStroke::NoStroke
         );
 
         let inherited = patch_axis_gridline_stroke(
             &empty,
-            ChartAxis::Category,
+            Axis::Category,
             ChartAxisGridline::Major,
             ChartAxisGridlineStroke::Inherited,
         )
         .unwrap();
         assert_eq!(
-            read_axis_gridline_stroke(&inherited, ChartAxis::Category, ChartAxisGridline::Major,)
+            read_axis_gridline_stroke(&inherited, Axis::Category, ChartAxisGridline::Major,)
                 .unwrap(),
             ChartAxisGridlineStroke::Inherited
         );
     }
 
-    fn test_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
-        ShapeStroke::new(
+    fn test_stroke(pattern: Pattern, width: f32) -> Stroke {
+        Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(width).unwrap(),
+            Width::new(width).unwrap(),
             pattern,
         )
     }
@@ -339,8 +329,8 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .into_iter()
-            .filter(|field| field.number == number)
-            .map(|field| data[field.start..field.end].to_vec())
+            .filter(|field| field.number() == number)
+            .map(|field| data[field.start()..field.end()].to_vec())
             .collect()
     }
 }

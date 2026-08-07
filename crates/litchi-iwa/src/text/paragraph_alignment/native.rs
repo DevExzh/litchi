@@ -8,7 +8,7 @@ use prost::Message;
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::protobuf::{tsd, tsp, tss, tswp};
 use crate::shapes::{
-    RgbaColor, StrokeCap, StrokeJoin, color_from_native, color_to_native, shadow_from_native,
+    Cap, Join, RgbaColor, Stroke, color_from_native, color_to_native, shadow_from_native,
     shadow_to_native, stroke_from_native, stroke_to_native,
 };
 use crate::text::storage_wire::update_parsed_archive;
@@ -19,23 +19,33 @@ use crate::wire::{
 use crate::{Error, IWorkPackage, IWorkThemeArchive, Result};
 
 use super::super::font::{TextFont, TextFontName};
-use super::super::paragraph_direction::ParagraphWritingDirection;
-use super::super::paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
-use super::super::paragraph_following_style::{
-    NamedParagraphStyle, ParagraphFollowingStyle, ParagraphStyleId,
+use super::super::paragraph_direction::{
+    ParagraphWritingDirection, from_native as writing_direction_from_native,
+    to_native as writing_direction_to_native,
+};
+use super::super::paragraph_flow::{
+    ParagraphFlow, ParagraphHyphenation, hyphenation_from_native, hyphenation_to_native,
 };
 use super::super::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
-};
-use super::super::style::{
-    ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
-    ParagraphBorders, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
-    ParagraphLineSpacingMultiple, ParagraphLineSpacingPoints, ParagraphSpacing,
-    ParagraphSpacingPoints, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextDecorations, TextLigatures, TextOutline, TextPointSize, TextScript,
-    TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    decimal_character_from_native,
 };
 use super::super::style_registry::object_archive;
+use super::{NativeTextCapitalization, NativeTextCharacterSpacing, NativeTextValue};
+use litchi_iwa_text::appearance::{Background, Outline, ParagraphBackground, Shadow};
+use litchi_iwa_text::character::{
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
+    TextPointSize, TextScript, TextStrikethrough, TextStyle, TextUnderline,
+};
+use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
+use litchi_iwa_text::paragraph::format::{
+    Alignment, Border, Borders, IndentPoints, Indents, LineSpacing, LineSpacingMultiple,
+    LineSpacingPoints, Spacing, SpacingPoints,
+};
+use litchi_iwa_text::paragraph::style::{
+    NamedParagraphStyle, ParagraphFollowingStyle, ParagraphStyleId,
+    raw::{from_native_id, native_id},
+};
 
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const THEME_MESSAGE_TYPES: &[u32] = &[10, 10_001, 12_009];
@@ -150,11 +160,11 @@ pub(crate) struct ParagraphStyleOverrides {
     pub(crate) baseline_shift: Option<TextBaselineShift>,
     pub(crate) character_spacing: Option<TextCharacterSpacing>,
     pub(crate) ligatures: Option<TextLigatures>,
-    pub(crate) outline: Option<TextOutline>,
-    pub(crate) shadow: Option<TextShadow>,
-    pub(crate) background: Option<TextBackground>,
+    pub(crate) outline: Option<Outline>,
+    pub(crate) shadow: Option<Shadow>,
+    pub(crate) background: Option<Background>,
     pub(crate) paragraph_background: Option<ParagraphBackground>,
-    pub(crate) paragraph_borders: Option<ParagraphBorders>,
+    pub(crate) paragraph_borders: Option<Borders>,
     pub(crate) hyphenation: Option<ParagraphHyphenation>,
     pub(crate) keep_lines_together: Option<bool>,
     pub(crate) keep_with_next: Option<bool>,
@@ -164,13 +174,13 @@ pub(crate) struct ParagraphStyleOverrides {
     pub(crate) following_style: Option<ParagraphFollowingStyle>,
     pub(crate) underline: Option<TextUnderline>,
     pub(crate) strikethrough: Option<TextStrikethrough>,
-    pub(crate) alignment: Option<TextAlignment>,
-    pub(crate) line_spacing: Option<ParagraphLineSpacing>,
-    pub(crate) space_before: Option<ParagraphSpacingPoints>,
-    pub(crate) space_after: Option<ParagraphSpacingPoints>,
-    pub(crate) first_line_indent: Option<ParagraphIndentPoints>,
-    pub(crate) left_indent: Option<ParagraphIndentPoints>,
-    pub(crate) right_indent: Option<ParagraphIndentPoints>,
+    pub(crate) alignment: Option<Alignment>,
+    pub(crate) line_spacing: Option<LineSpacing>,
+    pub(crate) space_before: Option<SpacingPoints>,
+    pub(crate) space_after: Option<SpacingPoints>,
+    pub(crate) first_line_indent: Option<IndentPoints>,
+    pub(crate) left_indent: Option<IndentPoints>,
+    pub(crate) right_indent: Option<IndentPoints>,
     pub(crate) decimal_tab_character: Option<ParagraphDecimalTabCharacter>,
     pub(crate) default_tab_interval: Option<ParagraphDefaultTabInterval>,
     pub(crate) tab_stops: Option<ParagraphTabStops>,
@@ -204,9 +214,7 @@ impl ParagraphStyleOverrides {
             + u32::from(self.shadow.is_some())
             + u32::from(self.background.is_some())
             + u32::from(self.paragraph_background.is_some())
-            + self
-                .paragraph_borders
-                .map_or(0, ParagraphBorders::native_override_count)
+            + self.paragraph_borders.map_or(0, border_override_count)
             + u32::from(self.hyphenation.is_some())
             + u32::from(self.keep_lines_together.is_some())
             + u32::from(self.keep_with_next.is_some())
@@ -334,8 +342,41 @@ pub(crate) fn locate_style_with_archive(
 pub(crate) fn inherited_alignment(
     package: &IWorkPackage,
     first_style_id: u64,
-) -> Result<TextAlignment> {
+) -> Result<Alignment> {
     inheritance::alignment(package, first_style_id)
+}
+
+pub(super) fn alignment_from_native(value: i32) -> Result<Alignment> {
+    match value {
+        0 => Ok(Alignment::Natural),
+        1 => Ok(Alignment::Right),
+        2 => Ok(Alignment::Center),
+        3 => Ok(Alignment::Justified),
+        4 => Ok(Alignment::Left),
+        _ => Err(Error::InvalidFormat(format!(
+            "unsupported native iWork paragraph alignment {value}"
+        ))),
+    }
+}
+
+pub(super) const fn alignment_to_native(value: Alignment) -> i32 {
+    match value {
+        Alignment::Natural => 0,
+        Alignment::Right => 1,
+        Alignment::Center => 2,
+        Alignment::Justified => 3,
+        Alignment::Left => 4,
+    }
+}
+
+pub(super) fn border_stroke(border: Border) -> Stroke {
+    Stroke::new(border.color(), border.width(), border.pattern())
+        .with_cap(Cap::Round)
+        .with_join(Join::Round)
+}
+
+fn border_override_count(_: Borders) -> u32 {
+    4
 }
 
 pub(crate) fn inherited_text_style(
@@ -401,21 +442,18 @@ pub(crate) fn inherited_text_ligatures(
 pub(crate) fn inherited_text_outline(
     package: &IWorkPackage,
     first_style_id: u64,
-) -> Result<TextOutline> {
+) -> Result<Outline> {
     inheritance::text_outline(package, first_style_id)
 }
 
-pub(crate) fn inherited_text_shadow(
-    package: &IWorkPackage,
-    first_style_id: u64,
-) -> Result<TextShadow> {
+pub(crate) fn inherited_text_shadow(package: &IWorkPackage, first_style_id: u64) -> Result<Shadow> {
     inheritance::text_shadow(package, first_style_id)
 }
 
 pub(crate) fn inherited_text_background(
     package: &IWorkPackage,
     first_style_id: u64,
-) -> Result<TextBackground> {
+) -> Result<Background> {
     inheritance::text_background(package, first_style_id)
 }
 
@@ -429,7 +467,7 @@ pub(crate) fn inherited_paragraph_background(
 pub(crate) fn inherited_paragraph_borders(
     package: &IWorkPackage,
     first_style_id: u64,
-) -> Result<ParagraphBorders> {
+) -> Result<Borders> {
     inheritance::paragraph_borders(package, first_style_id)
 }
 
@@ -450,21 +488,15 @@ pub(crate) fn inherited_paragraph_writing_direction(
 pub(crate) fn inherited_line_spacing(
     package: &IWorkPackage,
     first_style_id: u64,
-) -> Result<ParagraphLineSpacing> {
+) -> Result<LineSpacing> {
     inheritance::line_spacing(package, first_style_id)
 }
 
-pub(crate) fn inherited_spacing(
-    package: &IWorkPackage,
-    first_style_id: u64,
-) -> Result<ParagraphSpacing> {
+pub(crate) fn inherited_spacing(package: &IWorkPackage, first_style_id: u64) -> Result<Spacing> {
     inheritance::spacing(package, first_style_id)
 }
 
-pub(crate) fn inherited_indents(
-    package: &IWorkPackage,
-    first_style_id: u64,
-) -> Result<ParagraphIndents> {
+pub(crate) fn inherited_indents(package: &IWorkPackage, first_style_id: u64) -> Result<Indents> {
     inheritance::indents(package, first_style_id)
 }
 
@@ -563,8 +595,8 @@ pub(crate) fn named_paragraph_styles(
                 "iWork paragraph style preset {preset_id} has no name"
             ))
         })?;
-        styles.push(NamedParagraphStyle::new(
-            ParagraphStyleId::new(preset_id)?,
+        styles.push(NamedParagraphStyle::from_owned(
+            from_native_id(preset_id)?,
             name,
         )?);
     }
@@ -627,7 +659,7 @@ pub(crate) fn validate_named_paragraph_style(
     } else {
         Err(Error::InvalidFormat(format!(
             "iWork paragraph style {} is not a named style in this text stylesheet",
-            target.get()
+            native_id(target)
         )))
     }
 }
@@ -677,16 +709,14 @@ pub(crate) fn direct_overrides(
     let background = text_background_from_character(character_properties)?;
     let paragraph_background = paragraph_background_from_properties(properties)?;
     let paragraph_borders = paragraph_borders_from_properties(properties)?;
-    let hyphenation = properties
-        .hyphenate
-        .map(ParagraphHyphenation::from_native_value);
+    let hyphenation = properties.hyphenate.map(hyphenation_from_native);
     let keep_lines_together = properties.keep_lines_together;
     let keep_with_next = properties.keep_with_next;
     let start_on_new_page = properties.page_break_before;
     let prevent_widow_orphan_lines = properties.widow_control;
     let writing_direction = character_properties
         .writing_direction
-        .map(ParagraphWritingDirection::from_native_value)
+        .map(writing_direction_from_native)
         .transpose()?;
     let following_style = if properties.following_style_null == Some(true) {
         if properties.following_style.is_some() {
@@ -699,7 +729,7 @@ pub(crate) fn direct_overrides(
         properties
             .following_style
             .map(|reference| {
-                ParagraphStyleId::new(reference.identifier).map(ParagraphFollowingStyle::Named)
+                from_native_id(reference.identifier).map(ParagraphFollowingStyle::Named)
             })
             .transpose()?
     };
@@ -713,7 +743,7 @@ pub(crate) fn direct_overrides(
         .transpose()?;
     let alignment = properties
         .alignment
-        .map(TextAlignment::from_native_value)
+        .map(alignment_from_native)
         .transpose()?;
     let line_spacing = properties
         .line_spacing
@@ -722,23 +752,23 @@ pub(crate) fn direct_overrides(
         .transpose()?;
     let space_before = properties
         .space_before
-        .map(ParagraphSpacingPoints::from_points)
+        .map(SpacingPoints::from_points)
         .transpose()?;
     let space_after = properties
         .space_after
-        .map(ParagraphSpacingPoints::from_points)
+        .map(SpacingPoints::from_points)
         .transpose()?;
     let first_line_indent = properties
         .first_line_indent
-        .map(ParagraphIndentPoints::from_points)
+        .map(IndentPoints::from_points)
         .transpose()?;
     let left_indent = properties
         .left_indent
-        .map(ParagraphIndentPoints::from_points)
+        .map(IndentPoints::from_points)
         .transpose()?;
     let right_indent = properties
         .right_indent
-        .map(ParagraphIndentPoints::from_points)
+        .map(IndentPoints::from_points)
         .transpose()?;
     let decimal_tab_character = if properties.decimal_tab_null == Some(true) {
         if properties.decimal_tab.is_some() {
@@ -751,7 +781,7 @@ pub(crate) fn direct_overrides(
         properties
             .decimal_tab
             .as_deref()
-            .map(ParagraphDecimalTabCharacter::from_native)
+            .map(decimal_character_from_native)
             .transpose()?
     };
     let default_tab_interval = properties
@@ -953,23 +983,23 @@ pub(crate) fn direct_overrides(
     }
     if let Some(outline) = outline {
         character_fields.push(match outline {
-            TextOutline::None => CHARACTER_DRAWING_STROKE_NULL_FIELD,
-            TextOutline::Stroke(_) => CHARACTER_DRAWING_STROKE_FIELD,
+            Outline::None => CHARACTER_DRAWING_STROKE_NULL_FIELD,
+            Outline::Stroke(_) => CHARACTER_DRAWING_STROKE_FIELD,
         });
     }
     if let Some(shadow) = shadow {
         character_fields.push(match shadow {
-            TextShadow::None => CHARACTER_SHADOW_NULL_FIELD,
-            TextShadow::Drop(_) => CHARACTER_SHADOW_FIELD,
+            Shadow::None => CHARACTER_SHADOW_NULL_FIELD,
+            Shadow::Drop(_) => CHARACTER_SHADOW_FIELD,
         });
     }
     if let Some(background) = background {
         let field = match background {
-            TextBackground::None => CHARACTER_BACKGROUND_COLOR_NULL_FIELD,
-            TextBackground::Color(_) => CHARACTER_BACKGROUND_COLOR_FIELD,
+            Background::None => CHARACTER_BACKGROUND_COLOR_NULL_FIELD,
+            Background::Color(_) => CHARACTER_BACKGROUND_COLOR_FIELD,
         };
         character_fields.push(field);
-        if matches!(background, TextBackground::Color(_)) {
+        if matches!(background, Background::Color(_)) {
             let color_raw = required_payload(character_raw, field, "paragraph text background")?;
             if !has_canonical_color_wire(color_raw)? {
                 return Ok(None);
@@ -1014,8 +1044,8 @@ pub(crate) fn direct_overrides(
             paragraph_fields.push(PARAGRAPH_LEGACY_RULE_WIDTH_FIELD);
         }
         paragraph_fields.push(match borders {
-            ParagraphBorders::None => PARAGRAPH_BORDER_STROKE_NULL_FIELD,
-            ParagraphBorders::Bordered(_) => PARAGRAPH_BORDER_STROKE_FIELD,
+            Borders::None => PARAGRAPH_BORDER_STROKE_NULL_FIELD,
+            Borders::Bordered(_) => PARAGRAPH_BORDER_STROKE_FIELD,
         });
         paragraph_fields.push(PARAGRAPH_BORDER_POSITIONS_FIELD);
         paragraph_fields.push(PARAGRAPH_BORDER_ROUNDED_CORNERS_FIELD);
@@ -1051,7 +1081,7 @@ pub(crate) fn direct_overrides(
             "paragraph line spacing",
         )?;
         let expected = match line_spacing {
-            Some(ParagraphLineSpacing::Relative(_)) => vec![LINE_SPACING_AMOUNT_FIELD],
+            Some(LineSpacing::Relative(_)) => vec![LINE_SPACING_AMOUNT_FIELD],
             Some(_) => vec![LINE_SPACING_MODE_FIELD, LINE_SPACING_AMOUNT_FIELD],
             None => Vec::new(),
         };
@@ -1177,26 +1207,25 @@ pub(crate) fn variation_object(
                 .character_spacing
                 .map(TextCharacterSpacing::native_ratio),
             ligatures: overrides.ligatures.map(TextLigatures::native_value),
-            tsd_stroke_null: matches!(overrides.outline, Some(TextOutline::None)).then_some(true),
+            tsd_stroke_null: matches!(overrides.outline, Some(Outline::None)).then_some(true),
             tsd_stroke: overrides.outline.and_then(|outline| match outline {
-                TextOutline::None => None,
-                TextOutline::Stroke(stroke) => Some(stroke_to_native(stroke)),
+                Outline::None => None,
+                Outline::Stroke(stroke) => Some(stroke_to_native(stroke)),
             }),
-            shadow_null: matches!(overrides.shadow, Some(TextShadow::None)).then_some(true),
-            shadow: overrides
-                .shadow
-                .map(TextShadow::into_shape_shadow)
-                .and_then(|shadow| match shadow {
-                    crate::shapes::ShapeShadow::Disabled => None,
+            shadow_null: matches!(overrides.shadow, Some(Shadow::None)).then_some(true),
+            shadow: overrides.shadow.map(Shadow::into_shape_shadow).and_then(
+                |shadow| match shadow {
+                    crate::shapes::Shadow::Disabled => None,
                     enabled => Some(shadow_to_native(enabled)),
-                }),
-            background_color_null: matches!(overrides.background, Some(TextBackground::None))
+                },
+            ),
+            background_color_null: matches!(overrides.background, Some(Background::None))
                 .then_some(true),
             background_color: overrides
                 .background
                 .and_then(|background| match background {
-                    TextBackground::None => None,
-                    TextBackground::Color(color) => Some(color_to_native(color)),
+                    Background::None => None,
+                    Background::Color(color) => Some(color_to_native(color)),
                 }),
             underline: overrides.underline.map(TextUnderline::native_value),
             strikethru: overrides.strikethrough.map(TextStrikethrough::native_value),
@@ -1207,13 +1236,11 @@ pub(crate) fn variation_object(
             capitalization_uses_linguistics: overrides
                 .capitalization
                 .and_then(TextCapitalization::uses_linguistics),
-            writing_direction: overrides
-                .writing_direction
-                .map(ParagraphWritingDirection::native_value),
+            writing_direction: overrides.writing_direction.map(writing_direction_to_native),
             ..Default::default()
         }),
         para_properties: Some(tswp::ParagraphStylePropertiesArchive {
-            alignment: overrides.alignment.map(TextAlignment::native_value),
+            alignment: overrides.alignment.map(alignment_to_native),
             fill_null: matches!(
                 overrides.paragraph_background,
                 Some(ParagraphBackground::None)
@@ -1231,9 +1258,7 @@ pub(crate) fn variation_object(
             stroke: native_borders.stroke,
             border_positions: native_borders.positions,
             rounded_corners: native_borders.rounded_corners,
-            hyphenate: overrides
-                .hyphenation
-                .map(ParagraphHyphenation::native_value),
+            hyphenate: overrides.hyphenation.map(hyphenation_to_native),
             keep_lines_together: overrides.keep_lines_together,
             keep_with_next: overrides.keep_with_next,
             page_break_before: overrides.start_on_new_page,
@@ -1247,16 +1272,16 @@ pub(crate) fn variation_object(
                 .following_style
                 .and_then(|following| match following {
                     ParagraphFollowingStyle::Same => None,
-                    ParagraphFollowingStyle::Named(identifier) => Some(reference(identifier.get())),
+                    ParagraphFollowingStyle::Named(identifier) => {
+                        Some(reference(native_id(identifier)))
+                    },
                 }),
             line_spacing: overrides.line_spacing.map(line_spacing_archive),
-            space_before: overrides.space_before.map(ParagraphSpacingPoints::points),
-            space_after: overrides.space_after.map(ParagraphSpacingPoints::points),
-            first_line_indent: overrides
-                .first_line_indent
-                .map(ParagraphIndentPoints::points),
-            left_indent: overrides.left_indent.map(ParagraphIndentPoints::points),
-            right_indent: overrides.right_indent.map(ParagraphIndentPoints::points),
+            space_before: overrides.space_before.map(SpacingPoints::points),
+            space_after: overrides.space_after.map(SpacingPoints::points),
+            first_line_indent: overrides.first_line_indent.map(IndentPoints::points),
+            left_indent: overrides.left_indent.map(IndentPoints::points),
+            right_indent: overrides.right_indent.map(IndentPoints::points),
             decimal_tab: overrides
                 .decimal_tab_character
                 .map(|character| character.character().to_string()),
@@ -1283,24 +1308,24 @@ pub(crate) fn variation_object(
     if let Some(ParagraphFollowingStyle::Named(identifier)) = overrides.following_style {
         object.archive_info.message_infos[0]
             .object_references
-            .push(identifier.get());
+            .push(native_id(identifier));
     }
     if overrides.font_color.is_some() {
         object.archive_info.message_infos[0]
             .field_infos
             .push(text_fill_field_info());
     }
-    if matches!(overrides.outline, Some(TextOutline::Stroke(_))) {
+    if matches!(overrides.outline, Some(Outline::Stroke(_))) {
         object.archive_info.message_infos[0]
             .field_infos
             .push(text_stroke_field_info());
     }
-    if matches!(overrides.shadow, Some(TextShadow::Drop(_))) {
+    if matches!(overrides.shadow, Some(Shadow::Drop(_))) {
         object.archive_info.message_infos[0]
             .field_infos
             .push(text_shadow_field_info());
     }
-    if matches!(overrides.background, Some(TextBackground::Color(_))) {
+    if matches!(overrides.background, Some(Background::Color(_))) {
         object.archive_info.message_infos[0]
             .field_infos
             .push(text_background_field_info());
@@ -1654,12 +1679,12 @@ fn known_property_count(data: &[u8]) -> Result<u32> {
     let has_character = |numbers: &[u32]| {
         character_fields
             .iter()
-            .any(|field| numbers.contains(&field.number))
+            .any(|field| numbers.contains(&field.number()))
     };
     let has_paragraph = |numbers: &[u32]| {
         paragraph_fields
             .iter()
-            .any(|field| numbers.contains(&field.number))
+            .any(|field| numbers.contains(&field.number()))
     };
     let character_groups: &[&[u32]] = &[
         &[CHARACTER_BOLD_FIELD],
@@ -1721,7 +1746,7 @@ fn known_property_count(data: &[u8]) -> Result<u32> {
         PARAGRAPH_BORDER_POSITIONS_FIELD,
         PARAGRAPH_BORDER_ROUNDED_CORNERS_FIELD,
     ]) {
-        ParagraphBorders::None.native_override_count()
+        4
     } else {
         0
     };
@@ -1837,20 +1862,24 @@ pub(super) fn text_font_from_character(
     properties
         .font_name
         .as_deref()
-        .map(|name| TextFontName::new(name).map(TextFont::Named))
+        .map(|name| {
+            TextFontName::new(name)
+                .map(TextFont::Named)
+                .map_err(crate::Error::from)
+        })
         .transpose()
 }
 
 pub(super) fn text_outline_from_character(
     properties: &tswp::CharacterStylePropertiesArchive,
-) -> Result<Option<TextOutline>> {
+) -> Result<Option<Outline>> {
     if properties.tsd_stroke_null == Some(true) {
         if properties.tsd_stroke.is_some() {
             return Err(Error::InvalidFormat(
                 "native iWork text outline is both null and populated".to_owned(),
             ));
         }
-        return Ok(Some(TextOutline::None));
+        return Ok(Some(Outline::None));
     }
     if properties.tsd_stroke_null == Some(false) && properties.tsd_stroke.is_none() {
         return Err(Error::InvalidFormat(
@@ -1861,22 +1890,21 @@ pub(super) fn text_outline_from_character(
         .tsd_stroke
         .as_ref()
         .map(|stroke| {
-            stroke_from_native(stroke)
-                .map(|outline| outline.map_or(TextOutline::None, TextOutline::Stroke))
+            stroke_from_native(stroke).map(|outline| outline.map_or(Outline::None, Outline::Stroke))
         })
         .transpose()
 }
 
 pub(super) fn text_shadow_from_character(
     properties: &tswp::CharacterStylePropertiesArchive,
-) -> Result<Option<TextShadow>> {
+) -> Result<Option<Shadow>> {
     if properties.shadow_null == Some(true) {
         if properties.shadow.is_some() {
             return Err(Error::InvalidFormat(
                 "native iWork text shadow is both null and populated".to_owned(),
             ));
         }
-        return Ok(Some(TextShadow::None));
+        return Ok(Some(Shadow::None));
     }
     if properties.shadow_null == Some(false) && properties.shadow.is_none() {
         return Err(Error::InvalidFormat(
@@ -1886,20 +1914,23 @@ pub(super) fn text_shadow_from_character(
     properties
         .shadow
         .as_ref()
-        .map(|shadow| shadow_from_native(shadow).and_then(TextShadow::from_shape_shadow))
+        .map(|shadow| {
+            shadow_from_native(shadow)
+                .and_then(|shadow| Shadow::from_shape_shadow(shadow).map_err(crate::Error::from))
+        })
         .transpose()
 }
 
 pub(super) fn text_background_from_character(
     properties: &tswp::CharacterStylePropertiesArchive,
-) -> Result<Option<TextBackground>> {
+) -> Result<Option<Background>> {
     if properties.background_color_null == Some(true) {
         if properties.background_color.is_some() {
             return Err(Error::InvalidFormat(
                 "native iWork text background is both null and populated".to_owned(),
             ));
         }
-        return Ok(Some(TextBackground::None));
+        return Ok(Some(Background::None));
     }
     if properties.background_color_null == Some(false) && properties.background_color.is_none() {
         return Err(Error::InvalidFormat(
@@ -1909,7 +1940,7 @@ pub(super) fn text_background_from_character(
     properties
         .background_color
         .as_ref()
-        .map(|color| color_from_native(color).map(TextBackground::Color))
+        .map(|color| color_from_native(color).map(Background::Color))
         .transpose()
 }
 
@@ -1938,7 +1969,7 @@ pub(super) fn paragraph_background_from_properties(
 
 pub(super) fn paragraph_borders_from_properties(
     properties: &tswp::ParagraphStylePropertiesArchive,
-) -> Result<Option<ParagraphBorders>> {
+) -> Result<Option<Borders>> {
     let has_border_fields = properties.deprecated_borders.is_some()
         || properties.historical_rule_offset_null.is_some()
         || properties.historical_rule_offset.is_some()
@@ -1989,7 +2020,7 @@ pub(super) fn paragraph_borders_from_properties(
         .transpose()?;
     let modern_sides = properties
         .border_positions
-        .map(ParagraphBorderSides::from_native_bits)
+        .map(border_sides_from_native_bits)
         .transpose()?;
     if legacy_sides
         .zip(modern_sides)
@@ -1999,9 +2030,7 @@ pub(super) fn paragraph_borders_from_properties(
             "native paragraph-border side encodings disagree".to_owned(),
         ));
     }
-    let sides = modern_sides
-        .or(legacy_sides)
-        .unwrap_or(ParagraphBorderSides::NONE);
+    let sides = modern_sides.or(legacy_sides).unwrap_or(BorderSides::NONE);
     let native_stroke = properties
         .stroke
         .as_ref()
@@ -2014,7 +2043,7 @@ pub(super) fn paragraph_borders_from_properties(
                 "native paragraph border has a visible stroke without sides".to_owned(),
             ));
         }
-        return Ok(Some(ParagraphBorders::None));
+        return Ok(Some(Borders::None));
     }
     if properties.stroke_null == Some(true) {
         return Err(Error::InvalidFormat(
@@ -2024,7 +2053,7 @@ pub(super) fn paragraph_borders_from_properties(
     let stroke = native_stroke.ok_or_else(|| {
         Error::InvalidFormat("native paragraph border has sides but no visible stroke".to_owned())
     })?;
-    if stroke.cap != StrokeCap::Round || stroke.join != StrokeJoin::Round {
+    if stroke.cap != Cap::Round || stroke.join != Join::Round {
         return Err(Error::InvalidFormat(
             "native paragraph border does not use app-standard round stroke geometry".to_owned(),
         ));
@@ -2036,13 +2065,12 @@ pub(super) fn paragraph_borders_from_properties(
                     "native paragraph-border offset must contain equal finite axes".to_owned(),
                 ));
             }
-            ParagraphBorderOffset::from_native_inset(point.x)?
+            border_offset_from_native_inset(point.x)?
         },
-        None => ParagraphBorderOffset::DEFAULT,
+        None => BorderOffset::DEFAULT,
     };
-    let rounded_corners =
-        properties.rounded_corners.unwrap_or(false) && sides == ParagraphBorderSides::ALL;
-    Ok(Some(ParagraphBorders::Bordered(ParagraphBorder::new(
+    let rounded_corners = properties.rounded_corners.unwrap_or(false) && sides == BorderSides::ALL;
+    Ok(Some(Borders::Bordered(Border::new(
         stroke.color,
         stroke.width,
         stroke.pattern,
@@ -2052,26 +2080,26 @@ pub(super) fn paragraph_borders_from_properties(
     )?)))
 }
 
-fn paragraph_borders_to_native(borders: Option<ParagraphBorders>) -> NativeParagraphBorderFields {
+fn paragraph_borders_to_native(borders: Option<Borders>) -> NativeParagraphBorderFields {
     match borders {
         None => NativeParagraphBorderFields::default(),
-        Some(ParagraphBorders::None) => NativeParagraphBorderFields {
+        Some(Borders::None) => NativeParagraphBorderFields {
             deprecated_borders: Some(0),
             stroke_null: Some(true),
-            positions: Some(ParagraphBorderSides::NONE.native_bits()),
+            positions: Some(border_sides_native_bits(BorderSides::NONE)),
             rounded_corners: Some(false),
             ..Default::default()
         },
-        Some(ParagraphBorders::Bordered(border)) => {
-            let offset = (border.offset() != ParagraphBorderOffset::DEFAULT).then(|| {
-                let inset = border.offset().native_inset();
+        Some(Borders::Bordered(border)) => {
+            let offset = (border.offset() != BorderOffset::DEFAULT).then(|| {
+                let inset = border_offset_native_inset(border.offset());
                 tsp::Point { x: inset, y: inset }
             });
             NativeParagraphBorderFields {
                 deprecated_borders: Some(paragraph_border_legacy_value(border.sides())),
                 historical_rule_offset: offset,
-                stroke: Some(stroke_to_native(border.native_stroke())),
-                positions: Some(border.sides().native_bits()),
+                stroke: Some(stroke_to_native(border_stroke(border))),
+                positions: Some(border_sides_native_bits(border.sides())),
                 rounded_corners: Some(border.has_rounded_corners()),
                 ..Default::default()
             }
@@ -2079,19 +2107,56 @@ fn paragraph_borders_to_native(borders: Option<ParagraphBorders>) -> NativeParag
     }
 }
 
-fn paragraph_border_legacy_value(sides: ParagraphBorderSides) -> i32 {
-    if sides == ParagraphBorderSides::ALL {
-        return LEGACY_BORDER_ALL;
-    }
-    i32::from(sides.contains(ParagraphBorderSides::TOP)) * LEGACY_BORDER_TOP
-        + i32::from(sides.contains(ParagraphBorderSides::BOTTOM)) * LEGACY_BORDER_BOTTOM
-        + i32::from(sides.contains(ParagraphBorderSides::LEFT)) * LEGACY_BORDER_LEFT
-        + i32::from(sides.contains(ParagraphBorderSides::RIGHT)) * LEGACY_BORDER_RIGHT
+const PARAGRAPH_BORDER_ALL_BITS: u8 = 0b1111;
+const DEFAULT_PARAGRAPH_BORDER_OFFSET_POINTS: f32 = 6.0;
+
+fn border_sides_native_bits(sides: BorderSides) -> i32 {
+    i32::from(sides.contains(BorderSides::TOP))
+        | (i32::from(sides.contains(BorderSides::BOTTOM)) << 1)
+        | (i32::from(sides.contains(BorderSides::LEFT)) << 2)
+        | (i32::from(sides.contains(BorderSides::RIGHT)) << 3)
 }
 
-fn paragraph_border_sides_from_legacy(value: i32) -> Result<ParagraphBorderSides> {
+fn border_sides_from_native_bits(bits: i32) -> Result<BorderSides> {
+    let bits = u8::try_from(bits).map_err(|_| {
+        Error::InvalidFormat("native paragraph-border sides are negative".to_owned())
+    })?;
+    if bits & !PARAGRAPH_BORDER_ALL_BITS != 0 {
+        return Err(Error::InvalidFormat(
+            "native paragraph-border sides contain unknown bits".to_owned(),
+        ));
+    }
+    Ok(BorderSides::from_flags([
+        bits & 1 != 0,
+        bits & 2 != 0,
+        bits & 4 != 0,
+        bits & 8 != 0,
+    ]))
+}
+
+fn border_offset_from_native_inset(inset: f32) -> Result<BorderOffset> {
+    BorderOffset::from_points(inset + DEFAULT_PARAGRAPH_BORDER_OFFSET_POINTS).map_err(|error| {
+        Error::InvalidFormat(format!("invalid native paragraph-border offset: {error}"))
+    })
+}
+
+fn border_offset_native_inset(offset: BorderOffset) -> f32 {
+    offset.points() - DEFAULT_PARAGRAPH_BORDER_OFFSET_POINTS
+}
+
+fn paragraph_border_legacy_value(sides: BorderSides) -> i32 {
+    if sides == BorderSides::ALL {
+        return LEGACY_BORDER_ALL;
+    }
+    i32::from(sides.contains(BorderSides::TOP)) * LEGACY_BORDER_TOP
+        + i32::from(sides.contains(BorderSides::BOTTOM)) * LEGACY_BORDER_BOTTOM
+        + i32::from(sides.contains(BorderSides::LEFT)) * LEGACY_BORDER_LEFT
+        + i32::from(sides.contains(BorderSides::RIGHT)) * LEGACY_BORDER_RIGHT
+}
+
+fn paragraph_border_sides_from_legacy(value: i32) -> Result<BorderSides> {
     if value == LEGACY_BORDER_ALL {
-        return Ok(ParagraphBorderSides::ALL);
+        return Ok(BorderSides::ALL);
     }
     let known = LEGACY_BORDER_TOP | LEGACY_BORDER_BOTTOM | LEGACY_BORDER_LEFT | LEGACY_BORDER_RIGHT;
     if value < 0 || value & !known != 0 {
@@ -2099,12 +2164,12 @@ fn paragraph_border_sides_from_legacy(value: i32) -> Result<ParagraphBorderSides
             "native paragraph border has an unknown legacy side value".to_owned(),
         ));
     }
-    Ok(ParagraphBorderSides::new(
+    Ok(BorderSides::from_flags([
         value & LEGACY_BORDER_TOP != 0,
         value & LEGACY_BORDER_BOTTOM != 0,
         value & LEGACY_BORDER_LEFT != 0,
         value & LEGACY_BORDER_RIGHT != 0,
-    ))
+    ]))
 }
 
 pub(super) fn capitalization_from_character(
@@ -2327,20 +2392,20 @@ pub(crate) fn stylesheet_id(style: &tswp::ParagraphStyleArchive, style_id: u64) 
         })
 }
 
-fn line_spacing_archive(spacing: ParagraphLineSpacing) -> tswp::LineSpacingArchive {
+fn line_spacing_archive(spacing: LineSpacing) -> tswp::LineSpacingArchive {
     match spacing {
-        ParagraphLineSpacing::Relative(multiple) => tswp::LineSpacingArchive {
+        LineSpacing::Relative(multiple) => tswp::LineSpacingArchive {
             amount: Some(multiple.get()),
             ..Default::default()
         },
-        ParagraphLineSpacing::AtLeast(points) => point_spacing(MINIMUM_LINE_SPACING_MODE, points),
-        ParagraphLineSpacing::Exactly(points) => point_spacing(EXACT_LINE_SPACING_MODE, points),
-        ParagraphLineSpacing::Maximum(points) => point_spacing(MAXIMUM_LINE_SPACING_MODE, points),
-        ParagraphLineSpacing::Between(points) => point_spacing(BETWEEN_LINE_SPACING_MODE, points),
+        LineSpacing::AtLeast(points) => point_spacing(MINIMUM_LINE_SPACING_MODE, points),
+        LineSpacing::Exactly(points) => point_spacing(EXACT_LINE_SPACING_MODE, points),
+        LineSpacing::Maximum(points) => point_spacing(MAXIMUM_LINE_SPACING_MODE, points),
+        LineSpacing::Between(points) => point_spacing(BETWEEN_LINE_SPACING_MODE, points),
     }
 }
 
-fn point_spacing(mode: i32, points: ParagraphLineSpacingPoints) -> tswp::LineSpacingArchive {
+fn point_spacing(mode: i32, points: LineSpacingPoints) -> tswp::LineSpacingArchive {
     tswp::LineSpacingArchive {
         mode: Some(mode),
         amount: Some(points.points()),
@@ -2348,7 +2413,7 @@ fn point_spacing(mode: i32, points: ParagraphLineSpacingPoints) -> tswp::LineSpa
     }
 }
 
-fn line_spacing_from_archive(spacing: &tswp::LineSpacingArchive) -> Result<ParagraphLineSpacing> {
+fn line_spacing_from_archive(spacing: &tswp::LineSpacingArchive) -> Result<LineSpacing> {
     if spacing.baseline_rule.is_some() {
         return Err(Error::InvalidFormat(
             "unsupported native iWork line-spacing baseline rule".to_owned(),
@@ -2357,21 +2422,19 @@ fn line_spacing_from_archive(spacing: &tswp::LineSpacingArchive) -> Result<Parag
     let mode = spacing.mode.unwrap_or(RELATIVE_LINE_SPACING_MODE);
     if mode == RELATIVE_LINE_SPACING_MODE {
         let multiple = spacing.amount.unwrap_or(1.0);
-        return Ok(ParagraphLineSpacing::Relative(
-            ParagraphLineSpacingMultiple::new(multiple)?,
-        ));
+        return Ok(LineSpacing::Relative(LineSpacingMultiple::new(multiple)?));
     }
     let points = spacing.amount.ok_or_else(|| {
         Error::InvalidFormat(format!(
             "native iWork line-spacing mode {mode} has no amount"
         ))
     })?;
-    let points = ParagraphLineSpacingPoints::from_points(points)?;
+    let points = LineSpacingPoints::from_points(points)?;
     match mode {
-        MINIMUM_LINE_SPACING_MODE => Ok(ParagraphLineSpacing::AtLeast(points)),
-        EXACT_LINE_SPACING_MODE => Ok(ParagraphLineSpacing::Exactly(points)),
-        MAXIMUM_LINE_SPACING_MODE => Ok(ParagraphLineSpacing::Maximum(points)),
-        BETWEEN_LINE_SPACING_MODE => Ok(ParagraphLineSpacing::Between(points)),
+        MINIMUM_LINE_SPACING_MODE => Ok(LineSpacing::AtLeast(points)),
+        EXACT_LINE_SPACING_MODE => Ok(LineSpacing::Exactly(points)),
+        MAXIMUM_LINE_SPACING_MODE => Ok(LineSpacing::Maximum(points)),
+        BETWEEN_LINE_SPACING_MODE => Ok(LineSpacing::Between(points)),
         _ => Err(Error::InvalidFormat(format!(
             "unsupported native iWork line-spacing mode {mode}"
         ))),
@@ -2381,7 +2444,7 @@ fn line_spacing_from_archive(spacing: &tswp::LineSpacingArchive) -> Result<Parag
 fn has_exact_fields(data: &[u8], expected: &[u32]) -> Result<bool> {
     let mut actual = parse_wire_fields(data)?
         .into_iter()
-        .map(|field| field.number)
+        .map(|field| field.number())
         .collect::<Vec<_>>();
     let mut expected = expected.to_vec();
     actual.sort_unstable();
@@ -2392,14 +2455,14 @@ fn has_exact_fields(data: &[u8], expected: &[u32]) -> Result<bool> {
 fn has_canonical_bool_field(data: &[u8], number: u32) -> Result<bool> {
     let fields = parse_wire_fields(data)?
         .into_iter()
-        .filter(|field| field.number == number)
+        .filter(|field| field.number() == number)
         .collect::<Vec<_>>();
     let [field] = fields.as_slice() else {
         return Ok(false);
     };
-    Ok(field.wire_type == 0
+    Ok(field.wire_type() == 0
         && matches!(
-            &data[field.key_end..field.end],
+            &data[field.key_end()..field.end()],
             [PROTOBUF_FALSE_BYTE] | [PROTOBUF_TRUE_BYTE]
         ))
 }

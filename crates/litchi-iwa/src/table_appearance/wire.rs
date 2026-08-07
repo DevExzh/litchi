@@ -30,7 +30,7 @@ pub(super) fn table_appearance_overrides(data: &[u8]) -> Result<TableAppearanceO
     let fields = parse_wire_fields(data)?;
     let mut property_fields = fields
         .iter()
-        .filter(|field| field.number == TABLE_STYLE_PROPERTIES_FIELD);
+        .filter(|field| field.number() == TABLE_STYLE_PROPERTIES_FIELD);
     let Some(properties) = property_fields.next() else {
         return Ok(TableAppearanceOverrides::default());
     };
@@ -39,13 +39,13 @@ pub(super) fn table_appearance_overrides(data: &[u8]) -> Result<TableAppearanceO
             "iWork table-style properties occur more than once".to_owned(),
         ));
     }
-    if properties.wire_type != 2 {
+    if properties.wire_type() != 2 {
         return Err(Error::InvalidFormat(format!(
             "iWork table-style properties use wire type {}, expected 2",
-            properties.wire_type
+            properties.wire_type()
         )));
     }
-    let properties = &data[properties.payload_start..properties.end];
+    let properties = &data[properties.payload_start()..properties.end()];
     Ok(TableAppearanceOverrides {
         banded_rows: strict_optional_bool(properties, BANDED_ROWS_FIELD, "banded rows")?,
         auto_resize: strict_optional_bool(properties, AUTO_RESIZE_FIELD, "automatic row sizing")?,
@@ -94,7 +94,7 @@ pub(super) fn table_appearance_overrides(data: &[u8]) -> Result<TableAppearanceO
 
 fn strict_optional_bool(data: &[u8], field_number: u32, label: &str) -> Result<Option<bool>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -103,17 +103,17 @@ fn strict_optional_bool(data: &[u8], field_number: u32, label: &str) -> Result<O
             "iWork table {label} field occurs more than once"
         )));
     }
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "iWork table {label} uses wire type {}, expected 0",
-            field.wire_type
+            field.wire_type()
         )));
     }
-    let (value, length) = crate::varint::decode_varint_from_bytes(
-        &data[field.payload_start..field.end],
+    let (value, length) = litchi_iwa_common::varint::decode_varint_from_bytes(
+        &data[field.payload_start()..field.end()],
     )
     .map_err(|error| Error::InvalidFormat(format!("invalid iWork table {label}: {error}")))?;
-    if field.payload_start + length != field.end {
+    if field.payload_start() + length != field.end() {
         return Err(Error::InvalidFormat(format!(
             "iWork table {label} contains trailing bytes"
         )));

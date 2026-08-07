@@ -2,7 +2,9 @@
 
 use std::env;
 
-use litchi_iwa::pages::{PagesEditor, PagesRgbColorSpace, PagesRgbaColor, PagesSectionBackground};
+use litchi_iwa::pages::PagesEditor;
+use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+use litchi_pages::section::Background;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -23,21 +25,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let blue = component("missing blue component")?;
     let alpha = component("missing alpha component")?;
     let color_space = match arguments.next().as_deref() {
-        Some("srgb") => PagesRgbColorSpace::Srgb,
-        Some("p3") => PagesRgbColorSpace::DisplayP3,
+        Some("srgb") => RgbColorSpace::Srgb,
+        Some("p3") => RgbColorSpace::DisplayP3,
         _ => return Err("color space must be srgb or p3".into()),
     };
 
     let mut editor = PagesEditor::open(input)?;
     editor.set_section_background(
         section_id,
-        PagesSectionBackground::Solid(PagesRgbaColor {
-            red,
-            green,
-            blue,
-            alpha,
-            color_space,
-        }),
+        Background::Solid(Rgba::new(red, green, blue, alpha, color_space)?),
     )?;
     editor.save(output)?;
     Ok(())

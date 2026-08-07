@@ -51,6 +51,19 @@ lossless, construction is validated, and mutation is tracked.
 - Unsupported content remains readable and preservable. Unsupported editing is
   a typed capability error, never a silent approximation.
 
+For the IWA chart seam, this means the public reference-line model is a
+validated semantic value rather than an archive record: finite custom values,
+bounded names, packed visibility, and checked lossless future kinds belong to
+the common layer. Protobuf extensions, object ownership, graph ordering, and
+package transactions remain below the facade boundary.
+
+The same boundary applies to drawable geometry. Fixed-size document points,
+sizes, and the horizontal/vertical flip selector live in
+`litchi_iwa_common::shape::geometry`; the full IWA `DrawableGeometry` adapter
+retains optional-field presence, native reflection flags, rotation conventions,
+and protobuf/wire mutation because those details are not neutral semantic
+vocabulary.
+
 ## Consequences
 
 The current API may be replaced outright. Migration scaffolding is internal to

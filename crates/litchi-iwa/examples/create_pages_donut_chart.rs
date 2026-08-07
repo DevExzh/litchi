@@ -3,7 +3,7 @@
 use std::env;
 
 use litchi_iwa::charts::{
-    ChartData, ChartDonutInnerRadius, ChartKind, ChartPieLabelDistance, ChartPieLabelVisibility,
+    ChartData, ChartDonutInnerRadius, ChartPieLabelDistance, Kind, LabelVisibility,
 };
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut editor = PagesDocumentBuilder::new().body_text(body).build()?;
     let chart = editor.add_body_chart(
         body.encode_utf16().count(),
-        ChartKind::Donut2d,
+        Kind::Donut2d,
         donut_data()?,
         DrawablePoint { x: 96.0, y: 144.0 },
         DrawableSize {
@@ -29,9 +29,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_chart_pie_label_visibilities(
         chart.drawable_object_id,
         &[
-            ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY,
-            ChartPieLabelVisibility::ALL,
-            ChartPieLabelVisibility::VALUES_ONLY,
+            LabelVisibility::DATA_POINT_NAMES_ONLY,
+            LabelVisibility::ALL,
+            LabelVisibility::VALUES_ONLY,
         ],
     )?;
     editor.set_body_chart_pie_label_distances(

@@ -81,7 +81,7 @@ mod tests {
         let chart = editor
             .add_slide_chart(
                 0,
-                ChartKind::Radar2d,
+                Kind::Radar2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {

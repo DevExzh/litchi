@@ -19,7 +19,8 @@ pub(super) fn set_attached_table_formula(
         .ok_or_else(|| Error::ParseError(format!("iWork table object {table_id} not found")))?;
     let external_tables = formula_external_tables(package, &descriptors)?;
     let pivot_categories = formula_pivot_categories(package)?;
-    let compiled = expression.compile(
+    let compiled = compile_formula(
+        &expression,
         row,
         column,
         descriptor.model.number_of_rows as usize,
@@ -50,13 +51,7 @@ pub(super) fn set_attached_table_formula(
         (formula, error)
     };
     if let Some(cached_value) = cached_value {
-        set_attached_cell_in_package(
-            package,
-            table_id,
-            row,
-            column,
-            cached_value.into_cell_value(),
-        )?;
+        set_attached_cell_in_package(package, table_id, row, column, cached_value.into_value())?;
     } else {
         if old_formula.is_some()
             && let Some(identifier) = old_formula_error
@@ -80,7 +75,12 @@ pub(super) fn set_attached_table_formula(
                 &[],
             )?;
         } else {
-            set_attached_cell_in_package(package, table_id, row, column, CellValue::Number(0.0))?;
+            let empty_value = CellValue::number(0.0).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "Numbers formula placeholder value is not finite: {error}"
+                ))
+            })?;
+            set_attached_cell_in_package(package, table_id, row, column, empty_value)?;
         }
     }
 

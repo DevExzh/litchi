@@ -27,8 +27,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 shape.preset,
                 shape.line_segment,
                 shape.line_endpoints,
-                shape.storage.object_id,
-                shape.storage.text,
+                shape.storage.id,
+                shape.storage.storage.text(),
                 shape.geometry,
                 shape.properties,
             );

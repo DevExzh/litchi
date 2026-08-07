@@ -2,18 +2,16 @@
 
 use super::series_value_labels::value_label_series_count;
 use super::*;
+use crate::charts::Index;
 use crate::charts::series_error_bars::{
     chart_series_error_bars as read_native_error_bars,
     set_chart_series_error_bars as set_native_error_bars,
 };
-use crate::charts::{ChartSeriesErrorBars, ChartSeriesIndex};
+use litchi_iwa_common::chart::error_bar::Series;
 
 impl PagesEditor {
     /// Read every body chart series' error bars in native series order.
-    pub fn body_chart_series_error_bars(
-        &self,
-        drawable_object_id: u64,
-    ) -> Result<Vec<ChartSeriesErrorBars>> {
+    pub fn body_chart_series_error_bars(&self, drawable_object_id: u64) -> Result<Vec<Series>> {
         body_chart_series_error_bars(self, drawable_object_id)
     }
 
@@ -21,8 +19,8 @@ impl PagesEditor {
     pub fn body_chart_series_error_bar(
         &self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
-    ) -> Result<ChartSeriesErrorBars> {
+        series: Index,
+    ) -> Result<Series> {
         let values = body_chart_series_error_bars(self, drawable_object_id)?;
         values
             .get(series.zero_based())
@@ -34,7 +32,7 @@ impl PagesEditor {
     pub fn set_body_chart_series_error_bars(
         &mut self,
         drawable_object_id: u64,
-        values: &[ChartSeriesErrorBars],
+        values: &[Series],
     ) -> Result<()> {
         set_body_chart_series_error_bars(self, drawable_object_id, values)
     }
@@ -43,8 +41,8 @@ impl PagesEditor {
     pub fn set_body_chart_series_error_bar(
         &mut self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
-        value: ChartSeriesErrorBars,
+        series: Index,
+        value: Series,
     ) -> Result<()> {
         let mut values = body_chart_series_error_bars(self, drawable_object_id)?;
         let count = values.len();
@@ -62,7 +60,7 @@ impl PagesEditor {
 fn body_chart_series_error_bars(
     editor: &PagesEditor,
     drawable_object_id: u64,
-) -> Result<Vec<ChartSeriesErrorBars>> {
+) -> Result<Vec<Series>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
         graph.info.kind,
@@ -83,7 +81,7 @@ fn body_chart_series_error_bars(
 fn set_body_chart_series_error_bars(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    values: &[ChartSeriesErrorBars],
+    values: &[Series],
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
@@ -131,7 +129,7 @@ fn set_body_chart_series_error_bars(
 fn error_bar_index_error(
     drawable_label: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     series_count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

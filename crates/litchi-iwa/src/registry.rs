@@ -3,74 +3,9 @@
 //! iWork applications use integer type IDs to identify different protobuf message types.
 //! This registry provides mappings from type IDs to message names for different applications.
 
+use crate::application::Application;
 use once_cell::sync::Lazy;
-use std::{collections::HashMap, fmt, str::FromStr};
-
-/// Application type for iWork documents
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Application {
-    /// Apple Pages
-    Pages,
-    /// Apple Keynote
-    Keynote,
-    /// Apple Numbers
-    Numbers,
-    /// Common/shared types
-    Common,
-}
-
-impl Application {
-    /// Return the stable lowercase name used by configuration and diagnostics.
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Pages => "pages",
-            Self::Keynote => "keynote",
-            Self::Numbers => "numbers",
-            Self::Common => "common",
-        }
-    }
-
-    /// Return whether this is one of the three concrete iWork applications.
-    pub const fn is_concrete(self) -> bool {
-        !matches!(self, Self::Common)
-    }
-}
-
-impl fmt::Display for Application {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(self.as_str())
-    }
-}
-
-/// Error returned when a string does not name a supported iWork application.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ApplicationParseError;
-
-impl fmt::Display for ApplicationParseError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("unknown iWork application")
-    }
-}
-
-impl std::error::Error for ApplicationParseError {}
-
-impl FromStr for Application {
-    type Err = ApplicationParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.eq_ignore_ascii_case("pages") {
-            Ok(Self::Pages)
-        } else if s.eq_ignore_ascii_case("keynote") {
-            Ok(Self::Keynote)
-        } else if s.eq_ignore_ascii_case("numbers") {
-            Ok(Self::Numbers)
-        } else if s.eq_ignore_ascii_case("common") {
-            Ok(Self::Common)
-        } else {
-            Err(ApplicationParseError)
-        }
-    }
-}
+use std::{collections::HashMap, fmt};
 
 /// Error returned when a numeric message ID has more than one definition in
 /// the requested registry scope.
@@ -438,165 +373,11 @@ pub fn detect_application(message_type_ids: &[u32]) -> Option<Application> {
         .map(|index| applications[index])
 }
 
-/// Detect the owning iWork application from the root `DocumentArchive` payload.
-///
-/// Message type identifiers overlap between Pages, Numbers, and Keynote, so they
-/// cannot reliably identify an application. The root protobuf schemas have
-/// stable, application-specific required message shapes: Pages uses its shared
-/// document at field 15, Numbers uses references at fields 4/5/6 plus its shared
-/// document at field 8, and Keynote uses a reference at field 2 plus its shared
-/// document at field 3. Malformed or multiply matching payloads fail closed.
-pub fn detect_application_from_document(payload: &[u8]) -> Option<Application> {
-    let fields = wire_fields(payload)?;
-    let pages = unique_field(&fields, 15, 2).is_some_and(valid_shared_document);
-    let numbers = [4, 5, 6]
-        .into_iter()
-        .all(|field| unique_field(&fields, field, 2).is_some_and(valid_reference))
-        && unique_field(&fields, 8, 2).is_some_and(valid_shared_document);
-    let keynote = unique_field(&fields, 2, 2).is_some_and(valid_reference)
-        && unique_field(&fields, 3, 2).is_some_and(valid_shared_document);
-
-    match (pages, numbers, keynote) {
-        (true, false, false) => Some(Application::Pages),
-        (false, true, false) => Some(Application::Numbers),
-        (false, false, true) => Some(Application::Keynote),
-        _ => None,
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct WireField<'a> {
-    number: u32,
-    wire_type: u8,
-    value: &'a [u8],
-}
-
-fn wire_fields(payload: &[u8]) -> Option<Vec<WireField<'_>>> {
-    let mut fields = Vec::new();
-    let mut position = 0;
-
-    while position < payload.len() {
-        let tag = read_varint(payload, &mut position)?;
-        let number = u32::try_from(tag >> 3).ok()?;
-        let wire_type = (tag & 0x07) as u8;
-        if number == 0 {
-            return None;
-        }
-
-        let value = match wire_type {
-            0 => {
-                let start = position;
-                read_varint(payload, &mut position)?;
-                payload.get(start..position)?
-            },
-            1 => take(payload, &mut position, 8)?,
-            2 => {
-                let length = usize::try_from(read_varint(payload, &mut position)?).ok()?;
-                take(payload, &mut position, length)?
-            },
-            5 => take(payload, &mut position, 4)?,
-            _ => return None,
-        };
-
-        fields.push(WireField {
-            number,
-            wire_type,
-            value,
-        });
-    }
-
-    Some(fields)
-}
-
-fn take<'a>(payload: &'a [u8], position: &mut usize, length: usize) -> Option<&'a [u8]> {
-    let end = position.checked_add(length)?;
-    let value = payload.get(*position..end)?;
-    *position = end;
-    Some(value)
-}
-
-fn unique_field<'a>(fields: &[WireField<'a>], number: u32, wire_type: u8) -> Option<&'a [u8]> {
-    let mut matches = fields.iter().filter(|field| field.number == number);
-    let field = matches.next()?;
-    if matches.next().is_some() || field.wire_type != wire_type {
-        return None;
-    }
-    Some(field.value)
-}
-
-fn valid_reference(payload: &[u8]) -> bool {
-    wire_fields(payload)
-        .and_then(|fields| unique_field(&fields, 1, 0))
-        .is_some()
-}
-
-fn valid_shared_document(payload: &[u8]) -> bool {
-    wire_fields(payload)
-        .and_then(|fields| unique_field(&fields, 1, 2))
-        .and_then(wire_fields)
-        .is_some()
-}
-
-fn read_varint(payload: &[u8], position: &mut usize) -> Option<u64> {
-    let mut value = 0u64;
-    for shift in (0..=63).step_by(7) {
-        let byte = *payload.get(*position)?;
-        *position += 1;
-        if shift == 63 && byte > 1 {
-            return None;
-        }
-        value |= u64::from(byte & 0x7f) << shift;
-        if byte & 0x80 == 0 {
-            return Some(value);
-        }
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protobuf::{kn, tn, tp, tsa, tsk, tsp};
-    use prost::Message;
-
-    fn shared_document() -> tsa::DocumentArchive {
-        tsa::DocumentArchive {
-            super_: tsk::DocumentArchive::default(),
-            ..Default::default()
-        }
-    }
-
-    fn reference(identifier: u64) -> tsp::Reference {
-        tsp::Reference {
-            identifier,
-            ..Default::default()
-        }
-    }
-
-    fn document_payload(application: Application) -> Vec<u8> {
-        match application {
-            Application::Pages => tp::DocumentArchive {
-                super_: shared_document(),
-                ..Default::default()
-            }
-            .encode_to_vec(),
-            Application::Numbers => tn::DocumentArchive {
-                super_: shared_document(),
-                stylesheet: reference(1),
-                sidebar_order: reference(2),
-                theme: reference(3),
-                ..Default::default()
-            }
-            .encode_to_vec(),
-            Application::Keynote => kn::DocumentArchive {
-                super_: shared_document(),
-                show: reference(1),
-                ..Default::default()
-            }
-            .encode_to_vec(),
-            Application::Common => Vec::new(),
-        }
-    }
+    use crate::application::ParseError;
+    use std::str::FromStr;
 
     #[test]
     fn test_message_type_lookup() {
@@ -704,52 +485,12 @@ mod tests {
     }
 
     #[test]
-    fn test_document_payload_detection() {
-        assert_eq!(
-            detect_application_from_document(&document_payload(Application::Pages)),
-            Some(Application::Pages)
-        );
-        assert_eq!(
-            detect_application_from_document(&document_payload(Application::Numbers)),
-            Some(Application::Numbers)
-        );
-        assert_eq!(
-            detect_application_from_document(&document_payload(Application::Keynote)),
-            Some(Application::Keynote)
-        );
-
-        let pages_with_references = tp::DocumentArchive {
-            super_: shared_document(),
-            stylesheet: Some(reference(1)),
-            floating_drawables: Some(reference(2)),
-            ..Default::default()
-        }
-        .encode_to_vec();
-        assert_eq!(
-            detect_application_from_document(&pages_with_references),
-            Some(Application::Pages)
-        );
-
-        let mut conflicting = document_payload(Application::Pages);
-        conflicting.extend(document_payload(Application::Numbers));
-        assert_eq!(detect_application_from_document(&conflicting), None);
-
-        let mut conflicting = document_payload(Application::Pages);
-        conflicting.extend(document_payload(Application::Keynote));
-        assert_eq!(detect_application_from_document(&conflicting), None);
-
-        assert_eq!(detect_application_from_document(&[0x78, 0x00]), None);
-        assert_eq!(detect_application_from_document(&[0x7a, 0x00]), None);
-        assert_eq!(detect_application_from_document(&[0x80]), None);
-    }
-
-    #[test]
     fn test_application_from_string() {
         assert_eq!(Application::from_str("pages"), Ok(Application::Pages));
         assert_eq!(Application::from_str("Pages"), Ok(Application::Pages));
         assert_eq!(Application::from_str("keynote"), Ok(Application::Keynote));
         assert_eq!(Application::from_str("numbers"), Ok(Application::Numbers));
-        assert_eq!(Application::from_str("unknown"), Err(ApplicationParseError));
+        assert_eq!(Application::from_str("unknown"), Err(ParseError));
         assert_eq!(Application::Pages.as_str(), "pages");
         assert_eq!(Application::Pages.to_string(), "pages");
         assert!(Application::Pages.is_concrete());

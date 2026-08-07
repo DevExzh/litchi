@@ -47,7 +47,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             println!(
                 "  text_index={text_index} text_box_index={ordinary_index:?} role={:?} drawable={} storage={} text={:?} geometry={geometry:?} properties={properties:?} columns={columns:?} text_layout={text_layout:?}",
-                text.role, text.drawable_object_id, text.storage.object_id, text.storage.text
+                text.role,
+                text.drawable_object_id,
+                text.storage.id,
+                text.storage.storage.text()
             );
         }
     }

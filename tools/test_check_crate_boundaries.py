@@ -234,6 +234,22 @@ class BoundaryPolicyTests(unittest.TestCase):
             violations,
         )
 
+    def test_resolved_canonical_edge_requires_policy_cleanup(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        edge = next(iter(self.policy.canonical_edges))
+        edges = dict(snapshot.edges)
+        del edges[edge]
+        dependencies = dict(snapshot.dependencies)
+        dependencies[edge.dependent] -= frozenset({edge.dependency})
+        snapshot = replace(snapshot, edges=edges, dependencies=dependencies)
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertIn(
+            f"resolved canonical edge still listed: {edge.display()}; remove its policy entry",
+            violations,
+        )
+
     def test_allowed_edges_cannot_hide_a_dependency_cycle(self) -> None:
         snapshot = valid_snapshot(self.policy)
         edge = boundaries.Edge("litchi-core", "litchi-sheet")
@@ -310,6 +326,37 @@ class BoundaryPolicyTests(unittest.TestCase):
             "litchi facade has non-optional normal dependencies: litchi-xlsb",
             violations,
         )
+
+    def test_litchi_facade_rejects_retired_monolithic_iwork_dependency(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        dependencies = dict(snapshot.dependencies)
+        dependencies["litchi"] |= frozenset({"litchi-iwa"})
+        snapshot = replace(snapshot, dependencies=dependencies)
+
+        self.assertIn(
+            "litchi facade depends on retired packages: litchi-iwa",
+            boundaries.audit_litchi_facade(snapshot),
+        )
+
+    def test_litchi_facade_cannot_publicly_reexport_retired_iwa_module(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / boundaries.FACADE_SOURCE_ROOT / "lib.rs"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                "pub mod iwa;\npub use litchi_iwa::Document;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_litchi_facade_source_topology(root),
+                [
+                    "retired litchi facade public iwa module: "
+                    "crates/litchi/src/lib.rs:1",
+                    "retired litchi facade public iwa re-export: "
+                    "crates/litchi/src/lib.rs:2",
+                ],
+            )
 
     def test_litchi_facade_requires_an_empty_default_feature(self) -> None:
         snapshot = valid_snapshot(self.policy)

@@ -61,7 +61,7 @@ pub mod eval {
     feature = "xlsx",
     feature = "xlsb",
     feature = "ods",
-    feature = "iwork"
+    feature = "numbers"
 ))]
 mod adapters;
 #[cfg(any(
@@ -69,7 +69,7 @@ mod adapters;
     feature = "xlsx",
     feature = "xlsb",
     feature = "ods",
-    feature = "iwork"
+    feature = "numbers"
 ))]
 pub mod functions;
 pub mod text;
@@ -78,7 +78,7 @@ pub mod text;
     feature = "xlsx",
     feature = "xlsb",
     feature = "ods",
-    feature = "iwork"
+    feature = "numbers"
 ))]
 mod workbook;
 #[cfg(any(
@@ -86,7 +86,7 @@ mod workbook;
     feature = "xlsx",
     feature = "xlsb",
     feature = "ods",
-    feature = "iwork"
+    feature = "numbers"
 ))]
 mod workbook_types;
 
@@ -98,7 +98,7 @@ pub use eval::FormulaEvaluator;
     feature = "xlsx",
     feature = "xlsb",
     feature = "ods",
-    feature = "iwork"
+    feature = "numbers"
 ))]
 pub use functions::*;
 pub use traits::{Cell, CellIterator, RowIterator, WorkbookTrait, Worksheet, WorksheetIterator};
@@ -108,6 +108,6 @@ pub use types::{CellValue, Result};
     feature = "xlsx",
     feature = "xlsb",
     feature = "ods",
-    feature = "iwork"
+    feature = "numbers"
 ))]
 pub use workbook::Workbook;

@@ -5,11 +5,13 @@ use crate::shapes::{DrawablePoint, DrawableSize};
 use crate::text::highlight_object::validate_plain_highlight_graph;
 use crate::text::highlight_storage::locate_storage;
 use crate::text::highlight_storage::{HIGHLIGHT_TABLE_FIELD, TABLE_ENTRIES_FIELD};
+use crate::text::storage_id::TextStorageId;
 use crate::wire::{
     append_length_delimited_field, parse_wire_fields, patch_length_delimited_field,
     patch_varint_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields, transform_length_delimited_field,
 };
+use litchi_iwa_text::highlight::raw::object_id as native_object_id;
 use prost::Message;
 
 use super::*;
@@ -20,12 +22,12 @@ const SIZE: DrawableSize = DrawableSize {
     height: 140.0,
 };
 
-fn fixture() -> (super::super::IWorkTextEditor, u64) {
+fn fixture() -> (super::super::IWorkTextEditor, TextStorageId) {
     let mut pages = PagesEditor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
     (
         super::super::IWorkTextEditor::from_package(pages.into_package()),
-        text_box.storage.object_id,
+        text_box.storage.id,
     )
 }
 
@@ -42,11 +44,13 @@ fn unknown_table_entry_and_highlight_fields_survive_updates() {
     let (mut editor, storage_id) = fixture();
     let highlight = editor.add_text_highlight(storage_id, range(0, 5)).unwrap();
     let mut package = editor.into_package();
-    let archive_name = locate_storage(&package, storage_id).unwrap().archive_name;
-    let message_index = storage_message_index(&package, storage_id);
+    let archive_name = locate_storage(&package, storage_id.get())
+        .unwrap()
+        .archive_name;
+    let message_index = storage_message_index(&package, storage_id.get());
     package
         .update_archive(&archive_name, |archive| {
-            let storage = archive.object_mut(storage_id).unwrap();
+            let storage = archive.object_mut(storage_id.get()).unwrap();
             let original = &storage.messages[message_index];
             let data =
                 transform_length_delimited_field(&original.data, HIGHLIGHT_TABLE_FIELD, |table| {
@@ -66,7 +70,7 @@ fn unknown_table_entry_and_highlight_fields_survive_updates() {
                     data,
                 },
             )?;
-            let object = archive.object_mut(highlight.id.object_id()).unwrap();
+            let object = archive.object_mut(native_object_id(highlight.id)).unwrap();
             let original = &object.messages[0];
             let data = patch_varint_field(&original.data, 88, false, Some(9))?;
             object.replace_message(
@@ -86,29 +90,29 @@ fn unknown_table_entry_and_highlight_fields_survive_updates() {
         .unwrap();
     let package = editor.into_package();
     let archive = package.archive(&archive_name).unwrap();
-    let storage = archive.object(storage_id).unwrap();
-    let message = &storage.messages[storage_message_index(&package, storage_id)];
+    let storage = archive.object(storage_id.get()).unwrap();
+    let message = &storage.messages[storage_message_index(&package, storage_id.get())];
     let table =
         repeated_length_delimited_payloads(&message.data, HIGHLIGHT_TABLE_FIELD).unwrap()[0];
     assert!(
         parse_wire_fields(table)
             .unwrap()
             .iter()
-            .any(|field| field.number == 99)
+            .any(|field| field.number() == 99)
     );
     let entries = repeated_length_delimited_payloads(table, TABLE_ENTRIES_FIELD).unwrap();
     assert!(entries.iter().any(|entry| {
         parse_wire_fields(entry)
             .unwrap()
             .iter()
-            .any(|field| field.number == 77)
+            .any(|field| field.number() == 77)
     }));
-    let object = archive.object(highlight.id.object_id()).unwrap();
+    let object = archive.object(native_object_id(highlight.id)).unwrap();
     assert!(
         parse_wire_fields(&object.messages[0].data)
             .unwrap()
             .iter()
-            .any(|field| field.number == 88)
+            .any(|field| field.number() == 88)
     );
 }
 
@@ -117,11 +121,13 @@ fn duplicate_highlight_tables_fail_without_mutation() {
     let (mut editor, storage_id) = fixture();
     editor.add_text_highlight(storage_id, range(0, 5)).unwrap();
     let mut package = editor.into_package();
-    let archive_name = locate_storage(&package, storage_id).unwrap().archive_name;
-    let message_index = storage_message_index(&package, storage_id);
+    let archive_name = locate_storage(&package, storage_id.get())
+        .unwrap()
+        .archive_name;
+    let message_index = storage_message_index(&package, storage_id.get());
     package
         .update_archive(&archive_name, |archive| {
-            let object = archive.object_mut(storage_id).unwrap();
+            let object = archive.object_mut(storage_id.get()).unwrap();
             let original = &object.messages[message_index];
             let table =
                 repeated_length_delimited_payloads(&original.data, HIGHLIGHT_TABLE_FIELD)?[0];
@@ -148,7 +154,7 @@ fn duplicate_highlight_tables_fail_without_mutation() {
 fn highlight_updates_use_the_resolved_storage_with_a_2022_style_sibling() {
     let (editor, storage_id) = fixture();
     let mut package = editor.into_package();
-    let location = locate_storage(&package, storage_id).unwrap();
+    let location = locate_storage(&package, storage_id.get()).unwrap();
     let style_data = tswp::ParagraphStyleArchive {
         super_: crate::protobuf::tss::StyleArchive::default(),
         ..Default::default()
@@ -157,7 +163,7 @@ fn highlight_updates_use_the_resolved_storage_with_a_2022_style_sibling() {
     package
         .update_archive(&location.archive_name, |archive| {
             archive
-                .object_mut(storage_id)
+                .object_mut(storage_id.get())
                 .unwrap()
                 .push_message(RawMessage {
                     type_: 2_022,
@@ -176,9 +182,9 @@ fn highlight_updates_use_the_resolved_storage_with_a_2022_style_sibling() {
         .remove_text_highlight(storage_id, highlight.id)
         .unwrap();
     let package = editor.into_package();
-    let location = locate_storage(&package, storage_id).unwrap();
+    let location = locate_storage(&package, storage_id.get()).unwrap();
     let archive = package.archive(&location.archive_name).unwrap();
-    let object = archive.object(storage_id).unwrap();
+    let object = archive.object(storage_id.get()).unwrap();
     assert_eq!(
         object.messages[location.message_index].type_,
         location.message_type
@@ -196,20 +202,22 @@ fn highlight_with_an_additional_owner_cannot_be_updated_or_deleted() {
     let (mut editor, storage_id) = fixture();
     let highlight = editor.add_text_highlight(storage_id, range(0, 5)).unwrap();
     let mut package = editor.into_package();
-    let archive_name = locate_storage(&package, storage_id).unwrap().archive_name;
+    let archive_name = locate_storage(&package, storage_id.get())
+        .unwrap()
+        .archive_name;
     package
         .update_archive(&archive_name, |archive| {
             let other = archive
                 .objects
                 .iter_mut()
                 .find(|object| {
-                    object.archive_info.identifier != Some(storage_id)
+                    object.archive_info.identifier != Some(storage_id.get())
                         && !object.archive_info.message_infos.is_empty()
                 })
                 .unwrap();
             other.archive_info.message_infos[0]
                 .object_references
-                .push(highlight.id.object_id());
+                .push(native_object_id(highlight.id));
             Ok(())
         })
         .unwrap();
@@ -232,21 +240,21 @@ fn highlight_with_an_additional_owner_cannot_be_updated_or_deleted() {
 fn comment_backed_annotations_are_classified_without_mutation() {
     let mut pages = PagesEditor::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
-    let storage_id = text_box.storage.object_id;
+    let storage_id = text_box.storage.id;
     let mut package = pages.into_package();
     let created = add_text_highlight(
         &mut package,
-        storage_id,
+        storage_id.get(),
         TextRange::from_utf16_indexes(0, 5).unwrap(),
     )
     .unwrap();
-    let location = locate_storage(&package, storage_id).unwrap();
+    let location = locate_storage(&package, storage_id.get()).unwrap();
     let archive = package.archive(&location.archive_name).unwrap();
-    let object = archive.object(created.id.object_id()).unwrap();
+    let object = archive.object(native_object_id(created.id)).unwrap();
     let graph = validate_plain_highlight_graph(
         &package,
         &location.archive_name,
-        created.id.object_id(),
+        native_object_id(created.id),
         object,
     )
     .unwrap()
@@ -267,13 +275,20 @@ fn comment_backed_annotations_are_classified_without_mutation() {
         })
         .unwrap();
     let before = package.to_bytes().unwrap();
-    assert!(text_highlights(&package, storage_id).unwrap().is_empty());
-    let comments = crate::text::text_comment::text_comments(&package, storage_id).unwrap();
-    assert_eq!(comments.len(), 1);
-    assert_eq!(comments[0].id.object_id(), created.id.object_id());
-    assert_eq!(comments[0].body.as_str(), "note");
     assert!(
-        remove_text_highlight(&mut package, storage_id, created.id).is_err(),
+        text_highlights(&package, storage_id.get())
+            .unwrap()
+            .is_empty()
+    );
+    let comments = crate::text::text_comment::text_comments(&package, storage_id.get()).unwrap();
+    assert_eq!(comments.len(), 1);
+    assert_eq!(
+        litchi_iwa_text::comment::raw::comment_id_value(comments[0].id()),
+        native_object_id(created.id)
+    );
+    assert_eq!(comments[0].body().as_str(), "note");
+    assert!(
+        remove_text_highlight(&mut package, storage_id.get(), created.id).is_err(),
         "comment-backed annotation must not be discarded"
     );
     assert_eq!(package.to_bytes().unwrap(), before);

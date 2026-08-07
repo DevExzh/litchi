@@ -19,64 +19,85 @@
 //! let doc = NumbersDocument::open("spreadsheet.numbers")?;
 //! let sheets = doc.sheets()?;
 //!
-//! for sheet in sheets {
-//!     println!("Sheet: {}", sheet.name);
-//!     for table in &sheet.tables {
+//! for sheet in sheets.iter() {
+//!     println!("Sheet: {}", sheet.name());
+//!     for table in sheet.tables() {
 //!         println!("  Table: {}", table.name());
-//!         println!("{}", table.to_csv());
 //!     }
 //! }
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-pub mod cell;
+pub(crate) mod cell;
 pub mod creation;
 pub mod document;
 pub mod editor;
-pub mod formula;
-pub mod sheet;
+pub(crate) mod formula;
+pub(crate) mod sheet;
 pub mod table;
 pub mod table_extractor;
 
-mod bnc;
+pub(crate) use litchi_numbers::cell::wire as bnc;
+pub(crate) use litchi_numbers::table::dimension::{
+    Dimension as NumbersTableDimension, Points as NumbersTablePoints,
+    Size as NumbersTableDimensionSize,
+};
 mod formula_owner;
 mod function_map;
 mod table_uid_map;
 
-pub use cell::{APPLE_EPOCH_UNIX_OFFSET_SECONDS, CellType, CellValue, TableCellUpdate};
+impl From<litchi_numbers::cell::wire::Error> for crate::Error {
+    fn from(error: litchi_numbers::cell::wire::Error) -> Self {
+        match error {
+            litchi_numbers::cell::wire::Error::InvalidFormat(message) => {
+                Self::InvalidFormat(message)
+            },
+            litchi_numbers::cell::wire::Error::ParseError(message) => Self::ParseError(message),
+        }
+    }
+}
+
+impl From<litchi_numbers::table::headers::Error> for crate::Error {
+    fn from(error: litchi_numbers::table::headers::Error) -> Self {
+        Self::ParseError(error.to_string())
+    }
+}
+
+impl From<litchi_numbers::table::merge::Error> for crate::Error {
+    fn from(error: litchi_numbers::table::merge::Error) -> Self {
+        Self::ParseError(error.to_string())
+    }
+}
+
 pub use creation::NumbersDocumentBuilder;
 pub use document::NumbersDocument;
 pub use editor::{
-    ChartSeriesDirection, IWorkTableCellRegion, NumbersCellCommentInfo,
-    NumbersCellCommentReplyInfo, NumbersEditor, NumbersPivotCategoryInfo, NumbersSheetAudioInfo,
+    Dimension, Direction, NumbersEditor, NumbersPivotCategoryInfo, NumbersSheetAudioInfo,
     NumbersSheetAudioOptions, NumbersSheetChartInfo, NumbersSheetImageInfo,
     NumbersSheetImageOptions, NumbersSheetInfo, NumbersSheetMovieInfo, NumbersSheetMovieOptions,
-    NumbersSheetShapeInfo, NumbersSheetShapeKind, NumbersTableCellParagraphIndents,
-    NumbersTableCellParagraphLineSpacing, NumbersTableCellParagraphList,
-    NumbersTableCellParagraphListBullet, NumbersTableCellParagraphListBulletGeometry,
-    NumbersTableCellParagraphListIndentation, NumbersTableCellParagraphListLabelColor,
-    NumbersTableCellParagraphListLevel, NumbersTableCellParagraphListLevelPlacement,
-    NumbersTableCellParagraphListNumberFormat, NumbersTableCellParagraphListNumberScale,
-    NumbersTableCellParagraphListNumberTiering, NumbersTableCellParagraphListNumbering,
-    NumbersTableCellParagraphListPlacement, NumbersTableCellParagraphSpacing,
-    NumbersTableCellParagraphTabStops, NumbersTableCellTextAlignment,
-    NumbersTableCellTextBackground, NumbersTableCellTextBaselineShift,
-    NumbersTableCellTextCapitalization, NumbersTableCellTextCharacterSpacing,
-    NumbersTableCellTextColor, NumbersTableCellTextDecorations, NumbersTableCellTextFont,
-    NumbersTableCellTextLigatures, NumbersTableCellTextOutline, NumbersTableCellTextScript,
-    NumbersTableCellTextShadow, NumbersTableCellTextStyle, NumbersTableDimension,
-    NumbersTableDimensionSize, NumbersTableHeaderCount, NumbersTableHeaderSettings,
-    NumbersTableInfo, NumbersTablePoints, NumbersTableSortColumnIndex, NumbersTableSortDirection,
-    NumbersTableSortOrder, NumbersTableSortRowRange, NumbersTableSortRule, NumbersTableSortScope,
-    NumbersTableTitleSettings, NumbersTextBoxInfo, RemovedNumbersSheetAudio,
-    RemovedNumbersSheetChart, RemovedNumbersSheetImage, RemovedNumbersSheetMovie,
-    RemovedNumbersSheetShape, RemovedNumbersTextBox, TableCellConditionalHighlightInfo,
-    TableColumnDeletion, TableColumnInsertion, TableRowDeletion, TableRowInsertion,
+    NumbersSheetShapeInfo, NumbersTableCellParagraphList, NumbersTableCellParagraphListBullet,
+    NumbersTableCellParagraphListBulletGeometry, NumbersTableCellParagraphListIndentation,
+    NumbersTableCellParagraphListLabelColor, NumbersTableCellParagraphListLevel,
+    NumbersTableCellParagraphListLevelPlacement, NumbersTableCellParagraphListNumberFormat,
+    NumbersTableCellParagraphListNumberScale, NumbersTableCellParagraphListNumberTiering,
+    NumbersTableCellParagraphListNumbering, NumbersTableCellParagraphListPlacement,
+    NumbersTableCellParagraphTabStops, NumbersTableCellTextBackground,
+    NumbersTableCellTextBaselineShift, NumbersTableCellTextCapitalization,
+    NumbersTableCellTextCharacterSpacing, NumbersTableCellTextColor,
+    NumbersTableCellTextDecorations, NumbersTableCellTextFont, NumbersTableCellTextLigatures,
+    NumbersTableCellTextOutline, NumbersTableCellTextScript, NumbersTableCellTextShadow,
+    NumbersTableCellTextStyle, NumbersTableInfo, NumbersTableSortColumnIndex,
+    NumbersTableSortDirection, NumbersTableSortOrder, NumbersTableSortRowRange,
+    NumbersTableSortRule, NumbersTableSortScope, NumbersTextBoxInfo, Points,
+    RemovedNumbersSheetAudio, RemovedNumbersSheetChart, RemovedNumbersSheetImage,
+    RemovedNumbersSheetMovie, RemovedNumbersSheetShape, RemovedNumbersTextBox, Settings, Size,
+    TableCellConditionalHighlightInfo,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
     FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
 };
+pub use litchi_numbers::cell::{APPLE_EPOCH_UNIX_OFFSET_SECONDS, Type, Update, Value};
 pub use sheet::NumbersSheet;
-pub use table::{NumbersCellComment, NumbersCommentUuid, NumbersTable};
+pub use table::NumbersTable;
 pub use table_extractor::TableDataExtractor;

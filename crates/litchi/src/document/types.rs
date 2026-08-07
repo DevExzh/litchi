@@ -22,8 +22,8 @@ pub(super) enum DocumentImpl {
     #[cfg(feature = "docx")]
     Docx(Box<crate::docx::Package>, litchi_core::Metadata),
     /// Apple Pages format
-    #[cfg(feature = "iwork")]
-    Pages(crate::iwa::pages::PagesDocument),
+    #[cfg(feature = "pages")]
+    Pages(litchi_pages::Package),
     /// RTF format
     #[cfg(feature = "rtf")]
     Rtf(litchi_rtf::RtfDocument<'static>),

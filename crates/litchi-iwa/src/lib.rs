@@ -105,7 +105,7 @@
 //! let doc = Document::open("spreadsheet.numbers")?;
 //! let structured = doc.extract_structured_data()?;
 //!
-//! for table in &structured.tables {
+//! for table in structured.tables() {
 //!     let csv = table.to_csv();
 //!     println!("Table: {}\n{}", table.name(), csv);
 //! }
@@ -125,45 +125,40 @@
 //! - `pyiwa` - Python iWork format reader
 //! - `iWorkFileFormat` - Reverse-engineered format documentation
 
+#![forbid(unsafe_code)]
+
+use std::sync::Arc;
+
+use litchi_core::SourceVersion;
+
 // Core parsing modules
-pub mod archive;
-pub mod bundle;
+/// Semantic iWork application families.
+pub mod application;
+mod archive;
+mod bundle;
 /// Typed native drawable stacking-order controls.
 pub mod drawable_order;
 pub mod identity;
-/// Typed native controls for basic image adjustments.
-pub mod image_adjustments;
+mod image_adjustments;
 mod image_caption;
 pub mod media;
-/// Shared movie and audio playback settings.
-pub mod media_playback;
-pub mod object_index;
-pub mod package;
+/// Native movie and audio playback wire adapter.
+pub(crate) mod media_playback;
+mod object_index;
+mod package;
 mod package_metadata;
-pub mod protobuf;
-pub mod ref_graph;
-pub mod registry;
-pub mod snappy;
-pub mod structured;
+mod protobuf;
+#[cfg(test)]
+mod registry;
+mod snappy;
+mod structured;
 /// Typed copy-on-write appearance controls shared by Pages, Numbers, and Keynote.
 pub mod table_appearance;
-/// Typed explicit cell-border controls shared by native iWork tables.
-pub mod table_cell_border;
-/// Typed conditional-highlight rules shared by native iWork table cells.
-pub mod table_cell_conditional_highlight;
-/// Typed cell data formats shared by native iWork tables.
-pub mod table_cell_data_format;
-/// Typed text-layout controls shared by native iWork table cells.
-pub mod table_cell_layout;
-pub mod table_cell_number_format;
-/// Typed hidden-row and hidden-column state shared by native iWork tables.
-pub mod table_hidden_axes;
+mod table_hidden_axes;
 /// Typed native table lock controls shared by Pages, Numbers, and Keynote.
-pub mod table_lock;
-pub mod theme;
-pub mod varint;
+mod table_lock;
+mod theme;
 pub(crate) mod wire;
-pub mod zip_utils;
 
 /// Shared text extraction utilities
 pub mod text;
@@ -185,42 +180,110 @@ pub mod comments;
 /// Cross-application content extractors
 pub mod shapes;
 
-/// Re-export commonly used types
-pub use archive::{ArchiveInfo, MessageInfo};
-pub use bundle::{Bundle, BundleMetadata, PropertyMap, PropertyValue};
-pub use comments::{
-    DrawableCommentInfo, DrawableCommentReplyInfo, IWorkComment, IWorkCommentUuid,
-    IWorkDrawableCommentEditor, IWorkDrawableInfo, IWorkTableCellCommentInfo,
-    IWorkTableCellCommentReplyInfo,
-};
+/// Explicit low-level access to the native iWork archive and package layers.
+///
+/// The ordinary crate root is reserved for semantic document APIs. Consumers
+/// that intentionally need archive/package primitives must opt into this
+/// namespace so that the native boundary remains visible at every call site.
+pub mod raw {
+    /// Native iWork bundle parsing and metadata primitives.
+    pub mod bundle {
+        pub use crate::bundle::*;
+    }
+
+    /// Mutable native iWork package and snapshot primitives.
+    pub mod package {
+        pub use crate::package::*;
+    }
+
+    /// Native theme/protobuf extension codec.
+    pub mod theme {
+        pub use crate::theme::*;
+    }
+}
+
+// Internal modules use a short alias while the public API keeps this native
+// primitive behind the explicit `raw` namespace above.
+pub use comments::IWorkDrawableCommentEditor;
 pub use document::Document;
 pub use drawable_order::DrawableLayerMove;
 pub use identity::IWorkDocumentIdentity;
-pub use image_adjustments::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 pub use media::{
-    EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaManager, MediaStats, MediaType,
+    EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaAssetId, MediaManager, MediaStats,
 };
-pub use media_playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
-pub use package::IWorkPackage;
-pub use ref_graph::ReferenceGraph;
+pub(crate) use package::IWorkPackage;
 pub use shapes::DrawableTitleCaption;
-pub use snappy::SnappyStream;
-pub use structured::{CellValue, Section, Slide, StructuredData, Table};
+pub use structured::StructuredData;
 pub use text::{
-    ParagraphStyle, TextDecorations, TextExtractor, TextFragment, TextPointSize, TextStorage,
-    TextStrikethrough, TextStyle, TextUnderline,
+    Format, Fragment, Run, Storage, TextDecorations, TextPointSize, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
-pub use theme::{IWorkThemeArchive, IWorkThemeExtensions};
-pub use zip_utils::{
-    FileStructureInfo, analyze_file_structure, extract_message_types_from_archive,
-    parse_iwa_files_from_archive,
-};
+pub(crate) use theme::{IWorkThemeArchive, IWorkThemeExtensions};
 
 /// Error types for iWork parsing
+#[derive(Debug, Clone)]
+pub struct IwaCoreError(Arc<litchi_iwa_core::Error>);
+
+impl AsRef<litchi_iwa_core::Error> for IwaCoreError {
+    fn as_ref(&self) -> &litchi_iwa_core::Error {
+        self.0.as_ref()
+    }
+}
+
+impl From<litchi_iwa_core::Error> for IwaCoreError {
+    fn from(error: litchi_iwa_core::Error) -> Self {
+        Self(Arc::new(error))
+    }
+}
+
+impl std::fmt::Display for IwaCoreError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl std::error::Error for IwaCoreError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.0.as_ref())
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error(
+        "source changed during iWork package read (expected {expected:?}, observed {observed:?})"
+    )]
+    SourceChanged {
+        expected: SourceVersion,
+        observed: SourceVersion,
+    },
+
+    #[error(transparent)]
+    IwaCore(#[from] IwaCoreError),
+
+    #[error(transparent)]
+    IwaCommon(#[from] litchi_iwa_common::Error),
+
+    #[error(transparent)]
+    PagesSemantic(#[from] litchi_pages::Error),
+
+    #[error(transparent)]
+    TextHyperlink(#[from] litchi_iwa_text::hyperlink::Error),
+
+    #[error(transparent)]
+    TextHighlight(#[from] litchi_iwa_text::highlight::Error),
+
+    #[error(transparent)]
+    TextNumberAttachment(#[from] litchi_iwa_text::number_attachment::Error),
+
+    #[error(transparent)]
+    TextComment(#[from] litchi_iwa_text::comment::Error),
+
+    #[error(transparent)]
+    ParagraphStyle(#[from] litchi_iwa_text::paragraph::style::Error),
 
     #[error("Invalid IWA format: {0}")]
     InvalidFormat(String),
@@ -246,3 +309,26 @@ pub enum Error {
 
 /// Result type alias
 pub type Result<T> = std::result::Result<T, Error>;
+
+impl From<litchi_iwa_core::Error> for Error {
+    fn from(error: litchi_iwa_core::Error) -> Self {
+        Self::IwaCore(error.into())
+    }
+}
+
+impl From<litchi_iwa_archive::Error> for Error {
+    fn from(error: litchi_iwa_archive::Error) -> Self {
+        match error {
+            litchi_iwa_archive::Error::SourceChanged { expected, observed } => {
+                Self::SourceChanged { expected, observed }
+            },
+            error => Self::Bundle(format!("archive ingress: {error}")),
+        }
+    }
+}
+
+impl From<litchi_numbers::table::dimension::Error> for Error {
+    fn from(error: litchi_numbers::table::dimension::Error) -> Self {
+        Self::ParseError(error.to_string())
+    }
+}

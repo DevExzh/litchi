@@ -1,7 +1,7 @@
 use std::env;
 
-use litchi_iwa::IWorkPackage;
-use litchi_iwa::protobuf::tswp::StorageArchive;
+use litchi_iwa::raw::package::IWorkPackage;
+use litchi_iwa_protos::tswp::StorageArchive;
 use prost::Message;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -3,7 +3,7 @@
 use crate::protobuf::tswp;
 use crate::text::paragraph_tabs::{
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops,
+    ParagraphTabStops, alignment_from_native, alignment_to_native,
 };
 use crate::wire::repeated_length_delimited_payloads;
 use crate::{Error, Result};
@@ -21,9 +21,9 @@ pub(super) fn from_archive(archive: &tswp::TabsArchive) -> Result<ParagraphTabSt
         let position = tab.position.ok_or_else(|| {
             Error::InvalidFormat("native iWork tab stop has no position".to_owned())
         })?;
-        let alignment = ParagraphTabAlignment::from_native_value(
+        let alignment = alignment_from_native(
             tab.alignment
-                .unwrap_or(ParagraphTabAlignment::Left.native_value()),
+                .unwrap_or(alignment_to_native(ParagraphTabAlignment::Left)),
         )?;
         let leader = tab
             .leader
@@ -36,7 +36,7 @@ pub(super) fn from_archive(archive: &tswp::TabsArchive) -> Result<ParagraphTabSt
             leader,
         });
     }
-    ParagraphTabStops::new(stops)
+    Ok(ParagraphTabStops::new(stops)?)
 }
 
 pub(super) fn archive(stops: &ParagraphTabStops) -> tswp::TabsArchive {
@@ -47,7 +47,7 @@ pub(super) fn archive(stops: &ParagraphTabStops) -> tswp::TabsArchive {
             .map(|stop| tswp::TabArchive {
                 position: Some(stop.position.points()),
                 alignment: (stop.alignment != ParagraphTabAlignment::Left)
-                    .then(|| stop.alignment.native_value()),
+                    .then(|| alignment_to_native(stop.alignment)),
                 leader: stop
                     .leader
                     .as_ref()
@@ -120,7 +120,7 @@ mod tests {
     fn malformed_and_noncanonical_native_tabs_are_rejected() {
         let missing_position = tswp::TabsArchive {
             tabs: vec![tswp::TabArchive {
-                alignment: Some(ParagraphTabAlignment::Center.native_value()),
+                alignment: Some(alignment_to_native(ParagraphTabAlignment::Center)),
                 ..Default::default()
             }],
         };
@@ -129,7 +129,7 @@ mod tests {
         let explicit_left = tswp::TabsArchive {
             tabs: vec![tswp::TabArchive {
                 position: Some(12.0),
-                alignment: Some(ParagraphTabAlignment::Left.native_value()),
+                alignment: Some(alignment_to_native(ParagraphTabAlignment::Left)),
                 ..Default::default()
             }],
         };

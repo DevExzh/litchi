@@ -5,9 +5,8 @@ use crate::numbers::editor::conditional_highlight::native::{
     DATE_ADD_MONTHS_FUNCTION_INDEX, DATE_DIFFERENCE_FUNCTION_INDEX,
     DATE_DURATION_FROM_WEEKS_DAYS_FUNCTION_INDEX, DatePeriodPredicateKind,
 };
-use crate::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightDateOffset, TableCellConditionalHighlightDateOffsetDirection,
-    TableCellConditionalHighlightDatePeriod, TableCellConditionalHighlightDatePeriodUnit,
+use litchi_iwa_common::table::cell::conditional_highlight::{
+    Offset, OffsetDirection, Period, PeriodUnit,
 };
 
 const ZERO: f64 = 0.0;
@@ -27,39 +26,29 @@ const OFFSET_OTHER_QUANTITY_INDEX: i32 = 2;
 
 pub(in crate::numbers::editor::conditional_highlight::formula) fn quantity_node_index(
     kind: DatePeriodPredicateKind,
-    unit: TableCellConditionalHighlightDatePeriodUnit,
+    unit: PeriodUnit,
 ) -> i32 {
     match (kind, unit) {
-        (DatePeriodPredicateKind::InNext, TableCellConditionalHighlightDatePeriodUnit::Days) => {
-            NEXT_DAYS_QUANTITY_INDEX
-        },
+        (DatePeriodPredicateKind::InNext, PeriodUnit::Days) => NEXT_DAYS_QUANTITY_INDEX,
         (DatePeriodPredicateKind::InNext, _) => NEXT_OTHER_QUANTITY_INDEX,
-        (DatePeriodPredicateKind::InLast, TableCellConditionalHighlightDatePeriodUnit::Days) => {
-            LAST_DAYS_QUANTITY_INDEX
-        },
+        (DatePeriodPredicateKind::InLast, PeriodUnit::Days) => LAST_DAYS_QUANTITY_INDEX,
         (DatePeriodPredicateKind::InLast, _) => LAST_OTHER_QUANTITY_INDEX,
-        (
-            DatePeriodPredicateKind::OffsetFromToday,
-            TableCellConditionalHighlightDatePeriodUnit::Days,
-        ) => OFFSET_DAYS_QUANTITY_INDEX,
+        (DatePeriodPredicateKind::OffsetFromToday, PeriodUnit::Days) => OFFSET_DAYS_QUANTITY_INDEX,
         (DatePeriodPredicateKind::OffsetFromToday, _) => OFFSET_OTHER_QUANTITY_INDEX,
     }
 }
 
 pub(in crate::numbers::editor::conditional_highlight::formula) fn nodes(
     kind: DatePeriodPredicateKind,
-    period: TableCellConditionalHighlightDatePeriod,
-    direction: Option<TableCellConditionalHighlightDateOffsetDirection>,
+    period: Period,
+    direction: Option<OffsetDirection>,
     formula_owner_uuid: &tsp::Uuid,
 ) -> Result<Vec<tsce::ast_node_array_archive::AstNodeArchive>> {
     match kind {
         DatePeriodPredicateKind::InNext => range_nodes(period, true, formula_owner_uuid),
         DatePeriodPredicateKind::InLast => range_nodes(period, false, formula_owner_uuid),
         DatePeriodPredicateKind::OffsetFromToday => exact_nodes(
-            TableCellConditionalHighlightDateOffset::new(
-                period,
-                direction.ok_or_else(invalid_formula)?,
-            ),
+            Offset::new(period, direction.ok_or_else(invalid_formula)?),
             formula_owner_uuid,
         ),
     }
@@ -68,15 +57,15 @@ pub(in crate::numbers::editor::conditional_highlight::formula) fn nodes(
 pub(in crate::numbers::editor::conditional_highlight::formula) fn validate(
     formula: &tsce::FormulaArchive,
     kind: DatePeriodPredicateKind,
-    period: TableCellConditionalHighlightDatePeriod,
-    direction: Option<TableCellConditionalHighlightDateOffsetDirection>,
+    period: Period,
+    direction: Option<OffsetDirection>,
 ) -> Result<()> {
     let expected = nodes(kind, period, direction, &tsp::Uuid { upper: 0, lower: 0 })?;
     validate_nodes(formula, &expected)
 }
 
 fn range_nodes(
-    period: TableCellConditionalHighlightDatePeriod,
+    period: Period,
     forward: bool,
     formula_owner_uuid: &tsp::Uuid,
 ) -> Result<Vec<tsce::ast_node_array_archive::AstNodeArchive>> {
@@ -116,14 +105,14 @@ fn range_nodes(
 }
 
 fn exact_nodes(
-    offset: TableCellConditionalHighlightDateOffset,
+    offset: Offset,
     formula_owner_uuid: &tsp::Uuid,
 ) -> Result<Vec<tsce::ast_node_array_archive::AstNodeArchive>> {
     use tsce::ast_node_array_archive::AstNodeType;
 
     let sign = match offset.direction() {
-        TableCellConditionalHighlightDateOffsetDirection::Ago => BACKWARD_SIGN,
-        TableCellConditionalHighlightDateOffsetDirection::FromNow => FORWARD_SIGN,
+        OffsetDirection::Ago => BACKWARD_SIGN,
+        OffsetDirection::FromNow => FORWARD_SIGN,
     };
     let mut nodes = Vec::with_capacity(14);
     nodes.push(linked_cell_node(formula_owner_uuid));
@@ -141,10 +130,10 @@ fn exact_nodes(
 }
 
 fn shifted_today_nodes(
-    period: TableCellConditionalHighlightDatePeriod,
+    period: Period,
     sign: f64,
 ) -> Result<Vec<tsce::ast_node_array_archive::AstNodeArchive>> {
-    use TableCellConditionalHighlightDatePeriodUnit as Unit;
+    use PeriodUnit as Unit;
     use tsce::ast_node_array_archive::AstNodeType;
 
     let count = f64::from(period.count());
@@ -193,10 +182,10 @@ fn shifted_today_nodes(
     Ok(nodes)
 }
 
-fn month_multiplier(unit: TableCellConditionalHighlightDatePeriodUnit) -> Option<f64> {
+fn month_multiplier(unit: PeriodUnit) -> Option<f64> {
     match unit {
-        TableCellConditionalHighlightDatePeriodUnit::Quarters => Some(MONTHS_PER_QUARTER),
-        TableCellConditionalHighlightDatePeriodUnit::Years => Some(MONTHS_PER_YEAR),
+        PeriodUnit::Quarters => Some(MONTHS_PER_QUARTER),
+        PeriodUnit::Years => Some(MONTHS_PER_YEAR),
         _ => None,
     }
 }

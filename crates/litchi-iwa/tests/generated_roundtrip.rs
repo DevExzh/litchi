@@ -8,13 +8,14 @@ use std::error::Error;
 use std::fs;
 use std::io::Cursor;
 use std::path::Path;
+use std::sync::Arc;
 
 use litchi_iwa::Document;
+use litchi_iwa::application::Application;
 use litchi_iwa::detect::{self, Format};
 use litchi_iwa::keynote::{KeynoteDocument, KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocument, NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocument, PagesEditor};
-use litchi_iwa::registry::Application;
 use tempfile::tempdir;
 
 fn assert_send_sync<T: Send + Sync>() {}
@@ -63,7 +64,7 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
     assert_eq!(detect::path(path)?, Some(expected));
 
     let document = Document::open(path)?;
-    assert_send_sync::<litchi_iwa::Bundle>();
+    assert_send_sync::<litchi_iwa::raw::bundle::Bundle>();
     assert_send_sync::<litchi_iwa::Document>();
     assert_send_sync::<PagesDocument>();
     assert_send_sync::<NumbersDocument>();
@@ -79,11 +80,7 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
         document_snapshot_stats.total_objects,
         document_stats.total_objects
     );
-    let bundle_snapshot = document.bundle().snapshot();
-    assert_eq!(
-        bundle_snapshot.iter_archives().count(),
-        document.bundle().iter_archives().count()
-    );
+    document.validate()?;
     document.text()?;
     document.extract_structured_data()?;
 
@@ -112,6 +109,17 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
             assert_eq!(
                 snapshot_stats.total_objects,
                 specialized_stats.total_objects
+            );
+            let semantic_sheets = specialized.semantic_sheets();
+            let snapshot_sheets = snapshot.semantic_sheets();
+            assert!(Arc::ptr_eq(&semantic_sheets, &snapshot_sheets));
+            assert_eq!(semantic_sheets.len(), specialized_stats.sheet_count);
+            assert_eq!(
+                semantic_sheets
+                    .iter()
+                    .map(litchi_numbers::Sheet::table_count)
+                    .sum::<usize>(),
+                specialized_stats.table_count
             );
         },
         Format::Keynote => {

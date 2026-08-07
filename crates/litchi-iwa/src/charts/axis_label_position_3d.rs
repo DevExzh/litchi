@@ -6,73 +6,34 @@
 
 use prost::Message;
 
+use litchi_iwa_common::chart::axis::label_position_3d::LabelPosition3d;
+
 use crate::charts::axis::{
     GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD, axis_non_style_slot,
     generated_axis_non_style_extension,
 };
-use crate::charts::{ChartAxis, ChartKind};
+use crate::charts::{Axis, Kind};
 use crate::protobuf::tsch;
 use crate::wire::{patch_length_delimited_field, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
 
 /// `tschchartaxisdefault3dlabelposition` in the generated axis non-style.
 const VALUE_AXIS_3D_LABEL_POSITION_FIELD: u32 = 1;
-const AUTOMATIC_NATIVE_VALUE: i32 = 1;
-const LEADING_NATIVE_VALUE: i32 = 2;
-const TRAILING_NATIVE_VALUE: i32 = 3;
-
-/// Position of primary value-axis labels in a native 3D chart.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum Chart3dAxisLabelPosition {
-    /// Let iWork choose the side from chart orientation.
-    #[default]
-    Automatic,
-    /// Show labels at Left, or Top for a horizontal bar chart.
-    Leading,
-    /// Show labels at Right, or Bottom for a horizontal bar chart.
-    Trailing,
-    /// Preserve an unrecognized future native value.
-    Unsupported(i32),
-}
-
-impl Chart3dAxisLabelPosition {
-    /// Decode the integer stored by the iWork protobuf schema.
-    pub const fn from_raw(value: i32) -> Self {
-        match value {
-            AUTOMATIC_NATIVE_VALUE => Self::Automatic,
-            LEADING_NATIVE_VALUE => Self::Leading,
-            TRAILING_NATIVE_VALUE => Self::Trailing,
-            value => Self::Unsupported(value),
-        }
-    }
-
-    /// Return the integer used by the iWork protobuf schema.
-    pub const fn into_raw(self) -> i32 {
-        match self {
-            Self::Automatic => AUTOMATIC_NATIVE_VALUE,
-            Self::Leading => LEADING_NATIVE_VALUE,
-            Self::Trailing => TRAILING_NATIVE_VALUE,
-            Self::Unsupported(value) => value,
-        }
-    }
-}
-
 /// Read one chart's effective 3D value-axis label position.
 pub(crate) fn chart_3d_value_axis_label_position(
     package: &IWorkPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
-) -> Result<Chart3dAxisLabelPosition> {
+    kind: Kind,
+) -> Result<LabelPosition3d> {
     require_supported_kind(kind, drawable_object_id, drawable_label)?;
     axis_non_style_slot(
         package,
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Value,
+        Axis::Value,
     )?
     .read(package, read_3d_value_axis_label_position)
 }
@@ -83,8 +44,8 @@ pub(crate) fn set_chart_3d_value_axis_label_position(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
-    position: Chart3dAxisLabelPosition,
+    kind: Kind,
+    position: LabelPosition3d,
 ) -> Result<()> {
     require_supported_kind(kind, drawable_object_id, drawable_label)?;
     let slot = axis_non_style_slot(
@@ -92,7 +53,7 @@ pub(crate) fn set_chart_3d_value_axis_label_position(
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Value,
+        Axis::Value,
     )?;
     if slot.read(package, read_3d_value_axis_label_position)? == position {
         return Ok(());
@@ -109,11 +70,7 @@ pub(crate) fn set_chart_3d_value_axis_label_position(
     Ok(())
 }
 
-fn require_supported_kind(
-    kind: ChartKind,
-    drawable_object_id: u64,
-    drawable_label: &str,
-) -> Result<()> {
+fn require_supported_kind(kind: Kind, drawable_object_id: u64, drawable_label: &str) -> Result<()> {
     if !kind.supports_3d_value_axis_label_position() {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} kind {kind:?} has no 3D value-axis label position"
@@ -122,27 +79,24 @@ fn require_supported_kind(
     Ok(())
 }
 
-fn read_3d_value_axis_label_position(data: &[u8]) -> Result<Chart3dAxisLabelPosition> {
+fn read_3d_value_axis_label_position(data: &[u8]) -> Result<LabelPosition3d> {
     let Some(extension) = generated_axis_non_style_extension(data)? else {
-        return Ok(Chart3dAxisLabelPosition::default());
+        return Ok(LabelPosition3d::default());
     };
     let generated = tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
     Ok(generated
         .tschchartaxisdefault3dlabelposition
-        .map(Chart3dAxisLabelPosition::from_raw)
+        .map(LabelPosition3d::from_native)
         .unwrap_or_default())
 }
 
-fn patch_3d_value_axis_label_position(
-    data: &[u8],
-    position: Chart3dAxisLabelPosition,
-) -> Result<Vec<u8>> {
+fn patch_3d_value_axis_label_position(data: &[u8], position: LabelPosition3d) -> Result<Vec<u8>> {
     let Some(extension) = generated_axis_non_style_extension(data)? else {
-        if position == Chart3dAxisLabelPosition::default() {
+        if position == LabelPosition3d::default() {
             return Ok(data.to_vec());
         }
         let generated = tsch::generated::ChartAxisNonStyleArchive {
-            tschchartaxisdefault3dlabelposition: Some(position.into_raw()),
+            tschchartaxisdefault3dlabelposition: Some(position.native_value()),
             ..Default::default()
         };
         let encoded = generated.encode_to_vec();
@@ -158,8 +112,8 @@ fn patch_3d_value_axis_label_position(
 
     let generated = tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
     let present = generated.tschchartaxisdefault3dlabelposition.is_some();
-    let native = (present || position != Chart3dAxisLabelPosition::default())
-        .then_some(position.into_raw() as u64);
+    let native = (present || position != LabelPosition3d::default())
+        .then_some(position.native_value() as u64);
     let extension = patch_varint_field(
         extension,
         VALUE_AXIS_3D_LABEL_POSITION_FIELD,
@@ -178,7 +132,7 @@ fn patch_3d_value_axis_label_position(
 
 fn validate_patched_3d_value_axis_label_position(
     data: &[u8],
-    expected: Chart3dAxisLabelPosition,
+    expected: LabelPosition3d,
 ) -> Result<()> {
     if read_3d_value_axis_label_position(data)? != expected {
         return Err(Error::InvalidFormat(
@@ -201,38 +155,44 @@ mod tests {
     #[test]
     fn native_values_are_typed_defaulted_and_forward_compatible() {
         let cases = [
-            (AUTOMATIC_NATIVE_VALUE, Chart3dAxisLabelPosition::Automatic),
-            (LEADING_NATIVE_VALUE, Chart3dAxisLabelPosition::Leading),
-            (TRAILING_NATIVE_VALUE, Chart3dAxisLabelPosition::Trailing),
+            (
+                LabelPosition3d::Automatic.native_value(),
+                LabelPosition3d::Automatic,
+            ),
+            (
+                LabelPosition3d::Leading.native_value(),
+                LabelPosition3d::Leading,
+            ),
+            (
+                LabelPosition3d::Trailing.native_value(),
+                LabelPosition3d::Trailing,
+            ),
             (
                 FUTURE_NATIVE_VALUE,
-                Chart3dAxisLabelPosition::Unsupported(FUTURE_NATIVE_VALUE),
+                LabelPosition3d::Unsupported(FUTURE_NATIVE_VALUE),
             ),
         ];
         for (native, position) in cases {
-            assert_eq!(Chart3dAxisLabelPosition::from_raw(native), position);
-            assert_eq!(position.into_raw(), native);
+            assert_eq!(LabelPosition3d::from_native(native), position);
+            assert_eq!(position.native_value(), native);
         }
-        assert_eq!(
-            Chart3dAxisLabelPosition::default(),
-            Chart3dAxisLabelPosition::Automatic
-        );
+        assert_eq!(LabelPosition3d::default(), LabelPosition3d::Automatic);
     }
 
     #[test]
     fn capability_matches_all_axis_bearing_3d_kinds() {
         for kind in [
-            ChartKind::Column3d,
-            ChartKind::Bar3d,
-            ChartKind::Line3d,
-            ChartKind::Area3d,
-            ChartKind::StackedColumn3d,
-            ChartKind::StackedBar3d,
-            ChartKind::StackedArea3d,
+            Kind::Column3d,
+            Kind::Bar3d,
+            Kind::Line3d,
+            Kind::Area3d,
+            Kind::StackedColumn3d,
+            Kind::StackedBar3d,
+            Kind::StackedArea3d,
         ] {
             assert!(kind.supports_3d_value_axis_label_position(), "{kind:?}");
         }
-        for kind in [ChartKind::Column2d, ChartKind::Pie3d, ChartKind::Donut3d] {
+        for kind in [Kind::Column2d, Kind::Pie3d, Kind::Donut3d] {
             assert!(!kind.supports_3d_value_axis_label_position(), "{kind:?}");
         }
     }
@@ -241,17 +201,18 @@ mod tests {
     fn position_patch_preserves_neighboring_and_unknown_fields() {
         let original =
             axis_non_style_with_unknown_fields(tsch::generated::ChartAxisNonStyleArchive {
-                tschchartaxisdefault3dlabelposition: Some(AUTOMATIC_NATIVE_VALUE),
+                tschchartaxisdefault3dlabelposition: Some(
+                    LabelPosition3d::Automatic.native_value(),
+                ),
                 tschchartaxisvaluescale: Some(2),
                 tschchartaxisvaluenumberofmajorgridlines: Some(7),
                 ..Default::default()
             });
         let patched =
-            patch_3d_value_axis_label_position(&original, Chart3dAxisLabelPosition::Trailing)
-                .unwrap();
+            patch_3d_value_axis_label_position(&original, LabelPosition3d::Trailing).unwrap();
         assert_eq!(
             read_3d_value_axis_label_position(&patched).unwrap(),
-            Chart3dAxisLabelPosition::Trailing
+            LabelPosition3d::Trailing
         );
         let extension = generated_axis_non_style_extension(&patched)
             .unwrap()
@@ -263,8 +224,7 @@ mod tests {
         assert!(has_field(extension, UNKNOWN_EXTENSION_FIELD));
 
         let restored =
-            patch_3d_value_axis_label_position(&patched, Chart3dAxisLabelPosition::Automatic)
-                .unwrap();
+            patch_3d_value_axis_label_position(&patched, LabelPosition3d::Automatic).unwrap();
         assert_eq!(restored, original);
     }
 
@@ -276,19 +236,17 @@ mod tests {
         .encode_to_vec();
         assert_eq!(
             read_3d_value_axis_label_position(&original).unwrap(),
-            Chart3dAxisLabelPosition::Automatic
+            LabelPosition3d::Automatic
         );
         assert_eq!(
-            patch_3d_value_axis_label_position(&original, Chart3dAxisLabelPosition::Automatic)
-                .unwrap(),
+            patch_3d_value_axis_label_position(&original, LabelPosition3d::Automatic).unwrap(),
             original
         );
         let leading =
-            patch_3d_value_axis_label_position(&original, Chart3dAxisLabelPosition::Leading)
-                .unwrap();
+            patch_3d_value_axis_label_position(&original, LabelPosition3d::Leading).unwrap();
         assert_eq!(
             read_3d_value_axis_label_position(&leading).unwrap(),
-            Chart3dAxisLabelPosition::Leading
+            LabelPosition3d::Leading
         );
     }
 
@@ -315,6 +273,6 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .iter()
-            .any(|field| field.number == number)
+            .any(|field| field.number() == number)
     }
 }

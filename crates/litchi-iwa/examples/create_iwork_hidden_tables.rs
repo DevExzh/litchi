@@ -2,15 +2,12 @@
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{
-    KeynoteDocumentBuilder, KeynoteEditor, KeynoteTableAxisIndex, KeynoteTableHiddenAxes,
-};
-use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder, NumbersEditor, TableCellUpdate};
-use litchi_iwa::pages::{
-    PagesDocumentBuilder, PagesEditor, PagesTableAxisIndex, PagesTableHiddenAxes,
-};
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
+use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_iwa::table_hidden_axes::{TableAxisIndex, TableHiddenAxes};
+use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
+use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 
 const TABLE_ROWS: usize = 4;
 const TABLE_COLUMNS: usize = 3;
@@ -31,10 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let hidden = TableHiddenAxes::new([
-        TableAxisIndex::row(HIDDEN_ROW),
-        TableAxisIndex::column(HIDDEN_COLUMN),
-    ])?;
+    let hidden = HiddenAxes::new([AxisIndex::row(HIDDEN_ROW), AxisIndex::column(HIDDEN_COLUMN)])?;
     let mut editor = NumbersDocumentBuilder::new()
         .table_name("Hidden Axes")
         .table_dimensions(TABLE_ROWS, TABLE_COLUMNS)
@@ -50,10 +44,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let hidden = PagesTableHiddenAxes::new([
-        PagesTableAxisIndex::row(HIDDEN_ROW),
-        PagesTableAxisIndex::column(HIDDEN_COLUMN),
-    ])?;
+    let hidden = HiddenAxes::new([AxisIndex::row(HIDDEN_ROW), AxisIndex::column(HIDDEN_COLUMN)])?;
     let mut editor = PagesDocumentBuilder::new()
         .body_text("Hidden table axes created by litchi-iwa\n")
         .body_table("Hidden Axes", TABLE_ROWS, TABLE_COLUMNS)
@@ -69,10 +60,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let hidden = KeynoteTableHiddenAxes::new([
-        KeynoteTableAxisIndex::row(HIDDEN_ROW),
-        KeynoteTableAxisIndex::column(HIDDEN_COLUMN),
-    ])?;
+    let hidden = HiddenAxes::new([AxisIndex::row(HIDDEN_ROW), AxisIndex::column(HIDDEN_COLUMN)])?;
     let mut editor = KeynoteDocumentBuilder::new()
         .title("Hidden table axes")
         .build()?;

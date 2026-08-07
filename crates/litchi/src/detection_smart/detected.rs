@@ -37,11 +37,11 @@ pub enum DetectedFormat {
     Xls(litchi_cfb::OleFile<std::io::Cursor<Vec<u8>>>),
 
     // iWork formats with validated ZIP archive data (lazy parsing)
-    #[cfg(feature = "iwork")]
+    #[cfg(feature = "pages")]
     Pages(Vec<u8>),
-    #[cfg(feature = "iwork")]
+    #[cfg(feature = "keynote")]
     Keynote(Vec<u8>),
-    #[cfg(feature = "iwork")]
+    #[cfg(feature = "numbers")]
     Numbers(Vec<u8>),
 
     // ODF formats with validated ZIP archive data (lazy parsing)
@@ -165,13 +165,19 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
             };
         }
 
-        #[cfg(feature = "iwork")]
-        if let Ok(Some(format)) = litchi_iwa::detect::bytes(&bytes) {
-            return Some(match format {
-                litchi_iwa::detect::Format::Pages => DetectedFormat::Pages(bytes),
-                litchi_iwa::detect::Format::Keynote => DetectedFormat::Keynote(bytes),
-                litchi_iwa::detect::Format::Numbers => DetectedFormat::Numbers(bytes),
-            });
+        #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
+        if let Ok(Some(format)) = litchi_iwa_detect::bytes(&bytes) {
+            #[allow(unreachable_patterns)]
+            let detected = match format {
+                #[cfg(feature = "pages")]
+                litchi_iwa_detect::Format::Pages => DetectedFormat::Pages(bytes),
+                #[cfg(feature = "keynote")]
+                litchi_iwa_detect::Format::Keynote => DetectedFormat::Keynote(bytes),
+                #[cfg(feature = "numbers")]
+                litchi_iwa_detect::Format::Numbers => DetectedFormat::Numbers(bytes),
+                _ => return None,
+            };
+            return Some(detected);
         }
     }
 

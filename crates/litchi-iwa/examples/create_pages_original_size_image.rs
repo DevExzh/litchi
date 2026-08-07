@@ -5,6 +5,7 @@ use std::path::Path;
 
 use litchi_iwa::pages::{PagesEditor, PagesImageOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_common::comment::DrawableId;
 
 const BODY_TEXT: &str = "This image was restored to its original size by litchi-iwa.";
 const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 64.0, y: 128.0 };
@@ -40,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         PagesImageOptions::new(IMAGE_POSITION, DISPLAYED_IMAGE_SIZE)
             .with_natural_size(ORIGINAL_IMAGE_SIZE),
     )?;
-    editor.restore_body_image_original_size(created.drawable_object_id)?;
+    editor.restore_body_image_original_size(DrawableId::from_raw(created.drawable_object_id)?)?;
     editor.save(output)?;
     println!(
         "created Pages image {} at its original size",

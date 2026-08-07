@@ -4,7 +4,7 @@ High-performance Rust library for parsing Microsoft Office, OpenDocument, and Ap
 
 ## Overview
 
-`litchi` is the user-facing umbrella crate of the [Litchi workspace](https://github.com/DevExzh/litchi). It auto-detects file formats and delegates parsing to independently owned format crates (`litchi-doc`, `litchi-ppt`, `litchi-xls`, `litchi-docx`, `litchi-pptx`, `litchi-xlsb`, `litchi-xlsx`, `litchi-opc`, `litchi-ooxml-common`, `litchi-odf`, `litchi-iwa`, `litchi-rtf`, and friends). Most users should depend on this crate rather than the format-specific ones. Canonical low-level legacy-format entry points are the standalone `litchi-doc`, `litchi-ppt`, and `litchi-xls` crates; the umbrella exposes `doc`, `ppt`, and `xls` facades only for their enabled features.
+`litchi` is the user-facing umbrella crate of the [Litchi workspace](https://github.com/DevExzh/litchi). It auto-detects file formats and delegates parsing to independently owned format crates (`litchi-doc`, `litchi-ppt`, `litchi-xls`, `litchi-docx`, `litchi-pptx`, `litchi-xlsb`, `litchi-xlsx`, `litchi-opc`, `litchi-ooxml-common`, `litchi-odf`, `litchi-pages`, `litchi-keynote`, `litchi-numbers`, `litchi-rtf`, and shared IWA crates). Most users should depend on this crate rather than the format-specific ones. Canonical low-level legacy-format entry points are the standalone `litchi-doc`, `litchi-ppt`, and `litchi-xls` crates; the umbrella exposes `doc`, `ppt`, and `xls` facades only for their enabled features.
 
 Shared OOXML chart and SmartArt grammar is available through the concise
 `litchi::drawing::{chart, diagram}` facade when the `drawingml` feature is enabled.
@@ -54,7 +54,7 @@ litchi = { version = "0", default-features = false, features = ["xlsx"] }
 ```
 
 Format leaves: `doc`, `docx`, `ppt`, `pptx`, `xls`, `xlsx`, `xlsb`, `rtf`,
-`odt`, `ods`, `odp`, and `iwork`.
+`odt`, `ods`, `odp`, `pages`, `keynote`, and `numbers`.
 
 Infrastructure: `cfb`, `ole`, `opc`, `ooxml-common`, `drawingml`,
 `odf-common`, and `sheet`.
@@ -62,8 +62,12 @@ Infrastructure: `cfb`, `ole`, `opc`, `ooxml-common`, `drawingml`,
 Capabilities: `sign`, `encryption`, `formula`, `fonts`, `images`, `eval`,
 `web-functions`, `markdown`, and `yaml`.
 
-Convenience aggregates: `legacy`, `ooxml`, `odf`, `word`, `slides`,
+Convenience aggregates: `legacy`, `ooxml`, `odf`, `iwork`, `word`, `slides`,
 `spreadsheets`, `office`, `all-formats`, and `all`.
+
+`pages`, `keynote`, and `numbers` are independent full parsing leaves. Their
+concrete owner modules are `litchi::pages`, `litchi::keynote`, and
+`litchi::numbers`; `iwork` enables all three without adding another API layer.
 
 Formats do not implicitly enable signing; add `sign` explicitly when needed.
 

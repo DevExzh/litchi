@@ -4409,7 +4409,7 @@ targets; the owner suites report 254 DOCX unit tests plus three API targets,
 196 PPTX unit tests plus one API target, 395 XLSX unit tests plus examples,
 and 1,554 ODF tests across 85 harnesses. The no-default-features
 `litchi-ooxml` host suite also passes 1,499 unit tests and its integration and
-example targets. Formatting, staged diff checks, and the 35-package crate
+example targets. Formatting, staged diff checks, and the workspace crate
 boundary audit remain green.
 
 ## DOCX web settings, PPTX tags, XLSX timelines, and ODF graphic-property layering
@@ -4433,8 +4433,42 @@ The shared-logic audit reuses existing neutral MCE, XML escaping, GUID, and
 relationship helpers from `litchi-ooxml-common`, `litchi-opc`, and
 `litchi-core`. Web-settings, PresentationML tags, SpreadsheetML timelines,
 and ODF graphic-property vocabularies are not one grammar, so no speculative
-implementation was moved into a common crate. The workspace currently has no
-`litchi-iwa-common` crate; IWA-specific logic remains in `litchi-iwa`.
+document-model implementation was moved into a common crate. The workspace
+now also contains `litchi-iwa-common`, which owns dependency-neutral bounded
+IWA varint and wire primitives plus format-independent table-cell vocabulary;
+it owns no strokes, appearance, archive/protobuf codecs, package identifiers,
+or concrete object-model state. Concrete Pages, Numbers, and Keynote
+object-model logic remains in the format crates while the migration proceeds.
+The physical IWA substrate is also now owned by its leaf crates:
+`litchi-iwa-protos` owns generated raw schemas and `litchi-iwa-core` owns
+bounded archive framing plus checksum-free Snappy compression/decompression.
+The facade's former duplicate Snappy implementation was deleted; concrete
+readers pass compressed slices to the core and borrow decoded bytes through
+`as_bytes()`. Application message decoding and package topology remain in
+`litchi-iwa`.
+The migration exit for this family is deletion of the duplicate facade-local
+`wire.rs` and `varint.rs` kernels, with no public compatibility shim. Until
+all callers have moved, focused owner adapters may remain private, but they
+must preserve bounded-input policy and must not make the common structured
+wire errors untyped by accident.
+The varint portion of this exit is now complete: every facade caller imports
+`litchi-iwa-common::varint`, the duplicate `litchi-iwa::varint` module is gone,
+and the common bounded decoder/error type is the sole owner. The remaining
+facade-local file is `wire.rs`, now only a private callback/error adapter. Its
+parser returns `litchi_iwa_common::wire::WireField` directly, so the facade no
+longer copies parsed fields into a second vector; all consumers use the common
+typed accessors. Scalar, nested, repeated, and append mutation paths delegate
+to the bounded common kernel, including its typed limit/allocation errors.
+The callback traversal, fallible reservations, nesting/output limits, and
+removal seam now live in `litchi-iwa-common::wire` and are generic over the
+caller's error type; shared wire failures convert through `From<common::Error>`.
+The facade `wire.rs` retains only thin adapters that infer `litchi-iwa::Error`
+for existing callers. Deleting that file is now an import-migration task, not
+a second wire implementation.
+Canonical chart readers use the common `encoded_len` check instead of
+allocating temporary varint vectors, and the reference-line reader decodes
+directly from its borrowed payload while mapping malformed values to the typed
+format error.
 
 Checked-in anchors are `[MS-OE376]` §§2.1.444--2.1.462 for Word frameset/web
 settings behavior and §2.1.1170 for PowerPoint programmable tags; `[MS-XLSX]`
@@ -4446,7 +4480,18 @@ claim beyond its existing parser and fixture coverage.
 Verification for this slice passes with `cargo check` and `cargo test` for
 the four affected crates, all features and targets, followed by the
 no-default-features `litchi-ooxml` host suite. Formatting, diff checks, and
-the 35-package crate-boundary audit also pass.
+the workspace crate-boundary audit also pass.
+
+The Keynote soundtrack semantic migration moves playback values into the
+archive-free `litchi_keynote::soundtrack::{Mode, Settings}` module. The IWA
+adapter alone retains `KN.Soundtrack` decoding, object-graph and package-ID
+selection, optional protobuf presence, unknown-field and media-reference
+preservation, and failure-atomic edits. The focused gates are the semantic
+crate's discriminant/volume validation tests and the IWA fixture tests for
+unknown-field preservation, native media-reference stability, malformed graph
+rejection, no-op byte stability, and transactional rollback. The old
+`KeynoteSoundtrackMode` and `KeynoteSoundtrackSettings` owners and aliases are
+deleted rather than retained as compatibility shims.
 
 ## OOXML common relationships, ODF common vocabulary, and owner migration
 
@@ -5704,6 +5749,22 @@ one Office-resave/re-edit cycle. They do not certify other spreadsheet CRUD
 families, automatic calculation under a manual application setting, Windows
 Office, older Office versions, or performance.
 
+For the Numbers formula ownership slice, a fresh Litchi-authored archive opened
+in native Numbers with the generated formula result `323`. Numbers then changed
+the input cell from `120` to `43` through its real cell editor, recalculated the
+formula to `246`, saved, closed, and reopened the archive. The reopened document
+retained both `43` and `246`; the archive passed ZIP integrity checks, and the
+Numbers application was closed after verification.
+
+For the shared font ownership slice, the existing native table-layout generator
+created a fresh `/tmp/litchi-iwa-font-layouts.5zsTwA/table-layouts.numbers`
+artifact using `CourierNewPSMT` through the extracted public font value. Native
+Numbers opened it without a repair prompt and rendered the multi-line styled
+cell. A real UI edit changed that cell to `Native font round trip`; the file was
+saved, closed, reopened, and the edited text was retained. The generator's
+reader-side verification also recovered the authored font and layout values;
+Numbers was quit after the native check.
+
 The worksheet parser also matches checked-in Apache POI and LibreOffice shared-
 formula fixtures, including translated follower expressions and stored cached
 results. Synthetic tests cover missing versus explicit empty cells, grid-bound
@@ -5730,6 +5791,804 @@ test claim until that pre-existing dependency error is repaired in its own
 bounded owner slice.
 
 ## Quality gates
+
+The IWA migration has now established a value-model seam. `litchi-iwa-text`
+owns `storage::{Storage, Run, Fragment}`; `litchi-pages`
+owns `Section` and `SectionType`; and `litchi-keynote` owns `Slide`, `Show`,
+build-animation, and transition values. Its `transition::Effect` now owns the
+lossless native transition-effect identifiers and canonical-known-value check;
+the monolith retains only archive-boundary transition settings and wire
+mutation. The ordinary Keynote reader maps modern and legacy archive effect
+identifiers into the same leaf-owned `SlideTransition::effect` value, so the
+reader no longer collapses known or future effects to an untyped `Other` case.
+The old implementations were removed from the extracted value owners,
+while the monolith still has migration
+adapters where existing reader/editor surfaces need archive-boundary context.
+These adapters are staged ownership work, not a compatibility API. No archive,
+protobuf, or application decoder was moved into these value crates.
+The rich-text storage handoff is now complete for the bounded semantic seam:
+`litchi-iwa-text::storage::{Storage, Run, Fragment}` contains no native object
+or style identifiers and validates every published run against UTF-8 text.
+Keynote, Pages, and `litchi-iwa-structured` consume the leaf directly, while
+the IWA adapter performs decoded text-line joining and retains native lookup,
+UTF-16 boundary conversion, and unsupported wire content. The focused leaf,
+Keynote, Pages, and structured tests pass; the full IWA test target remains
+blocked by the pre-existing Numbers conditional-highlighting test that still
+passes the removed `TableCellCheckboxFormat` type to the new `Checkbox` API.
+The adapters and the four corresponding `litchi-iwa` dependency edges are
+staged ownership work, not compatibility API; their exit is to move the owning
+readers before deleting the adapters. The Numbers value slice now owns
+`litchi-numbers::cell::{Value, Type, Update}` and leaves only a monolith-local
+private adapter for the remaining reader/editor migration. The BNC wire slice
+now also owns `litchi-numbers::cell::wire::{BncCell, StoredValue,
+CachedScalar, CellDataFormatKind}` and the dependency-free decimal128 codec;
+the monolith retains only a private module alias plus its archive/protobuf
+callers. The combined Numbers cell/semantic leaf suite has 26 tests, the new
+formula vocabulary suite has 4 tests, and the IWA suite has 1,504 tests. The
+boundary check plus native Numbers smoke cover the extraction. The dependency-
+free `litchi-numbers::formula` module now owns formula caches, references,
+operators, and expression construction; `litchi-iwa` retains only the
+archive-boundary compiler, protobuf AST, and calculation-engine mutation.
+The former IWA formula module is crate-private, and its root-level re-exports
+are documented ergonomic aliases rather than compatibility shims. Formula
+compilation performs an iterative preflight for bounded depth, AST nodes,
+function arguments, and aggregate precedents before the recursive wire walk;
+known fixed-arity functions and unary constructors are covered by focused
+tests, while functions without validated arity metadata fail closed.
+The rich-text font ownership slice is now complete: dependency-free
+`litchi-iwa-text::font::{Font, Name}` owns the validated, one-allocation font
+identity and typed `NameError`; IWA retains only a contextual alias and the
+native archive adapter. The leaf's eight tests cover the existing storage
+models plus bounded/strict font construction, owned-input consumption, default
+semantics, and named identity. The scoped IWA example check passes with a
+Numbers fixture that writes `CourierNewPSMT` through the public table-cell
+font operation; native Numbers verification is recorded below.
+The neutral color ownership slice is now complete: dependency-free
+`litchi-iwa-common::color::{RgbColorSpace, Rgba}` owns the fixed-size validated
+RGBA value and typed `color::Error`; IWA retains only protobuf conversion and a
+facade error adapter. The common color tests cover compact representation,
+opaque/transparent defaults, valid Display P3 values, and strict channel
+validation. The existing Pages shape authoring example compiles through the
+new common value and is the native artifact used for this slice's Computer Use
+check.
+For the table-appearance ownership slice, the fresh generated
+`/tmp/litchi-iwa-appearance.G82gPP/table-appearance.numbers` opened in native
+Numbers without a repair prompt. Selecting its `Appearance` table exposed
+the authored alternating-row and row-fit controls in the table formatter.
+The matching `table-appearance.key` opened in Keynote without repair and
+displayed the six-by-three table; selecting it exposed the same alternating-row
+and resize-to-fit controls. The Pages artifact reported that it was damaged;
+the warning was dismissed without repair or save, matching the existing Pages
+limitation for this generated table family. ZIP integrity passed for all three
+artifacts, and Numbers, Pages, and Keynote were quit after the check.
+The table-appearance ownership slice is now complete: dependency-free
+`litchi-iwa-common::table::appearance::{Appearance, Banding, RowSizing,
+GridlineVisibility, Gridlines}` owns the compact semantic value, including its
+native-default representation. IWA retains only the archive adapter: strict
+wire override decoding, bounded style inheritance, native bool conversion,
+and transactional copy-on-write style mutation. Existing Numbers, Pages, and
+Keynote CRUD surfaces continue to use contextual facade aliases while the
+duplicate value implementation is removed from the monolith.
+The table-cell layout ownership slice is now complete at
+`litchi-iwa-common::table::cell::layout::{TextWrap, VerticalAlignment, Inset,
+Insets, Layout}`. Its two-value enums and 4/16/20-byte layout components are
+archive-free and heap-free; `Inset` rejects negative, NaN, and infinite input
+with a typed allocation-free error. IWA retains only native alignment and
+padding conversion, style inheritance, and package transactions. The Numbers,
+Pages, Keynote, and layout-generator consumers now import the common owner
+directly; the old public `litchi-iwa::table_cell_layout` module and its
+migration aliases are removed rather than retained for compatibility.
+
+Native Computer Use verification of a fresh
+`/tmp/litchi-iwa-layout.ONYCvR` fixture opened `table-layouts.numbers` and
+`table-layouts.key` without repair prompts. Selecting B2 in each application's
+real text inspector reported `Wrap text in cell = 1` and `Vertical alignment =
+middle`; the rendered multi-line value retained the authored 8-point inset
+layout. `table-layouts.pages` reproduced the known generated-table damaged-file
+limitation; the warning was dismissed without repair or save. All three ZIP
+archives passed integrity checks, and Numbers, Pages, and Keynote were quit
+after verification.
+The shape text-layout ownership slice now follows that table-cell precedent at
+`litchi-iwa-common::text::layout::{VerticalAlignment, AutoSize, Inset, Insets,
+Layout}`. The common suite pins 4/16/20-byte value sizes and typed rejection of
+negative, NaN, and infinite insets; the IWA suite keeps native enum/padding
+conversion, bounded style inheritance, and transactional archive mutation. The
+six shape and text-box creation examples import the common owner directly, and
+the focused native gate opened fresh Numbers, Pages, and Keynote shape
+artifacts without repair prompts. Numbers exposed `Bottom`, `Fixed`, and a
+9-point inset; Pages exposed `Middle`, `Fixed`, and a 12-point inset; Keynote
+exposed `Middle`, `ShrinkToFit`, a 14-point inset, and a checked `Autosize Text`
+control. Each app accepted a real text edit and Save, and reverse-read through
+the public layout APIs preserved those values and the edited text. All three
+ZIP archives passed integrity checks, and Numbers, Pages, and Keynote were
+quit after verification. The old `ShapeText*` model is deleted rather than
+retained as a compatibility alias.
+The media-kind ownership slice now follows the same boundary at
+`litchi-iwa-common::media::Type`. Its common tests pin one-byte storage,
+case-insensitive extension classification, representative signature families,
+the explicit `Unknown` case, and conservative unknown-`ftyp` handling. IWA
+retains media discovery, filesystem/package access, resource limits, metadata
+rewrites, and transactional replacement; its image, audio, movie, chart, and
+shape consumers import the common owner directly. Native media fixtures were
+verified through the existing real iWork image/media paths: fresh Numbers,
+Pages, and Keynote packages built from `test-data/images/png/lena.png` opened
+in the installed applications without repair prompts, and each exposed the
+embedded image object in its native canvas/inspector. The CLI reported
+`Type::Image` and the reachable data identifier for all three packages; all
+three ZIPs passed integrity checks, and the applications were quit after
+verification. The semantic classifier itself is exercised by the
+dependency-free suite, including complete and truncated ISO-BMFF headers.
+The media playback ownership slice now follows the same archive boundary at
+`litchi-iwa-common::media::playback`. Common tests cover compact volume
+validation, builder-preserved optional fields, strict trim-range validation,
+canonical known loop modes, and lossless genuinely unknown native values. The
+IWA adapter retains protobuf decoding, legacy/modern loop reconciliation,
+unknown-field-preserving wire patches, and transactional replacement; its
+wire-focused tests continue to cover those behaviors while Pages, Numbers,
+Keynote, and all six source-building media examples import the common types
+directly. The old IWA semantic owners and root compatibility exports are
+removed rather than duplicated.
+The shape-path ownership slice now follows the same boundary at
+`litchi-iwa-common::shape::path`. `Preset` owns the source-buildable geometry
+vocabulary while `CornerRadius`, `PolygonSides`, `StarPoints`, and
+`InnerRadiusRatio` are compact checked controls; their common tests pin scalar
+size/alignment, `Copy`, finite/domain validation, and preservation of native
+values. IWA retains structural path-family detection, native archive decoding,
+natural-size corner-radius validation, protobuf conversion, and
+wire-preserving mutation. Pages, Numbers, Keynote, and their shape examples
+import the common owner directly, and the former redundant `Shape*` value
+types are deleted rather than kept as compatibility aliases. Path-preset
+mutation preserves the path-source envelope's known metadata, unknown fields,
+and family-field position while replacing the owned family payload. Fresh generated
+shape packages for all three applications opened without repair prompts during
+the focused native gate; the matching semantic inspectors recovered the
+expected preset and path kind, and Numbers, Pages, and Keynote were quit after
+verification.
+The chart-axis vocabulary slice follows the same ownership boundary at
+`litchi-iwa-common::chart::axis::{Axis, TickMarkLocation}`. The common crate
+owns the one-byte category/value selector and copyable tick-mark value,
+including explicit preservation of unknown native integers; IWA retains the
+axis archive slots, protobuf field mapping, shared-object checks, and
+wire-preserving mutation. All Pages, Numbers, Keynote, and chart-example
+consumers now use the short canonical names, with no `ChartAxis*` compatibility
+aliases. Focused common and IWA library checks passed. The focused
+`axis-label-angles-crate` fixtures opened in Numbers, Pages, and Keynote
+without repair prompts: Numbers exposed Value (Y) `Right Diagonal`, Category
+(X) `Left Diagonal`, and `Centered` tick marks; Pages and Keynote exposed the
+same 2D chart with numeric Y and categorical X axes. The broader all-feature
+Numbers chart generator still produces a ZIP-valid artifact that native
+Numbers rejects as damaged, so it is treated as a fixture limitation rather
+than chart-axis evidence. No native-resave claim is made; all three
+applications were quit after verification.
+The follow-on chart-axis value slice now places the archive-free vocabulary in
+focused `litchi-iwa-common::chart::axis` children:
+`bounds::{Bound, Bounds}`, `label_angle::LabelAngle`,
+`label_position_3d::LabelPosition3d`, `scale::Scale`, and
+`steps::{MajorStepCount, MinorStepCount, Steps}`. The facade retains archive,
+protobuf, capability, and lossless wire adapters and removes the former long
+`Chart*` value names. The common suite passed 43 tests, the IWA library suite
+passed 1,502 tests, selected chart examples compiled, both scoped clippy gates
+were clean, and the crate-boundary checker remained valid. The focused
+`axis-values-crate` fixtures passed typed Rust readback and ZIP validation, and
+fresh Numbers, Pages, and Keynote opens produced no repair prompts. Numbers
+and Keynote exposed Value (Y) `Logarithmic`, `Max 30`, `Min 1`, and `Right
+Diagonal` in the native Axis formatter; Pages exposed the same 2D chart with
+numeric Y and categorical X axes. The native gate makes no resave claim, and
+all three applications were quit after inspection.
+The chart number-format ownership slice is complete as well:
+`litchi-iwa-common::chart::number_format` now owns the compact
+`FixedDecimalPlaces`, `DecimalPlaces`, `NegativeStyle`, `NumberFormat`, and
+`LabelAffixes` values. The common suite passed 45 tests and the IWA library
+suite passed all 1,502 tests; focused number-format and affix examples
+compiled, their generated Numbers, Pages, and Keynote packages passed ZIP
+validation, and the changed Rust files passed formatting and strict Clippy.
+Native Computer Use opened both fixture families in all three iWork apps
+without repair prompts. Numbers and Keynote exposed Number, parentheses (or
+minus sign), thousands separator, two decimals, and the authored prefix and
+suffix fields. Pages visibly rendered `14,000.00`, `(2,800.00)`, and `USD …
+net` axis labels. No native-resave claim is made; Numbers, Pages, and Keynote
+were quit after inspection.
+The chart-series direction ownership slice is complete: the archive-free
+`litchi-iwa-common::chart::Direction` value now owns row/column semantics and
+lossless unknown-native preservation. IWA retains only protobuf field mapping,
+archive lookup, and mutation validation; all three chart owners use the short
+canonical value and the former `ChartSeriesDirection` implementation is gone.
+The common suite passed 46 tests, the IWA library suite passed all 1,503
+tests, and the focused axis-value fixture compiled, wrote three valid ZIP
+packages, and set `Direction::Columns` in all three in-memory editors before
+native inspection. Existing CRUD tests round-tripped the serialized direction
+through each editor. Fresh Numbers, Pages, and Keynote opens produced no repair
+prompts. Numbers' Add Chart Data popover reported `Plot Columns as Series`;
+Keynote's Edit Chart Data dialog showed `Plot columns as series` selected with
+the `Revenue`/`Cost` rows and `Q1`/`Q2`/`Q3` reference columns; Pages exposed the
+same three chart series and visibly rendered `Revenue`/`Cost` categories. All
+three applications were quit after inspection.
+The BorderSide ownership slice
+is complete: the dependency-neutral table-cell edge selector now lives at
+`litchi-iwa-common::table::cell::BorderSide`; `Borders` and `ShapeStroke` remain
+concrete IWA types, and the former Numbers-owned enum and compatibility path
+were removed. This ownership change has no intentional wire-format change.
+The physical IWA substrate slice is complete as well: raw schemas remain in
+`litchi-iwa-protos`, bounded archive and Snappy framing remain in
+`litchi-iwa-core`, the facade owns no duplicate Snappy codec, and its callers
+use the allocation-conscious slice API. The core framing suite has 17 passing
+tests. The facade varint exit is now complete too: `varint.rs` was deleted,
+all callers use the common bounded implementation, and the IWA suite still
+passes 1,504 tests. The facade `WireField` representation and direct wire
+mutation exit is complete without a compatibility shim; the generic callback
+error boundary is now common-owned, while `wire.rs` retains only thin
+crate-error adapters pending the final import migration. The Numbers
+table/sheet semantic slice is now extracted into dependency-free
+`litchi-numbers::table` and `litchi-numbers::sheet`: finished tables use compact
+coordinates and immutable boxed sparse storage, while builders provide
+fallible append/replace operations and checked ownership handoff. The IWA
+reader now exposes `NumbersDocument::semantic_sheets`, which moves those
+finished tables into one lazily cached immutable `Arc<[Sheet]>` snapshot
+without rebuilding cell maps; the opaque archive adapter remains available for
+comments and native sidecars during the staged reader migration. Dense views
+remain explicitly budgeted and reject ranges outside the declared extent. The
+leaf suite has 26 cell/semantic tests plus 4 formula-vocabulary tests, the IWA
+suite has 1,504 tests, and the generated Numbers round trip passes. The generic
+structured-facade handoff
+remains the next ownership slice. Pages and Keynote table readers now borrow
+canonical sparse leaf tables
+directly while retaining their format-owned comment and merge sidecars;
+read-only comment snapshots use sorted boxed pairs, and Numbers ingress moves
+table names into the adapter without a redundant clone.
+
+The immutable Numbers table-data-list sidecars are now represented as sorted
+boxed `(u32, value)` pairs rather than hash tables. The loader already rejects
+duplicate keys, so binary search preserves strict missing-key behavior while
+removing hash-bucket and hasher state from each read-only table. Sidecar
+construction uses fallible reservations and checks the invariant again at the
+compact representation boundary; this is an allocation/layout improvement,
+not a measured throughput claim under ADR 0005.
+
+The IWA Numbers ingress adapter now protects the leaf ownership seam. It
+validates bounded dimensions before loading referenced data, rejects
+duplicate or out-of-range tile keys and coordinates, requires one typed tile
+payload, and maps allocation failures and finite table/cell budgets through
+the shared structured error type. Offset decoding is sparse and single-pass
+after a no-allocation shape/count scan; it never reserves from the archive's
+untrusted `cell_count` alone. Focused malformed-input tests cover dimension,
+coordinate, duplicate, odd-buffer, sparse-sentinel, descending-offset, and
+allocation-amplification cases. The extractor distinguishes native type `6000`
+TableInfoArchive metadata from type `6001` TableModelArchive cell payloads, so
+metadata records cannot be mis-decoded as table models.
+
+A fresh ZIP-valid generated artifact opened and rendered its 3×3 bordered table
+in Numbers and Keynote, including the expected `Numbers` and `Keynote` cell
+values. Pages reported the generated package as damaged; the warning was
+dismissed without repair, so Pages native opening remains a tracked limitation
+of this fixture rather than a claimed success.
+
+The Keynote transition-scalar ownership slice is complete. The archive-free
+`litchi-keynote::transition` module now owns compact `Direction`, `MosaicType`,
+`Acceleration`, and `TextDelivery` values; `litchi-iwa` retains only aggregate
+transition settings, archive decoding, protobuf field mapping, and
+wire-preserving transactions. The leaf suite passed 6 tests and the IWA
+library suite passed all 1,503 tests. The focused
+`create_keynote_transition` example wrote
+`/tmp/litchi-keynote-transition.n7Msjg/transition-vocabulary.key`, which passed
+ZIP integrity validation and typed in-memory reopen checks. Native Keynote
+opened it without a repair or recovery prompt; its Animate inspector exposed
+`Magic Move`, `By Word`, and `Ease In & Out`, matching the authored effect,
+text-delivery, and acceleration values. No native-resave claim is made, and
+Keynote was quit after inspection.
+
+The pie-visibility ownership slice is complete. The archive-free
+`litchi-iwa-common::chart::pie` module now owns compact `LabelVisibility` and
+lossless `LeaderLineVisibility`; all three concrete chart owners consume the
+short values, and the old `ChartPie*Visibility` names are gone. The common
+suite passed 48 tests, the focused IWA pie suite passed 16 tests, and the
+Numbers CRUD test passed after adding stylesheet/component-registration
+invariants for styled label overrides. The focused fixture saved and typed-
+reopened valid Numbers, Pages, and Keynote ZIP packages. Native Pages and
+Keynote opened the authored chart without repair prompts and exposed North
+22%, South 33%, and West 44%; the screenshot showed the authored South-only
+leader line. Numbers opened a minimal unmodified pie and accepted a native
+resave, but rejected source-generated per-series pie mutation packages as
+damaged, including both styled and geometry-only probe variants. This remains
+a tracked Numbers series-non-style fixture limitation rather than claimed
+native resave support for that path; Numbers, Pages, and Keynote were quit
+after inspection.
+
+The chart reference-line ownership slice is complete. The archive-free
+`litchi-iwa-common::chart::reference_line` module now owns finite `Value`,
+checked `Kind`, and compact `Line`; the IWA facade exposes the focused
+`charts::reference_line` module and retains only archive/protobuf/graph
+adapters. Nested custom-value patching retains unknown fields, recognized
+fields reject duplicate, wrong-wire-type, and noncanonical framing, and the
+reference-line graph is bounded before generated protobuf allocation. The
+common suite passed 52 tests and the focused IWA reference-line suite passed 9
+tests, including CRUD in Numbers, Pages, and Keynote. ZIP validation passed.
+Native Pages and Keynote opened the generated line chart without repair
+prompts and exposed its `Revenue thresholds` title and Revenue/Cost series;
+Numbers rejected this source-generated chart fixture as damaged, which remains
+a tracked Numbers chart-fixture limitation rather than native support evidence.
+No native-resave claim is made, and Pages, Numbers, and Keynote were quit after
+inspection.
+
+The follow-on wire and payload-discovery hardening keeps the same ownership and
+wire contract. Recognized reference-line fields now use the common checked
+`WireField` payload and canonical key/length views, while unknown fields remain
+permissive and wire-preserving. Pages, Numbers, and Keynote chart editors share
+one allocation-free exact-one message-index scan, so malformed zero- or
+duplicate-payload containers fail before chart decoding or mutation callbacks.
+The common suite passed 53 tests, the focused reference-line suite passed 11
+tests, and the exact-one scanner regression covers zero, one, and two matching
+payloads. Formatting, diff, and scoped lint checks are the applicable gates for
+this structural/performance slice; no additional native application run was
+needed because serialized chart semantics were unchanged.
+
+The reference-line graph preservation follow-up is now implemented in the IWA
+archive codec. `set_reference_lines` performs a bounded, occurrence-aware
+raw-wire merge for graph, axis, item, style, sparse-reference, `Reference`,
+UUID, and axis-ID messages; it preserves unknown fields in their existing
+positions and recursively validates every modeled known field before read,
+update, or removal. The staged opaque-field candidate is validated before
+assignment, and malformed deep-node updates remain atomic. The focused archive
+module passed 10 tests, the reference-line semantic filter passed 15 tests,
+the full IWA library passed 1,513 tests, and both affected crates passed
+`-D warnings` clippy. Native Pages and Keynote opened the generated chart
+fixture without repair prompts; Numbers rejected the source-generated chart as
+damaged, which remains the tracked Numbers chart-fixture limitation above.
+Pages, Numbers, and Keynote were quit after inspection.
+
+The next bounded migration slice introduces the common source-bound wire
+views. `litchi-iwa-common::wire::WireView<'a>` retains one borrowed source and
+compact private spans, while `WireFieldView<'a>` provides canonical key,
+length, framing, and payload checks without per-field byte ownership. Strict
+reference-line readers now use this view through the thin IWA adapter; the
+permissive mutation representation remains only in callers not yet migrated.
+Singular wire overlays now index base and overlay fields once and emit one
+exact-capacity output, removing the former quadratic reparse path while
+preserving duplicate, wire-type, field-count, and output-size checks.
+
+The Numbers editor layout follows the same staged ownership direction:
+`numbers::editor::text_box_api` now contains the ordinary sheet text-box API
+as a private child module, reducing the editor root without introducing a
+compatibility layer. The common suite passed 58 tests, the full IWA library
+passed 1,513 tests, strict `-D warnings` Clippy passed for both affected
+libraries, and the crate-boundary audit remained valid. A fresh fixture built
+from the changed branch opened in native Pages and Keynote without repair
+prompts and exposed the authored Revenue/Cost 2D line chart with numeric Y and
+categorical X axes. Native Numbers rejected the source-generated chart as
+damaged; this remains the tracked Numbers chart-fixture limitation above.
+All three applications were quit through their application menus after
+inspection.
+
+The table hidden-axis ownership slice now follows the focused table seam:
+`litchi-iwa-common::table::axis::{AxisIndex, HiddenAxes}` owns the archive-free
+row/column positions and the canonical duplicate-free hidden set. The set is a
+single boxed slice sorted deterministically by row, then column, and duplicate
+construction returns the typed axis-module error. The IWA implementation is
+now a private archive adapter retaining native hidden-state UUIDs, protobuf
+field mapping, package traversal, axis bounds, and transactional mutation.
+Numbers, Pages, Keynote, and all five hidden-axis examples import the common
+types directly; the former flat semantic definitions and contextual facade
+aliases are gone. The focused common suite passed 3 axis tests, the IWA hidden-
+axis suite passed 7 adapter/API tests, all five migrated examples compiled,
+both changed crates passed no-dependency `-D warnings` Clippy, and the crate
+boundary checker remained valid. No native application claim is made for this
+structural ownership slice.
+
+The Keynote slide-audio options slice now follows the archive boundary at
+`litchi_keynote::slide::audio::Options`. The semantic value is a compact,
+12-byte archive-free placement/duration pair: finite coordinates and positive
+native `f32` duration representation are checked before package work begins.
+The IWA adapter alone retains drawable and data identifiers, `TSD.MovieArchive`
+decoding, graph lookup, zero-size geometry, raw wire updates, automatic build
+objects, media records, and transactional publication. `KeynoteSlideAudioInfo`
+and the removal result remain IWA-owned because they expose native IDs,
+drawable properties, optional playback state, and package-GC disposition. The
+shared playback settings continue to preserve explicit absence versus native
+defaults, unknown loop values, and strict volume validation in their existing
+IWA boundary. The old `KeynoteSlideAudioOptions` definition and re-exports are
+removed rather than retained as compatibility aliases.
+
+The next structural handoff isolates archive-free structured aggregation in
+`litchi-iwa-structured`. `StructuredData` owns only the semantic table, slide,
+and section vectors supplied by `litchi-numbers`, `litchi-keynote`, and
+`litchi-pages`; native archive traversal remains in private `litchi-iwa`
+extractors. The new leaf has no protobuf, package, ZIP, or facade dependency,
+and the executable boundary policy records its three downward format edges.
+The new leaf's focused tests, the IWA structured extractor tests, the boundary
+policy tests, and strict no-dependency Clippy all pass. This is a crate-topology
+handoff, not native application evidence; the existing native iWork fixture
+matrix remains the authoritative verification for serialized packages.
+
+The Numbers cell display-format seam is also complete for this migration
+slice. `litchi-numbers::cell::data_format` now owns the archive-free checked
+format values, while the IWA adapter retains native registry IDs, protobuf
+codec details, BNC/control coordination, custom UUID registry handling, and
+transactional package mutation. The focused Numbers leaf filter passed 15
+tests, the IWA data-format filter passed 20 tests, strict no-dependency
+Clippy and the IWA library check passed, and the regenerated verification
+example compiled and ran. Native Numbers and Keynote opened the resulting
+`table-number-formats.numbers` and `.key` files without repair prompts; their
+accessibility trees exposed the expected formatted values, controls, and
+custom formats.
+
+The shared text-column ownership slice is complete. The archive-free
+`litchi-iwa-text::columns` module now owns the focused `Columns`, `Count`,
+`Gap`, `Width`, `Equal`, `Following`, and `Variable` values, with typed finite
+validation, a 256-column budget, canonical negative-zero rejection, and one
+boxed allocation for variable following columns. The IWA adapter retains only
+`ColumnsArchive` decoding/encoding and native malformed-state mapping; Pages,
+Numbers, Keynote, shape-style tests, and all three text-box creation examples
+consume the leaf directly. The former flat `TextColumn*` owners and facade
+reexports are gone. This structural slice is verified by the focused leaf and
+library/example checks, strict no-dependency Clippy, and the crate-boundary
+checks; the migrated conditional-highlighting test and table-number-format
+example now use the canonical Numbers leaf markers. No additional native
+iWork claim is needed for this ownership-only column change because serialized
+column semantics are unchanged.
+
+The Pages body-footnote selector slice is complete. The archive-free
+`litchi-pages::footnote::body` module now owns bounded `Footnote`, UTF-16
+`Position`, and source-order/position `Selector` values. `PagesEditor` no
+longer returns or accepts native footnote IDs: its body-footnote CRUD resolves
+selectors inside a staged transaction, while the private IWA adapter retains
+reference/storage/marker graph identifiers and cleanup. The focused Pages leaf
+tests and IWA body-footnote CRUD tests pass, and the migrated Pages examples
+compile against selectors. This is an ownership/API slice; native Pages
+verification remains part of the next fixture matrix run.
+
+The archive-free IWA index foundation slice is complete. `litchi-iwa-index`
+contains typed fragment/byte-span/object/reference values, deterministic
+immutable indexing, typed duplicate/null/reference failures, and graph
+queries without archive dependencies. Five leaf tests cover deterministic
+multi-edge ordering plus fragment/source boundary rejection; strict Clippy and the
+46-package/128-edge topology audit pass; private adapter integration remains
+explicit follow-up work. The Keynote build leaf likewise passes its focused
+semantic suite, strict Clippy, and formatting checks; its native adapter and
+CRUD migration remain open, so this slice makes no new native Keynote claim.
+
+The 2026-08-06 target-branch migration turn extends the same ownership direction.
+`litchi-iwa::shapes::ShapePathKind` remains the structural path-family owner,
+while `litchi-iwa-common::shape::path` owns only source-buildable path controls;
+`litchi-keynote::ChartSelector` resolves chart edits by checked position or exact
+visible name; `litchi-iwa-structured::StructuredData`
+owns shared immutable semantic snapshots with borrowed text iteration; and
+`litchi-pages::image::Options` owns validated image placement values. The archive
+ingress/egress handoff is also recorded in `litchi-iwa-archive`, including ordered
+logical opaque-entry storage, bounded legacy-package validation, and facade removal
+of the direct ZIP dependency; byte-level ZIP-record preservation remains an ADR
+0005 follow-up. The focused suites passed 113 common, 45 Keynote,
+30 Pages, and 7 structured tests; the integrated facade library check and the
+47-package boundary checker passed. Computer Use created and saved fresh native
+fixtures at `/tmp/litchi-native-next-turn-20260806.pages`,
+`/tmp/litchi-native-next-turn-20260806.numbers`, and
+`/tmp/litchi-native-next-turn-20260806.key`; each reopened in its native iWork
+application without a repair prompt, and Pages, Numbers, and Keynote were
+closed after verification. This is structural/API and native-open evidence, not
+a claim that the remaining monolithic semantic adapters or lazy physical catalog
+have been completed.
+
+The next 2026-08-06 migration slice adds three bounded ADR handoffs. The
+archive leaf now retains immutable physical ZIP provenance (local and central
+headers, timestamps, extras, comments, CRC, compressed ranges, and opaque
+compression state) and exposes an exact byte-for-byte no-op write path; edited
+entry reassembly remains an explicit follow-up. Format detection moved into the
+archive-free `litchi-iwa-detect` leaf with typed limits/errors and a thin facade
+adapter. `litchi-iwa-text` now owns checked UTF-16 positions/ranges and language
+values, while native storage and protobuf traversal remain in the IWA adapter.
+The bundle ingress path also preserves the catalog's lexical component order
+without the former HashMap-to-Vec-to-sort allocation. The archive, detector, and
+text leaves passed 14, 10, and 21 tests respectively; the full IWA library passed
+1,489 tests; the bundle filter passed 20 tests; no-dependency leaf Clippy and the
+boundary checker passed. Computer Use created and saved native Pages, Numbers,
+and Keynote fixtures containing the migration markers, each opened natively
+without a repair prompt, and all three applications were closed afterward.
+The physical files are `/Users/ryker/CodeProjects/litchi/test-data/images/png/:tmp:litchi-native-archive-detect-20260806.pages`,
+`/private/tmp/:tmp:litchi-native-archive-detect-20260806.numbers`, and
+`/private/tmp/:tmp:litchi-native-archive-detect-20260806.key`. This remains a
+bounded provenance/detection/value extraction slice; source-backed lazy object
+access, weighted caches, edited-entry reassembly, paragraph-list extraction,
+and full monolith removal remain open.
+
+The following 2026-08-06 slice advances the crate split and typed text boundary.
+`litchi-iwa-cache` is now a dependency-free leaf with weighted deterministic LRU
+eviction, explicit invalidation, and generation-safe single-flight parsing; its
+six concurrency, retry, weight, and eviction tests pass. It is deliberately a
+standalone seam until package-state cache wiring can replace the current
+single-entry adapter without mixing cache policy with archive ownership.
+`litchi-iwa-text::paragraph::list` now owns checked list presets, bullets,
+number formats, geometry, indentation, UTF-16 paragraph placement, and typed
+errors; the IWA, Pages, Keynote, and Numbers adapters use `TextPosition` and
+the leaf's semantic values. The former paragraph-level facade reexports were
+removed so the module hierarchy is explicit and incremental-build friendly.
+The text leaf passed 27 tests and production Clippy, while the migrated IWA
+paragraph-list suite passed 51 tests and the IWA test-target check passed.
+Stale resolved edges were removed from the boundary policy, a regression test
+now rejects reintroducing them, and the checker reports 49 packages, 136
+internal declarations, and 13 explicitly ordered debt items; its Python suite
+passes 15 tests.
+
+Computer Use created and saved fresh native fixtures through the real iWork
+applications. Pages applied text bullets with a 110% bullet scale and saved
+`/private/tmp/litchi-native-paragraph-list-20260806.pages`; Numbers saved a
+table-cell marker to
+`/private/tmp/litchi-native-paragraph-list-20260806.numbers`; and Keynote saved
+the title/subtitle marker pair to
+`/private/tmp/litchi-native-paragraph-list-20260806.key`. Each native window
+displayed its saved file URL and expected semantic content without a repair
+prompt, and all three applications were closed after verification. This is a
+bounded leaf/topology and native-open slice; the remaining ADR debt includes
+raw `IWorkTextEditor` object IDs and storage message exposure, eager
+`Bundle`/`Document` materialization and missing `ReadAt` source identity,
+weighted-cache integration into package state, edited ZIP-entry reassembly,
+and the remaining monolithic semantic adapters.
+
+The next 2026-08-06 slice wires immutable source access and bounded semantic
+caching through the split. `litchi-iwa-archive::Catalog::from_read_at` and the
+facade's `IWorkPackage::from_read_at` now read through positional `ReadAt`,
+check the configured size before allocation, and reject a changed source with
+typed `SourceChanged` errors. Flat catalogs retain their exact shared source
+for validated no-op output; legacy nested catalogs deliberately normalize on
+write. `PackageState` now uses the dependency-free `litchi-iwa-cache` weighted
+LRU with decompressed-stream byte weights, per-key invalidation, copy-on-write
+forks, and a bounded active-flight budget. The `litchi-iwa-text` leaf owns
+`paragraph::border::{Sides, Offset}` and bookmark text semantics; the old flat
+paragraph-border owners are gone, and list-bullet validation checks before
+allocation. The archive, cache, and text leaves passed their focused suites
+(20, 8, and 33 tests); the facade bookmark slice passed 10 tests, and the
+workspace boundary checker remained green. Computer Use created and saved
+fresh native fixtures containing the migration marker at
+`/private/tmp/litchi-native-border-cache-20260806.pages`,
+`/private/tmp/litchi-native-border-cache-20260806.numbers`, and
+`/private/tmp/litchi-native-border-cache-20260806.key`; each was shown by its
+native application and Pages, Numbers, and Keynote were closed afterward.
+This is structural/API and native-open evidence, not a claim that edited ZIP
+entry reassembly, raw `IWorkTextEditor` IDs/storage, full source-path
+retention for byte-ingress `open`, or the remaining monolithic adapters are
+complete.
+
+The concrete-crate audit for ADRs 0001–0004 found no direct `litchi_iwa`
+imports in `litchi-pages`, `litchi-numbers`, or `litchi-keynote`. It retained
+three follow-up seams: Pages' flat document re-exports and opaque background
+payload, Keynote's flat background re-exports and opaque payload, and the
+Numbers `table::{Position, Range}` migration aliases. The first implementation
+slice moved the archive-free Keynote slide-image insertion value from the
+monolith into `litchi_keynote::slide::image::Options`. The leaf now validates
+finite placement and strictly positive displayed/natural dimensions, stores
+only three common geometry values, and reports typed image-specific errors;
+the old `KeynoteSlideImageOptions` owner and facade re-exports were removed.
+The focused leaf tests, four Keynote image CRUD tests, five image examples,
+and strict Keynote Clippy passed. Table-lock ownership was intentionally
+outside this audit scope.
+
+This turn completes the next ADR 0001–0004 migration slice on the isolated
+`feat/office-format-completeness` branch. `litchi-iwa-common::table::lock`
+now owns the compact table-lock state consumed by the Pages, Numbers, and
+Keynote facades. The neutral object index now stores each record once and
+lets its format adapter borrow the record while retaining only source-local
+position metadata. `litchi-iwa-text` owns the date-time, storage, and
+paragraph drop-cap semantic values; `litchi-iwa-common::chart::error_bar`
+owns checked error-bar values and bounded custom arrays. The Keynote image
+options leaf, archive source retention, and `NumbersSheetInfo::id` complete
+the corresponding public API handoffs without compatibility aliases.
+
+`litchi-iwa-archive` now also has bounded physical ZIP reassembly for the
+supported Store/Deflate edited entries, preserving untouched records and
+metadata; unsupported legacy, ZIP64, and compression cases remain explicit
+errors. Its 24 tests, detector's 10 tests, common's 118 tests, text's 40
+tests, and the integrated IWA library's 1,489 tests passed. The crate
+boundary checker reports 49 packages and 138 internal declarations, its
+Python suite passes 15 tests, and the scoped leaf checks remain green. The
+library-target Clippy checks for detector and Keynote also pass; all-target
+`-D warnings` remains blocked only by pre-existing test-module unwrap, float,
+and shadowing lints in those packages. The exhaustive detector mapping for
+the new reassembly error and the date-time example's typed sheet-ID call are
+included in the integration commit.
+
+Computer Use verified native files through the real iWork applications.
+Numbers opened `/private/tmp/litchi-native-table-lock-20260806d/table-lock.numbers`
+and exposed `Locked Table` plus the disabled locked-table cells; the
+date-time Numbers file exposed `Created: Friday, July 17, 2026`. Pages opened
+the date-time fixture and exposed the same marker, while Keynote opened its
+fixture and exposed the marker in a text box. These files were saved and
+Numbers, Pages, and Keynote were closed afterward. The Pages table-lock
+fixture at `/private/tmp/litchi-native-table-lock-20260806d/table-lock.pages`
+was rejected by Pages as damaged, so it is recorded as a native-open gap,
+not a pass. Remaining ADR debt includes raw `IWorkTextEditor` IDs/storage,
+eager package materialization, fully source-backed lazy object access,
+remaining monolithic adapters, and the intentionally unsupported archive
+member classes above.
+
+This 2026-08-06 slice completes the next text-leaf boundary migration. The
+archive-free `litchi-iwa-text` crate now owns hyperlink, number-attachment,
+ranged-comment, and paragraph-style values; the former IWA owners
+`hyperlink_types.rs`, `number_attachment_types.rs`,
+`paragraph_following_style.rs`, and `text_comment_types.rs` were deleted.
+Each native identity is a compact opaque non-zero handle. Conversion to and
+from a native archive identifier is available only through the explicit
+`litchi_iwa_text::<leaf>::raw` adapter module, while normal semantic code has
+no object-ID constructor or accessor. Ranged comments additionally keep their
+records private, expose only checked accessors, and carry typed `Instant`,
+`AuthorId`, and `Uuid` metadata; hyperlink and comment owned text validates
+before borrowed input is allocated, and boxed native text is adopted without
+another allocation. The IWA facade retains structured leaf error variants
+instead of flattening these failures into `InvalidFormat(String)`.
+
+The focused leaf suite passed 57 tests, the integrated IWA library suite
+passed 1,485 tests, strict no-dependency Clippy passed for `litchi-iwa-text`,
+and the IWA library Clippy target passed with the three pre-existing dead-code
+groups explicitly allowed. The edited examples compile in their focused
+targets; an all-example check still reports unrelated baseline API drift in
+older table/image examples. An independent ADR audit found the initial
+identity/metadata boundary issues; the changes above resolve those findings
+without compatibility aliases. The workspace formatter remains noisy outside
+the scoped files, so only changed-file formatting and `git diff --check` are
+used for this migration turn.
+
+Computer Use verified the generated fixtures in the real iWork applications.
+Pages exposed `Page [attachment: 1] of [attachment: 1]` from
+`/private/tmp/litchi-adr-pages-number-attachments.pages`; Numbers exposed the
+`ADR leaf Numbers hyperlink comment` text box and its markup marker from
+`/private/tmp/litchi-adr-numbers-text.numbers`; and Keynote exposed the
+`ADR leaf Keynote hyperlink comment` text box and marker from
+`/private/tmp/litchi-adr-keynote-text.key`. The Pages text fixture was also
+opened during the same run. Pages, Numbers, and Keynote were saved and closed
+after verification. This is a bounded semantic-leaf and native-open slice;
+remaining debt includes the broader monolithic adapter split, raw storage
+APIs outside these leaves, and the other ADR 0005/0006 resource work.
+
+This follow-up completes the TextHighlight ownership handoff required by ADRs
+0001–0004. `litchi_iwa_text::highlight` now owns the compact non-zero semantic
+identity and UTF-16 range, including typed zero-ID rejection and a compact
+`Option` representation. Native numeric conversion is confined to the focused
+`highlight::raw` boundary; `litchi-iwa` retains annotation graph discovery,
+protobuf validation, range-table mutation, package ownership checks, and
+transactional CRUD. The former `litchi-iwa/src/text/highlight_types.rs` owner
+was deleted, and the example's raw-ID operations now use the explicit adapter
+boundary. No compatibility alias or archive dependency was added to the leaf.
+
+The focused text suite passed 58 tests, the integrated IWA library suite passed
+1,484 tests, strict no-dependency Clippy passed for both text and IWA library
+targets (with the three pre-existing IWA dead-code groups explicitly allowed),
+and the migrated highlight example compiles. CLI round trips exposed
+non-zero highlight IDs and ranges in Pages (`0..8`), Numbers (`0..7`), and
+Keynote (`0..9`). Computer Use opened the Pages and Keynote fixtures in the
+real applications; their accessibility trees exposed the generated text and
+their screenshots showed the turquoise native highlight. The newly generated
+Numbers fixture was rejected by Numbers as damaged (an existing fixture
+generation gap), so the known-good `/private/tmp/litchi-adr-numbers-text.numbers`
+fixture was opened instead; its accessibility tree exposed the text box and
+the CLI confirmed `TextHighlight { id: 131, range: 0..3 }`. Pages, Numbers, and
+Keynote were closed after verification. Remaining text debt includes raw
+`IWorkTextEditor` storage selectors and the broader monolithic adapter split.
+
+This follow-up completes the text-appearance ownership handoff required by ADRs
+0001–0004. The archive-free `litchi-iwa-text::appearance` module now owns the
+focused `Outline`, `Shadow`, `Background`, and `ParagraphBackground` values.
+They compose only the neutral `litchi-iwa-common` color, stroke, and shadow
+primitives; no protobuf, archive, graph, package, or facade error state enters
+the leaf. Text shadows retain the native text-inspector restriction to drop
+shadows through a typed `UnsupportedShadowFamily` error. The IWA adapter keeps
+all native color/stroke/shadow conversion, inheritance, null-marker validation,
+style lookup, and transactional publication. The former flat `TextOutline`,
+`TextShadow`, and `TextBackground` owners were removed rather than aliased, and
+the internal property discriminants now distinguish character appearance from
+paragraph background explicitly.
+
+The appearance leaf passed 60 focused tests, the integrated IWA library suite
+passed 1,484 tests, strict no-dependency Clippy passed for both
+`litchi-iwa-text` and the IWA library target (with the three existing IWA
+dead-code groups allowed), and the six appearance-related text examples
+compiled. Independent ADR, common-API, migration-risk, and native-verification
+audits agreed on the downward-only `litchi-iwa -> litchi-iwa-text ->
+litchi-iwa-common` boundary and found no archive dependency in the new leaf.
+
+The CLI text-style inspector read the migrated values from the known-good
+native fixtures: Pages storage 147, Numbers storage 130, and Keynote storage
+155 each reported a one-point `Stroke`, the standard one-point/five-point
+opaque `Drop` shadow at 45 degrees, and the fixture's non-default solid
+background. Computer Use opened `/private/tmp/adr-highlight-pages.pages`,
+`/private/tmp/litchi-adr-numbers-text.numbers`, and
+`/private/tmp/adr-highlight-keynote.key` in the real iWork applications. Pages
+and Keynote accessibility trees exposed their marker text and screenshots
+showed the native turquoise highlighted ranges; Numbers exposed the expected
+text-box marker without a repair prompt. Pages, Numbers, and Keynote were
+closed after verification. This remains a bounded semantic/API and native-open
+slice; raw `IWorkTextEditor` storage selectors and the wider monolithic adapter
+split remain open.
+
+This 2026-08-06 slice extracts the structured text wire adapter into the new
+`litchi-iwa-text-wire` crate. The leaf depends only on common wire errors,
+generated IWA protobufs, and `litchi-iwa-text`; it converts one decoded
+`TSWP.StorageArchive` into the canonical `Storage` value with one owned UTF-8
+buffer, boxed semantic runs, checked fragment and allocation limits, and typed
+errors. `litchi-iwa` now retains only the application-specific context/error
+mapping and structured traversal, while the old 55-line facade-local
+converter is deleted. No package, archive, graph, or application crate enters
+the new leaf, and the boundary checker reports 50 packages and 142 internal
+declarations with the existing 13 explicitly ordered OOXML debt edges.
+
+The new leaf's three unit tests and doc-test target pass, strict no-dependency
+Clippy passes for the leaf, the integrated IWA library passes 1,484 tests, and
+the IWA library target passes strict Clippy with the three existing dead-code
+groups allowed. ZIP integrity and the text-style inspector remain unchanged
+for the known-good native fixtures: Pages storage 147, Numbers storage 130,
+and Keynote storage 155 each retain their expected outline, drop shadow,
+background, and highlight values. Computer Use opened those fixtures in the
+real Pages, Numbers, and Keynote applications without repair prompts; their
+accessibility trees exposed the expected Overview, Numbers hyperlink/comment,
+and Quarterly result markers, and screenshots showed the native highlighted
+content. All three applications were quit through their application UI and
+confirmed absent from `sky.list_apps()` afterward.
+
+This is a focused wire-layer split toward deleting the `litchi-iwa` monolith;
+the dedicated IWA-owned `TextStorageId` migration, removal of public storage
+message metadata, and the remaining monolithic adapters are intentionally the
+next API/topology slices.
+
+This follow-up completes the dedicated IWA text-storage identity seam. The
+facade now owns `text::TextStorageId`, a transparent non-zero handle with
+compact `Option` representation, checked parsing, and explicit native
+conversion confined to the adapter. All 153 public `IWorkTextEditor` storage
+selectors accept the typed identity; `TextStorageInfo` exposes only its typed
+`id`, while message type and storage kind remain adapter-private. Pages,
+Numbers, and Keynote text graph storage fields and their public storage
+selectors were migrated accordingly. Raw `u64` remains only in private
+archive/protobuf helpers and application graph IDs that have not crossed this
+text boundary; no compatibility alias was added.
+
+The scoped IWA library check, formatter, diff check, boundary checker, and
+migrated text-inspection examples pass. The full unit-test build still has
+older internal fixtures and older Numbers examples using raw native IDs; that
+follow-on test/example migration is intentionally deferred rather than
+weakening the typed public seam. Computer Use opened the existing known-good
+Pages, Numbers, and Keynote fixtures in their native applications, confirmed
+the expected text markers and highlighted content without repair prompts, and
+closed all three applications afterward.
+
+This 2026-08-06 follow-up completes the archive-free section-relative table
+topology handoff. `litchi-numbers::table::topology` now owns the focused
+`RowInsertion`, `ColumnInsertion`, `RowDeletion`, and `ColumnDeletion` values;
+the Numbers, Pages, and Keynote IWA adapters consume those canonical types
+directly, while native section counts, object identifiers, graph updates,
+formula/merge maintenance, and wire publication remain adapter-owned. The
+former `Table*`, `PagesTable*`, and `KeynoteTable*` topology facades and their
+module files were removed rather than retained as compatibility aliases.
+
+The semantic leaf and IWA library checks, strict no-dependency Clippy targets,
+focused topology examples, topology unit test, diff check, and crate-boundary
+checker pass. Native iWork verification for this slice is performed separately
+with the real Pages, Numbers, and Keynote applications. Computer Use created
+`/private/tmp/litchi-topology-pages.pages`,
+`/private/tmp/litchi-topology-numbers.numbers`, and
+`/private/tmp/litchi-topology-keynote.key`, inserted the marker
+`Litchi topology verification`, reopened each saved document state, and found
+no repair prompts. Pages, Numbers, and Keynote were then quit through their
+application menus and confirmed absent from the final application list. The
+broader stale internal fixture build remains deferred under the typed-selector
+migration.
+
+This follow-up completes the archive-free table-header semantic handoff.
+`litchi_numbers::table::headers` now owns the focused `Count` and `Settings`
+values consumed by Numbers, Pages, and Keynote. `Count` is a compact
+`NonZeroU8` value with checked 1..=5 construction; `Settings` carries the
+optional header-row, header-column, footer-row, freeze, and repeat semantics
+without any archive or generated-protobuf dependency. IWA remains responsible
+for native `u32` conversion, wire-field validation, bounds checks, transactions,
+and publication. The former application-prefixed header facades and their
+compatibility aliases were removed.
+
+The semantic and IWA library checks, strict no-dependency Clippy targets,
+focused header examples, Numbers unit suite, formatter/diff check, and
+crate-boundary checker pass. The full IWA example target still exposes older,
+unrelated stale native-ID fixtures and remains deferred under the typed
+selector migration. Computer Use created and saved
+`/private/tmp/litchi-headers-pages-native.pages`,
+`/private/tmp/litchi-headers-numbers-native.numbers`, and
+`/private/tmp/litchi-headers-keynote-native.key` in the real iWork
+applications. Each native accessibility tree showed a 1/1/1
+header-column/header-row/footer configuration and the `HEADER`, `BODY`, and
+`FOOTER` markers. Pages, Numbers, and Keynote were then quit through their
+application menus and the final app list contained only Finder, Terminal, and
+ChatGPT.
 
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains

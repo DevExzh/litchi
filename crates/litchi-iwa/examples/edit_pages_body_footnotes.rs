@@ -1,6 +1,6 @@
 use std::env;
 
-use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::pages::{PagesEditor, Selector};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -17,11 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse::<usize>()?;
 
     let mut pages = PagesEditor::open(input)?;
-    let footnote = pages
-        .body_footnotes()?
-        .get(index)
-        .cloned()
-        .ok_or("footnote index is out of bounds")?;
+    let selector = Selector::Index(index);
     match operation.as_str() {
         "set" => {
             let text = arguments
@@ -30,13 +26,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if arguments.next().is_some() {
                 return Err("replacement footnote text must be one argument".into());
             }
-            pages.set_body_footnote_text(footnote.id, text)?;
+            pages.set_body_footnote_text(selector, text)?;
         },
         "remove" => {
             if arguments.next().is_some() {
                 return Err("remove does not accept replacement text".into());
             }
-            pages.remove_body_footnote(footnote.id)?;
+            pages.remove_body_footnote(selector)?;
         },
         _ => return Err("footnote operation must be set or remove".into()),
     }

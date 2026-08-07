@@ -1,11 +1,8 @@
 //! Strongly typed native predicate identifiers shared by encoders and decoders.
 
 use super::*;
-use crate::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightCondition, TableCellConditionalHighlightDate,
-    TableCellConditionalHighlightDateOffset, TableCellConditionalHighlightDatePeriod,
-    TableCellConditionalHighlightDateRange, TableCellConditionalHighlightNumber,
-    TableCellConditionalHighlightText,
+use litchi_iwa_common::table::cell::conditional_highlight::{
+    Condition, Date, DateRange, Number, Offset, Period, Text,
 };
 
 pub(super) const PREDICATE_QUALIFIER_NONE: i32 = 0;
@@ -68,48 +65,42 @@ pub(super) enum NumericPredicateKind {
 }
 
 impl NumericPredicateKind {
-    pub(super) const fn from_condition(
-        condition: &TableCellConditionalHighlightCondition,
-    ) -> Option<Self> {
+    pub(super) const fn from_condition(condition: &Condition) -> Option<Self> {
         match condition {
-            TableCellConditionalHighlightCondition::CellIsBlank
-            | TableCellConditionalHighlightCondition::CellIsNotBlank
-            | TableCellConditionalHighlightCondition::CheckboxIsChecked
-            | TableCellConditionalHighlightCondition::CheckboxIsNotChecked
-            | TableCellConditionalHighlightCondition::BooleanIsTrue
-            | TableCellConditionalHighlightCondition::BooleanIsFalse
-            | TableCellConditionalHighlightCondition::NumberIsPositive
-            | TableCellConditionalHighlightCondition::NumberIsNegative
-            | TableCellConditionalHighlightCondition::DateIsToday
-            | TableCellConditionalHighlightCondition::DateIsYesterday
-            | TableCellConditionalHighlightCondition::DateIsTomorrow
-            | TableCellConditionalHighlightCondition::DateIs(_)
-            | TableCellConditionalHighlightCondition::DateIsBefore(_)
-            | TableCellConditionalHighlightCondition::DateIsAfter(_)
-            | TableCellConditionalHighlightCondition::DateIsBetween(_)
-            | TableCellConditionalHighlightCondition::DateIsInNext(_)
-            | TableCellConditionalHighlightCondition::DateIsInLast(_)
-            | TableCellConditionalHighlightCondition::DateIsOffsetFromToday(_) => None,
-            TableCellConditionalHighlightCondition::EqualTo(_) => Some(Self::EqualTo),
-            TableCellConditionalHighlightCondition::NotEqualTo(_) => Some(Self::NotEqualTo),
-            TableCellConditionalHighlightCondition::GreaterThan(_) => Some(Self::GreaterThan),
-            TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(_) => {
-                Some(Self::GreaterThanOrEqualTo)
-            },
-            TableCellConditionalHighlightCondition::LessThan(_) => Some(Self::LessThan),
-            TableCellConditionalHighlightCondition::LessThanOrEqualTo(_) => {
-                Some(Self::LessThanOrEqualTo)
-            },
-            TableCellConditionalHighlightCondition::Between(_) => Some(Self::Between),
-            TableCellConditionalHighlightCondition::NotBetween(_) => Some(Self::NotBetween),
-            TableCellConditionalHighlightCondition::TextEqualTo(_)
-            | TableCellConditionalHighlightCondition::TextNotEqualTo(_)
-            | TableCellConditionalHighlightCondition::TextStartsWith(_)
-            | TableCellConditionalHighlightCondition::TextDoesNotStartWith(_)
-            | TableCellConditionalHighlightCondition::TextEndsWith(_)
-            | TableCellConditionalHighlightCondition::TextDoesNotEndWith(_)
-            | TableCellConditionalHighlightCondition::TextContains(_)
-            | TableCellConditionalHighlightCondition::TextDoesNotContain(_) => None,
+            Condition::CellIsBlank
+            | Condition::CellIsNotBlank
+            | Condition::CheckboxIsChecked
+            | Condition::CheckboxIsNotChecked
+            | Condition::BooleanIsTrue
+            | Condition::BooleanIsFalse
+            | Condition::NumberIsPositive
+            | Condition::NumberIsNegative
+            | Condition::DateIsToday
+            | Condition::DateIsYesterday
+            | Condition::DateIsTomorrow
+            | Condition::DateIs(_)
+            | Condition::DateIsBefore(_)
+            | Condition::DateIsAfter(_)
+            | Condition::DateIsBetween(_)
+            | Condition::DateIsInNext(_)
+            | Condition::DateIsInLast(_)
+            | Condition::DateIsOffsetFromToday(_) => None,
+            Condition::EqualTo(_) => Some(Self::EqualTo),
+            Condition::NotEqualTo(_) => Some(Self::NotEqualTo),
+            Condition::GreaterThan(_) => Some(Self::GreaterThan),
+            Condition::GreaterThanOrEqualTo(_) => Some(Self::GreaterThanOrEqualTo),
+            Condition::LessThan(_) => Some(Self::LessThan),
+            Condition::LessThanOrEqualTo(_) => Some(Self::LessThanOrEqualTo),
+            Condition::Between(_) => Some(Self::Between),
+            Condition::NotBetween(_) => Some(Self::NotBetween),
+            Condition::TextEqualTo(_)
+            | Condition::TextNotEqualTo(_)
+            | Condition::TextStartsWith(_)
+            | Condition::TextDoesNotStartWith(_)
+            | Condition::TextEndsWith(_)
+            | Condition::TextDoesNotEndWith(_)
+            | Condition::TextContains(_)
+            | Condition::TextDoesNotContain(_) => None,
         }
     }
 
@@ -117,21 +108,14 @@ impl NumericPredicateKind {
         self as i32
     }
 
-    pub(super) const fn single_condition(
-        self,
-        number: TableCellConditionalHighlightNumber,
-    ) -> Option<TableCellConditionalHighlightCondition> {
+    pub(super) const fn single_condition(self, number: Number) -> Option<Condition> {
         match self {
-            Self::EqualTo => Some(TableCellConditionalHighlightCondition::EqualTo(number)),
-            Self::NotEqualTo => Some(TableCellConditionalHighlightCondition::NotEqualTo(number)),
-            Self::GreaterThan => Some(TableCellConditionalHighlightCondition::GreaterThan(number)),
-            Self::GreaterThanOrEqualTo => {
-                Some(TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(number))
-            },
-            Self::LessThan => Some(TableCellConditionalHighlightCondition::LessThan(number)),
-            Self::LessThanOrEqualTo => Some(
-                TableCellConditionalHighlightCondition::LessThanOrEqualTo(number),
-            ),
+            Self::EqualTo => Some(Condition::EqualTo(number)),
+            Self::NotEqualTo => Some(Condition::NotEqualTo(number)),
+            Self::GreaterThan => Some(Condition::GreaterThan(number)),
+            Self::GreaterThanOrEqualTo => Some(Condition::GreaterThanOrEqualTo(number)),
+            Self::LessThan => Some(Condition::LessThan(number)),
+            Self::LessThanOrEqualTo => Some(Condition::LessThanOrEqualTo(number)),
             Self::Between | Self::NotBetween => None,
         }
     }
@@ -169,10 +153,10 @@ impl CellPredicateKind {
         self as i32
     }
 
-    pub(super) const fn condition(self) -> TableCellConditionalHighlightCondition {
+    pub(super) const fn condition(self) -> Condition {
         match self {
-            Self::IsBlank => TableCellConditionalHighlightCondition::CellIsBlank,
-            Self::IsNotBlank => TableCellConditionalHighlightCondition::CellIsNotBlank,
+            Self::IsBlank => Condition::CellIsBlank,
+            Self::IsNotBlank => Condition::CellIsNotBlank,
         }
     }
 }
@@ -211,11 +195,11 @@ impl RelativeDatePredicateKind {
         self as i32
     }
 
-    pub(super) const fn condition(self) -> TableCellConditionalHighlightCondition {
+    pub(super) const fn condition(self) -> Condition {
         match self {
-            Self::Today => TableCellConditionalHighlightCondition::DateIsToday,
-            Self::Yesterday => TableCellConditionalHighlightCondition::DateIsYesterday,
-            Self::Tomorrow => TableCellConditionalHighlightCondition::DateIsTomorrow,
+            Self::Today => Condition::DateIsToday,
+            Self::Yesterday => Condition::DateIsYesterday,
+            Self::Tomorrow => Condition::DateIsTomorrow,
         }
     }
 }
@@ -234,24 +218,18 @@ impl FixedDatePredicateKind {
         self as i32
     }
 
-    pub(super) const fn condition(
-        self,
-        date: TableCellConditionalHighlightDate,
-    ) -> Option<TableCellConditionalHighlightCondition> {
+    pub(super) const fn condition(self, date: Date) -> Option<Condition> {
         match self {
-            Self::Equal => Some(TableCellConditionalHighlightCondition::DateIs(date)),
-            Self::Before => Some(TableCellConditionalHighlightCondition::DateIsBefore(date)),
-            Self::After => Some(TableCellConditionalHighlightCondition::DateIsAfter(date)),
+            Self::Equal => Some(Condition::DateIs(date)),
+            Self::Before => Some(Condition::DateIsBefore(date)),
+            Self::After => Some(Condition::DateIsAfter(date)),
             Self::Between => None,
         }
     }
 
-    pub(super) const fn range_condition(
-        self,
-        range: TableCellConditionalHighlightDateRange,
-    ) -> Option<TableCellConditionalHighlightCondition> {
+    pub(super) const fn range_condition(self, range: DateRange) -> Option<Condition> {
         match self {
-            Self::Between => Some(TableCellConditionalHighlightCondition::DateIsBetween(range)),
+            Self::Between => Some(Condition::DateIsBetween(range)),
             Self::Equal | Self::Before | Self::After => None,
         }
     }
@@ -274,25 +252,17 @@ impl DatePeriodPredicateKind {
         self as i32
     }
 
-    pub(super) const fn period_condition(
-        self,
-        period: TableCellConditionalHighlightDatePeriod,
-    ) -> Option<TableCellConditionalHighlightCondition> {
+    pub(super) const fn period_condition(self, period: Period) -> Option<Condition> {
         match self {
-            Self::InNext => Some(TableCellConditionalHighlightCondition::DateIsInNext(period)),
-            Self::InLast => Some(TableCellConditionalHighlightCondition::DateIsInLast(period)),
+            Self::InNext => Some(Condition::DateIsInNext(period)),
+            Self::InLast => Some(Condition::DateIsInLast(period)),
             Self::OffsetFromToday => None,
         }
     }
 
-    pub(super) const fn offset_condition(
-        self,
-        offset: TableCellConditionalHighlightDateOffset,
-    ) -> Option<TableCellConditionalHighlightCondition> {
+    pub(super) const fn offset_condition(self, offset: Offset) -> Option<Condition> {
         match self {
-            Self::OffsetFromToday => {
-                Some(TableCellConditionalHighlightCondition::DateIsOffsetFromToday(offset))
-            },
+            Self::OffsetFromToday => Some(Condition::DateIsOffsetFromToday(offset)),
             Self::InNext | Self::InLast => None,
         }
     }
@@ -307,10 +277,10 @@ impl CheckboxPredicateKind {
         matches!(self, Self::IsChecked)
     }
 
-    pub(super) const fn condition(self) -> TableCellConditionalHighlightCondition {
+    pub(super) const fn condition(self) -> Condition {
         match self {
-            Self::IsChecked => TableCellConditionalHighlightCondition::CheckboxIsChecked,
-            Self::IsNotChecked => TableCellConditionalHighlightCondition::CheckboxIsNotChecked,
+            Self::IsChecked => Condition::CheckboxIsChecked,
+            Self::IsNotChecked => Condition::CheckboxIsNotChecked,
         }
     }
 
@@ -328,10 +298,10 @@ impl BooleanPredicateKind {
         matches!(self, Self::IsTrue)
     }
 
-    pub(super) const fn condition(self) -> TableCellConditionalHighlightCondition {
+    pub(super) const fn condition(self) -> Condition {
         match self {
-            Self::IsTrue => TableCellConditionalHighlightCondition::BooleanIsTrue,
-            Self::IsFalse => TableCellConditionalHighlightCondition::BooleanIsFalse,
+            Self::IsTrue => Condition::BooleanIsTrue,
+            Self::IsFalse => Condition::BooleanIsFalse,
         }
     }
 
@@ -345,10 +315,10 @@ impl NumericSignPredicateKind {
         self as i32
     }
 
-    pub(super) const fn condition(self) -> TableCellConditionalHighlightCondition {
+    pub(super) const fn condition(self) -> Condition {
         match self {
-            Self::IsPositive => TableCellConditionalHighlightCondition::NumberIsPositive,
-            Self::IsNegative => TableCellConditionalHighlightCondition::NumberIsNegative,
+            Self::IsPositive => Condition::NumberIsPositive,
+            Self::IsNegative => Condition::NumberIsNegative,
         }
     }
 
@@ -387,25 +357,16 @@ impl TextPredicateKind {
         self as i32
     }
 
-    pub(super) fn condition(
-        self,
-        text: TableCellConditionalHighlightText,
-    ) -> TableCellConditionalHighlightCondition {
+    pub(super) fn condition(self, text: Text) -> Condition {
         match self {
-            Self::EqualTo => TableCellConditionalHighlightCondition::TextEqualTo(text),
-            Self::NotEqualTo => TableCellConditionalHighlightCondition::TextNotEqualTo(text),
-            Self::StartsWith => TableCellConditionalHighlightCondition::TextStartsWith(text),
-            Self::DoesNotStartWith => {
-                TableCellConditionalHighlightCondition::TextDoesNotStartWith(text)
-            },
-            Self::EndsWith => TableCellConditionalHighlightCondition::TextEndsWith(text),
-            Self::DoesNotEndWith => {
-                TableCellConditionalHighlightCondition::TextDoesNotEndWith(text)
-            },
-            Self::Contains => TableCellConditionalHighlightCondition::TextContains(text),
-            Self::DoesNotContain => {
-                TableCellConditionalHighlightCondition::TextDoesNotContain(text)
-            },
+            Self::EqualTo => Condition::TextEqualTo(text),
+            Self::NotEqualTo => Condition::TextNotEqualTo(text),
+            Self::StartsWith => Condition::TextStartsWith(text),
+            Self::DoesNotStartWith => Condition::TextDoesNotStartWith(text),
+            Self::EndsWith => Condition::TextEndsWith(text),
+            Self::DoesNotEndWith => Condition::TextDoesNotEndWith(text),
+            Self::Contains => Condition::TextContains(text),
+            Self::DoesNotContain => Condition::TextDoesNotContain(text),
         }
     }
 
@@ -436,90 +397,76 @@ pub(super) enum NativePredicateKind {
 }
 
 impl NativePredicateKind {
-    pub(super) fn from_condition(condition: &TableCellConditionalHighlightCondition) -> Self {
+    pub(super) fn from_condition(condition: &Condition) -> Self {
         match condition {
-            TableCellConditionalHighlightCondition::CellIsBlank => {
+            Condition::CellIsBlank => {
                 return Self::Cell(CellPredicateKind::IsBlank);
             },
-            TableCellConditionalHighlightCondition::CellIsNotBlank => {
+            Condition::CellIsNotBlank => {
                 return Self::Cell(CellPredicateKind::IsNotBlank);
             },
-            TableCellConditionalHighlightCondition::CheckboxIsChecked => {
+            Condition::CheckboxIsChecked => {
                 return Self::Checkbox(CheckboxPredicateKind::IsChecked);
             },
-            TableCellConditionalHighlightCondition::CheckboxIsNotChecked => {
+            Condition::CheckboxIsNotChecked => {
                 return Self::Checkbox(CheckboxPredicateKind::IsNotChecked);
             },
-            TableCellConditionalHighlightCondition::BooleanIsTrue => {
+            Condition::BooleanIsTrue => {
                 return Self::Boolean(BooleanPredicateKind::IsTrue);
             },
-            TableCellConditionalHighlightCondition::BooleanIsFalse => {
+            Condition::BooleanIsFalse => {
                 return Self::Boolean(BooleanPredicateKind::IsFalse);
             },
-            TableCellConditionalHighlightCondition::NumberIsPositive => {
+            Condition::NumberIsPositive => {
                 return Self::NumericSign(NumericSignPredicateKind::IsPositive);
             },
-            TableCellConditionalHighlightCondition::NumberIsNegative => {
+            Condition::NumberIsNegative => {
                 return Self::NumericSign(NumericSignPredicateKind::IsNegative);
             },
-            TableCellConditionalHighlightCondition::DateIsToday => {
+            Condition::DateIsToday => {
                 return Self::RelativeDate(RelativeDatePredicateKind::Today);
             },
-            TableCellConditionalHighlightCondition::DateIsYesterday => {
+            Condition::DateIsYesterday => {
                 return Self::RelativeDate(RelativeDatePredicateKind::Yesterday);
             },
-            TableCellConditionalHighlightCondition::DateIsTomorrow => {
+            Condition::DateIsTomorrow => {
                 return Self::RelativeDate(RelativeDatePredicateKind::Tomorrow);
             },
-            TableCellConditionalHighlightCondition::DateIs(_) => {
+            Condition::DateIs(_) => {
                 return Self::FixedDate(FixedDatePredicateKind::Equal);
             },
-            TableCellConditionalHighlightCondition::DateIsBefore(_) => {
+            Condition::DateIsBefore(_) => {
                 return Self::FixedDate(FixedDatePredicateKind::Before);
             },
-            TableCellConditionalHighlightCondition::DateIsAfter(_) => {
+            Condition::DateIsAfter(_) => {
                 return Self::FixedDate(FixedDatePredicateKind::After);
             },
-            TableCellConditionalHighlightCondition::DateIsBetween(_) => {
+            Condition::DateIsBetween(_) => {
                 return Self::FixedDate(FixedDatePredicateKind::Between);
             },
-            TableCellConditionalHighlightCondition::DateIsInNext(_) => {
+            Condition::DateIsInNext(_) => {
                 return Self::DatePeriod(DatePeriodPredicateKind::InNext);
             },
-            TableCellConditionalHighlightCondition::DateIsInLast(_) => {
+            Condition::DateIsInLast(_) => {
                 return Self::DatePeriod(DatePeriodPredicateKind::InLast);
             },
-            TableCellConditionalHighlightCondition::DateIsOffsetFromToday(_) => {
+            Condition::DateIsOffsetFromToday(_) => {
                 return Self::DatePeriod(DatePeriodPredicateKind::OffsetFromToday);
             },
             _ => {},
         }
         NumericPredicateKind::from_condition(condition).map_or_else(
             || match condition {
-                TableCellConditionalHighlightCondition::TextEqualTo(_) => {
-                    Self::Text(TextPredicateKind::EqualTo)
-                },
-                TableCellConditionalHighlightCondition::TextNotEqualTo(_) => {
-                    Self::Text(TextPredicateKind::NotEqualTo)
-                },
-                TableCellConditionalHighlightCondition::TextStartsWith(_) => {
-                    Self::Text(TextPredicateKind::StartsWith)
-                },
-                TableCellConditionalHighlightCondition::TextDoesNotStartWith(_) => {
+                Condition::TextEqualTo(_) => Self::Text(TextPredicateKind::EqualTo),
+                Condition::TextNotEqualTo(_) => Self::Text(TextPredicateKind::NotEqualTo),
+                Condition::TextStartsWith(_) => Self::Text(TextPredicateKind::StartsWith),
+                Condition::TextDoesNotStartWith(_) => {
                     Self::Text(TextPredicateKind::DoesNotStartWith)
                 },
-                TableCellConditionalHighlightCondition::TextEndsWith(_) => {
-                    Self::Text(TextPredicateKind::EndsWith)
-                },
-                TableCellConditionalHighlightCondition::TextDoesNotEndWith(_) => {
-                    Self::Text(TextPredicateKind::DoesNotEndWith)
-                },
-                TableCellConditionalHighlightCondition::TextContains(_) => {
-                    Self::Text(TextPredicateKind::Contains)
-                },
-                TableCellConditionalHighlightCondition::TextDoesNotContain(_) => {
-                    Self::Text(TextPredicateKind::DoesNotContain)
-                },
+                Condition::TextEndsWith(_) => Self::Text(TextPredicateKind::EndsWith),
+                Condition::TextDoesNotEndWith(_) => Self::Text(TextPredicateKind::DoesNotEndWith),
+                Condition::TextContains(_) => Self::Text(TextPredicateKind::Contains),
+                Condition::TextDoesNotContain(_) => Self::Text(TextPredicateKind::DoesNotContain),
                 _ => unreachable!("every public predicate has a native kind"),
             },
             Self::Numeric,

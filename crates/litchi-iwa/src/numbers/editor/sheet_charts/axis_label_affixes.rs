@@ -5,7 +5,7 @@ use crate::charts::axis_label_affixes::{
     chart_axis_label_affixes as read_native_axis_label_affixes,
     set_chart_axis_label_affixes as set_native_axis_label_affixes,
 };
-use crate::charts::{ChartAxis, ChartLabelAffixes};
+use crate::charts::{Axis, LabelAffixes};
 
 impl NumbersEditor {
     /// Read the prefix and suffix applied to one sheet-chart axis' labels.
@@ -13,8 +13,8 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
-    ) -> Result<ChartLabelAffixes> {
+        axis: Axis,
+    ) -> Result<LabelAffixes> {
         sheet_chart_axis_label_affixes(self, sheet_id, drawable_object_id, axis)
     }
 
@@ -23,8 +23,8 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
-        affixes: ChartLabelAffixes,
+        axis: Axis,
+        affixes: LabelAffixes,
     ) -> Result<()> {
         set_sheet_chart_axis_label_affixes(self, sheet_id, drawable_object_id, axis, affixes)
     }
@@ -34,8 +34,8 @@ fn sheet_chart_axis_label_affixes(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
-) -> Result<ChartLabelAffixes> {
+    axis: Axis,
+) -> Result<LabelAffixes> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     read_native_axis_label_affixes(
         &editor.package,
@@ -50,8 +50,8 @@ fn set_sheet_chart_axis_label_affixes(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
-    affixes: ChartLabelAffixes,
+    axis: Axis,
+    affixes: LabelAffixes,
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let mut staged = editor.package.clone();
@@ -76,7 +76,7 @@ fn set_sheet_chart_axis_label_affixes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartKind};
+    use crate::charts::{ChartData, Kind};
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -87,7 +87,7 @@ mod tests {
         let chart = editor
             .add_sheet_chart(
                 sheet_id,
-                ChartKind::Line2d,
+                Kind::Line2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -96,34 +96,26 @@ mod tests {
                 },
             )
             .unwrap();
-        let expected = ChartLabelAffixes::new("USD ", " net");
+        let expected = LabelAffixes::new("USD ", " net").unwrap();
         assert_eq!(
             editor
-                .sheet_chart_axis_label_affixes(
-                    sheet_id,
-                    chart.drawable_object_id,
-                    ChartAxis::Value,
-                )
+                .sheet_chart_axis_label_affixes(sheet_id, chart.drawable_object_id, Axis::Value,)
                 .unwrap(),
-            ChartLabelAffixes::default()
+            LabelAffixes::default()
         );
         let baseline = editor.to_bytes().unwrap();
         editor
             .set_sheet_chart_axis_label_affixes(
                 sheet_id,
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 expected.clone(),
             )
             .unwrap();
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
-                .sheet_chart_axis_label_affixes(
-                    sheet_id,
-                    chart.drawable_object_id,
-                    ChartAxis::Value,
-                )
+                .sheet_chart_axis_label_affixes(sheet_id, chart.drawable_object_id, Axis::Value,)
                 .unwrap(),
             expected
         );
@@ -131,19 +123,15 @@ mod tests {
             .set_sheet_chart_axis_label_affixes(
                 sheet_id,
                 chart.drawable_object_id,
-                ChartAxis::Value,
-                ChartLabelAffixes::default(),
+                Axis::Value,
+                LabelAffixes::default(),
             )
             .unwrap();
         assert_eq!(
             reopened
-                .sheet_chart_axis_label_affixes(
-                    sheet_id,
-                    chart.drawable_object_id,
-                    ChartAxis::Value,
-                )
+                .sheet_chart_axis_label_affixes(sheet_id, chart.drawable_object_id, Axis::Value,)
                 .unwrap(),
-            ChartLabelAffixes::default()
+            LabelAffixes::default()
         );
         assert_eq!(reopened.to_bytes().unwrap(), baseline);
     }

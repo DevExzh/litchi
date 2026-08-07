@@ -13,7 +13,7 @@ pub(crate) struct PagesTableGraph {
 pub(crate) fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGraph>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -65,7 +65,8 @@ pub(crate) fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGr
             )));
         };
         let table_info = TableInfoArchive::decode(message.data.as_slice())?;
-        if table_info.super_.parent.map(|parent| parent.identifier) != Some(editor.body_storage_id)
+        if table_info.super_.parent.map(|parent| parent.identifier)
+            != Some(editor.body_storage_id.get())
         {
             return Err(Error::InvalidFormat(format!(
                 "Pages table drawable {} is not owned by the body",
@@ -152,7 +153,7 @@ pub(crate) fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGr
         excluded.remove(&graph.attachment_object_id);
         excluded.remove(&graph.info.drawable_object_id);
         excluded.remove(&graph.info.model_object_id);
-        excluded.insert(editor.body_storage_id);
+        excluded.insert(editor.body_storage_id.get());
         expand_formula_contexts(editor.package(), &mut graph.formula_context_ids, &excluded)?;
     }
     result.sort_by_key(|graph| graph.info.anchor_character_index);
@@ -182,7 +183,9 @@ pub(crate) fn clone_body_table_attachment(
     ]);
     let cloned_attachment = clone_pages_drawable_graph_object(attachment_object, &remap)?;
     staged.update_archive(&attachment_archive_name, |archive| {
-        archive.insert_object(cloned_attachment)
+        archive
+            .insert_object(cloned_attachment)
+            .map_err(Error::from)
     })?;
 
     if let Some(component) = component_identifier_for_entry(source, &attachment_archive_name)? {

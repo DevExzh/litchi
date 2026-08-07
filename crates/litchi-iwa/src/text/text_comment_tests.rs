@@ -59,14 +59,14 @@ fn text_comment_crud_round_trips_and_restores_pages_exactly() {
     let reply = pages
         .add_text_box_comment_reply(
             text_box.drawable_object_id,
-            created.id,
+            created.id(),
             reply_body("First reply"),
         )
         .unwrap();
-    assert_eq!(reply.comment_id, created.id);
+    assert_eq!(reply.comment_id(), created.id());
     assert_eq!(
         pages
-            .text_box_comment_replies(text_box.drawable_object_id, created.id)
+            .text_box_comment_replies(text_box.drawable_object_id, created.id())
             .unwrap()
             .as_slice(),
         std::slice::from_ref(&reply)
@@ -74,45 +74,42 @@ fn text_comment_crud_round_trips_and_restores_pages_exactly() {
     let updated_reply = pages
         .update_text_box_comment_reply(
             text_box.drawable_object_id,
-            created.id,
-            reply.id,
+            created.id(),
+            reply.id(),
             reply_body("Updated reply 😀"),
         )
         .unwrap();
-    assert_eq!(updated_reply.id, reply.id);
-    assert_eq!(updated_reply.body.as_str(), "Updated reply 😀");
-    assert_eq!(
-        updated_reply.creation_date_seconds,
-        reply.creation_date_seconds
-    );
-    assert_eq!(updated_reply.author_object_id, reply.author_object_id);
-    assert_eq!(updated_reply.storage_uuid, reply.storage_uuid);
+    assert_eq!(updated_reply.id(), reply.id());
+    assert_eq!(updated_reply.body().as_str(), "Updated reply 😀");
+    assert_eq!(updated_reply.creation_date(), reply.creation_date());
+    assert_eq!(updated_reply.author(), reply.author());
+    assert_eq!(updated_reply.storage_uuid(), reply.storage_uuid());
 
     let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     let updated = pages
         .update_text_box_comment(
             text_box.drawable_object_id,
-            created.id,
+            created.id(),
             text_range("Beta"),
             body("Reviewed 😀"),
         )
         .unwrap();
-    assert_eq!(updated.id, created.id);
-    assert_eq!(updated.range, text_range("Beta"));
-    assert_eq!(updated.body.as_str(), "Reviewed 😀");
-    assert_eq!(updated.creation_date_seconds, created.creation_date_seconds);
-    assert_eq!(updated.author_object_id, created.author_object_id);
-    assert_eq!(updated.storage_uuid, created.storage_uuid);
-    assert_eq!(updated.reply_count, 1);
+    assert_eq!(updated.id(), created.id());
+    assert_eq!(updated.range(), text_range("Beta"));
+    assert_eq!(updated.body().as_str(), "Reviewed 😀");
+    assert_eq!(updated.creation_date(), created.creation_date());
+    assert_eq!(updated.author(), created.author());
+    assert_eq!(updated.storage_uuid(), created.storage_uuid());
+    assert_eq!(updated.reply_count(), 1);
     assert_eq!(
         pages
-            .remove_text_box_comment_reply(text_box.drawable_object_id, created.id, reply.id,)
+            .remove_text_box_comment_reply(text_box.drawable_object_id, created.id(), reply.id(),)
             .unwrap(),
         updated_reply
     );
     assert!(
         pages
-            .text_box_comment_replies(text_box.drawable_object_id, created.id)
+            .text_box_comment_replies(text_box.drawable_object_id, created.id())
             .unwrap()
             .is_empty()
     );
@@ -122,7 +119,7 @@ fn text_comment_crud_round_trips_and_restores_pages_exactly() {
         .into_iter()
         .next()
         .unwrap();
-    assert_eq!(without_replies.reply_count, 0);
+    assert_eq!(without_replies.reply_count(), 0);
 
     let before_overlap = pages.to_bytes().unwrap();
     assert!(
@@ -138,7 +135,7 @@ fn text_comment_crud_round_trips_and_restores_pages_exactly() {
 
     assert_eq!(
         pages
-            .remove_text_box_comment(text_box.drawable_object_id, created.id)
+            .remove_text_box_comment(text_box.drawable_object_id, created.id())
             .unwrap(),
         without_replies
     );
@@ -171,7 +168,7 @@ fn scratch_text_comments_work_in_numbers_and_keynote() {
         .add_sheet_text_box_comment_reply(
             sheet_id,
             numbers_box.drawable_object_id,
-            numbers_comment.id,
+            numbers_comment.id(),
             reply_body("Numbers reply"),
         )
         .unwrap();
@@ -179,14 +176,14 @@ fn scratch_text_comments_work_in_numbers_and_keynote() {
     let stored_numbers_comment = numbers
         .sheet_text_box_comments(sheet_id, numbers_box.drawable_object_id)
         .unwrap();
-    assert_eq!(stored_numbers_comment[0].id, numbers_comment.id);
-    assert_eq!(stored_numbers_comment[0].reply_count, 1);
+    assert_eq!(stored_numbers_comment[0].id(), numbers_comment.id());
+    assert_eq!(stored_numbers_comment[0].reply_count(), 1);
     assert_eq!(
         numbers
             .sheet_text_box_comment_replies(
                 sheet_id,
                 numbers_box.drawable_object_id,
-                numbers_comment.id,
+                numbers_comment.id(),
             )
             .unwrap()
             .as_slice(),
@@ -196,12 +193,16 @@ fn scratch_text_comments_work_in_numbers_and_keynote() {
         .remove_sheet_text_box_comment_reply(
             sheet_id,
             numbers_box.drawable_object_id,
-            numbers_comment.id,
-            numbers_reply.id,
+            numbers_comment.id(),
+            numbers_reply.id(),
         )
         .unwrap();
     numbers
-        .remove_sheet_text_box_comment(sheet_id, numbers_box.drawable_object_id, numbers_comment.id)
+        .remove_sheet_text_box_comment(
+            sheet_id,
+            numbers_box.drawable_object_id,
+            numbers_comment.id(),
+        )
         .unwrap();
     assert_eq!(numbers.to_bytes().unwrap(), numbers_baseline);
 
@@ -220,7 +221,7 @@ fn scratch_text_comments_work_in_numbers_and_keynote() {
         .add_slide_text_box_comment_reply(
             0,
             keynote_box.drawable_object_id,
-            keynote_comment.id,
+            keynote_comment.id(),
             reply_body("Keynote reply"),
         )
         .unwrap();
@@ -228,11 +229,11 @@ fn scratch_text_comments_work_in_numbers_and_keynote() {
     let stored_keynote_comment = keynote
         .slide_text_box_comments(0, keynote_box.drawable_object_id)
         .unwrap();
-    assert_eq!(stored_keynote_comment[0].id, keynote_comment.id);
-    assert_eq!(stored_keynote_comment[0].reply_count, 1);
+    assert_eq!(stored_keynote_comment[0].id(), keynote_comment.id());
+    assert_eq!(stored_keynote_comment[0].reply_count(), 1);
     assert_eq!(
         keynote
-            .slide_text_box_comment_replies(0, keynote_box.drawable_object_id, keynote_comment.id,)
+            .slide_text_box_comment_replies(0, keynote_box.drawable_object_id, keynote_comment.id(),)
             .unwrap()
             .as_slice(),
         std::slice::from_ref(&keynote_reply)
@@ -241,12 +242,12 @@ fn scratch_text_comments_work_in_numbers_and_keynote() {
         .remove_slide_text_box_comment_reply(
             0,
             keynote_box.drawable_object_id,
-            keynote_comment.id,
-            keynote_reply.id,
+            keynote_comment.id(),
+            keynote_reply.id(),
         )
         .unwrap();
     keynote
-        .remove_slide_text_box_comment(0, keynote_box.drawable_object_id, keynote_comment.id)
+        .remove_slide_text_box_comment(0, keynote_box.drawable_object_id, keynote_comment.id())
         .unwrap();
     assert_eq!(keynote.to_bytes().unwrap(), keynote_baseline);
 }
@@ -287,7 +288,7 @@ fn highlights_and_comments_are_classified_independently() {
         .remove_text_box_highlight(text_box.drawable_object_id, highlight.id)
         .unwrap();
     pages
-        .remove_text_box_comment(text_box.drawable_object_id, comment.id)
+        .remove_text_box_comment(text_box.drawable_object_id, comment.id())
         .unwrap();
     assert_eq!(pages.to_bytes().unwrap(), baseline);
 }

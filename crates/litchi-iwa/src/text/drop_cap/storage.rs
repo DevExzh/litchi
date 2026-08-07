@@ -10,11 +10,11 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::types::ParagraphStart;
 use crate::text::storage_wire::{
     LocatedStorage, StorageLocation,
     locate_storage_with_archive as locate_native_storage_with_archive, update_parsed_archive,
 };
+use litchi_iwa_text::position::TextPosition;
 const DROP_CAP_TABLE_FIELD: u32 = 28;
 const TABLE_ENTRIES_FIELD: u32 = 1;
 const ENTRY_CHARACTER_INDEX_FIELD: u32 = 1;
@@ -23,7 +23,7 @@ const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct DropCapEntry {
-    pub(super) paragraph_start: ParagraphStart,
+    pub(super) paragraph: TextPosition,
     pub(super) style_id: Option<u64>,
 }
 
@@ -83,21 +83,21 @@ pub(super) fn locate_with_archive(
         .iter()
         .flat_map(|table| &table.entries)
     {
-        let start = ParagraphStart::from_utf16_index(entry.character_index as usize)?;
-        validate_utf16_boundary(&text, start)?;
-        if previous.is_some_and(|value| value >= start) {
+        let paragraph = TextPosition::from_utf16_index(entry.character_index as usize)?;
+        validate_utf16_boundary(&text, paragraph)?;
+        if previous.is_some_and(|value| value >= paragraph) {
             return Err(Error::InvalidFormat(format!(
                 "iWork text storage {storage_id} Drop Cap boundaries are not strictly increasing"
             )));
         }
-        previous = Some(start);
+        previous = Some(paragraph);
         let style_id = entry
             .object
             .as_ref()
             .map(|reference| reference.identifier)
             .filter(|identifier| *identifier != 0);
         entries.push(DropCapEntry {
-            paragraph_start: start,
+            paragraph,
             style_id,
         });
     }
@@ -117,7 +117,7 @@ pub(super) fn locate_with_archive(
     })
 }
 
-pub(super) fn validate_paragraph_start(text: &str, start: ParagraphStart) -> Result<()> {
+pub(super) fn validate_paragraph_start(text: &str, start: TextPosition) -> Result<()> {
     validate_utf16_boundary(text, start)?;
     let target = usize::try_from(start.utf16_index()).map_err(|_| {
         Error::InvalidFormat("paragraph start exceeds this platform's index range".to_owned())
@@ -149,7 +149,7 @@ pub(super) fn validate_paragraph_start(text: &str, start: ParagraphStart) -> Res
 pub(super) fn patch_entry(
     package: &mut IWorkPackage,
     located: LocatedDropCapStorage,
-    paragraph_start: ParagraphStart,
+    paragraph: TextPosition,
     old_style_id: Option<u64>,
     new_style_id: Option<u64>,
 ) -> Result<()> {
@@ -207,7 +207,7 @@ pub(super) fn patch_entry(
             let matches = entries
                 .iter()
                 .enumerate()
-                .filter(|(_, (entry, _))| entry.paragraph_start == paragraph_start)
+                .filter(|(_, (entry, _))| entry.paragraph == paragraph)
                 .map(|(index, _)| index)
                 .collect::<Vec<_>>();
             if matches.len() > 1 {
@@ -227,21 +227,21 @@ pub(super) fn patch_entry(
                 entries[index].0.style_id = new_style_id;
             } else if new_style_id.is_some() {
                 let entry = tswp::object_attribute_table::ObjectAttribute {
-                    character_index: paragraph_start.utf16_index(),
+                    character_index: paragraph.utf16_index(),
                     object: new_style_id.map(reference),
                 };
                 entries.push((
                     DropCapEntry {
-                        paragraph_start,
+                        paragraph,
                         style_id: new_style_id,
                     },
                     entry.encode_to_vec(),
                 ));
             }
-            entries.sort_by_key(|(entry, _)| entry.paragraph_start);
+            entries.sort_by_key(|(entry, _)| entry.paragraph);
             if entries
                 .windows(2)
-                .any(|pair| pair[0].0.paragraph_start == pair[1].0.paragraph_start)
+                .any(|pair| pair[0].0.paragraph == pair[1].0.paragraph)
             {
                 return Err(Error::InvalidFormat(format!(
                     "iWork text storage {storage_id} has duplicate Drop Cap boundaries"
@@ -306,7 +306,7 @@ pub(super) fn patch_entry(
     })
 }
 
-fn validate_utf16_boundary(text: &str, start: ParagraphStart) -> Result<()> {
+fn validate_utf16_boundary(text: &str, start: TextPosition) -> Result<()> {
     let target = usize::try_from(start.utf16_index()).map_err(|_| {
         Error::InvalidFormat("paragraph start exceeds this platform's index range".to_owned())
     })?;
@@ -359,7 +359,7 @@ fn decode_raw_entry(raw: &[u8]) -> Result<DropCapEntry> {
         },
     };
     Ok(DropCapEntry {
-        paragraph_start: ParagraphStart::from_utf16_index(character_index as usize)?,
+        paragraph: TextPosition::from_utf16_index(character_index as usize)?,
         style_id,
     })
 }
@@ -499,16 +499,17 @@ fn required_varint(data: &[u8], field_number: u32, context: &str) -> Result<u64>
     let fields = parse_wire_fields(data)?;
     let matches = fields
         .iter()
-        .filter(|field| field.number == field_number && field.wire_type == 0)
+        .filter(|field| field.number() == field_number && field.wire_type() == 0)
         .collect::<Vec<_>>();
     let [field] = matches.as_slice() else {
         return Err(Error::InvalidFormat(format!(
             "{context} must contain varint field {field_number} exactly once"
         )));
     };
-    let (value, length) = crate::varint::decode_varint_from_bytes(&data[field.key_end..field.end])
-        .map_err(|error| Error::InvalidFormat(format!("invalid {context}: {error}")))?;
-    if field.key_end + length != field.end {
+    let (value, length) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end()..field.end()])
+            .map_err(|error| Error::InvalidFormat(format!("invalid {context}: {error}")))?;
+    if field.key_end() + length != field.end() {
         return Err(Error::InvalidFormat(format!(
             "{context} has trailing varint bytes"
         )));

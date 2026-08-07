@@ -8,15 +8,15 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::series_style::{
     ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
     effective_chart_series_style_slots, generated_chart_series_style_extension,
 };
 use crate::protobuf::tsch;
 use crate::shapes::{
-    RgbaColor, ShapeFill, ShapeStroke, StrokePattern, StrokeWidth, fill_from_native,
-    fill_to_native, stroke_from_native, stroke_to_native,
+    Pattern, RgbaColor, ShapeFill, Stroke, Width, fill_from_native, fill_to_native,
+    stroke_from_native, stroke_to_native,
 };
 use crate::wire::{
     parse_wire_fields, patch_fixed32_field, patch_length_delimited_field, patch_varint_field,
@@ -49,7 +49,7 @@ pub(crate) fn chart_radar_series_style(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
 ) -> Result<ChartRadarSeriesStyle> {
     require_radar_chart(kind)?;
@@ -85,7 +85,7 @@ pub(crate) fn set_chart_radar_series_style(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     style: ChartRadarSeriesStyle,
 ) -> Result<()> {
@@ -129,7 +129,7 @@ pub(crate) fn set_chart_radar_series_style(
     Ok(())
 }
 
-fn require_radar_chart(kind: ChartKind) -> Result<()> {
+fn require_radar_chart(kind: Kind) -> Result<()> {
     if !kind.supports_radar_series_style() {
         return Err(Error::InvalidFormat(format!(
             "chart kind {kind:?} does not expose Radar series styles"
@@ -159,7 +159,7 @@ fn effective_radar_style(
 
 fn classify_radar_style(
     fill: &ShapeFill,
-    stroke: Option<&ShapeStroke>,
+    stroke: Option<&Stroke>,
     uses_stroke: bool,
 ) -> Result<ChartRadarSeriesStyle> {
     let has_fill = !matches!(fill, ShapeFill::None);
@@ -214,23 +214,23 @@ fn effective_radar_color(slot: &ChartSeriesStyleSlot, package: &IWorkPackage) ->
 }
 
 fn opaque(color: RgbaColor) -> Result<RgbaColor> {
-    RgbaColor::new(
+    Ok(RgbaColor::new(
         color.red(),
         color.green(),
         color.blue(),
         1.0,
         color.color_space(),
-    )
+    )?)
 }
 
 fn with_alpha(color: RgbaColor, alpha: f32) -> Result<RgbaColor> {
-    RgbaColor::new(
+    Ok(RgbaColor::new(
         color.red(),
         color.green(),
         color.blue(),
         alpha,
         color.color_space(),
-    )
+    )?)
 }
 
 fn read_local_radar_fill(data: &[u8]) -> Result<Option<ShapeFill>> {
@@ -246,7 +246,7 @@ fn read_local_radar_fill(data: &[u8]) -> Result<Option<ShapeFill>> {
         .transpose()
 }
 
-fn read_local_radar_stroke(data: &[u8]) -> Result<Option<Option<ShapeStroke>>> {
+fn read_local_radar_stroke(data: &[u8]) -> Result<Option<Option<Stroke>>> {
     let Some(extension) = generated_chart_series_style_extension(data)? else {
         return Ok(None);
     };
@@ -266,11 +266,11 @@ fn read_local_fill_uses_stroke(data: &[u8]) -> Result<Option<bool>> {
     let Some(field) = singular_field(extension, RADAR_FILL_USES_STROKE_FIELD, 0)? else {
         return Ok(None);
     };
-    let (value, length) = crate::varint::decode_varint_from_bytes(
-        &extension[field.key_end..field.end],
+    let (value, length) = litchi_iwa_common::varint::decode_varint_from_bytes(
+        &extension[field.key_end()..field.end()],
     )
     .map_err(|error| Error::InvalidFormat(format!("invalid Radar style boolean: {error}")))?;
-    if field.key_end + length != field.end || value > 1 {
+    if field.key_end() + length != field.end() || value > 1 {
         return Err(Error::InvalidFormat(format!(
             "native Radar style boolean must be zero or one, not {value}"
         )));
@@ -286,7 +286,7 @@ fn read_local_alpha_multiplier(data: &[u8]) -> Result<Option<f32>> {
     else {
         return Ok(None);
     };
-    let bytes: [u8; 4] = extension[field.payload_start..field.end]
+    let bytes: [u8; 4] = extension[field.payload_start()..field.end()]
         .try_into()
         .map_err(|_| Error::InvalidFormat("truncated Radar alpha multiplier".to_owned()))?;
     Ok(Some(f32::from_le_bytes(bytes)))
@@ -305,7 +305,7 @@ fn singular_field(
     let fields = parse_wire_fields(data)?;
     let matches = fields
         .into_iter()
-        .filter(|field| field.number == number)
+        .filter(|field| field.number() == number)
         .collect::<Vec<_>>();
     let [field] = matches.as_slice() else {
         if matches.is_empty() {
@@ -315,10 +315,10 @@ fn singular_field(
             "Radar series-style field {number} occurs more than once"
         )));
     };
-    if field.wire_type != wire_type {
+    if field.wire_type() != wire_type {
         return Err(Error::InvalidFormat(format!(
             "Radar series-style field {number} has wire type {}, not {wire_type}",
-            field.wire_type
+            field.wire_type()
         )));
     }
     Ok(Some(*field))
@@ -346,10 +346,10 @@ fn patch_local_radar_style(
     let stroke = if style == ChartRadarSeriesStyle::Fill {
         None
     } else {
-        let stroke = ShapeStroke::new(
+        let stroke = Stroke::new(
             color,
-            StrokeWidth::new(NATIVE_RADAR_STROKE_WIDTH_POINTS)?,
-            StrokePattern::Solid,
+            Width::new(NATIVE_RADAR_STROKE_WIDTH_POINTS)?,
+            Pattern::Solid,
         );
         Some(stroke_to_native(stroke).encode_to_vec())
     };
@@ -515,6 +515,6 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .iter()
-            .any(|field| field.number == number)
+            .any(|field| field.number() == number)
     }
 }

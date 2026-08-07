@@ -37,7 +37,7 @@ pub(super) fn alignment(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TextAlignment> {
+) -> Result<Alignment> {
     match property(
         package,
         table_id,
@@ -57,7 +57,7 @@ pub(super) fn set_alignment(
     table_id: u64,
     row: usize,
     column: usize,
-    value: TextAlignment,
+    value: Alignment,
 ) -> Result<()> {
     set_property(
         package,
@@ -88,7 +88,7 @@ pub(super) fn line_spacing(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<ParagraphLineSpacing> {
+) -> Result<LineSpacing> {
     match property(
         package,
         table_id,
@@ -108,7 +108,7 @@ pub(super) fn set_line_spacing(
     table_id: u64,
     row: usize,
     column: usize,
-    value: ParagraphLineSpacing,
+    value: LineSpacing,
 ) -> Result<()> {
     set_property(
         package,
@@ -139,7 +139,7 @@ pub(super) fn spacing(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<ParagraphSpacing> {
+) -> Result<Spacing> {
     match property(
         package,
         table_id,
@@ -159,7 +159,7 @@ pub(super) fn set_spacing(
     table_id: u64,
     row: usize,
     column: usize,
-    value: ParagraphSpacing,
+    value: Spacing,
 ) -> Result<()> {
     set_property(
         package,
@@ -190,7 +190,7 @@ pub(super) fn indents(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<ParagraphIndents> {
+) -> Result<Indents> {
     match property(
         package,
         table_id,
@@ -210,7 +210,7 @@ pub(super) fn set_indents(
     table_id: u64,
     row: usize,
     column: usize,
-    value: ParagraphIndents,
+    value: Indents,
 ) -> Result<()> {
     set_property(
         package,
@@ -293,7 +293,7 @@ pub(super) fn background(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TextBackground> {
+) -> Result<Background> {
     match property(
         package,
         table_id,
@@ -313,7 +313,7 @@ pub(super) fn set_background(
     table_id: u64,
     row: usize,
     column: usize,
-    value: TextBackground,
+    value: Background,
 ) -> Result<()> {
     set_property(
         package,
@@ -701,7 +701,7 @@ pub(super) fn outline(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TextOutline> {
+) -> Result<Outline> {
     match property(
         package,
         table_id,
@@ -721,7 +721,7 @@ pub(super) fn set_outline(
     table_id: u64,
     row: usize,
     column: usize,
-    value: TextOutline,
+    value: Outline,
 ) -> Result<()> {
     set_property(
         package,
@@ -803,7 +803,7 @@ pub(super) fn shadow(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TextShadow> {
+) -> Result<Shadow> {
     match property(
         package,
         table_id,
@@ -823,7 +823,7 @@ pub(super) fn set_shadow(
     table_id: u64,
     row: usize,
     column: usize,
-    value: TextShadow,
+    value: Shadow,
 ) -> Result<()> {
     set_property(
         package,
@@ -1291,6 +1291,7 @@ fn text_style_key(
     .map(|data| BncCell::parse(&data).map(|cell| cell.text_style_identifier()))
     .transpose()
     .map(Option::flatten)
+    .map_err(Into::into)
 }
 
 fn style_entry(
@@ -1421,6 +1422,7 @@ fn read_bnc(
         column,
     )?
     .map_or_else(|| Ok(BncCell::minimal()), |data| BncCell::parse(&data))
+    .map_err(Into::into)
 }
 
 fn write_text_style_key(
@@ -1520,16 +1522,16 @@ fn verify_property(
 mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
-    use crate::numbers::{CellValue, NumbersDocumentBuilder};
+    use crate::numbers::NumbersDocumentBuilder;
+    use crate::numbers::cell::CellValue;
     use crate::pages::PagesDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
     use crate::text::{
-        ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing,
-        ParagraphLineSpacingMultiple, ParagraphSpacing, ParagraphSpacingPoints,
+        Background, IndentPoints, Indents, LineSpacing, LineSpacingMultiple, Outline,
         ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-        ParagraphTabStops, TextBackground, TextBaselineShift, TextCapitalization,
-        TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize,
-        TextScript, TextShadow, TextStrikethrough, TextUnderline,
+        ParagraphTabStops, Shadow, Spacing, SpacingPoints, TextBaselineShift, TextCapitalization,
+        TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextPointSize, TextScript,
+        TextStrikethrough, TextUnderline,
     };
 
     fn test_color() -> RgbaColor {
@@ -1540,35 +1542,35 @@ mod tests {
         RgbaColor::new(RED, GREEN, BLUE, ALPHA, RgbColorSpace::Srgb).unwrap()
     }
 
-    fn test_background() -> TextBackground {
+    fn test_background() -> Background {
         const RED: f32 = 0.95;
         const GREEN: f32 = 0.82;
         const BLUE: f32 = 0.20;
         const ALPHA: f32 = 1.0;
-        TextBackground::Color(RgbaColor::new(RED, GREEN, BLUE, ALPHA, RgbColorSpace::Srgb).unwrap())
+        Background::Color(RgbaColor::new(RED, GREEN, BLUE, ALPHA, RgbColorSpace::Srgb).unwrap())
     }
 
-    fn test_line_spacing() -> ParagraphLineSpacing {
-        ParagraphLineSpacing::Relative(ParagraphLineSpacingMultiple::ONE_POINT_FIVE)
+    fn test_line_spacing() -> LineSpacing {
+        LineSpacing::Relative(LineSpacingMultiple::ONE_POINT_FIVE)
     }
 
-    fn test_paragraph_spacing() -> ParagraphSpacing {
+    fn test_paragraph_spacing() -> Spacing {
         const BEFORE_POINTS: f32 = 6.0;
         const AFTER_POINTS: f32 = 9.0;
-        ParagraphSpacing::new(
-            ParagraphSpacingPoints::from_points(BEFORE_POINTS).unwrap(),
-            ParagraphSpacingPoints::from_points(AFTER_POINTS).unwrap(),
+        Spacing::new(
+            SpacingPoints::from_points(BEFORE_POINTS).unwrap(),
+            SpacingPoints::from_points(AFTER_POINTS).unwrap(),
         )
     }
 
-    fn test_indents() -> ParagraphIndents {
+    fn test_indents() -> Indents {
         const FIRST_LINE_POINTS: f32 = 4.0;
         const LEFT_POINTS: f32 = 8.0;
         const RIGHT_POINTS: f32 = 6.0;
-        ParagraphIndents::new(
-            ParagraphIndentPoints::from_points(FIRST_LINE_POINTS).unwrap(),
-            ParagraphIndentPoints::from_points(LEFT_POINTS).unwrap(),
-            ParagraphIndentPoints::from_points(RIGHT_POINTS).unwrap(),
+        Indents::new(
+            IndentPoints::from_points(FIRST_LINE_POINTS).unwrap(),
+            IndentPoints::from_points(LEFT_POINTS).unwrap(),
+            IndentPoints::from_points(RIGHT_POINTS).unwrap(),
         )
     }
 
@@ -1609,11 +1611,11 @@ mod tests {
             .unwrap();
         assert_eq!(
             editor.table_cell_text_alignment(table_id, 1, 1).unwrap(),
-            TextAlignment::Natural
+            Alignment::Natural
         );
 
         editor
-            .set_table_cell_text_alignment(table_id, 1, 1, TextAlignment::Center)
+            .set_table_cell_text_alignment(table_id, 1, 1, Alignment::Center)
             .unwrap();
         let style_id = explicit_style_id(&editor, table_id, 1, 1);
         let location = model::locate_attached_cell(&editor.package, table_id, 1, 1).unwrap();
@@ -1622,12 +1624,12 @@ mod tests {
         assert!(cell.style_identifier().is_none());
 
         editor
-            .set_table_cell_text_alignment(table_id, 1, 1, TextAlignment::Right)
+            .set_table_cell_text_alignment(table_id, 1, 1, Alignment::Right)
             .unwrap();
         assert_eq!(explicit_style_id(&editor, table_id, 1, 1), style_id);
         assert_eq!(
             editor.table_cell_text_alignment(table_id, 1, 1).unwrap(),
-            TextAlignment::Right
+            Alignment::Right
         );
 
         assert!(
@@ -1637,7 +1639,7 @@ mod tests {
         );
         assert_eq!(
             editor.table_cell_text_alignment(table_id, 1, 1).unwrap(),
-            TextAlignment::Natural
+            Alignment::Natural
         );
         let location = model::locate_attached_cell(&editor.package, table_id, 1, 1).unwrap();
         assert!(
@@ -1679,7 +1681,7 @@ mod tests {
                 .unwrap();
         }
         editor
-            .set_table_cell_text_alignment(table_id, 1, 1, TextAlignment::Center)
+            .set_table_cell_text_alignment(table_id, 1, 1, Alignment::Center)
             .unwrap();
         let descriptor = model::attached_table_descriptor(&editor.package, table_id).unwrap();
         let locations = storage::object_locations(&editor.package).unwrap();
@@ -1707,17 +1709,17 @@ mod tests {
         let shared_style = explicit_style_id(&editor, table_id, 1, 1);
 
         editor
-            .set_table_cell_text_alignment(table_id, 1, 1, TextAlignment::Right)
+            .set_table_cell_text_alignment(table_id, 1, 1, Alignment::Right)
             .unwrap();
 
         assert_ne!(explicit_style_id(&editor, table_id, 1, 1), shared_style);
         assert_eq!(
             editor.table_cell_text_alignment(table_id, 1, 1).unwrap(),
-            TextAlignment::Right
+            Alignment::Right
         );
         assert_eq!(
             editor.table_cell_text_alignment(table_id, 1, 2).unwrap(),
-            TextAlignment::Center
+            Alignment::Center
         );
 
         assert!(
@@ -1727,11 +1729,11 @@ mod tests {
         );
         assert_eq!(
             editor.table_cell_text_alignment(table_id, 1, 1).unwrap(),
-            TextAlignment::Center
+            Alignment::Center
         );
         assert_eq!(
             editor.table_cell_text_alignment(table_id, 1, 2).unwrap(),
-            TextAlignment::Center
+            Alignment::Center
         );
         assert!(
             editor
@@ -1740,7 +1742,7 @@ mod tests {
         );
         assert_eq!(
             editor.table_cell_text_alignment(table_id, 1, 1).unwrap(),
-            TextAlignment::Natural
+            Alignment::Natural
         );
         assert!(
             !editor
@@ -1760,7 +1762,7 @@ mod tests {
             .set_cell(table_id, 1, 1, CellValue::Text("Styled".to_owned()))
             .unwrap();
         editor
-            .set_table_cell_text_alignment(table_id, 1, 1, TextAlignment::Center)
+            .set_table_cell_text_alignment(table_id, 1, 1, Alignment::Center)
             .unwrap();
         let style_id = explicit_style_id(&editor, table_id, 1, 1);
         let styled = TextStyle::new(TextPointSize::from_points(18.0).unwrap())
@@ -1774,9 +1776,9 @@ mod tests {
         let character_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
         let ligatures = TextLigatures::RequiredOnly;
         let background = test_background();
-        let outline = TextOutline::standard();
+        let outline = Outline::standard();
         let script = TextScript::Superscript;
-        let shadow = TextShadow::standard();
+        let shadow = Shadow::standard();
         let line_spacing = test_line_spacing();
         let paragraph_spacing = test_paragraph_spacing();
         let indents = test_indents();
@@ -1837,7 +1839,7 @@ mod tests {
         );
         assert_eq!(
             editor.table_cell_text_alignment(table_id, 1, 1).unwrap(),
-            TextAlignment::Center
+            Alignment::Center
         );
         assert_eq!(editor.table_cell_text_font(table_id, 1, 1).unwrap(), font);
         assert_eq!(editor.table_cell_text_color(table_id, 1, 1).unwrap(), color);
@@ -2069,7 +2071,7 @@ mod tests {
                 .unwrap();
         }
         editor
-            .set_table_cell_text_alignment(table_id, 1, 1, TextAlignment::Center)
+            .set_table_cell_text_alignment(table_id, 1, 1, Alignment::Center)
             .unwrap();
         let descriptor = model::attached_table_descriptor(&editor.package, table_id).unwrap();
         let locations = storage::object_locations(&editor.package).unwrap();
@@ -2137,7 +2139,7 @@ mod tests {
             editor
                 .table_cell_paragraph_line_spacing(table_id, 1, 2)
                 .unwrap(),
-            ParagraphLineSpacing::default()
+            LineSpacing::default()
         );
         assert!(
             editor
@@ -2157,7 +2159,7 @@ mod tests {
         );
         assert_eq!(
             editor.table_cell_paragraph_spacing(table_id, 1, 2).unwrap(),
-            ParagraphSpacing::NONE
+            Spacing::NONE
         );
         assert!(
             editor
@@ -2177,7 +2179,7 @@ mod tests {
         );
         assert_eq!(
             editor.table_cell_paragraph_indents(table_id, 1, 2).unwrap(),
-            ParagraphIndents::NONE
+            Indents::NONE
         );
         assert!(
             editor
@@ -2221,7 +2223,7 @@ mod tests {
         );
         assert_eq!(
             editor.table_cell_text_background(table_id, 1, 2).unwrap(),
-            TextBackground::None
+            Background::None
         );
         assert!(
             editor
@@ -2272,7 +2274,7 @@ mod tests {
         );
         assert_eq!(
             editor.table_cell_text_alignment(table_id, 1, 2).unwrap(),
-            TextAlignment::Center
+            Alignment::Center
         );
 
         assert!(editor.reset_table_cell_text_font(table_id, 1, 1).unwrap());
@@ -2298,7 +2300,7 @@ mod tests {
                 .unwrap();
         }
         editor
-            .set_table_cell_text_alignment(table_id, 1, 1, TextAlignment::Center)
+            .set_table_cell_text_alignment(table_id, 1, 1, Alignment::Center)
             .unwrap();
         let descriptor = model::attached_table_descriptor(&editor.package, table_id).unwrap();
         let locations = storage::object_locations(&editor.package).unwrap();
@@ -2340,7 +2342,7 @@ mod tests {
         );
         assert_eq!(
             editor.table_cell_text_alignment(table_id, 1, 2).unwrap(),
-            TextAlignment::Center
+            Alignment::Center
         );
 
         assert!(editor.reset_table_cell_text_style(table_id, 1, 1).unwrap());
@@ -2359,8 +2361,8 @@ mod tests {
         let pages_baseline_shift = TextBaselineShift::from_points(-1.5).unwrap();
         let pages_spacing = TextCharacterSpacing::from_percent(8.0).unwrap();
         let pages_background = test_background();
-        let pages_outline = TextOutline::standard();
-        let pages_shadow = TextShadow::standard();
+        let pages_outline = Outline::standard();
+        let pages_shadow = Shadow::standard();
         let pages_line_spacing = test_line_spacing();
         let pages_paragraph_spacing = test_paragraph_spacing();
         let pages_indents = test_indents();
@@ -2371,7 +2373,7 @@ mod tests {
             .unwrap();
         let pages_table = pages.tables().unwrap()[0].model_object_id;
         pages
-            .set_table_cell_text_alignment(pages_table, 1, 1, TextAlignment::Justified)
+            .set_table_cell_text_alignment(pages_table, 1, 1, Alignment::Justified)
             .unwrap();
         pages
             .set_table_cell_text_style(pages_table, 1, 1, pages_style)
@@ -2424,7 +2426,7 @@ mod tests {
         let mut pages = crate::pages::PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages.table_cell_text_alignment(pages_table, 1, 1).unwrap(),
-            TextAlignment::Justified
+            Alignment::Justified
         );
         assert_eq!(
             pages.table_cell_text_style(pages_table, 1, 1).unwrap(),
@@ -2592,8 +2594,8 @@ mod tests {
         let keynote_baseline_shift = TextBaselineShift::from_points(2.0).unwrap();
         let keynote_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
         let keynote_background = test_background();
-        let keynote_outline = TextOutline::standard();
-        let keynote_shadow = TextShadow::standard();
+        let keynote_outline = Outline::standard();
+        let keynote_shadow = Shadow::standard();
         let keynote_line_spacing = test_line_spacing();
         let keynote_paragraph_spacing = test_paragraph_spacing();
         let keynote_indents = test_indents();
@@ -2616,13 +2618,7 @@ mod tests {
             )
             .unwrap();
         keynote
-            .set_slide_table_cell_text_alignment(
-                0,
-                table.model_object_id,
-                1,
-                1,
-                TextAlignment::Left,
-            )
+            .set_slide_table_cell_text_alignment(0, table.model_object_id, 1, 1, Alignment::Left)
             .unwrap();
         keynote
             .set_slide_table_cell_text_style(0, table.model_object_id, 1, 1, keynote_style)
@@ -2738,7 +2734,7 @@ mod tests {
             keynote
                 .slide_table_cell_text_alignment(0, table.model_object_id, 1, 1)
                 .unwrap(),
-            TextAlignment::Left
+            Alignment::Left
         );
         assert_eq!(
             keynote
@@ -2928,7 +2924,7 @@ mod tests {
         let before = editor.to_bytes().unwrap();
         assert!(
             editor
-                .set_table_cell_text_alignment(table_id, 2, 1, TextAlignment::Center)
+                .set_table_cell_text_alignment(table_id, 2, 1, Alignment::Center)
                 .is_err()
         );
         assert!(
@@ -3013,7 +3009,7 @@ mod tests {
         );
         assert!(
             editor
-                .set_table_cell_text_outline(table_id, 1, 2, TextOutline::standard())
+                .set_table_cell_text_outline(table_id, 1, 2, Outline::standard())
                 .is_err()
         );
         assert!(
@@ -3023,7 +3019,7 @@ mod tests {
         );
         assert!(
             editor
-                .set_table_cell_text_shadow(table_id, 1, 2, TextShadow::standard())
+                .set_table_cell_text_shadow(table_id, 1, 2, Shadow::standard())
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

@@ -407,7 +407,7 @@ impl KeynoteDocumentBuilder {
     }
 
     /// Build the underlying package for lower-level IWA manipulation.
-    pub fn build_package(self) -> Result<IWorkPackage> {
+    pub(crate) fn build_package(self) -> Result<IWorkPackage> {
         self.validate()?;
         let identity = IWorkDocumentIdentity::generate();
         let template_identifier = fresh_tsp_uuid();
@@ -680,7 +680,7 @@ fn document_archive(builder: &KeynoteDocumentBuilder, template_id: tsp::Uuid) ->
     let common_field = common_fields.first().ok_or_else(|| {
         crate::Error::InvalidFormat("generated Keynote theme wrapper is empty".to_owned())
     })?;
-    let common_payload = &common_theme[common_field.payload_start..common_field.end];
+    let common_payload = &common_theme[common_field.payload_start()..common_field.end()];
     let theme = kn::ThemeArchive {
         super_: tss::ThemeArchive::default(),
         templates: vec![reference(TEMPLATE_NODE)],
@@ -1894,7 +1894,7 @@ mod tests {
         assert_eq!(
             styles
                 .iter()
-                .map(|style| style.id().get())
+                .map(|style| litchi_iwa_text::paragraph::style::raw::native_id(style.id()))
                 .collect::<Vec<_>>(),
             KeynoteParagraphStylePreset::ALL
                 .into_iter()

@@ -204,7 +204,7 @@ fn ensure_descriptor_storage(
             descriptor.object_id,
         )?;
         package.update_archive(&tile_template_archive, |archive| {
-            archive.insert_object(object)
+            Ok(archive.insert_object(object)?)
         })?;
         tiles.push(TileAllocation {
             key,
@@ -225,7 +225,7 @@ fn ensure_descriptor_storage(
             descriptor.object_id,
         )?;
         package.update_archive(&header_template_archive, |archive| {
-            archive.insert_object(object)
+            Ok(archive.insert_object(object)?)
         })?;
         headers.push(HeaderBucketAllocation {
             object_id,

@@ -1,22 +1,15 @@
 //! Create Numbers, Pages, and Keynote files with native fixed table sections.
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::{
-    KeynoteDocumentBuilder, KeynoteTableColumnDeletion, KeynoteTableColumnInsertion,
-    KeynoteTableHeaderCount, KeynoteTableHeaderSettings, KeynoteTableRowDeletion,
-    KeynoteTableRowInsertion,
-};
-use litchi_iwa::numbers::{
-    CellValue, NumbersDocumentBuilder, NumbersTableHeaderCount, NumbersTableHeaderSettings,
-    TableCellUpdate, TableColumnDeletion, TableColumnInsertion, TableRowDeletion,
-    TableRowInsertion,
-};
-use litchi_iwa::pages::{
-    PagesDocumentBuilder, PagesTableColumnDeletion, PagesTableColumnInsertion,
-    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableRowDeletion, PagesTableRowInsertion,
-};
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::numbers::NumbersDocumentBuilder;
+use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_numbers::TableSelector;
+use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
+use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 
 const TABLE_ROWS: usize = 4;
 const TABLE_COLUMNS: usize = 4;
@@ -48,24 +41,25 @@ fn create_numbers(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
         .table_name("Section CRUD")
         .table_dimensions(TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table_id = editor.tables()?.remove(0).id();
+    let table = TableSelector::index(0);
     editor.set_table_header_settings(
-        table_id,
-        NumbersTableHeaderSettings {
-            header_rows: Some(NumbersTableHeaderCount::ONE),
-            header_columns: Some(NumbersTableHeaderCount::ONE),
-            footer_rows: Some(NumbersTableHeaderCount::ONE),
+        table,
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;
-    editor.insert_table_row(table_id, TableRowInsertion::header(1))?;
-    editor.insert_table_row(table_id, TableRowInsertion::footer(0))?;
-    editor.insert_table_column(table_id, TableColumnInsertion::header(1))?;
+    editor.insert_table_row(table, RowInsertion::header(1))?;
+    editor.insert_table_row(table, RowInsertion::footer(0))?;
+    editor.insert_table_column(table, ColumnInsertion::header(1))?;
     editor.set_cells(table_id, section_values())?;
     editor.save(insertions)?;
-    editor.remove_table_row(table_id, TableRowDeletion::header(0))?;
-    editor.remove_table_row(table_id, TableRowDeletion::footer(1))?;
-    editor.remove_table_column(table_id, TableColumnDeletion::header(0))?;
+    editor.remove_table_row(table, RowDeletion::header(0))?;
+    editor.remove_table_row(table, RowDeletion::footer(1))?;
+    editor.remove_table_column(table, ColumnDeletion::header(0))?;
     editor.save(deletions)?;
     Ok(())
 }
@@ -78,21 +72,21 @@ fn create_pages(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_header_settings(
         table_id,
-        PagesTableHeaderSettings {
-            header_rows: Some(PagesTableHeaderCount::ONE),
-            header_columns: Some(PagesTableHeaderCount::ONE),
-            footer_rows: Some(PagesTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;
-    editor.insert_table_row(table_id, PagesTableRowInsertion::header(1))?;
-    editor.insert_table_row(table_id, PagesTableRowInsertion::footer(0))?;
-    editor.insert_table_column(table_id, PagesTableColumnInsertion::header(1))?;
+    editor.insert_table_row(table_id, RowInsertion::header(1))?;
+    editor.insert_table_row(table_id, RowInsertion::footer(0))?;
+    editor.insert_table_column(table_id, ColumnInsertion::header(1))?;
     editor.set_table_cells(table_id, section_values())?;
     editor.save(insertions)?;
-    editor.remove_table_row(table_id, PagesTableRowDeletion::header(0))?;
-    editor.remove_table_row(table_id, PagesTableRowDeletion::footer(1))?;
-    editor.remove_table_column(table_id, PagesTableColumnDeletion::header(0))?;
+    editor.remove_table_row(table_id, RowDeletion::header(0))?;
+    editor.remove_table_row(table_id, RowDeletion::footer(1))?;
+    editor.remove_table_column(table_id, ColumnDeletion::header(0))?;
     editor.save(deletions)?;
     Ok(())
 }
@@ -115,37 +109,21 @@ fn create_keynote(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
     editor.set_slide_table_header_settings(
         0,
         table.model_object_id,
-        KeynoteTableHeaderSettings {
-            header_rows: Some(KeynoteTableHeaderCount::ONE),
-            header_columns: Some(KeynoteTableHeaderCount::ONE),
-            footer_rows: Some(KeynoteTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;
-    editor.insert_slide_table_row(
-        0,
-        table.model_object_id,
-        KeynoteTableRowInsertion::header(1),
-    )?;
-    editor.insert_slide_table_row(
-        0,
-        table.model_object_id,
-        KeynoteTableRowInsertion::footer(0),
-    )?;
-    editor.insert_slide_table_column(
-        0,
-        table.model_object_id,
-        KeynoteTableColumnInsertion::header(1),
-    )?;
+    editor.insert_slide_table_row(0, table.model_object_id, RowInsertion::header(1))?;
+    editor.insert_slide_table_row(0, table.model_object_id, RowInsertion::footer(0))?;
+    editor.insert_slide_table_column(0, table.model_object_id, ColumnInsertion::header(1))?;
     editor.set_slide_table_cells(0, table.model_object_id, section_values())?;
     editor.save(insertions)?;
-    editor.remove_slide_table_row(0, table.model_object_id, KeynoteTableRowDeletion::header(0))?;
-    editor.remove_slide_table_row(0, table.model_object_id, KeynoteTableRowDeletion::footer(1))?;
-    editor.remove_slide_table_column(
-        0,
-        table.model_object_id,
-        KeynoteTableColumnDeletion::header(0),
-    )?;
+    editor.remove_slide_table_row(0, table.model_object_id, RowDeletion::header(0))?;
+    editor.remove_slide_table_row(0, table.model_object_id, RowDeletion::footer(1))?;
+    editor.remove_slide_table_column(0, table.model_object_id, ColumnDeletion::header(0))?;
     editor.save(deletions)?;
     Ok(())
 }

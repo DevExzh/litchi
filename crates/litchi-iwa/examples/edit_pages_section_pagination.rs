@@ -2,9 +2,8 @@
 
 use std::env;
 
-use litchi_iwa::pages::{
-    PagesEditor, PagesPageNumber, PagesSectionPageNumbering, PagesSectionStart,
-};
+use litchi_iwa::pages::PagesEditor;
+use litchi_pages::section::{PageNumber, PageNumbering, Start};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -18,9 +17,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("missing section ID")?
         .parse::<u64>()?;
     let start = match arguments.next().ok_or("missing section start")?.as_str() {
-        "next" => PagesSectionStart::NextPage,
-        "right" => PagesSectionStart::RightPage,
-        "left" => PagesSectionStart::LeftPage,
+        "next" => Start::NextPage,
+        "right" => Start::RightPage,
+        "left" => Start::LeftPage,
         _ => return Err("section start must be next, right, or left".into()),
     };
     let numbering = match arguments
@@ -28,11 +27,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("missing page numbering behavior")?
         .as_str()
     {
-        "continue" => PagesSectionPageNumbering::ContinueFromPrevious,
-        "restart" => PagesSectionPageNumbering::Restart,
+        "continue" => PageNumbering::ContinueFromPrevious,
+        "restart" => PageNumbering::Restart,
         _ => return Err("page numbering must be continue or restart".into()),
     };
-    let starting_page_number = PagesPageNumber::new(
+    let starting_page_number = PageNumber::new(
         arguments
             .next()
             .ok_or("missing starting page number")?
@@ -44,9 +43,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut editor = PagesEditor::open(input)?;
     let mut settings = editor.section_settings(section_id)?;
-    settings.start = Some(start);
-    settings.page_numbering = Some(numbering);
-    settings.starting_page_number = Some(starting_page_number);
+    settings.set_start(Some(start))?;
+    settings.set_page_numbering(Some(numbering))?;
+    settings.set_starting_page_number(Some(starting_page_number));
     editor.set_section_settings(section_id, settings)?;
     editor.save(output)?;
     Ok(())

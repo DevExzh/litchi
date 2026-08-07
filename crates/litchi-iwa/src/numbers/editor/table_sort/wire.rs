@@ -92,10 +92,10 @@ fn validate_required_varint(
 pub(super) fn write_table_sort_order_wire(
     original: &[u8],
     model: &TableModelArchive,
-    order: &NumbersTableSortOrder,
+    order: &Order,
 ) -> Result<Vec<u8>> {
     let existing = read_native_table_sort_order_wire(original, model)?;
-    let expected = order.as_native()?;
+    let expected = order_as_native(order);
     let data = if existing.is_some() {
         transform_length_delimited_field(original, SORT_ORDER_FIELD, |sort_order| {
             rewrite_sort_order_wire(sort_order, &expected)

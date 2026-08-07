@@ -2,10 +2,8 @@
 
 use super::{IWorkTextEditor, NumbersEditor, numbers_text_box_graph};
 use crate::Result;
-use crate::text::{
-    TextDateTimeDisplayText, TextDateTimeField, TextDateTimeFieldId, TextDateTimeFieldSettings,
-    TextPosition, TextRange,
-};
+use crate::text::{TextDateTimeField, TextDateTimeFieldId, TextPosition, TextRange};
+use litchi_iwa_text::date_time::{DisplayText, Settings};
 
 impl NumbersEditor {
     /// Read every native Date & Time field in one Numbers text box.
@@ -24,7 +22,7 @@ impl NumbersEditor {
         sheet_id: u64,
         drawable_object_id: u64,
         range: TextRange,
-        settings: TextDateTimeFieldSettings,
+        settings: Settings,
     ) -> Result<TextDateTimeField> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -39,8 +37,8 @@ impl NumbersEditor {
         sheet_id: u64,
         drawable_object_id: u64,
         position: TextPosition,
-        display_text: TextDateTimeDisplayText,
-        settings: TextDateTimeFieldSettings,
+        display_text: DisplayText,
+        settings: Settings,
     ) -> Result<TextDateTimeField> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -57,7 +55,7 @@ impl NumbersEditor {
         drawable_object_id: u64,
         id: TextDateTimeFieldId,
         range: TextRange,
-        settings: TextDateTimeFieldSettings,
+        settings: Settings,
     ) -> Result<TextDateTimeField> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());

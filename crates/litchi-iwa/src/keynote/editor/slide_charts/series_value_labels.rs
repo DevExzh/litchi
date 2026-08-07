@@ -10,9 +10,7 @@ use crate::charts::series_value_labels::{
     chart_series_value_label_visibilities as read_native_value_labels,
     set_chart_series_value_label_visibilities as set_native_value_labels,
 };
-use crate::charts::{
-    ChartSeriesIndex, ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility,
-};
+use crate::charts::{ChartSeriesValueLabelLocation, Index, Visibility};
 
 impl KeynoteEditor {
     /// Read every series' value-label visibility in native series order.
@@ -20,7 +18,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<Vec<ChartSeriesValueLabelVisibility>> {
+    ) -> Result<Vec<Visibility>> {
         slide_chart_series_value_label_visibilities(self, slide_index, drawable_object_id)
     }
 
@@ -29,8 +27,8 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
-    ) -> Result<ChartSeriesValueLabelVisibility> {
+        series: Index,
+    ) -> Result<Visibility> {
         let visibilities =
             slide_chart_series_value_label_visibilities(self, slide_index, drawable_object_id)?;
         visibilities
@@ -46,7 +44,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        visibilities: &[ChartSeriesValueLabelVisibility],
+        visibilities: &[Visibility],
     ) -> Result<()> {
         set_slide_chart_series_value_label_visibilities(
             self,
@@ -61,8 +59,8 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
-        visibility: ChartSeriesValueLabelVisibility,
+        series: Index,
+        visibility: Visibility,
     ) -> Result<()> {
         let mut visibilities =
             slide_chart_series_value_label_visibilities(self, slide_index, drawable_object_id)?;
@@ -96,7 +94,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesValueLabelLocation> {
         let locations =
             slide_chart_series_value_label_locations(self, slide_index, drawable_object_id)?;
@@ -125,7 +123,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         location: ChartSeriesValueLabelLocation,
     ) -> Result<()> {
         let mut locations =
@@ -151,7 +149,7 @@ fn slide_chart_series_value_label_visibilities(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-) -> Result<Vec<ChartSeriesValueLabelVisibility>> {
+) -> Result<Vec<Visibility>> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
         graph.info.kind,
@@ -174,7 +172,7 @@ fn set_slide_chart_series_value_label_visibilities(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    visibilities: &[ChartSeriesValueLabelVisibility],
+    visibilities: &[Visibility],
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
@@ -301,8 +299,8 @@ fn set_slide_chart_series_value_label_locations(
 }
 
 pub(super) fn value_label_series_count(
-    kind: ChartKind,
-    direction: ChartSeriesDirection,
+    kind: Kind,
+    direction: Direction,
     data: &ChartData,
     drawable_label: &str,
     drawable_object_id: u64,
@@ -313,7 +311,7 @@ pub(super) fn value_label_series_count(
 fn value_label_index_error(
     drawable_label: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     series_count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

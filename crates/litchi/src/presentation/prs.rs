@@ -189,9 +189,9 @@ impl Presentation {
                     cached_metadata,
                 })
             },
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "keynote")]
             DetectedFormat::Keynote(data) => {
-                let doc = crate::iwa::keynote::KeynoteDocument::from_bytes(&data).map_err(|e| {
+                let doc = litchi_keynote::Package::from_bytes(&data).map_err(|e| {
                     Error::ParseError(format!("Failed to open Keynote from bytes: {}", e))
                 })?;
 
@@ -269,7 +269,7 @@ impl Presentation {
                 }
                 Ok(texts.join("\n\n"))
             },
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "keynote")]
             PresentationImpl::Keynote(doc) => doc.text().map_err(|e| {
                 Error::ParseError(format!("Failed to extract text from Keynote: {}", e))
             }),
@@ -302,7 +302,7 @@ impl Presentation {
                 .map_err(crate::map_ooxml_error)?
                 .slide_count()
                 .map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "keynote")]
             PresentationImpl::Keynote(doc) => {
                 let slides = doc
                     .slides()
@@ -365,12 +365,29 @@ impl Presentation {
                     })
                     .collect()
             },
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "keynote")]
             PresentationImpl::Keynote(doc) => {
                 let keynote_slides = doc
                     .slides()
                     .map_err(|e| Error::ParseError(format!("Failed to get slides: {}", e)))?;
-                Ok(keynote_slides.into_iter().map(Slide::Keynote).collect())
+                Ok(keynote_slides
+                    .iter()
+                    .enumerate()
+                    .map(|(index, slide)| {
+                        let title = slide.title().map(str::to_owned);
+                        let content = slide.text_content().join("\n");
+                        let text = match &title {
+                            Some(title) if !content.is_empty() => format!("{title}\n\n{content}"),
+                            Some(title) => title.clone(),
+                            None => content,
+                        };
+                        Slide::Keynote {
+                            number: index + 1,
+                            title,
+                            text,
+                        }
+                    })
+                    .collect())
             },
             #[cfg(feature = "odp")]
             PresentationImpl::Odp(doc) => {
@@ -408,7 +425,7 @@ impl Presentation {
                 .slide_size()
                 .map(|(width, _)| Some(width))
                 .map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "keynote")]
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
             #[cfg(feature = "odp")]
             PresentationImpl::Odp(_) => Ok(None), // ODP doesn't expose slide dimensions in unified API yet
@@ -441,7 +458,7 @@ impl Presentation {
                 .slide_size()
                 .map(|(_, height)| Some(height))
                 .map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "keynote")]
             PresentationImpl::Keynote(_) => Ok(None), // Keynote doesn't expose slide dimensions in current API
             #[cfg(feature = "odp")]
             PresentationImpl::Odp(_) => Ok(None), // ODP doesn't expose slide dimensions in unified API yet
@@ -495,7 +512,7 @@ impl Presentation {
         // return early.
         #[cfg(all(
             feature = "ppt",
-            not(any(feature = "pptx", feature = "iwork", feature = "odp"))
+            not(any(feature = "pptx", feature = "keynote", feature = "odp"))
         ))]
         {
             let PresentationImpl::Ppt(pres) = &self.inner;
@@ -507,7 +524,7 @@ impl Presentation {
         // formats.
         #[cfg(not(all(
             feature = "ppt",
-            not(any(feature = "pptx", feature = "iwork", feature = "odp"))
+            not(any(feature = "pptx", feature = "keynote", feature = "odp"))
         )))]
         {
             #[cfg(feature = "ppt")]

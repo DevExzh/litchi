@@ -2,9 +2,8 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::shapes::{
-    DrawableGeometry, DrawablePoint, DrawableSize, ShapePreset, shape_path_source,
-};
+use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, shape_path_source};
+use litchi_iwa_common::shape::path::Preset;
 
 const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
 const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
@@ -117,7 +116,7 @@ impl PagesEditor {
         let root = root_document(self.package())?;
         let body: StorageArchive = decode_typed_package_object(
             self.package(),
-            self.body_storage_id,
+            self.body_storage_id.get(),
             self.body_storage()?.message_type,
             "TSWP.StorageArchive",
         )?;
@@ -133,7 +132,7 @@ impl PagesEditor {
             .checked_add(u64::from(creates_z_order))
             .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
         let ids = BodyTextShapeObjectIds::allocate(graph_first_identifier)?;
-        let archive_name = find_object_archive(self.package(), self.body_storage_id)?;
+        let archive_name = find_object_archive(self.package(), self.body_storage_id.get())?;
 
         let mut staged = self.package().clone();
         if creates_z_order {
@@ -141,12 +140,12 @@ impl PagesEditor {
         }
         let objects = body_text_shape_objects(
             ids,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             style_id,
             geometry,
             storage,
             root.left_margin.unwrap_or_default(),
-            shape_path_source(ShapePreset::Rectangle, size)?,
+            shape_path_source(Preset::Rectangle, size)?,
             BodyTextShapeRole::TextBox,
         )?;
         staged.update_archive(&archive_name, |archive| {
@@ -165,7 +164,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             ids.attachment,
         )?;
@@ -184,8 +183,8 @@ impl PagesEditor {
         let graph = verified.text_box_graph(ids.drawable)?;
         let expected_anchor = u32::try_from(anchor_character_index)
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
-        if created.storage.object_id != ids.storage
-            || created.storage.text != text
+        if created.storage.id.get() != ids.storage
+            || created.storage.storage.text() != text
             || graph.anchor_character_index != expected_anchor
             || verified.text_box_geometry(ids.drawable)? != geometry
         {
@@ -536,7 +535,7 @@ mod tests {
             .add_text_box(4, "Typed from scratch", FIRST_POSITION, FIRST_SIZE)
             .unwrap();
         let drawable_id = created.drawable_object_id;
-        assert_eq!(created.storage.text, "Typed from scratch");
+        assert_eq!(created.storage.storage.text(), "Typed from scratch");
         assert_eq!(editor.body_text().unwrap(), "Body\u{fffc}");
         assert_eq!(
             editor.text_box_geometry(drawable_id).unwrap(),
@@ -554,15 +553,15 @@ mod tests {
         let duplicate = editor
             .duplicate_text_box(drawable_id, 0, "Independent copy")
             .unwrap();
-        assert_ne!(duplicate.storage.object_id, created.storage.object_id);
+        assert_ne!(duplicate.storage.id, created.storage.id);
         assert_eq!(editor.body_text().unwrap(), "\u{fffc}Body\u{fffc}");
 
         let removed_copy = editor
             .remove_text_box(duplicate.drawable_object_id)
             .unwrap();
-        assert_eq!(removed_copy.text.storage.text, "Independent copy");
+        assert_eq!(removed_copy.text.storage.storage.text(), "Independent copy");
         let removed = editor.remove_text_box(drawable_id).unwrap();
-        assert_eq!(removed.text.storage.text, "Updated independently");
+        assert_eq!(removed.text.storage.storage.text(), "Updated independently");
         assert_eq!(editor.body_text().unwrap(), "Body");
         assert!(editor.drawables().unwrap().is_empty());
     }

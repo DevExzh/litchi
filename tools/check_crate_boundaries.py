@@ -95,8 +95,14 @@ LOCAL_CANONICAL_SHEET_VIEW_TYPE = re.compile(
 )
 FACADE_PACKAGE = "litchi"
 FACADE_REQUIRED_NORMAL_DEPENDENCIES = frozenset({"litchi-core"})
+RETIRED_FACADE_DEPENDENCIES = frozenset({"litchi-iwa"})
 FACADE_DEFAULT_FEATURE = "default"
 FACADE_ALL_FEATURE = "all"
+FACADE_SOURCE_ROOT = Path("crates/litchi/src")
+PUBLIC_FACADE_IWA_MODULE = re.compile(r"^\s*pub(?:\([^)]*\))?\s+mod\s+iwa\b")
+PUBLIC_FACADE_IWA_REEXPORT = re.compile(
+    r"^\s*pub(?:\([^)]*\))?\s+use\s+(?:(?:crate::)?iwa|litchi_iwa)\b"
+)
 PUBLIC_XLSX_MODULE = re.compile(r"^\s*pub(?:\([^)]*\))?\s+mod\s+xlsx\s*;")
 PACKAGE_XLSX_PATH = re.compile(r"(?<![A-Za-z0-9_])package::xlsx\b")
 RETIRED_XLSX_CHART_FILES = (
@@ -588,6 +594,10 @@ def audit_snapshot(snapshot: Snapshot, policy: Policy) -> list[str]:
     for edge in sorted(actual_edges - known_edges):
         evidence = "; ".join(snapshot.edges[edge])
         violations.append(f"unclassified internal edge {edge.display()} ({evidence})")
+    for edge in sorted(policy.canonical_edges - actual_edges):
+        violations.append(
+            f"resolved canonical edge still listed: {edge.display()}; remove its policy entry"
+        )
     for edge in sorted(policy.migration_edges - actual_edges):
         violations.append(
             f"resolved migration debt still listed: {edge.display()}; remove its policy entry"
@@ -715,6 +725,16 @@ def audit_litchi_facade(snapshot: Snapshot) -> list[str]:
             + ", ".join(sorted(missing_required))
         )
 
+    retired_dependencies = (
+        snapshot.dependencies.get(FACADE_PACKAGE, frozenset())
+        & RETIRED_FACADE_DEPENDENCIES
+    )
+    if retired_dependencies:
+        violations.append(
+            "litchi facade depends on retired packages: "
+            + ", ".join(sorted(retired_dependencies))
+        )
+
     if feature_definitions.get(FACADE_DEFAULT_FEATURE) != frozenset():
         violations.append("litchi default feature must be exactly empty")
     if FACADE_ALL_FEATURE not in feature_definitions:
@@ -771,6 +791,32 @@ def audit_litchi_facade(snapshot: Snapshot) -> list[str]:
             "litchi all feature omits optional dependencies: "
             + ", ".join(sorted(omitted_from_all))
         )
+
+    return sorted(set(violations))
+
+
+def audit_litchi_facade_source_topology(root: Path = ROOT) -> list[str]:
+    """Reject public re-exports of the retired monolithic iWork facade."""
+
+    source_root = root / FACADE_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    violations: list[str] = []
+    for path in sorted(source_root.rglob("*.rs")):
+        for line_number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            if PUBLIC_FACADE_IWA_MODULE.match(line):
+                violations.append(
+                    "retired litchi facade public iwa module: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            if PUBLIC_FACADE_IWA_REEXPORT.match(line):
+                violations.append(
+                    "retired litchi facade public iwa re-export: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
 
     return sorted(set(violations))
 
@@ -1037,6 +1083,7 @@ def main(argv: list[str] | None = None) -> int:
     violations = (
         audit_manifest_inventory(snapshot)
         + audit_snapshot(snapshot, policy)
+        + audit_litchi_facade_source_topology()
         + audit_xlsb_source_topology()
         + audit_spreadsheet_sheet_view_source_topology()
         + audit_spreadsheet_chart_source_topology()

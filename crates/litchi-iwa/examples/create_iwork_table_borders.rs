@@ -3,20 +3,20 @@
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder};
+use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeStroke, StrokePattern, StrokeWidth,
+    DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Stroke, Width,
 };
-use litchi_iwa::table_cell_border::TableCellBorderSide;
-
+use litchi_iwa_common::table::cell::BorderSide;
+use litchi_numbers::cell::Value as CellValue;
 const ROW: usize = 1;
 const COLUMN: usize = 1;
-const SIDES: [TableCellBorderSide; 4] = [
-    TableCellBorderSide::Left,
-    TableCellBorderSide::Right,
-    TableCellBorderSide::Top,
-    TableCellBorderSide::Bottom,
+const SIDES: [BorderSide; 4] = [
+    BorderSide::Left,
+    BorderSide::Right,
+    BorderSide::Top,
+    BorderSide::Bottom,
 ];
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -32,11 +32,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn border() -> Result<ShapeStroke, Box<dyn std::error::Error>> {
-    Ok(ShapeStroke::new(
+fn border() -> Result<Stroke, Box<dyn std::error::Error>> {
+    Ok(Stroke::new(
         RgbaColor::new(0.86, 0.12, 0.18, 1.0, RgbColorSpace::Srgb)?,
-        StrokeWidth::new(4.0)?,
-        StrokePattern::Solid,
+        Width::new(4.0)?,
+        Pattern::Solid,
     ))
 }
 

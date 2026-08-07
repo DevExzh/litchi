@@ -1,23 +1,26 @@
-//! Numbers Sheet Structure
+//! Archive-bound Numbers sheet conversion.
 //!
-//! Sheets in Numbers documents contain multiple tables and other content.
+//! The semantic sheet owner lives in `litchi_numbers::sheet`. This module is
+//! deliberately crate-private: it retains only the temporary mutable state
+//! needed while decoding native archives and transfers finished tables to the
+//! immutable leaf model at the boundary.
 
-use super::table::NumbersTable;
+use super::table::{NumbersTable, map_table_error};
 
-/// Represents a sheet in a Numbers document
+/// Archive adapter used while decoding one native sheet.
+///
+/// This type is intentionally opaque outside `litchi-iwa`; callers that need
+/// archive-free semantics should use `NumbersDocument::semantic_sheets`.
 #[derive(Debug, Clone)]
 pub struct NumbersSheet {
-    /// Sheet name
-    pub name: String,
-    /// Sheet index (0-based)
-    pub index: usize,
-    /// Tables in this sheet
-    pub tables: Vec<NumbersTable>,
+    pub(crate) name: String,
+    pub(crate) index: usize,
+    pub(crate) tables: Vec<NumbersTable>,
 }
 
 impl NumbersSheet {
-    /// Create a new sheet
-    pub fn new(name: String, index: usize) -> Self {
+    /// Creates a native sheet adapter.
+    pub(crate) fn new(name: String, index: usize) -> Self {
         Self {
             name,
             index,
@@ -25,42 +28,59 @@ impl NumbersSheet {
         }
     }
 
-    /// Add a table to the sheet
-    pub fn add_table(&mut self, table: NumbersTable) {
+    /// Adds an archive-decoded table to the adapter.
+    pub(crate) fn add_table(&mut self, table: NumbersTable) {
         self.tables.push(table);
     }
 
-    /// Get a table by name
-    pub fn get_table(&self, name: &str) -> Option<&NumbersTable> {
-        self.tables.iter().find(|t| t.name() == name)
+    /// Borrows the native sheet name without exposing archive state.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
-    /// Get a mutable reference to a table by name
-    pub fn get_table_mut(&mut self, name: &str) -> Option<&mut NumbersTable> {
-        self.tables.iter_mut().find(|t| t.name() == name)
+    /// Returns the logical zero-based sheet position.
+    #[must_use]
+    pub const fn index(&self) -> usize {
+        self.index
     }
 
-    /// Get all table names
-    pub fn table_names(&self) -> Vec<String> {
-        self.tables.iter().map(|t| t.name().to_owned()).collect()
+    /// Iterates native tables without exposing the backing collection.
+    #[must_use]
+    pub fn tables(&self) -> impl ExactSizeIterator<Item = &NumbersTable> + '_ {
+        self.tables.iter()
     }
 
-    /// Check if sheet is empty
-    pub fn is_empty(&self) -> bool {
-        self.tables.is_empty()
+    /// Returns a native table by exact name.
+    #[must_use]
+    pub fn table(&self, name: &str) -> Option<&NumbersTable> {
+        self.tables.iter().find(|table| table.name() == name)
     }
 
-    /// Get total number of tables
-    pub fn table_count(&self) -> usize {
+    /// Returns the number of native tables.
+    pub(crate) fn table_count(&self) -> usize {
         self.tables.len()
     }
 
-    /// Get total number of cells across all tables
-    pub fn total_cell_count(&self) -> usize {
+    /// Returns the number of addressable cells across all native tables.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn total_cell_count(&self) -> usize {
         self.tables
             .iter()
-            .map(|t| t.row_count() * t.column_count())
+            .map(|table| table.row_count() * table.column_count())
             .sum()
+    }
+
+    /// Consumes the archive adapter into the canonical dependency-free sheet.
+    pub(crate) fn into_semantic(self) -> crate::Result<litchi_numbers::Sheet> {
+        let mut builder = litchi_numbers::sheet::Builder::new(self.name, self.index);
+        for table in self.tables {
+            let semantic = table.into_semantic()?;
+            builder
+                .push_table(semantic)
+                .map_err(|failure| map_table_error(failure.into_parts().0))?;
+        }
+        Ok(builder.finish())
     }
 }
 
@@ -69,55 +89,54 @@ mod tests {
     use super::*;
     use crate::numbers::cell::CellValue;
 
-    #[test]
-    fn test_sheet_creation() {
-        let sheet = NumbersSheet::new("Sheet1".to_string(), 0);
-        assert_eq!(sheet.name, "Sheet1");
-        assert_eq!(sheet.index, 0);
-        assert!(sheet.is_empty());
-        assert_eq!(sheet.table_count(), 0);
+    fn cell_number(value: f64) -> CellValue {
+        CellValue::number(value).expect("finite test number")
     }
 
     #[test]
-    fn test_sheet_add_table() {
-        let mut sheet = NumbersSheet::new("Sheet1".to_string(), 0);
+    fn adapter_is_not_a_public_semantic_model() {
+        let sheet = NumbersSheet::new("Sheet1".to_owned(), 0);
+        assert_eq!(sheet.name, "Sheet1");
+        assert_eq!(sheet.index, 0);
+        assert!(sheet.tables.is_empty());
+        assert_eq!(sheet.total_cell_count(), 0);
+    }
 
-        let mut table = NumbersTable::new("Table1".to_string());
-        table.set_cell(0, 0, CellValue::Number(1.0));
+    #[test]
+    fn adapter_collects_native_tables() {
+        let mut sheet = NumbersSheet::new("Sheet1".to_owned(), 0);
+        let mut table = NumbersTable::new("Table1");
+        assert!(table.set_cell(0, 0, cell_number(1.0)).is_ok());
 
         sheet.add_table(table);
 
-        assert_eq!(sheet.table_count(), 1);
-        assert!(!sheet.is_empty());
+        assert_eq!(sheet.tables.len(), 1);
+        assert_eq!(sheet.total_cell_count(), 1);
     }
 
     #[test]
-    fn test_sheet_get_table() {
-        let mut sheet = NumbersSheet::new("Sheet1".to_string(), 0);
+    fn semantic_sheet_consumes_tables_without_rebuilding_cell_maps() {
+        let mut sheet = NumbersSheet::new("Sheet1".to_owned(), 0);
+        let mut table = NumbersTable::new("Table1");
+        assert!(table.set_cell(1, 2, cell_number(42.0)).is_ok());
+        assert!(table.set_column_headers(["A", "B", "C"]).is_ok());
+        sheet.add_table(table);
 
-        let table1 = NumbersTable::new("Table1".to_string());
-        let table2 = NumbersTable::new("Table2".to_string());
-
-        sheet.add_table(table1);
-        sheet.add_table(table2);
-
-        assert!(sheet.get_table("Table1").is_some());
-        assert!(sheet.get_table("Table2").is_some());
-        assert!(sheet.get_table("Table3").is_none());
-    }
-
-    #[test]
-    fn test_sheet_table_names() {
-        let mut sheet = NumbersSheet::new("Sheet1".to_string(), 0);
-
-        sheet.add_table(NumbersTable::new("Table1".to_string()));
-        sheet.add_table(NumbersTable::new("Table2".to_string()));
-        sheet.add_table(NumbersTable::new("Table3".to_string()));
-
-        let names = sheet.table_names();
-        assert_eq!(names.len(), 3);
-        assert!(names.contains(&"Table1".to_string()));
-        assert!(names.contains(&"Table2".to_string()));
-        assert!(names.contains(&"Table3".to_string()));
+        let semantic = sheet
+            .into_semantic()
+            .unwrap_or_else(|error| panic!("unexpected semantic conversion failure: {error}"));
+        assert_eq!(semantic.name(), "Sheet1");
+        assert_eq!(semantic.index(), 0);
+        assert_eq!(semantic.table_count(), 1);
+        let table = semantic
+            .get("Table1")
+            .unwrap_or_else(|error| panic!("unexpected selector failure: {error}"))
+            .unwrap_or_else(|| panic!("converted table is missing"));
+        assert_eq!(table.dimensions(), litchi_numbers::Dimensions::new(2, 3));
+        assert_eq!(
+            table.get(litchi_numbers::Position::new(1, 2)),
+            Some(&cell_number(42.0))
+        );
+        assert_eq!(table.column_headers().collect::<Vec<_>>(), ["A", "B", "C"]);
     }
 }

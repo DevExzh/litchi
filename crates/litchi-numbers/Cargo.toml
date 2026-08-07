@@ -1,0 +1,24 @@
+[package]
+name        = "litchi-numbers"
+description = "Numbers semantic values and native package parsing."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+litchi-iwa-archive = { workspace = true }
+litchi-iwa-common  = { workspace = true }
+litchi-iwa-core    = { workspace = true }
+litchi-iwa-protos  = { workspace = true }
+phf                = { workspace = true }
+prost              = { workspace = true }
+thiserror          = { workspace = true }
+
+[dev-dependencies]
+soapberry-zip = { workspace = true }
+
+[lints]
+workspace = true

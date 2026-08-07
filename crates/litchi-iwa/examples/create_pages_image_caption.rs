@@ -5,6 +5,7 @@ use std::path::Path;
 
 use litchi_iwa::pages::{PagesEditor, PagesImageOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_common::comment::DrawableId;
 
 const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
 const IMAGE_SIZE: DrawableSize = DrawableSize {
@@ -45,8 +46,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &image,
         PagesImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
     )?;
-    editor.set_body_image_title(created.drawable_object_id, &title)?;
-    editor.set_body_image_caption(created.drawable_object_id, &caption)?;
+    let drawable_object_id = DrawableId::from_raw(created.drawable_object_id)?;
+    editor.set_body_image_title(drawable_object_id, &title)?;
+    editor.set_body_image_caption(drawable_object_id, &caption)?;
     editor.save(output)?;
     Ok(())
 }

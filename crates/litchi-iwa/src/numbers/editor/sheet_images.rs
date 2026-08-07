@@ -2,17 +2,22 @@
 
 use std::collections::HashMap;
 
+use litchi_iwa_common::media::Type as MediaType;
+
 use super::*;
-use crate::ImageAdjustments;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
 use crate::image_adjustments::replace_image_adjustments;
 use crate::image_caption::{CaptionObjectIds, DrawableCaptionKind};
+use crate::media::MediaAssetId;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
     flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
 };
+use litchi_iwa_common::comment::DrawableId;
+use litchi_iwa_common::shape::image::ImageAdjustments;
+use litchi_iwa_graph::ObjectId;
 
 mod graph;
 
@@ -101,7 +106,7 @@ impl NumbersEditor {
 
         let mut media = IWorkMediaEditor::from_package(self.package.clone())?;
         let asset = media.insert_unreferenced(preferred_filename, data)?;
-        if asset.media_type != crate::MediaType::Image {
+        if asset.media_type != MediaType::Image {
             return Err(Error::ParseError(format!(
                 "Numbers sheet images require image data, not {}",
                 asset.media_type.name()
@@ -112,7 +117,7 @@ impl NumbersEditor {
             ids,
             sheet_id,
             context.style_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             geometry,
             options.natural_size,
         )?;
@@ -133,7 +138,7 @@ impl NumbersEditor {
         add_component_data_reference(
             &mut staged,
             context.component_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             ids.drawable,
         )?;
         if context.stylesheet_component_id != context.component_id {
@@ -155,12 +160,13 @@ impl NumbersEditor {
                 Error::InvalidFormat("Numbers image creation failed validation".to_owned())
             })?;
         let created_graph = image_graph(&verified, sheet_id, ids.drawable)?;
-        if created.image_data_identifier != asset.data_identifier
+        let created_data_identifier = MediaAssetId::try_from(created.image_data_identifier)?;
+        if created_data_identifier != asset.data_identifier
             || created.geometry != geometry
             || created.original_size != Some(options.natural_size)
             || created.natural_size != Some(options.natural_size)
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(asset.data_identifier)? != data
+            || verified.extract_media(created_data_identifier.get())? != data
         {
             return Err(Error::InvalidFormat(
                 "Numbers image creation produced an inconsistent graph".to_owned(),
@@ -499,7 +505,7 @@ impl NumbersEditor {
                 clone_numbers_drawable_graph_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
+                Ok(archive.insert_object(cloned)?)
             })?;
         }
 
@@ -595,12 +601,13 @@ impl NumbersEditor {
     /// native Numbers shared-asset behavior.
     pub fn replace_sheet_image_data(
         &mut self,
-        sheet_id: u64,
-        drawable_object_id: u64,
+        sheet_id: ObjectId,
+        drawable_object_id: DrawableId,
         replacement: &[u8],
     ) -> Result<Vec<u8>> {
-        let source = image_graph(self, sheet_id, drawable_object_id)?;
-        self.replace_media(source.info.image_data_identifier, replacement)
+        let source = image_graph(self, sheet_id.get(), drawable_object_id.get())?;
+        let image_data_identifier = MediaAssetId::try_from(source.info.image_data_identifier)?;
+        self.replace_media(image_data_identifier.get(), replacement)
     }
 
     /// Remove an ordinary image, its private graph, and unshared assets.
@@ -611,7 +618,9 @@ impl NumbersEditor {
     ) -> Result<RemovedNumbersSheetImage> {
         let source = image_graph(self, sheet_id, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
+            drawable_object_id,
+        )?)?;
         let mut staged = comments.into_package();
         patch_numbers_sheet_drawable_reference(
             &mut staged,
@@ -661,13 +670,14 @@ impl NumbersEditor {
             .iter()
             .map(|(data, _)| *data)
             .collect::<HashSet<_>>();
-        for identifier in data_identifiers {
+        for raw_identifier in data_identifiers {
+            let identifier = MediaAssetId::try_from(raw_identifier)?;
             if media
                 .asset(identifier)
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier);
+                removed_data_identifiers.push(identifier.get());
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -681,7 +691,7 @@ impl NumbersEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_assets
                     .iter()
-                    .any(|asset| asset.data_identifier == *identifier)
+                    .any(|asset| asset.data_identifier.get() == *identifier)
             })
         {
             return Err(Error::InvalidFormat(
@@ -708,7 +718,7 @@ fn set_sheet_image_caption(
     let before = image_title_caption(editor, sheet_id, drawable_object_id)?;
     let staged = if let Some(storage_id) = slot.storage_id {
         let mut text_editor = IWorkTextEditor::from_package(editor.package.clone());
-        text_editor.set_text(storage_id, text)?;
+        text_editor.set_text(crate::text::native_storage_id(storage_id)?, text)?;
         text_editor.into_package()
     } else {
         let context = image_creation_context(editor, sheet_id)?;
@@ -809,7 +819,7 @@ mod tests {
 
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
-    use crate::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
+    use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
     const IMAGE_SIZE: DrawableSize = DrawableSize {
@@ -825,6 +835,21 @@ mod tests {
     fn options() -> NumbersSheetImageOptions {
         NumbersSheetImageOptions::new(IMAGE_POSITION, IMAGE_SIZE)
             .with_natural_size(NATURAL_IMAGE_SIZE)
+    }
+
+    fn sheet_selector(raw: u64) -> ObjectId {
+        ObjectId::try_from(raw).expect("fixture sheet identifiers are non-zero")
+    }
+
+    fn drawable_selector(raw: u64) -> DrawableId {
+        DrawableId::from_raw(raw).expect("fixture drawable identifiers are non-zero")
+    }
+
+    #[test]
+    fn replace_image_selector_types_reject_null_wire_identifiers() {
+        assert!(ObjectId::try_from(0).is_err());
+        assert!(DrawableId::new(0).is_none());
+        assert!(MediaAssetId::try_from(0).is_err());
     }
 
     #[test]
@@ -985,7 +1010,11 @@ mod tests {
         );
 
         let previous = editor
-            .replace_sheet_image_data(sheet_id, created.drawable_object_id, &replacement)
+            .replace_sheet_image_data(
+                sheet_selector(sheet_id),
+                drawable_selector(created.drawable_object_id),
+                &replacement,
+            )
             .unwrap();
         assert_eq!(previous, original);
         assert_eq!(
@@ -1226,7 +1255,11 @@ mod tests {
 
         assert_eq!(
             editor
-                .replace_sheet_image_data(sheet_id, duplicate.drawable_object_id, &replacement)
+                .replace_sheet_image_data(
+                    sheet_selector(sheet_id),
+                    drawable_selector(duplicate.drawable_object_id),
+                    &replacement,
+                )
                 .unwrap(),
             original
         );

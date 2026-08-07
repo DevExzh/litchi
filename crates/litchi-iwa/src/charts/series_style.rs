@@ -35,27 +35,28 @@ pub(crate) fn chart_series_style_slots(
     drawable_object_id: u64,
     drawable_label: &str,
 ) -> Result<Vec<ChartSeriesStyleSlot>> {
-    let archive = package.archive(chart_archive_name)?;
-    let object = archive.object(drawable_object_id).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} is missing"
-        ))
-    })?;
-    let messages = object
-        .messages
-        .iter()
-        .filter(|message| message.type_ == CHART_MESSAGE_TYPE)
-        .collect::<Vec<_>>();
-    let [message] = messages.as_slice() else {
-        return Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} must have exactly one chart payload"
-        )));
-    };
-    let chart = IWorkChartArchive::decode(message.data.as_slice())?;
-    let chart = chart.chart.as_ref().ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} has no chart archive"
-        ))
+    let chart = package.with_parsed_archive(chart_archive_name, |archive| {
+        let object = archive.object(drawable_object_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "{drawable_label} chart {drawable_object_id} is missing"
+            ))
+        })?;
+        let messages = object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == CHART_MESSAGE_TYPE)
+            .collect::<Vec<_>>();
+        let [message] = messages.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "{drawable_label} chart {drawable_object_id} must have exactly one chart payload"
+            )));
+        };
+        let chart = IWorkChartArchive::decode(message.data.as_slice())?;
+        chart.chart.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "{drawable_label} chart {drawable_object_id} has no chart archive"
+            ))
+        })
     })?;
     if chart.series_theme_styles.is_empty() {
         return Err(Error::InvalidFormat(format!(
@@ -109,27 +110,29 @@ pub(crate) fn chart_series_style_slots(
         .map(|identifier| {
             let archive_name =
                 unique_chart_object_archive_name(package, identifier, "chart series style object")?;
-            let archive = package.archive(&archive_name)?;
-            let object = archive.object(identifier).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "{drawable_label} chart series style {identifier} is missing"
-                ))
+            let message_index = package.with_parsed_archive(&archive_name, |archive| {
+                let object = archive.object(identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "{drawable_label} chart series style {identifier} is missing"
+                    ))
+                })?;
+                let messages = object
+                    .messages
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, message)| message.type_ == SERIES_STYLE_MESSAGE_TYPE)
+                    .collect::<Vec<_>>();
+                let [(message_index, _)] = messages.as_slice() else {
+                    return Err(Error::InvalidFormat(format!(
+                        "{drawable_label} chart series style {identifier} must have exactly one series-style payload"
+                    )));
+                };
+                Ok(*message_index)
             })?;
-            let messages = object
-                .messages
-                .iter()
-                .enumerate()
-                .filter(|(_, message)| message.type_ == SERIES_STYLE_MESSAGE_TYPE)
-                .collect::<Vec<_>>();
-            let [(message_index, _)] = messages.as_slice() else {
-                return Err(Error::InvalidFormat(format!(
-                    "{drawable_label} chart series style {identifier} must have exactly one series-style payload"
-                )));
-            };
             Ok(ChartSeriesStyleSlot {
                 archive_name,
                 object_id: identifier,
-                message_index: *message_index,
+                message_index,
             })
         })
         .collect()
@@ -173,23 +176,24 @@ impl ChartSeriesStyleSlot {
         package: &IWorkPackage,
         read: impl FnOnce(&[u8]) -> Result<T>,
     ) -> Result<T> {
-        let archive = package.archive(&self.archive_name)?;
-        let object = archive.object(self.object_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("chart series style {} is missing", self.object_id))
-        })?;
-        let message = object.messages.get(self.message_index).ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "chart series style {} message index changed unexpectedly",
-                self.object_id
-            ))
-        })?;
-        if message.type_ != SERIES_STYLE_MESSAGE_TYPE {
-            return Err(Error::InvalidFormat(format!(
-                "chart series style {} message type changed unexpectedly",
-                self.object_id
-            )));
-        }
-        read(message.data.as_slice())
+        package.with_parsed_archive(&self.archive_name, |archive| {
+            let object = archive.object(self.object_id).ok_or_else(|| {
+                Error::InvalidFormat(format!("chart series style {} is missing", self.object_id))
+            })?;
+            let message = object.messages.get(self.message_index).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "chart series style {} message index changed unexpectedly",
+                    self.object_id
+                ))
+            })?;
+            if message.type_ != SERIES_STYLE_MESSAGE_TYPE {
+                return Err(Error::InvalidFormat(format!(
+                    "chart series style {} message type changed unexpectedly",
+                    self.object_id
+                )));
+            }
+            read(message.data.as_slice())
+        })
     }
 
     /// Resolve one property through the native series-style parent chain.
@@ -211,28 +215,39 @@ impl ChartSeriesStyleSlot {
                     "chart series style parent cycle contains {identifier}"
                 )));
             }
-            let archive = package.archive(&archive_name)?;
-            let object = archive.object(identifier).ok_or_else(|| {
-                Error::InvalidFormat(format!("chart series style {identifier} is missing"))
+            let (value, parent) = package.with_parsed_archive(&archive_name, |archive| {
+                let object = archive.object(identifier).ok_or_else(|| {
+                    Error::InvalidFormat(format!("chart series style {identifier} is missing"))
+                })?;
+                let messages = object
+                    .messages
+                    .iter()
+                    .filter(|message| message.type_ == SERIES_STYLE_MESSAGE_TYPE)
+                    .collect::<Vec<_>>();
+                let [message] = messages.as_slice() else {
+                    return Err(Error::InvalidFormat(format!(
+                        "chart series style {identifier} must have exactly one series-style payload"
+                    )));
+                };
+                let value = read(message.data.as_slice())?;
+                let parent = value.is_none().then(|| {
+                    tsch::ChartSeriesStyleArchive::decode(message.data.as_slice()).map(|style| {
+                        style
+                            .super_
+                            .and_then(|style| style.parent)
+                            .map(|reference| reference.identifier)
+                            .filter(|identifier| *identifier != 0)
+                    })
+                });
+                let parent = match parent {
+                    Some(parent) => parent?,
+                    None => None,
+                };
+                Ok((value, parent))
             })?;
-            let messages = object
-                .messages
-                .iter()
-                .filter(|message| message.type_ == SERIES_STYLE_MESSAGE_TYPE)
-                .collect::<Vec<_>>();
-            let [message] = messages.as_slice() else {
-                return Err(Error::InvalidFormat(format!(
-                    "chart series style {identifier} must have exactly one series-style payload"
-                )));
-            };
-            if let Some(value) = read(message.data.as_slice())? {
+            if let Some(value) = value {
                 return Ok(Some(value));
             }
-            let parent = tsch::ChartSeriesStyleArchive::decode(message.data.as_slice())?
-                .super_
-                .and_then(|style| style.parent)
-                .map(|reference| reference.identifier)
-                .filter(|identifier| *identifier != 0);
             let Some(parent) = parent else {
                 return Ok(None);
             };
@@ -332,7 +347,7 @@ pub(crate) fn generated_chart_series_style_extension(data: &[u8]) -> Result<Opti
     let fields = parse_wire_fields(data)?;
     let extensions = fields
         .iter()
-        .filter(|field| field.number == GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD)
+        .filter(|field| field.number() == GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD)
         .collect::<Vec<_>>();
     let [extension] = extensions.as_slice() else {
         if extensions.is_empty() {
@@ -342,10 +357,10 @@ pub(crate) fn generated_chart_series_style_extension(data: &[u8]) -> Result<Opti
             "chart series-style extension {GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD} occurs more than once"
         )));
     };
-    if extension.wire_type != 2 {
+    if extension.wire_type() != 2 {
         return Err(Error::InvalidFormat(format!(
             "chart series-style extension {GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD} is not length-delimited"
         )));
     }
-    Ok(Some(&data[extension.payload_start..extension.end]))
+    Ok(Some(&data[extension.payload_start()..extension.end()]))
 }

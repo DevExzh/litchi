@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "slide={slide_index} drawable={} storage={} kind={:?} title_caption={:?}",
         shape.drawable_object_id,
-        shape.storage.object_id,
+        shape.storage.id,
         shape.kind,
         editor.slide_shape_title_caption(slide_index, shape.drawable_object_id)?
     );

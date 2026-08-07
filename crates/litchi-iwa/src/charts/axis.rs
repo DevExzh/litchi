@@ -5,6 +5,7 @@
 //! native object lookup and lossless wire-level access used by focused
 //! axis-property modules.
 
+use litchi_iwa_common::chart::axis::Axis;
 use prost::Message;
 
 use crate::archive::RawMessage;
@@ -33,75 +34,52 @@ const VALUE_AXIS_LABELS_VISIBLE_FIELD: u32 = 11;
 /// `TSCH.Generated.ChartAxisNonStyleArchive`.
 const CATEGORY_AXIS_SERIES_NAMES_VISIBLE_FIELD: u32 = 12;
 
-/// A native chart axis exposed by iWork's Axis formatter.
-///
-/// [`Self::Value`] addresses the primary value-axis object. iWork charts can
-/// retain additional value-axis objects for specialized chart types, but the
-/// standard Axis formatter exposes this primary axis as `Value (Y)`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum ChartAxis {
-    /// The chart's category axis, shown as `Category (X)` by the standard formatter.
-    Category,
-    /// The chart's primary value axis, shown as `Value (Y)` by the standard formatter.
-    Value,
-}
-
 #[derive(Debug, Clone, Copy)]
 struct AxisTitleFields {
     visible: u32,
     text: u32,
 }
 
-impl ChartAxis {
-    const fn title_fields(self) -> AxisTitleFields {
-        match self {
-            Self::Category => AxisTitleFields {
-                visible: CATEGORY_AXIS_TITLE_VISIBLE_FIELD,
-                text: CATEGORY_AXIS_TITLE_TEXT_FIELD,
-            },
-            Self::Value => AxisTitleFields {
-                visible: VALUE_AXIS_TITLE_VISIBLE_FIELD,
-                text: VALUE_AXIS_TITLE_TEXT_FIELD,
-            },
-        }
+const fn title_fields(axis: Axis) -> AxisTitleFields {
+    match axis {
+        Axis::Category => AxisTitleFields {
+            visible: CATEGORY_AXIS_TITLE_VISIBLE_FIELD,
+            text: CATEGORY_AXIS_TITLE_TEXT_FIELD,
+        },
+        Axis::Value => AxisTitleFields {
+            visible: VALUE_AXIS_TITLE_VISIBLE_FIELD,
+            text: VALUE_AXIS_TITLE_TEXT_FIELD,
+        },
     }
+}
 
-    const fn labels_visible_field(self) -> u32 {
-        match self {
-            Self::Category => CATEGORY_AXIS_LABELS_VISIBLE_FIELD,
-            Self::Value => VALUE_AXIS_LABELS_VISIBLE_FIELD,
-        }
+const fn labels_visible_field(axis: Axis) -> u32 {
+    match axis {
+        Axis::Category => CATEGORY_AXIS_LABELS_VISIBLE_FIELD,
+        Axis::Value => VALUE_AXIS_LABELS_VISIBLE_FIELD,
     }
+}
 
-    pub(crate) const fn label(self) -> &'static str {
-        match self {
-            Self::Category => "category",
-            Self::Value => "value",
-        }
-    }
+fn primary_non_style_identifier(axis: Axis, chart: &tsch::ChartArchive) -> Option<u64> {
+    let references = match axis {
+        Axis::Category => &chart.category_axis_nonstyles,
+        Axis::Value => &chart.value_axis_nonstyles,
+    };
+    references
+        .first()
+        .map(|reference| reference.identifier)
+        .filter(|identifier| *identifier != 0)
+}
 
-    fn primary_non_style_identifier(self, chart: &tsch::ChartArchive) -> Option<u64> {
-        let references = match self {
-            Self::Category => &chart.category_axis_nonstyles,
-            Self::Value => &chart.value_axis_nonstyles,
-        };
-        references
-            .first()
-            .map(|reference| reference.identifier)
-            .filter(|identifier| *identifier != 0)
-    }
-
-    pub(crate) fn primary_style_identifier(self, chart: &tsch::ChartArchive) -> Option<u64> {
-        let references = match self {
-            Self::Category => &chart.category_axis_styles,
-            Self::Value => &chart.value_axis_styles,
-        };
-        references
-            .first()
-            .map(|reference| reference.identifier)
-            .filter(|identifier| *identifier != 0)
-    }
+pub(crate) fn primary_style_identifier(axis: Axis, chart: &tsch::ChartArchive) -> Option<u64> {
+    let references = match axis {
+        Axis::Category => &chart.category_axis_styles,
+        Axis::Value => &chart.value_axis_styles,
+    };
+    references
+        .first()
+        .map(|reference| reference.identifier)
+        .filter(|identifier| *identifier != 0)
 }
 
 /// The single mutable native axis non-style payload for one chart axis.
@@ -118,7 +96,7 @@ pub(crate) fn chart_axis_title(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<Option<String>> {
     axis_non_style_slot(
         package,
@@ -136,7 +114,7 @@ pub(crate) fn set_chart_axis_title(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
     title: &str,
 ) -> Result<()> {
     let slot = axis_non_style_slot(
@@ -164,7 +142,7 @@ pub(crate) fn set_chart_axis_title(
     {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} {}-axis title update failed validation",
-            axis.label()
+            axis.as_str()
         )));
     }
     Ok(())
@@ -179,7 +157,7 @@ pub(crate) fn remove_chart_axis_title(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<bool> {
     let slot = axis_non_style_slot(
         package,
@@ -202,7 +180,7 @@ pub(crate) fn remove_chart_axis_title(
     {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} {}-axis title removal failed validation",
-            axis.label()
+            axis.as_str()
         )));
     }
     Ok(true)
@@ -214,7 +192,7 @@ pub(crate) fn chart_axis_labels_visible(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<bool> {
     axis_non_style_slot(
         package,
@@ -232,7 +210,7 @@ pub(crate) fn set_chart_axis_labels_visible(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
     visible: bool,
 ) -> Result<()> {
     let slot = axis_non_style_slot(
@@ -252,7 +230,7 @@ pub(crate) fn set_chart_axis_labels_visible(
     if slot.read(package, |data| read_axis_labels_visible(data, axis))? != visible {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} {}-axis labels update failed validation",
-            axis.label()
+            axis.as_str()
         )));
     }
     Ok(())
@@ -270,7 +248,7 @@ pub(crate) fn chart_category_axis_series_names_visible(
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Category,
+        Axis::Category,
     )?
     .read(package, read_category_axis_series_names_visible)
 }
@@ -288,7 +266,7 @@ pub(crate) fn set_chart_category_axis_series_names_visible(
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Category,
+        Axis::Category,
     )?;
     if slot.read(package, read_category_axis_series_names_visible)? == visible {
         return Ok(());
@@ -306,17 +284,17 @@ pub(crate) fn set_chart_category_axis_series_names_visible(
 }
 
 /// Decode a `TSCH.ChartAxisNonStyleArchive` and return one visible title.
-fn read_axis_non_style_title(data: &[u8], axis: ChartAxis) -> Result<Option<String>> {
+fn read_axis_non_style_title(data: &[u8], axis: Axis) -> Result<Option<String>> {
     let Some(extension) = generated_axis_non_style_extension(data)? else {
         return Ok(None);
     };
     let generated = tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
     let (visible, title) = match axis {
-        ChartAxis::Category => (
+        Axis::Category => (
             generated.tschchartaxiscategoryshowtitle,
             generated.tschchartaxiscategorytitle,
         ),
-        ChartAxis::Value => (
+        Axis::Value => (
             generated.tschchartaxisvalueshowtitle,
             generated.tschchartaxisvaluetitle,
         ),
@@ -330,14 +308,14 @@ fn read_axis_non_style_title(data: &[u8], axis: ChartAxis) -> Result<Option<Stri
 /// Decode a `TSCH.ChartAxisNonStyleArchive` label-visibility switch.
 ///
 /// iWork shows axis labels by default when the native switch is absent.
-fn read_axis_labels_visible(data: &[u8], axis: ChartAxis) -> Result<bool> {
+fn read_axis_labels_visible(data: &[u8], axis: Axis) -> Result<bool> {
     let Some(extension) = generated_axis_non_style_extension(data)? else {
         return Ok(true);
     };
     let generated = tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
     let visible = match axis {
-        ChartAxis::Category => generated.tschchartaxiscategoryshowlabels,
-        ChartAxis::Value => generated.tschchartaxisvalueshowlabels,
+        Axis::Category => generated.tschchartaxiscategoryshowlabels,
+        Axis::Value => generated.tschchartaxisvalueshowlabels,
     };
     Ok(visible.unwrap_or(true))
 }
@@ -358,7 +336,7 @@ pub(crate) fn axis_non_style_slot(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<AxisNonStyleSlot> {
     let chart_archive = package.archive(chart_archive_name)?;
     let chart_object = chart_archive.object(drawable_object_id).ok_or_else(|| {
@@ -386,10 +364,10 @@ pub(crate) fn axis_non_style_slot(
             "{drawable_label} chart {drawable_object_id} has no chart payload"
         ))
     })?;
-    let non_style_id = axis.primary_non_style_identifier(payload).ok_or_else(|| {
+    let non_style_id = primary_non_style_identifier(axis, payload).ok_or_else(|| {
         Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} has no primary {}-axis non-style",
-            axis.label()
+            axis.as_str()
         ))
     })?;
     let archive_name =
@@ -398,7 +376,7 @@ pub(crate) fn axis_non_style_slot(
     let non_style_object = archive.object(non_style_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
             "{drawable_label} chart {}-axis non-style {non_style_id} is missing",
-            axis.label()
+            axis.as_str()
         ))
     })?;
     let mut messages = non_style_object
@@ -409,13 +387,13 @@ pub(crate) fn axis_non_style_slot(
     let Some((message_index, _)) = messages.next() else {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {}-axis non-style {non_style_id} must have exactly one axis non-style payload",
-            axis.label()
+            axis.as_str()
         )));
     };
     if messages.next().is_some() {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {}-axis non-style {non_style_id} must have exactly one axis non-style payload",
-            axis.label()
+            axis.as_str()
         )));
     }
     Ok(AxisNonStyleSlot {
@@ -534,23 +512,19 @@ impl AxisNonStyleSlot {
     }
 }
 
-fn patch_axis_non_style_title(
-    data: &[u8],
-    axis: ChartAxis,
-    title: Option<&str>,
-) -> Result<Vec<u8>> {
-    let fields = axis.title_fields();
+fn patch_axis_non_style_title(data: &[u8], axis: Axis, title: Option<&str>) -> Result<Vec<u8>> {
+    let fields = title_fields(axis);
     let Some(extension) = generated_axis_non_style_extension(data)? else {
         let Some(title) = title else {
             return Ok(data.to_vec());
         };
         let mut generated = tsch::generated::ChartAxisNonStyleArchive::default();
         match axis {
-            ChartAxis::Category => {
+            Axis::Category => {
                 generated.tschchartaxiscategoryshowtitle = Some(true);
                 generated.tschchartaxiscategorytitle = Some(title.to_owned());
             },
-            ChartAxis::Value => {
+            Axis::Value => {
                 generated.tschchartaxisvalueshowtitle = Some(true);
                 generated.tschchartaxisvaluetitle = Some(title.to_owned());
             },
@@ -567,11 +541,11 @@ fn patch_axis_non_style_title(
 
     let generated = tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
     let (visible_present, title_present) = match axis {
-        ChartAxis::Category => (
+        Axis::Category => (
             generated.tschchartaxiscategoryshowtitle.is_some(),
             generated.tschchartaxiscategorytitle.is_some(),
         ),
-        ChartAxis::Value => (
+        Axis::Value => (
             generated.tschchartaxisvalueshowtitle.is_some(),
             generated.tschchartaxisvaluetitle.is_some(),
         ),
@@ -598,15 +572,15 @@ fn patch_axis_non_style_title(
     Ok(patched)
 }
 
-fn patch_axis_labels_visibility(data: &[u8], axis: ChartAxis, visible: bool) -> Result<Vec<u8>> {
+fn patch_axis_labels_visibility(data: &[u8], axis: Axis, visible: bool) -> Result<Vec<u8>> {
     let Some(extension) = generated_axis_non_style_extension(data)? else {
         if visible {
             return Ok(data.to_vec());
         }
         let mut generated = tsch::generated::ChartAxisNonStyleArchive::default();
         match axis {
-            ChartAxis::Category => generated.tschchartaxiscategoryshowlabels = Some(false),
-            ChartAxis::Value => generated.tschchartaxisvalueshowlabels = Some(false),
+            Axis::Category => generated.tschchartaxiscategoryshowlabels = Some(false),
+            Axis::Value => generated.tschchartaxisvalueshowlabels = Some(false),
         }
         let patched = patch_length_delimited_field(
             data,
@@ -620,12 +594,12 @@ fn patch_axis_labels_visibility(data: &[u8], axis: ChartAxis, visible: bool) -> 
 
     let generated = tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
     let visible_present = match axis {
-        ChartAxis::Category => generated.tschchartaxiscategoryshowlabels.is_some(),
-        ChartAxis::Value => generated.tschchartaxisvalueshowlabels.is_some(),
+        Axis::Category => generated.tschchartaxiscategoryshowlabels.is_some(),
+        Axis::Value => generated.tschchartaxisvalueshowlabels.is_some(),
     };
     let extension = patch_varint_field(
         extension,
-        axis.labels_visible_field(),
+        labels_visible_field(axis),
         visible_present,
         Some(u64::from(visible)),
     )?;
@@ -672,25 +646,21 @@ fn patch_category_axis_series_names_visibility(data: &[u8], visible: bool) -> Re
     Ok(patched)
 }
 
-fn validate_patched_axis_title(data: &[u8], axis: ChartAxis, expected: Option<&str>) -> Result<()> {
+fn validate_patched_axis_title(data: &[u8], axis: Axis, expected: Option<&str>) -> Result<()> {
     if read_axis_non_style_title(data, axis)?.as_deref() != expected {
         return Err(Error::InvalidFormat(format!(
             "{}-axis title wire patch failed validation",
-            axis.label()
+            axis.as_str()
         )));
     }
     Ok(())
 }
 
-fn validate_patched_axis_labels_visibility(
-    data: &[u8],
-    axis: ChartAxis,
-    expected: bool,
-) -> Result<()> {
+fn validate_patched_axis_labels_visibility(data: &[u8], axis: Axis, expected: bool) -> Result<()> {
     if read_axis_labels_visible(data, axis)? != expected {
         return Err(Error::InvalidFormat(format!(
             "{}-axis labels wire patch failed validation",
-            axis.label()
+            axis.as_str()
         )));
     }
     Ok(())
@@ -713,7 +683,7 @@ pub(crate) fn generated_axis_non_style_extension(data: &[u8]) -> Result<Option<&
     let fields = parse_wire_fields(data)?;
     let mut extensions = fields
         .iter()
-        .filter(|field| field.number == GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD);
+        .filter(|field| field.number() == GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD);
     let Some(extension) = extensions.next() else {
         return Ok(None);
     };
@@ -722,12 +692,12 @@ pub(crate) fn generated_axis_non_style_extension(data: &[u8]) -> Result<Option<&
             "chart axis non-style extension {GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD} occurs more than once"
         )));
     }
-    if extension.wire_type != 2 {
+    if extension.wire_type() != 2 {
         return Err(Error::InvalidFormat(format!(
             "chart axis non-style extension {GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD} is not length-delimited"
         )));
     }
-    Ok(Some(&data[extension.payload_start..extension.end]))
+    Ok(Some(&data[extension.payload_start()..extension.end()]))
 }
 
 #[cfg(test)]
@@ -750,21 +720,20 @@ mod tests {
         };
         let original = axis_non_style_with_unknown_fields(generated);
 
-        let titled =
-            patch_axis_non_style_title(&original, ChartAxis::Category, Some("Month")).unwrap();
+        let titled = patch_axis_non_style_title(&original, Axis::Category, Some("Month")).unwrap();
         assert_eq!(
-            read_axis_non_style_title(&titled, ChartAxis::Category).unwrap(),
+            read_axis_non_style_title(&titled, Axis::Category).unwrap(),
             Some("Month".to_owned())
         );
         assert_eq!(
-            read_axis_non_style_title(&titled, ChartAxis::Value).unwrap(),
+            read_axis_non_style_title(&titled, Axis::Value).unwrap(),
             Some("Revenue".to_owned())
         );
         assert_unknown_fields_retained(&original, &titled);
 
-        let removed = patch_axis_non_style_title(&titled, ChartAxis::Category, None).unwrap();
+        let removed = patch_axis_non_style_title(&titled, Axis::Category, None).unwrap();
         assert_eq!(
-            read_axis_non_style_title(&removed, ChartAxis::Category).unwrap(),
+            read_axis_non_style_title(&removed, Axis::Category).unwrap(),
             None
         );
         assert_eq!(removed, original);
@@ -780,21 +749,20 @@ mod tests {
         };
         let original = axis_non_style_with_unknown_fields(generated);
 
-        let titled =
-            patch_axis_non_style_title(&original, ChartAxis::Value, Some("Revenue")).unwrap();
+        let titled = patch_axis_non_style_title(&original, Axis::Value, Some("Revenue")).unwrap();
         assert_eq!(
-            read_axis_non_style_title(&titled, ChartAxis::Category).unwrap(),
+            read_axis_non_style_title(&titled, Axis::Category).unwrap(),
             Some("Month".to_owned())
         );
         assert_eq!(
-            read_axis_non_style_title(&titled, ChartAxis::Value).unwrap(),
+            read_axis_non_style_title(&titled, Axis::Value).unwrap(),
             Some("Revenue".to_owned())
         );
         assert_unknown_fields_retained(&original, &titled);
 
-        let removed = patch_axis_non_style_title(&titled, ChartAxis::Value, None).unwrap();
+        let removed = patch_axis_non_style_title(&titled, Axis::Value, None).unwrap();
         assert_eq!(
-            read_axis_non_style_title(&removed, ChartAxis::Value).unwrap(),
+            read_axis_non_style_title(&removed, Axis::Value).unwrap(),
             None
         );
         assert_eq!(removed, original);
@@ -815,11 +783,11 @@ mod tests {
         let visible = patch_category_axis_series_names_visibility(&original, true).unwrap();
         assert!(read_category_axis_series_names_visible(&visible).unwrap());
         assert_eq!(
-            read_axis_non_style_title(&visible, ChartAxis::Category).unwrap(),
+            read_axis_non_style_title(&visible, Axis::Category).unwrap(),
             Some("Month".to_owned())
         );
         assert_eq!(
-            read_axis_non_style_title(&visible, ChartAxis::Value).unwrap(),
+            read_axis_non_style_title(&visible, Axis::Value).unwrap(),
             Some("Revenue".to_owned())
         );
         assert_unknown_fields_retained(&original, &visible);
@@ -860,22 +828,22 @@ mod tests {
         let original = axis_non_style_with_unknown_fields(generated);
 
         let category_hidden =
-            patch_axis_labels_visibility(&original, ChartAxis::Category, false).unwrap();
-        assert!(!read_axis_labels_visible(&category_hidden, ChartAxis::Category).unwrap());
-        assert!(read_axis_labels_visible(&category_hidden, ChartAxis::Value).unwrap());
+            patch_axis_labels_visibility(&original, Axis::Category, false).unwrap();
+        assert!(!read_axis_labels_visible(&category_hidden, Axis::Category).unwrap());
+        assert!(read_axis_labels_visible(&category_hidden, Axis::Value).unwrap());
         assert!(read_category_axis_series_names_visible(&category_hidden).unwrap());
         assert_eq!(
-            read_axis_non_style_title(&category_hidden, ChartAxis::Category).unwrap(),
+            read_axis_non_style_title(&category_hidden, Axis::Category).unwrap(),
             Some("Month".to_owned())
         );
         assert_unknown_fields_retained(&original, &category_hidden);
 
         let value_hidden =
-            patch_axis_labels_visibility(&category_hidden, ChartAxis::Value, false).unwrap();
-        assert!(!read_axis_labels_visible(&value_hidden, ChartAxis::Category).unwrap());
-        assert!(!read_axis_labels_visible(&value_hidden, ChartAxis::Value).unwrap());
+            patch_axis_labels_visibility(&category_hidden, Axis::Value, false).unwrap();
+        assert!(!read_axis_labels_visible(&value_hidden, Axis::Category).unwrap());
+        assert!(!read_axis_labels_visible(&value_hidden, Axis::Value).unwrap());
         assert_eq!(
-            read_axis_non_style_title(&value_hidden, ChartAxis::Value).unwrap(),
+            read_axis_non_style_title(&value_hidden, Axis::Value).unwrap(),
             Some("Revenue".to_owned())
         );
         assert_unknown_fields_retained(&original, &value_hidden);
@@ -887,7 +855,7 @@ mod tests {
             super_: Some(tss::StyleArchive::default()),
         }
         .encode_to_vec();
-        for axis in [ChartAxis::Category, ChartAxis::Value] {
+        for axis in [Axis::Category, Axis::Value] {
             assert!(read_axis_labels_visible(&original, axis).unwrap());
             assert_eq!(
                 patch_axis_labels_visibility(&original, axis, true).unwrap(),
@@ -910,14 +878,13 @@ mod tests {
         }
         .encode_to_vec();
 
-        let titled =
-            patch_axis_non_style_title(&original, ChartAxis::Value, Some("Revenue")).unwrap();
+        let titled = patch_axis_non_style_title(&original, Axis::Value, Some("Revenue")).unwrap();
         assert_eq!(
-            read_axis_non_style_title(&titled, ChartAxis::Value).unwrap(),
+            read_axis_non_style_title(&titled, Axis::Value).unwrap(),
             Some("Revenue".to_owned())
         );
         assert_eq!(
-            read_axis_non_style_title(&titled, ChartAxis::Category).unwrap(),
+            read_axis_non_style_title(&titled, Axis::Category).unwrap(),
             None
         );
     }
@@ -966,8 +933,8 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .into_iter()
-            .filter(|field| field.number == number)
-            .map(|field| data[field.start..field.end].to_vec())
+            .filter(|field| field.number() == number)
+            .map(|field| data[field.start()..field.end()].to_vec())
             .collect()
     }
 }

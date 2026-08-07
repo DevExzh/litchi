@@ -5,7 +5,7 @@ use crate::charts::border_stroke::{
     chart_border_stroke as read_native_chart_border_stroke,
     set_chart_border_stroke as set_native_chart_border_stroke,
 };
-use crate::shapes::ShapeStroke;
+use crate::shapes::Stroke;
 
 impl NumbersEditor {
     /// Read the chart-area border stroke independently of border visibility.
@@ -15,7 +15,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<Option<ShapeStroke>> {
+    ) -> Result<Option<Stroke>> {
         sheet_chart_border_stroke(self, sheet_id, drawable_object_id)
     }
 
@@ -24,7 +24,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        stroke: Option<ShapeStroke>,
+        stroke: Option<Stroke>,
     ) -> Result<()> {
         set_sheet_chart_border_stroke(self, sheet_id, drawable_object_id, stroke)
     }
@@ -34,7 +34,7 @@ fn sheet_chart_border_stroke(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-) -> Result<Option<ShapeStroke>> {
+) -> Result<Option<Stroke>> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     read_native_chart_border_stroke(
         &editor.package,
@@ -48,7 +48,7 @@ fn set_sheet_chart_border_stroke(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    stroke: Option<ShapeStroke>,
+    stroke: Option<Stroke>,
 ) -> Result<()> {
     if sheet_chart_border_stroke(editor, sheet_id, drawable_object_id)? == stroke {
         return Ok(());

@@ -11,8 +11,12 @@ pub enum Slide {
     /// Modern PPTX slide with extracted data
     Pptx(SlideData),
     /// Apple Keynote slide
-    #[cfg(feature = "iwork")]
-    Keynote(crate::iwa::keynote::KeynoteSlide),
+    #[cfg(feature = "keynote")]
+    Keynote {
+        number: usize,
+        title: Option<String>,
+        text: String,
+    },
     /// OpenDocument Presentation slide
     #[cfg(feature = "odp")]
     Odp(litchi_odp::Slide),
@@ -36,19 +40,8 @@ impl Slide {
         match self {
             Slide::Ppt(data) => Ok(data.text.clone()),
             Slide::Pptx(data) => Ok(data.text.clone()),
-            #[cfg(feature = "iwork")]
-            Slide::Keynote(slide) => {
-                // Combine title and content
-                let mut text = String::new();
-                if let Some(ref title) = slide.title {
-                    text.push_str(title);
-                    if !slide.text_content.is_empty() {
-                        text.push_str("\n\n");
-                    }
-                }
-                text.push_str(&slide.text_content.join("\n"));
-                Ok(text)
-            },
+            #[cfg(feature = "keynote")]
+            Slide::Keynote { text, .. } => Ok(text.clone()),
             #[cfg(feature = "odp")]
             Slide::Odp(slide) => Ok(slide.all_text()),
         }
@@ -75,8 +68,8 @@ impl Slide {
         match self {
             Slide::Ppt(data) => Some(data.slide_number),
             Slide::Pptx(_) => None,
-            #[cfg(feature = "iwork")]
-            Slide::Keynote(slide) => Some(slide.index + 1), // Convert 0-based to 1-based
+            #[cfg(feature = "keynote")]
+            Slide::Keynote { number, .. } => Some(*number),
             #[cfg(feature = "odp")]
             Slide::Odp(_) => None, // Slide numbers not currently exposed for ODP
         }
@@ -103,8 +96,8 @@ impl Slide {
         match self {
             Slide::Ppt(data) => Some(data.shape_count),
             Slide::Pptx(_) => None,
-            #[cfg(feature = "iwork")]
-            Slide::Keynote(_) => None, // Shape count not currently exposed for Keynote
+            #[cfg(feature = "keynote")]
+            Slide::Keynote { .. } => None, // Shape count not currently exposed for Keynote
             #[cfg(feature = "odp")]
             Slide::Odp(_) => None, // Shape count not currently exposed for ODP
         }
@@ -131,8 +124,8 @@ impl Slide {
         match self {
             Slide::Ppt(_) => Ok(None),
             Slide::Pptx(data) => Ok(data.name.clone()),
-            #[cfg(feature = "iwork")]
-            Slide::Keynote(slide) => Ok(slide.title.clone()),
+            #[cfg(feature = "keynote")]
+            Slide::Keynote { title, .. } => Ok(title.clone()),
             #[cfg(feature = "odp")]
             Slide::Odp(_slide) => Ok(None), // ODP slides don't have names in the current API
         }

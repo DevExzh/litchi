@@ -182,7 +182,7 @@ fn strict_optional_distance(
     field_number: u32,
 ) -> Result<Option<ChartPieLabelDistance>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -191,12 +191,12 @@ fn strict_optional_distance(
             "singular chart pie label distance field {field_number} occurs more than once"
         )));
     }
-    if field.wire_type != 5 || field.end - field.key_end != size_of::<f32>() {
+    if field.wire_type() != 5 || field.end() - field.key_end() != size_of::<f32>() {
         return Err(Error::InvalidFormat(format!(
             "chart pie label distance field {field_number} is not fixed32"
         )));
     }
-    let bytes: [u8; size_of::<f32>()] = data[field.key_end..field.end]
+    let bytes: [u8; size_of::<f32>()] = data[field.key_end()..field.end()]
         .try_into()
         .map_err(|_| Error::InvalidFormat("chart pie label distance is truncated".to_owned()))?;
     ChartPieLabelDistance::from_percent(f32::from_le_bytes(bytes)).map(Some)
@@ -333,8 +333,8 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .into_iter()
-            .filter(|field| field.number == number)
-            .map(|field| data[field.start..field.end].to_vec())
+            .filter(|field| field.number() == number)
+            .map(|field| data[field.start()..field.end()].to_vec())
             .collect()
     }
 }

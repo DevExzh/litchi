@@ -56,7 +56,7 @@ impl PagesEditor {
     }
 }
 
-fn require_3d_scene(kind: ChartKind, drawable_object_id: u64) -> Result<()> {
+fn require_3d_scene(kind: Kind, drawable_object_id: u64) -> Result<()> {
     if !kind.supports_3d_scene() {
         return Err(Error::InvalidFormat(format!(
             "Pages chart {drawable_object_id} kind {kind:?} has no 3D scene"
@@ -77,7 +77,7 @@ mod tests {
         let chart = editor
             .add_body_chart(
                 0,
-                ChartKind::Column3d,
+                Kind::Column3d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -120,7 +120,7 @@ mod tests {
         let chart = editor
             .add_body_chart(
                 0,
-                ChartKind::Column2d,
+                Kind::Column2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {

@@ -11,15 +11,17 @@ use crate::charts::axis_style::{
     set_chart_axis_major_gridlines_visible as set_native_chart_axis_major_gridlines_visible,
     set_chart_axis_minor_gridlines_visible as set_native_chart_axis_minor_gridlines_visible,
 };
-use crate::charts::{ChartAxis, ChartAxisGridline, ChartAxisGridlineStroke};
+use crate::charts::{ChartAxisGridline, ChartAxisGridlineStroke};
+use litchi_iwa_common::chart::axis::Axis;
+use litchi_iwa_common::chart::axis::style::Visibility;
 
 impl PagesEditor {
     /// Read whether Pages shows major gridlines for one native body-chart axis.
     pub fn body_chart_axis_major_gridlines_visible(
         &self,
         drawable_object_id: u64,
-        axis: ChartAxis,
-    ) -> Result<bool> {
+        axis: Axis,
+    ) -> Result<Visibility> {
         body_chart_axis_major_gridlines_visible(self, drawable_object_id, axis)
     }
 
@@ -27,8 +29,8 @@ impl PagesEditor {
     pub fn set_body_chart_axis_major_gridlines_visible(
         &mut self,
         drawable_object_id: u64,
-        axis: ChartAxis,
-        visible: bool,
+        axis: Axis,
+        visible: Visibility,
     ) -> Result<()> {
         set_body_chart_axis_major_gridlines_visible(self, drawable_object_id, axis, visible)
     }
@@ -37,8 +39,8 @@ impl PagesEditor {
     pub fn body_chart_axis_minor_gridlines_visible(
         &self,
         drawable_object_id: u64,
-        axis: ChartAxis,
-    ) -> Result<bool> {
+        axis: Axis,
+    ) -> Result<Visibility> {
         body_chart_axis_minor_gridlines_visible(self, drawable_object_id, axis)
     }
 
@@ -46,8 +48,8 @@ impl PagesEditor {
     pub fn set_body_chart_axis_minor_gridlines_visible(
         &mut self,
         drawable_object_id: u64,
-        axis: ChartAxis,
-        visible: bool,
+        axis: Axis,
+        visible: Visibility,
     ) -> Result<()> {
         set_body_chart_axis_minor_gridlines_visible(self, drawable_object_id, axis, visible)
     }
@@ -56,7 +58,7 @@ impl PagesEditor {
     pub fn body_chart_axis_gridline_stroke(
         &self,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         gridline: ChartAxisGridline,
     ) -> Result<ChartAxisGridlineStroke> {
         let graph = body_chart_graph(self, drawable_object_id)?;
@@ -74,7 +76,7 @@ impl PagesEditor {
     pub fn set_body_chart_axis_gridline_stroke(
         &mut self,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         gridline: ChartAxisGridline,
         stroke: ChartAxisGridlineStroke,
     ) -> Result<()> {
@@ -103,8 +105,8 @@ impl PagesEditor {
 fn body_chart_axis_major_gridlines_visible(
     editor: &PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
-) -> Result<bool> {
+    axis: Axis,
+) -> Result<Visibility> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_axis_major_gridlines_visible(
         editor.package(),
@@ -118,8 +120,8 @@ fn body_chart_axis_major_gridlines_visible(
 fn set_body_chart_axis_major_gridlines_visible(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
-    visible: bool,
+    axis: Axis,
+    visible: Visibility,
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let mut staged = editor.package().clone();
@@ -144,8 +146,8 @@ fn set_body_chart_axis_major_gridlines_visible(
 fn body_chart_axis_minor_gridlines_visible(
     editor: &PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
-) -> Result<bool> {
+    axis: Axis,
+) -> Result<Visibility> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_axis_minor_gridlines_visible(
         editor.package(),
@@ -159,8 +161,8 @@ fn body_chart_axis_minor_gridlines_visible(
 fn set_body_chart_axis_minor_gridlines_visible(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
-    visible: bool,
+    axis: Axis,
+    visible: Visibility,
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let mut staged = editor.package().clone();
@@ -185,11 +187,10 @@ fn set_body_chart_axis_minor_gridlines_visible(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartKind};
+    use crate::charts::{ChartData, Kind};
     use crate::pages::PagesDocumentBuilder;
     use crate::shapes::{
-        DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeStroke, StrokePattern,
-        StrokeWidth,
+        DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Stroke, Width,
     };
 
     #[test]
@@ -199,7 +200,7 @@ mod tests {
         let chart = editor
             .add_body_chart(
                 body.encode_utf16().count(),
-                ChartKind::Column2d,
+                Kind::Column2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -214,7 +215,7 @@ mod tests {
         editor
             .set_body_chart_axis_gridline_stroke(
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 ChartAxisGridline::Minor,
                 stroke,
             )
@@ -223,24 +224,22 @@ mod tests {
             editor
                 .body_chart_axis_gridline_stroke(
                     chart.drawable_object_id,
-                    ChartAxis::Value,
+                    Axis::Value,
                     ChartAxisGridline::Minor,
                 )
                 .unwrap(),
             stroke
         );
         assert!(
-            !editor
-                .body_chart_axis_minor_gridlines_visible(
-                    chart.drawable_object_id,
-                    ChartAxis::Value,
-                )
+            editor
+                .body_chart_axis_minor_gridlines_visible(chart.drawable_object_id, Axis::Value,)
                 .unwrap()
+                .is_hidden()
         );
         editor
             .set_body_chart_axis_gridline_stroke(
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 ChartAxisGridline::Minor,
                 ChartAxisGridlineStroke::Inherited,
             )
@@ -257,11 +256,11 @@ mod tests {
         .unwrap()
     }
 
-    fn test_stroke() -> ShapeStroke {
-        ShapeStroke::new(
+    fn test_stroke() -> Stroke {
+        Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(2.0).unwrap(),
-            StrokePattern::RoundedDash,
+            Width::new(2.0).unwrap(),
+            Pattern::RoundedDash,
         )
     }
 }

@@ -5,7 +5,7 @@ use crate::charts::axis_label_angle::{
     chart_axis_label_angle as read_native_axis_label_angle,
     set_chart_axis_label_angle as set_native_axis_label_angle,
 };
-use crate::charts::{ChartAxis, ChartAxisLabelAngle};
+use crate::charts::{Axis, LabelAngle};
 
 impl KeynoteEditor {
     /// Read one slide-chart axis' normalized label angle.
@@ -13,8 +13,8 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
-    ) -> Result<ChartAxisLabelAngle> {
+        axis: Axis,
+    ) -> Result<LabelAngle> {
         slide_chart_axis_label_angle(self, slide_index, drawable_object_id, axis)
     }
 
@@ -23,8 +23,8 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
-        angle: ChartAxisLabelAngle,
+        axis: Axis,
+        angle: LabelAngle,
     ) -> Result<()> {
         set_slide_chart_axis_label_angle(self, slide_index, drawable_object_id, axis, angle)
     }
@@ -34,8 +34,8 @@ fn slide_chart_axis_label_angle(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
-) -> Result<ChartAxisLabelAngle> {
+    axis: Axis,
+) -> Result<LabelAngle> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     read_native_axis_label_angle(
         editor.package(),
@@ -50,8 +50,8 @@ fn set_slide_chart_axis_label_angle(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
-    angle: ChartAxisLabelAngle,
+    axis: Axis,
+    angle: LabelAngle,
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let mut staged = editor.package().clone();
@@ -76,7 +76,7 @@ fn set_slide_chart_axis_label_angle(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartKind};
+    use crate::charts::{ChartData, Kind};
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -86,7 +86,7 @@ mod tests {
         let chart = editor
             .add_slide_chart(
                 0,
-                ChartKind::Line2d,
+                Kind::Line2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -98,23 +98,18 @@ mod tests {
         let baseline = editor.to_bytes().unwrap();
         assert_eq!(
             editor
-                .slide_chart_axis_label_angle(0, chart.drawable_object_id, ChartAxis::Value)
+                .slide_chart_axis_label_angle(0, chart.drawable_object_id, Axis::Value)
                 .unwrap(),
-            ChartAxisLabelAngle::HORIZONTAL
+            LabelAngle::HORIZONTAL
         );
-        let expected = ChartAxisLabelAngle::new(12.5).unwrap();
+        let expected = LabelAngle::new(12.5).unwrap();
         editor
-            .set_slide_chart_axis_label_angle(
-                0,
-                chart.drawable_object_id,
-                ChartAxis::Value,
-                expected,
-            )
+            .set_slide_chart_axis_label_angle(0, chart.drawable_object_id, Axis::Value, expected)
             .unwrap();
         let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
-                .slide_chart_axis_label_angle(0, chart.drawable_object_id, ChartAxis::Value)
+                .slide_chart_axis_label_angle(0, chart.drawable_object_id, Axis::Value)
                 .unwrap(),
             expected
         );
@@ -122,8 +117,8 @@ mod tests {
             .set_slide_chart_axis_label_angle(
                 0,
                 chart.drawable_object_id,
-                ChartAxis::Value,
-                ChartAxisLabelAngle::HORIZONTAL,
+                Axis::Value,
+                LabelAngle::HORIZONTAL,
             )
             .unwrap();
         assert_eq!(reopened.to_bytes().unwrap(), baseline);

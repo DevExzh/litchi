@@ -6,7 +6,7 @@ use crate::numbers::formula_owner::{formula_owner_uuid_for_table, uuid_as_cfuuid
 const NATIVE_MERGE_FUNCTION_INDEX: u32 = 168;
 const NATIVE_MERGE_FUNCTION_ARGUMENTS: u32 = 1;
 
-pub(super) fn parse_regions(model: &TableModelArchive) -> Result<Vec<IWorkTableCellRegion>> {
+pub(super) fn parse_regions(model: &TableModelArchive) -> Result<Vec<Region>> {
     let Some(owner) = &model.merge_owner else {
         return Ok(Vec::new());
     };
@@ -35,7 +35,7 @@ pub(super) fn parse_regions(model: &TableModelArchive) -> Result<Vec<IWorkTableC
         validate_region_bounds(model, region)?;
         if let Some(overlap) = regions
             .iter()
-            .find(|candidate: &&IWorkTableCellRegion| candidate.overlaps(region))
+            .find(|candidate: &&Region| candidate.overlaps(region))
         {
             return Err(Error::InvalidFormat(format!(
                 "iWork merge regions {overlap:?} and {region:?} overlap"
@@ -49,7 +49,7 @@ pub(super) fn parse_regions(model: &TableModelArchive) -> Result<Vec<IWorkTableC
 pub(super) fn parse_merge_formula(
     formula: &tsce::FormulaArchive,
     expected_table: &tsp::CfuuidArchive,
-) -> Result<IWorkTableCellRegion> {
+) -> Result<Region> {
     let nodes = &formula.ast_node_array.ast_node;
     let [range_node, function_node] = nodes.as_slice() else {
         return Err(unsupported_merge_formula());
@@ -102,29 +102,25 @@ pub(super) fn parse_merge_formula(
         .checked_sub(rows.range_begin)
         .and_then(|difference| difference.checked_add(1))
         .ok_or_else(unsupported_merge_formula)?;
-    IWorkTableCellRegion::new(
-        rows.range_begin as usize,
-        columns.range_begin as usize,
-        row_count as usize,
-        column_count as usize,
+    Region::new(
+        rows.range_begin,
+        columns.range_begin,
+        row_count,
+        column_count,
     )
     .map_err(|_| unsupported_merge_formula())
 }
 
 pub(super) fn merge_formula(
-    region: IWorkTableCellRegion,
+    region: Region,
     table_id: tsp::CfuuidArchive,
 ) -> Result<tsce::FormulaArchive> {
     use tsce::ast_node_array_archive::AstNodeType;
     use tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractAbsoluteRangeArchive;
-    let begin_row = u32::try_from(region.row())
-        .map_err(|_| Error::ParseError("Table-cell merge row exceeds u32".to_owned()))?;
-    let end_row = u32::try_from(region.end_row())
-        .map_err(|_| Error::ParseError("Table-cell merge row exceeds u32".to_owned()))?;
-    let begin_column = u32::try_from(region.column())
-        .map_err(|_| Error::ParseError("Table-cell merge column exceeds u32".to_owned()))?;
-    let end_column = u32::try_from(region.end_column())
-        .map_err(|_| Error::ParseError("Table-cell merge column exceeds u32".to_owned()))?;
+    let begin_row = region.row();
+    let end_row = region.end_row();
+    let begin_column = region.column();
+    let end_column = region.end_column();
     let range_node = tsce::ast_node_array_archive::AstNodeArchive {
         ast_node_type: AstNodeType::ColonTractNode as i32,
         ast_cross_table_reference_extra_info: Some(
@@ -174,7 +170,7 @@ pub(super) fn merge_formula(
 /// unknown protobuf fields in native formulas byte-for-byte.
 pub(super) fn rewrite_formula_region(
     formula: &tsce::FormulaArchive,
-    region: IWorkTableCellRegion,
+    region: Region,
 ) -> Result<tsce::FormulaArchive> {
     let begin_row = merge_coordinate(region.row(), "row")?;
     let end_row = merge_coordinate(region.end_row(), "row")?;
@@ -200,9 +196,8 @@ pub(super) fn rewrite_formula_region(
     Ok(rewritten)
 }
 
-fn merge_coordinate(value: usize, axis: &str) -> Result<u32> {
-    u32::try_from(value)
-        .map_err(|_| Error::ParseError(format!("Table-cell merge {axis} exceeds u32")))
+fn merge_coordinate(value: u32, _axis: &str) -> Result<u32> {
+    Ok(value)
 }
 
 fn rewrite_absolute_range(
@@ -224,13 +219,8 @@ fn rewrite_absolute_range(
     Ok(())
 }
 
-pub(super) fn validate_region_bounds(
-    model: &TableModelArchive,
-    region: IWorkTableCellRegion,
-) -> Result<()> {
-    if region.end_row() >= model.number_of_rows as usize
-        || region.end_column() >= model.number_of_columns as usize
-    {
+pub(super) fn validate_region_bounds(model: &TableModelArchive, region: Region) -> Result<()> {
+    if region.end_row() >= model.number_of_rows || region.end_column() >= model.number_of_columns {
         return Err(Error::ParseError(format!(
             "Table-cell region {region:?} exceeds table dimensions {}x{}",
             model.number_of_rows, model.number_of_columns

@@ -2,7 +2,8 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::shapes::{DrawablePoint, DrawableSize, ShapePreset, shape_path_source};
+use crate::shapes::{DrawablePoint, DrawableSize, shape_path_source};
+use litchi_iwa_common::shape::path::Preset;
 
 const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
 const DEFAULT_TEXT_BOX_ROTATION_DEGREES: f32 = 0.0;
@@ -109,7 +110,7 @@ impl KeynoteEditor {
             styles.shape,
             geometry,
             storage,
-            shape_path_source(ShapePreset::Rectangle, size)?,
+            shape_path_source(Preset::Rectangle, size)?,
             true,
         )?;
 
@@ -140,8 +141,8 @@ impl KeynoteEditor {
             })?;
         let created_graph = verified.text_box_graph(slide_index, ids.drawable)?;
         if created.role != KeynoteSlideTextRole::TextBox
-            || created.storage.object_id != ids.storage
-            || created.storage.text != text
+            || created.storage.id.get() != ids.storage
+            || created.storage.storage.text() != text
             || created_graph.object_ids != ids.all()
             || verified.slide_text_box_geometry(slide_index, ids.drawable)? != geometry
         {
@@ -487,7 +488,7 @@ mod tests {
             .add_slide_text_box(0, "Built from typed objects", FIRST_POSITION, FIRST_SIZE)
             .unwrap();
         assert_eq!(created.role, KeynoteSlideTextRole::TextBox);
-        assert_eq!(created.storage.text, "Built from typed objects");
+        assert_eq!(created.storage.storage.text(), "Built from typed objects");
         assert_eq!(
             editor
                 .slide_text_box_geometry(0, created.drawable_object_id)
@@ -506,7 +507,7 @@ mod tests {
         let duplicate = editor
             .duplicate_slide_text_box(0, created.drawable_object_id, "Independent copy")
             .unwrap();
-        assert_ne!(duplicate.storage.object_id, created.storage.object_id);
+        assert_ne!(duplicate.storage.id, created.storage.id);
 
         let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let text_boxes = reopened
@@ -516,8 +517,11 @@ mod tests {
             .filter(|text| text.role == KeynoteSlideTextRole::TextBox)
             .collect::<Vec<_>>();
         assert_eq!(text_boxes.len(), 2);
-        assert_eq!(text_boxes[0].storage.text, "Updated independently");
-        assert_eq!(text_boxes[1].storage.text, "Independent copy");
+        assert_eq!(
+            text_boxes[0].storage.storage.text(),
+            "Updated independently"
+        );
+        assert_eq!(text_boxes[1].storage.storage.text(), "Independent copy");
 
         editor
             .remove_slide_text_box(0, duplicate.drawable_object_id)
@@ -525,7 +529,7 @@ mod tests {
         let removed = editor
             .remove_slide_text_box(0, created.drawable_object_id)
             .unwrap();
-        assert_eq!(removed.text.storage.text, "Updated independently");
+        assert_eq!(removed.text.storage.storage.text(), "Updated independently");
         assert_eq!(editor.to_bytes().unwrap(), baseline);
     }
 
@@ -597,7 +601,7 @@ mod tests {
         let created = editor
             .add_slide_text_box(0, "On a truly blank slide", FIRST_POSITION, FIRST_SIZE)
             .unwrap();
-        assert_eq!(created.storage.text, "On a truly blank slide");
+        assert_eq!(created.storage.storage.text(), "On a truly blank slide");
         assert_eq!(created.role, KeynoteSlideTextRole::TextBox);
     }
 
@@ -614,6 +618,6 @@ mod tests {
         assert_eq!(graph.object_ids.len(), 4);
         assert_eq!(graph.uuid_object_ids, graph.object_ids);
         assert_eq!(graph.drawable_id, created.drawable_object_id);
-        assert_eq!(graph.storage_id, created.storage.object_id);
+        assert_eq!(graph.storage_id, created.storage.id);
     }
 }

@@ -7,6 +7,7 @@ use crate::shapes::{
     DrawableProperties, drawable_properties, geometry_from_drawable, patch_drawable_geometry,
     patch_wrapped_drawable_properties,
 };
+use litchi_pages::movie::Options as PagesMovieOptions;
 
 const THEME_MESSAGE_TYPE: u32 = 10_001;
 const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
@@ -100,29 +101,14 @@ pub(super) struct BodyMovieGraph {
 }
 
 pub(super) fn movie_creation_values(options: PagesMovieOptions) -> Result<(DrawableGeometry, f32)> {
-    if !options.natural_size.width.is_finite()
-        || !options.natural_size.height.is_finite()
-        || options.natural_size.width <= 0.0
-        || options.natural_size.height <= 0.0
-    {
-        return Err(Error::ParseError(
-            "Pages movie natural size must be finite and greater than zero".to_owned(),
-        ));
-    }
-    let duration_seconds = options.duration.as_secs_f64();
-    if duration_seconds == 0.0 || duration_seconds > f64::from(f32::MAX) {
-        return Err(Error::ParseError(
-            "Pages movie duration must be greater than zero and fit in f32 seconds".to_owned(),
-        ));
-    }
     let geometry = DrawableGeometry {
-        position: Some(options.position),
-        size: Some(options.size),
+        position: Some(options.position()),
+        size: Some(options.size()),
         flags: Some(DEFAULT_DRAWABLE_FLAGS),
         angle: Some(DEFAULT_MOVIE_ROTATION_DEGREES),
     }
     .validate()?;
-    Ok((geometry, duration_seconds as f32))
+    Ok((geometry, options.duration_seconds()))
 }
 
 pub(super) fn movie_style_id(package: &IWorkPackage, root: &DocumentArchive) -> Result<u64> {
@@ -157,7 +143,7 @@ pub(super) fn movie_style_id(package: &IWorkPackage, root: &DocumentArchive) -> 
 pub(super) fn body_movie_infos(editor: &PagesEditor) -> Result<Vec<PagesMovieInfo>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -212,7 +198,7 @@ pub(super) fn body_movie_infos(editor: &PagesEditor) -> Result<Vec<PagesMovieInf
         }
         movies.push(movie_info(
             editor.package(),
-            editor.body_storage_id,
+            editor.body_storage_id.get(),
             drawable.identifier,
             entry.character_index,
         )?);
@@ -245,7 +231,7 @@ pub(super) fn body_movie_graph(
         })?;
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -304,7 +290,7 @@ pub(super) fn body_movie_graph(
             "Pages drawable {drawable_object_id} is not an ordinary file-backed movie"
         )));
     }
-    if movie.super_.parent.map(|parent| parent.identifier) != Some(editor.body_storage_id) {
+    if movie.super_.parent.map(|parent| parent.identifier) != Some(editor.body_storage_id.get()) {
         return Err(Error::InvalidFormat(format!(
             "Pages movie {drawable_object_id} is not owned by the body storage"
         )));
@@ -399,7 +385,7 @@ pub(super) fn body_movie_graph(
         Error::InvalidFormat(format!("Pages movie {drawable_object_id} is missing"))
     })?;
     let mut allowed_references = [
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         title.reference_id,
         caption.reference_id,
         style_id,
@@ -461,8 +447,8 @@ pub(super) fn body_movie_graph(
     data_references.sort_unstable();
     data_references.dedup();
     for identifier in [
-        info.movie_data_identifier,
-        info.poster_image_data_identifier,
+        info.movie_data_identifier.get(),
+        info.poster_image_data_identifier.get(),
     ] {
         if !data_references.contains(&(identifier, drawable_object_id)) {
             return Err(Error::InvalidFormat(format!(
@@ -498,16 +484,22 @@ fn movie_info(
             "Pages movie {identifier} is not owned by the body storage"
         )));
     }
-    let movie_data_identifier = movie
-        .movie_data
-        .ok_or_else(|| Error::InvalidFormat(format!("Pages movie {identifier} has no video data")))?
-        .identifier;
-    let poster_image_data_identifier = movie
-        .poster_image_data
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!("Pages movie {identifier} has no poster data"))
-        })?
-        .identifier;
+    let movie_data_identifier = MediaAssetId::try_from(
+        movie
+            .movie_data
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("Pages movie {identifier} has no video data"))
+            })?
+            .identifier,
+    )?;
+    let poster_image_data_identifier = MediaAssetId::try_from(
+        movie
+            .poster_image_data
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("Pages movie {identifier} has no poster data"))
+            })?
+            .identifier,
+    )?;
     let playback = media_playback_settings(&movie).map_err(|error| {
         Error::InvalidFormat(format!(
             "Pages movie {identifier} has invalid playback settings: {error}"

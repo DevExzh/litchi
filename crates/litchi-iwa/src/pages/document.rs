@@ -2,18 +2,19 @@
 //!
 //! Provides high-level API for working with Apple Pages documents.
 
+use std::num::NonZeroU64;
 use std::path::Path;
 use std::sync::Arc;
 
 use prost::Message;
 
-use super::section::{PagesSection, PagesSectionType};
+use crate::application::Application;
 use crate::bundle::{Bundle, BundleLimits};
 use crate::object_index::ObjectIndex;
 use crate::protobuf::{tp, tswp};
-use crate::registry::Application;
-use crate::text::{TextExtractor, TextStorage};
+use crate::text::{Storage, TextExtractor};
 use crate::{Error, Result};
+use litchi_iwa_graph::ObjectId;
 
 /// High-level interface for Pages documents
 #[derive(Debug, Clone)]
@@ -27,6 +28,8 @@ struct PagesDocumentState {
     bundle: Bundle,
     /// Object index for cross-referencing
     object_index: ObjectIndex,
+    /// Immutable Pages semantic snapshot built at ingress.
+    document: litchi_pages::Document,
 }
 
 impl PagesDocument {
@@ -46,15 +49,15 @@ impl PagesDocument {
     }
 
     /// Open a Pages document under caller-selected bundle ingress ceilings.
-    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
+    pub(crate) fn open_with_limits<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
         let bundle = Bundle::open_with_limits(path, limits)?;
 
-        // Verify this is a Pages document
-        Self::verify_application(&bundle)?;
-
         let object_index = ObjectIndex::from_bundle(&bundle)?;
+        let root = Self::root_body_reference(&bundle)?;
+        let document =
+            Self::decode_document(&bundle, &object_index, root, limits.max_iwa_stream_bytes())?;
 
-        Ok(Self::from_parts(bundle, object_index))
+        Ok(Self::from_parts(bundle, object_index, document))
     }
 
     /// Open a Pages document from raw bytes
@@ -75,22 +78,27 @@ impl PagesDocument {
 
     /// Open a Pages document from bytes under caller-selected ingress
     /// ceilings.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
+    pub(crate) fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
         let bundle = Bundle::from_bytes_with_limits(bytes, limits)?;
 
-        // Verify this is a Pages document
-        Self::verify_application(&bundle)?;
-
         let object_index = ObjectIndex::from_bundle(&bundle)?;
+        let root = Self::root_body_reference(&bundle)?;
+        let document =
+            Self::decode_document(&bundle, &object_index, root, limits.max_iwa_stream_bytes())?;
 
-        Ok(Self::from_parts(bundle, object_index))
+        Ok(Self::from_parts(bundle, object_index, document))
     }
 
-    fn from_parts(bundle: Bundle, object_index: ObjectIndex) -> Self {
+    fn from_parts(
+        bundle: Bundle,
+        object_index: ObjectIndex,
+        document: litchi_pages::Document,
+    ) -> Self {
         Self {
             state: Arc::new(PagesDocumentState {
                 bundle,
                 object_index,
+                document,
             }),
         }
     }
@@ -108,62 +116,128 @@ impl PagesDocument {
         Self::from_bytes(bytes)
     }
 
-    /// Create a Pages document from archive bytes under caller-selected
-    /// ingress ceilings.
-    pub fn from_archive_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, limits)
-    }
-
-    /// Verify that the bundle is a Pages document
-    fn verify_application(bundle: &Bundle) -> Result<()> {
-        if Self::root_document(bundle).is_none() {
-            return Err(Error::InvalidFormat(
-                "package does not contain a Pages root document".to_owned(),
-            ));
+    /// Decode the native root reference while keeping protobuf details below
+    /// the semantic Pages boundary.
+    fn root_body_reference(bundle: &Bundle) -> Result<Option<NonZeroU64>> {
+        let archive = bundle.get_archive("Index/Document.iwa").ok_or_else(|| {
+            Error::InvalidFormat("package does not contain a Pages root document".to_owned())
+        })?;
+        let object = archive
+            .object(1)
+            .ok_or_else(|| Error::InvalidFormat("Pages root object 1 is missing".to_owned()))?;
+        let mut payload = None;
+        for message in &object.messages {
+            if message.type_ == 10_000 && payload.replace(message.data.as_slice()).is_some() {
+                return Err(Error::InvalidFormat(
+                    "Pages root contains duplicate type-10000 payloads".to_owned(),
+                ));
+            }
         }
-        Ok(())
+        let payload = payload.ok_or_else(|| {
+            Error::InvalidFormat("Pages root has no type-10000 payload".to_owned())
+        })?;
+        let root = tp::DocumentArchive::decode(payload)?;
+        root.body_storage
+            .map(|reference| {
+                NonZeroU64::new(reference.identifier).ok_or_else(|| {
+                    Error::InvalidFormat("Pages root body-storage reference is zero".to_owned())
+                })
+            })
+            .transpose()
     }
 
-    fn root_document(bundle: &Bundle) -> Option<tp::DocumentArchive> {
-        bundle
-            .get_archive("Index/Document.iwa")?
-            .object(1)?
-            .messages
-            .iter()
-            .find(|message| message.type_ == 10000)
-            .and_then(|message| tp::DocumentArchive::decode(message.data.as_slice()).ok())
+    fn decode_document(
+        bundle: &Bundle,
+        object_index: &ObjectIndex,
+        body_identifier: Option<NonZeroU64>,
+        max_text_bytes: usize,
+    ) -> Result<litchi_pages::Document> {
+        let body = match body_identifier {
+            Some(identifier) => {
+                let object_id = ObjectId::new(identifier.get()).ok_or_else(|| {
+                    Error::InvalidFormat("Pages body-storage reference is zero".to_owned())
+                })?;
+                let object = object_index.resolve(bundle, object_id)?.ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Pages body storage object {} is missing",
+                        identifier
+                    ))
+                })?;
+                let storage =
+                    Self::decode_body_storage(&object.messages, identifier, max_text_bytes)?;
+                Some(litchi_pages::Body::with_max_text_bytes(
+                    vec![storage],
+                    max_text_bytes,
+                )?)
+            },
+            None => {
+                let mut extractor = TextExtractor::new();
+                extractor.extract_from_bundle(bundle)?;
+                let storages = extractor.storages().to_vec();
+                if storages.is_empty() {
+                    None
+                } else {
+                    Some(litchi_pages::Body::with_max_text_bytes(
+                        storages,
+                        max_text_bytes,
+                    )?)
+                }
+            },
+        };
+        let root = body.map_or_else(litchi_pages::Root::empty, litchi_pages::Root::with_body);
+        litchi_pages::Document::from_root_with_max_text_bytes(root, max_text_bytes)
+            .map_err(Into::into)
     }
 
-    fn body_storage(&self) -> Result<Option<TextStorage>> {
-        let Some(reference) =
-            Self::root_document(&self.state.bundle).and_then(|doc| doc.body_storage)
-        else {
-            return Ok(None);
-        };
-        let Some(object) = self
-            .state
-            .object_index
-            .resolve_ref_id(&self.state.bundle, reference.identifier)?
-        else {
-            return Err(Error::InvalidFormat(format!(
-                "Pages body storage object {} is missing",
-                reference.identifier
-            )));
-        };
-        let storage = object
-            .messages
-            .iter()
-            .filter(|message| message.type_ == 2001 || message.type_ == 2022)
-            .find_map(|message| tswp::StorageArchive::decode(message.data.as_slice()).ok())
-            .ok_or_else(|| {
+    fn decode_body_storage(
+        messages: &[crate::archive::RawMessage],
+        identifier: NonZeroU64,
+        max_text_bytes: usize,
+    ) -> Result<Storage> {
+        let mut payload = None;
+        for message in messages {
+            if matches!(message.type_, 2001 | 2022)
+                && payload
+                    .replace((message.type_, message.data.as_slice()))
+                    .is_some()
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "Pages body storage object {} contains duplicate text payloads",
+                    identifier
+                )));
+            }
+        }
+        let (message_type, payload) = payload.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Pages body object {} has no type-2001/type-2022 text payload",
+                identifier
+            ))
+        })?;
+        let storage = tswp::StorageArchive::decode(payload).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Pages body object {} type-{message_type} payload is invalid: {error}",
+                identifier
+            ))
+        })?;
+        let text_len = storage.text.iter().try_fold(0usize, |length, line| {
+            length.checked_add(line.len()).ok_or_else(|| {
                 Error::InvalidFormat(format!(
-                    "Pages body object {} has no text storage payload",
-                    reference.identifier
+                    "Pages body object {} text length overflows usize",
+                    identifier
                 ))
-            })?;
-        let mut result = TextStorage::from_text(storage.text.concat());
-        result.identifier = Some(reference.identifier);
-        Ok(Some(result))
+            })
+        })?;
+        if text_len > max_text_bytes {
+            return Err(Error::InvalidFormat(format!(
+                "Pages body object {} text exceeds {max_text_bytes} bytes",
+                identifier
+            )));
+        }
+        let mut text = String::with_capacity(text_len);
+        for line in &storage.text {
+            text.push_str(line);
+        }
+        Ok(Storage::from_text(text))
     }
 
     /// Extract all text content from the document
@@ -179,15 +253,14 @@ impl PagesDocument {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn text(&self) -> Result<String> {
-        let mut extractor = TextExtractor::new();
-        extractor.extract_from_bundle(&self.state.bundle)?;
-        Ok(extractor.get_text())
+        Ok(self.state.document.plain_text())
     }
 
-    /// Extract sections from the document
+    /// Borrow the immutable semantic sections in source order.
     ///
-    /// Pages documents are organized into sections. This method parses the
-    /// document structure and returns all sections with their content.
+    /// Pages documents are organized into sections. The document structure is
+    /// decoded at ingress, so this method only borrows the retained semantic
+    /// sections and performs no allocation or parsing.
     ///
     /// # Examples
     ///
@@ -195,64 +268,73 @@ impl PagesDocument {
     /// use litchi_iwa::pages::PagesDocument;
     ///
     /// let doc = PagesDocument::open("document.pages")?;
-    /// let sections = doc.sections()?;
+    /// let sections = doc.sections();
     ///
     /// for section in sections {
-    ///     println!("Section {}: {}", section.index, section.section_type.name());
+    ///     println!("Section {}: {}", section.index(), section.section_type().name());
     ///     println!("{}", section.plain_text());
     /// }
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn sections(&self) -> Result<Vec<PagesSection>> {
-        if let Some(storage) = self.body_storage()? {
-            let mut section = PagesSection::new(0, PagesSectionType::Body);
-            section.text_storages.push(storage);
-            return Ok(vec![section]);
-        }
-
-        // Older and page-layout packages may not expose a root body storage.
-        // Keep the conservative fallback, but only after verifying the Pages root.
-        let mut sections = Vec::new();
-        let mut section = PagesSection::new(0, PagesSectionType::Body);
-        let mut extractor = TextExtractor::new();
-        extractor.extract_from_bundle(&self.state.bundle)?;
-        section.text_storages.extend(
-            extractor
-                .storages()
-                .iter()
-                .filter(|s| !s.is_empty())
-                .cloned(),
-        );
-        if !section.is_empty() {
-            sections.push(section);
-        }
-        Ok(sections)
+    #[must_use]
+    pub fn sections(&self) -> &[litchi_pages::Section] {
+        self.state.document.sections()
     }
 
-    /// Get the underlying bundle
-    pub fn bundle(&self) -> &Bundle {
-        &self.state.bundle
+    /// Borrow the immutable Pages semantic snapshot without exposing package
+    /// archives, protobuf messages, or native object identifiers.
+    #[must_use]
+    pub fn semantic_document(&self) -> &litchi_pages::Document {
+        &self.state.document
     }
 
-    /// Return a bounded, deterministic validation report for this snapshot.
-    pub fn validation_report(&self) -> crate::bundle::BundleValidationReport {
-        self.state.bundle.validation_report()
+    /// Extract standard document metadata from the Pages package.
+    ///
+    /// The metadata is parsed while the bundle is opened and projected into
+    /// the format-neutral semantic type. Archive entries, plist containers,
+    /// and native identifiers remain private to the decoder.
+    #[must_use]
+    pub fn metadata(&self) -> litchi_core::Metadata {
+        let bundle_metadata = self.state.bundle.metadata();
+        let revision = bundle_metadata
+            .get_property_string("revision")
+            .or_else(|| bundle_metadata.latest_build_version().map(str::to_owned));
+        let content_status = bundle_metadata
+            .get_property_string("fileFormatVersion")
+            .map(|version| format!("Pages Format Version {version}"));
+        let identifier = bundle_metadata.document_identifier().map(str::to_owned);
+        let application = bundle_metadata
+            .detected_application()
+            .map(str::to_owned)
+            .unwrap_or_else(|| "Pages".to_owned());
+
+        litchi_core::Metadata {
+            title: bundle_metadata
+                .get_property_string("Title")
+                .or_else(|| bundle_metadata.get_property_string("kDocumentTitleKey")),
+            author: bundle_metadata
+                .get_property_string("Author")
+                .or_else(|| bundle_metadata.get_property_string("kDocumentAuthorKey"))
+                .or_else(|| bundle_metadata.get_property_string("kSFWPAuthorPropertyKey")),
+            keywords: bundle_metadata.get_property_string("Keywords"),
+            description: bundle_metadata.get_property_string("Comments"),
+            application: Some(application),
+            revision,
+            content_status,
+            identifier,
+            ..Default::default()
+        }
     }
 
     /// Validate this immutable snapshot without mutating it.
     pub fn validate(&self) -> Result<()> {
-        self.validation_report().as_result()
-    }
-
-    /// Get the object index
-    pub fn object_index(&self) -> &ObjectIndex {
-        &self.state.object_index
+        self.state.bundle.validate()
     }
 
     /// Get document statistics after resolving the document sections.
     pub fn stats(&self) -> Result<PagesDocumentStats> {
         let total_objects = self.state.object_index.object_count();
-        let section_count = self.sections()?.len();
+        let section_count = self.state.document.section_count();
 
         Ok(PagesDocumentStats {
             total_objects,
@@ -303,7 +385,7 @@ mod tests {
         );
 
         let doc = doc_result.unwrap();
-        assert!(!doc.object_index().object_ids().is_empty());
+        assert!(doc.stats().unwrap().total_objects > 0);
         assert!(doc.validate().is_ok());
     }
 
@@ -369,15 +451,39 @@ mod tests {
             .unwrap();
 
         let document = PagesDocument::from_bytes(&package.to_bytes().unwrap()).unwrap();
-        let sections = document.sections().unwrap();
+        let sections = document.sections();
         assert_eq!(sections.len(), 1);
-        assert_eq!(sections[0].text_storages[0].identifier, Some(body_id));
+        assert_eq!(
+            sections[0].text_storages()[0].text(),
+            "Pages body — café 東京 🚀"
+        );
         assert_eq!(sections[0].plain_text(), "Pages body — café 東京 🚀");
+        assert_eq!(document.text().unwrap(), "Pages body — café 東京 🚀");
+        assert_eq!(document.metadata().application.as_deref(), Some("Pages"));
 
-        let structured =
-            crate::structured::extract_sections(document.bundle(), document.object_index())
-                .unwrap();
+        let snapshot = document.snapshot();
+        assert!(std::ptr::eq(
+            document.semantic_document(),
+            snapshot.semantic_document()
+        ));
+        assert!(std::ptr::eq(
+            document.sections().as_ptr(),
+            document.semantic_document().sections().as_ptr()
+        ));
+        assert_eq!(
+            snapshot.semantic_document().text_len(),
+            sections[0].plain_text().len()
+        );
+
+        let structured = crate::structured::extract_sections(
+            &document.state.bundle,
+            &document.state.object_index,
+        )
+        .unwrap();
         assert_eq!(structured.len(), 1);
-        assert_eq!(structured[0].paragraphs, ["Pages body — café 東京 🚀"]);
+        assert_eq!(
+            structured[0].text_storages()[0].text(),
+            "Pages body — café 東京 🚀"
+        );
     }
 }

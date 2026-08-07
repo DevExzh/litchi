@@ -7,6 +7,7 @@ use crate::shapes::{
     DrawableGeometry, DrawableProperties, DrawableSize, drawable_properties,
     geometry_from_drawable, patch_drawable_geometry, patch_wrapped_drawable_properties,
 };
+use litchi_pages::audio::Options as PagesAudioOptions;
 
 const THEME_MESSAGE_TYPE: u32 = 10_001;
 const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
@@ -105,20 +106,14 @@ pub(super) struct BodyAudioGraph {
 }
 
 pub(super) fn audio_creation_values(options: PagesAudioOptions) -> Result<(DrawableGeometry, f32)> {
-    let duration_seconds = options.duration.as_secs_f64();
-    if duration_seconds == 0.0 || duration_seconds > f64::from(f32::MAX) {
-        return Err(Error::ParseError(
-            "Pages audio duration must be greater than zero and fit in f32 seconds".to_owned(),
-        ));
-    }
     let geometry = DrawableGeometry {
-        position: Some(options.position),
+        position: Some(options.position()),
         size: Some(ZERO_SIZE),
         flags: Some(DEFAULT_DRAWABLE_FLAGS),
         angle: Some(DEFAULT_AUDIO_ROTATION_DEGREES),
     }
     .validate()?;
-    Ok((geometry, duration_seconds as f32))
+    Ok((geometry, options.duration_seconds()))
 }
 
 pub(super) fn audio_style_id(package: &IWorkPackage, root: &DocumentArchive) -> Result<u64> {
@@ -153,7 +148,7 @@ pub(super) fn audio_style_id(package: &IWorkPackage, root: &DocumentArchive) -> 
 pub(super) fn body_audio_infos(editor: &PagesEditor) -> Result<Vec<PagesAudioInfo>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -208,7 +203,7 @@ pub(super) fn body_audio_infos(editor: &PagesEditor) -> Result<Vec<PagesAudioInf
         }
         audio.push(audio_info(
             editor.package(),
-            editor.body_storage_id,
+            editor.body_storage_id.get(),
             drawable.identifier,
             entry.character_index,
         )?);
@@ -241,7 +236,7 @@ pub(super) fn body_audio_graph(
         })?;
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -300,7 +295,7 @@ pub(super) fn body_audio_graph(
             "Pages drawable {drawable_object_id} is not ordinary file-backed audio"
         )));
     }
-    if audio.super_.parent.map(|parent| parent.identifier) != Some(editor.body_storage_id) {
+    if audio.super_.parent.map(|parent| parent.identifier) != Some(editor.body_storage_id.get()) {
         return Err(Error::InvalidFormat(format!(
             "Pages audio {drawable_object_id} is not owned by the body storage"
         )));
@@ -397,7 +392,7 @@ pub(super) fn body_audio_graph(
     let drawable = archive.object(drawable_object_id).ok_or_else(|| {
         Error::InvalidFormat(format!("Pages audio {drawable_object_id} is missing"))
     })?;
-    let mut allowed_references = [editor.body_storage_id, title_id, caption_id, style_id]
+    let mut allowed_references = [editor.body_storage_id.get(), title_id, caption_id, style_id]
         .into_iter()
         .collect::<HashSet<_>>();
     allowed_references.extend(audio.super_.comment.map(|reference| reference.identifier));
@@ -455,7 +450,7 @@ pub(super) fn body_audio_graph(
     }
     data_references.sort_unstable();
     data_references.dedup();
-    if !data_references.contains(&(info.audio_data_identifier, drawable_object_id)) {
+    if !data_references.contains(&(info.audio_data_identifier.get(), drawable_object_id)) {
         return Err(Error::InvalidFormat(format!(
             "Pages audio {drawable_object_id} data {} is missing from archive metadata",
             info.audio_data_identifier
@@ -490,12 +485,14 @@ fn audio_info(
             "Pages audio {identifier} is not owned by the body storage"
         )));
     }
-    let audio_data_identifier = audio
-        .movie_data
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!("Pages audio {identifier} has no data reference"))
-        })?
-        .identifier;
+    let audio_data_identifier = MediaAssetId::try_from(
+        audio
+            .movie_data
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("Pages audio {identifier} has no data reference"))
+            })?
+            .identifier,
+    )?;
     let position = geometry_from_drawable(&audio.super_)?
         .position
         .ok_or_else(|| Error::InvalidFormat(format!("Pages audio {identifier} has no position")))?;

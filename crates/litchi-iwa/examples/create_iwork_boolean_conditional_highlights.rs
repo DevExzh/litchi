@@ -3,13 +3,11 @@
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder, NumbersEditor};
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
-use litchi_iwa::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
-    TableCellConditionalHighlightStyle,
-};
+use litchi_iwa_common::table::cell::conditional_highlight::{Condition, Rule, Style};
+use litchi_numbers::cell::Value as CellValue;
 
 const BOOLEAN_ROW: usize = 1;
 const TRUE_COLUMN: usize = 1;
@@ -28,18 +26,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn boolean_rules() -> Result<[TableCellConditionalHighlightRule; 2], Box<dyn std::error::Error>> {
+fn boolean_rules() -> Result<[Rule; 2], Box<dyn std::error::Error>> {
     let red = RgbaColor::new(0.96, 0.22, 0.18, 1.0, RgbColorSpace::Srgb)?;
-    let style = TableCellConditionalHighlightStyle::new(Some(red), None, true)?;
+    let style = Style::new(Some(red), None, true)?;
     Ok([
-        TableCellConditionalHighlightRule::new(
-            TableCellConditionalHighlightCondition::BooleanIsTrue,
-            style,
-        ),
-        TableCellConditionalHighlightRule::new(
-            TableCellConditionalHighlightCondition::BooleanIsFalse,
-            style,
-        ),
+        Rule::new(Condition::BooleanIsTrue, style),
+        Rule::new(Condition::BooleanIsFalse, style),
     ])
 }
 

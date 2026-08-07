@@ -3,24 +3,25 @@
 use std::env;
 
 use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeTextAutoSize, ShapeTextInset,
-    ShapeTextInsets, ShapeTextLayout, ShapeTextVerticalAlignment, StrokePattern, StrokeWidth,
-};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Width};
+use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 use litchi_iwa::text::{
-    DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
-    ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
-    ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
-    ParagraphFlow, ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel,
-    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphStyleName,
+    Alignment, Background, Border, Borders, IndentPoints, Indents, LineSpacing, LineSpacingPoints,
+    Outline, ParagraphBackground, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval,
+    ParagraphFlow, ParagraphHyphenation, ParagraphList, ParagraphListLevel, ParagraphStyleName,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap, TextColumns,
-    TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget,
-    TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript,
-    TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphTabStops, ParagraphWritingDirection, Shadow, Spacing, SpacingPoints,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextCommentBody,
+    TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage,
+    TextLigatures, TextPointSize, TextRange, TextScript, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
+use litchi_iwa_text::columns::{Columns, Count, Gap};
+use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
+use litchi_iwa_text::paragraph::drop_cap::{
+    CharacterCount, DropCap, LineCount, Outdent, Padding, RaisedLines,
+};
+use litchi_iwa_text::position::TextPosition;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -38,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .sheet_name("Scratch Sheet")
         .table_name("Scratch Table")
         .build()?;
-    let sheet_id = editor.sheets()?[0].object_id;
+    let sheet_id = editor.sheets()?[0].id();
     let created = editor.add_sheet_text_box(
         sheet_id,
         &text,
@@ -51,18 +52,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_text_box_columns(
         sheet_id,
         created.drawable_object_id,
-        &TextColumns::equal(
-            TextColumnCount::new(3)?,
-            Some(TextColumnGap::from_points(12.0)?),
-        ),
+        &Columns::equal(Count::new(3)?, Some(Gap::from_points(12.0)?)),
     )?;
     editor.set_sheet_text_box_text_layout(
         sheet_id,
         created.drawable_object_id,
-        ShapeTextLayout::new(
-            ShapeTextVerticalAlignment::Bottom,
-            ShapeTextInsets::uniform(ShapeTextInset::from_points(6.0)?),
-            ShapeTextAutoSize::Fixed,
+        Layout::new(
+            VerticalAlignment::Bottom,
+            Insets::uniform(Inset::from_points(6.0)?),
+            AutoSize::Fixed,
         ),
     )?;
     editor.set_sheet_text_box_text_style(
@@ -113,17 +111,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_text_box_text_outline(
         sheet_id,
         created.drawable_object_id,
-        TextOutline::standard(),
+        Outline::standard(),
     )?;
     editor.set_sheet_text_box_text_shadow(
         sheet_id,
         created.drawable_object_id,
-        TextShadow::standard(),
+        Shadow::standard(),
     )?;
     editor.set_sheet_text_box_text_background(
         sheet_id,
         created.drawable_object_id,
-        TextBackground::Color(RgbaColor::new(0.74, 0.95, 0.78, 1.0, RgbColorSpace::Srgb)?),
+        Background::Color(RgbaColor::new(0.74, 0.95, 0.78, 1.0, RgbColorSpace::Srgb)?),
     )?;
     editor.set_sheet_text_box_paragraph_background(
         sheet_id,
@@ -139,12 +137,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_text_box_paragraph_borders(
         sheet_id,
         created.drawable_object_id,
-        ParagraphBorders::Bordered(ParagraphBorder::new(
+        Borders::Bordered(Border::new(
             RgbaColor::black(),
-            StrokeWidth::new(3.0)?,
-            StrokePattern::Solid,
-            ParagraphBorderSides::ALL,
-            ParagraphBorderOffset::from_points(9.0)?,
+            Width::new(3.0)?,
+            Pattern::Solid,
+            BorderSides::ALL,
+            BorderOffset::from_points(9.0)?,
             true,
         )?),
     )?;
@@ -166,28 +164,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_text_box_paragraph_alignment(
         sheet_id,
         created.drawable_object_id,
-        TextAlignment::Right,
+        Alignment::Right,
     )?;
     editor.set_sheet_text_box_paragraph_line_spacing(
         sheet_id,
         created.drawable_object_id,
-        ParagraphLineSpacing::Exactly(ParagraphLineSpacingPoints::from_points(24.0)?),
+        LineSpacing::Exactly(LineSpacingPoints::from_points(24.0)?),
     )?;
     editor.set_sheet_text_box_paragraph_spacing(
         sheet_id,
         created.drawable_object_id,
-        ParagraphSpacing::new(
-            ParagraphSpacingPoints::from_points(11.0)?,
-            ParagraphSpacingPoints::from_points(17.0)?,
+        Spacing::new(
+            SpacingPoints::from_points(11.0)?,
+            SpacingPoints::from_points(17.0)?,
         ),
     )?;
     editor.set_sheet_text_box_paragraph_indents(
         sheet_id,
         created.drawable_object_id,
-        ParagraphIndents::new(
-            ParagraphIndentPoints::from_points(23.0)?,
-            ParagraphIndentPoints::from_points(13.0)?,
-            ParagraphIndentPoints::from_points(2.833_333_3)?,
+        Indents::new(
+            IndentPoints::from_points(23.0)?,
+            IndentPoints::from_points(13.0)?,
+            IndentPoints::from_points(2.833_333_3)?,
         ),
     )?;
     editor.set_sheet_text_box_paragraph_list(
@@ -218,13 +216,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         editor.add_sheet_text_box_comment_reply(
             sheet_id,
             created.drawable_object_id,
-            comment.id,
+            comment.id(),
             TextCommentReplyBody::new("Created reply by litchi-iwa")?,
         )?;
     }
     if let Some(newline) = text.find('\n') {
         let start_index = text[..=newline].encode_utf16().count();
-        let start = ParagraphStart::from_utf16_index(start_index)?;
+        let start = TextPosition::from_utf16_index(start_index)?;
         editor.set_sheet_text_box_paragraph_list_level(
             sheet_id,
             created.drawable_object_id,
@@ -254,11 +252,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_text_box_paragraph_drop_cap(
         sheet_id,
         created.drawable_object_id,
-        ParagraphStart::ZERO,
-        ParagraphDropCap::new(DropCapLineCount::new(5)?, DropCapCharacterCount::new(1)?)
-            .with_raised_lines(DropCapRaisedLines::new(2)?)
-            .with_padding(DropCapPadding::from_points(4.0)?)
-            .with_outdent(DropCapOutdent::from_ratio(0.10)?),
+        TextPosition::ZERO,
+        DropCap::new(LineCount::new(5)?, CharacterCount::new(1)?)
+            .with_raised_lines(RaisedLines::new(2)?)
+            .with_padding(Padding::from_points(4.0)?)
+            .with_outdent(Outdent::from_ratio(0.10)?),
     )?;
     editor.set_sheet_text_box_paragraph_tab_stops(
         sheet_id,
@@ -324,7 +322,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_text_box_paragraph_alignment(
         sheet_id,
         named_style_box.drawable_object_id,
-        TextAlignment::Center,
+        Alignment::Center,
     )?;
     editor.redefine_applied_sheet_text_box_named_paragraph_style(
         sheet_id,
@@ -344,7 +342,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.save(output)?;
     println!(
         "created three-column Numbers text box {} with storage {} on sheet {}",
-        created.drawable_object_id, created.storage.object_id, sheet_id
+        created.drawable_object_id, created.storage.id, sheet_id
     );
     Ok(())
 }

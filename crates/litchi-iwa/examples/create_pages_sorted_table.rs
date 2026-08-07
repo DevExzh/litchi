@@ -1,11 +1,11 @@
 //! Create and physically sort a plain-text Pages table without an input document.
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 use std::env;
 
 use litchi_iwa::pages::{
-    PagesCellValue, PagesDocumentBuilder, PagesTableCellUpdate, PagesTableHeaderCount,
-    PagesTableHeaderSettings, PagesTableSortColumnIndex, PagesTableSortDirection,
-    PagesTableSortOrder, PagesTableSortRule,
+    PagesCellValue, PagesDocumentBuilder, PagesTableCellUpdate, PagesTableSortColumnIndex,
+    PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRule,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,8 +19,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_header_settings(
         table_id,
-        PagesTableHeaderSettings {
-            header_rows: Some(PagesTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;
@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let moved_reply_id = editor
         .table_cell_comment_replies(table_id, 4, 1)?
         .first()
-        .map(|reply| reply.storage_object_id);
+        .map(|reply| reply.storage_id.get());
     if moved.comment.text != "Zebra comment follows its sorted row"
         || moved_reply_id != Some(reply_id)
     {

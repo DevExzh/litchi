@@ -2,7 +2,8 @@
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::shapes::{DrawablePoint, DrawableSize, ShapePreset, shape_path_source};
+use crate::shapes::{DrawablePoint, DrawableSize, shape_path_source};
+use litchi_iwa_common::shape::path::Preset;
 
 const NUMBERS_THEME_MESSAGE_TYPE: u32 = 12_009;
 const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
@@ -99,7 +100,7 @@ impl NumbersEditor {
             styles.shape,
             geometry,
             storage,
-            shape_path_source(ShapePreset::Rectangle, size)?,
+            shape_path_source(Preset::Rectangle, size)?,
             true,
         )?;
 
@@ -129,8 +130,8 @@ impl NumbersEditor {
                 Error::InvalidFormat("Numbers text-box creation failed validation".to_owned())
             })?;
         let created_graph = numbers_text_box_graph(verified.package(), sheet_id, ids.drawable)?;
-        if created.storage.object_id != ids.storage
-            || created.storage.text != text
+        if created.storage.id.get() != ids.storage
+            || created.storage.storage.text() != text
             || created_graph.object_ids != ids.all()
             || verified.sheet_text_box_geometry(sheet_id, ids.drawable)? != geometry
         {
@@ -448,7 +449,7 @@ mod tests {
                 FIRST_SIZE,
             )
             .unwrap();
-        assert_eq!(created.storage.text, "Built from typed objects");
+        assert_eq!(created.storage.storage.text(), "Built from typed objects");
         assert_eq!(
             editor
                 .sheet_text_box_geometry(sheet_id, created.drawable_object_id)
@@ -471,13 +472,16 @@ mod tests {
         let duplicate = editor
             .duplicate_sheet_text_box(sheet_id, created.drawable_object_id, "Independent copy")
             .unwrap();
-        assert_ne!(duplicate.storage.object_id, created.storage.object_id);
+        assert_ne!(duplicate.storage.id, created.storage.id);
 
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let text_boxes = reopened.sheet_text_boxes(sheet_id).unwrap();
         assert_eq!(text_boxes.len(), 2);
-        assert_eq!(text_boxes[0].storage.text, "Updated independently");
-        assert_eq!(text_boxes[1].storage.text, "Independent copy");
+        assert_eq!(
+            text_boxes[0].storage.storage.text(),
+            "Updated independently"
+        );
+        assert_eq!(text_boxes[1].storage.storage.text(), "Independent copy");
 
         editor
             .remove_sheet_text_box(sheet_id, duplicate.drawable_object_id)
@@ -485,7 +489,10 @@ mod tests {
         let removed = editor
             .remove_sheet_text_box(sheet_id, created.drawable_object_id)
             .unwrap();
-        assert_eq!(removed.text_box.storage.text, "Updated independently");
+        assert_eq!(
+            removed.text_box.storage.storage.text(),
+            "Updated independently"
+        );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
     }
 
@@ -535,11 +542,11 @@ mod tests {
         assert_eq!(graph.object_ids.len(), 4);
         assert_eq!(graph.uuid_object_ids, graph.object_ids);
         assert_eq!(graph.drawable_id, created.drawable_object_id);
-        assert_eq!(graph.storage_id, created.storage.object_id);
+        assert_eq!(graph.storage_id, created.storage.id);
 
         let archive = editor.package().archive(&graph.archive_name).unwrap();
         let storage = tswp::StorageArchive::decode(
-            archive.object(graph.storage_id).unwrap().messages[0]
+            archive.object(graph.storage_id.get()).unwrap().messages[0]
                 .data
                 .as_slice(),
         )

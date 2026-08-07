@@ -2,17 +2,21 @@
 
 use std::collections::HashMap;
 
+use litchi_iwa_common::media::Type as MediaType;
+
 use super::*;
-use crate::ImageAdjustments;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
 use crate::image_adjustments::replace_image_adjustments;
 use crate::image_caption::{CaptionObjectIds, DrawableCaptionKind};
+use crate::media::MediaAssetId;
 use crate::shapes::{
-    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
+    DrawableFlipAxis, DrawableGeometry, DrawableProperties, DrawableSize, flip_drawable_geometry,
+    offset_drawable_geometry, restore_drawable_original_size,
 };
+use litchi_iwa_common::shape::image::ImageAdjustments;
+use litchi_keynote::slide::image::Options as ImageOptions;
 
 mod graph;
 
@@ -44,35 +48,6 @@ pub struct KeynoteSlideImageInfo {
     pub natural_size: Option<DrawableSize>,
 }
 
-/// Typed layout metadata for a newly created Keynote slide image.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct KeynoteSlideImageOptions {
-    /// Top-left position on the slide, in points.
-    pub position: DrawablePoint,
-    /// Displayed image size on the slide, in points.
-    pub size: DrawableSize,
-    /// Untransformed media dimensions reported to Keynote, in points.
-    pub natural_size: DrawableSize,
-}
-
-impl KeynoteSlideImageOptions {
-    /// Create options whose displayed and natural dimensions are identical.
-    pub const fn new(position: DrawablePoint, size: DrawableSize) -> Self {
-        Self {
-            position,
-            size,
-            natural_size: size,
-        }
-    }
-
-    /// Set media dimensions independently of the displayed size.
-    #[must_use]
-    pub const fn with_natural_size(mut self, natural_size: DrawableSize) -> Self {
-        self.natural_size = natural_size;
-        self
-    }
-}
-
 /// Result of removing one slide-owned image and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedKeynoteSlideImage {
@@ -97,7 +72,7 @@ impl KeynoteEditor {
         slide_index: usize,
         preferred_filename: &str,
         data: &[u8],
-        options: KeynoteSlideImageOptions,
+        options: ImageOptions,
     ) -> Result<KeynoteSlideImageInfo> {
         let geometry = image_creation_values(options)?;
         let context = image_creation_context(self, slide_index)?;
@@ -105,7 +80,7 @@ impl KeynoteEditor {
 
         let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
         let asset = media.insert_unreferenced(preferred_filename, data)?;
-        if asset.media_type != crate::MediaType::Image {
+        if asset.media_type != MediaType::Image {
             return Err(Error::ParseError(format!(
                 "Keynote slide images require image data, not {}",
                 asset.media_type.name()
@@ -116,9 +91,9 @@ impl KeynoteEditor {
             ids,
             context.slide_id,
             context.style_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             geometry,
-            options.natural_size,
+            options.natural_size(),
         )?;
         staged.update_archive(&context.archive_name, |archive| {
             for object in objects {
@@ -137,7 +112,7 @@ impl KeynoteEditor {
         add_component_data_reference(
             &mut staged,
             context.component_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             ids.drawable,
         )?;
         add_component_external_reference(
@@ -158,12 +133,12 @@ impl KeynoteEditor {
             })?;
         let created_graph = image_graph(&verified, slide_index, ids.drawable)?;
         if created.kind != KeynoteSlideImageKind::File
-            || created.image_data_identifier != asset.data_identifier
+            || created.image_data_identifier != asset.data_identifier.get()
             || created.geometry != geometry
-            || created.original_size != Some(options.natural_size)
-            || created.natural_size != Some(options.natural_size)
+            || created.original_size != Some(options.natural_size())
+            || created.natural_size != Some(options.natural_size())
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(asset.data_identifier)? != data
+            || verified.extract_media(asset.data_identifier.get())? != data
         {
             return Err(Error::InvalidFormat(
                 "Keynote image creation produced an inconsistent graph".to_owned(),
@@ -459,7 +434,7 @@ impl KeynoteEditor {
                 clone_slide_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
+                Ok(archive.insert_object(cloned)?)
             })?;
         }
 
@@ -566,7 +541,9 @@ impl KeynoteEditor {
     ) -> Result<RemovedKeynoteSlideImage> {
         let source = require_file_image(self, slide_index, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
+            drawable_object_id,
+        )?)?;
         let mut staged = comments.into_package();
         patch_slide_drawable_references(
             &mut staged,
@@ -604,12 +581,13 @@ impl KeynoteEditor {
             .map(|(data, _)| *data)
             .collect::<HashSet<_>>();
         for identifier in data_identifiers {
+            let identifier = MediaAssetId::try_from(identifier)?;
             if media
                 .asset(identifier)
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier);
+                removed_data_identifiers.push(identifier.get());
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -623,7 +601,7 @@ impl KeynoteEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_assets
                     .iter()
-                    .any(|asset| asset.data_identifier == *identifier)
+                    .any(|asset| asset.data_identifier.get() == *identifier)
             })
         {
             return Err(Error::InvalidFormat(
@@ -649,7 +627,7 @@ fn set_slide_image_caption(
     let slot = image_caption_slot(editor, slide_index, drawable_object_id, kind)?;
     let staged = if let Some(storage_id) = slot.storage_id {
         let mut text_editor = IWorkTextEditor::from_package(editor.package().clone());
-        text_editor.set_text(storage_id, text)?;
+        text_editor.set_text(crate::text::native_storage_id(storage_id)?, text)?;
         text_editor.into_package()
     } else {
         let context = image_creation_context(editor, slide_index)?;
@@ -749,7 +727,8 @@ mod tests {
 
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
-    use crate::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
+    use crate::shapes::DrawablePoint;
+    use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
     const IMAGE_SIZE: DrawableSize = DrawableSize {
@@ -761,9 +740,11 @@ mod tests {
         height: 480.0,
     };
 
-    fn options() -> KeynoteSlideImageOptions {
-        KeynoteSlideImageOptions::new(IMAGE_POSITION, IMAGE_SIZE)
+    fn options() -> ImageOptions {
+        ImageOptions::new(IMAGE_POSITION, IMAGE_SIZE)
+            .unwrap()
             .with_natural_size(NATURAL_IMAGE_SIZE)
+            .unwrap()
     }
 
     #[test]
@@ -1186,18 +1167,12 @@ mod tests {
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
-        assert!(
-            editor
-                .add_slide_image(
-                    0,
-                    "lena.png",
-                    &original,
-                    options().with_natural_size(DrawableSize {
-                        width: 0.0,
-                        height: NATURAL_IMAGE_SIZE.height,
-                    }),
-                )
-                .is_err()
+        assert_eq!(
+            options().with_natural_size(DrawableSize {
+                width: 0.0,
+                height: NATURAL_IMAGE_SIZE.height,
+            }),
+            Err(litchi_keynote::Error::InvalidImageSize)
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 

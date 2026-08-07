@@ -6,7 +6,9 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use litchi_iwa_common::chart::number_format::LabelAffixes;
+
+use crate::charts::Kind;
 use crate::charts::number_format::{DualNumberFormatFields, patch_dual_affixes, read_dual_affixes};
 use crate::charts::series_non_style::{
     NewChartSeriesNonStyleBase, chart_series_non_style_values,
@@ -15,8 +17,6 @@ use crate::charts::series_non_style::{
 };
 use crate::protobuf::tsch;
 use crate::{Error, IWorkPackage, Result};
-
-pub use crate::charts::number_format::ChartLabelAffixes as ChartSeriesValueLabelAffixes;
 
 const SERIES_NUMBER_FORMAT_FIELDS: DualNumberFormatFields = DualNumberFormatFields {
     legacy: 21,
@@ -31,9 +31,9 @@ pub(crate) fn chart_series_value_label_affixes(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
-) -> Result<Vec<ChartSeriesValueLabelAffixes>> {
+) -> Result<Vec<LabelAffixes>> {
     ensure_supported_kind(kind)?;
     chart_series_non_style_values(
         package,
@@ -41,7 +41,7 @@ pub(crate) fn chart_series_value_label_affixes(
         drawable_object_id,
         drawable_label,
         series_count,
-        ChartSeriesValueLabelAffixes::default(),
+        LabelAffixes::default(),
         read_affixes,
     )
 }
@@ -52,8 +52,8 @@ pub(crate) fn set_chart_series_value_label_affixes(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
-    expected: &[ChartSeriesValueLabelAffixes],
+    kind: Kind,
+    expected: &[LabelAffixes],
 ) -> Result<()> {
     ensure_supported_kind(kind)?;
     set_chart_series_non_style_values(
@@ -64,14 +64,14 @@ pub(crate) fn set_chart_series_value_label_affixes(
         "series value-label affixes",
         NewChartSeriesNonStyleBase::Styled,
         expected,
-        ChartSeriesValueLabelAffixes::default(),
+        LabelAffixes::default(),
         read_affixes,
         patch_affixes,
     )
 }
 
-fn ensure_supported_kind(kind: ChartKind) -> Result<()> {
-    if matches!(kind, ChartKind::Undefined | ChartKind::Unsupported(_)) {
+fn ensure_supported_kind(kind: Kind) -> Result<()> {
+    if kind == Kind::Undefined || kind.is_unsupported() {
         return Err(Error::InvalidFormat(format!(
             "chart kind {kind:?} has no supported series value-label affixes"
         )));
@@ -79,7 +79,7 @@ fn ensure_supported_kind(kind: ChartKind) -> Result<()> {
     Ok(())
 }
 
-fn read_affixes(data: &[u8]) -> Result<ChartSeriesValueLabelAffixes> {
+fn read_affixes(data: &[u8]) -> Result<LabelAffixes> {
     let extension = generated_chart_series_non_style_extension(data)?;
     if let Some(extension) = extension {
         tsch::generated::ChartSeriesNonStyleArchive::decode(extension)?;
@@ -87,7 +87,7 @@ fn read_affixes(data: &[u8]) -> Result<ChartSeriesValueLabelAffixes> {
     read_dual_affixes(extension, SERIES_NUMBER_FORMAT_FIELDS, FORMAT_CONTEXT)
 }
 
-fn patch_affixes(data: &[u8], expected: &ChartSeriesValueLabelAffixes) -> Result<Vec<u8>> {
+fn patch_affixes(data: &[u8], expected: &LabelAffixes) -> Result<Vec<u8>> {
     let existing_extension = generated_chart_series_non_style_extension(data)?;
     if existing_extension.is_none() && expected.is_empty() {
         return Ok(data.to_vec());
@@ -98,7 +98,7 @@ fn patch_affixes(data: &[u8], expected: &ChartSeriesValueLabelAffixes) -> Result
         extension,
         SERIES_NUMBER_FORMAT_FIELDS,
         expected,
-        crate::charts::ChartNumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
+        crate::charts::NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
         FORMAT_CONTEXT,
     )?
     else {
@@ -121,11 +121,11 @@ fn patch_affixes(data: &[u8], expected: &ChartSeriesValueLabelAffixes) -> Result
 mod tests {
     use super::*;
     use crate::charts::series_non_style::canonical_empty_chart_series_non_style_data;
-    use crate::charts::{ChartDecimalPlaces, ChartNegativeStyle, ChartNumberFormat};
+    use crate::charts::{DecimalPlaces, NegativeStyle, NumberFormat};
     use crate::wire::{append_varint_field, parse_wire_fields};
 
-    fn custom_affixes() -> ChartSeriesValueLabelAffixes {
-        ChartSeriesValueLabelAffixes::new("$", " net")
+    fn custom_affixes() -> LabelAffixes {
+        LabelAffixes::new("$", " net").unwrap()
     }
 
     #[test]
@@ -146,7 +146,7 @@ mod tests {
                 parse_wire_fields(extension)
                     .unwrap()
                     .iter()
-                    .filter(|wire| wire.number == field)
+                    .filter(|wire| wire.number() == field)
                     .count(),
                 1
             );
@@ -162,9 +162,9 @@ mod tests {
         let original =
             patch_chart_series_non_style_extension(&original, false, Some(extension.as_slice()))
                 .unwrap();
-        let number_format = ChartNumberFormat::new(
-            ChartDecimalPlaces::fixed(3).unwrap(),
-            ChartNegativeStyle::Parentheses,
+        let number_format = NumberFormat::new(
+            DecimalPlaces::fixed(3).unwrap(),
+            NegativeStyle::Parentheses,
             false,
         );
         let extension = generated_chart_series_non_style_extension(&original)
@@ -174,7 +174,7 @@ mod tests {
             extension,
             SERIES_NUMBER_FORMAT_FIELDS,
             number_format,
-            ChartNumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
+            NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
             FORMAT_CONTEXT,
         )
         .unwrap()
@@ -191,7 +191,7 @@ mod tests {
             crate::charts::number_format::read_dual_number_format(
                 Some(extension),
                 SERIES_NUMBER_FORMAT_FIELDS,
-                ChartNumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
+                NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
                 FORMAT_CONTEXT,
             )
             .unwrap(),
@@ -201,7 +201,7 @@ mod tests {
             parse_wire_fields(extension)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == UNKNOWN_FIELD)
+                .any(|field| field.number() == UNKNOWN_FIELD)
         );
     }
 
@@ -209,7 +209,7 @@ mod tests {
     fn empty_affixes_do_not_materialize_sparse_storage() {
         let original = canonical_empty_chart_series_non_style_data().unwrap();
         assert_eq!(
-            patch_affixes(&original, &ChartSeriesValueLabelAffixes::default()).unwrap(),
+            patch_affixes(&original, &LabelAffixes::default()).unwrap(),
             original
         );
     }

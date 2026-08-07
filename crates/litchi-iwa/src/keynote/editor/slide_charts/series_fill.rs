@@ -2,7 +2,7 @@
 
 use super::series_value_labels::value_label_series_count;
 use super::*;
-use crate::charts::ChartSeriesIndex;
+use crate::charts::Index;
 use crate::charts::series_fill::{
     chart_series_fills as read_native_fills, reset_chart_series_fill as reset_native_fill,
     set_chart_series_fills as set_native_fills,
@@ -25,7 +25,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ShapeFill> {
         let fills = slide_chart_series_fills(self, slide_index, drawable_object_id)?;
         fills.get(series.zero_based()).cloned().ok_or_else(|| {
@@ -48,7 +48,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         fill: &ShapeFill,
     ) -> Result<()> {
         let mut fills = slide_chart_series_fills(self, slide_index, drawable_object_id)?;
@@ -68,7 +68,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ShapeFill> {
         reset_slide_chart_series_fill(self, slide_index, drawable_object_id, series)
     }
@@ -79,7 +79,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         preferred_filename: &str,
         data: &[u8],
         technique: ShapeImageFillTechnique,
@@ -162,7 +162,7 @@ fn reset_slide_chart_series_fill(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
 ) -> Result<ShapeFill> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
@@ -197,7 +197,7 @@ fn set_slide_chart_series_image_fill(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     preferred_filename: &str,
     data: &[u8],
     technique: ShapeImageFillTechnique,
@@ -246,7 +246,7 @@ fn set_slide_chart_series_image_fill(
 fn series_fill_index_error(
     application: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

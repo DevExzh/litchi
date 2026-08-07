@@ -2,18 +2,37 @@
 
 use super::*;
 use crate::archive::RawMessage;
-use crate::numbers::CellValue;
 use crate::pages::PagesDocumentBuilder;
-use crate::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
-    TableCellConditionalHighlightStyle, TableCellConditionalHighlightText,
+use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+use litchi_iwa_common::shape::stroke::{Pattern as StrokePattern, Stroke, Width as StrokeWidth};
+use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
+use litchi_iwa_common::table::cell::conditional_highlight::{
+    Condition, Rule, Style, Text as ConditionalText,
 };
-use crate::table_cell_data_format::{
-    TableCellCurrencyCode, TableCellCurrencyStyle, TableCellCustomFormatName,
-    TableCellCustomTextFormat, TableCellFractionAccuracy, TableCellNumeralSystemBase,
-    TableCellNumeralSystemFixedPlaces, TableCellNumeralSystemNegativeStyle,
-    TableCellNumeralSystemPlaces,
+use litchi_numbers::Settings as TitleSettings;
+use litchi_numbers::cell::Value as CellValue;
+use litchi_numbers::cell::data_format::control::Range as ControlRange;
+use litchi_numbers::cell::data_format::custom::{
+    Name as CustomFormatName, Text as CustomTextFormat,
 };
+use litchi_numbers::cell::data_format::duration::{
+    Duration, Style as DurationStyle, UnitRange as DurationUnitRange,
+};
+use litchi_numbers::cell::data_format::number::{
+    NegativeStyle as NumberNegativeStyle, ThousandsSeparator as NumberThousandsSeparator,
+};
+use litchi_numbers::cell::data_format::numeral_system::{
+    Base as NumeralSystemBase, FixedPlaces as NumeralSystemFixedPlaces,
+    NegativeStyle as NumeralSystemNegativeStyle, Places as NumeralSystemPlaces,
+};
+use litchi_numbers::cell::data_format::pop_up_menu::InitialSelection as PopUpMenuInitialSelection;
+use litchi_numbers::cell::data_format::{
+    Checkbox, Currency, CurrencyCode, CurrencyStyle, Custom, DataFormat, DateTime, DecimalPlaces,
+    FixedDecimalPlaces, Fraction, FractionAccuracy, Number, NumeralSystem, Percentage, PopUpMenu,
+    Scientific, Slider, StarRating, Stepper, Text as TextFormat,
+};
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
+use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 
 const SOURCE_BUILT_TABLE_INFO_OBJECT_ID: u64 = 9;
 
@@ -68,14 +87,9 @@ fn source_built_table_creates_and_replaces_conditional_highlighting() {
     editor
         .set_table_cell(model_id, 1, 1, CellValue::Text("Organic Grain".to_owned()))
         .unwrap();
-    let rule = TableCellConditionalHighlightRule::new(
-        TableCellConditionalHighlightCondition::TextContains(
-            TableCellConditionalHighlightText::new("grain").unwrap(),
-        ),
-        TableCellConditionalHighlightStyle::with_fill(
-            crate::shapes::RgbaColor::new(0.9, 0.1, 0.1, 1.0, crate::shapes::RgbColorSpace::Srgb)
-                .unwrap(),
-        ),
+    let rule = Rule::new(
+        Condition::TextContains(ConditionalText::new("grain").unwrap()),
+        Style::with_fill(Rgba::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb).unwrap()),
     );
     let created = editor
         .set_table_cell_conditional_highlighting(model_id, 1, 1, std::slice::from_ref(&rule))
@@ -107,14 +121,13 @@ fn source_built_table_roundtrips_cell_border_crud() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let stroke = crate::shapes::ShapeStroke::new(
-        crate::shapes::RgbaColor::new(0.1, 0.3, 0.9, 1.0, crate::shapes::RgbColorSpace::Srgb)
-            .unwrap(),
-        crate::shapes::StrokeWidth::new(2.0).unwrap(),
-        crate::shapes::StrokePattern::RoundedDash,
+    let stroke = Stroke::new(
+        Rgba::new(0.1, 0.3, 0.9, 1.0, RgbColorSpace::Srgb).unwrap(),
+        StrokeWidth::new(2.0).unwrap(),
+        StrokePattern::RoundedDash,
     );
     editor
-        .set_table_cell_border(model_id, 1, 1, PagesTableCellBorderSide::Right, stroke)
+        .set_table_cell_border(model_id, 1, 1, BorderSide::Right, stroke)
         .unwrap();
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -123,7 +136,7 @@ fn source_built_table_roundtrips_cell_border_crud() {
         Some(stroke)
     );
     reopened
-        .clear_table_cell_border(model_id, 1, 1, PagesTableCellBorderSide::Right)
+        .clear_table_cell_border(model_id, 1, 1, BorderSide::Right)
         .unwrap();
     assert_eq!(
         reopened.table_cell_borders(model_id, 1, 1).unwrap().right,
@@ -185,13 +198,18 @@ fn source_built_table_roundtrips_number_format_crud() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let format = PagesTableCellNumberFormat::new(
-        PagesTableCellDecimalPlaces::fixed(2).unwrap(),
-        PagesTableCellNegativeNumberStyle::Parentheses,
-        PagesTableCellThousandsSeparator::Shown,
+    let format = Number::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NumberNegativeStyle::Parentheses,
+        NumberThousandsSeparator::Shown,
     );
     editor
-        .set_table_cell(model_id, 1, 1, PagesCellValue::Number(1_234.5))
+        .set_table_cell(
+            model_id,
+            1,
+            1,
+            CellValue::number(1_234.5).expect("finite test number"),
+        )
         .unwrap();
     editor
         .set_table_cell_number_format(model_id, 1, 1, format)
@@ -220,13 +238,18 @@ fn source_built_table_roundtrips_percentage_data_format() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let format = PagesTableCellPercentageFormat::new(
-        PagesTableCellDecimalPlaces::fixed(2).unwrap(),
-        PagesTableCellNegativeNumberStyle::Parentheses,
-        PagesTableCellThousandsSeparator::Shown,
+    let format = Percentage::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NumberNegativeStyle::Parentheses,
+        NumberThousandsSeparator::Shown,
     );
     editor
-        .set_table_cell(model_id, 1, 1, PagesCellValue::Number(-12.345))
+        .set_table_cell(
+            model_id,
+            1,
+            1,
+            CellValue::number(-12.345).expect("finite test number"),
+        )
         .unwrap();
     editor
         .set_table_cell_percentage_format(model_id, 1, 1, format)
@@ -235,7 +258,7 @@ fn source_built_table_roundtrips_percentage_data_format() {
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
-        PagesTableCellDataFormat::Percentage(format)
+        DataFormat::Percentage(format)
     );
     assert_eq!(
         reopened
@@ -244,11 +267,11 @@ fn source_built_table_roundtrips_percentage_data_format() {
         Some(format)
     );
     reopened
-        .set_table_cell_data_format(model_id, 1, 1, PagesTableCellDataFormat::Automatic)
+        .set_table_cell_data_format(model_id, 1, 1, DataFormat::Automatic)
         .unwrap();
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
-        PagesTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -259,15 +282,20 @@ fn source_built_table_roundtrips_currency_format_crud() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let format = PagesTableCellCurrencyFormat::new(
-        TableCellCurrencyCode::EUR,
-        PagesTableCellDecimalPlaces::fixed(2).unwrap(),
-        PagesTableCellNegativeNumberStyle::Parentheses,
-        PagesTableCellThousandsSeparator::Shown,
-        TableCellCurrencyStyle::Accounting,
+    let format = Currency::new(
+        CurrencyCode::EUR,
+        DecimalPlaces::fixed(2).unwrap(),
+        NumberNegativeStyle::Parentheses,
+        NumberThousandsSeparator::Shown,
+        CurrencyStyle::Accounting,
     );
     editor
-        .set_table_cell(model_id, 1, 1, PagesCellValue::Number(-1_234.5))
+        .set_table_cell(
+            model_id,
+            1,
+            1,
+            CellValue::number(-1_234.5).expect("finite test number"),
+        )
         .unwrap();
     editor
         .set_table_cell_currency_format(model_id, 1, 1, format)
@@ -285,7 +313,7 @@ fn source_built_table_roundtrips_currency_format_crud() {
     );
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
-        PagesTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -296,10 +324,14 @@ fn source_built_table_roundtrips_scientific_format_crud() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let format =
-        PagesTableCellScientificFormat::new(PagesTableCellFixedDecimalPlaces::new(5).unwrap());
+    let format = Scientific::new(FixedDecimalPlaces::new(5).unwrap());
     editor
-        .set_table_cell(model_id, 1, 1, PagesCellValue::Number(-1_234.5))
+        .set_table_cell(
+            model_id,
+            1,
+            1,
+            CellValue::number(-1_234.5).expect("finite test number"),
+        )
         .unwrap();
     editor
         .set_table_cell_scientific_format(model_id, 1, 1, format)
@@ -319,7 +351,7 @@ fn source_built_table_roundtrips_scientific_format_crud() {
     );
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
-        PagesTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -330,9 +362,14 @@ fn source_built_table_roundtrips_fraction_format_crud() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let format = PagesTableCellFractionFormat::new(TableCellFractionAccuracy::Eighths);
+    let format = Fraction::new(FractionAccuracy::Eighths);
     editor
-        .set_table_cell(model_id, 1, 1, PagesCellValue::Number(-12.375))
+        .set_table_cell(
+            model_id,
+            1,
+            1,
+            CellValue::number(-12.375).expect("finite test number"),
+        )
         .unwrap();
     editor
         .set_table_cell_fraction_format(model_id, 1, 1, format)
@@ -350,7 +387,7 @@ fn source_built_table_roundtrips_fraction_format_crud() {
     );
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
-        PagesTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -361,14 +398,19 @@ fn source_built_table_roundtrips_numeral_system_format_crud() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let format = PagesTableCellNumeralSystemFormat::new(
-        TableCellNumeralSystemBase::HEXADECIMAL,
-        TableCellNumeralSystemPlaces::Fixed(TableCellNumeralSystemFixedPlaces::EIGHT),
-        TableCellNumeralSystemNegativeStyle::TwosComplement,
+    let format = NumeralSystem::new(
+        NumeralSystemBase::HEXADECIMAL,
+        NumeralSystemPlaces::Fixed(NumeralSystemFixedPlaces::EIGHT),
+        NumeralSystemNegativeStyle::TwosComplement,
     )
     .unwrap();
     editor
-        .set_table_cell(model_id, 1, 1, PagesCellValue::Number(-1_234.5))
+        .set_table_cell(
+            model_id,
+            1,
+            1,
+            CellValue::number(-1_234.5).expect("finite test number"),
+        )
         .unwrap();
     editor
         .set_table_cell_numeral_system_format(model_id, 1, 1, format)
@@ -388,7 +430,7 @@ fn source_built_table_roundtrips_numeral_system_format_crud() {
     );
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
-        PagesTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -399,9 +441,14 @@ fn source_built_table_roundtrips_date_time_format_crud() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let format = PagesTableCellDateTimeFormat::iso_date_time_24_hour_with_seconds();
+    let format = DateTime::iso_date_time_24_hour_with_seconds();
     editor
-        .set_table_cell(model_id, 1, 1, PagesCellValue::Date(789_332_889.0))
+        .set_table_cell(
+            model_id,
+            1,
+            1,
+            CellValue::date(789_332_889.0).expect("finite test date"),
+        )
         .unwrap();
     editor
         .set_table_cell_date_time_format(model_id, 1, 1, format.clone())
@@ -421,7 +468,7 @@ fn source_built_table_roundtrips_date_time_format_crud() {
     );
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
-        PagesTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -432,11 +479,15 @@ fn source_built_table_roundtrips_duration_format_crud() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let range = PagesTableCellDurationUnitRange::hours_to_milliseconds();
-    let format =
-        PagesTableCellDurationFormat::custom(PagesTableCellDurationStyle::Abbreviated, range);
+    let range = DurationUnitRange::hours_to_milliseconds();
+    let format = Duration::custom(DurationStyle::Abbreviated, range);
     editor
-        .set_table_cell(model_id, 1, 1, PagesCellValue::Duration(3_723.5))
+        .set_table_cell(
+            model_id,
+            1,
+            1,
+            CellValue::duration(3_723.5).expect("finite test duration"),
+        )
         .unwrap();
     editor
         .set_table_cell_duration_format(model_id, 1, 1, format)
@@ -454,7 +505,7 @@ fn source_built_table_roundtrips_duration_format_crud() {
     );
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
-        PagesTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -466,17 +517,17 @@ fn source_built_table_roundtrips_checkbox_format_crud() {
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
     editor
-        .set_table_cell_checkbox_format(model_id, 1, 1, PagesTableCellCheckboxFormat)
+        .set_table_cell_checkbox_format(model_id, 1, 1, Checkbox)
         .unwrap();
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_cell_checkbox_format(model_id, 1, 1).unwrap(),
-        Some(PagesTableCellCheckboxFormat)
+        Some(Checkbox)
     );
     assert_eq!(
         reopened.table(model_id).unwrap().get_cell(1, 1),
-        Some(&PagesCellValue::Boolean(false))
+        Some(&CellValue::Boolean(false))
     );
     assert!(
         reopened
@@ -485,7 +536,7 @@ fn source_built_table_roundtrips_checkbox_format_crud() {
     );
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
-        PagesTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -497,7 +548,7 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
     editor
-        .set_table_cell_star_rating_format(model_id, 1, 1, PagesTableCellStarRatingFormat)
+        .set_table_cell_star_rating_format(model_id, 1, 1, StarRating)
         .unwrap();
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -505,11 +556,11 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
         reopened
             .table_cell_star_rating_format(model_id, 1, 1)
             .unwrap(),
-        Some(PagesTableCellStarRatingFormat)
+        Some(StarRating)
     );
     assert_eq!(
         reopened.table(model_id).unwrap().get_cell(1, 1),
-        Some(&PagesCellValue::Number(0.0))
+        Some(&CellValue::number(0.0).expect("finite test number"))
     );
     assert!(
         reopened
@@ -518,7 +569,7 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
     );
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
-        PagesTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -529,9 +580,8 @@ fn source_built_table_roundtrips_slider_format_crud() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let range = PagesTableCellSliderRange::new(-10.0, 30.0, 0.5).unwrap();
-    let format =
-        PagesTableCellSliderFormat::new(range, PagesTableCellNumberFormat::default().into());
+    let range = ControlRange::new(-10.0, 30.0, 0.5).unwrap();
+    let format = Slider::new(range, Number::default().into());
     editor
         .set_table_cell_slider_format(model_id, 1, 1, format.clone())
         .unwrap();
@@ -543,7 +593,7 @@ fn source_built_table_roundtrips_slider_format_crud() {
     );
     assert_eq!(
         reopened.table(model_id).unwrap().get_cell(1, 1),
-        Some(&PagesCellValue::Number(10.0))
+        Some(&CellValue::number(10.0).expect("finite test number"))
     );
     assert!(
         reopened
@@ -552,7 +602,7 @@ fn source_built_table_roundtrips_slider_format_crud() {
     );
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
-        PagesTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -563,9 +613,8 @@ fn source_built_table_roundtrips_stepper_format_crud() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let range = PagesTableCellStepperRange::new(-10.0, 30.0, 0.5).unwrap();
-    let format =
-        PagesTableCellStepperFormat::new(range, PagesTableCellNumberFormat::default().into());
+    let range = ControlRange::new(-10.0, 30.0, 0.5).unwrap();
+    let format = Stepper::new(range, Number::default().into());
     editor
         .set_table_cell_stepper_format(model_id, 1, 1, format.clone())
         .unwrap();
@@ -577,7 +626,7 @@ fn source_built_table_roundtrips_stepper_format_crud() {
     );
     assert_eq!(
         reopened.table(model_id).unwrap().get_cell(1, 1),
-        Some(&PagesCellValue::Number(-10.0))
+        Some(&CellValue::number(-10.0).expect("finite test number"))
     );
     assert!(
         reopened
@@ -586,7 +635,7 @@ fn source_built_table_roundtrips_stepper_format_crud() {
     );
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
-        PagesTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -598,18 +647,18 @@ fn source_built_table_roundtrips_text_format_crud() {
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
     editor
-        .set_table_cell(model_id, 1, 1, PagesCellValue::Text("00123".to_owned()))
+        .set_table_cell(model_id, 1, 1, CellValue::Text("00123".to_owned()))
         .unwrap();
     editor.set_table_cell_text_format(model_id, 1, 1).unwrap();
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_cell_text_format(model_id, 1, 1).unwrap(),
-        Some(PagesTableCellTextFormat)
+        Some(TextFormat)
     );
     assert_eq!(
         reopened.table(model_id).unwrap().get_cell(1, 1),
-        Some(&PagesCellValue::Text("00123".to_owned()))
+        Some(&CellValue::Text("00123".to_owned()))
     );
     assert!(
         reopened
@@ -618,7 +667,7 @@ fn source_built_table_roundtrips_text_format_crud() {
     );
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
-        PagesTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -629,16 +678,16 @@ fn source_built_table_roundtrips_custom_format_crud() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let format = PagesTableCellCustomFormat::Text(
-        TableCellCustomTextFormat::try_new(
-            TableCellCustomFormatName::try_new("Invoice Identifier").unwrap(),
+    let format = Custom::Text(
+        CustomTextFormat::try_new(
+            CustomFormatName::try_new("Invoice Identifier").unwrap(),
             "",
             " ID",
         )
         .unwrap(),
     );
     editor
-        .set_table_cell(model_id, 1, 1, PagesCellValue::Text("00123".to_owned()))
+        .set_table_cell(model_id, 1, 1, CellValue::Text("00123".to_owned()))
         .unwrap();
     editor
         .set_table_cell_custom_format(model_id, 1, 1, format.clone())
@@ -656,7 +705,7 @@ fn source_built_table_roundtrips_custom_format_crud() {
     );
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
-        PagesTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -667,9 +716,9 @@ fn source_built_table_roundtrips_pop_up_menu_format_crud() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let format = PagesTableCellPopUpMenuFormat::try_new(["Draft", "Published"])
+    let format = PopUpMenu::new(["Draft", "Published"])
         .unwrap()
-        .with_initial_selection(PagesTableCellPopUpMenuInitialSelection::Blank);
+        .with_initial_selection(PopUpMenuInitialSelection::Blank);
     editor
         .set_table_cell_pop_up_menu_format(model_id, 1, 1, format.clone())
         .unwrap();
@@ -683,7 +732,7 @@ fn source_built_table_roundtrips_pop_up_menu_format_crud() {
     );
     assert_eq!(
         reopened.table(model_id).unwrap().get_cell(1, 1),
-        Some(&PagesCellValue::Empty)
+        Some(&CellValue::Empty)
     );
     assert!(
         reopened
@@ -692,7 +741,7 @@ fn source_built_table_roundtrips_pop_up_menu_format_crud() {
     );
     assert_eq!(
         reopened.table_cell_data_format(model_id, 1, 1).unwrap(),
-        PagesTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -720,8 +769,12 @@ fn source_built_table_roundtrips_cell_updates() {
             .set_table_cells(
                 model_id,
                 [
-                    PagesTableCellUpdate::new(0, 0, PagesCellValue::Text("Header".to_owned()),),
-                    PagesTableCellUpdate::new(1, 1, PagesCellValue::Number(42.5)),
+                    PagesTableCellUpdate::new(0, 0, CellValue::Text("Header".to_owned()),),
+                    PagesTableCellUpdate::new(
+                        1,
+                        1,
+                        CellValue::number(42.5).expect("finite test number"),
+                    ),
                 ],
             )
             .unwrap(),
@@ -733,7 +786,7 @@ fn source_built_table_roundtrips_cell_updates() {
             .set_table_cells(
                 model_id,
                 [
-                    PagesTableCellUpdate::new(2, 0, PagesCellValue::Boolean(true)),
+                    PagesTableCellUpdate::new(2, 0, CellValue::Boolean(true)),
                     PagesTableCellUpdate::clear(2, 0),
                 ],
             )
@@ -744,9 +797,12 @@ fn source_built_table_roundtrips_cell_updates() {
     let table = reopened.table(model_id).unwrap();
     assert_eq!(
         table.get_cell(0, 0),
-        Some(&PagesCellValue::Text("Header".to_owned()))
+        Some(&CellValue::Text("Header".to_owned()))
     );
-    assert_eq!(table.get_cell(1, 1), Some(&PagesCellValue::Number(42.5)));
+    assert_eq!(
+        table.get_cell(1, 1),
+        Some(&CellValue::number(42.5).expect("finite test number"))
+    );
     reopened.clear_table_cell(model_id, 0, 0).unwrap();
     assert!(reopened.table(model_id).unwrap().get_cell(0, 0).is_none());
 }
@@ -763,9 +819,13 @@ fn source_built_table_duplication_clones_formula_storage_and_attachment() {
         .set_table_cells(
             source.model_object_id,
             [
-                PagesTableCellUpdate::new(0, 0, PagesCellValue::Text("Category".to_owned())),
-                PagesTableCellUpdate::new(1, 0, PagesCellValue::Text("Travel".to_owned())),
-                PagesTableCellUpdate::new(1, 1, PagesCellValue::Number(125.0)),
+                PagesTableCellUpdate::new(0, 0, CellValue::Text("Category".to_owned())),
+                PagesTableCellUpdate::new(1, 0, CellValue::Text("Travel".to_owned())),
+                PagesTableCellUpdate::new(
+                    1,
+                    1,
+                    CellValue::number(125.0).expect("finite test number"),
+                ),
             ],
         )
         .unwrap();
@@ -781,7 +841,7 @@ fn source_built_table_duplication_clones_formula_storage_and_attachment() {
                     PagesTableFormulaExpression::Number(25.0),
                 ],
             ),
-            PagesTableFormulaCachedValue::Number(125.0),
+            PagesTableFormulaCachedValue::number(125.0).expect("finite cached formula number"),
         )
         .unwrap();
 
@@ -796,7 +856,7 @@ fn source_built_table_duplication_clones_formula_storage_and_attachment() {
     assert_eq!((copied.rows, copied.columns), (source.rows, source.columns));
     assert_eq!(
         editor.table(copied.model_object_id).unwrap().get_cell(1, 0),
-        Some(&PagesCellValue::Text("Travel".to_owned()))
+        Some(&CellValue::Text("Travel".to_owned()))
     );
     assert_eq!(
         editor
@@ -811,12 +871,12 @@ fn source_built_table_duplication_clones_formula_storage_and_attachment() {
             copied.model_object_id,
             1,
             0,
-            PagesCellValue::Text("Lodging".to_owned()),
+            CellValue::Text("Lodging".to_owned()),
         )
         .unwrap();
     assert_eq!(
         editor.table(source.model_object_id).unwrap().get_cell(1, 0),
-        Some(&PagesCellValue::Text("Travel".to_owned()))
+        Some(&CellValue::Text("Travel".to_owned()))
     );
 
     let second_anchor = editor.body_text().unwrap().encode_utf16().count();
@@ -845,7 +905,7 @@ fn source_built_table_duplication_clones_formula_storage_and_attachment() {
             .table(source.model_object_id)
             .unwrap()
             .get_cell(1, 0),
-        Some(&PagesCellValue::Text("Travel".to_owned()))
+        Some(&CellValue::Text("Travel".to_owned()))
     );
 }
 
@@ -859,8 +919,8 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     editor
         .set_table_header_settings(
             model_id,
-            PagesTableHeaderSettings {
-                header_rows: Some(PagesTableHeaderCount::ONE),
+            HeaderSettings {
+                header_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -869,16 +929,16 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         .set_table_cells(
             model_id,
             [
-                PagesTableCellUpdate::new(0, 0, PagesCellValue::Text("Name".to_owned())),
-                PagesTableCellUpdate::new(0, 1, PagesCellValue::Text("Marker".to_owned())),
-                PagesTableCellUpdate::new(1, 0, PagesCellValue::Text("zebra".to_owned())),
-                PagesTableCellUpdate::new(1, 1, PagesCellValue::Text("last".to_owned())),
-                PagesTableCellUpdate::new(2, 0, PagesCellValue::Text("apple".to_owned())),
-                PagesTableCellUpdate::new(2, 1, PagesCellValue::Text("first apple".to_owned())),
-                PagesTableCellUpdate::new(3, 0, PagesCellValue::Text("banana".to_owned())),
-                PagesTableCellUpdate::new(3, 1, PagesCellValue::Text("middle".to_owned())),
-                PagesTableCellUpdate::new(4, 0, PagesCellValue::Text("apple".to_owned())),
-                PagesTableCellUpdate::new(4, 1, PagesCellValue::Text("second apple".to_owned())),
+                PagesTableCellUpdate::new(0, 0, CellValue::Text("Name".to_owned())),
+                PagesTableCellUpdate::new(0, 1, CellValue::Text("Marker".to_owned())),
+                PagesTableCellUpdate::new(1, 0, CellValue::Text("zebra".to_owned())),
+                PagesTableCellUpdate::new(1, 1, CellValue::Text("last".to_owned())),
+                PagesTableCellUpdate::new(2, 0, CellValue::Text("apple".to_owned())),
+                PagesTableCellUpdate::new(2, 1, CellValue::Text("first apple".to_owned())),
+                PagesTableCellUpdate::new(3, 0, CellValue::Text("banana".to_owned())),
+                PagesTableCellUpdate::new(3, 1, CellValue::Text("middle".to_owned())),
+                PagesTableCellUpdate::new(4, 0, CellValue::Text("apple".to_owned())),
+                PagesTableCellUpdate::new(4, 1, CellValue::Text("second apple".to_owned())),
             ],
         )
         .unwrap();
@@ -892,8 +952,8 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         .table_cell_comment(model_id, 1, 1)
         .unwrap()
         .unwrap()
-        .storage_object_id;
-    let hidden = PagesTableHiddenAxes::new([PagesTableAxisIndex::row(2)]).unwrap();
+        .storage_id;
+    let hidden = HiddenAxes::new([AxisIndex::row(2)]).unwrap();
     editor.set_table_hidden_axes(model_id, &hidden).unwrap();
     let order = PagesTableSortOrder::new([PagesTableSortRule::new(
         PagesTableSortColumnIndex::new(0).unwrap(),
@@ -914,27 +974,27 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     let table = editor.table(model_id).unwrap();
     assert_eq!(
         table.get_cell(0, 0),
-        Some(&PagesCellValue::Text("Name".to_owned()))
+        Some(&CellValue::Text("Name".to_owned()))
     );
     assert_eq!(
         table.get_cell(1, 0),
-        Some(&PagesCellValue::Text("apple".to_owned()))
+        Some(&CellValue::Text("apple".to_owned()))
     );
     assert_eq!(
         table.get_cell(1, 1),
-        Some(&PagesCellValue::Text("first apple".to_owned()))
+        Some(&CellValue::Text("first apple".to_owned()))
     );
     assert_eq!(
         table.get_cell(2, 1),
-        Some(&PagesCellValue::Text("second apple".to_owned()))
+        Some(&CellValue::Text("second apple".to_owned()))
     );
     assert_eq!(
         table.get_cell(3, 0),
-        Some(&PagesCellValue::Text("banana".to_owned()))
+        Some(&CellValue::Text("banana".to_owned()))
     );
     assert_eq!(
         table.get_cell(4, 0),
-        Some(&PagesCellValue::Text("zebra".to_owned()))
+        Some(&CellValue::Text("zebra".to_owned()))
     );
     assert!(editor.table_cell_comment(model_id, 1, 1).unwrap().is_none());
     assert_eq!(
@@ -942,11 +1002,13 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             .table_cell_comment(model_id, 4, 1)
             .unwrap()
             .unwrap()
-            .storage_object_id,
+            .storage_id,
         comment_id
     );
     assert_eq!(
-        editor.table_cell_comment_replies(model_id, 4, 1).unwrap()[0].storage_object_id,
+        editor.table_cell_comment_replies(model_id, 4, 1).unwrap()[0]
+            .storage_id
+            .get(),
         reply_id
     );
     assert_eq!(editor.table_hidden_axes(model_id).unwrap(), hidden);
@@ -961,11 +1023,13 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             .table_cell_comment(model_id, 4, 1)
             .unwrap()
             .unwrap()
-            .storage_object_id,
+            .storage_id,
         comment_id
     );
     assert_eq!(
-        reopened.table_cell_comment_replies(model_id, 4, 1).unwrap()[0].storage_object_id,
+        reopened.table_cell_comment_replies(model_id, 4, 1).unwrap()[0]
+            .storage_id
+            .get(),
         reply_id
     );
     assert_eq!(reopened.table_hidden_axes(model_id).unwrap(), hidden);
@@ -1005,19 +1069,19 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     let table = reopened.table(model_id).unwrap();
     assert_eq!(
         table.get_cell(1, 1),
-        Some(&PagesCellValue::Text("first apple".to_owned()))
+        Some(&CellValue::Text("first apple".to_owned()))
     );
     assert_eq!(
         table.get_cell(2, 0),
-        Some(&PagesCellValue::Text("zebra".to_owned()))
+        Some(&CellValue::Text("zebra".to_owned()))
     );
     assert_eq!(
         table.get_cell(3, 0),
-        Some(&PagesCellValue::Text("banana".to_owned()))
+        Some(&CellValue::Text("banana".to_owned()))
     );
     assert_eq!(
         table.get_cell(4, 1),
-        Some(&PagesCellValue::Text("second apple".to_owned()))
+        Some(&CellValue::Text("second apple".to_owned()))
     );
     assert!(
         reopened
@@ -1030,11 +1094,13 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             .table_cell_comment(model_id, 2, 1)
             .unwrap()
             .unwrap()
-            .storage_object_id,
+            .storage_id,
         comment_id
     );
     assert_eq!(
-        reopened.table_cell_comment_replies(model_id, 2, 1).unwrap()[0].storage_object_id,
+        reopened.table_cell_comment_replies(model_id, 2, 1).unwrap()[0]
+            .storage_id
+            .get(),
         reply_id
     );
     assert_eq!(reopened.table_hidden_axes(model_id).unwrap(), hidden);
@@ -1073,7 +1139,7 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
                     PagesTableFormulaExpression::Number(2.0),
                 ],
             ),
-            PagesTableFormulaCachedValue::Number(3.0),
+            PagesTableFormulaCachedValue::number(3.0).expect("finite cached formula number"),
         )
         .unwrap();
 
@@ -1094,7 +1160,7 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
                     PagesTableFormulaExpression::Number(4.0),
                 ],
             ),
-            PagesTableFormulaCachedValue::Number(7.0),
+            PagesTableFormulaCachedValue::number(7.0).expect("finite cached formula number"),
         )
         .unwrap();
     assert_eq!(
@@ -1110,7 +1176,7 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
                 usize::MAX,
                 1,
                 PagesTableFormulaExpression::Number(1.0),
-                PagesTableFormulaCachedValue::Number(1.0),
+                PagesTableFormulaCachedValue::number(1.0).expect("finite cached formula number"),
             )
             .is_err()
     );
@@ -1135,7 +1201,7 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
     let row_size = PagesTableDimensionSize::points(33.0).unwrap();
     let column_size = PagesTableDimensionSize::points(77.0).unwrap();
     editor
-        .set_table_cell(model_id, 1, 1, PagesCellValue::Text("shift me".to_owned()))
+        .set_table_cell(model_id, 1, 1, CellValue::Text("shift me".to_owned()))
         .unwrap();
     editor
         .set_table_formula(
@@ -1143,7 +1209,7 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
             2,
             2,
             PagesTableFormulaExpression::cell(PagesTableFormulaCellReference::relative(1, 1)),
-            PagesTableFormulaCachedValue::Number(7.0),
+            PagesTableFormulaCachedValue::number(7.0).expect("finite cached formula number"),
         )
         .unwrap();
     editor.set_table_row_height(model_id, 1, row_size).unwrap();
@@ -1153,21 +1219,21 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
     let baseline = editor.to_bytes().unwrap();
 
     editor
-        .insert_table_row(model_id, PagesTableRowInsertion::body(1))
+        .insert_table_row(model_id, RowInsertion::body(1))
         .unwrap();
     editor
-        .insert_table_column(model_id, PagesTableColumnInsertion::body(1))
+        .insert_table_column(model_id, ColumnInsertion::body(1))
         .unwrap();
     let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = reopened.table(model_id).unwrap();
     assert_eq!((table.info.rows, table.info.columns), (5, 5));
     assert_eq!(
         table.get_cell(1, 1),
-        Some(&PagesCellValue::Text("shift me".to_owned()))
+        Some(&CellValue::Text("shift me".to_owned()))
     );
     assert_eq!(
         table.get_cell(3, 3),
-        Some(&PagesCellValue::Formula("=B2".to_owned()))
+        Some(&CellValue::Formula("=B2".to_owned()))
     );
     assert_eq!(reopened.table_row_height(model_id, 1).unwrap(), row_size);
     assert_eq!(
@@ -1176,22 +1242,22 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
     );
 
     editor
-        .remove_table_column(model_id, PagesTableColumnDeletion::body(1))
+        .remove_table_column(model_id, ColumnDeletion::body(1))
         .unwrap();
     editor
-        .remove_table_row(model_id, PagesTableRowDeletion::body(1))
+        .remove_table_row(model_id, RowDeletion::body(1))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     let before_error = editor.to_bytes().unwrap();
     assert!(
         editor
-            .insert_table_row(model_id, PagesTableRowInsertion::body(usize::MAX))
+            .insert_table_row(model_id, RowInsertion::body(usize::MAX))
             .is_err()
     );
     assert!(
         editor
-            .remove_table_column(model_id, PagesTableColumnDeletion::body(usize::MAX))
+            .remove_table_column(model_id, ColumnDeletion::body(usize::MAX))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before_error);
@@ -1207,8 +1273,8 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
     editor
         .set_table_header_settings(
             model_id,
-            PagesTableHeaderSettings {
-                footer_rows: Some(PagesTableHeaderCount::ONE),
+            HeaderSettings {
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -1225,7 +1291,7 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
                     PagesTableFormulaCellReference::relative(2, 1),
                 )],
             ),
-            PagesTableFormulaCachedValue::Number(3.0),
+            PagesTableFormulaCachedValue::number(3.0).expect("finite cached formula number"),
         )
         .unwrap();
     let mut package = editor.into_package();
@@ -1237,14 +1303,14 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
     let baseline = editor.to_bytes().unwrap();
 
     editor
-        .insert_table_row(model_id, PagesTableRowInsertion::body(3))
+        .insert_table_row(model_id, RowInsertion::body(3))
         .unwrap();
     assert_eq!(
         editor.table_formula(model_id, 4, 1).unwrap().as_deref(),
         Some("=SUM(B2:B4)")
     );
     editor
-        .remove_table_row(model_id, PagesTableRowDeletion::body(3))
+        .remove_table_row(model_id, RowDeletion::body(3))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
@@ -1259,10 +1325,10 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
     editor
         .set_table_header_settings(
             model_id,
-            PagesTableHeaderSettings {
-                header_rows: Some(PagesTableHeaderCount::ONE),
-                header_columns: Some(PagesTableHeaderCount::ONE),
-                footer_rows: Some(PagesTableHeaderCount::ONE),
+            HeaderSettings {
+                header_rows: Some(HeaderCount::ONE),
+                header_columns: Some(HeaderCount::ONE),
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -1270,13 +1336,13 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
     let baseline = editor.to_bytes().unwrap();
 
     editor
-        .insert_table_row(model_id, PagesTableRowInsertion::header(1))
+        .insert_table_row(model_id, RowInsertion::header(1))
         .unwrap();
     editor
-        .insert_table_row(model_id, PagesTableRowInsertion::footer(0))
+        .insert_table_row(model_id, RowInsertion::footer(0))
         .unwrap();
     editor
-        .insert_table_column(model_id, PagesTableColumnInsertion::header(1))
+        .insert_table_column(model_id, ColumnInsertion::header(1))
         .unwrap();
     let settings = editor.table_header_settings(model_id).unwrap();
     assert_eq!(settings.header_row_count(), 2);
@@ -1286,33 +1352,33 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
     assert_eq!((table.info.rows, table.info.columns), (6, 5));
 
     editor
-        .remove_table_column(model_id, PagesTableColumnDeletion::header(1))
+        .remove_table_column(model_id, ColumnDeletion::header(1))
         .unwrap();
     editor
-        .remove_table_row(model_id, PagesTableRowDeletion::footer(0))
+        .remove_table_row(model_id, RowDeletion::footer(0))
         .unwrap();
     editor
-        .remove_table_row(model_id, PagesTableRowDeletion::header(1))
+        .remove_table_row(model_id, RowDeletion::header(1))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     editor
-        .set_table_cell(model_id, 0, 0, PagesCellValue::Text("Header".to_owned()))
+        .set_table_cell(model_id, 0, 0, CellValue::Text("Header".to_owned()))
         .unwrap();
     editor
-        .set_table_cell(model_id, 1, 1, PagesCellValue::Text("Body".to_owned()))
+        .set_table_cell(model_id, 1, 1, CellValue::Text("Body".to_owned()))
         .unwrap();
     editor
-        .set_table_cell(model_id, 3, 2, PagesCellValue::Text("Footer".to_owned()))
+        .set_table_cell(model_id, 3, 2, CellValue::Text("Footer".to_owned()))
         .unwrap();
     editor
-        .remove_table_row(model_id, PagesTableRowDeletion::header(0))
+        .remove_table_row(model_id, RowDeletion::header(0))
         .unwrap();
     editor
-        .remove_table_row(model_id, PagesTableRowDeletion::footer(0))
+        .remove_table_row(model_id, RowDeletion::footer(0))
         .unwrap();
     editor
-        .remove_table_column(model_id, PagesTableColumnDeletion::header(0))
+        .remove_table_column(model_id, ColumnDeletion::header(0))
         .unwrap();
     let settings = editor.table_header_settings(model_id).unwrap();
     assert_eq!(settings.header_row_count(), 0);
@@ -1322,11 +1388,11 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
     assert_eq!((table.info.rows, table.info.columns), (2, 3));
     assert_eq!(
         table.get_cell(0, 0),
-        Some(&PagesCellValue::Text("Body".to_owned()))
+        Some(&CellValue::Text("Body".to_owned()))
     );
     assert!(!table.iter_cells().any(|(_, value)| matches!(
         value,
-        PagesCellValue::Text(text) if text == "Header" || text == "Footer"
+        CellValue::Text(text) if text == "Header" || text == "Footer"
     )));
 }
 
@@ -1337,14 +1403,8 @@ fn source_built_table_roundtrips_title_settings_transactionally() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let visible = PagesTableTitleSettings {
-        visible: Some(true),
-        outlined: Some(true),
-    };
-    let initially_hidden = PagesTableTitleSettings {
-        visible: Some(false),
-        outlined: None,
-    };
+    let visible = TitleSettings::new(Some(true), Some(true));
+    let initially_hidden = TitleSettings::new(Some(false), None);
     assert_eq!(
         editor.table_title_settings(model_id).unwrap(),
         initially_hidden
@@ -1359,10 +1419,7 @@ fn source_built_table_roundtrips_title_settings_transactionally() {
         .unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
 
-    let explicit_hidden = PagesTableTitleSettings {
-        visible: Some(false),
-        outlined: Some(false),
-    };
+    let explicit_hidden = TitleSettings::new(Some(false), Some(false));
     reopened
         .set_table_title_settings(model_id, explicit_hidden)
         .unwrap();
@@ -1371,11 +1428,11 @@ fn source_built_table_roundtrips_title_settings_transactionally() {
         explicit_hidden
     );
     reopened
-        .set_table_title_settings(model_id, PagesTableTitleSettings::default())
+        .set_table_title_settings(model_id, TitleSettings::default())
         .unwrap();
     assert_eq!(
         reopened.table_title_settings(model_id).unwrap(),
-        PagesTableTitleSettings::default()
+        TitleSettings::default()
     );
 
     let before_error = reopened.to_bytes().unwrap();
@@ -1401,7 +1458,7 @@ fn inserts_independent_table_and_shifts_existing_anchor() {
             source.model_object_id,
             1,
             1,
-            PagesCellValue::Text("source only".to_owned()),
+            CellValue::Text("source only".to_owned()),
         )
         .unwrap();
     let anchor = "Alpha 🙂\n".encode_utf16().count();
@@ -1433,7 +1490,7 @@ fn inserts_independent_table_and_shifts_existing_anchor() {
             inserted.model_object_id,
             0,
             0,
-            PagesCellValue::Text("inserted only".to_owned()),
+            CellValue::Text("inserted only".to_owned()),
         )
         .unwrap();
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -1442,14 +1499,14 @@ fn inserts_independent_table_and_shifts_existing_anchor() {
             .table(source.model_object_id)
             .unwrap()
             .get_cell(1, 1),
-        Some(&PagesCellValue::Text("source only".to_owned()))
+        Some(&CellValue::Text("source only".to_owned()))
     );
     assert_eq!(
         reopened
             .table(inserted.model_object_id)
             .unwrap()
             .get_cell(0, 0),
-        Some(&PagesCellValue::Text("inserted only".to_owned()))
+        Some(&CellValue::Text("inserted only".to_owned()))
     );
     reopened.remove_table(inserted.model_object_id).unwrap();
     let retained = reopened.tables().unwrap();
@@ -1464,7 +1521,7 @@ fn inserts_independent_table_and_shifts_existing_anchor() {
             .table(source.model_object_id)
             .unwrap()
             .get_cell(1, 1),
-        Some(&PagesCellValue::Text("source only".to_owned()))
+        Some(&CellValue::Text("source only".to_owned()))
     );
 }
 
@@ -1483,7 +1540,7 @@ fn inserts_and_removes_first_table_without_a_template() {
             created.model_object_id,
             1,
             2,
-            PagesCellValue::Text("bootstrapped".to_owned()),
+            CellValue::Text("bootstrapped".to_owned()),
         )
         .unwrap();
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -1492,7 +1549,7 @@ fn inserts_and_removes_first_table_without_a_template() {
             .table(created.model_object_id)
             .unwrap()
             .get_cell(1, 2),
-        Some(&PagesCellValue::Text("bootstrapped".to_owned()))
+        Some(&CellValue::Text("bootstrapped".to_owned()))
     );
     reopened.remove_table(created.model_object_id).unwrap();
     assert!(reopened.tables().unwrap().is_empty());
@@ -1507,13 +1564,15 @@ fn first_table_bootstrap_rejects_reserved_id_collision_transactionally() {
         .unwrap();
     package
         .update_archive("Index/Document.iwa", |archive| {
-            archive.insert_object(ArchiveObject::new(
+            let object = ArchiveObject::new(
                 SOURCE_BUILT_TABLE_INFO_OBJECT_ID,
                 vec![RawMessage {
                     type_: u32::MAX,
                     data: Vec::new(),
                 }],
-            )?)
+            )
+            .map_err(Error::from)?;
+            archive.insert_object(object).map_err(Error::from)
         })
         .unwrap();
     let mut editor = PagesEditor::from_package(package).unwrap();
@@ -1544,7 +1603,7 @@ fn out_of_bounds_cell_update_is_transactional() {
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .set_table_cell(model_id, 2, 0, PagesCellValue::Boolean(true))
+            .set_table_cell(model_id, 2, 0, CellValue::Boolean(true))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -1558,7 +1617,7 @@ fn source_built_table_roundtrips_rename_and_resize() {
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
     editor
-        .set_table_cell(model_id, 1, 1, PagesCellValue::Text("kept".to_owned()))
+        .set_table_cell(model_id, 1, 1, CellValue::Text("kept".to_owned()))
         .unwrap();
 
     editor.rename_table(model_id, "Renamed").unwrap();
@@ -1569,7 +1628,7 @@ fn source_built_table_roundtrips_rename_and_resize() {
     assert_eq!((info.rows, info.columns), (5, 4));
     assert_eq!(
         reopened.table(model_id).unwrap().get_cell(1, 1),
-        Some(&PagesCellValue::Text("kept".to_owned()))
+        Some(&CellValue::Text("kept".to_owned()))
     );
 
     reopened.resize_table(model_id, 2, 2).unwrap();
@@ -1584,10 +1643,10 @@ fn source_built_table_roundtrips_layout_crud_transactionally() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let settings = PagesTableHeaderSettings {
-        header_rows: Some(PagesTableHeaderCount::TWO),
-        header_columns: Some(PagesTableHeaderCount::ONE),
-        footer_rows: Some(PagesTableHeaderCount::ONE),
+    let settings = HeaderSettings {
+        header_rows: Some(HeaderCount::TWO),
+        header_columns: Some(HeaderCount::ONE),
+        footer_rows: Some(HeaderCount::ONE),
         ..Default::default()
     };
 
@@ -1646,9 +1705,9 @@ fn source_built_table_roundtrips_layout_crud_transactionally() {
         reopened
             .set_table_header_settings(
                 model_id,
-                PagesTableHeaderSettings {
-                    header_rows: Some(PagesTableHeaderCount::FOUR),
-                    footer_rows: Some(PagesTableHeaderCount::ONE),
+                HeaderSettings {
+                    header_rows: Some(HeaderCount::FOUR),
+                    footer_rows: Some(HeaderCount::ONE),
                     ..Default::default()
                 },
             )
@@ -1665,7 +1724,12 @@ fn table_rename_and_occupied_shrink_are_transactional() {
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
     editor
-        .set_table_cell(model_id, 2, 2, PagesCellValue::Number(7.0))
+        .set_table_cell(
+            model_id,
+            2,
+            2,
+            CellValue::number(7.0).expect("finite test number"),
+        )
         .unwrap();
 
     let before = editor.to_bytes().unwrap();
@@ -1694,7 +1758,7 @@ fn source_built_table_deletion_removes_private_graph_and_anchor() {
             table.model_object_id,
             1,
             1,
-            PagesCellValue::Text("removed".to_owned()),
+            CellValue::Text("removed".to_owned()),
         )
         .unwrap();
 

@@ -1,6 +1,7 @@
 //! Wire-preserving Keynote slide-style variation lifecycle.
 
-use super::slide_background::KeynoteSlideBackground;
+use litchi_keynote::background::Background;
+
 use super::slide_background_color::native_color_space;
 use super::slide_background_gradient_wire::gradient_to_fill;
 use super::slide_style_graph::{
@@ -14,7 +15,7 @@ use super::*;
 pub(super) fn set_slide_background(
     editor: &mut KeynoteEditor,
     slide_index: usize,
-    background: KeynoteSlideBackground,
+    background: Background,
     inherited_fill_payload: &[u8],
 ) -> Result<()> {
     let slides = editor.slides()?;
@@ -102,17 +103,17 @@ pub(super) fn set_slide_background(
 }
 
 fn encode_background_fill(
-    background: &KeynoteSlideBackground,
+    background: &Background,
     inherited_fill_payload: &[u8],
 ) -> Result<Vec<u8>> {
     match background {
-        KeynoteSlideBackground::None => Ok(tsd::FillArchive::default().encode_to_vec()),
-        KeynoteSlideBackground::Opaque(payload) => {
-            tsd::FillArchive::decode(payload.as_slice())?;
-            Ok(payload.clone())
+        Background::None => Ok(tsd::FillArchive::default().encode_to_vec()),
+        Background::Opaque(payload) => {
+            tsd::FillArchive::decode(payload.as_bytes())?;
+            Ok(payload.as_bytes().to_vec())
         },
-        KeynoteSlideBackground::Gradient(gradient) => Ok(gradient_to_fill(gradient)),
-        KeynoteSlideBackground::Solid(color) => {
+        Background::Gradient(gradient) => Ok(gradient_to_fill(gradient)),
+        Background::Solid(color) => {
             let existing = tsd::FillArchive::decode(inherited_fill_payload)?;
             let mut data = if existing.gradient.is_none() && existing.image.is_none() {
                 if existing.color.is_some() {
@@ -135,11 +136,11 @@ fn encode_background_fill(
                 tsd::FillArchive {
                     color: Some(tsp::Color {
                         model: tsp::color::ColorModel::Rgb as i32,
-                        r: Some(color.red),
-                        g: Some(color.green),
-                        b: Some(color.blue),
-                        rgbspace: Some(native_color_space(color.color_space)),
-                        a: Some(color.alpha),
+                        r: Some(color.red()),
+                        g: Some(color.green()),
+                        b: Some(color.blue()),
+                        rgbspace: Some(native_color_space(color.color_space())),
+                        a: Some(color.alpha()),
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -153,10 +154,10 @@ fn encode_background_fill(
                 Some(tsp::color::ColorModel::Rgb as u64),
             )?;
             for (field, value) in [
-                (3, color.red),
-                (4, color.green),
-                (5, color.blue),
-                (6, color.alpha),
+                (3, color.red()),
+                (4, color.green()),
+                (5, color.blue()),
+                (6, color.alpha()),
             ] {
                 data = patch_nested_fixed32_field(&data, &[1, field], true, Some(value.to_bits()))?;
             }
@@ -164,7 +165,7 @@ fn encode_background_fill(
                 &data,
                 &[1, 12],
                 true,
-                Some(native_color_space(color.color_space) as u64),
+                Some(native_color_space(color.color_space()) as u64),
             )?;
             let verified = tsd::FillArchive::decode(data.as_slice())?;
             if verified.gradient.is_some() || verified.image.is_some() {
@@ -174,6 +175,9 @@ fn encode_background_fill(
             }
             Ok(data)
         },
+        _ => Err(Error::InvalidFormat(
+            "unsupported Keynote slide-background semantic variant".to_owned(),
+        )),
     }
 }
 

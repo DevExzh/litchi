@@ -3,12 +3,12 @@
 use std::env;
 
 use litchi_iwa::keynote::{
-    KeynoteEditor, KeynoteGradient, KeynoteGradientAngle, KeynoteGradientKind, KeynoteGradientStop,
-    KeynoteRgbColorSpace, KeynoteRgbaColor, KeynoteSlideBackground,
+    Angle, Background, Gradient, KeynoteEditor, Kind, RgbColorSpace, Rgba, Stop,
 };
+use litchi_iwa_common::shape::fill::{Opacity, StopMidpoint, StopPosition};
 
 enum Operation {
-    Set(KeynoteSlideBackground),
+    Set(Background),
     Reset,
 }
 
@@ -20,15 +20,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let slide_index = slide_index.parse::<usize>()?;
     let operation = match (mode.as_str(), rest) {
         ("reset", []) => Operation::Reset,
-        ("none", []) => Operation::Set(KeynoteSlideBackground::None),
+        ("none", []) => Operation::Set(Background::None),
         ("solid", [red, green, blue, alpha, color_space]) => {
-            Operation::Set(KeynoteSlideBackground::Solid(KeynoteRgbaColor {
-                red: red.parse()?,
-                green: green.parse()?,
-                blue: blue.parse()?,
-                alpha: alpha.parse()?,
-                color_space: parse_color_space(color_space)?,
-            }))
+            Operation::Set(Background::Solid(Rgba::new(
+                red.parse()?,
+                green.parse()?,
+                blue.parse()?,
+                alpha.parse()?,
+                parse_color_space(color_space)?,
+            )?))
         },
         (
             "linear-gradient",
@@ -45,11 +45,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 end_alpha,
                 end_space,
             ],
-        ) => Operation::Set(KeynoteSlideBackground::Gradient(KeynoteGradient::linear(
+        ) => Operation::Set(Background::Gradient(Gradient::linear(
             parse_color(start_red, start_green, start_blue, start_alpha, start_space)?,
             parse_color(end_red, end_green, end_blue, end_alpha, end_space)?,
-            KeynoteGradientAngle::from_degrees(angle.parse()?)?,
-        )?)),
+            Angle::from_degrees(angle.parse()?)?,
+        ))),
         (
             "radial-gradient",
             [
@@ -68,14 +68,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ) => {
             let start = parse_color(start_red, start_green, start_blue, start_alpha, start_space)?;
             let end = parse_color(end_red, end_green, end_blue, end_alpha, end_space)?;
-            Operation::Set(KeynoteSlideBackground::Gradient(KeynoteGradient::advanced(
-                KeynoteGradientKind::Radial,
+            Operation::Set(Background::Gradient(Gradient::advanced(
+                Kind::Radial,
                 vec![
-                    KeynoteGradientStop::new(start, 0.0, 0.5)?,
-                    KeynoteGradientStop::new(end, 1.0, 0.5)?,
+                    Stop::new(start, StopPosition::START, StopMidpoint::CENTER),
+                    Stop::new(end, StopPosition::END, StopMidpoint::CENTER),
                 ],
-                1.0,
-                KeynoteGradientAngle::from_degrees(angle.parse()?)?,
+                Opacity::OPAQUE,
+                Angle::from_degrees(angle.parse()?)?,
             )?))
         },
         _ => return Err(usage().into()),
@@ -105,20 +105,20 @@ fn parse_color(
     blue: &str,
     alpha: &str,
     color_space: &str,
-) -> Result<KeynoteRgbaColor, Box<dyn std::error::Error>> {
-    Ok(KeynoteRgbaColor {
-        red: red.parse()?,
-        green: green.parse()?,
-        blue: blue.parse()?,
-        alpha: alpha.parse()?,
-        color_space: parse_color_space(color_space)?,
-    })
+) -> Result<Rgba, Box<dyn std::error::Error>> {
+    Ok(Rgba::new(
+        red.parse()?,
+        green.parse()?,
+        blue.parse()?,
+        alpha.parse()?,
+        parse_color_space(color_space)?,
+    )?)
 }
 
-fn parse_color_space(value: &str) -> Result<KeynoteRgbColorSpace, Box<dyn std::error::Error>> {
+fn parse_color_space(value: &str) -> Result<RgbColorSpace, Box<dyn std::error::Error>> {
     match value {
-        "srgb" => Ok(KeynoteRgbColorSpace::Srgb),
-        "display-p3" => Ok(KeynoteRgbColorSpace::DisplayP3),
+        "srgb" => Ok(RgbColorSpace::Srgb),
+        "display-p3" => Ok(RgbColorSpace::DisplayP3),
         _ => Err(usage().into()),
     }
 }

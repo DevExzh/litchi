@@ -16,6 +16,7 @@ use crate::protobuf::{tsd, tsp, tswp};
 use crate::{Error, IWorkPackage, Result};
 
 use super::shape_line_segment;
+pub use litchi_iwa_common::shape::line::{Endpoint, Endpoints};
 use native::endpoint_archive;
 pub(crate) use registry::{
     ShapeStyleOverrides, ShapeStyleVariationLocation, collapse_line_end_variation,
@@ -28,56 +29,12 @@ const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const SHAPE_STYLE_MESSAGE_TYPE: u32 = 2_025;
 
-/// A native endpoint decoration supported by Pages, Numbers, and Keynote.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum LineEndpoint {
-    /// No endpoint decoration.
-    #[default]
-    None,
-    /// A compact filled triangular arrowhead.
-    SimpleArrow,
-    /// A filled circular endpoint.
-    FilledCircle,
-    /// A filled diamond endpoint.
-    FilledDiamond,
-    /// An outlined arrowhead with a short center stem.
-    OpenArrow,
-    /// A broad filled arrowhead with an inset base.
-    FilledArrow,
-    /// A filled square endpoint.
-    FilledSquare,
-    /// An outlined square endpoint.
-    OpenSquare,
-    /// An outlined circular endpoint.
-    OpenCircle,
-    /// A filled arrowhead pointing toward the line segment.
-    InvertedArrow,
-    /// A perpendicular bar endpoint.
-    Line,
-}
-
-/// Decorations at the directed start and end of a straight line.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct LineEndpoints {
-    /// Decoration at the directed start point.
-    pub start: LineEndpoint,
-    /// Decoration at the directed end point.
-    pub end: LineEndpoint,
-}
-
-impl LineEndpoints {
-    /// Construct independently typed start and end decorations.
-    pub const fn new(start: LineEndpoint, end: LineEndpoint) -> Self {
-        Self { start, end }
-    }
-}
-
 #[allow(deprecated)]
 pub(crate) fn shape_line_endpoints(
     package: &IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-) -> Result<LineEndpoints> {
+) -> Result<Endpoints> {
     let shape = shape_payload(package, archive_name, drawable_id)?;
     if shape_line_segment(&shape)?.is_none() {
         return Err(Error::ParseError(format!(
@@ -99,7 +56,7 @@ pub(crate) fn shape_line_endpoints(
         head = head.or(inherited.0);
         tail = tail.or(inherited.1);
     }
-    let mut endpoints = LineEndpoints {
+    let mut endpoints = Endpoints {
         start: endpoint_from_archive(tail.as_ref())?,
         end: endpoint_from_archive(head.as_ref())?,
     };
@@ -119,7 +76,7 @@ pub(crate) fn set_shape_line_endpoints(
     package: &mut IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-    endpoints: LineEndpoints,
+    endpoints: Endpoints,
 ) -> Result<()> {
     let shape = shape_payload(package, archive_name, drawable_id)?;
     if shape_line_segment(&shape)?.is_none() {
@@ -175,18 +132,18 @@ pub(crate) fn set_shape_line_endpoints(
         .map(|reference| reference.identifier);
 
     let mut remove_direct_endpoints = false;
-    if disposable && endpoints == LineEndpoints::default() {
+    if disposable && endpoints == Endpoints::default() {
         let parent_style_id = parent_style_id.ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "iWork endpoint variation {old_style_id} has no parent style"
             ))
         })?;
         let inherited = inherited_line_ends(package, parent_style_id)?;
-        let inherited = LineEndpoints {
+        let inherited = Endpoints {
             start: endpoint_from_archive(inherited.1.as_ref())?,
             end: endpoint_from_archive(inherited.0.as_ref())?,
         };
-        if inherited == LineEndpoints::default() {
+        if inherited == Endpoints::default() {
             remove_direct_endpoints = true;
         }
     }
@@ -407,17 +364,17 @@ mod tests {
     #[test]
     fn every_typed_endpoint_round_trips_through_native_identifier() {
         for endpoint in [
-            LineEndpoint::None,
-            LineEndpoint::SimpleArrow,
-            LineEndpoint::FilledCircle,
-            LineEndpoint::FilledDiamond,
-            LineEndpoint::OpenArrow,
-            LineEndpoint::FilledArrow,
-            LineEndpoint::FilledSquare,
-            LineEndpoint::OpenSquare,
-            LineEndpoint::OpenCircle,
-            LineEndpoint::InvertedArrow,
-            LineEndpoint::Line,
+            Endpoint::None,
+            Endpoint::SimpleArrow,
+            Endpoint::FilledCircle,
+            Endpoint::FilledDiamond,
+            Endpoint::OpenArrow,
+            Endpoint::FilledArrow,
+            Endpoint::FilledSquare,
+            Endpoint::OpenSquare,
+            Endpoint::OpenCircle,
+            Endpoint::InvertedArrow,
+            Endpoint::Line,
         ] {
             let archive = endpoint_archive(endpoint);
             assert_eq!(endpoint_from_archive(Some(&archive)).unwrap(), endpoint);
@@ -428,8 +385,8 @@ mod tests {
     #[test]
     fn line_endpoints_default_to_undecorated() {
         assert_eq!(
-            LineEndpoints::default(),
-            LineEndpoints::new(LineEndpoint::None, LineEndpoint::None)
+            Endpoints::default(),
+            Endpoints::new(Endpoint::None, Endpoint::None)
         );
     }
 }

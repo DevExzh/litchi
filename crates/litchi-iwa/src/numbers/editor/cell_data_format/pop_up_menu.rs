@@ -2,7 +2,7 @@
 #![allow(deprecated)] // Native archives still emit these fields; strict reads must validate them.
 
 use super::*;
-use crate::table_cell_data_format::{TableCellPopUpMenuFormat, TableCellPopUpMenuInitialSelection};
+use litchi_numbers::cell::data_format::pop_up_menu::{InitialSelection, PopUpMenu};
 
 pub(super) const MODEL_MESSAGE_TYPE: u32 = 6_206;
 
@@ -11,7 +11,7 @@ pub(super) fn read_model(
     locations: &HashMap<u64, String>,
     identifier: u64,
     starts_with_first_item: bool,
-) -> Result<TableCellPopUpMenuFormat> {
+) -> Result<PopUpMenu> {
     let archive_name = locations.get(&identifier).ok_or_else(|| {
         Error::InvalidFormat(format!("Pop-Up Menu model object {identifier} is missing"))
     })?;
@@ -74,19 +74,21 @@ pub(super) fn read_model(
             Ok(string.value.as_str())
         })
         .collect::<Result<Vec<_>>>()?;
-    TableCellPopUpMenuFormat::try_new(items).map(|format| {
-        format.with_initial_selection(if starts_with_first_item {
-            TableCellPopUpMenuInitialSelection::FirstItem
-        } else {
-            TableCellPopUpMenuInitialSelection::Blank
+    PopUpMenu::new(items)
+        .map(|format| {
+            format.with_initial_selection(if starts_with_first_item {
+                InitialSelection::FirstItem
+            } else {
+                InitialSelection::Blank
+            })
         })
-    })
+        .map_err(Into::into)
 }
 
 pub(super) fn create_model(
     package: &mut IWorkPackage,
     archive_name: &str,
-    format: &TableCellPopUpMenuFormat,
+    format: &PopUpMenu,
 ) -> Result<u64> {
     let identifier = next_object_identifier(package)?;
     let model = tst::PopUpMenuModel {

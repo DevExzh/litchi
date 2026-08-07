@@ -11,15 +11,25 @@ rust-version.workspace = true
 [dependencies]
 chrono        = { workspace = true }
 litchi-core   = { workspace = true }
+litchi-iwa-archive = { workspace = true }
+litchi-iwa-cache = { workspace = true }
+litchi-iwa-common = { workspace = true }
+litchi-iwa-core = { workspace = true }
+litchi-iwa-detect = { workspace = true }
+litchi-iwa-graph = { workspace = true }
+litchi-iwa-index = { workspace = true }
+litchi-iwa-package = { workspace = true }
+litchi-iwa-structured = { workspace = true }
+litchi-iwa-text = { workspace = true }
+litchi-iwa-text-wire = { workspace = true }
+litchi-iwa-protos = { workspace = true }
+litchi-keynote = { workspace = true }
+litchi-numbers = { workspace = true }
+litchi-pages = { workspace = true }
 once_cell     = { workspace = true }
 phf           = { workspace = true }
 plist         = { workspace = true }
 prost         = { workspace = true }
 sha1          = { workspace = true }
-snap          = { workspace = true }
-soapberry-zip = { workspace = true }
 tempfile      = { workspace = true }
 thiserror     = { workspace = true }
-
-[build-dependencies]
-prost-build = { workspace = true }

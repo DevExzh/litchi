@@ -3,66 +3,31 @@
 //! This module provides support for decoding Protocol Buffers messages
 //! used in iWork IWA (iWork Archive) files using the prost crate.
 
+#![allow(
+    dead_code,
+    unused_imports,
+    reason = "This private decoder adapter retains in-crate migration entries."
+)]
+
 use crate::{Error, Result};
 use phf::phf_map;
 use prost::Message;
 
-// Include the generated protobuf definitions from build.rs
-include!(concat!(env!("OUT_DIR"), "/iwa_protos.rs"));
+// Keep the generated schema layer in its own crate. The explicit list makes
+// this compatibility boundary auditable and prevents decoder-only additions
+// from accidentally becoming part of the raw schema crate.
+pub use litchi_iwa_protos::{kn, tn, tp, tsa, tsce, tsch, tsd, tsk, tsp, tss, tst, tswp};
 
 /// Static decoder function for ArchiveInfo messages
 fn decode_archive_info(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = tsp::ArchiveInfo::decode(data)?;
-    Ok(Box::new(ArchiveInfoWrapper(msg)) as Box<dyn DecodedMessage>)
+    tsp::ArchiveInfo::decode(data)?;
+    Ok(Box::new(ArchiveInfoWrapper) as Box<dyn DecodedMessage>)
 }
 
 /// Static decoder function for MessageInfo messages
 fn decode_message_info(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = tsp::MessageInfo::decode(data)?;
-    Ok(Box::new(MessageInfoWrapper(msg)) as Box<dyn DecodedMessage>)
-}
-
-/// Static decoder function for Pages DocumentArchive messages
-fn decode_pages_document(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = tp::DocumentArchive::decode(data)?;
-    Ok(Box::new(PagesDocumentWrapper(msg)) as Box<dyn DecodedMessage>)
-}
-
-fn decode_pages_theme(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = tp::ThemeArchive::decode(data)?;
-    Ok(Box::new(PagesThemeWrapper(msg)) as Box<dyn DecodedMessage>)
-}
-
-fn decode_pages_section(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = tp::SectionArchive::decode(data)?;
-    Ok(Box::new(PagesSectionWrapper(msg)) as Box<dyn DecodedMessage>)
-}
-
-fn decode_pages_section_template(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = tp::SectionTemplateArchive::decode(data)?;
-    Ok(Box::new(PagesSectionTemplateWrapper(msg)) as Box<dyn DecodedMessage>)
-}
-
-/// Static decoder function for Numbers SheetArchive messages
-fn decode_numbers_sheet(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = tn::SheetArchive::decode(data)?;
-    Ok(Box::new(NumbersSheetWrapper(msg)) as Box<dyn DecodedMessage>)
-}
-
-/// Static decoder function for Keynote SlideArchive messages
-fn decode_keynote_slide(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = kn::SlideArchive::decode(data)?;
-    Ok(Box::new(KeynoteSlideWrapper(msg)) as Box<dyn DecodedMessage>)
-}
-
-fn decode_keynote_build(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = kn::BuildArchive::decode(data)?;
-    Ok(Box::new(KeynoteBuildWrapper(msg)) as Box<dyn DecodedMessage>)
-}
-
-fn decode_keynote_build_chunk(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = kn::BuildChunkArchive::decode(data)?;
-    Ok(Box::new(KeynoteBuildChunkWrapper(msg)) as Box<dyn DecodedMessage>)
+    tsp::MessageInfo::decode(data)?;
+    Ok(Box::new(MessageInfoWrapper) as Box<dyn DecodedMessage>)
 }
 
 /// Static decoder function for StorageArchive messages
@@ -97,8 +62,8 @@ fn decode_shape_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
 
 /// Static decoder function for DrawableArchive messages
 fn decode_drawable_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = tsd::DrawableArchive::decode(data)?;
-    Ok(Box::new(DrawableArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
+    tsd::DrawableArchive::decode(data)?;
+    Ok(Box::new(DrawableArchiveWrapper) as Box<dyn DecodedMessage>)
 }
 
 fn decode_comment_storage_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
@@ -112,8 +77,8 @@ fn decode_legacy_chart(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
 }
 
 fn decode_chart_mediator(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let message = tsch::ChartMediatorArchive::decode(data)?;
-    Ok(Box::new(ChartMediatorArchiveWrapper(message)) as Box<dyn DecodedMessage>)
+    tsch::ChartMediatorArchive::decode(data)?;
+    Ok(Box::new(ChartMediatorArchiveWrapper) as Box<dyn DecodedMessage>)
 }
 
 fn decode_chart_drawable(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
@@ -123,11 +88,13 @@ fn decode_chart_drawable(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
 
 type DecoderMap = phf::Map<u32, fn(&[u8]) -> Result<Box<dyn DecodedMessage>>>;
 
-/// Perfect hash map of message type IDs to decoder functions
-/// This provides O(1) lookup performance at compile time
+/// Perfect hash map of globally shared, non-colliding message type IDs.
+///
+/// This provides O(1) lookup performance at compile time. It intentionally
+/// excludes IDs that are owned by an application namespace. Application
+/// editors decode their own schemas at the typed editor boundary.
 ///
 /// Based on analysis of iWork documents and official message type registry:
-/// - 1-2: TSP (Core Protocol) ArchiveInfo and MessageInfo
 /// - 200-299: TSK (Document Core)
 /// - 400-499: TSS (Stylesheets)
 /// - 600-699: TSA (Application Core)
@@ -140,12 +107,8 @@ type DecoderMap = phf::Map<u32, fn(&[u8]) -> Result<Box<dyn DecodedMessage>>>;
 /// - 12000-12999: TN (Numbers-specific)
 /// - 1-25, 100-199: KN (Keynote-specific)
 ///
-/// Note: Message types are application-specific and may overlap between apps
-static DECODERS: DecoderMap = phf_map! {
-    // TSP (Core Protocol) types - used by all applications
-    1u32 => decode_archive_info,
-    2u32 => decode_message_info,
-
+/// Note: Message types are application-specific and may overlap between apps.
+static SHARED_DECODERS: DecoderMap = phf_map! {
     // TST (Table) types - Numbers spreadsheet tables and cells
     // Message type 6001 is TST.TableModelArchive
     6000u32 => decode_table_model,
@@ -187,37 +150,29 @@ static DECODERS: DecoderMap = phf_map! {
     2014u32 => decode_storage_archive,
     2022u32 => decode_storage_archive,
 
-    // Pages-specific document types (TP namespace)
-    10000u32 => decode_pages_document,
-    10001u32 => decode_pages_theme,
-    10011u32 => decode_pages_section,
-    10143u32 => decode_pages_section_template,
-
-    // Numbers-specific document types (TN namespace)
-    // Note: Numbers uses low message type numbers that conflict with TSP types
-    // Type 1 for TN.DocumentArchive conflicts with TSP.ArchiveInfo
-    // Type 2 for TN.SheetArchive conflicts with TSP.MessageInfo
-    // We prioritize TSP types in the decoder map and handle app-specific
-    // types through context-aware parsing in the document parsers
-    3u32 => decode_numbers_sheet,       // TN.FormBasedSheetArchive
-
-    // Keynote-specific document types (KN namespace)
-    // Note: Keynote uses low message type numbers (1-25, 100-199)
-    // Type 2 is KN.ShowArchive but conflicts with TSP.MessageInfo
-    // Type 5/6 are KN.SlideArchive
-    5u32 => decode_keynote_slide,       // KN.SlideArchive
-    6u32 => decode_keynote_slide,       // KN.SlideArchive (variant)
-    8u32 => decode_keynote_build,       // KN.BuildArchive
-    153u32 => decode_keynote_build_chunk, // KN.BuildChunkArchive
 };
 
-/// Decode a message of the given type using the perfect hash map for O(1) lookup
-pub fn decode(message_type: u32, data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    if let Some(decoder) = DECODERS.get(&message_type) {
-        decoder(data)
-    } else {
-        Err(Error::UnsupportedMessageType(message_type))
-    }
+/// TSP core messages are shared in meaning but their numeric IDs collide with
+/// application-owned messages. They are included only in the neutral archive
+/// text projection below.
+static COMMON_DECODERS: DecoderMap = phf_map! {
+    1u32 => decode_archive_info,
+    2u32 => decode_message_info,
+};
+
+/// Decode a message for the neutral archive text projection.
+///
+/// The archive layer never guesses an application namespace. It only accepts
+/// the shared schemas and returns an unsupported-type error for everything
+/// else, leaving application-specific decoding to the owning editor crate.
+pub(crate) fn decode_common(message_type: u32, data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
+    let Some(decoder) = COMMON_DECODERS
+        .get(&message_type)
+        .or_else(|| SHARED_DECODERS.get(&message_type))
+    else {
+        return Err(Error::UnsupportedMessageType(message_type));
+    };
+    decoder(data)
 }
 
 /// Trait for decoded iWork messages retained by immutable bundle snapshots.
@@ -226,9 +181,6 @@ pub fn decode(message_type: u32, data: &[u8]) -> Result<Box<dyn DecodedMessage>>
 /// marker traits makes the containing archive and bundle safe to share across
 /// concurrent readers without a runtime lock.
 pub trait DecodedMessage: std::fmt::Debug + Send + Sync {
-    /// Get the message type identifier
-    fn message_type(&self) -> u32;
-
     /// Extract text content from the message if available
     fn extract_text(&self) -> Vec<String> {
         Vec::new()
@@ -237,13 +189,9 @@ pub trait DecodedMessage: std::fmt::Debug + Send + Sync {
 
 /// Wrapper for ArchiveInfo message
 #[derive(Debug)]
-pub struct ArchiveInfoWrapper(pub tsp::ArchiveInfo);
+struct ArchiveInfoWrapper;
 
 impl DecodedMessage for ArchiveInfoWrapper {
-    fn message_type(&self) -> u32 {
-        1
-    }
-
     fn extract_text(&self) -> Vec<String> {
         Vec::new() // ArchiveInfo doesn't contain text
     }
@@ -251,13 +199,9 @@ impl DecodedMessage for ArchiveInfoWrapper {
 
 /// Wrapper for MessageInfo message
 #[derive(Debug)]
-pub struct MessageInfoWrapper(pub tsp::MessageInfo);
+struct MessageInfoWrapper;
 
 impl DecodedMessage for MessageInfoWrapper {
-    fn message_type(&self) -> u32 {
-        2
-    }
-
     fn extract_text(&self) -> Vec<String> {
         Vec::new() // MessageInfo doesn't contain text
     }
@@ -268,127 +212,8 @@ impl DecodedMessage for MessageInfoWrapper {
 pub struct StorageArchiveWrapper(pub tswp::StorageArchive);
 
 impl DecodedMessage for StorageArchiveWrapper {
-    fn message_type(&self) -> u32 {
-        200
-    }
-
     fn extract_text(&self) -> Vec<String> {
         self.0.text.clone()
-    }
-}
-
-/// Document wrapper for TP.DocumentArchive
-#[derive(Debug)]
-pub struct PagesDocumentWrapper(pub tp::DocumentArchive);
-
-impl DecodedMessage for PagesDocumentWrapper {
-    fn message_type(&self) -> u32 {
-        10000
-    }
-
-    fn extract_text(&self) -> Vec<String> {
-        Vec::new() // Document metadata doesn't contain direct text
-    }
-}
-
-/// Wrapper for TP.ThemeArchive.
-#[derive(Debug)]
-pub struct PagesThemeWrapper(pub tp::ThemeArchive);
-
-impl DecodedMessage for PagesThemeWrapper {
-    fn message_type(&self) -> u32 {
-        10001
-    }
-}
-
-/// Wrapper for TP.SectionArchive.
-#[derive(Debug)]
-pub struct PagesSectionWrapper(pub tp::SectionArchive);
-
-impl DecodedMessage for PagesSectionWrapper {
-    fn message_type(&self) -> u32 {
-        10011
-    }
-
-    fn extract_text(&self) -> Vec<String> {
-        self.0
-            .name
-            .iter()
-            .filter(|name| !name.is_empty())
-            .cloned()
-            .collect()
-    }
-}
-
-/// Wrapper for TP.SectionTemplateArchive.
-#[derive(Debug)]
-pub struct PagesSectionTemplateWrapper(pub tp::SectionTemplateArchive);
-
-impl DecodedMessage for PagesSectionTemplateWrapper {
-    fn message_type(&self) -> u32 {
-        10143
-    }
-}
-
-/// Sheet wrapper for TN.SheetArchive
-#[derive(Debug)]
-pub struct NumbersSheetWrapper(pub tn::SheetArchive);
-
-impl DecodedMessage for NumbersSheetWrapper {
-    fn message_type(&self) -> u32 {
-        1003
-    }
-
-    fn extract_text(&self) -> Vec<String> {
-        if !self.0.name.is_empty() {
-            vec![self.0.name.clone()]
-        } else {
-            Vec::new()
-        }
-    }
-}
-
-/// Wrapper for Keynote Slide Archive
-#[derive(Debug)]
-pub struct KeynoteSlideWrapper(pub kn::SlideArchive);
-
-impl DecodedMessage for KeynoteSlideWrapper {
-    fn message_type(&self) -> u32 {
-        1102
-    }
-
-    fn extract_text(&self) -> Vec<String> {
-        let mut text = Vec::new();
-        if let Some(ref name) = self.0.name
-            && !name.is_empty()
-        {
-            text.push(name.clone());
-        }
-        // if let Some(ref note) = self.0.note {
-        //     // Note is a reference, not direct text - we can't extract text from it here
-        //     // without additional processing
-        // }
-        text
-    }
-}
-
-/// Wrapper for a Keynote object build.
-#[derive(Debug)]
-pub struct KeynoteBuildWrapper(pub kn::BuildArchive);
-
-impl DecodedMessage for KeynoteBuildWrapper {
-    fn message_type(&self) -> u32 {
-        8
-    }
-}
-
-/// Wrapper for a Keynote build timing chunk.
-#[derive(Debug)]
-pub struct KeynoteBuildChunkWrapper(pub kn::BuildChunkArchive);
-
-impl DecodedMessage for KeynoteBuildChunkWrapper {
-    fn message_type(&self) -> u32 {
-        153
     }
 }
 
@@ -397,10 +222,6 @@ impl DecodedMessage for KeynoteBuildChunkWrapper {
 pub struct TableModelWrapper(pub tst::TableModelArchive);
 
 impl DecodedMessage for TableModelWrapper {
-    fn message_type(&self) -> u32 {
-        100
-    }
-
     fn extract_text(&self) -> Vec<String> {
         let mut text = Vec::new();
         // Extract table name if present
@@ -418,10 +239,6 @@ impl DecodedMessage for TableModelWrapper {
 pub struct TableDataListWrapper(pub tst::TableDataList);
 
 impl DecodedMessage for TableDataListWrapper {
-    fn message_type(&self) -> u32 {
-        101
-    }
-
     fn extract_text(&self) -> Vec<String> {
         // TableDataList contains actual cell data as ListEntry items
         // Extract string values from entries
@@ -444,10 +261,6 @@ impl DecodedMessage for TableDataListWrapper {
 pub struct TableDataListSegmentWrapper(pub tst::TableDataListSegment);
 
 impl DecodedMessage for TableDataListSegmentWrapper {
-    fn message_type(&self) -> u32 {
-        6011
-    }
-
     fn extract_text(&self) -> Vec<String> {
         self.0
             .entries
@@ -464,10 +277,6 @@ impl DecodedMessage for TableDataListSegmentWrapper {
 pub struct ShapeArchiveWrapper(pub tsd::ShapeArchive);
 
 impl DecodedMessage for ShapeArchiveWrapper {
-    fn message_type(&self) -> u32 {
-        500
-    }
-
     fn extract_text(&self) -> Vec<String> {
         // Shapes can contain text, particularly text boxes
         // Text is typically stored in the DrawableArchive's accessibility description
@@ -497,13 +306,9 @@ impl DecodedMessage for ShapeArchiveWrapper {
 
 /// Wrapper for Drawable Archive
 #[derive(Debug)]
-pub struct DrawableArchiveWrapper(pub tsd::DrawableArchive);
+struct DrawableArchiveWrapper;
 
 impl DecodedMessage for DrawableArchiveWrapper {
-    fn message_type(&self) -> u32 {
-        501
-    }
-
     fn extract_text(&self) -> Vec<String> {
         // Drawables are visual elements without direct text
         Vec::new()
@@ -515,10 +320,6 @@ impl DecodedMessage for DrawableArchiveWrapper {
 pub struct CommentStorageArchiveWrapper(pub tsd::CommentStorageArchive);
 
 impl DecodedMessage for CommentStorageArchiveWrapper {
-    fn message_type(&self) -> u32 {
-        3056
-    }
-
     fn extract_text(&self) -> Vec<String> {
         self.0
             .text
@@ -534,10 +335,6 @@ impl DecodedMessage for CommentStorageArchiveWrapper {
 pub struct LegacyChartArchiveWrapper(pub tsch::pre_uff::ChartInfoArchive);
 
 impl DecodedMessage for LegacyChartArchiveWrapper {
-    fn message_type(&self) -> u32 {
-        5_000
-    }
-
     fn extract_text(&self) -> Vec<String> {
         self.0
             .chart_model
@@ -552,23 +349,15 @@ impl DecodedMessage for LegacyChartArchiveWrapper {
 
 /// Wrapper for a chart's data mediator.
 #[derive(Debug)]
-pub struct ChartMediatorArchiveWrapper(pub tsch::ChartMediatorArchive);
+struct ChartMediatorArchiveWrapper;
 
-impl DecodedMessage for ChartMediatorArchiveWrapper {
-    fn message_type(&self) -> u32 {
-        5_004
-    }
-}
+impl DecodedMessage for ChartMediatorArchiveWrapper {}
 
 /// Wrapper for an extension-backed modern chart drawable.
 #[derive(Debug)]
 pub struct ChartDrawableArchiveWrapper(pub crate::charts::IWorkChartArchive);
 
 impl DecodedMessage for ChartDrawableArchiveWrapper {
-    fn message_type(&self) -> u32 {
-        5_021
-    }
-
     fn extract_text(&self) -> Vec<String> {
         self.0
             .chart
@@ -586,41 +375,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_message_decoder_creation() {
-        // Test that all expected decoders are available in the static map
-        assert!(DECODERS.contains_key(&1)); // ArchiveInfo / TN.DocumentArchive
-        assert!(DECODERS.contains_key(&2)); // MessageInfo / TN.SheetArchive
-        assert!(DECODERS.contains_key(&6001)); // TST.TableModelArchive
-        assert!(DECODERS.contains_key(&6011)); // TST.TableDataListSegment
-        assert!(DECODERS.contains_key(&2001)); // TSWP.StorageArchive
-        assert!(DECODERS.contains_key(&2002)); // StorageArchive variant
-        assert!(DECODERS.contains_key(&2003)); // StorageArchive variant
-        assert!(DECODERS.contains_key(&2022)); // Common StorageArchive type
-        assert!(DECODERS.contains_key(&3056)); // TSD.CommentStorageArchive
-        assert!(DECODERS.contains_key(&10000)); // TP.DocumentArchive (Pages)
-        assert!(DECODERS.contains_key(&10001)); // TP.ThemeArchive (Pages)
-        assert!(DECODERS.contains_key(&10011)); // TP.SectionArchive (Pages)
-        assert!(DECODERS.contains_key(&10143)); // TP.SectionTemplateArchive (Pages)
-        assert!(DECODERS.contains_key(&3)); // TN.FormBasedSheetArchive (Numbers)
-        assert!(DECODERS.contains_key(&5)); // KN.SlideArchive (Keynote)
-        assert!(DECODERS.contains_key(&6)); // KN.SlideArchive variant (Keynote)
-        assert!(DECODERS.contains_key(&8)); // KN.BuildArchive (Keynote)
-        assert!(DECODERS.contains_key(&153)); // KN.BuildChunkArchive (Keynote)
+    fn neutral_decoder_registry_contains_only_supported_types() {
+        assert!(COMMON_DECODERS.contains_key(&1));
+        assert!(COMMON_DECODERS.contains_key(&2));
+        assert!(SHARED_DECODERS.contains_key(&6001)); // TST.TableModelArchive
+        assert!(SHARED_DECODERS.contains_key(&6011)); // TST.TableDataListSegment
+        assert!(SHARED_DECODERS.contains_key(&2001)); // TSWP.StorageArchive
+        assert!(SHARED_DECODERS.contains_key(&2002)); // StorageArchive variant
+        assert!(SHARED_DECODERS.contains_key(&2003)); // StorageArchive variant
+        assert!(SHARED_DECODERS.contains_key(&2022)); // Common StorageArchive type
+        assert!(SHARED_DECODERS.contains_key(&3056)); // TSD.CommentStorageArchive
     }
 
     #[test]
-    fn keynote_build_types_use_their_concrete_decoders() {
-        let build = kn::BuildArchive {
-            delivery: "All at Once".to_owned(),
-            attributes: kn::BuildAttributesArchive::default(),
+    fn archive_info_is_decoded_without_application_guessing() {
+        let archive_info = tsp::ArchiveInfo::default().encode_to_vec();
+        let decoded = decode_common(1, &archive_info).unwrap();
+        assert!(decoded.extract_text().is_empty());
+    }
+
+    #[test]
+    fn shared_storage_extracts_text() {
+        let storage = tswp::StorageArchive {
+            text: vec!["shared".to_owned()],
             ..Default::default()
         };
-        assert_eq!(decode(8, &build.encode_to_vec()).unwrap().message_type(), 8);
-
-        let chunk = kn::BuildChunkArchive::default();
+        let data = storage.encode_to_vec();
         assert_eq!(
-            decode(153, &chunk.encode_to_vec()).unwrap().message_type(),
-            153
+            decode_common(2001, &data).unwrap().extract_text(),
+            ["shared"]
         );
     }
 
@@ -639,8 +422,7 @@ mod tests {
                 ..Default::default()
             }],
         };
-        let decoded = decode(6011, &segment.encode_to_vec()).unwrap();
-        assert_eq!(decoded.message_type(), 6011);
+        let decoded = decode_common(6011, &segment.encode_to_vec()).unwrap();
         assert_eq!(decoded.extract_text(), ["Segmented"]);
     }
 
@@ -650,8 +432,7 @@ mod tests {
             text: Some("Review this".to_owned()),
             ..Default::default()
         };
-        let decoded = decode(3056, &comment.encode_to_vec()).unwrap();
-        assert_eq!(decoded.message_type(), 3056);
+        let decoded = decode_common(3056, &comment.encode_to_vec()).unwrap();
         assert_eq!(decoded.extract_text(), ["Review this"]);
     }
 
@@ -669,31 +450,13 @@ mod tests {
                 ..Default::default()
             },
         );
-        let decoded = decode(5_021, &chart.encode().unwrap()).unwrap();
-
-        assert_eq!(decoded.message_type(), 5_021);
+        let decoded = decode_common(5_021, &chart.encode().unwrap()).unwrap();
         assert_eq!(decoded.extract_text(), ["Revenue", "2026"]);
     }
 
     #[test]
-    fn pages_section_types_use_their_concrete_decoders() {
-        let section = tp::SectionArchive {
-            name: Some("Chapter".to_owned()),
-            ..Default::default()
-        };
-        let decoded = decode(10011, &section.encode_to_vec()).unwrap();
-        assert_eq!(decoded.message_type(), 10011);
-        assert_eq!(decoded.extract_text(), ["Chapter"]);
-
-        let template = tp::SectionTemplateArchive::default();
-        let decoded = decode(10143, &template.encode_to_vec()).unwrap();
-        assert_eq!(decoded.message_type(), 10143);
-        assert!(decoded.extract_text().is_empty());
-    }
-
-    #[test]
-    fn test_unsupported_message_type() {
-        let result = decode(999, &[]);
+    fn unsupported_application_message_is_rejected() {
+        let result = decode_common(999, &[]);
         assert!(matches!(result, Err(Error::UnsupportedMessageType(999))));
     }
 
@@ -701,13 +464,13 @@ mod tests {
     fn test_decoder_performance() {
         // Test that decoding is fast with phf::Map
         // This test ensures the static map lookup is working
-        let message_types = [1, 2, 6001, 2001, 2002, 2003, 10000, 3, 5];
+        let shared_message_types = [6001, 2001, 2002, 2003];
 
         // Create some dummy data that will fail to decode but test the lookup
         let dummy_data = vec![0u8; 10];
 
-        for &msg_type in &message_types {
-            let result = decode(msg_type, &dummy_data);
+        for &msg_type in &shared_message_types {
+            let result = decode_common(msg_type, &dummy_data);
             // We expect this to fail due to invalid protobuf data, but the lookup should be fast
             assert!(result.is_err());
         }

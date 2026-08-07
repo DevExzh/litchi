@@ -5,9 +5,10 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::pages::{PagesEditor, PagesMovieOptions};
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_iwa::{MediaLoopMode, MediaVolume};
+use litchi_iwa::pages::PagesEditor;
+use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
+use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_pages::movie::Options as PagesMovieOptions;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -50,13 +51,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         poster_filename,
         &poster,
         PagesMovieOptions::new(
-            DrawablePoint { x: 96.0, y: 144.0 },
-            DrawableSize {
+            Point { x: 96.0, y: 144.0 },
+            Size {
                 width: 320.0,
                 height: 180.0,
             },
             duration,
-        ),
+        )?,
     )?;
     let mut properties = editor.body_movie_properties(created.drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded movie: {movie_filename}"));

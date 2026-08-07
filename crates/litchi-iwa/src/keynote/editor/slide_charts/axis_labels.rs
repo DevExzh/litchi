@@ -1,7 +1,7 @@
 //! Native axis-label visibility CRUD for Keynote slide charts.
 
 use super::*;
-use crate::charts::ChartAxis;
+use crate::charts::Axis;
 use crate::charts::axis::{
     chart_axis_labels_visible as read_native_chart_axis_labels_visible,
     set_chart_axis_labels_visible as set_native_chart_axis_labels_visible,
@@ -13,7 +13,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<bool> {
         slide_chart_axis_labels_visible(self, slide_index, drawable_object_id, axis)
     }
@@ -23,7 +23,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         visible: bool,
     ) -> Result<()> {
         set_slide_chart_axis_labels_visible(self, slide_index, drawable_object_id, axis, visible)
@@ -34,7 +34,7 @@ fn slide_chart_axis_labels_visible(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<bool> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     read_native_chart_axis_labels_visible(
@@ -50,7 +50,7 @@ fn set_slide_chart_axis_labels_visible(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
     visible: bool,
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;

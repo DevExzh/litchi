@@ -1,0 +1,27 @@
+[package]
+name        = "litchi-pages"
+description = "Pages semantic value models and document capabilities."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+litchi-core       = { workspace = true }
+litchi-iwa-archive = { workspace = true }
+litchi-iwa-common = { workspace = true }
+litchi-iwa-core   = { workspace = true }
+litchi-iwa-protos = { workspace = true }
+litchi-iwa-text = { workspace = true }
+litchi-iwa-text-wire = { workspace = true }
+plist           = { workspace = true }
+prost           = { workspace = true }
+thiserror       = { workspace = true }
+
+[dev-dependencies]
+soapberry-zip = { workspace = true }
+
+[lints]
+workspace = true

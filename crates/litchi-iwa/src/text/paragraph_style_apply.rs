@@ -5,11 +5,11 @@ use crate::shapes::remove_style_variation;
 use crate::{Error, IWorkPackage, Result};
 
 use super::paragraph_alignment::{native, storage};
-use super::paragraph_following_style::{NamedParagraphStyle, ParagraphStyleId};
 use super::style_registry::{
     object_archive_name, register_style_reference, unregister_owner_reference_if_unused,
     unregister_private_style,
 };
+use litchi_iwa_text::paragraph::style::{NamedParagraphStyle, ParagraphStyleId, raw::native_id};
 
 /// The named style selected for one uniform text storage.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,10 +60,10 @@ pub(super) fn apply_named_paragraph_style(
     }
 
     let current_location = native::locate_style(package, style_id)?;
-    let current_is_named = current.style.id().get() == style_id;
-    let target_location = native::locate_style(package, target.get())?;
+    let current_is_named = native_id(current.style.id()) == style_id;
+    let target_location = native::locate_style(package, native_id(target))?;
     let mut staged = package.clone();
-    storage::patch_style_reference_with_archive(&mut staged, storage, style_id, target.get())?;
+    storage::patch_style_reference_with_archive(&mut staged, storage, style_id, native_id(target))?;
 
     if !current_is_named && native::is_exclusive(package, style_id)? {
         remove_exclusive_variation(
@@ -78,7 +78,7 @@ pub(super) fn apply_named_paragraph_style(
             &mut staged,
             &storage_archive_name,
             &target_location.archive_name,
-            target.get(),
+            native_id(target),
         )?;
         unregister_owner_reference_if_unused(
             &mut staged,
@@ -106,7 +106,10 @@ fn resolve_applied_style(
     let mut current = first_style_id;
     let mut visited = Vec::new();
     loop {
-        if let Some(style) = selectable.iter().find(|style| style.id().get() == current) {
+        if let Some(style) = selectable
+            .iter()
+            .find(|style| native_id(style.id()) == current)
+        {
             return Ok(AppliedParagraphStyle::new(
                 style.clone(),
                 current != first_style_id,
@@ -139,7 +142,7 @@ fn selectable_style(
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "iWork paragraph style {} is not a named style in this text stylesheet",
-                target.get()
+                native_id(target)
             ))
         })
 }
@@ -174,10 +177,10 @@ fn remove_exclusive_variation(
             owner_archive_name,
             &current_location.archive_name,
             current_id,
-            Some(target.get()),
+            Some(native_id(target)),
         )?;
         release_package_identifier_suffix(package, &[current_id])?;
-        if parent_style_id == base_style_id.get()
+        if parent_style_id == native_id(base_style_id)
             || !native::is_unreferenced(package, parent_style_id)?
         {
             return Ok(());

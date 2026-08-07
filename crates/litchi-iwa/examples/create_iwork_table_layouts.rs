@@ -3,26 +3,25 @@
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
-use litchi_iwa::numbers::{CellValue, NumbersDocumentBuilder, NumbersEditor};
+use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
-use litchi_iwa::table_cell_layout::{
-    TableCellInset, TableCellInsets, TableCellLayout, TableCellTextWrap, TableCellVerticalAlignment,
-};
 use litchi_iwa::text::{
-    ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple,
-    ParagraphLineSpacingPoints, ParagraphList, ParagraphListBullet,
+    Alignment, Background, IndentPoints, Indents, LineSpacing, LineSpacingMultiple,
+    LineSpacingPoints, Outline, ParagraphList, ParagraphListBullet,
     ParagraphListBulletBaselineOffset, ParagraphListBulletGeometry, ParagraphListBulletScale,
     ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLabelIndent,
     ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
     ParagraphListNumberPunctuation, ParagraphListNumberScale, ParagraphListNumberSequence,
     ParagraphListNumberTiering, ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart,
-    ParagraphListTextGap, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
-    ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, TextAlignment, TextBackground, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize,
-    TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    ParagraphListTextGap, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
+    ParagraphTabStop, ParagraphTabStops, Shadow, Spacing, SpacingPoints, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont, TextLigatures,
+    TextPointSize, TextScript, TextStrikethrough, TextStyle, TextUnderline,
 };
+use litchi_iwa_common::table::cell::layout::{Inset, Insets, Layout, TextWrap, VerticalAlignment};
+use litchi_iwa_text::position::TextPosition;
+use litchi_numbers::cell::Value as CellValue;
 
 const ROW: usize = 1;
 const COLUMN: usize = 1;
@@ -58,7 +57,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let numbers_table = numbers.tables()?.remove(0);
     assert_eq!(
         numbers.table_cell_text_alignment(numbers_table.object_id, ROW, COLUMN)?,
-        TextAlignment::Center
+        Alignment::Center
     );
     assert_eq!(
         numbers.table_cell_text_style(numbers_table.object_id, ROW, COLUMN)?,
@@ -98,7 +97,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         numbers.table_cell_text_outline(numbers_table.object_id, ROW, COLUMN)?,
-        TextOutline::standard()
+        Outline::standard()
     );
     assert_eq!(
         numbers.table_cell_text_script(numbers_table.object_id, ROW, COLUMN)?,
@@ -106,7 +105,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         numbers.table_cell_text_shadow(numbers_table.object_id, ROW, COLUMN)?,
-        TextShadow::standard()
+        Shadow::standard()
     );
     assert_eq!(
         numbers.table_cell_paragraph_line_spacing(numbers_table.object_id, ROW, COLUMN)?,
@@ -209,7 +208,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let pages_table = pages.tables()?.remove(0);
     assert_eq!(
         pages.table_cell_text_alignment(pages_table.model_object_id, ROW, COLUMN)?,
-        TextAlignment::Right
+        Alignment::Right
     );
     assert_eq!(
         pages.table_cell_text_style(pages_table.model_object_id, ROW, COLUMN)?,
@@ -249,7 +248,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         pages.table_cell_text_outline(pages_table.model_object_id, ROW, COLUMN)?,
-        TextOutline::standard()
+        Outline::standard()
     );
     assert_eq!(
         pages.table_cell_text_script(pages_table.model_object_id, ROW, COLUMN)?,
@@ -257,7 +256,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         pages.table_cell_text_shadow(pages_table.model_object_id, ROW, COLUMN)?,
-        TextShadow::standard()
+        Shadow::standard()
     );
     assert_eq!(
         pages.table_cell_paragraph_line_spacing(pages_table.model_object_id, ROW, COLUMN)?,
@@ -360,7 +359,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let keynote_table = keynote.slide_tables(0)?.remove(0);
     assert_eq!(
         keynote.slide_table_cell_text_alignment(0, keynote_table.model_object_id, ROW, COLUMN)?,
-        TextAlignment::Justified
+        Alignment::Justified
     );
     assert_eq!(
         keynote.slide_table_cell_text_style(0, keynote_table.model_object_id, ROW, COLUMN)?,
@@ -415,7 +414,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         keynote.slide_table_cell_text_outline(0, keynote_table.model_object_id, ROW, COLUMN)?,
-        TextOutline::standard()
+        Outline::standard()
     );
     assert_eq!(
         keynote.slide_table_cell_text_script(0, keynote_table.model_object_id, ROW, COLUMN)?,
@@ -423,7 +422,7 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     );
     assert_eq!(
         keynote.slide_table_cell_text_shadow(0, keynote_table.model_object_id, ROW, COLUMN)?,
-        TextShadow::standard()
+        Shadow::standard()
     );
     assert_eq!(
         keynote.slide_table_cell_paragraph_line_spacing(
@@ -557,46 +556,41 @@ fn verify(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn layout(alignment: TableCellVerticalAlignment) -> Result<TableCellLayout, litchi_iwa::Error> {
-    Ok(TableCellLayout::default()
-        .with_text_wrap(TableCellTextWrap::Wrapped)
+fn layout(alignment: VerticalAlignment) -> Result<Layout, litchi_iwa::Error> {
+    Ok(Layout::default()
+        .with_text_wrap(TextWrap::Wrapped)
         .with_vertical_alignment(alignment)
-        .with_insets(TableCellInsets::uniform(TableCellInset::from_points(
-            INSET_POINTS,
-        )?)))
+        .with_insets(Insets::uniform(Inset::from_points(INSET_POINTS)?)))
 }
 
 fn mixed_paragraph_lists() -> Result<Vec<ParagraphListPlacement>, litchi_iwa::Error> {
     Ok(vec![
-        ParagraphListPlacement::new(ParagraphStart::ZERO, ParagraphList::None),
-        ParagraphListPlacement::new(ParagraphStart::from_utf16_index(13)?, ParagraphList::Bullet),
-        ParagraphListPlacement::new(
-            ParagraphStart::from_utf16_index(32)?,
-            ParagraphList::Numbered,
-        ),
+        ParagraphListPlacement::new(TextPosition::ZERO, ParagraphList::None),
+        ParagraphListPlacement::new(TextPosition::from_utf16_index(13)?, ParagraphList::Bullet),
+        ParagraphListPlacement::new(TextPosition::from_utf16_index(32)?, ParagraphList::Numbered),
     ])
 }
 
 fn nested_paragraph_levels() -> Result<Vec<ParagraphListLevelPlacement>, litchi_iwa::Error> {
     Ok(vec![
-        ParagraphListLevelPlacement::new(ParagraphStart::ZERO, ParagraphListLevel::ZERO),
+        ParagraphListLevelPlacement::new(TextPosition::ZERO, ParagraphListLevel::ZERO),
         ParagraphListLevelPlacement::new(
-            ParagraphStart::from_utf16_index(13)?,
+            TextPosition::from_utf16_index(13)?,
             ParagraphListLevel::ONE,
         ),
         ParagraphListLevelPlacement::new(
-            ParagraphStart::from_utf16_index(32)?,
+            TextPosition::from_utf16_index(32)?,
             ParagraphListLevel::ZERO,
         ),
     ])
 }
 
-fn numbered_paragraph_start() -> Result<ParagraphStart, litchi_iwa::Error> {
-    ParagraphStart::from_utf16_index(32)
+fn numbered_paragraph_start() -> Result<TextPosition, litchi_iwa::Error> {
+    TextPosition::from_utf16_index(32)
 }
 
-fn bullet_paragraph_start() -> Result<ParagraphStart, litchi_iwa::Error> {
-    ParagraphStart::from_utf16_index(13)
+fn bullet_paragraph_start() -> Result<TextPosition, litchi_iwa::Error> {
+    TextPosition::from_utf16_index(13)
 }
 
 fn custom_bullet() -> Result<ParagraphListBullet, litchi_iwa::Error> {
@@ -659,43 +653,61 @@ fn keynote_text_style() -> Result<TextStyle, litchi_iwa::Error> {
 }
 
 fn numbers_text_font() -> Result<TextFont, litchi_iwa::Error> {
-    TextFont::named(NUMBERS_FONT_NAME)
+    Ok(TextFont::named(NUMBERS_FONT_NAME)?)
 }
 
 fn pages_text_font() -> Result<TextFont, litchi_iwa::Error> {
-    TextFont::named(PAGES_FONT_NAME)
+    Ok(TextFont::named(PAGES_FONT_NAME)?)
 }
 
 fn keynote_text_font() -> Result<TextFont, litchi_iwa::Error> {
-    TextFont::named(KEYNOTE_FONT_NAME)
+    Ok(TextFont::named(KEYNOTE_FONT_NAME)?)
 }
 
 fn numbers_text_color() -> Result<RgbaColor, litchi_iwa::Error> {
     const RED: f32 = 0.72;
     const GREEN: f32 = 0.10;
     const BLUE: f32 = 0.14;
-    RgbaColor::new(RED, GREEN, BLUE, OPAQUE, RgbColorSpace::Srgb)
+    Ok(RgbaColor::new(
+        RED,
+        GREEN,
+        BLUE,
+        OPAQUE,
+        RgbColorSpace::Srgb,
+    )?)
 }
 
 fn pages_text_color() -> Result<RgbaColor, litchi_iwa::Error> {
     const RED: f32 = 0.10;
     const GREEN: f32 = 0.32;
     const BLUE: f32 = 0.78;
-    RgbaColor::new(RED, GREEN, BLUE, OPAQUE, RgbColorSpace::Srgb)
+    Ok(RgbaColor::new(
+        RED,
+        GREEN,
+        BLUE,
+        OPAQUE,
+        RgbColorSpace::Srgb,
+    )?)
 }
 
 fn keynote_text_color() -> Result<RgbaColor, litchi_iwa::Error> {
     const RED: f32 = 0.08;
     const GREEN: f32 = 0.55;
     const BLUE: f32 = 0.28;
-    RgbaColor::new(RED, GREEN, BLUE, OPAQUE, RgbColorSpace::Srgb)
+    Ok(RgbaColor::new(
+        RED,
+        GREEN,
+        BLUE,
+        OPAQUE,
+        RgbColorSpace::Srgb,
+    )?)
 }
 
-fn numbers_text_background() -> Result<TextBackground, litchi_iwa::Error> {
+fn numbers_text_background() -> Result<Background, litchi_iwa::Error> {
     const RED: f32 = 0.96;
     const GREEN: f32 = 0.86;
     const BLUE: f32 = 0.25;
-    Ok(TextBackground::Color(RgbaColor::new(
+    Ok(Background::Color(RgbaColor::new(
         RED,
         GREEN,
         BLUE,
@@ -704,11 +716,11 @@ fn numbers_text_background() -> Result<TextBackground, litchi_iwa::Error> {
     )?))
 }
 
-fn pages_text_background() -> Result<TextBackground, litchi_iwa::Error> {
+fn pages_text_background() -> Result<Background, litchi_iwa::Error> {
     const RED: f32 = 0.70;
     const GREEN: f32 = 0.92;
     const BLUE: f32 = 0.96;
-    Ok(TextBackground::Color(RgbaColor::new(
+    Ok(Background::Color(RgbaColor::new(
         RED,
         GREEN,
         BLUE,
@@ -717,11 +729,11 @@ fn pages_text_background() -> Result<TextBackground, litchi_iwa::Error> {
     )?))
 }
 
-fn keynote_text_background() -> Result<TextBackground, litchi_iwa::Error> {
+fn keynote_text_background() -> Result<Background, litchi_iwa::Error> {
     const RED: f32 = 0.98;
     const GREEN: f32 = 0.70;
     const BLUE: f32 = 0.28;
-    Ok(TextBackground::Color(RgbaColor::new(
+    Ok(Background::Color(RgbaColor::new(
         RED,
         GREEN,
         BLUE,
@@ -744,75 +756,72 @@ const fn keynote_text_decorations() -> TextDecorations {
 
 fn numbers_baseline_shift() -> Result<TextBaselineShift, litchi_iwa::Error> {
     const POINTS: f32 = 1.0;
-    TextBaselineShift::from_points(POINTS)
+    Ok(TextBaselineShift::from_points(POINTS)?)
 }
 
 fn pages_baseline_shift() -> Result<TextBaselineShift, litchi_iwa::Error> {
     const POINTS: f32 = -1.0;
-    TextBaselineShift::from_points(POINTS)
+    Ok(TextBaselineShift::from_points(POINTS)?)
 }
 
 fn keynote_baseline_shift() -> Result<TextBaselineShift, litchi_iwa::Error> {
     const POINTS: f32 = 2.0;
-    TextBaselineShift::from_points(POINTS)
+    Ok(TextBaselineShift::from_points(POINTS)?)
 }
 
 fn numbers_character_spacing() -> Result<TextCharacterSpacing, litchi_iwa::Error> {
     const PERCENT: f32 = 10.0;
-    TextCharacterSpacing::from_percent(PERCENT)
+    Ok(TextCharacterSpacing::from_percent(PERCENT)?)
 }
 
 fn pages_character_spacing() -> Result<TextCharacterSpacing, litchi_iwa::Error> {
     const PERCENT: f32 = 6.0;
-    TextCharacterSpacing::from_percent(PERCENT)
+    Ok(TextCharacterSpacing::from_percent(PERCENT)?)
 }
 
 fn keynote_character_spacing() -> Result<TextCharacterSpacing, litchi_iwa::Error> {
     const PERCENT: f32 = 12.0;
-    TextCharacterSpacing::from_percent(PERCENT)
+    Ok(TextCharacterSpacing::from_percent(PERCENT)?)
 }
 
-const fn numbers_paragraph_line_spacing() -> ParagraphLineSpacing {
-    ParagraphLineSpacing::Relative(ParagraphLineSpacingMultiple::ONE_POINT_FIVE)
+const fn numbers_paragraph_line_spacing() -> LineSpacing {
+    LineSpacing::Relative(LineSpacingMultiple::ONE_POINT_FIVE)
 }
 
-fn pages_paragraph_line_spacing() -> Result<ParagraphLineSpacing, litchi_iwa::Error> {
+fn pages_paragraph_line_spacing() -> Result<LineSpacing, litchi_iwa::Error> {
     const POINTS: f32 = 24.0;
-    Ok(ParagraphLineSpacing::Exactly(
-        ParagraphLineSpacingPoints::from_points(POINTS)?,
-    ))
+    Ok(LineSpacing::Exactly(LineSpacingPoints::from_points(
+        POINTS,
+    )?))
 }
 
-fn keynote_paragraph_line_spacing() -> Result<ParagraphLineSpacing, litchi_iwa::Error> {
+fn keynote_paragraph_line_spacing() -> Result<LineSpacing, litchi_iwa::Error> {
     const POINTS: f32 = 7.0;
-    Ok(ParagraphLineSpacing::Between(
-        ParagraphLineSpacingPoints::from_points(POINTS)?,
+    Ok(LineSpacing::Between(LineSpacingPoints::from_points(
+        POINTS,
+    )?))
+}
+
+fn paragraph_spacing(before_points: f32, after_points: f32) -> Result<Spacing, litchi_iwa::Error> {
+    Ok(Spacing::new(
+        SpacingPoints::from_points(before_points)?,
+        SpacingPoints::from_points(after_points)?,
     ))
 }
 
-fn paragraph_spacing(
-    before_points: f32,
-    after_points: f32,
-) -> Result<ParagraphSpacing, litchi_iwa::Error> {
-    Ok(ParagraphSpacing::new(
-        ParagraphSpacingPoints::from_points(before_points)?,
-        ParagraphSpacingPoints::from_points(after_points)?,
-    ))
-}
-
-fn numbers_paragraph_spacing() -> Result<ParagraphSpacing, litchi_iwa::Error> {
+fn numbers_paragraph_spacing() -> Result<Spacing, litchi_iwa::Error> {
     const BEFORE_POINTS: f32 = 6.0;
     const AFTER_POINTS: f32 = 9.0;
     paragraph_spacing(BEFORE_POINTS, AFTER_POINTS)
 }
 
-fn pages_paragraph_spacing() -> Result<ParagraphSpacing, litchi_iwa::Error> {
+fn pages_paragraph_spacing() -> Result<Spacing, litchi_iwa::Error> {
     const BEFORE_POINTS: f32 = 5.0;
     const AFTER_POINTS: f32 = 8.0;
     paragraph_spacing(BEFORE_POINTS, AFTER_POINTS)
 }
 
-fn keynote_paragraph_spacing() -> Result<ParagraphSpacing, litchi_iwa::Error> {
+fn keynote_paragraph_spacing() -> Result<Spacing, litchi_iwa::Error> {
     const BEFORE_POINTS: f32 = 4.0;
     const AFTER_POINTS: f32 = 7.0;
     paragraph_spacing(BEFORE_POINTS, AFTER_POINTS)
@@ -822,29 +831,29 @@ fn paragraph_indents(
     first_line_points: f32,
     left_points: f32,
     right_points: f32,
-) -> Result<ParagraphIndents, litchi_iwa::Error> {
-    Ok(ParagraphIndents::new(
-        ParagraphIndentPoints::from_points(first_line_points)?,
-        ParagraphIndentPoints::from_points(left_points)?,
-        ParagraphIndentPoints::from_points(right_points)?,
+) -> Result<Indents, litchi_iwa::Error> {
+    Ok(Indents::new(
+        IndentPoints::from_points(first_line_points)?,
+        IndentPoints::from_points(left_points)?,
+        IndentPoints::from_points(right_points)?,
     ))
 }
 
-fn numbers_paragraph_indents() -> Result<ParagraphIndents, litchi_iwa::Error> {
+fn numbers_paragraph_indents() -> Result<Indents, litchi_iwa::Error> {
     const FIRST_LINE_POINTS: f32 = 4.0;
     const LEFT_POINTS: f32 = 8.0;
     const RIGHT_POINTS: f32 = 6.0;
     paragraph_indents(FIRST_LINE_POINTS, LEFT_POINTS, RIGHT_POINTS)
 }
 
-fn pages_paragraph_indents() -> Result<ParagraphIndents, litchi_iwa::Error> {
+fn pages_paragraph_indents() -> Result<Indents, litchi_iwa::Error> {
     const FIRST_LINE_POINTS: f32 = 6.0;
     const LEFT_POINTS: f32 = 12.0;
     const RIGHT_POINTS: f32 = 8.0;
     paragraph_indents(FIRST_LINE_POINTS, LEFT_POINTS, RIGHT_POINTS)
 }
 
-fn keynote_paragraph_indents() -> Result<ParagraphIndents, litchi_iwa::Error> {
+fn keynote_paragraph_indents() -> Result<Indents, litchi_iwa::Error> {
     const FIRST_LINE_POINTS: f32 = 8.0;
     const LEFT_POINTS: f32 = 16.0;
     const RIGHT_POINTS: f32 = 10.0;
@@ -854,7 +863,7 @@ fn keynote_paragraph_indents() -> Result<ParagraphIndents, litchi_iwa::Error> {
 fn numbers_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error> {
     const CENTER_POINTS: f32 = 36.0;
     const DECIMAL_POINTS: f32 = 72.0;
-    ParagraphTabStops::new(vec![
+    Ok(ParagraphTabStops::new(vec![
         ParagraphTabStop::new(
             ParagraphTabPosition::from_points(CENTER_POINTS)?,
             ParagraphTabAlignment::Center,
@@ -864,13 +873,13 @@ fn numbers_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error>
             ParagraphTabAlignment::Decimal,
         )
         .with_leader(ParagraphTabLeader::new(".")?),
-    ])
+    ])?)
 }
 
 fn pages_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error> {
     const LEFT_POINTS: f32 = 42.0;
     const RIGHT_POINTS: f32 = 78.0;
-    ParagraphTabStops::new(vec![
+    Ok(ParagraphTabStops::new(vec![
         ParagraphTabStop::new(
             ParagraphTabPosition::from_points(LEFT_POINTS)?,
             ParagraphTabAlignment::Left,
@@ -880,13 +889,13 @@ fn pages_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error> {
             ParagraphTabAlignment::Right,
         )
         .with_leader(ParagraphTabLeader::new("-")?),
-    ])
+    ])?)
 }
 
 fn keynote_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error> {
     const CENTER_POINTS: f32 = 48.0;
     const RIGHT_POINTS: f32 = 84.0;
-    ParagraphTabStops::new(vec![
+    Ok(ParagraphTabStops::new(vec![
         ParagraphTabStop::new(
             ParagraphTabPosition::from_points(CENTER_POINTS)?,
             ParagraphTabAlignment::Center,
@@ -895,7 +904,7 @@ fn keynote_paragraph_tab_stops() -> Result<ParagraphTabStops, litchi_iwa::Error>
             ParagraphTabPosition::from_points(RIGHT_POINTS)?,
             ParagraphTabAlignment::Right,
         ),
-    ])
+    ])?)
 }
 
 fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -905,13 +914,8 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let table_id = editor.tables()?.remove(0).object_id;
     editor.set_cell(table_id, ROW, COLUMN, CellValue::Text(CELL_TEXT.to_owned()))?;
-    editor.set_table_cell_layout(
-        table_id,
-        ROW,
-        COLUMN,
-        layout(TableCellVerticalAlignment::Middle)?,
-    )?;
-    editor.set_table_cell_text_alignment(table_id, ROW, COLUMN, TextAlignment::Center)?;
+    editor.set_table_cell_layout(table_id, ROW, COLUMN, layout(VerticalAlignment::Middle)?)?;
+    editor.set_table_cell_text_alignment(table_id, ROW, COLUMN, Alignment::Center)?;
     editor.set_table_cell_text_style(table_id, ROW, COLUMN, numbers_text_style()?)?;
     editor.set_table_cell_text_font(table_id, ROW, COLUMN, numbers_text_font()?)?;
     editor.set_table_cell_text_color(table_id, ROW, COLUMN, numbers_text_color()?)?;
@@ -931,9 +935,9 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_table_cell_text_ligatures(table_id, ROW, COLUMN, TextLigatures::RequiredOnly)?;
     editor.set_table_cell_text_background(table_id, ROW, COLUMN, numbers_text_background()?)?;
-    editor.set_table_cell_text_outline(table_id, ROW, COLUMN, TextOutline::standard())?;
+    editor.set_table_cell_text_outline(table_id, ROW, COLUMN, Outline::standard())?;
     editor.set_table_cell_text_script(table_id, ROW, COLUMN, TextScript::Superscript)?;
-    editor.set_table_cell_text_shadow(table_id, ROW, COLUMN, TextShadow::standard())?;
+    editor.set_table_cell_text_shadow(table_id, ROW, COLUMN, Shadow::standard())?;
     editor.set_table_cell_paragraph_line_spacing(
         table_id,
         ROW,
@@ -953,7 +957,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         COLUMN,
-        ParagraphStart::from_utf16_index(13)?,
+        TextPosition::from_utf16_index(13)?,
         ParagraphListLevel::ONE,
     )?;
     editor.set_table_cell_paragraph_list_numbering(
@@ -1023,13 +1027,8 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.set_table_cell(table_id, ROW, COLUMN, CellValue::Text(CELL_TEXT.to_owned()))?;
-    editor.set_table_cell_layout(
-        table_id,
-        ROW,
-        COLUMN,
-        layout(TableCellVerticalAlignment::Bottom)?,
-    )?;
-    editor.set_table_cell_text_alignment(table_id, ROW, COLUMN, TextAlignment::Right)?;
+    editor.set_table_cell_layout(table_id, ROW, COLUMN, layout(VerticalAlignment::Bottom)?)?;
+    editor.set_table_cell_text_alignment(table_id, ROW, COLUMN, Alignment::Right)?;
     editor.set_table_cell_text_style(table_id, ROW, COLUMN, pages_text_style()?)?;
     editor.set_table_cell_text_font(table_id, ROW, COLUMN, pages_text_font()?)?;
     editor.set_table_cell_text_color(table_id, ROW, COLUMN, pages_text_color()?)?;
@@ -1049,9 +1048,9 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_table_cell_text_ligatures(table_id, ROW, COLUMN, TextLigatures::All)?;
     editor.set_table_cell_text_background(table_id, ROW, COLUMN, pages_text_background()?)?;
-    editor.set_table_cell_text_outline(table_id, ROW, COLUMN, TextOutline::standard())?;
+    editor.set_table_cell_text_outline(table_id, ROW, COLUMN, Outline::standard())?;
     editor.set_table_cell_text_script(table_id, ROW, COLUMN, TextScript::Subscript)?;
-    editor.set_table_cell_text_shadow(table_id, ROW, COLUMN, TextShadow::standard())?;
+    editor.set_table_cell_text_shadow(table_id, ROW, COLUMN, Shadow::standard())?;
     editor.set_table_cell_paragraph_line_spacing(
         table_id,
         ROW,
@@ -1071,7 +1070,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table_id,
         ROW,
         COLUMN,
-        ParagraphStart::from_utf16_index(13)?,
+        TextPosition::from_utf16_index(13)?,
         ParagraphListLevel::ONE,
     )?;
     editor.set_table_cell_paragraph_list_numbering(
@@ -1161,14 +1160,14 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         COLUMN,
-        layout(TableCellVerticalAlignment::Middle)?,
+        layout(VerticalAlignment::Middle)?,
     )?;
     editor.set_slide_table_cell_text_alignment(
         0,
         table.model_object_id,
         ROW,
         COLUMN,
-        TextAlignment::Justified,
+        Alignment::Justified,
     )?;
     editor.set_slide_table_cell_text_style(
         0,
@@ -1238,7 +1237,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         COLUMN,
-        TextOutline::standard(),
+        Outline::standard(),
     )?;
     editor.set_slide_table_cell_text_script(
         0,
@@ -1252,7 +1251,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         COLUMN,
-        TextShadow::standard(),
+        Shadow::standard(),
     )?;
     editor.set_slide_table_cell_paragraph_line_spacing(
         0,
@@ -1294,7 +1293,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         table.model_object_id,
         ROW,
         COLUMN,
-        ParagraphStart::from_utf16_index(13)?,
+        TextPosition::from_utf16_index(13)?,
         ParagraphListLevel::ONE,
     )?;
     editor.set_slide_table_cell_paragraph_list_numbering(

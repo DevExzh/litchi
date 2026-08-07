@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.save(output)?;
     println!(
         "sheet={sheet_id} drawable={} storage={} kind={:?}",
-        removed.shape.drawable_object_id, removed.shape.storage.object_id, removed.shape.kind
+        removed.shape.drawable_object_id, removed.shape.storage.id, removed.shape.kind
     );
     Ok(())
 }

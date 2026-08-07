@@ -3,7 +3,7 @@ use crate::keynote::KeynoteDocumentBuilder;
 use crate::numbers::NumbersDocumentBuilder;
 use crate::pages::PagesEditor;
 use crate::shapes::{DrawablePoint, DrawableSize};
-use crate::text::ParagraphStart;
+use crate::text::TextPosition;
 
 const TEXT: &str = "First\nSecond\nThird";
 const POSITION: DrawablePoint = DrawablePoint { x: 40.0, y: 80.0 };
@@ -12,12 +12,12 @@ const SIZE: DrawableSize = DrawableSize {
     height: 140.0,
 };
 
-fn second_start() -> ParagraphStart {
-    ParagraphStart::from_utf16_index("First\n".encode_utf16().count()).unwrap()
+fn second_start() -> TextPosition {
+    TextPosition::from_utf16_index("First\n".encode_utf16().count()).unwrap()
 }
 
-fn third_start() -> ParagraphStart {
-    ParagraphStart::from_utf16_index("First\nSecond\n".encode_utf16().count()).unwrap()
+fn third_start() -> TextPosition {
+    TextPosition::from_utf16_index("First\nSecond\n".encode_utf16().count()).unwrap()
 }
 
 fn restart_at_seven() -> ParagraphListNumbering {
@@ -134,7 +134,7 @@ fn invalid_or_non_numbered_restarts_are_transactional() {
         pages
             .set_text_box_paragraph_list_numbering(
                 text_box.drawable_object_id,
-                ParagraphStart::from_utf16_index(1).unwrap(),
+                TextPosition::from_utf16_index(1).unwrap(),
                 restart_at_seven(),
             )
             .is_err()

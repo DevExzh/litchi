@@ -284,7 +284,7 @@ mod tests {
             crate::wire::parse_wire_fields(extension)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == UNKNOWN_FIELD)
+                .any(|field| field.number() == UNKNOWN_FIELD)
         );
 
         let inherited = patch_direct_paragraph_style_index(&direct, None).unwrap();

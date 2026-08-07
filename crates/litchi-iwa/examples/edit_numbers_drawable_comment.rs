@@ -30,17 +30,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into_iter()
         .nth(drawable_index)
         .ok_or("drawable index out of range")?;
-    let old = editor.sheet_drawable_comment(sheet.object_id, drawable.object_id)?;
+    let drawable_id = drawable.id.get();
+    let old = editor.sheet_drawable_comment(sheet.object_id, drawable_id)?;
     if replacement == "--clear" {
-        editor.clear_sheet_drawable_comment(sheet.object_id, drawable.object_id)?;
+        editor.clear_sheet_drawable_comment(sheet.object_id, drawable_id)?;
     } else {
-        editor.set_sheet_drawable_comment(sheet.object_id, drawable.object_id, replacement)?;
+        editor.set_sheet_drawable_comment(sheet.object_id, drawable_id, replacement)?;
     }
     editor.save(output)?;
-    let new = editor.sheet_drawable_comment(sheet.object_id, drawable.object_id)?;
+    let new = editor.sheet_drawable_comment(sheet.object_id, drawable_id)?;
     println!(
         "sheet={sheet_index} drawable={} old={:?} new={:?}",
-        drawable.object_id,
+        drawable_id,
         old.as_ref().map(|value| value.comment.text.as_str()),
         new.as_ref().map(|value| value.comment.text.as_str())
     );

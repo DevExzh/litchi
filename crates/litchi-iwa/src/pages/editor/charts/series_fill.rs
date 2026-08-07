@@ -2,7 +2,7 @@
 
 use super::series_value_labels::value_label_series_count;
 use super::*;
-use crate::charts::ChartSeriesIndex;
+use crate::charts::Index;
 use crate::charts::series_fill::{
     chart_series_fills as read_native_fills, reset_chart_series_fill as reset_native_fill,
     set_chart_series_fills as set_native_fills,
@@ -20,7 +20,7 @@ impl PagesEditor {
     pub fn body_chart_series_fill(
         &self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ShapeFill> {
         let fills = body_chart_series_fills(self, drawable_object_id)?;
         fills.get(series.zero_based()).cloned().ok_or_else(|| {
@@ -41,7 +41,7 @@ impl PagesEditor {
     pub fn set_body_chart_series_fill(
         &mut self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         fill: &ShapeFill,
     ) -> Result<()> {
         let mut fills = body_chart_series_fills(self, drawable_object_id)?;
@@ -60,7 +60,7 @@ impl PagesEditor {
     pub fn reset_body_chart_series_fill(
         &mut self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ShapeFill> {
         reset_body_chart_series_fill(self, drawable_object_id, series)
     }
@@ -70,7 +70,7 @@ impl PagesEditor {
     pub fn set_body_chart_series_image_fill(
         &mut self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         preferred_filename: &str,
         data: &[u8],
         technique: ShapeImageFillTechnique,
@@ -149,7 +149,7 @@ fn set_body_chart_series_fills(
 fn reset_body_chart_series_fill(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
 ) -> Result<ShapeFill> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
@@ -183,7 +183,7 @@ fn reset_body_chart_series_fill(
 fn set_body_chart_series_image_fill(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     preferred_filename: &str,
     data: &[u8],
     technique: ShapeImageFillTechnique,
@@ -232,7 +232,7 @@ fn set_body_chart_series_image_fill(
 fn series_fill_index_error(
     application: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

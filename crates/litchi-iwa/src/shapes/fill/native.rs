@@ -2,14 +2,13 @@
 
 use crate::protobuf::{tsd, tsp};
 use crate::{Error, Result};
+use litchi_iwa_common::shape::fill::{
+    Angle, Gradient, Kind, Opacity, Stop, StopMidpoint, StopPosition,
+};
 
 use super::super::DrawableSize;
 use super::super::color::{color_from_native, color_to_native};
-use super::{
-    ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity,
-    ShapeGradientStop, ShapeGradientStopMidpoint, ShapeGradientStopPosition,
-    ShapeImageDataIdentifier, ShapeImageFill, ShapeImageFillTechnique,
-};
+use super::{ShapeFill, ShapeImageDataIdentifier, ShapeImageFill, ShapeImageFillTechnique};
 
 pub(crate) fn fill_from_native(fill: &tsd::FillArchive) -> Result<ShapeFill> {
     match (
@@ -166,7 +165,7 @@ fn image_to_native(image: &ShapeImageFill) -> tsd::ImageFillArchive {
     }
 }
 
-fn gradient_from_native(native: &tsd::GradientArchive) -> Result<ShapeGradient> {
+fn gradient_from_native(native: &tsd::GradientArchive) -> Result<Gradient> {
     if native.transformgradient.is_some() {
         return Err(Error::InvalidFormat(
             "transformed iWork shape gradients are not supported".to_owned(),
@@ -176,8 +175,8 @@ fn gradient_from_native(native: &tsd::GradientArchive) -> Result<ShapeGradient> 
         .r#type
         .and_then(|value| tsd::gradient_archive::GradientType::try_from(value).ok())
     {
-        Some(tsd::gradient_archive::GradientType::Linear) => ShapeGradientKind::Linear,
-        Some(tsd::gradient_archive::GradientType::Radial) => ShapeGradientKind::Radial,
+        Some(tsd::gradient_archive::GradientType::Linear) => Kind::Linear,
+        Some(tsd::gradient_archive::GradientType::Radial) => Kind::Radial,
         None => {
             return Err(Error::InvalidFormat(
                 "native iWork shape gradient has no recognized geometry".to_owned(),
@@ -196,34 +195,34 @@ fn gradient_from_native(native: &tsd::GradientArchive) -> Result<ShapeGradient> 
         let color = stop.color.as_ref().ok_or_else(|| {
             Error::InvalidFormat("native iWork shape gradient stop has no color".to_owned())
         })?;
-        stops.push(ShapeGradientStop::new(
+        stops.push(Stop::new(
             color_from_native(color)?,
-            ShapeGradientStopPosition::new(stop.fraction.ok_or_else(|| {
+            StopPosition::new(stop.fraction.ok_or_else(|| {
                 Error::InvalidFormat("native iWork shape gradient stop has no position".to_owned())
             })?)?,
-            ShapeGradientStopMidpoint::new(stop.inflection.ok_or_else(|| {
+            StopMidpoint::new(stop.inflection.ok_or_else(|| {
                 Error::InvalidFormat("native iWork shape gradient stop has no midpoint".to_owned())
             })?)?,
         ));
     }
-    ShapeGradient::from_native_parts(
+    Ok(Gradient::from_parts(
         kind,
         stops,
-        ShapeGradientOpacity::new(native.opacity.ok_or_else(|| {
+        Opacity::new(native.opacity.ok_or_else(|| {
             Error::InvalidFormat("native iWork shape gradient has no opacity".to_owned())
         })?)?,
         native.advanced_gradient.ok_or_else(|| {
             Error::InvalidFormat("native iWork shape gradient has no editing mode".to_owned())
         })?,
-        ShapeGradientAngle::from_radians(angle)?,
-    )
+        Angle::from_radians(angle)?,
+    )?)
 }
 
-fn gradient_to_native(gradient: &ShapeGradient) -> tsd::GradientArchive {
+fn gradient_to_native(gradient: &Gradient) -> tsd::GradientArchive {
     tsd::GradientArchive {
         r#type: Some(match gradient.kind() {
-            ShapeGradientKind::Linear => tsd::gradient_archive::GradientType::Linear as i32,
-            ShapeGradientKind::Radial => tsd::gradient_archive::GradientType::Radial as i32,
+            Kind::Linear => tsd::gradient_archive::GradientType::Linear as i32,
+            Kind::Radial => tsd::gradient_archive::GradientType::Radial as i32,
         }),
         stops: gradient
             .stops()
@@ -255,28 +254,20 @@ mod tests {
         for fill in [
             ShapeFill::None,
             ShapeFill::Solid(start),
-            ShapeFill::Gradient(ShapeGradient::linear(
+            ShapeFill::Gradient(Gradient::linear(
                 start,
                 end,
-                ShapeGradientAngle::from_degrees(270.0).unwrap(),
+                Angle::from_degrees(270.0).unwrap(),
             )),
             ShapeFill::Gradient(
-                ShapeGradient::advanced(
-                    ShapeGradientKind::Radial,
+                Gradient::advanced(
+                    Kind::Radial,
                     vec![
-                        ShapeGradientStop::new(
-                            start,
-                            ShapeGradientStopPosition::START,
-                            ShapeGradientStopMidpoint::new(0.35).unwrap(),
-                        ),
-                        ShapeGradientStop::new(
-                            end,
-                            ShapeGradientStopPosition::END,
-                            ShapeGradientStopMidpoint::CENTER,
-                        ),
+                        Stop::new(start, StopPosition::START, StopMidpoint::new(0.35).unwrap()),
+                        Stop::new(end, StopPosition::END, StopMidpoint::CENTER),
                     ],
-                    ShapeGradientOpacity::new(0.8).unwrap(),
-                    ShapeGradientAngle::from_degrees(315.0).unwrap(),
+                    Opacity::new(0.8).unwrap(),
+                    Angle::from_degrees(315.0).unwrap(),
                 )
                 .unwrap(),
             ),

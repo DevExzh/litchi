@@ -61,7 +61,7 @@ impl KeynoteEditor {
     }
 }
 
-fn require_3d_scene(kind: ChartKind, drawable_object_id: u64) -> Result<()> {
+fn require_3d_scene(kind: Kind, drawable_object_id: u64) -> Result<()> {
     if !kind.supports_3d_scene() {
         return Err(Error::InvalidFormat(format!(
             "Keynote chart {drawable_object_id} kind {kind:?} has no 3D scene"
@@ -82,7 +82,7 @@ mod tests {
         let chart = editor
             .add_slide_chart(
                 0,
-                ChartKind::Area3d,
+                Kind::Area3d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -96,7 +96,7 @@ mod tests {
             .set_slide_chart_3d_rotation(0, chart.drawable_object_id, rotation)
             .unwrap();
         let duplicate = editor
-            .duplicate_slide_chart(0, chart.drawable_object_id)
+            .duplicate_slide_chart(0, chart_selector(&editor, &chart))
             .unwrap();
         let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(

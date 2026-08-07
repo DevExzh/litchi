@@ -2,7 +2,8 @@
 
 use std::env;
 
-use litchi_iwa::keynote::{KeynoteEditor, KeynoteSoundtrackMode};
+use litchi_iwa::keynote::KeynoteEditor;
+use litchi_keynote::soundtrack::{Mode, Settings};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -11,20 +12,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let output = arguments.next().ok_or("missing output path")?;
     let mode = match arguments.next().ok_or("missing soundtrack mode")?.as_str() {
-        "play-once" => KeynoteSoundtrackMode::PlayOnce,
-        "loop" => KeynoteSoundtrackMode::Loop,
-        "do-not-play" => KeynoteSoundtrackMode::DoNotPlay,
+        "play-once" => Mode::PlayOnce,
+        "loop" => Mode::Loop,
+        "do-not-play" => Mode::DoNotPlay,
         _ => return Err("soundtrack mode must be play-once, loop, or do-not-play".into()),
     };
     let volume = arguments.next().ok_or("missing volume")?.parse::<f64>()?;
 
     let mut editor = KeynoteEditor::open(input)?;
-    let mut settings = editor
+    let _current = editor
         .soundtrack_settings()?
         .ok_or("presentation has no soundtrack object")?;
-    settings.mode = Some(mode);
-    settings.volume = Some(volume);
-    editor.set_soundtrack_settings(settings)?;
+    editor.set_soundtrack_settings(Settings::new(Some(volume), Some(mode))?)?;
     editor.save(output)?;
     Ok(())
 }

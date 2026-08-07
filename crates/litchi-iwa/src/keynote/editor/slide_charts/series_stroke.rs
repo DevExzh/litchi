@@ -6,7 +6,7 @@ use crate::charts::series_stroke::{
     chart_series_strokes as read_native_strokes, reset_chart_series_stroke as reset_native_stroke,
     set_chart_series_strokes as set_native_strokes,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesStroke};
+use crate::charts::{ChartSeriesStroke, Index};
 
 impl KeynoteEditor {
     /// Read effective strokes in native series order.
@@ -23,7 +23,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<Option<ChartSeriesStroke>> {
         let strokes = slide_chart_series_strokes(self, slide_index, drawable_object_id)?;
         strokes.get(series.zero_based()).copied().ok_or_else(|| {
@@ -46,7 +46,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         stroke: Option<ChartSeriesStroke>,
     ) -> Result<()> {
         let mut strokes = slide_chart_series_strokes(self, slide_index, drawable_object_id)?;
@@ -66,7 +66,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<Option<ChartSeriesStroke>> {
         reset_slide_chart_series_stroke(self, slide_index, drawable_object_id, series)
     }
@@ -136,7 +136,7 @@ fn reset_slide_chart_series_stroke(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
 ) -> Result<Option<ChartSeriesStroke>> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let series_count = value_label_series_count(
@@ -169,7 +169,7 @@ fn reset_slide_chart_series_stroke(
 fn series_stroke_index_error(
     application: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

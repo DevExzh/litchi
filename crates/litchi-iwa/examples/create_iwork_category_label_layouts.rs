@@ -3,14 +3,12 @@
 use std::env;
 use std::path::Path;
 
-use litchi_iwa::charts::{
-    ChartCategoryLabelFrequency, ChartCategoryLabelInterval, ChartCategoryLabelLayout, ChartData,
-    ChartKind,
-};
+use litchi_iwa::charts::{ChartData, Kind};
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_common::chart::category_labels::{Frequency, Interval, Layout};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -22,10 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let output = Path::new(&output);
     std::fs::create_dir_all(output)?;
-    let layout = ChartCategoryLabelLayout::new(
-        ChartCategoryLabelFrequency::Every(ChartCategoryLabelInterval::new(3)?),
-        false,
-    );
+    let layout = Layout::new(Frequency::Every(Interval::new(3)?), false);
 
     let mut numbers = NumbersDocumentBuilder::new()
         .sheet_name("Category Label Layout")
@@ -33,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sheet_id = numbers.sheets()?[0].object_id;
     let chart = numbers.add_sheet_chart(
         sheet_id,
-        ChartKind::Line2d,
+        Kind::Line2d,
         data()?,
         DrawablePoint { x: 360.0, y: 100.0 },
         DrawableSize {
@@ -53,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut pages = PagesDocumentBuilder::new().body_text(body).build()?;
     let chart = pages.add_body_chart(
         body.encode_utf16().count(),
-        ChartKind::Line2d,
+        Kind::Line2d,
         data()?,
         DrawablePoint { x: 72.0, y: 120.0 },
         DrawableSize {
@@ -74,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let chart = keynote.add_slide_chart(
         0,
-        ChartKind::Line2d,
+        Kind::Line2d,
         data()?,
         DrawablePoint { x: 260.0, y: 220.0 },
         DrawableSize {

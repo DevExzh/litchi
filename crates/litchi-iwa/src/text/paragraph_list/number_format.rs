@@ -9,17 +9,17 @@ use crate::text::style_registry::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::super::drop_cap::ParagraphStart;
-use super::types::{ParagraphList, ParagraphListNumberFormat};
 use super::variation::{
     effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
 };
 use super::{levels, native, storage};
+use litchi_iwa_text::paragraph::list::{ParagraphList, ParagraphListNumberFormat};
+use litchi_iwa_text::position::TextPosition;
 
 pub(crate) fn paragraph_list_number_format(
     package: &IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListNumberFormat> {
     let level = levels::paragraph_list_level(package, storage_id, paragraph)?;
     let boundaries = storage::locate_boundaries(package, storage_id)?;
@@ -37,7 +37,7 @@ pub(crate) fn paragraph_list_number_format(
 pub(in crate::text) fn set_paragraph_list_number_format(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     format: ParagraphListNumberFormat,
 ) -> Result<()> {
     if paragraph_list_number_format(package, storage_id, paragraph)? == format {
@@ -116,7 +116,7 @@ pub(in crate::text) fn set_paragraph_list_number_format(
 pub(in crate::text) fn reset_paragraph_list_number_format(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     if paragraph_list_number_format(package, storage_id, paragraph)?
         == ParagraphListNumberFormat::DECIMAL
@@ -136,7 +136,7 @@ pub(in crate::text) fn reset_paragraph_list_number_format(
 fn collapse_or_clear_redundant_format(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<()> {
     let located = storage::locate_boundaries_with_archive(package, storage_id)?;
     let boundaries = &located.location;

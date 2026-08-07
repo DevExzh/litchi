@@ -4,13 +4,16 @@ use std::{env, fs, path::Path};
 
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeEffects,
-    ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeImageFillTechnique, ShapeOpacity,
-    ShapePreset, ShapeReflection, ShapeReflectionOpacity, ShapeShadow, ShapeShadowAngle,
-    ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity,
-    ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets, ShapeTextLayout,
-    ShapeTextVerticalAlignment,
+    Appearance, BlurRadius, DrawablePoint, DrawableSize, Drop, Offset, RgbColorSpace, RgbaColor,
+    Shadow, ShapeFill, ShapeImageFillTechnique,
 };
+use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+use litchi_iwa_common::shape::effects::{
+    Effects, Opacity as EffectsOpacity, Reflection, ReflectionOpacity,
+};
+use litchi_iwa_common::shape::fill::{Angle, Gradient};
+use litchi_iwa_common::shape::path::Preset;
+use litchi_iwa_common::shape::shadow::{Angle as ShadowAngle, Opacity as ShadowOpacity};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -35,11 +38,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             width: 300.0,
             height: 150.0,
         },
-        ShapePreset::RightArrow,
-        ShapeFill::Gradient(ShapeGradient::linear(
+        Preset::RightArrow,
+        ShapeFill::Gradient(Gradient::linear(
             RgbaColor::new(0.88, 0.18, 0.12, 1.0, RgbColorSpace::DisplayP3)?,
             RgbaColor::new(0.98, 0.65, 0.08, 1.0, RgbColorSpace::DisplayP3)?,
-            ShapeGradientAngle::from_degrees(45.0)?,
+            Angle::from_degrees(45.0)?,
         )),
     )?;
     if let Some(path) = fill_image {
@@ -54,29 +57,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.set_body_shape_effects(
         created.drawable_object_id,
-        ShapeEffects::new(
-            ShapeOpacity::new(0.72)?,
-            ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.35)?),
+        Effects::new(
+            EffectsOpacity::new(0.72)?,
+            Reflection::Enabled(ReflectionOpacity::new(0.35)?),
         ),
     )?;
     editor.set_body_shape_shadow(
         created.drawable_object_id,
-        ShapeShadow::Drop(ShapeDropShadow::new(
-            ShapeShadowAppearance::new(
+        Shadow::Drop(Drop::new(
+            Appearance::new(
                 RgbaColor::black(),
-                ShapeShadowBlurRadius::from_points(7)?,
-                ShapeShadowOffset::from_points(11.0)?,
-                ShapeShadowOpacity::new(0.42)?,
+                BlurRadius::from_points(7)?,
+                Offset::from_points(11.0)?,
+                ShadowOpacity::new(0.42)?,
             ),
-            ShapeShadowAngle::from_degrees(135.0)?,
+            ShadowAngle::from_degrees(135.0)?,
         )),
     )?;
     editor.set_body_shape_text_layout(
         created.drawable_object_id,
-        ShapeTextLayout::new(
-            ShapeTextVerticalAlignment::Middle,
-            ShapeTextInsets::uniform(ShapeTextInset::from_points(12.0)?),
-            ShapeTextAutoSize::Fixed,
+        Layout::new(
+            VerticalAlignment::Middle,
+            Insets::uniform(Inset::from_points(12.0)?),
+            AutoSize::Fixed,
         ),
     )?;
     editor.set_body_shape_title(created.drawable_object_id, "Typed Pages shape")?;
@@ -90,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         created.kind,
         created.preset,
         created.drawable_object_id,
-        created.storage.object_id,
+        created.storage.id,
         created.anchor_character_index
     );
     Ok(())

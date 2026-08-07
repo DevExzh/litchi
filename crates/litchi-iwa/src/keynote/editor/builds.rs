@@ -1,7 +1,230 @@
 //! Build and transition validation, conversion, and wire patching.
 
 use super::*;
+
+fn semantic_error(error: impl std::fmt::Display) -> Error {
+    Error::ParseError(format!("invalid Keynote build semantics: {error}"))
+}
+
+/// Convert the private native adapter state into the bounded public model.
+///
+/// The conversion intentionally dispatches exact native effect identifiers
+/// before falling back to `Unknown`; substring matching here would silently
+/// turn a future producer effect into a different typed action.
+pub(super) fn semantic_settings(
+    settings: &KeynoteBuildSettings,
+) -> Result<litchi_keynote::build::Settings> {
+    let duration = litchi_keynote::Seconds::new(settings.duration).map_err(semantic_error)?;
+    let mut semantic = litchi_keynote::build::Settings::new(semantic_effect(settings)?, duration);
+    semantic.set_start(settings.start).map_err(semantic_error)?;
+    semantic
+        .set_delay(litchi_keynote::Seconds::new(settings.delay).map_err(semantic_error)?)
+        .map_err(semantic_error)?;
+    semantic.validate().map_err(semantic_error)?;
+    Ok(semantic)
+}
+
+fn semantic_effect(settings: &KeynoteBuildSettings) -> Result<litchi_keynote::build::Effect> {
+    use litchi_keynote::build::{
+        Action, Effect, Emphasis, FlipDirection, HorizontalDirection, Keyboard, KeyboardDirection,
+        Motion, ObjectEffect, Opacity, Rotation, RotationDirection, Scale, SwooshDirection,
+    };
+
+    let effect = settings.effect.as_str();
+    let typed = match effect {
+        ROTATE_ACTION_EFFECT => {
+            let action = settings.rotation.as_ref().ok_or_else(|| {
+                Error::ParseError("Keynote Rotate is missing its typed parameters".to_owned())
+            })?;
+            Effect::action(Action::Rotate(
+                Rotation::new(
+                    action.total_degrees,
+                    match action.direction {
+                        KeynoteRotationDirection::Clockwise => RotationDirection::Clockwise,
+                        KeynoteRotationDirection::Counterclockwise => {
+                            RotationDirection::Counterclockwise
+                        },
+                    },
+                    action.acceleration,
+                )
+                .map_err(semantic_error)?,
+            ))
+        },
+        SCALE_ACTION_EFFECT => {
+            let action = settings.scale.as_ref().ok_or_else(|| {
+                Error::ParseError("Keynote Scale is missing its typed parameters".to_owned())
+            })?;
+            Effect::action(Action::Scale(
+                Scale::new(action.scale_factor, action.acceleration).map_err(semantic_error)?,
+            ))
+        },
+        OPACITY_ACTION_EFFECT => {
+            let action = settings.opacity.as_ref().ok_or_else(|| {
+                Error::ParseError("Keynote Opacity is missing its typed parameters".to_owned())
+            })?;
+            Effect::action(Action::Opacity(
+                Opacity::new(action.opacity_percent, action.acceleration)
+                    .map_err(semantic_error)?,
+            ))
+        },
+        MOVE_ACTION_EFFECT => {
+            let action = settings.move_action.as_ref().ok_or_else(|| {
+                Error::ParseError("Keynote Move is missing its typed parameters".to_owned())
+            })?;
+            Effect::action(Action::Move(Motion::new(
+                semantic_path(&action.path)?,
+                action.align_to_path,
+                action.acceleration,
+            )))
+        },
+        BLINK_ACTION_EFFECT | BOUNCE_ACTION_EFFECT | FLIP_ACTION_EFFECT | JIGGLE_ACTION_EFFECT
+        | POP_ACTION_EFFECT | PULSE_ACTION_EFFECT => {
+            let action = settings.emphasis.ok_or_else(|| {
+                Error::ParseError("Keynote emphasis is missing its typed parameters".to_owned())
+            })?;
+            let emphasis = match action {
+                KeynoteEmphasisAction::Blink { repeat_count, fade } => {
+                    Emphasis::blink(repeat_count, fade)
+                },
+                KeynoteEmphasisAction::Bounce {
+                    repeat_count,
+                    decay,
+                } => Emphasis::bounce(repeat_count, decay),
+                KeynoteEmphasisAction::Flip {
+                    repeat_count,
+                    direction,
+                } => Emphasis::flip(
+                    repeat_count,
+                    match direction {
+                        KeynoteFlipDirection::LeftToRight => FlipDirection::LeftToRight,
+                        KeynoteFlipDirection::RightToLeft => FlipDirection::RightToLeft,
+                    },
+                ),
+                KeynoteEmphasisAction::Jiggle { intensity } => {
+                    Ok(Emphasis::jiggle(match intensity {
+                        KeynoteJiggleIntensity::Small => {
+                            litchi_keynote::build::JiggleIntensity::Small
+                        },
+                        KeynoteJiggleIntensity::Medium => {
+                            litchi_keynote::build::JiggleIntensity::Medium
+                        },
+                        KeynoteJiggleIntensity::Large => {
+                            litchi_keynote::build::JiggleIntensity::Large
+                        },
+                    }))
+                },
+                KeynoteEmphasisAction::Pop { scale_percent } => Emphasis::pop(scale_percent),
+                KeynoteEmphasisAction::Pulse {
+                    repeat_count,
+                    scale_percent,
+                } => Emphasis::pulse(repeat_count, scale_percent),
+            }
+            .map_err(semantic_error)?;
+            Effect::emphasis(emphasis)
+        },
+        KEYBOARD_BUILD_EFFECT => {
+            let keyboard = settings.keyboard.ok_or_else(|| {
+                Error::ParseError("Keynote Keyboard is missing its typed parameters".to_owned())
+            })?;
+            Effect::keyboard(Keyboard::new(
+                match keyboard.direction {
+                    KeynoteKeyboardDirection::Forward => KeyboardDirection::Forward,
+                    KeynoteKeyboardDirection::Backward => KeyboardDirection::Backward,
+                },
+                keyboard.show_cursor,
+            ))
+        },
+        DISSOLVE_BUILD_EFFECT
+        | SHIMMER_BUILD_EFFECT
+        | SKID_BUILD_EFFECT
+        | SWOOSH_BUILD_EFFECT
+        | TRACE_BUILD_EFFECT => {
+            let object = settings.object_effect.ok_or_else(|| {
+                Error::ParseError("Keynote object build is missing its typed parameters".to_owned())
+            })?;
+            Effect::object(match object {
+                KeynoteObjectBuildEffect::Dissolve => ObjectEffect::Dissolve,
+                KeynoteObjectBuildEffect::Shimmer => ObjectEffect::Shimmer,
+                KeynoteObjectBuildEffect::Skid { direction } => {
+                    ObjectEffect::Skid(match direction {
+                        KeynoteHorizontalBuildDirection::LeftToRight => {
+                            HorizontalDirection::LeftToRight
+                        },
+                        KeynoteHorizontalBuildDirection::RightToLeft => {
+                            HorizontalDirection::RightToLeft
+                        },
+                    })
+                },
+                KeynoteObjectBuildEffect::Swoosh { direction } => {
+                    ObjectEffect::Swoosh(match direction {
+                        KeynoteSwooshDirection::Center => SwooshDirection::Center,
+                        KeynoteSwooshDirection::FromLeft => SwooshDirection::FromLeft,
+                        KeynoteSwooshDirection::FromRight => SwooshDirection::FromRight,
+                    })
+                },
+                KeynoteObjectBuildEffect::Trace { direction } => {
+                    ObjectEffect::Trace(match direction {
+                        KeynoteHorizontalBuildDirection::LeftToRight => {
+                            HorizontalDirection::LeftToRight
+                        },
+                        KeynoteHorizontalBuildDirection::RightToLeft => {
+                            HorizontalDirection::RightToLeft
+                        },
+                    })
+                },
+            })
+        },
+        "apple:bc-appear" | "appear" => Effect::Appear,
+        "apple:bc-dissolve" | "dissolve" => Effect::Dissolve,
+        "apple:bc-move" | "move" => Effect::MoveIn,
+        "apple:bc-scale" | "scale" => Effect::Scale,
+        "apple:bc-fade-scale" | "fade-scale" => Effect::FadeAndScale,
+        _ => Effect::unknown(effect.to_owned()).map_err(semantic_error)?,
+    };
+    Ok(typed)
+}
+
+fn semantic_path(path: &KeynoteMotionPath) -> Result<litchi_keynote::build::Path> {
+    use litchi_keynote::build::{Node, NodeKind, Point, Subpath};
+
+    let subpaths = path
+        .subpaths
+        .iter()
+        .map(|subpath| {
+            let nodes = subpath
+                .nodes
+                .iter()
+                .map(|node| {
+                    let point = |point: KeynoteMotionPathPoint| {
+                        Point::new(f64::from(point.x), f64::from(point.y)).map_err(semantic_error)
+                    };
+                    Ok(Node::new(
+                        point(node.in_control_point)?,
+                        point(node.point)?,
+                        point(node.out_control_point)?,
+                        match node.node_type {
+                            KeynoteMotionPathNodeType::Sharp => NodeKind::Sharp,
+                            KeynoteMotionPathNodeType::Bezier => NodeKind::Bezier,
+                            KeynoteMotionPathNodeType::Smooth => NodeKind::Smooth,
+                        },
+                    ))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            Subpath::new(nodes.into_boxed_slice(), subpath.closed).map_err(semantic_error)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    litchi_keynote::build::Path::new(
+        subpaths.into_boxed_slice(),
+        f64::from(path.natural_width),
+        f64::from(path.natural_height),
+        path.horizontal_flip,
+        path.vertical_flip,
+    )
+    .map_err(semantic_error)
+}
+
 pub(super) fn validate_build_settings(settings: &KeynoteBuildSettings) -> Result<()> {
+    semantic_settings(settings)?;
     for (label, value) in [
         ("delivery", settings.delivery.as_str()),
         ("animation type", settings.animation_type.as_str()),
@@ -25,7 +248,7 @@ pub(super) fn validate_build_settings(settings: &KeynoteBuildSettings) -> Result
     }
     if matches!(
         settings.start,
-        KeynoteBuildStart::OnClick | KeynoteBuildStart::WithPrevious
+        BuildStart::OnClick | BuildStart::WithPrevious
     ) && settings.delay != 0.0
     {
         return Err(Error::ParseError(
@@ -52,7 +275,7 @@ pub(super) fn validate_build_settings(settings: &KeynoteBuildSettings) -> Result
     }
     if let Some(curve) = &settings.timing_curve {
         validate_timing_curve(curve)?;
-        if typed_action_acceleration(settings) != Some(KeynoteBuildAcceleration::Custom) {
+        if typed_action_acceleration(settings) != Some(BuildAcceleration::Custom) {
             return Err(Error::ParseError(
                 "Keynote timing curves require custom action acceleration".to_owned(),
             ));
@@ -325,7 +548,7 @@ pub(super) fn emphasis_jiggle_intensity(action: Option<KeynoteEmphasisAction>) -
 
 pub(super) fn typed_action_acceleration(
     settings: &KeynoteBuildSettings,
-) -> Option<KeynoteBuildAcceleration> {
+) -> Option<BuildAcceleration> {
     settings
         .rotation
         .as_ref()
@@ -683,26 +906,12 @@ pub(super) fn rotation_direction_from_native(value: i32) -> Option<KeynoteRotati
     }
 }
 
-pub(super) fn native_build_acceleration(acceleration: KeynoteBuildAcceleration) -> i32 {
-    use kn::build_attributes_archive::BuildAttributesAcceleration;
-    match acceleration {
-        KeynoteBuildAcceleration::None => BuildAttributesAcceleration::KNone as i32,
-        KeynoteBuildAcceleration::EaseIn => BuildAttributesAcceleration::KEaseIn as i32,
-        KeynoteBuildAcceleration::EaseOut => BuildAttributesAcceleration::KEaseOut as i32,
-        KeynoteBuildAcceleration::EaseInOut => BuildAttributesAcceleration::KEaseBoth as i32,
-        KeynoteBuildAcceleration::Custom => BuildAttributesAcceleration::KCustom as i32,
-    }
+pub(super) const fn native_build_acceleration(acceleration: BuildAcceleration) -> i32 {
+    acceleration.native_value()
 }
 
-pub(super) fn build_acceleration_from_native(value: i32) -> Option<KeynoteBuildAcceleration> {
-    use kn::build_attributes_archive::BuildAttributesAcceleration;
-    match BuildAttributesAcceleration::try_from(value).ok()? {
-        BuildAttributesAcceleration::KNone => Some(KeynoteBuildAcceleration::None),
-        BuildAttributesAcceleration::KEaseIn => Some(KeynoteBuildAcceleration::EaseIn),
-        BuildAttributesAcceleration::KEaseOut => Some(KeynoteBuildAcceleration::EaseOut),
-        BuildAttributesAcceleration::KEaseBoth => Some(KeynoteBuildAcceleration::EaseInOut),
-        BuildAttributesAcceleration::KCustom => Some(KeynoteBuildAcceleration::Custom),
-    }
+pub(super) const fn build_acceleration_from_native(value: i32) -> BuildAcceleration {
+    BuildAcceleration::from_native(value)
 }
 
 #[allow(deprecated)]
@@ -1220,30 +1429,24 @@ pub(super) fn validate_motion_path_source_wire(
     })
 }
 
-pub(super) fn validate_build_start_position(
-    start: KeynoteBuildStart,
-    event_index: usize,
-) -> Result<()> {
+pub(super) fn validate_build_start_position(start: BuildStart, event_index: usize) -> Result<()> {
     match (start, event_index) {
-        (KeynoteBuildStart::AfterTransition, 0) | (KeynoteBuildStart::OnClick, _) => Ok(()),
-        (KeynoteBuildStart::AfterTransition, _) => Err(Error::ParseError(
+        (BuildStart::AfterTransition, 0) | (BuildStart::OnClick, _) => Ok(()),
+        (BuildStart::AfterTransition, _) => Err(Error::ParseError(
             "Keynote After Transition is only valid for the first build event".to_owned(),
         )),
-        (KeynoteBuildStart::WithPrevious | KeynoteBuildStart::AfterPrevious, 0) => {
-            Err(Error::ParseError(
-                "Keynote With Previous and After Previous require a preceding build event"
-                    .to_owned(),
-            ))
-        },
-        (KeynoteBuildStart::WithPrevious | KeynoteBuildStart::AfterPrevious, _) => Ok(()),
+        (BuildStart::WithPrevious | BuildStart::AfterPrevious, 0) => Err(Error::ParseError(
+            "Keynote With Previous and After Previous require a preceding build event".to_owned(),
+        )),
+        (BuildStart::WithPrevious | BuildStart::AfterPrevious, _) => Ok(()),
     }
 }
 
-pub(super) fn build_start_fields(start: KeynoteBuildStart) -> (bool, bool) {
+pub(super) fn build_start_fields(start: BuildStart) -> (bool, bool) {
     match start {
-        KeynoteBuildStart::OnClick => (false, true),
-        KeynoteBuildStart::AfterTransition | KeynoteBuildStart::AfterPrevious => (true, true),
-        KeynoteBuildStart::WithPrevious => (true, false),
+        BuildStart::OnClick => (false, true),
+        BuildStart::AfterTransition | BuildStart::AfterPrevious => (true, true),
+        BuildStart::WithPrevious => (true, false),
     }
 }
 
@@ -1269,26 +1472,26 @@ pub(super) fn build_settings(
         Some(KeynoteRotationAction {
             total_degrees: build.attributes.action_rotation_angle?,
             direction: rotation_direction_from_native(build.attributes.action_rotation_direction?)?,
-            acceleration: build_acceleration_from_native(build.attributes.action_acceleration?)?,
+            acceleration: build_acceleration_from_native(build.attributes.action_acceleration?),
         })
     });
     let scale = (effect == SCALE_ACTION_EFFECT).then(|| {
         Some(KeynoteScaleAction {
             scale_factor: build.attributes.action_scale_size?,
-            acceleration: build_acceleration_from_native(build.attributes.action_acceleration?)?,
+            acceleration: build_acceleration_from_native(build.attributes.action_acceleration?),
         })
     });
     let opacity = (effect == OPACITY_ACTION_EFFECT).then(|| {
         Some(KeynoteOpacityAction {
             opacity_percent: build.attributes.action_color_alpha?,
-            acceleration: build_acceleration_from_native(build.attributes.action_acceleration?)?,
+            acceleration: build_acceleration_from_native(build.attributes.action_acceleration?),
         })
     });
     let move_action = (effect == MOVE_ACTION_EFFECT).then(|| {
         Some(KeynoteMoveAction {
             path: motion_path_from_native(build.attributes.action_motion_path_source.as_ref()?)?,
             align_to_path: build.attributes.custom_align_to_path.unwrap_or(false),
-            acceleration: build_acceleration_from_native(build.attributes.action_acceleration?)?,
+            acceleration: build_acceleration_from_native(build.attributes.action_acceleration?),
         })
     });
     let emphasis = match effect.as_str() {
@@ -1355,8 +1558,8 @@ pub(super) fn build_settings(
         && build
             .attributes
             .action_acceleration
-            .and_then(build_acceleration_from_native)
-            == Some(KeynoteBuildAcceleration::Custom))
+            .map(build_acceleration_from_native)
+            == Some(BuildAcceleration::Custom))
     .then(|| {
         animation
             .and_then(|attributes| attributes.custom_effect_timing_curve_1.as_ref())
@@ -1391,10 +1594,10 @@ pub(super) fn build_settings(
                 .unwrap_or(true),
             starts_slide_events,
         ) {
-            (false, _, _) => KeynoteBuildStart::OnClick,
-            (true, false, _) => KeynoteBuildStart::WithPrevious,
-            (true, true, true) => KeynoteBuildStart::AfterTransition,
-            (true, true, false) => KeynoteBuildStart::AfterPrevious,
+            (false, _, _) => BuildStart::OnClick,
+            (true, false, _) => BuildStart::WithPrevious,
+            (true, true, true) => BuildStart::AfterTransition,
+            (true, true, false) => BuildStart::AfterPrevious,
         },
         text_delivery: build.attributes.custom_text_delivery,
         delivery_option: build.attributes.custom_delivery_option,
@@ -1941,7 +2144,7 @@ pub(super) fn patch_build_settings_wire(
                 animation.delay.is_some(),
                 Some(settings.delay.to_bits()),
             )?;
-            if typed_action_acceleration(settings) == Some(KeynoteBuildAcceleration::Custom) {
+            if typed_action_acceleration(settings) == Some(BuildAcceleration::Custom) {
                 if let Some(curve) = &settings.timing_curve {
                     let replacement = native_motion_path(&curve.path).encode_to_vec();
                     animation_data = if animation
@@ -1998,7 +2201,7 @@ pub(super) fn patch_build_settings_wire(
     if build_settings(
         &verified,
         &[chunk],
-        settings.start == KeynoteBuildStart::AfterTransition,
+        settings.start == BuildStart::AfterTransition,
     ) != *settings
     {
         return Err(Error::InvalidFormat(

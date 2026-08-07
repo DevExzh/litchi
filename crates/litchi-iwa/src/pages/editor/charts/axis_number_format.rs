@@ -5,15 +5,15 @@ use crate::charts::axis_number_format::{
     chart_axis_number_format as read_native_chart_axis_number_format,
     set_chart_axis_number_format as set_native_chart_axis_number_format,
 };
-use crate::charts::{ChartAxis, ChartNumberFormat};
+use crate::charts::{Axis, NumberFormat};
 
 impl PagesEditor {
     /// Read the decimal-number format of one native body-chart axis.
     pub fn body_chart_axis_number_format(
         &self,
         drawable_object_id: u64,
-        axis: ChartAxis,
-    ) -> Result<ChartNumberFormat> {
+        axis: Axis,
+    ) -> Result<NumberFormat> {
         body_chart_axis_number_format(self, drawable_object_id, axis)
     }
 
@@ -21,8 +21,8 @@ impl PagesEditor {
     pub fn set_body_chart_axis_number_format(
         &mut self,
         drawable_object_id: u64,
-        axis: ChartAxis,
-        format: ChartNumberFormat,
+        axis: Axis,
+        format: NumberFormat,
     ) -> Result<()> {
         set_body_chart_axis_number_format(self, drawable_object_id, axis, format)
     }
@@ -31,8 +31,8 @@ impl PagesEditor {
 fn body_chart_axis_number_format(
     editor: &PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
-) -> Result<ChartNumberFormat> {
+    axis: Axis,
+) -> Result<NumberFormat> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_axis_number_format(
         editor.package(),
@@ -46,8 +46,8 @@ fn body_chart_axis_number_format(
 fn set_body_chart_axis_number_format(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
-    format: ChartNumberFormat,
+    axis: Axis,
+    format: NumberFormat,
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let mut staged = editor.package().clone();
@@ -72,7 +72,7 @@ fn set_body_chart_axis_number_format(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartDecimalPlaces, ChartKind, ChartNegativeStyle};
+    use crate::charts::{ChartData, DecimalPlaces, Kind, NegativeStyle};
     use crate::pages::PagesDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -83,7 +83,7 @@ mod tests {
         let chart = editor
             .add_body_chart(
                 body.encode_utf16().count(),
-                ChartKind::Line2d,
+                Kind::Line2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -92,33 +92,33 @@ mod tests {
                 },
             )
             .unwrap();
-        let expected = ChartNumberFormat::new(
-            ChartDecimalPlaces::fixed(2).unwrap(),
-            ChartNegativeStyle::Parentheses,
+        let expected = NumberFormat::new(
+            DecimalPlaces::fixed(2).unwrap(),
+            NegativeStyle::Parentheses,
             true,
         );
         assert_eq!(
             editor
-                .body_chart_axis_number_format(chart.drawable_object_id, ChartAxis::Value)
+                .body_chart_axis_number_format(chart.drawable_object_id, Axis::Value)
                 .unwrap(),
-            ChartNumberFormat::AXIS_NATIVE_DEFAULT
+            NumberFormat::AXIS_NATIVE_DEFAULT
         );
         let baseline = editor.to_bytes().unwrap();
         editor
-            .set_body_chart_axis_number_format(chart.drawable_object_id, ChartAxis::Value, expected)
+            .set_body_chart_axis_number_format(chart.drawable_object_id, Axis::Value, expected)
             .unwrap();
         let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
-                .body_chart_axis_number_format(chart.drawable_object_id, ChartAxis::Value)
+                .body_chart_axis_number_format(chart.drawable_object_id, Axis::Value)
                 .unwrap(),
             expected
         );
         reopened
             .set_body_chart_axis_number_format(
                 chart.drawable_object_id,
-                ChartAxis::Value,
-                ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+                Axis::Value,
+                NumberFormat::AXIS_NATIVE_DEFAULT,
             )
             .unwrap();
         assert_eq!(reopened.to_bytes().unwrap(), baseline);

@@ -17,7 +17,7 @@ use super::super::line_end::{
     patch_shape_style_reference, replace_style_variation, shape_payload, shape_style,
     shape_style_is_exclusive, shape_style_message, shape_style_variation_object,
 };
-use super::ShapeStroke;
+use super::Stroke;
 use super::native::{empty_stroke_archive, stroke_from_native, stroke_to_native};
 
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
@@ -26,7 +26,7 @@ pub(crate) fn shape_stroke(
     package: &IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-) -> Result<Option<ShapeStroke>> {
+) -> Result<Option<Stroke>> {
     let shape = shape_payload(package, archive_name, drawable_id)?;
     let style_id = shape
         .super_
@@ -41,7 +41,7 @@ pub(crate) fn set_shape_stroke(
     package: &mut IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-    stroke: ShapeStroke,
+    stroke: Stroke,
 ) -> Result<()> {
     if shape_stroke(package, archive_name, drawable_id)? == Some(stroke) {
         return Ok(());
@@ -179,7 +179,7 @@ fn insert_stroke_variation(
     stylesheet_id: u64,
     parent_style_id: u64,
     overrides: ShapeStyleOverrides,
-    expected: Option<ShapeStroke>,
+    expected: Option<Stroke>,
 ) -> Result<()> {
     let new_style_id = next_object_identifier(package)?;
     let new_style =
@@ -224,7 +224,7 @@ fn validate_stroke(
     package: &IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-    expected: Option<ShapeStroke>,
+    expected: Option<Stroke>,
 ) -> Result<()> {
     if shape_stroke(package, archive_name, drawable_id)? != expected {
         return Err(Error::InvalidFormat(
@@ -271,10 +271,7 @@ fn parent_style_id(style_id: u64, style: &tswp::ShapeStyleArchive) -> Result<u64
         })
 }
 
-fn inherited_shape_stroke(
-    package: &IWorkPackage,
-    first_style_id: u64,
-) -> Result<Option<ShapeStroke>> {
+fn inherited_shape_stroke(package: &IWorkPackage, first_style_id: u64) -> Result<Option<Stroke>> {
     let mut visited = HashSet::new();
     let mut style_id = Some(first_style_id);
     for _ in 0..MAX_STYLE_INHERITANCE_DEPTH {

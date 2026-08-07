@@ -10,7 +10,7 @@ const FOOTNOTE_GAP_FIELD: u32 = 33;
 
 impl PagesEditor {
     /// Read the lossless settings shown by Pages' Footnotes formatter.
-    pub fn footnote_settings(&self) -> Result<PagesFootnoteSettings> {
+    pub fn footnote_settings(&self) -> Result<FootnoteSettings> {
         let location = locate_settings(self.text.package())?;
         decode_footnote_settings(&location.data, &location.settings)
     }
@@ -19,7 +19,7 @@ impl PagesEditor {
     ///
     /// Only the four note fields are patched. Unknown fields, field order, and
     /// all unrelated document settings remain byte-for-byte unchanged.
-    pub fn set_footnote_settings(&mut self, settings: PagesFootnoteSettings) -> Result<()> {
+    pub fn set_footnote_settings(&mut self, settings: FootnoteSettings) -> Result<()> {
         validate_footnote_settings(settings)?;
         let current = self.footnote_settings()?;
         if current == settings {
@@ -69,7 +69,7 @@ impl PagesEditor {
 fn decode_footnote_settings(
     original: &[u8],
     native: &tp::SettingsArchive,
-) -> Result<PagesFootnoteSettings> {
+) -> Result<FootnoteSettings> {
     for (field, present, raw) in [
         (
             FOOTNOTE_KIND_FIELD,
@@ -104,15 +104,13 @@ fn decode_footnote_settings(
                         "Pages footnote gap {points} must be non-negative"
                     ))
                 })
-                .and_then(PagesFootnoteGap::new)
+                .and_then(|points| FootnoteGap::new(points).map_err(semantic_error))
         })
         .transpose()?;
-    Ok(PagesFootnoteSettings {
-        kind: native.footnote_kind.map(PagesFootnoteKind::from_raw),
-        format: native.footnote_format.map(PagesFootnoteFormat::from_raw),
-        numbering: native
-            .footnote_numbering
-            .map(PagesFootnoteNumbering::from_raw),
+    Ok(FootnoteSettings {
+        kind: native.footnote_kind.map(FootnoteKind::from_raw),
+        format: native.footnote_format.map(FootnoteFormat::from_raw),
+        numbering: native.footnote_numbering.map(FootnoteNumbering::from_raw),
         gap,
     })
 }
@@ -120,7 +118,7 @@ fn decode_footnote_settings(
 fn encode_footnote_settings(
     original: &[u8],
     native: &tp::SettingsArchive,
-    settings: PagesFootnoteSettings,
+    settings: FootnoteSettings,
 ) -> Result<Vec<u8>> {
     decode_footnote_settings(original, native)?;
     let mut data = original.to_vec();
@@ -128,17 +126,17 @@ fn encode_footnote_settings(
         (
             FOOTNOTE_KIND_FIELD,
             native.footnote_kind.is_some(),
-            settings.kind.map(PagesFootnoteKind::as_raw),
+            settings.kind.map(FootnoteKind::as_raw),
         ),
         (
             FOOTNOTE_FORMAT_FIELD,
             native.footnote_format.is_some(),
-            settings.format.map(PagesFootnoteFormat::as_raw),
+            settings.format.map(FootnoteFormat::as_raw),
         ),
         (
             FOOTNOTE_NUMBERING_FIELD,
             native.footnote_numbering.is_some(),
-            settings.numbering.map(PagesFootnoteNumbering::as_raw),
+            settings.numbering.map(FootnoteNumbering::as_raw),
         ),
         (
             FOOTNOTE_GAP_FIELD,
@@ -157,26 +155,12 @@ fn encode_footnote_settings(
     Ok(data)
 }
 
-fn validate_footnote_settings(settings: PagesFootnoteSettings) -> Result<()> {
-    if settings.kind.is_some_and(|value| !value.is_canonical()) {
-        return Err(Error::ParseError(
-            "Pages unknown footnote kind must not alias a known kind".to_owned(),
-        ));
-    }
-    if settings.format.is_some_and(|value| !value.is_canonical()) {
-        return Err(Error::ParseError(
-            "Pages unknown footnote format must not alias a known format".to_owned(),
-        ));
-    }
-    if settings
-        .numbering
-        .is_some_and(|value| !value.is_canonical())
-    {
-        return Err(Error::ParseError(
-            "Pages unknown footnote numbering must not alias a known mode".to_owned(),
-        ));
-    }
-    Ok(())
+fn validate_footnote_settings(settings: FootnoteSettings) -> Result<()> {
+    settings.validate().map_err(semantic_error)
+}
+
+fn semantic_error(error: litchi_pages::footnote::Error) -> Error {
+    Error::ParseError(format!("invalid Pages footnote settings: {error}"))
 }
 
 const fn i32_varint(value: i32) -> u64 {

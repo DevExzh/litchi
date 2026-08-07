@@ -6,7 +6,9 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use litchi_iwa_common::media::Type as MediaType;
+
+use crate::charts::Kind;
 use crate::charts::series_style::{
     ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
     effective_chart_series_style_slots, generated_chart_series_style_extension,
@@ -14,6 +16,7 @@ use crate::charts::series_style::{
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media::MediaAssetId;
 use crate::package_metadata::component_identifier_for_entry;
 use crate::protobuf::tsch;
 use crate::shapes::{
@@ -22,7 +25,7 @@ use crate::shapes::{
     remove_orphaned_image_asset, validate_image_asset,
 };
 use crate::wire::{patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkMediaEditor, IWorkPackage, MediaType, Result};
+use crate::{Error, IWorkMediaEditor, IWorkPackage, Result};
 
 const AREA_FILL_FIELD: u32 = 54;
 const BUBBLE_FILL_FIELD: u32 = 55;
@@ -75,13 +78,13 @@ struct SymbolFillFields {
 }
 
 impl ChartSeriesSymbolFillKind {
-    pub fn for_chart_kind(kind: ChartKind) -> Result<Self> {
+    pub fn for_chart_kind(kind: Kind) -> Result<Self> {
         match kind {
-            ChartKind::Area2d | ChartKind::StackedArea2d => Ok(Self::Area2d),
-            ChartKind::Bubble2d => Ok(Self::Bubble2d),
-            ChartKind::Line2d => Ok(Self::Line2d),
-            ChartKind::Radar2d => Ok(Self::Radar2d),
-            ChartKind::Scatter2d => Ok(Self::Scatter2d),
+            Kind::Area2d | Kind::StackedArea2d => Ok(Self::Area2d),
+            Kind::Bubble2d => Ok(Self::Bubble2d),
+            Kind::Line2d => Ok(Self::Line2d),
+            Kind::Radar2d => Ok(Self::Radar2d),
+            Kind::Scatter2d => Ok(Self::Scatter2d),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no unambiguous data-symbol fill family"
             ))),
@@ -131,7 +134,7 @@ pub(crate) fn chart_series_symbol_fills(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
 ) -> Result<Vec<ChartSeriesSymbolFill>> {
     let storage = ChartSeriesSymbolFillKind::for_chart_kind(kind)?;
@@ -153,7 +156,7 @@ pub(crate) fn set_chart_series_symbol_fills(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     expected: &[ChartSeriesSymbolFill],
 ) -> Result<()> {
@@ -185,19 +188,24 @@ pub(crate) fn set_chart_series_symbol_fills(
             continue;
         }
         slot.ensure_exclusive(package, drawable_object_id, drawable_label)?;
-        let old_image = slot.read(package, |data| {
-            read_underlying_fill(data, storage)
-                .map(|fill| fill.as_ref().and_then(image_data_identifier))
-        })?;
+        let old_image = slot
+            .read(package, |data| {
+                read_underlying_fill(data, storage)
+                    .map(|fill| fill.as_ref().and_then(image_data_identifier))
+            })?
+            .map(MediaAssetId::try_from)
+            .transpose()?;
         slot.update(package, |data| {
             patch_local_fill(data, storage, Some(replacement))
         })?;
         let new_image = match replacement {
-            ChartSeriesSymbolFill::Custom(fill) => image_data_identifier(fill),
+            ChartSeriesSymbolFill::Custom(fill) => image_data_identifier(fill)
+                .map(MediaAssetId::try_from)
+                .transpose()?,
             ChartSeriesSymbolFill::SeriesFill | ChartSeriesSymbolFill::SeriesStroke => None,
         };
         adjust_data_reference(package, slot, old_image, new_image)?;
-        remove_orphaned_image_asset(package, old_image)?;
+        remove_orphaned_image_asset(package, old_image.map(MediaAssetId::get))?;
     }
     if chart_series_symbol_fills(
         package,
@@ -221,7 +229,7 @@ pub(crate) fn reset_chart_series_symbol_fill(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     series_index: usize,
 ) -> Result<ChartSeriesSymbolFill> {
@@ -239,10 +247,13 @@ pub(crate) fn reset_chart_series_symbol_fill(
             series_index + 1
         ))
     })?;
-    let old_image = slot.read(package, |data| {
-        read_underlying_fill(data, storage)
-            .map(|fill| fill.as_ref().and_then(image_data_identifier))
-    })?;
+    let old_image = slot
+        .read(package, |data| {
+            read_underlying_fill(data, storage)
+                .map(|fill| fill.as_ref().and_then(image_data_identifier))
+        })?
+        .map(MediaAssetId::try_from)
+        .transpose()?;
     let local = slot.read(package, |data| read_local_fill(data, storage))?;
     if local.is_none() {
         return read_effective_fill(slot, package, storage);
@@ -250,7 +261,7 @@ pub(crate) fn reset_chart_series_symbol_fill(
     slot.ensure_exclusive(package, drawable_object_id, drawable_label)?;
     slot.update(package, |data| patch_local_fill(data, storage, None))?;
     adjust_data_reference(package, slot, old_image, None)?;
-    remove_orphaned_image_asset(package, old_image)?;
+    remove_orphaned_image_asset(package, old_image.map(MediaAssetId::get))?;
     read_effective_fill(slot, package, storage)
 }
 
@@ -261,7 +272,7 @@ pub(crate) fn set_chart_series_symbol_image_fill_data(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     series_index: usize,
     preferred_filename: &str,
@@ -286,7 +297,7 @@ pub(crate) fn set_chart_series_symbol_image_fill_data(
     }
     let mut staged = media.into_package();
     let mut image = ShapeImageFill::embedded(
-        ShapeImageDataIdentifier::new(asset.data_identifier)?,
+        ShapeImageDataIdentifier::new(asset.data_identifier.get())?,
         technique,
         fill_size,
     )?;
@@ -465,8 +476,8 @@ fn bool_field(generated: &tsch::generated::ChartSeriesStyleArchive, field: u32) 
 fn adjust_data_reference(
     package: &mut IWorkPackage,
     slot: &ChartSeriesStyleSlot,
-    old_data_identifier: Option<u64>,
-    new_data_identifier: Option<u64>,
+    old_data_identifier: Option<MediaAssetId>,
+    new_data_identifier: Option<MediaAssetId>,
 ) -> Result<()> {
     if old_data_identifier == new_data_identifier {
         return Ok(());
@@ -474,10 +485,10 @@ fn adjust_data_reference(
     let component_id = component_identifier_for_entry(package, slot.archive_name())?
         .ok_or_else(|| Error::InvalidFormat("Chart series style has no component".to_owned()))?;
     if let Some(identifier) = old_data_identifier {
-        remove_component_data_reference(package, component_id, identifier, slot.object_id())?;
+        remove_component_data_reference(package, component_id, identifier.get(), slot.object_id())?;
     }
     if let Some(identifier) = new_data_identifier {
-        add_component_data_reference(package, component_id, identifier, slot.object_id())?;
+        add_component_data_reference(package, component_id, identifier.get(), slot.object_id())?;
     }
     Ok(())
 }
@@ -486,8 +497,9 @@ fn adjust_data_reference(
 mod tests {
     use super::*;
     use crate::protobuf::tss;
-    use crate::shapes::{RgbColorSpace, ShapeGradient, ShapeGradientAngle};
+    use crate::shapes::RgbColorSpace;
     use crate::wire::{append_varint_field, parse_wire_fields};
+    use litchi_iwa_common::shape::fill::{Angle, Gradient};
 
     const UNKNOWN_OUTER_FIELD: u32 = 4_096;
     const UNKNOWN_GENERATED_FIELD: u32 = 4_097;
@@ -500,10 +512,10 @@ mod tests {
             ChartSeriesSymbolFill::SeriesStroke,
             ChartSeriesSymbolFill::Custom(ShapeFill::None),
             ChartSeriesSymbolFill::Custom(ShapeFill::Solid(color(0.2, 0.5, 0.8))),
-            ChartSeriesSymbolFill::Custom(ShapeFill::Gradient(ShapeGradient::linear(
+            ChartSeriesSymbolFill::Custom(ShapeFill::Gradient(Gradient::linear(
                 color(0.8, 0.1, 0.2),
                 color(0.1, 0.3, 0.9),
-                ShapeGradientAngle::from_degrees(35.0).unwrap(),
+                Angle::from_degrees(35.0).unwrap(),
             ))),
         ];
         for mode in modes {
@@ -565,13 +577,13 @@ mod tests {
         let original_outer = parse_wire_fields(original)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == UNKNOWN_OUTER_FIELD)
-            .map(|field| original[field.start..field.end].to_vec());
+            .find(|field| field.number() == UNKNOWN_OUTER_FIELD)
+            .map(|field| original[field.start()..field.end()].to_vec());
         let patched_outer = parse_wire_fields(patched)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == UNKNOWN_OUTER_FIELD)
-            .map(|field| patched[field.start..field.end].to_vec());
+            .find(|field| field.number() == UNKNOWN_OUTER_FIELD)
+            .map(|field| patched[field.start()..field.end()].to_vec());
         assert_eq!(patched_outer, original_outer);
         let original_generated = generated_chart_series_style_extension(original)
             .unwrap()
@@ -582,13 +594,13 @@ mod tests {
         let original_unknown = parse_wire_fields(original_generated)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == UNKNOWN_GENERATED_FIELD)
-            .map(|field| original_generated[field.start..field.end].to_vec());
+            .find(|field| field.number() == UNKNOWN_GENERATED_FIELD)
+            .map(|field| original_generated[field.start()..field.end()].to_vec());
         let patched_unknown = parse_wire_fields(patched_generated)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == UNKNOWN_GENERATED_FIELD)
-            .map(|field| patched_generated[field.start..field.end].to_vec());
+            .find(|field| field.number() == UNKNOWN_GENERATED_FIELD)
+            .map(|field| patched_generated[field.start()..field.end()].to_vec());
         assert_eq!(patched_unknown, original_unknown);
     }
 

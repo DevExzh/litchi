@@ -23,17 +23,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(sheet_index)
         .ok_or("sheet index out of range")?;
     let target = editor
-        .sheet_text_boxes(sheet.object_id)?
+        .sheet_text_boxes(sheet.id())?
         .into_iter()
         .nth(text_box_index)
         .ok_or("text-box index out of range")?;
-    let removed = editor.remove_sheet_text_box(sheet.object_id, target.drawable_object_id)?;
+    let removed = editor.remove_sheet_text_box(sheet.id(), target.drawable_object_id)?;
     editor.save(output)?;
     println!(
         "sheet={sheet_index} removed_drawable={} removed_storage={} text={:?}",
         removed.text_box.drawable_object_id,
-        removed.text_box.storage.object_id,
-        removed.text_box.storage.text
+        removed.text_box.storage.id,
+        removed.text_box.storage.storage.text()
     );
     Ok(())
 }

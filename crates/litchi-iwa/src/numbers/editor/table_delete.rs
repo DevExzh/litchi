@@ -7,7 +7,7 @@ mod dimension;
 mod row;
 mod uid;
 
-use crate::table_hidden_axes::{TableAxisIndex, remove_table_hidden_axis};
+use crate::table_hidden_axes::remove_table_hidden_axis;
 use cell_merge::{
     MergeAnchorRelocation, MergeAxis, merge_anchor_relocations_for_axis_deletion,
     regions_in_package, shift_merges_for_axis_deletion,
@@ -17,6 +17,7 @@ use dimension::set_table_dimensions;
 use formula_dependency_shift::{
     DependencyAxis, FormulaHostCoordinate, delete_formula_dependencies,
 };
+use litchi_iwa_common::table::axis::AxisIndex;
 use row::{delete_row_headers, delete_table_tile_row};
 use stroke_layers::{StrokeAxis, delete as delete_stroke_layers};
 use table_headers::set_attached_table_header_settings;
@@ -47,7 +48,12 @@ impl NumbersEditor {
     /// reference the deleted row cause the entire operation to fail unchanged.
     /// Full-table sort rules are preserved because row edits do not change
     /// their physical column slots.
-    pub fn remove_table_row(&mut self, table_id: u64, deletion: TableRowDeletion) -> Result<()> {
+    pub fn remove_table_row(
+        &mut self,
+        selector: litchi_numbers::TableSelector<'_>,
+        deletion: RowDeletion,
+    ) -> Result<()> {
+        let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
         let (new_rows, columns) = remove_attached_table_row(&mut staged, table_id, deletion)?;
         verify_numbers_dimensions(&staged, table_id, new_rows, columns)?;
@@ -64,9 +70,10 @@ impl NumbersEditor {
     /// all other rule indices remain unchanged, matching Numbers.
     pub fn remove_table_column(
         &mut self,
-        table_id: u64,
-        deletion: TableColumnDeletion,
+        selector: litchi_numbers::TableSelector<'_>,
+        deletion: ColumnDeletion,
     ) -> Result<()> {
+        let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
         let (rows, new_columns) = remove_attached_table_column(&mut staged, table_id, deletion)?;
         verify_numbers_dimensions(&staged, table_id, rows, new_columns)?;
@@ -78,7 +85,7 @@ impl NumbersEditor {
 pub(super) fn remove_attached_table_row(
     package: &mut IWorkPackage,
     table_id: u64,
-    deletion: TableRowDeletion,
+    deletion: RowDeletion,
 ) -> Result<(usize, usize)> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     let old_rows = descriptor.model.number_of_rows as usize;
@@ -132,7 +139,7 @@ pub(super) fn remove_attached_table_row(
             )
         })?;
     if descriptor.model.hidden_states_owner.is_some() {
-        remove_table_hidden_axis(package, table_id, TableAxisIndex::row(row))?;
+        remove_table_hidden_axis(package, table_id, AxisIndex::row(row))?;
     }
     delete_row_uid(package, &locations, uid.identifier, old_rows, row)?;
     if let Some(sidecar) = &descriptor.model.stroke_sidecar {
@@ -158,7 +165,7 @@ pub(super) fn remove_attached_table_row(
 pub(super) fn remove_attached_table_column(
     package: &mut IWorkPackage,
     table_id: u64,
-    deletion: TableColumnDeletion,
+    deletion: ColumnDeletion,
 ) -> Result<(usize, usize)> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     let old_columns = descriptor.model.number_of_columns as usize;
@@ -224,7 +231,7 @@ pub(super) fn remove_attached_table_column(
             )
         })?;
     if descriptor.model.hidden_states_owner.is_some() {
-        remove_table_hidden_axis(package, table_id, TableAxisIndex::column(column))?;
+        remove_table_hidden_axis(package, table_id, AxisIndex::column(column))?;
     }
     delete_column_uid(package, &locations, uid.identifier, old_columns, column)?;
     if let Some(sidecar) = &descriptor.model.stroke_sidecar {
@@ -254,9 +261,9 @@ fn validate_deletion_features(
     model: &TableModelArchive,
     axis: TableAxis,
     new_length: usize,
-    updated_header_settings: Option<NumbersTableHeaderSettings>,
+    updated_header_settings: Option<HeaderSettings>,
 ) -> Result<()> {
-    let stored_settings = NumbersTableHeaderSettings::from_model(model)?;
+    let stored_settings = table_headers::settings_from_model(model)?;
     let settings = updated_header_settings.unwrap_or(stored_settings);
     let fixed_regions_fit = match axis {
         TableAxis::Row => settings
@@ -292,14 +299,14 @@ fn validate_deletion_features(
 
 struct ResolvedRowDeletion {
     physical_index: usize,
-    updated_header_settings: Option<NumbersTableHeaderSettings>,
+    updated_header_settings: Option<HeaderSettings>,
 }
 
 fn resolve_row_deletion(
     model: &TableModelArchive,
-    deletion: TableRowDeletion,
+    deletion: RowDeletion,
 ) -> Result<ResolvedRowDeletion> {
-    let mut settings = NumbersTableHeaderSettings::from_model(model)?;
+    let mut settings = table_headers::settings_from_model(model)?;
     let rows = model.number_of_rows as usize;
     let header_rows = settings.header_row_count();
     let footer_rows = settings.footer_row_count();
@@ -313,7 +320,7 @@ fn resolve_row_deletion(
         })?;
     let body_rows = rows - fixed_rows;
     match deletion {
-        TableRowDeletion::Header { index } => {
+        RowDeletion::Header { index } => {
             validate_section_deletion(index, header_rows, "header row")?;
             settings.header_rows = decremented_header_count(header_rows)?;
             Ok(ResolvedRowDeletion {
@@ -321,14 +328,14 @@ fn resolve_row_deletion(
                 updated_header_settings: Some(settings),
             })
         },
-        TableRowDeletion::Body { index } => {
+        RowDeletion::Body { index } => {
             validate_section_deletion(index, body_rows, "body row")?;
             Ok(ResolvedRowDeletion {
                 physical_index: header_rows + index,
                 updated_header_settings: None,
             })
         },
-        TableRowDeletion::Footer { index } => {
+        RowDeletion::Footer { index } => {
             validate_section_deletion(index, footer_rows, "footer row")?;
             settings.footer_rows = decremented_header_count(footer_rows)?;
             Ok(ResolvedRowDeletion {
@@ -341,21 +348,21 @@ fn resolve_row_deletion(
 
 struct ResolvedColumnDeletion {
     physical_index: usize,
-    updated_header_settings: Option<NumbersTableHeaderSettings>,
+    updated_header_settings: Option<HeaderSettings>,
 }
 
 fn resolve_column_deletion(
     model: &TableModelArchive,
-    deletion: TableColumnDeletion,
+    deletion: ColumnDeletion,
 ) -> Result<ResolvedColumnDeletion> {
-    let mut settings = NumbersTableHeaderSettings::from_model(model)?;
+    let mut settings = table_headers::settings_from_model(model)?;
     let columns = model.number_of_columns as usize;
     let header_columns = settings.header_column_count();
     let body_columns = columns.checked_sub(header_columns).ok_or_else(|| {
         Error::InvalidFormat("iWork header columns exceed the table column count".to_owned())
     })?;
     match deletion {
-        TableColumnDeletion::Header { index } => {
+        ColumnDeletion::Header { index } => {
             validate_section_deletion(index, header_columns, "header column")?;
             settings.header_columns = decremented_header_count(header_columns)?;
             Ok(ResolvedColumnDeletion {
@@ -363,7 +370,7 @@ fn resolve_column_deletion(
                 updated_header_settings: Some(settings),
             })
         },
-        TableColumnDeletion::Body { index } => {
+        ColumnDeletion::Body { index } => {
             validate_section_deletion(index, body_columns, "body column")?;
             Ok(ResolvedColumnDeletion {
                 physical_index: header_columns + index,
@@ -382,10 +389,10 @@ fn validate_section_deletion(index: usize, length: usize, section: &str) -> Resu
     Ok(())
 }
 
-fn decremented_header_count(count: usize) -> Result<Option<NumbersTableHeaderCount>> {
+fn decremented_header_count(count: usize) -> Result<Option<HeaderCount>> {
     match count.checked_sub(1) {
         Some(0) => Ok(None),
-        Some(count) => NumbersTableHeaderCount::new(count).map(Some),
+        Some(count) => Ok(Some(HeaderCount::new(count)?)),
         None => Err(Error::InvalidFormat(
             "iWork header/footer deletion underflow".to_owned(),
         )),
@@ -400,13 +407,15 @@ fn relocate_merge_anchors(
     relocations: &[MergeAnchorRelocation],
 ) -> Result<()> {
     for relocation in relocations {
+        let ((source_row, source_column), (destination_row, destination_column)) =
+            native_anchor_coordinates(relocation)?;
         model::relocate_attached_cell_in_package(
             package,
             table_id,
-            relocation.source_row,
-            relocation.source_column,
-            relocation.destination_row,
-            relocation.destination_column,
+            source_row,
+            source_column,
+            destination_row,
+            destination_column,
         )?;
     }
     Ok(())
@@ -420,8 +429,7 @@ fn validated_merge_anchor_sources(
     let mut planned_sources = HashSet::with_capacity(relocations.len());
     let mut planned_destinations = HashSet::with_capacity(relocations.len());
     for relocation in relocations {
-        let source = (relocation.source_row, relocation.source_column);
-        let destination = (relocation.destination_row, relocation.destination_column);
+        let (source, destination) = native_anchor_coordinates(relocation)?;
         if !planned_sources.insert(source) || !planned_destinations.insert(destination) {
             return Err(Error::InvalidFormat(
                 "iWork merged-cell deletion has overlapping anchor relocations".to_owned(),
@@ -448,19 +456,35 @@ fn merge_anchor_formula_hosts(
 ) -> Result<Vec<FormulaHostCoordinate>> {
     let mut hosts = Vec::new();
     for relocation in relocations {
-        if model::attached_cell_is_formula(
-            package,
-            table_id,
-            relocation.source_row,
-            relocation.source_column,
-        )? {
+        let ((source_row, source_column), _) = native_anchor_coordinates(relocation)?;
+        if model::attached_cell_is_formula(package, table_id, source_row, source_column)? {
             hosts.push(FormulaHostCoordinate::from_table_coordinates(
-                relocation.source_row,
-                relocation.source_column,
+                source_row,
+                source_column,
             )?);
         }
     }
     Ok(hosts)
+}
+
+fn native_anchor_coordinates(
+    relocation: &MergeAnchorRelocation,
+) -> Result<((usize, usize), (usize, usize))> {
+    let source = relocation.source();
+    let destination = relocation.destination();
+    let source_row = usize::try_from(source.row())
+        .map_err(|_| Error::ParseError("iWork merge source row exceeds usize".to_owned()))?;
+    let source_column = usize::try_from(source.column())
+        .map_err(|_| Error::ParseError("iWork merge source column exceeds usize".to_owned()))?;
+    let destination_row = usize::try_from(destination.row())
+        .map_err(|_| Error::ParseError("iWork merge destination row exceeds usize".to_owned()))?;
+    let destination_column = usize::try_from(destination.column()).map_err(|_| {
+        Error::ParseError("iWork merge destination column exceeds usize".to_owned())
+    })?;
+    Ok((
+        (source_row, source_column),
+        (destination_row, destination_column),
+    ))
 }
 
 fn without_relocated_cells(

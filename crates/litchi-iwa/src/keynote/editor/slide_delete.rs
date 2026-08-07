@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::data_reference_registry::component_data_identifiers;
+use crate::media::MediaAssetId;
 
 impl KeynoteEditor {
     /// Remove a slide and its slide-tree node.
@@ -143,6 +144,7 @@ fn remove_dedicated_slide_component(
 
     let mut media = IWorkMediaEditor::from_package(package)?;
     for identifier in data_identifiers {
+        let identifier = MediaAssetId::try_from(identifier)?;
         if media
             .asset(identifier)
             .is_some_and(|asset| !asset.is_referenced())
@@ -156,7 +158,9 @@ fn remove_dedicated_slide_component(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::media::MediaAssetId;
     use crate::shapes::{DrawablePoint, DrawableSize};
+    use litchi_keynote::slide::image::Options as ImageOptions;
 
     const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 80.0, y: 90.0 };
     const IMAGE_SIZE: DrawableSize = DrawableSize {
@@ -194,7 +198,7 @@ mod tests {
                 1,
                 "litchi_logo.png",
                 include_bytes!("../../../../../media/litchi_logo.png"),
-                KeynoteSlideImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
+                ImageOptions::new(IMAGE_POSITION, IMAGE_SIZE).unwrap(),
             )
             .unwrap();
         assert_eq!(editor.media_assets().unwrap().len(), 1);
@@ -218,7 +222,7 @@ mod tests {
                 1,
                 "litchi_logo.png",
                 include_bytes!("../../../../../media/litchi_logo.png"),
-                KeynoteSlideImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
+                ImageOptions::new(IMAGE_POSITION, IMAGE_SIZE).unwrap(),
             )
             .unwrap();
         editor.duplicate_slide(1).unwrap();
@@ -227,9 +231,11 @@ mod tests {
 
         let assets = editor.media_assets().unwrap();
         assert_eq!(assets.len(), 1);
-        assert_eq!(assets[0].data_identifier, created.image_data_identifier);
+        let image_data_identifier =
+            MediaAssetId::try_from(created.image_data_identifier).expect("valid image media ID");
+        assert_eq!(assets[0].data_identifier, image_data_identifier);
         assert_eq!(
-            editor.extract_media(created.image_data_identifier).unwrap(),
+            editor.extract_media(image_data_identifier.get()).unwrap(),
             include_bytes!("../../../../../media/litchi_logo.png")
         );
         assert_eq!(editor.slide_images(1).unwrap(), [created]);

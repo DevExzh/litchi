@@ -31,25 +31,36 @@
 
 use super::bnc::read_decimal128_le;
 use super::cell::CellValue;
-use super::table::{NumbersCellComment, NumbersCommentUuid, NumbersTable};
+use super::table::NumbersTable;
 use crate::bundle::Bundle;
 use crate::object_index::{ObjectIndex, ResolvedObjectRef};
 use crate::protobuf::{tn, tsce, tsd, tst};
 use crate::{Error, Result};
+use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
+use litchi_numbers::cell::FiniteF64;
 use prost::Message;
 use std::collections::{HashMap, HashSet};
 
-type FormulaTable = HashMap<u32, tsce::FormulaArchive>;
-type FormulaErrorTable = HashMap<u32, String>;
-type CommentTable = HashMap<u32, NumbersCellComment>;
+type CompactTable<T> = Box<[(u32, T)]>;
+type StringTable = CompactTable<String>;
+type FormulaTable = CompactTable<tsce::FormulaArchive>;
+type FormulaErrorTable = CompactTable<String>;
+type CommentTable = CompactTable<Comment>;
 type FormulaOwnerKey = [u32; 4];
 type FormulaCategoryKey = [u64; 2];
 
+const TILE_MESSAGE_TYPE: u32 = 6_002;
+const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
+const MAX_TABLE_ROWS: usize = 1 << 20;
+const MAX_TABLE_COLUMNS: usize = 1 << 14;
+const MAX_ADDRESSABLE_CELLS: usize = 1 << 24;
+const MAX_MATERIALIZED_CELLS: usize = 1 << 20;
+
 struct CellTables<'a> {
-    strings: &'a HashMap<u32, String>,
+    strings: &'a StringTable,
     formulas: &'a FormulaTable,
     formula_errors: &'a FormulaErrorTable,
-    rich_text: &'a HashMap<u32, String>,
+    rich_text: &'a StringTable,
     comments: &'a CommentTable,
     formula_references: &'a FormulaReferenceMaps,
 }
@@ -57,6 +68,132 @@ struct CellTables<'a> {
 struct ParsedCell {
     value: CellValue,
     comment_identifier: Option<u32>,
+}
+
+#[derive(Debug)]
+struct CellBudget {
+    remaining: usize,
+}
+
+impl CellBudget {
+    fn new() -> Self {
+        Self {
+            remaining: MAX_MATERIALIZED_CELLS,
+        }
+    }
+
+    fn check(&self, requested: usize) -> Result<()> {
+        if requested > self.remaining {
+            return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::MaterializedCells,
+                observed: MAX_MATERIALIZED_CELLS
+                    .saturating_sub(self.remaining)
+                    .saturating_add(requested),
+                limit: MAX_MATERIALIZED_CELLS,
+            }));
+        }
+        Ok(())
+    }
+
+    fn consume(&mut self, materialized: usize) -> Result<()> {
+        self.check(materialized)?;
+        self.remaining -= materialized;
+        Ok(())
+    }
+}
+
+fn allocation_error(resource: &'static str, amount: usize) -> Error {
+    Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
+}
+
+fn compact_table<T>(entries: impl IntoIterator<Item = (u32, T)>) -> Result<CompactTable<T>> {
+    let mut compacted = Vec::new();
+    let entries = entries.into_iter();
+    let (lower_bound, _) = entries.size_hint();
+    compacted
+        .try_reserve(lower_bound)
+        .map_err(|_| allocation_error("Numbers table sidecar entries", lower_bound))?;
+    for entry in entries {
+        compacted
+            .try_reserve(1)
+            .map_err(|_| allocation_error("Numbers table sidecar entries", compacted.len() + 1))?;
+        compacted.push(entry);
+    }
+    compact_table_vec(compacted)
+}
+
+fn compact_table_vec<T>(mut compacted: Vec<(u32, T)>) -> Result<CompactTable<T>> {
+    compacted.sort_unstable_by_key(|(key, _)| *key);
+    if compacted.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+        return Err(Error::InvalidFormat(
+            "Numbers table sidecar contains duplicate keys".to_owned(),
+        ));
+    }
+    Ok(compacted.into_boxed_slice())
+}
+
+fn compact_table_get<T>(table: &[(u32, T)], key: u32) -> Option<&T> {
+    table
+        .binary_search_by_key(&key, |(entry_key, _)| *entry_key)
+        .ok()
+        .map(|index| &table[index].1)
+}
+
+fn checked_table_dimensions(row_count: u32, column_count: u32) -> Result<(usize, usize)> {
+    let row_count = usize::try_from(row_count).map_err(|_| {
+        Error::InvalidFormat("Numbers table row count does not fit the host usize".to_owned())
+    })?;
+    let column_count = usize::try_from(column_count).map_err(|_| {
+        Error::InvalidFormat("Numbers table column count does not fit the host usize".to_owned())
+    })?;
+
+    if row_count > MAX_TABLE_ROWS {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::TableRows,
+            observed: row_count,
+            limit: MAX_TABLE_ROWS,
+        }));
+    }
+    if column_count > MAX_TABLE_COLUMNS {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::TableColumns,
+            observed: column_count,
+            limit: MAX_TABLE_COLUMNS,
+        }));
+    }
+
+    let addressable_cells = row_count.checked_mul(column_count).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers table dimensions overflow host address space: {row_count}x{column_count}"
+        ))
+    })?;
+    if addressable_cells > MAX_ADDRESSABLE_CELLS {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::TableCells,
+            observed: addressable_cells,
+            limit: MAX_ADDRESSABLE_CELLS,
+        }));
+    }
+
+    Ok((row_count, column_count))
+}
+
+fn validate_table_row(row: usize, row_count: usize) -> Result<()> {
+    if row >= row_count {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers tile row {row} is outside the declared table height {row_count}"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_table_column(column: usize, column_count: usize) -> Result<()> {
+    if column >= column_count {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers cell column {column} is outside the declared table width {column_count}"
+        )));
+    }
+    Ok(())
 }
 
 fn validate_table_data_list_segment(
@@ -111,6 +248,21 @@ pub struct TableDataExtractor<'a> {
 }
 
 impl<'a> TableDataExtractor<'a> {
+    /// Return whether the index contains a candidate table-model object.
+    ///
+    /// This cheap type probe lets generic structured extraction avoid building
+    /// formula-reference sidecars for Pages and Keynote packages.
+    pub(crate) fn has_table_models(object_index: &ObjectIndex) -> bool {
+        [TABLE_MODEL_MESSAGE_TYPE, 6_000]
+            .into_iter()
+            .any(|message_type| {
+                object_index
+                    .iter_entries_by_type(message_type)
+                    .next()
+                    .is_some()
+            })
+    }
+
     /// Create a new table data extractor
     pub fn new(bundle: &'a Bundle, object_index: &'a ObjectIndex) -> Self {
         Self {
@@ -123,33 +275,54 @@ impl<'a> TableDataExtractor<'a> {
     /// Extract all tables from the document
     pub fn extract_all_tables(&self) -> Result<Vec<NumbersTable>> {
         let mut tables = Vec::new();
-
-        // Find all TableModelArchive objects (message type 6000 or 6001)
-        let table_entries = self.object_index.iter_entries_by_type(6000);
-        tables.extend(self.extract_tables_from_entries(table_entries)?);
-
-        let table_entries = self.object_index.iter_entries_by_type(6001);
-        tables.extend(self.extract_tables_from_entries(table_entries)?);
-
+        self.for_each_table(|table| {
+            tables.try_reserve(1).map_err(|_| {
+                allocation_error("Numbers extracted table results", tables.len() + 1)
+            })?;
+            tables.push(table);
+            Ok(())
+        })?;
         Ok(tables)
     }
 
-    /// Extract tables from object index entries
-    fn extract_tables_from_entries<'entry, I>(&self, entries: I) -> Result<Vec<NumbersTable>>
-    where
-        I: IntoIterator<Item = &'entry crate::object_index::ObjectIndexEntry>,
-    {
+    /// Extract all tables directly into the canonical Numbers semantic model.
+    ///
+    /// The archive adapter's builder is consumed one table at a time. Its
+    /// sparse cell and header buffers move into the leaf table, so this path
+    /// avoids first allocating a `Vec<NumbersTable>` only to convert every
+    /// element into a second result vector for structured extraction.
+    pub(crate) fn extract_all_semantic_tables(&self) -> Result<Vec<litchi_numbers::Table>> {
         let mut tables = Vec::new();
+        self.for_each_table(|table| {
+            tables.try_reserve(1).map_err(|_| {
+                allocation_error("Numbers semantic table results", tables.len() + 1)
+            })?;
+            tables.push(table.into_semantic_table()?);
+            Ok(())
+        })?;
+        Ok(tables)
+    }
 
-        for entry in entries {
-            if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())?
-                && let Some(table) = self.extract_table_from_object(&resolved)?
-            {
-                tables.push(table);
+    fn for_each_table(&self, mut visit: impl FnMut(NumbersTable) -> Result<()>) -> Result<()> {
+        let mut seen_objects = HashSet::new();
+
+        // Real packages index TableModelArchive as 6001. Older generated
+        // fixtures may store the same payload under 6000, so the object
+        // adapter accepts 6000 only when its payload passes model extraction;
+        // a genuine TableInfoArchive is ignored rather than mis-decoded.
+        for message_type in [TABLE_MODEL_MESSAGE_TYPE, 6_000] {
+            for entry in self.object_index.iter_entries_by_type(message_type) {
+                if !seen_objects.insert(entry.id()) {
+                    continue;
+                }
+                if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())?
+                    && let Some(table) = self.extract_table_from_object(&resolved)?
+                {
+                    visit(table)?;
+                }
             }
         }
-
-        Ok(tables)
+        Ok(())
     }
 
     /// Extract a single table from a resolved object
@@ -157,12 +330,35 @@ impl<'a> TableDataExtractor<'a> {
         &self,
         object: &ResolvedObjectRef<'_>,
     ) -> Result<Option<NumbersTable>> {
-        // Find the TableModelArchive message
-        for msg in object.messages {
-            if (msg.type_ == 6000 || msg.type_ == 6001)
-                && let Ok(table_model) = tst::TableModelArchive::decode(&*msg.data)
-            {
-                return self.parse_table_model(table_model).map(Some);
+        // Prefer the typed TableModelArchive message in real packages.
+        if let Some(message) = object
+            .messages
+            .iter()
+            .find(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
+        {
+            let table_model = tst::TableModelArchive::decode(&*message.data).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "Numbers table-model message {} is malformed: {error}",
+                    message.type_
+                ))
+            })?;
+            return self.parse_table_model(table_model).map(Some);
+        }
+
+        // Protobuf is permissive, and legacy fixtures used 6000 for a model.
+        // Only return that fallback after the complete table extraction
+        // succeeds; a genuine TableInfoArchive has no cell data stores and is
+        // therefore skipped safely.
+        for message in object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == 6_000)
+        {
+            let Ok(table_model) = tst::TableModelArchive::decode(&*message.data) else {
+                continue;
+            };
+            if let Ok(table) = self.parse_table_model(table_model) {
+                return Ok(Some(table));
             }
         }
 
@@ -171,11 +367,10 @@ impl<'a> TableDataExtractor<'a> {
 
     /// Parse a TableModelArchive protobuf message
     fn parse_table_model(&self, table_model: tst::TableModelArchive) -> Result<NumbersTable> {
-        let mut table = NumbersTable::with_dimensions(
-            table_model.table_name.clone(),
-            table_model.number_of_rows as usize,
-            table_model.number_of_columns as usize,
-        );
+        let (row_count, column_count) =
+            checked_table_dimensions(table_model.number_of_rows, table_model.number_of_columns)?;
+        let mut table =
+            NumbersTable::with_dimensions(table_model.table_name, row_count, column_count)?;
 
         // Extract string table for cell text values
         // string_table is a required field, not Optional
@@ -188,16 +383,16 @@ impl<'a> TableDataExtractor<'a> {
             self.load_formula_table(table_model.base_data_store.formula_table.identifier)?;
         let formula_error_table = match table_model.base_data_store.formula_error_table {
             Some(reference) => self.load_formula_error_table(reference.identifier)?,
-            None => HashMap::new(),
+            None => Box::default(),
         };
 
         let rich_text_table = match table_model.base_data_store.rich_text_table {
             Some(reference) => self.load_rich_text_table(reference.identifier)?,
-            None => HashMap::new(),
+            None => Box::default(),
         };
         let comment_table = match table_model.base_data_store.comment_storage_table {
             Some(reference) => self.load_comment_table(reference.identifier)?,
-            None => HashMap::new(),
+            None => Box::default(),
         };
 
         // Parse tiles to extract cell data
@@ -215,32 +410,35 @@ impl<'a> TableDataExtractor<'a> {
     }
 
     /// Load a TableDataList from an object reference
-    fn load_string_table(&self, object_id: u64) -> Result<HashMap<u32, String>> {
-        Ok(self
-            .load_table_data_list_entries(object_id, tst::table_data_list::ListType::String)?
-            .into_iter()
-            .filter_map(|entry| entry.string.map(|value| (entry.key, value)))
-            .collect())
+    fn load_string_table(&self, object_id: u64) -> Result<StringTable> {
+        compact_table(
+            self.load_table_data_list_entries(object_id, tst::table_data_list::ListType::String)?
+                .into_iter()
+                .filter_map(|entry| entry.string.map(|value| (entry.key, value))),
+        )
     }
 
     fn load_formula_table(&self, object_id: u64) -> Result<FormulaTable> {
-        Ok(self
-            .load_table_data_list_entries(object_id, tst::table_data_list::ListType::Formula)?
-            .into_iter()
-            .filter_map(|entry| entry.formula.map(|value| (entry.key, value)))
-            .collect())
+        compact_table(
+            self.load_table_data_list_entries(object_id, tst::table_data_list::ListType::Formula)?
+                .into_iter()
+                .filter_map(|entry| entry.formula.map(|value| (entry.key, value))),
+        )
     }
 
     fn load_formula_error_table(&self, object_id: u64) -> Result<FormulaErrorTable> {
-        Ok(self
-            .load_table_data_list_entries(object_id, tst::table_data_list::ListType::FormulaError)?
+        compact_table(
+            self.load_table_data_list_entries(
+                object_id,
+                tst::table_data_list::ListType::FormulaError,
+            )?
             .into_iter()
-            .filter_map(|entry| entry.string.map(|value| (entry.key, value)))
-            .collect())
+            .filter_map(|entry| entry.string.map(|value| (entry.key, value))),
+        )
     }
 
-    fn load_rich_text_table(&self, object_id: u64) -> Result<HashMap<u32, String>> {
-        let mut result = HashMap::new();
+    fn load_rich_text_table(&self, object_id: u64) -> Result<StringTable> {
+        let mut result = Vec::new();
 
         for entry in self.load_table_data_list_entries(
             object_id,
@@ -262,17 +460,20 @@ impl<'a> TableDataExtractor<'a> {
                     continue;
                 };
                 if let Some(text) = self.extract_rich_text(payload.storage.identifier)? {
-                    result.insert(entry.key, text);
+                    result.try_reserve(1).map_err(|_| {
+                        allocation_error("Numbers rich-text sidecar", result.len() + 1)
+                    })?;
+                    result.push((entry.key, text));
                     break;
                 }
             }
         }
 
-        Ok(result)
+        compact_table_vec(result)
     }
 
     fn load_comment_table(&self, object_id: u64) -> Result<CommentTable> {
-        let mut result = HashMap::new();
+        let mut result = Vec::new();
         for entry in self.load_table_data_list_entries(
             object_id,
             tst::table_data_list::ListType::CommentStorage,
@@ -317,28 +518,36 @@ impl<'a> TableDataExtractor<'a> {
                     "Object {storage_id} has multiple TSD comment-storage payloads"
                 )));
             }
-            result.insert(
+            result
+                .try_reserve(1)
+                .map_err(|_| allocation_error("Numbers comment sidecar", result.len() + 1))?;
+            result.push((
                 entry.key,
-                NumbersCellComment {
+                Comment {
                     text: comment.text.clone().unwrap_or_default(),
                     creation_date_seconds: comment.creation_date.as_ref().map(|date| date.seconds),
-                    author_object_id: comment.author.as_ref().map(|author| author.identifier),
-                    reply_object_ids: comment
+                    author_id: comment
+                        .author
+                        .as_ref()
+                        .map(|author| AuthorId::from_raw(author.identifier))
+                        .transpose()?,
+                    reply_ids: comment
                         .replies
                         .iter()
-                        .map(|reply| reply.identifier)
-                        .collect(),
+                        .map(|reply| {
+                            StorageId::from_raw(reply.identifier).map_err(crate::Error::from)
+                        })
+                        .collect::<Result<Vec<_>>>()?
+                        .into_boxed_slice(),
                     storage_uuid: comment
                         .storage_uuid
                         .as_ref()
-                        .map(|uuid| NumbersCommentUuid {
-                            lower: uuid.lower,
-                            upper: uuid.upper,
-                        }),
+                        .map(|uuid| Uuid::from_parts(uuid.lower, uuid.upper))
+                        .transpose()?,
                 },
-            );
+            ));
         }
-        Ok(result)
+        compact_table_vec(result)
     }
 
     fn load_table_data_list_entries(
@@ -440,21 +649,55 @@ impl<'a> TableDataExtractor<'a> {
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
     ) -> Result<()> {
-        let tile_size = tile_storage.tile_size.unwrap_or(256);
+        let tile_size = usize::try_from(tile_storage.tile_size.unwrap_or(256)).map_err(|_| {
+            Error::InvalidFormat("Numbers tile size does not fit the host usize".to_owned())
+        })?;
         if tile_size == 0 {
             return Err(Error::InvalidFormat(
                 "Numbers table declares a zero tile size".to_owned(),
             ));
         }
+        let tile_count = if table.row_count() == 0 {
+            0
+        } else {
+            (table.row_count() - 1) / tile_size + 1
+        };
+        let mut seen_tile_ids = HashSet::new();
+        seen_tile_ids
+            .try_reserve(tile_storage.tiles.len())
+            .map_err(|_| allocation_error("Numbers tile keys", tile_storage.tiles.len()))?;
+        let mut budget = CellBudget::new();
         // Resolve each tile reference and parse its contents
         for tile_ref in &tile_storage.tiles {
-            let row_origin = tile_ref
-                .tileid
+            let tile_key = usize::try_from(tile_ref.tileid).map_err(|_| {
+                Error::InvalidFormat("Numbers tile key does not fit the host usize".to_owned())
+            })?;
+            if tile_key >= tile_count {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers tile key {tile_key} is outside the declared table height {}",
+                    table.row_count()
+                )));
+            }
+            if !seen_tile_ids.insert(tile_ref.tileid) {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers table repeats tile key {tile_key}"
+                )));
+            }
+            let row_origin = tile_key
                 .checked_mul(tile_size)
                 .ok_or_else(|| Error::ParseError("Numbers tile row origin overflow".to_owned()))?;
             // tile is a required field, not Optional
             let tile_reference = &tile_ref.tile;
-            self.parse_tile(tile_reference.identifier, row_origin, cell_tables, table)?;
+            self.parse_tile(
+                tile_reference.identifier,
+                row_origin,
+                tile_size,
+                table.row_count(),
+                table.column_count(),
+                &mut budget,
+                cell_tables,
+                table,
+            )?;
         }
 
         Ok(())
@@ -464,17 +707,54 @@ impl<'a> TableDataExtractor<'a> {
     fn parse_tile(
         &self,
         tile_id: u64,
-        row_origin: u32,
+        row_origin: usize,
+        tile_size: usize,
+        row_count: usize,
+        column_count: usize,
+        budget: &mut CellBudget,
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
     ) -> Result<()> {
-        if let Some(resolved) = self.object_index.resolve_ref_id(self.bundle, tile_id)? {
-            for msg in resolved.messages {
-                // Tile messages are typically in the TST namespace
-                if let Ok(tile) = tst::Tile::decode(&*msg.data) {
-                    self.parse_tile_rows(&tile, row_origin, cell_tables, table)?;
-                }
+        let resolved = self
+            .object_index
+            .resolve_ref_id(self.bundle, tile_id)?
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers tile object {tile_id} referenced by table is missing"
+                ))
+            })?;
+        let mut decoded = false;
+        for msg in resolved.messages {
+            if msg.type_ != TILE_MESSAGE_TYPE {
+                continue;
             }
+            if decoded {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers tile object {tile_id} contains multiple tile payloads"
+                )));
+            }
+            let tile = tst::Tile::decode(&*msg.data).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "Numbers tile object {tile_id} has a malformed tile payload: {error}"
+                ))
+            })?;
+            self.parse_tile_rows(
+                &tile,
+                row_origin,
+                tile_size,
+                row_count,
+                column_count,
+                budget,
+                cell_tables,
+                table,
+            )?;
+            decoded = true;
+        }
+
+        if !decoded {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers tile object {tile_id} has no tile payload"
+            )));
         }
 
         Ok(())
@@ -484,12 +764,25 @@ impl<'a> TableDataExtractor<'a> {
     fn parse_tile_rows(
         &self,
         tile: &tst::Tile,
-        row_origin: u32,
+        row_origin: usize,
+        tile_size: usize,
+        row_count: usize,
+        column_count: usize,
+        budget: &mut CellBudget,
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
     ) -> Result<()> {
         for row_info in &tile.row_infos {
-            self.parse_tile_row(row_info, row_origin, cell_tables, table)?;
+            self.parse_tile_row(
+                row_info,
+                row_origin,
+                tile_size,
+                row_count,
+                column_count,
+                budget,
+                cell_tables,
+                table,
+            )?;
         }
 
         Ok(())
@@ -499,14 +792,27 @@ impl<'a> TableDataExtractor<'a> {
     fn parse_tile_row(
         &self,
         row_info: &tst::TileRowInfo,
-        row_origin: u32,
+        row_origin: usize,
+        tile_size: usize,
+        row_count: usize,
+        column_count: usize,
+        budget: &mut CellBudget,
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
     ) -> Result<()> {
+        let tile_row_index = usize::try_from(row_info.tile_row_index).map_err(|_| {
+            Error::InvalidFormat("Numbers tile row index does not fit the host usize".to_owned())
+        })?;
+        if tile_row_index >= tile_size {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers tile row {} is outside tile size {tile_size}",
+                row_info.tile_row_index
+            )));
+        }
         let row_index = row_origin
-            .checked_add(row_info.tile_row_index)
-            .map(|row| row as usize)
+            .checked_add(tile_row_index)
             .ok_or_else(|| Error::ParseError("Numbers tile row index overflow".to_owned()))?;
+        validate_table_row(row_index, row_count)?;
 
         // The cell_storage_buffer contains serialized Cell messages
         // The cell_offsets buffer contains the byte offsets for each cell
@@ -522,28 +828,35 @@ impl<'a> TableDataExtractor<'a> {
             ),
         };
 
+        let expected_cells = usize::try_from(row_info.cell_count).map_err(|_| {
+            Error::InvalidFormat("Numbers cell count does not fit the host usize".to_owned())
+        })?;
+        budget.check(expected_cells)?;
         let cells = Self::parse_cell_offsets(
             cell_offsets,
             cell_storage.len(),
             row_info.has_wide_offsets.unwrap_or(false),
-            row_info.cell_count as usize,
+            expected_cells,
+            column_count,
         )?;
+        budget.consume(cells.len())?;
 
         for (column_index, range) in cells {
+            validate_table_column(column_index, column_count)?;
             let parsed = Self::parse_cell_storage(
                 &cell_storage[range],
                 cell_tables,
                 row_index,
                 column_index,
             )?;
-            table.set_cell(row_index, column_index, parsed.value);
+            table.try_set_cell(row_index, column_index, parsed.value)?;
             if let Some(identifier) = parsed.comment_identifier {
-                let comment = cell_tables.comments.get(&identifier).ok_or_else(|| {
+                let comment = compact_table_get(cell_tables.comments, identifier).ok_or_else(|| {
                     Error::InvalidFormat(format!(
                         "Numbers comment table has no entry {identifier} referenced by cell ({row_index}, {column_index})"
                     ))
                 })?;
-                table.set_comment(row_index, column_index, comment.clone());
+                table.try_set_comment(row_index, column_index, comment.clone())?;
             }
         }
 
@@ -559,6 +872,7 @@ impl<'a> TableDataExtractor<'a> {
         storage_length: usize,
         wide_offsets: bool,
         expected_cells: usize,
+        column_count: usize,
     ) -> Result<Vec<(usize, std::ops::Range<usize>)>> {
         if !offsets_buffer.len().is_multiple_of(2) {
             return Err(Error::ParseError(
@@ -566,8 +880,34 @@ impl<'a> TableDataExtractor<'a> {
             ));
         }
 
+        let slot_count = offsets_buffer.len() / 2;
+        if slot_count > column_count {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers row has {slot_count} offset slots but table width is {column_count}"
+            )));
+        }
+        if expected_cells > slot_count {
+            return Err(Error::ParseError(format!(
+                "Numbers row declares {expected_cells} cells but has only {slot_count} offset slots"
+            )));
+        }
+
+        let present_cells = offsets_buffer
+            .chunks_exact(2)
+            .filter(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]) != u16::MAX)
+            .count();
+        if present_cells != expected_cells {
+            return Err(Error::ParseError(format!(
+                "Numbers row declares {expected_cells} cells but has {present_cells} offsets"
+            )));
+        }
+
         let width = if wide_offsets { 4usize } else { 1usize };
-        let mut offsets = Vec::with_capacity(expected_cells);
+        let mut cells = Vec::new();
+        cells
+            .try_reserve_exact(expected_cells)
+            .map_err(|_| allocation_error("Numbers cell ranges", expected_cells))?;
+        let mut previous = None;
         for (column, bytes) in offsets_buffer.chunks_exact(2).enumerate() {
             let raw_offset = u16::from_le_bytes([bytes[0], bytes[1]]);
             if raw_offset == u16::MAX {
@@ -581,27 +921,23 @@ impl<'a> TableDataExtractor<'a> {
                     "Numbers cell offset {offset} exceeds storage length {storage_length}"
                 )));
             }
-            offsets.push((column, offset));
+            if let Some((previous_column, previous_offset)) = previous {
+                if offset <= previous_offset {
+                    return Err(Error::ParseError(format!(
+                        "Numbers cell offsets are not strictly increasing: {previous_offset} then {offset}"
+                    )));
+                }
+                cells.push((previous_column, previous_offset..offset));
+            }
+            previous = Some((column, offset));
         }
-
-        if offsets.len() != expected_cells {
-            return Err(Error::ParseError(format!(
-                "Numbers row declares {expected_cells} cells but has {} offsets",
-                offsets.len()
-            )));
-        }
-
-        let mut cells = Vec::with_capacity(offsets.len());
-        for (index, &(column, start)) in offsets.iter().enumerate() {
-            let end = offsets
-                .get(index + 1)
-                .map_or(storage_length, |(_, offset)| *offset);
-            if end <= start {
+        if let Some((column, start)) = previous {
+            if storage_length <= start {
                 return Err(Error::ParseError(format!(
-                    "Numbers cell offsets are not strictly increasing: {start} then {end}"
+                    "Numbers cell offset range ends at {storage_length} after {start}"
                 )));
             }
-            cells.push((column, start..end));
+            cells.push((column, start..storage_length));
         }
         Ok(cells)
     }
@@ -638,9 +974,9 @@ impl<'a> TableDataExtractor<'a> {
         let cell_type = data[1];
         let flags = read_u32_le(&data[8..12])?;
         let mut cursor = 12;
-        let mut decimal = None;
-        let mut number = None;
-        let mut date = None;
+        let mut decimal: Option<FiniteF64> = None;
+        let mut number: Option<FiniteF64> = None;
+        let mut date: Option<FiniteF64> = None;
         let mut string_id = None;
         let mut rich_text_id = None;
         let mut formula_id = None;
@@ -675,7 +1011,7 @@ impl<'a> TableDataExtractor<'a> {
             }
             let field = take_field(data, &mut cursor, size)?;
             match flag {
-                0x000001 => decimal = Some(read_decimal128_le(field)?),
+                0x000001 => decimal = Some(read_finite_decimal128_le(field)?),
                 0x000002 => number = Some(read_f64_le(field)?),
                 0x000004 => date = Some(read_f64_le(field)?),
                 0x000008 => string_id = Some(read_u32_le(field)?),
@@ -688,7 +1024,7 @@ impl<'a> TableDataExtractor<'a> {
         }
 
         if let Some(identifier) = formula_id {
-            let formula = cell_tables.formulas.get(&identifier).ok_or_else(|| {
+            let formula = compact_table_get(cell_tables.formulas, identifier).ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Numbers formula table has no entry {identifier} referenced by cell ({row}, {column})"
                 ))
@@ -710,22 +1046,23 @@ impl<'a> TableDataExtractor<'a> {
             });
         }
 
+        let zero = finite_zero()?;
         let value = match cell_type {
             0 => CellValue::Empty,
-            2 | 10 => CellValue::Number(decimal.or(number).unwrap_or(0.0)),
+            2 | 10 => CellValue::Number(decimal.or(number).unwrap_or(zero)),
             3 => string_id
-                .and_then(|id| cell_tables.strings.get(&id).cloned())
+                .and_then(|id| compact_table_get(cell_tables.strings, id).cloned())
                 .map_or(CellValue::Empty, CellValue::Text),
-            5 => CellValue::Date(date.unwrap_or(0.0)),
-            6 => CellValue::Boolean(number.unwrap_or(0.0) != 0.0),
-            7 => CellValue::Duration(number.unwrap_or(0.0)),
+            5 => CellValue::Date(date.unwrap_or(zero)),
+            6 => CellValue::Boolean(number.unwrap_or(zero).get() != 0.0),
+            7 => CellValue::Duration(number.unwrap_or(zero)),
             8 => CellValue::Error(
                 formula_error_id
-                    .and_then(|id| cell_tables.formula_errors.get(&id).cloned())
+                    .and_then(|id| compact_table_get(cell_tables.formula_errors, id).cloned())
                     .unwrap_or_else(|| "FORMULA".to_owned()),
             ),
             9 => rich_text_id
-                .and_then(|id| cell_tables.rich_text.get(&id).cloned())
+                .and_then(|id| compact_table_get(cell_tables.rich_text, id).cloned())
                 .map_or(CellValue::Empty, CellValue::Text),
             other => {
                 return Err(Error::ParseError(format!(
@@ -759,8 +1096,8 @@ impl<'a> TableDataExtractor<'a> {
             read_u32_le(&data[4..8])?
         };
         let mut cursor = header_length;
-        let mut number = None;
-        let mut date = None;
+        let mut number: Option<FiniteF64> = None;
+        let mut date: Option<FiniteF64> = None;
         let mut string_id = None;
         let mut rich_text_id = None;
         let mut formula_id = None;
@@ -807,7 +1144,7 @@ impl<'a> TableDataExtractor<'a> {
         }
 
         if let Some(identifier) = formula_id {
-            let formula = cell_tables.formulas.get(&identifier).ok_or_else(|| {
+            let formula = compact_table_get(cell_tables.formulas, identifier).ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Numbers formula table has no entry {identifier} referenced by cell ({row}, {column})"
                 ))
@@ -829,22 +1166,23 @@ impl<'a> TableDataExtractor<'a> {
             });
         }
 
+        let zero = finite_zero()?;
         let value = match cell_type {
             0 => CellValue::Empty,
-            2 => CellValue::Number(number.unwrap_or(0.0)),
+            2 => CellValue::Number(number.unwrap_or(zero)),
             3 => string_id
-                .and_then(|id| cell_tables.strings.get(&id).cloned())
+                .and_then(|id| compact_table_get(cell_tables.strings, id).cloned())
                 .map_or(CellValue::Empty, CellValue::Text),
-            5 => CellValue::Date(date.unwrap_or(0.0)),
-            6 => CellValue::Boolean(number.unwrap_or(0.0) != 0.0),
-            7 => CellValue::Duration(number.unwrap_or(0.0)),
+            5 => CellValue::Date(date.unwrap_or(zero)),
+            6 => CellValue::Boolean(number.unwrap_or(zero).get() != 0.0),
+            7 => CellValue::Duration(number.unwrap_or(zero)),
             8 => CellValue::Error(
                 formula_error_id
-                    .and_then(|id| cell_tables.formula_errors.get(&id).cloned())
+                    .and_then(|id| compact_table_get(cell_tables.formula_errors, id).cloned())
                     .unwrap_or_else(|| "FORMULA".to_owned()),
             ),
             9 => rich_text_id
-                .and_then(|id| cell_tables.rich_text.get(&id).cloned())
+                .and_then(|id| compact_table_get(cell_tables.rich_text, id).cloned())
                 .map_or(CellValue::Empty, CellValue::Text),
             other => {
                 return Err(Error::ParseError(format!(
@@ -1649,11 +1987,25 @@ fn read_u32_le(data: &[u8]) -> Result<u32> {
     Ok(u32::from_le_bytes(bytes))
 }
 
-fn read_f64_le(data: &[u8]) -> Result<f64> {
+fn read_f64_le(data: &[u8]) -> Result<FiniteF64> {
     let bytes: [u8; 8] = data
         .try_into()
         .map_err(|_| Error::ParseError("Expected an eight-byte Numbers field".to_string()))?;
-    Ok(f64::from_le_bytes(bytes))
+    FiniteF64::new(f64::from_le_bytes(bytes)).map_err(|_| {
+        Error::ParseError("Numbers scalar field must contain a finite value".to_string())
+    })
+}
+
+fn read_finite_decimal128_le(data: &[u8]) -> Result<FiniteF64> {
+    FiniteF64::new(read_decimal128_le(data)?).map_err(|_| {
+        Error::ParseError("Numbers decimal128 field must contain a finite value".to_string())
+    })
+}
+
+fn finite_zero() -> Result<FiniteF64> {
+    FiniteF64::new(0.0).map_err(|_| {
+        Error::InvalidFormat("Numbers zero scalar is unexpectedly non-finite".to_string())
+    })
 }
 
 #[cfg(test)]
@@ -1912,8 +2264,77 @@ mod tests {
             0x30, 0x00, // column 3 starts at 48
             0xff, 0xff,
         ];
-        let cells = TableDataExtractor::parse_cell_offsets(&offsets, 72, false, 3).unwrap();
+        let cells = TableDataExtractor::parse_cell_offsets(&offsets, 72, false, 3, 5).unwrap();
         assert_eq!(cells, vec![(1, 0..24), (2, 24..48), (3, 48..72)]);
+    }
+
+    #[test]
+    fn table_dimensions_are_bounded_before_archive_references_are_loaded() {
+        assert_eq!(checked_table_dimensions(0, 0).unwrap(), (0, 0));
+        assert_eq!(checked_table_dimensions(3, 5).unwrap(), (3, 5));
+
+        let error = checked_table_dimensions((MAX_TABLE_ROWS + 1) as u32, 1).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::TableRows,
+                ..
+            })
+        ));
+
+        let error = checked_table_dimensions(1, (MAX_TABLE_COLUMNS + 1) as u32).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::TableColumns,
+                ..
+            })
+        ));
+
+        let error = checked_table_dimensions(1_025, MAX_TABLE_COLUMNS as u32).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::TableCells,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn table_coordinates_are_checked_against_declared_dimensions() {
+        validate_table_row(2, 3).unwrap();
+        validate_table_column(4, 5).unwrap();
+        assert!(validate_table_row(3, 3).is_err());
+        assert!(validate_table_column(5, 5).is_err());
+    }
+
+    #[test]
+    fn cell_count_is_validated_before_offset_reservation() {
+        let error =
+            TableDataExtractor::parse_cell_offsets(&[], 0, false, usize::MAX, 0).unwrap_err();
+        assert!(matches!(error, Error::ParseError(message) if message.contains("offset slots")));
+
+        let offsets = [0, 0, 0xff, 0xff];
+        let error = TableDataExtractor::parse_cell_offsets(&offsets, 1, false, 1, 1).unwrap_err();
+        assert!(matches!(error, Error::InvalidFormat(message) if message.contains("offset slots")));
+    }
+
+    #[test]
+    fn malformed_and_sparse_cell_offsets_are_handled_strictly() {
+        let error = TableDataExtractor::parse_cell_offsets(&[0, 0, 1], 2, false, 1, 2).unwrap_err();
+        assert!(matches!(error, Error::ParseError(message) if message.contains("odd")));
+
+        let descending = [0, 0, 2, 0, 1, 0];
+        let error =
+            TableDataExtractor::parse_cell_offsets(&descending, 3, false, 3, 3).unwrap_err();
+        assert!(
+            matches!(error, Error::ParseError(message) if message.contains("strictly increasing"))
+        );
+
+        let sparse = [0xff, 0xff, 0, 0, 2, 0, 0xff, 0xff];
+        let cells = TableDataExtractor::parse_cell_offsets(&sparse, 3, false, 2, 4).unwrap();
+        assert_eq!(cells, vec![(1, 0..2), (2, 2..3)]);
     }
 
     #[test]
@@ -1926,17 +2347,34 @@ mod tests {
     }
 
     #[test]
+    fn compact_sidecars_sort_and_binary_search_without_hash_buckets() {
+        let table = compact_table([(9, "nine"), (1, "one"), (5, "five")]).unwrap();
+        assert_eq!(
+            table.iter().map(|(key, _)| *key).collect::<Vec<_>>(),
+            [1, 5, 9]
+        );
+        assert_eq!(compact_table_get(&table, 5), Some(&"five"));
+        assert_eq!(compact_table_get(&table, 7), None);
+    }
+
+    #[test]
+    fn compact_sidecars_reject_duplicate_keys() {
+        let error = compact_table([(7, "first"), (7, "second")]).unwrap_err();
+        assert!(matches!(error, Error::InvalidFormat(message) if message.contains("duplicate")));
+    }
+
+    #[test]
     fn test_bnc_string_cell() {
         let data = [
             5, 3, 0, 0, 0, 0, 0, 0, // version and type
             0x08, 0x00, 0x00, 0x00, // string-id flag
             7, 0, 0, 0, // string id
         ];
-        let strings = HashMap::from([(7, "hello".to_string())]);
-        let formulas = HashMap::new();
-        let errors = HashMap::new();
-        let rich_text = HashMap::new();
-        let comments = HashMap::new();
+        let strings: StringTable = compact_table([(7, "hello".to_string())]).unwrap();
+        let formulas: FormulaTable = Box::default();
+        let errors: FormulaErrorTable = Box::default();
+        let rich_text: StringTable = Box::default();
+        let comments: CommentTable = Box::default();
         let formula_references = FormulaReferenceMaps::default();
         let tables = CellTables {
             strings: &strings,
@@ -1952,16 +2390,16 @@ mod tests {
 
     #[test]
     fn bnc_and_pre_bnc_error_cells_resolve_formula_error_text() {
-        let errors = HashMap::from([(7, "Syntax Error".to_owned())]);
+        let errors: FormulaErrorTable = compact_table([(7, "Syntax Error".to_owned())]).unwrap();
         let bnc = [
             5, 8, 0, 0, 0, 0, 0, 0, // version and type
             0x00, 0x08, 0x00, 0x00, // formula-error flag
             7, 0, 0, 0,
         ];
-        let strings = HashMap::new();
-        let formulas = HashMap::new();
-        let rich_text = HashMap::new();
-        let comments = HashMap::new();
+        let strings: StringTable = Box::default();
+        let formulas: FormulaTable = Box::default();
+        let rich_text: StringTable = Box::default();
+        let comments: CommentTable = Box::default();
         let formula_references = FormulaReferenceMaps::default();
         let tables = CellTables {
             strings: &strings,
@@ -1986,11 +2424,11 @@ mod tests {
 
     #[test]
     fn bnc_and_pre_bnc_cells_expose_comment_identifiers() {
-        let strings = HashMap::new();
-        let formulas = HashMap::new();
-        let errors = HashMap::new();
-        let rich_text = HashMap::new();
-        let comments = HashMap::new();
+        let strings: StringTable = Box::default();
+        let formulas: FormulaTable = Box::default();
+        let errors: FormulaErrorTable = Box::default();
+        let rich_text: StringTable = Box::default();
+        let comments: CommentTable = Box::default();
         let formula_references = FormulaReferenceMaps::default();
         let tables = CellTables {
             strings: &strings,

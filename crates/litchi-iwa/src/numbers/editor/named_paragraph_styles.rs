@@ -16,7 +16,7 @@ impl NumbersEditor {
         drawable_object_id: u64,
     ) -> Result<Vec<NamedParagraphStyle>> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        named_paragraph_styles_in_storage(&self.package, graph.storage_id)
+        named_paragraph_styles_in_storage(&self.package, graph.storage_id.get())
     }
 
     /// Read the named paragraph style selected for a sheet-owned text box.
@@ -26,7 +26,7 @@ impl NumbersEditor {
         drawable_object_id: u64,
     ) -> Result<AppliedParagraphStyle> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        applied_named_paragraph_style_in_storage(&self.package, graph.storage_id)
+        applied_named_paragraph_style_in_storage(&self.package, graph.storage_id.get())
     }
 
     /// Redefine the selected named style from this text box's direct overrides.

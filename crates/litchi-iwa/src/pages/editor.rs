@@ -4,13 +4,24 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::path::Path;
 
+use litchi_iwa_common::comment::{
+    DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId,
+};
+use litchi_iwa_text::columns::Columns;
+use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
+use litchi_iwa_text::position::TextPosition;
+use litchi_pages::document_options::Options as DocumentOptions;
+use litchi_pages::footnote::{
+    Format as FootnoteFormat, Gap as FootnoteGap, Kind as FootnoteKind,
+    Numbering as FootnoteNumbering, Settings as FootnoteSettings,
+};
+use litchi_pages::page_layout::{Layout as PageLayout, Orientation as PageOrientation};
+use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Settings, Start};
 use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
-use crate::comments::{
-    DrawableCommentInfo, DrawableCommentReplyInfo, IWorkDrawableCommentEditor, IWorkDrawableInfo,
-};
-use crate::media::reachable_embedded_assets;
+use crate::comments::IWorkDrawableCommentEditor;
+use crate::media::{MediaAssetId, reachable_embedded_assets};
 use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
     component_uuid_identifiers, next_object_identifier, release_package_identifier_suffix,
@@ -23,26 +34,26 @@ use crate::protobuf::tsp;
 use crate::protobuf::tswp::{
     DrawableAttachmentArchive, StorageArchive, object_attribute_table::ObjectAttribute,
 };
-use crate::shapes::ShapeTextLayout;
 use crate::shapes::{
     DrawableGeometry, DrawableProperties, RgbaColor, reset_shape_text_columns,
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
+use crate::text::layout::Layout;
 use crate::text::{
-    AppliedParagraphStyle, IWorkTextEditor, NamedParagraphStyle, ParagraphBackground,
-    ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
-    ParagraphDropCapPlacement, ParagraphFlow, ParagraphFollowingStyle, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
+    Alignment, AppliedParagraphStyle, Background as TextAppearanceBackground, Borders,
+    IWorkTextEditor, Indents, LineSpacing, NamedParagraphStyle, Outline, ParagraphBackground,
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
+    ParagraphFollowingStyle, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
     ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLevel,
     ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberScale,
-    ParagraphListNumberTiering, ParagraphListNumbering, ParagraphSpacing, ParagraphStart,
-    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
-    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
-    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    ParagraphListNumberTiering, ParagraphListNumbering, ParagraphTabStops,
+    ParagraphWritingDirection, Shadow, Spacing, TextBaselineShift, TextCapitalization,
+    TextCharacterSpacing, TextComment, TextCommentBody, TextCommentId, TextCommentReply,
+    TextCommentReplyBody, TextCommentReplyId, TextDecorations, TextFont, TextHighlight,
+    TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget, TextLanguage,
+    TextLanguageRun, TextLigatures, TextRange, TextScript, TextStorageId, TextStorageInfo,
+    TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -70,14 +81,9 @@ const DRAWABLE_ATTACHMENT_MESSAGE_TYPE: u32 = 2003;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3097;
 const BODY_DRAWABLE_DUPLICATE_OFFSET: f32 = 12.0;
 
-pub use document_options::PagesDocumentOptions;
+use litchi_pages::header_footer::{Kind, Template};
 pub use types::{
-    PagesDrawableTextInfo, PagesFootnote, PagesFootnoteFormat, PagesFootnoteGap, PagesFootnoteId,
-    PagesFootnoteKind, PagesFootnoteNumbering, PagesFootnoteSettings, PagesHeaderFooterInfo,
-    PagesHeaderFooterKind, PagesPageLayout, PagesPageNumber, PagesPageOrientation,
-    PagesRgbColorSpace, PagesRgbaColor, PagesSectionBackground, PagesSectionInfo,
-    PagesSectionPageNumbering, PagesSectionSettings, PagesSectionStart, PagesTemplateKind,
-    RemovedPagesTextBox,
+    PagesDrawableTextInfo, PagesHeaderFooterInfo, PagesSectionInfo, RemovedPagesTextBox,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -86,17 +92,17 @@ struct HeaderFooterLocation {
     section_name: Option<String>,
     section_character_index: u32,
     template_id: u64,
-    template: PagesTemplateKind,
-    kind: PagesHeaderFooterKind,
+    template: Template,
+    kind: Kind,
     slot: usize,
-    storage_id: u64,
+    storage_id: TextStorageId,
 }
 
 /// Transactional editor for a Pages package.
 #[derive(Debug, Clone)]
 pub struct PagesEditor {
     text: IWorkTextEditor,
-    body_storage_id: u64,
+    body_storage_id: TextStorageId,
     sections: Vec<PagesSectionInfo>,
     header_footers: Vec<HeaderFooterLocation>,
 }
@@ -127,7 +133,7 @@ impl PagesEditor {
 
     pub fn from_package(package: IWorkPackage) -> Result<Self> {
         let body_storage_id = body_storage_id(&package)?;
-        let (sections, header_footers) = discover_structure(&package, body_storage_id)?;
+        let (sections, header_footers) = discover_structure(&package, body_storage_id.get())?;
         let text = IWorkTextEditor::from_package(package);
         if text.storage(body_storage_id).is_err() {
             return Err(Error::InvalidFormat(format!(
@@ -152,18 +158,18 @@ impl PagesEditor {
     }
 
     pub fn body_text(&self) -> Result<String> {
-        Ok(self.body_storage()?.text)
+        Ok(self.body_storage()?.storage.into_text())
     }
 
     /// List supported direct-comment drawables reachable from the Pages root.
-    pub fn drawables(&self) -> Result<Vec<IWorkDrawableInfo>> {
+    pub fn drawables(&self) -> Result<Vec<DrawableInfo>> {
         let reachable = self.reachable_drawable_ids()?;
         let mut drawables = IWorkDrawableCommentEditor::from_package(self.package().clone())?
             .drawables()?
             .into_iter()
-            .filter(|drawable| reachable.contains(&drawable.object_id))
+            .filter(|drawable| reachable.contains(&drawable.id.get()))
             .collect::<Vec<_>>();
-        drawables.sort_by_key(|drawable| drawable.object_id);
+        drawables.sort_by_key(|drawable| drawable.id.get());
         Ok(drawables)
     }
 
@@ -179,20 +185,23 @@ impl PagesEditor {
             let Some(storage_id) = drawable_owned_text_storage(self.package(), &drawable)? else {
                 continue;
             };
-            if let Some(previous_drawable) = storage_owners.insert(storage_id, drawable.object_id) {
+            if let Some(previous_drawable) = storage_owners.insert(storage_id, drawable.id.get()) {
                 return Err(Error::InvalidFormat(format!(
                     "Pages drawables {previous_drawable} and {} share owned text storage {storage_id}",
-                    drawable.object_id
+                    drawable.id
                 )));
             }
-            let storage = self.text.storage(storage_id).map_err(|error| {
-                Error::InvalidFormat(format!(
-                    "Pages drawable {} owns invalid text storage {storage_id}: {error}",
-                    drawable.object_id
-                ))
-            })?;
+            let storage = self
+                .text
+                .storage(crate::text::native_storage_id(storage_id)?)
+                .map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "Pages drawable {} owns invalid text storage {storage_id}: {error}",
+                        drawable.id
+                    ))
+                })?;
             result.push(PagesDrawableTextInfo {
-                drawable_object_id: drawable.object_id,
+                drawable_object_id: drawable.id.get(),
                 storage,
             });
         }
@@ -287,7 +296,7 @@ impl PagesEditor {
     }
 
     /// Read vertical alignment, edge insets, and autosizing for a text box.
-    pub fn text_box_text_layout(&self, drawable_object_id: u64) -> Result<ShapeTextLayout> {
+    pub fn text_box_text_layout(&self, drawable_object_id: u64) -> Result<Layout> {
         self.text_box_graph(drawable_object_id)?;
         let archive_name = find_object_archive(self.package(), drawable_object_id)?;
         shape_text_layout(self.package(), &archive_name, drawable_object_id)
@@ -297,7 +306,7 @@ impl PagesEditor {
     pub fn set_text_box_text_layout(
         &mut self,
         drawable_object_id: u64,
-        layout: ShapeTextLayout,
+        layout: Layout,
     ) -> Result<()> {
         self.text_box_graph(drawable_object_id)?;
         let archive_name = find_object_archive(self.package(), drawable_object_id)?;
@@ -330,7 +339,7 @@ impl PagesEditor {
     }
 
     /// Read the uniform column layout of a reachable ordinary text box.
-    pub fn text_box_columns(&self, drawable_object_id: u64) -> Result<TextColumns> {
+    pub fn text_box_columns(&self, drawable_object_id: u64) -> Result<Columns> {
         self.text_box_graph(drawable_object_id)?;
         let archive_name = find_object_archive(self.package(), drawable_object_id)?;
         shape_text_columns(self.package(), &archive_name, drawable_object_id)
@@ -340,7 +349,7 @@ impl PagesEditor {
     pub fn set_text_box_columns(
         &mut self,
         drawable_object_id: u64,
-        columns: &TextColumns,
+        columns: &Columns,
     ) -> Result<()> {
         self.text_box_graph(drawable_object_id)?;
         let archive_name = find_object_archive(self.package(), drawable_object_id)?;
@@ -733,7 +742,7 @@ impl PagesEditor {
     pub fn text_box_paragraph_list_level(
         &self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListLevel> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.paragraph_list_level(graph.storage_id, paragraph)
@@ -743,7 +752,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_list_level(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         level: ParagraphListLevel,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
@@ -757,7 +766,7 @@ impl PagesEditor {
     pub fn reset_text_box_paragraph_list_level(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -772,7 +781,7 @@ impl PagesEditor {
     pub fn text_box_paragraph_list_numbering(
         &self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumbering> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text
@@ -783,7 +792,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_list_numbering(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         numbering: ParagraphListNumbering,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
@@ -797,7 +806,7 @@ impl PagesEditor {
     pub fn text_box_paragraph_list_number_format(
         &self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumberFormat> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text
@@ -808,7 +817,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_list_number_format(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         format: ParagraphListNumberFormat,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
@@ -822,7 +831,7 @@ impl PagesEditor {
     pub fn reset_text_box_paragraph_list_number_format(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -837,7 +846,7 @@ impl PagesEditor {
     pub fn text_box_paragraph_list_number_tiering(
         &self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumberTiering> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text
@@ -848,7 +857,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_list_number_tiering(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         tiering: ParagraphListNumberTiering,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
@@ -862,7 +871,7 @@ impl PagesEditor {
     pub fn reset_text_box_paragraph_list_number_tiering(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -877,7 +886,7 @@ impl PagesEditor {
     pub fn text_box_paragraph_list_number_scale(
         &self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumberScale> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text
@@ -888,7 +897,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_list_number_scale(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         scale: ParagraphListNumberScale,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
@@ -902,7 +911,7 @@ impl PagesEditor {
     pub fn reset_text_box_paragraph_list_number_scale(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -917,7 +926,7 @@ impl PagesEditor {
     pub fn text_box_paragraph_list_bullet(
         &self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListBullet> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.paragraph_list_bullet(graph.storage_id, paragraph)
@@ -927,7 +936,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_list_bullet(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         bullet: &ParagraphListBullet,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
@@ -941,7 +950,7 @@ impl PagesEditor {
     pub fn reset_text_box_paragraph_list_bullet(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -956,7 +965,7 @@ impl PagesEditor {
     pub fn text_box_paragraph_list_bullet_geometry(
         &self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListBulletGeometry> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text
@@ -967,7 +976,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_list_bullet_geometry(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         geometry: ParagraphListBulletGeometry,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
@@ -981,7 +990,7 @@ impl PagesEditor {
     pub fn reset_text_box_paragraph_list_bullet_geometry(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -996,7 +1005,7 @@ impl PagesEditor {
     pub fn text_box_paragraph_list_indentation(
         &self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListIndentation> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text
@@ -1007,7 +1016,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_list_indentation(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         indentation: ParagraphListIndentation,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
@@ -1021,7 +1030,7 @@ impl PagesEditor {
     pub fn reset_text_box_paragraph_list_indentation(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1036,7 +1045,7 @@ impl PagesEditor {
     pub fn text_box_paragraph_list_label_color(
         &self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListLabelColor> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text
@@ -1047,7 +1056,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_list_label_color(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         color: ParagraphListLabelColor,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
@@ -1061,7 +1070,7 @@ impl PagesEditor {
     pub fn reset_text_box_paragraph_list_label_color(
         &mut self,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1337,7 +1346,7 @@ impl PagesEditor {
     }
 
     /// Read the effective outline of a reachable ordinary text box.
-    pub fn text_box_text_outline(&self, drawable_object_id: u64) -> Result<TextOutline> {
+    pub fn text_box_text_outline(&self, drawable_object_id: u64) -> Result<Outline> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.text_outline(graph.storage_id)
     }
@@ -1346,7 +1355,7 @@ impl PagesEditor {
     pub fn set_text_box_text_outline(
         &mut self,
         drawable_object_id: u64,
-        outline: TextOutline,
+        outline: Outline,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1373,7 +1382,7 @@ impl PagesEditor {
     }
 
     /// Read the effective shadow of a reachable ordinary text box.
-    pub fn text_box_text_shadow(&self, drawable_object_id: u64) -> Result<TextShadow> {
+    pub fn text_box_text_shadow(&self, drawable_object_id: u64) -> Result<Shadow> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.text_shadow(graph.storage_id)
     }
@@ -1382,7 +1391,7 @@ impl PagesEditor {
     pub fn set_text_box_text_shadow(
         &mut self,
         drawable_object_id: u64,
-        shadow: TextShadow,
+        shadow: Shadow,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1409,7 +1418,10 @@ impl PagesEditor {
     }
 
     /// Read the effective solid background of a reachable ordinary text box.
-    pub fn text_box_text_background(&self, drawable_object_id: u64) -> Result<TextBackground> {
+    pub fn text_box_text_background(
+        &self,
+        drawable_object_id: u64,
+    ) -> Result<TextAppearanceBackground> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.text_background(graph.storage_id)
     }
@@ -1418,7 +1430,7 @@ impl PagesEditor {
     pub fn set_text_box_text_background(
         &mut self,
         drawable_object_id: u64,
-        background: TextBackground,
+        background: TextAppearanceBackground,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1484,7 +1496,7 @@ impl PagesEditor {
     }
 
     /// Read the effective Text → Layout paragraph borders.
-    pub fn text_box_paragraph_borders(&self, drawable_object_id: u64) -> Result<ParagraphBorders> {
+    pub fn text_box_paragraph_borders(&self, drawable_object_id: u64) -> Result<Borders> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.paragraph_borders(graph.storage_id)
     }
@@ -1493,7 +1505,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_borders(
         &mut self,
         drawable_object_id: u64,
-        borders: ParagraphBorders,
+        borders: Borders,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1800,7 +1812,7 @@ impl PagesEditor {
     }
 
     /// Read the effective paragraph alignment of a reachable ordinary text box.
-    pub fn text_box_paragraph_alignment(&self, drawable_object_id: u64) -> Result<TextAlignment> {
+    pub fn text_box_paragraph_alignment(&self, drawable_object_id: u64) -> Result<Alignment> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.paragraph_alignment(graph.storage_id)
     }
@@ -1809,7 +1821,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_alignment(
         &mut self,
         drawable_object_id: u64,
-        alignment: TextAlignment,
+        alignment: Alignment,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1836,10 +1848,7 @@ impl PagesEditor {
     }
 
     /// Read the effective line spacing of a reachable ordinary text box.
-    pub fn text_box_paragraph_line_spacing(
-        &self,
-        drawable_object_id: u64,
-    ) -> Result<ParagraphLineSpacing> {
+    pub fn text_box_paragraph_line_spacing(&self, drawable_object_id: u64) -> Result<LineSpacing> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.paragraph_line_spacing(graph.storage_id)
     }
@@ -1848,7 +1857,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_line_spacing(
         &mut self,
         drawable_object_id: u64,
-        spacing: ParagraphLineSpacing,
+        spacing: LineSpacing,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1878,7 +1887,7 @@ impl PagesEditor {
     }
 
     /// Read effective before/after paragraph spacing of an ordinary text box.
-    pub fn text_box_paragraph_spacing(&self, drawable_object_id: u64) -> Result<ParagraphSpacing> {
+    pub fn text_box_paragraph_spacing(&self, drawable_object_id: u64) -> Result<Spacing> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.paragraph_spacing(graph.storage_id)
     }
@@ -1887,7 +1896,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_spacing(
         &mut self,
         drawable_object_id: u64,
-        spacing: ParagraphSpacing,
+        spacing: Spacing,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1914,7 +1923,7 @@ impl PagesEditor {
     }
 
     /// Read effective first-line, left, and right indentation of an ordinary text box.
-    pub fn text_box_paragraph_indents(&self, drawable_object_id: u64) -> Result<ParagraphIndents> {
+    pub fn text_box_paragraph_indents(&self, drawable_object_id: u64) -> Result<Indents> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.paragraph_indents(graph.storage_id)
     }
@@ -1923,7 +1932,7 @@ impl PagesEditor {
     pub fn set_text_box_paragraph_indents(
         &mut self,
         drawable_object_id: u64,
-        indents: ParagraphIndents,
+        indents: Indents,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2074,10 +2083,7 @@ impl PagesEditor {
     }
 
     /// List every Drop Cap in an ordinary text box.
-    pub fn text_box_paragraph_drop_caps(
-        &self,
-        drawable_object_id: u64,
-    ) -> Result<Vec<ParagraphDropCapPlacement>> {
+    pub fn text_box_paragraph_drop_caps(&self, drawable_object_id: u64) -> Result<Vec<Placement>> {
         let graph = self.text_box_graph(drawable_object_id)?;
         self.text.paragraph_drop_caps(graph.storage_id)
     }
@@ -2086,27 +2092,24 @@ impl PagesEditor {
     pub fn text_box_paragraph_drop_cap(
         &self,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
-    ) -> Result<Option<ParagraphDropCap>> {
+        paragraph: TextPosition,
+    ) -> Result<Option<DropCap>> {
         let graph = self.text_box_graph(drawable_object_id)?;
-        self.text
-            .paragraph_drop_cap(graph.storage_id, paragraph_start)
+        self.text.paragraph_drop_cap(graph.storage_id, paragraph)
     }
 
     /// Atomically create or replace a text-box Drop Cap.
     pub fn set_text_box_paragraph_drop_cap(
         &mut self,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
-        drop_cap: ParagraphDropCap,
+        paragraph: TextPosition,
+        drop_cap: DropCap,
     ) -> Result<()> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
-        staged.set_paragraph_drop_cap(graph.storage_id, paragraph_start, drop_cap)?;
+        staged.set_paragraph_drop_cap(graph.storage_id, paragraph, drop_cap)?;
         let verified = Self::from_package(staged.package().clone())?;
-        if verified.text_box_paragraph_drop_cap(drawable_object_id, paragraph_start)?
-            != Some(drop_cap)
-        {
+        if verified.text_box_paragraph_drop_cap(drawable_object_id, paragraph)? != Some(drop_cap) {
             return Err(Error::InvalidFormat(
                 "Pages text-box Drop Cap update failed validation".to_owned(),
             ));
@@ -2119,11 +2122,11 @@ impl PagesEditor {
     pub fn remove_text_box_paragraph_drop_cap(
         &mut self,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let mut staged = self.text.clone();
-        let changed = staged.remove_paragraph_drop_cap(graph.storage_id, paragraph_start)?;
+        let changed = staged.remove_paragraph_drop_cap(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }
@@ -2164,11 +2167,11 @@ impl PagesEditor {
                 })?;
                 clone_pages_drawable_graph_object(source_object, &remap)?
             };
-            staged.update_archive(&archive_name, |archive| archive.insert_object(cloned))?;
+            staged.update_archive(&archive_name, |archive| Ok(archive.insert_object(cloned)?))?;
         }
 
         let new_drawable_id = remap[&source.drawable_id];
-        let new_storage_id = remap[&source.storage_id];
+        let new_storage_id = crate::text::native_storage_id(remap[&source.storage_id.get()])?;
         let new_attachment_id = remap[&source.attachment_id];
         offset_pages_body_drawable_clone(
             &mut staged,
@@ -2186,7 +2189,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             new_attachment_id,
         )?;
@@ -2214,8 +2217,8 @@ impl PagesEditor {
         let expected_anchor = u32::try_from(anchor_character_index)
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
         if created_graph.anchor_character_index != expected_anchor
-            || created.storage.object_id != new_storage_id
-            || created.storage.text != text
+            || created.storage.id != new_storage_id
+            || created.storage.storage.text() != text
         {
             return Err(Error::InvalidFormat(
                 "Pages text-box duplication produced an inconsistent graph".to_owned(),
@@ -2239,7 +2242,7 @@ impl PagesEditor {
             })?;
 
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(DrawableId::from_raw(drawable_object_id)?)?;
         let mut text_editor = IWorkTextEditor::from_package(comments.into_package());
         let anchor = graph.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
@@ -2271,7 +2274,7 @@ impl PagesEditor {
         if verified
             .drawables()?
             .iter()
-            .any(|drawable| drawable.object_id == drawable_object_id)
+            .any(|drawable| drawable.id.get() == drawable_object_id)
         {
             return Err(Error::InvalidFormat(
                 "Pages text-box deletion failed validation".to_owned(),
@@ -2285,10 +2288,10 @@ impl PagesEditor {
     }
 
     /// Read a comment attached directly to a reachable Pages drawable.
-    pub fn drawable_comment(&self, drawable_object_id: u64) -> Result<Option<DrawableCommentInfo>> {
+    pub fn drawable_comment(&self, drawable_object_id: u64) -> Result<Option<DrawableComment>> {
         self.require_drawable(drawable_object_id)?;
         IWorkDrawableCommentEditor::from_package(self.package().clone())?
-            .comment(drawable_object_id)
+            .comment(DrawableId::from_raw(drawable_object_id)?)
     }
 
     /// Create or replace a direct comment on a reachable Pages drawable.
@@ -2299,7 +2302,7 @@ impl PagesEditor {
     ) -> Result<()> {
         self.require_drawable(drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.set_comment(drawable_object_id, text)?;
+        comments.set_comment(DrawableId::from_raw(drawable_object_id)?, text)?;
         *self = Self::from_package(comments.into_package())?;
         Ok(())
     }
@@ -2308,7 +2311,7 @@ impl PagesEditor {
     pub fn clear_drawable_comment(&mut self, drawable_object_id: u64) -> Result<()> {
         self.require_drawable(drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(DrawableId::from_raw(drawable_object_id)?)?;
         *self = Self::from_package(comments.into_package())?;
         Ok(())
     }
@@ -2316,9 +2319,9 @@ impl PagesEditor {
     /// Read the direct replies in a reachable Pages drawable comment thread.
     pub fn drawable_comment_replies(
         &self,
-        drawable_object_id: u64,
-    ) -> Result<Vec<DrawableCommentReplyInfo>> {
-        self.require_drawable(drawable_object_id)?;
+        drawable_object_id: DrawableId,
+    ) -> Result<Vec<DrawableReply>> {
+        self.require_drawable(drawable_object_id.get())?;
         IWorkDrawableCommentEditor::from_package(self.package().clone())?
             .replies(drawable_object_id)
     }
@@ -2326,10 +2329,10 @@ impl PagesEditor {
     /// Add a reply to a reachable Pages drawable comment.
     pub fn add_drawable_comment_reply(
         &mut self,
-        drawable_object_id: u64,
+        drawable_object_id: DrawableId,
         text: impl Into<String>,
-    ) -> Result<u64> {
-        self.require_drawable(drawable_object_id)?;
+    ) -> Result<StorageId> {
+        self.require_drawable(drawable_object_id.get())?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         let reply_id = comments.add_reply(drawable_object_id, text)?;
         *self = Self::from_package(comments.into_package())?;
@@ -2339,11 +2342,11 @@ impl PagesEditor {
     /// Update a direct reply, returning its current storage identifier.
     pub fn set_drawable_comment_reply(
         &mut self,
-        drawable_object_id: u64,
-        reply_storage_object_id: u64,
+        drawable_object_id: DrawableId,
+        reply_storage_object_id: StorageId,
         text: impl Into<String>,
-    ) -> Result<u64> {
-        self.require_drawable(drawable_object_id)?;
+    ) -> Result<StorageId> {
+        self.require_drawable(drawable_object_id.get())?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         let reply_id = comments.set_reply(drawable_object_id, reply_storage_object_id, text)?;
         *self = Self::from_package(comments.into_package())?;
@@ -2353,10 +2356,10 @@ impl PagesEditor {
     /// Remove a direct reply from a reachable Pages drawable comment.
     pub fn remove_drawable_comment_reply(
         &mut self,
-        drawable_object_id: u64,
-        reply_storage_object_id: u64,
+        drawable_object_id: DrawableId,
+        reply_storage_object_id: StorageId,
     ) -> Result<()> {
-        self.require_drawable(drawable_object_id)?;
+        self.require_drawable(drawable_object_id.get())?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         comments.remove_reply(drawable_object_id, reply_storage_object_id)?;
         *self = Self::from_package(comments.into_package())?;
@@ -2371,7 +2374,9 @@ impl PagesEditor {
     /// Set or clear the display name of a reachable Pages section.
     pub fn set_section_name(&mut self, section_id: u64, name: Option<&str>) -> Result<()> {
         let mut settings = self.section_settings(section_id)?;
-        settings.name = name.map(str::to_owned);
+        settings
+            .set_name(name)
+            .map_err(|error| Error::ParseError(error.to_string()))?;
         self.set_section_settings(section_id, settings)
     }
 
@@ -2452,7 +2457,9 @@ impl PagesEditor {
                 })?;
                 clone_pages_section_graph_object(source_object, &remap, name)?
             };
-            staged.update_archive(&graph.archive_name, |archive| archive.insert_object(cloned))?;
+            staged.update_archive(&graph.archive_name, |archive| {
+                Ok(archive.insert_object(cloned)?)
+            })?;
         }
         let new_section_id = remap[&source_section_id];
         let last_identifier = remap.values().copied().max().ok_or_else(|| {
@@ -2482,7 +2489,7 @@ impl PagesEditor {
         };
         patch_body_section_table(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             None,
             Some(new_section_id),
             |table| insert_section_table_entry(table, entry),
@@ -2559,7 +2566,7 @@ impl PagesEditor {
         let mut staged = self.package().clone();
         patch_body_section_table(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             Some(section_id),
             None,
             |table| {
@@ -2647,7 +2654,7 @@ impl PagesEditor {
     /// Replace a UTF-16 range in a reachable header/footer storage.
     pub fn replace_header_footer_text(
         &mut self,
-        storage_id: u64,
+        storage_id: TextStorageId,
         range: Range<usize>,
         replacement: &str,
     ) -> Result<()> {
@@ -2656,13 +2663,17 @@ impl PagesEditor {
     }
 
     /// Set the complete text of a reachable header/footer storage.
-    pub fn set_header_footer_text(&mut self, storage_id: u64, replacement: &str) -> Result<()> {
+    pub fn set_header_footer_text(
+        &mut self,
+        storage_id: TextStorageId,
+        replacement: &str,
+    ) -> Result<()> {
         self.require_header_footer(storage_id)?;
         self.text.set_text(storage_id, replacement)
     }
 
     /// Clear a reachable header/footer storage without deleting its styled slot.
-    pub fn clear_header_footer(&mut self, storage_id: u64) -> Result<()> {
+    pub fn clear_header_footer(&mut self, storage_id: TextStorageId) -> Result<()> {
         self.set_header_footer_text(storage_id, "")
     }
 
@@ -2689,7 +2700,7 @@ impl PagesEditor {
         reachable_embedded_assets(self.package(), [section_id])
     }
 
-    pub fn extract_media(&self, data_identifier: u64) -> Result<Vec<u8>> {
+    pub fn extract_media(&self, data_identifier: MediaAssetId) -> Result<Vec<u8>> {
         if !self
             .media_assets()?
             .iter()
@@ -2703,7 +2714,11 @@ impl PagesEditor {
     }
 
     /// Replace a referenced materialized asset without changing its data identifier.
-    pub fn replace_media(&mut self, data_identifier: u64, replacement: &[u8]) -> Result<Vec<u8>> {
+    pub fn replace_media(
+        &mut self,
+        data_identifier: MediaAssetId,
+        replacement: &[u8],
+    ) -> Result<Vec<u8>> {
         if !self
             .media_assets()?
             .iter()
@@ -2733,7 +2748,7 @@ impl PagesEditor {
         self.text.save(path)
     }
 
-    fn require_header_footer(&self, storage_id: u64) -> Result<()> {
+    fn require_header_footer(&self, storage_id: TextStorageId) -> Result<()> {
         if self
             .header_footers
             .iter()
@@ -2749,7 +2764,8 @@ impl PagesEditor {
 
     fn reachable_drawable_ids(&self) -> Result<HashSet<u64>> {
         let document = root_document(self.package())?;
-        let mut reachable = metadata_reachable_objects(self.package(), [1, self.body_storage_id])?;
+        let mut reachable =
+            metadata_reachable_objects(self.package(), [1, self.body_storage_id.get()])?;
 
         if let Some(reference) = document.floating_drawables {
             reachable.insert(reference.identifier);
@@ -2843,7 +2859,7 @@ impl PagesEditor {
         if !self
             .drawables()?
             .iter()
-            .any(|drawable| drawable.object_id == drawable_object_id)
+            .any(|drawable| drawable.id.get() == drawable_object_id)
         {
             return Err(Error::ParseError(format!(
                 "drawable object {drawable_object_id} is not reachable from the Pages document"
@@ -2852,11 +2868,11 @@ impl PagesEditor {
         Ok(())
     }
 
-    fn require_drawable_text_storage(&self, drawable_object_id: u64) -> Result<u64> {
+    fn require_drawable_text_storage(&self, drawable_object_id: u64) -> Result<TextStorageId> {
         self.drawable_text_storages()?
             .into_iter()
             .find(|text| text.drawable_object_id == drawable_object_id)
-            .map(|text| text.storage.object_id)
+            .map(|text| text.storage.id)
             .ok_or_else(|| {
                 Error::ParseError(format!(
                     "drawable object {drawable_object_id} does not own writable text reachable from the Pages document"
@@ -2886,10 +2902,10 @@ impl PagesEditor {
                 "Pages drawable {drawable_object_id} is not an ordinary text box"
             )));
         }
-        if shape.owned_storage.map(|item| item.identifier) != Some(text.storage.object_id)
+        if shape.owned_storage.map(|item| item.identifier) != Some(text.storage.id.get())
             || shape
                 .deprecated_storage
-                .is_some_and(|item| item.identifier != text.storage.object_id)
+                .is_some_and(|item| item.identifier != text.storage.id.get())
         {
             return Err(Error::InvalidFormat(format!(
                 "Pages text box {drawable_object_id} has inconsistent storage ownership"
@@ -2903,7 +2919,7 @@ impl PagesEditor {
 
         let body: StorageArchive = decode_typed_package_object(
             self.package(),
-            self.body_storage_id,
+            self.body_storage_id.get(),
             self.body_storage()?.message_type,
             "TSWP.StorageArchive",
         )?;
@@ -2967,7 +2983,7 @@ impl PagesEditor {
             )));
         }
 
-        let mut object_ids = vec![drawable_object_id, text.storage.object_id, attachment_id];
+        let mut object_ids = vec![drawable_object_id, text.storage.id.get(), attachment_id];
         for reference in [shape.super_.super_.title, shape.super_.super_.caption]
             .into_iter()
             .flatten()
@@ -2997,7 +3013,7 @@ impl PagesEditor {
             .unwrap_or_default();
         Ok(PagesTextBoxGraph {
             drawable_id: drawable_object_id,
-            storage_id: text.storage.object_id,
+            storage_id: text.storage.id,
             attachment_id,
             anchor_character_index,
             object_ids,
@@ -3009,7 +3025,7 @@ impl PagesEditor {
 #[derive(Debug, Clone)]
 struct PagesTextBoxGraph {
     drawable_id: u64,
-    storage_id: u64,
+    storage_id: TextStorageId,
     attachment_id: u64,
     anchor_character_index: u32,
     object_ids: Vec<u64>,
@@ -3853,7 +3869,7 @@ fn patch_pages_zorder(
 
 fn drawable_owned_text_storage(
     package: &IWorkPackage,
-    drawable: &IWorkDrawableInfo,
+    drawable: &DrawableInfo,
 ) -> Result<Option<u64>> {
     if !matches!(
         drawable.message_type,
@@ -3865,13 +3881,13 @@ fn drawable_owned_text_storage(
     let mut owned_storage = None;
     for name in package.iwa_entry_names() {
         let archive = package.archive(name)?;
-        let Some(object) = archive.object(drawable.object_id) else {
+        let Some(object) = archive.object(drawable.id.get()) else {
             continue;
         };
         if owned_storage.is_some() {
             return Err(Error::InvalidFormat(format!(
                 "drawable object {} occurs in more than one Pages component",
-                drawable.object_id
+                drawable.id
             )));
         }
         let payload = &object
@@ -3881,7 +3897,7 @@ fn drawable_owned_text_storage(
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Pages drawable {} has no type-{} payload",
-                    drawable.object_id, drawable.message_type
+                    drawable.id, drawable.message_type
                 ))
             })?
             .data;
@@ -3899,10 +3915,7 @@ fn drawable_owned_text_storage(
     }
     owned_storage
         .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Pages drawable object {} is missing",
-                drawable.object_id
-            ))
+            Error::InvalidFormat(format!("Pages drawable object {} is missing", drawable.id))
         })
         .map(|storage| storage.map(|reference| reference.identifier))
 }
@@ -4386,10 +4399,12 @@ fn package_references_object(package: &IWorkPackage, identifier: u64) -> Result<
     Ok(false)
 }
 
-fn body_storage_id(package: &IWorkPackage) -> Result<u64> {
+fn body_storage_id(package: &IWorkPackage) -> Result<TextStorageId> {
     root_document(package)?
         .body_storage
         .map(|reference| reference.identifier)
+        .map(crate::text::native_storage_id)
+        .transpose()?
         .ok_or_else(|| Error::InvalidFormat("Pages document has no body storage".to_owned()))
 }
 
@@ -4559,17 +4574,11 @@ fn discover_structure(
         });
         for (template_kind, reference) in [
             (
-                PagesTemplateKind::First,
+                Template::First,
                 section.first_section_template_page.as_ref(),
             ),
-            (
-                PagesTemplateKind::Even,
-                section.even_section_template_page.as_ref(),
-            ),
-            (
-                PagesTemplateKind::Odd,
-                section.odd_section_template_page.as_ref(),
-            ),
+            (Template::Even, section.even_section_template_page.as_ref()),
+            (Template::Odd, section.odd_section_template_page.as_ref()),
         ] {
             let Some(reference) = reference else {
                 continue;
@@ -4581,8 +4590,8 @@ fn discover_structure(
                 ))
             })?;
             for (kind, references) in [
-                (PagesHeaderFooterKind::Header, &template.headers),
-                (PagesHeaderFooterKind::Footer, &template.footers),
+                (Kind::Header, &template.headers),
+                (Kind::Footer, &template.footers),
             ] {
                 for (slot, reference) in references.iter().enumerate() {
                     if !writable_storages.contains(&reference.identifier) {
@@ -4599,7 +4608,7 @@ fn discover_structure(
                         template: template_kind,
                         kind,
                         slot,
-                        storage_id: reference.identifier,
+                        storage_id: crate::text::native_storage_id(reference.identifier)?,
                     });
                 }
             }
@@ -4666,47 +4675,56 @@ mod tables;
 mod text_box_create;
 mod types;
 
-pub use audio::{PagesAudioInfo, PagesAudioOptions, RemovedPagesAudio};
-pub use body_shapes::{PagesBodyShapeInfo, PagesBodyShapeKind, RemovedPagesBodyShape};
+pub use audio::{PagesAudioInfo, RemovedPagesAudio};
+pub use body_shapes::{PagesBodyShapeInfo, RemovedPagesBodyShape};
 pub use charts::{PagesBodyChartInfo, RemovedPagesBodyChart};
-pub use images::{PagesImageInfo, PagesImageOptions, RemovedPagesImage};
-pub use movies::{PagesMovieInfo, PagesMovieOptions, RemovedPagesMovie};
+pub use images::{PagesImageInfo, RemovedPagesImage};
+pub use movies::{PagesMovieInfo, RemovedPagesMovie};
 pub use tables::{
-    PagesCellValue, PagesTable, PagesTableAxisIndex, PagesTableCellCheckboxFormat,
-    PagesTableCellComment, PagesTableCellCommentInfo, PagesTableCellCommentReplyInfo,
-    PagesTableCellConditionalHighlightInfo, PagesTableCellCurrencyFormat, PagesTableCellDataFormat,
-    PagesTableCellDateTimeFormat, PagesTableCellDecimalPlaces, PagesTableCellDurationFormat,
-    PagesTableCellDurationStyle, PagesTableCellDurationUnit, PagesTableCellDurationUnitRange,
-    PagesTableCellDurationUnits, PagesTableCellFixedDecimalPlaces, PagesTableCellFractionFormat,
-    PagesTableCellInset, PagesTableCellInsets, PagesTableCellLayout,
-    PagesTableCellNegativeNumberStyle, PagesTableCellNumberFormat,
-    PagesTableCellNumeralSystemFormat, PagesTableCellParagraphIndents,
-    PagesTableCellParagraphLineSpacing, PagesTableCellParagraphList,
+    PagesCellValue, PagesTable, PagesTableCellConditionalHighlightInfo, PagesTableCellInset,
+    PagesTableCellInsets, PagesTableCellLayout, PagesTableCellParagraphList,
     PagesTableCellParagraphListBullet, PagesTableCellParagraphListBulletGeometry,
     PagesTableCellParagraphListIndentation, PagesTableCellParagraphListLabelColor,
     PagesTableCellParagraphListLevel, PagesTableCellParagraphListLevelPlacement,
     PagesTableCellParagraphListNumberFormat, PagesTableCellParagraphListNumberScale,
     PagesTableCellParagraphListNumberTiering, PagesTableCellParagraphListNumbering,
-    PagesTableCellParagraphListPlacement, PagesTableCellParagraphSpacing,
-    PagesTableCellParagraphTabStops, PagesTableCellPercentageFormat, PagesTableCellPopUpMenuFormat,
-    PagesTableCellPopUpMenuInitialSelection, PagesTableCellPopUpMenuItem, PagesTableCellRegion,
-    PagesTableCellScientificFormat, PagesTableCellSliderDisplayFormat, PagesTableCellSliderFormat,
-    PagesTableCellSliderRange, PagesTableCellStarRatingFormat, PagesTableCellStepperDisplayFormat,
-    PagesTableCellStepperFormat, PagesTableCellStepperRange, PagesTableCellTextAlignment,
+    PagesTableCellParagraphListPlacement, PagesTableCellParagraphTabStops,
     PagesTableCellTextBackground, PagesTableCellTextBaselineShift,
     PagesTableCellTextCapitalization, PagesTableCellTextCharacterSpacing, PagesTableCellTextColor,
-    PagesTableCellTextDecorations, PagesTableCellTextFont, PagesTableCellTextFormat,
-    PagesTableCellTextLigatures, PagesTableCellTextOutline, PagesTableCellTextScript,
-    PagesTableCellTextShadow, PagesTableCellTextStyle, PagesTableCellTextWrap,
-    PagesTableCellThousandsSeparator, PagesTableCellUpdate, PagesTableCellVerticalAlignment,
-    PagesTableColumnDeletion, PagesTableColumnInsertion, PagesTableDimension,
-    PagesTableDimensionSize, PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator,
-    PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
-    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableHiddenAxes, PagesTableInfo,
-    PagesTablePoints, PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
-    PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule,
-    PagesTableSortScope, PagesTableTitleSettings,
+    PagesTableCellTextDecorations, PagesTableCellTextFont, PagesTableCellTextLigatures,
+    PagesTableCellTextOutline, PagesTableCellTextScript, PagesTableCellTextShadow,
+    PagesTableCellTextStyle, PagesTableCellTextWrap, PagesTableCellUpdate,
+    PagesTableCellVerticalAlignment, PagesTableDimension, PagesTableDimensionSize,
+    PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
+    PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableInfo, PagesTablePoints,
+    PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder,
+    PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope, PagesTableTitleSettings,
 };
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod strict_selector_tests {
+    use super::*;
+
+    #[test]
+    fn direct_comment_reply_api_uses_semantic_ids() {
+        let drawable = DrawableId::from_raw(7).unwrap();
+        let reply = StorageId::from_raw(9).unwrap();
+
+        assert_eq!(drawable.get(), 7);
+        assert_eq!(reply.get(), 9);
+        assert_eq!(DrawableId::new(0), None);
+        assert_eq!(StorageId::new(0), None);
+
+        let _: fn(&PagesEditor, DrawableId) -> Result<Vec<DrawableReply>> =
+            PagesEditor::drawable_comment_replies;
+        let _: fn(&mut PagesEditor, DrawableId, String) -> Result<StorageId> =
+            PagesEditor::add_drawable_comment_reply;
+        let _: fn(&mut PagesEditor, DrawableId, StorageId, String) -> Result<StorageId> =
+            PagesEditor::set_drawable_comment_reply;
+        let _: fn(&mut PagesEditor, DrawableId, StorageId) -> Result<()> =
+            PagesEditor::remove_drawable_comment_reply;
+    }
+}

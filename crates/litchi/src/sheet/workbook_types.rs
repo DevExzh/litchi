@@ -1,7 +1,7 @@
 //! Unified workbook types and format detection.
 
 use litchi_core::Error;
-#[cfg(any(feature = "ods", any(feature = "xlsx", feature = "xlsb")))]
+#[cfg(any(feature = "ods", feature = "xlsx", feature = "xlsb"))]
 use litchi_core::FileFormat;
 use std::io::{Read, Seek, SeekFrom};
 
@@ -13,8 +13,8 @@ type Result<T> = std::result::Result<T, Error>;
 /// but instead use the methods on `UnifiedWorkbook`.
 #[allow(clippy::large_enum_variant)]
 pub(super) enum WorkbookImpl {
-    #[cfg(feature = "iwork")]
-    Numbers(crate::iwa::numbers::NumbersDocument),
+    #[cfg(feature = "numbers")]
+    Numbers(litchi_numbers::Package),
 
     // OOXML-based formats
     #[cfg(feature = "xlsx")]
@@ -103,7 +103,7 @@ pub fn detect_workbook_format_from_signature<R: Read + Seek>(
 #[allow(dead_code)]
 // For format detection, it is better to use the smart detection function, but the function is still useful for other purposes
 #[cfg(any(
-    feature = "iwork",
+    feature = "numbers",
     any(feature = "xlsx", feature = "xlsb"),
     feature = "ods"
 ))]
@@ -132,9 +132,9 @@ pub fn refine_workbook_format<R: Read + Seek>(
             return Ok(WorkbookFormat::Ods);
         }
 
-        #[cfg(feature = "iwork")]
-        if litchi_iwa::detect::bytes(&data).ok().flatten()
-            == Some(litchi_iwa::detect::Format::Numbers)
+        #[cfg(feature = "numbers")]
+        if litchi_iwa_detect::bytes(&data).ok().flatten()
+            == Some(litchi_iwa_detect::Format::Numbers)
         {
             return Ok(WorkbookFormat::Numbers);
         }
@@ -239,7 +239,7 @@ mod tests {
 
     #[test]
     #[cfg(any(
-        feature = "iwork",
+        feature = "numbers",
         any(feature = "xlsx", feature = "xlsb"),
         feature = "ods"
     ))]

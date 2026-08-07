@@ -2,10 +2,11 @@
 
 use std::collections::HashSet;
 
+use litchi_iwa_common::comment::Uuid;
 use prost::Message;
 
-use crate::archive::{ArchiveObject, RawMessage};
-use crate::comments::{IWorkCommentUuid, fresh_comment_storage_uuid, insert_comment_storage};
+use crate::archive::{Archive, ArchiveObject, RawMessage};
+use crate::comments::{fresh_comment_storage_uuid, insert_comment_storage};
 use crate::protobuf::{tsd, tsp, tswp};
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
@@ -19,7 +20,7 @@ pub(super) struct AnnotationReplyGraph {
     pub(super) body: String,
     pub(super) creation_date_seconds: Option<f64>,
     pub(super) author_id: Option<u64>,
-    pub(super) storage_uuid: IWorkCommentUuid,
+    pub(super) storage_uuid: Uuid,
 }
 
 #[derive(Debug, Clone)]
@@ -28,7 +29,7 @@ pub(super) struct AnnotationGraph {
     pub(super) body: String,
     pub(super) creation_date_seconds: Option<f64>,
     pub(super) author_id: Option<u64>,
-    pub(super) storage_uuid: IWorkCommentUuid,
+    pub(super) storage_uuid: Uuid,
     pub(super) replies: Vec<AnnotationReplyGraph>,
 }
 
@@ -48,7 +49,7 @@ struct CommentNode {
     body: String,
     creation_date_seconds: Option<f64>,
     author_id: Option<u64>,
-    storage_uuid: IWorkCommentUuid,
+    storage_uuid: Uuid,
     reply_ids: Vec<u64>,
 }
 
@@ -114,16 +115,26 @@ fn validate_uuid(identifier: u64, uuid: &str) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 pub(super) fn validate_annotation_graph(
     package: &IWorkPackage,
     archive_name: &str,
     identifier: u64,
     object: &ArchiveObject,
 ) -> Result<Option<AnnotationGraph>> {
+    let archive = package.archive(archive_name)?;
+    validate_annotation_graph_in_archive(&archive, identifier, object)
+}
+
+pub(super) fn validate_annotation_graph_in_archive(
+    archive: &Archive,
+    identifier: u64,
+    object: &ArchiveObject,
+) -> Result<Option<AnnotationGraph>> {
     let Some(comment_storage_id) = validate_highlight_object(identifier, object)? else {
         return Ok(None);
     };
-    let root = validate_comment_node(package, archive_name, identifier, comment_storage_id)?;
+    let root = validate_comment_node(archive, identifier, comment_storage_id)?;
     if root.body.is_empty() && !root.reply_ids.is_empty() {
         return Err(Error::InvalidFormat(format!(
             "plain highlight {identifier} unexpectedly owns comment replies"
@@ -138,7 +149,7 @@ pub(super) fn validate_annotation_graph(
                 "text annotation {identifier} has a cyclic or duplicate reply {reply_id}"
             )));
         }
-        let reply = validate_comment_node(package, archive_name, identifier, reply_id)?;
+        let reply = validate_comment_node(archive, identifier, reply_id)?;
         if reply.body.is_empty() || !reply.reply_ids.is_empty() {
             return Err(Error::InvalidFormat(format!(
                 "text annotation {identifier} reply {reply_id} must be nonempty and cannot own nested replies"
@@ -181,12 +192,10 @@ pub(super) fn validate_plain_highlight_graph(
 }
 
 fn validate_comment_node(
-    package: &IWorkPackage,
-    archive_name: &str,
+    archive: &Archive,
     annotation_id: u64,
     storage_id: u64,
 ) -> Result<CommentNode> {
-    let archive = package.archive(archive_name)?;
     let object = archive.object(storage_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
             "iWork text annotation {annotation_id} references missing comment storage {storage_id}"
@@ -239,10 +248,7 @@ fn validate_comment_node(
         body,
         creation_date_seconds,
         author_id,
-        storage_uuid: IWorkCommentUuid {
-            lower: uuid.lower,
-            upper: uuid.upper,
-        },
+        storage_uuid: Uuid::from_parts(uuid.lower, uuid.upper)?,
         reply_ids,
     })
 }

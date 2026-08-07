@@ -7,15 +7,17 @@ use crate::wire::{
 };
 
 use super::*;
+use crate::text::TextStorageId;
 use crate::text::number_attachment_storage::ATTACHMENT_TABLE_FIELD;
-use crate::text::number_attachment_types::{
+use litchi_iwa_text::number_attachment::{
     TextNumberAttachmentKind, TextNumberAttachmentSettings, TextNumberAttachmentText,
+    raw::object_id as native_object_id,
 };
 use prost::Message;
 
-fn fixture() -> (super::super::IWorkTextEditor, u64) {
+fn fixture() -> (super::super::IWorkTextEditor, TextStorageId) {
     let pages = PagesEditor::create_with_text("Page ").unwrap();
-    let storage_id = pages.body_storage().unwrap().object_id;
+    let storage_id = pages.body_storage().unwrap().id;
     (
         super::super::IWorkTextEditor::from_package(pages.into_package()),
         storage_id,
@@ -27,8 +29,8 @@ fn settings(kind: TextNumberAttachmentKind) -> TextNumberAttachmentSettings {
         .with_string_equivalent(TextNumberAttachmentText::new("").unwrap())
 }
 
-fn storage_message_index(package: &crate::IWorkPackage, storage_id: u64) -> usize {
-    locate_attachment_storage(package, storage_id)
+fn storage_message_index(package: &crate::IWorkPackage, storage_id: TextStorageId) -> usize {
+    locate_attachment_storage(package, storage_id.get())
         .unwrap()
         .message_index
 }
@@ -44,12 +46,12 @@ fn unknown_table_root_and_nested_fields_survive_updates() {
         )
         .unwrap();
     let mut package = editor.into_package();
-    let location = locate_attachment_storage(&package, storage_id).unwrap();
+    let location = locate_attachment_storage(&package, storage_id.get()).unwrap();
     let archive_name = location.archive_name.clone();
     let message_index = location.message_index;
     package
         .update_archive(&archive_name, |archive| {
-            let storage = archive.object_mut(storage_id).unwrap();
+            let storage = archive.object_mut(storage_id.get()).unwrap();
             let original = &storage.messages[message_index];
             let data = transform_length_delimited_field(
                 &original.data,
@@ -64,7 +66,7 @@ fn unknown_table_root_and_nested_fields_survive_updates() {
                 },
             )?;
 
-            let object = archive.object_mut(attachment.id.object_id()).unwrap();
+            let object = archive.object_mut(native_object_id(attachment.id)).unwrap();
             let original = &object.messages[0];
             let mut data = patch_varint_field(&original.data, 88, false, Some(9))?;
             data = transform_length_delimited_field(&data, 1, |textual| {
@@ -92,7 +94,7 @@ fn unknown_table_root_and_nested_fields_survive_updates() {
     let package = editor.into_package();
     let message_index = storage_message_index(&package, storage_id);
     let archive = package.archive(&archive_name).unwrap();
-    let storage = archive.object(storage_id).unwrap();
+    let storage = archive.object(storage_id.get()).unwrap();
     let storage_message = &storage.messages[message_index];
     let table = repeated_length_delimited_payloads(&storage_message.data, ATTACHMENT_TABLE_FIELD)
         .unwrap()[0];
@@ -100,21 +102,21 @@ fn unknown_table_root_and_nested_fields_survive_updates() {
         parse_wire_fields(table)
             .unwrap()
             .iter()
-            .any(|field| field.number == 99)
+            .any(|field| field.number() == 99)
     );
-    let object = archive.object(attachment.id.object_id()).unwrap();
+    let object = archive.object(native_object_id(attachment.id)).unwrap();
     assert!(
         parse_wire_fields(&object.messages[0].data)
             .unwrap()
             .iter()
-            .any(|field| field.number == 88)
+            .any(|field| field.number() == 88)
     );
     let textual = repeated_length_delimited_payloads(&object.messages[0].data, 1).unwrap()[0];
     assert!(
         parse_wire_fields(textual)
             .unwrap()
             .iter()
-            .any(|field| field.number == 77)
+            .any(|field| field.number() == 77)
     );
 }
 
@@ -122,7 +124,7 @@ fn unknown_table_root_and_nested_fields_survive_updates() {
 fn attachment_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
     let (editor, storage_id) = fixture();
     let mut package = editor.into_package();
-    let location = locate_attachment_storage(&package, storage_id).unwrap();
+    let location = locate_attachment_storage(&package, storage_id.get()).unwrap();
     let style_data = tswp::ParagraphStyleArchive {
         super_: crate::protobuf::tss::StyleArchive::default(),
         ..Default::default()
@@ -131,7 +133,7 @@ fn attachment_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
     package
         .update_archive(&location.archive_name, |archive| {
             archive
-                .object_mut(storage_id)
+                .object_mut(storage_id.get())
                 .unwrap()
                 .push_message(RawMessage {
                     type_: 2_022,
@@ -159,9 +161,9 @@ fn attachment_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
         .unwrap();
 
     let package = editor.into_package();
-    let location = locate_attachment_storage(&package, storage_id).unwrap();
+    let location = locate_attachment_storage(&package, storage_id.get()).unwrap();
     let archive = package.archive(&location.archive_name).unwrap();
-    let object = archive.object(storage_id).unwrap();
+    let object = archive.object(storage_id.get()).unwrap();
     assert_eq!(
         object.messages[location.message_index].type_,
         location.message_type
@@ -216,12 +218,12 @@ fn missing_kind_and_additional_owner_fail_transactionally() {
         )
         .unwrap();
     let mut package = editor.into_package();
-    let archive_name = locate_attachment_storage(&package, storage_id)
+    let archive_name = locate_attachment_storage(&package, storage_id.get())
         .unwrap()
         .archive_name;
     package
         .update_archive(&archive_name, |archive| {
-            let object = archive.object_mut(attachment.id.object_id()).unwrap();
+            let object = archive.object_mut(native_object_id(attachment.id)).unwrap();
             let original = &object.messages[0];
             let data = patch_nested_varint_field(&original.data, &[1, 2], true, None)?;
             object.replace_message(
@@ -246,7 +248,7 @@ fn missing_kind_and_additional_owner_fail_transactionally() {
         )
         .unwrap();
     let mut package = editor.into_package();
-    let archive_name = locate_attachment_storage(&package, storage_id)
+    let archive_name = locate_attachment_storage(&package, storage_id.get())
         .unwrap()
         .archive_name;
     package
@@ -255,13 +257,13 @@ fn missing_kind_and_additional_owner_fail_transactionally() {
                 .objects
                 .iter_mut()
                 .find(|object| {
-                    object.archive_info.identifier != Some(storage_id)
+                    object.archive_info.identifier != Some(storage_id.get())
                         && !object.archive_info.message_infos.is_empty()
                 })
                 .unwrap();
             other.archive_info.message_infos[0]
                 .object_references
-                .push(attachment.id.object_id());
+                .push(native_object_id(attachment.id));
             Ok(())
         })
         .unwrap();

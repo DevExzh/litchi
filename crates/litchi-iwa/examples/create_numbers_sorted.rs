@@ -1,10 +1,11 @@
 //! Create and physically sort a Numbers table without an input document.
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 use litchi_iwa::numbers::{
-    CellValue, NumbersDocumentBuilder, NumbersTableHeaderCount, NumbersTableHeaderSettings,
-    NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
-    NumbersTableSortRule, TableCellUpdate,
+    NumbersDocumentBuilder, NumbersTableSortColumnIndex, NumbersTableSortDirection,
+    NumbersTableSortOrder, NumbersTableSortRule,
 };
+use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
@@ -17,9 +18,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let table_id = editor.tables()?.remove(0).object_id;
     editor.set_table_header_settings(
         table_id,
-        NumbersTableHeaderSettings {
-            header_rows: Some(NumbersTableHeaderCount::ONE),
-            footer_rows: Some(NumbersTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;
@@ -61,7 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let moved_reply_id = editor
         .cell_comment_replies(table_id, 1, 1)?
         .first()
-        .map(|reply| reply.storage_object_id);
+        .map(|reply| reply.storage_id.get());
     if moved.comment.text != "South comment follows its sorted row"
         || moved_reply_id != Some(reply_id)
     {

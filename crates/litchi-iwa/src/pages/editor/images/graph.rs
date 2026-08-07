@@ -13,6 +13,7 @@ use crate::shapes::{
     drawable_properties, geometry_from_drawable, patch_drawable_geometry,
     patch_wrapped_drawable_properties,
 };
+use litchi_iwa_common::shape::image::ImageAdjustments;
 
 const THEME_MESSAGE_TYPE: u32 = 10_001;
 const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
@@ -109,18 +110,9 @@ pub(super) struct ImageCaptionSlot {
 }
 
 pub(super) fn image_creation_values(options: PagesImageOptions) -> Result<DrawableGeometry> {
-    if !options.natural_size.width.is_finite()
-        || !options.natural_size.height.is_finite()
-        || options.natural_size.width <= 0.0
-        || options.natural_size.height <= 0.0
-    {
-        return Err(Error::ParseError(
-            "Pages image natural size must be finite and greater than zero".to_owned(),
-        ));
-    }
     DrawableGeometry {
-        position: Some(options.position),
-        size: Some(options.size),
+        position: Some(options.position()),
+        size: Some(options.size()),
         flags: Some(DEFAULT_DRAWABLE_FLAGS),
         angle: Some(DEFAULT_IMAGE_ROTATION_DEGREES),
     }
@@ -205,7 +197,7 @@ pub(super) fn image_caption_theme(
 pub(super) fn body_image_infos(editor: &PagesEditor) -> Result<Vec<PagesImageInfo>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -271,7 +263,7 @@ pub(super) fn body_image_graph(
         })?;
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         editor.body_storage()?.message_type,
         "TSWP.StorageArchive",
     )?;
@@ -325,7 +317,7 @@ pub(super) fn body_image_graph(
         IMAGE_MESSAGE_TYPE,
         "TSD.ImageArchive",
     )?;
-    if image.super_.parent.map(|parent| parent.identifier) != Some(editor.body_storage_id) {
+    if image.super_.parent.map(|parent| parent.identifier) != Some(editor.body_storage_id.get()) {
         return Err(Error::InvalidFormat(format!(
             "Pages image {drawable_object_id} is not owned by the body storage"
         )));
@@ -441,11 +433,19 @@ pub(super) fn image_title_caption(
     Ok(DrawableTitleCaption {
         title: title
             .storage_id
-            .map(|storage_id| text_editor.storage(storage_id).map(|storage| storage.text))
+            .map(|storage_id| {
+                text_editor
+                    .storage(crate::text::native_storage_id(storage_id)?)
+                    .map(|storage| storage.storage.into_text())
+            })
             .transpose()?,
         caption: caption
             .storage_id
-            .map(|storage_id| text_editor.storage(storage_id).map(|storage| storage.text))
+            .map(|storage_id| {
+                text_editor
+                    .storage(crate::text::native_storage_id(storage_id)?)
+                    .map(|storage| storage.storage.into_text())
+            })
             .transpose()?,
     })
 }
@@ -647,22 +647,29 @@ fn image_info(
 ) -> Result<PagesImageInfo> {
     let image: tsd::ImageArchive =
         decode_typed_package_object(package, identifier, IMAGE_MESSAGE_TYPE, "TSD.ImageArchive")?;
-    let image_data_identifier = image
-        .data
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Pages image {identifier} has no primary data reference"
-            ))
-        })?
-        .identifier;
+    let image_data_identifier = MediaAssetId::try_from(
+        image
+            .data
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Pages image {identifier} has no primary data reference"
+                ))
+            })?
+            .identifier,
+    )?;
+    let thumbnail_data_identifier = image
+        .thumbnail_data
+        .map(|reference| MediaAssetId::try_from(reference.identifier))
+        .transpose()?;
+    let image_adjustments: ImageAdjustments = image_adjustments_from_archive(&image)?;
     Ok(PagesImageInfo {
         drawable_object_id: identifier,
         anchor_character_index,
         image_data_identifier,
-        thumbnail_data_identifier: image.thumbnail_data.map(|reference| reference.identifier),
+        thumbnail_data_identifier,
         geometry: geometry_from_drawable(&image.super_)?,
         properties: drawable_properties(&image.super_),
-        image_adjustments: image_adjustments_from_archive(&image)?,
+        image_adjustments,
         original_size: image.original_size.map(drawable_size),
         natural_size: image.natural_size.map(drawable_size),
     })

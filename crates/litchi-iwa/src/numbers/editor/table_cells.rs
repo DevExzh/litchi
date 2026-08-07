@@ -1,80 +1,78 @@
-//! Transactional collection and one-pass application of table-cell batches.
-
-use std::collections::HashSet;
+//! Archive application of validated Numbers table-cell batches.
 
 use super::*;
 
+use litchi_numbers::CellPosition;
+use litchi_numbers::table::edit::{Batch, Budget, Error as BatchError};
+
+const MAX_TABLE_CELL_BATCH: usize = 1 << 20;
+
 pub(crate) struct TableCellBatch {
-    updates: Vec<TableCellUpdate>,
-    coordinates: Vec<(usize, usize)>,
+    batch: Batch,
 }
 
 impl TableCellBatch {
     pub(crate) fn collect(updates: impl IntoIterator<Item = TableCellUpdate>) -> Result<Self> {
-        let updates = updates.into_iter().collect::<Vec<_>>();
-        let mut seen = HashSet::with_capacity(updates.len());
-        let mut coordinates = Vec::with_capacity(updates.len());
-        for update in &updates {
-            if !seen.insert((update.row, update.column)) {
-                return Err(Error::ParseError(format!(
-                    "Table cell batch repeats coordinate ({}, {})",
-                    update.row, update.column
-                )));
-            }
-            validate_value(&update.value)?;
-            coordinates.push((update.row, update.column));
-        }
-        Ok(Self {
-            updates,
-            coordinates,
-        })
+        let batch =
+            Batch::collect(updates, Budget::new(MAX_TABLE_CELL_BATCH)).map_err(map_batch_error)?;
+        Ok(Self { batch })
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.updates.is_empty()
+        self.batch.is_empty()
     }
 
     pub(crate) fn len(&self) -> usize {
-        self.updates.len()
+        self.batch.len()
     }
 
     pub(crate) fn apply_numbers(self, package: &mut IWorkPackage, table_id: u64) -> Result<usize> {
-        let Self {
-            updates,
-            coordinates,
-        } = self;
+        let (updates, coordinates) = self.batch.into_parts();
+        let coordinates = into_formula_cache_coordinates(coordinates)?;
         let count = updates.len();
-        model::set_cells_in_package(package, table_id, updates)?;
+        model::set_cells_in_package(package, table_id, updates.into_vec())?;
         formula_cache::refresh_formula_caches_after_cell_writes(package, table_id, &coordinates)?;
         Ok(count)
     }
 
     pub(crate) fn apply_attached(self, package: &mut IWorkPackage, table_id: u64) -> Result<usize> {
-        let Self {
-            updates,
-            coordinates,
-        } = self;
+        let (updates, coordinates) = self.batch.into_parts();
+        let coordinates = into_formula_cache_coordinates(coordinates)?;
         let count = updates.len();
-        model::set_attached_cells_in_package(package, table_id, updates)?;
+        model::set_attached_cells_in_package(package, table_id, updates.into_vec())?;
         formula_cache::refresh_formula_caches_after_cell_writes(package, table_id, &coordinates)?;
         Ok(count)
     }
 }
 
-fn validate_value(value: &CellValue) -> Result<()> {
-    match value {
-        CellValue::Number(number) if !number.is_finite() => Err(Error::ParseError(
-            "Table cell batches cannot store non-finite numbers".to_owned(),
-        )),
-        CellValue::Date(date) if !date.is_finite() => Err(Error::ParseError(
-            "Table cell batches cannot store non-finite dates".to_owned(),
-        )),
-        CellValue::Duration(duration) if !duration.is_finite() => Err(Error::ParseError(
-            "Table cell batches cannot store non-finite durations".to_owned(),
-        )),
-        CellValue::Formula(_) | CellValue::Error(_) => Err(Error::ParseError(
-            "Formula and error cell writes require referenced-table construction".to_owned(),
-        )),
-        _ => Ok(()),
+/// Converts compact semantic coordinates to the legacy tuple shape consumed
+/// by the private formula-cache implementation. Keeping this allocation at
+/// the archive boundary prevents platform-sized coordinates from widening the
+/// owned semantic batch.
+fn into_formula_cache_coordinates(
+    coordinates: Box<[CellPosition]>,
+) -> Result<Box<[(usize, usize)]>> {
+    coordinates
+        .into_vec()
+        .into_iter()
+        .map(|position| {
+            let row = usize::try_from(position.row()).map_err(|_| {
+                Error::ParseError("Numbers row exceeds the platform index range".to_owned())
+            })?;
+            let column = usize::try_from(position.column()).map_err(|_| {
+                Error::ParseError("Numbers column exceeds the platform index range".to_owned())
+            })?;
+            Ok((row, column))
+        })
+        .collect::<Result<Vec<_>>>()
+        .map(Vec::into_boxed_slice)
+}
+
+fn map_batch_error(error: BatchError) -> Error {
+    match error {
+        BatchError::Allocation { resource, amount } => {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
+        },
+        other => Error::ParseError(other.to_string()),
     }
 }

@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::text::{IWorkTextEditor, TextOutline};
+use litchi_iwa::text::{IWorkTextEditor, Outline};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -12,8 +12,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = arguments.next().ok_or("missing output path")?;
     let storage_id = arguments.next().ok_or("missing storage ID")?.parse()?;
     let outline = match arguments.next().as_deref() {
-        Some("none") => TextOutline::None,
-        Some("standard") => TextOutline::standard(),
+        Some("none") => Outline::None,
+        Some("standard") => Outline::standard(),
         Some(_) => return Err("outline must be none or standard".into()),
         None => return Err("missing outline".into()),
     };

@@ -28,7 +28,7 @@
 use crate::Result;
 use crate::bundle::Bundle;
 use crate::charts::options::read_chart_non_style_title;
-use crate::charts::{ChartKind, IWorkChartArchive};
+use crate::charts::{IWorkChartArchive, Kind};
 use crate::object_index::{ObjectIndex, ResolvedObjectRef};
 use crate::protobuf::tsch;
 use prost::Message;
@@ -51,7 +51,7 @@ pub struct ChartMetadata {
     /// Number of data series
     pub series_count: usize,
     /// Strongly typed native chart kind.
-    pub chart_type: ChartKind,
+    pub chart_type: Kind,
     /// Whether chart contains default/sample data
     pub contains_default_data: bool,
 }
@@ -73,14 +73,14 @@ impl ChartMetadata {
 }
 
 /// Extractor for chart metadata
-pub struct ChartMetadataExtractor<'a> {
+pub(crate) struct ChartMetadataExtractor<'a> {
     bundle: &'a Bundle,
     object_index: &'a ObjectIndex,
 }
 
 impl<'a> ChartMetadataExtractor<'a> {
     /// Create a new chart metadata extractor
-    pub fn new(bundle: &'a Bundle, object_index: &'a ObjectIndex) -> Self {
+    pub(crate) fn new(bundle: &'a Bundle, object_index: &'a ObjectIndex) -> Self {
         Self {
             bundle,
             object_index,
@@ -88,7 +88,7 @@ impl<'a> ChartMetadataExtractor<'a> {
     }
 
     /// Extract metadata from all charts in the document
-    pub fn extract_all_charts(&self) -> Result<Vec<ChartMetadata>> {
+    pub(crate) fn extract_all_charts(&self) -> Result<Vec<ChartMetadata>> {
         let mut charts = Vec::new();
 
         for chart_type in [LEGACY_CHART_MESSAGE_TYPE, CHART_DRAWABLE_MESSAGE_TYPE] {
@@ -139,7 +139,7 @@ impl<'a> ChartMetadataExtractor<'a> {
             row_names: grid.map_or_else(Vec::new, |grid| grid.row_name.clone()),
             column_names: grid.map_or_else(Vec::new, |grid| grid.column_name.clone()),
             series_count: grid.map_or(0, |grid| grid.grid_row.len()),
-            chart_type: ChartKind::from_raw(
+            chart_type: Kind::from_native(
                 chart
                     .chart_type
                     .unwrap_or(tsch::ChartType::UndefinedChartType as i32),
@@ -159,7 +159,7 @@ impl<'a> ChartMetadataExtractor<'a> {
             row_names: grid.map_or_else(Vec::new, |grid| grid.row_name.clone()),
             column_names: grid.map_or_else(Vec::new, |grid| grid.column_name.clone()),
             series_count: grid.map_or(0, |grid| grid.value_row.len()),
-            chart_type: ChartKind::from_raw(chart.chart_type),
+            chart_type: Kind::from_native(chart.chart_type),
             contains_default_data: false,
         }
     }
@@ -193,32 +193,6 @@ impl<'a> ChartMetadataExtractor<'a> {
         }
         read_chart_non_style_title(message.data.as_slice())
     }
-
-    /// Extract metadata from a specific chart by object ID
-    pub fn extract_chart_by_id(&self, chart_id: u64) -> Result<Option<ChartMetadata>> {
-        if let Some(resolved) = self.object_index.resolve_ref_id(self.bundle, chart_id)? {
-            return self.extract_chart_metadata(&resolved);
-        }
-
-        Ok(None)
-    }
-
-    /// Get all chart titles in the document
-    pub fn get_all_chart_titles(&self) -> Result<Vec<String>> {
-        let charts = self.extract_all_charts()?;
-        Ok(charts.into_iter().filter_map(|c| c.title).collect())
-    }
-
-    /// Get total number of charts in the document
-    pub fn chart_count(&self) -> Result<usize> {
-        let mut count = 0;
-
-        for chart_type in [LEGACY_CHART_MESSAGE_TYPE, CHART_DRAWABLE_MESSAGE_TYPE] {
-            count += self.object_index.iter_entries_by_type(chart_type).count();
-        }
-
-        Ok(count)
-    }
 }
 
 #[cfg(test)]
@@ -233,7 +207,7 @@ mod tests {
             row_names: Vec::new(),
             column_names: Vec::new(),
             series_count: 0,
-            chart_type: ChartKind::Undefined,
+            chart_type: Kind::Undefined,
             contains_default_data: false,
         };
         assert_eq!(metadata.title, None);
@@ -249,7 +223,7 @@ mod tests {
             row_names: vec!["Q1".to_owned(), "Q2".to_owned()],
             column_names: vec!["Revenue".to_owned()],
             series_count: 2,
-            chart_type: ChartKind::Column2d,
+            chart_type: Kind::Column2d,
             contains_default_data: false,
         };
 
@@ -267,10 +241,10 @@ mod tests {
             row_names: vec![],
             column_names: vec![],
             series_count: 0,
-            chart_type: ChartKind::Bar2d,
+            chart_type: Kind::Bar2d,
             contains_default_data: false,
         };
 
-        assert_eq!(metadata.chart_type, ChartKind::Bar2d);
+        assert_eq!(metadata.chart_type, Kind::Bar2d);
     }
 }

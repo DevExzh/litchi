@@ -12,9 +12,11 @@ use super::*;
 use crate::text::hyperlink_storage::{
     RangedObjectTable, SMART_FIELD_TABLE_FIELD, TABLE_ENTRIES_FIELD, locate_storage,
 };
+use crate::text::storage_id::TextStorageId;
+use litchi_iwa_text::hyperlink::raw::object_id as native_object_id;
 use prost::Message;
 
-fn fixture() -> (super::super::IWorkTextEditor, u64) {
+fn fixture() -> (super::super::IWorkTextEditor, TextStorageId) {
     let mut pages = PagesEditor::create_with_text("Body").unwrap();
     let text_box = pages
         .add_text_box(
@@ -29,7 +31,7 @@ fn fixture() -> (super::super::IWorkTextEditor, u64) {
         .unwrap();
     (
         super::super::IWorkTextEditor::from_package(pages.into_package()),
-        text_box.storage.object_id,
+        text_box.storage.id,
     )
 }
 
@@ -58,12 +60,13 @@ fn unknown_table_entry_and_hyperlink_fields_survive_updates() {
         .add_text_hyperlink(storage_id, range(0, 5), target("https://example.com/one"))
         .unwrap();
     let mut package = editor.into_package();
-    let location = locate_storage(&package, storage_id, RangedObjectTable::SmartField).unwrap();
+    let location =
+        locate_storage(&package, storage_id.get(), RangedObjectTable::SmartField).unwrap();
     let archive_name = location.archive_name.clone();
     let message_index = location.message_index;
     package
         .update_archive(&archive_name, |archive| {
-            let storage = archive.object_mut(storage_id).unwrap();
+            let storage = archive.object_mut(storage_id.get()).unwrap();
             let original = &storage.messages[message_index];
             let data = transform_length_delimited_field(
                 &original.data,
@@ -86,7 +89,7 @@ fn unknown_table_entry_and_hyperlink_fields_survive_updates() {
                     data,
                 },
             )?;
-            let object = archive.object_mut(hyperlink.id.object_id()).unwrap();
+            let object = archive.object_mut(native_object_id(hyperlink.id)).unwrap();
             let original = &object.messages[0];
             let data = patch_varint_field(&original.data, 88, false, Some(9))?;
             object.replace_message(
@@ -110,9 +113,10 @@ fn unknown_table_entry_and_hyperlink_fields_survive_updates() {
         )
         .unwrap();
     let package = editor.into_package();
-    let message_index = storage_message_index(&package, storage_id, RangedObjectTable::SmartField);
+    let message_index =
+        storage_message_index(&package, storage_id.get(), RangedObjectTable::SmartField);
     let archive = package.archive(&archive_name).unwrap();
-    let storage = archive.object(storage_id).unwrap();
+    let storage = archive.object(storage_id.get()).unwrap();
     let message = &storage.messages[message_index];
     let table =
         repeated_length_delimited_payloads(&message.data, SMART_FIELD_TABLE_FIELD).unwrap()[0];
@@ -120,21 +124,21 @@ fn unknown_table_entry_and_hyperlink_fields_survive_updates() {
         parse_wire_fields(table)
             .unwrap()
             .iter()
-            .any(|field| field.number == 99)
+            .any(|field| field.number() == 99)
     );
     let entries = repeated_length_delimited_payloads(table, TABLE_ENTRIES_FIELD).unwrap();
     assert!(
         parse_wire_fields(entries[0])
             .unwrap()
             .iter()
-            .any(|field| field.number == 77)
+            .any(|field| field.number() == 77)
     );
-    let object = archive.object(hyperlink.id.object_id()).unwrap();
+    let object = archive.object(native_object_id(hyperlink.id)).unwrap();
     assert!(
         parse_wire_fields(&object.messages[0].data)
             .unwrap()
             .iter()
-            .any(|field| field.number == 88)
+            .any(|field| field.number() == 88)
     );
 }
 
@@ -145,12 +149,13 @@ fn duplicate_smart_field_tables_fail_without_mutation() {
         .add_text_hyperlink(storage_id, range(0, 5), target("https://example.com"))
         .unwrap();
     let mut package = editor.into_package();
-    let location = locate_storage(&package, storage_id, RangedObjectTable::SmartField).unwrap();
+    let location =
+        locate_storage(&package, storage_id.get(), RangedObjectTable::SmartField).unwrap();
     let archive_name = location.archive_name.clone();
     let message_index = location.message_index;
     package
         .update_archive(&archive_name, |archive| {
-            let object = archive.object_mut(storage_id).unwrap();
+            let object = archive.object_mut(storage_id.get()).unwrap();
             let original = &object.messages[message_index];
             let table =
                 repeated_length_delimited_payloads(&original.data, SMART_FIELD_TABLE_FIELD)?[0];
@@ -181,7 +186,8 @@ fn duplicate_smart_field_tables_fail_without_mutation() {
 fn hyperlink_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
     let (editor, storage_id) = fixture();
     let mut package = editor.into_package();
-    let location = locate_storage(&package, storage_id, RangedObjectTable::SmartField).unwrap();
+    let location =
+        locate_storage(&package, storage_id.get(), RangedObjectTable::SmartField).unwrap();
     let style_data = tswp::ParagraphStyleArchive {
         super_: crate::protobuf::tss::StyleArchive::default(),
         ..Default::default()
@@ -190,7 +196,7 @@ fn hyperlink_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
     package
         .update_archive(&location.archive_name, |archive| {
             archive
-                .object_mut(storage_id)
+                .object_mut(storage_id.get())
                 .unwrap()
                 .push_message(RawMessage {
                     type_: 2_022,
@@ -217,9 +223,10 @@ fn hyperlink_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
         .unwrap();
 
     let package = editor.into_package();
-    let location = locate_storage(&package, storage_id, RangedObjectTable::SmartField).unwrap();
+    let location =
+        locate_storage(&package, storage_id.get(), RangedObjectTable::SmartField).unwrap();
     let archive = package.archive(&location.archive_name).unwrap();
-    let object = archive.object(storage_id).unwrap();
+    let object = archive.object(storage_id.get()).unwrap();
     assert_eq!(
         object.messages[location.message_index].type_,
         location.message_type
@@ -239,7 +246,7 @@ fn hyperlink_with_an_additional_owner_cannot_be_updated_or_deleted() {
         .add_text_hyperlink(storage_id, range(0, 5), target("https://example.com"))
         .unwrap();
     let mut package = editor.into_package();
-    let archive_name = locate_storage(&package, storage_id, RangedObjectTable::SmartField)
+    let archive_name = locate_storage(&package, storage_id.get(), RangedObjectTable::SmartField)
         .unwrap()
         .archive_name;
     package
@@ -248,13 +255,13 @@ fn hyperlink_with_an_additional_owner_cannot_be_updated_or_deleted() {
                 .objects
                 .iter_mut()
                 .find(|object| {
-                    object.archive_info.identifier != Some(storage_id)
+                    object.archive_info.identifier != Some(storage_id.get())
                         && !object.archive_info.message_infos.is_empty()
                 })
                 .unwrap();
             other.archive_info.message_infos[0]
                 .object_references
-                .push(hyperlink.id.object_id());
+                .push(native_object_id(hyperlink.id));
             Ok(())
         })
         .unwrap();

@@ -2,18 +2,22 @@
 
 use std::time::Duration;
 
+use litchi_iwa_common::media::Type as MediaType;
+use litchi_keynote::slide::audio::Options as SlideAudioOptions;
+use litchi_keynote::slide::media::MovieKind;
+
 use super::slide_movies::geometry::{set_movie_geometry, set_movie_properties};
 use super::slide_movies::graph::{
     MovieObjectIds, audio_creation_values, audio_objects, movie_creation_context,
 };
 use super::*;
-use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::add_component_data_reference;
 use crate::media_playback::media_playback_settings;
 use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawablePoint, DrawableProperties, drawable_properties, geometry_from_drawable,
 };
+use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 
 const AUDIO_ARCHIVE_MESSAGE_TYPE: u32 = 3_007;
 
@@ -31,21 +35,6 @@ pub struct KeynoteSlideAudioInfo {
     pub duration: Duration,
 }
 
-/// Typed placement and playback metadata for a newly created audio clip.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct KeynoteSlideAudioOptions {
-    /// Center point of Keynote's zero-size audio control, in slide points.
-    pub position: DrawablePoint,
-    /// Playable duration of the source audio.
-    pub duration: Duration,
-}
-
-impl KeynoteSlideAudioOptions {
-    pub const fn new(position: DrawablePoint, duration: Duration) -> Self {
-        Self { position, duration }
-    }
-}
-
 /// Result of removing one slide-owned audio clip and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedKeynoteSlideAudio {
@@ -59,7 +48,7 @@ impl KeynoteEditor {
     pub fn slide_audio(&self, slide_index: usize) -> Result<Vec<KeynoteSlideAudioInfo>> {
         self.slide_media_infos(slide_index)?
             .into_iter()
-            .filter(|media| media.kind == KeynoteSlideMovieKind::Audio)
+            .filter(|media| media.kind == MovieKind::Audio)
             .map(|media| audio_info(self, slide_index, media.drawable_object_id))
             .collect()
     }
@@ -74,16 +63,15 @@ impl KeynoteEditor {
         slide_index: usize,
         preferred_filename: &str,
         data: &[u8],
-        options: KeynoteSlideAudioOptions,
+        options: SlideAudioOptions,
     ) -> Result<KeynoteSlideAudioInfo> {
-        let (geometry, duration_seconds) =
-            audio_creation_values(options.position, options.duration)?;
+        let (geometry, duration_seconds) = audio_creation_values(options)?;
         let context = movie_creation_context(self, slide_index)?;
         let ids = MovieObjectIds::allocate(next_object_identifier(self.package())?)?;
 
         let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
         let asset = media.insert_unreferenced(preferred_filename, data)?;
-        if asset.media_type != crate::MediaType::Audio {
+        if asset.media_type != MediaType::Audio {
             return Err(Error::ParseError(format!(
                 "Keynote slide audio requires audio data, not {}",
                 asset.media_type.name()
@@ -95,7 +83,7 @@ impl KeynoteEditor {
             ids,
             context.slide_id,
             context.style_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             geometry,
             duration_seconds,
         )?;
@@ -116,7 +104,7 @@ impl KeynoteEditor {
         add_component_data_reference(
             &mut staged,
             context.component_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             ids.drawable,
         )?;
         add_component_external_reference(
@@ -132,12 +120,12 @@ impl KeynoteEditor {
         let created_graph = verified.slide_movie_graph(slide_index, ids.drawable)?;
         let expected_duration = Duration::try_from_secs_f64(f64::from(duration_seconds))
             .map_err(|error| Error::ParseError(error.to_string()))?;
-        if created.audio_data_identifier != asset.data_identifier
-            || created.position != options.position
+        if created.audio_data_identifier != asset.data_identifier.get()
+            || created.position != options.position()
             || created.duration != expected_duration
-            || created_graph.info.kind != KeynoteSlideMovieKind::Audio
+            || created_graph.info.kind != MovieKind::Audio
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(asset.data_identifier)? != data
+            || verified.extract_media(asset.data_identifier.get())? != data
         {
             return Err(Error::InvalidFormat(
                 "Keynote audio creation produced an inconsistent graph".to_owned(),
@@ -218,7 +206,7 @@ impl KeynoteEditor {
         properties: DrawableProperties,
     ) -> Result<()> {
         let source = self.slide_movie_graph(slide_index, drawable_object_id)?;
-        if source.info.kind != KeynoteSlideMovieKind::Audio {
+        if source.info.kind != MovieKind::Audio {
             return Err(Error::ParseError(format!(
                 "Keynote media {drawable_object_id} is {:?}, not slide audio",
                 source.info.kind
@@ -258,7 +246,7 @@ impl KeynoteEditor {
         settings: MediaPlaybackSettings,
     ) -> Result<()> {
         let source = self.slide_movie_graph(slide_index, drawable_object_id)?;
-        if source.info.kind != KeynoteSlideMovieKind::Audio {
+        if source.info.kind != MovieKind::Audio {
             return Err(Error::ParseError(format!(
                 "Keynote media {drawable_object_id} is {:?}, not slide audio",
                 source.info.kind
@@ -294,11 +282,8 @@ impl KeynoteEditor {
         source_drawable_object_id: u64,
     ) -> Result<KeynoteSlideAudioInfo> {
         let source = require_audio(self, slide_index, source_drawable_object_id)?;
-        let media = self.duplicate_slide_media(
-            slide_index,
-            source_drawable_object_id,
-            KeynoteSlideMovieKind::Audio,
-        )?;
+        let media =
+            self.duplicate_slide_media(slide_index, source_drawable_object_id, MovieKind::Audio)?;
         let created = require_audio(self, slide_index, media.drawable_object_id)?;
         let media_position = media.geometry.position.ok_or_else(|| {
             Error::InvalidFormat("Keynote audio clone has no position".to_owned())
@@ -335,11 +320,7 @@ impl KeynoteEditor {
         drawable_object_id: u64,
     ) -> Result<RemovedKeynoteSlideAudio> {
         let audio = require_audio(self, slide_index, drawable_object_id)?;
-        let removed = self.remove_slide_media(
-            slide_index,
-            drawable_object_id,
-            KeynoteSlideMovieKind::Audio,
-        )?;
+        let removed = self.remove_slide_media(slide_index, drawable_object_id, MovieKind::Audio)?;
         if removed.movie.movie_data_identifier != Some(audio.audio_data_identifier) {
             return Err(Error::InvalidFormat(
                 "Keynote audio deletion removed a mismatched media graph".to_owned(),
@@ -358,7 +339,7 @@ fn require_audio(
     drawable_object_id: u64,
 ) -> Result<KeynoteSlideAudioInfo> {
     let graph = editor.slide_movie_graph(slide_index, drawable_object_id)?;
-    if graph.info.kind != KeynoteSlideMovieKind::Audio {
+    if graph.info.kind != MovieKind::Audio {
         return Err(Error::ParseError(format!(
             "Keynote media {drawable_object_id} is {:?}, not slide audio",
             graph.info.kind
@@ -418,7 +399,8 @@ fn audio_info(
 mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
-    use crate::{MediaLoopMode, MediaVolume};
+    use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
+    use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-audio";
     const REPLACEMENT_AUDIO: &[u8] = b"FORM\0\0\0\x10AIFFreplacement-audio";
@@ -440,7 +422,7 @@ mod tests {
             .subtitle("No embedded package")
             .build()
             .unwrap();
-        let options = KeynoteSlideAudioOptions::new(POSITION, Duration::from_millis(1_375));
+        let options = SlideAudioOptions::new(POSITION, Duration::from_millis(1_375)).unwrap();
 
         let created = editor
             .add_slide_audio(0, "audio.aiff", AUDIO, options)
@@ -556,7 +538,7 @@ mod tests {
                 0,
                 "audio.aiff",
                 AUDIO,
-                KeynoteSlideAudioOptions::new(POSITION, Duration::from_millis(1_375)),
+                SlideAudioOptions::new(POSITION, Duration::from_millis(1_375)).unwrap(),
             )
             .unwrap();
         let source_properties = properties("Duplicated Keynote audio");
@@ -690,43 +672,36 @@ mod tests {
                 0,
                 "payload.bin",
                 b"not audio",
-                KeynoteSlideAudioOptions::new(POSITION, Duration::from_secs(1)),
+                SlideAudioOptions::new(POSITION, Duration::from_secs(1)).unwrap(),
             ),
             editor.add_slide_audio(
                 1,
                 "audio.aiff",
                 AUDIO,
-                KeynoteSlideAudioOptions::new(POSITION, Duration::from_secs(1)),
-            ),
-            editor.add_slide_audio(
-                0,
-                "audio.aiff",
-                AUDIO,
-                KeynoteSlideAudioOptions::new(POSITION, Duration::ZERO),
-            ),
-            editor.add_slide_audio(
-                0,
-                "audio.aiff",
-                AUDIO,
-                KeynoteSlideAudioOptions::new(
-                    DrawablePoint {
-                        x: f32::NAN,
-                        y: 10.0,
-                    },
-                    Duration::from_secs(1),
-                ),
+                SlideAudioOptions::new(POSITION, Duration::from_secs(1)).unwrap(),
             ),
         ] {
             assert!(result.is_err());
             assert_eq!(editor.to_bytes().unwrap(), baseline);
         }
+        assert!(SlideAudioOptions::new(POSITION, Duration::ZERO).is_err());
+        assert!(
+            SlideAudioOptions::new(
+                DrawablePoint {
+                    x: f32::NAN,
+                    y: 10.0,
+                },
+                Duration::from_secs(1),
+            )
+            .is_err()
+        );
 
         let audio = editor
             .add_slide_audio(
                 0,
                 "audio.aiff",
                 AUDIO,
-                KeynoteSlideAudioOptions::new(POSITION, Duration::from_secs(1)),
+                SlideAudioOptions::new(POSITION, Duration::from_secs(1)).unwrap(),
             )
             .unwrap();
         let before = editor.to_bytes().unwrap();

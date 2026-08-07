@@ -4,6 +4,7 @@ use std::path::Path;
 
 use litchi_iwa::IWorkMediaEditor;
 use litchi_iwa::keynote::KeynoteEditor;
+use litchi_iwa::media::MediaAssetId;
 use litchi_iwa::numbers::NumbersEditor;
 use litchi_iwa::pages::PagesEditor;
 
@@ -54,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
         if arguments[2] == "remove" {
-            let data_identifier = arguments[3].parse::<u64>()?;
+            let data_identifier = MediaAssetId::try_from(arguments[3].parse::<u64>()?)?;
             let mut media = IWorkMediaEditor::open(input)?;
             let removed = media.remove_unreferenced(data_identifier)?;
             media.save(output)?;
@@ -65,7 +66,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
 
-        let data_identifier = arguments[2].parse::<u64>()?;
+        // The application-specific wrapper methods still use their native
+        // wire ID. Keep that value local while the shared media editor uses
+        // the checked semantic identifier above it.
+        let raw_data_identifier = arguments[2].parse::<u64>()?;
+        let data_identifier = MediaAssetId::try_from(raw_data_identifier)?;
         let replacement = fs::read(&arguments[3])?;
         let previous = match Path::new(input)
             .extension()
@@ -73,13 +78,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         {
             Some("key") => {
                 let mut app = KeynoteEditor::open(input)?;
-                let previous = app.replace_media(data_identifier, &replacement)?;
+                let previous = app.replace_media(raw_data_identifier, &replacement)?;
                 app.save(output)?;
                 previous
             },
             Some("numbers") => {
                 let mut app = NumbersEditor::open(input)?;
-                let previous = app.replace_media(data_identifier, &replacement)?;
+                let previous = app.replace_media(raw_data_identifier, &replacement)?;
                 app.save(output)?;
                 previous
             },

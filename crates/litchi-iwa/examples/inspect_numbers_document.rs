@@ -2,7 +2,8 @@
 
 use std::env;
 
-use litchi_iwa::numbers::{CellValue, NumbersDocument, NumbersEditor};
+use litchi_iwa::numbers::{NumbersDocument, NumbersEditor};
+use litchi_numbers::cell::Value as CellValue;
 use prost::Message;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -18,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|archive| archive.object(1))
         .and_then(|object| object.messages.first())
         .and_then(|message| {
-            litchi_iwa::protobuf::tn::DocumentArchive::decode(message.data.as_slice()).ok()
+            litchi_iwa_protos::tn::DocumentArchive::decode(message.data.as_slice()).ok()
         })
     {
         println!(
@@ -29,9 +30,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect::<Vec<_>>()
         );
     }
-    for sheet in document.sheets()? {
-        println!("sheet {}: {:?}", sheet.index, sheet.name);
-        for table in sheet.tables {
+    for sheet in document.sheets()?.iter() {
+        println!("sheet {}: {:?}", sheet.index(), sheet.name());
+        for table in sheet.tables() {
             println!(
                 "  table {:?}: {} rows x {} columns",
                 table.name(),

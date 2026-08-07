@@ -1,11 +1,9 @@
 //! Native protobuf wire translation for typed Keynote gradients.
 
 use super::slide_background_color::{color_from_native, color_to_native};
-use super::slide_background_gradient::{
-    KeynoteGradient, KeynoteGradientAngle, KeynoteGradientKind, KeynoteGradientStop,
-    validate_gradient,
-};
 use super::*;
+use litchi_iwa_common::shape::fill::{Opacity, StopMidpoint, StopPosition};
+use litchi_keynote::background::{Angle, Gradient, Kind, Stop};
 
 const FILL_GRADIENT_FIELD: u32 = 2;
 const GRADIENT_TYPE_FIELD: u32 = 1;
@@ -24,7 +22,7 @@ const COLOR_BLUE_FIELD: u32 = 5;
 const COLOR_ALPHA_FIELD: u32 = 6;
 const COLOR_SPACE_FIELD: u32 = 12;
 
-pub(super) fn gradient_from_fill(fill_payload: &[u8]) -> Result<Option<KeynoteGradient>> {
+pub(super) fn gradient_from_fill(fill_payload: &[u8]) -> Result<Option<Gradient>> {
     if !has_exact_fields(fill_payload, &[FILL_GRADIENT_FIELD])? {
         return Ok(None);
     }
@@ -45,14 +43,14 @@ pub(super) fn gradient_from_fill(fill_payload: &[u8]) -> Result<Option<KeynoteGr
         .r#type
         .and_then(|value| tsd::gradient_archive::GradientType::try_from(value).ok())
     {
-        Some(tsd::gradient_archive::GradientType::Linear) => KeynoteGradientKind::Linear,
-        Some(tsd::gradient_archive::GradientType::Radial) => KeynoteGradientKind::Radial,
+        Some(tsd::gradient_archive::GradientType::Linear) => Kind::Linear,
+        Some(tsd::gradient_archive::GradientType::Radial) => Kind::Radial,
         None => return Ok(None),
     };
     if native.transformgradient.is_some() {
         return Ok(None);
     }
-    let Some(opacity) = native.opacity else {
+    let Some(opacity) = native.opacity.and_then(|value| Opacity::new(value).ok()) else {
         return Ok(None);
     };
     let Some(is_advanced) = native.advanced_gradient else {
@@ -72,7 +70,7 @@ pub(super) fn gradient_from_fill(fill_payload: &[u8]) -> Result<Option<KeynoteGr
     let Some(angle_radians) = angle_archive.gradientangle else {
         return Ok(None);
     };
-    let angle = match KeynoteGradientAngle::from_radians(angle_radians) {
+    let angle = match Angle::from_radians(angle_radians) {
         Ok(angle) => angle,
         Err(_) => return Ok(None),
     };
@@ -109,48 +107,39 @@ pub(super) fn gradient_from_fill(fill_payload: &[u8]) -> Result<Option<KeynoteGr
         let Some(color) = color_from_native(native_color) else {
             return Ok(None);
         };
-        let (Some(position), Some(midpoint)) = (stop.fraction, stop.inflection) else {
+        let (Some(position), Some(midpoint)) = (
+            stop.fraction
+                .and_then(|value| StopPosition::new(value).ok()),
+            stop.inflection
+                .and_then(|value| StopMidpoint::new(value).ok()),
+        ) else {
             return Ok(None);
         };
-        stops.push(KeynoteGradientStop {
-            color,
-            position,
-            midpoint,
-        });
+        stops.push(Stop::new(color, position, midpoint));
     }
-    let gradient = KeynoteGradient {
-        kind,
-        stops,
-        opacity,
-        is_advanced,
-        angle,
-    };
-    if validate_gradient(&gradient).is_err() {
-        return Ok(None);
-    }
-    Ok(Some(gradient))
+    Ok(Gradient::from_parts(kind, stops, opacity, is_advanced, angle).ok())
 }
 
-pub(super) fn gradient_to_fill(gradient: &KeynoteGradient) -> Vec<u8> {
+pub(super) fn gradient_to_fill(gradient: &Gradient) -> Vec<u8> {
     tsd::FillArchive {
         gradient: Some(tsd::GradientArchive {
-            r#type: Some(match gradient.kind {
-                KeynoteGradientKind::Linear => tsd::gradient_archive::GradientType::Linear as i32,
-                KeynoteGradientKind::Radial => tsd::gradient_archive::GradientType::Radial as i32,
+            r#type: Some(match gradient.kind() {
+                Kind::Linear => tsd::gradient_archive::GradientType::Linear as i32,
+                Kind::Radial => tsd::gradient_archive::GradientType::Radial as i32,
             }),
             stops: gradient
-                .stops
+                .stops()
                 .iter()
                 .map(|stop| tsd::gradient_archive::GradientStop {
-                    color: Some(color_to_native(stop.color)),
-                    fraction: Some(stop.position),
-                    inflection: Some(stop.midpoint),
+                    color: Some(color_to_native(stop.color())),
+                    fraction: Some(stop.position().get()),
+                    inflection: Some(stop.midpoint().get()),
                 })
                 .collect(),
-            opacity: Some(gradient.opacity),
-            advanced_gradient: Some(gradient.is_advanced),
+            opacity: Some(gradient.opacity().get()),
+            advanced_gradient: Some(gradient.is_advanced()),
             anglegradient: Some(tsd::AngleGradientArchive {
-                gradientangle: Some(gradient.angle.radians()),
+                gradientangle: Some(gradient.angle().radians()),
             }),
             transformgradient: None,
         }),
@@ -162,7 +151,7 @@ pub(super) fn gradient_to_fill(gradient: &KeynoteGradient) -> Vec<u8> {
 fn has_exact_fields(data: &[u8], expected: &[u32]) -> Result<bool> {
     let mut actual = parse_wire_fields(data)?
         .into_iter()
-        .map(|field| field.number)
+        .map(|field| field.number())
         .collect::<Vec<_>>();
     let mut expected = expected.to_vec();
     actual.sort_unstable();

@@ -105,7 +105,7 @@ pub(super) fn create_empty_table_formula_graph(
             }],
         )?;
         owner_object.archive_info.message_infos[0].versions = vec![3, 2, 10];
-        archive.insert_object(owner_object)
+        Ok(archive.insert_object(owner_object)?)
     })?;
 
     set_package_last_object_identifier(package, owner_id)?;

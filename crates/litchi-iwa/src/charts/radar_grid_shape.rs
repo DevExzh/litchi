@@ -7,7 +7,7 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::style::{
     GENERATED_CHART_STYLE_EXTENSION_FIELD, chart_style_slot, generated_chart_style_extension,
 };
@@ -56,7 +56,7 @@ pub(crate) fn chart_radar_grid_shape(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
 ) -> Result<ChartRadarGridShape> {
     require_radar_chart(kind)?;
     chart_style_slot(
@@ -74,7 +74,7 @@ pub(crate) fn set_chart_radar_grid_shape(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     shape: ChartRadarGridShape,
 ) -> Result<()> {
     require_radar_chart(kind)?;
@@ -97,7 +97,7 @@ pub(crate) fn set_chart_radar_grid_shape(
     Ok(())
 }
 
-fn require_radar_chart(kind: ChartKind) -> Result<()> {
+fn require_radar_chart(kind: Kind) -> Result<()> {
     if !kind.supports_radar_grid_shape() {
         return Err(Error::InvalidFormat(format!(
             "chart kind {kind:?} does not expose radar grid shape"
@@ -122,7 +122,7 @@ fn read_optional_native_shape(extension: &[u8]) -> Result<Option<u64>> {
     let fields = parse_wire_fields(extension)?;
     let mut matches = fields
         .iter()
-        .filter(|field| field.number == RADAR_RADIUS_GRIDLINE_CURVE_FIELD);
+        .filter(|field| field.number() == RADAR_RADIUS_GRIDLINE_CURVE_FIELD);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -131,17 +131,16 @@ fn read_optional_native_shape(extension: &[u8]) -> Result<Option<u64>> {
             "radar grid-shape field {RADAR_RADIUS_GRIDLINE_CURVE_FIELD} occurs more than once"
         )));
     }
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "radar grid-shape field {RADAR_RADIUS_GRIDLINE_CURVE_FIELD} is not a varint"
         )));
     }
-    let (value, length) =
-        crate::varint::decode_varint_from_bytes(&extension[field.payload_start..field.end])
-            .map_err(|error| {
-                Error::InvalidFormat(format!("invalid radar grid-shape value: {error}"))
-            })?;
-    if field.payload_start + length != field.end {
+    let (value, length) = litchi_iwa_common::varint::decode_varint_from_bytes(
+        &extension[field.payload_start()..field.end()],
+    )
+    .map_err(|error| Error::InvalidFormat(format!("invalid radar grid-shape value: {error}")))?;
+    if field.payload_start() + length != field.end() {
         return Err(Error::InvalidFormat(
             "radar grid-shape varint has trailing bytes".to_owned(),
         ));
@@ -310,6 +309,6 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .iter()
-            .any(|field| field.number == field_number)
+            .any(|field| field.number() == field_number)
     }
 }

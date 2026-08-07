@@ -4,64 +4,35 @@ use super::*;
 
 mod wire;
 
+use litchi_numbers::TableSelector;
 use wire::{read_table_title_settings_wire, write_table_title_settings_wire};
 
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 const SHAPE_STYLE_MESSAGE_TYPE: u32 = 2_025;
 
-/// Lossless optional title settings stored by a native iWork table model.
-///
-/// Optional booleans retain their native protobuf presence. iWork normally
-/// omits `visible` when the title is hidden, while documents from other app
-/// versions may encode an explicit `false` value.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct NumbersTableTitleSettings {
-    /// Whether the table title is displayed.
-    pub visible: Option<bool>,
-    /// Whether the table outline includes the title region.
-    pub outlined: Option<bool>,
-}
-
-impl NumbersTableTitleSettings {
-    /// Return whether the title is effectively visible.
-    pub fn is_visible(self) -> bool {
-        self.visible.unwrap_or(false)
-    }
-
-    /// Return whether the title region is effectively outlined.
-    pub fn is_outlined(self) -> bool {
-        self.outlined.unwrap_or(false)
-    }
-
-    fn from_model(model: &TableModelArchive) -> Self {
-        Self {
-            visible: model.table_name_enabled,
-            outlined: model.table_name_border_enabled,
-        }
-    }
-}
-
 impl NumbersEditor {
     /// Read an attached table's lossless title visibility and outline settings.
-    pub fn table_title_settings(&self, table_id: u64) -> Result<NumbersTableTitleSettings> {
+    pub fn table_title_settings(&self, selector: TableSelector<'_>) -> Result<Settings> {
+        let table_id = super::selectors::table_id(self, selector)?;
         table_title_settings_in_package(&self.package, table_id)
     }
 
     /// Replace an attached table's title visibility and outline settings transactionally.
     pub fn set_table_title_settings(
         &mut self,
-        table_id: u64,
-        settings: NumbersTableTitleSettings,
+        selector: TableSelector<'_>,
+        settings: Settings,
     ) -> Result<()> {
-        if table_title_settings_in_package(&self.package, table_id)? == settings {
+        let table_id = super::selectors::table_id(self, selector)?;
+        if self.table_title_settings(selector)? == settings {
             return Ok(());
         }
         let mut staged = self.package.clone();
         set_table_title_settings_in_package(&mut staged, table_id, settings)?;
 
         let verified = Self::from_package(staged)?;
-        if verified.table_title_settings(table_id)? != settings {
+        if verified.table_title_settings(selector)? != settings {
             return Err(Error::InvalidFormat(
                 "Numbers table title settings failed round-trip validation".to_owned(),
             ));
@@ -74,7 +45,7 @@ impl NumbersEditor {
 pub(crate) fn table_title_settings_in_package(
     package: &IWorkPackage,
     table_id: u64,
-) -> Result<NumbersTableTitleSettings> {
+) -> Result<Settings> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     read_table_title_settings(package, &descriptor)
 }
@@ -82,7 +53,7 @@ pub(crate) fn table_title_settings_in_package(
 pub(crate) fn set_table_title_settings_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    settings: NumbersTableTitleSettings,
+    settings: Settings,
 ) -> Result<()> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     if read_table_title_settings(package, &descriptor)? == settings {
@@ -246,7 +217,7 @@ fn require_title_style<M: Message + Default>(
 fn read_table_title_settings(
     package: &IWorkPackage,
     descriptor: &TableDescriptor,
-) -> Result<NumbersTableTitleSettings> {
+) -> Result<Settings> {
     let locations = object_locations(package)?;
     let archive_name = locations.get(&descriptor.object_id).ok_or_else(|| {
         Error::InvalidFormat(format!(

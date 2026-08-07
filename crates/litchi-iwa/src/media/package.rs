@@ -18,7 +18,9 @@ use super::codec::{
     embedded_assets, insert_unique_asset, materialized_file_name, patch_package_metadata,
     remove_data_info, validate_new_media, validate_replacement_type, write_package_entry,
 };
-use super::model::{EmbeddedMediaAsset, MediaAsset, MediaLimits, MediaStats, MediaType};
+use super::model::{
+    EmbeddedMediaAsset, MediaAsset, MediaAssetId, MediaLimits, MediaStats, MediaType,
+};
 
 const DEFAULT_MAX_REPLACEMENT_BYTES: usize = 1024 * 1024 * 1024;
 
@@ -554,13 +556,13 @@ impl IWorkMediaEditor {
         &self.assets
     }
 
-    pub fn asset(&self, data_identifier: u64) -> Option<&EmbeddedMediaAsset> {
+    pub fn asset(&self, data_identifier: MediaAssetId) -> Option<&EmbeddedMediaAsset> {
         self.assets
             .iter()
             .find(|asset| asset.data_identifier == data_identifier)
     }
 
-    pub fn extract(&self, data_identifier: u64) -> Result<Vec<u8>> {
+    pub fn extract(&self, data_identifier: MediaAssetId) -> Result<Vec<u8>> {
         let asset = self.asset(data_identifier).ok_or_else(|| {
             Error::Bundle(format!("Data identifier {data_identifier} does not exist"))
         })?;
@@ -579,7 +581,11 @@ impl IWorkMediaEditor {
     ///
     /// The operation is staged on a package clone, serialized, reparsed, and
     /// verified before it becomes visible through this editor.
-    pub fn replace(&mut self, data_identifier: u64, replacement: &[u8]) -> Result<Vec<u8>> {
+    pub fn replace(
+        &mut self,
+        data_identifier: MediaAssetId,
+        replacement: &[u8],
+    ) -> Result<Vec<u8>> {
         if replacement.is_empty() {
             return Err(Error::Bundle(
                 "A materialized media asset cannot be replaced with empty data".to_owned(),
@@ -612,7 +618,7 @@ impl IWorkMediaEditor {
             .ok_or_else(|| Error::Bundle(format!("Materialized data entry not found: {path}")))?;
 
         update_package_metadata(&mut staged, |metadata| {
-            patch_package_metadata(metadata, data_identifier, &digest, replacement_length)
+            patch_package_metadata(metadata, data_identifier.get(), &digest, replacement_length)
         })?;
 
         let serialized = staged.to_bytes()?;
@@ -649,8 +655,7 @@ impl IWorkMediaEditor {
             .iter()
             .map(|asset| asset.data_identifier)
             .max()
-            .unwrap_or(0)
-            .checked_add(1)
+            .map_or_else(|| MediaAssetId::new(1), MediaAssetId::next)
             .ok_or_else(|| Error::Bundle("Data identifier space is exhausted".to_owned()))?;
         let file_name = materialized_file_name(preferred_filename, data_identifier)?;
         let package_path = data_entry_name(&file_name)?;
@@ -675,7 +680,7 @@ impl IWorkMediaEditor {
         update_package_metadata(&mut staged, |metadata| {
             append_data_info(
                 metadata,
-                data_identifier,
+                data_identifier.get(),
                 &digest,
                 preferred_filename,
                 &file_name,
@@ -707,7 +712,10 @@ impl IWorkMediaEditor {
     ///
     /// Referenced assets are rejected. For an unmaterialized record the return
     /// value is `None`; otherwise it contains the removed `Data/*` bytes.
-    pub fn remove_unreferenced(&mut self, data_identifier: u64) -> Result<Option<Vec<u8>>> {
+    pub fn remove_unreferenced(
+        &mut self,
+        data_identifier: MediaAssetId,
+    ) -> Result<Option<Vec<u8>>> {
         let asset = self.asset(data_identifier).cloned().ok_or_else(|| {
             Error::Bundle(format!("Data identifier {data_identifier} does not exist"))
         })?;
@@ -723,7 +731,7 @@ impl IWorkMediaEditor {
             .as_deref()
             .and_then(|path| staged.remove_entry(path));
         update_package_metadata(&mut staged, |metadata| {
-            remove_data_info(metadata, data_identifier)
+            remove_data_info(metadata, data_identifier.get())
         })?;
 
         let serialized = staged.to_bytes()?;

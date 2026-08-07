@@ -1,10 +1,8 @@
 //! Native control-cell-spec table lifecycle for interactive data formats.
 
 use super::*;
-use crate::table_cell_data_format::{
-    TableCellPopUpMenuFormat, TableCellPopUpMenuInitialSelection, TableCellSliderRange,
-    TableCellStepperRange,
-};
+use litchi_numbers::cell::data_format::control::Range;
+use litchi_numbers::cell::data_format::pop_up_menu::{InitialSelection, PopUpMenu};
 
 const DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
 const CHECKBOX_INTERACTION_TYPE: u32 = 8;
@@ -20,9 +18,9 @@ const POP_UP_MENU_INTERACTION_TYPE: u32 = 7;
 pub(super) enum ControlCellSpecKind {
     Checkbox,
     StarRating,
-    Slider(TableCellSliderRange),
-    Stepper(TableCellStepperRange),
-    PopUpMenu(TableCellPopUpMenuFormat),
+    Slider(Range),
+    Stepper(Range),
+    PopUpMenu(PopUpMenu),
 }
 
 pub(super) fn acquire_spec(
@@ -111,7 +109,7 @@ pub(super) fn acquire_pop_up_menu_spec(
     package: &mut IWorkPackage,
     location: &model::CellLocation,
     current_identifier: Option<u32>,
-    format: &TableCellPopUpMenuFormat,
+    format: &PopUpMenu,
 ) -> Result<u32> {
     let table_id = ensure_control_table(package, location)?;
     let locations = storage::object_locations(package)?;
@@ -172,7 +170,7 @@ pub(super) fn acquire_pop_up_menu_spec(
         }),
         chooser_control_start_w_first: Some(matches!(
             format.initial_selection(),
-            TableCellPopUpMenuInitialSelection::FirstItem
+            InitialSelection::FirstItem
         )),
         ..Default::default()
     };
@@ -500,8 +498,7 @@ fn parse_cell_spec(
                 .range_control_inc
                 .ok_or_else(|| "Slider has no increment".to_owned())?;
             ControlCellSpecKind::Slider(
-                TableCellSliderRange::new(minimum, maximum, increment)
-                    .map_err(|error| error.to_string())?,
+                Range::new(minimum, maximum, increment).map_err(|error| error.to_string())?,
             )
         },
         STEPPER_INTERACTION_TYPE => {
@@ -515,8 +512,7 @@ fn parse_cell_spec(
                 .range_control_inc
                 .ok_or_else(|| "Stepper has no increment".to_owned())?;
             ControlCellSpecKind::Stepper(
-                TableCellStepperRange::new(minimum, maximum, increment)
-                    .map_err(|error| error.to_string())?,
+                Range::new(minimum, maximum, increment).map_err(|error| error.to_string())?,
             )
         },
         value => return Err(format!("unsupported interaction type {value}")),

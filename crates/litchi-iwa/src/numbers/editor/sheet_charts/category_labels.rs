@@ -1,7 +1,8 @@
 //! Native category-label layout CRUD for Numbers sheet charts.
 
 use super::*;
-use crate::charts::ChartCategoryLabelLayout;
+use litchi_iwa_common::chart::category_labels::Layout;
+
 use crate::charts::category_labels::{
     chart_category_label_layout as read_native_category_label_layout,
     set_chart_category_label_layout as set_native_category_label_layout,
@@ -13,7 +14,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<ChartCategoryLabelLayout> {
+    ) -> Result<Layout> {
         sheet_chart_category_label_layout(self, sheet_id, drawable_object_id)
     }
 
@@ -22,7 +23,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        layout: ChartCategoryLabelLayout,
+        layout: Layout,
     ) -> Result<()> {
         set_sheet_chart_category_label_layout(self, sheet_id, drawable_object_id, layout)
     }
@@ -32,7 +33,7 @@ fn sheet_chart_category_label_layout(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-) -> Result<ChartCategoryLabelLayout> {
+) -> Result<Layout> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     read_native_category_label_layout(
         &editor.package,
@@ -46,7 +47,7 @@ fn set_sheet_chart_category_label_layout(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    layout: ChartCategoryLabelLayout,
+    layout: Layout,
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let mut staged = editor.package.clone();
@@ -70,11 +71,10 @@ fn set_sheet_chart_category_label_layout(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{
-        ChartCategoryLabelFrequency, ChartCategoryLabelInterval, ChartData, ChartKind,
-    };
+    use crate::charts::{ChartData, Kind};
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
+    use litchi_iwa_common::chart::category_labels::{Frequency, Interval};
 
     #[test]
     fn scratch_spreadsheet_supports_category_label_layout_crud() {
@@ -83,7 +83,7 @@ mod tests {
         let chart = editor
             .add_sheet_chart(
                 sheet_id,
-                ChartKind::Line2d,
+                Kind::Line2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -97,11 +97,11 @@ mod tests {
             editor
                 .sheet_chart_category_label_layout(sheet_id, chart.drawable_object_id)
                 .unwrap(),
-            ChartCategoryLabelLayout::default()
+            Layout::default()
         );
         for layout in [
-            ChartCategoryLabelLayout::new(ChartCategoryLabelFrequency::None, true),
-            ChartCategoryLabelLayout::new(ChartCategoryLabelFrequency::All, true),
+            Layout::new(Frequency::None, true),
+            Layout::new(Frequency::All, true),
         ] {
             editor
                 .set_sheet_chart_category_label_layout(sheet_id, chart.drawable_object_id, layout)
@@ -113,10 +113,7 @@ mod tests {
                 layout
             );
         }
-        let customized = ChartCategoryLabelLayout::new(
-            ChartCategoryLabelFrequency::Every(ChartCategoryLabelInterval::new(3).unwrap()),
-            false,
-        );
+        let customized = Layout::new(Frequency::Every(Interval::new(3).unwrap()), false);
         editor
             .set_sheet_chart_category_label_layout(sheet_id, chart.drawable_object_id, customized)
             .unwrap();
@@ -131,7 +128,7 @@ mod tests {
             .set_sheet_chart_category_label_layout(
                 sheet_id,
                 chart.drawable_object_id,
-                ChartCategoryLabelLayout::default(),
+                Layout::default(),
             )
             .unwrap();
         assert_eq!(reopened.to_bytes().unwrap(), baseline);

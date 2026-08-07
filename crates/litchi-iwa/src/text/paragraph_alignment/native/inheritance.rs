@@ -5,21 +5,26 @@ use std::collections::HashSet;
 use crate::protobuf::tswp;
 use crate::shapes::RgbaColor;
 use crate::text::font::TextFont;
-use crate::text::paragraph_direction::ParagraphWritingDirection;
-use crate::text::paragraph_flow::{ParagraphFlow, ParagraphHyphenation};
-use crate::text::paragraph_following_style::{ParagraphFollowingStyle, ParagraphStyleId};
+use crate::text::paragraph_direction::{
+    ParagraphWritingDirection, from_native as writing_direction_from_native,
+};
+use crate::text::paragraph_flow::{ParagraphFlow, hyphenation_from_native};
 use crate::text::paragraph_tabs::{
     ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphTabStops,
-};
-use crate::text::style::{
-    ParagraphBackground, ParagraphBorders, ParagraphIndentPoints, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphSpacing, ParagraphSpacingPoints, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
-    TextOutline, TextPointSize, TextScript, TextShadow, TextStrikethrough, TextStyle,
-    TextUnderline,
+    decimal_character_from_native,
 };
 use crate::{Error, IWorkPackage, Result};
+use litchi_iwa_text::appearance::{Background, Outline, ParagraphBackground, Shadow};
+use litchi_iwa_text::character::{
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextDecorations, TextLigatures,
+    TextPointSize, TextScript, TextStrikethrough, TextStyle, TextUnderline,
+};
+use litchi_iwa_text::paragraph::format::{
+    Alignment, Borders, IndentPoints, Indents, LineSpacing, Spacing, SpacingPoints,
+};
+use litchi_iwa_text::paragraph::style::{ParagraphFollowingStyle, raw::from_native_id};
 
+use super::super::{NativeTextCharacterSpacing, NativeTextValue};
 use super::{
     capitalization_from_character, line_spacing_from_archive, locate_style,
     paragraph_background_from_properties, paragraph_borders_from_properties, tabs,
@@ -216,7 +221,7 @@ pub(super) fn text_ligatures(package: &IWorkPackage, first_style_id: u64) -> Res
     Ok(value.unwrap_or_default())
 }
 
-pub(super) fn text_outline(package: &IWorkPackage, first_style_id: u64) -> Result<TextOutline> {
+pub(super) fn text_outline(package: &IWorkPackage, first_style_id: u64) -> Result<Outline> {
     let value = walk(package, first_style_id, None, |value, style| {
         let Some(properties) = style.char_properties.as_ref() else {
             return Ok(InheritanceControl::Continue);
@@ -230,7 +235,7 @@ pub(super) fn text_outline(package: &IWorkPackage, first_style_id: u64) -> Resul
     Ok(value.unwrap_or_default())
 }
 
-pub(super) fn text_shadow(package: &IWorkPackage, first_style_id: u64) -> Result<TextShadow> {
+pub(super) fn text_shadow(package: &IWorkPackage, first_style_id: u64) -> Result<Shadow> {
     let value = walk(package, first_style_id, None, |value, style| {
         let Some(properties) = style.char_properties.as_ref() else {
             return Ok(InheritanceControl::Continue);
@@ -244,10 +249,7 @@ pub(super) fn text_shadow(package: &IWorkPackage, first_style_id: u64) -> Result
     Ok(value.unwrap_or_default())
 }
 
-pub(super) fn text_background(
-    package: &IWorkPackage,
-    first_style_id: u64,
-) -> Result<TextBackground> {
+pub(super) fn text_background(package: &IWorkPackage, first_style_id: u64) -> Result<Background> {
     let value = walk(package, first_style_id, None, |value, style| {
         let Some(properties) = style.char_properties.as_ref() else {
             return Ok(InheritanceControl::Continue);
@@ -278,10 +280,7 @@ pub(super) fn paragraph_background(
     Ok(value.unwrap_or_default())
 }
 
-pub(super) fn paragraph_borders(
-    package: &IWorkPackage,
-    first_style_id: u64,
-) -> Result<ParagraphBorders> {
+pub(super) fn paragraph_borders(package: &IWorkPackage, first_style_id: u64) -> Result<Borders> {
     let value = walk(package, first_style_id, None, |value, style| {
         let Some(properties) = style.para_properties.as_ref() else {
             return Ok(InheritanceControl::Continue);
@@ -303,9 +302,7 @@ pub(super) fn paragraph_flow(package: &IWorkPackage, first_style_id: u64) -> Res
         |(hyphenation, keep_lines, keep_next, new_page, widow_orphan), style| {
             if let Some(properties) = style.para_properties.as_ref() {
                 if hyphenation.is_none() {
-                    *hyphenation = properties
-                        .hyphenate
-                        .map(ParagraphHyphenation::from_native_value);
+                    *hyphenation = properties.hyphenate.map(hyphenation_from_native);
                 }
                 if keep_lines.is_none() {
                     *keep_lines = properties.keep_lines_together;
@@ -357,13 +354,13 @@ pub(super) fn paragraph_writing_direction(
         else {
             return Ok(InheritanceControl::Continue);
         };
-        *value = Some(ParagraphWritingDirection::from_native_value(direction)?);
+        *value = Some(writing_direction_from_native(direction)?);
         Ok(InheritanceControl::Complete)
     })?;
     Ok(value.unwrap_or_default())
 }
 
-pub(super) fn alignment(package: &IWorkPackage, first_style_id: u64) -> Result<TextAlignment> {
+pub(super) fn alignment(package: &IWorkPackage, first_style_id: u64) -> Result<Alignment> {
     let value = walk(package, first_style_id, None, |value, style| {
         let Some(alignment) = style
             .para_properties
@@ -372,22 +369,19 @@ pub(super) fn alignment(package: &IWorkPackage, first_style_id: u64) -> Result<T
         else {
             return Ok(InheritanceControl::Continue);
         };
-        *value = Some(TextAlignment::from_native_value(alignment)?);
+        *value = Some(super::alignment_from_native(alignment)?);
         Ok(InheritanceControl::Complete)
     })?;
-    Ok(value.unwrap_or(TextAlignment::Natural))
+    Ok(value.unwrap_or(Alignment::Natural))
 }
 
-pub(super) fn line_spacing(
-    package: &IWorkPackage,
-    first_style_id: u64,
-) -> Result<ParagraphLineSpacing> {
+pub(super) fn line_spacing(package: &IWorkPackage, first_style_id: u64) -> Result<LineSpacing> {
     let value = walk(package, first_style_id, None, |value, style| {
         let Some(properties) = style.para_properties.as_ref() else {
             return Ok(InheritanceControl::Continue);
         };
         if properties.line_spacing_null == Some(true) {
-            *value = Some(ParagraphLineSpacing::default());
+            *value = Some(LineSpacing::default());
             return Ok(InheritanceControl::Complete);
         }
         let Some(spacing) = properties.line_spacing.as_ref() else {
@@ -399,7 +393,7 @@ pub(super) fn line_spacing(
     Ok(value.unwrap_or_default())
 }
 
-pub(super) fn spacing(package: &IWorkPackage, first_style_id: u64) -> Result<ParagraphSpacing> {
+pub(super) fn spacing(package: &IWorkPackage, first_style_id: u64) -> Result<Spacing> {
     let (before, after) = walk(
         package,
         first_style_id,
@@ -409,13 +403,13 @@ pub(super) fn spacing(package: &IWorkPackage, first_style_id: u64) -> Result<Par
                 if before.is_none() {
                     *before = properties
                         .space_before
-                        .map(ParagraphSpacingPoints::from_points)
+                        .map(SpacingPoints::from_points)
                         .transpose()?;
                 }
                 if after.is_none() {
                     *after = properties
                         .space_after
-                        .map(ParagraphSpacingPoints::from_points)
+                        .map(SpacingPoints::from_points)
                         .transpose()?;
                 }
             }
@@ -426,13 +420,13 @@ pub(super) fn spacing(package: &IWorkPackage, first_style_id: u64) -> Result<Par
             })
         },
     )?;
-    Ok(ParagraphSpacing::new(
-        before.unwrap_or(ParagraphSpacingPoints::ZERO),
-        after.unwrap_or(ParagraphSpacingPoints::ZERO),
+    Ok(Spacing::new(
+        before.unwrap_or(SpacingPoints::ZERO),
+        after.unwrap_or(SpacingPoints::ZERO),
     ))
 }
 
-pub(super) fn indents(package: &IWorkPackage, first_style_id: u64) -> Result<ParagraphIndents> {
+pub(super) fn indents(package: &IWorkPackage, first_style_id: u64) -> Result<Indents> {
     let (first_line, left, right) = walk(
         package,
         first_style_id,
@@ -442,19 +436,19 @@ pub(super) fn indents(package: &IWorkPackage, first_style_id: u64) -> Result<Par
                 if first_line.is_none() {
                     *first_line = properties
                         .first_line_indent
-                        .map(ParagraphIndentPoints::from_points)
+                        .map(IndentPoints::from_points)
                         .transpose()?;
                 }
                 if left.is_none() {
                     *left = properties
                         .left_indent
-                        .map(ParagraphIndentPoints::from_points)
+                        .map(IndentPoints::from_points)
                         .transpose()?;
                 }
                 if right.is_none() {
                     *right = properties
                         .right_indent
-                        .map(ParagraphIndentPoints::from_points)
+                        .map(IndentPoints::from_points)
                         .transpose()?;
                 }
             }
@@ -467,10 +461,10 @@ pub(super) fn indents(package: &IWorkPackage, first_style_id: u64) -> Result<Par
             )
         },
     )?;
-    Ok(ParagraphIndents::new(
-        first_line.unwrap_or(ParagraphIndentPoints::ZERO),
-        left.unwrap_or(ParagraphIndentPoints::ZERO),
-        right.unwrap_or(ParagraphIndentPoints::ZERO),
+    Ok(Indents::new(
+        first_line.unwrap_or(IndentPoints::ZERO),
+        left.unwrap_or(IndentPoints::ZERO),
+        right.unwrap_or(IndentPoints::ZERO),
     ))
 }
 
@@ -517,7 +511,7 @@ pub(super) fn decimal_tab_character(
         let Some(character) = properties.decimal_tab.as_deref() else {
             return Ok(InheritanceControl::Continue);
         };
-        *value = Some(ParagraphDecimalTabCharacter::from_native(character)?);
+        *value = Some(decimal_character_from_native(character)?);
         Ok(InheritanceControl::Complete)
     })?;
     Ok(value.unwrap_or_default())
@@ -561,7 +555,7 @@ pub(super) fn following_style(
         let Some(reference) = properties.following_style else {
             return Ok(InheritanceControl::Continue);
         };
-        *value = Some(ParagraphFollowingStyle::Named(ParagraphStyleId::new(
+        *value = Some(ParagraphFollowingStyle::Named(from_native_id(
             reference.identifier,
         )?));
         Ok(InheritanceControl::Complete)

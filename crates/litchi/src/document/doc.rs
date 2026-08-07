@@ -251,9 +251,9 @@ impl Document {
                     inner: DocumentImpl::Docx(package, metadata),
                 })
             },
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "pages")]
             DetectedFormat::Pages(data) => {
-                let doc = crate::iwa::pages::PagesDocument::from_bytes(&data).map_err(|e| {
+                let doc = litchi_pages::Package::from_bytes(&data).map_err(|e| {
                     Error::ParseError(format!("Failed to open Pages document from bytes: {}", e))
                 })?;
 
@@ -310,7 +310,7 @@ impl Document {
                 .document()
                 .and_then(|document| document.text())
                 .map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "pages")]
             DocumentImpl::Pages(doc) => doc.text().map_err(|e| {
                 Error::ParseError(format!("Failed to extract text from Pages: {}", e))
             }),
@@ -344,13 +344,14 @@ impl Document {
                 .document()
                 .and_then(|document| document.paragraph_count())
                 .map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "pages")]
             DocumentImpl::Pages(doc) => {
                 // Pages documents are organized by sections
-                let sections = doc
+                Ok(doc
                     .sections()
-                    .map_err(|e| Error::ParseError(format!("Failed to get sections: {}", e)))?;
-                Ok(sections.iter().map(|s| s.paragraphs.len()).sum())
+                    .iter()
+                    .map(|section| section.paragraphs().len())
+                    .sum())
             },
             #[cfg(feature = "rtf")]
             DocumentImpl::Rtf(doc) => Ok(doc.paragraph_count()),
@@ -389,17 +390,15 @@ impl Document {
                     .map_err(crate::map_ooxml_error)?;
                 Ok(paras.into_iter().map(Paragraph::Docx).collect())
             },
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "pages")]
             DocumentImpl::Pages(doc) => {
                 // Pages documents have sections, each with paragraphs
-                let sections = doc
+                let paragraphs: Vec<_> = doc
                     .sections()
-                    .map_err(|e| Error::ParseError(format!("Failed to get sections: {}", e)))?;
-                let paragraphs: Vec<_> = sections
                     .iter()
                     .flat_map(|section| {
                         section
-                            .paragraphs
+                            .paragraphs()
                             .iter()
                             .map(|text| Paragraph::Pages(text.clone()))
                     })
@@ -474,7 +473,7 @@ impl Document {
                     .map(|t| Table::Docx(Box::new(t)))
                     .collect())
             },
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "pages")]
             DocumentImpl::Pages(_doc) => {
                 // Pages tables are not currently supported in the paragraph/table extraction API
                 // Tables in Pages are embedded as structured data which requires different extraction
@@ -562,18 +561,16 @@ impl Document {
                     })
                     .collect())
             },
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "pages")]
             DocumentImpl::Pages(doc) => {
                 use super::DocumentElement;
                 // Pages documents have sections with paragraphs
                 // Tables are not currently supported in the extraction API
-                let sections = doc
+                let elements: Vec<_> = doc
                     .sections()
-                    .map_err(|e| Error::ParseError(format!("Failed to get sections: {}", e)))?;
-                let elements: Vec<_> = sections
                     .iter()
                     .flat_map(|section| {
-                        section.paragraphs.iter().map(|text| {
+                        section.paragraphs().iter().map(|text| {
                             DocumentElement::Paragraph(Box::new(Paragraph::Pages(text.clone())))
                         })
                     })
@@ -699,29 +696,8 @@ impl Document {
             DocumentImpl::Doc(_, metadata) => Ok(metadata.clone()),
             #[cfg(feature = "docx")]
             DocumentImpl::Docx(_, metadata) => Ok(metadata.clone()),
-            #[cfg(feature = "iwork")]
-            DocumentImpl::Pages(doc) => {
-                // Extract metadata from Pages bundle metadata
-                let bundle_metadata = doc.bundle().metadata();
-                let mut metadata = litchi_core::Metadata::default();
-
-                // Extract title from properties
-                if let Some(title) = bundle_metadata.get_property_string("Title") {
-                    metadata.title = Some(title);
-                }
-
-                // Extract author from properties
-                if let Some(author) = bundle_metadata.get_property_string("Author") {
-                    metadata.author = Some(author);
-                }
-
-                // Extract document identifier
-                if let Some(doc_id) = bundle_metadata.document_identifier() {
-                    metadata.description = Some(format!("Document ID: {}", doc_id));
-                }
-
-                Ok(metadata)
-            },
+            #[cfg(feature = "pages")]
+            DocumentImpl::Pages(doc) => Ok(doc.metadata()),
             #[cfg(feature = "rtf")]
             DocumentImpl::Rtf(doc) => Ok(rtf_metadata(doc)),
             #[cfg(feature = "odt")]

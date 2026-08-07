@@ -1,7 +1,8 @@
 use std::env;
 use std::path::PathBuf;
 
-use litchi_iwa::pages::{PagesEditor, PagesTableRowInsertion};
+use litchi_iwa::pages::PagesEditor;
+use litchi_numbers::table::topology::RowInsertion;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -21,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut editor = PagesEditor::open(input)?;
-    editor.insert_table_row(table_id, PagesTableRowInsertion::body(row))?;
+    editor.insert_table_row(table_id, RowInsertion::body(row))?;
     editor.save(output)?;
     Ok(())
 }

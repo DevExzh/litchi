@@ -5,7 +5,7 @@ use crate::charts::axis_number_format::{
     chart_axis_number_format as read_native_chart_axis_number_format,
     set_chart_axis_number_format as set_native_chart_axis_number_format,
 };
-use crate::charts::{ChartAxis, ChartNumberFormat};
+use crate::charts::{Axis, NumberFormat};
 
 impl KeynoteEditor {
     /// Read the decimal-number format of one native slide-chart axis.
@@ -13,8 +13,8 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
-    ) -> Result<ChartNumberFormat> {
+        axis: Axis,
+    ) -> Result<NumberFormat> {
         slide_chart_axis_number_format(self, slide_index, drawable_object_id, axis)
     }
 
@@ -23,8 +23,8 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
-        format: ChartNumberFormat,
+        axis: Axis,
+        format: NumberFormat,
     ) -> Result<()> {
         set_slide_chart_axis_number_format(self, slide_index, drawable_object_id, axis, format)
     }
@@ -34,8 +34,8 @@ fn slide_chart_axis_number_format(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
-) -> Result<ChartNumberFormat> {
+    axis: Axis,
+) -> Result<NumberFormat> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     read_native_chart_axis_number_format(
         editor.package(),
@@ -50,8 +50,8 @@ fn set_slide_chart_axis_number_format(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
-    format: ChartNumberFormat,
+    axis: Axis,
+    format: NumberFormat,
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let mut staged = editor.package().clone();
@@ -76,7 +76,7 @@ fn set_slide_chart_axis_number_format(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartDecimalPlaces, ChartKind, ChartNegativeStyle};
+    use crate::charts::{ChartData, DecimalPlaces, Kind, NegativeStyle};
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -86,7 +86,7 @@ mod tests {
         let chart = editor
             .add_slide_chart(
                 0,
-                ChartKind::Line2d,
+                Kind::Line2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -99,25 +99,25 @@ mod tests {
     }
 
     fn exercise(editor: &mut KeynoteEditor, chart_id: u64) {
-        let expected = ChartNumberFormat::new(
-            ChartDecimalPlaces::fixed(2).unwrap(),
-            ChartNegativeStyle::Parentheses,
+        let expected = NumberFormat::new(
+            DecimalPlaces::fixed(2).unwrap(),
+            NegativeStyle::Parentheses,
             true,
         );
         assert_eq!(
             editor
-                .slide_chart_axis_number_format(0, chart_id, ChartAxis::Value)
+                .slide_chart_axis_number_format(0, chart_id, Axis::Value)
                 .unwrap(),
-            ChartNumberFormat::AXIS_NATIVE_DEFAULT
+            NumberFormat::AXIS_NATIVE_DEFAULT
         );
         let baseline = editor.to_bytes().unwrap();
         editor
-            .set_slide_chart_axis_number_format(0, chart_id, ChartAxis::Value, expected)
+            .set_slide_chart_axis_number_format(0, chart_id, Axis::Value, expected)
             .unwrap();
         let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
-                .slide_chart_axis_number_format(0, chart_id, ChartAxis::Value)
+                .slide_chart_axis_number_format(0, chart_id, Axis::Value)
                 .unwrap(),
             expected
         );
@@ -125,8 +125,8 @@ mod tests {
             .set_slide_chart_axis_number_format(
                 0,
                 chart_id,
-                ChartAxis::Value,
-                ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+                Axis::Value,
+                NumberFormat::AXIS_NATIVE_DEFAULT,
             )
             .unwrap();
         assert_eq!(reopened.to_bytes().unwrap(), baseline);

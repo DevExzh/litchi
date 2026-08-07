@@ -4,21 +4,23 @@ use std::fs;
 use std::path::PathBuf;
 
 use super::*;
+use litchi_iwa_common::chart::axis::style::Visibility as AxisVisibility;
+use litchi_iwa_common::chart::error_bar::{
+    Direction as ErrorBarDirection, FixedValue as ErrorBarFixedValue,
+    Percentage as ErrorBarPercentage, Series,
+};
+use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
+
 use crate::charts::{
-    ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
-    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartGapPercentage,
-    ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame,
-    ChartLegendRect, ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance,
-    ChartPieLabelVisibility, ChartPieLeaderLineVisibility, ChartPieStartAngle,
+    Axis, Bound, Bounds, ChartCornerRadius, ChartDonutInnerRadius, ChartFont, ChartFontSize,
+    ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame, ChartLegendRect,
+    ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance, ChartPieStartAngle,
     ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
-    ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern,
-    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
-    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
-    ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
-    ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
-    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
+    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Index,
+    LabelAffixes, LabelVisibility, LeaderLineVisibility, MajorStepCount, MinorStepCount,
+    NegativeStyle, NumberFormat, Scale, Steps, TickMarkLocation, Visibility,
 };
 use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
@@ -26,10 +28,10 @@ use crate::package_metadata::{
 };
 use crate::pages::PagesDocumentBuilder;
 use crate::shapes::{
-    RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill, ShapeImageFillTechnique,
-    ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
-    ShapeShadowOpacity, ShapeStroke, StrokePattern, StrokeWidth,
+    Appearance, BlurRadius, Drop, Offset, Pattern, RgbColorSpace, RgbaColor, ShapeFill,
+    ShapeImageFillTechnique, Stroke, Width,
 };
+use litchi_iwa_common::shape::shadow::{Angle, Opacity};
 
 const POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
 const SIZE: DrawableSize = DrawableSize {
@@ -58,17 +60,17 @@ fn pie_data() -> ChartData {
     .unwrap()
 }
 
-fn gap_spacing(between_items: f32, between_sets: f32) -> ChartGapSpacing {
-    ChartGapSpacing::new(
-        ChartGapPercentage::new(between_items).unwrap(),
-        ChartGapPercentage::new(between_sets).unwrap(),
+fn gap_spacing(between_items: f32, between_sets: f32) -> Spacing {
+    Spacing::new(
+        Percentage::new(between_items).unwrap(),
+        Percentage::new(between_sets).unwrap(),
     )
 }
 
-fn chart_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
-    ShapeStroke::new(
+fn chart_stroke(pattern: Pattern, width: f32) -> Stroke {
+    Stroke::new(
         RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-        StrokeWidth::new(width).unwrap(),
+        Width::new(width).unwrap(),
         pattern,
     )
 }
@@ -76,7 +78,7 @@ fn chart_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
 fn chart_series_stroke(pattern: ChartSeriesStrokePattern, width: f32) -> ChartSeriesStroke {
     ChartSeriesStroke::new(
         RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-        StrokeWidth::new(width).unwrap(),
+        Width::new(width).unwrap(),
         pattern,
     )
 }
@@ -86,14 +88,14 @@ fn chart_background_fill() -> ShapeFill {
 }
 
 fn chart_shadow() -> ChartShadow {
-    ChartShadow::Grouped(ShapeDropShadow::new(
-        ShapeShadowAppearance::new(
+    ChartShadow::Grouped(Drop::new(
+        Appearance::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            ShapeShadowBlurRadius::from_points(15).unwrap(),
-            ShapeShadowOffset::from_points(8.0).unwrap(),
-            ShapeShadowOpacity::new(0.6).unwrap(),
+            BlurRadius::from_points(15).unwrap(),
+            Offset::from_points(8.0).unwrap(),
+            Opacity::new(0.6).unwrap(),
         ),
-        ShapeShadowAngle::from_degrees(60.0).unwrap(),
+        Angle::from_degrees(60.0).unwrap(),
     ))
 }
 
@@ -179,11 +181,11 @@ fn scratch_document_supports_body_chart_crud() {
     assert!(editor.body_charts().unwrap().is_empty());
 
     let created = editor
-        .add_body_chart(anchor, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_body_chart(anchor, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     assert_eq!(created.anchor_character_index, anchor as u32);
-    assert_eq!(created.kind, ChartKind::Column2d);
-    assert_eq!(created.direction, ChartSeriesDirection::Rows);
+    assert_eq!(created.kind, Kind::Column2d);
+    assert_eq!(created.direction, Direction::Rows);
     assert_eq!(created.data, sample_data());
     assert_eq!(editor.body_text().unwrap(), "Quarterly results\u{fffc}");
 
@@ -194,13 +196,13 @@ fn scratch_document_supports_body_chart_crud() {
     )
     .unwrap();
     editor
-        .set_body_chart_kind(created.drawable_object_id, ChartKind::Bar2d)
+        .set_body_chart_kind(created.drawable_object_id, Kind::Bar2d)
         .unwrap();
     editor
         .set_body_chart_data(created.drawable_object_id, replacement.clone())
         .unwrap();
     editor
-        .set_body_chart_direction(created.drawable_object_id, ChartSeriesDirection::Columns)
+        .set_body_chart_direction(created.drawable_object_id, Direction::Columns)
         .unwrap();
     let changed_geometry = chart_geometry(
         "Pages",
@@ -218,8 +220,8 @@ fn scratch_document_supports_body_chart_crud() {
     let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let charts = reopened.body_charts().unwrap();
     assert_eq!(charts.len(), 1);
-    assert_eq!(charts[0].kind, ChartKind::Bar2d);
-    assert_eq!(charts[0].direction, ChartSeriesDirection::Columns);
+    assert_eq!(charts[0].kind, Kind::Bar2d);
+    assert_eq!(charts[0].direction, Direction::Columns);
     assert_eq!(charts[0].data, replacement);
     assert_eq!(charts[0].geometry, changed_geometry);
 
@@ -236,7 +238,7 @@ fn scratch_document_supports_body_chart_crud() {
 fn pages_normalized_chart_styles_support_full_lifecycle_crud() {
     let mut editor = PagesEditor::create_with_text("Chart").unwrap();
     let source = editor
-        .add_body_chart(5, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_body_chart(5, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let frame = ChartLegendFrame::Frame(ChartLegendRect::from_points(43.0, 8.0, 0.0, 0.0).unwrap());
     editor
@@ -284,13 +286,13 @@ fn chart_creation_rejects_invalid_inputs_transactionally() {
     let baseline = editor.to_bytes().unwrap();
     assert!(
         editor
-            .add_body_chart(4, ChartKind::Undefined, sample_data(), POSITION, SIZE)
+            .add_body_chart(4, Kind::Undefined, sample_data(), POSITION, SIZE)
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
     assert!(
         editor
-            .add_body_chart(5, ChartKind::Column2d, sample_data(), POSITION, SIZE,)
+            .add_body_chart(5, Kind::Column2d, sample_data(), POSITION, SIZE,)
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -298,7 +300,7 @@ fn chart_creation_rejects_invalid_inputs_transactionally() {
         editor
             .add_body_chart(
                 4,
-                ChartKind::Column2d,
+                Kind::Column2d,
                 sample_data(),
                 POSITION,
                 DrawableSize {
@@ -315,12 +317,12 @@ fn chart_creation_rejects_invalid_inputs_transactionally() {
 fn removing_an_earlier_chart_preserves_later_chart_and_anchor() {
     let mut editor = PagesEditor::create_with_text("Body").unwrap();
     let first = editor
-        .add_body_chart(4, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_body_chart(4, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let second = editor
         .add_body_chart(
             5,
-            ChartKind::Line2d,
+            Kind::Line2d,
             sample_data(),
             DrawablePoint { x: 120.0, y: 420.0 },
             SIZE,
@@ -343,7 +345,7 @@ fn removing_an_earlier_chart_preserves_later_chart_and_anchor() {
 fn duplicate_body_chart_clones_the_private_graph_and_inline_data() {
     let mut editor = PagesEditor::create_with_text("Body").unwrap();
     let source = editor
-        .add_body_chart(4, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_body_chart(4, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let source_graph = body_chart_graph(&editor, source.drawable_object_id).unwrap();
     let baseline = editor.to_bytes().unwrap();
@@ -423,7 +425,7 @@ fn scratch_document_supports_native_chart_caption_crud() {
     let source = editor
         .add_body_chart(
             "Chart captions".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -504,7 +506,7 @@ fn scratch_document_supports_native_chart_title_crud() {
     let source = editor
         .add_body_chart(
             "Chart titles".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -589,14 +591,14 @@ fn scratch_document_supports_native_chart_axis_title_crud() {
     let source = editor
         .add_body_chart(
             "Chart axis titles".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
         )
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert_eq!(
             editor
                 .body_chart_axis_title(source.drawable_object_id, axis)
@@ -605,10 +607,10 @@ fn scratch_document_supports_native_chart_axis_title_crud() {
         );
     }
     editor
-        .set_body_chart_axis_title(source.drawable_object_id, ChartAxis::Category, "Month")
+        .set_body_chart_axis_title(source.drawable_object_id, Axis::Category, "Month")
         .unwrap();
     editor
-        .set_body_chart_axis_title(source.drawable_object_id, ChartAxis::Value, "Revenue")
+        .set_body_chart_axis_title(source.drawable_object_id, Axis::Value, "Revenue")
         .unwrap();
 
     let duplicate = editor
@@ -617,10 +619,7 @@ fn scratch_document_supports_native_chart_axis_title_crud() {
             editor.body_text().unwrap().encode_utf16().count(),
         )
         .unwrap();
-    for (axis, title) in [
-        (ChartAxis::Category, "Month"),
-        (ChartAxis::Value, "Revenue"),
-    ] {
+    for (axis, title) in [(Axis::Category, "Month"), (Axis::Value, "Revenue")] {
         assert_eq!(
             editor
                 .body_chart_axis_title(source.drawable_object_id, axis)
@@ -638,49 +637,41 @@ fn scratch_document_supports_native_chart_axis_title_crud() {
     }
 
     editor
-        .set_body_chart_axis_title(
-            source.drawable_object_id,
-            ChartAxis::Category,
-            "Updated month",
-        )
+        .set_body_chart_axis_title(source.drawable_object_id, Axis::Category, "Updated month")
         .unwrap();
     editor
-        .set_body_chart_axis_title(
-            source.drawable_object_id,
-            ChartAxis::Value,
-            "Updated revenue",
-        )
+        .set_body_chart_axis_title(source.drawable_object_id, Axis::Value, "Updated revenue")
         .unwrap();
     assert_eq!(
         editor
-            .body_chart_axis_title(source.drawable_object_id, ChartAxis::Category)
+            .body_chart_axis_title(source.drawable_object_id, Axis::Category)
             .unwrap()
             .as_deref(),
         Some("Updated month")
     );
     assert_eq!(
         editor
-            .body_chart_axis_title(source.drawable_object_id, ChartAxis::Value)
+            .body_chart_axis_title(source.drawable_object_id, Axis::Value)
             .unwrap()
             .as_deref(),
         Some("Updated revenue")
     );
     assert_eq!(
         editor
-            .body_chart_axis_title(duplicate.drawable_object_id, ChartAxis::Category)
+            .body_chart_axis_title(duplicate.drawable_object_id, Axis::Category)
             .unwrap()
             .as_deref(),
         Some("Month")
     );
     assert_eq!(
         editor
-            .body_chart_axis_title(duplicate.drawable_object_id, ChartAxis::Value)
+            .body_chart_axis_title(duplicate.drawable_object_id, Axis::Value)
             .unwrap()
             .as_deref(),
         Some("Revenue")
     );
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
                 .remove_body_chart_axis_title(source.drawable_object_id, axis)
@@ -696,14 +687,14 @@ fn scratch_document_supports_native_chart_axis_title_crud() {
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
-            .body_chart_axis_title(duplicate.drawable_object_id, ChartAxis::Category)
+            .body_chart_axis_title(duplicate.drawable_object_id, Axis::Category)
             .unwrap()
             .as_deref(),
         Some("Month")
     );
     assert_eq!(
         reopened
-            .body_chart_axis_title(duplicate.drawable_object_id, ChartAxis::Value)
+            .body_chart_axis_title(duplicate.drawable_object_id, Axis::Value)
             .unwrap()
             .as_deref(),
         Some("Revenue")
@@ -726,20 +717,15 @@ fn scratch_document_supports_native_chart_value_axis_bounds_crud() {
     let source = editor
         .add_body_chart(
             "Chart value-axis bounds".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
         )
         .unwrap();
-    let automatic = ChartValueAxisBounds::automatic();
-    let fixed = ChartValueAxisBounds::fixed(
-        ChartAxisBound::new(-10.0).unwrap(),
-        ChartAxisBound::new(40.0).unwrap(),
-    )
-    .unwrap();
-    let minimum_only =
-        ChartValueAxisBounds::new(Some(ChartAxisBound::new(-5.0).unwrap()), None).unwrap();
+    let automatic = Bounds::automatic();
+    let fixed = Bounds::fixed(Bound::new(-10.0).unwrap(), Bound::new(40.0).unwrap()).unwrap();
+    let minimum_only = Bounds::new(Some(Bound::new(-5.0).unwrap()), None).unwrap();
 
     assert_eq!(
         editor
@@ -812,7 +798,7 @@ fn scratch_document_supports_native_chart_border_crud() {
     let source = editor
         .add_body_chart(
             "Chart borders".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -880,7 +866,7 @@ fn scratch_document_supports_native_chart_rounded_corner_crud() {
     let source = editor
         .add_body_chart(
             "Rounded chart corners".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -955,7 +941,7 @@ fn scratch_document_supports_native_chart_gap_crud() {
     let source = editor
         .add_body_chart(
             "Chart gaps".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -968,11 +954,11 @@ fn scratch_document_supports_native_chart_gap_crud() {
         editor
             .body_chart_gap_spacing(source.drawable_object_id)
             .unwrap(),
-        ChartGapSpacing::NATIVE_DEFAULT
+        Spacing::DEFAULT
     );
     let baseline = editor.to_bytes().unwrap();
     editor
-        .set_body_chart_gap_spacing(source.drawable_object_id, ChartGapSpacing::NATIVE_DEFAULT)
+        .set_body_chart_gap_spacing(source.drawable_object_id, Spacing::DEFAULT)
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
@@ -1023,21 +1009,21 @@ fn scratch_document_supports_native_chart_value_axis_steps_crud() {
     let source = editor
         .add_body_chart(
             "Chart value-axis steps".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
         )
         .unwrap();
-    let defaults = ChartValueAxisSteps::fixed(
-        ChartAxisMajorStepCount::new(5).unwrap(),
-        ChartAxisMinorStepCount::new(1).unwrap(),
+    let defaults = Steps::fixed(
+        MajorStepCount::new(5).unwrap(),
+        MinorStepCount::new(1).unwrap(),
     );
-    let fixed = ChartValueAxisSteps::fixed(
-        ChartAxisMajorStepCount::new(6).unwrap(),
-        ChartAxisMinorStepCount::new(2).unwrap(),
+    let fixed = Steps::fixed(
+        MajorStepCount::new(6).unwrap(),
+        MinorStepCount::new(2).unwrap(),
     );
-    let major_only = ChartValueAxisSteps::new(Some(ChartAxisMajorStepCount::new(4).unwrap()), None);
+    let major_only = Steps::new(Some(MajorStepCount::new(4).unwrap()), None);
 
     assert_eq!(
         editor
@@ -1091,16 +1077,13 @@ fn scratch_document_supports_native_chart_value_axis_steps_crud() {
         fixed
     );
     reopened
-        .set_body_chart_value_axis_steps(
-            source.drawable_object_id,
-            ChartValueAxisSteps::automatic(),
-        )
+        .set_body_chart_value_axis_steps(source.drawable_object_id, Steps::automatic())
         .unwrap();
     assert_eq!(
         reopened
             .body_chart_value_axis_steps(source.drawable_object_id)
             .unwrap(),
-        ChartValueAxisSteps::automatic()
+        Steps::automatic()
     );
     reopened
         .remove_body_chart(duplicate.drawable_object_id)
@@ -1113,7 +1096,7 @@ fn scratch_document_supports_native_chart_value_axis_minimum_label_visibility_cr
     let source = editor
         .add_body_chart(
             "Chart minimum label".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -1124,20 +1107,28 @@ fn scratch_document_supports_native_chart_value_axis_minimum_label_visibility_cr
         editor
             .body_chart_value_axis_minimum_label_visible(source.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
     let baseline = editor.to_bytes().unwrap();
     editor
-        .set_body_chart_value_axis_minimum_label_visible(source.drawable_object_id, true)
+        .set_body_chart_value_axis_minimum_label_visible(
+            source.drawable_object_id,
+            AxisVisibility::Visible,
+        )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     editor
-        .set_body_chart_value_axis_minimum_label_visible(source.drawable_object_id, false)
+        .set_body_chart_value_axis_minimum_label_visible(
+            source.drawable_object_id,
+            AxisVisibility::Hidden,
+        )
         .unwrap();
     assert!(
         !editor
             .body_chart_value_axis_minimum_label_visible(source.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
     let duplicate = editor
         .duplicate_body_chart(
@@ -1149,29 +1140,39 @@ fn scratch_document_supports_native_chart_value_axis_minimum_label_visibility_cr
         !editor
             .body_chart_value_axis_minimum_label_visible(duplicate.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
 
     editor
-        .set_body_chart_value_axis_minimum_label_visible(source.drawable_object_id, true)
+        .set_body_chart_value_axis_minimum_label_visible(
+            source.drawable_object_id,
+            AxisVisibility::Visible,
+        )
         .unwrap();
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert!(
         reopened
             .body_chart_value_axis_minimum_label_visible(source.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
     assert!(
         !reopened
             .body_chart_value_axis_minimum_label_visible(duplicate.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
     reopened
-        .set_body_chart_value_axis_minimum_label_visible(source.drawable_object_id, false)
+        .set_body_chart_value_axis_minimum_label_visible(
+            source.drawable_object_id,
+            AxisVisibility::Hidden,
+        )
         .unwrap();
     assert!(
         !reopened
             .body_chart_value_axis_minimum_label_visible(source.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
     reopened
         .remove_body_chart(duplicate.drawable_object_id)
@@ -1184,7 +1185,7 @@ fn scratch_document_supports_native_chart_category_axis_series_names_visibility_
     let source = editor
         .add_body_chart(
             "Chart series names".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -1255,14 +1256,14 @@ fn scratch_document_supports_native_chart_axis_label_visibility_crud() {
     let source = editor
         .add_body_chart(
             "Chart axis labels".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
         )
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
                 .body_chart_axis_labels_visible(source.drawable_object_id, axis)
@@ -1271,11 +1272,11 @@ fn scratch_document_supports_native_chart_axis_label_visibility_crud() {
     }
     let baseline = editor.to_bytes().unwrap();
     editor
-        .set_body_chart_axis_labels_visible(source.drawable_object_id, ChartAxis::Category, true)
+        .set_body_chart_axis_labels_visible(source.drawable_object_id, Axis::Category, true)
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         editor
             .set_body_chart_axis_labels_visible(source.drawable_object_id, axis, false)
             .unwrap();
@@ -1292,7 +1293,7 @@ fn scratch_document_supports_native_chart_axis_label_visibility_crud() {
             editor.body_text().unwrap().encode_utf16().count(),
         )
         .unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             !editor
                 .body_chart_axis_labels_visible(duplicate.drawable_object_id, axis)
@@ -1304,7 +1305,7 @@ fn scratch_document_supports_native_chart_axis_label_visibility_crud() {
     }
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             reopened
                 .body_chart_axis_labels_visible(source.drawable_object_id, axis)
@@ -1335,26 +1336,32 @@ fn scratch_document_supports_native_chart_axis_line_visibility_crud() {
     let source = editor
         .add_body_chart(
             "Chart axis lines".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
         )
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
                 .body_chart_axis_line_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         editor
-            .set_body_chart_axis_line_visible(source.drawable_object_id, axis, false)
+            .set_body_chart_axis_line_visible(
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Hidden,
+            )
             .unwrap();
         assert!(
             !editor
                 .body_chart_axis_line_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
 
@@ -1364,28 +1371,35 @@ fn scratch_document_supports_native_chart_axis_line_visibility_crud() {
             editor.body_text().unwrap().encode_utf16().count(),
         )
         .unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             !editor
                 .body_chart_axis_line_visible(duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         editor
-            .set_body_chart_axis_line_visible(source.drawable_object_id, axis, true)
+            .set_body_chart_axis_line_visible(
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Visible,
+            )
             .unwrap();
     }
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             reopened
                 .body_chart_axis_line_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         assert!(
             !reopened
                 .body_chart_axis_line_visible(duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
     reopened
@@ -1399,7 +1413,7 @@ fn scratch_document_supports_native_chart_axis_major_gridline_visibility_crud() 
     let source = editor
         .add_body_chart(
             "Chart major gridlines".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -1408,20 +1422,22 @@ fn scratch_document_supports_native_chart_axis_major_gridline_visibility_crud() 
 
     assert!(
         !editor
-            .body_chart_axis_major_gridlines_visible(source.drawable_object_id, ChartAxis::Category)
+            .body_chart_axis_major_gridlines_visible(source.drawable_object_id, Axis::Category)
             .unwrap()
+            .is_visible()
     );
     assert!(
         editor
-            .body_chart_axis_major_gridlines_visible(source.drawable_object_id, ChartAxis::Value)
+            .body_chart_axis_major_gridlines_visible(source.drawable_object_id, Axis::Value)
             .unwrap()
+            .is_visible()
     );
     let baseline = editor.to_bytes().unwrap();
     editor
         .set_body_chart_axis_major_gridlines_visible(
             source.drawable_object_id,
-            ChartAxis::Category,
-            false,
+            Axis::Category,
+            AxisVisibility::Hidden,
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -1429,15 +1445,15 @@ fn scratch_document_supports_native_chart_axis_major_gridline_visibility_crud() 
     editor
         .set_body_chart_axis_major_gridlines_visible(
             source.drawable_object_id,
-            ChartAxis::Category,
-            true,
+            Axis::Category,
+            AxisVisibility::Visible,
         )
         .unwrap();
     editor
         .set_body_chart_axis_major_gridlines_visible(
             source.drawable_object_id,
-            ChartAxis::Value,
-            false,
+            Axis::Value,
+            AxisVisibility::Hidden,
         )
         .unwrap();
 
@@ -1447,43 +1463,46 @@ fn scratch_document_supports_native_chart_axis_major_gridline_visibility_crud() 
             editor.body_text().unwrap().encode_utf16().count(),
         )
         .unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert_eq!(
             editor
                 .body_chart_axis_major_gridlines_visible(duplicate.drawable_object_id, axis)
-                .unwrap(),
-            axis == ChartAxis::Category
+                .unwrap()
+                .is_visible(),
+            axis == Axis::Category
         );
     }
 
     editor
         .set_body_chart_axis_major_gridlines_visible(
             source.drawable_object_id,
-            ChartAxis::Category,
-            false,
+            Axis::Category,
+            AxisVisibility::Hidden,
         )
         .unwrap();
     editor
         .set_body_chart_axis_major_gridlines_visible(
             source.drawable_object_id,
-            ChartAxis::Value,
-            true,
+            Axis::Value,
+            AxisVisibility::Visible,
         )
         .unwrap();
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert_eq!(
             reopened
                 .body_chart_axis_major_gridlines_visible(source.drawable_object_id, axis)
-                .unwrap(),
-            axis == ChartAxis::Value
+                .unwrap()
+                .is_visible(),
+            axis == Axis::Value
         );
         assert_eq!(
             reopened
                 .body_chart_axis_major_gridlines_visible(duplicate.drawable_object_id, axis)
-                .unwrap(),
-            axis == ChartAxis::Category
+                .unwrap()
+                .is_visible(),
+            axis == Axis::Category
         );
     }
     reopened
@@ -1497,33 +1516,38 @@ fn scratch_document_supports_native_chart_axis_minor_gridline_visibility_crud() 
     let source = editor
         .add_body_chart(
             "Chart minor gridlines".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
         )
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             !editor
                 .body_chart_axis_minor_gridlines_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
     let baseline = editor.to_bytes().unwrap();
     editor
         .set_body_chart_axis_minor_gridlines_visible(
             source.drawable_object_id,
-            ChartAxis::Category,
-            false,
+            Axis::Category,
+            AxisVisibility::Hidden,
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         editor
-            .set_body_chart_axis_minor_gridlines_visible(source.drawable_object_id, axis, true)
+            .set_body_chart_axis_minor_gridlines_visible(
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Visible,
+            )
             .unwrap();
     }
     let duplicate = editor
@@ -1532,28 +1556,35 @@ fn scratch_document_supports_native_chart_axis_minor_gridline_visibility_crud() 
             editor.body_text().unwrap().encode_utf16().count(),
         )
         .unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
                 .body_chart_axis_minor_gridlines_visible(duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         editor
-            .set_body_chart_axis_minor_gridlines_visible(source.drawable_object_id, axis, false)
+            .set_body_chart_axis_minor_gridlines_visible(
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Hidden,
+            )
             .unwrap();
     }
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             !reopened
                 .body_chart_axis_minor_gridlines_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         assert!(
             reopened
                 .body_chart_axis_minor_gridlines_visible(duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
     reopened
@@ -1567,38 +1598,44 @@ fn scratch_document_supports_native_chart_axis_minor_tick_mark_visibility_crud()
     let source = editor
         .add_body_chart(
             "Chart minor tick marks".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
         )
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
                 .body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
     let baseline = editor.to_bytes().unwrap();
     editor
         .set_body_chart_axis_minor_tick_marks_visible(
             source.drawable_object_id,
-            ChartAxis::Category,
-            true,
+            Axis::Category,
+            AxisVisibility::Visible,
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         editor
-            .set_body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis, false)
+            .set_body_chart_axis_minor_tick_marks_visible(
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Hidden,
+            )
             .unwrap();
         assert!(
             !editor
                 .body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
 
@@ -1608,36 +1645,48 @@ fn scratch_document_supports_native_chart_axis_minor_tick_mark_visibility_crud()
             editor.body_text().unwrap().encode_utf16().count(),
         )
         .unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             !editor
                 .body_chart_axis_minor_tick_marks_visible(duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         editor
-            .set_body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis, true)
+            .set_body_chart_axis_minor_tick_marks_visible(
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Visible,
+            )
             .unwrap();
     }
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             reopened
                 .body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         assert!(
             !reopened
                 .body_chart_axis_minor_tick_marks_visible(duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         reopened
-            .set_body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis, false)
+            .set_body_chart_axis_minor_tick_marks_visible(
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Hidden,
+            )
             .unwrap();
         assert!(
             !reopened
                 .body_chart_axis_minor_tick_marks_visible(source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
     reopened
@@ -1651,27 +1700,27 @@ fn scratch_document_supports_native_chart_axis_tick_mark_location_crud() {
     let source = editor
         .add_body_chart(
             "Chart tick-mark locations".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
         )
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert_eq!(
             editor
                 .body_chart_axis_tick_mark_location(source.drawable_object_id, axis)
                 .unwrap(),
-            ChartAxisTickMarkLocation::Centered
+            TickMarkLocation::Centered
         );
     }
     let baseline = editor.to_bytes().unwrap();
     editor
         .set_body_chart_axis_tick_mark_location(
             source.drawable_object_id,
-            ChartAxis::Category,
-            ChartAxisTickMarkLocation::Centered,
+            Axis::Category,
+            TickMarkLocation::Centered,
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -1679,28 +1728,28 @@ fn scratch_document_supports_native_chart_axis_tick_mark_location_crud() {
     editor
         .set_body_chart_axis_tick_mark_location(
             source.drawable_object_id,
-            ChartAxis::Category,
-            ChartAxisTickMarkLocation::None,
+            Axis::Category,
+            TickMarkLocation::None,
         )
         .unwrap();
     editor
         .set_body_chart_axis_tick_mark_location(
             source.drawable_object_id,
-            ChartAxis::Value,
-            ChartAxisTickMarkLocation::Outside,
+            Axis::Value,
+            TickMarkLocation::Outside,
         )
         .unwrap();
     assert_eq!(
         editor
-            .body_chart_axis_tick_mark_location(source.drawable_object_id, ChartAxis::Category)
+            .body_chart_axis_tick_mark_location(source.drawable_object_id, Axis::Category)
             .unwrap(),
-        ChartAxisTickMarkLocation::None
+        TickMarkLocation::None
     );
     assert_eq!(
         editor
-            .body_chart_axis_tick_mark_location(source.drawable_object_id, ChartAxis::Value)
+            .body_chart_axis_tick_mark_location(source.drawable_object_id, Axis::Value)
             .unwrap(),
-        ChartAxisTickMarkLocation::Outside
+        TickMarkLocation::Outside
     );
 
     let duplicate = editor
@@ -1711,56 +1760,56 @@ fn scratch_document_supports_native_chart_axis_tick_mark_location_crud() {
         .unwrap();
     assert_eq!(
         editor
-            .body_chart_axis_tick_mark_location(duplicate.drawable_object_id, ChartAxis::Category)
+            .body_chart_axis_tick_mark_location(duplicate.drawable_object_id, Axis::Category)
             .unwrap(),
-        ChartAxisTickMarkLocation::None
+        TickMarkLocation::None
     );
     assert_eq!(
         editor
-            .body_chart_axis_tick_mark_location(duplicate.drawable_object_id, ChartAxis::Value)
+            .body_chart_axis_tick_mark_location(duplicate.drawable_object_id, Axis::Value)
             .unwrap(),
-        ChartAxisTickMarkLocation::Outside
+        TickMarkLocation::Outside
     );
 
     editor
         .set_body_chart_axis_tick_mark_location(
             source.drawable_object_id,
-            ChartAxis::Category,
-            ChartAxisTickMarkLocation::Inside,
+            Axis::Category,
+            TickMarkLocation::Inside,
         )
         .unwrap();
     editor
         .set_body_chart_axis_tick_mark_location(
             source.drawable_object_id,
-            ChartAxis::Value,
-            ChartAxisTickMarkLocation::Centered,
+            Axis::Value,
+            TickMarkLocation::Centered,
         )
         .unwrap();
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
-            .body_chart_axis_tick_mark_location(source.drawable_object_id, ChartAxis::Category)
+            .body_chart_axis_tick_mark_location(source.drawable_object_id, Axis::Category)
             .unwrap(),
-        ChartAxisTickMarkLocation::Inside
+        TickMarkLocation::Inside
     );
     assert_eq!(
         reopened
-            .body_chart_axis_tick_mark_location(source.drawable_object_id, ChartAxis::Value)
+            .body_chart_axis_tick_mark_location(source.drawable_object_id, Axis::Value)
             .unwrap(),
-        ChartAxisTickMarkLocation::Centered
+        TickMarkLocation::Centered
     );
     assert_eq!(
         reopened
-            .body_chart_axis_tick_mark_location(duplicate.drawable_object_id, ChartAxis::Category)
+            .body_chart_axis_tick_mark_location(duplicate.drawable_object_id, Axis::Category)
             .unwrap(),
-        ChartAxisTickMarkLocation::None
+        TickMarkLocation::None
     );
     assert_eq!(
         reopened
-            .body_chart_axis_tick_mark_location(duplicate.drawable_object_id, ChartAxis::Value)
+            .body_chart_axis_tick_mark_location(duplicate.drawable_object_id, Axis::Value)
             .unwrap(),
-        ChartAxisTickMarkLocation::Outside
+        TickMarkLocation::Outside
     );
     reopened
         .remove_body_chart(duplicate.drawable_object_id)
@@ -1773,7 +1822,7 @@ fn scratch_document_supports_native_chart_legend_visibility_crud() {
     let source = editor
         .add_body_chart(
             "Chart legends".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -1851,7 +1900,7 @@ fn scratch_document_supports_exact_chart_legend_fill_crud() {
     let chart = editor
         .add_body_chart(
             "Chart legend fill".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -1890,7 +1939,7 @@ fn scratch_document_supports_exact_chart_legend_frame_crud() {
     let chart = editor
         .add_body_chart(
             "Legend".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -1922,7 +1971,7 @@ fn scratch_document_supports_exact_chart_legend_frame_crud() {
 fn scratch_document_supports_exact_chart_legend_typography_crud() {
     let mut editor = PagesDocumentBuilder::new().build().unwrap();
     let chart = editor
-        .add_body_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_body_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let object_id = chart.drawable_object_id;
     let baseline = editor.to_bytes().unwrap();
@@ -1985,7 +2034,7 @@ fn scratch_document_supports_exact_chart_legend_stroke_crud() {
     let chart = editor
         .add_body_chart(
             "Chart legend stroke".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -1998,10 +2047,10 @@ fn scratch_document_supports_exact_chart_legend_stroke_crud() {
         editor.body_chart_legend_stroke(object_id).unwrap(),
         ChartLegendStroke::Inherited
     );
-    let stroke = ChartLegendStroke::Stroke(ShapeStroke::new(
+    let stroke = ChartLegendStroke::Stroke(Stroke::new(
         RgbaColor::new(0.8, 0.2, 0.15, 1.0, RgbColorSpace::Srgb).unwrap(),
-        StrokeWidth::new(1.5).unwrap(),
-        StrokePattern::RoundedDash,
+        Width::new(1.5).unwrap(),
+        Pattern::RoundedDash,
     ));
     editor
         .set_body_chart_legend_stroke(object_id, stroke)
@@ -2026,7 +2075,7 @@ fn scratch_document_supports_exact_chart_legend_shadow_crud() {
     let chart = editor
         .add_body_chart(
             "Chart legend shadow".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -2039,14 +2088,14 @@ fn scratch_document_supports_exact_chart_legend_shadow_crud() {
         editor.body_chart_legend_shadow(object_id).unwrap(),
         ChartLegendShadow::Inherited
     );
-    let shadow = ChartLegendShadow::Shadow(ShapeDropShadow::new(
-        ShapeShadowAppearance::new(
+    let shadow = ChartLegendShadow::Shadow(Drop::new(
+        Appearance::new(
             RgbaColor::black(),
-            ShapeShadowBlurRadius::from_points(11).unwrap(),
-            ShapeShadowOffset::from_points(7.0).unwrap(),
-            ShapeShadowOpacity::new(0.55).unwrap(),
+            BlurRadius::from_points(11).unwrap(),
+            Offset::from_points(7.0).unwrap(),
+            Opacity::new(0.55).unwrap(),
         ),
-        ShapeShadowAngle::from_degrees(25.0).unwrap(),
+        Angle::from_degrees(25.0).unwrap(),
     ));
     editor
         .set_body_chart_legend_shadow(object_id, shadow)
@@ -2071,7 +2120,7 @@ fn scratch_document_supports_native_chart_value_axis_scale_crud() {
     let source = editor
         .add_body_chart(
             "Chart value-axis scale".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -2082,25 +2131,22 @@ fn scratch_document_supports_native_chart_value_axis_scale_crud() {
         editor
             .body_chart_value_axis_scale(source.drawable_object_id)
             .unwrap(),
-        ChartValueAxisScale::Linear
+        Scale::Linear
     );
     let baseline = editor.to_bytes().unwrap();
     editor
-        .set_body_chart_value_axis_scale(source.drawable_object_id, ChartValueAxisScale::Linear)
+        .set_body_chart_value_axis_scale(source.drawable_object_id, Scale::Linear)
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     editor
-        .set_body_chart_value_axis_scale(
-            source.drawable_object_id,
-            ChartValueAxisScale::Logarithmic,
-        )
+        .set_body_chart_value_axis_scale(source.drawable_object_id, Scale::Logarithmic)
         .unwrap();
     assert_eq!(
         editor
             .body_chart_value_axis_scale(source.drawable_object_id)
             .unwrap(),
-        ChartValueAxisScale::Logarithmic
+        Scale::Logarithmic
     );
 
     let duplicate = editor
@@ -2113,10 +2159,10 @@ fn scratch_document_supports_native_chart_value_axis_scale_crud() {
         editor
             .body_chart_value_axis_scale(duplicate.drawable_object_id)
             .unwrap(),
-        ChartValueAxisScale::Logarithmic
+        Scale::Logarithmic
     );
     editor
-        .set_body_chart_value_axis_scale(source.drawable_object_id, ChartValueAxisScale::Linear)
+        .set_body_chart_value_axis_scale(source.drawable_object_id, Scale::Linear)
         .unwrap();
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -2124,13 +2170,13 @@ fn scratch_document_supports_native_chart_value_axis_scale_crud() {
         reopened
             .body_chart_value_axis_scale(source.drawable_object_id)
             .unwrap(),
-        ChartValueAxisScale::Linear
+        Scale::Linear
     );
     assert_eq!(
         reopened
             .body_chart_value_axis_scale(duplicate.drawable_object_id)
             .unwrap(),
-        ChartValueAxisScale::Logarithmic
+        Scale::Logarithmic
     );
     reopened
         .remove_body_chart(source.drawable_object_id)
@@ -2146,15 +2192,15 @@ fn scratch_document_supports_native_chart_border_stroke_crud() {
     let source = editor
         .add_body_chart(
             "Chart border stroke".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
         )
         .unwrap();
-    let default = ShapeStroke::new(RgbaColor::black(), StrokeWidth::ONE, StrokePattern::Solid);
-    let customized = chart_stroke(StrokePattern::MediumDash, 3.0);
-    let changed = chart_stroke(StrokePattern::RoundedDash, 2.0);
+    let default = Stroke::new(RgbaColor::black(), Width::ONE, Pattern::Solid);
+    let customized = chart_stroke(Pattern::MediumDash, 3.0);
+    let changed = chart_stroke(Pattern::RoundedDash, 2.0);
 
     assert_eq!(
         editor
@@ -2219,7 +2265,7 @@ fn scratch_document_supports_native_chart_background_fill_crud() {
     let source = editor
         .add_body_chart(
             "Chart background fill".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -2276,7 +2322,9 @@ fn scratch_document_supports_native_chart_background_fill_crud() {
     );
     assert_eq!(
         reopened
-            .extract_media(image.data_identifier().unwrap().get())
+            .extract_media(
+                crate::MediaAssetId::try_from(image.data_identifier().unwrap().get()).unwrap(),
+            )
             .unwrap(),
         image_bytes
     );
@@ -2295,7 +2343,7 @@ fn scratch_document_supports_inherited_series_fill_crud() {
     let image_bytes = fixture("test-data/images/png/lena.png");
     let mut editor = PagesEditor::create_with_text("Chart").unwrap();
     let source = editor
-        .add_body_chart(5, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_body_chart(5, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let defaults = editor
         .body_chart_series_fills(source.drawable_object_id)
@@ -2313,8 +2361,8 @@ fn scratch_document_supports_inherited_series_fill_crud() {
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    let first = ChartSeriesIndex::from_zero_based(0);
-    let second = ChartSeriesIndex::from_zero_based(1);
+    let first = Index::from_zero_based(0);
+    let second = Index::from_zero_based(1);
     editor
         .set_body_chart_series_fill(source.drawable_object_id, first, &ShapeFill::None)
         .unwrap();
@@ -2359,7 +2407,9 @@ fn scratch_document_supports_inherited_series_fill_crud() {
     );
     assert_eq!(
         reopened
-            .extract_media(image.data_identifier().unwrap().get())
+            .extract_media(
+                crate::MediaAssetId::try_from(image.data_identifier().unwrap().get()).unwrap(),
+            )
             .unwrap(),
         image_bytes
     );
@@ -2377,7 +2427,7 @@ fn scratch_document_supports_inherited_series_fill_crud() {
 fn scratch_document_supports_inherited_series_stroke_crud() {
     let mut editor = PagesEditor::create_with_text("Chart").unwrap();
     let source = editor
-        .add_body_chart(5, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_body_chart(5, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let defaults = vec![None, None];
     assert_eq!(
@@ -2392,8 +2442,8 @@ fn scratch_document_supports_inherited_series_stroke_crud() {
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    let first = ChartSeriesIndex::from_zero_based(0);
-    let second = ChartSeriesIndex::from_zero_based(1);
+    let first = Index::from_zero_based(0);
+    let second = Index::from_zero_based(1);
     let rounded = chart_series_stroke(ChartSeriesStrokePattern::RoundedDash, 3.5);
     let medium = chart_series_stroke(ChartSeriesStrokePattern::MediumDash, 2.0);
     editor
@@ -2445,7 +2495,7 @@ fn scratch_document_supports_native_chart_shadow_crud() {
     let source = editor
         .add_body_chart(
             "Chart shadow".encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -2513,7 +2563,7 @@ fn scratch_document_supports_native_pie_start_angle_crud() {
     let source = editor
         .add_body_chart(
             "Pie rotation".encode_utf16().count(),
-            ChartKind::Pie2d,
+            Kind::Pie2d,
             pie_data(),
             POSITION,
             SIZE,
@@ -2542,7 +2592,7 @@ fn scratch_document_supports_native_pie_start_angle_crud() {
         )
         .unwrap();
     editor
-        .set_body_chart_kind(duplicate.drawable_object_id, ChartKind::Donut2d)
+        .set_body_chart_kind(duplicate.drawable_object_id, Kind::Donut2d)
         .unwrap();
     assert_eq!(
         editor
@@ -2574,7 +2624,7 @@ fn scratch_document_supports_native_pie_start_angle_crud() {
     let column = reopened
         .add_body_chart(
             reopened.body_text().unwrap().encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -2614,7 +2664,7 @@ fn scratch_document_supports_native_donut_inner_radius_crud() {
     let source = editor
         .add_body_chart(
             "Donut radius".encode_utf16().count(),
-            ChartKind::Donut2d,
+            Kind::Donut2d,
             pie_data(),
             POSITION,
             SIZE,
@@ -2652,7 +2702,7 @@ fn scratch_document_supports_native_donut_inner_radius_crud() {
         customized
     );
     editor
-        .set_body_chart_kind(duplicate.drawable_object_id, ChartKind::Pie2d)
+        .set_body_chart_kind(duplicate.drawable_object_id, Kind::Pie2d)
         .unwrap();
     let before_rejected_update = editor.to_bytes().unwrap();
     assert!(
@@ -2670,7 +2720,7 @@ fn scratch_document_supports_native_donut_inner_radius_crud() {
     );
     assert_eq!(editor.to_bytes().unwrap(), before_rejected_update);
     editor
-        .set_body_chart_kind(duplicate.drawable_object_id, ChartKind::Donut3d)
+        .set_body_chart_kind(duplicate.drawable_object_id, Kind::Donut3d)
         .unwrap();
 
     editor
@@ -2711,7 +2761,7 @@ fn scratch_document_supports_native_donut_inner_radius_crud() {
 fn scratch_document_supports_native_pie_wedge_explosion_crud() {
     let mut editor = PagesEditor::create_with_text("Revenue").unwrap();
     let source = editor
-        .add_body_chart(7, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+        .add_body_chart(7, Kind::Pie2d, pie_data(), POSITION, SIZE)
         .unwrap();
     let zeros = vec![ChartPieWedgeExplosion::ZERO; 3];
     assert_eq!(
@@ -2755,7 +2805,7 @@ fn scratch_document_supports_native_pie_wedge_explosion_crud() {
         .duplicate_body_chart(source.drawable_object_id, 7)
         .unwrap();
     editor
-        .set_body_chart_kind(duplicate.drawable_object_id, ChartKind::Donut2d)
+        .set_body_chart_kind(duplicate.drawable_object_id, Kind::Donut2d)
         .unwrap();
     assert_eq!(
         editor
@@ -2807,7 +2857,7 @@ fn scratch_document_supports_native_pie_wedge_explosion_crud() {
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected_updates);
 
     let column = reopened
-        .add_body_chart(7, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_body_chart(7, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let before_wrong_kind = reopened.to_bytes().unwrap();
     assert!(
@@ -2838,13 +2888,13 @@ fn scratch_document_supports_native_pie_wedge_explosion_crud() {
 fn scratch_document_supports_native_pie_label_visibility_crud() {
     let mut editor = PagesEditor::create_with_text("Revenue").unwrap();
     let source = editor
-        .add_body_chart(7, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+        .add_body_chart(7, Kind::Pie2d, pie_data(), POSITION, SIZE)
         .unwrap();
-    let defaults = vec![ChartPieLabelVisibility::DEFAULT; 3];
+    let defaults = vec![LabelVisibility::DEFAULT; 3];
     let customized = [
-        ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY,
-        ChartPieLabelVisibility::ALL,
-        ChartPieLabelVisibility::HIDDEN,
+        LabelVisibility::DATA_POINT_NAMES_ONLY,
+        LabelVisibility::ALL,
+        LabelVisibility::HIDDEN,
     ];
     assert_eq!(
         editor
@@ -2868,7 +2918,7 @@ fn scratch_document_supports_native_pie_label_visibility_crud() {
                 ChartPieWedgeIndex::from_zero_based(1),
             )
             .unwrap(),
-        ChartPieLabelVisibility::ALL
+        LabelVisibility::ALL
     );
     let explosions = [
         ChartPieWedgeExplosion::from_percent(10.0).unwrap(),
@@ -2902,13 +2952,13 @@ fn scratch_document_supports_native_pie_label_visibility_crud() {
         .duplicate_body_chart(source.drawable_object_id, 7)
         .unwrap();
     editor
-        .set_body_chart_kind(duplicate.drawable_object_id, ChartKind::Donut2d)
+        .set_body_chart_kind(duplicate.drawable_object_id, Kind::Donut2d)
         .unwrap();
     editor
         .set_body_chart_pie_label_visibility(
             source.drawable_object_id,
             ChartPieWedgeIndex::from_zero_based(0),
-            ChartPieLabelVisibility::VALUES_ONLY,
+            LabelVisibility::VALUES_ONLY,
         )
         .unwrap();
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -2938,7 +2988,7 @@ fn scratch_document_supports_native_pie_label_visibility_crud() {
 fn scratch_document_supports_native_pie_label_distance_crud() {
     let mut editor = PagesEditor::create_with_text("Revenue").unwrap();
     let source = editor
-        .add_body_chart(7, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+        .add_body_chart(7, Kind::Pie2d, pie_data(), POSITION, SIZE)
         .unwrap();
     let defaults = vec![ChartPieLabelDistance::DEFAULT; 3];
     let customized = [
@@ -2957,11 +3007,11 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
         .set_body_chart_pie_label_distances(source.drawable_object_id, &defaults)
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
-    let leader_line_defaults = [ChartPieLeaderLineVisibility::Visible; 3];
+    let leader_line_defaults = [LeaderLineVisibility::Visible; 3];
     let leader_line_customized = [
-        ChartPieLeaderLineVisibility::Hidden,
-        ChartPieLeaderLineVisibility::Visible,
-        ChartPieLeaderLineVisibility::Hidden,
+        LeaderLineVisibility::Hidden,
+        LeaderLineVisibility::Visible,
+        LeaderLineVisibility::Hidden,
     ];
     assert_eq!(
         editor
@@ -2989,7 +3039,7 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
                 ChartPieWedgeIndex::from_zero_based(0),
             )
             .unwrap(),
-        ChartPieLeaderLineVisibility::Hidden
+        LeaderLineVisibility::Hidden
     );
     editor
         .set_body_chart_pie_leader_line_visibilities(
@@ -3012,9 +3062,9 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
         customized[1]
     );
     let visibilities = [
-        ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY,
-        ChartPieLabelVisibility::ALL,
-        ChartPieLabelVisibility::VALUES_ONLY,
+        LabelVisibility::DATA_POINT_NAMES_ONLY,
+        LabelVisibility::ALL,
+        LabelVisibility::VALUES_ONLY,
     ];
     editor
         .set_body_chart_pie_label_visibilities(source.drawable_object_id, &visibilities)
@@ -3031,7 +3081,7 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
     editor
         .set_body_chart_pie_label_visibilities(
             source.drawable_object_id,
-            &[ChartPieLabelVisibility::DEFAULT; 3],
+            &[LabelVisibility::DEFAULT; 3],
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -3049,7 +3099,7 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
         .duplicate_body_chart(source.drawable_object_id, 7)
         .unwrap();
     editor
-        .set_body_chart_kind(duplicate.drawable_object_id, ChartKind::Donut2d)
+        .set_body_chart_kind(duplicate.drawable_object_id, Kind::Donut2d)
         .unwrap();
     editor
         .set_body_chart_pie_label_distance(
@@ -3062,7 +3112,7 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
         .set_body_chart_pie_leader_line_visibility(
             source.drawable_object_id,
             ChartPieWedgeIndex::from_zero_based(0),
-            ChartPieLeaderLineVisibility::Visible,
+            LeaderLineVisibility::Visible,
         )
         .unwrap();
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -3083,9 +3133,9 @@ fn scratch_document_supports_native_pie_label_distance_crud() {
             .body_chart_pie_leader_line_visibilities(source.drawable_object_id)
             .unwrap(),
         [
-            ChartPieLeaderLineVisibility::Visible,
-            ChartPieLeaderLineVisibility::Visible,
-            ChartPieLeaderLineVisibility::Hidden,
+            LeaderLineVisibility::Visible,
+            LeaderLineVisibility::Visible,
+            LeaderLineVisibility::Hidden,
         ]
     );
     let before_rejected = reopened.to_bytes().unwrap();
@@ -3136,17 +3186,14 @@ fn scratch_document_supports_native_series_value_label_crud() {
     let source = editor
         .add_body_chart(
             BODY_TEXT.encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
         )
         .unwrap();
-    let defaults = [ChartSeriesValueLabelVisibility::Hidden; 2];
-    let customized = [
-        ChartSeriesValueLabelVisibility::Visible,
-        ChartSeriesValueLabelVisibility::Hidden,
-    ];
+    let defaults = [Visibility::Hidden; 2];
+    let customized = [Visibility::Visible, Visibility::Hidden];
 
     assert_eq!(
         editor
@@ -3167,10 +3214,10 @@ fn scratch_document_supports_native_series_value_label_crud() {
         editor
             .body_chart_series_value_label_visibility(
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap(),
-        ChartSeriesValueLabelVisibility::Visible
+        Visibility::Visible
     );
     editor
         .set_body_chart_series_value_label_visibilities(source.drawable_object_id, &defaults)
@@ -3189,8 +3236,8 @@ fn scratch_document_supports_native_series_value_label_crud() {
     editor
         .set_body_chart_series_value_label_visibility(
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(0),
-            ChartSeriesValueLabelVisibility::Hidden,
+            Index::from_zero_based(0),
+            Visibility::Hidden,
         )
         .unwrap();
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -3220,7 +3267,7 @@ fn scratch_document_supports_native_series_value_label_crud() {
         reopened
             .body_chart_series_value_label_visibility(
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
+                Index::from_zero_based(2),
             )
             .is_err()
     );
@@ -3242,7 +3289,7 @@ fn scratch_document_supports_native_series_value_label_location_crud() {
     let source = editor
         .add_body_chart(
             BODY_TEXT.encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -3273,7 +3320,7 @@ fn scratch_document_supports_native_series_value_label_location_crud() {
         editor
             .body_chart_series_value_label_location(
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap(),
         ChartSeriesValueLabelLocation::Outside
@@ -3295,7 +3342,7 @@ fn scratch_document_supports_native_series_value_label_location_crud() {
     editor
         .set_body_chart_series_value_label_location(
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(0),
+            Index::from_zero_based(0),
             ChartSeriesValueLabelLocation::Top,
         )
         .unwrap();
@@ -3326,7 +3373,7 @@ fn scratch_document_supports_native_series_value_label_location_crud() {
         reopened
             .body_chart_series_value_label_location(
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
+                Index::from_zero_based(2),
             )
             .is_err()
     );
@@ -3348,16 +3395,16 @@ fn scratch_document_supports_native_series_value_label_affix_crud() {
     let source = editor
         .add_body_chart(
             BODY_TEXT.encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
         )
         .unwrap();
-    let defaults = vec![ChartSeriesValueLabelAffixes::default(); 2];
+    let defaults = vec![LabelAffixes::default(); 2];
     let customized = vec![
-        ChartSeriesValueLabelAffixes::new("$", " USD"),
-        ChartSeriesValueLabelAffixes::new("€", " net"),
+        LabelAffixes::new("$", " USD").unwrap(),
+        LabelAffixes::new("€", " net").unwrap(),
     ];
 
     assert_eq!(
@@ -3379,7 +3426,7 @@ fn scratch_document_supports_native_series_value_label_affix_crud() {
         editor
             .body_chart_series_value_label_affix(
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap()
             .suffix(),
@@ -3395,8 +3442,8 @@ fn scratch_document_supports_native_series_value_label_affix_crud() {
         editor
             .set_body_chart_series_value_label_affix(
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(series),
-                ChartSeriesValueLabelAffixes::default(),
+                Index::from_zero_based(series),
+                LabelAffixes::default(),
             )
             .unwrap();
     }
@@ -3425,7 +3472,7 @@ fn scratch_document_supports_native_series_value_label_affix_crud() {
         reopened
             .body_chart_series_value_label_affix(
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
+                Index::from_zero_based(2),
             )
             .is_err()
     );
@@ -3447,19 +3494,19 @@ fn scratch_document_supports_native_series_value_label_number_format_crud() {
     let source = editor
         .add_body_chart(
             BODY_TEXT.encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
         )
         .unwrap();
-    let defaults = vec![ChartSeriesValueLabelNumberFormat::NATIVE_DEFAULT; 2];
-    let fixed_two = ChartSeriesValueLabelNumberFormat::new(
-        ChartSeriesValueLabelDecimalPlaces::fixed(2).unwrap(),
-        ChartSeriesValueLabelNegativeStyle::Parentheses,
+    let defaults = vec![NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT; 2];
+    let fixed_two = NumberFormat::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::Parentheses,
         false,
     );
-    let customized = vec![fixed_two, ChartSeriesValueLabelNumberFormat::NATIVE_DEFAULT];
+    let customized = vec![fixed_two, NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT];
 
     assert_eq!(
         editor
@@ -3479,7 +3526,7 @@ fn scratch_document_supports_native_series_value_label_number_format_crud() {
         editor
             .body_chart_series_value_label_number_format(
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap(),
         fixed_two
@@ -3494,8 +3541,8 @@ fn scratch_document_supports_native_series_value_label_number_format_crud() {
     editor
         .set_body_chart_series_value_label_number_format(
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(0),
-            ChartSeriesValueLabelNumberFormat::NATIVE_DEFAULT,
+            Index::from_zero_based(0),
+            NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
         )
         .unwrap();
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -3525,7 +3572,7 @@ fn scratch_document_supports_native_series_value_label_number_format_crud() {
         reopened
             .body_chart_series_value_label_number_format(
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
+                Index::from_zero_based(2),
             )
             .is_err()
     );
@@ -3547,7 +3594,7 @@ fn scratch_document_supports_native_series_value_label_auto_fit_crud() {
     let source = editor
         .add_body_chart(
             BODY_TEXT.encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -3577,7 +3624,7 @@ fn scratch_document_supports_native_series_value_label_auto_fit_crud() {
         editor
             .body_chart_series_value_label_auto_fit(
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap(),
         ChartSeriesValueLabelAutoFit::Disabled
@@ -3592,7 +3639,7 @@ fn scratch_document_supports_native_series_value_label_auto_fit_crud() {
     editor
         .set_body_chart_series_value_label_auto_fit(
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(0),
+            Index::from_zero_based(0),
             ChartSeriesValueLabelAutoFit::Enabled,
         )
         .unwrap();
@@ -3623,7 +3670,7 @@ fn scratch_document_supports_native_series_value_label_auto_fit_crud() {
         reopened
             .body_chart_series_value_label_auto_fit(
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
+                Index::from_zero_based(2),
             )
             .is_err()
     );
@@ -3645,7 +3692,7 @@ fn scratch_document_supports_native_series_trendline_crud() {
     let source = editor
         .add_body_chart(
             BODY_TEXT.encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
@@ -3683,10 +3730,7 @@ fn scratch_document_supports_native_series_trendline_crud() {
         .unwrap();
     assert_eq!(
         editor
-            .body_chart_series_trendline(
-                source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(1),
-            )
+            .body_chart_series_trendline(source.drawable_object_id, Index::from_zero_based(1),)
             .unwrap(),
         customized[1]
     );
@@ -3701,7 +3745,7 @@ fn scratch_document_supports_native_series_trendline_crud() {
         editor
             .set_body_chart_series_trendline(
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(series),
+                Index::from_zero_based(series),
                 ChartSeriesTrendline::none(),
             )
             .unwrap();
@@ -3728,10 +3772,7 @@ fn scratch_document_supports_native_series_trendline_crud() {
     );
     assert!(
         reopened
-            .body_chart_series_trendline(
-                source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
-            )
+            .body_chart_series_trendline(source.drawable_object_id, Index::from_zero_based(2),)
             .is_err()
     );
     assert!(ChartSeriesTrendline::unsupported(1).is_err());
@@ -3754,21 +3795,21 @@ fn scratch_document_supports_native_series_error_bar_crud() {
     let source = editor
         .add_body_chart(
             BODY_TEXT.encode_utf16().count(),
-            ChartKind::Column2d,
+            Kind::Column2d,
             sample_data(),
             POSITION,
             SIZE,
         )
         .unwrap();
-    let defaults = vec![ChartSeriesErrorBars::None; 2];
+    let defaults = vec![Series::None; 2];
     let customized = vec![
-        ChartSeriesErrorBars::FixedValue {
-            direction: ChartErrorBarDirection::PositiveAndNegative,
-            value: ChartErrorBarFixedValue::new(12.5).unwrap(),
+        Series::FixedValue {
+            direction: ErrorBarDirection::PositiveAndNegative,
+            value: ErrorBarFixedValue::new(12.5).unwrap(),
         },
-        ChartSeriesErrorBars::Percentage {
-            direction: ChartErrorBarDirection::PositiveOnly,
-            percentage: ChartErrorBarPercentage::new(17).unwrap(),
+        Series::Percentage {
+            direction: ErrorBarDirection::PositiveOnly,
+            percentage: ErrorBarPercentage::new(17).unwrap(),
         },
     ];
     let default_auto_fits = vec![ChartSeriesErrorBarAutoFit::Enabled; 2];
@@ -3802,10 +3843,7 @@ fn scratch_document_supports_native_series_error_bar_crud() {
         .unwrap();
     assert_eq!(
         editor
-            .body_chart_series_error_bar(
-                source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(1),
-            )
+            .body_chart_series_error_bar(source.drawable_object_id, Index::from_zero_based(1),)
             .unwrap(),
         customized[1]
     );
@@ -3813,7 +3851,7 @@ fn scratch_document_supports_native_series_error_bar_crud() {
         editor
             .body_chart_series_error_bar_auto_fit(
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap(),
         ChartSeriesErrorBarAutoFit::Disabled
@@ -3829,8 +3867,8 @@ fn scratch_document_supports_native_series_error_bar_crud() {
         editor
             .set_body_chart_series_error_bar(
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(series),
-                ChartSeriesErrorBars::None,
+                Index::from_zero_based(series),
+                Series::None,
             )
             .unwrap();
     }
@@ -3879,10 +3917,7 @@ fn scratch_document_supports_native_series_error_bar_crud() {
     );
     assert!(
         reopened
-            .body_chart_series_error_bar(
-                source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
-            )
+            .body_chart_series_error_bar(source.drawable_object_id, Index::from_zero_based(2),)
             .is_err()
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);

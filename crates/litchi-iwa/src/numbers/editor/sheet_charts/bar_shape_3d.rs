@@ -1,7 +1,7 @@
 //! Native 3D bar-shape CRUD for Numbers sheet charts.
 
 use super::*;
-use crate::charts::Chart3dBarShape;
+use crate::charts::BarShape;
 use crate::charts::bar_shape_3d::{
     chart_3d_bar_shape as read_native_chart_3d_bar_shape,
     set_chart_3d_bar_shape as set_native_chart_3d_bar_shape,
@@ -13,7 +13,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<Chart3dBarShape> {
+    ) -> Result<BarShape> {
         let graph = chart_graph(self, sheet_id, drawable_object_id)?;
         require_3d_bar_shape(graph.info.kind, drawable_object_id)?;
         read_native_chart_3d_bar_shape(
@@ -29,7 +29,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        shape: Chart3dBarShape,
+        shape: BarShape,
     ) -> Result<()> {
         let graph = chart_graph(self, sheet_id, drawable_object_id)?;
         require_3d_bar_shape(graph.info.kind, drawable_object_id)?;
@@ -61,7 +61,7 @@ impl NumbersEditor {
     }
 }
 
-fn require_3d_bar_shape(kind: ChartKind, drawable_object_id: u64) -> Result<()> {
+fn require_3d_bar_shape(kind: Kind, drawable_object_id: u64) -> Result<()> {
     if !kind.supports_3d_bar_shape() {
         return Err(Error::InvalidFormat(format!(
             "Numbers chart {drawable_object_id} kind {kind:?} has no 3D bar shape"
@@ -83,7 +83,7 @@ mod tests {
         let chart = editor
             .add_sheet_chart(
                 sheet_id,
-                ChartKind::Bar3d,
+                Kind::Bar3d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -93,11 +93,7 @@ mod tests {
             )
             .unwrap();
         editor
-            .set_sheet_chart_3d_bar_shape(
-                sheet_id,
-                chart.drawable_object_id,
-                Chart3dBarShape::Cylinder,
-            )
+            .set_sheet_chart_3d_bar_shape(sheet_id, chart.drawable_object_id, BarShape::Cylinder)
             .unwrap();
         let duplicate = editor
             .duplicate_sheet_chart(sheet_id, chart.drawable_object_id)
@@ -106,20 +102,20 @@ mod tests {
             .set_sheet_chart_3d_bar_shape(
                 sheet_id,
                 duplicate.drawable_object_id,
-                Chart3dBarShape::Rectangle,
+                BarShape::Rectangle,
             )
             .unwrap();
         assert_eq!(
             editor
                 .sheet_chart_3d_bar_shape(sheet_id, chart.drawable_object_id)
                 .unwrap(),
-            Chart3dBarShape::Cylinder
+            BarShape::Cylinder
         );
         assert_eq!(
             editor
                 .sheet_chart_3d_bar_shape(sheet_id, duplicate.drawable_object_id)
                 .unwrap(),
-            Chart3dBarShape::Rectangle
+            BarShape::Rectangle
         );
     }
 

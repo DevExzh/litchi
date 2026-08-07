@@ -1,91 +1,16 @@
 //! Semantic media models and resource profiles.
 
+use std::fmt;
+use std::num::NonZeroU64;
 use std::path::PathBuf;
 
 use crate::{Error, Result};
+pub use litchi_iwa_common::media::Type as MediaType;
+use litchi_iwa_graph::ObjectId;
 
 const DEFAULT_MAX_MEDIA_ASSETS: usize = 100_000;
 const DEFAULT_MAX_MEDIA_ASSET_BYTES: u64 = 512 * 1024 * 1024;
 const DEFAULT_MAX_MEDIA_TOTAL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
-
-/// Types of media assets that can be found in iWork documents.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MediaType {
-    /// Image file (PNG, JPEG, TIFF, HEIF, etc.).
-    Image,
-    /// Video file (MP4, MOV, etc.).
-    Video,
-    /// Audio file (MP3, AAC, WAV, etc.).
-    Audio,
-    /// PDF document.
-    Pdf,
-    /// Unknown or unsupported media type.
-    Unknown,
-}
-
-impl MediaType {
-    /// Detect a media type from a filename extension.
-    pub fn from_extension(ext: &str) -> Self {
-        match ext.to_ascii_lowercase().as_str() {
-            "png" | "jpg" | "jpeg" | "gif" | "tiff" | "tif" | "bmp" | "heic" | "heif" | "webp"
-            | "svg" => Self::Image,
-            "mp4" | "mov" | "m4v" | "avi" | "mkv" => Self::Video,
-            "mp3" | "aac" | "m4a" | "wav" | "aiff" | "aif" | "ogg" => Self::Audio,
-            "pdf" => Self::Pdf,
-            _ => Self::Unknown,
-        }
-    }
-
-    /// Sniff common media signatures without trusting the filename.
-    pub fn from_bytes(data: &[u8]) -> Self {
-        if data.starts_with(b"\x89PNG\r\n\x1a\n")
-            || data.starts_with(b"\xff\xd8\xff")
-            || data.starts_with(b"GIF87a")
-            || data.starts_with(b"GIF89a")
-            || data.starts_with(b"II*\0")
-            || data.starts_with(b"MM\0*")
-            || data.starts_with(b"BM")
-            || (data.len() >= 12 && &data[..4] == b"RIFF" && &data[8..12] == b"WEBP")
-        {
-            return Self::Image;
-        }
-        if data.starts_with(b"%PDF-") {
-            return Self::Pdf;
-        }
-        if data.starts_with(b"ID3")
-            || data
-                .get(..2)
-                .is_some_and(|prefix| prefix[0] == 0xff && prefix[1] & 0xe0 == 0xe0)
-            || (data.len() >= 12 && &data[..4] == b"RIFF" && &data[8..12] == b"WAVE")
-            || (data.len() >= 12
-                && &data[..4] == b"FORM"
-                && matches!(&data[8..12], b"AIFF" | b"AIFC"))
-            || data.starts_with(b"OggS")
-        {
-            return Self::Audio;
-        }
-        if data.len() >= 12 && &data[4..8] == b"ftyp" {
-            return match &data[8..12] {
-                b"heic" | b"heix" | b"hevc" | b"hevx" | b"heim" | b"heis" | b"mif1" | b"msf1"
-                | b"avif" | b"avis" => Self::Image,
-                b"M4A " | b"M4B " | b"M4P " => Self::Audio,
-                _ => Self::Video,
-            };
-        }
-        Self::Unknown
-    }
-
-    /// Get a human-readable name for this media type.
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Image => "Image",
-            Self::Video => "Video",
-            Self::Audio => "Audio",
-            Self::Pdf => "PDF Document",
-            Self::Unknown => "Unknown",
-        }
-    }
-}
 
 /// Information about a materialized `Data/*` package member.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -211,11 +136,58 @@ impl Default for MediaLimits {
     }
 }
 
+/// A validated native identifier for one embedded media asset.
+///
+/// iWork uses zero as the absence value for media references. Keeping that
+/// sentinel out of the semantic API leaves the native representation at the
+/// archive boundary while making an addressed asset compact and non-null.
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct MediaAssetId(NonZeroU64);
+
+impl MediaAssetId {
+    /// Construct a media asset identifier, returning `None` for the native
+    /// null sentinel.
+    #[must_use]
+    pub const fn new(raw: u64) -> Option<Self> {
+        match NonZeroU64::new(raw) {
+            Some(value) => Some(Self(value)),
+            None => None,
+        }
+    }
+
+    /// Return the native identifier used at the archive boundary.
+    #[must_use]
+    pub(crate) const fn get(self) -> u64 {
+        self.0.get()
+    }
+
+    pub(crate) fn next(self) -> Option<Self> {
+        self.get().checked_add(1).and_then(Self::new)
+    }
+}
+
+impl TryFrom<u64> for MediaAssetId {
+    type Error = Error;
+
+    fn try_from(raw: u64) -> Result<Self> {
+        Self::new(raw).ok_or_else(|| {
+            Error::InvalidFormat("embedded media asset identifiers must be non-zero".to_owned())
+        })
+    }
+}
+
+impl fmt::Display for MediaAssetId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.get().fmt(formatter)
+    }
+}
+
 /// Metadata-backed view of one `TSP.DataInfo` record.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EmbeddedMediaAsset {
     /// Stable `TSP.DataInfo.identifier` used by drawable protobufs.
-    pub data_identifier: u64,
+    pub data_identifier: MediaAssetId,
     /// Name iWork prefers when materializing or exporting the asset.
     pub preferred_filename: String,
     /// Materialized package member, when present.
@@ -237,7 +209,7 @@ pub struct EmbeddedMediaAsset {
     /// Whether the package's `DataMetadataMap` contains this identifier.
     pub has_data_metadata: bool,
     /// Object identifiers whose MessageInfo/component records reference this data.
-    pub referencing_object_ids: Vec<u64>,
+    pub referencing_object_ids: Vec<ObjectId>,
 }
 
 impl EmbeddedMediaAsset {

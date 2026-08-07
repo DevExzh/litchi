@@ -26,8 +26,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut editor = PagesEditor::open(input)?;
     let mut settings = editor.section_settings(section_id)?;
-    settings.inherit_previous_header_footer = Some(match_previous);
-    settings.first_page_hides_header_footer = Some(hide_first_page);
+    settings.set_inherit_previous_header_footer(Some(match_previous));
+    settings.set_first_page_hides_header_footer(Some(hide_first_page));
     editor.set_section_settings(section_id, settings)?;
     editor.save(output)?;
     Ok(())

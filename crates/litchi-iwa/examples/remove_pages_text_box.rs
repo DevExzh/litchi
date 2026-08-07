@@ -25,9 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.save(output)?;
     println!(
         "drawable={} storage={} anchor={}",
-        removed.text.drawable_object_id,
-        removed.text.storage.object_id,
-        removed.anchor_character_index
+        removed.text.drawable_object_id, removed.text.storage.id, removed.anchor_character_index
     );
     Ok(())
 }

@@ -10,7 +10,7 @@ use crate::charts::legend_style::{
     GENERATED_LEGEND_STYLE_EXTENSION_FIELD, generated_legend_style_extension, legend_style_slot,
 };
 use crate::protobuf::tsch;
-use crate::shapes::{ShapeDropShadow, ShapeShadow, shadow_from_native, shadow_to_native};
+use crate::shapes::{Drop, Shadow, shadow_from_native, shadow_to_native};
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
 
@@ -26,7 +26,7 @@ pub enum ChartLegendShadow {
     /// A direct disabled shadow (the inspector checkbox is off).
     NoShadow,
     /// A direct typed drop shadow.
-    Shadow(ShapeDropShadow),
+    Shadow(Drop),
 }
 
 /// Read the exact direct legend-shadow state of one native chart.
@@ -93,9 +93,9 @@ fn read_legend_shadow(data: &[u8]) -> Result<ChartLegendShadow> {
         return Ok(ChartLegendShadow::Inherited);
     };
     match shadow_from_native(native)? {
-        ShapeShadow::Disabled => Ok(ChartLegendShadow::NoShadow),
-        ShapeShadow::Drop(shadow) => Ok(ChartLegendShadow::Shadow(shadow)),
-        ShapeShadow::Contact(_) | ShapeShadow::Curved(_) => Err(Error::InvalidFormat(
+        Shadow::Disabled => Ok(ChartLegendShadow::NoShadow),
+        Shadow::Drop(shadow) => Ok(ChartLegendShadow::Shadow(shadow)),
+        Shadow::Contact(_) | Shadow::Curved(_) => Err(Error::InvalidFormat(
             "native chart legend uses a non-drop shadow".to_owned(),
         )),
     }
@@ -105,8 +105,8 @@ fn patch_legend_shadow(data: &[u8], shadow: ChartLegendShadow) -> Result<Vec<u8>
     let Some(extension) = generated_legend_style_extension(data)? else {
         let native = match shadow {
             ChartLegendShadow::Inherited => return Ok(data.to_vec()),
-            ChartLegendShadow::NoShadow => shadow_to_native(ShapeShadow::Disabled),
-            ChartLegendShadow::Shadow(shadow) => shadow_to_native(ShapeShadow::Drop(shadow)),
+            ChartLegendShadow::NoShadow => shadow_to_native(Shadow::Disabled),
+            ChartLegendShadow::Shadow(shadow) => shadow_to_native(Shadow::Drop(shadow)),
         };
         let generated = tsch::generated::LegendStyleArchive {
             tschlegendmodeldefaultshadow: Some(native),
@@ -127,11 +127,9 @@ fn patch_legend_shadow(data: &[u8], shadow: ChartLegendShadow) -> Result<Vec<u8>
     let shadow_present = generated.tschlegendmodeldefaultshadow.is_some();
     let native = match shadow {
         ChartLegendShadow::Inherited => None,
-        ChartLegendShadow::NoShadow => {
-            Some(shadow_to_native(ShapeShadow::Disabled).encode_to_vec())
-        },
+        ChartLegendShadow::NoShadow => Some(shadow_to_native(Shadow::Disabled).encode_to_vec()),
         ChartLegendShadow::Shadow(shadow) => {
-            Some(shadow_to_native(ShapeShadow::Drop(shadow)).encode_to_vec())
+            Some(shadow_to_native(Shadow::Drop(shadow)).encode_to_vec())
         },
     };
     let extension = patch_length_delimited_field(
@@ -164,11 +162,11 @@ mod tests {
     use super::*;
     use crate::protobuf::tss;
     use crate::shapes::{
-        RgbColorSpace, RgbaColor, ShapeFill, ShapeShadowAngle, ShapeShadowAppearance,
-        ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity, ShapeStroke, StrokePattern,
-        StrokeWidth, fill_to_native, stroke_to_native,
+        Appearance, BlurRadius, Offset, Pattern, RgbColorSpace, RgbaColor, ShapeFill, Stroke,
+        Width, fill_to_native, stroke_to_native,
     };
     use crate::wire::{append_length_delimited_field, append_varint_field, parse_wire_fields};
+    use litchi_iwa_common::shape::shadow::{Angle, Opacity};
 
     const UNMAPPED_OUTER_FIELD: u32 = 4_096;
     const UNMAPPED_GENERATED_FIELD: u32 = 4_097;
@@ -178,10 +176,10 @@ mod tests {
     fn legend_shadow_is_exact_and_preserves_fill_stroke_and_unknown_fields() {
         let fill =
             ShapeFill::Solid(RgbaColor::new(0.9, 0.95, 1.0, 1.0, RgbColorSpace::Srgb).unwrap());
-        let stroke = ShapeStroke::new(
+        let stroke = Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(2.5).unwrap(),
-            StrokePattern::MediumDash,
+            Width::new(2.5).unwrap(),
+            Pattern::MediumDash,
         );
         let mut generated = tsch::generated::LegendStyleArchive {
             tschlegendmodeldefaultfill: Some(fill_to_native(&fill)),
@@ -207,14 +205,14 @@ mod tests {
             read_legend_shadow(&original).unwrap(),
             ChartLegendShadow::Inherited
         );
-        let shadow = ChartLegendShadow::Shadow(ShapeDropShadow::new(
-            ShapeShadowAppearance::new(
+        let shadow = ChartLegendShadow::Shadow(Drop::new(
+            Appearance::new(
                 RgbaColor::black(),
-                ShapeShadowBlurRadius::from_points(12).unwrap(),
-                ShapeShadowOffset::from_points(8.0).unwrap(),
-                ShapeShadowOpacity::new(0.6).unwrap(),
+                BlurRadius::from_points(12).unwrap(),
+                Offset::from_points(8.0).unwrap(),
+                Opacity::new(0.6).unwrap(),
             ),
-            ShapeShadowAngle::from_degrees(30.0).unwrap(),
+            Angle::from_degrees(30.0).unwrap(),
         ));
         let shadowed = patch_legend_shadow(&original, shadow).unwrap();
         assert_eq!(read_legend_shadow(&shadowed).unwrap(), shadow);
@@ -235,13 +233,13 @@ mod tests {
             parse_wire_fields(&shadowed)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == UNMAPPED_OUTER_FIELD && field.wire_type == 0)
+                .any(|field| field.number() == UNMAPPED_OUTER_FIELD && field.wire_type() == 0)
         );
         assert!(
             parse_wire_fields(generated_after)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == UNMAPPED_GENERATED_FIELD && field.wire_type == 0)
+                .any(|field| field.number() == UNMAPPED_GENERATED_FIELD && field.wire_type() == 0)
         );
 
         let disabled = patch_legend_shadow(&shadowed, ChartLegendShadow::NoShadow).unwrap();

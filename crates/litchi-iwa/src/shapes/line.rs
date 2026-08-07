@@ -11,6 +11,8 @@ use crate::wire::{
 };
 use crate::{Error, Result};
 
+pub use litchi_iwa_common::shape::line::{Endpoint, Endpoints};
+
 use super::geometry::{
     DrawableGeometry, DrawablePoint, DrawableSize, geometry_from_drawable, patch_drawable_geometry,
 };
@@ -547,7 +549,9 @@ mod tests {
     }
 
     fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) {
-        data.extend(crate::varint::encode_varint(u64::from(field_number) << 3));
-        data.extend(crate::varint::encode_varint(value));
+        data.extend(litchi_iwa_common::varint::encode_varint(
+            u64::from(field_number) << 3,
+        ));
+        data.extend(litchi_iwa_common::varint::encode_varint(value));
     }
 }

@@ -3,6 +3,8 @@ use super::{
 };
 use crate::pages::PagesEditor;
 use crate::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_common::comment::DrawableId;
+use litchi_iwa_text::number_attachment::raw::object_id as native_object_id;
 
 const PREFIX: &str = "Page ";
 const POSITION: DrawablePoint = DrawablePoint { x: 40.0, y: 80.0 };
@@ -74,7 +76,7 @@ fn invalid_positions_and_text_replacement_are_transactional() {
             .package()
             .archive(name)
             .unwrap()
-            .object(attachment.id.object_id())
+            .object(native_object_id(attachment.id))
             .is_some()
     }));
     assert_eq!(pages.to_bytes().unwrap(), baseline);
@@ -83,7 +85,7 @@ fn invalid_positions_and_text_replacement_are_transactional() {
 #[test]
 fn pages_header_footer_ownership_is_enforced() {
     let mut pages = PagesEditor::create_with_text("Body").unwrap();
-    let header = pages.header_footers().unwrap()[0].storage.object_id;
+    let header = pages.header_footers().unwrap()[0].storage.id;
     pages.set_header_footer_text(header, PREFIX).unwrap();
     let attachment = pages
         .insert_header_footer_number_attachment(
@@ -99,7 +101,7 @@ fn pages_header_footer_ownership_is_enforced() {
             .as_slice(),
         std::slice::from_ref(&attachment)
     );
-    let body_id = pages.body_storage().unwrap().object_id;
+    let body_id = pages.body_storage().unwrap().id;
     assert!(pages.header_footer_number_attachments(body_id).is_err());
     pages
         .remove_header_footer_number_attachment(header, attachment.id)
@@ -109,10 +111,11 @@ fn pages_header_footer_ownership_is_enforced() {
             .header_footers()
             .unwrap()
             .into_iter()
-            .find(|item| item.storage.object_id == header)
+            .find(|item| item.storage.id == header)
             .unwrap()
             .storage
-            .text,
+            .storage
+            .text(),
         PREFIX
     );
 }
@@ -129,9 +132,10 @@ fn scratch_pages_text_box_number_attachments_round_trip() {
         )
         .unwrap();
     let pages_box = pages.add_text_box(5, PREFIX, POSITION, SIZE).unwrap();
+    let pages_box_id = DrawableId::from_raw(pages_box.drawable_object_id).unwrap();
     let pages_attachment = pages
         .insert_text_box_number_attachment(
-            pages_box.drawable_object_id,
+            pages_box_id,
             position,
             settings(TextNumberAttachmentKind::PageNumber),
         )
@@ -143,12 +147,12 @@ fn scratch_pages_text_box_number_attachments_round_trip() {
     );
     assert_eq!(
         pages
-            .text_box_number_attachments(pages_box.drawable_object_id)
+            .text_box_number_attachments(pages_box_id)
             .unwrap()
             .as_slice(),
         std::slice::from_ref(&pages_attachment)
     );
     pages
-        .remove_text_box_number_attachment(pages_box.drawable_object_id, pages_attachment.id)
+        .remove_text_box_number_attachment(pages_box_id, pages_attachment.id)
         .unwrap();
 }

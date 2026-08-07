@@ -1,8 +1,11 @@
 //! Table and cell editing semantics.
 
-#![allow(unused_imports)]
-
 use super::*;
+use crate::numbers::editor::table::cell::Borders;
+use crate::text::{Alignment, Indents, LineSpacing, Spacing};
+use litchi_iwa_common::shape::stroke::Stroke;
+use litchi_iwa_common::table::cell::{BorderSide, layout::Layout};
+use litchi_numbers::table::merge::Region;
 
 impl NumbersEditor {
     /// List absolute pivot categories backed by valid calculation-engine
@@ -96,7 +99,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<crate::table_cell_data_format::TableCellDataFormat> {
+    ) -> Result<DataFormat> {
         cell_data_format::cell_data_format(&self.package, table_id, row, column)
     }
 
@@ -106,7 +109,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellDataFormat,
+        format: DataFormat,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_data_format::set_cell_data_format(&mut staged, table_id, row, column, &format)?;
@@ -128,7 +131,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_number_format::TableCellNumberFormat>> {
+    ) -> Result<Option<Number>> {
         cell_data_format::cell_number_format(&self.package, table_id, row, column)
     }
 
@@ -138,7 +141,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_number_format::TableCellNumberFormat,
+        format: Number,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -176,7 +179,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellTextFormat>> {
+    ) -> Result<Option<Text>> {
         cell_data_format::cell_text_format(&self.package, table_id, row, column)
     }
 
@@ -187,12 +190,7 @@ impl NumbersEditor {
         row: usize,
         column: usize,
     ) -> Result<()> {
-        self.set_table_cell_data_format(
-            table_id,
-            row,
-            column,
-            crate::table_cell_data_format::TableCellTextFormat.into(),
-        )
+        self.set_table_cell_data_format(table_id, row, column, Text.into())
     }
 
     /// Restore Automatic from an explicit Text cell.
@@ -206,9 +204,7 @@ impl NumbersEditor {
         let changed = cell_data_format::reset_cell_text_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
-            {
+            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers Text-format reset failed package validation".to_owned(),
                 ));
@@ -226,7 +222,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellCustomFormat>> {
+    ) -> Result<Option<Custom>> {
         cell_data_format::cell_custom_format(&self.package, table_id, row, column)
     }
 
@@ -236,7 +232,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellCustomFormat,
+        format: Custom,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -253,9 +249,7 @@ impl NumbersEditor {
             cell_data_format::reset_cell_custom_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
-            {
+            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers Custom-format reset failed package validation".to_owned(),
                 ));
@@ -273,7 +267,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellCurrencyFormat>> {
+    ) -> Result<Option<Currency>> {
         cell_data_format::cell_currency_format(&self.package, table_id, row, column)
     }
 
@@ -283,7 +277,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellCurrencyFormat,
+        format: Currency,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -300,9 +294,7 @@ impl NumbersEditor {
             cell_data_format::reset_cell_currency_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
-            {
+            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers currency-format reset failed package validation".to_owned(),
                 ));
@@ -320,7 +312,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellPercentageFormat>> {
+    ) -> Result<Option<Percentage>> {
         cell_data_format::cell_percentage_format(&self.package, table_id, row, column)
     }
 
@@ -330,7 +322,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellPercentageFormat,
+        format: Percentage,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -347,9 +339,7 @@ impl NumbersEditor {
             cell_data_format::reset_cell_percentage_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
-            {
+            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers percentage-format reset failed package validation".to_owned(),
                 ));
@@ -367,7 +357,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellScientificFormat>> {
+    ) -> Result<Option<Scientific>> {
         cell_data_format::cell_scientific_format(&self.package, table_id, row, column)
     }
 
@@ -377,7 +367,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellScientificFormat,
+        format: Scientific,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -394,9 +384,7 @@ impl NumbersEditor {
             cell_data_format::reset_cell_scientific_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
-            {
+            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers scientific-format reset failed package validation".to_owned(),
                 ));
@@ -414,7 +402,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellFractionFormat>> {
+    ) -> Result<Option<Fraction>> {
         cell_data_format::cell_fraction_format(&self.package, table_id, row, column)
     }
 
@@ -424,7 +412,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellFractionFormat,
+        format: Fraction,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -441,9 +429,7 @@ impl NumbersEditor {
             cell_data_format::reset_cell_fraction_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
-            {
+            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers fraction-format reset failed package validation".to_owned(),
                 ));
@@ -461,7 +447,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellNumeralSystemFormat>> {
+    ) -> Result<Option<NumeralSystem>> {
         cell_data_format::cell_numeral_system_format(&self.package, table_id, row, column)
     }
 
@@ -471,7 +457,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellNumeralSystemFormat,
+        format: NumeralSystem,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -488,9 +474,7 @@ impl NumbersEditor {
             cell_data_format::reset_cell_numeral_system_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
-            {
+            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers numeral-system reset failed package validation".to_owned(),
                 ));
@@ -508,7 +492,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellDateTimeFormat>> {
+    ) -> Result<Option<DateTime>> {
         cell_data_format::cell_date_time_format(&self.package, table_id, row, column)
     }
 
@@ -518,7 +502,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellDateTimeFormat,
+        format: DateTime,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -535,9 +519,7 @@ impl NumbersEditor {
             cell_data_format::reset_cell_date_time_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
-            {
+            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers Date & Time reset failed package validation".to_owned(),
                 ));
@@ -555,7 +537,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellDurationFormat>> {
+    ) -> Result<Option<Duration>> {
         cell_data_format::cell_duration_format(&self.package, table_id, row, column)
     }
 
@@ -565,7 +547,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellDurationFormat,
+        format: Duration,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -582,9 +564,7 @@ impl NumbersEditor {
             cell_data_format::reset_cell_duration_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
-            {
+            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers Duration reset failed package validation".to_owned(),
                 ));
@@ -600,7 +580,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellCheckboxFormat>> {
+    ) -> Result<Option<Checkbox>> {
         cell_data_format::cell_checkbox_format(&self.package, table_id, row, column)
     }
 
@@ -610,7 +590,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellCheckboxFormat,
+        format: Checkbox,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -627,9 +607,7 @@ impl NumbersEditor {
             cell_data_format::reset_cell_checkbox_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
-            {
+            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers Checkbox reset failed package validation".to_owned(),
                 ));
@@ -645,7 +623,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellStarRatingFormat>> {
+    ) -> Result<Option<StarRating>> {
         cell_data_format::cell_star_rating_format(&self.package, table_id, row, column)
     }
 
@@ -655,7 +633,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellStarRatingFormat,
+        format: StarRating,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -672,9 +650,7 @@ impl NumbersEditor {
             cell_data_format::reset_cell_star_rating_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
-            {
+            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers Star Rating reset failed package validation".to_owned(),
                 ));
@@ -690,7 +666,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellSliderFormat>> {
+    ) -> Result<Option<Slider>> {
         cell_data_format::cell_slider_format(&self.package, table_id, row, column)
     }
 
@@ -700,7 +676,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellSliderFormat,
+        format: Slider,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -717,9 +693,7 @@ impl NumbersEditor {
             cell_data_format::reset_cell_slider_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
-            {
+            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers Slider reset failed package validation".to_owned(),
                 ));
@@ -735,7 +709,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellStepperFormat>> {
+    ) -> Result<Option<Stepper>> {
         cell_data_format::cell_stepper_format(&self.package, table_id, row, column)
     }
 
@@ -745,7 +719,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellStepperFormat,
+        format: Stepper,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -762,9 +736,7 @@ impl NumbersEditor {
             cell_data_format::reset_cell_stepper_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
-            {
+            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers Stepper reset failed package validation".to_owned(),
                 ));
@@ -780,7 +752,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<crate::table_cell_data_format::TableCellPopUpMenuFormat>> {
+    ) -> Result<Option<PopUpMenu>> {
         cell_data_format::cell_pop_up_menu_format(&self.package, table_id, row, column)
     }
 
@@ -790,7 +762,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        format: crate::table_cell_data_format::TableCellPopUpMenuFormat,
+        format: PopUpMenu,
     ) -> Result<()> {
         self.set_table_cell_data_format(table_id, row, column, format.into())
     }
@@ -807,9 +779,7 @@ impl NumbersEditor {
             cell_data_format::reset_cell_pop_up_menu_format(&mut staged, table_id, row, column)?;
         if changed {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)?
-                != crate::table_cell_data_format::TableCellDataFormat::Automatic
-            {
+            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers Pop-Up Menu reset failed package validation".to_owned(),
                 ));
@@ -820,12 +790,7 @@ impl NumbersEditor {
     }
 
     /// Read the effective text layout for one zero-based table cell.
-    pub fn table_cell_layout(
-        &self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<crate::table_cell_layout::TableCellLayout> {
+    pub fn table_cell_layout(&self, table_id: u64, row: usize, column: usize) -> Result<Layout> {
         cell_layout::cell_layout(&self.package, table_id, row, column)
     }
 
@@ -835,7 +800,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        layout: crate::table_cell_layout::TableCellLayout,
+        layout: Layout,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_layout::set_cell_layout(&mut staged, table_id, row, column, layout)?;
@@ -870,7 +835,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellTextAlignment> {
+    ) -> Result<Alignment> {
         cell_paragraph_style::alignment(&self.package, table_id, row, column)
     }
 
@@ -880,7 +845,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        alignment: NumbersTableCellTextAlignment,
+        alignment: Alignment,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_alignment(&mut staged, table_id, row, column, alignment)?;
@@ -915,7 +880,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellParagraphLineSpacing> {
+    ) -> Result<LineSpacing> {
         cell_paragraph_style::line_spacing(&self.package, table_id, row, column)
     }
 
@@ -925,7 +890,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        spacing: NumbersTableCellParagraphLineSpacing,
+        spacing: LineSpacing,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_line_spacing(&mut staged, table_id, row, column, spacing)?;
@@ -960,7 +925,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellParagraphSpacing> {
+    ) -> Result<Spacing> {
         cell_paragraph_style::spacing(&self.package, table_id, row, column)
     }
 
@@ -970,7 +935,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        spacing: NumbersTableCellParagraphSpacing,
+        spacing: Spacing,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_spacing(&mut staged, table_id, row, column, spacing)?;
@@ -1092,7 +1057,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         level: NumbersTableCellParagraphListLevel,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1127,7 +1092,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_level(
@@ -1149,7 +1114,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListNumbering> {
         cell_paragraph_list::paragraph_list_numbering(
             &self.package,
@@ -1166,7 +1131,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         numbering: NumbersTableCellParagraphListNumbering,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1201,7 +1166,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListNumberFormat> {
         cell_paragraph_list::paragraph_list_number_format(
             &self.package,
@@ -1218,7 +1183,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         format: NumbersTableCellParagraphListNumberFormat,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1249,7 +1214,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_number_format(
@@ -1271,7 +1236,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListNumberTiering> {
         cell_paragraph_list::paragraph_list_number_tiering(
             &self.package,
@@ -1288,7 +1253,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         tiering: NumbersTableCellParagraphListNumberTiering,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1319,7 +1284,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_number_tiering(
@@ -1341,7 +1306,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListNumberScale> {
         cell_paragraph_list::paragraph_list_number_scale(
             &self.package,
@@ -1358,7 +1323,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         scale: NumbersTableCellParagraphListNumberScale,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1389,7 +1354,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_number_scale(
@@ -1411,7 +1376,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListBullet> {
         cell_paragraph_list::paragraph_list_bullet(&self.package, table_id, row, column, paragraph)
     }
@@ -1422,7 +1387,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         bullet: &NumbersTableCellParagraphListBullet,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1450,7 +1415,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_bullet(
@@ -1472,7 +1437,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListBulletGeometry> {
         cell_paragraph_list::paragraph_list_bullet_geometry(
             &self.package,
@@ -1489,7 +1454,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         geometry: NumbersTableCellParagraphListBulletGeometry,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1519,7 +1484,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_bullet_geometry(
@@ -1541,7 +1506,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListIndentation> {
         cell_paragraph_list::paragraph_list_indentation(
             &self.package,
@@ -1558,7 +1523,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         indentation: NumbersTableCellParagraphListIndentation,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1589,7 +1554,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_indentation(
@@ -1611,7 +1576,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<NumbersTableCellParagraphListLabelColor> {
         cell_paragraph_list::paragraph_list_label_color(
             &self.package,
@@ -1628,7 +1593,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         color: NumbersTableCellParagraphListLabelColor,
     ) -> Result<()> {
         let mut staged = self.package.clone();
@@ -1659,7 +1624,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_paragraph_list::reset_paragraph_list_label_color(
@@ -1681,7 +1646,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<NumbersTableCellParagraphIndents> {
+    ) -> Result<Indents> {
         cell_paragraph_style::indents(&self.package, table_id, row, column)
     }
 
@@ -1691,7 +1656,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        indents: NumbersTableCellParagraphIndents,
+        indents: Indents,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         cell_paragraph_style::set_indents(&mut staged, table_id, row, column, indents)?;
@@ -2360,12 +2325,7 @@ impl NumbersEditor {
     }
 
     /// Read the effective explicit borders for one zero-based table cell.
-    pub fn table_cell_borders(
-        &self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<crate::table_cell_border::TableCellBorders> {
+    pub fn table_cell_borders(&self, table_id: u64, row: usize, column: usize) -> Result<Borders> {
         stroke_layers::cell_borders(&self.package, table_id, row, column)
     }
 
@@ -2375,8 +2335,8 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        side: crate::table_cell_border::TableCellBorderSide,
-        stroke: crate::shapes::ShapeStroke,
+        side: BorderSide,
+        stroke: Stroke,
     ) -> Result<()> {
         self.update_table_cell_border(table_id, row, column, side, Some(stroke))
     }
@@ -2387,7 +2347,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        side: crate::table_cell_border::TableCellBorderSide,
+        side: BorderSide,
     ) -> Result<()> {
         self.update_table_cell_border(table_id, row, column, side, None)
     }
@@ -2397,8 +2357,8 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        side: crate::table_cell_border::TableCellBorderSide,
-        stroke: Option<crate::shapes::ShapeStroke>,
+        side: BorderSide,
+        stroke: Option<Stroke>,
     ) -> Result<()> {
         let mut staged = self.package.clone();
         stroke_layers::set_cell_border(&mut staged, table_id, row, column, side, stroke)?;
@@ -2417,12 +2377,12 @@ impl NumbersEditor {
     }
 
     /// List every native merged-cell rectangle in one attached table.
-    pub fn table_cell_merges(&self, table_id: u64) -> Result<Vec<IWorkTableCellRegion>> {
+    pub fn table_cell_merges(&self, table_id: u64) -> Result<Vec<Region>> {
         cell_merge::regions_in_package(&self.package, table_id)
     }
 
     /// Merge one non-overlapping rectangular cell region transactionally.
-    pub fn merge_cells(&mut self, table_id: u64, region: IWorkTableCellRegion) -> Result<()> {
+    pub fn merge_cells(&mut self, table_id: u64, region: Region) -> Result<()> {
         let mut staged = self.package.clone();
         cell_merge::merge_in_package(&mut staged, table_id, region)?;
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
@@ -2436,7 +2396,7 @@ impl NumbersEditor {
     }
 
     /// Remove one exact merged-cell rectangle, returning whether it existed.
-    pub fn unmerge_cells(&mut self, table_id: u64, region: IWorkTableCellRegion) -> Result<bool> {
+    pub fn unmerge_cells(&mut self, table_id: u64, region: Region) -> Result<bool> {
         let mut staged = self.package.clone();
         let changed = cell_merge::unmerge_in_package(&mut staged, table_id, region)?;
         if !changed {
@@ -2458,7 +2418,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<NumbersCellCommentInfo>> {
+    ) -> Result<Option<TableCellComment>> {
         cell_comment_in_package(&self.package, table_id, row, column)
     }
 
@@ -2504,7 +2464,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<Vec<TableCellConditionalHighlightRule>>> {
+    ) -> Result<Option<Vec<Rule>>> {
         conditional_highlight::rules_in_package(&self.package, table_id, row, column)
     }
 
@@ -2536,7 +2496,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-        rules: &[TableCellConditionalHighlightRule],
+        rules: &[Rule],
     ) -> Result<TableCellConditionalHighlightInfo> {
         let mut staged = self.package.clone();
         conditional_highlight::set_in_package(&mut staged, table_id, row, column, rules)?;
@@ -2572,7 +2532,7 @@ impl NumbersEditor {
         table_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Vec<NumbersCellCommentReplyInfo>> {
+    ) -> Result<Vec<TableCellReply>> {
         cell_comment_replies_in_package(&self.package, table_id, row, column)
     }
 

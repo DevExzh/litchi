@@ -107,9 +107,9 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
         }
 
         // Finally try iWork detection
-        #[cfg(feature = "iwork")]
-        if let Ok(Some(result)) =
-            litchi_iwa::detect::bytes(bytes).map(|result| result.map(iwork_format))
+        #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
+        if let Ok(Some(format)) = litchi_iwa_detect::bytes(bytes)
+            && let Some(result) = iwork_format(format)
         {
             return Some(result);
         }
@@ -166,7 +166,9 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
         #[cfg(any(
             any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
             any(feature = "odt", feature = "ods", feature = "odp"),
-            feature = "iwork"
+            feature = "pages",
+            feature = "keynote",
+            feature = "numbers"
         ))]
         if header_len >= utils::ZIP_SIGNATURE.len()
             && signature_matches(&header[..header_len], utils::ZIP_SIGNATURE)
@@ -187,11 +189,11 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
                 }
             }
 
-            #[cfg(feature = "iwork")]
+            #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
             {
                 reader.seek(SeekFrom::Start(0)).ok()?;
-                if let Ok(Some(format)) =
-                    litchi_iwa::detect::reader(reader).map(|result| result.map(iwork_format))
+                if let Ok(Some(format)) = litchi_iwa_detect::reader(reader)
+                    && let Some(format) = iwork_format(format)
                 {
                     return Some(format);
                 }
@@ -221,21 +223,17 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
     detected
 }
 
-/// Detect iWork format from file path.
-#[cfg(feature = "iwork")]
-pub fn detect_iwork_format_from_path<P: AsRef<Path>>(path: P) -> Option<FileFormat> {
-    litchi_iwa::detect::path(path.as_ref())
-        .ok()
-        .flatten()
-        .map(iwork_format)
-}
-
-#[cfg(feature = "iwork")]
-fn iwork_format(format: litchi_iwa::detect::Format) -> FileFormat {
+#[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
+#[allow(unreachable_patterns)]
+fn iwork_format(format: litchi_iwa_detect::Format) -> Option<FileFormat> {
     match format {
-        litchi_iwa::detect::Format::Pages => FileFormat::Pages,
-        litchi_iwa::detect::Format::Keynote => FileFormat::Keynote,
-        litchi_iwa::detect::Format::Numbers => FileFormat::Numbers,
+        #[cfg(feature = "pages")]
+        litchi_iwa_detect::Format::Pages => Some(FileFormat::Pages),
+        #[cfg(feature = "keynote")]
+        litchi_iwa_detect::Format::Keynote => Some(FileFormat::Keynote),
+        #[cfg(feature = "numbers")]
+        litchi_iwa_detect::Format::Numbers => Some(FileFormat::Numbers),
+        _ => None,
     }
 }
 
@@ -330,99 +328,6 @@ mod tests {
             Some(FileFormat::Rtf)
         );
         assert_eq!(reader.position(), 2);
-    }
-
-    #[test]
-    #[cfg(feature = "iwork")]
-    fn iwork_leaf_detection_maps_bytes_reader_smart_and_path() {
-        let bytes = iwork_package(None);
-        assert_eq!(
-            detect_file_format_from_bytes(&bytes),
-            Some(FileFormat::Numbers)
-        );
-
-        let mut reader = std::io::Cursor::new(&bytes);
-        reader.set_position(6);
-        assert_eq!(
-            detect_format_from_reader(&mut reader),
-            Some(FileFormat::Numbers)
-        );
-        assert_eq!(reader.position(), 6);
-
-        assert!(matches!(
-            crate::detection_smart::detect_format_smart(bytes.clone()),
-            Some(crate::detection_smart::DetectedFormat::Numbers(retained)) if retained == bytes
-        ));
-
-        let file = tempfile::NamedTempFile::new().unwrap();
-        std::fs::write(file.path(), &bytes).unwrap();
-        assert_eq!(
-            detect_iwork_format_from_path(file.path()),
-            Some(FileFormat::Numbers)
-        );
-    }
-
-    #[test]
-    #[cfg(all(feature = "iwork", feature = "ods"))]
-    fn odf_precedes_iwork_consistently_for_mixed_packages() {
-        let bytes = iwork_package(Some("application/vnd.oasis.opendocument.spreadsheet"));
-        assert_eq!(detect_file_format_from_bytes(&bytes), Some(FileFormat::Ods));
-
-        let mut reader = std::io::Cursor::new(&bytes);
-        reader.set_position(4);
-        assert_eq!(
-            detect_format_from_reader(&mut reader),
-            Some(FileFormat::Ods)
-        );
-        assert_eq!(reader.position(), 4);
-
-        assert!(matches!(
-            crate::detection_smart::detect_format_smart(bytes),
-            Some(crate::detection_smart::DetectedFormat::Ods(_))
-        ));
-    }
-
-    #[cfg(feature = "iwork")]
-    fn iwork_package(mimetype: Option<&str>) -> Vec<u8> {
-        use litchi_iwa::archive::{Archive, ArchiveObject, RawMessage};
-        use std::io::{Cursor, Write};
-
-        let document = Archive {
-            objects: vec![
-                ArchiveObject::new(
-                    1,
-                    vec![RawMessage {
-                        type_: 6,
-                        // TN.DocumentArchive required references plus its shared root.
-                        data: vec![
-                            0x22, 0x02, 0x08, 0x01, 0x2a, 0x02, 0x08, 0x02, 0x32, 0x02, 0x08, 0x03,
-                            0x42, 0x02, 0x0a, 0x00,
-                        ],
-                    }],
-                )
-                .unwrap(),
-            ],
-        };
-        let document = litchi_iwa::SnappyStream::compress(&document.to_bytes().unwrap()).unwrap();
-
-        let mut bytes = Vec::new();
-        {
-            let mut writer = zip::ZipWriter::new(Cursor::new(&mut bytes));
-            let options = zip::write::SimpleFileOptions::default()
-                .compression_method(zip::CompressionMethod::Stored);
-            if let Some(mimetype) = mimetype {
-                writer.start_file("mimetype", options).unwrap();
-                writer.write_all(mimetype.as_bytes()).unwrap();
-            }
-            writer.start_file("Index/Document.iwa", options).unwrap();
-            writer.write_all(&document).unwrap();
-            writer
-                .start_file("Index/CalculationEngine-174.iwa", options)
-                .unwrap();
-            writer.write_all(b"iwa").unwrap();
-            writer.finish().unwrap();
-        }
-        bytes
     }
 
     // Helper function to create a minimal DOCX-like ZIP for testing

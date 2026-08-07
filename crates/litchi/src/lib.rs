@@ -188,15 +188,15 @@ pub mod common {
         feature = "odt",
         feature = "ods",
         feature = "odp",
-        feature = "iwork"
+        feature = "pages",
+        feature = "keynote",
+        feature = "numbers"
     ))]
     pub use crate::detection_smart::{detect_file_format, detect_file_format_from_bytes};
 
     /// Detection re-exports — merges `litchi-core`'s signature detection with
     /// the umbrella's smart-detection entry points.
     pub mod detection {
-        #[cfg(feature = "iwork")]
-        pub use crate::detection_smart::detect_iwork_format_from_path;
         #[cfg(any(
             feature = "doc",
             feature = "ppt",
@@ -205,7 +205,9 @@ pub mod common {
             feature = "pptx",
             feature = "xlsx",
             feature = "xlsb",
-            feature = "iwork",
+            feature = "pages",
+            feature = "keynote",
+            feature = "numbers",
             feature = "odt",
             feature = "ods",
             feature = "odp",
@@ -228,7 +230,9 @@ pub mod common {
     feature = "xls",
     feature = "xlsx",
     feature = "xlsb",
-    feature = "iwork",
+    feature = "pages",
+    feature = "keynote",
+    feature = "numbers",
     feature = "odt",
     feature = "ods",
     feature = "odp",
@@ -251,7 +255,7 @@ pub use metadata_ext::MetadataYaml;
     feature = "docx",
     feature = "rtf",
     feature = "odt",
-    feature = "iwork"
+    feature = "pages"
 ))]
 pub mod document;
 
@@ -270,7 +274,12 @@ pub mod images;
 /// Use [`Presentation::open()`] to get started.
 ///
 /// **Note**: This requires at least one presentation-format feature to be enabled.
-#[cfg(any(feature = "ppt", feature = "pptx", feature = "odp", feature = "iwork"))]
+#[cfg(any(
+    feature = "ppt",
+    feature = "pptx",
+    feature = "odp",
+    feature = "keynote"
+))]
 pub mod presentation;
 
 /// Unified Excel/Spreadsheet API (.xls, .xlsx, .xlsb, .ods, .numbers)
@@ -280,7 +289,7 @@ pub mod presentation;
 /// - `xlsx` for .xlsx
 /// - `xlsb` for .xlsb
 /// - `ods` for .ods
-/// - `iwork` for .numbers
+/// - `numbers` for .numbers
 #[cfg(feature = "sheet")]
 pub mod sheet;
 
@@ -416,16 +425,22 @@ pub mod formula {
     pub use litchi_formula::*;
 }
 
-/// iWork Archive Format Support
-///
-/// Provides support for parsing Apple's iWork file formats
-/// (Pages, Keynote, Numbers) which use the IWA (iWork Archive) format.
-/// Use [`iwa::Document::open()`] to get started.
-///
-/// **Note**: This requires the `iwork` feature to be enabled.
-#[cfg(feature = "iwork")]
-pub mod iwa {
-    pub use litchi_iwa::*;
+/// Apple Pages package and semantic APIs.
+#[cfg(feature = "pages")]
+pub mod pages {
+    pub use litchi_pages::*;
+}
+
+/// Apple Keynote package and semantic APIs.
+#[cfg(feature = "keynote")]
+pub mod keynote {
+    pub use litchi_keynote::*;
+}
+
+/// Apple Numbers package and semantic APIs.
+#[cfg(feature = "numbers")]
+pub mod numbers {
+    pub use litchi_numbers::*;
 }
 
 /// OpenDocument Presentation (`.odp`) package and semantic APIs.
@@ -489,11 +504,16 @@ pub use common::{Error, Result};
     feature = "docx",
     feature = "rtf",
     feature = "odt",
-    feature = "iwork"
+    feature = "pages"
 ))]
 pub use document::{Document, DocumentElement};
 
-#[cfg(any(feature = "ppt", feature = "pptx", feature = "odp", feature = "iwork"))]
+#[cfg(any(
+    feature = "ppt",
+    feature = "pptx",
+    feature = "odp",
+    feature = "keynote"
+))]
 pub use presentation::Presentation;
 
 #[cfg(any(
@@ -501,7 +521,7 @@ pub use presentation::Presentation;
     feature = "xlsx",
     feature = "xlsb",
     feature = "ods",
-    feature = "iwork"
+    feature = "numbers"
 ))]
 pub use sheet::Workbook;
 
@@ -516,7 +536,9 @@ pub use common::{FileFormat, Length, PlaceholderType, RGBColor, ShapeType};
     feature = "xls",
     feature = "xlsx",
     feature = "xlsb",
-    feature = "iwork",
+    feature = "pages",
+    feature = "keynote",
+    feature = "numbers",
     feature = "odt",
     feature = "ods",
     feature = "odp",

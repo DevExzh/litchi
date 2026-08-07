@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "sheet={sheet_id} drawable={} storage={} kind={:?} title_caption={:?}",
         shape.drawable_object_id,
-        shape.storage.object_id,
+        shape.storage.id,
         shape.kind,
         editor.sheet_shape_title_caption(sheet_id, shape.drawable_object_id)?
     );

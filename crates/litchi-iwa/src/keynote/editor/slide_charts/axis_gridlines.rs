@@ -11,7 +11,9 @@ use crate::charts::axis_style::{
     set_chart_axis_major_gridlines_visible as set_native_chart_axis_major_gridlines_visible,
     set_chart_axis_minor_gridlines_visible as set_native_chart_axis_minor_gridlines_visible,
 };
-use crate::charts::{ChartAxis, ChartAxisGridline, ChartAxisGridlineStroke};
+use crate::charts::{ChartAxisGridline, ChartAxisGridlineStroke};
+use litchi_iwa_common::chart::axis::Axis;
+use litchi_iwa_common::chart::axis::style::Visibility;
 
 impl KeynoteEditor {
     /// Read whether Keynote shows major gridlines for one native slide-chart axis.
@@ -19,8 +21,8 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
-    ) -> Result<bool> {
+        axis: Axis,
+    ) -> Result<Visibility> {
         slide_chart_axis_major_gridlines_visible(self, slide_index, drawable_object_id, axis)
     }
 
@@ -29,8 +31,8 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
-        visible: bool,
+        axis: Axis,
+        visible: Visibility,
     ) -> Result<()> {
         set_slide_chart_axis_major_gridlines_visible(
             self,
@@ -46,8 +48,8 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
-    ) -> Result<bool> {
+        axis: Axis,
+    ) -> Result<Visibility> {
         slide_chart_axis_minor_gridlines_visible(self, slide_index, drawable_object_id, axis)
     }
 
@@ -56,8 +58,8 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
-        visible: bool,
+        axis: Axis,
+        visible: Visibility,
     ) -> Result<()> {
         set_slide_chart_axis_minor_gridlines_visible(
             self,
@@ -73,7 +75,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         gridline: ChartAxisGridline,
     ) -> Result<ChartAxisGridlineStroke> {
         let graph = chart_graph(self, slide_index, drawable_object_id)?;
@@ -92,7 +94,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         gridline: ChartAxisGridline,
         stroke: ChartAxisGridlineStroke,
     ) -> Result<()> {
@@ -128,8 +130,8 @@ fn slide_chart_axis_major_gridlines_visible(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
-) -> Result<bool> {
+    axis: Axis,
+) -> Result<Visibility> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     read_native_chart_axis_major_gridlines_visible(
         editor.package(),
@@ -144,8 +146,8 @@ fn set_slide_chart_axis_major_gridlines_visible(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
-    visible: bool,
+    axis: Axis,
+    visible: Visibility,
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let mut staged = editor.package().clone();
@@ -173,8 +175,8 @@ fn slide_chart_axis_minor_gridlines_visible(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
-) -> Result<bool> {
+    axis: Axis,
+) -> Result<Visibility> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     read_native_chart_axis_minor_gridlines_visible(
         editor.package(),
@@ -189,8 +191,8 @@ fn set_slide_chart_axis_minor_gridlines_visible(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
-    visible: bool,
+    axis: Axis,
+    visible: Visibility,
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let mut staged = editor.package().clone();
@@ -217,11 +219,10 @@ fn set_slide_chart_axis_minor_gridlines_visible(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartKind};
+    use crate::charts::{ChartData, Kind};
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{
-        DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeStroke, StrokePattern,
-        StrokeWidth,
+        DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Stroke, Width,
     };
 
     #[test]
@@ -230,7 +231,7 @@ mod tests {
         let chart = editor
             .add_slide_chart(
                 0,
-                ChartKind::Column2d,
+                Kind::Column2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -247,7 +248,7 @@ mod tests {
                 .slide_chart_axis_gridline_stroke(
                     0,
                     chart.drawable_object_id,
-                    ChartAxis::Category,
+                    Axis::Category,
                     ChartAxisGridline::Major,
                 )
                 .unwrap(),
@@ -257,7 +258,7 @@ mod tests {
             .set_slide_chart_axis_gridline_stroke(
                 0,
                 chart.drawable_object_id,
-                ChartAxis::Category,
+                Axis::Category,
                 ChartAxisGridline::Major,
                 stroke,
             )
@@ -267,26 +268,27 @@ mod tests {
                 .slide_chart_axis_gridline_stroke(
                     0,
                     chart.drawable_object_id,
-                    ChartAxis::Category,
+                    Axis::Category,
                     ChartAxisGridline::Major,
                 )
                 .unwrap(),
             stroke
         );
         assert!(
-            !editor
+            editor
                 .slide_chart_axis_major_gridlines_visible(
                     0,
                     chart.drawable_object_id,
-                    ChartAxis::Category,
+                    Axis::Category,
                 )
                 .unwrap()
+                .is_hidden()
         );
         editor
             .set_slide_chart_axis_gridline_stroke(
                 0,
                 chart.drawable_object_id,
-                ChartAxis::Category,
+                Axis::Category,
                 ChartAxisGridline::Major,
                 ChartAxisGridlineStroke::NoStroke,
             )
@@ -295,7 +297,7 @@ mod tests {
             .set_slide_chart_axis_gridline_stroke(
                 0,
                 chart.drawable_object_id,
-                ChartAxis::Category,
+                Axis::Category,
                 ChartAxisGridline::Major,
                 ChartAxisGridlineStroke::Inherited,
             )
@@ -312,11 +314,11 @@ mod tests {
         .unwrap()
     }
 
-    fn test_stroke() -> ShapeStroke {
-        ShapeStroke::new(
+    fn test_stroke() -> Stroke {
+        Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(3.0).unwrap(),
-            StrokePattern::MediumDash,
+            Width::new(3.0).unwrap(),
+            Pattern::MediumDash,
         )
     }
 }

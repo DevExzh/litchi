@@ -2,12 +2,12 @@
 
 use crate::{Error, Result};
 
-use super::super::drop_cap::ParagraphStart;
 use super::storage::ListBoundaryStorage;
+use litchi_iwa_text::position::TextPosition;
 
 pub(super) fn effective_style_id(
     storage: &ListBoundaryStorage,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<u64> {
     let target = paragraph.utf16_index();
     if storage.paragraph_starts.binary_search(&target).is_err() {
@@ -28,7 +28,7 @@ pub(super) fn effective_style_id(
 
 pub(super) fn style_isolated_to_paragraph(
     storage: &ListBoundaryStorage,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     let target = paragraph.utf16_index();
     let target_boundary = storage
@@ -54,7 +54,7 @@ pub(super) fn style_isolated_to_paragraph(
 
 pub(super) fn paragraph_boundaries_with_style(
     storage: &ListBoundaryStorage,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     replacement_style_id: u64,
 ) -> Result<Vec<(u32, u64)>> {
     let target = paragraph.utf16_index();
@@ -110,7 +110,7 @@ mod tests {
         assert_eq!(
             paragraph_boundaries_with_style(
                 &storage(),
-                ParagraphStart::from_utf16_index(10).unwrap(),
+                TextPosition::from_utf16_index(10).unwrap(),
                 99,
             )
             .unwrap(),
@@ -121,13 +121,13 @@ mod tests {
     #[test]
     fn only_single_paragraph_style_spans_are_isolated() {
         let storage = storage();
-        assert!(!style_isolated_to_paragraph(&storage, ParagraphStart::ZERO).unwrap());
+        assert!(!style_isolated_to_paragraph(&storage, TextPosition::ZERO).unwrap());
         assert!(
-            !style_isolated_to_paragraph(&storage, ParagraphStart::from_utf16_index(10).unwrap())
+            !style_isolated_to_paragraph(&storage, TextPosition::from_utf16_index(10).unwrap())
                 .unwrap()
         );
         assert!(
-            style_isolated_to_paragraph(&storage, ParagraphStart::from_utf16_index(20).unwrap())
+            style_isolated_to_paragraph(&storage, TextPosition::from_utf16_index(20).unwrap())
                 .unwrap()
         );
     }

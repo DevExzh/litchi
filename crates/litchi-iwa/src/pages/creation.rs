@@ -7,7 +7,9 @@ pub(super) use table_bootstrap::bootstrap_first_table_graph;
 use plist::Value;
 use prost::Message;
 
-use super::editor::{PagesEditor, PagesSectionPageNumbering, PagesSectionStart};
+use litchi_pages::section::{PageNumbering, Start};
+
+use super::editor::PagesEditor;
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::identity::IWorkDocumentIdentity;
 use crate::protobuf::{tp, tsa, tsd, tsk, tsp, tss, tst, tswp};
@@ -508,7 +510,7 @@ impl PagesDocumentBuilder {
     }
 
     /// Build the underlying package for lower-level IWA manipulation.
-    pub fn build_package(self) -> Result<IWorkPackage> {
+    pub(crate) fn build_package(self) -> Result<IWorkPackage> {
         crate::text::TextLanguageTag::new(self.language.as_str())?;
         if self.locale.trim().is_empty() {
             return Err(crate::Error::InvalidFormat(
@@ -799,10 +801,8 @@ fn document_archive(
                 inherit_previous_header_footer: Some(true),
                 section_template_first_page_different: Some(false),
                 section_template_even_odd_pages_different: Some(false),
-                section_start_kind: Some(PagesSectionStart::NextPage.as_raw()),
-                section_page_number_kind: Some(
-                    PagesSectionPageNumbering::ContinueFromPrevious.as_raw(),
-                ),
+                section_start_kind: Some(Start::NextPage.as_raw()),
+                section_page_number_kind: Some(PageNumbering::ContinueFromPrevious.as_raw()),
                 section_page_number_start: Some(INITIAL_PAGE_NUMBER),
                 first_section_template_page: Some(reference(PagesObjectId::SectionTemplate)),
                 even_section_template_page: Some(reference(PagesObjectId::SectionTemplate)),
@@ -1708,7 +1708,7 @@ mod tests {
         assert_eq!(
             styles
                 .iter()
-                .map(|style| style.id().get())
+                .map(|style| litchi_iwa_text::paragraph::style::raw::native_id(style.id()))
                 .collect::<Vec<_>>(),
             PagesParagraphStylePreset::ALL
                 .into_iter()

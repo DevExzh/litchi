@@ -7,68 +7,77 @@ use crate::protobuf::tswp::{
     ObjectAttributeTable, StorageArchive, object_attribute_table::ObjectAttribute,
 };
 use crate::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+use litchi_pages::document_options::Options as DocumentOptions;
+use litchi_pages::footnote::{
+    Format as FootnoteFormat, Gap as FootnoteGap, Kind as FootnoteKind,
+    Numbering as FootnoteNumbering, Settings as FootnoteSettings,
+};
+use litchi_pages::header_footer::{Kind, Template};
+use litchi_pages::page_layout::{Layout as PageLayout, Orientation as PageOrientation};
+use litchi_pages::section::{Background, Opaque, PageNumber, PageNumbering, Settings, Start};
 
 #[test]
 fn pages_native_discriminants_are_typed_and_lossless() {
     for (raw, value) in [
-        (0, PagesSectionStart::NextPage),
-        (1, PagesSectionStart::RightPage),
-        (2, PagesSectionStart::LeftPage),
-        (7, PagesSectionStart::Unknown(7)),
+        (0, Start::NextPage),
+        (1, Start::RightPage),
+        (2, Start::LeftPage),
+        (7, Start::Unknown(7)),
     ] {
-        assert_eq!(PagesSectionStart::from_raw(raw), value);
+        assert_eq!(Start::from_raw(raw), value);
         assert_eq!(value.as_raw(), raw);
     }
     for (raw, value) in [
-        (0, PagesSectionPageNumbering::ContinueFromPrevious),
-        (1, PagesSectionPageNumbering::Restart),
-        (3, PagesSectionPageNumbering::Unknown(3)),
+        (0, PageNumbering::ContinueFromPrevious),
+        (1, PageNumbering::Restart),
+        (3, PageNumbering::Unknown(3)),
     ] {
-        assert_eq!(PagesSectionPageNumbering::from_raw(raw), value);
+        assert_eq!(PageNumbering::from_raw(raw), value);
         assert_eq!(value.as_raw(), raw);
     }
     for (raw, value) in [
-        (0, PagesPageOrientation::Portrait),
-        (1, PagesPageOrientation::Landscape),
-        (9, PagesPageOrientation::Unknown(9)),
+        (0, PageOrientation::Portrait),
+        (1, PageOrientation::Landscape),
+        (9, PageOrientation::Unknown(9)),
     ] {
-        assert_eq!(PagesPageOrientation::from_raw(raw), value);
+        assert_eq!(PageOrientation::from_raw(raw), value);
         assert_eq!(value.as_raw(), raw);
     }
     for (raw, value) in [
-        (0, PagesFootnoteKind::Footnotes),
-        (1, PagesFootnoteKind::DocumentEndnotes),
-        (2, PagesFootnoteKind::SectionEndnotes),
-        (7, PagesFootnoteKind::Unknown(7)),
+        (0, FootnoteKind::Footnotes),
+        (1, FootnoteKind::DocumentEndnotes),
+        (2, FootnoteKind::SectionEndnotes),
+        (7, FootnoteKind::Unknown(7)),
     ] {
-        assert_eq!(PagesFootnoteKind::from_raw(raw), value);
+        assert_eq!(FootnoteKind::from_raw(raw), value);
         assert_eq!(value.as_raw(), raw);
     }
     for (raw, value) in [
-        (0, PagesFootnoteFormat::Numeric),
-        (1, PagesFootnoteFormat::Roman),
-        (2, PagesFootnoteFormat::Symbolic),
-        (3, PagesFootnoteFormat::JapaneseNumeric),
-        (4, PagesFootnoteFormat::JapaneseIdeographic),
-        (5, PagesFootnoteFormat::ArabicNumeric),
-        (8, PagesFootnoteFormat::Unknown(8)),
+        (0, FootnoteFormat::Numeric),
+        (1, FootnoteFormat::Roman),
+        (2, FootnoteFormat::Symbolic),
+        (3, FootnoteFormat::JapaneseNumeric),
+        (4, FootnoteFormat::JapaneseIdeographic),
+        (5, FootnoteFormat::ArabicNumeric),
+        (8, FootnoteFormat::Unknown(8)),
     ] {
-        assert_eq!(PagesFootnoteFormat::from_raw(raw), value);
+        assert_eq!(FootnoteFormat::from_raw(raw), value);
         assert_eq!(value.as_raw(), raw);
     }
     for (raw, value) in [
-        (0, PagesFootnoteNumbering::Continuous),
-        (1, PagesFootnoteNumbering::RestartEachPage),
-        (2, PagesFootnoteNumbering::RestartEachSection),
-        (9, PagesFootnoteNumbering::Unknown(9)),
+        (0, FootnoteNumbering::Continuous),
+        (1, FootnoteNumbering::RestartEachPage),
+        (2, FootnoteNumbering::RestartEachSection),
+        (9, FootnoteNumbering::Unknown(9)),
     ] {
-        assert_eq!(PagesFootnoteNumbering::from_raw(raw), value);
+        assert_eq!(FootnoteNumbering::from_raw(raw), value);
         assert_eq!(value.as_raw(), raw);
     }
-    assert!(PagesPageNumber::new(0).is_err());
-    assert_eq!(PagesPageNumber::new(42).unwrap().get(), 42);
-    assert_eq!(PagesFootnoteGap::new(14).unwrap().points(), 14);
-    assert!(PagesFootnoteGap::new(u32::MAX).is_err());
+    assert!(PageNumber::new(0).is_err());
+    assert_eq!(PageNumber::new(42).unwrap().get(), 42);
+    assert_eq!(FootnoteGap::new(14).unwrap().points(), 14);
+    assert!(FootnoteGap::new(u32::MAX).is_err());
 }
 
 #[test]
@@ -87,8 +96,8 @@ fn semantic_body_update_and_clear_are_transactional() {
 fn page_layout_crud_preserves_unknown_wire_and_restores_exact_bytes() {
     let mut package = test_package("Body");
     let unknown = {
-        let mut field = crate::varint::encode_varint(99 << 3);
-        field.extend(crate::varint::encode_varint(999));
+        let mut field = litchi_iwa_common::varint::encode_varint(99 << 3);
+        field.extend(litchi_iwa_common::varint::encode_varint(999));
         field
     };
     package
@@ -96,7 +105,7 @@ fn page_layout_crud_preserves_unknown_wire_and_restores_exact_bytes() {
             let object = archive.object_mut(1).unwrap();
             let mut message = object.messages[0].clone();
             message.data.extend_from_slice(&unknown);
-            object.replace_message(0, message).map(|_| ())
+            Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
     let mut editor = PagesEditor::from_package(package).unwrap();
@@ -110,20 +119,21 @@ fn page_layout_crud_preserves_unknown_wire_and_restores_exact_bytes() {
         .data
         .clone();
 
-    let layout = PagesPageLayout {
-        page_width: Some(612.0),
-        page_height: Some(792.0),
-        left_margin: Some(72.0),
-        right_margin: Some(72.0),
-        top_margin: Some(54.0),
-        bottom_margin: Some(54.0),
-        header_margin: Some(24.0),
-        footer_margin: Some(24.0),
-        page_scale: Some(1.0),
-        orientation: Some(PagesPageOrientation::Landscape),
-        lays_out_body_vertically: Some(false),
-    };
-    editor.set_page_layout(layout.clone()).unwrap();
+    let layout = PageLayout::new(
+        Some(612.0),
+        Some(792.0),
+        Some(72.0),
+        Some(72.0),
+        Some(54.0),
+        Some(54.0),
+        Some(24.0),
+        Some(24.0),
+        Some(1.0),
+        Some(PageOrientation::Landscape),
+        Some(false),
+    )
+    .unwrap();
+    editor.set_page_layout(layout).unwrap();
     assert_eq!(editor.page_layout().unwrap(), layout);
     let updated = editor
         .package()
@@ -142,20 +152,21 @@ fn page_layout_crud_preserves_unknown_wire_and_restores_exact_bytes() {
         1
     );
 
-    let mut unknown_orientation = layout.clone();
-    unknown_orientation.orientation = Some(PagesPageOrientation::Unknown(9));
-    editor.set_page_layout(unknown_orientation.clone()).unwrap();
+    let mut unknown_orientation = layout;
+    unknown_orientation
+        .set_orientation(Some(PageOrientation::Unknown(9)))
+        .unwrap();
+    editor.set_page_layout(unknown_orientation).unwrap();
     assert_eq!(editor.page_layout().unwrap(), unknown_orientation);
     let before_invalid = editor.to_bytes().unwrap();
-    unknown_orientation.orientation = Some(PagesPageOrientation::Unknown(0));
-    assert!(editor.set_page_layout(unknown_orientation).is_err());
+    assert!(
+        unknown_orientation
+            .set_orientation(Some(PageOrientation::Unknown(0)))
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), before_invalid);
 
-    editor
-        .set_page_layout(PagesPageLayout::from(
-            &DocumentArchive::decode(original_payload.as_slice()).unwrap(),
-        ))
-        .unwrap();
+    editor.set_page_layout(PageLayout::default()).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
 
@@ -169,16 +180,16 @@ fn page_layout_rejects_duplicate_scalar_fields_transactionally() {
             for width in [612.0_f32, 640.0] {
                 message
                     .data
-                    .extend(crate::varint::encode_varint((30 << 3) | 5));
+                    .extend(litchi_iwa_common::varint::encode_varint((30 << 3) | 5));
                 message.data.extend(width.to_bits().to_le_bytes());
             }
-            object.replace_message(0, message).map(|_| ())
+            Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
     let mut editor = PagesEditor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     let mut layout = editor.page_layout().unwrap();
-    layout.page_width = Some(700.0);
+    layout.set_page_width(Some(700.0)).unwrap();
     assert!(editor.set_page_layout(layout).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
@@ -200,17 +211,17 @@ fn document_options_crud_is_lossless_transactional_and_wire_exact() {
     let baseline = editor.to_bytes().unwrap();
     assert_eq!(
         editor.document_options().unwrap(),
-        PagesDocumentOptions::default()
+        DocumentOptions::default()
     );
 
-    let options = PagesDocumentOptions {
-        body_enabled: Some(true),
-        headers_enabled: Some(false),
-        footers_enabled: Some(true),
-        facing_pages: Some(true),
-        automatic_hyphenation: Some(true),
-        ligatures_enabled: Some(false),
-    };
+    let options = DocumentOptions::new(
+        Some(true),
+        Some(false),
+        Some(true),
+        Some(true),
+        Some(true),
+        Some(false),
+    );
     editor.set_document_options(options).unwrap();
     assert_eq!(editor.document_options().unwrap(), options);
     assert!(options.body_is_enabled());
@@ -239,28 +250,28 @@ fn document_options_crud_is_lossless_transactional_and_wire_exact() {
     assert_eq!(editor.to_bytes().unwrap(), changed);
 
     editor
-        .set_document_options(PagesDocumentOptions::default())
+        .set_document_options(DocumentOptions::default())
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
 
 #[test]
 fn document_options_update_and_restore_native_presence_exactly() {
-    let native = PagesDocumentOptions {
-        body_enabled: Some(true),
-        headers_enabled: Some(true),
-        footers_enabled: Some(true),
-        facing_pages: Some(false),
-        automatic_hyphenation: Some(false),
-        ligatures_enabled: Some(true),
-    };
+    let native = DocumentOptions::new(
+        Some(true),
+        Some(true),
+        Some(true),
+        Some(false),
+        Some(false),
+        Some(true),
+    );
     let mut data = tp::SettingsArchive {
-        body: native.body_enabled,
-        headers: native.headers_enabled,
-        footers: native.footers_enabled,
-        facing_pages: native.facing_pages,
-        hyphenation: native.automatic_hyphenation,
-        use_ligatures: native.ligatures_enabled,
+        body: native.body_enabled(),
+        headers: native.headers_enabled(),
+        footers: native.footers_enabled(),
+        facing_pages: native.facing_pages(),
+        hyphenation: native.automatic_hyphenation(),
+        use_ligatures: native.ligatures_enabled(),
         language: Some("en".to_owned()),
         ..Default::default()
     }
@@ -270,14 +281,14 @@ fn document_options_update_and_restore_native_presence_exactly() {
     let baseline = editor.to_bytes().unwrap();
     assert_eq!(editor.document_options().unwrap(), native);
 
-    let changed = PagesDocumentOptions {
-        headers_enabled: Some(false),
-        footers_enabled: Some(false),
-        facing_pages: Some(true),
-        automatic_hyphenation: Some(true),
-        ligatures_enabled: Some(false),
-        ..native
-    };
+    let changed = DocumentOptions::new(
+        native.body_enabled(),
+        Some(false),
+        Some(false),
+        Some(true),
+        Some(true),
+        Some(false),
+    );
     editor.set_document_options(changed).unwrap();
     assert_eq!(editor.document_options().unwrap(), changed);
     editor.set_document_options(native).unwrap();
@@ -286,11 +297,11 @@ fn document_options_update_and_restore_native_presence_exactly() {
 
 #[test]
 fn footnote_settings_crud_is_lossless_transactional_and_wire_exact() {
-    let baseline_settings = PagesFootnoteSettings {
-        kind: Some(PagesFootnoteKind::Footnotes),
-        format: Some(PagesFootnoteFormat::Numeric),
-        numbering: Some(PagesFootnoteNumbering::Continuous),
-        gap: Some(PagesFootnoteGap::new(10).unwrap()),
+    let baseline_settings = FootnoteSettings {
+        kind: Some(FootnoteKind::Footnotes),
+        format: Some(FootnoteFormat::Numeric),
+        numbering: Some(FootnoteNumbering::Continuous),
+        gap: Some(FootnoteGap::new(10).unwrap()),
     };
     let mut data = tp::SettingsArchive {
         language: Some("en".to_owned()),
@@ -306,11 +317,11 @@ fn footnote_settings_crud_is_lossless_transactional_and_wire_exact() {
     let baseline = editor.to_bytes().unwrap();
     assert_eq!(editor.footnote_settings().unwrap(), baseline_settings);
 
-    let changed = PagesFootnoteSettings {
-        kind: Some(PagesFootnoteKind::DocumentEndnotes),
-        format: Some(PagesFootnoteFormat::Symbolic),
-        numbering: Some(PagesFootnoteNumbering::RestartEachSection),
-        gap: Some(PagesFootnoteGap::new(14).unwrap()),
+    let changed = FootnoteSettings {
+        kind: Some(FootnoteKind::DocumentEndnotes),
+        format: Some(FootnoteFormat::Symbolic),
+        numbering: Some(FootnoteNumbering::RestartEachSection),
+        gap: Some(FootnoteGap::new(14).unwrap()),
     };
     editor.set_footnote_settings(changed).unwrap();
     assert_eq!(editor.footnote_settings().unwrap(), changed);
@@ -352,7 +363,7 @@ fn footnote_settings_reject_invalid_input_and_malformed_wire_transactionally() {
     assert!(duplicated.footnote_settings().is_err());
     assert!(
         duplicated
-            .set_footnote_settings(PagesFootnoteSettings::default())
+            .set_footnote_settings(FootnoteSettings::default())
             .is_err()
     );
     assert_eq!(duplicated.to_bytes().unwrap(), duplicated_before);
@@ -368,17 +379,17 @@ fn footnote_settings_reject_invalid_input_and_malformed_wire_transactionally() {
     assert!(negative_gap.footnote_settings().is_err());
     assert!(
         negative_gap
-            .set_footnote_settings(PagesFootnoteSettings::default())
+            .set_footnote_settings(FootnoteSettings::default())
             .is_err()
     );
     assert_eq!(negative_gap.to_bytes().unwrap(), negative_before);
 
     let mut editor = PagesEditor::from_package(test_package("Body")).unwrap();
     let before = editor.to_bytes().unwrap();
-    let invalid = PagesFootnoteSettings {
-        kind: Some(PagesFootnoteKind::Unknown(0)),
-        format: Some(PagesFootnoteFormat::Unknown(2)),
-        numbering: Some(PagesFootnoteNumbering::Unknown(1)),
+    let invalid = FootnoteSettings {
+        kind: Some(FootnoteKind::Unknown(0)),
+        format: Some(FootnoteFormat::Unknown(2)),
+        numbering: Some(FootnoteNumbering::Unknown(1)),
         gap: None,
     };
     assert!(editor.set_footnote_settings(invalid).is_err());
@@ -397,7 +408,7 @@ fn document_options_reject_malformed_wire_transactionally() {
         assert!(editor.document_options().is_err());
         assert!(
             editor
-                .set_document_options(PagesDocumentOptions::default())
+                .set_document_options(DocumentOptions::default())
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);
@@ -409,7 +420,7 @@ fn document_options_reject_malformed_wire_transactionally() {
     assert!(invalid_payload.document_options().is_err());
     assert!(
         invalid_payload
-            .set_document_options(PagesDocumentOptions::default())
+            .set_document_options(DocumentOptions::default())
             .is_err()
     );
     assert_eq!(invalid_payload.to_bytes().unwrap(), before);
@@ -440,7 +451,7 @@ fn document_options_reject_malformed_wire_transactionally() {
     assert!(duplicate_reference.document_options().is_err());
     assert!(
         duplicate_reference
-            .set_document_options(PagesDocumentOptions::default())
+            .set_document_options(DocumentOptions::default())
             .is_err()
     );
     assert_eq!(duplicate_reference.to_bytes().unwrap(), before);
@@ -450,7 +461,7 @@ fn document_options_reject_malformed_wire_transactionally() {
     assert!(editor.document_options().is_err());
     assert!(
         editor
-            .set_document_options(PagesDocumentOptions::default())
+            .set_document_options(DocumentOptions::default())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -469,15 +480,15 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
         text: vec!["Body".to_owned()],
         ..Default::default()
     };
-    let mut fill_payload = crate::varint::encode_varint(99 << 3);
-    fill_payload.extend(crate::varint::encode_varint(7));
+    let mut fill_payload = litchi_iwa_common::varint::encode_varint(99 << 3);
+    fill_payload.extend(litchi_iwa_common::varint::encode_varint(7));
     let mut section_data = SectionArchive {
         inherit_previous_header_footer: Some(true),
         section_template_first_page_different: Some(false),
         section_template_even_odd_pages_different: Some(false),
-        section_start_kind: Some(PagesSectionStart::NextPage.as_raw()),
-        section_page_number_kind: Some(PagesSectionPageNumbering::ContinueFromPrevious.as_raw()),
-        section_page_number_start: Some(PagesPageNumber::new(1).unwrap().get()),
+        section_start_kind: Some(Start::NextPage.as_raw()),
+        section_page_number_kind: Some(PageNumbering::ContinueFromPrevious.as_raw()),
+        section_page_number_start: Some(PageNumber::new(1).unwrap().get()),
         name: Some("Blank".to_owned()),
         section_template_first_page_hides_header_footer: Some(false),
         background_fill: Some(tsd::FillArchive::default()),
@@ -486,8 +497,8 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
     .encode_to_vec();
     section_data =
         patch_length_delimited_field(&section_data, 30, true, Some(&fill_payload)).unwrap();
-    let mut unknown_section_field = crate::varint::encode_varint(101 << 3);
-    unknown_section_field.extend(crate::varint::encode_varint(999));
+    let mut unknown_section_field = litchi_iwa_common::varint::encode_varint(101 << 3);
+    unknown_section_field.extend(litchi_iwa_common::varint::encode_varint(999));
     section_data.extend_from_slice(&unknown_section_field);
 
     let objects = vec![
@@ -500,17 +511,17 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
         .replace_archive("Index/Document.iwa", &Archive { objects })
         .unwrap();
     let mut editor = PagesEditor::from_package(package).unwrap();
-    let original = PagesSectionSettings {
-        name: Some("Blank".to_owned()),
-        inherit_previous_header_footer: Some(true),
-        first_page_different: Some(false),
-        even_odd_pages_different: Some(false),
-        start: Some(PagesSectionStart::NextPage),
-        page_numbering: Some(PagesSectionPageNumbering::ContinueFromPrevious),
-        starting_page_number: Some(PagesPageNumber::new(1).unwrap()),
-        first_page_hides_header_footer: Some(false),
-        background_fill_payload: Some(fill_payload),
-    };
+    let mut original = Settings::new();
+    original.set_name(Some("Blank")).unwrap();
+    original.set_inherit_previous_header_footer(Some(true));
+    original.set_first_page_different(Some(false));
+    original.set_even_odd_pages_different(Some(false));
+    original.set_start(Some(Start::NextPage)).unwrap();
+    original
+        .set_page_numbering(Some(PageNumbering::ContinueFromPrevious))
+        .unwrap();
+    original.set_starting_page_number(Some(PageNumber::new(1).unwrap()));
+    original.set_first_page_hides_header_footer(Some(false));
     assert_eq!(editor.section_settings(section_id).unwrap(), original);
     let baseline = editor.to_bytes().unwrap();
     editor
@@ -519,14 +530,16 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     let mut updated = original.clone();
-    updated.name = Some("Chapter Two".to_owned());
-    updated.inherit_previous_header_footer = Some(false);
-    updated.first_page_different = Some(true);
-    updated.even_odd_pages_different = Some(true);
-    updated.start = Some(PagesSectionStart::LeftPage);
-    updated.page_numbering = Some(PagesSectionPageNumbering::Restart);
-    updated.starting_page_number = Some(PagesPageNumber::new(42).unwrap());
-    updated.first_page_hides_header_footer = Some(true);
+    updated.set_name(Some("Chapter Two")).unwrap();
+    updated.set_inherit_previous_header_footer(Some(false));
+    updated.set_first_page_different(Some(true));
+    updated.set_even_odd_pages_different(Some(true));
+    updated.set_start(Some(Start::LeftPage)).unwrap();
+    updated
+        .set_page_numbering(Some(PageNumbering::Restart))
+        .unwrap();
+    updated.set_starting_page_number(Some(PageNumber::new(42).unwrap()));
+    updated.set_first_page_hides_header_footer(Some(true));
     editor
         .set_section_settings(section_id, updated.clone())
         .unwrap();
@@ -545,8 +558,10 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
     let reparsed = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(reparsed.section_settings(section_id).unwrap(), updated);
 
-    updated.start = Some(PagesSectionStart::Unknown(7));
-    updated.page_numbering = Some(PagesSectionPageNumbering::Unknown(3));
+    updated.set_start(Some(Start::Unknown(7))).unwrap();
+    updated
+        .set_page_numbering(Some(PageNumbering::Unknown(3)))
+        .unwrap();
     editor
         .set_section_settings(section_id, updated.clone())
         .unwrap();
@@ -570,27 +585,17 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
         .set_section_settings(section_id, original.clone())
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
-    for invalid in [
-        PagesSectionSettings {
-            name: Some("bad\0name".to_owned()),
-            ..original.clone()
-        },
-        PagesSectionSettings {
-            background_fill_payload: Some(vec![0xff]),
-            ..original.clone()
-        },
-        PagesSectionSettings {
-            start: Some(PagesSectionStart::Unknown(0)),
-            ..original.clone()
-        },
-        PagesSectionSettings {
-            page_numbering: Some(PagesSectionPageNumbering::Unknown(1)),
-            ..original.clone()
-        },
-    ] {
-        assert!(editor.set_section_settings(section_id, invalid).is_err());
-        assert_eq!(editor.to_bytes().unwrap(), baseline);
-    }
+    let mut invalid_name = original.clone();
+    assert!(invalid_name.set_name(Some("bad\0name")).is_err());
+    let mut invalid_start = original.clone();
+    assert!(invalid_start.set_start(Some(Start::Unknown(0))).is_err());
+    let mut invalid_numbering = original.clone();
+    assert!(
+        invalid_numbering
+            .set_page_numbering(Some(PageNumbering::Unknown(1)))
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
     assert!(editor.section_settings(999).is_err());
     assert!(editor.set_section_settings(999, original.clone()).is_err());
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -600,9 +605,11 @@ fn section_settings_crud_is_lossless_validated_and_transactional() {
         .update_archive("Index/Document.iwa", |archive| {
             let object = archive.object_mut(section_id).unwrap();
             let mut message = object.messages[0].clone();
-            message.data.extend(crate::varint::encode_varint(17 << 3));
+            message
+                .data
+                .extend(litchi_iwa_common::varint::encode_varint(17 << 3));
             message.data.push(0);
-            object.replace_message(0, message).map(|_| ())
+            Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
     let mut malformed = PagesEditor::from_package(malformed).unwrap();
@@ -626,8 +633,8 @@ fn section_settings_reject_zero_starting_page_number_transactionally() {
         ..Default::default()
     };
     let section = SectionArchive {
-        section_start_kind: Some(PagesSectionStart::NextPage.as_raw()),
-        section_page_number_kind: Some(PagesSectionPageNumbering::Restart.as_raw()),
+        section_start_kind: Some(Start::NextPage.as_raw()),
+        section_page_number_kind: Some(PageNumbering::Restart.as_raw()),
         section_page_number_start: Some(0),
         ..Default::default()
     };
@@ -657,7 +664,7 @@ fn section_settings_reject_zero_starting_page_number_transactionally() {
     assert!(editor.section_settings(section_id).is_err());
     assert!(
         editor
-            .set_section_settings(section_id, PagesSectionSettings::default())
+            .set_section_settings(section_id, Settings::default())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -676,25 +683,20 @@ fn solid_section_background_crud_preserves_nested_unknown_wire() {
         text: vec!["Body".to_owned()],
         ..Default::default()
     };
-    let original_color = PagesRgbaColor {
-        red: 1.0,
-        green: 0.588_738_74,
-        blue: 0.552_926_2,
-        alpha: 1.0,
-        color_space: PagesRgbColorSpace::Srgb,
-    };
+    let original_color =
+        Rgba::new(1.0, 0.588_738_74, 0.552_926_2, 1.0, RgbColorSpace::Srgb).unwrap();
     let mut color_payload = tsp::Color {
         model: tsp::color::ColorModel::Rgb as i32,
-        r: Some(original_color.red),
-        g: Some(original_color.green),
-        b: Some(original_color.blue),
+        r: Some(original_color.red()),
+        g: Some(original_color.green()),
+        b: Some(original_color.blue()),
         rgbspace: Some(tsp::color::RgbColorSpace::Srgb as i32),
-        a: Some(original_color.alpha),
+        a: Some(original_color.alpha()),
         ..Default::default()
     }
     .encode_to_vec();
-    let mut unknown_color_field = crate::varint::encode_varint(99 << 3);
-    unknown_color_field.extend(crate::varint::encode_varint(123));
+    let mut unknown_color_field = litchi_iwa_common::varint::encode_varint(99 << 3);
+    unknown_color_field.extend(litchi_iwa_common::varint::encode_varint(123));
     color_payload.extend_from_slice(&unknown_color_field);
     let mut fill_payload = tsd::FillArchive {
         color: Some(tsp::Color {
@@ -706,8 +708,8 @@ fn solid_section_background_crud_preserves_nested_unknown_wire() {
     .encode_to_vec();
     fill_payload =
         patch_length_delimited_field(&fill_payload, 1, true, Some(&color_payload)).unwrap();
-    let mut unknown_fill_field = crate::varint::encode_varint(100 << 3);
-    unknown_fill_field.extend(crate::varint::encode_varint(456));
+    let mut unknown_fill_field = litchi_iwa_common::varint::encode_varint(100 << 3);
+    unknown_fill_field.extend(litchi_iwa_common::varint::encode_varint(456));
     fill_payload.extend_from_slice(&unknown_fill_field);
     let mut section_data = SectionArchive {
         name: Some("Blank".to_owned()),
@@ -729,32 +731,42 @@ fn solid_section_background_crud_preserves_nested_unknown_wire() {
     let mut editor = PagesEditor::from_package(package).unwrap();
     assert_eq!(
         editor.section_background(section_id).unwrap(),
-        PagesSectionBackground::Solid(original_color)
+        Background::Solid(original_color)
     );
     let baseline = editor.to_bytes().unwrap();
     editor
-        .set_section_background(section_id, PagesSectionBackground::Solid(original_color))
+        .set_section_background(section_id, Background::Solid(original_color))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    let updated = PagesRgbaColor {
-        red: 0.125,
-        green: original_color.green,
-        blue: 0.75,
-        alpha: 0.5,
-        color_space: PagesRgbColorSpace::DisplayP3,
-    };
+    let updated = Rgba::new(
+        0.125,
+        original_color.green(),
+        0.75,
+        0.5,
+        RgbColorSpace::DisplayP3,
+    )
+    .unwrap();
     editor
-        .set_section_background(section_id, PagesSectionBackground::Solid(updated))
+        .set_section_background(section_id, Background::Solid(updated))
         .unwrap();
     assert_eq!(
         editor.section_background(section_id).unwrap(),
-        PagesSectionBackground::Solid(updated)
+        Background::Solid(updated)
     );
-    let payload = editor
-        .section_settings(section_id)
+    let section_payload = editor
+        .package()
+        .archive("Index/Document.iwa")
         .unwrap()
-        .background_fill_payload
+        .object(section_id)
+        .unwrap()
+        .messages[0]
+        .data
+        .clone();
+    let payload = repeated_length_delimited_payloads(&section_payload, 30)
+        .unwrap()
+        .into_iter()
+        .next()
         .unwrap();
     for unknown in [&unknown_color_field, &unknown_fill_field] {
         assert!(
@@ -764,40 +776,47 @@ fn solid_section_background_crud_preserves_nested_unknown_wire() {
         );
     }
     editor
-        .set_section_background(section_id, PagesSectionBackground::Solid(original_color))
+        .set_section_background(section_id, Background::Solid(original_color))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    for invalid in [
-        PagesRgbaColor {
-            red: f32::NAN,
-            ..original_color
-        },
-        PagesRgbaColor {
-            alpha: 1.01,
-            ..original_color
-        },
-    ] {
-        assert!(
-            editor
-                .set_section_background(section_id, PagesSectionBackground::Solid(invalid))
-                .is_err()
-        );
-        assert_eq!(editor.to_bytes().unwrap(), baseline);
-    }
+    assert!(
+        Rgba::new(
+            f32::NAN,
+            original_color.green(),
+            original_color.blue(),
+            original_color.alpha(),
+            original_color.color_space(),
+        )
+        .is_err()
+    );
+    assert!(
+        Rgba::new(
+            original_color.red(),
+            original_color.green(),
+            original_color.blue(),
+            1.01,
+            original_color.color_space(),
+        )
+        .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
     assert!(
         editor
-            .set_section_background(section_id, PagesSectionBackground::Opaque(vec![0xff]),)
+            .set_section_background(
+                section_id,
+                Background::Opaque(Opaque::from_slice(&[0xff]).unwrap()),
+            )
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     editor
-        .set_section_background(section_id, PagesSectionBackground::None)
+        .set_section_background(section_id, Background::None)
         .unwrap();
     assert_eq!(
         editor.section_background(section_id).unwrap(),
-        PagesSectionBackground::None
+        Background::None
     );
     let opaque = tsd::FillArchive {
         gradient: Some(tsd::GradientArchive::default()),
@@ -805,11 +824,14 @@ fn solid_section_background_crud_preserves_nested_unknown_wire() {
     }
     .encode_to_vec();
     editor
-        .set_section_background(section_id, PagesSectionBackground::Opaque(opaque.clone()))
+        .set_section_background(
+            section_id,
+            Background::Opaque(Opaque::from_slice(&opaque).unwrap()),
+        )
         .unwrap();
     assert_eq!(
         editor.section_background(section_id).unwrap(),
-        PagesSectionBackground::Opaque(opaque)
+        Background::Opaque(Opaque::from_slice(&opaque).unwrap())
     );
 }
 
@@ -872,26 +894,32 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
     let regions = editor.header_footers().unwrap();
     assert_eq!(regions.len(), 2);
     assert_eq!(regions[0].section_name.as_deref(), Some("Chapter"));
-    assert_eq!(regions[0].template, PagesTemplateKind::Odd);
-    assert_eq!(regions[0].kind, PagesHeaderFooterKind::Header);
-    assert_eq!(regions[0].storage.text, "A🚀B");
-    assert_eq!(regions[1].kind, PagesHeaderFooterKind::Footer);
+    assert_eq!(regions[0].template, Template::Odd);
+    assert_eq!(regions[0].kind, Kind::Header);
+    assert_eq!(regions[0].storage.storage.text(), "A🚀B");
+    assert_eq!(regions[1].kind, Kind::Footer);
 
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .replace_header_footer_text(header_id, 2..3, "x")
+            .replace_header_footer_text(TextStorageId::new(header_id).unwrap(), 2..3, "x")
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
     editor
-        .replace_header_footer_text(header_id, 1..3, "東京")
+        .replace_header_footer_text(TextStorageId::new(header_id).unwrap(), 1..3, "東京")
         .unwrap();
-    editor.clear_header_footer(footer_id).unwrap();
+    editor
+        .clear_header_footer(TextStorageId::new(footer_id).unwrap())
+        .unwrap();
     let regions = editor.header_footers().unwrap();
-    assert_eq!(regions[0].storage.text, "A東京B");
-    assert_eq!(regions[1].storage.text, "");
-    assert!(editor.set_header_footer_text(body_id, "no").is_err());
+    assert_eq!(regions[0].storage.storage.text(), "A東京B");
+    assert!(regions[1].storage.storage.is_empty());
+    assert!(
+        editor
+            .set_header_footer_text(TextStorageId::new(body_id).unwrap(), "no")
+            .is_err()
+    );
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_section_name(999, Some("no")).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -900,27 +928,44 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
         .unwrap();
     assert_eq!(editor.sections()[0].name.as_deref(), Some("Renamed"));
     let mut layout = editor.page_layout().unwrap();
-    layout.page_width = Some(612.0);
-    layout.page_height = Some(792.0);
-    layout.left_margin = Some(72.0);
-    layout.right_margin = Some(72.0);
-    layout.top_margin = Some(54.0);
-    layout.bottom_margin = Some(54.0);
-    layout.header_margin = Some(24.0);
-    layout.footer_margin = Some(24.0);
-    layout.page_scale = Some(1.0);
+    layout.set_page_width(Some(612.0)).unwrap();
+    layout.set_page_height(Some(792.0)).unwrap();
+    layout.set_left_margin(Some(72.0)).unwrap();
+    layout.set_right_margin(Some(72.0)).unwrap();
+    layout.set_top_margin(Some(54.0)).unwrap();
+    layout.set_bottom_margin(Some(54.0)).unwrap();
+    layout.set_header_margin(Some(24.0)).unwrap();
+    layout.set_footer_margin(Some(24.0)).unwrap();
+    layout.set_page_scale(Some(1.0)).unwrap();
     let before = editor.to_bytes().unwrap();
-    let mut invalid = layout.clone();
-    invalid.page_width = Some(f32::NAN);
-    assert!(editor.set_page_layout(invalid).is_err());
+    assert!(
+        PageLayout::new(
+            Some(f32::NAN),
+            layout.page_height(),
+            layout.left_margin(),
+            layout.right_margin(),
+            layout.top_margin(),
+            layout.bottom_margin(),
+            layout.header_margin(),
+            layout.footer_margin(),
+            layout.page_scale(),
+            layout.orientation(),
+            layout.lays_out_body_vertically(),
+        )
+        .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), before);
-    editor.set_page_layout(layout.clone()).unwrap();
+    editor.set_page_layout(layout).unwrap();
     assert_eq!(editor.page_layout().unwrap(), layout);
 
     let reparsed = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let regions = reparsed.header_footers().unwrap();
-    assert_eq!(regions[0].storage.text, "A東京B");
-    assert_eq!(regions[1].storage.text, "");
+    assert_eq!(regions[0].template, Template::Odd);
+    assert_eq!(regions[0].kind, Kind::Header);
+    assert_eq!(regions[1].template, Template::Odd);
+    assert_eq!(regions[1].kind, Kind::Footer);
+    assert_eq!(regions[0].storage.storage.text(), "A東京B");
+    assert!(regions[1].storage.storage.is_empty());
     assert_eq!(reparsed.sections()[0].name.as_deref(), Some("Renamed"));
     assert_eq!(reparsed.page_layout().unwrap(), layout);
 }
@@ -1226,7 +1271,7 @@ fn reachable_floating_drawable_comment_crud_is_guarded() {
             .drawables()
             .unwrap()
             .into_iter()
-            .map(|drawable| drawable.object_id)
+            .map(|drawable| drawable.id.get())
             .collect::<Vec<_>>(),
         vec![drawable_id]
     );
@@ -1262,11 +1307,11 @@ fn reachable_drawable_text_crud_covers_placeholders_and_text_boxes() {
     let text = editor.drawable_text_storages().unwrap();
     assert_eq!(text.len(), 2);
     assert_eq!(text[0].drawable_object_id, 60);
-    assert_eq!(text[0].storage.object_id, 62);
-    assert_eq!(text[0].storage.text, "A🚀B");
+    assert_eq!(text[0].storage.id, TextStorageId::new(62).unwrap());
+    assert_eq!(text[0].storage.storage.text(), "A🚀B");
     assert_eq!(text[1].drawable_object_id, 64);
-    assert_eq!(text[1].storage.object_id, 65);
-    assert_eq!(text[1].storage.text, "Independent text box");
+    assert_eq!(text[1].storage.id, TextStorageId::new(65).unwrap());
+    assert_eq!(text[1].storage.storage.text(), "Independent text box");
 
     let before = editor.to_bytes().unwrap();
     assert!(editor.replace_drawable_text(60, 2..3, "x").is_err());
@@ -1275,18 +1320,29 @@ fn reachable_drawable_text_crud_covers_placeholders_and_text_boxes() {
 
     editor.replace_drawable_text(60, 1..3, "東京").unwrap();
     assert_eq!(
-        editor.drawable_text_storages().unwrap()[0].storage.text,
+        editor.drawable_text_storages().unwrap()[0]
+            .storage
+            .storage
+            .text(),
         "A東京B"
     );
     editor
         .set_drawable_text(64, "Replacement shape 🚀")
         .unwrap();
     assert_eq!(
-        editor.drawable_text_storages().unwrap()[1].storage.text,
+        editor.drawable_text_storages().unwrap()[1]
+            .storage
+            .storage
+            .text(),
         "Replacement shape 🚀"
     );
     editor.clear_drawable_text(64).unwrap();
-    assert_eq!(editor.drawable_text_storages().unwrap()[1].storage.text, "");
+    assert!(
+        editor.drawable_text_storages().unwrap()[1]
+            .storage
+            .storage
+            .is_empty()
+    );
     assert_eq!(editor.body_text().unwrap(), "Body");
 }
 
@@ -1298,7 +1354,7 @@ fn drawable_text_updates_preserve_unknown_wire_and_restore_exactly() {
             let object = archive.object_mut(65).unwrap();
             let mut message = object.messages[0].clone();
             append_unknown_varint(&mut message.data, 99, 990);
-            object.replace_message(0, message).map(|_| ())
+            Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
     let mut editor = PagesEditor::from_package(package).unwrap();
@@ -1379,7 +1435,10 @@ fn text_box_geometry_updates_are_guarded_and_byte_exact() {
     editor.set_text_box_geometry(64, changed).unwrap();
     assert_eq!(editor.text_box_geometry(64).unwrap(), changed);
     assert_eq!(
-        editor.drawable_text_storages().unwrap()[0].storage.text,
+        editor.drawable_text_storages().unwrap()[0]
+            .storage
+            .storage
+            .text(),
         "Source"
     );
     editor.set_text_box_geometry(64, original).unwrap();
@@ -1409,7 +1468,10 @@ fn text_box_properties_updates_are_guarded_and_byte_exact() {
     editor.set_text_box_properties(64, changed.clone()).unwrap();
     assert_eq!(editor.text_box_properties(64).unwrap(), changed);
     assert_eq!(
-        editor.drawable_text_storages().unwrap()[0].storage.text,
+        editor.drawable_text_storages().unwrap()[0]
+            .storage
+            .storage
+            .text(),
         "Source"
     );
     editor.set_text_box_properties(64, original).unwrap();
@@ -1434,12 +1496,12 @@ fn body_anchored_text_box_duplicate_delete_is_independent_and_exact() {
 
     let created = editor.duplicate_text_box(64, 0, "Clone 🚀").unwrap();
     assert_ne!(created.drawable_object_id, source.drawable_object_id);
-    assert_ne!(created.storage.object_id, source.storage.object_id);
-    assert_eq!(created.storage.text, "Clone 🚀");
+    assert_ne!(created.storage.id, source.storage.id);
+    assert_eq!(created.storage.storage.text(), "Clone 🚀");
     assert_eq!(editor.body_text().unwrap(), "￼Before￼After");
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
-        editor.body_storage_id,
+        editor.body_storage_id.get(),
         2001,
         "TSWP.StorageArchive",
     )
@@ -1472,7 +1534,8 @@ fn body_anchored_text_box_duplicate_delete_is_independent_and_exact() {
             .find(|item| item.drawable_object_id == 64)
             .unwrap()
             .storage
-            .text,
+            .storage
+            .text(),
         "Source"
     );
     let removed = editor.remove_text_box(created.drawable_object_id).unwrap();
@@ -1481,7 +1544,7 @@ fn body_anchored_text_box_duplicate_delete_is_independent_and_exact() {
 
     let removed = editor.remove_text_box(64).unwrap();
     assert_eq!(removed.anchor_character_index, 6);
-    assert_eq!(removed.text.storage.text, "Source");
+    assert_eq!(removed.text.storage.storage.text(), "Source");
     assert_eq!(editor.body_text().unwrap(), "BeforeAfter");
     assert!(editor.drawable_text_storages().unwrap().is_empty());
 }
@@ -1585,7 +1648,7 @@ fn text_box_graph_crud_preserves_unknown_fields_and_rejects_external_owners() {
             external.archive_info.message_infos[0]
                 .object_references
                 .push(65);
-            archive.insert_object(external)
+            Ok(archive.insert_object(external)?)
         })
         .unwrap();
     let mut editor = PagesEditor::from_package(package).unwrap();
@@ -1926,8 +1989,8 @@ fn reference(identifier: u64) -> Reference {
 }
 
 fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) -> Vec<u8> {
-    let mut field = crate::varint::encode_varint(u64::from(field_number) << 3);
-    field.extend(crate::varint::encode_varint(value));
+    let mut field = litchi_iwa_common::varint::encode_varint(u64::from(field_number) << 3);
+    field.extend(litchi_iwa_common::varint::encode_varint(value));
     data.extend_from_slice(&field);
     field
 }

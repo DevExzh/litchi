@@ -2,10 +2,10 @@
 
 use std::env;
 
-use litchi_iwa::IWorkPackage;
 use litchi_iwa::pages::PagesEditor;
-use litchi_iwa::protobuf::tp::{DocumentArchive, DrawablesZOrderArchive, FloatingDrawablesArchive};
-use litchi_iwa::protobuf::tswp::{DrawableAttachmentArchive, ShapeInfoArchive, StorageArchive};
+use litchi_iwa::raw::package::IWorkPackage;
+use litchi_iwa_protos::tp::{DocumentArchive, DrawablesZOrderArchive, FloatingDrawablesArchive};
+use litchi_iwa_protos::tswp::{DrawableAttachmentArchive, ShapeInfoArchive, StorageArchive};
 use prost::Message;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -52,8 +52,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let columns = editor.text_box_columns(text.drawable_object_id).ok();
         let text_layout = editor.text_box_text_layout(text.drawable_object_id).ok();
         println!(
-            "drawable={} storage={} kind={:?} text={:?} geometry={geometry:?} properties={properties:?} columns={columns:?} text_layout={text_layout:?}",
-            text.drawable_object_id, text.storage.object_id, text.storage.kind, text.storage.text,
+            "drawable={} storage={} text={:?} geometry={geometry:?} properties={properties:?} columns={columns:?} text_layout={text_layout:?}",
+            text.drawable_object_id,
+            text.storage.id,
+            text.storage.storage.text(),
         );
         for name in package.iwa_entry_names() {
             let archive = package.archive(name)?;
@@ -69,12 +71,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        print_decoded::<StorageArchive>(
-            &package,
-            text.storage.object_id,
-            text.storage.message_type,
-            "storage",
-        )?;
     }
     Ok(())
 }

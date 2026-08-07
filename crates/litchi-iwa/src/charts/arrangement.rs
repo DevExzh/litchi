@@ -97,7 +97,7 @@ pub(crate) fn set_chart_arrangement(
                 "{drawable_label} chart {drawable_object_id} is missing"
             ))
         })?;
-        object
+        Ok(object
             .replace_message(
                 message_index,
                 RawMessage {
@@ -105,7 +105,7 @@ pub(crate) fn set_chart_arrangement(
                     data,
                 },
             )
-            .map(|_| ())
+            .map(|_| ())?)
     })
 }
 
@@ -132,7 +132,7 @@ fn raw_arrangement(data: &[u8]) -> Result<RawChartArrangement> {
     let fields = parse_wire_fields(data)?;
     let drawable = singular_field(&fields, CHART_DRAWABLE_SUPER_FIELD, "chart drawable super")?;
     require_wire_type(drawable, 2, "chart drawable super")?;
-    let drawable = &data[drawable.payload_start..drawable.end];
+    let drawable = &data[drawable.payload_start()..drawable.end()];
     Ok(RawChartArrangement {
         locked: strict_optional_bool(drawable, DRAWABLE_LOCKED_FIELD, "chart lock")?,
         constrain_proportions: strict_optional_bool(
@@ -209,7 +209,7 @@ fn strict_optional_bool(data: &[u8], field_number: u32, label: &str) -> Result<O
     let fields = parse_wire_fields(data)?;
     let matches = fields
         .iter()
-        .filter(|field| field.number == field_number)
+        .filter(|field| field.number() == field_number)
         .collect::<Vec<_>>();
     if matches.len() > 1 {
         return Err(Error::InvalidFormat(format!(
@@ -221,10 +221,11 @@ fn strict_optional_bool(data: &[u8], field_number: u32, label: &str) -> Result<O
         return Ok(None);
     };
     require_wire_type(field, 0, label)?;
-    let (value, length) =
-        crate::varint::decode_varint_from_bytes(&data[field.payload_start..field.end])
-            .map_err(|error| Error::InvalidFormat(format!("invalid {label}: {error}")))?;
-    if field.payload_start + length != field.end {
+    let (value, length) = litchi_iwa_common::varint::decode_varint_from_bytes(
+        &data[field.payload_start()..field.end()],
+    )
+    .map_err(|error| Error::InvalidFormat(format!("invalid {label}: {error}")))?;
+    if field.payload_start() + length != field.end() {
         return Err(Error::InvalidFormat(format!(
             "{label} contains trailing bytes"
         )));
@@ -245,7 +246,7 @@ fn singular_field<'a>(
 ) -> Result<&'a crate::wire::WireField> {
     let matches = fields
         .iter()
-        .filter(|field| field.number == field_number)
+        .filter(|field| field.number() == field_number)
         .collect::<Vec<_>>();
     if matches.len() != 1 {
         return Err(Error::InvalidFormat(format!(
@@ -257,10 +258,10 @@ fn singular_field<'a>(
 }
 
 fn require_wire_type(field: &crate::wire::WireField, expected: u8, label: &str) -> Result<()> {
-    if field.wire_type != expected {
+    if field.wire_type() != expected {
         return Err(Error::InvalidFormat(format!(
             "{label} has wire type {}, expected {expected}",
-            field.wire_type
+            field.wire_type()
         )));
     }
     Ok(())

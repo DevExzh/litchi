@@ -1,0 +1,17 @@
+[package]
+name        = "litchi-iwa-structured"
+description = "Archive-free structured iWork result aggregation across semantic format crates."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+litchi-keynote = { workspace = true }
+litchi-numbers = { workspace = true }
+litchi-pages   = { workspace = true }
+
+[lints]
+workspace = true

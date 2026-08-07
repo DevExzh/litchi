@@ -4,13 +4,16 @@ use std::{env, fs, path::Path};
 
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeContactShadow, ShapeEffects,
-    ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeImageFillTechnique, ShapeOpacity,
-    ShapePreset, ShapeReflection, ShapeReflectionOpacity, ShapeShadow, ShapeShadowAppearance,
-    ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity, ShapeShadowPerspective,
-    ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets, ShapeTextLayout,
-    ShapeTextVerticalAlignment,
+    Appearance, BlurRadius, Contact, DrawablePoint, DrawableSize, Offset, Perspective,
+    RgbColorSpace, RgbaColor, Shadow, ShapeFill, ShapeImageFillTechnique,
 };
+use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+use litchi_iwa_common::shape::effects::{
+    Effects, Opacity as EffectsOpacity, Reflection, ReflectionOpacity,
+};
+use litchi_iwa_common::shape::fill::{Angle, Gradient};
+use litchi_iwa_common::shape::path::Preset;
+use litchi_iwa_common::shape::shadow::Opacity as ShadowOpacity;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -38,11 +41,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             width: 300.0,
             height: 150.0,
         },
-        ShapePreset::RightArrow,
-        ShapeFill::Gradient(ShapeGradient::linear(
+        Preset::RightArrow,
+        ShapeFill::Gradient(Gradient::linear(
             RgbaColor::new(0.08, 0.42, 0.9, 1.0, RgbColorSpace::Srgb)?,
             RgbaColor::new(0.1, 0.85, 0.78, 1.0, RgbColorSpace::Srgb)?,
-            ShapeGradientAngle::from_degrees(0.0)?,
+            Angle::from_degrees(0.0)?,
         )),
     )?;
     if let Some(path) = fill_image {
@@ -59,31 +62,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_sheet_shape_effects(
         sheet_id,
         created.drawable_object_id,
-        ShapeEffects::new(
-            ShapeOpacity::new(0.84)?,
-            ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.65)?),
+        Effects::new(
+            EffectsOpacity::new(0.84)?,
+            Reflection::Enabled(ReflectionOpacity::new(0.65)?),
         ),
     )?;
     editor.set_sheet_shape_shadow(
         sheet_id,
         created.drawable_object_id,
-        ShapeShadow::Contact(ShapeContactShadow::new(
-            ShapeShadowAppearance::new(
+        Shadow::Contact(Contact::new(
+            Appearance::new(
                 RgbaColor::black(),
-                ShapeShadowBlurRadius::from_points(18)?,
-                ShapeShadowOffset::from_points(6.0)?,
-                ShapeShadowOpacity::new(0.58)?,
+                BlurRadius::from_points(18)?,
+                Offset::from_points(6.0)?,
+                ShadowOpacity::new(0.58)?,
             ),
-            ShapeShadowPerspective::from_degrees(23.0)?,
+            Perspective::from_degrees(23.0)?,
         )),
     )?;
     editor.set_sheet_shape_text_layout(
         sheet_id,
         created.drawable_object_id,
-        ShapeTextLayout::new(
-            ShapeTextVerticalAlignment::Bottom,
-            ShapeTextInsets::uniform(ShapeTextInset::from_points(9.0)?),
-            ShapeTextAutoSize::Fixed,
+        Layout::new(
+            VerticalAlignment::Bottom,
+            Insets::uniform(Inset::from_points(9.0)?),
+            AutoSize::Fixed,
         ),
     )?;
     editor.set_sheet_shape_title(sheet_id, created.drawable_object_id, "Typed Numbers shape")?;
@@ -95,11 +98,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.save(output)?;
     println!(
         "created Numbers {:?} {:?} {} with storage {} on sheet {}",
-        created.kind,
-        created.preset,
-        created.drawable_object_id,
-        created.storage.object_id,
-        sheet_id
+        created.kind, created.preset, created.drawable_object_id, created.storage.id, sheet_id
     );
     Ok(())
 }

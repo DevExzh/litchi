@@ -10,13 +10,12 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::language_types::{TextLanguage, TextLanguageRun};
-use super::position::TextPosition;
 use super::storage_wire::{
     LocatedStorage, StorageLocation, locate_storage as locate_native_storage,
     locate_storage_with_archive as locate_native_storage_with_archive, update_parsed_archive,
     validate_sorted_boundaries,
 };
+use litchi_iwa_text::{TextLanguage, TextLanguageRun, TextLanguageTag, TextPosition};
 
 const LANGUAGE_TABLE_FIELD: u32 = 19;
 const TABLE_ENTRIES_FIELD: u32 = 1;
@@ -34,8 +33,8 @@ pub(crate) fn text_languages(
         .iter()
         .map(|entry| {
             Ok(TextLanguageRun::new(
-                TextPosition::from_native(entry.character_index),
-                TextLanguage::from_native(entry.object.as_deref())?,
+                TextPosition::from_utf16_code_units(entry.character_index),
+                language_from_native(entry.object.as_deref())?,
             ))
         })
         .collect()
@@ -59,7 +58,7 @@ pub(crate) fn text_language(
     else {
         return Ok(TextLanguage::Automatic);
     };
-    TextLanguage::from_native(entry.object.as_deref())
+    language_from_native(entry.object.as_deref())
 }
 
 /// Set one language boundary while preserving unrelated native wire fields.
@@ -299,13 +298,13 @@ fn patch_existing_table(
             raw,
             ENTRY_LANGUAGE_FIELD,
             entry.object.is_some(),
-            language.native_value().map(str::as_bytes),
+            native_language_value(language).map(str::as_bytes),
         )?;
-        entry.object = language.native_value().map(str::to_owned);
+        entry.object = native_language_value(language).map(str::to_owned);
     } else {
         let entry = tswp::string_attribute_table::StringAttribute {
             character_index: position.utf16_index(),
-            object: language.native_value().map(str::to_owned),
+            object: native_language_value(language).map(str::to_owned),
         };
         let raw = entry.encode_to_vec();
         entries.push((entry, raw));
@@ -326,7 +325,7 @@ fn new_table(position: TextPosition, language: &TextLanguage) -> Result<Vec<u8>>
     }
     entries.push(tswp::string_attribute_table::StringAttribute {
         character_index: position.utf16_index(),
-        object: language.native_value().map(str::to_owned),
+        object: native_language_value(language).map(str::to_owned),
     });
     Ok(tswp::StringAttributeTable { entries }.encode_to_vec())
 }
@@ -351,7 +350,7 @@ fn validate_entries(
                 "iWork text storage {storage_id} language boundaries are not strictly increasing"
             )));
         }
-        TextLanguage::from_native(entry.object.as_deref())?;
+        language_from_native(entry.object.as_deref())?;
         previous = Some(entry.character_index);
     }
     validate_sorted_boundaries(
@@ -363,6 +362,17 @@ fn validate_entries(
 
 fn require_text_boundary(storage_id: u64, position: TextPosition, text: &[String]) -> Result<()> {
     super::storage_wire::require_text_boundary(storage_id, position.utf16_index(), text)
+}
+
+fn language_from_native(value: Option<&str>) -> Result<TextLanguage> {
+    Ok(value
+        .map(TextLanguage::tag)
+        .transpose()?
+        .unwrap_or_default())
+}
+
+fn native_language_value(language: &TextLanguage) -> Option<&str> {
+    language.as_tag().map(TextLanguageTag::as_str)
 }
 
 #[cfg(test)]
@@ -385,7 +395,7 @@ mod tests {
                 },
             )
             .unwrap();
-        let storage_id = text_box.storage.object_id;
+        let storage_id = text_box.storage.id.get();
         let archive_name = locate_storage(pages.package(), storage_id)
             .unwrap()
             .archive_name;
@@ -448,7 +458,7 @@ mod tests {
         let mut editor = super::super::IWorkTextEditor::from_package(package);
         editor
             .set_text_language(
-                storage_id,
+                crate::text::TextStorageId::try_from(storage_id).unwrap(),
                 TextPosition::from_utf16_index(6).unwrap(),
                 TextLanguage::tag("fr").unwrap(),
             )
@@ -465,14 +475,14 @@ mod tests {
             parse_wire_fields(tables[0])
                 .unwrap()
                 .iter()
-                .any(|field| field.number == 99)
+                .any(|field| field.number() == 99)
         );
         let entries = repeated_length_delimited_payloads(tables[0], TABLE_ENTRIES_FIELD).unwrap();
         assert!(
             parse_wire_fields(entries[0])
                 .unwrap()
                 .iter()
-                .any(|field| field.number == 77)
+                .any(|field| field.number() == 77)
         );
     }
 
@@ -500,7 +510,7 @@ mod tests {
         let mut editor = super::super::IWorkTextEditor::from_package(package);
         editor
             .set_text_language(
-                storage_id,
+                crate::text::TextStorageId::try_from(storage_id).unwrap(),
                 TextPosition::from_utf16_index(6).unwrap(),
                 TextLanguage::tag("fr").unwrap(),
             )
@@ -546,11 +556,15 @@ mod tests {
 
         let mut editor = super::super::IWorkTextEditor::from_package(package);
         let before = editor.to_bytes().unwrap();
-        assert!(editor.text_languages(storage_id).is_err());
+        assert!(
+            editor
+                .text_languages(crate::text::TextStorageId::try_from(storage_id).unwrap())
+                .is_err()
+        );
         assert!(
             editor
                 .set_text_language(
-                    storage_id,
+                    crate::text::TextStorageId::try_from(storage_id).unwrap(),
                     TextPosition::ZERO,
                     TextLanguage::tag("fr").unwrap(),
                 )

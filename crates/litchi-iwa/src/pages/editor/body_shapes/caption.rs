@@ -77,11 +77,19 @@ pub(super) fn body_shape_title_caption(
     Ok(DrawableTitleCaption {
         title: title
             .storage_id
-            .map(|storage_id| text_editor.storage(storage_id).map(|storage| storage.text))
+            .map(|storage_id| {
+                text_editor
+                    .storage(crate::text::native_storage_id(storage_id)?)
+                    .map(|storage| storage.storage.into_text())
+            })
             .transpose()?,
         caption: caption
             .storage_id
-            .map(|storage_id| text_editor.storage(storage_id).map(|storage| storage.text))
+            .map(|storage_id| {
+                text_editor
+                    .storage(crate::text::native_storage_id(storage_id)?)
+                    .map(|storage| storage.storage.into_text())
+            })
             .transpose()?,
     })
 }
@@ -300,7 +308,7 @@ fn set_body_shape_caption(
     }
     let staged = if let Some(storage_id) = slot.storage_id {
         let mut text_editor = IWorkTextEditor::from_package(editor.package().clone());
-        text_editor.set_text(storage_id, text)?;
+        text_editor.set_text(crate::text::native_storage_id(storage_id)?, text)?;
         text_editor.into_package()
     } else {
         let (theme, language) = body_shape_caption_theme(editor)?;
@@ -521,7 +529,8 @@ fn require_exact_message_count(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shapes::{DrawablePoint, DrawableSize, ShapePreset};
+    use crate::shapes::{DrawablePoint, DrawableSize};
+    use litchi_iwa_common::shape::path::Preset;
 
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -533,13 +542,7 @@ mod tests {
     fn scratch_document_supports_native_shape_title_caption_crud() {
         let mut editor = PagesEditor::create_with_text("Shape labels").unwrap();
         let shape = editor
-            .add_body_shape(
-                0,
-                "Quarterly trend",
-                POSITION,
-                SIZE,
-                ShapePreset::RightArrow,
-            )
+            .add_body_shape(0, "Quarterly trend", POSITION, SIZE, Preset::RightArrow)
             .unwrap();
         assert_eq!(
             editor

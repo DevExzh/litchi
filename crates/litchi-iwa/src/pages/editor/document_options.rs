@@ -11,71 +11,25 @@ use wire::{read_document_options_wire, write_document_options_wire};
 const SETTINGS_REFERENCE_FIELD: u32 = 7;
 pub(super) const SETTINGS_MESSAGE_TYPE: u32 = 10_012;
 
-/// Lossless options exposed by Pages' Document formatter.
-///
-/// Every field retains its optional protobuf presence. The convenience methods
-/// return the effective native defaults without erasing that distinction.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct PagesDocumentOptions {
-    pub body_enabled: Option<bool>,
-    pub headers_enabled: Option<bool>,
-    pub footers_enabled: Option<bool>,
-    pub facing_pages: Option<bool>,
-    pub automatic_hyphenation: Option<bool>,
-    pub ligatures_enabled: Option<bool>,
-}
-
-impl PagesDocumentOptions {
-    /// Return whether the document body is effectively enabled.
-    pub fn body_is_enabled(self) -> bool {
-        self.body_enabled.unwrap_or(true)
-    }
-
-    /// Return whether headers are effectively enabled.
-    pub fn headers_are_enabled(self) -> bool {
-        self.headers_enabled.unwrap_or(true)
-    }
-
-    /// Return whether footers are effectively enabled.
-    pub fn footers_are_enabled(self) -> bool {
-        self.footers_enabled.unwrap_or(true)
-    }
-
-    /// Return whether facing-page layout is effectively enabled.
-    pub fn uses_facing_pages(self) -> bool {
-        self.facing_pages.unwrap_or(false)
-    }
-
-    /// Return whether automatic hyphenation is effectively enabled.
-    pub fn uses_automatic_hyphenation(self) -> bool {
-        self.automatic_hyphenation.unwrap_or(false)
-    }
-
-    /// Return whether typographic ligatures are effectively enabled.
-    pub fn uses_ligatures(self) -> bool {
-        self.ligatures_enabled.unwrap_or(false)
-    }
-
-    fn from_settings(settings: &SettingsArchive) -> Self {
-        Self {
-            body_enabled: settings.body,
-            headers_enabled: settings.headers,
-            footers_enabled: settings.footers,
-            facing_pages: settings.facing_pages,
-            automatic_hyphenation: settings.hyphenation,
-            ligatures_enabled: settings.use_ligatures,
-        }
-    }
+fn options_from_settings(settings: &SettingsArchive) -> DocumentOptions {
+    DocumentOptions::new(
+        settings.body,
+        settings.headers,
+        settings.footers,
+        settings.facing_pages,
+        settings.hyphenation,
+        settings.use_ligatures,
+    )
 }
 
 impl PagesEditor {
     /// Read the lossless options shown by Pages' Document formatter.
-    pub fn document_options(&self) -> Result<PagesDocumentOptions> {
+    pub fn document_options(&self) -> Result<DocumentOptions> {
         Ok(locate_settings(self.text.package())?.options)
     }
 
     /// Replace Pages' Document formatter options transactionally.
-    pub fn set_document_options(&mut self, options: PagesDocumentOptions) -> Result<()> {
+    pub fn set_document_options(&mut self, options: DocumentOptions) -> Result<()> {
         let location = locate_settings(self.text.package())?;
         if location.options == options {
             return Ok(());
@@ -120,7 +74,7 @@ pub(super) struct SettingsLocation {
     pub(super) archive_name: String,
     pub(super) data: Vec<u8>,
     pub(super) settings: SettingsArchive,
-    options: PagesDocumentOptions,
+    options: DocumentOptions,
 }
 
 pub(super) fn locate_settings(package: &IWorkPackage) -> Result<SettingsLocation> {
@@ -211,7 +165,7 @@ mod tests {
 
     #[test]
     fn absent_options_use_native_effective_defaults() {
-        let options = PagesDocumentOptions::default();
+        let options = DocumentOptions::default();
         assert!(options.body_is_enabled());
         assert!(options.headers_are_enabled());
         assert!(options.footers_are_enabled());

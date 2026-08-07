@@ -1,7 +1,8 @@
 //! Lossless protobuf wire handling for Keynote slide transitions.
 
-use super::transition::KeynoteTransitionSettings;
+use super::transition::{settings_from_native, validate_transition_settings};
 use super::*;
+use litchi_keynote::transition::{Effect, Settings as TransitionSettings, TimingCurveSlot};
 
 const SLIDE_TRANSITION_FIELD: u32 = 4;
 const TRANSITION_ATTRIBUTES_FIELD: u32 = 2;
@@ -46,8 +47,8 @@ const fn custom_path(field: u32) -> [u32; 3] {
 pub(super) fn transition_settings_from_wire(
     original: &[u8],
     attributes: &kn::TransitionAttributesArchive,
-) -> Result<Option<KeynoteTransitionSettings>> {
-    let Some(mut settings) = KeynoteTransitionSettings::from_native(attributes) else {
+) -> Result<Option<TransitionSettings>> {
+    let Some(mut settings) = settings_from_native(attributes)? else {
         return Ok(None);
     };
     let transition = required_length_delimited_payload(
@@ -65,42 +66,54 @@ pub(super) fn transition_settings_from_wire(
         ANIMATION_ATTRIBUTES_FIELD,
         "Keynote modern transition attributes",
     )?;
-    settings.animation_parameters.color_payload =
-        optional_length_delimited_payload(animation, COLOR_FIELD)?.map(Vec::from);
+    let mut animation_parameters = settings.animation_parameters().clone();
+    animation_parameters
+        .set_color_payload(optional_length_delimited_payload(animation, COLOR_FIELD)?)
+        .map_err(|error| transition_parameter_error("color", error))?;
     for (index, field_number) in TIMING_CURVE_FIELDS.into_iter().enumerate() {
-        settings.animation_parameters.timing_curve_payloads[index] =
-            optional_length_delimited_payload(animation, field_number)?.map(Vec::from);
+        animation_parameters
+            .set_timing_curve_payload(
+                TimingCurveSlot::ALL[index],
+                optional_length_delimited_payload(animation, field_number)?,
+            )
+            .map_err(|error| transition_parameter_error("timing curve", error))?;
     }
+    settings
+        .set_animation_parameters(animation_parameters)
+        .map_err(|error| transition_parameter_error("animation parameters", error))?;
+    validate_transition_settings(&settings)?;
     Ok(Some(settings))
+}
+
+fn transition_parameter_error(context: &str, error: impl std::fmt::Display) -> Error {
+    Error::ParseError(format!("invalid Keynote transition {context}: {error}"))
 }
 
 pub(super) fn patch_transition_settings_wire(
     original: &[u8],
     attributes: &kn::TransitionAttributesArchive,
-    settings: &KeynoteTransitionSettings,
+    settings: &TransitionSettings,
 ) -> Result<Vec<u8>> {
     let animation = attributes.animation_attributes.as_ref().ok_or_else(|| {
         Error::InvalidFormat("Keynote transition has no modern attributes".to_owned())
     })?;
+    let animation_parameters = settings.animation_parameters();
+    let custom_parameters = settings.custom_parameters();
     let mut data = patch_nested_length_delimited_field(
         original,
         &animation_path(ANIMATION_TYPE_FIELD),
         animation.animation_type.is_some(),
-        settings.animation_type.as_deref().map(str::as_bytes),
+        settings.animation_type().map(str::as_bytes),
     )?;
     data = patch_nested_length_delimited_field(
         &data,
         &animation_path(EFFECT_FIELD),
         animation.effect.is_some(),
-        settings
-            .effect
-            .as_ref()
-            .map(KeynoteTransitionEffect::as_identifier)
-            .map(str::as_bytes),
+        settings.effect().map(Effect::identifier).map(str::as_bytes),
     )?;
     for (field_number, current, replacement) in [
-        (DURATION_FIELD, animation.duration, settings.duration),
-        (DELAY_FIELD, animation.delay, settings.delay),
+        (DURATION_FIELD, animation.duration, settings.duration()),
+        (DELAY_FIELD, animation.delay, settings.delay()),
     ] {
         data = patch_nested_fixed64_field(
             &data,
@@ -114,20 +127,20 @@ pub(super) fn patch_transition_settings_wire(
         &animation_path(DIRECTION_FIELD),
         animation.direction.is_some(),
         settings
-            .direction
-            .map(|direction| u64::from(direction.as_raw())),
+            .direction()
+            .map(|direction| u64::from(direction.native_value())),
     )?;
     data = patch_nested_varint_field(
         &data,
         &animation_path(IS_AUTOMATIC_FIELD),
         animation.is_automatic.is_some(),
-        settings.is_automatic.map(u64::from),
+        settings.is_automatic().map(u64::from),
     )?;
     data = patch_nested_length_delimited_field(
         &data,
         &animation_path(COLOR_FIELD),
         animation.color.is_some(),
-        settings.animation_parameters.color_payload.as_deref(),
+        animation_parameters.color_payload(),
     )?;
     for (index, field_number, current) in [
         (
@@ -150,23 +163,20 @@ pub(super) fn patch_transition_settings_wire(
             &data,
             &animation_path(field_number),
             current,
-            settings.animation_parameters.timing_curve_payloads[index].as_deref(),
+            animation_parameters.timing_curve_payload(TimingCurveSlot::ALL[index]),
         )?;
     }
     data = patch_nested_varint_field(
         &data,
         &animation_path(RANDOM_NUMBER_SEED_FIELD),
         animation.random_number_seed.is_some(),
-        settings
-            .animation_parameters
-            .random_number_seed
-            .map(u64::from),
+        animation_parameters.random_number_seed().map(u64::from),
     )?;
     data = patch_nested_fixed64_field(
         &data,
         &animation_path(DETAIL_FIELD),
         animation.custom_detail.is_some(),
-        settings.animation_parameters.detail.map(f64::to_bits),
+        animation_parameters.detail().map(f64::to_bits),
     )?;
     for (index, field_number, current) in [
         (
@@ -189,8 +199,8 @@ pub(super) fn patch_transition_settings_wire(
             &data,
             &animation_path(field_number),
             current,
-            settings.animation_parameters.timing_curve_theme_names[index]
-                .as_deref()
+            animation_parameters
+                .timing_curve_theme_name(TimingCurveSlot::ALL[index])
                 .map(str::as_bytes),
         )?;
     }
@@ -198,21 +208,20 @@ pub(super) fn patch_transition_settings_wire(
         &data,
         &animation_path(WRITING_DIRECTION_IS_RTL_FIELD),
         animation.writing_direction_is_rtl.is_some(),
-        settings
-            .animation_parameters
-            .writing_direction_is_rtl
+        animation_parameters
+            .writing_direction_is_rtl()
             .map(u64::from),
     )?;
     for (field_number, current, replacement) in [
         (
             CUSTOM_TWIST_FIELD,
             attributes.custom_twist,
-            settings.custom_parameters.twist,
+            custom_parameters.twist(),
         ),
         (
             CUSTOM_TRAVEL_DISTANCE_FIELD,
             attributes.custom_travel_distance,
-            settings.custom_parameters.travel_distance,
+            custom_parameters.travel_distance(),
         ),
     ] {
         data = patch_nested_fixed32_field(
@@ -222,23 +231,20 @@ pub(super) fn patch_transition_settings_wire(
             replacement.map(f32::to_bits),
         )?;
     }
-    let mosaic_type = settings
-        .custom_parameters
-        .mosaic_type
-        .map(|value| u64::from(value.as_raw()));
-    let acceleration = settings
-        .custom_parameters
-        .acceleration
-        .map(|value| i64::from(value.as_raw()) as u64);
-    let text_delivery = settings
-        .custom_parameters
-        .text_delivery
-        .map(|value| i64::from(value.as_raw()) as u64);
+    let mosaic_type = custom_parameters
+        .mosaic_type()
+        .map(|value| u64::from(value.native_value()));
+    let acceleration = custom_parameters
+        .acceleration()
+        .map(|value| i64::from(value.native_value()) as u64);
+    let text_delivery = custom_parameters
+        .text_delivery()
+        .map(|value| i64::from(value.native_value()) as u64);
     for (field_number, current, replacement) in [
         (
             CUSTOM_MOSAIC_SIZE_FIELD,
             attributes.custom_mosaic_size.map(u64::from),
-            settings.custom_parameters.mosaic_size.map(u64::from),
+            custom_parameters.mosaic_size().map(u64::from),
         ),
         (
             CUSTOM_MOSAIC_TYPE_FIELD,
@@ -248,16 +254,15 @@ pub(super) fn patch_transition_settings_wire(
         (
             CUSTOM_BOUNCE_FIELD,
             attributes.custom_bounce.map(u64::from),
-            settings.custom_parameters.bounce.map(u64::from),
+            custom_parameters.bounce().map(u64::from),
         ),
         (
             CUSTOM_MAGIC_MOVE_FADE_FIELD,
             attributes
                 .custom_magic_move_fade_unmatched_objects
                 .map(u64::from),
-            settings
-                .custom_parameters
-                .magic_move_fade_unmatched_objects
+            custom_parameters
+                .magic_move_fade_unmatched_objects()
                 .map(u64::from),
         ),
         (
@@ -277,7 +282,7 @@ pub(super) fn patch_transition_settings_wire(
         (
             CUSTOM_MOTION_BLUR_FIELD,
             attributes.custom_motion_blur.map(u64::from),
-            settings.custom_parameters.motion_blur.map(u64::from),
+            custom_parameters.motion_blur().map(u64::from),
         ),
     ] {
         data = patch_nested_varint_field(

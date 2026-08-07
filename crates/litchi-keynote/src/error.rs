@@ -1,0 +1,78 @@
+//! Errors owned by the archive-free Keynote semantic layer.
+
+use thiserror::Error;
+
+/// A fallible semantic-model operation failed validation.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum Error {
+    /// A presentation or slide size was not finite and strictly positive.
+    #[error("Keynote dimensions must be finite and greater than zero")]
+    InvalidDimensions,
+    /// A duration was not finite and non-negative.
+    #[error("Keynote duration must be finite and non-negative")]
+    InvalidDuration,
+    /// A slide-audio position contained a non-finite coordinate.
+    #[error("Keynote slide-audio position must have finite coordinates")]
+    InvalidAudioPosition,
+    /// A slide-audio duration was zero or outside finite `f32` seconds.
+    #[error("Keynote slide-audio duration must be positive and fit in finite f32 seconds")]
+    InvalidAudioDuration,
+    /// A slide-image position contained a non-finite coordinate.
+    #[error("Keynote slide-image position must have finite coordinates")]
+    InvalidImagePosition,
+    /// A slide-image displayed or natural size was not finite and strictly positive.
+    #[error("Keynote slide-image dimensions must be finite and greater than zero")]
+    InvalidImageSize,
+    /// A slide-movie position contained a non-finite coordinate.
+    #[error("Keynote slide-movie position must have finite coordinates")]
+    InvalidMoviePosition,
+    /// A slide-movie displayed or natural size was not finite and strictly positive.
+    #[error("Keynote slide-movie dimensions must be finite and greater than zero")]
+    InvalidMovieSize,
+    /// A slide-movie duration was zero or outside finite `f32` seconds.
+    #[error("Keynote slide-movie duration must be positive and fit in finite f32 seconds")]
+    InvalidMovieDuration,
+    /// A transition delay was not finite and non-negative.
+    #[error("Keynote transition delay must be finite and non-negative")]
+    InvalidDelay,
+    /// A transition-specific floating-point value was not finite.
+    #[error("Keynote transition custom values must be finite")]
+    InvalidCustomFloat,
+    /// A transition animation detail value was not finite.
+    #[error("Keynote transition detail must be finite")]
+    InvalidDetail,
+    /// A known native enum value was represented by its lossless unknown form.
+    #[error("Keynote mode must use its canonical variant for a known native value")]
+    NonCanonicalMode,
+    /// A known transition effect identifier was represented by its unknown form.
+    #[error("Keynote transition effect must use its canonical variant for a known identifier")]
+    NonCanonicalEffect,
+    /// A semantic transition string contained a NUL byte.
+    #[error("Keynote transition strings cannot contain NUL")]
+    NulString,
+    /// A transition identifier exceeded the bounded semantic storage budget.
+    #[error("Keynote transition identifier exceeds the semantic byte budget")]
+    IdentifierTooLarge,
+    /// An opaque transition payload exceeded the bounded semantic storage budget.
+    #[error("Keynote transition opaque payload exceeds the semantic byte budget")]
+    PayloadTooLarge,
+    /// A native identifier required for lossless decoding was empty.
+    #[error("Keynote animation identifier cannot be empty")]
+    EmptyIdentifier,
+    /// A typed build value was non-finite or outside its semantic range.
+    #[error("Keynote build value is non-finite or outside its semantic range")]
+    InvalidBuildValue,
+    /// A build path or timing curve did not satisfy its semantic invariants.
+    #[error("Keynote build path is empty or malformed")]
+    InvalidBuildPath,
+    /// A build path exceeded the bounded semantic collection budget.
+    #[error("Keynote build path exceeds the semantic collection budget")]
+    BuildTooLarge,
+    /// An opaque background payload cannot be empty.
+    #[error("Keynote opaque background payload cannot be empty")]
+    EmptyBackgroundPayload,
+}
+
+/// Result type for semantic Keynote operations.
+pub type Result<T> = std::result::Result<T, Error>;

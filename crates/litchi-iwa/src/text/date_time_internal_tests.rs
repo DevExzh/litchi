@@ -7,30 +7,26 @@ use crate::wire::{
 };
 
 use super::*;
-use crate::text::date_time_types::{
-    TextDateTimeFieldSettings, TextDateTimeFormat, TextDateTimeFormatterStyle, TextDateTimeInstant,
-    TextDateTimeLocaleIdentifier,
-};
+use crate::text::TextStorageId;
 use crate::text::hyperlink_storage::SMART_FIELD_TABLE_FIELD;
+use litchi_iwa_text::date_time::{Format, FormatterStyle, Instant, LocaleIdentifier, Settings};
 use prost::Message;
 
 const DATE_FIELD: u32 = 8;
 
-fn settings(seconds: f64) -> TextDateTimeFieldSettings {
-    TextDateTimeFieldSettings::fixed(
-        TextDateTimeFormat::new("EEEE, MMMM d, y").unwrap(),
-        TextDateTimeLocaleIdentifier::new("en_US").unwrap(),
-        TextDateTimeInstant::from_reference_date_seconds(seconds).unwrap(),
+fn settings(seconds: f64) -> Settings {
+    Settings::fixed(
+        Format::new("EEEE, MMMM d, y").unwrap(),
+        LocaleIdentifier::new("en_US").unwrap(),
+        Instant::from_reference_date_seconds(seconds).unwrap(),
     )
-    .with_styles(
-        TextDateTimeFormatterStyle::Full,
-        TextDateTimeFormatterStyle::None,
-    )
+    .with_styles(FormatterStyle::Full, FormatterStyle::None)
+    .unwrap()
 }
 
-fn fixture() -> (super::super::IWorkTextEditor, u64) {
+fn fixture() -> (super::super::IWorkTextEditor, TextStorageId) {
     let pages = PagesEditor::create_with_text("Friday, July 17, 2026").unwrap();
-    let storage_id = pages.body_storage().unwrap().object_id;
+    let storage_id = pages.body_storage().unwrap().id;
     (
         super::super::IWorkTextEditor::from_package(pages.into_package()),
         storage_id,
@@ -41,8 +37,8 @@ fn whole_range() -> TextRange {
     TextRange::from_utf16_indexes(0, "Friday, July 17, 2026".encode_utf16().count()).unwrap()
 }
 
-fn storage_message_index(package: &crate::IWorkPackage, storage_id: u64) -> usize {
-    locate_storage(package, storage_id, SMART_FIELD_TABLE)
+fn storage_message_index(package: &crate::IWorkPackage, storage_id: TextStorageId) -> usize {
+    locate_storage(package, storage_id.get(), SMART_FIELD_TABLE)
         .unwrap()
         .message_index
 }
@@ -54,12 +50,12 @@ fn unknown_table_payload_and_nested_date_fields_survive_updates() {
         .add_text_date_time_field(storage_id, whole_range(), settings(805_965_335.0))
         .unwrap();
     let mut package = editor.into_package();
-    let location = locate_storage(&package, storage_id, SMART_FIELD_TABLE).unwrap();
+    let location = locate_storage(&package, storage_id.get(), SMART_FIELD_TABLE).unwrap();
     let archive_name = location.archive_name.clone();
     let message_index = location.message_index;
     package
         .update_archive(&archive_name, |archive| {
-            let storage = archive.object_mut(storage_id).unwrap();
+            let storage = archive.object_mut(storage_id.get()).unwrap();
             let original = &storage.messages[message_index];
             let data = transform_length_delimited_field(
                 &original.data,
@@ -97,7 +93,7 @@ fn unknown_table_payload_and_nested_date_fields_survive_updates() {
     let package = editor.into_package();
     let message_index = storage_message_index(&package, storage_id);
     let archive = package.archive(&archive_name).unwrap();
-    let storage = archive.object(storage_id).unwrap();
+    let storage = archive.object(storage_id.get()).unwrap();
     let message = &storage.messages[message_index];
     let table =
         repeated_length_delimited_payloads(&message.data, SMART_FIELD_TABLE_FIELD).unwrap()[0];
@@ -105,21 +101,21 @@ fn unknown_table_payload_and_nested_date_fields_survive_updates() {
         parse_wire_fields(table)
             .unwrap()
             .iter()
-            .any(|wire| wire.number == 99)
+            .any(|wire| wire.number() == 99)
     );
     let object = archive.object(field.id.object_id()).unwrap();
     assert!(
         parse_wire_fields(&object.messages[0].data)
             .unwrap()
             .iter()
-            .any(|wire| wire.number == 88)
+            .any(|wire| wire.number() == 88)
     );
     let date = repeated_length_delimited_payloads(&object.messages[0].data, DATE_FIELD).unwrap()[0];
     assert!(
         parse_wire_fields(date)
             .unwrap()
             .iter()
-            .any(|wire| wire.number == 77)
+            .any(|wire| wire.number() == 77)
     );
 }
 
@@ -127,7 +123,7 @@ fn unknown_table_payload_and_nested_date_fields_survive_updates() {
 fn date_time_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
     let (editor, storage_id) = fixture();
     let mut package = editor.into_package();
-    let location = locate_storage(&package, storage_id, SMART_FIELD_TABLE).unwrap();
+    let location = locate_storage(&package, storage_id.get(), SMART_FIELD_TABLE).unwrap();
     let style_data = tswp::ParagraphStyleArchive {
         super_: crate::protobuf::tss::StyleArchive::default(),
         ..Default::default()
@@ -136,7 +132,7 @@ fn date_time_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
     package
         .update_archive(&location.archive_name, |archive| {
             archive
-                .object_mut(storage_id)
+                .object_mut(storage_id.get())
                 .unwrap()
                 .push_message(RawMessage {
                     type_: 2_022,
@@ -158,9 +154,9 @@ fn date_time_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
         .unwrap();
 
     let package = editor.into_package();
-    let location = locate_storage(&package, storage_id, SMART_FIELD_TABLE).unwrap();
+    let location = locate_storage(&package, storage_id.get(), SMART_FIELD_TABLE).unwrap();
     let archive = package.archive(&location.archive_name).unwrap();
-    let object = archive.object(storage_id).unwrap();
+    let object = archive.object(storage_id.get()).unwrap();
     assert_eq!(
         object.messages[location.message_index].type_,
         location.message_type
@@ -180,7 +176,7 @@ fn malformed_instant_and_additional_owner_fail_without_mutation() {
         .add_text_date_time_field(storage_id, whole_range(), settings(805_965_335.0))
         .unwrap();
     let mut package = editor.into_package();
-    let archive_name = locate_storage(&package, storage_id, SMART_FIELD_TABLE)
+    let archive_name = locate_storage(&package, storage_id.get(), SMART_FIELD_TABLE)
         .unwrap()
         .archive_name;
     package
@@ -208,7 +204,7 @@ fn malformed_instant_and_additional_owner_fail_without_mutation() {
         .add_text_date_time_field(storage_id, whole_range(), settings(805_965_335.0))
         .unwrap();
     let mut package = editor.into_package();
-    let archive_name = locate_storage(&package, storage_id, SMART_FIELD_TABLE)
+    let archive_name = locate_storage(&package, storage_id.get(), SMART_FIELD_TABLE)
         .unwrap()
         .archive_name;
     package
@@ -217,7 +213,7 @@ fn malformed_instant_and_additional_owner_fail_without_mutation() {
                 .objects
                 .iter_mut()
                 .find(|object| {
-                    object.archive_info.identifier != Some(storage_id)
+                    object.archive_info.identifier != Some(storage_id.get())
                         && !object.archive_info.message_infos.is_empty()
                 })
                 .unwrap();

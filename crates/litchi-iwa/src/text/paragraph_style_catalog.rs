@@ -16,8 +16,11 @@ use crate::wire::{
 use crate::{Error, IWorkPackage, IWorkThemeArchive, Result};
 
 use super::paragraph_alignment::native;
-use super::paragraph_following_style::{NamedParagraphStyle, ParagraphStyleId, ParagraphStyleName};
 use super::style_registry::object_archive_name;
+use litchi_iwa_text::paragraph::style::{
+    NamedParagraphStyle, ParagraphStyleId, ParagraphStyleName,
+    raw::{from_native_id, native_id},
+};
 
 const THEME_MESSAGE_TYPES: &[u32] = &[10, 10_001, 12_009];
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
@@ -45,14 +48,17 @@ pub(super) fn create_named_paragraph_style(
 ) -> Result<NamedParagraphStyle> {
     native::validate_named_paragraph_style(package, first_style_id, source)?;
     let existing = native::named_paragraph_styles(package, first_style_id)?;
-    if existing.iter().any(|style| style.name() == name.as_str()) {
+    if existing
+        .iter()
+        .any(|style| style.name().as_str() == name.as_str())
+    {
         return Err(Error::InvalidFormat(format!(
             "iWork paragraph style name {:?} already exists",
             name.as_str()
         )));
     }
 
-    let source_id = source.get();
+    let source_id = native_id(source);
     let native::LocatedParagraphStyle {
         location: source_location,
         archive: source_archive,
@@ -110,10 +116,8 @@ pub(super) fn create_named_paragraph_style(
     }
     set_package_last_object_identifier(&mut staged, new_style_id)?;
 
-    let created = NamedParagraphStyle::new(
-        ParagraphStyleId::new(new_style_id)?,
-        name.as_str().to_owned(),
-    )?;
+    let created =
+        NamedParagraphStyle::from_owned(from_native_id(new_style_id)?, name.as_str().to_owned())?;
     let matches = native::named_paragraph_styles(&staged, first_style_id)?
         .into_iter()
         .filter(|style| style == &created)
@@ -319,7 +323,7 @@ fn insert_named_style_in_archive(
     stylesheet.archive_info.message_infos[message_index]
         .object_references
         .push(style_id);
-    archive.insert_object(style)
+    Ok(archive.insert_object(style)?)
 }
 
 fn append_theme_preset(

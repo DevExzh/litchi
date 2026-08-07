@@ -1,17 +1,21 @@
 //! Standalone movie-object CRUD for Keynote slides.
 
+use litchi_iwa_common::media::Type as MediaType;
+use litchi_keynote::slide::media::MovieKind;
+use litchi_keynote::slide::movie::Options as SlideMovieOptions;
+
 use super::*;
-use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media::MediaAssetId;
 use crate::media_playback::media_playback_settings;
 use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
-    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    flip_drawable_geometry, geometry_from_drawable, restore_drawable_original_size,
+    DrawableFlipAxis, DrawableGeometry, DrawableProperties, DrawableSize, flip_drawable_geometry,
+    geometry_from_drawable, restore_drawable_original_size,
 };
-use std::time::Duration;
+use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 
 mod builds;
 mod caption;
@@ -29,25 +33,12 @@ const SLIDE_BUILDS_FIELD: u32 = 2;
 const SLIDE_BUILD_CHUNKS_FIELD: u32 = 43;
 const MOVIE_MEDIA_PLACEHOLDER_FLAG: u32 = 1;
 
-/// Semantic role of a movie drawable owned directly by a Keynote slide.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteSlideMovieKind {
-    /// Ordinary file-backed movie inserted by the user.
-    File,
-    /// Independently positioned audio clip stored in a movie archive.
-    Audio,
-    /// File-backed replacement target materialized from a slide layout.
-    MediaPlaceholder,
-    /// Camera-backed live-video drawable.
-    LiveVideo,
-}
-
 /// One movie drawable owned directly by a Keynote slide.
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeynoteSlideMovieInfo {
     pub slide_index: usize,
     pub drawable_object_id: u64,
-    pub kind: KeynoteSlideMovieKind,
+    pub kind: MovieKind,
     pub movie_data_identifier: Option<u64>,
     pub poster_image_data_identifier: Option<u64>,
     pub geometry: DrawableGeometry,
@@ -58,38 +49,6 @@ pub struct KeynoteSlideMovieInfo {
     pub playback: Option<MediaPlaybackSettings>,
     pub original_size: Option<DrawableSize>,
     pub natural_size: Option<DrawableSize>,
-}
-
-/// Typed layout and playback metadata for a newly created Keynote movie.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct KeynoteSlideMovieOptions {
-    /// Top-left position of the movie on the slide, in points.
-    pub position: DrawablePoint,
-    /// Displayed movie size on the slide, in points.
-    pub size: DrawableSize,
-    /// Untransformed media dimensions reported to Keynote, in points.
-    pub natural_size: DrawableSize,
-    /// Playable duration of the source movie.
-    pub duration: Duration,
-}
-
-impl KeynoteSlideMovieOptions {
-    /// Create options whose displayed and natural dimensions are identical.
-    pub const fn new(position: DrawablePoint, size: DrawableSize, duration: Duration) -> Self {
-        Self {
-            position,
-            size,
-            natural_size: size,
-            duration,
-        }
-    }
-
-    /// Set dimensions independent of the displayed size.
-    #[must_use]
-    pub const fn with_natural_size(mut self, natural_size: DrawableSize) -> Self {
-        self.natural_size = natural_size;
-        self
-    }
 }
 
 /// Result of removing one slide-owned movie and its private object graph.
@@ -117,7 +76,7 @@ impl KeynoteEditor {
         Ok(self
             .slide_media_infos(slide_index)?
             .into_iter()
-            .filter(|movie| movie.kind != KeynoteSlideMovieKind::Audio)
+            .filter(|movie| movie.kind != MovieKind::Audio)
             .collect())
     }
 
@@ -164,7 +123,7 @@ impl KeynoteEditor {
         movie_data: &[u8],
         preferred_poster_filename: &str,
         poster_data: &[u8],
-        options: KeynoteSlideMovieOptions,
+        options: SlideMovieOptions,
     ) -> Result<KeynoteSlideMovieInfo> {
         let (geometry, duration_seconds) = movie_creation_values(options)?;
         let context = movie_creation_context(self, slide_index)?;
@@ -172,14 +131,14 @@ impl KeynoteEditor {
 
         let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
         let movie_asset = media.insert_unreferenced(preferred_movie_filename, movie_data)?;
-        if movie_asset.media_type != crate::MediaType::Video {
+        if movie_asset.media_type != MediaType::Video {
             return Err(Error::ParseError(format!(
                 "Keynote slide movies require video data, not {}",
                 movie_asset.media_type.name()
             )));
         }
         let poster_asset = media.insert_unreferenced(preferred_poster_filename, poster_data)?;
-        if poster_asset.media_type != crate::MediaType::Image {
+        if poster_asset.media_type != MediaType::Image {
             return Err(Error::ParseError(format!(
                 "Keynote movie posters require image data, not {}",
                 poster_asset.media_type.name()
@@ -191,10 +150,10 @@ impl KeynoteEditor {
             ids,
             context.slide_id,
             context.style_id,
-            movie_asset.data_identifier,
-            poster_asset.data_identifier,
+            movie_asset.data_identifier.get(),
+            poster_asset.data_identifier.get(),
             geometry,
-            options.natural_size,
+            options.natural_size(),
             duration_seconds,
         )?;
         staged.update_archive(&context.archive_name, |archive| {
@@ -215,7 +174,7 @@ impl KeynoteEditor {
             add_component_data_reference(
                 &mut staged,
                 context.component_id,
-                data_identifier,
+                data_identifier.get(),
                 ids.drawable,
             )?;
         }
@@ -236,15 +195,15 @@ impl KeynoteEditor {
                 Error::InvalidFormat("Keynote movie creation failed validation".to_owned())
             })?;
         let created_graph = verified.slide_movie_graph(slide_index, ids.drawable)?;
-        if created.kind != KeynoteSlideMovieKind::File
-            || created.movie_data_identifier != Some(movie_asset.data_identifier)
-            || created.poster_image_data_identifier != Some(poster_asset.data_identifier)
+        if created.kind != MovieKind::File
+            || created.movie_data_identifier != Some(movie_asset.data_identifier.get())
+            || created.poster_image_data_identifier != Some(poster_asset.data_identifier.get())
             || created.geometry != geometry
-            || created.original_size != Some(options.natural_size)
-            || created.natural_size != Some(options.natural_size)
+            || created.original_size != Some(options.natural_size())
+            || created.natural_size != Some(options.natural_size())
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(movie_asset.data_identifier)? != movie_data
-            || verified.extract_media(poster_asset.data_identifier)? != poster_data
+            || verified.extract_media(movie_asset.data_identifier.get())? != movie_data
+            || verified.extract_media(poster_asset.data_identifier.get())? != poster_data
         {
             return Err(Error::InvalidFormat(
                 "Keynote movie creation produced an inconsistent graph".to_owned(),
@@ -492,18 +451,14 @@ impl KeynoteEditor {
         slide_index: usize,
         source_drawable_object_id: u64,
     ) -> Result<KeynoteSlideMovieInfo> {
-        self.duplicate_slide_media(
-            slide_index,
-            source_drawable_object_id,
-            KeynoteSlideMovieKind::File,
-        )
+        self.duplicate_slide_media(slide_index, source_drawable_object_id, MovieKind::File)
     }
 
     pub(in crate::keynote::editor) fn duplicate_slide_media(
         &mut self,
         slide_index: usize,
         source_drawable_object_id: u64,
-        expected_kind: KeynoteSlideMovieKind,
+        expected_kind: MovieKind,
     ) -> Result<KeynoteSlideMovieInfo> {
         let source =
             self.require_slide_media_kind(slide_index, source_drawable_object_id, expected_kind)?;
@@ -542,7 +497,7 @@ impl KeynoteEditor {
                 clone_slide_object(object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
+                Ok(archive.insert_object(cloned)?)
             })?;
         }
         let mut build_uuids = HashMap::with_capacity(builds.len());
@@ -563,7 +518,7 @@ impl KeynoteEditor {
                 )?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
+                Ok(archive.insert_object(cloned)?)
             })?;
             build_uuids.insert(build.object_id, new_build_uuid_and_seed().0);
         }
@@ -586,7 +541,7 @@ impl KeynoteEditor {
                     )?
                 };
                 staged.update_archive(&source.archive_name, |archive| {
-                    archive.insert_object(cloned)
+                    Ok(archive.insert_object(cloned)?)
                 })?;
             }
         }
@@ -705,14 +660,14 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
     ) -> Result<RemovedKeynoteSlideMovie> {
-        self.remove_slide_media(slide_index, drawable_object_id, KeynoteSlideMovieKind::File)
+        self.remove_slide_media(slide_index, drawable_object_id, MovieKind::File)
     }
 
     pub(in crate::keynote::editor) fn remove_slide_media(
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        expected_kind: KeynoteSlideMovieKind,
+        expected_kind: MovieKind,
     ) -> Result<RemovedKeynoteSlideMovie> {
         let source =
             self.require_slide_media_kind(slide_index, drawable_object_id, expected_kind)?;
@@ -724,7 +679,9 @@ impl KeynoteEditor {
             working.require_slide_media_kind(slide_index, drawable_object_id, expected_kind)?;
 
         let mut comments = IWorkDrawableCommentEditor::from_package(working.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
+            drawable_object_id,
+        )?)?;
         let mut staged = comments.into_package();
         patch_slide_drawable_references(
             &mut staged,
@@ -769,12 +726,13 @@ impl KeynoteEditor {
             .map(|(data, _)| *data)
             .collect::<HashSet<_>>();
         for identifier in data_identifiers {
+            let identifier = MediaAssetId::try_from(identifier)?;
             if media
                 .asset(identifier)
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier);
+                removed_data_identifiers.push(identifier.get());
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -792,7 +750,7 @@ impl KeynoteEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_media
                     .iter()
-                    .any(|asset| asset.data_identifier == *identifier)
+                    .any(|asset| asset.data_identifier.get() == *identifier)
             })
         {
             return Err(Error::InvalidFormat(
@@ -812,7 +770,7 @@ impl KeynoteEditor {
         drawable_object_id: u64,
     ) -> Result<SlideMovieGraph> {
         let source = self.slide_movie_graph(slide_index, drawable_object_id)?;
-        if source.info.kind != KeynoteSlideMovieKind::File {
+        if source.info.kind != MovieKind::File {
             return Err(Error::ParseError(format!(
                 "Keynote movie {drawable_object_id} is {:?}, not an ordinary file-backed movie",
                 source.info.kind
@@ -825,7 +783,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        expected_kind: KeynoteSlideMovieKind,
+        expected_kind: MovieKind,
     ) -> Result<SlideMovieGraph> {
         let source = self.slide_movie_graph(slide_index, drawable_object_id)?;
         if source.info.kind != expected_kind {
@@ -943,16 +901,16 @@ fn movie_info(
     let movie: tsd::MovieArchive =
         graph.decode_type(identifier, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
     let kind = if movie.is_live_video == Some(true) {
-        KeynoteSlideMovieKind::LiveVideo
+        MovieKind::LiveVideo
     } else if movie.audio_only == Some(true) {
-        KeynoteSlideMovieKind::Audio
+        MovieKind::Audio
     } else if movie
         .flags
         .is_some_and(|flags| flags & MOVIE_MEDIA_PLACEHOLDER_FLAG != 0)
     {
-        KeynoteSlideMovieKind::MediaPlaceholder
+        MovieKind::Placeholder
     } else {
-        KeynoteSlideMovieKind::File
+        MovieKind::File
     };
     let playback = movie
         .end_time
@@ -999,7 +957,9 @@ fn take_movie_identifier(next: &mut u64) -> Result<u64> {
 mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
-    use crate::{MediaLoopMode, MediaVolume};
+    use crate::shapes::DrawablePoint;
+    use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
+    use std::time::Duration;
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-movie";
     const REPLACEMENT_MOVIE: &[u8] = b"\0\0\0\x18ftypqt  replacement-movie";
@@ -1016,9 +976,11 @@ mod tests {
         height: 720.0,
     };
 
-    fn options() -> KeynoteSlideMovieOptions {
-        KeynoteSlideMovieOptions::new(POSITION, DISPLAY_SIZE, Duration::from_millis(1_250))
+    fn options() -> SlideMovieOptions {
+        SlideMovieOptions::new(POSITION, DISPLAY_SIZE, Duration::from_millis(1_250))
+            .unwrap()
             .with_natural_size(NATURAL_SIZE)
+            .unwrap()
     }
 
     fn properties(description: &str) -> DrawableProperties {
@@ -1043,7 +1005,7 @@ mod tests {
         let created = editor
             .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
             .unwrap();
-        assert_eq!(created.kind, KeynoteSlideMovieKind::File);
+        assert_eq!(created.kind, MovieKind::File);
         assert_eq!(created.original_size, Some(NATURAL_SIZE));
         assert_eq!(created.natural_size, Some(NATURAL_SIZE));
         assert_eq!(created.geometry.position, Some(POSITION));
@@ -1333,29 +1295,23 @@ mod tests {
                 options(),
             ),
             editor.add_slide_movie(1, "movie.mov", MOVIE, "poster.png", POSTER, options()),
-            editor.add_slide_movie(
-                0,
-                "movie.mov",
-                MOVIE,
-                "poster.png",
-                POSTER,
-                KeynoteSlideMovieOptions::new(POSITION, DISPLAY_SIZE, Duration::ZERO),
-            ),
-            editor.add_slide_movie(
-                0,
-                "movie.mov",
-                MOVIE,
-                "poster.png",
-                POSTER,
-                options().with_natural_size(DrawableSize {
-                    width: f32::NAN,
-                    height: 720.0,
-                }),
-            ),
         ] {
             assert!(result.is_err());
             assert_eq!(editor.to_bytes().unwrap(), baseline);
         }
+
+        assert_eq!(
+            SlideMovieOptions::new(POSITION, DISPLAY_SIZE, Duration::ZERO),
+            Err(litchi_keynote::Error::InvalidMovieDuration)
+        );
+        assert_eq!(
+            options().with_natural_size(DrawableSize {
+                width: f32::NAN,
+                height: 720.0,
+            }),
+            Err(litchi_keynote::Error::InvalidMovieSize)
+        );
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
 
         let created = editor
             .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())

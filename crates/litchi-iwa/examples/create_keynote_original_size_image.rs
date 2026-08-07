@@ -3,15 +3,16 @@
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideImageOptions};
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_keynote::slide::image::Options as ImageOptions;
 
-const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 720.0, y: 405.0 };
-const DISPLAYED_IMAGE_SIZE: DrawableSize = DrawableSize {
+const IMAGE_POSITION: Point = Point { x: 720.0, y: 405.0 };
+const DISPLAYED_IMAGE_SIZE: Size = Size {
     width: 240.0,
     height: 240.0,
 };
-const ORIGINAL_IMAGE_SIZE: DrawableSize = DrawableSize {
+const ORIGINAL_IMAGE_SIZE: Size = Size {
     width: 512.0,
     height: 512.0,
 };
@@ -39,8 +40,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0,
         image_filename,
         &image,
-        KeynoteSlideImageOptions::new(IMAGE_POSITION, DISPLAYED_IMAGE_SIZE)
-            .with_natural_size(ORIGINAL_IMAGE_SIZE),
+        ImageOptions::new(IMAGE_POSITION, DISPLAYED_IMAGE_SIZE)?
+            .with_natural_size(ORIGINAL_IMAGE_SIZE)?,
     )?;
     editor.restore_slide_image_original_size(0, created.drawable_object_id)?;
     editor.save(output)?;

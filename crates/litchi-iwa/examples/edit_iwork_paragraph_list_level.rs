@@ -2,7 +2,8 @@
 
 use std::env;
 
-use litchi_iwa::text::{IWorkTextEditor, ParagraphListLevel, ParagraphStart};
+use litchi_iwa::text::{IWorkTextEditor, ParagraphListLevel};
+use litchi_iwa_text::position::TextPosition;
 
 enum LevelEdit {
     Reset,
@@ -16,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let output = arguments.next().ok_or("missing output path")?;
     let storage_id = arguments.next().ok_or("missing storage ID")?.parse()?;
-    let paragraph = ParagraphStart::from_utf16_index(
+    let paragraph = TextPosition::from_utf16_index(
         arguments
             .next()
             .ok_or("missing UTF-16 paragraph start")?

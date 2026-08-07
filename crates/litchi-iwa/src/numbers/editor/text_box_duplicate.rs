@@ -71,12 +71,12 @@ impl NumbersEditor {
                 clone_numbers_drawable_graph_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
+                Ok(archive.insert_object(cloned)?)
             })?;
         }
 
         let new_drawable_id = remap[&source.drawable_id];
-        let new_storage_id = remap[&source.storage_id];
+        let new_storage_id = remap[&source.storage_id.get()];
         if offset != f32::default() {
             offset_numbers_drawable_clone(
                 &mut staged,
@@ -86,6 +86,7 @@ impl NumbersEditor {
             )?;
         }
         let mut text_editor = IWorkTextEditor::from_package(staged);
+        let new_storage_id = crate::text::native_storage_id(new_storage_id)?;
         text_editor.set_text(new_storage_id, text)?;
         staged = text_editor.into_package();
         patch_numbers_sheet_drawable_reference(
@@ -125,8 +126,8 @@ impl NumbersEditor {
             })?;
         let created_graph =
             numbers_text_box_graph(verified.package(), target_sheet_id, new_drawable_id)?;
-        if created.storage.object_id != new_storage_id
-            || created.storage.text != text
+        if created.storage.id != new_storage_id
+            || created.storage.storage.text() != text
             || created_graph.object_ids.len() != source.object_ids.len()
         {
             return Err(Error::InvalidFormat(

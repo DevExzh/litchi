@@ -74,7 +74,7 @@ fn set_body_chart_pie_start_angle(
     Ok(())
 }
 
-fn require_pie_start_angle(kind: ChartKind, drawable_object_id: u64) -> Result<()> {
+fn require_pie_start_angle(kind: Kind, drawable_object_id: u64) -> Result<()> {
     if !kind.supports_pie_start_angle() {
         return Err(Error::InvalidFormat(format!(
             "Pages chart {drawable_object_id} kind {kind:?} has no Wedges rotation angle"

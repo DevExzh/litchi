@@ -9,34 +9,34 @@ use crate::text::style_registry::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::super::drop_cap::ParagraphStart;
-use super::types::{ParagraphList, ParagraphListNumberScale};
 use super::variation::{
     effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
 };
 use super::{levels, native, storage};
+use litchi_iwa_text::paragraph::list::{ParagraphList, ParagraphListNumberScale};
+use litchi_iwa_text::position::TextPosition;
 
 pub(crate) fn paragraph_list_number_scale(
     package: &IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListNumberScale> {
     let level = levels::paragraph_list_level(package, storage_id, paragraph)?;
     let boundaries = storage::locate_boundaries(package, storage_id)?;
     let style_id = effective_style_id(&boundaries, paragraph)?;
     require_numbered(package, storage_id, paragraph, style_id)?;
     let geometries = native::effective_label_geometries(package, style_id)?;
-    ParagraphListNumberScale::from_ratio(
+    Ok(ParagraphListNumberScale::from_ratio(
         geometries[usize::from(level.get())]
             .scale
             .unwrap_or(ParagraphListNumberScale::ONE.ratio()),
-    )
+    )?)
 }
 
 pub(in crate::text) fn set_paragraph_list_number_scale(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     scale: ParagraphListNumberScale,
 ) -> Result<()> {
     if paragraph_list_number_scale(package, storage_id, paragraph)? == scale {
@@ -112,7 +112,7 @@ pub(in crate::text) fn set_paragraph_list_number_scale(
 pub(in crate::text) fn reset_paragraph_list_number_scale(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     if paragraph_list_number_scale(package, storage_id, paragraph)? == ParagraphListNumberScale::ONE
     {
@@ -131,7 +131,7 @@ pub(in crate::text) fn reset_paragraph_list_number_scale(
 fn collapse_or_clear_redundant_scale(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<()> {
     let located = storage::locate_boundaries_with_archive(package, storage_id)?;
     let boundaries = &located.location;
@@ -207,7 +207,7 @@ fn collapse_or_clear_redundant_scale(
 fn require_numbered(
     package: &IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     style_id: u64,
 ) -> Result<()> {
     if native::resolved_paragraph_list(package, style_id)? != ParagraphList::Numbered {

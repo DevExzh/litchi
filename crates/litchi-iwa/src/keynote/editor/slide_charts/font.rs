@@ -135,7 +135,7 @@ impl KeynoteEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartKind};
+    use crate::charts::{ChartData, Kind};
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -145,7 +145,7 @@ mod tests {
         let chart = editor
             .add_slide_chart(
                 0,
-                ChartKind::Line2d,
+                Kind::Line2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -172,7 +172,7 @@ mod tests {
             .set_slide_chart_font_size(0, chart.drawable_object_id, large)
             .unwrap();
         let duplicate = editor
-            .duplicate_slide_chart(0, chart.drawable_object_id)
+            .duplicate_slide_chart(0, chart_selector(&editor, &chart))
             .unwrap();
         assert_eq!(
             editor
@@ -237,7 +237,7 @@ mod tests {
             inherited_size
         );
         editor
-            .remove_slide_chart(0, duplicate.drawable_object_id)
+            .remove_slide_chart(0, chart_selector(&editor, &duplicate))
             .unwrap();
         assert!(
             editor

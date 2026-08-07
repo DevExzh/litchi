@@ -12,6 +12,12 @@
 use crate::{Error, IWorkPackage, Result};
 
 mod archive;
+
+/// Native protobuf-backed chart data for advanced format-level integrations.
+pub mod raw {
+    pub use super::archive::IWorkChartArchive;
+}
+
 pub(crate) mod arrangement;
 pub(crate) mod axis;
 pub(crate) mod axis_bounds;
@@ -30,12 +36,18 @@ pub(crate) mod border_stroke;
 pub(crate) mod category_labels;
 mod data;
 pub(crate) mod depth_3d;
-mod direction;
 pub(crate) mod donut_inner_radius;
+/// Archive-free error-bar values used by native chart adapters.
+pub mod error_bar {
+    pub use litchi_iwa_common::chart::error_bar::{
+        CustomValue, CustomValues, Direction, Error, FixedValue, Kind, MAX_CUSTOM_VALUES_PER_SIDE,
+        Percentage, Result, Series, Side, StandardDeviationCount, Unknown,
+    };
+}
 pub(crate) mod font;
 pub(crate) mod gaps;
 pub(crate) mod hidden_data;
-mod kind;
+pub use litchi_iwa_common::chart::kind::Kind;
 pub(crate) mod legend_fill;
 pub(crate) mod legend_font;
 pub(crate) mod legend_frame;
@@ -43,7 +55,7 @@ pub(crate) mod legend_shadow;
 pub(crate) mod legend_stroke;
 pub(crate) mod legend_style;
 pub(crate) mod lighting_3d;
-pub mod metadata_extractor;
+pub(crate) mod metadata_extractor;
 pub(crate) mod non_style;
 pub(crate) mod number_format;
 pub(crate) mod object_container;
@@ -56,7 +68,7 @@ pub(crate) mod pie_wedge_explosion;
 pub(crate) mod radar_grid_shape;
 pub(crate) mod radar_series_style;
 pub(crate) mod radar_start_angle;
-pub(crate) mod reference_lines;
+pub mod reference_line;
 pub(crate) mod rounded_corners;
 pub(crate) mod scene_3d;
 pub(crate) mod series_connection_line;
@@ -81,27 +93,15 @@ pub(crate) mod shadow;
 pub(crate) mod source;
 pub(crate) mod style;
 
-pub use archive::IWorkChartArchive;
+pub use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
+
+pub(crate) use archive::IWorkChartArchive;
 pub use arrangement::ChartArrangement;
-pub use axis::ChartAxis;
-pub use axis_bounds::{ChartAxisBound, ChartValueAxisBounds};
 pub use axis_gridline_stroke::{ChartAxisGridline, ChartAxisGridlineStroke};
-pub use axis_label_angle::ChartAxisLabelAngle;
-pub use axis_label_position_3d::Chart3dAxisLabelPosition;
-pub use axis_scale::ChartValueAxisScale;
-pub use axis_steps::{ChartAxisMajorStepCount, ChartAxisMinorStepCount, ChartValueAxisSteps};
-pub use axis_style::ChartAxisTickMarkLocation;
-pub use bar_shape_3d::Chart3dBarShape;
-pub use category_labels::{
-    ChartCategoryLabelFrequency, ChartCategoryLabelInterval, ChartCategoryLabelLayout,
-};
 pub use data::ChartData;
 pub use depth_3d::Chart3dDepth;
-pub use direction::ChartSeriesDirection;
 pub use donut_inner_radius::ChartDonutInnerRadius;
 pub use font::{ChartFont, ChartFontSize};
-pub use gaps::{ChartGapPercentage, ChartGapSpacing};
-pub use kind::ChartKind;
 pub use legend_fill::ChartLegendFill;
 pub use legend_font::{ChartLegendFont, ChartLegendFontSize};
 pub use legend_frame::{
@@ -110,29 +110,30 @@ pub use legend_frame::{
 pub use legend_shadow::ChartLegendShadow;
 pub use legend_stroke::ChartLegendStroke;
 pub use lighting_3d::Chart3dLightingStyle;
-pub use metadata_extractor::{ChartMetadata, ChartMetadataExtractor};
-pub use number_format::{
-    ChartDecimalPlaces, ChartFixedDecimalPlaces, ChartLabelAffixes, ChartNegativeStyle,
-    ChartNumberFormat,
+pub use litchi_iwa_common::chart::axis::{
+    Axis, Bound, Bounds, LabelAngle, LabelPosition3d, MajorStepCount, MinorStepCount, Scale, Steps,
+    TickMarkLocation,
 };
+pub use litchi_iwa_common::chart::number_format::{
+    DecimalPlaces, FixedDecimalPlaces, LabelAffixes, NegativeStyle, NumberFormat,
+};
+pub use litchi_iwa_common::chart::pie::{
+    LabelVisibility, LeaderLineVisibility, LeaderLineVisibilityKind,
+};
+pub use litchi_iwa_common::chart::series_labels::{Index, Visibility};
+pub use litchi_iwa_common::chart::{Direction, DirectionKind};
+pub use litchi_iwa_common::chart3d::BarShape;
+pub use metadata_extractor::ChartMetadata;
 pub use pie_label_distance::ChartPieLabelDistance;
-pub use pie_labels::ChartPieLabelVisibility;
-pub use pie_leader_lines::ChartPieLeaderLineVisibility;
 pub use pie_start_angle::ChartPieStartAngle;
 pub use pie_wedge_explosion::{ChartPieWedgeExplosion, ChartPieWedgeIndex};
 pub use radar_grid_shape::ChartRadarGridShape;
 pub use radar_series_style::ChartRadarSeriesStyle;
 pub use radar_start_angle::ChartRadarStartAngle;
-pub use reference_lines::{ChartReferenceLine, ChartReferenceLineKind, ChartReferenceLineValue};
 pub use rounded_corners::{ChartCornerRadius, ChartRoundedCorners};
 pub use scene_3d::Chart3dRotation;
 pub use series_connection_line::{ChartSeriesConnectionLine, ChartSeriesConnectionLineKind};
 pub use series_error_bar_auto_fit::ChartSeriesErrorBarAutoFit;
-pub use series_error_bars::{
-    ChartErrorBarCustomValue, ChartErrorBarCustomValues, ChartErrorBarDirection,
-    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartErrorBarStandardDeviationCount,
-    ChartSeriesErrorBars,
-};
 pub use series_fill::ChartSeriesFillKind;
 pub use series_gap_3d::Chart3dSeriesGap;
 pub use series_stroke::{ChartSeriesStroke, ChartSeriesStrokeKind, ChartSeriesStrokePattern};
@@ -145,15 +146,51 @@ pub use series_trendline::{
     ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
     ChartSeriesTrendlinePolynomialOrder, ChartSeriesTrendlineType,
 };
-pub use series_value_label_affixes::ChartSeriesValueLabelAffixes;
 pub use series_value_label_auto_fit::ChartSeriesValueLabelAutoFit;
 pub use series_value_label_location::ChartSeriesValueLabelLocation;
-pub use series_value_label_number_format::{
-    ChartSeriesValueLabelDecimalPlaces, ChartSeriesValueLabelFixedDecimalPlaces,
-    ChartSeriesValueLabelNegativeStyle, ChartSeriesValueLabelNumberFormat,
-};
-pub use series_value_labels::{ChartSeriesIndex, ChartSeriesValueLabelVisibility};
 pub use shadow::ChartShadow;
+
+impl From<litchi_iwa_common::chart::axis::bounds::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::chart::axis::bounds::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_common::chart::axis::label_angle::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::chart::axis::label_angle::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_common::chart::axis::steps::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::chart::axis::steps::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_common::chart::category_labels::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::chart::category_labels::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_common::chart::number_format::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::chart::number_format::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_common::chart::reference_line::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::chart::reference_line::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
+
+impl From<litchi_iwa_common::chart::error_bar::Error> for crate::Error {
+    fn from(error: litchi_iwa_common::chart::error_bar::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
+    }
+}
 
 /// Locate one chart-private object and reject ambiguous cross-component IDs.
 pub(crate) fn unique_chart_object_archive_name(

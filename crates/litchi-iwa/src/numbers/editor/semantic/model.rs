@@ -7,7 +7,10 @@ use super::*;
 /// Stable identity and dimensions of a Numbers table.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NumbersTableInfo {
-    pub object_id: u64,
+    /// Native model identity retained only inside the IWA adapter.
+    pub(crate) object_id: u64,
+    /// Checked zero-based position in the editor's semantic table catalog.
+    pub index: usize,
     pub name: String,
     pub rows: usize,
     pub columns: usize,
@@ -20,9 +23,34 @@ pub struct NumbersTableInfo {
 /// Stable identity and name of a sheet in workbook order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NumbersSheetInfo {
-    pub object_id: u64,
+    /// Native identity retained only inside the IWA adapter.
+    pub(crate) object_id: u64,
     pub index: usize,
     pub name: String,
+}
+
+impl NumbersTableInfo {
+    /// Return the stable native table identifier accepted by cell-level APIs.
+    #[must_use]
+    pub const fn id(&self) -> u64 {
+        self.object_id
+    }
+
+    pub(crate) const fn native_id(&self) -> u64 {
+        self.object_id
+    }
+}
+
+impl NumbersSheetInfo {
+    /// Return the stable native sheet identifier accepted by sheet-scoped APIs.
+    #[must_use]
+    pub const fn id(&self) -> u64 {
+        self.object_id
+    }
+
+    pub(crate) const fn native_id(&self) -> u64 {
+        self.object_id
+    }
 }
 
 /// A writable ordinary text box owned by one Numbers sheet.
@@ -46,19 +74,14 @@ pub struct NumbersPivotCategoryInfo {
     pub label: Option<String>,
 }
 
-/// Address and storage identity of a comment attached to a Numbers cell.
-pub type NumbersCellCommentInfo = IWorkTableCellCommentInfo;
-
-/// A resolved direct reply in a Numbers cell-comment thread.
-pub type NumbersCellCommentReplyInfo = IWorkTableCellCommentReplyInfo;
 /// Horizontal text alignment shared by native Numbers table cells.
-pub type NumbersTableCellTextAlignment = TextAlignment;
+pub type NumbersTableCellTextAlignment = Alignment;
 /// Typed first-line, left, and right indents for a Numbers table cell.
-pub type NumbersTableCellParagraphIndents = ParagraphIndents;
+pub type NumbersTableCellParagraphIndents = Indents;
 /// Typed native line spacing applied to a whole Numbers table cell.
-pub type NumbersTableCellParagraphLineSpacing = ParagraphLineSpacing;
+pub type NumbersTableCellParagraphLineSpacing = LineSpacing;
 /// Typed before/after paragraph spacing applied to a whole Numbers table cell.
-pub type NumbersTableCellParagraphSpacing = ParagraphSpacing;
+pub type NumbersTableCellParagraphSpacing = Spacing;
 /// Canonical native list preset applied uniformly to a Numbers table cell.
 pub type NumbersTableCellParagraphList = ParagraphList;
 /// A validated custom text-bullet marker in a Numbers table cell.
@@ -85,7 +108,7 @@ pub type NumbersTableCellParagraphListPlacement = ParagraphListPlacement;
 /// Ordered explicit ruler tab stops for a Numbers table cell.
 pub type NumbersTableCellParagraphTabStops = ParagraphTabStops;
 /// Typed solid background painted behind a whole Numbers table cell's text.
-pub type NumbersTableCellTextBackground = TextBackground;
+pub type NumbersTableCellTextBackground = Background;
 /// Validated custom baseline displacement applied to a whole Numbers cell.
 pub type NumbersTableCellTextBaselineShift = TextBaselineShift;
 /// Typed capitalization applied to a whole Numbers table cell.
@@ -101,11 +124,11 @@ pub type NumbersTableCellTextFont = TextFont;
 /// Typed ligature policy applied to a whole Numbers table cell.
 pub type NumbersTableCellTextLigatures = TextLigatures;
 /// Typed outline applied to a whole Numbers table cell's text.
-pub type NumbersTableCellTextOutline = TextOutline;
+pub type NumbersTableCellTextOutline = Outline;
 /// Typed normal, superscript, or subscript formatting for a whole Numbers cell.
 pub type NumbersTableCellTextScript = TextScript;
 /// Typed drop shadow applied to a whole Numbers table cell's text.
-pub type NumbersTableCellTextShadow = TextShadow;
+pub type NumbersTableCellTextShadow = Shadow;
 /// Whole-cell point size, bold, and italic formatting.
 pub type NumbersTableCellTextStyle = TextStyle;
 

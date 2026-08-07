@@ -273,7 +273,7 @@ impl NumbersDocumentBuilder {
     }
 
     /// Build the underlying package for lower-level IWA manipulation.
-    pub fn build_package(self) -> Result<IWorkPackage> {
+    pub(crate) fn build_package(self) -> Result<IWorkPackage> {
         self.validate()?;
         let identity = IWorkDocumentIdentity::generate();
         let table_uuid = fresh_tsp_uuid();
@@ -1337,8 +1337,9 @@ fn solid_fill() -> tsd::FillArchive {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::numbers::cell::CellValue;
     use crate::numbers::{
-        CellValue, FormulaBinaryOperator, FormulaCellReference, FormulaExpression, NumbersDocument,
+        FormulaBinaryOperator, FormulaCellReference, FormulaExpression, NumbersDocument,
     };
 
     #[test]
@@ -1396,7 +1397,7 @@ mod tests {
         assert_eq!(
             styles
                 .iter()
-                .map(|style| style.id().get())
+                .map(|style| litchi_iwa_text::paragraph::style::raw::native_id(style.id()))
                 .collect::<Vec<_>>(),
             NumbersParagraphStylePreset::ALL
                 .into_iter()
@@ -1504,9 +1505,19 @@ mod tests {
         );
 
         let sheet_id = editor.sheets().unwrap()[0].object_id;
-        editor.remove_table(initial.object_id).unwrap();
+        editor
+            .remove_table(crate::numbers::editor::test_table_selector(
+                &editor,
+                initial.object_id,
+            ))
+            .unwrap();
         let bootstrapped = editor
-            .add_empty_table(sheet_id, "Identity Preserved", 4, 3)
+            .add_empty_table(
+                crate::numbers::editor::test_sheet_selector(&editor, sheet_id),
+                "Identity Preserved",
+                4,
+                3,
+            )
             .unwrap();
         assert_eq!(
             uid_map_message_type(&editor, bootstrapped.object_id),
@@ -1558,7 +1569,12 @@ mod tests {
             .set_cell(table_id, 1, 1, CellValue::Text("Litchi".to_owned()))
             .unwrap();
         editor
-            .set_cell(table_id, 2, 2, CellValue::Number(42.5))
+            .set_cell(
+                table_id,
+                2,
+                2,
+                CellValue::number(42.5).expect("finite test number"),
+            )
             .unwrap();
         editor
             .set_cell(table_id, 3, 3, CellValue::Boolean(true))
@@ -1573,7 +1589,10 @@ mod tests {
             table.get_cell(1, 1),
             Some(&CellValue::Text("Litchi".to_owned()))
         );
-        assert_eq!(table.get_cell(2, 2), Some(&CellValue::Number(42.5)));
+        assert_eq!(
+            table.get_cell(2, 2),
+            Some(&CellValue::number(42.5).expect("finite test number"))
+        );
         assert!(table.get_cell(3, 3).is_none_or(CellValue::is_empty));
     }
 
@@ -1582,10 +1601,20 @@ mod tests {
         let mut editor = NumbersEditor::create().unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
         editor
-            .set_cell(table_id, 0, 0, CellValue::Number(40.0))
+            .set_cell(
+                table_id,
+                0,
+                0,
+                CellValue::number(40.0).expect("finite test number"),
+            )
             .unwrap();
         editor
-            .set_cell(table_id, 0, 1, CellValue::Number(2.0))
+            .set_cell(
+                table_id,
+                0,
+                1,
+                CellValue::number(2.0).expect("finite test number"),
+            )
             .unwrap();
         let baseline = editor.to_bytes().unwrap();
 
@@ -1616,13 +1645,28 @@ mod tests {
         let mut editor = NumbersEditor::create().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let table = editor
-            .add_empty_table(sheet_id, "Calculated", 4, 3)
+            .add_empty_table(
+                crate::numbers::editor::test_sheet_selector(&editor, sheet_id),
+                "Calculated",
+                4,
+                3,
+            )
             .unwrap();
         editor
-            .set_cell(table.object_id, 0, 0, CellValue::Number(21.0))
+            .set_cell(
+                table.object_id,
+                0,
+                0,
+                CellValue::number(21.0).expect("finite test number"),
+            )
             .unwrap();
         editor
-            .set_cell(table.object_id, 0, 1, CellValue::Number(2.0))
+            .set_cell(
+                table.object_id,
+                0,
+                1,
+                CellValue::number(2.0).expect("finite test number"),
+            )
             .unwrap();
         let baseline = editor.to_bytes().unwrap();
 
@@ -1659,7 +1703,12 @@ mod tests {
         let mut editor = NumbersEditor::create().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let table = editor
-            .add_empty_table(sheet_id, "Disposable", 3, 2)
+            .add_empty_table(
+                crate::numbers::editor::test_sheet_selector(&editor, sheet_id),
+                "Disposable",
+                3,
+                2,
+            )
             .unwrap();
         editor
             .set_formula(
@@ -1686,7 +1735,12 @@ mod tests {
             2
         );
 
-        editor.remove_table(table.object_id).unwrap();
+        editor
+            .remove_table(crate::numbers::editor::test_table_selector(
+                &editor,
+                table.object_id,
+            ))
+            .unwrap();
         let calculation = editor.package().archive(CALCULATION_ARCHIVE_ENTRY).unwrap();
         let engine = calculation
             .objects
@@ -1730,10 +1784,20 @@ mod tests {
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source_table_id = editor.tables().unwrap()[0].object_id;
         let target = editor
-            .add_empty_table(sheet_id, "Referenced", 2, 2)
+            .add_empty_table(
+                crate::numbers::editor::test_sheet_selector(&editor, sheet_id),
+                "Referenced",
+                2,
+                2,
+            )
             .unwrap();
         editor
-            .set_cell(target.object_id, 0, 0, CellValue::Number(7.0))
+            .set_cell(
+                target.object_id,
+                0,
+                0,
+                CellValue::number(7.0).expect("finite test number"),
+            )
             .unwrap();
         editor
             .set_formula(
@@ -1748,7 +1812,14 @@ mod tests {
             .unwrap();
         let baseline = editor.to_bytes().unwrap();
 
-        assert!(editor.remove_table(target.object_id).is_err());
+        assert!(
+            editor
+                .remove_table(crate::numbers::editor::test_table_selector(
+                    &editor,
+                    target.object_id
+                ))
+                .is_err()
+        );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
     }
 
@@ -1757,12 +1828,33 @@ mod tests {
         let mut editor = NumbersEditor::create().unwrap();
         let sheet = editor.add_empty_sheet("Archive").unwrap();
         let table = editor
-            .add_empty_table(sheet.object_id, "History", 3, 2)
+            .add_empty_table(
+                crate::numbers::editor::test_sheet_selector(&editor, sheet.object_id),
+                "History",
+                3,
+                2,
+            )
             .unwrap();
         assert!(editor.tables().unwrap().iter().any(|item| item == &table));
 
-        assert_eq!(editor.remove_table(table.object_id).unwrap(), table);
-        assert_eq!(editor.remove_sheet(sheet.object_id).unwrap(), sheet);
+        assert_eq!(
+            editor
+                .remove_table(crate::numbers::editor::test_table_selector(
+                    &editor,
+                    table.object_id
+                ))
+                .unwrap(),
+            table
+        );
+        assert_eq!(
+            editor
+                .remove_sheet(crate::numbers::editor::test_sheet_selector(
+                    &editor,
+                    sheet.object_id
+                ))
+                .unwrap(),
+            sheet
+        );
 
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.sheets().unwrap().len(), 1);

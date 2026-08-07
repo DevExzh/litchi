@@ -1,6 +1,7 @@
 //! Native-style duplication of populated Numbers sheets.
 
 use super::*;
+use litchi_numbers::{SheetSelector, TableSelector};
 
 mod wire;
 
@@ -45,7 +46,8 @@ impl NumbersEditor {
     /// writable object storage is independent.
     /// Unsupported drawable kinds and cross-table formula edges are rejected
     /// transactionally.
-    pub fn duplicate_sheet(&mut self, sheet_id: u64) -> Result<NumbersSheetInfo> {
+    pub fn duplicate_sheet(&mut self, selector: SheetSelector<'_>) -> Result<NumbersSheetInfo> {
+        let sheet_id = super::selectors::sheet_id(self, selector)?;
         let sheets = self.sheets()?;
         let source = sheets
             .iter()
@@ -55,7 +57,7 @@ impl NumbersEditor {
             .iter()
             .map(|sheet| sheet.name.as_str())
             .collect::<HashSet<_>>();
-        let name = duplicate_sheet_name(&source.name, &existing_names)?;
+        let new_sheet_name = duplicate_sheet_name(&source.name, &existing_names)?;
         let (archive_name, message_index, sheet) = numbers_sheet(&self.package, sheet_id)?;
         let drawables = classify_sheet_drawables(self, sheet_id, &sheet)?;
         for drawable in &drawables {
@@ -80,13 +82,15 @@ impl NumbersEditor {
                 source_object,
                 message_index,
                 new_sheet_id,
-                &name,
+                &new_sheet_name,
                 &sheet.drawable_infos,
             )?
         };
 
         let mut staged = self.package.clone();
-        staged.update_archive(&archive_name, |archive| archive.insert_object(cloned_sheet))?;
+        staged.update_archive(&archive_name, |archive| {
+            Ok(archive.insert_object(cloned_sheet)?)
+        })?;
         update_numbers_document(&mut staged, |document| {
             let matches = document
                 .sheets
@@ -122,10 +126,19 @@ impl NumbersEditor {
         let mut cloned_drawable_ids = Vec::with_capacity(drawables.len());
         for drawable in drawables {
             match drawable {
-                SheetDrawableClone::Table { model_id, name, .. } => {
-                    let cloned = working.duplicate_table(model_id)?;
-                    working.move_table(cloned.object_id, new_sheet_id)?;
-                    working.rename_table(cloned.object_id, &name)?;
+                SheetDrawableClone::Table {
+                    model_id,
+                    name: table_name,
+                    ..
+                } => {
+                    let source_index = super::selectors::table_index(&working, model_id)?;
+                    let cloned = working.duplicate_table(TableSelector::index(source_index))?;
+                    working.move_table(
+                        TableSelector::name(&cloned.name),
+                        SheetSelector::name(&new_sheet_name),
+                    )?;
+                    let cloned_index = super::selectors::table_index(&working, cloned.native_id())?;
+                    working.rename_table(TableSelector::index(cloned_index), &table_name)?;
                     restore_table_geometry(&mut working.package, model_id, cloned.object_id)?;
                     cloned_drawable_ids
                         .push(find_table_owner(working.package(), cloned.object_id)?.table_info_id);
@@ -181,7 +194,7 @@ impl NumbersEditor {
             .iter()
             .map(|reference| reference.identifier)
             .collect::<Vec<_>>();
-        if verified_sheet.name != name || verified_drawables != cloned_drawable_ids {
+        if verified_sheet.name != new_sheet_name || verified_drawables != cloned_drawable_ids {
             return Err(Error::InvalidFormat(
                 "Numbers sheet duplication failed structural validation".to_owned(),
             ));
@@ -217,7 +230,12 @@ fn classify_sheet_drawables(
     let text_boxes = editor
         .sheet_text_boxes(sheet_id)?
         .into_iter()
-        .map(|text_box| (text_box.drawable_object_id, text_box.storage.text))
+        .map(|text_box| {
+            (
+                text_box.drawable_object_id,
+                text_box.storage.storage.into_text(),
+            )
+        })
         .collect::<HashMap<_, _>>();
     let images = editor
         .sheet_images(sheet_id)?
@@ -409,10 +427,9 @@ mod tests {
         NumbersDocumentBuilder, NumbersSheetAudioOptions, NumbersSheetImageOptions,
         NumbersSheetMovieOptions,
     };
-    use crate::shapes::{
-        DrawableGeometry, DrawablePoint, DrawableSize, RgbaColor, ShapeFill, ShapePreset,
-    };
-    use crate::{MediaLoopMode, MediaVolume};
+    use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize, RgbaColor, ShapeFill};
+    use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
+    use litchi_iwa_common::shape::path::Preset;
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsheet-duplicate-audio";
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  sheet-duplicate-movie";
@@ -477,7 +494,9 @@ mod tests {
             )
             .unwrap();
 
-        let duplicate = editor.duplicate_sheet(source_sheet.object_id).unwrap();
+        let duplicate = editor
+            .duplicate_sheet(test_sheet_selector(&editor, source_sheet.object_id))
+            .unwrap();
 
         assert_eq!(duplicate.index, 1);
         assert_eq!(duplicate.name, "Movie-1");
@@ -585,7 +604,9 @@ mod tests {
             )
             .unwrap();
 
-        let duplicate = editor.duplicate_sheet(source_sheet.object_id).unwrap();
+        let duplicate = editor
+            .duplicate_sheet(test_sheet_selector(&editor, source_sheet.object_id))
+            .unwrap();
 
         assert_eq!(duplicate.index, 1);
         assert_eq!(duplicate.name, "Audio-1");
@@ -653,20 +674,22 @@ mod tests {
                 "Native-style shape",
                 SHAPE_POSITION,
                 SHAPE_SIZE,
-                ShapePreset::Rectangle,
+                Preset::Rectangle,
                 SOURCE_SHAPE_FILL,
             )
             .unwrap();
 
-        let duplicate = editor.duplicate_sheet(source_sheet.object_id).unwrap();
+        let duplicate = editor
+            .duplicate_sheet(test_sheet_selector(&editor, source_sheet.object_id))
+            .unwrap();
 
         assert_eq!(duplicate.index, 1);
         assert_eq!(duplicate.name, "Shapes-1");
         let copied = editor.sheet_shapes(duplicate.object_id).unwrap().remove(0);
         assert_ne!(copied.drawable_object_id, source.drawable_object_id);
-        assert_ne!(copied.storage.object_id, source.storage.object_id);
+        assert_ne!(copied.storage.id, source.storage.id);
         assert_eq!(copied.sheet_id, duplicate.object_id);
-        assert_eq!(copied.storage.text, source.storage.text);
+        assert_eq!(copied.storage.storage, source.storage.storage);
         assert_eq!(copied.preset, source.preset);
         assert_eq!(copied.geometry, source.geometry);
         assert_eq!(
@@ -705,7 +728,7 @@ mod tests {
             .sheet_shapes(source_sheet.object_id)
             .unwrap()
             .remove(0);
-        assert_eq!(original.storage.text, "Native-style shape");
+        assert_eq!(original.storage.storage.text(), "Native-style shape");
         assert_eq!(original.geometry, source.geometry);
         assert_eq!(
             editor
@@ -723,12 +746,9 @@ mod tests {
             .sheet_shapes(duplicate.object_id)
             .unwrap()
             .remove(0);
-        assert_eq!(reopened_source.storage.text, "Native-style shape");
-        assert_eq!(reopened_copy.storage.text, "Independent copy");
-        assert_ne!(
-            reopened_source.storage.object_id,
-            reopened_copy.storage.object_id
-        );
+        assert_eq!(reopened_source.storage.storage.text(), "Native-style shape");
+        assert_eq!(reopened_copy.storage.storage.text(), "Independent copy");
+        assert_ne!(reopened_source.storage.id, reopened_copy.storage.id);
         assert_eq!(
             reopened
                 .sheet_shape_fill(source_sheet.object_id, source.drawable_object_id)
@@ -759,7 +779,9 @@ mod tests {
             )
             .unwrap();
 
-        let duplicate = editor.duplicate_sheet(source_sheet.object_id).unwrap();
+        let duplicate = editor
+            .duplicate_sheet(test_sheet_selector(&editor, source_sheet.object_id))
+            .unwrap();
 
         assert_eq!(duplicate.index, 1);
         assert_eq!(duplicate.name, "Media-1");

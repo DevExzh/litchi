@@ -6,7 +6,7 @@ use crate::charts::series_error_bar_auto_fit::{
     chart_series_error_bar_auto_fits as read_native_auto_fits,
     set_chart_series_error_bar_auto_fits as set_native_auto_fits,
 };
-use crate::charts::{ChartSeriesErrorBarAutoFit, ChartSeriesIndex};
+use crate::charts::{ChartSeriesErrorBarAutoFit, Index};
 
 impl PagesEditor {
     /// Read every body chart series' error-bar Auto-Fit setting.
@@ -21,7 +21,7 @@ impl PagesEditor {
     pub fn body_chart_series_error_bar_auto_fit(
         &self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesErrorBarAutoFit> {
         let values = body_chart_series_error_bar_auto_fits(self, drawable_object_id)?;
         values
@@ -43,7 +43,7 @@ impl PagesEditor {
     pub fn set_body_chart_series_error_bar_auto_fit(
         &mut self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         value: ChartSeriesErrorBarAutoFit,
     ) -> Result<()> {
         let mut values = body_chart_series_error_bar_auto_fits(self, drawable_object_id)?;
@@ -130,7 +130,7 @@ fn set_body_chart_series_error_bar_auto_fits(
 fn auto_fit_index_error(
     drawable_label: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     series_count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

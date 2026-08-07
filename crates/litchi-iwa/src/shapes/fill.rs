@@ -1,16 +1,11 @@
 //! Typed native fills for ordinary iWork drawing shapes.
 
-mod gradient;
 mod image;
 mod native;
 mod style;
 
 use super::RgbaColor;
 
-pub use gradient::{
-    ShapeGradient, ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity, ShapeGradientStop,
-    ShapeGradientStopMidpoint, ShapeGradientStopPosition,
-};
 pub use image::{ShapeImageDataIdentifier, ShapeImageFill, ShapeImageFillTechnique};
 pub(crate) use native::{fill_from_native, fill_to_native, image_data_identifier};
 pub(crate) use style::{remove_orphaned_image_asset, validate_image_asset};
@@ -25,7 +20,7 @@ pub enum ShapeFill {
     /// One normalized RGB color.
     Solid(RgbaColor),
     /// A validated simple or advanced linear/radial gradient.
-    Gradient(ShapeGradient),
+    Gradient(litchi_iwa_common::shape::fill::Gradient),
     /// A validated simple or tinted image fill.
     Image(ShapeImageFill),
 }

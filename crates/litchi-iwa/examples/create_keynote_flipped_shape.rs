@@ -1,7 +1,8 @@
 //! Create a Keynote shape and apply a native horizontal Arrange flip from scratch.
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::shapes::{DrawableFlipAxis, DrawablePoint, DrawableSize, ShapePreset};
+use litchi_iwa::shapes::{DrawableFlipAxis, DrawablePoint, DrawableSize};
+use litchi_iwa_common::shape::path::Preset;
 
 const ARROW_POSITION: DrawablePoint = DrawablePoint { x: 720.0, y: 660.0 };
 const ARROW_SIZE: DrawableSize = DrawableSize {
@@ -22,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Horizontally Flipped",
         ARROW_POSITION,
         ARROW_SIZE,
-        ShapePreset::RightArrow,
+        Preset::RightArrow,
     )?;
     editor.flip_slide_shape(0, arrow.drawable_object_id, DrawableFlipAxis::Horizontal)?;
     editor.save(output)?;

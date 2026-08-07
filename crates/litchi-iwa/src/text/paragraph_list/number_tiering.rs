@@ -9,17 +9,29 @@ use crate::text::style_registry::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::super::drop_cap::ParagraphStart;
-use super::types::{ParagraphList, ParagraphListNumberTiering};
 use super::variation::{
     effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
 };
 use super::{levels, native, storage};
+use litchi_iwa_text::paragraph::list::{ParagraphList, ParagraphListNumberTiering};
+use litchi_iwa_text::position::TextPosition;
+
+const fn tiering_from_native(value: bool) -> ParagraphListNumberTiering {
+    if value {
+        ParagraphListNumberTiering::Tiered
+    } else {
+        ParagraphListNumberTiering::Flat
+    }
+}
+
+const fn tiering_to_native(value: ParagraphListNumberTiering) -> bool {
+    matches!(value, ParagraphListNumberTiering::Tiered)
+}
 
 pub(crate) fn paragraph_list_number_tiering(
     package: &IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListNumberTiering> {
     let level = levels::paragraph_list_level(package, storage_id, paragraph)?;
     let boundaries = storage::locate_boundaries(package, storage_id)?;
@@ -31,15 +43,13 @@ pub(crate) fn paragraph_list_number_tiering(
         )));
     }
     let tiering = native::effective_tiered_numbers(package, style_id)?;
-    Ok(ParagraphListNumberTiering::from_native(
-        tiering[usize::from(level.get())],
-    ))
+    Ok(tiering_from_native(tiering[usize::from(level.get())]))
 }
 
 pub(in crate::text) fn set_paragraph_list_number_tiering(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     tiering: ParagraphListNumberTiering,
 ) -> Result<()> {
     if paragraph_list_number_tiering(package, storage_id, paragraph)? == tiering {
@@ -57,7 +67,7 @@ pub(in crate::text) fn set_paragraph_list_number_tiering(
         )));
     }
     let mut native_tiering = native::effective_tiered_numbers(package, style_id)?;
-    native_tiering[usize::from(level.get())] = tiering.native_value();
+    native_tiering[usize::from(level.get())] = tiering_to_native(tiering);
 
     let can_update_in_place = style.style.super_.parent.is_some()
         && style_isolated_to_paragraph(&boundaries, paragraph)?
@@ -118,7 +128,7 @@ pub(in crate::text) fn set_paragraph_list_number_tiering(
 pub(in crate::text) fn reset_paragraph_list_number_tiering(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     if paragraph_list_number_tiering(package, storage_id, paragraph)?
         == ParagraphListNumberTiering::Flat
@@ -138,7 +148,7 @@ pub(in crate::text) fn reset_paragraph_list_number_tiering(
 fn collapse_or_clear_redundant_tiering(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<()> {
     let located = storage::locate_boundaries_with_archive(package, storage_id)?;
     let boundaries = &located.location;
@@ -153,7 +163,7 @@ fn collapse_or_clear_redundant_tiering(
     let parent_style_id = native::parent_style_id(&style.style, style_id)?;
     let level = levels::paragraph_list_level(package, storage_id, paragraph)?;
     let parent_tiering = native::effective_tiered_numbers(package, parent_style_id)?;
-    if ParagraphListNumberTiering::from_native(parent_tiering[usize::from(level.get())])
+    if tiering_from_native(parent_tiering[usize::from(level.get())])
         != ParagraphListNumberTiering::Flat
     {
         return Ok(());

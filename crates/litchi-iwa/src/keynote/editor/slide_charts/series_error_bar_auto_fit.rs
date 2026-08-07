@@ -6,7 +6,7 @@ use crate::charts::series_error_bar_auto_fit::{
     chart_series_error_bar_auto_fits as read_native_auto_fits,
     set_chart_series_error_bar_auto_fits as set_native_auto_fits,
 };
-use crate::charts::{ChartSeriesErrorBarAutoFit, ChartSeriesIndex};
+use crate::charts::{ChartSeriesErrorBarAutoFit, Index};
 
 impl KeynoteEditor {
     /// Read every series' error-bar Auto-Fit setting.
@@ -23,7 +23,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesErrorBarAutoFit> {
         let values = slide_chart_series_error_bar_auto_fits(self, slide_index, drawable_object_id)?;
         values.get(series.zero_based()).copied().ok_or_else(|| {
@@ -46,7 +46,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         value: ChartSeriesErrorBarAutoFit,
     ) -> Result<()> {
         let mut values =
@@ -136,7 +136,7 @@ fn set_slide_chart_series_error_bar_auto_fits(
 fn auto_fit_index_error(
     drawable_label: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     series_count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

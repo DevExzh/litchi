@@ -17,19 +17,12 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use comments::{
-    PagesTableCellComment, PagesTableCellCommentInfo, PagesTableCellCommentReplyInfo,
-};
 pub use conditional_highlight::PagesTableCellConditionalHighlightInfo;
 pub use formula::{
     PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
     PagesTableFormulaCellReference, PagesTableFormulaExpression,
 };
-pub use hidden_axes::{PagesTableAxisIndex, PagesTableHiddenAxes};
-pub use layout::{
-    PagesTableDimension, PagesTableDimensionSize, PagesTableHeaderCount, PagesTableHeaderSettings,
-    PagesTablePoints,
-};
+pub use layout::{PagesTableDimension, PagesTableDimensionSize, PagesTablePoints};
 pub use sort::{
     PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder,
     PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope,
@@ -46,7 +39,8 @@ use crate::numbers::table_extractor::TableDataExtractor;
 use crate::object_index::ObjectIndex;
 use crate::protobuf::tst::TableInfoArchive;
 use crate::table_appearance::TableAppearance;
-use crate::table_lock::{TableLockState, table_lock_state_from_message};
+use crate::table_lock::table_lock_state_from_message;
+use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
@@ -54,64 +48,13 @@ const OBJECT_REPLACEMENT_CHARACTER: u16 = 0xfffc;
 const INLINE_TABLE_DUPLICATE_OFFSET: f32 = 0.0;
 
 /// Strongly typed cell value shared by Pages and Numbers table storage.
-pub type PagesCellValue = crate::numbers::CellValue;
+pub type PagesCellValue = litchi_numbers::cell::Value;
 /// One mutation in a transactional Pages table-cell batch.
-pub type PagesTableCellUpdate = crate::numbers::TableCellUpdate;
-/// Section-relative row deletion shared by native iWork tables.
-pub type PagesTableRowDeletion = crate::numbers::TableRowDeletion;
-/// Section-relative column deletion shared by native iWork tables.
-pub type PagesTableColumnDeletion = crate::numbers::TableColumnDeletion;
-/// Section-relative row insertion shared by native iWork tables.
-pub type PagesTableRowInsertion = crate::numbers::TableRowInsertion;
-/// Section-relative column insertion shared by native iWork tables.
-pub type PagesTableColumnInsertion = crate::numbers::TableColumnInsertion;
-/// A validated native merged-cell rectangle.
-pub type PagesTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
+pub type PagesTableCellUpdate = litchi_numbers::cell::Update;
+pub use crate::numbers::editor::table::cell::Borders;
 pub use crate::shapes::RgbaColor as PagesTableCellTextColor;
-pub use crate::table_cell_border::{
-    TableCellBorderSide as PagesTableCellBorderSide, TableCellBorders as PagesTableCellBorders,
-};
-pub use crate::table_cell_data_format::{
-    TableCellCheckboxFormat as PagesTableCellCheckboxFormat,
-    TableCellCurrencyFormat as PagesTableCellCurrencyFormat,
-    TableCellCustomFormat as PagesTableCellCustomFormat,
-    TableCellDataFormat as PagesTableCellDataFormat,
-    TableCellDateTimeFormat as PagesTableCellDateTimeFormat,
-    TableCellDurationFormat as PagesTableCellDurationFormat,
-    TableCellDurationStyle as PagesTableCellDurationStyle,
-    TableCellDurationUnit as PagesTableCellDurationUnit,
-    TableCellDurationUnitRange as PagesTableCellDurationUnitRange,
-    TableCellDurationUnits as PagesTableCellDurationUnits,
-    TableCellFractionFormat as PagesTableCellFractionFormat,
-    TableCellNumeralSystemFormat as PagesTableCellNumeralSystemFormat,
-    TableCellPercentageFormat as PagesTableCellPercentageFormat,
-    TableCellPopUpMenuFormat as PagesTableCellPopUpMenuFormat,
-    TableCellPopUpMenuInitialSelection as PagesTableCellPopUpMenuInitialSelection,
-    TableCellPopUpMenuItem as PagesTableCellPopUpMenuItem,
-    TableCellScientificFormat as PagesTableCellScientificFormat,
-    TableCellSliderDisplayFormat as PagesTableCellSliderDisplayFormat,
-    TableCellSliderFormat as PagesTableCellSliderFormat,
-    TableCellSliderRange as PagesTableCellSliderRange,
-    TableCellStarRatingFormat as PagesTableCellStarRatingFormat,
-    TableCellStepperDisplayFormat as PagesTableCellStepperDisplayFormat,
-    TableCellStepperFormat as PagesTableCellStepperFormat,
-    TableCellStepperRange as PagesTableCellStepperRange,
-    TableCellTextFormat as PagesTableCellTextFormat,
-};
-pub use crate::table_cell_layout::{
-    TableCellInset as PagesTableCellInset, TableCellInsets as PagesTableCellInsets,
-    TableCellLayout as PagesTableCellLayout, TableCellTextWrap as PagesTableCellTextWrap,
-    TableCellVerticalAlignment as PagesTableCellVerticalAlignment,
-};
-pub use crate::table_cell_number_format::{
-    TableCellDecimalPlaces as PagesTableCellDecimalPlaces,
-    TableCellFixedDecimalPlaces as PagesTableCellFixedDecimalPlaces,
-    TableCellNegativeNumberStyle as PagesTableCellNegativeNumberStyle,
-    TableCellNumberFormat as PagesTableCellNumberFormat,
-    TableCellThousandsSeparator as PagesTableCellThousandsSeparator,
-};
-pub use crate::text::ParagraphIndents as PagesTableCellParagraphIndents;
-pub use crate::text::ParagraphLineSpacing as PagesTableCellParagraphLineSpacing;
+pub use crate::text::Background as PagesTableCellTextBackground;
+pub use crate::text::Outline as PagesTableCellTextOutline;
 pub use crate::text::ParagraphList as PagesTableCellParagraphList;
 pub use crate::text::ParagraphListBullet as PagesTableCellParagraphListBullet;
 pub use crate::text::ParagraphListBulletGeometry as PagesTableCellParagraphListBulletGeometry;
@@ -124,20 +67,22 @@ pub use crate::text::ParagraphListNumberScale as PagesTableCellParagraphListNumb
 pub use crate::text::ParagraphListNumberTiering as PagesTableCellParagraphListNumberTiering;
 pub use crate::text::ParagraphListNumbering as PagesTableCellParagraphListNumbering;
 pub use crate::text::ParagraphListPlacement as PagesTableCellParagraphListPlacement;
-pub use crate::text::ParagraphSpacing as PagesTableCellParagraphSpacing;
 pub use crate::text::ParagraphTabStops as PagesTableCellParagraphTabStops;
-pub use crate::text::TextAlignment as PagesTableCellTextAlignment;
-pub use crate::text::TextBackground as PagesTableCellTextBackground;
+pub use crate::text::Shadow as PagesTableCellTextShadow;
 pub use crate::text::TextBaselineShift as PagesTableCellTextBaselineShift;
 pub use crate::text::TextCapitalization as PagesTableCellTextCapitalization;
 pub use crate::text::TextCharacterSpacing as PagesTableCellTextCharacterSpacing;
 pub use crate::text::TextDecorations as PagesTableCellTextDecorations;
 pub use crate::text::TextFont as PagesTableCellTextFont;
 pub use crate::text::TextLigatures as PagesTableCellTextLigatures;
-pub use crate::text::TextOutline as PagesTableCellTextOutline;
 pub use crate::text::TextScript as PagesTableCellTextScript;
-pub use crate::text::TextShadow as PagesTableCellTextShadow;
 pub use crate::text::TextStyle as PagesTableCellTextStyle;
+pub use litchi_iwa_common::shape::stroke::Stroke;
+pub use litchi_iwa_common::table::cell::BorderSide;
+pub use litchi_iwa_common::table::cell::layout::{
+    Inset as PagesTableCellInset, Insets as PagesTableCellInsets, Layout as PagesTableCellLayout,
+    TextWrap as PagesTableCellTextWrap, VerticalAlignment as PagesTableCellVerticalAlignment,
+};
 
 pub use semantic::{PagesTable, PagesTableInfo};
 use storage::{

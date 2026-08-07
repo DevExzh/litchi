@@ -1,0 +1,24 @@
+[package]
+name        = "litchi-keynote"
+description = "Keynote semantic value models and presentation capabilities."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+litchi-core       = { workspace = true }
+litchi-iwa-archive = { workspace = true }
+litchi-iwa-common = { workspace = true }
+litchi-iwa-core   = { workspace = true }
+litchi-iwa-detect = { workspace = true }
+litchi-iwa-protos = { workspace = true }
+litchi-iwa-text = { workspace = true }
+plist             = { workspace = true }
+prost             = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

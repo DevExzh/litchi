@@ -45,6 +45,13 @@ The detailed matrices are the source of truth for per-format rows. Shared ODF im
 primarily in `litchi-odf` and its companion crates; shared Office package and drawing behavior lives
 in the crates named by the specification map below.
 
+iWork parsing is split by concrete application format: `litchi-pages` owns
+Pages (`.pages`), `litchi-keynote` owns Keynote (`.key`), and `litchi-numbers`
+owns Numbers (`.numbers`). Their shared IWA archive, protocol, and package
+layers do not constitute a fourth user-facing format. At the `litchi` facade,
+the `pages`, `keynote`, and `numbers` feature leaves enable those parsers
+independently; `iwork` is only the aggregate of all three.
+
 ## Cross-format capability index
 
 This index records capability families that span more than one detailed matrix. The linked matrices
@@ -61,7 +68,7 @@ give the authoritative status and limitations for each concrete format.
 | Drawing, media, and embedded objects | Typed support varies by format; opaque preservation is not semantic rendering | `litchi-drawingml`, `litchi-odraw`, `litchi-ograph`, format matrices |
 | Formula and equation conversion/evaluation | Shared formula/equation infrastructure with intentionally incomplete host semantics | `litchi-formula`, `litchi-eval`, ODF/XLS/XLSB/XLSX matrices |
 | VBA and macro-enabled packages | Bounded codepage-aware project/module metadata and preservation; VBA is never compiled, interpreted, or executed | `litchi-vba`, OOXML matrices |
-| Conversion and interchange | Markdown, images, RTF, iWork, CSV/TSV and other text-workbook APIs are separate from the ten matrices | `litchi-markdown`, `litchi-imgconv`, `litchi-rtf`, `litchi-iwa`, `litchi-sheet` |
+| Conversion and interchange | Markdown, images, RTF, iWork, CSV/TSV and other text-workbook APIs are separate from the ten matrices | `litchi-markdown`, `litchi-imgconv`, `litchi-rtf`, `litchi-pages`, `litchi-keynote`, `litchi-numbers`, `litchi-sheet` |
 
 ## Shared specification map
 
@@ -102,8 +109,8 @@ with an honest boundary in `Notes`.
 
 ## Project-wide boundaries
 
-Feature-gated families require the corresponding Cargo feature. Optional ODF, formula, RTF, iWork,
-font, image-conversion, and related stacks are not implied by the default umbrella build. Public
+Feature-gated families require the corresponding Cargo feature. Optional ODF, formula, RTF, iWork
+format leaves, font, image-conversion, and related stacks are not implied by the default umbrella build. Public
 APIs generally support in-memory and path-based workflows, but streaming, lazy loading, zero-copy
 parsing, and rendering fidelity vary by crate. Typed errors and resource bounds are part of the
 support claim where the detailed matrix says so.
@@ -120,4 +127,5 @@ verification is integrity-oriented and does not establish certificate trust.
 - Legacy Office infrastructure: `crates/litchi-codepage/`, `crates/litchi-odraw/`, and `crates/litchi-ograph/`
 - VBA project codec: `crates/litchi-vba/`
 - OpenDocument shared models: `crates/litchi-odf/`, `crates/litchi-odf-common/`, and `crates/litchi-odf-formula/`
+- iWork format owners and shared IWA layers: `crates/litchi-pages/`, `crates/litchi-keynote/`, `crates/litchi-numbers/`, and `crates/litchi-iwa-*/`
 - Unified facades and conversion APIs: `crates/litchi/`, `crates/litchi-core/`, `crates/litchi-formula/`, `crates/litchi-eval/`, `crates/litchi-markdown/`, and `crates/litchi-sheet/`

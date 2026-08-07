@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use litchi_iwa_common::media::playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
 use prost::Message;
 
 use crate::archive::RawMessage;
@@ -16,155 +17,16 @@ const POSTER_TIME_FIELD: u32 = 5;
 const LEGACY_LOOP_MODE_FIELD: u32 = 6;
 const VOLUME_FIELD: u32 = 7;
 const LOOP_MODE_FIELD: u32 = 24;
+#[cfg(test)]
 const NO_LOOP_MODE: i32 = 0;
+#[cfg(test)]
 const REPEAT_LOOP_MODE: i32 = 1;
+#[cfg(test)]
 const BACK_AND_FORTH_LOOP_MODE: i32 = 2;
 
-/// A normalized media volume accepted by Pages, Numbers, and Keynote.
-///
-/// Values are expressed as a linear multiplier in the inclusive range
-/// `0.0..=1.0`. Construction rejects non-finite and out-of-range values.
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[repr(transparent)]
-pub struct MediaVolume(f32);
-
-impl MediaVolume {
-    /// Silence the media clip.
-    pub const SILENT: Self = Self(0.0);
-    /// Play the media clip at its unattenuated source volume.
-    pub const FULL: Self = Self(1.0);
-
-    /// Construct one validated linear volume multiplier.
-    pub fn new(value: f32) -> Result<Self> {
-        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-            return Err(Error::ParseError(
-                "media volume must be finite and within 0.0..=1.0".to_owned(),
-            ));
-        }
-        Ok(Self(value))
-    }
-
-    /// Return the native linear volume multiplier.
-    pub const fn as_f32(self) -> f32 {
-        self.0
-    }
-}
-
-impl TryFrom<f32> for MediaVolume {
-    type Error = Error;
-
-    fn try_from(value: f32) -> Result<Self> {
-        Self::new(value)
-    }
-}
-
-/// Repeat behavior shared by movie and audio clips.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MediaLoopMode {
-    /// Stop after one playback.
-    None,
-    /// Restart from the beginning after each playback.
-    Repeat,
-    /// Alternate forward and reverse playback.
-    BackAndForth,
-    /// A value introduced by a newer iWork version.
-    Unknown(i32),
-}
-
-impl MediaLoopMode {
-    /// Decode a native `TSD.MovieArchive.MovieLoopOption` value losslessly.
-    pub const fn from_raw(value: i32) -> Self {
-        match value {
-            NO_LOOP_MODE => Self::None,
-            REPEAT_LOOP_MODE => Self::Repeat,
-            BACK_AND_FORTH_LOOP_MODE => Self::BackAndForth,
-            value => Self::Unknown(value),
-        }
-    }
-
-    /// Return the native `TSD.MovieArchive.MovieLoopOption` value.
-    pub const fn as_raw(self) -> i32 {
-        match self {
-            Self::None => NO_LOOP_MODE,
-            Self::Repeat => REPEAT_LOOP_MODE,
-            Self::BackAndForth => BACK_AND_FORTH_LOOP_MODE,
-            Self::Unknown(value) => value,
-        }
-    }
-
-    const fn is_canonical(self) -> bool {
-        !matches!(
-            self,
-            Self::Unknown(NO_LOOP_MODE | REPEAT_LOOP_MODE | BACK_AND_FORTH_LOOP_MODE)
-        )
-    }
-}
-
-/// Playback state stored by an iWork movie archive.
-///
-/// `end_time` is required because the supported file-backed media graphs use it
-/// as the authoritative playback boundary. Optional fields preserve the native
-/// distinction between an omitted value and an explicitly encoded default.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct MediaPlaybackSettings {
-    /// Optional absolute trim start from the beginning of the source media.
-    pub start_time: Option<Duration>,
-    /// Absolute trim end from the beginning of the source media.
-    pub end_time: Duration,
-    /// Optional absolute frame or sample position used for the media poster.
-    pub poster_time: Option<Duration>,
-    /// Optional repeat behavior.
-    pub loop_mode: Option<MediaLoopMode>,
-    /// Optional linear volume multiplier.
-    pub volume: Option<MediaVolume>,
-}
-
-impl MediaPlaybackSettings {
-    /// Create settings with an explicit playback end and no optional fields.
-    #[must_use]
-    pub const fn new(end_time: Duration) -> Self {
-        Self {
-            start_time: None,
-            end_time,
-            poster_time: None,
-            loop_mode: None,
-            volume: None,
-        }
-    }
-
-    /// Set the optional absolute trim start.
-    #[must_use]
-    pub const fn with_start_time(mut self, start_time: Option<Duration>) -> Self {
-        self.start_time = start_time;
-        self
-    }
-
-    /// Set the optional absolute poster position.
-    #[must_use]
-    pub const fn with_poster_time(mut self, poster_time: Option<Duration>) -> Self {
-        self.poster_time = poster_time;
-        self
-    }
-
-    /// Set the optional repeat behavior.
-    #[must_use]
-    pub const fn with_loop_mode(mut self, loop_mode: Option<MediaLoopMode>) -> Self {
-        self.loop_mode = loop_mode;
-        self
-    }
-
-    /// Set the optional linear volume multiplier.
-    #[must_use]
-    pub const fn with_volume(mut self, volume: Option<MediaVolume>) -> Self {
-        self.volume = volume;
-        self
-    }
-
-    /// Return the playable duration after applying the trim range.
-    #[must_use]
-    pub fn duration(self) -> Duration {
-        self.end_time
-            .saturating_sub(self.start_time.unwrap_or(Duration::ZERO))
+impl From<litchi_iwa_common::media::playback::Error> for Error {
+    fn from(error: litchi_iwa_common::media::playback::Error) -> Self {
+        Self::ParseError(error.to_string())
     }
 }
 
@@ -182,14 +44,20 @@ pub(crate) fn media_playback_settings(movie: &tsd::MovieArchive) -> Result<Media
         .map(|value| duration_from_seconds(value, "media poster time"))
         .transpose()?;
     let loop_mode = movie_loop_mode(movie)?;
-    let volume = movie.volume.map(MediaVolume::new).transpose()?;
-    canonicalize_media_playback_settings(MediaPlaybackSettings {
+    let volume = movie
+        .volume
+        .map(MediaVolume::new)
+        .transpose()
+        .map_err(Error::from)?;
+    MediaPlaybackSettings {
         start_time,
         end_time,
         poster_time,
         loop_mode,
         volume,
-    })
+    }
+    .canonicalize()
+    .map_err(Error::from)
 }
 
 pub(crate) fn replace_movie_playback_settings(
@@ -199,7 +67,7 @@ pub(crate) fn replace_movie_playback_settings(
     context: &str,
     settings: MediaPlaybackSettings,
 ) -> Result<MediaPlaybackSettings> {
-    let settings = canonicalize_media_playback_settings(settings)?;
+    let settings = settings.canonicalize().map_err(Error::from)?;
     package.update_archive(archive_name, |archive| {
         let object = archive.object_mut(movie_id).ok_or_else(|| {
             Error::InvalidFormat(format!("{context} object {movie_id} is missing"))
@@ -240,40 +108,6 @@ pub(crate) fn replace_movie_playback_settings(
         Ok(())
     })?;
     Ok(settings)
-}
-
-fn canonicalize_media_playback_settings(
-    settings: MediaPlaybackSettings,
-) -> Result<MediaPlaybackSettings> {
-    let start_time = settings
-        .start_time
-        .map(|value| canonical_duration(value, "media start time"))
-        .transpose()?;
-    let end_time = canonical_duration(settings.end_time, "media end time")?;
-    let poster_time = settings
-        .poster_time
-        .map(|value| canonical_duration(value, "media poster time"))
-        .transpose()?;
-    let start = start_time.unwrap_or(Duration::ZERO);
-    if end_time <= start {
-        return Err(Error::ParseError(
-            "media end time must be later than its start time".to_owned(),
-        ));
-    }
-    if let Some(loop_mode) = settings.loop_mode
-        && !loop_mode.is_canonical()
-    {
-        return Err(Error::ParseError(
-            "media loop mode must not use a reserved native value as unknown".to_owned(),
-        ));
-    }
-    Ok(MediaPlaybackSettings {
-        start_time,
-        end_time,
-        poster_time,
-        loop_mode: settings.loop_mode,
-        volume: settings.volume,
-    })
 }
 
 #[allow(deprecated)]
@@ -357,10 +191,6 @@ fn legacy_loop_mode_value(loop_mode: Option<MediaLoopMode>) -> Result<Option<u64
     Ok(loop_mode.map(|mode| u64::from(u32::from_le_bytes(mode.as_raw().to_le_bytes()))))
 }
 
-fn canonical_duration(value: Duration, context: &str) -> Result<Duration> {
-    duration_from_seconds(duration_as_seconds(value, context)?, context)
-}
-
 fn duration_as_seconds(value: Duration, context: &str) -> Result<f32> {
     let seconds = value.as_secs_f64();
     if !seconds.is_finite() || seconds > f64::from(f32::MAX) {
@@ -421,30 +251,6 @@ mod tests {
 
         let restored = patch_movie_playback_settings(&changed, &changed_movie, baseline).unwrap();
         assert_eq!(restored, original);
-    }
-
-    #[test]
-    fn playback_settings_reject_invalid_ranges_and_volumes() {
-        assert!(MediaVolume::new(f32::NAN).is_err());
-        assert!(MediaVolume::new(1.01).is_err());
-        assert!(
-            canonicalize_media_playback_settings(MediaPlaybackSettings::new(Duration::ZERO,))
-                .is_err()
-        );
-        assert!(
-            canonicalize_media_playback_settings(
-                MediaPlaybackSettings::new(Duration::from_secs(1))
-                    .with_start_time(Some(Duration::from_secs(1))),
-            )
-            .is_err()
-        );
-        assert!(
-            canonicalize_media_playback_settings(
-                MediaPlaybackSettings::new(Duration::from_secs(1))
-                    .with_loop_mode(Some(MediaLoopMode::Unknown(NO_LOOP_MODE))),
-            )
-            .is_err()
-        );
     }
 
     #[test]
@@ -512,7 +318,9 @@ mod tests {
     }
 
     fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) {
-        data.extend(crate::varint::encode_varint(u64::from(field_number) << 3));
-        data.extend(crate::varint::encode_varint(value));
+        data.extend(litchi_iwa_common::varint::encode_varint(
+            u64::from(field_number) << 3,
+        ));
+        data.extend(litchi_iwa_common::varint::encode_varint(value));
     }
 }

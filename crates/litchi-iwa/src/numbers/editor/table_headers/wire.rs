@@ -13,7 +13,7 @@ const REPEATING_HEADER_COLUMNS_FIELD: u32 = 32;
 pub(super) fn read_table_header_settings_wire(
     original: &[u8],
     model: &TableModelArchive,
-) -> Result<NumbersTableHeaderSettings> {
+) -> Result<Settings> {
     for (field, label, decoded) in [
         (
             HEADER_ROWS_FIELD,
@@ -57,13 +57,13 @@ pub(super) fn read_table_header_settings_wire(
     ] {
         require_optional_bool(original, field, label, decoded)?;
     }
-    NumbersTableHeaderSettings::from_model(model)
+    settings_from_model(model)
 }
 
 pub(super) fn write_table_header_settings_wire(
     original: &[u8],
     model: &TableModelArchive,
-    settings: NumbersTableHeaderSettings,
+    settings: Settings,
 ) -> Result<Vec<u8>> {
     read_table_header_settings_wire(original, model)?;
     let mut data = original.to_vec();
@@ -71,26 +71,17 @@ pub(super) fn write_table_header_settings_wire(
         (
             HEADER_ROWS_FIELD,
             model.number_of_header_rows.is_some(),
-            settings
-                .header_rows
-                .map(NumbersTableHeaderCount::as_native)
-                .map(u64::from),
+            settings.header_rows.map(count_as_native).map(u64::from),
         ),
         (
             HEADER_COLUMNS_FIELD,
             model.number_of_header_columns.is_some(),
-            settings
-                .header_columns
-                .map(NumbersTableHeaderCount::as_native)
-                .map(u64::from),
+            settings.header_columns.map(count_as_native).map(u64::from),
         ),
         (
             FOOTER_ROWS_FIELD,
             model.number_of_footer_rows.is_some(),
-            settings
-                .footer_rows
-                .map(NumbersTableHeaderCount::as_native)
-                .map(u64::from),
+            settings.footer_rows.map(count_as_native).map(u64::from),
         ),
         (
             HEADER_ROWS_FROZEN_FIELD,

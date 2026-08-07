@@ -7,7 +7,7 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::non_style::{
     GENERATED_CHART_NON_STYLE_EXTENSION_FIELD, chart_non_style_slot,
     generated_chart_non_style_extension,
@@ -113,13 +113,13 @@ enum ScaleField {
 }
 
 impl ScaleField {
-    const fn for_kind(kind: ChartKind) -> Option<Self> {
+    const fn for_kind(kind: Kind) -> Option<Self> {
         match kind {
-            ChartKind::Area3d | ChartKind::StackedArea3d => Some(Self::Area),
-            ChartKind::Bar3d | ChartKind::StackedBar3d => Some(Self::Bar),
-            ChartKind::Column3d | ChartKind::StackedColumn3d => Some(Self::Column),
-            ChartKind::Line3d => Some(Self::Line),
-            ChartKind::Pie3d | ChartKind::Donut3d => Some(Self::Pie),
+            Kind::Area3d | Kind::StackedArea3d => Some(Self::Area),
+            Kind::Bar3d | Kind::StackedBar3d => Some(Self::Bar),
+            Kind::Column3d | Kind::StackedColumn3d => Some(Self::Column),
+            Kind::Line3d => Some(Self::Line),
+            Kind::Pie3d | Kind::Donut3d => Some(Self::Pie),
             _ => None,
         }
     }
@@ -186,7 +186,7 @@ pub(crate) fn chart_3d_depth(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
 ) -> Result<Chart3dDepth> {
     let field = ScaleField::for_kind(kind).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -208,7 +208,7 @@ pub(crate) fn set_chart_3d_depth(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     depth: Chart3dDepth,
 ) -> Result<()> {
     let field = ScaleField::for_kind(kind).ok_or_else(|| {
@@ -408,20 +408,20 @@ mod tests {
     #[test]
     fn every_native_3d_kind_selects_its_scale_slot() {
         let cases = [
-            (ChartKind::Area3d, AREA_3D_SCALE_FIELD),
-            (ChartKind::StackedArea3d, AREA_3D_SCALE_FIELD),
-            (ChartKind::Bar3d, BAR_3D_SCALE_FIELD),
-            (ChartKind::StackedBar3d, BAR_3D_SCALE_FIELD),
-            (ChartKind::Column3d, COLUMN_3D_SCALE_FIELD),
-            (ChartKind::StackedColumn3d, COLUMN_3D_SCALE_FIELD),
-            (ChartKind::Line3d, LINE_3D_SCALE_FIELD),
-            (ChartKind::Pie3d, PIE_3D_SCALE_FIELD),
-            (ChartKind::Donut3d, PIE_3D_SCALE_FIELD),
+            (Kind::Area3d, AREA_3D_SCALE_FIELD),
+            (Kind::StackedArea3d, AREA_3D_SCALE_FIELD),
+            (Kind::Bar3d, BAR_3D_SCALE_FIELD),
+            (Kind::StackedBar3d, BAR_3D_SCALE_FIELD),
+            (Kind::Column3d, COLUMN_3D_SCALE_FIELD),
+            (Kind::StackedColumn3d, COLUMN_3D_SCALE_FIELD),
+            (Kind::Line3d, LINE_3D_SCALE_FIELD),
+            (Kind::Pie3d, PIE_3D_SCALE_FIELD),
+            (Kind::Donut3d, PIE_3D_SCALE_FIELD),
         ];
         for (kind, expected) in cases {
             assert_eq!(ScaleField::for_kind(kind).unwrap().number(), expected);
         }
-        assert!(ScaleField::for_kind(ChartKind::Column2d).is_none());
+        assert!(ScaleField::for_kind(Kind::Column2d).is_none());
     }
 
     #[test]
@@ -450,12 +450,15 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .iter()
-            .any(|field| field.number == number)
+            .any(|field| field.number() == number)
     }
 
     fn find_field_bytes(data: &[u8], number: u32) -> &[u8] {
         let fields = parse_wire_fields(data).unwrap();
-        let field = fields.iter().find(|field| field.number == number).unwrap();
-        &data[field.payload_start..field.end]
+        let field = fields
+            .iter()
+            .find(|field| field.number() == number)
+            .unwrap();
+        &data[field.payload_start()..field.end()]
     }
 }

@@ -3,17 +3,21 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use litchi_iwa_common::media::Type as MediaType;
+use litchi_pages::movie::Options as PagesMovieOptions;
+
 use super::*;
-use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media::MediaAssetId;
 use crate::media_playback::replace_movie_playback_settings;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
     flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
 };
+use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 
 mod caption;
 mod graph;
@@ -27,8 +31,8 @@ pub struct PagesMovieInfo {
     pub drawable_object_id: u64,
     /// UTF-16 index of the object-replacement character in the body text.
     pub anchor_character_index: u32,
-    pub movie_data_identifier: u64,
-    pub poster_image_data_identifier: u64,
+    pub movie_data_identifier: MediaAssetId,
+    pub poster_image_data_identifier: MediaAssetId,
     pub geometry: DrawableGeometry,
     /// Shared drawable metadata, including accessibility description and lock state.
     pub properties: DrawableProperties,
@@ -39,44 +43,12 @@ pub struct PagesMovieInfo {
     pub duration: Duration,
 }
 
-/// Typed layout and playback metadata for a newly created Pages movie.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PagesMovieOptions {
-    /// Top-left position on the page, in points.
-    pub position: DrawablePoint,
-    /// Displayed movie size, in points.
-    pub size: DrawableSize,
-    /// Untransformed media dimensions reported to Pages, in points.
-    pub natural_size: DrawableSize,
-    /// Playable duration of the source movie.
-    pub duration: Duration,
-}
-
-impl PagesMovieOptions {
-    /// Create options whose displayed and natural dimensions are identical.
-    pub const fn new(position: DrawablePoint, size: DrawableSize, duration: Duration) -> Self {
-        Self {
-            position,
-            size,
-            natural_size: size,
-            duration,
-        }
-    }
-
-    /// Set media dimensions independently of the displayed size.
-    #[must_use]
-    pub const fn with_natural_size(mut self, natural_size: DrawableSize) -> Self {
-        self.natural_size = natural_size;
-        self
-    }
-}
-
 /// Result of removing one body-anchored Pages movie and its private graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedPagesMovie {
     pub movie: PagesMovieInfo,
     /// Assets culled because the removed movie held their final package reference.
-    pub removed_data_identifiers: Vec<u64>,
+    pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
 impl PagesEditor {
@@ -113,18 +85,18 @@ impl PagesEditor {
             .checked_add(u64::from(creates_z_order))
             .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
         let ids = MovieObjectIds::allocate(graph_first_identifier)?;
-        let archive_name = find_object_archive(self.package(), self.body_storage_id)?;
+        let archive_name = find_object_archive(self.package(), self.body_storage_id.get())?;
 
         let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
         let movie_asset = media.insert_unreferenced(preferred_movie_filename, movie_data)?;
-        if movie_asset.media_type != crate::MediaType::Video {
+        if movie_asset.media_type != MediaType::Video {
             return Err(Error::ParseError(format!(
                 "Pages body movies require video data, not {}",
                 movie_asset.media_type.name()
             )));
         }
         let poster_asset = media.insert_unreferenced(preferred_poster_filename, poster_data)?;
-        if poster_asset.media_type != crate::MediaType::Image {
+        if poster_asset.media_type != MediaType::Image {
             return Err(Error::ParseError(format!(
                 "Pages movie posters require image data, not {}",
                 poster_asset.media_type.name()
@@ -136,12 +108,12 @@ impl PagesEditor {
         }
         let objects = movie_objects(
             ids,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             style_id,
-            movie_asset.data_identifier,
-            poster_asset.data_identifier,
+            movie_asset.data_identifier.get(),
+            poster_asset.data_identifier.get(),
             geometry,
-            options.natural_size,
+            options.natural_size(),
             duration_seconds,
             root.left_margin.unwrap_or_default(),
         )?;
@@ -161,13 +133,16 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             ids.attachment,
         )?;
         patch_pages_zorder(&mut staged, None, Some(ids.drawable))?;
         add_component_object_uuids(&mut staged, DOCUMENT_OBJECT_ID, &ids.uuid_objects())?;
-        for data_identifier in [movie_asset.data_identifier, poster_asset.data_identifier] {
+        for data_identifier in [
+            movie_asset.data_identifier.get(),
+            poster_asset.data_identifier.get(),
+        ] {
             add_component_data_reference(
                 &mut staged,
                 DOCUMENT_OBJECT_ID,
@@ -203,8 +178,8 @@ impl PagesEditor {
             || created.movie_data_identifier != movie_asset.data_identifier
             || created.poster_image_data_identifier != poster_asset.data_identifier
             || created.geometry != geometry
-            || created.original_size != Some(options.natural_size)
-            || created.natural_size != Some(options.natural_size)
+            || created.original_size != Some(options.natural_size())
+            || created.natural_size != Some(options.natural_size())
             || created.duration.as_secs_f32() != duration_seconds
             || created_graph.object_ids != ids.all()
             || verified.extract_media(movie_asset.data_identifier)? != movie_data
@@ -420,7 +395,7 @@ impl PagesEditor {
                 clone_pages_drawable_graph_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
+                Ok(archive.insert_object(cloned)?)
             })?;
         }
 
@@ -447,7 +422,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             new_attachment_id,
         )?;
@@ -554,7 +529,9 @@ impl PagesEditor {
     pub fn remove_body_movie(&mut self, drawable_object_id: u64) -> Result<RemovedPagesMovie> {
         let source = body_movie_graph(self, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
+            drawable_object_id,
+        )?)?;
         let mut text_editor = IWorkTextEditor::from_package(comments.into_package());
         let anchor = source.info.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
@@ -596,7 +573,8 @@ impl PagesEditor {
             .iter()
             .map(|(data, _)| *data)
             .collect::<HashSet<_>>();
-        for identifier in data_identifiers {
+        for raw_identifier in data_identifiers {
+            let identifier = MediaAssetId::try_from(raw_identifier)?;
             if media
                 .asset(identifier)
                 .is_some_and(|asset| !asset.is_referenced())
@@ -634,8 +612,8 @@ impl PagesEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pages::PagesImageOptions;
-    use crate::{MediaLoopMode, MediaVolume};
+    use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
+    use litchi_pages::image::Options as PagesImageOptions;
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-pages-movie";
     const REPLACEMENT_MOVIE: &[u8] = b"\0\0\0\x18ftypqt  replacement-pages-movie";
@@ -653,7 +631,9 @@ mod tests {
 
     fn options() -> PagesMovieOptions {
         PagesMovieOptions::new(POSITION, SIZE, Duration::from_secs(8))
+            .unwrap()
             .with_natural_size(NATURAL_SIZE)
+            .unwrap()
     }
 
     fn properties(description: &str) -> DrawableProperties {
@@ -1058,29 +1038,43 @@ mod tests {
         let baseline = editor.to_bytes().unwrap();
         assert!(editor.duplicate_body_movie(999, 0).is_err());
         assert_eq!(editor.to_bytes().unwrap(), baseline);
-        for result in [
-            editor.add_body_movie(4, "poster.png", POSTER, "poster.png", POSTER, options()),
-            editor.add_body_movie(4, "movie.mov", MOVIE, "movie.mov", MOVIE, options()),
-            editor.add_body_movie(
-                4,
-                "movie.mov",
-                MOVIE,
-                "poster.png",
-                POSTER,
-                PagesMovieOptions::new(POSITION, SIZE, Duration::ZERO),
-            ),
-            editor.add_body_movie(5, "movie.mov", MOVIE, "poster.png", POSTER, options()),
-        ] {
-            assert!(result.is_err());
-            assert_eq!(editor.to_bytes().unwrap(), baseline);
-        }
+        let result =
+            editor.add_body_movie(4, "poster.png", POSTER, "poster.png", POSTER, options());
+        assert!(result.is_err());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let result = editor.add_body_movie(4, "movie.mov", MOVIE, "movie.mov", MOVIE, options());
+        assert!(result.is_err());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let result =
+            editor.add_body_movie(4, "../movie.mov", MOVIE, "poster.png", POSTER, options());
+        assert!(result.is_err());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+        let result = editor.add_body_movie(5, "movie.mov", MOVIE, "poster.png", POSTER, options());
+        assert!(result.is_err());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+        assert!(PagesMovieOptions::new(POSITION, SIZE, Duration::ZERO).is_err());
+        assert!(
+            PagesMovieOptions::new(
+                POSITION,
+                DrawableSize {
+                    width: f32::NAN,
+                    height: 180.0,
+                },
+                Duration::from_secs(1),
+            )
+            .is_err()
+        );
 
         let image = editor
             .add_body_image(
                 4,
                 "poster.png",
                 POSTER,
-                PagesImageOptions::new(POSITION, SIZE),
+                PagesImageOptions::new(POSITION, SIZE)
+                    .unwrap_or_else(|error| panic!("valid Pages image options: {error}")),
             )
             .unwrap();
         let before = editor.to_bytes().unwrap();

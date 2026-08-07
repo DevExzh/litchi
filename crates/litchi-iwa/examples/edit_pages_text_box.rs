@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.save(output)?;
     println!(
         "drawable={} storage={}",
-        text.drawable_object_id, text.storage.object_id
+        text.drawable_object_id, text.storage.id
     );
     Ok(())
 }

@@ -3,14 +3,18 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use litchi_iwa_common::media::Type as MediaType;
+use litchi_pages::audio::Options as PagesAudioOptions;
+
 use super::*;
-use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media::MediaAssetId;
 use crate::media_playback::replace_movie_playback_settings;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
 use crate::shapes::{DrawablePoint, DrawableProperties, offset_drawable_geometry};
+use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 
 mod graph;
 
@@ -25,7 +29,7 @@ pub struct PagesAudioInfo {
     pub drawable_object_id: u64,
     /// UTF-16 index of the object-replacement character in the body text.
     pub anchor_character_index: u32,
-    pub audio_data_identifier: u64,
+    pub audio_data_identifier: MediaAssetId,
     /// Center point of Pages' zero-size audio control, in document points.
     pub position: DrawablePoint,
     /// Shared drawable metadata, including accessibility description and lock state.
@@ -35,27 +39,12 @@ pub struct PagesAudioInfo {
     pub duration: Duration,
 }
 
-/// Typed placement and playback metadata for a newly created Pages audio clip.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PagesAudioOptions {
-    /// Center point of Pages' zero-size audio control, in document points.
-    pub position: DrawablePoint,
-    /// Playable duration of the source audio.
-    pub duration: Duration,
-}
-
-impl PagesAudioOptions {
-    pub const fn new(position: DrawablePoint, duration: Duration) -> Self {
-        Self { position, duration }
-    }
-}
-
 /// Result of removing one body-anchored Pages audio clip and its private graph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedPagesAudio {
     pub audio: PagesAudioInfo,
     /// Assets culled because the removed clip held their final package reference.
-    pub removed_data_identifiers: Vec<u64>,
+    pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
 impl PagesEditor {
@@ -90,11 +79,11 @@ impl PagesEditor {
             .checked_add(u64::from(creates_z_order))
             .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
         let ids = AudioObjectIds::allocate(graph_first_identifier)?;
-        let archive_name = find_object_archive(self.package(), self.body_storage_id)?;
+        let archive_name = find_object_archive(self.package(), self.body_storage_id.get())?;
 
         let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
         let asset = media.insert_unreferenced(preferred_filename, data)?;
-        if asset.media_type != crate::MediaType::Audio {
+        if asset.media_type != MediaType::Audio {
             return Err(Error::ParseError(format!(
                 "Pages body audio requires audio data, not {}",
                 asset.media_type.name()
@@ -106,9 +95,9 @@ impl PagesEditor {
         }
         let objects = audio_objects(
             ids,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             style_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             geometry,
             duration_seconds,
             root.left_margin.unwrap_or_default(),
@@ -129,7 +118,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             ids.attachment,
         )?;
@@ -138,7 +127,7 @@ impl PagesEditor {
         add_component_data_reference(
             &mut staged,
             DOCUMENT_OBJECT_ID,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             ids.drawable,
         )?;
         let style_archive = find_object_archive(&staged, style_id)?;
@@ -167,7 +156,7 @@ impl PagesEditor {
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
         if created.anchor_character_index != expected_anchor
             || created.audio_data_identifier != asset.data_identifier
-            || created.position != options.position
+            || created.position != options.position()
             || created.duration.as_secs_f32() != duration_seconds
             || created_graph.object_ids != ids.all()
             || verified.extract_media(asset.data_identifier)? != data
@@ -322,7 +311,7 @@ impl PagesEditor {
                 clone_pages_drawable_graph_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
+                Ok(archive.insert_object(cloned)?)
             })?;
         }
 
@@ -351,7 +340,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             new_attachment_id,
         )?;
@@ -442,7 +431,9 @@ impl PagesEditor {
     pub fn remove_body_audio(&mut self, drawable_object_id: u64) -> Result<RemovedPagesAudio> {
         let source = body_audio_graph(self, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
+            drawable_object_id,
+        )?)?;
         let mut text_editor = IWorkTextEditor::from_package(comments.into_package());
         let anchor = source.info.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
@@ -484,7 +475,8 @@ impl PagesEditor {
             .iter()
             .map(|(data, _)| *data)
             .collect::<HashSet<_>>();
-        for identifier in data_identifiers {
+        for raw_identifier in data_identifiers {
+            let identifier = MediaAssetId::try_from(raw_identifier)?;
             if media
                 .asset(identifier)
                 .is_some_and(|asset| !asset.is_referenced())
@@ -522,14 +514,14 @@ impl PagesEditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{MediaLoopMode, MediaVolume};
+    use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-pages-audio";
     const REPLACEMENT_AUDIO: &[u8] = b"FORM\0\0\0\x10AIFFreplacement-pages-audio";
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
 
     fn options() -> PagesAudioOptions {
-        PagesAudioOptions::new(POSITION, Duration::from_millis(1_375))
+        PagesAudioOptions::new(POSITION, Duration::from_millis(1_375)).unwrap()
     }
 
     fn properties(description: &str) -> DrawableProperties {
@@ -752,17 +744,22 @@ mod tests {
         assert_eq!(editor.to_bytes().unwrap(), baseline);
         for result in [
             editor.add_body_audio(4, "payload.bin", b"not audio", options()),
-            editor.add_body_audio(
-                4,
-                "audio.aiff",
-                AUDIO,
-                PagesAudioOptions::new(POSITION, Duration::ZERO),
-            ),
             editor.add_body_audio(5, "audio.aiff", AUDIO, options()),
         ] {
             assert!(result.is_err());
             assert_eq!(editor.to_bytes().unwrap(), baseline);
         }
+        assert!(PagesAudioOptions::new(POSITION, Duration::ZERO).is_err());
+        assert!(
+            PagesAudioOptions::new(
+                DrawablePoint {
+                    x: f32::NAN,
+                    y: 10.0,
+                },
+                Duration::from_secs(1),
+            )
+            .is_err()
+        );
 
         let movie = editor
             .add_body_movie(
@@ -771,14 +768,15 @@ mod tests {
                 b"\0\0\0\x18ftypqt  source-built-pages-movie",
                 "poster.png",
                 b"\x89PNG\r\n\x1a\nsource-built-pages-poster",
-                crate::pages::PagesMovieOptions::new(
+                litchi_pages::movie::Options::new(
                     POSITION,
                     crate::shapes::DrawableSize {
                         width: 320.0,
                         height: 180.0,
                     },
                     Duration::from_secs(1),
-                ),
+                )
+                .unwrap(),
             )
             .unwrap();
         let before = editor.to_bytes().unwrap();

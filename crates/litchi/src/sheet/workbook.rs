@@ -10,7 +10,7 @@ use litchi_ole_common::property_set::PropertySetReader;
 use std::path::Path;
 
 #[cfg(any(
-    feature = "iwork",
+    feature = "numbers",
     any(feature = "xlsx", feature = "xlsb"),
     feature = "xls"
 ))]
@@ -137,9 +137,9 @@ impl Workbook {
 
         // Open with appropriate implementation and extract metadata
         let (inner, metadata) = match detected {
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "numbers")]
             DetectedFormat::Numbers(data) => {
-                let doc = crate::iwa::numbers::NumbersDocument::from_bytes(&data).map_err(|e| {
+                let doc = litchi_numbers::Package::from_bytes(&data).map_err(|e| {
                     Box::new(Error::ParseError(format!("Failed to parse Numbers: {}", e)))
                         as Box<dyn std::error::Error + Send + Sync>
                 })?;
@@ -248,14 +248,12 @@ impl Workbook {
     /// ```
     pub fn worksheet_names(&self) -> Result<Vec<String>> {
         match &self.inner {
-            #[cfg(feature = "iwork")]
-            WorkbookImpl::Numbers(doc) => {
-                let sheets = doc.sheets().map_err(|e| {
-                    Box::new(Error::ParseError(format!("Failed to get sheets: {}", e)))
-                        as Box<dyn std::error::Error + Send + Sync>
-                })?;
-                Ok(sheets.iter().map(|s| s.name.clone()).collect())
-            },
+            #[cfg(feature = "numbers")]
+            WorkbookImpl::Numbers(doc) => Ok(doc
+                .sheets()
+                .iter()
+                .map(|sheet| sheet.name().to_owned())
+                .collect()),
 
             #[cfg(feature = "xlsx")]
             WorkbookImpl::Xlsx(xlsx) => Ok(xlsx.worksheet_names().to_vec()),
@@ -299,13 +297,8 @@ impl Workbook {
     /// ```
     pub fn worksheet_count(&self) -> Result<usize> {
         match &self.inner {
-            #[cfg(feature = "iwork")]
-            WorkbookImpl::Numbers(doc) => {
-                let sheets = doc
-                    .sheets()
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-                Ok(sheets.len())
-            },
+            #[cfg(feature = "numbers")]
+            WorkbookImpl::Numbers(doc) => Ok(doc.sheets().len()),
             #[cfg(feature = "xlsx")]
             WorkbookImpl::Xlsx(xlsx) => Ok(xlsx.worksheet_count()),
             #[cfg(feature = "xlsb")]
@@ -343,7 +336,7 @@ impl Workbook {
     /// ```
     pub fn text(&self) -> Result<String> {
         match &self.inner {
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "numbers")]
             WorkbookImpl::Numbers(doc) => doc.text().map_err(|e| {
                 Box::new(Error::ParseError(format!(
                     "Failed to extract text from Numbers: {}",
@@ -471,62 +464,12 @@ impl Workbook {
     ///
     /// This extracts metadata from the Numbers bundle, similar to how
     /// Keynote metadata is extracted.
-    #[cfg(feature = "iwork")]
-    fn extract_numbers_metadata(doc: &crate::iwa::numbers::NumbersDocument) -> Metadata {
-        let bundle_metadata = doc.bundle().metadata();
-        let mut metadata = Metadata::default();
-
-        // Extract title from properties
-        if let Some(title) = bundle_metadata.get_property_string("Title") {
-            metadata.title = Some(title);
-        } else if let Some(title) = bundle_metadata.get_property_string("kDocumentTitleKey") {
-            metadata.title = Some(title);
+    #[cfg(feature = "numbers")]
+    fn extract_numbers_metadata(_doc: &litchi_numbers::Package) -> Metadata {
+        Metadata {
+            application: Some("Numbers".to_owned()),
+            ..Metadata::default()
         }
-
-        // Extract author
-        if let Some(author) = bundle_metadata.get_property_string("Author") {
-            metadata.author = Some(author);
-        } else if let Some(author) = bundle_metadata.get_property_string("kDocumentAuthorKey") {
-            metadata.author = Some(author);
-        } else if let Some(author) = bundle_metadata.get_property_string("kSFWPAuthorPropertyKey") {
-            metadata.author = Some(author);
-        }
-
-        // Extract keywords
-        if let Some(keywords) = bundle_metadata.get_property_string("Keywords") {
-            metadata.keywords = Some(keywords);
-        }
-
-        // Extract comments/description
-        if let Some(comments) = bundle_metadata.get_property_string("Comments") {
-            metadata.description = Some(comments);
-        }
-
-        // Extract application name
-        if let Some(app) = bundle_metadata.detected_application() {
-            metadata.application = Some(app.to_owned());
-        } else {
-            metadata.application = Some("Numbers".to_string());
-        }
-
-        // Extract revision from Properties.plist
-        if let Some(revision) = bundle_metadata.get_property_string("revision") {
-            metadata.revision = Some(revision);
-        }
-
-        // Extract build version as additional version info
-        if let Some(version) = bundle_metadata.latest_build_version()
-            && metadata.revision.is_none()
-        {
-            metadata.revision = Some(version.to_string());
-        }
-
-        // Extract file format version
-        if let Some(format_version) = bundle_metadata.get_property_string("fileFormatVersion") {
-            metadata.content_status = Some(format!("Numbers Format Version {}", format_version));
-        }
-
-        metadata
     }
 }
 

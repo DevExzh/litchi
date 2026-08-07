@@ -4,33 +4,12 @@ use crate::archive::RawMessage;
 use crate::protobuf::tst::TableInfoArchive;
 use crate::wire::{parse_wire_fields, patch_varint_field, transform_length_delimited_field};
 use crate::{Error, IWorkPackage, Result};
+use litchi_iwa_common::table::lock::State as TableLockState;
 use prost::Message;
 
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_DRAWABLE_SUPER_FIELD: u32 = 1;
 const DRAWABLE_LOCKED_FIELD: u32 = 5;
-
-/// Interactive editing state of a native iWork table.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum TableLockState {
-    /// The table can be selected and edited interactively.
-    #[default]
-    Unlocked,
-    /// The table is protected from interactive editing.
-    Locked,
-}
-
-impl TableLockState {
-    /// Construct a lock state from its native boolean representation.
-    pub const fn from_locked(locked: bool) -> Self {
-        if locked { Self::Locked } else { Self::Unlocked }
-    }
-
-    /// Return whether the table is protected from interactive editing.
-    pub const fn is_locked(self) -> bool {
-        matches!(self, Self::Locked)
-    }
-}
 
 /// Read one table's effective interactive lock state.
 pub(crate) fn table_lock_state(
@@ -143,7 +122,7 @@ fn set_table_lock_state_inner(
                 "{application} table drawable {drawable_object_id} is missing"
             ))
         })?;
-        object
+        Ok(object
             .replace_message(
                 message_index,
                 RawMessage {
@@ -151,7 +130,7 @@ fn set_table_lock_state_inner(
                     data,
                 },
             )
-            .map(|_| ())
+            .map(|_| ())?)
     })
 }
 
@@ -168,7 +147,7 @@ fn raw_table_lock_state(data: &[u8]) -> Result<Option<bool>> {
     let drawable = singular_field(&fields, TABLE_DRAWABLE_SUPER_FIELD, "table drawable super")?;
     require_wire_type(drawable, 2, "table drawable super")?;
     strict_optional_bool(
-        &data[drawable.payload_start..drawable.end],
+        &data[drawable.payload_start()..drawable.end()],
         DRAWABLE_LOCKED_FIELD,
         "table lock",
     )
@@ -210,7 +189,7 @@ fn table_message(
 
 fn strict_optional_bool(data: &[u8], field_number: u32, label: &str) -> Result<Option<bool>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -220,10 +199,11 @@ fn strict_optional_bool(data: &[u8], field_number: u32, label: &str) -> Result<O
         )));
     }
     require_wire_type(field, 0, label)?;
-    let (value, length) =
-        crate::varint::decode_varint_from_bytes(&data[field.payload_start..field.end])
-            .map_err(|error| Error::InvalidFormat(format!("invalid {label}: {error}")))?;
-    if field.payload_start + length != field.end {
+    let (value, length) = litchi_iwa_common::varint::decode_varint_from_bytes(
+        &data[field.payload_start()..field.end()],
+    )
+    .map_err(|error| Error::InvalidFormat(format!("invalid {label}: {error}")))?;
+    if field.payload_start() + length != field.end() {
         return Err(Error::InvalidFormat(format!(
             "{label} contains trailing bytes"
         )));
@@ -242,7 +222,7 @@ fn singular_field<'a>(
     field_number: u32,
     label: &str,
 ) -> Result<&'a crate::wire::WireField> {
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Err(Error::InvalidFormat(format!(
             "{label} must occur exactly once, found none"
@@ -257,10 +237,10 @@ fn singular_field<'a>(
 }
 
 fn require_wire_type(field: &crate::wire::WireField, expected: u8, label: &str) -> Result<()> {
-    if field.wire_type != expected {
+    if field.wire_type() != expected {
         return Err(Error::InvalidFormat(format!(
             "{label} has wire type {}, expected {expected}",
-            field.wire_type
+            field.wire_type()
         )));
     }
     Ok(())

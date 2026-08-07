@@ -2,16 +2,12 @@
 
 mod native;
 mod storage;
-mod types;
+
+use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
+use litchi_iwa_text::position::TextPosition;
 
 #[cfg(test)]
 mod tests;
-
-pub use types::{
-    DropCapCharacterCount, DropCapCharacterScale, DropCapCornerRadius, DropCapLineCount,
-    DropCapOutdent, DropCapPadding, DropCapRaisedLines, DropCapWrap, ParagraphDropCap,
-    ParagraphDropCapPlacement, ParagraphStart,
-};
 
 use crate::package_metadata::{
     next_object_identifier, release_package_identifier_suffix, set_package_last_object_identifier,
@@ -26,7 +22,7 @@ use crate::text::style_registry::{
 pub(super) fn paragraph_drop_caps(
     package: &IWorkPackage,
     storage_id: u64,
-) -> Result<Vec<ParagraphDropCapPlacement>> {
+) -> Result<Vec<Placement>> {
     let storage = storage::locate(package, storage_id)?;
     if storage.entries.iter().all(|entry| entry.style_id.is_none()) {
         return Ok(Vec::new());
@@ -40,7 +36,7 @@ pub(super) fn paragraph_drop_caps(
                 .style_id
                 .filter(|style_id| *style_id != base.identifier)
                 .map(|style_id| {
-                    storage::validate_paragraph_start(&storage.text, entry.paragraph_start)?;
+                    storage::validate_paragraph_start(&storage.text, entry.paragraph)?;
                     let location = native::locate_style(package, style_id)?;
                     validate_style_ownership(
                         &location,
@@ -48,8 +44,8 @@ pub(super) fn paragraph_drop_caps(
                         storage.stylesheet_id,
                         &base.archive_name,
                     )?;
-                    Ok(ParagraphDropCapPlacement {
-                        paragraph_start: entry.paragraph_start,
+                    Ok(Placement {
+                        paragraph: entry.paragraph,
                         drop_cap: native::plain_text_model(style_id, &location)?,
                     })
                 })
@@ -60,26 +56,26 @@ pub(super) fn paragraph_drop_caps(
 pub(super) fn paragraph_drop_cap(
     package: &IWorkPackage,
     storage_id: u64,
-    paragraph_start: ParagraphStart,
-) -> Result<Option<ParagraphDropCap>> {
+    paragraph: TextPosition,
+) -> Result<Option<DropCap>> {
     Ok(paragraph_drop_caps(package, storage_id)?
         .into_iter()
-        .find(|placement| placement.paragraph_start == paragraph_start)
+        .find(|placement| placement.paragraph == paragraph)
         .map(|placement| placement.drop_cap))
 }
 
 pub(super) fn set_paragraph_drop_cap(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph_start: ParagraphStart,
-    drop_cap: ParagraphDropCap,
+    paragraph: TextPosition,
+    drop_cap: DropCap,
 ) -> Result<()> {
     let storage = storage::locate(package, storage_id)?;
-    storage::validate_paragraph_start(&storage.text, paragraph_start)?;
+    storage::validate_paragraph_start(&storage.text, paragraph)?;
     let old_reference_style_id = storage
         .entries
         .iter()
-        .find(|entry| entry.paragraph_start == paragraph_start)
+        .find(|entry| entry.paragraph == paragraph)
         .and_then(|entry| entry.style_id);
     let base = native::base_style(package, storage.stylesheet_id)?;
     let old_style_id = old_reference_style_id.filter(|style_id| *style_id != base.identifier);
@@ -104,7 +100,7 @@ pub(super) fn set_paragraph_drop_cap(
             )?;
             let mut staged = package.clone();
             native::replace_variation(&mut staged, &location, replacement)?;
-            validate_drop_cap(&staged, storage_id, paragraph_start, Some(drop_cap))?;
+            validate_drop_cap(&staged, storage_id, paragraph, Some(drop_cap))?;
             *package = staged;
             return Ok(());
         }
@@ -130,7 +126,7 @@ pub(super) fn set_paragraph_drop_cap(
     storage::patch_entry(
         &mut staged,
         located,
-        paragraph_start,
+        paragraph,
         old_reference_style_id,
         Some(new_style_id),
     )?;
@@ -149,7 +145,7 @@ pub(super) fn set_paragraph_drop_cap(
         )?;
     }
     set_package_last_object_identifier(&mut staged, new_style_id)?;
-    validate_drop_cap(&staged, storage_id, paragraph_start, Some(drop_cap))?;
+    validate_drop_cap(&staged, storage_id, paragraph, Some(drop_cap))?;
     *package = staged;
     Ok(())
 }
@@ -157,14 +153,14 @@ pub(super) fn set_paragraph_drop_cap(
 pub(super) fn remove_paragraph_drop_cap(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph_start: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     let storage = storage::locate(package, storage_id)?;
-    storage::validate_paragraph_start(&storage.text, paragraph_start)?;
+    storage::validate_paragraph_start(&storage.text, paragraph)?;
     let referenced_style_id = storage
         .entries
         .iter()
-        .find(|entry| entry.paragraph_start == paragraph_start)
+        .find(|entry| entry.paragraph == paragraph)
         .and_then(|entry| entry.style_id);
     let base = native::base_style(package, storage.stylesheet_id)?;
     let Some(style_id) = referenced_style_id.filter(|style_id| *style_id != base.identifier) else {
@@ -181,7 +177,7 @@ pub(super) fn remove_paragraph_drop_cap(
     let exclusive = native::is_exclusive(package, style_id)?;
     let mut staged = package.clone();
     let located = storage::locate_with_archive(&staged, storage_id)?;
-    storage::patch_entry(&mut staged, located, paragraph_start, Some(style_id), None)?;
+    storage::patch_entry(&mut staged, located, paragraph, Some(style_id), None)?;
     if exclusive {
         let parent_style_id = native::parent_style_id(&location.style, style_id)?;
         remove_style_variation(
@@ -207,7 +203,7 @@ pub(super) fn remove_paragraph_drop_cap(
             style_id,
         )?;
     }
-    validate_drop_cap(&staged, storage_id, paragraph_start, None)?;
+    validate_drop_cap(&staged, storage_id, paragraph, None)?;
     *package = staged;
     Ok(true)
 }
@@ -231,10 +227,10 @@ fn validate_style_ownership(
 fn validate_drop_cap(
     package: &IWorkPackage,
     storage_id: u64,
-    paragraph_start: ParagraphStart,
-    expected: Option<ParagraphDropCap>,
+    paragraph: TextPosition,
+    expected: Option<DropCap>,
 ) -> Result<()> {
-    if paragraph_drop_cap(package, storage_id, paragraph_start)? != expected {
+    if paragraph_drop_cap(package, storage_id, paragraph)? != expected {
         return Err(Error::InvalidFormat(
             "iWork Drop Cap mutation failed validation".to_owned(),
         ));

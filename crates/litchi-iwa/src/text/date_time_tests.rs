@@ -1,12 +1,11 @@
-use super::{
-    TextDateTimeDisplayText, TextDateTimeFieldSettings, TextDateTimeFormat,
-    TextDateTimeFormatterStyle, TextDateTimeInstant, TextDateTimeLocaleIdentifier,
-    TextDateTimeUpdatePlan, TextHyperlinkTarget, TextPosition, TextRange,
-};
+use super::{TextHyperlinkTarget, TextPosition, TextRange};
 use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use crate::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use crate::pages::PagesEditor;
 use crate::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_text::date_time::{
+    DisplayText, Format, FormatterStyle, Instant, LocaleIdentifier, Settings, UpdatePlan,
+};
 
 const DISPLAY: &str = "Friday, July 17, 2026";
 const FORMAT: &str = "EEEE, MMMM d, y";
@@ -17,16 +16,14 @@ const SIZE: DrawableSize = DrawableSize {
     height: 140.0,
 };
 
-fn settings() -> TextDateTimeFieldSettings {
-    TextDateTimeFieldSettings::fixed(
-        TextDateTimeFormat::new(FORMAT).unwrap(),
-        TextDateTimeLocaleIdentifier::new("en_US").unwrap(),
-        TextDateTimeInstant::from_reference_date_seconds(NATIVE_SECONDS).unwrap(),
+fn settings() -> Settings {
+    Settings::fixed(
+        Format::new(FORMAT).unwrap(),
+        LocaleIdentifier::new("en_US").unwrap(),
+        Instant::from_reference_date_seconds(NATIVE_SECONDS).unwrap(),
     )
-    .with_styles(
-        TextDateTimeFormatterStyle::Full,
-        TextDateTimeFormatterStyle::None,
-    )
+    .with_styles(FormatterStyle::Full, FormatterStyle::None)
+    .unwrap()
 }
 
 fn range(start: usize, end: usize) -> TextRange {
@@ -39,11 +36,7 @@ fn scratch_pages_date_time_insert_update_remove_round_trips() {
     let baseline = pages.to_bytes().unwrap();
     let position = TextPosition::from_utf16_index(8).unwrap();
     let created = pages
-        .insert_body_date_time_field(
-            position,
-            TextDateTimeDisplayText::new(DISPLAY).unwrap(),
-            settings(),
-        )
+        .insert_body_date_time_field(position, DisplayText::new(DISPLAY).unwrap(), settings())
         .unwrap();
     assert_eq!(pages.body_text().unwrap(), format!("Report: {DISPLAY}"));
     assert_eq!(
@@ -52,7 +45,7 @@ fn scratch_pages_date_time_insert_update_remove_round_trips() {
     );
 
     let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
-    let updated_settings = settings().with_update_plan(TextDateTimeUpdatePlan::Automatic);
+    let updated_settings = settings().with_update_plan(UpdatePlan::Automatic).unwrap();
     let updated = pages
         .update_body_date_time_field(created.id, created.range, updated_settings.clone())
         .unwrap();
@@ -80,7 +73,7 @@ fn attach_delete_cycle_is_byte_exact_and_overlap_is_transactional() {
     let mut text = crate::text::IWorkTextEditor::from_package(pages.package().clone());
     assert!(
         text.add_text_hyperlink(
-            pages.body_storage().unwrap().object_id,
+            pages.body_storage().unwrap().id,
             range(0, 6),
             TextHyperlinkTarget::new("https://example.com").unwrap(),
         )
@@ -104,7 +97,7 @@ fn invalid_positions_and_text_replacement_are_safe() {
         pages
             .insert_body_date_time_field(
                 TextPosition::from_utf16_index(2).unwrap(),
-                TextDateTimeDisplayText::new(DISPLAY).unwrap(),
+                DisplayText::new(DISPLAY).unwrap(),
                 settings(),
             )
             .is_err()
@@ -138,7 +131,7 @@ fn scratch_text_box_date_time_fields_work_across_the_suite() {
         .insert_text_box_date_time_field(
             pages_box.drawable_object_id,
             position,
-            TextDateTimeDisplayText::new(DISPLAY).unwrap(),
+            DisplayText::new(DISPLAY).unwrap(),
             settings(),
         )
         .unwrap();
@@ -164,7 +157,7 @@ fn scratch_text_box_date_time_fields_work_across_the_suite() {
             sheet_id,
             numbers_box.drawable_object_id,
             position,
-            TextDateTimeDisplayText::new(DISPLAY).unwrap(),
+            DisplayText::new(DISPLAY).unwrap(),
             settings(),
         )
         .unwrap();
@@ -193,7 +186,7 @@ fn scratch_text_box_date_time_fields_work_across_the_suite() {
             0,
             keynote_box.drawable_object_id,
             position,
-            TextDateTimeDisplayText::new(DISPLAY).unwrap(),
+            DisplayText::new(DISPLAY).unwrap(),
             settings(),
         )
         .unwrap();

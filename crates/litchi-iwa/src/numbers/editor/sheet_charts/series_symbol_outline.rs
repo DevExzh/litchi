@@ -7,7 +7,7 @@ use crate::charts::series_symbol_outline::{
     chart_series_symbol_outlines as read_native, reset_chart_series_symbol_outline as reset_native,
     set_chart_series_symbol_outlines as set_native,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesStroke};
+use crate::charts::{ChartSeriesStroke, Index};
 
 impl NumbersEditor {
     pub fn sheet_chart_series_symbol_outlines(
@@ -22,7 +22,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<Option<ChartSeriesStroke>> {
         let values = read(self, sheet_id, drawable_object_id)?;
         values
@@ -44,7 +44,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         outline: Option<ChartSeriesStroke>,
     ) -> Result<()> {
         let mut values = read(self, sheet_id, drawable_object_id)?;
@@ -63,7 +63,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<Option<ChartSeriesStroke>> {
         let graph = chart_graph(self, sheet_id, drawable_object_id)?;
         let count = series_count(&graph, drawable_object_id)?;
@@ -146,12 +146,7 @@ fn series_count(graph: &SheetChartGraph, drawable_object_id: u64) -> Result<usiz
     )
 }
 
-fn index_error(
-    application: &str,
-    drawable_object_id: u64,
-    series: ChartSeriesIndex,
-    count: usize,
-) -> Error {
+fn index_error(application: &str, drawable_object_id: u64, series: Index, count: usize) -> Error {
     Error::InvalidFormat(format!(
         "{application} chart {drawable_object_id} has {count} series, not series {}",
         series.zero_based() + 1

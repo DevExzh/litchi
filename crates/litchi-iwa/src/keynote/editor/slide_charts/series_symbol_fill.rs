@@ -8,7 +8,7 @@ use crate::charts::series_symbol_fill::{
     set_chart_series_symbol_fills as set_native,
     set_chart_series_symbol_image_fill_data as set_native_image,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesSymbolFill};
+use crate::charts::{ChartSeriesSymbolFill, Index};
 use crate::shapes::{RgbaColor, ShapeImageFill, ShapeImageFillTechnique};
 
 impl KeynoteEditor {
@@ -24,7 +24,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesSymbolFill> {
         let values = read(self, slide_index, drawable_object_id)?;
         values
@@ -46,7 +46,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         fill: ChartSeriesSymbolFill,
     ) -> Result<()> {
         let mut values = read(self, slide_index, drawable_object_id)?;
@@ -65,7 +65,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesSymbolFill> {
         let graph = chart_graph(self, slide_index, drawable_object_id)?;
         let count = series_count(&graph, drawable_object_id)?;
@@ -96,7 +96,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         preferred_filename: &str,
         data: &[u8],
         technique: ShapeImageFillTechnique,
@@ -193,7 +193,7 @@ fn series_count(graph: &SlideChartGraph, drawable_object_id: u64) -> Result<usiz
     )
 }
 
-fn index_error(drawable_object_id: u64, series: ChartSeriesIndex, count: usize) -> Error {
+fn index_error(drawable_object_id: u64, series: Index, count: usize) -> Error {
     Error::InvalidFormat(format!(
         "Keynote chart {drawable_object_id} has {count} series, not series {}",
         series.zero_based() + 1

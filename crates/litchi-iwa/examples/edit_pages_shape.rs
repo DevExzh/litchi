@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "drawable={} storage={} anchor={} kind={:?} title_caption={:?}",
         shape.drawable_object_id,
-        shape.storage.object_id,
+        shape.storage.id,
         shape.anchor_character_index,
         shape.kind,
         editor.body_shape_title_caption(shape.drawable_object_id)?

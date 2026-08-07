@@ -24,6 +24,32 @@ diagnostics. It never mutates the source snapshot. A full validation pass is
 explicit. Untouched malformed or unknown content is preserved and may remain a
 diagnostic, but a commit cannot worsen it.
 
+IWA reference-line edits apply the same boundary at the archive adapter:
+malformed existing line payloads are rejected before patching, recognized
+fields are checked for canonical framing, nested custom-value unknown fields
+survive scalar replacement, and repeated graph nodes are bounded before
+generated protobuf materialization. Typed graph updates preserve unknown raw
+fields at every modeled reference-line nesting level and validate a staged
+opaque-field candidate before publishing it. Public format editors publish
+only after their staged CRUD operation and typed readback succeed.
+
+The strict reference-line readers now parse through the common source-bound
+`WireView<'a>` once and expose `WireFieldView<'a>` values tied to that source.
+Canonical key and length framing is checked before a recognized payload is
+interpreted; mutation continues through the shared bounded patch primitives.
+This keeps borrowed inspection allocation-conscious without weakening the
+transactional publication boundary.
+
+The Numbers table-header adapter applies the same publication rule to
+`litchi_numbers::table::headers::{Count, Settings}`. It validates every
+recognized field's canonical presence and value before staging a wire patch,
+retains unknown payload fields, validates table-section capacities, reparses
+the staged package, and publishes only after typed readback equals the
+requested settings. The leaf error is non-exhaustive and is mapped only at the
+IWA boundary. Pages and Keynote share the value type; their remaining native
+model-object selectors are an explicit migration debt and do not become a
+precedent for new semantic APIs.
+
 ## Identity and selection
 
 Handles carry snapshot lineage and stable internal identity. Public lookup is

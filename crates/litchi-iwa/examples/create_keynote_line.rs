@@ -4,8 +4,7 @@ use std::env;
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, LineEndpoint, LineEndpoints, LineStyle, RgbColorSpace, RgbaColor, ShapeStroke,
-    StrokePattern, StrokeWidth,
+    DrawablePoint, Endpoint, Endpoints, LineStyle, Pattern, RgbColorSpace, RgbaColor, Stroke, Width,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -21,10 +20,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .title("Created from scratch")
         .subtitle("Line built from typed IWA objects")
         .build()?;
-    let stroke = ShapeStroke::new(
+    let stroke = Stroke::new(
         RgbaColor::new(0.95, 0.45, 0.05, 1.0, RgbColorSpace::DisplayP3)?,
-        StrokeWidth::new(5.0)?,
-        StrokePattern::LongDash,
+        Width::new(5.0)?,
+        Pattern::LongDash,
     );
     let created = editor.add_slide_line_with_style(
         0,
@@ -33,9 +32,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             x: 1_200.0,
             y: 900.0,
         },
-        LineStyle::new(stroke).with_endpoints(LineEndpoints::new(
-            LineEndpoint::OpenSquare,
-            LineEndpoint::FilledDiamond,
+        LineStyle::new(stroke).with_endpoints(Endpoints::new(
+            Endpoint::OpenSquare,
+            Endpoint::FilledDiamond,
         )),
     )?;
     editor.set_slide_line_segment(

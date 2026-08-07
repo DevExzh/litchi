@@ -1,16 +1,30 @@
 use super::*;
 use crate::keynote::KeynoteDocumentBuilder;
-use crate::numbers::CellValue;
-use crate::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightCondition, TableCellConditionalHighlightRule,
-    TableCellConditionalHighlightStyle, TableCellConditionalHighlightText,
+use crate::numbers::cell::CellValue;
+use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
+use litchi_iwa_common::table::cell::BorderSide;
+use litchi_iwa_common::table::cell::conditional_highlight::{
+    Condition, Rule, Style as ConditionalHighlightStyle, Text as ConditionalText,
 };
-use crate::table_cell_data_format::{
-    TableCellCurrencyCode, TableCellCurrencyStyle, TableCellCustomFormatName,
-    TableCellCustomNumberFormat, TableCellCustomNumberPattern, TableCellFractionAccuracy,
-    TableCellNumeralSystemBase, TableCellNumeralSystemFixedPlaces,
-    TableCellNumeralSystemNegativeStyle, TableCellNumeralSystemPlaces,
+use litchi_keynote::slide::table::{
+    formula::{FormulaCachedValue, FormulaCellReference, FormulaExpression},
+    sort::{ColumnIndex, Direction, Order, RowRange, Rule as SortRule},
 };
+use litchi_numbers::cell::data_format::control::{Range as ControlRange, Slider, Stepper};
+use litchi_numbers::cell::data_format::custom::{
+    Name as CustomFormatName, Number as CustomNumber, NumberPattern,
+};
+use litchi_numbers::cell::data_format::duration::{Duration, Style as DurationStyle, UnitRange};
+use litchi_numbers::cell::data_format::number::{
+    Currency, CurrencyCode, CurrencyStyle, DecimalPlaces, FixedDecimalPlaces, Fraction,
+    FractionAccuracy, NegativeStyle, Number, Percentage, Scientific, ThousandsSeparator,
+};
+use litchi_numbers::cell::data_format::numeral_system::{
+    Base, FixedPlaces, NegativeStyle as NumeralSystemNegativeStyle, Places,
+};
+use litchi_numbers::cell::data_format::pop_up_menu::PopUpMenu;
+use litchi_numbers::cell::data_format::{Checkbox, DataFormat, StarRating, Text as TextFormat};
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 fn table_geometry() -> (DrawablePoint, DrawableSize) {
     (
@@ -64,11 +78,9 @@ fn source_built_table_creates_and_replaces_conditional_highlighting() {
             CellValue::Text("Organic Grain".to_owned()),
         )
         .unwrap();
-    let rule = TableCellConditionalHighlightRule::new(
-        TableCellConditionalHighlightCondition::TextContains(
-            TableCellConditionalHighlightText::new("grain").unwrap(),
-        ),
-        TableCellConditionalHighlightStyle::with_text_color(
+    let rule = Rule::new(
+        Condition::TextContains(ConditionalText::new("grain").unwrap()),
+        ConditionalHighlightStyle::with_text_color(
             crate::shapes::RgbaColor::new(0.1, 0.6, 0.2, 1.0, crate::shapes::RgbColorSpace::Srgb)
                 .unwrap(),
         ),
@@ -109,21 +121,14 @@ fn source_built_table_roundtrips_cell_border_crud() {
     let table = editor
         .add_slide_table(0, "Borders", 3, 3, position, size)
         .unwrap();
-    let stroke = crate::shapes::ShapeStroke::new(
+    let stroke = crate::shapes::Stroke::new(
         crate::shapes::RgbaColor::new(0.9, 0.2, 0.1, 1.0, crate::shapes::RgbColorSpace::Srgb)
             .unwrap(),
-        crate::shapes::StrokeWidth::new(3.0).unwrap(),
-        crate::shapes::StrokePattern::Solid,
+        crate::shapes::Width::new(3.0).unwrap(),
+        crate::shapes::Pattern::Solid,
     );
     editor
-        .set_slide_table_cell_border(
-            0,
-            table.model_object_id,
-            2,
-            1,
-            KeynoteTableCellBorderSide::Top,
-            stroke,
-        )
+        .set_slide_table_cell_border(0, table.model_object_id, 2, 1, BorderSide::Top, stroke)
         .unwrap();
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -135,13 +140,7 @@ fn source_built_table_roundtrips_cell_border_crud() {
         Some(stroke)
     );
     reopened
-        .clear_slide_table_cell_border(
-            0,
-            table.model_object_id,
-            2,
-            1,
-            KeynoteTableCellBorderSide::Top,
-        )
+        .clear_slide_table_cell_border(0, table.model_object_id, 2, 1, BorderSide::Top)
         .unwrap();
     assert_eq!(
         reopened
@@ -237,10 +236,10 @@ fn source_built_table_roundtrips_number_format_crud() {
     let table = editor
         .add_slide_table(0, "Formats", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellNumberFormat::new(
-        KeynoteTableCellDecimalPlaces::fixed(2).unwrap(),
-        KeynoteTableCellNegativeNumberStyle::Parentheses,
-        KeynoteTableCellThousandsSeparator::Shown,
+    let format = Number::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::Parentheses,
+        ThousandsSeparator::Shown,
     );
     editor
         .set_slide_table_cell(
@@ -248,7 +247,7 @@ fn source_built_table_roundtrips_number_format_crud() {
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Number(1_234.5),
+            CellValue::number(1_234.5).expect("finite cell number"),
         )
         .unwrap();
     editor
@@ -282,10 +281,10 @@ fn source_built_table_roundtrips_percentage_data_format() {
     let table = editor
         .add_slide_table(0, "Percentages", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellPercentageFormat::new(
-        KeynoteTableCellDecimalPlaces::fixed(2).unwrap(),
-        KeynoteTableCellNegativeNumberStyle::Parentheses,
-        KeynoteTableCellThousandsSeparator::Shown,
+    let format = Percentage::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::Parentheses,
+        ThousandsSeparator::Shown,
     );
     editor
         .set_slide_table_cell(
@@ -293,7 +292,7 @@ fn source_built_table_roundtrips_percentage_data_format() {
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Number(-12.345),
+            CellValue::number(-12.345).expect("finite cell number"),
         )
         .unwrap();
     editor
@@ -305,7 +304,7 @@ fn source_built_table_roundtrips_percentage_data_format() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Percentage(format)
+        DataFormat::Percentage(format)
     );
     assert_eq!(
         reopened
@@ -314,19 +313,13 @@ fn source_built_table_roundtrips_percentage_data_format() {
         Some(format)
     );
     reopened
-        .set_slide_table_cell_data_format(
-            0,
-            table.model_object_id,
-            1,
-            1,
-            KeynoteTableCellDataFormat::Automatic,
-        )
+        .set_slide_table_cell_data_format(0, table.model_object_id, 1, 1, DataFormat::Automatic)
         .unwrap();
     assert_eq!(
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -337,12 +330,12 @@ fn source_built_table_roundtrips_currency_format_crud() {
     let table = editor
         .add_slide_table(0, "Currencies", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellCurrencyFormat::new(
-        TableCellCurrencyCode::GBP,
-        KeynoteTableCellDecimalPlaces::fixed(2).unwrap(),
-        KeynoteTableCellNegativeNumberStyle::Parentheses,
-        KeynoteTableCellThousandsSeparator::Shown,
-        TableCellCurrencyStyle::Accounting,
+    let format = Currency::new(
+        CurrencyCode::GBP,
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::Parentheses,
+        ThousandsSeparator::Shown,
+        CurrencyStyle::Accounting,
     );
     editor
         .set_slide_table_cell(
@@ -350,7 +343,7 @@ fn source_built_table_roundtrips_currency_format_crud() {
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Number(-1_234.5),
+            CellValue::number(-1_234.5).expect("finite cell number"),
         )
         .unwrap();
     editor
@@ -373,7 +366,7 @@ fn source_built_table_roundtrips_currency_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -384,15 +377,14 @@ fn source_built_table_roundtrips_scientific_format_crud() {
     let table = editor
         .add_slide_table(0, "Scientific", 3, 3, position, size)
         .unwrap();
-    let format =
-        KeynoteTableCellScientificFormat::new(KeynoteTableCellFixedDecimalPlaces::new(5).unwrap());
+    let format = Scientific::new(FixedDecimalPlaces::new(5).unwrap());
     editor
         .set_slide_table_cell(
             0,
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Number(-1_234.5),
+            CellValue::number(-1_234.5).expect("finite cell number"),
         )
         .unwrap();
     editor
@@ -415,7 +407,7 @@ fn source_built_table_roundtrips_scientific_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -426,14 +418,14 @@ fn source_built_table_roundtrips_fraction_format_crud() {
     let table = editor
         .add_slide_table(0, "Fractions", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellFractionFormat::new(TableCellFractionAccuracy::Eighths);
+    let format = Fraction::new(FractionAccuracy::Eighths);
     editor
         .set_slide_table_cell(
             0,
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Number(-12.375),
+            CellValue::number(-12.375).expect("finite cell number"),
         )
         .unwrap();
     editor
@@ -456,7 +448,7 @@ fn source_built_table_roundtrips_fraction_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -467,10 +459,10 @@ fn source_built_table_roundtrips_numeral_system_format_crud() {
     let table = editor
         .add_slide_table(0, "Numeral Systems", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellNumeralSystemFormat::new(
-        TableCellNumeralSystemBase::HEXADECIMAL,
-        TableCellNumeralSystemPlaces::Fixed(TableCellNumeralSystemFixedPlaces::EIGHT),
-        TableCellNumeralSystemNegativeStyle::TwosComplement,
+    let format = NumeralSystem::new(
+        Base::HEXADECIMAL,
+        Places::Fixed(FixedPlaces::EIGHT),
+        NumeralSystemNegativeStyle::TwosComplement,
     )
     .unwrap();
     editor
@@ -479,7 +471,7 @@ fn source_built_table_roundtrips_numeral_system_format_crud() {
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Number(-1_234.5),
+            CellValue::number(-1_234.5).expect("finite cell number"),
         )
         .unwrap();
     editor
@@ -502,7 +494,7 @@ fn source_built_table_roundtrips_numeral_system_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -513,14 +505,14 @@ fn source_built_table_roundtrips_date_time_format_crud() {
     let table = editor
         .add_slide_table(0, "Dates", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellDateTimeFormat::iso_date_time_24_hour_with_seconds();
+    let format = DateTime::iso_date_time_24_hour_with_seconds();
     editor
         .set_slide_table_cell(
             0,
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Date(789_332_889.0),
+            CellValue::date(789_332_889.0).expect("finite cell date"),
         )
         .unwrap();
     editor
@@ -543,7 +535,7 @@ fn source_built_table_roundtrips_date_time_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -554,16 +546,15 @@ fn source_built_table_roundtrips_duration_format_crud() {
     let table = editor
         .add_slide_table(0, "Durations", 3, 3, position, size)
         .unwrap();
-    let range = KeynoteTableCellDurationUnitRange::hours_to_milliseconds();
-    let format =
-        KeynoteTableCellDurationFormat::custom(KeynoteTableCellDurationStyle::Abbreviated, range);
+    let range = UnitRange::hours_to_milliseconds();
+    let format = Duration::custom(DurationStyle::Abbreviated, range);
     editor
         .set_slide_table_cell(
             0,
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Duration(3_723.5),
+            CellValue::duration(3_723.5).expect("finite cell duration"),
         )
         .unwrap();
     editor
@@ -586,7 +577,7 @@ fn source_built_table_roundtrips_duration_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -598,13 +589,7 @@ fn source_built_table_roundtrips_checkbox_format_crud() {
         .add_slide_table(0, "Checkboxes", 3, 3, position, size)
         .unwrap();
     editor
-        .set_slide_table_cell_checkbox_format(
-            0,
-            table.model_object_id,
-            1,
-            1,
-            KeynoteTableCellCheckboxFormat,
-        )
+        .set_slide_table_cell_checkbox_format(0, table.model_object_id, 1, 1, Checkbox)
         .unwrap();
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -612,7 +597,7 @@ fn source_built_table_roundtrips_checkbox_format_crud() {
         reopened
             .slide_table_cell_checkbox_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        Some(KeynoteTableCellCheckboxFormat)
+        Some(Checkbox)
     );
     assert_eq!(
         reopened
@@ -630,7 +615,7 @@ fn source_built_table_roundtrips_checkbox_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -642,13 +627,7 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
         .add_slide_table(0, "Ratings", 3, 3, position, size)
         .unwrap();
     editor
-        .set_slide_table_cell_star_rating_format(
-            0,
-            table.model_object_id,
-            1,
-            1,
-            KeynoteTableCellStarRatingFormat,
-        )
+        .set_slide_table_cell_star_rating_format(0, table.model_object_id, 1, 1, StarRating)
         .unwrap();
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -656,14 +635,14 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
         reopened
             .slide_table_cell_star_rating_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        Some(KeynoteTableCellStarRatingFormat)
+        Some(StarRating)
     );
     assert_eq!(
         reopened
             .slide_table(0, table.model_object_id)
             .unwrap()
             .get_cell(1, 1),
-        Some(&KeynoteTableCellValue::Number(0.0))
+        Some(&CellValue::number(0.0).expect("finite cell number"))
     );
     assert!(
         reopened
@@ -674,7 +653,7 @@ fn source_built_table_roundtrips_star_rating_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -685,9 +664,8 @@ fn source_built_table_roundtrips_slider_format_crud() {
     let table = editor
         .add_slide_table(0, "Sliders", 3, 3, position, size)
         .unwrap();
-    let range = KeynoteTableCellSliderRange::new(-10.0, 30.0, 0.5).unwrap();
-    let format =
-        KeynoteTableCellSliderFormat::new(range, KeynoteTableCellNumberFormat::default().into());
+    let range = ControlRange::new(-10.0, 30.0, 0.5).unwrap();
+    let format = Slider::new(range, Number::default().into());
     editor
         .set_slide_table_cell_slider_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
@@ -704,7 +682,7 @@ fn source_built_table_roundtrips_slider_format_crud() {
             .slide_table(0, table.model_object_id)
             .unwrap()
             .get_cell(1, 1),
-        Some(&KeynoteTableCellValue::Number(10.0))
+        Some(&CellValue::number(10.0).expect("finite cell number"))
     );
     assert!(
         reopened
@@ -715,7 +693,7 @@ fn source_built_table_roundtrips_slider_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -726,9 +704,8 @@ fn source_built_table_roundtrips_stepper_format_crud() {
     let table = editor
         .add_slide_table(0, "Steppers", 3, 3, position, size)
         .unwrap();
-    let range = KeynoteTableCellStepperRange::new(-10.0, 30.0, 0.5).unwrap();
-    let format =
-        KeynoteTableCellStepperFormat::new(range, KeynoteTableCellNumberFormat::default().into());
+    let range = ControlRange::new(-10.0, 30.0, 0.5).unwrap();
+    let format = Stepper::new(range, Number::default().into());
     editor
         .set_slide_table_cell_stepper_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
@@ -745,7 +722,7 @@ fn source_built_table_roundtrips_stepper_format_crud() {
             .slide_table(0, table.model_object_id)
             .unwrap()
             .get_cell(1, 1),
-        Some(&KeynoteTableCellValue::Number(-10.0))
+        Some(&CellValue::number(-10.0).expect("finite cell number"))
     );
     assert!(
         reopened
@@ -756,7 +733,7 @@ fn source_built_table_roundtrips_stepper_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -785,7 +762,7 @@ fn source_built_table_roundtrips_text_format_crud() {
         reopened
             .slide_table_cell_text_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        Some(KeynoteTableCellTextFormat)
+        Some(TextFormat)
     );
     assert_eq!(
         reopened
@@ -803,7 +780,7 @@ fn source_built_table_roundtrips_text_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -814,9 +791,9 @@ fn source_built_table_roundtrips_custom_format_crud() {
     let table = editor
         .add_slide_table(0, "Custom Numbers", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellCustomFormat::Number(TableCellCustomNumberFormat::new(
-        TableCellCustomFormatName::try_new("Grouped Integer").unwrap(),
-        TableCellCustomNumberPattern::try_new("#,###").unwrap(),
+    let format = Custom::Number(CustomNumber::new(
+        CustomFormatName::try_new("Grouped Integer").unwrap(),
+        NumberPattern::try_new("#,###").unwrap(),
     ));
     editor
         .set_slide_table_cell(
@@ -824,7 +801,7 @@ fn source_built_table_roundtrips_custom_format_crud() {
             table.model_object_id,
             1,
             1,
-            KeynoteTableCellValue::Number(12_345.0),
+            CellValue::number(12_345.0).expect("finite cell number"),
         )
         .unwrap();
     editor
@@ -847,7 +824,7 @@ fn source_built_table_roundtrips_custom_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -858,7 +835,7 @@ fn source_built_table_roundtrips_pop_up_menu_format_crud() {
     let table = editor
         .add_slide_table(0, "Menus", 3, 3, position, size)
         .unwrap();
-    let format = KeynoteTableCellPopUpMenuFormat::try_new(["Draft", "Published"]).unwrap();
+    let format = PopUpMenu::new(["Draft", "Published"]).unwrap();
     editor
         .set_slide_table_cell_pop_up_menu_format(0, table.model_object_id, 1, 1, format.clone())
         .unwrap();
@@ -886,7 +863,7 @@ fn source_built_table_roundtrips_pop_up_menu_format_crud() {
         reopened
             .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        KeynoteTableCellDataFormat::Automatic
+        DataFormat::Automatic
     );
 }
 
@@ -918,7 +895,11 @@ fn source_built_table_roundtrips_full_crud() {
                         0,
                         KeynoteTableCellValue::Text("Region".to_owned()),
                     ),
-                    KeynoteTableCellUpdate::new(1, 1, KeynoteTableCellValue::Number(42.5)),
+                    KeynoteTableCellUpdate::new(
+                        1,
+                        1,
+                        CellValue::number(42.5).expect("finite cell number"),
+                    ),
                 ],
             )
             .unwrap(),
@@ -956,10 +937,10 @@ fn source_built_table_roundtrips_full_crud() {
     editor
         .set_slide_table_geometry(0, table.drawable_object_id, replacement)
         .unwrap();
-    let headers = KeynoteTableHeaderSettings {
-        header_rows: Some(KeynoteTableHeaderCount::TWO),
+    let headers = HeaderSettings {
+        header_rows: Some(HeaderCount::TWO),
         header_columns: None,
-        footer_rows: Some(KeynoteTableHeaderCount::ONE),
+        footer_rows: Some(HeaderCount::ONE),
         ..Default::default()
     };
     editor
@@ -1019,7 +1000,7 @@ fn source_built_table_roundtrips_full_crud() {
     );
     assert_eq!(
         materialized.get_cell(1, 1),
-        Some(&KeynoteTableCellValue::Number(42.5))
+        Some(&CellValue::number(42.5).expect("finite cell number"))
     );
 
     reopened
@@ -1058,7 +1039,11 @@ fn source_built_table_duplication_clones_formula_storage_and_geometry() {
                     KeynoteTableCellValue::Text("Category".to_owned()),
                 ),
                 KeynoteTableCellUpdate::new(1, 0, KeynoteTableCellValue::Text("Travel".to_owned())),
-                KeynoteTableCellUpdate::new(1, 1, KeynoteTableCellValue::Number(125.0)),
+                KeynoteTableCellUpdate::new(
+                    1,
+                    1,
+                    CellValue::number(125.0).expect("finite cell number"),
+                ),
             ],
         )
         .unwrap();
@@ -1068,14 +1053,14 @@ fn source_built_table_duplication_clones_formula_storage_and_geometry() {
             source.model_object_id,
             2,
             1,
-            KeynoteTableFormulaExpression::function(
+            FormulaExpression::function(
                 "SUM",
                 [
-                    KeynoteTableFormulaExpression::Number(100.0),
-                    KeynoteTableFormulaExpression::Number(25.0),
+                    FormulaExpression::Number(100.0),
+                    FormulaExpression::Number(25.0),
                 ],
             ),
-            KeynoteTableFormulaCachedValue::Number(125.0),
+            FormulaCachedValue::number(125.0).expect("finite cached number"),
         )
         .unwrap();
 
@@ -1158,8 +1143,8 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         .set_slide_table_header_settings(
             0,
             model_id,
-            KeynoteTableHeaderSettings {
-                header_rows: Some(KeynoteTableHeaderCount::ONE),
+            HeaderSettings {
+                header_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -1200,14 +1185,14 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         .slide_table_cell_comment(0, model_id, 1, 1)
         .unwrap()
         .unwrap()
-        .storage_object_id;
-    let hidden = KeynoteTableHiddenAxes::new([KeynoteTableAxisIndex::row(2)]).unwrap();
+        .storage_id;
+    let hidden = HiddenAxes::new([AxisIndex::row(2)]).unwrap();
     editor
         .set_slide_table_hidden_axes(0, model_id, &hidden)
         .unwrap();
-    let order = KeynoteTableSortOrder::new([KeynoteTableSortRule::new(
-        KeynoteTableSortColumnIndex::new(0).unwrap(),
-        KeynoteTableSortDirection::Ascending,
+    let order = Order::new([SortRule::new(
+        ColumnIndex::new(0).unwrap(),
+        Direction::Ascending,
     )])
     .unwrap();
 
@@ -1257,15 +1242,15 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             .slide_table_cell_comment(0, model_id, 4, 1)
             .unwrap()
             .unwrap()
-            .storage_object_id,
+            .storage_id,
         comment_id
     );
     assert_eq!(
         editor
             .slide_table_cell_comment_replies(0, model_id, 4, 1)
             .unwrap()[0]
-            .storage_object_id,
-        reply_id
+            .storage_id,
+        StorageId::new(reply_id).unwrap()
     );
     assert_eq!(editor.slide_table_hidden_axes(0, model_id).unwrap(), hidden);
 
@@ -1279,15 +1264,15 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             .slide_table_cell_comment(0, model_id, 4, 1)
             .unwrap()
             .unwrap()
-            .storage_object_id,
+            .storage_id,
         comment_id
     );
     assert_eq!(
         reopened
             .slide_table_cell_comment_replies(0, model_id, 4, 1)
             .unwrap()[0]
-            .storage_object_id,
-        reply_id
+            .storage_id,
+        StorageId::new(reply_id).unwrap()
     );
     assert_eq!(
         reopened.slide_table_hidden_axes(0, model_id).unwrap(),
@@ -1299,9 +1284,9 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         .unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
 
-    let invalid = KeynoteTableSortOrder::new([KeynoteTableSortRule::new(
-        KeynoteTableSortColumnIndex::new(2).unwrap(),
-        KeynoteTableSortDirection::Ascending,
+    let invalid = Order::new([SortRule::new(
+        ColumnIndex::new(2).unwrap(),
+        Direction::Ascending,
     )])
     .unwrap();
     let before_invalid = reopened.to_bytes().unwrap();
@@ -1312,9 +1297,9 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_invalid);
 
-    let selected_order = KeynoteTableSortOrder::selected_rows([KeynoteTableSortRule::new(
-        KeynoteTableSortColumnIndex::new(0).unwrap(),
-        KeynoteTableSortDirection::Descending,
+    let selected_order = Order::selected_rows([SortRule::new(
+        ColumnIndex::new(0).unwrap(),
+        Direction::Descending,
     )])
     .unwrap();
     reopened
@@ -1329,11 +1314,7 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     assert_eq!(reopened.to_bytes().unwrap(), before_wrong_executor);
     assert!(
         reopened
-            .apply_slide_table_sort_order_to_rows(
-                0,
-                model_id,
-                KeynoteTableSortRowRange::new(1, 4).unwrap(),
-            )
+            .apply_slide_table_sort_order_to_rows(0, model_id, RowRange::new(1, 4).unwrap(),)
             .unwrap()
     );
     let table = reopened.slide_table(0, model_id).unwrap();
@@ -1364,15 +1345,15 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
             .slide_table_cell_comment(0, model_id, 2, 1)
             .unwrap()
             .unwrap()
-            .storage_object_id,
+            .storage_id,
         comment_id
     );
     assert_eq!(
         reopened
             .slide_table_cell_comment_replies(0, model_id, 2, 1)
             .unwrap()[0]
-            .storage_object_id,
-        reply_id
+            .storage_id,
+        StorageId::new(reply_id).unwrap()
     );
     assert_eq!(
         reopened.slide_table_hidden_axes(0, model_id).unwrap(),
@@ -1407,14 +1388,14 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
             table.model_object_id,
             2,
             1,
-            KeynoteTableFormulaExpression::function(
+            FormulaExpression::function(
                 "SUM",
                 [
-                    KeynoteTableFormulaExpression::Number(1.0),
-                    KeynoteTableFormulaExpression::Number(2.0),
+                    FormulaExpression::Number(1.0),
+                    FormulaExpression::Number(2.0),
                 ],
             ),
-            KeynoteTableFormulaCachedValue::Number(3.0),
+            FormulaCachedValue::number(3.0).expect("finite cached number"),
         )
         .unwrap();
 
@@ -1432,14 +1413,14 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
             table.model_object_id,
             2,
             1,
-            KeynoteTableFormulaExpression::function(
+            FormulaExpression::function(
                 "SUM",
                 [
-                    KeynoteTableFormulaExpression::Number(3.0),
-                    KeynoteTableFormulaExpression::Number(4.0),
+                    FormulaExpression::Number(3.0),
+                    FormulaExpression::Number(4.0),
                 ],
             ),
-            KeynoteTableFormulaCachedValue::Number(7.0),
+            FormulaCachedValue::number(7.0).expect("finite cached number"),
         )
         .unwrap();
     assert_eq!(
@@ -1458,8 +1439,8 @@ fn source_built_table_roundtrips_formula_crud_transactionally() {
                 table.model_object_id,
                 usize::MAX,
                 1,
-                KeynoteTableFormulaExpression::Number(1.0),
-                KeynoteTableFormulaCachedValue::Number(1.0),
+                FormulaExpression::Number(1.0),
+                FormulaCachedValue::number(1.0).expect("finite cached number"),
             )
             .is_err()
     );
@@ -1510,8 +1491,8 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
             model_id,
             2,
             2,
-            KeynoteTableFormulaExpression::cell(KeynoteTableFormulaCellReference::relative(1, 1)),
-            KeynoteTableFormulaCachedValue::Number(7.0),
+            FormulaExpression::cell(FormulaCellReference::relative(1, 1)),
+            FormulaCachedValue::number(7.0).expect("finite cached number"),
         )
         .unwrap();
     editor
@@ -1524,10 +1505,10 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
     let baseline = editor.to_bytes().unwrap();
 
     editor
-        .insert_slide_table_row(0, model_id, KeynoteTableRowInsertion::body(1))
+        .insert_slide_table_row(0, model_id, RowInsertion::body(1))
         .unwrap();
     editor
-        .insert_slide_table_column(0, model_id, KeynoteTableColumnInsertion::body(1))
+        .insert_slide_table_column(0, model_id, ColumnInsertion::body(1))
         .unwrap();
     let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let shifted = reopened.slide_table(0, model_id).unwrap();
@@ -1551,10 +1532,10 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
     );
 
     editor
-        .remove_slide_table_column(0, model_id, KeynoteTableColumnDeletion::body(1))
+        .remove_slide_table_column(0, model_id, ColumnDeletion::body(1))
         .unwrap();
     editor
-        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::body(1))
+        .remove_slide_table_row(0, model_id, RowDeletion::body(1))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
     assert_eq!(
@@ -1565,12 +1546,12 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
     let before_error = editor.to_bytes().unwrap();
     assert!(
         editor
-            .insert_slide_table_row(1, model_id, KeynoteTableRowInsertion::body(usize::MAX))
+            .insert_slide_table_row(1, model_id, RowInsertion::body(usize::MAX))
             .is_err()
     );
     assert!(
         editor
-            .remove_slide_table_column(0, model_id, KeynoteTableColumnDeletion::body(usize::MAX))
+            .remove_slide_table_column(0, model_id, ColumnDeletion::body(usize::MAX))
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before_error);
@@ -1588,8 +1569,8 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
         .set_slide_table_header_settings(
             0,
             model_id,
-            KeynoteTableHeaderSettings {
-                footer_rows: Some(KeynoteTableHeaderCount::ONE),
+            HeaderSettings {
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -1600,14 +1581,14 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
             model_id,
             3,
             1,
-            KeynoteTableFormulaExpression::function(
+            FormulaExpression::function(
                 "SUM",
-                [KeynoteTableFormulaExpression::range(
-                    KeynoteTableFormulaCellReference::relative(1, 1),
-                    KeynoteTableFormulaCellReference::relative(2, 1),
+                [FormulaExpression::range(
+                    FormulaCellReference::relative(1, 1),
+                    FormulaCellReference::relative(2, 1),
                 )],
             ),
-            KeynoteTableFormulaCachedValue::Number(3.0),
+            FormulaCachedValue::number(3.0).expect("finite cached number"),
         )
         .unwrap();
     let mut package = editor.into_package();
@@ -1619,7 +1600,7 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
     let baseline = editor.to_bytes().unwrap();
 
     editor
-        .insert_slide_table_row(0, model_id, KeynoteTableRowInsertion::body(3))
+        .insert_slide_table_row(0, model_id, RowInsertion::body(3))
         .unwrap();
     assert_eq!(
         editor
@@ -1629,7 +1610,7 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
         Some("=SUM(B2:B4)")
     );
     editor
-        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::body(3))
+        .remove_slide_table_row(0, model_id, RowDeletion::body(3))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
@@ -1646,10 +1627,10 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
         .set_slide_table_header_settings(
             0,
             model_id,
-            KeynoteTableHeaderSettings {
-                header_rows: Some(KeynoteTableHeaderCount::ONE),
-                header_columns: Some(KeynoteTableHeaderCount::ONE),
-                footer_rows: Some(KeynoteTableHeaderCount::ONE),
+            HeaderSettings {
+                header_rows: Some(HeaderCount::ONE),
+                header_columns: Some(HeaderCount::ONE),
+                footer_rows: Some(HeaderCount::ONE),
                 ..Default::default()
             },
         )
@@ -1657,13 +1638,13 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
     let baseline = editor.to_bytes().unwrap();
 
     editor
-        .insert_slide_table_row(0, model_id, KeynoteTableRowInsertion::header(1))
+        .insert_slide_table_row(0, model_id, RowInsertion::header(1))
         .unwrap();
     editor
-        .insert_slide_table_row(0, model_id, KeynoteTableRowInsertion::footer(0))
+        .insert_slide_table_row(0, model_id, RowInsertion::footer(0))
         .unwrap();
     editor
-        .insert_slide_table_column(0, model_id, KeynoteTableColumnInsertion::header(1))
+        .insert_slide_table_column(0, model_id, ColumnInsertion::header(1))
         .unwrap();
     let settings = editor.slide_table_header_settings(0, model_id).unwrap();
     assert_eq!(settings.header_row_count(), 2);
@@ -1673,13 +1654,13 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
     assert_eq!((table.info.rows, table.info.columns), (6, 5));
 
     editor
-        .remove_slide_table_column(0, model_id, KeynoteTableColumnDeletion::header(1))
+        .remove_slide_table_column(0, model_id, ColumnDeletion::header(1))
         .unwrap();
     editor
-        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::footer(0))
+        .remove_slide_table_row(0, model_id, RowDeletion::footer(0))
         .unwrap();
     editor
-        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::header(1))
+        .remove_slide_table_row(0, model_id, RowDeletion::header(1))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
@@ -1711,13 +1692,13 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
         )
         .unwrap();
     editor
-        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::header(0))
+        .remove_slide_table_row(0, model_id, RowDeletion::header(0))
         .unwrap();
     editor
-        .remove_slide_table_row(0, model_id, KeynoteTableRowDeletion::footer(0))
+        .remove_slide_table_row(0, model_id, RowDeletion::footer(0))
         .unwrap();
     editor
-        .remove_slide_table_column(0, model_id, KeynoteTableColumnDeletion::header(0))
+        .remove_slide_table_column(0, model_id, ColumnDeletion::header(0))
         .unwrap();
     let settings = editor.slide_table_header_settings(0, model_id).unwrap();
     assert_eq!(settings.header_row_count(), 0);
@@ -1742,14 +1723,8 @@ fn source_built_table_roundtrips_title_settings_transactionally() {
     let table = editor
         .add_slide_table(0, "Forecast", 2, 2, position, size)
         .unwrap();
-    let visible = KeynoteTableTitleSettings {
-        visible: Some(true),
-        outlined: Some(true),
-    };
-    let initially_hidden = KeynoteTableTitleSettings {
-        visible: Some(false),
-        outlined: None,
-    };
+    let visible = KeynoteTableTitleSettings::new(Some(true), Some(true));
+    let initially_hidden = KeynoteTableTitleSettings::new(Some(false), None);
     assert_eq!(
         editor
             .slide_table_title_settings(0, table.model_object_id)
@@ -1773,10 +1748,7 @@ fn source_built_table_roundtrips_title_settings_transactionally() {
         .unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
 
-    let explicit_hidden = KeynoteTableTitleSettings {
-        visible: Some(false),
-        outlined: Some(false),
-    };
+    let explicit_hidden = KeynoteTableTitleSettings::new(Some(false), Some(false));
     reopened
         .set_slide_table_title_settings(0, table.model_object_id, explicit_hidden)
         .unwrap();

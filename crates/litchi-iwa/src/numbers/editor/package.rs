@@ -4,7 +4,12 @@
 //! mutations behind the semantic editor facade. They are crate-visible only;
 //! consumers operate through the typed [`super::NumbersEditor`] API.
 
+use super::table::cell::Borders;
 use super::*;
+use crate::text::{Alignment, Indents, LineSpacing, Spacing};
+use litchi_iwa_common::shape::stroke::Stroke;
+use litchi_iwa_common::table::cell::{BorderSide, layout::Layout};
+use litchi_numbers::table::dimension::{Dimension, Size};
 
 pub(crate) fn set_table_cell_in_package(
     package: &mut IWorkPackage,
@@ -23,7 +28,7 @@ pub(crate) fn table_cell_borders_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<crate::table_cell_border::TableCellBorders> {
+) -> Result<Borders> {
     stroke_layers::cell_borders(package, table_id, row, column)
 }
 
@@ -41,7 +46,7 @@ pub(crate) fn table_cell_layout_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<crate::table_cell_layout::TableCellLayout> {
+) -> Result<Layout> {
     cell_layout::cell_layout(package, table_id, row, column)
 }
 
@@ -50,7 +55,7 @@ pub(crate) fn table_cell_text_alignment_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TextAlignment> {
+) -> Result<Alignment> {
     cell_paragraph_style::alignment(package, table_id, row, column)
 }
 
@@ -59,7 +64,7 @@ pub(crate) fn set_table_cell_text_alignment_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    alignment: TextAlignment,
+    alignment: Alignment,
 ) -> Result<()> {
     cell_paragraph_style::set_alignment(package, table_id, row, column, alignment)
 }
@@ -78,7 +83,7 @@ pub(crate) fn table_cell_paragraph_line_spacing_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<ParagraphLineSpacing> {
+) -> Result<LineSpacing> {
     cell_paragraph_style::line_spacing(package, table_id, row, column)
 }
 
@@ -87,7 +92,7 @@ pub(crate) fn set_table_cell_paragraph_line_spacing_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    spacing: ParagraphLineSpacing,
+    spacing: LineSpacing,
 ) -> Result<()> {
     cell_paragraph_style::set_line_spacing(package, table_id, row, column, spacing)
 }
@@ -106,7 +111,7 @@ pub(crate) fn table_cell_paragraph_spacing_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<ParagraphSpacing> {
+) -> Result<Spacing> {
     cell_paragraph_style::spacing(package, table_id, row, column)
 }
 
@@ -115,7 +120,7 @@ pub(crate) fn set_table_cell_paragraph_spacing_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    spacing: ParagraphSpacing,
+    spacing: Spacing,
 ) -> Result<()> {
     cell_paragraph_style::set_spacing(package, table_id, row, column, spacing)
 }
@@ -190,7 +195,7 @@ pub(crate) fn set_table_cell_paragraph_list_level_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     level: ParagraphListLevel,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_level(package, table_id, row, column, paragraph, level)
@@ -201,7 +206,7 @@ pub(crate) fn reset_table_cell_paragraph_list_level_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_level(package, table_id, row, column, paragraph)
 }
@@ -211,7 +216,7 @@ pub(crate) fn table_cell_paragraph_list_numbering_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListNumbering> {
     cell_paragraph_list::paragraph_list_numbering(package, table_id, row, column, paragraph)
 }
@@ -221,7 +226,7 @@ pub(crate) fn set_table_cell_paragraph_list_numbering_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     numbering: ParagraphListNumbering,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_numbering(
@@ -234,7 +239,7 @@ pub(crate) fn table_cell_paragraph_list_number_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListNumberFormat> {
     cell_paragraph_list::paragraph_list_number_format(package, table_id, row, column, paragraph)
 }
@@ -244,7 +249,7 @@ pub(crate) fn set_table_cell_paragraph_list_number_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     format: ParagraphListNumberFormat,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_number_format(
@@ -257,7 +262,7 @@ pub(crate) fn reset_table_cell_paragraph_list_number_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_number_format(
         package, table_id, row, column, paragraph,
@@ -269,7 +274,7 @@ pub(crate) fn table_cell_paragraph_list_number_tiering_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListNumberTiering> {
     cell_paragraph_list::paragraph_list_number_tiering(package, table_id, row, column, paragraph)
 }
@@ -279,7 +284,7 @@ pub(crate) fn set_table_cell_paragraph_list_number_tiering_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     tiering: ParagraphListNumberTiering,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_number_tiering(
@@ -292,7 +297,7 @@ pub(crate) fn reset_table_cell_paragraph_list_number_tiering_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_number_tiering(
         package, table_id, row, column, paragraph,
@@ -304,7 +309,7 @@ pub(crate) fn table_cell_paragraph_list_number_scale_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListNumberScale> {
     cell_paragraph_list::paragraph_list_number_scale(package, table_id, row, column, paragraph)
 }
@@ -314,7 +319,7 @@ pub(crate) fn set_table_cell_paragraph_list_number_scale_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     scale: ParagraphListNumberScale,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_number_scale(
@@ -327,7 +332,7 @@ pub(crate) fn reset_table_cell_paragraph_list_number_scale_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_number_scale(
         package, table_id, row, column, paragraph,
@@ -339,7 +344,7 @@ pub(crate) fn table_cell_paragraph_list_bullet_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListBullet> {
     cell_paragraph_list::paragraph_list_bullet(package, table_id, row, column, paragraph)
 }
@@ -349,7 +354,7 @@ pub(crate) fn set_table_cell_paragraph_list_bullet_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     bullet: &ParagraphListBullet,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_bullet(
@@ -362,7 +367,7 @@ pub(crate) fn reset_table_cell_paragraph_list_bullet_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_bullet(package, table_id, row, column, paragraph)
 }
@@ -372,7 +377,7 @@ pub(crate) fn table_cell_paragraph_list_bullet_geometry_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListBulletGeometry> {
     cell_paragraph_list::paragraph_list_bullet_geometry(package, table_id, row, column, paragraph)
 }
@@ -382,7 +387,7 @@ pub(crate) fn set_table_cell_paragraph_list_bullet_geometry_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     geometry: ParagraphListBulletGeometry,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_bullet_geometry(
@@ -395,7 +400,7 @@ pub(crate) fn reset_table_cell_paragraph_list_bullet_geometry_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_bullet_geometry(
         package, table_id, row, column, paragraph,
@@ -407,7 +412,7 @@ pub(crate) fn table_cell_paragraph_list_indentation_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListIndentation> {
     cell_paragraph_list::paragraph_list_indentation(package, table_id, row, column, paragraph)
 }
@@ -417,7 +422,7 @@ pub(crate) fn set_table_cell_paragraph_list_indentation_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     indentation: ParagraphListIndentation,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_indentation(
@@ -435,7 +440,7 @@ pub(crate) fn reset_table_cell_paragraph_list_indentation_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_indentation(package, table_id, row, column, paragraph)
 }
@@ -445,7 +450,7 @@ pub(crate) fn table_cell_paragraph_list_label_color_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListLabelColor> {
     cell_paragraph_list::paragraph_list_label_color(package, table_id, row, column, paragraph)
 }
@@ -455,7 +460,7 @@ pub(crate) fn set_table_cell_paragraph_list_label_color_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     color: ParagraphListLabelColor,
 ) -> Result<()> {
     cell_paragraph_list::set_paragraph_list_label_color(
@@ -468,7 +473,7 @@ pub(crate) fn reset_table_cell_paragraph_list_label_color_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     cell_paragraph_list::reset_paragraph_list_label_color(package, table_id, row, column, paragraph)
 }
@@ -478,7 +483,7 @@ pub(crate) fn table_cell_paragraph_indents_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<ParagraphIndents> {
+) -> Result<Indents> {
     cell_paragraph_style::indents(package, table_id, row, column)
 }
 
@@ -487,7 +492,7 @@ pub(crate) fn set_table_cell_paragraph_indents_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    indents: ParagraphIndents,
+    indents: Indents,
 ) -> Result<()> {
     cell_paragraph_style::set_indents(package, table_id, row, column, indents)
 }
@@ -534,7 +539,7 @@ pub(crate) fn table_cell_text_background_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TextBackground> {
+) -> Result<Background> {
     cell_paragraph_style::background(package, table_id, row, column)
 }
 
@@ -543,7 +548,7 @@ pub(crate) fn set_table_cell_text_background_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    background: TextBackground,
+    background: Background,
 ) -> Result<()> {
     cell_paragraph_style::set_background(package, table_id, row, column, background)
 }
@@ -758,7 +763,7 @@ pub(crate) fn table_cell_text_outline_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TextOutline> {
+) -> Result<Outline> {
     cell_paragraph_style::outline(package, table_id, row, column)
 }
 
@@ -767,7 +772,7 @@ pub(crate) fn set_table_cell_text_outline_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    outline: TextOutline,
+    outline: Outline,
 ) -> Result<()> {
     cell_paragraph_style::set_outline(package, table_id, row, column, outline)
 }
@@ -814,7 +819,7 @@ pub(crate) fn table_cell_text_shadow_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TextShadow> {
+) -> Result<Shadow> {
     cell_paragraph_style::shadow(package, table_id, row, column)
 }
 
@@ -823,7 +828,7 @@ pub(crate) fn set_table_cell_text_shadow_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    shadow: TextShadow,
+    shadow: Shadow,
 ) -> Result<()> {
     cell_paragraph_style::set_shadow(package, table_id, row, column, shadow)
 }
@@ -870,7 +875,7 @@ pub(crate) fn table_cell_number_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_number_format::TableCellNumberFormat>> {
+) -> Result<Option<Number>> {
     cell_data_format::cell_number_format(package, table_id, row, column)
 }
 
@@ -879,9 +884,28 @@ pub(crate) fn set_table_cell_number_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    format: crate::table_cell_number_format::TableCellNumberFormat,
+    format: Number,
 ) -> Result<()> {
     cell_data_format::set_cell_number_format(package, table_id, row, column, format)
+}
+
+pub(crate) fn common_table_cell_number_format_in_package(
+    package: &IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Number>> {
+    table_cell_number_format_in_package(package, table_id, row, column)
+}
+
+pub(crate) fn set_common_table_cell_number_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: Number,
+) -> Result<()> {
+    set_table_cell_number_format_in_package(package, table_id, row, column, format)
 }
 
 pub(crate) fn reset_table_cell_number_format_in_package(
@@ -898,7 +922,7 @@ pub(crate) fn table_cell_text_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_data_format::TableCellTextFormat>> {
+) -> Result<Option<Text>> {
     cell_data_format::cell_text_format(package, table_id, row, column)
 }
 
@@ -916,7 +940,7 @@ pub(crate) fn table_cell_custom_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_data_format::TableCellCustomFormat>> {
+) -> Result<Option<Custom>> {
     cell_data_format::cell_custom_format(package, table_id, row, column)
 }
 
@@ -934,7 +958,7 @@ pub(crate) fn table_cell_currency_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_data_format::TableCellCurrencyFormat>> {
+) -> Result<Option<Currency>> {
     cell_data_format::cell_currency_format(package, table_id, row, column)
 }
 
@@ -952,7 +976,7 @@ pub(crate) fn table_cell_data_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<crate::table_cell_data_format::TableCellDataFormat> {
+) -> Result<DataFormat> {
     cell_data_format::cell_data_format(package, table_id, row, column)
 }
 
@@ -961,7 +985,7 @@ pub(crate) fn set_table_cell_data_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    format: &crate::table_cell_data_format::TableCellDataFormat,
+    format: &DataFormat,
 ) -> Result<()> {
     cell_data_format::set_cell_data_format(package, table_id, row, column, format)
 }
@@ -971,7 +995,7 @@ pub(crate) fn table_cell_percentage_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_data_format::TableCellPercentageFormat>> {
+) -> Result<Option<Percentage>> {
     cell_data_format::cell_percentage_format(package, table_id, row, column)
 }
 
@@ -989,7 +1013,7 @@ pub(crate) fn table_cell_scientific_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_data_format::TableCellScientificFormat>> {
+) -> Result<Option<Scientific>> {
     cell_data_format::cell_scientific_format(package, table_id, row, column)
 }
 
@@ -1007,7 +1031,7 @@ pub(crate) fn table_cell_fraction_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_data_format::TableCellFractionFormat>> {
+) -> Result<Option<Fraction>> {
     cell_data_format::cell_fraction_format(package, table_id, row, column)
 }
 
@@ -1025,7 +1049,7 @@ pub(crate) fn table_cell_numeral_system_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_data_format::TableCellNumeralSystemFormat>> {
+) -> Result<Option<NumeralSystem>> {
     cell_data_format::cell_numeral_system_format(package, table_id, row, column)
 }
 
@@ -1043,7 +1067,7 @@ pub(crate) fn table_cell_date_time_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_data_format::TableCellDateTimeFormat>> {
+) -> Result<Option<DateTime>> {
     cell_data_format::cell_date_time_format(package, table_id, row, column)
 }
 
@@ -1061,7 +1085,7 @@ pub(crate) fn table_cell_duration_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_data_format::TableCellDurationFormat>> {
+) -> Result<Option<Duration>> {
     cell_data_format::cell_duration_format(package, table_id, row, column)
 }
 
@@ -1079,7 +1103,7 @@ pub(crate) fn table_cell_checkbox_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_data_format::TableCellCheckboxFormat>> {
+) -> Result<Option<Checkbox>> {
     cell_data_format::cell_checkbox_format(package, table_id, row, column)
 }
 
@@ -1097,7 +1121,7 @@ pub(crate) fn table_cell_star_rating_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_data_format::TableCellStarRatingFormat>> {
+) -> Result<Option<StarRating>> {
     cell_data_format::cell_star_rating_format(package, table_id, row, column)
 }
 
@@ -1115,7 +1139,7 @@ pub(crate) fn table_cell_slider_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_data_format::TableCellSliderFormat>> {
+) -> Result<Option<Slider>> {
     cell_data_format::cell_slider_format(package, table_id, row, column)
 }
 
@@ -1133,7 +1157,7 @@ pub(crate) fn table_cell_stepper_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_data_format::TableCellStepperFormat>> {
+) -> Result<Option<Stepper>> {
     cell_data_format::cell_stepper_format(package, table_id, row, column)
 }
 
@@ -1151,7 +1175,7 @@ pub(crate) fn table_cell_pop_up_menu_format_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<crate::table_cell_data_format::TableCellPopUpMenuFormat>> {
+) -> Result<Option<PopUpMenu>> {
     cell_data_format::cell_pop_up_menu_format(package, table_id, row, column)
 }
 
@@ -1169,7 +1193,7 @@ pub(crate) fn set_table_cell_layout_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    layout: crate::table_cell_layout::TableCellLayout,
+    layout: Layout,
 ) -> Result<()> {
     cell_layout::set_cell_layout(package, table_id, row, column, layout)
 }
@@ -1207,8 +1231,8 @@ pub(crate) fn set_table_cell_border_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    side: crate::table_cell_border::TableCellBorderSide,
-    stroke: Option<crate::shapes::ShapeStroke>,
+    side: BorderSide,
+    stroke: Option<Stroke>,
 ) -> Result<()> {
     stroke_layers::set_cell_border(package, table_id, row, column, side, stroke)
 }
@@ -1216,14 +1240,14 @@ pub(crate) fn set_table_cell_border_in_package(
 pub(crate) fn table_cell_merges_in_package(
     package: &IWorkPackage,
     table_id: u64,
-) -> Result<Vec<IWorkTableCellRegion>> {
+) -> Result<Vec<Region>> {
     cell_merge::regions_in_package(package, table_id)
 }
 
 pub(crate) fn merge_table_cells_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    region: IWorkTableCellRegion,
+    region: Region,
 ) -> Result<()> {
     cell_merge::merge_in_package(package, table_id, region)
 }
@@ -1231,7 +1255,7 @@ pub(crate) fn merge_table_cells_in_package(
 pub(crate) fn unmerge_table_cells_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    region: IWorkTableCellRegion,
+    region: Region,
 ) -> Result<bool> {
     cell_merge::unmerge_in_package(package, table_id, region)
 }
@@ -1241,7 +1265,7 @@ pub(crate) fn table_cell_comment_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<NumbersCellCommentInfo>> {
+) -> Result<Option<TableCellComment>> {
     model::attached_cell_comment_in_package(package, table_id, row, column)
 }
 
@@ -1259,7 +1283,7 @@ pub(crate) fn table_cell_conditional_highlight_rules_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<Vec<TableCellConditionalHighlightRule>>> {
+) -> Result<Option<Vec<Rule>>> {
     conditional_highlight::attached_rules_in_package(package, table_id, row, column)
 }
 
@@ -1277,7 +1301,7 @@ pub(crate) fn set_table_cell_conditional_highlighting_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    rules: &[TableCellConditionalHighlightRule],
+    rules: &[Rule],
 ) -> Result<()> {
     conditional_highlight::set_attached_in_package(package, table_id, row, column, rules)
 }
@@ -1306,7 +1330,7 @@ pub(crate) fn table_cell_comment_replies_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Vec<NumbersCellCommentReplyInfo>> {
+) -> Result<Vec<TableCellReply>> {
     model::attached_cell_comment_replies_in_package(package, table_id, row, column)
 }
 
@@ -1402,10 +1426,10 @@ pub(crate) fn table_dimensions_in_package(
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum TableTopologyMutation {
-    InsertRow(TableRowInsertion),
-    InsertColumn(TableColumnInsertion),
-    RemoveRow(TableRowDeletion),
-    RemoveColumn(TableColumnDeletion),
+    InsertRow(RowInsertion),
+    InsertColumn(ColumnInsertion),
+    RemoveRow(RowDeletion),
+    RemoveColumn(ColumnDeletion),
 }
 
 impl TableTopologyMutation {
@@ -1429,7 +1453,7 @@ impl TableTopologyMutation {
 pub(crate) fn insert_table_row_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    insertion: TableRowInsertion,
+    insertion: RowInsertion,
 ) -> Result<usize> {
     row_insert::insert_attached_table_row(package, table_id, insertion)
 }
@@ -1437,7 +1461,7 @@ pub(crate) fn insert_table_row_in_package(
 pub(crate) fn insert_table_column_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    insertion: TableColumnInsertion,
+    insertion: ColumnInsertion,
 ) -> Result<usize> {
     column_insert::insert_attached_table_column(package, table_id, insertion)
 }
@@ -1445,7 +1469,7 @@ pub(crate) fn insert_table_column_in_package(
 pub(crate) fn remove_table_row_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    deletion: TableRowDeletion,
+    deletion: RowDeletion,
 ) -> Result<(usize, usize)> {
     table_delete::remove_attached_table_row(package, table_id, deletion)
 }
@@ -1453,7 +1477,7 @@ pub(crate) fn remove_table_row_in_package(
 pub(crate) fn remove_table_column_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    deletion: TableColumnDeletion,
+    deletion: ColumnDeletion,
 ) -> Result<(usize, usize)> {
     table_delete::remove_attached_table_column(package, table_id, deletion)
 }
@@ -1461,8 +1485,8 @@ pub(crate) fn remove_table_column_in_package(
 pub(crate) fn set_table_dimension_size_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    dimension: NumbersTableDimension,
-    size: NumbersTableDimensionSize,
+    dimension: Dimension,
+    size: Size,
 ) -> Result<()> {
     table_dimension::set_attached_table_dimension_size(package, table_id, dimension, size)
 }
@@ -1470,8 +1494,8 @@ pub(crate) fn set_table_dimension_size_in_package(
 pub(crate) fn table_dimension_size_in_package(
     package: &IWorkPackage,
     table_id: u64,
-    dimension: NumbersTableDimension,
-) -> Result<NumbersTableDimensionSize> {
+    dimension: Dimension,
+) -> Result<Size> {
     table_dimension::read_attached_table_dimension_size(package, table_id, dimension)
 }
 
@@ -1485,14 +1509,14 @@ pub(crate) fn table_size_points_in_package(
 pub(crate) fn table_header_settings_in_package(
     package: &IWorkPackage,
     table_id: u64,
-) -> Result<NumbersTableHeaderSettings> {
+) -> Result<HeaderSettings> {
     table_headers::read_attached_table_header_settings(package, table_id)
 }
 
 pub(crate) fn set_table_header_settings_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    settings: NumbersTableHeaderSettings,
+    settings: HeaderSettings,
 ) -> Result<()> {
     table_headers::set_attached_table_header_settings(package, table_id, settings)
 }

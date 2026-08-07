@@ -19,13 +19,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!(
             "shape[{index}] drawable={} storage={} anchor={} kind={:?} preset={:?} line={:?} endpoints={:?} fill={fill:?} stroke={stroke:?} effects={effects:?} shadow={shadow:?} text_layout={text_layout:?} title_caption={title_caption:?} text={:?} geometry={:?} properties={:?}",
             shape.drawable_object_id,
-            shape.storage.object_id,
+            shape.storage.id,
             shape.anchor_character_index,
             shape.kind,
             shape.preset,
             shape.line_segment,
             shape.line_endpoints,
-            shape.storage.text,
+            shape.storage.storage.text(),
             shape.geometry,
             shape.properties
         );

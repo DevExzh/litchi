@@ -54,6 +54,9 @@ pub(crate) fn local_chart_style_ids(
             .iter()
             .filter(|message| CHART_STYLE_MESSAGE_TYPES.contains(&message.type_))
             .collect::<Vec<_>>();
+        for message in &style_payloads {
+            validate_chart_style_payload(message.type_, message.data.as_slice())?;
+        }
         match style_payloads.as_slice() {
             [message] if message.type_ == SERIES_NON_STYLE_MESSAGE_TYPE => {
                 let non_style = tsch::ChartSeriesNonStyleArchive::decode(message.data.as_slice())?;
@@ -86,6 +89,19 @@ pub(crate) fn register_chart_styles(
     owner_archive_name: &str,
     style_ids: &[u64],
 ) -> Result<()> {
+    let mut staged = package.clone();
+    register_chart_styles_staged(&mut staged, stylesheet_id, owner_archive_name, style_ids)?;
+    staged.validate()?;
+    *package = staged;
+    Ok(())
+}
+
+fn register_chart_styles_staged(
+    package: &mut IWorkPackage,
+    stylesheet_id: u64,
+    owner_archive_name: &str,
+    style_ids: &[u64],
+) -> Result<()> {
     validate_style_ids(package, owner_archive_name, style_ids)?;
     let stylesheet_archive_name =
         unique_chart_object_archive_name(package, stylesheet_id, "chart stylesheet")?;
@@ -96,9 +112,8 @@ pub(crate) fn register_chart_styles(
         let stylesheet = archive.object_mut(stylesheet_id).ok_or_else(|| {
             Error::InvalidFormat(format!("chart stylesheet {stylesheet_id} is missing"))
         })?;
-        let message_index = unique_stylesheet_message_index(stylesheet_id, stylesheet)?;
-        let original = &stylesheet.messages[message_index];
-        let decoded = tss::StylesheetArchive::decode(original.data.as_slice())?;
+        let (message_index, original_data) = stylesheet_message_data(stylesheet_id, stylesheet)?;
+        let decoded = tss::StylesheetArchive::decode(original_data.as_slice())?;
         for &style_id in style_ids {
             if decoded
                 .styles
@@ -111,7 +126,7 @@ pub(crate) fn register_chart_styles(
             }
         }
 
-        let mut data = original.data.clone();
+        let mut data = original_data;
         for &style_id in style_ids {
             data = append_repeated_length_delimited_field(
                 &data,
@@ -140,7 +155,15 @@ pub(crate) fn register_chart_styles(
                 data,
             },
         )?;
-        let info = &mut stylesheet.archive_info.message_infos[message_index];
+        let info = stylesheet
+            .archive_info
+            .message_infos
+            .get_mut(message_index)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "chart stylesheet {stylesheet_id} has no metadata for payload {message_index}"
+                ))
+            })?;
         for &style_id in style_ids {
             if info.object_references.contains(&style_id) {
                 return Err(Error::InvalidFormat(format!(
@@ -189,10 +212,8 @@ pub(crate) fn validate_chart_styles_registered(
     let stylesheet = archive.object(stylesheet_id).ok_or_else(|| {
         Error::InvalidFormat(format!("chart stylesheet {stylesheet_id} is missing"))
     })?;
-    let message_index = unique_stylesheet_message_index(stylesheet_id, stylesheet)?;
-    let registered =
-        tss::StylesheetArchive::decode(stylesheet.messages[message_index].data.as_slice())?;
-    let info = &stylesheet.archive_info.message_infos[message_index];
+    let (_message_index, message_data, info) = stylesheet_message(stylesheet_id, stylesheet)?;
+    let registered = tss::StylesheetArchive::decode(message_data)?;
     for &style_id in style_ids {
         if registered
             .styles
@@ -226,6 +247,19 @@ pub(crate) fn unregister_chart_styles(
     owner_archive_name: &str,
     style_ids: &[u64],
 ) -> Result<()> {
+    let mut staged = package.clone();
+    unregister_chart_styles_staged(&mut staged, stylesheet_id, owner_archive_name, style_ids)?;
+    staged.validate()?;
+    *package = staged;
+    Ok(())
+}
+
+fn unregister_chart_styles_staged(
+    package: &mut IWorkPackage,
+    stylesheet_id: u64,
+    owner_archive_name: &str,
+    style_ids: &[u64],
+) -> Result<()> {
     validate_unique_nonzero_ids(style_ids)?;
     let stylesheet_archive_name =
         unique_chart_object_archive_name(package, stylesheet_id, "chart stylesheet")?;
@@ -237,10 +271,9 @@ pub(crate) fn unregister_chart_styles(
         let stylesheet = archive.object_mut(stylesheet_id).ok_or_else(|| {
             Error::InvalidFormat(format!("chart stylesheet {stylesheet_id} is missing"))
         })?;
-        let message_index = unique_stylesheet_message_index(stylesheet_id, stylesheet)?;
-        let original = &stylesheet.messages[message_index];
+        let (message_index, original_data) = stylesheet_message_data(stylesheet_id, stylesheet)?;
         let mut registered =
-            repeated_length_delimited_payloads(original.data.as_slice(), STYLESHEET_STYLES_FIELD)?
+            repeated_length_delimited_payloads(original_data.as_slice(), STYLESHEET_STYLES_FIELD)?
                 .into_iter()
                 .map(|payload| {
                     Ok((
@@ -268,7 +301,7 @@ pub(crate) fn unregister_chart_styles(
             .map(|(_, payload)| payload)
             .collect::<Vec<_>>();
         let data = rewrite_repeated_length_delimited_fields(
-            original.data.as_slice(),
+            original_data.as_slice(),
             STYLESHEET_STYLES_FIELD,
             &payloads,
         )?;
@@ -279,7 +312,15 @@ pub(crate) fn unregister_chart_styles(
                 data,
             },
         )?;
-        let info = &mut stylesheet.archive_info.message_infos[message_index];
+        let info = stylesheet
+            .archive_info
+            .message_infos
+            .get_mut(message_index)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "chart stylesheet {stylesheet_id} has no metadata for payload {message_index}"
+                ))
+            })?;
         for &style_id in style_ids {
             let metadata_count = info
                 .object_references
@@ -340,6 +381,35 @@ fn validate_style_ids(
                 "chart style {style_id} must contain exactly one chart-style payload"
             )));
         }
+        let message = object
+            .messages
+            .iter()
+            .find(|message| CHART_STYLE_MESSAGE_TYPES.contains(&message.type_))
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("chart style {style_id} has no chart-style payload"))
+            })?;
+        validate_chart_style_payload(message.type_, message.data.as_slice())?;
+    }
+    Ok(())
+}
+
+fn validate_chart_style_payload(message_type: u32, data: &[u8]) -> Result<()> {
+    match message_type {
+        CHART_STYLE_MESSAGE_TYPE => tsch::ChartStyleArchive::decode(data).map(|_| ())?,
+        CHART_NON_STYLE_MESSAGE_TYPE => tsch::ChartNonStyleArchive::decode(data).map(|_| ())?,
+        LEGEND_STYLE_MESSAGE_TYPE => tsch::LegendStyleArchive::decode(data).map(|_| ())?,
+        LEGEND_NON_STYLE_MESSAGE_TYPE => tsch::LegendNonStyleArchive::decode(data).map(|_| ())?,
+        AXIS_STYLE_MESSAGE_TYPE => tsch::ChartAxisStyleArchive::decode(data).map(|_| ())?,
+        AXIS_NON_STYLE_MESSAGE_TYPE => tsch::ChartAxisNonStyleArchive::decode(data).map(|_| ())?,
+        SERIES_STYLE_MESSAGE_TYPE => tsch::ChartSeriesStyleArchive::decode(data).map(|_| ())?,
+        SERIES_NON_STYLE_MESSAGE_TYPE => {
+            tsch::ChartSeriesNonStyleArchive::decode(data).map(|_| ())?
+        },
+        _ => {
+            return Err(Error::InvalidFormat(format!(
+                "unknown chart style payload type {message_type}"
+            )));
+        },
     }
     Ok(())
 }
@@ -358,24 +428,102 @@ fn unique_stylesheet_message_index(
     stylesheet_id: u64,
     stylesheet: &crate::archive::ArchiveObject,
 ) -> Result<usize> {
-    let indexes = stylesheet
-        .messages
-        .iter()
-        .enumerate()
-        .filter(|(_, message)| message.type_ == STYLESHEET_MESSAGE_TYPE)
-        .map(|(index, _)| index)
-        .collect::<Vec<_>>();
-    let [message_index] = indexes.as_slice() else {
-        return Err(Error::InvalidFormat(format!(
+    let mut message_index = None;
+    for (index, message) in stylesheet.messages.iter().enumerate() {
+        if message.type_ != STYLESHEET_MESSAGE_TYPE {
+            continue;
+        }
+        if message_index.replace(index).is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "chart stylesheet {stylesheet_id} must contain exactly one stylesheet payload"
+            )));
+        }
+    }
+    message_index.ok_or_else(|| {
+        Error::InvalidFormat(format!(
             "chart stylesheet {stylesheet_id} must contain exactly one stylesheet payload"
-        )));
-    };
-    Ok(*message_index)
+        ))
+    })
+}
+
+fn stylesheet_message(
+    stylesheet_id: u64,
+    stylesheet: &crate::archive::ArchiveObject,
+) -> Result<(usize, &[u8], &crate::archive::MessageInfo)> {
+    let message_index = unique_stylesheet_message_index(stylesheet_id, stylesheet)?;
+    let message = stylesheet.messages.get(message_index).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "chart stylesheet {stylesheet_id} has no payload at index {message_index}"
+        ))
+    })?;
+    let info = stylesheet
+        .archive_info
+        .message_infos
+        .get(message_index)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "chart stylesheet {stylesheet_id} has no metadata for payload {message_index}"
+            ))
+        })?;
+    Ok((message_index, message.data.as_slice(), info))
+}
+
+fn stylesheet_message_data(
+    stylesheet_id: u64,
+    stylesheet: &crate::archive::ArchiveObject,
+) -> Result<(usize, Vec<u8>)> {
+    let (message_index, data, _) = stylesheet_message(stylesheet_id, stylesheet)?;
+    Ok((message_index, data.to_vec()))
 }
 
 fn reference(identifier: u64) -> tsp::Reference {
     tsp::Reference {
         identifier,
         ..Default::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn stylesheet_object(messages: Vec<RawMessage>) -> crate::archive::ArchiveObject {
+        crate::archive::ArchiveObject::new(1, messages).expect("test object should be valid")
+    }
+
+    #[test]
+    fn stylesheet_message_rejects_missing_payload() {
+        let object = stylesheet_object(Vec::new());
+        assert!(stylesheet_message(1, &object).is_err());
+    }
+
+    #[test]
+    fn stylesheet_message_rejects_duplicate_payloads() {
+        let object = stylesheet_object(vec![
+            RawMessage {
+                type_: STYLESHEET_MESSAGE_TYPE,
+                data: Vec::new(),
+            },
+            RawMessage {
+                type_: STYLESHEET_MESSAGE_TYPE,
+                data: Vec::new(),
+            },
+        ]);
+        assert!(stylesheet_message(1, &object).is_err());
+    }
+
+    #[test]
+    fn stylesheet_message_rejects_missing_metadata() {
+        let mut object = stylesheet_object(vec![RawMessage {
+            type_: STYLESHEET_MESSAGE_TYPE,
+            data: Vec::new(),
+        }]);
+        object.archive_info.message_infos.clear();
+        assert!(stylesheet_message(1, &object).is_err());
+    }
+
+    #[test]
+    fn malformed_chart_style_payload_is_rejected_before_registration() {
+        assert!(validate_chart_style_payload(CHART_STYLE_MESSAGE_TYPE, &[0x0a]).is_err());
     }
 }

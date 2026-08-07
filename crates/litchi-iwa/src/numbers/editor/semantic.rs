@@ -8,10 +8,10 @@ use super::table_duplicate::{
     duplicate_attached_table_graph_in_package, duplicate_table_name, table_owned_graph,
 };
 use super::{
-    DOCUMENT_COMPONENT_IDENTIFIER, EMPTY_TABLE_POSITION_OFFSET, IWorkTableCellRegion,
-    SHAPE_INFO_MESSAGE_TYPE, TABLE_DUPLICATE_OFFSET, cell_data_format, cell_fill, cell_layout,
-    cell_merge, cell_paragraph_list, cell_paragraph_style, conditional_highlight, formula_cache,
-    stroke_layers, table_bootstrap, table_cells, table_create, table_formula,
+    DOCUMENT_COMPONENT_IDENTIFIER, EMPTY_TABLE_POSITION_OFFSET, SHAPE_INFO_MESSAGE_TYPE,
+    TABLE_DUPLICATE_OFFSET, cell_data_format, cell_fill, cell_layout, cell_merge,
+    cell_paragraph_list, cell_paragraph_style, conditional_highlight, formula_cache, stroke_layers,
+    table_bootstrap, table_cells, table_create, table_formula,
 };
 
 use std::collections::{HashMap, HashSet};
@@ -23,10 +23,7 @@ use prost::Message;
 use super::super::cell::{CellValue, TableCellUpdate};
 use super::super::formula::{FormulaCachedValue, FormulaExpression, FormulaPivotCategoryReference};
 use crate::archive::RawMessage;
-use crate::comments::{
-    DrawableCommentInfo, DrawableCommentReplyInfo, IWorkDrawableCommentEditor, IWorkDrawableInfo,
-    IWorkTableCellCommentInfo, IWorkTableCellCommentReplyInfo,
-};
+use crate::comments::IWorkDrawableCommentEditor;
 use crate::media::reachable_embedded_assets;
 use crate::package_metadata::{
     component_identifier_for_entry, component_uuid_identifiers, release_package_identifier_suffix,
@@ -35,30 +32,36 @@ use crate::package_metadata::{
 };
 use crate::protobuf::{tn, tswp};
 use crate::shapes::{
-    DrawableGeometry, DrawableProperties, RgbaColor, ShapeTextLayout, reset_shape_text_columns,
+    DrawableGeometry, DrawableProperties, RgbaColor, reset_shape_text_columns,
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::table_appearance::TableAppearance;
-use crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule;
-use crate::table_lock::TableLockState;
 use crate::text::{
-    IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,
-    ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphFlow,
-    ParagraphIndents, ParagraphLineSpacing, ParagraphList, ParagraphListBullet,
-    ParagraphListBulletGeometry, ParagraphListIndentation, ParagraphListLabelColor,
-    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
-    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering,
-    ParagraphListPlacement, ParagraphSpacing, ParagraphStart, ParagraphTabStops,
-    ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
-    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
-    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    Alignment, Background, Borders, IWorkTextEditor, Indents, LineSpacing, Outline,
+    ParagraphBackground, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
+    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
+    ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
+    ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
+    ParagraphListNumbering, ParagraphListPlacement, ParagraphTabStops, ParagraphWritingDirection,
+    Shadow, Spacing, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextComment,
+    TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId,
+    TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId,
+    TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextPosition, TextRange,
+    TextScript, TextStorageInfo, TextStyle,
 };
 use crate::wire::{patch_length_delimited_field, patch_nested_length_delimited_field};
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
+use litchi_iwa_common::comment::{
+    Comment, DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId, TableCellComment,
+    TableCellReply,
+};
+use litchi_iwa_common::table::cell::conditional_highlight::Rule;
+use litchi_iwa_common::table::lock::State as TableLockState;
+use litchi_numbers::cell::data_format::{
+    Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,
+    Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,
+};
 
 #[path = "semantic/drawables.rs"]
 mod drawables;

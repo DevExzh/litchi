@@ -1,9 +1,13 @@
 //! Table-cell text layout backed by the shared cell-style graph.
 
 use super::*;
-use crate::table_cell_layout::{
-    TableCellInset, TableCellInsets, TableCellLayout, TableCellTextWrap, TableCellVerticalAlignment,
-};
+use litchi_iwa_common::table::cell::layout::{Inset, Insets, Layout, TextWrap, VerticalAlignment};
+
+impl From<litchi_iwa_common::table::cell::layout::Error> for Error {
+    fn from(error: litchi_iwa_common::table::cell::layout::Error) -> Self {
+        Self::ParseError(error.to_string())
+    }
+}
 
 const NATIVE_ALIGN_TOP: i32 =
     tswp::shape_style_properties_archive::VerticalAlignmentType::KFrameAlignTop as i32;
@@ -17,7 +21,7 @@ pub(super) fn cell_layout(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<TableCellLayout> {
+) -> Result<Layout> {
     let text_wrap = cell_style::effective_property(
         package,
         table_id,
@@ -25,14 +29,14 @@ pub(super) fn cell_layout(
         column,
         cell_style::CellStylePropertyKind::TextWrap,
     )?
-    .map_or(Ok(TableCellTextWrap::Unwrapped), |property| {
+    .map_or(Ok(TextWrap::Unwrapped), |property| {
         let cell_style::CellStyleProperty::TextWrap(value) = property else {
             return property_mismatch("text wrapping");
         };
         Ok(if value {
-            TableCellTextWrap::Wrapped
+            TextWrap::Wrapped
         } else {
-            TableCellTextWrap::Unwrapped
+            TextWrap::Unwrapped
         })
     })?;
     let vertical_alignment = cell_style::effective_property(
@@ -42,7 +46,7 @@ pub(super) fn cell_layout(
         column,
         cell_style::CellStylePropertyKind::VerticalAlignment,
     )?
-    .map_or(Ok(TableCellVerticalAlignment::Top), |property| {
+    .map_or(Ok(VerticalAlignment::Top), |property| {
         let cell_style::CellStyleProperty::VerticalAlignment(value) = property else {
             return property_mismatch("vertical alignment");
         };
@@ -55,13 +59,13 @@ pub(super) fn cell_layout(
         column,
         cell_style::CellStylePropertyKind::Padding,
     )?
-    .map_or(Ok(TableCellInsets::ZERO), |property| {
+    .map_or(Ok(Insets::ZERO), |property| {
         let cell_style::CellStyleProperty::Padding(value) = property else {
             return property_mismatch("text insets");
         };
         insets_from_native(&value)
     })?;
-    Ok(TableCellLayout::new(text_wrap, vertical_alignment, insets))
+    Ok(Layout::new(text_wrap, vertical_alignment, insets))
 }
 
 pub(super) fn set_cell_layout(
@@ -69,13 +73,10 @@ pub(super) fn set_cell_layout(
     table_id: u64,
     row: usize,
     column: usize,
-    layout: TableCellLayout,
+    layout: Layout,
 ) -> Result<()> {
     let properties = [
-        cell_style::CellStyleProperty::TextWrap(matches!(
-            layout.text_wrap(),
-            TableCellTextWrap::Wrapped
-        )),
+        cell_style::CellStyleProperty::TextWrap(matches!(layout.text_wrap(), TextWrap::Wrapped)),
         cell_style::CellStyleProperty::VerticalAlignment(alignment_to_native(
             layout.vertical_alignment(),
         )),
@@ -105,35 +106,35 @@ pub(super) fn reset_cell_layout(
     Ok(changed)
 }
 
-fn alignment_from_native(value: i32) -> Result<TableCellVerticalAlignment> {
+fn alignment_from_native(value: i32) -> Result<VerticalAlignment> {
     match value {
-        NATIVE_ALIGN_TOP => Ok(TableCellVerticalAlignment::Top),
-        NATIVE_ALIGN_MIDDLE => Ok(TableCellVerticalAlignment::Middle),
-        NATIVE_ALIGN_BOTTOM => Ok(TableCellVerticalAlignment::Bottom),
+        NATIVE_ALIGN_TOP => Ok(VerticalAlignment::Top),
+        NATIVE_ALIGN_MIDDLE => Ok(VerticalAlignment::Middle),
+        NATIVE_ALIGN_BOTTOM => Ok(VerticalAlignment::Bottom),
         _ => Err(Error::InvalidFormat(format!(
             "iWork table cell uses unknown vertical alignment {value}"
         ))),
     }
 }
 
-const fn alignment_to_native(value: TableCellVerticalAlignment) -> i32 {
+const fn alignment_to_native(value: VerticalAlignment) -> i32 {
     match value {
-        TableCellVerticalAlignment::Top => NATIVE_ALIGN_TOP,
-        TableCellVerticalAlignment::Middle => NATIVE_ALIGN_MIDDLE,
-        TableCellVerticalAlignment::Bottom => NATIVE_ALIGN_BOTTOM,
+        VerticalAlignment::Top => NATIVE_ALIGN_TOP,
+        VerticalAlignment::Middle => NATIVE_ALIGN_MIDDLE,
+        VerticalAlignment::Bottom => NATIVE_ALIGN_BOTTOM,
     }
 }
 
-fn insets_from_native(native: &tswp::PaddingArchive) -> Result<TableCellInsets> {
-    Ok(TableCellInsets::new(
-        TableCellInset::from_points(native.left.unwrap_or(0.0))?,
-        TableCellInset::from_points(native.top.unwrap_or(0.0))?,
-        TableCellInset::from_points(native.right.unwrap_or(0.0))?,
-        TableCellInset::from_points(native.bottom.unwrap_or(0.0))?,
+fn insets_from_native(native: &tswp::PaddingArchive) -> Result<Insets> {
+    Ok(Insets::new(
+        Inset::from_points(native.left.unwrap_or(0.0))?,
+        Inset::from_points(native.top.unwrap_or(0.0))?,
+        Inset::from_points(native.right.unwrap_or(0.0))?,
+        Inset::from_points(native.bottom.unwrap_or(0.0))?,
     ))
 }
 
-fn insets_to_native(insets: TableCellInsets) -> tswp::PaddingArchive {
+fn insets_to_native(insets: Insets) -> tswp::PaddingArchive {
     tswp::PaddingArchive {
         left: Some(insets.left().points()),
         top: Some(insets.top().points()),
@@ -146,4 +147,23 @@ fn property_mismatch<T>(name: &str) -> Result<T> {
     Err(Error::InvalidFormat(format!(
         "iWork cell-style {name} resolved to another property"
     )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unknown_native_alignment_is_rejected() {
+        assert!(alignment_from_native(i32::MAX).is_err());
+    }
+
+    #[test]
+    fn malformed_native_padding_is_rejected_before_layout_construction() {
+        let padding = tswp::PaddingArchive {
+            left: Some(f32::NAN),
+            ..Default::default()
+        };
+        assert!(insets_from_native(&padding).is_err());
+    }
 }

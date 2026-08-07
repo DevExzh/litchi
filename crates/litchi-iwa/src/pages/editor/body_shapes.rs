@@ -8,16 +8,19 @@ use crate::package_metadata::{
     remove_component_external_references_to_object,
 };
 use crate::shapes::{
-    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
-    LineEndpoints, LineSegment, LineStyle, RgbaColor, ShapeEffects, ShapeFill, ShapeImageFill,
-    ShapeImageFillTechnique, ShapePathKind, ShapePreset, ShapeShadow, ShapeStroke, ShapeTextLayout,
-    flip_drawable_geometry, line_geometry, line_path_source, line_segments_match,
-    reset_shape_effects, reset_shape_fill, reset_shape_shadow, reset_shape_stroke,
-    reset_shape_text_layout, set_shape_effects, set_shape_fill, set_shape_geometry,
-    set_shape_image_fill_data, set_shape_line_endpoints, set_shape_line_segment, set_shape_preset,
-    set_shape_shadow, set_shape_stroke, set_shape_text_layout, shape_effects, shape_fill,
-    shape_line_endpoints, shape_path_source, shape_shadow, shape_stroke, shape_text_layout,
+    DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize, Endpoints,
+    LineSegment, LineStyle, RgbaColor, Shadow, ShapeFill, ShapeImageFill, ShapeImageFillTechnique,
+    ShapePathKind, Stroke, flip_drawable_geometry, line_geometry, line_path_source,
+    line_segments_match, reset_shape_effects, reset_shape_fill, reset_shape_shadow,
+    reset_shape_stroke, reset_shape_text_layout, set_shape_effects, set_shape_fill,
+    set_shape_geometry, set_shape_image_fill_data, set_shape_line_endpoints,
+    set_shape_line_segment, set_shape_preset, set_shape_shadow, set_shape_stroke,
+    set_shape_text_layout, shape_effects, shape_fill, shape_line_endpoints, shape_path_source,
+    shape_shadow, shape_stroke, shape_text_layout,
 };
+use crate::text::layout::Layout;
+use litchi_iwa_common::shape::effects::Effects;
+use litchi_iwa_common::shape::path::Preset;
 
 use super::text_box_create::{
     BodyTextShapeObjectIds, BodyTextShapeRole, body_text_shape_objects, body_text_storage,
@@ -29,22 +32,19 @@ mod graph;
 use caption::*;
 use graph::*;
 
-/// Structural path family used by an ordinary Pages body shape.
-pub type PagesBodyShapeKind = ShapePathKind;
-
 /// One ordinary, non-text-box shape anchored to the Pages body text flow.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PagesBodyShapeInfo {
     pub drawable_object_id: u64,
     /// UTF-16 index of the object-replacement character in the body text.
     pub anchor_character_index: u32,
-    pub kind: PagesBodyShapeKind,
+    pub kind: ShapePathKind,
     /// Source-buildable preset and its native controls, when recognized.
-    pub preset: Option<ShapePreset>,
+    pub preset: Option<Preset>,
     /// Document-space endpoints when this shape is a native straight line.
     pub line_segment: Option<LineSegment>,
     /// Directed start/end decorations when this shape is a native straight line.
-    pub line_endpoints: Option<LineEndpoints>,
+    pub line_endpoints: Option<Endpoints>,
     pub storage: TextStorageInfo,
     pub geometry: DrawableGeometry,
     pub properties: DrawableProperties,
@@ -79,7 +79,7 @@ impl PagesEditor {
             text,
             position,
             size,
-            ShapePreset::Rectangle,
+            Preset::Rectangle,
         )
     }
 
@@ -94,7 +94,7 @@ impl PagesEditor {
         text: &str,
         position: DrawablePoint,
         size: DrawableSize,
-        preset: ShapePreset,
+        preset: Preset,
     ) -> Result<PagesBodyShapeInfo> {
         let geometry = new_shape_geometry(position, size)?;
         self.add_body_shape_path(
@@ -114,7 +114,7 @@ impl PagesEditor {
         text: &str,
         position: DrawablePoint,
         size: DrawableSize,
-        preset: ShapePreset,
+        preset: Preset,
         fill: ShapeFill,
     ) -> Result<PagesBodyShapeInfo> {
         let created = self.add_body_shape(anchor_character_index, text, position, size, preset)?;
@@ -150,7 +150,7 @@ impl PagesEditor {
         anchor_character_index: usize,
         start: DrawablePoint,
         end: DrawablePoint,
-        endpoints: LineEndpoints,
+        endpoints: Endpoints,
     ) -> Result<PagesBodyShapeInfo> {
         let created = self.add_body_line(anchor_character_index, start, end)?;
         self.set_body_line_endpoints(created.drawable_object_id, endpoints)?;
@@ -177,13 +177,13 @@ impl PagesEditor {
         text: &str,
         geometry: DrawableGeometry,
         path_source: tsd::PathSourceArchive,
-        expected_preset: Option<ShapePreset>,
+        expected_preset: Option<Preset>,
         expected_line: Option<LineSegment>,
     ) -> Result<PagesBodyShapeInfo> {
         let root = root_document(self.package())?;
         let body: StorageArchive = decode_typed_package_object(
             self.package(),
-            self.body_storage_id,
+            self.body_storage_id.get(),
             self.body_storage()?.message_type,
             "TSWP.StorageArchive",
         )?;
@@ -199,10 +199,10 @@ impl PagesEditor {
             .checked_add(u64::from(creates_z_order))
             .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
         let ids = BodyTextShapeObjectIds::allocate(graph_first_identifier)?;
-        let archive_name = find_object_archive(self.package(), self.body_storage_id)?;
+        let archive_name = find_object_archive(self.package(), self.body_storage_id.get())?;
         let objects = body_text_shape_objects(
             ids,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             style_id,
             geometry,
             storage,
@@ -230,7 +230,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             ids.attachment,
         )?;
@@ -268,8 +268,8 @@ impl PagesEditor {
         if created.anchor_character_index != expected_anchor
             || created.preset != expected_preset
             || !line_matches
-            || created.storage.object_id != ids.storage
-            || created.storage.text != text
+            || created.storage.id.get() != ids.storage
+            || created.storage.storage.text() != text
             || created.geometry != geometry
             || created_graph.object_ids != ids.all()
         {
@@ -294,7 +294,7 @@ impl PagesEditor {
     }
 
     /// Read the directed start and end decorations of one native straight line.
-    pub fn body_line_endpoints(&self, drawable_object_id: u64) -> Result<LineEndpoints> {
+    pub fn body_line_endpoints(&self, drawable_object_id: u64) -> Result<Endpoints> {
         let source = body_shape_graph(self, drawable_object_id)?;
         source.info.line_endpoints.ok_or_else(|| {
             Error::ParseError(format!(
@@ -307,7 +307,7 @@ impl PagesEditor {
     pub fn set_body_line_endpoints(
         &mut self,
         drawable_object_id: u64,
-        endpoints: LineEndpoints,
+        endpoints: Endpoints,
     ) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         if source.info.line_segment.is_none() {
@@ -337,25 +337,21 @@ impl PagesEditor {
     /// Returns `true` when decorations were reset and `false` when the line was
     /// already undecorated.
     pub fn reset_body_line_endpoints(&mut self, drawable_object_id: u64) -> Result<bool> {
-        if self.body_line_endpoints(drawable_object_id)? == LineEndpoints::default() {
+        if self.body_line_endpoints(drawable_object_id)? == Endpoints::default() {
             return Ok(false);
         }
-        self.set_body_line_endpoints(drawable_object_id, LineEndpoints::default())?;
+        self.set_body_line_endpoints(drawable_object_id, Endpoints::default())?;
         Ok(true)
     }
 
     /// Read the effective standard stroke of one ordinary body shape.
-    pub fn body_shape_stroke(&self, drawable_object_id: u64) -> Result<Option<ShapeStroke>> {
+    pub fn body_shape_stroke(&self, drawable_object_id: u64) -> Result<Option<Stroke>> {
         let source = body_shape_graph(self, drawable_object_id)?;
         shape_stroke(self.package(), &source.archive_name, drawable_object_id)
     }
 
     /// Replace one shape's stroke transactionally, using copy-on-write for shared styles.
-    pub fn set_body_shape_stroke(
-        &mut self,
-        drawable_object_id: u64,
-        stroke: ShapeStroke,
-    ) -> Result<()> {
+    pub fn set_body_shape_stroke(&mut self, drawable_object_id: u64, stroke: Stroke) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         let mut staged = self.package().clone();
         set_shape_stroke(
@@ -454,7 +450,7 @@ impl PagesEditor {
     }
 
     /// Read effective whole-object opacity and reflection settings.
-    pub fn body_shape_effects(&self, drawable_object_id: u64) -> Result<ShapeEffects> {
+    pub fn body_shape_effects(&self, drawable_object_id: u64) -> Result<Effects> {
         let source = body_shape_graph(self, drawable_object_id)?;
         shape_effects(self.package(), &source.archive_name, drawable_object_id)
     }
@@ -463,7 +459,7 @@ impl PagesEditor {
     pub fn set_body_shape_effects(
         &mut self,
         drawable_object_id: u64,
-        effects: ShapeEffects,
+        effects: Effects,
     ) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         let mut staged = self.package().clone();
@@ -495,17 +491,13 @@ impl PagesEditor {
     }
 
     /// Read the effective drop, contact, curved, or disabled shadow state.
-    pub fn body_shape_shadow(&self, drawable_object_id: u64) -> Result<ShapeShadow> {
+    pub fn body_shape_shadow(&self, drawable_object_id: u64) -> Result<Shadow> {
         let source = body_shape_graph(self, drawable_object_id)?;
         shape_shadow(self.package(), &source.archive_name, drawable_object_id)
     }
 
     /// Replace the shadow while preserving fill, stroke, opacity, and reflection.
-    pub fn set_body_shape_shadow(
-        &mut self,
-        drawable_object_id: u64,
-        shadow: ShapeShadow,
-    ) -> Result<()> {
+    pub fn set_body_shape_shadow(&mut self, drawable_object_id: u64, shadow: Shadow) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         let staged = set_shape_shadow(
             self.package().clone(),
@@ -538,7 +530,7 @@ impl PagesEditor {
     }
 
     /// Read effective vertical alignment, edge insets, and autosizing.
-    pub fn body_shape_text_layout(&self, drawable_object_id: u64) -> Result<ShapeTextLayout> {
+    pub fn body_shape_text_layout(&self, drawable_object_id: u64) -> Result<Layout> {
         let source = body_shape_graph(self, drawable_object_id)?;
         shape_text_layout(self.package(), &source.archive_name, drawable_object_id)
     }
@@ -547,7 +539,7 @@ impl PagesEditor {
     pub fn set_body_shape_text_layout(
         &mut self,
         drawable_object_id: u64,
-        layout: ShapeTextLayout,
+        layout: Layout,
     ) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         let staged = set_shape_text_layout(
@@ -613,16 +605,12 @@ impl PagesEditor {
     }
 
     /// Read the recognized preset and native controls for one body shape.
-    pub fn body_shape_preset(&self, drawable_object_id: u64) -> Result<Option<ShapePreset>> {
+    pub fn body_shape_preset(&self, drawable_object_id: u64) -> Result<Option<Preset>> {
         Ok(body_shape_graph(self, drawable_object_id)?.info.preset)
     }
 
     /// Replace a body shape's preset path while retaining its text and style.
-    pub fn set_body_shape_preset(
-        &mut self,
-        drawable_object_id: u64,
-        preset: ShapePreset,
-    ) -> Result<()> {
+    pub fn set_body_shape_preset(&mut self, drawable_object_id: u64, preset: Preset) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         let mut staged = self.package().clone();
         set_shape_preset(
@@ -736,7 +724,7 @@ impl PagesEditor {
     ) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package().clone());
-        text.replace_text(source.info.storage.object_id, range, replacement)?;
+        text.replace_text(source.info.storage.id, range, replacement)?;
         let verified = Self::from_package(text.into_package())?;
         body_shape_graph(&verified, drawable_object_id)?;
         *self = verified;
@@ -751,10 +739,10 @@ impl PagesEditor {
     ) -> Result<()> {
         let source = body_shape_graph(self, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package().clone());
-        text.set_text(source.info.storage.object_id, replacement)?;
+        text.set_text(source.info.storage.id, replacement)?;
         let verified = Self::from_package(text.into_package())?;
         let updated = body_shape_graph(&verified, drawable_object_id)?;
-        if updated.info.storage.text != replacement {
+        if updated.info.storage.storage.text() != replacement {
             return Err(Error::InvalidFormat(
                 "Pages shape text update failed validation".to_owned(),
             ));
@@ -801,12 +789,12 @@ impl PagesEditor {
                 clone_pages_drawable_graph_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
+                Ok(archive.insert_object(cloned)?)
             })?;
         }
 
         let new_drawable_id = remap[&source_drawable_object_id];
-        let new_storage_id = remap[&source.info.storage.object_id];
+        let new_storage_id = remap[&source.info.storage.id.get()];
         let new_attachment_id = remap[&source.attachment_id];
         offset_pages_body_drawable_clone(
             &mut staged,
@@ -823,7 +811,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             new_attachment_id,
         )?;
@@ -851,8 +839,8 @@ impl PagesEditor {
         let expected_anchor = u32::try_from(anchor_character_index)
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".to_owned()))?;
         if created.anchor_character_index != expected_anchor
-            || created.storage.object_id != new_storage_id
-            || created.storage.text != source.info.storage.text
+            || created.storage.id.get() != new_storage_id
+            || created.storage.storage != source.info.storage.storage
             || created.kind != source.info.kind
             || created.preset != source.info.preset
             || created.line_segment != source.info.line_segment
@@ -875,7 +863,9 @@ impl PagesEditor {
     pub fn remove_body_shape(&mut self, drawable_object_id: u64) -> Result<RemovedPagesBodyShape> {
         let graph = body_shape_graph(self, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
+            drawable_object_id,
+        )?)?;
         let mut text_editor = IWorkTextEditor::from_package(comments.into_package());
         let anchor = graph.info.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
@@ -927,12 +917,15 @@ mod tests {
 
     use super::*;
     use crate::shapes::{
-        LineEndpoint, RgbColorSpace, RgbaColor, ShapeCornerRadius, ShapeDropShadow, ShapeGradient,
-        ShapeGradientAngle, ShapeOpacity, ShapeReflection, ShapeReflectionOpacity,
-        ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
-        ShapeShadowOpacity, ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets,
-        ShapeTextVerticalAlignment, StrokePattern, StrokeWidth,
+        Appearance, BlurRadius, Drop, Endpoint, Offset, Pattern, RgbColorSpace, RgbaColor, Width,
     };
+    use crate::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+    use litchi_iwa_common::shape::effects::{
+        Effects, Opacity as EffectsOpacity, Reflection, ReflectionOpacity,
+    };
+    use litchi_iwa_common::shape::fill::{Angle, Gradient};
+    use litchi_iwa_common::shape::path::CornerRadius;
+    use litchi_iwa_common::shape::shadow::{Angle as ShadowAngle, Opacity as ShadowOpacity};
 
     const POSITION: DrawablePoint = DrawablePoint { x: 180.0, y: 240.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -958,9 +951,9 @@ mod tests {
         let created = editor
             .add_body_rectangle(4, "Built from typed objects", POSITION, SIZE)
             .unwrap();
-        assert_eq!(created.kind, PagesBodyShapeKind::Rectangle);
-        assert_eq!(created.preset, Some(ShapePreset::Rectangle));
-        assert_eq!(created.storage.text, "Built from typed objects");
+        assert_eq!(created.kind, ShapePathKind::Rectangle);
+        assert_eq!(created.preset, Some(Preset::Rectangle));
+        assert_eq!(created.storage.storage.text(), "Built from typed objects");
         let horizontally_flipped = editor
             .flip_body_shape(created.drawable_object_id, DrawableFlipAxis::Horizontal)
             .unwrap();
@@ -1005,10 +998,10 @@ mod tests {
         editor
             .set_body_shape_properties(created.drawable_object_id, properties.clone())
             .unwrap();
-        let rectangle_stroke = ShapeStroke::new(
+        let rectangle_stroke = Stroke::new(
             RgbaColor::new(0.2, 0.7, 0.3, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(2.0).unwrap(),
-            StrokePattern::Solid,
+            Width::new(2.0).unwrap(),
+            Pattern::Solid,
         );
         editor
             .set_body_shape_stroke(created.drawable_object_id, rectangle_stroke)
@@ -1016,7 +1009,7 @@ mod tests {
 
         let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let shape = &reopened.body_shapes().unwrap()[0];
-        assert_eq!(shape.storage.text, "Made from typed objects");
+        assert_eq!(shape.storage.storage.text(), "Made from typed objects");
         assert_eq!(shape.geometry, geometry);
         assert_eq!(shape.properties, properties);
         assert_eq!(
@@ -1076,7 +1069,7 @@ mod tests {
     fn scratch_document_supports_native_shape_duplication() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
         let created = editor
-            .add_body_shape(4, "Source shape", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_body_shape(4, "Source shape", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let fill =
             ShapeFill::Solid(RgbaColor::new(0.2, 0.6, 0.9, 1.0, RgbColorSpace::Srgb).unwrap());
@@ -1102,9 +1095,9 @@ mod tests {
             .duplicate_body_shape(source.drawable_object_id, duplicate_anchor)
             .unwrap();
         assert_ne!(duplicate.drawable_object_id, source.drawable_object_id);
-        assert_ne!(duplicate.storage.object_id, source.storage.object_id);
+        assert_ne!(duplicate.storage.id, source.storage.id);
         assert_eq!(duplicate.anchor_character_index, duplicate_anchor as u32);
-        assert_eq!(duplicate.storage.text, source.storage.text);
+        assert_eq!(duplicate.storage.storage, source.storage.storage);
         assert_eq!(duplicate.kind, source.kind);
         assert_eq!(duplicate.preset, source.preset);
         assert_eq!(duplicate.properties, properties);
@@ -1133,7 +1126,8 @@ mod tests {
                 .find(|shape| shape.drawable_object_id == source.drawable_object_id)
                 .unwrap()
                 .storage
-                .text,
+                .storage
+                .text(),
             "Source shape"
         );
         let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -1145,7 +1139,8 @@ mod tests {
                 .find(|shape| shape.drawable_object_id == duplicate.drawable_object_id)
                 .unwrap()
                 .storage
-                .text,
+                .storage
+                .text(),
             "Independent copy"
         );
         assert_eq!(reopened.body_shapes().unwrap().len(), 2);
@@ -1153,7 +1148,7 @@ mod tests {
         let removed = editor
             .remove_body_shape(duplicate.drawable_object_id)
             .unwrap();
-        assert_eq!(removed.shape.storage.text, "Independent copy");
+        assert_eq!(removed.shape.storage.storage.text(), "Independent copy");
         assert_eq!(editor.body_shapes().unwrap().len(), 1);
     }
 
@@ -1162,9 +1157,9 @@ mod tests {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
         let baseline_body = editor.body_text().unwrap();
         let created = editor.add_body_line(4, LINE_START, LINE_END).unwrap();
-        assert_eq!(created.kind, PagesBodyShapeKind::Line);
+        assert_eq!(created.kind, ShapePathKind::Line);
         assert_eq!(created.preset, None);
-        assert_eq!(created.storage.text, "");
+        assert!(created.storage.storage.is_empty());
         assert!(line_segments_match(
             created.line_segment.unwrap(),
             LineSegment::new(LINE_START, LINE_END).unwrap()
@@ -1207,7 +1202,7 @@ mod tests {
         let removed = editor
             .remove_body_shape(created.drawable_object_id)
             .unwrap();
-        assert_eq!(removed.shape.kind, PagesBodyShapeKind::Line);
+        assert_eq!(removed.shape.kind, ShapePathKind::Line);
         assert_eq!(editor.body_text().unwrap(), baseline_body);
         assert!(editor.body_shapes().unwrap().is_empty());
     }
@@ -1215,12 +1210,12 @@ mod tests {
     #[test]
     fn scratch_document_supports_typed_shape_stroke_crud() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
-        let stroke = ShapeStroke::new(
+        let stroke = Stroke::new(
             RgbaColor::new(0.8, 0.1, 0.2, 0.9, RgbColorSpace::DisplayP3).unwrap(),
-            StrokeWidth::new(3.5).unwrap(),
-            StrokePattern::MediumDash,
+            Width::new(3.5).unwrap(),
+            Pattern::MediumDash,
         );
-        let endpoints = LineEndpoints::new(LineEndpoint::OpenCircle, LineEndpoint::FilledArrow);
+        let endpoints = Endpoints::new(Endpoint::OpenCircle, Endpoint::FilledArrow);
         let created = editor
             .add_body_line_with_style(
                 4,
@@ -1247,10 +1242,10 @@ mod tests {
             .map(|name| editor.package().archive(name).unwrap().objects.len())
             .sum::<usize>();
 
-        let replacement = ShapeStroke::new(
+        let replacement = Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.9, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(2.25).unwrap(),
-            StrokePattern::LongDash,
+            Width::new(2.25).unwrap(),
+            Pattern::LongDash,
         );
         editor
             .set_body_shape_stroke(created.drawable_object_id, replacement)
@@ -1328,7 +1323,7 @@ mod tests {
             RgbaColor::new(0.85, 0.2, 0.15, 0.9, RgbColorSpace::DisplayP3).unwrap(),
         );
         let created = editor
-            .add_body_shape(4, "Filled", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_body_shape(4, "Filled", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let inherited_fill = editor.body_shape_fill(created.drawable_object_id).unwrap();
         editor
@@ -1339,11 +1334,7 @@ mod tests {
             fill
         );
 
-        let stroke = ShapeStroke::new(
-            RgbaColor::black(),
-            StrokeWidth::new(2.0).unwrap(),
-            StrokePattern::Solid,
-        );
+        let stroke = Stroke::new(RgbaColor::black(), Width::new(2.0).unwrap(), Pattern::Solid);
         editor
             .set_body_shape_stroke(created.drawable_object_id, stroke)
             .unwrap();
@@ -1352,10 +1343,10 @@ mod tests {
             .iwa_entry_names()
             .map(|name| editor.package().archive(name).unwrap().objects.len())
             .sum::<usize>();
-        let replacement = ShapeFill::Gradient(ShapeGradient::linear(
+        let replacement = ShapeFill::Gradient(Gradient::linear(
             RgbaColor::new(0.1, 0.45, 0.9, 1.0, RgbColorSpace::Srgb).unwrap(),
             RgbaColor::new(0.8, 0.15, 0.55, 1.0, RgbColorSpace::DisplayP3).unwrap(),
-            ShapeGradientAngle::from_degrees(45.0).unwrap(),
+            Angle::from_degrees(45.0).unwrap(),
         ));
         editor
             .set_body_shape_fill(created.drawable_object_id, &replacement)
@@ -1412,7 +1403,7 @@ mod tests {
         let replacement_bytes = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
         let created = editor
-            .add_body_shape(4, "Image", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_body_shape(4, "Image", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let inherited = editor.body_shape_fill(created.drawable_object_id).unwrap();
         let image = editor
@@ -1426,7 +1417,12 @@ mod tests {
             .unwrap();
         let identifier = image.data_identifier().unwrap();
         assert_eq!(image.fill_size(), SIZE);
-        assert_eq!(editor.extract_media(identifier.get()).unwrap(), image_bytes);
+        assert_eq!(
+            editor
+                .extract_media(crate::MediaAssetId::try_from(identifier.get()).unwrap())
+                .unwrap(),
+            image_bytes
+        );
         assert_eq!(editor.media_assets().unwrap().len(), 1);
 
         let advanced = image
@@ -1444,7 +1440,10 @@ mod tests {
         );
         assert_eq!(
             editor
-                .replace_media(identifier.get(), &replacement_bytes)
+                .replace_media(
+                    crate::MediaAssetId::try_from(identifier.get()).unwrap(),
+                    &replacement_bytes,
+                )
                 .unwrap(),
             image_bytes
         );
@@ -1470,7 +1469,7 @@ mod tests {
         let fill =
             ShapeFill::Solid(RgbaColor::new(0.15, 0.45, 0.85, 1.0, RgbColorSpace::Srgb).unwrap());
         let created = editor
-            .add_body_shape(4, "Effects", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_body_shape(4, "Effects", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         editor
             .set_body_shape_fill(created.drawable_object_id, &fill)
@@ -1478,9 +1477,9 @@ mod tests {
         let inherited = editor
             .body_shape_effects(created.drawable_object_id)
             .unwrap();
-        let effects = ShapeEffects::new(
-            ShapeOpacity::new(0.72).unwrap(),
-            ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.35).unwrap()),
+        let effects = Effects::new(
+            EffectsOpacity::new(0.72).unwrap(),
+            Reflection::Enabled(ReflectionOpacity::new(0.35).unwrap()),
         );
         editor
             .set_body_shape_effects(created.drawable_object_id, effects)
@@ -1496,8 +1495,7 @@ mod tests {
             fill
         );
 
-        let replacement =
-            ShapeEffects::new(ShapeOpacity::new(0.48).unwrap(), ShapeReflection::Disabled);
+        let replacement = Effects::new(EffectsOpacity::new(0.48).unwrap(), Reflection::Disabled);
         editor
             .set_body_shape_effects(created.drawable_object_id, replacement)
             .unwrap();
@@ -1536,7 +1534,7 @@ mod tests {
     fn scratch_document_supports_drop_shadow_crud() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
         let created = editor
-            .add_body_shape(4, "Shadow", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_body_shape(4, "Shadow", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let inherited = editor
             .body_shape_shadow(created.drawable_object_id)
@@ -1544,14 +1542,14 @@ mod tests {
         let effects = editor
             .body_shape_effects(created.drawable_object_id)
             .unwrap();
-        let shadow = ShapeShadow::Drop(ShapeDropShadow::new(
-            ShapeShadowAppearance::new(
+        let shadow = Shadow::Drop(Drop::new(
+            Appearance::new(
                 RgbaColor::black(),
-                ShapeShadowBlurRadius::from_points(7).unwrap(),
-                ShapeShadowOffset::from_points(11.0).unwrap(),
-                ShapeShadowOpacity::new(0.42).unwrap(),
+                BlurRadius::from_points(7).unwrap(),
+                Offset::from_points(11.0).unwrap(),
+                ShadowOpacity::new(0.42).unwrap(),
             ),
-            ShapeShadowAngle::from_degrees(135.0).unwrap(),
+            ShadowAngle::from_degrees(135.0).unwrap(),
         ));
         editor
             .set_body_shape_shadow(created.drawable_object_id, shadow)
@@ -1571,13 +1569,13 @@ mod tests {
             effects
         );
         reopened
-            .set_body_shape_shadow(created.drawable_object_id, ShapeShadow::Disabled)
+            .set_body_shape_shadow(created.drawable_object_id, Shadow::Disabled)
             .unwrap();
         assert_eq!(
             reopened
                 .body_shape_shadow(created.drawable_object_id)
                 .unwrap(),
-            ShapeShadow::Disabled
+            Shadow::Disabled
         );
         assert!(
             reopened
@@ -1601,27 +1599,27 @@ mod tests {
     fn scratch_document_supports_shape_text_layout_crud() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
         let created = editor
-            .add_body_shape(4, "Layout", POSITION, SIZE, ShapePreset::Rectangle)
+            .add_body_shape(4, "Layout", POSITION, SIZE, Preset::Rectangle)
             .unwrap();
         let inherited = editor
             .body_shape_text_layout(created.drawable_object_id)
             .unwrap();
-        let shadow = ShapeShadow::Drop(ShapeDropShadow::new(
-            ShapeShadowAppearance::new(
+        let shadow = Shadow::Drop(Drop::new(
+            Appearance::new(
                 RgbaColor::black(),
-                ShapeShadowBlurRadius::from_points(7).unwrap(),
-                ShapeShadowOffset::from_points(11.0).unwrap(),
-                ShapeShadowOpacity::new(0.42).unwrap(),
+                BlurRadius::from_points(7).unwrap(),
+                Offset::from_points(11.0).unwrap(),
+                ShadowOpacity::new(0.42).unwrap(),
             ),
-            ShapeShadowAngle::from_degrees(135.0).unwrap(),
+            ShadowAngle::from_degrees(135.0).unwrap(),
         ));
         editor
             .set_body_shape_shadow(created.drawable_object_id, shadow)
             .unwrap();
-        let layout = ShapeTextLayout::new(
-            ShapeTextVerticalAlignment::Middle,
-            ShapeTextInsets::uniform(ShapeTextInset::from_points(12.0).unwrap()),
-            ShapeTextAutoSize::Fixed,
+        let layout = Layout::new(
+            VerticalAlignment::Middle,
+            Insets::uniform(Inset::from_points(12.0).unwrap()),
+            AutoSize::Fixed,
         );
         editor
             .set_body_shape_text_layout(created.drawable_object_id, layout)
@@ -1672,15 +1670,12 @@ mod tests {
                 4,
                 LINE_START,
                 LINE_END,
-                LineEndpoints::new(LineEndpoint::OpenCircle, LineEndpoint::FilledArrow),
+                Endpoints::new(Endpoint::OpenCircle, Endpoint::FilledArrow),
             )
             .unwrap();
         assert_eq!(
             created.line_endpoints,
-            Some(LineEndpoints::new(
-                LineEndpoint::OpenCircle,
-                LineEndpoint::FilledArrow
-            ))
+            Some(Endpoints::new(Endpoint::OpenCircle, Endpoint::FilledArrow))
         );
         let object_count_after_create = editor
             .package()
@@ -1689,7 +1684,7 @@ mod tests {
             .sum::<usize>();
 
         let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        let replacement = LineEndpoints::new(LineEndpoint::Line, LineEndpoint::SimpleArrow);
+        let replacement = Endpoints::new(Endpoint::Line, Endpoint::SimpleArrow);
         reopened
             .set_body_line_endpoints(created.drawable_object_id, replacement)
             .unwrap();
@@ -1724,7 +1719,7 @@ mod tests {
             reopened
                 .body_line_endpoints(created.drawable_object_id)
                 .unwrap(),
-            LineEndpoints::default()
+            Endpoints::default()
         );
         let object_count_after_reset = reopened
             .package()
@@ -1739,26 +1734,26 @@ mod tests {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
         let baseline_body = editor.body_text().unwrap();
         let created = editor
-            .add_body_shape(4, "Rounded", POSITION, SIZE, ShapePreset::ROUNDED_RECTANGLE)
+            .add_body_shape(4, "Rounded", POSITION, SIZE, Preset::ROUNDED_RECTANGLE)
             .unwrap();
-        assert_eq!(created.kind, PagesBodyShapeKind::RoundedRectangle);
-        assert_eq!(created.preset, Some(ShapePreset::ROUNDED_RECTANGLE));
+        assert_eq!(created.kind, ShapePathKind::RoundedRectangle);
+        assert_eq!(created.preset, Some(Preset::ROUNDED_RECTANGLE));
 
         let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_shape_preset(created.drawable_object_id)
                 .unwrap(),
-            Some(ShapePreset::ROUNDED_RECTANGLE)
+            Some(Preset::ROUNDED_RECTANGLE)
         );
 
         for (preset, kind) in [
-            (ShapePreset::Ellipse, PagesBodyShapeKind::Ellipse),
-            (ShapePreset::LeftArrow, PagesBodyShapeKind::LeftArrow),
-            (ShapePreset::RightArrow, PagesBodyShapeKind::RightArrow),
-            (ShapePreset::DoubleArrow, PagesBodyShapeKind::DoubleArrow),
-            (ShapePreset::PENTAGON, PagesBodyShapeKind::RegularPolygon),
-            (ShapePreset::STAR, PagesBodyShapeKind::Star),
+            (Preset::Ellipse, ShapePathKind::Ellipse),
+            (Preset::LeftArrow, ShapePathKind::LeftArrow),
+            (Preset::RightArrow, ShapePathKind::RightArrow),
+            (Preset::DoubleArrow, ShapePathKind::DoubleArrow),
+            (Preset::PENTAGON, ShapePathKind::RegularPolygon),
+            (Preset::STAR, ShapePathKind::Star),
         ] {
             editor
                 .set_body_shape_preset(created.drawable_object_id, preset)
@@ -1766,7 +1761,7 @@ mod tests {
             let shape = &editor.body_shapes().unwrap()[0];
             assert_eq!(shape.kind, kind);
             assert_eq!(shape.preset, Some(preset));
-            assert_eq!(shape.storage.text, "Rounded");
+            assert_eq!(shape.storage.storage.text(), "Rounded");
             assert_eq!(shape.anchor_character_index, 4);
         }
 
@@ -1802,8 +1797,8 @@ mod tests {
                     "invalid radius",
                     POSITION,
                     SIZE,
-                    ShapePreset::RoundedRectangle {
-                        corner_radius: ShapeCornerRadius::new(SIZE.height).unwrap(),
+                    Preset::RoundedRectangle {
+                        corner_radius: CornerRadius::new(SIZE.height).unwrap(),
                     },
                 )
                 .is_err()
@@ -1822,7 +1817,7 @@ mod tests {
         assert_eq!(editor.to_bytes().unwrap(), before);
         assert!(
             editor
-                .set_body_shape_preset(text_box.drawable_object_id, ShapePreset::Ellipse)
+                .set_body_shape_preset(text_box.drawable_object_id, Preset::Ellipse)
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

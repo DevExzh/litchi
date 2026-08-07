@@ -1,7 +1,8 @@
 //! Native gap-spacing CRUD for Pages body charts.
 
 use super::*;
-use crate::charts::ChartGapSpacing;
+use litchi_iwa_common::chart::gaps::Spacing;
+
 use crate::charts::gaps::{
     chart_gap_spacing as read_native_chart_gap_spacing,
     set_chart_gap_spacing as set_native_chart_gap_spacing,
@@ -9,7 +10,7 @@ use crate::charts::gaps::{
 
 impl PagesEditor {
     /// Read the spacing between items and sets for one native body chart.
-    pub fn body_chart_gap_spacing(&self, drawable_object_id: u64) -> Result<ChartGapSpacing> {
+    pub fn body_chart_gap_spacing(&self, drawable_object_id: u64) -> Result<Spacing> {
         body_chart_gap_spacing(self, drawable_object_id)
     }
 
@@ -17,16 +18,13 @@ impl PagesEditor {
     pub fn set_body_chart_gap_spacing(
         &mut self,
         drawable_object_id: u64,
-        spacing: ChartGapSpacing,
+        spacing: Spacing,
     ) -> Result<()> {
         set_body_chart_gap_spacing(self, drawable_object_id, spacing)
     }
 }
 
-fn body_chart_gap_spacing(
-    editor: &PagesEditor,
-    drawable_object_id: u64,
-) -> Result<ChartGapSpacing> {
+fn body_chart_gap_spacing(editor: &PagesEditor, drawable_object_id: u64) -> Result<Spacing> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_gap_spacing(
         editor.package(),
@@ -39,7 +37,7 @@ fn body_chart_gap_spacing(
 fn set_body_chart_gap_spacing(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    spacing: ChartGapSpacing,
+    spacing: Spacing,
 ) -> Result<()> {
     if body_chart_gap_spacing(editor, drawable_object_id)? == spacing {
         return Ok(());

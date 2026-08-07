@@ -1,13 +1,7 @@
 //! Transactional comment-thread CRUD for Pages body-table cells.
 
 use super::*;
-
-/// A comment attached to a Pages table cell.
-pub type PagesTableCellComment = crate::comments::IWorkComment;
-/// Address and storage identity of a Pages table-cell comment.
-pub type PagesTableCellCommentInfo = crate::comments::IWorkTableCellCommentInfo;
-/// A resolved direct reply in a Pages table-cell comment thread.
-pub type PagesTableCellCommentReplyInfo = crate::comments::IWorkTableCellCommentReplyInfo;
+use litchi_iwa_common::comment::{TableCellComment, TableCellReply};
 
 impl PagesEditor {
     /// Read the comment attached to a reachable body-table cell.
@@ -16,7 +10,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<PagesTableCellCommentInfo>> {
+    ) -> Result<Option<TableCellComment>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_comment_in_package(
             self.package(),
@@ -93,7 +87,7 @@ impl PagesEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Vec<PagesTableCellCommentReplyInfo>> {
+    ) -> Result<Vec<TableCellReply>> {
         self.require_body_table(model_object_id)?;
         crate::numbers::editor::table_cell_comment_replies_in_package(
             self.package(),
@@ -174,7 +168,7 @@ impl PagesEditor {
         if verified
             .table_cell_comment_replies(model_object_id, row, column)?
             .iter()
-            .any(|reply| reply.storage_object_id == reply_storage_object_id)
+            .any(|reply| reply.storage_id.get() == reply_storage_object_id)
         {
             return Err(Error::InvalidFormat(
                 "Pages table comment reply deletion failed validation".to_owned(),
@@ -196,7 +190,7 @@ fn require_reply(
     let valid = editor
         .table_cell_comment_replies(model_object_id, row, column)?
         .iter()
-        .any(|reply| reply.storage_object_id == reply_id && reply.comment.text == text);
+        .any(|reply| reply.storage_id.get() == reply_id && reply.comment.text == text);
     if valid {
         Ok(())
     } else {

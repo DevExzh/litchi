@@ -12,7 +12,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        insertion: KeynoteTableRowInsertion,
+        insertion: RowInsertion,
     ) -> Result<()> {
         self.edit_slide_table_topology(
             slide_index,
@@ -26,7 +26,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        insertion: KeynoteTableColumnInsertion,
+        insertion: ColumnInsertion,
     ) -> Result<()> {
         self.edit_slide_table_topology(
             slide_index,
@@ -43,7 +43,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        deletion: KeynoteTableRowDeletion,
+        deletion: RowDeletion,
     ) -> Result<()> {
         self.edit_slide_table_topology(
             slide_index,
@@ -57,7 +57,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        deletion: KeynoteTableColumnDeletion,
+        deletion: ColumnDeletion,
     ) -> Result<()> {
         self.edit_slide_table_topology(
             slide_index,

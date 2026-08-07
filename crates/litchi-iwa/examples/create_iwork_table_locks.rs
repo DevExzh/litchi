@@ -6,7 +6,8 @@ use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_iwa::table_lock::TableLockState;
+use litchi_iwa_common::table::lock::State as TableLockState;
+use litchi_numbers::TableSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = PathBuf::from(
@@ -22,10 +23,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .table_dimensions(4, 3)
         .build()?;
     let numbers_table = numbers.tables()?.remove(0);
-    numbers.set_table_lock_state(numbers_table.object_id, TableLockState::Locked)?;
+    numbers.set_table_lock_state(
+        TableSelector::name(&numbers_table.name),
+        TableLockState::Locked,
+    )?;
     numbers.save(&numbers_path)?;
     assert_eq!(
-        NumbersEditor::open(&numbers_path)?.table_lock_state(numbers_table.object_id)?,
+        NumbersEditor::open(&numbers_path)?
+            .table_lock_state(TableSelector::name(&numbers_table.name))?,
         TableLockState::Locked
     );
 

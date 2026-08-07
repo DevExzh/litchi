@@ -272,10 +272,10 @@ mod tests {
         let vector = parse_wire_fields(extension)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == CHART_3D_ROTATION_FIELD)
+            .find(|field| field.number() == CHART_3D_ROTATION_FIELD)
             .unwrap();
         assert!(has_field(
-            &extension[vector.payload_start..vector.end],
+            &extension[vector.payload_start()..vector.end()],
             UNKNOWN_VECTOR_FIELD
         ));
         assert_eq!(
@@ -331,6 +331,6 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .iter()
-            .any(|field| field.number == field_number)
+            .any(|field| field.number() == field_number)
     }
 }

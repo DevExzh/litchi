@@ -82,7 +82,7 @@ mod tests {
         let source = editor
             .add_sheet_chart(
                 sheet_id,
-                ChartKind::Radar2d,
+                Kind::Radar2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {

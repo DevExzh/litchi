@@ -7,7 +7,7 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::non_style::{
     GENERATED_CHART_NON_STYLE_EXTENSION_FIELD, chart_non_style_slot,
     generated_chart_non_style_extension,
@@ -84,7 +84,7 @@ pub(crate) fn chart_radar_start_angle(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
 ) -> Result<ChartRadarStartAngle> {
     require_radar_chart(kind)?;
     chart_non_style_slot(
@@ -102,7 +102,7 @@ pub(crate) fn set_chart_radar_start_angle(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     angle: ChartRadarStartAngle,
 ) -> Result<()> {
     require_radar_chart(kind)?;
@@ -125,7 +125,7 @@ pub(crate) fn set_chart_radar_start_angle(
     Ok(())
 }
 
-fn require_radar_chart(kind: ChartKind) -> Result<()> {
+fn require_radar_chart(kind: Kind) -> Result<()> {
     if !kind.supports_radar_start_angle() {
         return Err(Error::InvalidFormat(format!(
             "chart kind {kind:?} does not expose a radar rotation angle"
@@ -308,8 +308,8 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .into_iter()
-            .filter(|field| field.number == number)
-            .map(|field| data[field.start..field.end].to_vec())
+            .filter(|field| field.number() == number)
+            .map(|field| data[field.start()..field.end()].to_vec())
             .collect()
     }
 }

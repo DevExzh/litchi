@@ -1,6 +1,7 @@
 use std::env;
 
 use litchi_iwa::IWorkDrawableCommentEditor;
+use litchi_iwa_common::comment::{DrawableId, StorageId};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -8,10 +9,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "usage: edit_drawable_comment_reply <input> <output> <drawable-id> <add|set|remove> [reply-id] [text]",
     )?;
     let output = arguments.next().ok_or("missing output path")?;
-    let drawable_id = arguments
-        .next()
-        .ok_or("missing drawable object identifier")?
-        .parse::<u64>()?;
+    let drawable_id = DrawableId::from_raw(
+        arguments
+            .next()
+            .ok_or("missing drawable object identifier")?
+            .parse::<u64>()?,
+    )?;
     let operation = arguments.next().ok_or("missing add, set, or remove")?;
 
     let mut editor = IWorkDrawableCommentEditor::open(&input)?;
@@ -25,10 +28,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("added reply={reply_id}");
         },
         "set" => {
-            let reply_id = arguments
-                .next()
-                .ok_or("missing reply object identifier")?
-                .parse::<u64>()?;
+            let reply_id = StorageId::from_raw(
+                arguments
+                    .next()
+                    .ok_or("missing reply object identifier")?
+                    .parse::<u64>()?,
+            )?;
             let text = arguments.next().ok_or("missing replacement text")?;
             if arguments.next().is_some() {
                 return Err("unexpected extra arguments".into());
@@ -37,10 +42,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("updated reply={reply_id} current_reply={current_id}");
         },
         "remove" => {
-            let reply_id = arguments
-                .next()
-                .ok_or("missing reply object identifier")?
-                .parse::<u64>()?;
+            let reply_id = StorageId::from_raw(
+                arguments
+                    .next()
+                    .ok_or("missing reply object identifier")?
+                    .parse::<u64>()?,
+            )?;
             if arguments.next().is_some() {
                 return Err("unexpected extra arguments".into());
             }
@@ -53,7 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for reply in editor.replies(drawable_id)? {
         println!(
             "reply={} author={:?} text={:?}",
-            reply.storage_object_id, reply.comment.author_object_id, reply.comment.text
+            reply.storage_id, reply.comment.author_id, reply.comment.text
         );
     }
     Ok(())

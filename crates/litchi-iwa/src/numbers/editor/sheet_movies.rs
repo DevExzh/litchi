@@ -3,16 +3,19 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use litchi_iwa_common::media::Type as MediaType;
+
 use super::*;
-use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media::MediaAssetId;
 use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawablePoint, DrawableProperties, DrawableSize,
     flip_drawable_geometry, offset_drawable_geometry, restore_drawable_original_size,
 };
+use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 
 mod caption;
 pub(super) mod graph;
@@ -109,14 +112,14 @@ impl NumbersEditor {
 
         let mut media = IWorkMediaEditor::from_package(self.package.clone())?;
         let movie_asset = media.insert_unreferenced(preferred_movie_filename, movie_data)?;
-        if movie_asset.media_type != crate::MediaType::Video {
+        if movie_asset.media_type != MediaType::Video {
             return Err(Error::ParseError(format!(
                 "Numbers sheet movies require video data, not {}",
                 movie_asset.media_type.name()
             )));
         }
         let poster_asset = media.insert_unreferenced(preferred_poster_filename, poster_data)?;
-        if poster_asset.media_type != crate::MediaType::Image {
+        if poster_asset.media_type != MediaType::Image {
             return Err(Error::ParseError(format!(
                 "Numbers movie posters require image data, not {}",
                 poster_asset.media_type.name()
@@ -127,8 +130,8 @@ impl NumbersEditor {
             ids,
             sheet_id,
             context.style_id,
-            movie_asset.data_identifier,
-            poster_asset.data_identifier,
+            movie_asset.data_identifier.get(),
+            poster_asset.data_identifier.get(),
             geometry,
             options.natural_size,
             duration_seconds,
@@ -151,7 +154,7 @@ impl NumbersEditor {
             add_component_data_reference(
                 &mut staged,
                 context.component_id,
-                data_identifier,
+                data_identifier.get(),
                 ids.drawable,
             )?;
         }
@@ -174,15 +177,15 @@ impl NumbersEditor {
                 Error::InvalidFormat("Numbers movie creation failed validation".to_owned())
             })?;
         let created_graph = movie_graph(&verified, sheet_id, ids.drawable)?;
-        if created.movie_data_identifier != movie_asset.data_identifier
-            || created.poster_image_data_identifier != poster_asset.data_identifier
+        if created.movie_data_identifier != movie_asset.data_identifier.get()
+            || created.poster_image_data_identifier != poster_asset.data_identifier.get()
             || created.geometry != geometry
             || created.original_size != Some(options.natural_size)
             || created.natural_size != Some(options.natural_size)
             || created.duration.as_secs_f32() != duration_seconds
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(movie_asset.data_identifier)? != movie_data
-            || verified.extract_media(poster_asset.data_identifier)? != poster_data
+            || verified.extract_media(movie_asset.data_identifier.get())? != movie_data
+            || verified.extract_media(poster_asset.data_identifier.get())? != poster_data
         {
             return Err(Error::InvalidFormat(
                 "Numbers movie creation produced an inconsistent graph".to_owned(),
@@ -444,7 +447,7 @@ impl NumbersEditor {
                 clone_numbers_drawable_graph_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
+                Ok(archive.insert_object(cloned)?)
             })?;
         }
 
@@ -571,7 +574,9 @@ impl NumbersEditor {
     ) -> Result<RemovedNumbersSheetMovie> {
         let source = movie_graph(self, sheet_id, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
+            drawable_object_id,
+        )?)?;
         let mut staged = comments.into_package();
         patch_numbers_sheet_drawable_reference(
             &mut staged,
@@ -622,12 +627,13 @@ impl NumbersEditor {
             .map(|(data, _)| *data)
             .collect::<HashSet<_>>();
         for identifier in data_identifiers {
+            let identifier = MediaAssetId::try_from(identifier)?;
             if media
                 .asset(identifier)
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier);
+                removed_data_identifiers.push(identifier.get());
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -641,7 +647,7 @@ impl NumbersEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_assets
                     .iter()
-                    .any(|asset| asset.data_identifier == *identifier)
+                    .any(|asset| asset.data_identifier.get() == *identifier)
             })
         {
             return Err(Error::InvalidFormat(
@@ -660,7 +666,7 @@ impl NumbersEditor {
 mod tests {
     use super::*;
     use crate::numbers::{NumbersDocumentBuilder, NumbersSheetImageOptions};
-    use crate::{MediaLoopMode, MediaVolume};
+    use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-numbers-movie";
     const REPLACEMENT_MOVIE: &[u8] = b"\0\0\0\x18ftypqt  replacement-numbers-movie";

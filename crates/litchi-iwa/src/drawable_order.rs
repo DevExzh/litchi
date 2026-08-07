@@ -1,6 +1,8 @@
 //! Typed stacking-order operations for native iWork drawables.
 
 use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
+use std::hash::Hash;
 
 use prost::Message;
 
@@ -31,11 +33,14 @@ pub enum DrawableLayerMove {
 /// Move one identifier within a back-to-front drawable list.
 ///
 /// Returns `None` when the requested move would leave the list unchanged.
-pub(crate) fn move_drawable_layer(
-    current: &[u64],
-    drawable_object_id: u64,
+pub(crate) fn move_drawable_layer<T>(
+    current: &[T],
+    drawable_object_id: T,
     movement: DrawableLayerMove,
-) -> Result<Option<Vec<u64>>> {
+) -> Result<Option<Vec<T>>>
+where
+    T: Copy + Eq + Hash + Display,
+{
     validate_unique_drawables(current, "current drawable order")?;
     let current_index = current
         .iter()
@@ -116,7 +121,10 @@ pub(crate) fn reorder_reference_field(
     rewrite_repeated_length_delimited_fields(data, field_number, &replacements)
 }
 
-pub(crate) fn validate_unique_drawables(order: &[u64], label: &str) -> Result<()> {
+pub(crate) fn validate_unique_drawables<T>(order: &[T], label: &str) -> Result<()>
+where
+    T: Copy + Eq + Hash + Display,
+{
     let mut indexes = HashMap::with_capacity(order.len());
     for (index, &identifier) in order.iter().enumerate() {
         if let Some(previous) = indexes.insert(identifier, index) {
@@ -128,7 +136,10 @@ pub(crate) fn validate_unique_drawables(order: &[u64], label: &str) -> Result<()
     Ok(())
 }
 
-fn validate_exact_permutation(current: &[u64], requested: &[u64]) -> Result<()> {
+fn validate_exact_permutation<T>(current: &[T], requested: &[T]) -> Result<()>
+where
+    T: Copy + Eq + Hash + Display,
+{
     if current.len() != requested.len() {
         return Err(Error::ParseError(format!(
             "requested drawable order has {} entries but this scope owns {}",
@@ -168,11 +179,11 @@ mod tests {
         .encode_to_vec();
         append_unknown_varint(&mut second, 99, 20_001);
 
-        let mut original = crate::varint::encode_varint(90_u64 << 3);
-        original.extend(crate::varint::encode_varint(1));
+        let mut original = litchi_iwa_common::varint::encode_varint(90_u64 << 3);
+        original.extend(litchi_iwa_common::varint::encode_varint(1));
         append_length_delimited_field(&mut original, 7, &first).unwrap();
-        original.extend(crate::varint::encode_varint(91_u64 << 3));
-        original.extend(crate::varint::encode_varint(2));
+        original.extend(litchi_iwa_common::varint::encode_varint(91_u64 << 3));
+        original.extend(litchi_iwa_common::varint::encode_varint(2));
         append_length_delimited_field(&mut original, 7, &second).unwrap();
 
         let reordered = reorder_reference_field(&original, 7, &[10, 20], &[20, 10]).unwrap();
@@ -210,7 +221,9 @@ mod tests {
     }
 
     fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) {
-        data.extend(crate::varint::encode_varint(u64::from(field_number) << 3));
-        data.extend(crate::varint::encode_varint(value));
+        data.extend(litchi_iwa_common::varint::encode_varint(
+            u64::from(field_number) << 3,
+        ));
+        data.extend(litchi_iwa_common::varint::encode_varint(value));
     }
 }

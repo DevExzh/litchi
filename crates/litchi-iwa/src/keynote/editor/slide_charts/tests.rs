@@ -4,28 +4,31 @@ use std::fs;
 use std::path::PathBuf;
 
 use super::*;
+use litchi_iwa_common::chart::axis::style::Visibility as AxisVisibility;
+use litchi_iwa_common::chart::error_bar::{
+    Direction as ErrorBarDirection, FixedValue as ErrorBarFixedValue,
+    Percentage as ErrorBarPercentage, Series,
+};
+use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
+
 use crate::charts::{
-    ChartAxis, ChartAxisBound, ChartAxisMajorStepCount, ChartAxisMinorStepCount,
-    ChartAxisTickMarkLocation, ChartCornerRadius, ChartDonutInnerRadius, ChartErrorBarDirection,
-    ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont, ChartFontSize, ChartGapPercentage,
-    ChartGapSpacing, ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame,
-    ChartLegendRect, ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance,
-    ChartPieLabelVisibility, ChartPieLeaderLineVisibility, ChartPieStartAngle,
+    Axis, Bound, Bounds, ChartCornerRadius, ChartDonutInnerRadius, ChartFont, ChartFontSize,
+    ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame, ChartLegendRect,
+    ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance, ChartPieStartAngle,
     ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
-    ChartSeriesErrorBars, ChartSeriesIndex, ChartSeriesStroke, ChartSeriesStrokePattern,
-    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAffixes,
-    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
-    ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
-    ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
-    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
+    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Index,
+    LabelAffixes, LabelVisibility, LeaderLineVisibility, MajorStepCount, MinorStepCount,
+    NegativeStyle, NumberFormat, Scale, Steps, TickMarkLocation, Visibility,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::shapes::{
-    RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill, ShapeImageFillTechnique,
-    ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowOffset,
-    ShapeShadowOpacity, ShapeStroke, StrokePattern, StrokeWidth,
+    Appearance, BlurRadius, Drop, Offset, Pattern, RgbColorSpace, RgbaColor, ShapeFill,
+    ShapeImageFillTechnique, Stroke, Width,
 };
+use litchi_iwa_common::shape::shadow::{Angle, Opacity};
+use litchi_keynote::ChartSelector;
 
 const POSITION: DrawablePoint = DrawablePoint { x: 240.0, y: 260.0 };
 const SIZE: DrawableSize = DrawableSize {
@@ -59,17 +62,17 @@ fn pie_data() -> ChartData {
     .unwrap()
 }
 
-fn gap_spacing(between_items: f32, between_sets: f32) -> ChartGapSpacing {
-    ChartGapSpacing::new(
-        ChartGapPercentage::new(between_items).unwrap(),
-        ChartGapPercentage::new(between_sets).unwrap(),
+fn gap_spacing(between_items: f32, between_sets: f32) -> Spacing {
+    Spacing::new(
+        Percentage::new(between_items).unwrap(),
+        Percentage::new(between_sets).unwrap(),
     )
 }
 
-fn chart_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
-    ShapeStroke::new(
+fn chart_stroke(pattern: Pattern, width: f32) -> Stroke {
+    Stroke::new(
         RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-        StrokeWidth::new(width).unwrap(),
+        Width::new(width).unwrap(),
         pattern,
     )
 }
@@ -77,7 +80,7 @@ fn chart_stroke(pattern: StrokePattern, width: f32) -> ShapeStroke {
 fn chart_series_stroke(pattern: ChartSeriesStrokePattern, width: f32) -> ChartSeriesStroke {
     ChartSeriesStroke::new(
         RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-        StrokeWidth::new(width).unwrap(),
+        Width::new(width).unwrap(),
         pattern,
     )
 }
@@ -87,14 +90,14 @@ fn chart_background_fill() -> ShapeFill {
 }
 
 fn chart_shadow() -> ChartShadow {
-    ChartShadow::Grouped(ShapeDropShadow::new(
-        ShapeShadowAppearance::new(
+    ChartShadow::Grouped(Drop::new(
+        Appearance::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            ShapeShadowBlurRadius::from_points(15).unwrap(),
-            ShapeShadowOffset::from_points(8.0).unwrap(),
-            ShapeShadowOpacity::new(0.6).unwrap(),
+            BlurRadius::from_points(15).unwrap(),
+            Offset::from_points(8.0).unwrap(),
+            Opacity::new(0.6).unwrap(),
         ),
-        ShapeShadowAngle::from_degrees(60.0).unwrap(),
+        Angle::from_degrees(60.0).unwrap(),
     ))
 }
 
@@ -112,10 +115,10 @@ fn scratch_presentation_supports_standalone_chart_crud() {
     let baseline = editor.to_bytes().unwrap();
 
     let created = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
-    assert_eq!(created.kind, ChartKind::Column2d);
-    assert_eq!(created.direction, ChartSeriesDirection::Rows);
+    assert_eq!(created.kind, Kind::Column2d);
+    assert_eq!(created.direction, Direction::Rows);
     assert_eq!(created.data, sample_data());
 
     let replacement = ChartData::new(
@@ -125,13 +128,13 @@ fn scratch_presentation_supports_standalone_chart_crud() {
     )
     .unwrap();
     editor
-        .set_slide_chart_kind(0, created.drawable_object_id, ChartKind::Bar2d)
+        .set_slide_chart_kind(0, chart_selector(&editor, &created), Kind::Bar2d)
         .unwrap();
     editor
-        .set_slide_chart_data(0, created.drawable_object_id, replacement.clone())
+        .set_slide_chart_data(0, chart_selector(&editor, &created), replacement.clone())
         .unwrap();
     editor
-        .set_slide_chart_direction(0, created.drawable_object_id, ChartSeriesDirection::Columns)
+        .set_slide_chart_direction(0, chart_selector(&editor, &created), Direction::Columns)
         .unwrap();
     let changed_geometry = chart_geometry(
         "Keynote",
@@ -143,18 +146,18 @@ fn scratch_presentation_supports_standalone_chart_crud() {
     )
     .unwrap();
     editor
-        .set_slide_chart_geometry(0, created.drawable_object_id, changed_geometry)
+        .set_slide_chart_geometry(0, chart_selector(&editor, &created), changed_geometry)
         .unwrap();
 
     let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let chart = &reopened.slide_charts(0).unwrap()[0];
-    assert_eq!(chart.kind, ChartKind::Bar2d);
-    assert_eq!(chart.direction, ChartSeriesDirection::Columns);
+    assert_eq!(chart.kind, Kind::Bar2d);
+    assert_eq!(chart.direction, Direction::Columns);
     assert_eq!(chart.data, replacement);
     assert_eq!(chart.geometry, changed_geometry);
 
     let removed = editor
-        .remove_slide_chart(0, created.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&editor, &created))
         .unwrap();
     assert_eq!(removed.chart.drawable_object_id, created.drawable_object_id);
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -166,14 +169,14 @@ fn chart_creation_rejects_invalid_inputs_transactionally() {
     let baseline = editor.to_bytes().unwrap();
     assert!(
         editor
-            .add_slide_chart(0, ChartKind::Undefined, sample_data(), POSITION, SIZE)
+            .add_slide_chart(0, Kind::Undefined, sample_data(), POSITION, SIZE)
             .is_err()
     );
     assert!(
         editor
             .add_slide_chart(
                 0,
-                ChartKind::Column2d,
+                Kind::Column2d,
                 sample_data(),
                 POSITION,
                 DrawableSize {
@@ -185,10 +188,85 @@ fn chart_creation_rejects_invalid_inputs_transactionally() {
     );
     assert!(
         editor
-            .add_slide_chart(1, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+            .add_slide_chart(1, Kind::Column2d, sample_data(), POSITION, SIZE)
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
+}
+
+#[test]
+fn lifecycle_chart_apis_accept_semantic_selectors_and_reject_out_of_range_positions() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let chart = editor
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+
+    editor
+        .set_slide_chart_kind(0, ChartSelector::index(0), Kind::Bar2d)
+        .unwrap();
+    assert_eq!(editor.slide_charts(0).unwrap()[0].kind, Kind::Bar2d);
+
+    let baseline = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .set_slide_chart_kind(0, ChartSelector::index(usize::MAX), Kind::Line2d)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    assert_eq!(
+        editor.slide_charts(0).unwrap()[0].drawable_object_id,
+        chart.drawable_object_id
+    );
+}
+
+#[test]
+fn chart_name_selectors_match_titles_exactly_and_reject_ambiguity() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let first = editor
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    let second = editor
+        .add_slide_chart(
+            0,
+            Kind::Line2d,
+            sample_data(),
+            DrawablePoint {
+                x: POSITION.x + SIZE.width,
+                y: POSITION.y,
+            },
+            SIZE,
+        )
+        .unwrap();
+    editor
+        .set_slide_chart_title(0, first.drawable_object_id, "Revenue")
+        .unwrap();
+    editor
+        .set_slide_chart_title(0, second.drawable_object_id, "Cost")
+        .unwrap();
+
+    editor
+        .set_slide_chart_kind(0, ChartSelector::name("Cost"), Kind::Bar2d)
+        .unwrap();
+    assert_eq!(editor.slide_charts(0).unwrap()[1].kind, Kind::Bar2d);
+
+    let before_missing = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .set_slide_chart_kind(0, ChartSelector::name("cost"), Kind::Pie2d)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before_missing);
+
+    editor
+        .set_slide_chart_title(0, first.drawable_object_id, "Cost")
+        .unwrap();
+    let before_ambiguous = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .set_slide_chart_kind(0, ChartSelector::name("Cost"), Kind::Pie2d)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before_ambiguous);
 }
 
 #[test]
@@ -196,12 +274,12 @@ fn multiple_chart_theme_registrations_are_removed_independently() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let baseline = editor.to_bytes().unwrap();
     let first = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let second = editor
         .add_slide_chart(
             0,
-            ChartKind::Line2d,
+            Kind::Line2d,
             sample_data(),
             DrawablePoint {
                 x: POSITION.x + SIZE.width,
@@ -212,7 +290,7 @@ fn multiple_chart_theme_registrations_are_removed_independently() {
         .unwrap();
 
     editor
-        .remove_slide_chart(0, first.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&editor, &first))
         .unwrap();
     assert_eq!(
         editor
@@ -224,7 +302,7 @@ fn multiple_chart_theme_registrations_are_removed_independently() {
         vec![second.drawable_object_id]
     );
     editor
-        .remove_slide_chart(0, second.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&editor, &second))
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 }
@@ -233,15 +311,19 @@ fn multiple_chart_theme_registrations_are_removed_independently() {
 fn duplicate_slide_chart_clones_the_private_graph_and_inline_data() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let source_graph = chart_graph(&editor, 0, source.drawable_object_id).unwrap();
     let baseline = editor.to_bytes().unwrap();
-    assert!(editor.duplicate_slide_chart(0, u64::MAX).is_err());
+    assert!(
+        editor
+            .duplicate_slide_chart(0, ChartSelector::index(usize::MAX))
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     let duplicate_graph = chart_graph(&editor, 0, duplicate.drawable_object_id).unwrap();
     let expected_geometry =
@@ -270,7 +352,7 @@ fn duplicate_slide_chart_clones_the_private_graph_and_inline_data() {
     )
     .unwrap();
     editor
-        .set_slide_chart_data(0, duplicate.drawable_object_id, replacement.clone())
+        .set_slide_chart_data(0, chart_selector(&editor, &duplicate), replacement.clone())
         .unwrap();
     assert_eq!(
         chart_graph(&editor, 0, source.drawable_object_id)
@@ -288,7 +370,7 @@ fn duplicate_slide_chart_clones_the_private_graph_and_inline_data() {
     );
 
     editor
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -300,7 +382,7 @@ fn duplicate_slide_chart_clones_the_private_graph_and_inline_data() {
         vec![duplicate.drawable_object_id]
     );
     editor
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&editor, &duplicate))
         .unwrap();
     assert!(editor.slide_charts(0).unwrap().is_empty());
 }
@@ -309,7 +391,7 @@ fn duplicate_slide_chart_clones_the_private_graph_and_inline_data() {
 fn scratch_presentation_supports_native_chart_caption_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
     assert_eq!(
@@ -329,7 +411,7 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -366,7 +448,7 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
         Some("Revenue by region".to_owned())
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(
         reopened
@@ -381,7 +463,7 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
 fn scratch_presentation_supports_native_chart_title_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
     assert_eq!(
@@ -401,7 +483,7 @@ fn scratch_presentation_supports_native_chart_title_crud() {
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -450,7 +532,7 @@ fn scratch_presentation_supports_native_chart_title_crud() {
         Some("Revenue by region".to_owned())
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(
         reopened
@@ -465,10 +547,10 @@ fn scratch_presentation_supports_native_chart_title_crud() {
 fn scratch_presentation_supports_native_chart_axis_title_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert_eq!(
             editor
                 .slide_chart_axis_title(0, source.drawable_object_id, axis)
@@ -477,19 +559,16 @@ fn scratch_presentation_supports_native_chart_axis_title_crud() {
         );
     }
     editor
-        .set_slide_chart_axis_title(0, source.drawable_object_id, ChartAxis::Category, "Month")
+        .set_slide_chart_axis_title(0, source.drawable_object_id, Axis::Category, "Month")
         .unwrap();
     editor
-        .set_slide_chart_axis_title(0, source.drawable_object_id, ChartAxis::Value, "Revenue")
+        .set_slide_chart_axis_title(0, source.drawable_object_id, Axis::Value, "Revenue")
         .unwrap();
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
-    for (axis, title) in [
-        (ChartAxis::Category, "Month"),
-        (ChartAxis::Value, "Revenue"),
-    ] {
+    for (axis, title) in [(Axis::Category, "Month"), (Axis::Value, "Revenue")] {
         assert_eq!(
             editor
                 .slide_chart_axis_title(0, source.drawable_object_id, axis)
@@ -510,48 +589,43 @@ fn scratch_presentation_supports_native_chart_axis_title_crud() {
         .set_slide_chart_axis_title(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
+            Axis::Category,
             "Updated month",
         )
         .unwrap();
     editor
-        .set_slide_chart_axis_title(
-            0,
-            source.drawable_object_id,
-            ChartAxis::Value,
-            "Updated revenue",
-        )
+        .set_slide_chart_axis_title(0, source.drawable_object_id, Axis::Value, "Updated revenue")
         .unwrap();
     assert_eq!(
         editor
-            .slide_chart_axis_title(0, source.drawable_object_id, ChartAxis::Category)
+            .slide_chart_axis_title(0, source.drawable_object_id, Axis::Category)
             .unwrap()
             .as_deref(),
         Some("Updated month")
     );
     assert_eq!(
         editor
-            .slide_chart_axis_title(0, source.drawable_object_id, ChartAxis::Value)
+            .slide_chart_axis_title(0, source.drawable_object_id, Axis::Value)
             .unwrap()
             .as_deref(),
         Some("Updated revenue")
     );
     assert_eq!(
         editor
-            .slide_chart_axis_title(0, duplicate.drawable_object_id, ChartAxis::Category)
+            .slide_chart_axis_title(0, duplicate.drawable_object_id, Axis::Category)
             .unwrap()
             .as_deref(),
         Some("Month")
     );
     assert_eq!(
         editor
-            .slide_chart_axis_title(0, duplicate.drawable_object_id, ChartAxis::Value)
+            .slide_chart_axis_title(0, duplicate.drawable_object_id, Axis::Value)
             .unwrap()
             .as_deref(),
         Some("Revenue")
     );
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
                 .remove_slide_chart_axis_title(0, source.drawable_object_id, axis)
@@ -567,20 +641,20 @@ fn scratch_presentation_supports_native_chart_axis_title_crud() {
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
-            .slide_chart_axis_title(0, duplicate.drawable_object_id, ChartAxis::Category)
+            .slide_chart_axis_title(0, duplicate.drawable_object_id, Axis::Category)
             .unwrap()
             .as_deref(),
         Some("Month")
     );
     assert_eq!(
         reopened
-            .slide_chart_axis_title(0, duplicate.drawable_object_id, ChartAxis::Value)
+            .slide_chart_axis_title(0, duplicate.drawable_object_id, Axis::Value)
             .unwrap()
             .as_deref(),
         Some("Revenue")
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(
         reopened
@@ -595,16 +669,11 @@ fn scratch_presentation_supports_native_chart_axis_title_crud() {
 fn scratch_presentation_supports_native_chart_value_axis_bounds_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
-    let automatic = ChartValueAxisBounds::automatic();
-    let fixed = ChartValueAxisBounds::fixed(
-        ChartAxisBound::new(-10.0).unwrap(),
-        ChartAxisBound::new(40.0).unwrap(),
-    )
-    .unwrap();
-    let minimum_only =
-        ChartValueAxisBounds::new(Some(ChartAxisBound::new(-5.0).unwrap()), None).unwrap();
+    let automatic = Bounds::automatic();
+    let fixed = Bounds::fixed(Bound::new(-10.0).unwrap(), Bound::new(40.0).unwrap()).unwrap();
+    let minimum_only = Bounds::new(Some(Bound::new(-5.0).unwrap()), None).unwrap();
 
     assert_eq!(
         editor
@@ -622,7 +691,7 @@ fn scratch_presentation_supports_native_chart_value_axis_bounds_crud() {
         .set_slide_chart_value_axis_bounds(0, source.drawable_object_id, fixed)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -664,7 +733,7 @@ fn scratch_presentation_supports_native_chart_value_axis_bounds_crud() {
         automatic
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -672,7 +741,7 @@ fn scratch_presentation_supports_native_chart_value_axis_bounds_crud() {
 fn scratch_presentation_supports_native_chart_border_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
     assert!(
@@ -696,7 +765,7 @@ fn scratch_presentation_supports_native_chart_border_crud() {
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert!(
         editor
@@ -719,10 +788,10 @@ fn scratch_presentation_supports_native_chart_border_crud() {
             .unwrap()
     );
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -731,7 +800,7 @@ fn scratch_presentation_supports_native_chart_border_crud() {
 fn scratch_presentation_supports_native_chart_rounded_corner_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let rounded = ChartRoundedCorners::new(ChartCornerRadius::new(20.0).unwrap(), true);
     let changed = ChartRoundedCorners::new(ChartCornerRadius::new(35.0).unwrap(), false);
@@ -759,7 +828,7 @@ fn scratch_presentation_supports_native_chart_rounded_corner_crud() {
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -785,10 +854,10 @@ fn scratch_presentation_supports_native_chart_rounded_corner_crud() {
         rounded
     );
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -797,7 +866,7 @@ fn scratch_presentation_supports_native_chart_rounded_corner_crud() {
 fn scratch_presentation_supports_native_chart_gap_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let customized = gap_spacing(25.0, 70.0);
     let changed = gap_spacing(30.0, 60.0);
@@ -806,15 +875,11 @@ fn scratch_presentation_supports_native_chart_gap_crud() {
         editor
             .slide_chart_gap_spacing(0, source.drawable_object_id)
             .unwrap(),
-        ChartGapSpacing::NATIVE_DEFAULT
+        Spacing::DEFAULT
     );
     let baseline = editor.to_bytes().unwrap();
     editor
-        .set_slide_chart_gap_spacing(
-            0,
-            source.drawable_object_id,
-            ChartGapSpacing::NATIVE_DEFAULT,
-        )
+        .set_slide_chart_gap_spacing(0, source.drawable_object_id, Spacing::DEFAULT)
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
@@ -822,7 +887,7 @@ fn scratch_presentation_supports_native_chart_gap_crud() {
         .set_slide_chart_gap_spacing(0, source.drawable_object_id, customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -848,10 +913,10 @@ fn scratch_presentation_supports_native_chart_gap_crud() {
         customized
     );
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -860,17 +925,17 @@ fn scratch_presentation_supports_native_chart_gap_crud() {
 fn scratch_presentation_supports_native_chart_value_axis_steps_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
-    let defaults = ChartValueAxisSteps::fixed(
-        ChartAxisMajorStepCount::new(5).unwrap(),
-        ChartAxisMinorStepCount::new(1).unwrap(),
+    let defaults = Steps::fixed(
+        MajorStepCount::new(5).unwrap(),
+        MinorStepCount::new(1).unwrap(),
     );
-    let fixed = ChartValueAxisSteps::fixed(
-        ChartAxisMajorStepCount::new(6).unwrap(),
-        ChartAxisMinorStepCount::new(2).unwrap(),
+    let fixed = Steps::fixed(
+        MajorStepCount::new(6).unwrap(),
+        MinorStepCount::new(2).unwrap(),
     );
-    let major_only = ChartValueAxisSteps::new(Some(ChartAxisMajorStepCount::new(4).unwrap()), None);
+    let major_only = Steps::new(Some(MajorStepCount::new(4).unwrap()), None);
 
     assert_eq!(
         editor
@@ -888,7 +953,7 @@ fn scratch_presentation_supports_native_chart_value_axis_steps_crud() {
         .set_slide_chart_value_axis_steps(0, source.drawable_object_id, fixed)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -921,20 +986,16 @@ fn scratch_presentation_supports_native_chart_value_axis_steps_crud() {
         fixed
     );
     reopened
-        .set_slide_chart_value_axis_steps(
-            0,
-            source.drawable_object_id,
-            ChartValueAxisSteps::automatic(),
-        )
+        .set_slide_chart_value_axis_steps(0, source.drawable_object_id, Steps::automatic())
         .unwrap();
     assert_eq!(
         reopened
             .slide_chart_value_axis_steps(0, source.drawable_object_id)
             .unwrap(),
-        ChartValueAxisSteps::automatic()
+        Steps::automatic()
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -942,61 +1003,83 @@ fn scratch_presentation_supports_native_chart_value_axis_steps_crud() {
 fn scratch_presentation_supports_native_chart_value_axis_minimum_label_visibility_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
     assert!(
         editor
             .slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
     let baseline = editor.to_bytes().unwrap();
     editor
-        .set_slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id, true)
+        .set_slide_chart_value_axis_minimum_label_visible(
+            0,
+            source.drawable_object_id,
+            AxisVisibility::Visible,
+        )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     editor
-        .set_slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id, false)
+        .set_slide_chart_value_axis_minimum_label_visible(
+            0,
+            source.drawable_object_id,
+            AxisVisibility::Hidden,
+        )
         .unwrap();
     assert!(
         !editor
             .slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert!(
         !editor
             .slide_chart_value_axis_minimum_label_visible(0, duplicate.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
 
     editor
-        .set_slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id, true)
+        .set_slide_chart_value_axis_minimum_label_visible(
+            0,
+            source.drawable_object_id,
+            AxisVisibility::Visible,
+        )
         .unwrap();
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert!(
         reopened
             .slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
     assert!(
         !reopened
             .slide_chart_value_axis_minimum_label_visible(0, duplicate.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
     reopened
-        .set_slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id, false)
+        .set_slide_chart_value_axis_minimum_label_visible(
+            0,
+            source.drawable_object_id,
+            AxisVisibility::Hidden,
+        )
         .unwrap();
     assert!(
         !reopened
             .slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id)
             .unwrap()
+            .is_visible()
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1004,7 +1087,7 @@ fn scratch_presentation_supports_native_chart_value_axis_minimum_label_visibilit
 fn scratch_presentation_supports_native_chart_category_axis_series_names_visibility_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
     assert!(
@@ -1027,7 +1110,7 @@ fn scratch_presentation_supports_native_chart_category_axis_series_names_visibil
             .unwrap()
     );
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert!(
         editor
@@ -1058,7 +1141,7 @@ fn scratch_presentation_supports_native_chart_category_axis_series_names_visibil
             .unwrap()
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1066,10 +1149,10 @@ fn scratch_presentation_supports_native_chart_category_axis_series_names_visibil
 fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
                 .slide_chart_axis_labels_visible(0, source.drawable_object_id, axis)
@@ -1078,16 +1161,11 @@ fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
     }
     let baseline = editor.to_bytes().unwrap();
     editor
-        .set_slide_chart_axis_labels_visible(
-            0,
-            source.drawable_object_id,
-            ChartAxis::Category,
-            true,
-        )
+        .set_slide_chart_axis_labels_visible(0, source.drawable_object_id, Axis::Category, true)
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         editor
             .set_slide_chart_axis_labels_visible(0, source.drawable_object_id, axis, false)
             .unwrap();
@@ -1099,9 +1177,9 @@ fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
     }
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             !editor
                 .slide_chart_axis_labels_visible(0, duplicate.drawable_object_id, axis)
@@ -1113,7 +1191,7 @@ fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
     }
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             reopened
                 .slide_chart_axis_labels_visible(0, source.drawable_object_id, axis)
@@ -1134,7 +1212,7 @@ fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
         );
     }
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1142,54 +1220,69 @@ fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
 fn scratch_presentation_supports_native_chart_axis_line_visibility_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
                 .slide_chart_axis_line_visible(0, source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         editor
-            .set_slide_chart_axis_line_visible(0, source.drawable_object_id, axis, false)
+            .set_slide_chart_axis_line_visible(
+                0,
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Hidden,
+            )
             .unwrap();
         assert!(
             !editor
                 .slide_chart_axis_line_visible(0, source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             !editor
                 .slide_chart_axis_line_visible(0, duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         editor
-            .set_slide_chart_axis_line_visible(0, source.drawable_object_id, axis, true)
+            .set_slide_chart_axis_line_visible(
+                0,
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Visible,
+            )
             .unwrap();
     }
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             reopened
                 .slide_chart_axis_line_visible(0, source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         assert!(
             !reopened
                 .slide_chart_axis_line_visible(0, duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1197,34 +1290,28 @@ fn scratch_presentation_supports_native_chart_axis_line_visibility_crud() {
 fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
     assert!(
         !editor
-            .slide_chart_axis_major_gridlines_visible(
-                0,
-                source.drawable_object_id,
-                ChartAxis::Category,
-            )
+            .slide_chart_axis_major_gridlines_visible(0, source.drawable_object_id, Axis::Category,)
             .unwrap()
+            .is_visible()
     );
     assert!(
         editor
-            .slide_chart_axis_major_gridlines_visible(
-                0,
-                source.drawable_object_id,
-                ChartAxis::Value
-            )
+            .slide_chart_axis_major_gridlines_visible(0, source.drawable_object_id, Axis::Value)
             .unwrap()
+            .is_visible()
     );
     let baseline = editor.to_bytes().unwrap();
     editor
         .set_slide_chart_axis_major_gridlines_visible(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
-            false,
+            Axis::Category,
+            AxisVisibility::Hidden,
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -1233,28 +1320,29 @@ fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_cru
         .set_slide_chart_axis_major_gridlines_visible(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
-            true,
+            Axis::Category,
+            AxisVisibility::Visible,
         )
         .unwrap();
     editor
         .set_slide_chart_axis_major_gridlines_visible(
             0,
             source.drawable_object_id,
-            ChartAxis::Value,
-            false,
+            Axis::Value,
+            AxisVisibility::Hidden,
         )
         .unwrap();
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert_eq!(
             editor
                 .slide_chart_axis_major_gridlines_visible(0, duplicate.drawable_object_id, axis)
-                .unwrap(),
-            axis == ChartAxis::Category
+                .unwrap()
+                .is_visible(),
+            axis == Axis::Category
         );
     }
 
@@ -1262,36 +1350,38 @@ fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_cru
         .set_slide_chart_axis_major_gridlines_visible(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
-            false,
+            Axis::Category,
+            AxisVisibility::Hidden,
         )
         .unwrap();
     editor
         .set_slide_chart_axis_major_gridlines_visible(
             0,
             source.drawable_object_id,
-            ChartAxis::Value,
-            true,
+            Axis::Value,
+            AxisVisibility::Visible,
         )
         .unwrap();
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert_eq!(
             reopened
                 .slide_chart_axis_major_gridlines_visible(0, source.drawable_object_id, axis)
-                .unwrap(),
-            axis == ChartAxis::Value
+                .unwrap()
+                .is_visible(),
+            axis == Axis::Value
         );
         assert_eq!(
             reopened
                 .slide_chart_axis_major_gridlines_visible(0, duplicate.drawable_object_id, axis)
-                .unwrap(),
-            axis == ChartAxis::Category
+                .unwrap()
+                .is_visible(),
+            axis == Axis::Category
         );
     }
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1299,14 +1389,15 @@ fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_cru
 fn scratch_presentation_supports_native_chart_axis_minor_gridline_visibility_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             !editor
                 .slide_chart_axis_minor_gridlines_visible(0, source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
     let baseline = editor.to_bytes().unwrap();
@@ -1314,46 +1405,59 @@ fn scratch_presentation_supports_native_chart_axis_minor_gridline_visibility_cru
         .set_slide_chart_axis_minor_gridlines_visible(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
-            false,
+            Axis::Category,
+            AxisVisibility::Hidden,
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         editor
-            .set_slide_chart_axis_minor_gridlines_visible(0, source.drawable_object_id, axis, true)
+            .set_slide_chart_axis_minor_gridlines_visible(
+                0,
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Visible,
+            )
             .unwrap();
     }
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
                 .slide_chart_axis_minor_gridlines_visible(0, duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         editor
-            .set_slide_chart_axis_minor_gridlines_visible(0, source.drawable_object_id, axis, false)
+            .set_slide_chart_axis_minor_gridlines_visible(
+                0,
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Hidden,
+            )
             .unwrap();
     }
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             !reopened
                 .slide_chart_axis_minor_gridlines_visible(0, source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         assert!(
             reopened
                 .slide_chart_axis_minor_gridlines_visible(0, duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1361,14 +1465,15 @@ fn scratch_presentation_supports_native_chart_axis_minor_gridline_visibility_cru
 fn scratch_presentation_supports_native_chart_axis_minor_tick_mark_visibility_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
                 .slide_chart_axis_minor_tick_marks_visible(0, source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
     let baseline = editor.to_bytes().unwrap();
@@ -1376,70 +1481,80 @@ fn scratch_presentation_supports_native_chart_axis_minor_tick_mark_visibility_cr
         .set_slide_chart_axis_minor_tick_marks_visible(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
-            true,
+            Axis::Category,
+            AxisVisibility::Visible,
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         editor
             .set_slide_chart_axis_minor_tick_marks_visible(
                 0,
                 source.drawable_object_id,
                 axis,
-                false,
+                AxisVisibility::Hidden,
             )
             .unwrap();
         assert!(
             !editor
                 .slide_chart_axis_minor_tick_marks_visible(0, source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             !editor
                 .slide_chart_axis_minor_tick_marks_visible(0, duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         editor
-            .set_slide_chart_axis_minor_tick_marks_visible(0, source.drawable_object_id, axis, true)
+            .set_slide_chart_axis_minor_tick_marks_visible(
+                0,
+                source.drawable_object_id,
+                axis,
+                AxisVisibility::Visible,
+            )
             .unwrap();
     }
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert!(
             reopened
                 .slide_chart_axis_minor_tick_marks_visible(0, source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         assert!(
             !reopened
                 .slide_chart_axis_minor_tick_marks_visible(0, duplicate.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
         reopened
             .set_slide_chart_axis_minor_tick_marks_visible(
                 0,
                 source.drawable_object_id,
                 axis,
-                false,
+                AxisVisibility::Hidden,
             )
             .unwrap();
         assert!(
             !reopened
                 .slide_chart_axis_minor_tick_marks_visible(0, source.drawable_object_id, axis)
                 .unwrap()
+                .is_visible()
         );
     }
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1447,15 +1562,15 @@ fn scratch_presentation_supports_native_chart_axis_minor_tick_mark_visibility_cr
 fn scratch_presentation_supports_native_chart_axis_tick_mark_location_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
-    for axis in [ChartAxis::Category, ChartAxis::Value] {
+    for axis in [Axis::Category, Axis::Value] {
         assert_eq!(
             editor
                 .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, axis)
                 .unwrap(),
-            ChartAxisTickMarkLocation::Centered
+            TickMarkLocation::Centered
         );
     }
     let baseline = editor.to_bytes().unwrap();
@@ -1463,8 +1578,8 @@ fn scratch_presentation_supports_native_chart_axis_tick_mark_location_crud() {
         .set_slide_chart_axis_tick_mark_location(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
-            ChartAxisTickMarkLocation::Centered,
+            Axis::Category,
+            TickMarkLocation::Centered,
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -1473,99 +1588,91 @@ fn scratch_presentation_supports_native_chart_axis_tick_mark_location_crud() {
         .set_slide_chart_axis_tick_mark_location(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
-            ChartAxisTickMarkLocation::None,
+            Axis::Category,
+            TickMarkLocation::None,
         )
         .unwrap();
     editor
         .set_slide_chart_axis_tick_mark_location(
             0,
             source.drawable_object_id,
-            ChartAxis::Value,
-            ChartAxisTickMarkLocation::Outside,
+            Axis::Value,
+            TickMarkLocation::Outside,
         )
         .unwrap();
     assert_eq!(
         editor
-            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, ChartAxis::Category)
+            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, Axis::Category)
             .unwrap(),
-        ChartAxisTickMarkLocation::None
+        TickMarkLocation::None
     );
     assert_eq!(
         editor
-            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, ChartAxis::Value)
+            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, Axis::Value)
             .unwrap(),
-        ChartAxisTickMarkLocation::Outside
+        TickMarkLocation::Outside
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
-            .slide_chart_axis_tick_mark_location(
-                0,
-                duplicate.drawable_object_id,
-                ChartAxis::Category,
-            )
+            .slide_chart_axis_tick_mark_location(0, duplicate.drawable_object_id, Axis::Category,)
             .unwrap(),
-        ChartAxisTickMarkLocation::None
+        TickMarkLocation::None
     );
     assert_eq!(
         editor
-            .slide_chart_axis_tick_mark_location(0, duplicate.drawable_object_id, ChartAxis::Value)
+            .slide_chart_axis_tick_mark_location(0, duplicate.drawable_object_id, Axis::Value)
             .unwrap(),
-        ChartAxisTickMarkLocation::Outside
+        TickMarkLocation::Outside
     );
 
     editor
         .set_slide_chart_axis_tick_mark_location(
             0,
             source.drawable_object_id,
-            ChartAxis::Category,
-            ChartAxisTickMarkLocation::Inside,
+            Axis::Category,
+            TickMarkLocation::Inside,
         )
         .unwrap();
     editor
         .set_slide_chart_axis_tick_mark_location(
             0,
             source.drawable_object_id,
-            ChartAxis::Value,
-            ChartAxisTickMarkLocation::Centered,
+            Axis::Value,
+            TickMarkLocation::Centered,
         )
         .unwrap();
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
-            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, ChartAxis::Category)
+            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, Axis::Category)
             .unwrap(),
-        ChartAxisTickMarkLocation::Inside
+        TickMarkLocation::Inside
     );
     assert_eq!(
         reopened
-            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, ChartAxis::Value)
+            .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, Axis::Value)
             .unwrap(),
-        ChartAxisTickMarkLocation::Centered
+        TickMarkLocation::Centered
     );
     assert_eq!(
         reopened
-            .slide_chart_axis_tick_mark_location(
-                0,
-                duplicate.drawable_object_id,
-                ChartAxis::Category,
-            )
+            .slide_chart_axis_tick_mark_location(0, duplicate.drawable_object_id, Axis::Category,)
             .unwrap(),
-        ChartAxisTickMarkLocation::None
+        TickMarkLocation::None
     );
     assert_eq!(
         reopened
-            .slide_chart_axis_tick_mark_location(0, duplicate.drawable_object_id, ChartAxis::Value)
+            .slide_chart_axis_tick_mark_location(0, duplicate.drawable_object_id, Axis::Value)
             .unwrap(),
-        ChartAxisTickMarkLocation::Outside
+        TickMarkLocation::Outside
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -1573,7 +1680,7 @@ fn scratch_presentation_supports_native_chart_axis_tick_mark_location_crud() {
 fn scratch_presentation_supports_native_chart_legend_visibility_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
     assert!(
@@ -1596,7 +1703,7 @@ fn scratch_presentation_supports_native_chart_legend_visibility_crud() {
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert!(
         !editor
@@ -1630,10 +1737,10 @@ fn scratch_presentation_supports_native_chart_legend_visibility_crud() {
             .unwrap()
     );
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -1642,7 +1749,7 @@ fn scratch_presentation_supports_native_chart_legend_visibility_crud() {
 fn scratch_presentation_supports_exact_chart_legend_fill_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let chart = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let object_id = chart.drawable_object_id;
     let baseline = editor.to_bytes().unwrap();
@@ -1682,7 +1789,7 @@ fn scratch_presentation_supports_exact_chart_legend_fill_crud() {
 fn scratch_presentation_supports_exact_chart_legend_frame_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let chart = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let object_id = chart.drawable_object_id;
     let baseline = editor.to_bytes().unwrap();
@@ -1716,7 +1823,7 @@ fn scratch_presentation_supports_exact_chart_legend_frame_crud() {
 fn scratch_presentation_supports_exact_chart_legend_typography_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let chart = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let object_id = chart.drawable_object_id;
     let fill = ChartLegendFill::Fill(ShapeFill::Solid(
@@ -1793,7 +1900,7 @@ fn scratch_presentation_supports_exact_chart_legend_typography_crud() {
 fn duplicated_legend_typography_is_copy_on_write() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let chart = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let eighteen = ChartLegendFontSize::Size(ChartFontSize::from_points(18.0).unwrap());
     editor
@@ -1804,7 +1911,7 @@ fn duplicated_legend_typography_is_copy_on_write() {
         .set_slide_chart_legend_font(0, chart.drawable_object_id, &bold)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, chart.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &chart))
         .unwrap();
     let sixteen = ChartLegendFontSize::Size(ChartFontSize::from_points(16.0).unwrap());
     editor
@@ -1849,7 +1956,7 @@ fn duplicated_legend_typography_is_copy_on_write() {
 fn scratch_presentation_supports_exact_chart_legend_stroke_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let chart = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let object_id = chart.drawable_object_id;
     let fill = ChartLegendFill::Fill(ShapeFill::Solid(
@@ -1864,10 +1971,10 @@ fn scratch_presentation_supports_exact_chart_legend_stroke_crud() {
         editor.slide_chart_legend_stroke(0, object_id).unwrap(),
         ChartLegendStroke::Inherited
     );
-    let stroke = ChartLegendStroke::Stroke(ShapeStroke::new(
+    let stroke = ChartLegendStroke::Stroke(Stroke::new(
         RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-        StrokeWidth::new(2.5).unwrap(),
-        StrokePattern::MediumDash,
+        Width::new(2.5).unwrap(),
+        Pattern::MediumDash,
     ));
     editor
         .set_slide_chart_legend_stroke(0, object_id, stroke)
@@ -1900,16 +2007,16 @@ fn scratch_presentation_supports_exact_chart_legend_stroke_crud() {
 fn scratch_presentation_supports_exact_chart_legend_shadow_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let chart = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let object_id = chart.drawable_object_id;
     let fill = ChartLegendFill::Fill(ShapeFill::Solid(
         RgbaColor::new(0.9, 0.95, 1.0, 1.0, RgbColorSpace::Srgb).unwrap(),
     ));
-    let stroke = ChartLegendStroke::Stroke(ShapeStroke::new(
+    let stroke = ChartLegendStroke::Stroke(Stroke::new(
         RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-        StrokeWidth::new(2.5).unwrap(),
-        StrokePattern::MediumDash,
+        Width::new(2.5).unwrap(),
+        Pattern::MediumDash,
     ));
     editor
         .set_slide_chart_legend_fill(0, object_id, &fill)
@@ -1923,14 +2030,14 @@ fn scratch_presentation_supports_exact_chart_legend_shadow_crud() {
         editor.slide_chart_legend_shadow(0, object_id).unwrap(),
         ChartLegendShadow::Inherited
     );
-    let shadow = ChartLegendShadow::Shadow(ShapeDropShadow::new(
-        ShapeShadowAppearance::new(
+    let shadow = ChartLegendShadow::Shadow(Drop::new(
+        Appearance::new(
             RgbaColor::black(),
-            ShapeShadowBlurRadius::from_points(12).unwrap(),
-            ShapeShadowOffset::from_points(8.0).unwrap(),
-            ShapeShadowOpacity::new(0.6).unwrap(),
+            BlurRadius::from_points(12).unwrap(),
+            Offset::from_points(8.0).unwrap(),
+            Opacity::new(0.6).unwrap(),
         ),
-        ShapeShadowAngle::from_degrees(30.0).unwrap(),
+        Angle::from_degrees(30.0).unwrap(),
     ));
     editor
         .set_slide_chart_legend_shadow(0, object_id, shadow)
@@ -1971,46 +2078,42 @@ fn scratch_presentation_supports_exact_chart_legend_shadow_crud() {
 fn scratch_presentation_supports_native_chart_value_axis_scale_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
     assert_eq!(
         editor
             .slide_chart_value_axis_scale(0, source.drawable_object_id)
             .unwrap(),
-        ChartValueAxisScale::Linear
+        Scale::Linear
     );
     let baseline = editor.to_bytes().unwrap();
     editor
-        .set_slide_chart_value_axis_scale(0, source.drawable_object_id, ChartValueAxisScale::Linear)
+        .set_slide_chart_value_axis_scale(0, source.drawable_object_id, Scale::Linear)
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
     editor
-        .set_slide_chart_value_axis_scale(
-            0,
-            source.drawable_object_id,
-            ChartValueAxisScale::Logarithmic,
-        )
+        .set_slide_chart_value_axis_scale(0, source.drawable_object_id, Scale::Logarithmic)
         .unwrap();
     assert_eq!(
         editor
             .slide_chart_value_axis_scale(0, source.drawable_object_id)
             .unwrap(),
-        ChartValueAxisScale::Logarithmic
+        Scale::Logarithmic
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
             .slide_chart_value_axis_scale(0, duplicate.drawable_object_id)
             .unwrap(),
-        ChartValueAxisScale::Logarithmic
+        Scale::Logarithmic
     );
     editor
-        .set_slide_chart_value_axis_scale(0, source.drawable_object_id, ChartValueAxisScale::Linear)
+        .set_slide_chart_value_axis_scale(0, source.drawable_object_id, Scale::Linear)
         .unwrap();
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -2018,19 +2121,19 @@ fn scratch_presentation_supports_native_chart_value_axis_scale_crud() {
         reopened
             .slide_chart_value_axis_scale(0, source.drawable_object_id)
             .unwrap(),
-        ChartValueAxisScale::Linear
+        Scale::Linear
     );
     assert_eq!(
         reopened
             .slide_chart_value_axis_scale(0, duplicate.drawable_object_id)
             .unwrap(),
-        ChartValueAxisScale::Logarithmic
+        Scale::Logarithmic
     );
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
 }
 
@@ -2038,11 +2141,11 @@ fn scratch_presentation_supports_native_chart_value_axis_scale_crud() {
 fn scratch_presentation_supports_native_chart_border_stroke_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
-    let default = ShapeStroke::new(RgbaColor::black(), StrokeWidth::ONE, StrokePattern::Solid);
-    let customized = chart_stroke(StrokePattern::MediumDash, 3.0);
-    let changed = chart_stroke(StrokePattern::RoundedDash, 2.0);
+    let default = Stroke::new(RgbaColor::black(), Width::ONE, Pattern::Solid);
+    let customized = chart_stroke(Pattern::MediumDash, 3.0);
+    let changed = chart_stroke(Pattern::RoundedDash, 2.0);
 
     assert_eq!(
         editor
@@ -2060,7 +2163,7 @@ fn scratch_presentation_supports_native_chart_border_stroke_crud() {
         .set_slide_chart_border_stroke(0, source.drawable_object_id, Some(customized))
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -2089,10 +2192,10 @@ fn scratch_presentation_supports_native_chart_border_stroke_crud() {
         None
     );
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -2102,7 +2205,7 @@ fn scratch_presentation_supports_native_chart_background_fill_crud() {
     let image_bytes = fixture("test-data/images/png/lena.png");
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let native_default = editor
         .slide_chart_background_fill(0, source.drawable_object_id)
@@ -2126,7 +2229,7 @@ fn scratch_presentation_supports_native_chart_background_fill_crud() {
         )
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -2158,11 +2261,11 @@ fn scratch_presentation_supports_native_chart_background_fill_crud() {
         image_bytes
     );
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.media_assets().unwrap().is_empty());
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -2172,7 +2275,7 @@ fn scratch_presentation_supports_inherited_series_fill_crud() {
     let image_bytes = fixture("test-data/images/png/lena.png");
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let defaults = editor
         .slide_chart_series_fills(0, source.drawable_object_id)
@@ -2190,8 +2293,8 @@ fn scratch_presentation_supports_inherited_series_fill_crud() {
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    let first = ChartSeriesIndex::from_zero_based(0);
-    let second = ChartSeriesIndex::from_zero_based(1);
+    let first = Index::from_zero_based(0);
+    let second = Index::from_zero_based(1);
     editor
         .set_slide_chart_series_fill(0, source.drawable_object_id, first, &ShapeFill::None)
         .unwrap();
@@ -2207,7 +2310,7 @@ fn scratch_presentation_supports_inherited_series_fill_crud() {
         )
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -2242,11 +2345,11 @@ fn scratch_presentation_supports_inherited_series_fill_crud() {
         image_bytes
     );
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     assert_eq!(reopened.media_assets().unwrap().len(), 1);
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.media_assets().unwrap().is_empty());
 }
@@ -2255,7 +2358,7 @@ fn scratch_presentation_supports_inherited_series_fill_crud() {
 fn scratch_presentation_supports_inherited_series_stroke_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let defaults = vec![None, None];
     assert_eq!(
@@ -2270,8 +2373,8 @@ fn scratch_presentation_supports_inherited_series_stroke_crud() {
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-    let first = ChartSeriesIndex::from_zero_based(0);
-    let second = ChartSeriesIndex::from_zero_based(1);
+    let first = Index::from_zero_based(0);
+    let second = Index::from_zero_based(1);
     let rounded = chart_series_stroke(ChartSeriesStrokePattern::RoundedDash, 3.5);
     let medium = chart_series_stroke(ChartSeriesStrokePattern::MediumDash, 2.0);
     editor
@@ -2282,7 +2385,7 @@ fn scratch_presentation_supports_inherited_series_stroke_crud() {
         )
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -2325,7 +2428,7 @@ fn scratch_presentation_supports_inherited_series_stroke_crud() {
 fn scratch_presentation_supports_native_chart_shadow_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let native_default = ChartShadow::native_default();
     assert_eq!(
@@ -2345,7 +2448,7 @@ fn scratch_presentation_supports_native_chart_shadow_crud() {
         .set_slide_chart_shadow(0, source.drawable_object_id, customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -2374,10 +2477,10 @@ fn scratch_presentation_supports_native_chart_shadow_crud() {
         .set_slide_chart_shadow(0, duplicate.drawable_object_id, native_default)
         .unwrap();
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -2386,7 +2489,7 @@ fn scratch_presentation_supports_native_chart_shadow_crud() {
 fn scratch_presentation_supports_native_pie_start_angle_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Pie2d, pie_data(), POSITION, SIZE)
         .unwrap();
     assert_eq!(
         editor
@@ -2405,10 +2508,10 @@ fn scratch_presentation_supports_native_pie_start_angle_crud() {
         .set_slide_chart_pie_start_angle(0, source.drawable_object_id, customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
-        .set_slide_chart_kind(0, duplicate.drawable_object_id, ChartKind::Donut2d)
+        .set_slide_chart_kind(0, chart_selector(&editor, &duplicate), Kind::Donut2d)
         .unwrap();
     assert_eq!(
         editor
@@ -2442,7 +2545,7 @@ fn scratch_presentation_supports_native_pie_start_angle_crud() {
         .unwrap();
 
     let column = reopened
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let before_rejected_update = reopened.to_bytes().unwrap();
     assert!(
@@ -2462,13 +2565,13 @@ fn scratch_presentation_supports_native_pie_start_angle_crud() {
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected_update);
 
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     reopened
-        .remove_slide_chart(0, column.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &column))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -2477,7 +2580,7 @@ fn scratch_presentation_supports_native_pie_start_angle_crud() {
 fn scratch_presentation_supports_native_donut_inner_radius_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Donut2d, pie_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Donut2d, pie_data(), POSITION, SIZE)
         .unwrap();
     assert_eq!(
         editor
@@ -2500,7 +2603,7 @@ fn scratch_presentation_supports_native_donut_inner_radius_crud() {
         .set_slide_chart_donut_inner_radius(0, source.drawable_object_id, customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     assert_eq!(
         editor
@@ -2509,7 +2612,7 @@ fn scratch_presentation_supports_native_donut_inner_radius_crud() {
         customized
     );
     editor
-        .set_slide_chart_kind(0, duplicate.drawable_object_id, ChartKind::Pie2d)
+        .set_slide_chart_kind(0, chart_selector(&editor, &duplicate), Kind::Pie2d)
         .unwrap();
     let before_rejected_update = editor.to_bytes().unwrap();
     assert!(
@@ -2528,7 +2631,7 @@ fn scratch_presentation_supports_native_donut_inner_radius_crud() {
     );
     assert_eq!(editor.to_bytes().unwrap(), before_rejected_update);
     editor
-        .set_slide_chart_kind(0, duplicate.drawable_object_id, ChartKind::Donut3d)
+        .set_slide_chart_kind(0, chart_selector(&editor, &duplicate), Kind::Donut3d)
         .unwrap();
 
     editor
@@ -2559,10 +2662,10 @@ fn scratch_presentation_supports_native_donut_inner_radius_crud() {
         )
         .unwrap();
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -2571,7 +2674,7 @@ fn scratch_presentation_supports_native_donut_inner_radius_crud() {
 fn scratch_presentation_supports_native_pie_wedge_explosion_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Pie2d, pie_data(), POSITION, SIZE)
         .unwrap();
     let zeros = vec![ChartPieWedgeExplosion::ZERO; 3];
     assert_eq!(
@@ -2613,10 +2716,10 @@ fn scratch_presentation_supports_native_pie_wedge_explosion_crud() {
         .set_slide_chart_pie_wedge_explosions(0, source.drawable_object_id, &customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
-        .set_slide_chart_kind(0, duplicate.drawable_object_id, ChartKind::Donut2d)
+        .set_slide_chart_kind(0, chart_selector(&editor, &duplicate), Kind::Donut2d)
         .unwrap();
     assert_eq!(
         editor
@@ -2671,7 +2774,7 @@ fn scratch_presentation_supports_native_pie_wedge_explosion_crud() {
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected_updates);
 
     let column = reopened
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let before_wrong_kind = reopened.to_bytes().unwrap();
     assert!(
@@ -2687,13 +2790,13 @@ fn scratch_presentation_supports_native_pie_wedge_explosion_crud() {
     assert_eq!(reopened.to_bytes().unwrap(), before_wrong_kind);
 
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     reopened
-        .remove_slide_chart(0, column.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &column))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -2702,13 +2805,13 @@ fn scratch_presentation_supports_native_pie_wedge_explosion_crud() {
 fn scratch_presentation_supports_native_pie_label_visibility_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Pie2d, pie_data(), POSITION, SIZE)
         .unwrap();
-    let defaults = vec![ChartPieLabelVisibility::DEFAULT; 3];
+    let defaults = vec![LabelVisibility::DEFAULT; 3];
     let customized = [
-        ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY,
-        ChartPieLabelVisibility::ALL,
-        ChartPieLabelVisibility::HIDDEN,
+        LabelVisibility::DATA_POINT_NAMES_ONLY,
+        LabelVisibility::ALL,
+        LabelVisibility::HIDDEN,
     ];
     assert_eq!(
         editor
@@ -2733,7 +2836,7 @@ fn scratch_presentation_supports_native_pie_label_visibility_crud() {
                 ChartPieWedgeIndex::from_zero_based(1),
             )
             .unwrap(),
-        ChartPieLabelVisibility::ALL
+        LabelVisibility::ALL
     );
     let explosions = [
         ChartPieWedgeExplosion::from_percent(10.0).unwrap(),
@@ -2765,17 +2868,17 @@ fn scratch_presentation_supports_native_pie_label_visibility_crud() {
         .set_slide_chart_pie_label_visibilities(0, source.drawable_object_id, &customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
-        .set_slide_chart_kind(0, duplicate.drawable_object_id, ChartKind::Donut2d)
+        .set_slide_chart_kind(0, chart_selector(&editor, &duplicate), Kind::Donut2d)
         .unwrap();
     editor
         .set_slide_chart_pie_label_visibility(
             0,
             source.drawable_object_id,
             ChartPieWedgeIndex::from_zero_based(0),
-            ChartPieLabelVisibility::VALUES_ONLY,
+            LabelVisibility::VALUES_ONLY,
         )
         .unwrap();
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -2793,10 +2896,10 @@ fn scratch_presentation_supports_native_pie_label_visibility_crud() {
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -2805,7 +2908,7 @@ fn scratch_presentation_supports_native_pie_label_visibility_crud() {
 fn scratch_presentation_supports_native_pie_label_distance_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Pie2d, pie_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Pie2d, pie_data(), POSITION, SIZE)
         .unwrap();
     let defaults = vec![ChartPieLabelDistance::DEFAULT; 3];
     let customized = [
@@ -2824,11 +2927,11 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
         .set_slide_chart_pie_label_distances(0, source.drawable_object_id, &defaults)
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
-    let leader_line_defaults = [ChartPieLeaderLineVisibility::Visible; 3];
+    let leader_line_defaults = [LeaderLineVisibility::Visible; 3];
     let leader_line_customized = [
-        ChartPieLeaderLineVisibility::Hidden,
-        ChartPieLeaderLineVisibility::Visible,
-        ChartPieLeaderLineVisibility::Hidden,
+        LeaderLineVisibility::Hidden,
+        LeaderLineVisibility::Visible,
+        LeaderLineVisibility::Hidden,
     ];
     assert_eq!(
         editor
@@ -2859,7 +2962,7 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
                 ChartPieWedgeIndex::from_zero_based(0),
             )
             .unwrap(),
-        ChartPieLeaderLineVisibility::Hidden
+        LeaderLineVisibility::Hidden
     );
     editor
         .set_slide_chart_pie_leader_line_visibilities(
@@ -2884,9 +2987,9 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
         customized[1]
     );
     let visibilities = [
-        ChartPieLabelVisibility::DATA_POINT_NAMES_ONLY,
-        ChartPieLabelVisibility::ALL,
-        ChartPieLabelVisibility::VALUES_ONLY,
+        LabelVisibility::DATA_POINT_NAMES_ONLY,
+        LabelVisibility::ALL,
+        LabelVisibility::VALUES_ONLY,
     ];
     editor
         .set_slide_chart_pie_label_visibilities(0, source.drawable_object_id, &visibilities)
@@ -2904,7 +3007,7 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
         .set_slide_chart_pie_label_visibilities(
             0,
             source.drawable_object_id,
-            &[ChartPieLabelVisibility::DEFAULT; 3],
+            &[LabelVisibility::DEFAULT; 3],
         )
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -2920,10 +3023,10 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
         )
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
-        .set_slide_chart_kind(0, duplicate.drawable_object_id, ChartKind::Donut2d)
+        .set_slide_chart_kind(0, chart_selector(&editor, &duplicate), Kind::Donut2d)
         .unwrap();
     editor
         .set_slide_chart_pie_label_distance(
@@ -2938,7 +3041,7 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
             0,
             source.drawable_object_id,
             ChartPieWedgeIndex::from_zero_based(0),
-            ChartPieLeaderLineVisibility::Visible,
+            LeaderLineVisibility::Visible,
         )
         .unwrap();
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -2959,9 +3062,9 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
             .slide_chart_pie_leader_line_visibilities(0, source.drawable_object_id)
             .unwrap(),
         [
-            ChartPieLeaderLineVisibility::Visible,
-            ChartPieLeaderLineVisibility::Visible,
-            ChartPieLeaderLineVisibility::Hidden,
+            LeaderLineVisibility::Visible,
+            LeaderLineVisibility::Visible,
+            LeaderLineVisibility::Hidden,
         ]
     );
     let before_rejected = reopened.to_bytes().unwrap();
@@ -2999,10 +3102,10 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -3011,13 +3114,10 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
 fn scratch_presentation_supports_native_series_value_label_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
-    let defaults = [ChartSeriesValueLabelVisibility::Hidden; 2];
-    let customized = [
-        ChartSeriesValueLabelVisibility::Visible,
-        ChartSeriesValueLabelVisibility::Hidden,
-    ];
+    let defaults = [Visibility::Hidden; 2];
+    let customized = [Visibility::Visible, Visibility::Hidden];
 
     assert_eq!(
         editor
@@ -3039,10 +3139,10 @@ fn scratch_presentation_supports_native_series_value_label_crud() {
             .slide_chart_series_value_label_visibility(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap(),
-        ChartSeriesValueLabelVisibility::Visible
+        Visibility::Visible
     );
     editor
         .set_slide_chart_series_value_label_visibilities(0, source.drawable_object_id, &defaults)
@@ -3053,14 +3153,14 @@ fn scratch_presentation_supports_native_series_value_label_crud() {
         .set_slide_chart_series_value_label_visibilities(0, source.drawable_object_id, &customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
         .set_slide_chart_series_value_label_visibility(
             0,
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(0),
-            ChartSeriesValueLabelVisibility::Hidden,
+            Index::from_zero_based(0),
+            Visibility::Hidden,
         )
         .unwrap();
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -3092,16 +3192,16 @@ fn scratch_presentation_supports_native_series_value_label_crud() {
             .slide_chart_series_value_label_visibility(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
+                Index::from_zero_based(2),
             )
             .is_err()
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -3110,7 +3210,7 @@ fn scratch_presentation_supports_native_series_value_label_crud() {
 fn scratch_presentation_supports_native_series_value_label_location_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let defaults = [ChartSeriesValueLabelLocation::Top; 2];
     let customized = [
@@ -3138,7 +3238,7 @@ fn scratch_presentation_supports_native_series_value_label_location_crud() {
             .slide_chart_series_value_label_location(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap(),
         ChartSeriesValueLabelLocation::Outside
@@ -3152,13 +3252,13 @@ fn scratch_presentation_supports_native_series_value_label_location_crud() {
         .set_slide_chart_series_value_label_locations(0, source.drawable_object_id, &customized)
         .unwrap();
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
         .set_slide_chart_series_value_label_location(
             0,
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(0),
+            Index::from_zero_based(0),
             ChartSeriesValueLabelLocation::Top,
         )
         .unwrap();
@@ -3191,16 +3291,16 @@ fn scratch_presentation_supports_native_series_value_label_location_crud() {
             .slide_chart_series_value_label_location(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
+                Index::from_zero_based(2),
             )
             .is_err()
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -3209,12 +3309,12 @@ fn scratch_presentation_supports_native_series_value_label_location_crud() {
 fn scratch_presentation_supports_native_series_value_label_affix_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
-    let defaults = vec![ChartSeriesValueLabelAffixes::default(); 2];
+    let defaults = vec![LabelAffixes::default(); 2];
     let customized = vec![
-        ChartSeriesValueLabelAffixes::new("$", " USD"),
-        ChartSeriesValueLabelAffixes::new("€", " net"),
+        LabelAffixes::new("$", " USD").unwrap(),
+        LabelAffixes::new("€", " net").unwrap(),
     ];
 
     assert_eq!(
@@ -3237,29 +3337,29 @@ fn scratch_presentation_supports_native_series_value_label_affix_crud() {
             .slide_chart_series_value_label_affix(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap()
             .prefix(),
         "$"
     );
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
         .set_slide_chart_series_value_label_affix(
             0,
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(0),
-            ChartSeriesValueLabelAffixes::default(),
+            Index::from_zero_based(0),
+            LabelAffixes::default(),
         )
         .unwrap();
     editor
         .set_slide_chart_series_value_label_affix(
             0,
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(1),
-            ChartSeriesValueLabelAffixes::default(),
+            Index::from_zero_based(1),
+            LabelAffixes::default(),
         )
         .unwrap();
 
@@ -3292,16 +3392,16 @@ fn scratch_presentation_supports_native_series_value_label_affix_crud() {
             .slide_chart_series_value_label_affix(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
+                Index::from_zero_based(2),
             )
             .is_err()
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -3310,15 +3410,15 @@ fn scratch_presentation_supports_native_series_value_label_affix_crud() {
 fn scratch_presentation_supports_native_series_value_label_number_format_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
-    let defaults = vec![ChartSeriesValueLabelNumberFormat::NATIVE_DEFAULT; 2];
-    let fixed_two = ChartSeriesValueLabelNumberFormat::new(
-        ChartSeriesValueLabelDecimalPlaces::fixed(2).unwrap(),
-        ChartSeriesValueLabelNegativeStyle::Parentheses,
+    let defaults = vec![NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT; 2];
+    let fixed_two = NumberFormat::new(
+        DecimalPlaces::fixed(2).unwrap(),
+        NegativeStyle::Parentheses,
         false,
     );
-    let customized = vec![fixed_two, ChartSeriesValueLabelNumberFormat::NATIVE_DEFAULT];
+    let customized = vec![fixed_two, NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT];
 
     assert_eq!(
         editor
@@ -3343,21 +3443,21 @@ fn scratch_presentation_supports_native_series_value_label_number_format_crud() 
             .slide_chart_series_value_label_number_format(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap(),
         fixed_two
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
         .set_slide_chart_series_value_label_number_format(
             0,
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(0),
-            ChartSeriesValueLabelNumberFormat::NATIVE_DEFAULT,
+            Index::from_zero_based(0),
+            NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
         )
         .unwrap();
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -3389,16 +3489,16 @@ fn scratch_presentation_supports_native_series_value_label_number_format_crud() 
             .slide_chart_series_value_label_number_format(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
+                Index::from_zero_based(2),
             )
             .is_err()
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -3407,7 +3507,7 @@ fn scratch_presentation_supports_native_series_value_label_number_format_crud() 
 fn scratch_presentation_supports_native_series_value_label_auto_fit_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let defaults = vec![ChartSeriesValueLabelAutoFit::Enabled; 2];
     let customized = vec![
@@ -3434,20 +3534,20 @@ fn scratch_presentation_supports_native_series_value_label_auto_fit_crud() {
             .slide_chart_series_value_label_auto_fit(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap(),
         ChartSeriesValueLabelAutoFit::Disabled
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     editor
         .set_slide_chart_series_value_label_auto_fit(
             0,
             source.drawable_object_id,
-            ChartSeriesIndex::from_zero_based(0),
+            Index::from_zero_based(0),
             ChartSeriesValueLabelAutoFit::Enabled,
         )
         .unwrap();
@@ -3480,16 +3580,16 @@ fn scratch_presentation_supports_native_series_value_label_auto_fit_crud() {
             .slide_chart_series_value_label_auto_fit(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
+                Index::from_zero_based(2),
             )
             .is_err()
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -3498,7 +3598,7 @@ fn scratch_presentation_supports_native_series_value_label_auto_fit_crud() {
 fn scratch_presentation_supports_native_series_trendline_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
     let defaults = vec![ChartSeriesTrendline::none(); 2];
     let customized = vec![
@@ -3532,24 +3632,20 @@ fn scratch_presentation_supports_native_series_trendline_crud() {
         .unwrap();
     assert_eq!(
         editor
-            .slide_chart_series_trendline(
-                0,
-                source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(1),
-            )
+            .slide_chart_series_trendline(0, source.drawable_object_id, Index::from_zero_based(1),)
             .unwrap(),
         customized[1]
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     for series in 0..2 {
         editor
             .set_slide_chart_series_trendline(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(series),
+                Index::from_zero_based(series),
                 ChartSeriesTrendline::none(),
             )
             .unwrap();
@@ -3576,21 +3672,17 @@ fn scratch_presentation_supports_native_series_trendline_crud() {
     );
     assert!(
         reopened
-            .slide_chart_series_trendline(
-                0,
-                source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
-            )
+            .slide_chart_series_trendline(0, source.drawable_object_id, Index::from_zero_based(2),)
             .is_err()
     );
     assert!(ChartSeriesTrendline::unsupported(1).is_err());
     assert!(ChartSeriesTrendlinePolynomialOrder::new(7).is_err());
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }
@@ -3599,17 +3691,17 @@ fn scratch_presentation_supports_native_series_trendline_crud() {
 fn scratch_presentation_supports_native_series_error_bar_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
-        .add_slide_chart(0, ChartKind::Column2d, sample_data(), POSITION, SIZE)
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
-    let defaults = vec![ChartSeriesErrorBars::None; 2];
+    let defaults = vec![Series::None; 2];
     let customized = vec![
-        ChartSeriesErrorBars::FixedValue {
-            direction: ChartErrorBarDirection::PositiveAndNegative,
-            value: ChartErrorBarFixedValue::new(12.5).unwrap(),
+        Series::FixedValue {
+            direction: ErrorBarDirection::PositiveAndNegative,
+            value: ErrorBarFixedValue::new(12.5).unwrap(),
         },
-        ChartSeriesErrorBars::Percentage {
-            direction: ChartErrorBarDirection::PositiveOnly,
-            percentage: ChartErrorBarPercentage::new(17).unwrap(),
+        Series::Percentage {
+            direction: ErrorBarDirection::PositiveOnly,
+            percentage: ErrorBarPercentage::new(17).unwrap(),
         },
     ];
     let default_auto_fits = vec![ChartSeriesErrorBarAutoFit::Enabled; 2];
@@ -3647,11 +3739,7 @@ fn scratch_presentation_supports_native_series_error_bar_crud() {
         .unwrap();
     assert_eq!(
         editor
-            .slide_chart_series_error_bar(
-                0,
-                source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(1),
-            )
+            .slide_chart_series_error_bar(0, source.drawable_object_id, Index::from_zero_based(1),)
             .unwrap(),
         customized[1]
     );
@@ -3660,22 +3748,22 @@ fn scratch_presentation_supports_native_series_error_bar_crud() {
             .slide_chart_series_error_bar_auto_fit(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(0),
+                Index::from_zero_based(0),
             )
             .unwrap(),
         ChartSeriesErrorBarAutoFit::Disabled
     );
 
     let duplicate = editor
-        .duplicate_slide_chart(0, source.drawable_object_id)
+        .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
     for series in 0..2 {
         editor
             .set_slide_chart_series_error_bar(
                 0,
                 source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(series),
-                ChartSeriesErrorBars::None,
+                Index::from_zero_based(series),
+                Series::None,
             )
             .unwrap();
     }
@@ -3729,19 +3817,15 @@ fn scratch_presentation_supports_native_series_error_bar_crud() {
     );
     assert!(
         reopened
-            .slide_chart_series_error_bar(
-                0,
-                source.drawable_object_id,
-                ChartSeriesIndex::from_zero_based(2),
-            )
+            .slide_chart_series_error_bar(0, source.drawable_object_id, Index::from_zero_based(2),)
             .is_err()
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_rejected);
     reopened
-        .remove_slide_chart(0, source.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &source))
         .unwrap();
     reopened
-        .remove_slide_chart(0, duplicate.drawable_object_id)
+        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
 }

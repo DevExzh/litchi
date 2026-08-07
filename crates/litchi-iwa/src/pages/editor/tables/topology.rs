@@ -12,7 +12,7 @@ impl PagesEditor {
     pub fn insert_table_row(
         &mut self,
         model_object_id: u64,
-        insertion: PagesTableRowInsertion,
+        insertion: RowInsertion,
     ) -> Result<()> {
         self.edit_table_topology(model_object_id, TableTopologyMutation::InsertRow(insertion))
     }
@@ -21,7 +21,7 @@ impl PagesEditor {
     pub fn insert_table_column(
         &mut self,
         model_object_id: u64,
-        insertion: PagesTableColumnInsertion,
+        insertion: ColumnInsertion,
     ) -> Result<()> {
         self.edit_table_topology(
             model_object_id,
@@ -33,11 +33,7 @@ impl PagesEditor {
     ///
     /// The operation fails unchanged when a surviving formula still references
     /// the deleted row or native topology cannot be rewritten safely.
-    pub fn remove_table_row(
-        &mut self,
-        model_object_id: u64,
-        deletion: PagesTableRowDeletion,
-    ) -> Result<()> {
+    pub fn remove_table_row(&mut self, model_object_id: u64, deletion: RowDeletion) -> Result<()> {
         self.edit_table_topology(model_object_id, TableTopologyMutation::RemoveRow(deletion))
     }
 
@@ -45,7 +41,7 @@ impl PagesEditor {
     pub fn remove_table_column(
         &mut self,
         model_object_id: u64,
-        deletion: PagesTableColumnDeletion,
+        deletion: ColumnDeletion,
     ) -> Result<()> {
         self.edit_table_topology(
             model_object_id,

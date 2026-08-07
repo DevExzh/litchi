@@ -1,10 +1,15 @@
 //! Shared strict decimal-number formatting for native chart labels.
 //!
 //! Chart axes and series value labels store the same `TSK.FormatStructArchive`
-//! payload in two legacy/current fields. This module owns the strongly typed
-//! public values and the lossless dual-field codec used by both features.
+//! payload in two legacy/current fields. The archive-free semantic values live
+//! in `litchi-iwa-common`; this module owns the lossless dual-field codec used
+//! by both features.
 
 use prost::Message;
+
+use litchi_iwa_common::chart::number_format::{
+    DecimalPlaces, FixedDecimalPlaces, LabelAffixes, NegativeStyle, NumberFormat,
+};
 
 use crate::protobuf::tsk;
 use crate::wire::{
@@ -26,161 +31,6 @@ const NATIVE_MINUS_SIGN_NEGATIVE_STYLE: u64 = 0;
 const NATIVE_PARENTHESES_NEGATIVE_STYLE: u64 = 2;
 const NATIVE_MAXIMUM_DECIMAL_PLACES: u8 = 30;
 
-/// A fixed number of decimal places accepted by the native iWork inspector.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ChartFixedDecimalPlaces(u8);
-
-impl ChartFixedDecimalPlaces {
-    /// No fractional digits.
-    pub const ZERO: Self = Self(0);
-
-    /// The largest value accepted by Pages, Numbers, and Keynote.
-    pub const MAXIMUM: Self = Self(NATIVE_MAXIMUM_DECIMAL_PLACES);
-
-    /// Build a fixed decimal-place count accepted by iWork.
-    pub fn new(value: u8) -> Result<Self> {
-        if value > NATIVE_MAXIMUM_DECIMAL_PLACES {
-            return Err(Error::InvalidFormat(format!(
-                "chart decimal places must not exceed {NATIVE_MAXIMUM_DECIMAL_PLACES}"
-            )));
-        }
-        Ok(Self(value))
-    }
-
-    /// Return the decimal-place count shown by iWork.
-    pub const fn value(self) -> u8 {
-        self.0
-    }
-}
-
-impl TryFrom<u8> for ChartFixedDecimalPlaces {
-    type Error = Error;
-
-    fn try_from(value: u8) -> Result<Self> {
-        Self::new(value)
-    }
-}
-
-/// Automatic or fixed decimal places for native chart labels.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum ChartDecimalPlaces {
-    /// Let iWork derive the necessary number of fractional digits.
-    #[default]
-    Automatic,
-    /// Always render exactly this many fractional digits.
-    Fixed(ChartFixedDecimalPlaces),
-}
-
-impl ChartDecimalPlaces {
-    /// Build a fixed decimal-place setting.
-    pub fn fixed(value: u8) -> Result<Self> {
-        ChartFixedDecimalPlaces::new(value).map(Self::Fixed)
-    }
-}
-
-/// Native negative-number presentation for chart labels.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum ChartNegativeStyle {
-    /// Render a leading minus sign, for example `-100`.
-    #[default]
-    MinusSign,
-    /// Render the magnitude in parentheses, for example `(100)`.
-    Parentheses,
-}
-
-/// Decimal number formatting applied to native chart labels.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ChartNumberFormat {
-    decimal_places: ChartDecimalPlaces,
-    negative_style: ChartNegativeStyle,
-    thousands_separator: bool,
-}
-
-impl ChartNumberFormat {
-    /// Native default retained for existing series value-label callers.
-    pub const NATIVE_DEFAULT: Self = Self::SERIES_VALUE_LABEL_NATIVE_DEFAULT;
-
-    /// Native default for per-series value labels.
-    pub const SERIES_VALUE_LABEL_NATIVE_DEFAULT: Self = Self::new(
-        ChartDecimalPlaces::Automatic,
-        ChartNegativeStyle::MinusSign,
-        true,
-    );
-
-    /// Native default for value-axis labels.
-    pub const AXIS_NATIVE_DEFAULT: Self = Self::new(
-        ChartDecimalPlaces::Automatic,
-        ChartNegativeStyle::MinusSign,
-        false,
-    );
-
-    /// Construct a complete decimal-number format.
-    pub const fn new(
-        decimal_places: ChartDecimalPlaces,
-        negative_style: ChartNegativeStyle,
-        thousands_separator: bool,
-    ) -> Self {
-        Self {
-            decimal_places,
-            negative_style,
-            thousands_separator,
-        }
-    }
-
-    /// Return the automatic or fixed fractional-digit setting.
-    pub const fn decimal_places(self) -> ChartDecimalPlaces {
-        self.decimal_places
-    }
-
-    /// Return the negative-number presentation.
-    pub const fn negative_style(self) -> ChartNegativeStyle {
-        self.negative_style
-    }
-
-    /// Whether labels include locale-aware thousands separators.
-    pub const fn thousands_separator(self) -> bool {
-        self.thousands_separator
-    }
-}
-
-impl Default for ChartNumberFormat {
-    fn default() -> Self {
-        Self::SERIES_VALUE_LABEL_NATIVE_DEFAULT
-    }
-}
-
-/// Text placed immediately before and after native chart labels.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct ChartLabelAffixes {
-    prefix: Box<str>,
-    suffix: Box<str>,
-}
-
-impl ChartLabelAffixes {
-    /// Construct chart-label affixes.
-    pub fn new(prefix: impl Into<Box<str>>, suffix: impl Into<Box<str>>) -> Self {
-        Self {
-            prefix: prefix.into(),
-            suffix: suffix.into(),
-        }
-    }
-
-    /// Text placed before each label.
-    pub fn prefix(&self) -> &str {
-        &self.prefix
-    }
-
-    /// Text placed after each label.
-    pub fn suffix(&self) -> &str {
-        &self.suffix
-    }
-
-    /// Whether neither affix contains text.
-    pub fn is_empty(&self) -> bool {
-        self.prefix.is_empty() && self.suffix.is_empty()
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct DualNumberFormatFields {
     pub(crate) legacy: u32,
@@ -191,9 +41,9 @@ pub(crate) struct DualNumberFormatFields {
 pub(crate) fn read_dual_number_format(
     extension: Option<&[u8]>,
     fields: DualNumberFormatFields,
-    default: ChartNumberFormat,
+    default: NumberFormat,
     context: &str,
-) -> Result<ChartNumberFormat> {
+) -> Result<NumberFormat> {
     let Some(extension) = extension else {
         return Ok(default);
     };
@@ -224,9 +74,9 @@ pub(crate) fn read_dual_affixes(
     extension: Option<&[u8]>,
     fields: DualNumberFormatFields,
     context: &str,
-) -> Result<ChartLabelAffixes> {
+) -> Result<LabelAffixes> {
     let Some(extension) = extension else {
-        return Ok(ChartLabelAffixes::default());
+        return Ok(LabelAffixes::default());
     };
     if let Some(format_type) = strict_optional_varint(extension, fields.format_type, context)?
         && format_type != NATIVE_NUMBER_FORMAT_TYPE
@@ -247,7 +97,7 @@ pub(crate) fn read_dual_affixes(
         ))),
         (_, Some(current)) => Ok(current),
         (Some(legacy), None) => Ok(legacy),
-        (None, None) => Ok(ChartLabelAffixes::default()),
+        (None, None) => Ok(LabelAffixes::default()),
     }
 }
 
@@ -258,8 +108,8 @@ pub(crate) fn read_dual_affixes(
 pub(crate) fn patch_dual_number_format(
     extension: &[u8],
     fields: DualNumberFormatFields,
-    expected: ChartNumberFormat,
-    default: ChartNumberFormat,
+    expected: NumberFormat,
+    default: NumberFormat,
     context: &str,
 ) -> Result<Option<Vec<u8>>> {
     let legacy = strict_optional_length_delimited(extension, fields.legacy, context)?;
@@ -312,8 +162,8 @@ pub(crate) fn patch_dual_number_format(
 pub(crate) fn patch_dual_affixes(
     extension: &[u8],
     fields: DualNumberFormatFields,
-    expected: &ChartLabelAffixes,
-    default_format: ChartNumberFormat,
+    expected: &LabelAffixes,
+    default_format: NumberFormat,
     context: &str,
 ) -> Result<Option<Vec<u8>>> {
     let legacy = strict_optional_length_delimited(extension, fields.legacy, context)?;
@@ -402,11 +252,7 @@ pub(crate) fn clear_dual_number_format(
     patch_varint_field(&extension, fields.format_type, format_type_present, None).map(Some)
 }
 
-fn read_number_format(
-    data: &[u8],
-    default: ChartNumberFormat,
-    context: &str,
-) -> Result<ChartNumberFormat> {
+fn read_number_format(data: &[u8], default: NumberFormat, context: &str) -> Result<NumberFormat> {
     tsk::FormatStructArchive::decode(data)?;
     let format_type = strict_optional_varint(data, FORMAT_TYPE_FIELD, context)?
         .unwrap_or(NATIVE_DECIMAL_NUMBER_FORMAT);
@@ -418,14 +264,19 @@ fn read_number_format(
     let decimal_places = match strict_optional_varint(data, DECIMAL_PLACES_FIELD, context)?
         .unwrap_or(NATIVE_AUTOMATIC_DECIMAL_PLACES)
     {
-        NATIVE_AUTOMATIC_DECIMAL_PLACES => ChartDecimalPlaces::Automatic,
-        value if value <= u64::from(NATIVE_MAXIMUM_DECIMAL_PLACES) => ChartDecimalPlaces::Fixed(
-            ChartFixedDecimalPlaces(u8::try_from(value).map_err(|_| {
+        NATIVE_AUTOMATIC_DECIMAL_PLACES => DecimalPlaces::Automatic,
+        value if value <= u64::from(NATIVE_MAXIMUM_DECIMAL_PLACES) => {
+            let value = u8::try_from(value).map_err(|_| {
                 Error::InvalidFormat(format!(
                     "native {context} decimal places {value} cannot be represented"
                 ))
-            })?),
-        ),
+            })?;
+            DecimalPlaces::Fixed(FixedDecimalPlaces::new(value).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "native {context} decimal places are invalid: {error}"
+                ))
+            })?)
+        },
         value => {
             return Err(Error::InvalidFormat(format!(
                 "native {context} decimal places {value} exceeds {NATIVE_MAXIMUM_DECIMAL_PLACES}"
@@ -435,8 +286,8 @@ fn read_number_format(
     let negative_style = match strict_optional_varint(data, NEGATIVE_STYLE_FIELD, context)?
         .unwrap_or(NATIVE_MINUS_SIGN_NEGATIVE_STYLE)
     {
-        NATIVE_MINUS_SIGN_NEGATIVE_STYLE => ChartNegativeStyle::MinusSign,
-        NATIVE_PARENTHESES_NEGATIVE_STYLE => ChartNegativeStyle::Parentheses,
+        NATIVE_MINUS_SIGN_NEGATIVE_STYLE => NegativeStyle::MinusSign,
+        NATIVE_PARENTHESES_NEGATIVE_STYLE => NegativeStyle::Parentheses,
         value => {
             return Err(Error::InvalidFormat(format!(
                 "unsupported native {context} negative style {value}"
@@ -455,24 +306,24 @@ fn read_number_format(
                 )));
             },
         };
-    Ok(ChartNumberFormat::new(
+    Ok(NumberFormat::new(
         decimal_places,
         negative_style,
         thousands_separator,
     ))
 }
 
-fn read_affixes(data: &[u8], context: &str) -> Result<ChartLabelAffixes> {
+fn read_affixes(data: &[u8], context: &str) -> Result<LabelAffixes> {
     tsk::FormatStructArchive::decode(data)?;
-    Ok(ChartLabelAffixes::new(
+    Ok(LabelAffixes::new(
         strict_optional_string(data, PREFIX_FIELD, context)?.unwrap_or_default(),
         strict_optional_string(data, SUFFIX_FIELD, context)?.unwrap_or_default(),
-    ))
+    )?)
 }
 
 fn patch_number_format(
     mut format: Vec<u8>,
-    expected: ChartNumberFormat,
+    expected: NumberFormat,
     context: &str,
 ) -> Result<Vec<u8>> {
     tsk::FormatStructArchive::decode(format.as_slice())?;
@@ -483,13 +334,13 @@ fn patch_number_format(
         context,
     )?;
     let decimal_places = match expected.decimal_places() {
-        ChartDecimalPlaces::Automatic => NATIVE_AUTOMATIC_DECIMAL_PLACES,
-        ChartDecimalPlaces::Fixed(value) => u64::from(value.value()),
+        DecimalPlaces::Automatic => NATIVE_AUTOMATIC_DECIMAL_PLACES,
+        DecimalPlaces::Fixed(value) => u64::from(value.value()),
     };
     format = patch_format_varint(&format, DECIMAL_PLACES_FIELD, decimal_places, context)?;
     let negative_style = match expected.negative_style() {
-        ChartNegativeStyle::MinusSign => NATIVE_MINUS_SIGN_NEGATIVE_STYLE,
-        ChartNegativeStyle::Parentheses => NATIVE_PARENTHESES_NEGATIVE_STYLE,
+        NegativeStyle::MinusSign => NATIVE_MINUS_SIGN_NEGATIVE_STYLE,
+        NegativeStyle::Parentheses => NATIVE_PARENTHESES_NEGATIVE_STYLE,
     };
     format = patch_format_varint(&format, NEGATIVE_STYLE_FIELD, negative_style, context)?;
     patch_format_varint(
@@ -500,25 +351,21 @@ fn patch_number_format(
     )
 }
 
-fn patch_affixes(
-    mut format: Vec<u8>,
-    expected: &ChartLabelAffixes,
-    context: &str,
-) -> Result<Vec<u8>> {
+fn patch_affixes(mut format: Vec<u8>, expected: &LabelAffixes, context: &str) -> Result<Vec<u8>> {
     tsk::FormatStructArchive::decode(format.as_slice())?;
     let prefix_present = strict_optional_string(&format, PREFIX_FIELD, context)?.is_some();
     format = patch_length_delimited_field(
         &format,
         PREFIX_FIELD,
         prefix_present,
-        (!expected.prefix.is_empty()).then_some(expected.prefix.as_bytes()),
+        (!expected.prefix().is_empty()).then_some(expected.prefix().as_bytes()),
     )?;
     let suffix_present = strict_optional_string(&format, SUFFIX_FIELD, context)?.is_some();
     patch_length_delimited_field(
         &format,
         SUFFIX_FIELD,
         suffix_present,
-        (!expected.suffix.is_empty()).then_some(expected.suffix.as_bytes()),
+        (!expected.suffix().is_empty()).then_some(expected.suffix().as_bytes()),
     )
 }
 
@@ -532,19 +379,19 @@ fn patch_format_varint(
     patch_varint_field(data, field_number, present, Some(value))
 }
 
-fn canonical_number_format(default: ChartNumberFormat) -> Vec<u8> {
+fn canonical_number_format(default: NumberFormat) -> Vec<u8> {
     let mut format = Vec::new();
     append_varint_field(&mut format, FORMAT_TYPE_FIELD, NATIVE_DECIMAL_NUMBER_FORMAT)
         .expect("writing to a Vec cannot fail");
     let decimal_places = match default.decimal_places() {
-        ChartDecimalPlaces::Automatic => NATIVE_AUTOMATIC_DECIMAL_PLACES,
-        ChartDecimalPlaces::Fixed(value) => u64::from(value.value()),
+        DecimalPlaces::Automatic => NATIVE_AUTOMATIC_DECIMAL_PLACES,
+        DecimalPlaces::Fixed(value) => u64::from(value.value()),
     };
     append_varint_field(&mut format, DECIMAL_PLACES_FIELD, decimal_places)
         .expect("writing to a Vec cannot fail");
     let negative_style = match default.negative_style() {
-        ChartNegativeStyle::MinusSign => NATIVE_MINUS_SIGN_NEGATIVE_STYLE,
-        ChartNegativeStyle::Parentheses => NATIVE_PARENTHESES_NEGATIVE_STYLE,
+        NegativeStyle::MinusSign => NATIVE_MINUS_SIGN_NEGATIVE_STYLE,
+        NegativeStyle::Parentheses => NATIVE_PARENTHESES_NEGATIVE_STYLE,
     };
     append_varint_field(&mut format, NEGATIVE_STYLE_FIELD, negative_style)
         .expect("writing to a Vec cannot fail");
@@ -557,20 +404,18 @@ fn canonical_number_format(default: ChartNumberFormat) -> Vec<u8> {
     format
 }
 
-fn strict_optional_string(
-    data: &[u8],
+fn strict_optional_string<'a>(
+    data: &'a [u8],
     field_number: u32,
     context: &str,
-) -> Result<Option<Box<str>>> {
+) -> Result<Option<&'a str>> {
     strict_optional_length_delimited(data, field_number, context)?
         .map(|bytes| {
-            std::str::from_utf8(bytes)
-                .map(Box::<str>::from)
-                .map_err(|error| {
-                    Error::InvalidFormat(format!(
-                        "{context} label-affix field {field_number} is not UTF-8: {error}"
-                    ))
-                })
+            std::str::from_utf8(bytes).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "{context} label-affix field {field_number} is not UTF-8: {error}"
+                ))
+            })
         })
         .transpose()
 }
@@ -581,7 +426,7 @@ fn strict_optional_length_delimited<'a>(
     context: &str,
 ) -> Result<Option<&'a [u8]>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -590,17 +435,17 @@ fn strict_optional_length_delimited<'a>(
             "singular {context} number-format field {field_number} occurs more than once"
         )));
     }
-    if field.wire_type != 2 {
+    if field.wire_type() != 2 {
         return Err(Error::InvalidFormat(format!(
             "{context} number-format field {field_number} is not length-delimited"
         )));
     }
-    Ok(Some(&data[field.payload_start..field.end]))
+    Ok(Some(&data[field.payload_start()..field.end()]))
 }
 
 fn strict_optional_varint(data: &[u8], field_number: u32, context: &str) -> Result<Option<u64>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -609,21 +454,20 @@ fn strict_optional_varint(data: &[u8], field_number: u32, context: &str) -> Resu
             "singular {context} number-format field {field_number} occurs more than once"
         )));
     }
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "{context} number-format field {field_number} is not a varint"
         )));
     }
-    let (value, consumed) = crate::varint::decode_varint_from_bytes(
-        &data[field.key_end..field.end],
-    )
-    .map_err(|error| {
-        Error::InvalidFormat(format!(
-            "{context} number-format field {field_number} is invalid: {error}"
-        ))
-    })?;
-    if consumed != field.end - field.key_end
-        || crate::varint::encode_varint(value).len() != consumed
+    let (value, consumed) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end()..field.end()])
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "{context} number-format field {field_number} is invalid: {error}"
+                ))
+            })?;
+    if consumed != field.end() - field.key_end()
+        || litchi_iwa_common::varint::encoded_len(value) != consumed
     {
         return Err(Error::InvalidFormat(format!(
             "{context} number-format field {field_number} is not canonical"
@@ -643,25 +487,25 @@ mod tests {
         format_type: 3,
     };
 
-    fn custom_format() -> ChartNumberFormat {
-        ChartNumberFormat::new(
-            ChartDecimalPlaces::fixed(2).unwrap(),
-            ChartNegativeStyle::Parentheses,
+    fn custom_format() -> NumberFormat {
+        NumberFormat::new(
+            DecimalPlaces::fixed(2).unwrap(),
+            NegativeStyle::Parentheses,
             true,
         )
     }
 
-    fn custom_affixes() -> ChartLabelAffixes {
-        ChartLabelAffixes::new("USD ", " net")
+    fn custom_affixes() -> LabelAffixes {
+        LabelAffixes::new("USD ", " net").unwrap()
     }
 
     #[test]
     fn fixed_decimal_places_match_the_native_inspector_range() {
         assert_eq!(
-            ChartFixedDecimalPlaces::new(30).unwrap(),
-            ChartFixedDecimalPlaces::MAXIMUM
+            FixedDecimalPlaces::new(30).unwrap(),
+            FixedDecimalPlaces::MAXIMUM
         );
-        assert!(ChartFixedDecimalPlaces::new(31).is_err());
+        assert!(FixedDecimalPlaces::new(31).is_err());
     }
 
     #[test]
@@ -673,7 +517,7 @@ mod tests {
             &extension,
             FIELDS,
             custom_format(),
-            ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+            NumberFormat::AXIS_NATIVE_DEFAULT,
             "test axis",
         )
         .unwrap()
@@ -682,7 +526,7 @@ mod tests {
             read_dual_number_format(
                 Some(&patched),
                 FIELDS,
-                ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+                NumberFormat::AXIS_NATIVE_DEFAULT,
                 "test axis"
             )
             .unwrap(),
@@ -700,7 +544,7 @@ mod tests {
             &[],
             FIELDS,
             custom_format(),
-            ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+            NumberFormat::AXIS_NATIVE_DEFAULT,
             "test axis",
         )
         .unwrap()
@@ -709,7 +553,7 @@ mod tests {
             &formatted,
             FIELDS,
             &custom_affixes(),
-            ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+            NumberFormat::AXIS_NATIVE_DEFAULT,
             "test axis",
         )
         .unwrap()
@@ -722,7 +566,7 @@ mod tests {
             read_dual_number_format(
                 Some(&patched),
                 FIELDS,
-                ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+                NumberFormat::AXIS_NATIVE_DEFAULT,
                 "test axis"
             )
             .unwrap(),
@@ -731,21 +575,21 @@ mod tests {
         let cleared = patch_dual_affixes(
             &patched,
             FIELDS,
-            &ChartLabelAffixes::default(),
-            ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+            &LabelAffixes::default(),
+            NumberFormat::AXIS_NATIVE_DEFAULT,
             "test axis",
         )
         .unwrap()
         .unwrap();
         assert_eq!(
             read_dual_affixes(Some(&cleared), FIELDS, "test axis").unwrap(),
-            ChartLabelAffixes::default()
+            LabelAffixes::default()
         );
         assert_eq!(
             read_dual_number_format(
                 Some(&cleared),
                 FIELDS,
-                ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+                NumberFormat::AXIS_NATIVE_DEFAULT,
                 "test axis"
             )
             .unwrap(),
@@ -756,29 +600,37 @@ mod tests {
     #[test]
     fn dual_affixes_reject_conflicts_and_non_utf8_text() {
         let legacy = patch_affixes(
-            canonical_number_format(ChartNumberFormat::AXIS_NATIVE_DEFAULT),
+            canonical_number_format(NumberFormat::AXIS_NATIVE_DEFAULT),
             &custom_affixes(),
             "test axis",
         )
         .unwrap();
-        let current = canonical_number_format(ChartNumberFormat::AXIS_NATIVE_DEFAULT);
+        let current = canonical_number_format(NumberFormat::AXIS_NATIVE_DEFAULT);
         let mut conflicting = Vec::new();
         append_length_delimited_field(&mut conflicting, FIELDS.legacy, &legacy).unwrap();
         append_length_delimited_field(&mut conflicting, FIELDS.current, &current).unwrap();
         assert!(read_dual_affixes(Some(&conflicting), FIELDS, "test axis").is_err());
 
-        let mut malformed_format = canonical_number_format(ChartNumberFormat::AXIS_NATIVE_DEFAULT);
+        let mut malformed_format = canonical_number_format(NumberFormat::AXIS_NATIVE_DEFAULT);
         append_length_delimited_field(&mut malformed_format, PREFIX_FIELD, &[0xff]).unwrap();
         let mut malformed = Vec::new();
         append_length_delimited_field(&mut malformed, FIELDS.current, &malformed_format).unwrap();
         assert!(read_dual_affixes(Some(&malformed), FIELDS, "test axis").is_err());
+
+        let mut oversized_format = canonical_number_format(NumberFormat::AXIS_NATIVE_DEFAULT);
+        let oversized_prefix = vec![b'x'; LabelAffixes::MAXIMUM_BYTES + 1];
+        append_length_delimited_field(&mut oversized_format, PREFIX_FIELD, &oversized_prefix)
+            .unwrap();
+        let mut oversized = Vec::new();
+        append_length_delimited_field(&mut oversized, FIELDS.current, &oversized_format).unwrap();
+        assert!(read_dual_affixes(Some(&oversized), FIELDS, "test axis").is_err());
     }
 
     #[test]
     fn conflicting_and_malformed_dual_formats_are_rejected() {
-        let legacy = canonical_number_format(ChartNumberFormat::AXIS_NATIVE_DEFAULT);
+        let legacy = canonical_number_format(NumberFormat::AXIS_NATIVE_DEFAULT);
         let current = patch_number_format(
-            canonical_number_format(ChartNumberFormat::AXIS_NATIVE_DEFAULT),
+            canonical_number_format(NumberFormat::AXIS_NATIVE_DEFAULT),
             custom_format(),
             "test axis",
         )
@@ -790,21 +642,16 @@ mod tests {
             read_dual_number_format(
                 Some(&extension),
                 FIELDS,
-                ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+                NumberFormat::AXIS_NATIVE_DEFAULT,
                 "test axis"
             )
             .is_err()
         );
 
-        let mut malformed = canonical_number_format(ChartNumberFormat::AXIS_NATIVE_DEFAULT);
+        let mut malformed = canonical_number_format(NumberFormat::AXIS_NATIVE_DEFAULT);
         append_varint_field(&mut malformed, DECIMAL_PLACES_FIELD, 2).unwrap();
         assert!(
-            read_number_format(
-                &malformed,
-                ChartNumberFormat::AXIS_NATIVE_DEFAULT,
-                "test axis"
-            )
-            .is_err()
+            read_number_format(&malformed, NumberFormat::AXIS_NATIVE_DEFAULT, "test axis").is_err()
         );
 
         let mut wrong_type = Vec::new();
@@ -813,7 +660,7 @@ mod tests {
             read_dual_number_format(
                 Some(&wrong_type),
                 FIELDS,
-                ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+                NumberFormat::AXIS_NATIVE_DEFAULT,
                 "test axis"
             )
             .is_err()

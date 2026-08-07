@@ -133,7 +133,7 @@ fn set_slide_chart_pie_wedge_explosions(
     Ok(())
 }
 
-fn require_pie_wedges(kind: ChartKind, drawable_object_id: u64) -> Result<()> {
+fn require_pie_wedges(kind: Kind, drawable_object_id: u64) -> Result<()> {
     if !kind.supports_pie_start_angle() {
         return Err(Error::InvalidFormat(format!(
             "Keynote chart {drawable_object_id} kind {kind:?} has no pie wedges"
@@ -143,16 +143,17 @@ fn require_pie_wedges(kind: ChartKind, drawable_object_id: u64) -> Result<()> {
 }
 
 fn chart_series_count(
-    direction: ChartSeriesDirection,
+    direction: Direction,
     data: &ChartData,
     drawable_label: &str,
     drawable_object_id: u64,
 ) -> Result<usize> {
-    match direction {
-        ChartSeriesDirection::Rows => Ok(data.row_names().len()),
-        ChartSeriesDirection::Columns => Ok(data.column_names().len()),
-        ChartSeriesDirection::Unsupported(value) => Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} has unsupported series direction {value}"
+    match direction.kind() {
+        Some(DirectionKind::Rows) => Ok(data.row_names().len()),
+        Some(DirectionKind::Columns) => Ok(data.column_names().len()),
+        None => Err(Error::InvalidFormat(format!(
+            "{drawable_label} chart {drawable_object_id} has unsupported series direction {}",
+            direction.native_value()
         ))),
     }
 }

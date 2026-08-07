@@ -11,7 +11,7 @@ use super::native::DatePeriodPredicateKind;
 use super::*;
 
 pub(super) fn encode(
-    condition: &TableCellConditionalHighlightCondition,
+    condition: &Condition,
     formula_owner_uuid: &tsp::Uuid,
 ) -> Result<tsce::FormulaArchive> {
     let kind = NativePredicateKind::from_condition(condition);
@@ -26,15 +26,14 @@ pub(super) fn encode(
             let (period, direction) = date_period_operands(condition)?;
             date::period_nodes(kind, period, direction, formula_owner_uuid)?
         },
-        (
-            NativePredicateKind::FixedDate(kind),
-            TableCellConditionalHighlightCondition::DateIsBetween(range),
-        ) => date::fixed_nodes(
-            kind,
-            range.lower().apple_seconds(),
-            Some(range.upper().apple_seconds()),
-            formula_owner_uuid,
-        ),
+        (NativePredicateKind::FixedDate(kind), Condition::DateIsBetween(range)) => {
+            date::fixed_nodes(
+                kind,
+                range.lower().apple_seconds(),
+                Some(range.upper().apple_seconds()),
+                formula_owner_uuid,
+            )
+        },
         (NativePredicateKind::FixedDate(kind), _) => date::fixed_nodes(
             kind,
             condition
@@ -47,8 +46,7 @@ pub(super) fn encode(
         (NativePredicateKind::NumericSign(kind), _) => sign::nodes(kind, formula_owner_uuid)?,
         (
             NativePredicateKind::Numeric(kind),
-            TableCellConditionalHighlightCondition::Between(range)
-            | TableCellConditionalHighlightCondition::NotBetween(range),
+            Condition::Between(range) | Condition::NotBetween(range),
         ) => range_nodes(
             kind,
             range.lower().get(),
@@ -85,7 +83,7 @@ pub(super) fn encode(
 }
 
 pub(super) fn encode_prepivot(
-    condition: &TableCellConditionalHighlightCondition,
+    condition: &Condition,
     formula_owner_uuid: &tsp::Uuid,
 ) -> Result<tsce::FormulaArchive> {
     let kind = NativePredicateKind::from_condition(condition);
@@ -119,7 +117,7 @@ pub(super) fn encode_prepivot(
 pub(super) fn validate(
     formula: &tsce::FormulaArchive,
     kind: NativePredicateKind,
-    condition: &TableCellConditionalHighlightCondition,
+    condition: &Condition,
 ) -> Result<()> {
     match (kind, condition) {
         (NativePredicateKind::Cell(kind), _) => cell::validate(formula, kind),
@@ -130,15 +128,14 @@ pub(super) fn validate(
             let (period, direction) = date_period_operands(condition)?;
             date::validate_period(formula, kind, period, direction)
         },
-        (
-            NativePredicateKind::FixedDate(kind),
-            TableCellConditionalHighlightCondition::DateIsBetween(range),
-        ) => date::validate_fixed(
-            formula,
-            kind,
-            range.lower().apple_seconds(),
-            Some(range.upper().apple_seconds()),
-        ),
+        (NativePredicateKind::FixedDate(kind), Condition::DateIsBetween(range)) => {
+            date::validate_fixed(
+                formula,
+                kind,
+                range.lower().apple_seconds(),
+                Some(range.upper().apple_seconds()),
+            )
+        },
         (NativePredicateKind::FixedDate(kind), _) => date::validate_fixed(
             formula,
             kind,
@@ -151,8 +148,7 @@ pub(super) fn validate(
         (NativePredicateKind::NumericSign(kind), _) => sign::validate(formula, kind),
         (
             NativePredicateKind::Numeric(kind),
-            TableCellConditionalHighlightCondition::Between(range)
-            | TableCellConditionalHighlightCondition::NotBetween(range),
+            Condition::Between(range) | Condition::NotBetween(range),
         ) => validate_range(formula, kind, range.lower().get(), range.upper().get()),
         (NativePredicateKind::Numeric(kind), _) => {
             let value = condition
@@ -171,26 +167,21 @@ pub(super) fn validate(
 
 pub(super) fn date_period_quantity_node_index(
     kind: DatePeriodPredicateKind,
-    condition: &TableCellConditionalHighlightCondition,
+    condition: &Condition,
 ) -> Result<i32> {
     let (period, _) = date_period_operands(condition)?;
     Ok(date::period_quantity_node_index(kind, period.unit()))
 }
 
 fn date_period_operands(
-    condition: &TableCellConditionalHighlightCondition,
+    condition: &Condition,
 ) -> Result<(
-    crate::table_cell_conditional_highlight::TableCellConditionalHighlightDatePeriod,
-    Option<
-        crate::table_cell_conditional_highlight::TableCellConditionalHighlightDateOffsetDirection,
-    >,
+    litchi_iwa_common::table::cell::conditional_highlight::Period,
+    Option<litchi_iwa_common::table::cell::conditional_highlight::OffsetDirection>,
 )> {
     match condition {
-        TableCellConditionalHighlightCondition::DateIsInNext(period)
-        | TableCellConditionalHighlightCondition::DateIsInLast(period) => Ok((*period, None)),
-        TableCellConditionalHighlightCondition::DateIsOffsetFromToday(offset) => {
-            Ok((offset.period(), Some(offset.direction())))
-        },
+        Condition::DateIsInNext(period) | Condition::DateIsInLast(period) => Ok((*period, None)),
+        Condition::DateIsOffsetFromToday(offset) => Ok((offset.period(), Some(offset.direction()))),
         _ => Err(invalid_formula()),
     }
 }
@@ -198,7 +189,7 @@ fn date_period_operands(
 pub(super) fn validate_prepivot(
     formula: &tsce::FormulaArchive,
     kind: NativePredicateKind,
-    condition: &TableCellConditionalHighlightCondition,
+    condition: &Condition,
 ) -> Result<()> {
     match kind {
         NativePredicateKind::Checkbox(kind) => {

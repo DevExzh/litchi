@@ -4,14 +4,18 @@ use std::{env, fs, path::Path};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeCurvedShadow, ShapeEffects,
-    ShapeFill, ShapeGradient, ShapeGradientAngle, ShapeGradientKind, ShapeGradientOpacity,
-    ShapeGradientStop, ShapeGradientStopMidpoint, ShapeGradientStopPosition,
-    ShapeImageFillTechnique, ShapeOpacity, ShapePreset, ShapeReflection, ShapeReflectionOpacity,
-    ShapeShadow, ShapeShadowAngle, ShapeShadowAppearance, ShapeShadowBlurRadius, ShapeShadowCurve,
-    ShapeShadowOffset, ShapeShadowOpacity, ShapeTextAutoSize, ShapeTextInset, ShapeTextInsets,
-    ShapeTextLayout, ShapeTextVerticalAlignment,
+    Appearance, BlurRadius, Curve, Curved, DrawablePoint, DrawableSize, Offset, RgbColorSpace,
+    RgbaColor, Shadow, ShapeFill, ShapeImageFillTechnique,
 };
+use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+use litchi_iwa_common::shape::effects::{
+    Effects, Opacity as EffectsOpacity, Reflection, ReflectionOpacity,
+};
+use litchi_iwa_common::shape::fill::{
+    Angle, Gradient, Kind, Opacity as GradientOpacity, Stop, StopMidpoint, StopPosition,
+};
+use litchi_iwa_common::shape::path::Preset;
+use litchi_iwa_common::shape::shadow::{Angle as ShadowAngle, Opacity as ShadowOpacity};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -38,23 +42,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             width: 480.0,
             height: 240.0,
         },
-        ShapePreset::RightArrow,
-        ShapeFill::Gradient(ShapeGradient::advanced(
-            ShapeGradientKind::Radial,
+        Preset::RightArrow,
+        ShapeFill::Gradient(Gradient::advanced(
+            Kind::Radial,
             vec![
-                ShapeGradientStop::new(
+                Stop::new(
                     RgbaColor::new(0.98, 0.62, 0.08, 1.0, RgbColorSpace::DisplayP3)?,
-                    ShapeGradientStopPosition::START,
-                    ShapeGradientStopMidpoint::new(0.4)?,
+                    StopPosition::START,
+                    StopMidpoint::new(0.4)?,
                 ),
-                ShapeGradientStop::new(
+                Stop::new(
                     RgbaColor::new(0.72, 0.08, 0.38, 1.0, RgbColorSpace::DisplayP3)?,
-                    ShapeGradientStopPosition::END,
-                    ShapeGradientStopMidpoint::CENTER,
+                    StopPosition::END,
+                    StopMidpoint::CENTER,
                 ),
             ],
-            ShapeGradientOpacity::OPAQUE,
-            ShapeGradientAngle::from_degrees(315.0)?,
+            GradientOpacity::OPAQUE,
+            Angle::from_degrees(315.0)?,
         )?),
     )?;
     if let Some(path) = fill_image {
@@ -71,32 +75,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_shape_effects(
         0,
         created.drawable_object_id,
-        ShapeEffects::new(
-            ShapeOpacity::new(0.61)?,
-            ShapeReflection::Enabled(ShapeReflectionOpacity::new(0.2)?),
+        Effects::new(
+            EffectsOpacity::new(0.61)?,
+            Reflection::Enabled(ReflectionOpacity::new(0.2)?),
         ),
     )?;
     editor.set_slide_shape_shadow(
         0,
         created.drawable_object_id,
-        ShapeShadow::Curved(ShapeCurvedShadow::new(
-            ShapeShadowAppearance::new(
+        Shadow::Curved(Curved::new(
+            Appearance::new(
                 RgbaColor::black(),
-                ShapeShadowBlurRadius::from_points(15)?,
-                ShapeShadowOffset::from_points(4.0)?,
-                ShapeShadowOpacity::new(0.73)?,
+                BlurRadius::from_points(15)?,
+                Offset::from_points(4.0)?,
+                ShadowOpacity::new(0.73)?,
             ),
-            ShapeShadowAngle::from_degrees(310.0)?,
-            ShapeShadowCurve::new(0.2)?,
+            ShadowAngle::from_degrees(310.0)?,
+            Curve::new(0.2)?,
         )),
     )?;
     editor.set_slide_shape_text_layout(
         0,
         created.drawable_object_id,
-        ShapeTextLayout::new(
-            ShapeTextVerticalAlignment::Middle,
-            ShapeTextInsets::uniform(ShapeTextInset::from_points(14.0)?),
-            ShapeTextAutoSize::ShrinkToFit,
+        Layout::new(
+            VerticalAlignment::Middle,
+            Insets::uniform(Inset::from_points(14.0)?),
+            AutoSize::ShrinkToFit,
         ),
     )?;
     editor.set_slide_shape_title(0, created.drawable_object_id, "Typed Keynote shape")?;
@@ -108,7 +112,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.save(output)?;
     println!(
         "created Keynote {:?} {:?} {} with storage {}",
-        created.kind, created.preset, created.drawable_object_id, created.storage.object_id
+        created.kind, created.preset, created.drawable_object_id, created.storage.id
     );
     Ok(())
 }

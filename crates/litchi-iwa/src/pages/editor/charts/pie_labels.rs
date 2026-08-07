@@ -5,14 +5,14 @@ use crate::charts::pie_labels::{
     chart_pie_label_visibilities as read_native_label_visibilities,
     set_chart_pie_label_visibilities as set_native_label_visibilities,
 };
-use crate::charts::{ChartPieLabelVisibility, ChartPieWedgeIndex};
+use crate::charts::{ChartPieWedgeIndex, LabelVisibility};
 
 impl PagesEditor {
     /// Read label visibility for every pie or donut wedge in chart-series order.
     pub fn body_chart_pie_label_visibilities(
         &self,
         drawable_object_id: u64,
-    ) -> Result<Vec<ChartPieLabelVisibility>> {
+    ) -> Result<Vec<LabelVisibility>> {
         body_chart_pie_label_visibilities(self, drawable_object_id)
     }
 
@@ -21,7 +21,7 @@ impl PagesEditor {
         &self,
         drawable_object_id: u64,
         wedge: ChartPieWedgeIndex,
-    ) -> Result<ChartPieLabelVisibility> {
+    ) -> Result<LabelVisibility> {
         let values = body_chart_pie_label_visibilities(self, drawable_object_id)?;
         values
             .get(wedge.zero_based())
@@ -33,7 +33,7 @@ impl PagesEditor {
     pub fn set_body_chart_pie_label_visibilities(
         &mut self,
         drawable_object_id: u64,
-        visibilities: &[ChartPieLabelVisibility],
+        visibilities: &[LabelVisibility],
     ) -> Result<()> {
         set_body_chart_pie_label_visibilities(self, drawable_object_id, visibilities)
     }
@@ -43,7 +43,7 @@ impl PagesEditor {
         &mut self,
         drawable_object_id: u64,
         wedge: ChartPieWedgeIndex,
-        visibility: ChartPieLabelVisibility,
+        visibility: LabelVisibility,
     ) -> Result<()> {
         let mut values = body_chart_pie_label_visibilities(self, drawable_object_id)?;
         let count = values.len();
@@ -61,7 +61,7 @@ impl PagesEditor {
 fn body_chart_pie_label_visibilities(
     editor: &PagesEditor,
     drawable_object_id: u64,
-) -> Result<Vec<ChartPieLabelVisibility>> {
+) -> Result<Vec<LabelVisibility>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     require_pie_labels(graph.info.kind, drawable_object_id)?;
     let series_count = label_series_count(
@@ -82,7 +82,7 @@ fn body_chart_pie_label_visibilities(
 fn set_body_chart_pie_label_visibilities(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    visibilities: &[ChartPieLabelVisibility],
+    visibilities: &[LabelVisibility],
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     require_pie_labels(graph.info.kind, drawable_object_id)?;
@@ -127,7 +127,7 @@ fn set_body_chart_pie_label_visibilities(
     Ok(())
 }
 
-fn require_pie_labels(kind: ChartKind, drawable_object_id: u64) -> Result<()> {
+fn require_pie_labels(kind: Kind, drawable_object_id: u64) -> Result<()> {
     if !kind.supports_pie_start_angle() {
         return Err(Error::InvalidFormat(format!(
             "Pages chart {drawable_object_id} kind {kind:?} has no pie labels"
@@ -137,16 +137,17 @@ fn require_pie_labels(kind: ChartKind, drawable_object_id: u64) -> Result<()> {
 }
 
 fn label_series_count(
-    direction: ChartSeriesDirection,
+    direction: Direction,
     data: &ChartData,
     drawable_label: &str,
     drawable_object_id: u64,
 ) -> Result<usize> {
-    match direction {
-        ChartSeriesDirection::Rows => Ok(data.row_names().len()),
-        ChartSeriesDirection::Columns => Ok(data.column_names().len()),
-        ChartSeriesDirection::Unsupported(value) => Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} has unsupported series direction {value}"
+    match direction.kind() {
+        Some(DirectionKind::Rows) => Ok(data.row_names().len()),
+        Some(DirectionKind::Columns) => Ok(data.column_names().len()),
+        None => Err(Error::InvalidFormat(format!(
+            "{drawable_label} chart {drawable_object_id} has unsupported series direction {}",
+            direction.native_value()
         ))),
     }
 }

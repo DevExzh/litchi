@@ -1,7 +1,8 @@
 //! Native gap-spacing CRUD for Keynote slide charts.
 
 use super::*;
-use crate::charts::ChartGapSpacing;
+use litchi_iwa_common::chart::gaps::Spacing;
+
 use crate::charts::gaps::{
     chart_gap_spacing as read_native_chart_gap_spacing,
     set_chart_gap_spacing as set_native_chart_gap_spacing,
@@ -13,7 +14,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<ChartGapSpacing> {
+    ) -> Result<Spacing> {
         slide_chart_gap_spacing(self, slide_index, drawable_object_id)
     }
 
@@ -22,7 +23,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        spacing: ChartGapSpacing,
+        spacing: Spacing,
     ) -> Result<()> {
         set_slide_chart_gap_spacing(self, slide_index, drawable_object_id, spacing)
     }
@@ -32,7 +33,7 @@ fn slide_chart_gap_spacing(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-) -> Result<ChartGapSpacing> {
+) -> Result<Spacing> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     read_native_chart_gap_spacing(
         editor.package(),
@@ -46,7 +47,7 @@ fn set_slide_chart_gap_spacing(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    spacing: ChartGapSpacing,
+    spacing: Spacing,
 ) -> Result<()> {
     if slide_chart_gap_spacing(editor, slide_index, drawable_object_id)? == spacing {
         return Ok(());

@@ -61,8 +61,8 @@ fn sheet_chart_caption(
     slot.storage_id
         .map(|storage_id| {
             IWorkTextEditor::from_package(editor.package.clone())
-                .storage(storage_id)
-                .map(|storage| storage.text)
+                .storage(crate::text::native_storage_id(storage_id)?)
+                .map(|storage| storage.storage.into_text())
         })
         .transpose()
 }
@@ -113,7 +113,7 @@ fn set_sheet_chart_caption(
     let expected = Some(text.to_owned());
     let staged = if let Some(storage_id) = slot.storage_id {
         let mut text_editor = IWorkTextEditor::from_package(editor.package.clone());
-        text_editor.set_text(storage_id, text)?;
+        text_editor.set_text(crate::text::native_storage_id(storage_id)?, text)?;
         text_editor.into_package()
     } else {
         let (theme, language) = sheet_chart_caption_theme(editor)?;

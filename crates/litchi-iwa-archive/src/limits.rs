@@ -1,0 +1,244 @@
+use litchi_iwa_core::{ArchiveLimits, SnappyLimits, SnappyStream};
+
+use crate::{Error, LimitKind, Result};
+
+/// Checked resource ceilings for one physical iWork bundle ingress.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    max_input_bytes: u64,
+    max_entries: usize,
+    max_entry_bytes: u64,
+    max_total_bytes: u64,
+    max_iwa_stream_bytes: usize,
+    iwa_profile: ArchiveLimits,
+}
+
+impl Limits {
+    /// Hard ceiling for bytes read from one bundle file or nested `Index.zip`.
+    pub const MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    /// Hard ceiling for non-directory ZIP members in one archive.
+    pub const MAX_ENTRIES: usize = 100_000;
+    /// Hard ceiling for one declared uncompressed ZIP member.
+    pub const MAX_ENTRY_BYTES: u64 = 512 * 1024 * 1024;
+    /// Hard ceiling for one declared ZIP archive total.
+    pub const MAX_TOTAL_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    /// Hard ceiling for one decompressed IWA component.
+    pub const MAX_IWA_STREAM_BYTES: usize = SnappyStream::MAX_DECOMPRESSED_STREAM;
+
+    /// Build a checked physical ingress profile.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when any requested ceiling is zero or exceeds its
+    /// format-wide hard ceiling.
+    pub fn new(
+        max_input_bytes: u64,
+        max_entries: usize,
+        max_entry_bytes: u64,
+        max_total_bytes: u64,
+        max_iwa_stream_bytes: usize,
+    ) -> Result<Self> {
+        let iwa_profile = ArchiveLimits::default()
+            .with_archive_bytes(max_iwa_stream_bytes)
+            .map_err(|error| Error::InvalidLimits(error.to_string()))?;
+        Self {
+            max_input_bytes,
+            max_entries,
+            max_entry_bytes,
+            max_total_bytes,
+            max_iwa_stream_bytes,
+            iwa_profile,
+        }
+        .validate()
+    }
+
+    /// Maximum complete input accepted from a path or byte slice.
+    #[must_use]
+    pub const fn max_input_bytes(self) -> u64 {
+        self.max_input_bytes
+    }
+
+    /// Maximum number of non-directory ZIP members.
+    #[must_use]
+    pub const fn max_entries(self) -> usize {
+        self.max_entries
+    }
+
+    /// Maximum declared uncompressed size of one ZIP member.
+    #[must_use]
+    pub const fn max_entry_bytes(self) -> u64 {
+        self.max_entry_bytes
+    }
+
+    /// Maximum aggregate declared uncompressed ZIP size.
+    #[must_use]
+    pub const fn max_total_bytes(self) -> u64 {
+        self.max_total_bytes
+    }
+
+    /// Maximum decompressed size of one IWA component.
+    #[must_use]
+    pub const fn max_iwa_stream_bytes(self) -> usize {
+        self.max_iwa_stream_bytes
+    }
+
+    /// Return the caller-selected neutral IWA archive profile.
+    #[must_use]
+    pub const fn archive_limits(self) -> ArchiveLimits {
+        self.iwa_profile
+    }
+
+    /// Tighten the neutral IWA archive profile while preserving the outer
+    /// bundle stream ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the supplied neutral profile is invalid.
+    pub fn with_archive_limits(mut self, limits: ArchiveLimits) -> Result<Self> {
+        limits
+            .validate()
+            .map_err(|error| Error::InvalidLimits(error.to_string()))?;
+        if limits.max_archive_bytes() > self.max_iwa_stream_bytes {
+            return Err(Error::InvalidLimits(
+                "IWA archive limit exceeds the bundle stream limit".to_owned(),
+            ));
+        }
+        self.iwa_profile = limits;
+        self.validate()
+    }
+
+    /// Return the effective neutral IWA profile applied during parsing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the profile cannot be tightened to the stream
+    /// ceiling.
+    pub fn effective_archive_limits(self) -> Result<ArchiveLimits> {
+        Ok(self.validate()?.iwa_profile)
+    }
+
+    /// Return the checked Snappy framing profile corresponding to this budget.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the effective IWA profile cannot be represented by
+    /// the Snappy framing limits.
+    pub fn snappy_limits(self) -> Result<SnappyLimits> {
+        let max_stream_bytes = self.effective_archive_limits()?.max_archive_bytes();
+        SnappyLimits::new(
+            max_stream_bytes.min(SnappyStream::MAX_UNCOMPRESSED_CHUNK),
+            max_stream_bytes,
+        )
+        .map_err(|error| Error::InvalidLimits(error.to_string()))
+    }
+
+    /// Reject an input whose complete byte length exceeds this profile.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `size` exceeds the configured input ceiling.
+    pub(crate) fn check_input_size(self, size: u64, _label: &str) -> Result<()> {
+        if size > self.max_input_bytes {
+            return Err(Error::Limit {
+                kind: LimitKind::InputBytes,
+                observed: size,
+                maximum: self.max_input_bytes,
+            });
+        }
+        Ok(())
+    }
+
+    /// Reject an output artifact before its complete byte buffer is allocated.
+    ///
+    /// The physical input ceiling is also the maximum in-memory artifact size
+    /// for this bounded reassembly API. Callers that need a larger artifact
+    /// must choose a larger profile, still subject to the format hard ceiling.
+    pub(crate) fn check_output_size(self, size: u64) -> Result<()> {
+        if size > self.max_input_bytes {
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
+                observed: size,
+                maximum: self.max_input_bytes,
+            });
+        }
+        Ok(())
+    }
+
+    pub(crate) fn validate(self) -> Result<Self> {
+        if self.max_input_bytes == 0
+            || self.max_entries == 0
+            || self.max_entry_bytes == 0
+            || self.max_total_bytes == 0
+            || self.max_iwa_stream_bytes == 0
+        {
+            return Err(Error::InvalidLimits(
+                "all iWork archive limits must be non-zero".to_owned(),
+            ));
+        }
+        if self.max_input_bytes > Self::MAX_INPUT_BYTES {
+            return Err(Error::Limit {
+                kind: LimitKind::InputBytes,
+                observed: self.max_input_bytes,
+                maximum: Self::MAX_INPUT_BYTES,
+            });
+        }
+        if self.max_entries > Self::MAX_ENTRIES {
+            return Err(Error::Limit {
+                kind: LimitKind::Entries,
+                observed: self.max_entries as u64,
+                maximum: Self::MAX_ENTRIES as u64,
+            });
+        }
+        if self.max_entry_bytes > Self::MAX_ENTRY_BYTES {
+            return Err(Error::Limit {
+                kind: LimitKind::EntryBytes,
+                observed: self.max_entry_bytes,
+                maximum: Self::MAX_ENTRY_BYTES,
+            });
+        }
+        if self.max_total_bytes > Self::MAX_TOTAL_BYTES {
+            return Err(Error::Limit {
+                kind: LimitKind::TotalBytes,
+                observed: self.max_total_bytes,
+                maximum: Self::MAX_TOTAL_BYTES,
+            });
+        }
+        if self.max_iwa_stream_bytes > Self::MAX_IWA_STREAM_BYTES {
+            return Err(Error::Limit {
+                kind: LimitKind::IwaStreamBytes,
+                observed: self.max_iwa_stream_bytes as u64,
+                maximum: Self::MAX_IWA_STREAM_BYTES as u64,
+            });
+        }
+        self.iwa_profile
+            .validate()
+            .map_err(|error| Error::InvalidLimits(error.to_string()))?;
+        if self.iwa_profile.max_archive_bytes() > self.max_iwa_stream_bytes {
+            return Err(Error::InvalidLimits(
+                "IWA archive limit exceeds the bundle stream limit".to_owned(),
+            ));
+        }
+        Ok(self)
+    }
+
+    pub(crate) const fn zip_limits(self) -> soapberry_zip::office::ArchiveLimits {
+        soapberry_zip::office::ArchiveLimits {
+            max_files: self.max_entries,
+            max_entry_size: self.max_entry_bytes,
+            max_total_size: self.max_total_bytes,
+        }
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            max_input_bytes: Self::MAX_INPUT_BYTES,
+            max_entries: Self::MAX_ENTRIES,
+            max_entry_bytes: Self::MAX_ENTRY_BYTES,
+            max_total_bytes: Self::MAX_TOTAL_BYTES,
+            max_iwa_stream_bytes: Self::MAX_IWA_STREAM_BYTES,
+            iwa_profile: ArchiveLimits::default(),
+        }
+    }
+}

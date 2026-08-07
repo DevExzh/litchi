@@ -46,12 +46,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "found {} table(s), {} slide(s), {} section(s)",
-        structured.tables.len(),
-        structured.slides.len(),
-        structured.sections.len()
+        structured.table_count(),
+        structured.slide_count(),
+        structured.section_count()
     );
 
-    let Some(first) = structured.tables.first() else {
+    let Some(first) = structured.table(0) else {
         println!("no tables found in this document.");
         return Ok(());
     };
@@ -69,10 +69,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{}", csv);
     }
 
-    if structured.tables.len() > 1 {
+    if structured.table_count() > 1 {
         println!(
             "... and {} more table(s) not shown.",
-            structured.tables.len() - 1
+            structured.table_count() - 1
         );
     }
 

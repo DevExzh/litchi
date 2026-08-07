@@ -20,7 +20,7 @@ use super::super::line_end::{
 use super::native::{
     opacity_from_native, opacity_to_native, reflection_from_native, reflection_to_native,
 };
-use super::{ShapeEffects, ShapeOpacity, ShapeReflection};
+use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection};
 
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
 
@@ -28,7 +28,7 @@ pub(crate) fn shape_effects(
     package: &IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-) -> Result<ShapeEffects> {
+) -> Result<Effects> {
     let style_id = shape_payload(package, archive_name, drawable_id)?
         .super_
         .style
@@ -42,7 +42,7 @@ pub(crate) fn set_shape_effects(
     package: &mut IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-    effects: ShapeEffects,
+    effects: Effects,
 ) -> Result<()> {
     if shape_effects(package, archive_name, drawable_id)? == effects {
         return Ok(());
@@ -167,13 +167,13 @@ pub(crate) fn reset_shape_effects(
     Ok(true)
 }
 
-fn effect_overrides(effects: ShapeEffects) -> ShapeStyleOverrides {
+fn effect_overrides(effects: Effects) -> ShapeStyleOverrides {
     let mut overrides = ShapeStyleOverrides::default();
     apply_effects(&mut overrides, effects);
     overrides
 }
 
-fn apply_effects(overrides: &mut ShapeStyleOverrides, effects: ShapeEffects) {
+fn apply_effects(overrides: &mut ShapeStyleOverrides, effects: Effects) {
     overrides.opacity = Some(opacity_to_native(effects.opacity()));
     overrides.reflection = Some(reflection_to_native(effects.reflection()));
 }
@@ -190,7 +190,7 @@ fn insert_effect_variation(
     package: &mut IWorkPackage,
     location: EffectVariationLocation<'_>,
     overrides: ShapeStyleOverrides,
-    expected: ShapeEffects,
+    expected: Effects,
 ) -> Result<()> {
     let EffectVariationLocation {
         drawable_archive_name,
@@ -242,7 +242,7 @@ fn validate_effects(
     package: &IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-    expected: ShapeEffects,
+    expected: Effects,
 ) -> Result<()> {
     if shape_effects(package, archive_name, drawable_id)? != expected {
         return Err(Error::InvalidFormat(
@@ -289,16 +289,16 @@ fn parent_style_id(style_id: u64, style: &tswp::ShapeStyleArchive) -> Result<u64
         })
 }
 
-fn inherited_shape_effects(package: &IWorkPackage, first_style_id: u64) -> Result<ShapeEffects> {
+fn inherited_shape_effects(package: &IWorkPackage, first_style_id: u64) -> Result<Effects> {
     let mut visited = HashSet::new();
     let mut style_id = Some(first_style_id);
     let mut opacity = None;
     let mut reflection = None;
     for _ in 0..MAX_STYLE_INHERITANCE_DEPTH {
         let Some(identifier) = style_id else {
-            return Ok(ShapeEffects::new(
-                opacity.unwrap_or(ShapeOpacity::OPAQUE),
-                reflection.unwrap_or(ShapeReflection::Disabled),
+            return Ok(Effects::new(
+                opacity.unwrap_or(Opacity::OPAQUE),
+                reflection.unwrap_or(Reflection::Disabled),
             ));
         };
         if !visited.insert(identifier) {
@@ -321,7 +321,7 @@ fn inherited_shape_effects(package: &IWorkPackage, first_style_id: u64) -> Resul
             }
         }
         if let (Some(opacity), Some(reflection)) = (opacity, reflection) {
-            return Ok(ShapeEffects::new(opacity, reflection));
+            return Ok(Effects::new(opacity, reflection));
         }
         style_id = style
             .super_

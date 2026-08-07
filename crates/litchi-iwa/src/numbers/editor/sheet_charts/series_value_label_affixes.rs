@@ -6,7 +6,7 @@ use crate::charts::series_value_label_affixes::{
     chart_series_value_label_affixes as read_native_affixes,
     set_chart_series_value_label_affixes as set_native_affixes,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesValueLabelAffixes};
+use crate::charts::{Index, LabelAffixes};
 
 impl NumbersEditor {
     /// Read every series' value-label affixes in native series order.
@@ -14,7 +14,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<Vec<ChartSeriesValueLabelAffixes>> {
+    ) -> Result<Vec<LabelAffixes>> {
         sheet_chart_series_value_label_affixes(self, sheet_id, drawable_object_id)
     }
 
@@ -23,8 +23,8 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
-    ) -> Result<ChartSeriesValueLabelAffixes> {
+        series: Index,
+    ) -> Result<LabelAffixes> {
         let affixes = sheet_chart_series_value_label_affixes(self, sheet_id, drawable_object_id)?;
         affixes
             .get(series.zero_based())
@@ -37,7 +37,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        affixes: &[ChartSeriesValueLabelAffixes],
+        affixes: &[LabelAffixes],
     ) -> Result<()> {
         set_sheet_chart_series_value_label_affixes(self, sheet_id, drawable_object_id, affixes)
     }
@@ -47,8 +47,8 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
-        affixes: ChartSeriesValueLabelAffixes,
+        series: Index,
+        affixes: LabelAffixes,
     ) -> Result<()> {
         let mut values =
             sheet_chart_series_value_label_affixes(self, sheet_id, drawable_object_id)?;
@@ -68,7 +68,7 @@ fn sheet_chart_series_value_label_affixes(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-) -> Result<Vec<ChartSeriesValueLabelAffixes>> {
+) -> Result<Vec<LabelAffixes>> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let series_count = value_label_series_count(
         graph.info.kind,
@@ -91,7 +91,7 @@ fn set_sheet_chart_series_value_label_affixes(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    affixes: &[ChartSeriesValueLabelAffixes],
+    affixes: &[LabelAffixes],
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let series_count = value_label_series_count(
@@ -138,12 +138,7 @@ fn set_sheet_chart_series_value_label_affixes(
     Ok(())
 }
 
-fn affix_index_error(
-    suite: &str,
-    drawable_object_id: u64,
-    series: ChartSeriesIndex,
-    count: usize,
-) -> Error {
+fn affix_index_error(suite: &str, drawable_object_id: u64, series: Index, count: usize) -> Error {
     Error::InvalidFormat(format!(
         "{suite} chart {drawable_object_id} series index {} exceeds series count {count}",
         series.zero_based()

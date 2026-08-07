@@ -18,7 +18,7 @@ A high-performance Rust library for parsing Microsoft Office file formats (OLE2 
 - **Unified API** - Same interface for legacy and modern formats with automatic format detection
 - **Microsoft Office** - Full support for .doc, .docx, .xls, .xlsx, .xlsb, .ppt, .pptx files
 - **OpenDocument** - Parse .odt, .ods, .odp files (ODF format)
-- **Apple iWork** - Parse .pages, .numbers, .key files (IWA format)
+- **Apple iWork** - Independently parse .pages, .numbers, and .key files through dedicated format leaves
 - **Formula Conversion** - Parse MathType and Office MathML equations and convert to LaTeX
 - **Markdown Conversion** - Convert documents and presentations to Markdown format
 - **Memory Efficient** - Direct byte buffer support with zero-copy parsing where possible
@@ -91,12 +91,28 @@ pkg.save("output.pptx")?;
     let text = odt.text()?;
 }
 
-// Apple iWork formats (requires "iwork" feature)
-#[cfg(feature = "iwork")]
+// Apple Pages documents (requires "pages")
+#[cfg(feature = "pages")]
 {
-    use litchi::iwa;
-    let pages = iwa::Document::open("document.pages")?;
+    use litchi::Document;
+    let pages = Document::open("document.pages")?;
     let text = pages.text()?;
+}
+
+// Apple Keynote presentations (requires "keynote")
+#[cfg(feature = "keynote")]
+{
+    use litchi::Presentation;
+    let keynote = Presentation::open("slides.key")?;
+    let slide_count = keynote.slide_count()?;
+}
+
+// Apple Numbers workbooks (requires "numbers")
+#[cfg(feature = "numbers")]
+{
+    use litchi::sheet::Workbook;
+    let numbers = Workbook::open("budget.numbers")?;
+    let sheet_count = numbers.worksheet_count();
 }
 
 // Formula conversion (requires "formula" feature)
@@ -135,12 +151,20 @@ litchi = { version = "0", features = ["ppt", "pptx", "sign"] }
 
 # A minimal spreadsheet reader/writer surface.
 litchi = { version = "0", default-features = false, features = ["xlsx"] }
+
+# Parse only Pages documents. `keynote` and `numbers` are independent leaves.
+litchi = { version = "0", features = ["pages"] }
+
+# Enable every iWork format as a convenience bundle.
+litchi = { version = "0", features = ["iwork"] }
 ```
 
 Formats never imply signing. Add `sign` only when your application needs
 signature support.
 
-**Note about `iwork`:** iWork files are essentially bundles of serialized Protocol Buffer messages, so enabling `iwork` requires a system `protoc` installation (used by `prost-build`).
+**Note about iWork leaves:** `pages`, `keynote`, and `numbers` parse serialized
+IWA Protocol Buffer messages. Enabling any one of them requires a system
+`protoc` installation (used by `prost-build`); `iwork` simply enables all three.
 
 - **Linux (Debian/Ubuntu)**: install `protobuf-compiler`
 - **macOS**: install `protobuf` (e.g. via Homebrew)
@@ -152,10 +176,10 @@ signature support.
 
 **Feature groups:**
 
-- Format leaves: `doc`, `docx`, `ppt`, `pptx`, `xls`, `xlsx`, `xlsb`, `rtf`, `odt`, `ods`, `odp`, `iwork`.
+- Format leaves: `doc`, `docx`, `ppt`, `pptx`, `xls`, `xlsx`, `xlsb`, `rtf`, `odt`, `ods`, `odp`, `pages`, `keynote`, `numbers`.
 - Infrastructure: `cfb`, `ole`, `opc`, `ooxml-common`, `drawingml`, `odf-common`, `sheet`.
 - Capabilities: `sign`, `encryption`, `formula`, `fonts`, `images`, `eval`, `web-functions`, `markdown`, `yaml`.
-- Aggregates: `legacy`, `ooxml`, `odf`, `word`, `slides`, `spreadsheets`, `office`, `all-formats`, `all`.
+- Aggregates: `legacy`, `ooxml`, `odf`, `iwork`, `word`, `slides`, `spreadsheets`, `office`, `all-formats`, `all`.
 
 Use leaf features for lean applications; aggregates are convenience bundles.
 
@@ -163,6 +187,11 @@ Legacy binary formats have independent owners: `litchi-doc`, `litchi-ppt`,
 and `litchi-xls`. Their canonical umbrella modules are `litchi::doc`,
 `litchi::ppt`, and `litchi::xls`. The low-level `ole` feature exposes shared
 OLE vocabulary; it is not a legacy format owner or compatibility facade.
+
+iWork follows the same ownership rule: `litchi::pages`, `litchi::keynote`, and
+`litchi::numbers` expose the concrete format owners, while `Document`,
+`Presentation`, and `sheet::Workbook` provide the corresponding unified
+high-level entry points. The `iwork` feature is only their aggregate.
 
 ## Documentation
 

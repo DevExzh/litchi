@@ -15,7 +15,7 @@ pub enum Run {
     Doc(doc::Run),
     #[cfg(feature = "docx")]
     Docx(crate::docx::Run),
-    #[cfg(feature = "iwork")]
+    #[cfg(feature = "pages")]
     Pages(String),
     #[cfg(feature = "rtf")]
     Rtf(litchi_rtf::Run<'static>),
@@ -34,7 +34,7 @@ impl Run {
                 .text()
                 .map(|s| s.to_string())
                 .map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "pages")]
             Run::Pages(text) => Ok(text.clone()),
             #[cfg(feature = "rtf")]
             Run::Rtf(r) => Ok(r.text().to_string()),
@@ -52,7 +52,7 @@ impl Run {
             Run::Doc(r) => Ok(r.bold()),
             #[cfg(feature = "docx")]
             Run::Docx(r) => r.bold().map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "pages")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
             #[cfg(feature = "rtf")]
             Run::Rtf(r) => Ok(r.bold()),
@@ -68,7 +68,7 @@ impl Run {
             Run::Doc(r) => Ok(r.italic()),
             #[cfg(feature = "docx")]
             Run::Docx(r) => r.italic().map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "pages")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
             #[cfg(feature = "rtf")]
             Run::Rtf(r) => Ok(r.italic()),
@@ -84,7 +84,7 @@ impl Run {
             Run::Doc(r) => Ok(r.strikethrough()),
             #[cfg(feature = "docx")]
             Run::Docx(r) => r.strikethrough().map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "pages")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
             #[cfg(feature = "rtf")]
             Run::Rtf(r) => Ok(r.strikethrough()),
@@ -98,7 +98,7 @@ impl Run {
     /// Returns the vertical positioning if specified, None if normal.
     ///
     /// Pages currently reports no run-level vertical positioning.
-    #[cfg(any(feature = "doc", feature = "docx", feature = "iwork"))]
+    #[cfg(any(feature = "doc", feature = "docx", feature = "pages"))]
     pub fn vertical_position(&self) -> Result<Option<litchi_core::VerticalPosition>> {
         #[cfg(any(feature = "doc", feature = "docx"))]
         use litchi_core::VerticalPosition;
@@ -121,7 +121,7 @@ impl Run {
                     Some(VerticalPosition::Normal) | None => Ok(None),
                 }
             },
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "pages")]
             Run::Pages(_) => Ok(None), // Pages doesn't support run-level formatting in the current API
             #[cfg(feature = "rtf")]
             Run::Rtf(r) => Ok(r.vertical_position()),

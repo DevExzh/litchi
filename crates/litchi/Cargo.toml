@@ -57,7 +57,10 @@ rtf = ["dep:litchi-rtf", "dep:chrono"]
 odt = ["dep:litchi-odt", "odf-common"]
 ods = ["dep:litchi-ods", "odf-common", "sheet"]
 odp = ["dep:litchi-odp", "odf-common"]
-iwork = ["dep:litchi-iwa", "sheet"]
+pages = ["dep:litchi-pages", "dep:litchi-iwa-detect"]
+keynote = ["dep:litchi-keynote", "dep:litchi-iwa-detect"]
+numbers = ["dep:litchi-numbers", "dep:litchi-iwa-detect", "sheet"]
+iwork = ["pages", "keynote", "numbers"]
 
 # Low-level and opt-in capabilities
 cfb = ["dep:litchi-cfb"]
@@ -81,9 +84,9 @@ yaml = ["dep:serde-saphyr"]
 legacy = ["doc", "ppt", "xls", "cfb", "ole"]
 ooxml = ["docx", "pptx", "xlsx", "xlsb", "opc", "ooxml-common", "drawingml"]
 odf = ["odt", "ods", "odp", "odf-common"]
-word = ["doc", "docx", "rtf", "odt"]
-slides = ["ppt", "pptx", "odp"]
-spreadsheets = ["xls", "xlsx", "xlsb", "ods", "sheet"]
+word = ["doc", "docx", "rtf", "odt", "pages"]
+slides = ["ppt", "pptx", "odp", "keynote"]
+spreadsheets = ["xls", "xlsx", "xlsb", "ods", "numbers", "sheet"]
 office = ["legacy", "ooxml", "odf", "rtf", "iwork"]
 all-formats = ["office"]
 all = [
@@ -119,8 +122,10 @@ litchi-eval = { workspace = true, optional = true } # Formula evaluation
 litchi-fonts = { workspace = true, optional = true } # Font support
 litchi-formula = { workspace = true, optional = true } # Formula parsing and conversion
 litchi-imgconv = { workspace = true, optional = true } # Legacy image conversion
-litchi-iwa = { workspace = true, optional = true } # Apple iWork support
+litchi-iwa-detect = { workspace = true, optional = true } # Bounded iWork package detection
+litchi-keynote = { workspace = true, optional = true } # Apple Keynote support
 litchi-markdown = { workspace = true, optional = true } # Markdown emission
+litchi-numbers = { workspace = true, optional = true } # Apple Numbers support
 litchi-odf-common = { workspace = true, optional = true } # Shared OpenDocument vocabulary
 litchi-odp = { workspace = true, optional = true } # OpenDocument Presentation support
 litchi-ods = { workspace = true, optional = true } # OpenDocument Spreadsheet support
@@ -131,6 +136,7 @@ litchi-ooxml-common = { workspace = true, optional = true } # Shared OOXML vocab
 litchi-opc = { workspace = true, optional = true } # Open Packaging Conventions support
 litchi-ppt = { workspace = true, optional = true } # Legacy PowerPoint binary support
 litchi-pptx = { workspace = true, optional = true } # PresentationML support
+litchi-pages = { workspace = true, optional = true } # Apple Pages support
 litchi-rtf = { workspace = true, optional = true } # Rich Text Format support
 litchi-sheet = { workspace = true, optional = true } # Shared spreadsheet vocabulary
 litchi-sign = { workspace = true, optional = true } # Office signature support
@@ -142,7 +148,7 @@ rayon = { version = "1.11", optional = true } # Parallel Markdown rendering
 serde-saphyr = { version = "0", optional = true } # YAML metadata serialization
 
 [build-dependencies]
-# (none) — iwa proto compilation lives in `crates/litchi-iwa/build.rs`.
+# (none) — iwa proto compilation lives in `crates/litchi-iwa-protos/build.rs`.
 
 [dev-dependencies]
 clap = { version = "4", features = ["derive"] }

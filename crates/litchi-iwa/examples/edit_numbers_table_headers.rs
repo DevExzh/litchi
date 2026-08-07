@@ -1,18 +1,23 @@
 //! Edit typed Numbers table header, footer, freeze, and repetition settings.
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 use std::env;
 use std::path::PathBuf;
 
-use litchi_iwa::numbers::{NumbersEditor, NumbersTableHeaderCount, NumbersTableHeaderSettings};
+use litchi_iwa::numbers::NumbersEditor;
+use litchi_numbers::TableSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
     let input = PathBuf::from(arguments.next().ok_or(
-        "usage: edit_numbers_table_headers <input.numbers> <output.numbers> <table-id> <header-rows:0..5> <header-columns:0..5> <footer-rows:0..5> <unset|true|false:freeze-rows> <unset|true|false:freeze-columns> <unset|true|false:repeat-rows> <unset|true|false:repeat-columns>",
+        "usage: edit_numbers_table_headers <input.numbers> <output.numbers> <table-index> <header-rows:0..5> <header-columns:0..5> <footer-rows:0..5> <unset|true|false:freeze-rows> <unset|true|false:freeze-columns> <unset|true|false:repeat-rows> <unset|true|false:repeat-columns>",
     )?);
     let output = PathBuf::from(arguments.next().ok_or("missing output path")?);
-    let table_id = arguments.next().ok_or("missing table ID")?.parse::<u64>()?;
-    let settings = NumbersTableHeaderSettings {
+    let table_index = arguments
+        .next()
+        .ok_or("missing table index")?
+        .parse::<usize>()?;
+    let settings = HeaderSettings {
         header_rows: parse_count(arguments.next(), "header rows")?,
         header_columns: parse_count(arguments.next(), "header columns")?,
         footer_rows: parse_count(arguments.next(), "footer rows")?,
@@ -26,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut editor = NumbersEditor::open(input)?;
-    editor.set_table_header_settings(table_id, settings)?;
+    editor.set_table_header_settings(TableSelector::index(table_index), settings)?;
     editor.save(output)?;
     Ok(())
 }
@@ -34,14 +39,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn parse_count(
     value: Option<String>,
     label: &str,
-) -> Result<Option<NumbersTableHeaderCount>, Box<dyn std::error::Error>> {
+) -> Result<Option<HeaderCount>, Box<dyn std::error::Error>> {
     let count = value
         .ok_or_else(|| format!("missing {label}"))?
         .parse::<usize>()?;
     if count == 0 {
         Ok(None)
     } else {
-        Ok(Some(NumbersTableHeaderCount::new(count)?))
+        Ok(Some(HeaderCount::new(count)?))
     }
 }
 

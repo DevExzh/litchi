@@ -13,9 +13,8 @@ use crate::numbers::editor::table_topology::{
     category_grouping_is_enabled, deprecated_category_grouping_is_enabled, filter_has_row_state,
     table_has_spill_state,
 };
-use crate::table_hidden_axes::{
-    TableHiddenAxes, positional_user_hidden_axes, restore_positional_user_hidden_axes,
-};
+use crate::table_hidden_axes::{positional_user_hidden_axes, restore_positional_user_hidden_axes};
+use litchi_iwa_common::table::axis::HiddenAxes;
 
 use super::*;
 
@@ -141,11 +140,11 @@ fn compare_finite_numbers(left: f64, right: f64) -> Ordering {
 pub(super) fn apply_attached_table_sort_order(
     package: &mut IWorkPackage,
     table_id: u64,
-    order: &NumbersTableSortOrder,
+    order: &Order,
 ) -> Result<bool> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     validate_sort_order(&descriptor.model, order)?;
-    if order.scope() != NumbersTableSortScope::EntireTable {
+    if order.scope() != Scope::EntireTable {
         return Err(Error::ParseError(
             "Cannot execute a selected-row Numbers sort without an explicit row range".to_owned(),
         ));
@@ -157,12 +156,12 @@ pub(super) fn apply_attached_table_sort_order(
 pub(super) fn apply_attached_table_sort_order_to_rows(
     package: &mut IWorkPackage,
     table_id: u64,
-    order: &NumbersTableSortOrder,
-    rows: NumbersTableSortRowRange,
+    order: &Order,
+    rows: RowRange,
 ) -> Result<bool> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     validate_sort_order(&descriptor.model, order)?;
-    if order.scope() != NumbersTableSortScope::SelectedRows {
+    if order.scope() != Scope::SelectedRows {
         return Err(Error::ParseError(
             "Cannot execute an entire-table Numbers sort through a selected-row range".to_owned(),
         ));
@@ -196,7 +195,7 @@ fn apply_attached_table_sort_range(
     package: &mut IWorkPackage,
     table_id: u64,
     descriptor: &TableDescriptor,
-    order: &NumbersTableSortOrder,
+    order: &Order,
     row_start: usize,
     row_end: usize,
 ) -> Result<bool> {
@@ -279,7 +278,7 @@ fn apply_attached_table_sort_range(
 
 fn table_body_bounds(model: &TableModelArchive) -> Result<(usize, usize)> {
     let rows = model.number_of_rows as usize;
-    let settings = NumbersTableHeaderSettings::from_model(model)?;
+    let settings = table_headers::settings_from_model(model)?;
     let body_start = settings.header_row_count();
     let body_end = rows
         .checked_sub(settings.footer_row_count())
@@ -298,7 +297,7 @@ fn validate_sort_features(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
     descriptor: &TableDescriptor,
-) -> Result<TableHiddenAxes> {
+) -> Result<HiddenAxes> {
     let model = &descriptor.model;
     if model.number_of_filtered_rows.unwrap_or(0) != 0
         || model.pivot_owner.is_some()
@@ -355,7 +354,7 @@ fn validate_sort_features(
     if declares_hidden_storage {
         positional_user_hidden_axes(package, descriptor.object_id)
     } else {
-        Ok(TableHiddenAxes::empty())
+        Ok(HiddenAxes::empty())
     }
 }
 
@@ -365,7 +364,7 @@ fn plan_body_sort(
     model: &TableModelArchive,
     body_start: usize,
     body_end: usize,
-    order: &NumbersTableSortOrder,
+    order: &Order,
 ) -> Result<BodySortPlan> {
     let rows = model.number_of_rows as usize;
     let columns = model.number_of_columns as usize;
@@ -558,17 +557,10 @@ fn sort_scalar(cell: &BncCell, row: usize, column: usize) -> Result<SortScalar> 
         return Ok(SortScalar::Text(identifier));
     }
     let scalar = match cell.cached_scalar()? {
-        Some(CachedScalar::Number(value)) if value.is_finite() => SortScalar::Number(value),
+        Some(CachedScalar::Number(value)) => SortScalar::Number(value.get()),
         Some(CachedScalar::Boolean(value)) => SortScalar::Boolean(value),
-        Some(CachedScalar::Date(value)) if value.is_finite() => SortScalar::Date(value),
-        Some(CachedScalar::Duration(value)) if value.is_finite() => SortScalar::Duration(value),
-        Some(CachedScalar::Number(_))
-        | Some(CachedScalar::Date(_))
-        | Some(CachedScalar::Duration(_)) => {
-            return Err(Error::ParseError(format!(
-                "Numbers sort key in body cell ({row}, {column}) is not finite"
-            )));
-        },
+        Some(CachedScalar::Date(value)) => SortScalar::Date(value.get()),
+        Some(CachedScalar::Duration(value)) => SortScalar::Duration(value.get()),
         Some(CachedScalar::Unsupported(kind)) => {
             return Err(Error::ParseError(format!(
                 "Numbers sort key in body cell ({row}, {column}) has unsupported cell type {kind}"
@@ -585,7 +577,7 @@ fn sort_scalar(cell: &BncCell, row: usize, column: usize) -> Result<SortScalar> 
 
 fn validate_consistent_scalar_kinds(
     keys_by_body_row: &[Vec<SortScalar>],
-    order: &NumbersTableSortOrder,
+    order: &Order,
 ) -> Result<()> {
     let Some(first) = keys_by_body_row.first() else {
         return Ok(());
@@ -608,7 +600,7 @@ fn validate_consistent_scalar_kinds(
 fn validate_sort_text_references(
     keys_by_body_row: &[Vec<SortScalar>],
     body_start: usize,
-    order: &NumbersTableSortOrder,
+    order: &Order,
     text_by_identifier: &HashMap<u32, String>,
 ) -> Result<()> {
     for (body_row, keys) in keys_by_body_row.iter().enumerate() {
@@ -634,14 +626,14 @@ fn validate_sort_text_references(
 fn compare_body_rows(
     left: &[SortScalar],
     right: &[SortScalar],
-    order: &NumbersTableSortOrder,
+    order: &Order,
     text_by_identifier: &HashMap<u32, String>,
 ) -> Ordering {
     for ((left, right), rule) in left.iter().zip(right).zip(order.rules()) {
         let ordering = left.compare(*right, text_by_identifier);
         let ordering = match rule.direction() {
-            NumbersTableSortDirection::Ascending => ordering,
-            NumbersTableSortDirection::Descending => ordering.reverse(),
+            Direction::Ascending => ordering,
+            Direction::Descending => ordering.reverse(),
         };
         if ordering != Ordering::Equal {
             return ordering;

@@ -2,17 +2,21 @@
 
 use prost::Message;
 
+use litchi_iwa_common::shape::path::{
+    CornerRadius, InnerRadiusRatio, PolygonSides, Preset, StarPoints,
+};
+
 use super::geometry::DrawableSize;
 use super::line::is_straight_line_bezier;
 use crate::IWorkPackage;
 use crate::archive::RawMessage;
 use crate::protobuf::{tsd, tsp, tswp};
-use crate::wire::{patch_length_delimited_field, transform_length_delimited_field};
+use crate::wire::{
+    parse_wire_fields, patch_length_delimited_field, transform_length_delimited_field,
+};
 use crate::{Error, Result};
 
 const NORMALIZED_RECTANGLE_EXTENT: f32 = 100.0;
-const MINIMUM_POLYGON_SIDES: u8 = 3;
-const MINIMUM_STAR_POINTS: u8 = 3;
 const ELLIPSE_CONTROL_FACTOR: f32 = 0.552_284_8;
 const PATH_COMPARISON_EPSILON: f32 = 0.000_1;
 const NATIVE_ELLIPSE_DIAGONAL: f32 = 0.353_553_4;
@@ -24,144 +28,6 @@ const NATIVE_ARROW_SHAFT_RATIO: f32 = 0.34;
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const SHAPE_INFO_SHAPE_FIELD: u32 = 1;
 const SHAPE_ARCHIVE_PATH_SOURCE_FIELD: u32 = 3;
-
-/// Corner radius in the path's natural coordinate system.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct ShapeCornerRadius(f32);
-
-impl ShapeCornerRadius {
-    /// Native default used by iWork for a 100-point rounded rectangle.
-    pub const DEFAULT: Self = Self(15.0);
-
-    /// Validate a corner radius measured in path points.
-    pub fn new(points: f32) -> Result<Self> {
-        if !points.is_finite() || points < 0.0 {
-            return Err(Error::ParseError(
-                "iWork shape corner radius must be finite and non-negative".to_owned(),
-            ));
-        }
-        Ok(Self(points))
-    }
-
-    /// Return the radius in path points.
-    pub const fn points(self) -> f32 {
-        self.0
-    }
-}
-
-/// Valid number of sides for an iWork regular polygon.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct ShapePolygonSides(u8);
-
-impl ShapePolygonSides {
-    /// Three-sided regular polygon.
-    pub const TRIANGLE: Self = Self(3);
-    /// Five-sided regular polygon used by iWork's Pentagon preset.
-    pub const PENTAGON: Self = Self(5);
-
-    /// Validate a regular-polygon side count.
-    pub fn new(sides: u8) -> Result<Self> {
-        if sides < MINIMUM_POLYGON_SIDES {
-            return Err(Error::ParseError(format!(
-                "iWork regular polygons require at least {MINIMUM_POLYGON_SIDES} sides"
-            )));
-        }
-        Ok(Self(sides))
-    }
-
-    /// Return the side count.
-    pub const fn get(self) -> u8 {
-        self.0
-    }
-}
-
-/// Valid number of outer points for an iWork star.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct ShapeStarPoints(u8);
-
-impl ShapeStarPoints {
-    /// Native five-point star control.
-    pub const FIVE: Self = Self(5);
-
-    /// Validate a star point count.
-    pub fn new(points: u8) -> Result<Self> {
-        if points < MINIMUM_STAR_POINTS {
-            return Err(Error::ParseError(format!(
-                "iWork stars require at least {MINIMUM_STAR_POINTS} points"
-            )));
-        }
-        Ok(Self(points))
-    }
-
-    /// Return the outer point count.
-    pub const fn get(self) -> u8 {
-        self.0
-    }
-}
-
-/// Ratio between an iWork star's inner and outer radii.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct ShapeStarInnerRatio(f32);
-
-impl ShapeStarInnerRatio {
-    /// Native default used by iWork's five-point star preset.
-    pub const DEFAULT: Self = Self(0.382);
-
-    /// Validate an inner-radius ratio.
-    pub fn new(ratio: f32) -> Result<Self> {
-        if !ratio.is_finite() || !(0.0..1.0).contains(&ratio) {
-            return Err(Error::ParseError(
-                "iWork star inner-radius ratio must be finite and in [0, 1)".to_owned(),
-            ));
-        }
-        Ok(Self(ratio))
-    }
-
-    /// Return the inner-radius ratio.
-    pub const fn get(self) -> f32 {
-        self.0
-    }
-}
-
-/// Source-buildable iWork shape preset.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ShapePreset {
-    /// Four-corner Bézier rectangle.
-    Rectangle,
-    /// Native rounded rectangle with an explicit corner radius.
-    RoundedRectangle { corner_radius: ShapeCornerRadius },
-    /// Four-segment cubic Bézier ellipse.
-    Ellipse,
-    /// Native left-facing single arrow with standard head and shaft proportions.
-    LeftArrow,
-    /// Native right-facing single arrow with standard head and shaft proportions.
-    RightArrow,
-    /// Native bidirectional arrow with standard head and shaft proportions.
-    DoubleArrow,
-    /// Native regular polygon with a configurable side count.
-    RegularPolygon { sides: ShapePolygonSides },
-    /// Native star with configurable point count and inner radius.
-    Star {
-        points: ShapeStarPoints,
-        inner_radius: ShapeStarInnerRatio,
-    },
-}
-
-impl ShapePreset {
-    /// Native default rounded rectangle.
-    pub const ROUNDED_RECTANGLE: Self = Self::RoundedRectangle {
-        corner_radius: ShapeCornerRadius::DEFAULT,
-    };
-    /// Native five-sided Pentagon preset.
-    pub const PENTAGON: Self = Self::RegularPolygon {
-        sides: ShapePolygonSides::PENTAGON,
-    };
-    /// Native five-point Star preset.
-    pub const STAR: Self = Self::Star {
-        points: ShapeStarPoints::FIVE,
-        inner_radius: ShapeStarInnerRatio::DEFAULT,
-    };
-}
 
 /// Structural path family used by an ordinary iWork shape.
 ///
@@ -233,15 +99,15 @@ pub(crate) fn shape_path_kind(shape: &tswp::ShapeInfoArchive) -> Result<ShapePat
     }
 }
 
-pub(crate) fn shape_preset(shape: &tswp::ShapeInfoArchive) -> Result<Option<ShapePreset>> {
+pub(crate) fn shape_preset(shape: &tswp::ShapeInfoArchive) -> Result<Option<Preset>> {
     let path = shape.super_.pathsource.as_ref().ok_or_else(|| {
         Error::InvalidFormat("ordinary iWork shape has no path source".to_owned())
     })?;
     if let Some(bezier) = &path.bezier_path_source {
         return Ok(if is_rectangle_path(bezier) {
-            Some(ShapePreset::Rectangle)
+            Some(Preset::Rectangle)
         } else if is_ellipse_path(bezier) {
-            Some(ShapePreset::Ellipse)
+            Some(Preset::Ellipse)
         } else {
             None
         });
@@ -256,8 +122,8 @@ pub(crate) fn shape_preset(shape: &tswp::ShapeInfoArchive) -> Result<Option<Shap
                 let radius = scalar.scalar.ok_or_else(|| {
                     Error::InvalidFormat("rounded rectangle has no corner radius".to_owned())
                 })?;
-                Ok(Some(ShapePreset::RoundedRectangle {
-                    corner_radius: ShapeCornerRadius::new(radius)?,
+                Ok(Some(Preset::RoundedRectangle {
+                    corner_radius: CornerRadius::new(radius)?,
                 }))
             },
             Some(ScalarPathSourceType::KTsdRegularPolygon) => {
@@ -269,8 +135,8 @@ pub(crate) fn shape_preset(shape: &tswp::ShapeInfoArchive) -> Result<Option<Shap
                         "regular polygon side count is not an unsigned integer".to_owned(),
                     )
                 })?;
-                Ok(Some(ShapePreset::RegularPolygon {
-                    sides: ShapePolygonSides::new(sides)?,
+                Ok(Some(Preset::RegularPolygon {
+                    sides: PolygonSides::new(sides)?,
                 }))
             },
             _ => Ok(None),
@@ -283,7 +149,7 @@ pub(crate) fn shape_preset(shape: &tswp::ShapeInfoArchive) -> Result<Option<Shap
 }
 
 pub(crate) fn shape_path_source(
-    preset: ShapePreset,
+    preset: Preset,
     natural_size: DrawableSize,
 ) -> Result<tsd::PathSourceArchive> {
     validate_natural_size(natural_size)?;
@@ -297,14 +163,14 @@ pub(crate) fn shape_path_source(
         ..Default::default()
     };
     match preset {
-        ShapePreset::Rectangle => {
+        Preset::Rectangle => {
             source.bezier_path_source = Some(tsd::BezierPathSourceArchive {
                 natural_size: Some(size),
                 path: Some(rectangle_path(natural_size)),
                 ..Default::default()
             });
         },
-        ShapePreset::RoundedRectangle { corner_radius } => {
+        Preset::RoundedRectangle { corner_radius } => {
             let maximum = natural_size.width.min(natural_size.height) / 2.0;
             if corner_radius.points() > maximum {
                 return Err(Error::ParseError(format!(
@@ -322,14 +188,14 @@ pub(crate) fn shape_path_source(
                 is_curve_continuous: Some(true),
             });
         },
-        ShapePreset::Ellipse => {
+        Preset::Ellipse => {
             source.bezier_path_source = Some(tsd::BezierPathSourceArchive {
                 natural_size: Some(size),
                 path: Some(ellipse_path(natural_size)),
                 ..Default::default()
             });
         },
-        ShapePreset::LeftArrow => {
+        Preset::LeftArrow => {
             source.point_path_source = Some(arrow_path_source(
                 tsd::point_path_source_archive::PointPathSourceType::KTsdLeftSingleArrow,
                 NATIVE_SINGLE_ARROW_HEAD_START_RATIO,
@@ -337,7 +203,7 @@ pub(crate) fn shape_path_source(
                 size,
             ));
         },
-        ShapePreset::RightArrow => {
+        Preset::RightArrow => {
             source.point_path_source = Some(arrow_path_source(
                 tsd::point_path_source_archive::PointPathSourceType::KTsdRightSingleArrow,
                 NATIVE_SINGLE_ARROW_HEAD_START_RATIO,
@@ -345,7 +211,7 @@ pub(crate) fn shape_path_source(
                 size,
             ));
         },
-        ShapePreset::DoubleArrow => {
+        Preset::DoubleArrow => {
             source.point_path_source = Some(arrow_path_source(
                 tsd::point_path_source_archive::PointPathSourceType::KTsdDoubleArrow,
                 NATIVE_DOUBLE_ARROW_HEAD_END_RATIO,
@@ -353,26 +219,26 @@ pub(crate) fn shape_path_source(
                 size,
             ));
         },
-        ShapePreset::RegularPolygon { sides } => {
+        Preset::RegularPolygon { sides } => {
             source.scalar_path_source = Some(tsd::ScalarPathSourceArchive {
                 r#type: Some(
                     tsd::scalar_path_source_archive::ScalarPathSourceType::KTsdRegularPolygon
                         as i32,
                 ),
-                scalar: Some(f32::from(sides.get())),
+                scalar: Some(f32::from(sides.count())),
                 natural_size: Some(size),
                 is_curve_continuous: Some(false),
             });
         },
-        ShapePreset::Star {
+        Preset::Star {
             points,
             inner_radius,
         } => {
             source.point_path_source = Some(tsd::PointPathSourceArchive {
                 r#type: Some(tsd::point_path_source_archive::PointPathSourceType::KTsdStar as i32),
                 point: Some(tsp::Point {
-                    x: f32::from(points.get()),
-                    y: inner_radius.get(),
+                    x: f32::from(points.count()),
+                    y: inner_radius.ratio(),
                 }),
                 natural_size: Some(size),
             });
@@ -385,7 +251,7 @@ pub(crate) fn set_shape_preset(
     package: &mut IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-    preset: ShapePreset,
+    preset: Preset,
 ) -> Result<()> {
     package.update_archive(archive_name, |archive| {
         let object = archive.object_mut(drawable_id).ok_or_else(|| {
@@ -417,7 +283,7 @@ pub(crate) fn set_shape_preset(
     })
 }
 
-fn patch_shape_preset(data: &[u8], drawable_id: u64, preset: ShapePreset) -> Result<Vec<u8>> {
+fn patch_shape_preset(data: &[u8], drawable_id: u64, preset: Preset) -> Result<Vec<u8>> {
     let shape = tswp::ShapeInfoArchive::decode(data)?;
     let geometry = shape
         .super_
@@ -430,25 +296,29 @@ fn patch_shape_preset(data: &[u8], drawable_id: u64, preset: ShapePreset) -> Res
                 "iWork drawable {drawable_id} has no natural path size"
             ))
         })?;
-    let mut replacement = shape_path_source(
+    let replacement = shape_path_source(
         preset,
         DrawableSize {
             width: geometry.width,
             height: geometry.height,
         },
     )?;
-    if let Some(path_source) = &shape.super_.pathsource {
-        replacement.horizontal_flip = path_source.horizontal_flip;
-        replacement.vertical_flip = path_source.vertical_flip;
-    }
-    let replacement = replacement.encode_to_vec();
     let data = transform_length_delimited_field(data, SHAPE_INFO_SHAPE_FIELD, |shape_archive| {
         let current = tsd::ShapeArchive::decode(shape_archive)?;
+        let original_path_source = parse_wire_fields(shape_archive)?
+            .into_iter()
+            .find(|field| field.number() == SHAPE_ARCHIVE_PATH_SOURCE_FIELD)
+            .ok_or_else(|| {
+                Error::InvalidFormat("iWork shape archive has no path source".to_owned())
+            })?;
+        let original_path_source =
+            &shape_archive[original_path_source.payload_start()..original_path_source.end()];
+        let replacement_path_source = patch_path_source(original_path_source, &replacement)?;
         patch_length_delimited_field(
             shape_archive,
             SHAPE_ARCHIVE_PATH_SOURCE_FIELD,
             current.pathsource.is_some(),
-            Some(&replacement),
+            Some(&replacement_path_source),
         )
     })?;
     let verified = tswp::ShapeInfoArchive::decode(data.as_slice())?;
@@ -458,6 +328,113 @@ fn patch_shape_preset(data: &[u8], drawable_id: u64, preset: ShapePreset) -> Res
         ));
     }
     Ok(data)
+}
+
+fn patch_path_source(original: &[u8], replacement: &tsd::PathSourceArchive) -> Result<Vec<u8>> {
+    let original_fields = parse_wire_fields(original)?;
+    let replacement_fields = [
+        (
+            3,
+            replacement
+                .point_path_source
+                .as_ref()
+                .map(Message::encode_to_vec),
+        ),
+        (
+            4,
+            replacement
+                .scalar_path_source
+                .as_ref()
+                .map(Message::encode_to_vec),
+        ),
+        (
+            5,
+            replacement
+                .bezier_path_source
+                .as_ref()
+                .map(Message::encode_to_vec),
+        ),
+        (
+            6,
+            replacement
+                .callout_path_source
+                .as_ref()
+                .map(Message::encode_to_vec),
+        ),
+        (
+            7,
+            replacement
+                .connection_line_path_source
+                .as_ref()
+                .map(Message::encode_to_vec),
+        ),
+        (
+            8,
+            replacement
+                .editable_bezier_path_source
+                .as_ref()
+                .map(Message::encode_to_vec),
+        ),
+    ];
+    let mut family_count = 0;
+    for field in &original_fields {
+        if !(3..=8).contains(&field.number()) {
+            continue;
+        }
+        let (key, _) = litchi_iwa_common::varint::decode_varint_from_bytes(
+            &original[field.start()..field.key_end()],
+        )
+        .map_err(|error| Error::InvalidFormat(format!("invalid path family key: {error}")))?;
+        if key & 7 != 2 {
+            return Err(Error::InvalidFormat(format!(
+                "iWork path family field {} is not length-delimited",
+                field.number()
+            )));
+        }
+        family_count += 1;
+    }
+    if family_count > 1 {
+        return Err(Error::InvalidFormat(
+            "iWork shape path source has multiple path families".to_owned(),
+        ));
+    }
+
+    let replacement = replacement_fields
+        .into_iter()
+        .find_map(|(field_number, payload)| payload.map(|payload| (field_number, payload)));
+    let mut output = Vec::with_capacity(original.len());
+    let mut inserted = false;
+    for field in &original_fields {
+        if (3..=8).contains(&field.number()) {
+            if !inserted {
+                if let Some((field_number, payload)) = &replacement {
+                    append_length_delimited_field(&mut output, *field_number, payload)?;
+                }
+                inserted = true;
+            }
+            continue;
+        }
+        output.extend_from_slice(&original[field.start()..field.end()]);
+    }
+    if !inserted && let Some((field_number, payload)) = &replacement {
+        append_length_delimited_field(&mut output, *field_number, payload)?;
+    }
+    Ok(output)
+}
+
+fn append_length_delimited_field(
+    output: &mut Vec<u8>,
+    field_number: u32,
+    payload: &[u8],
+) -> Result<()> {
+    output.extend(litchi_iwa_common::varint::encode_varint(
+        (u64::from(field_number) << 3) | 2,
+    ));
+    let length = u64::try_from(payload.len())
+        .map_err(|_| Error::InvalidFormat("path field length exceeds u64".to_owned()))?;
+    output.extend(litchi_iwa_common::varint::encode_varint(length));
+    output.extend_from_slice(payload);
+    Ok(())
 }
 
 fn point_path_kind(point: &tsd::PointPathSourceArchive) -> ShapePathKind {
@@ -475,7 +452,7 @@ fn point_path_kind(point: &tsd::PointPathSourceArchive) -> ShapePathKind {
     }
 }
 
-fn point_shape_preset(point: &tsd::PointPathSourceArchive) -> Result<Option<ShapePreset>> {
+fn point_shape_preset(point: &tsd::PointPathSourceArchive) -> Result<Option<Preset>> {
     use tsd::point_path_source_archive::PointPathSourceType;
 
     let Some(kind) = point
@@ -514,9 +491,9 @@ fn point_shape_preset(point: &tsd::PointPathSourceArchive) -> Result<Option<Shap
                 return Ok(None);
             }
             Ok(Some(match kind {
-                PointPathSourceType::KTsdLeftSingleArrow => ShapePreset::LeftArrow,
-                PointPathSourceType::KTsdRightSingleArrow => ShapePreset::RightArrow,
-                PointPathSourceType::KTsdDoubleArrow => ShapePreset::DoubleArrow,
+                PointPathSourceType::KTsdLeftSingleArrow => Preset::LeftArrow,
+                PointPathSourceType::KTsdRightSingleArrow => Preset::RightArrow,
+                PointPathSourceType::KTsdDoubleArrow => Preset::DoubleArrow,
                 _ => unreachable!("matched arrow variants"),
             }))
         },
@@ -524,9 +501,9 @@ fn point_shape_preset(point: &tsd::PointPathSourceArchive) -> Result<Option<Shap
             let points = integral_u8(control.x).ok_or_else(|| {
                 Error::InvalidFormat("star point count is not an unsigned integer".to_owned())
             })?;
-            Ok(Some(ShapePreset::Star {
-                points: ShapeStarPoints::new(points)?,
-                inner_radius: ShapeStarInnerRatio::new(control.y)?,
+            Ok(Some(Preset::Star {
+                points: StarPoints::new(points)?,
+                inner_radius: InnerRadiusRatio::new(control.y)?,
             }))
         },
         PointPathSourceType::KTsdPlus => Ok(None),
@@ -862,27 +839,24 @@ mod tests {
             height: 120.0,
         };
         for (preset, kind) in [
-            (ShapePreset::Rectangle, ShapePathKind::Rectangle),
+            (Preset::Rectangle, ShapePathKind::Rectangle),
+            (Preset::ROUNDED_RECTANGLE, ShapePathKind::RoundedRectangle),
+            (Preset::Ellipse, ShapePathKind::Ellipse),
+            (Preset::LeftArrow, ShapePathKind::LeftArrow),
+            (Preset::RightArrow, ShapePathKind::RightArrow),
+            (Preset::DoubleArrow, ShapePathKind::DoubleArrow),
+            (Preset::PENTAGON, ShapePathKind::RegularPolygon),
+            (Preset::STAR, ShapePathKind::Star),
             (
-                ShapePreset::ROUNDED_RECTANGLE,
-                ShapePathKind::RoundedRectangle,
-            ),
-            (ShapePreset::Ellipse, ShapePathKind::Ellipse),
-            (ShapePreset::LeftArrow, ShapePathKind::LeftArrow),
-            (ShapePreset::RightArrow, ShapePathKind::RightArrow),
-            (ShapePreset::DoubleArrow, ShapePathKind::DoubleArrow),
-            (ShapePreset::PENTAGON, ShapePathKind::RegularPolygon),
-            (ShapePreset::STAR, ShapePathKind::Star),
-            (
-                ShapePreset::RegularPolygon {
-                    sides: ShapePolygonSides::new(8).unwrap(),
+                Preset::RegularPolygon {
+                    sides: PolygonSides::new(8).unwrap(),
                 },
                 ShapePathKind::RegularPolygon,
             ),
             (
-                ShapePreset::Star {
-                    points: ShapeStarPoints::new(7).unwrap(),
-                    inner_radius: ShapeStarInnerRatio::new(0.45).unwrap(),
+                Preset::Star {
+                    points: StarPoints::new(7).unwrap(),
+                    inner_radius: InnerRadiusRatio::new(0.45).unwrap(),
                 },
                 ShapePathKind::Star,
             ),
@@ -917,14 +891,11 @@ mod tests {
             shape
         };
         let right = arrow(PointPathSourceType::KTsdRightSingleArrow, 100.0, 64.0);
-        assert_eq!(shape_preset(&right).unwrap(), Some(ShapePreset::RightArrow));
+        assert_eq!(shape_preset(&right).unwrap(), Some(Preset::RightArrow));
         let left = arrow(PointPathSourceType::KTsdLeftSingleArrow, 100.0, 64.0);
-        assert_eq!(shape_preset(&left).unwrap(), Some(ShapePreset::LeftArrow));
+        assert_eq!(shape_preset(&left).unwrap(), Some(Preset::LeftArrow));
         let double = arrow(PointPathSourceType::KTsdDoubleArrow, 110.0, 44.0);
-        assert_eq!(
-            shape_preset(&double).unwrap(),
-            Some(ShapePreset::DoubleArrow)
-        );
+        assert_eq!(shape_preset(&double).unwrap(), Some(Preset::DoubleArrow));
 
         let custom = arrow(PointPathSourceType::KTsdRightSingleArrow, 100.0, 63.0);
         assert_eq!(shape_path_kind(&custom).unwrap(), ShapePathKind::RightArrow);
@@ -1003,20 +974,20 @@ mod tests {
         });
 
         assert_eq!(shape_path_kind(&shape).unwrap(), ShapePathKind::Ellipse);
-        assert_eq!(shape_preset(&shape).unwrap(), Some(ShapePreset::Ellipse));
+        assert_eq!(shape_preset(&shape).unwrap(), Some(Preset::Ellipse));
     }
 
     #[test]
     fn typed_preset_controls_reject_invalid_values_and_sizes() {
-        assert!(ShapeCornerRadius::new(-1.0).is_err());
-        assert!(ShapeCornerRadius::new(f32::INFINITY).is_err());
-        assert!(ShapePolygonSides::new(2).is_err());
-        assert!(ShapeStarPoints::new(2).is_err());
-        assert!(ShapeStarInnerRatio::new(-0.1).is_err());
-        assert!(ShapeStarInnerRatio::new(1.0).is_err());
+        assert!(CornerRadius::new(-1.0).is_err());
+        assert!(CornerRadius::new(f32::INFINITY).is_err());
+        assert!(PolygonSides::new(2).is_err());
+        assert!(StarPoints::new(2).is_err());
+        assert!(InnerRadiusRatio::new(-0.1).is_err());
+        assert!(InnerRadiusRatio::new(1.0).is_err());
         assert!(
             shape_path_source(
-                ShapePreset::ROUNDED_RECTANGLE,
+                Preset::ROUNDED_RECTANGLE,
                 DrawableSize {
                     width: 20.0,
                     height: 20.0,
@@ -1026,7 +997,7 @@ mod tests {
         );
         assert!(
             shape_path_source(
-                ShapePreset::Ellipse,
+                Preset::Ellipse,
                 DrawableSize {
                     width: f32::NAN,
                     height: 20.0,
@@ -1042,7 +1013,7 @@ mod tests {
             width: 240.0,
             height: 120.0,
         };
-        let mut path_source = shape_path_source(ShapePreset::Rectangle, size).unwrap();
+        let mut path_source = shape_path_source(Preset::Rectangle, size).unwrap();
         path_source.horizontal_flip = Some(true);
         path_source.vertical_flip = Some(false);
         let shape = tswp::ShapeInfoArchive {
@@ -1063,9 +1034,9 @@ mod tests {
             ..Default::default()
         };
 
-        let changed = patch_shape_preset(&shape.encode_to_vec(), 42, ShapePreset::Ellipse).unwrap();
+        let changed = patch_shape_preset(&shape.encode_to_vec(), 42, Preset::Ellipse).unwrap();
         let changed = tswp::ShapeInfoArchive::decode(changed.as_slice()).unwrap();
-        assert_eq!(shape_preset(&changed).unwrap(), Some(ShapePreset::Ellipse));
+        assert_eq!(shape_preset(&changed).unwrap(), Some(Preset::Ellipse));
         assert_eq!(
             changed.super_.pathsource.as_ref().unwrap().horizontal_flip,
             Some(true)
@@ -1094,7 +1065,7 @@ mod tests {
                     }),
                     ..Default::default()
                 },
-                pathsource: Some(shape_path_source(ShapePreset::Rectangle, size).unwrap()),
+                pathsource: Some(shape_path_source(Preset::Rectangle, size).unwrap()),
                 ..Default::default()
             },
             ..Default::default()
@@ -1108,14 +1079,90 @@ mod tests {
         let mut original_with_unknowns = original;
         append_unknown_varint(&mut original_with_unknowns, 99, 990);
 
-        let changed = patch_shape_preset(&original_with_unknowns, 42, ShapePreset::STAR).unwrap();
-        let restored = patch_shape_preset(&changed, 42, ShapePreset::Rectangle).unwrap();
+        let changed = patch_shape_preset(&original_with_unknowns, 42, Preset::STAR).unwrap();
+        let restored = patch_shape_preset(&changed, 42, Preset::Rectangle).unwrap();
 
         assert_eq!(restored, original_with_unknowns);
     }
 
+    #[test]
+    fn preset_patch_preserves_path_source_metadata_and_unknowns() {
+        let size = DrawableSize {
+            width: 240.0,
+            height: 120.0,
+        };
+        let shape = tswp::ShapeInfoArchive {
+            super_: tsd::ShapeArchive {
+                super_: tsd::DrawableArchive {
+                    geometry: Some(tsd::GeometryArchive {
+                        size: Some(tsp::Size {
+                            width: size.width,
+                            height: size.height,
+                        }),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                pathsource: Some(shape_path_source(Preset::Rectangle, size).unwrap()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let original = transform_length_delimited_field(&shape.encode_to_vec(), 1, |shape| {
+            let shape = transform_length_delimited_field(shape, 3, |path_source| {
+                let mut path_source = path_source.to_vec();
+                append_length_delimited_field(&mut path_source, 9, b"shape.localization")?;
+                append_length_delimited_field(&mut path_source, 10, b"Shape Label")?;
+                append_unknown_varint(&mut path_source, 97, 970);
+                Ok(path_source)
+            })?;
+            let mut shape = shape;
+            append_unknown_varint(&mut shape, 98, 980);
+            Ok(shape)
+        })
+        .unwrap();
+        let mut original_with_unknowns = original;
+        append_unknown_varint(&mut original_with_unknowns, 99, 990);
+
+        let changed = patch_shape_preset(&original_with_unknowns, 42, Preset::STAR).unwrap();
+        let changed_shape = tswp::ShapeInfoArchive::decode(changed.as_slice()).unwrap();
+        let changed_path = changed_shape.super_.pathsource.as_ref().unwrap();
+        assert_eq!(
+            changed_path.localization_key.as_deref(),
+            Some("shape.localization")
+        );
+        assert_eq!(
+            changed_path.user_defined_name.as_deref(),
+            Some("Shape Label")
+        );
+        let changed_shape_archive = parse_wire_fields(&changed).unwrap();
+        let shape_archive = changed_shape_archive
+            .iter()
+            .find(|field| field.number() == SHAPE_INFO_SHAPE_FIELD)
+            .unwrap();
+        let shape_archive_bytes = &changed[shape_archive.payload_start()..shape_archive.end()];
+        let shape_archive_fields = parse_wire_fields(shape_archive_bytes).unwrap();
+        let path_source = shape_archive_fields
+            .iter()
+            .find(|field| field.number() == SHAPE_ARCHIVE_PATH_SOURCE_FIELD)
+            .unwrap();
+        let path_source_bytes =
+            &shape_archive_bytes[path_source.payload_start()..path_source.end()];
+        assert!(
+            parse_wire_fields(path_source_bytes)
+                .unwrap()
+                .iter()
+                .any(|field| field.number() == 97)
+        );
+
+        let restored = patch_shape_preset(&changed, 42, Preset::Rectangle).unwrap();
+        assert_eq!(restored, original_with_unknowns);
+    }
+
     fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) {
-        data.extend(crate::varint::encode_varint(u64::from(field_number) << 3));
-        data.extend(crate::varint::encode_varint(value));
+        data.extend(litchi_iwa_common::varint::encode_varint(
+            u64::from(field_number) << 3,
+        ));
+        data.extend(litchi_iwa_common::varint::encode_varint(value));
     }
 }

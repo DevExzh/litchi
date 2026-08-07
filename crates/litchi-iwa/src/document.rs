@@ -17,12 +17,12 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
+use crate::application::Application;
 use crate::bundle::{Bundle, BundleLimits};
+use crate::detect::detect_application_from_document;
 use crate::media::{MediaLimits, MediaManager, MediaStats};
-use crate::object_index::{ObjectIndex, ResolvedObject, ResolvedObjectRef};
+use crate::object_index::ObjectIndex;
 use crate::package::PackageLimits;
-use crate::ref_graph::ObjectId;
-use crate::registry::{Application, detect_application_from_document};
 use crate::structured::{self, StructuredData};
 use crate::text::TextExtractor;
 use crate::{Error, Result};
@@ -52,7 +52,7 @@ impl Document {
     }
 
     /// Open an iWork document under caller-selected bundle ingress ceilings.
-    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
+    pub(crate) fn open_with_limits<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
         let path_ref = path.as_ref();
         let bundle = Bundle::open_with_limits(path_ref, limits)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
@@ -105,7 +105,7 @@ impl Document {
     }
 
     /// Open an iWork document from bytes under caller-selected bundle limits.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
+    pub(crate) fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
         let bundle = Bundle::from_bytes_with_limits(bytes, limits)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
@@ -161,80 +161,13 @@ impl Document {
         Ok(extractor.get_text())
     }
 
-    /// Resolve all objects in the document in deterministic object-ID order.
-    pub fn objects(&self) -> Result<Vec<ResolvedObject>> {
-        self.try_objects()
-    }
-
-    /// Resolve all indexed objects in deterministic object-ID order.
-    ///
-    /// This named compatibility entry point remains available for callers
-    /// that prefer an explicitly fallible method name. It uses the typed
-    /// object index and batches archive lookups.
-    pub fn try_objects(&self) -> Result<Vec<ResolvedObject>> {
-        let object_ids = self.state.object_index.object_ids();
-        self.state
-            .object_index
-            .resolve_many(&self.state.bundle, &object_ids)
-    }
-
-    /// Get an object through the validated identity API.
-    pub fn object(&self, object_id: ObjectId) -> Result<Option<ResolvedObject>> {
-        self.state
-            .object_index
-            .resolve(&self.state.bundle, object_id)
-    }
-
-    /// Borrow one indexed object from this immutable document snapshot.
-    ///
-    /// The returned view retains no cloned archive metadata or message
-    /// payloads and cannot outlive this document borrow. Use [`Self::object`]
-    /// when an owned result must be retained independently.
-    pub fn object_view(&self, object_id: ObjectId) -> Result<Option<ResolvedObjectRef<'_>>> {
-        self.state
-            .object_index
-            .resolve_ref(&self.state.bundle, object_id)
-    }
-
-    /// Borrow all indexed objects in deterministic object-ID order.
-    ///
-    /// This is the preferred traversal path for read-only extraction. The
-    /// returned views borrow this immutable document snapshot and therefore do
-    /// not duplicate archive payload allocations.
-    pub fn object_views(&self) -> Result<Vec<ResolvedObjectRef<'_>>> {
-        self.object_view_iter().collect()
-    }
-
-    /// Stream all indexed object views in deterministic object-ID order.
-    ///
-    /// Each item borrows this immutable document snapshot. The iterator does
-    /// not allocate an object-ID list or a result collection; use
-    /// [`Self::object_views`] when an owned vector is more convenient.
-    pub fn object_view_iter(&self) -> impl Iterator<Item = Result<ResolvedObjectRef<'_>>> + '_ {
-        self.state.object_index.iter_refs(&self.state.bundle)
-    }
-
-    /// Get an object by its legacy raw numeric ID.
-    #[deprecated(note = "use object(ObjectId) for checked identity semantics")]
-    pub fn get_object(&self, id: u64) -> Result<Option<ResolvedObject>> {
-        self.state.object_index.resolve_id(&self.state.bundle, id)
-    }
-
-    /// Get the immutable typed object index backing this document.
-    pub fn object_index(&self) -> &ObjectIndex {
-        &self.state.object_index
-    }
-
-    /// Borrow all validated object identities in deterministic numeric order.
-    pub fn object_id_iter(&self) -> impl Iterator<Item = ObjectId> + '_ {
-        self.state.object_index.iter_object_ids()
-    }
-
-    /// Get all validated object identities in deterministic numeric order.
-    ///
-    /// Use [`Self::object_id_iter`] when an owned collection is unnecessary.
-    pub fn object_ids(&self) -> Vec<ObjectId> {
-        self.object_id_iter().collect()
+    /// Extract chart metadata without exposing the archive object index.
+    pub fn charts(&self) -> Result<Vec<crate::charts::ChartMetadata>> {
+        crate::charts::metadata_extractor::ChartMetadataExtractor::new(
+            &self.state.bundle,
+            &self.state.object_index,
+        )
+        .extract_all_charts()
     }
 
     /// Get the application type
@@ -242,38 +175,21 @@ impl Document {
         self.state.application
     }
 
-    /// Get the underlying bundle
-    pub fn bundle(&self) -> &Bundle {
-        &self.state.bundle
-    }
-
-    /// Return a bounded, deterministic validation report for this snapshot.
-    pub fn validation_report(&self) -> crate::bundle::BundleValidationReport {
-        self.state.bundle.validation_report()
-    }
-
     /// Validate this immutable snapshot without mutating it or emitting
     /// process-wide diagnostics.
     pub fn validate(&self) -> Result<()> {
-        self.validation_report().as_result()
+        self.state.bundle.validate()
     }
 
-    /// Get document metadata
-    pub fn metadata(&self) -> &crate::bundle::BundleMetadata {
-        self.state.bundle.metadata()
-    }
-
-    /// Get the media manager (if available)
-    pub fn media_manager(&self) -> Option<&MediaManager> {
-        self.state.media_manager.as_ref()
-    }
-
-    /// Get media statistics
+    /// Get statistics for materialized media assets.
+    ///
+    /// Package and directory-backed media state remains private to the
+    /// document. Use the bounded extraction methods below for payload access.
     pub fn media_stats(&self) -> Option<MediaStats> {
         self.state.media_manager.as_ref().map(|m| m.stats())
     }
 
-    /// Extract a media asset by filename
+    /// Extract a media asset by filename under the document's resource limits.
     pub fn extract_media(&self, filename: &str) -> Result<Vec<u8>> {
         let manager = self
             .state
@@ -321,7 +237,8 @@ impl Document {
         let archives_count = self.state.bundle.iter_archives().count();
 
         let mut message_type_counts = HashMap::new();
-        for object in self.object_views()? {
+        for object in self.state.object_index.iter_refs(&self.state.bundle) {
+            let object = object?;
             for msg_type in object.message_types() {
                 *message_type_counts.entry(msg_type).or_insert(0) += 1;
             }
@@ -523,17 +440,6 @@ mod tests {
         let document = Document::from_bytes(&package.to_bytes().unwrap()).unwrap();
         assert_eq!(document.application(), Application::Common);
         assert!(document.validate().is_ok());
-        assert!(document.validation_report().is_valid());
-
-        let object_id = ObjectId::try_from(1).unwrap();
-        let views = document.object_views().unwrap();
-        assert_eq!(views.len(), 1);
-        assert_eq!(views[0].id(), object_id);
-        assert_eq!(views[0].primary_message_type(), Some(101));
-        assert_eq!(
-            document.object_view(object_id).unwrap().unwrap().id(),
-            object_id
-        );
     }
 
     #[test]
@@ -560,6 +466,11 @@ mod tests {
             .unwrap();
 
         let document = Document::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let media_stats = document
+            .media_stats()
+            .expect("the materialized media catalog should be available");
+        assert_eq!(media_stats.total_count, 1);
+        assert_eq!(media_stats.total_size, 11);
         let mut streamed = Vec::new();
         document
             .extract_media_to_writer("image.png", &mut streamed)
@@ -598,10 +509,6 @@ mod tests {
         );
 
         let doc = doc_result.unwrap();
-
-        // Verify we can get objects
-        let objects = doc.objects().expect("test document should resolve objects");
-        assert!(!objects.is_empty(), "Document should contain objects");
 
         // Verify we can get stats
         let stats = doc

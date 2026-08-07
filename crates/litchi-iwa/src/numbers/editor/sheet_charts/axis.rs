@@ -1,7 +1,7 @@
 //! Native axis-title CRUD for Numbers sheet charts.
 
 use super::*;
-use crate::charts::ChartAxis;
+use crate::charts::Axis;
 use crate::charts::axis::{
     chart_axis_title as read_native_chart_axis_title,
     remove_chart_axis_title as remove_native_chart_axis_title,
@@ -14,7 +14,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<Option<String>> {
         sheet_chart_axis_title(self, sheet_id, drawable_object_id, axis)
     }
@@ -24,7 +24,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         title: &str,
     ) -> Result<()> {
         set_sheet_chart_axis_title(self, sheet_id, drawable_object_id, axis, title)
@@ -37,7 +37,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<bool> {
         remove_sheet_chart_axis_title(self, sheet_id, drawable_object_id, axis)
     }
@@ -47,7 +47,7 @@ fn sheet_chart_axis_title(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<Option<String>> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     read_native_chart_axis_title(
@@ -63,7 +63,7 @@ fn set_sheet_chart_axis_title(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
     title: &str,
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
@@ -94,7 +94,7 @@ fn remove_sheet_chart_axis_title(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<bool> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let mut staged = editor.package.clone();

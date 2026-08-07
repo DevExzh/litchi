@@ -3,24 +3,25 @@
 use std::env;
 
 use litchi_iwa::pages::PagesEditor;
-use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeTextAutoSize, ShapeTextInset,
-    ShapeTextInsets, ShapeTextLayout, ShapeTextVerticalAlignment, StrokePattern, StrokeWidth,
-};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Width};
+use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 use litchi_iwa::text::{
-    DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
-    DropCapWrap, ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
-    ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
-    ParagraphFlow, ParagraphFollowingStyle, ParagraphHyphenation, ParagraphIndentPoints,
-    ParagraphIndents, ParagraphLineSpacing, ParagraphLineSpacingMultiple, ParagraphList,
-    ParagraphListLevel, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart,
-    ParagraphStyleName, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
-    ParagraphTabStop, ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumnGap,
-    TextColumns, TextCommentBody, TextCommentReplyBody, TextDecorations, TextFont,
-    TextHyperlinkTarget, TextLanguage, TextLigatures, TextOutline, TextPointSize, TextPosition,
-    TextRange, TextScript, TextShadow, TextStrikethrough, TextStyle, TextUnderline,
+    Alignment, Background, Border, Borders, IndentPoints, Indents, LineSpacing,
+    LineSpacingMultiple, Outline, ParagraphBackground, ParagraphDecimalTabCharacter,
+    ParagraphDefaultTabInterval, ParagraphFlow, ParagraphFollowingStyle, ParagraphHyphenation,
+    ParagraphList, ParagraphListLevel, ParagraphStyleName, ParagraphTabAlignment,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
+    ParagraphWritingDirection, Shadow, Spacing, SpacingPoints, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextCommentBody, TextCommentReplyBody,
+    TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage, TextLigatures, TextPointSize,
+    TextRange, TextScript, TextStrikethrough, TextStyle, TextUnderline,
 };
+use litchi_iwa_text::columns::{Columns, Count, Gap};
+use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
+use litchi_iwa_text::paragraph::drop_cap::{
+    CharacterCount, DropCap, LineCount, Outdent, Padding, RaisedLines, Wrap,
+};
+use litchi_iwa_text::position::TextPosition;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -47,17 +48,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_text_box_columns(
         created.drawable_object_id,
-        &TextColumns::equal(
-            TextColumnCount::new(2)?,
-            Some(TextColumnGap::from_points(18.0)?),
-        ),
+        &Columns::equal(Count::new(2)?, Some(Gap::from_points(18.0)?)),
     )?;
     editor.set_text_box_text_layout(
         created.drawable_object_id,
-        ShapeTextLayout::new(
-            ShapeTextVerticalAlignment::Middle,
-            ShapeTextInsets::uniform(ShapeTextInset::from_points(9.0)?),
-            ShapeTextAutoSize::ShrinkToFit,
+        Layout::new(
+            VerticalAlignment::Middle,
+            Insets::uniform(Inset::from_points(9.0)?),
+            AutoSize::ShrinkToFit,
         ),
     )?;
     editor.set_text_box_text_style(
@@ -87,11 +85,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         TextCharacterSpacing::from_percent(12.0)?,
     )?;
     editor.set_text_box_text_ligatures(created.drawable_object_id, TextLigatures::RequiredOnly)?;
-    editor.set_text_box_text_outline(created.drawable_object_id, TextOutline::standard())?;
-    editor.set_text_box_text_shadow(created.drawable_object_id, TextShadow::standard())?;
+    editor.set_text_box_text_outline(created.drawable_object_id, Outline::standard())?;
+    editor.set_text_box_text_shadow(created.drawable_object_id, Shadow::standard())?;
     editor.set_text_box_text_background(
         created.drawable_object_id,
-        TextBackground::Color(RgbaColor::new(1.0, 0.82, 0.72, 1.0, RgbColorSpace::Srgb)?),
+        Background::Color(RgbaColor::new(1.0, 0.82, 0.72, 1.0, RgbColorSpace::Srgb)?),
     )?;
     editor.set_text_box_paragraph_background(
         created.drawable_object_id,
@@ -105,12 +103,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_text_box_paragraph_borders(
         created.drawable_object_id,
-        ParagraphBorders::Bordered(ParagraphBorder::new(
+        Borders::Bordered(Border::new(
             RgbaColor::black(),
-            StrokeWidth::new(3.0)?,
-            StrokePattern::Solid,
-            ParagraphBorderSides::ALL,
-            ParagraphBorderOffset::from_points(9.0)?,
+            Width::new(3.0)?,
+            Pattern::Solid,
+            BorderSides::ALL,
+            BorderOffset::from_points(9.0)?,
             true,
         )?),
     )?;
@@ -127,24 +125,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         created.drawable_object_id,
         ParagraphWritingDirection::LeftToRight,
     )?;
-    editor.set_text_box_paragraph_alignment(created.drawable_object_id, TextAlignment::Center)?;
+    editor.set_text_box_paragraph_alignment(created.drawable_object_id, Alignment::Center)?;
     editor.set_text_box_paragraph_line_spacing(
         created.drawable_object_id,
-        ParagraphLineSpacing::Relative(ParagraphLineSpacingMultiple::ONE_POINT_FIVE),
+        LineSpacing::Relative(LineSpacingMultiple::ONE_POINT_FIVE),
     )?;
     editor.set_text_box_paragraph_spacing(
         created.drawable_object_id,
-        ParagraphSpacing::new(
-            ParagraphSpacingPoints::from_points(9.0)?,
-            ParagraphSpacingPoints::from_points(15.0)?,
+        Spacing::new(
+            SpacingPoints::from_points(9.0)?,
+            SpacingPoints::from_points(15.0)?,
         ),
     )?;
     editor.set_text_box_paragraph_indents(
         created.drawable_object_id,
-        ParagraphIndents::new(
-            ParagraphIndentPoints::from_points(26.0)?,
-            ParagraphIndentPoints::from_points(12.5)?,
-            ParagraphIndentPoints::from_points(12.0)?,
+        Indents::new(
+            IndentPoints::from_points(26.0)?,
+            IndentPoints::from_points(12.5)?,
+            IndentPoints::from_points(12.0)?,
         ),
     )?;
     editor.set_text_box_paragraph_list(created.drawable_object_id, ParagraphList::Bullet)?;
@@ -168,13 +166,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )?;
         editor.add_text_box_comment_reply(
             created.drawable_object_id,
-            comment.id,
+            comment.id(),
             TextCommentReplyBody::new("Created reply by litchi-iwa")?,
         )?;
     }
     if let Some(newline) = text.find('\n') {
         let start_index = text[..=newline].encode_utf16().count();
-        let start = ParagraphStart::from_utf16_index(start_index)?;
+        let start = TextPosition::from_utf16_index(start_index)?;
         editor.set_text_box_paragraph_list_level(
             created.drawable_object_id,
             start,
@@ -200,12 +198,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.set_text_box_paragraph_drop_cap(
         created.drawable_object_id,
-        ParagraphStart::ZERO,
-        ParagraphDropCap::new(DropCapLineCount::new(4)?, DropCapCharacterCount::new(2)?)
-            .with_raised_lines(DropCapRaisedLines::new(1)?)
-            .with_wrap(DropCapWrap::Contour)
-            .with_padding(DropCapPadding::from_points(6.0)?)
-            .with_outdent(DropCapOutdent::from_ratio(0.25)?),
+        TextPosition::ZERO,
+        DropCap::new(LineCount::new(4)?, CharacterCount::new(2)?)
+            .with_raised_lines(RaisedLines::new(1)?)
+            .with_wrap(Wrap::Contour)
+            .with_padding(Padding::from_points(6.0)?)
+            .with_outdent(Outdent::from_ratio(0.25)?),
     )?;
     editor.set_text_box_paragraph_tab_stops(
         created.drawable_object_id,
@@ -281,14 +279,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_text_box_paragraph_alignment(
         following_style_box.drawable_object_id,
-        TextAlignment::Center,
+        Alignment::Center,
     )?;
     editor
         .redefine_applied_text_box_named_paragraph_style(following_style_box.drawable_object_id)?;
     editor.save(output)?;
     println!(
         "created two-column Pages text box {} with storage {}",
-        created.drawable_object_id, created.storage.object_id
+        created.drawable_object_id, created.storage.id
     );
     Ok(())
 }

@@ -4,9 +4,9 @@ use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesEditor;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_iwa::text::{
-    TextDateTimeDisplayText, TextDateTimeFieldSettings, TextDateTimeFormat,
-    TextDateTimeFormatterStyle, TextDateTimeInstant, TextDateTimeLocaleIdentifier, TextPosition,
+use litchi_iwa::text::TextPosition;
+use litchi_iwa_text::date_time::{
+    DisplayText, Format, FormatterStyle, Instant, LocaleIdentifier, Settings,
 };
 
 const PREFIX: &str = "Created: ";
@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .ok_or("usage: create_iwork_date_time_field <output.pages|output.numbers|output.key>")?;
     let position = TextPosition::from_utf16_index(PREFIX.encode_utf16().count())?;
-    let display = || TextDateTimeDisplayText::new(DISPLAY);
+    let display = || DisplayText::new(DISPLAY);
     match Path::new(&output)
         .extension()
         .and_then(|value| value.to_str())
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         Some("numbers") => {
             let mut editor = NumbersDocumentBuilder::new().build()?;
-            let sheet_id = editor.sheets()?[0].object_id;
+            let sheet_id = editor.sheets()?[0].id();
             let text_box = editor.add_sheet_text_box(sheet_id, PREFIX, POSITION, SIZE)?;
             editor.insert_sheet_text_box_date_time_field(
                 sheet_id,
@@ -63,14 +63,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn settings() -> litchi_iwa::Result<TextDateTimeFieldSettings> {
-    Ok(TextDateTimeFieldSettings::fixed(
-        TextDateTimeFormat::new("EEEE, MMMM d, y")?,
-        TextDateTimeLocaleIdentifier::new("en_US")?,
-        TextDateTimeInstant::from_reference_date_seconds(APPLE_REFERENCE_DATE_SECONDS)?,
+fn settings() -> litchi_iwa::Result<Settings> {
+    Ok(Settings::fixed(
+        Format::new("EEEE, MMMM d, y")?,
+        LocaleIdentifier::new("en_US")?,
+        Instant::from_reference_date_seconds(APPLE_REFERENCE_DATE_SECONDS)?,
     )
-    .with_styles(
-        TextDateTimeFormatterStyle::Full,
-        TextDateTimeFormatterStyle::None,
-    ))
+    .with_styles(FormatterStyle::Full, FormatterStyle::None)?)
 }

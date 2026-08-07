@@ -7,6 +7,9 @@
 
 use prost::Message;
 
+use litchi_iwa_common::media::Type as MediaType;
+use litchi_iwa_common::shape::fill::{Angle, Gradient};
+
 use crate::charts::style::{
     ChartStyleSlot, GENERATED_CHART_STYLE_EXTENSION_FIELD, chart_style_slot,
     generated_chart_style_extension,
@@ -14,15 +17,16 @@ use crate::charts::style::{
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media::MediaAssetId;
 use crate::package_metadata::component_identifier_for_entry;
 use crate::protobuf::tsch;
 use crate::shapes::{
-    DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapeGradient, ShapeGradientAngle,
-    ShapeImageDataIdentifier, ShapeImageFill, ShapeImageFillTechnique, fill_from_native,
-    fill_to_native, image_data_identifier, remove_orphaned_image_asset, validate_image_asset,
+    DrawableSize, RgbColorSpace, RgbaColor, ShapeFill, ShapeImageDataIdentifier, ShapeImageFill,
+    ShapeImageFillTechnique, fill_from_native, fill_to_native, image_data_identifier,
+    remove_orphaned_image_asset, validate_image_asset,
 };
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkMediaEditor, IWorkPackage, MediaType, Result};
+use crate::{Error, IWorkMediaEditor, IWorkPackage, Result};
 
 /// `tschchartinfodefaultgridbackgroundfill` in `TSCH.Generated.ChartStyleArchive`.
 const CHART_BACKGROUND_FILL_FIELD: u32 = 14;
@@ -40,8 +44,8 @@ pub(crate) fn native_default_chart_background_fill() -> Result<ShapeFill> {
         1.0,
         RgbColorSpace::Srgb,
     )?;
-    let angle = ShapeGradientAngle::from_degrees(DEFAULT_BACKGROUND_ANGLE_DEGREES)?;
-    Ok(ShapeFill::Gradient(ShapeGradient::linear(
+    let angle = Angle::from_degrees(DEFAULT_BACKGROUND_ANGLE_DEGREES)?;
+    Ok(ShapeFill::Gradient(Gradient::linear(
         gray,
         RgbaColor::new(1.0, 1.0, 1.0, 1.0, RgbColorSpace::Srgb)?,
         angle,
@@ -83,8 +87,12 @@ pub(crate) fn set_chart_background_fill(
         return Ok(());
     }
     validate_image_asset(package, fill)?;
-    let old_data_identifier = image_data_identifier(&current);
-    let new_data_identifier = image_data_identifier(fill);
+    let old_data_identifier = image_data_identifier(&current)
+        .map(MediaAssetId::try_from)
+        .transpose()?;
+    let new_data_identifier = image_data_identifier(fill)
+        .map(MediaAssetId::try_from)
+        .transpose()?;
     slot.ensure_exclusive(package, drawable_object_id, drawable_label)?;
     slot.update(package, |data| patch_chart_background_fill(data, fill))?;
     adjust_chart_style_data_reference(package, &slot, old_data_identifier, new_data_identifier)?;
@@ -93,7 +101,7 @@ pub(crate) fn set_chart_background_fill(
             "{drawable_label} chart {drawable_object_id} background fill update failed validation"
         )));
     }
-    remove_orphaned_image_asset(package, old_data_identifier)?;
+    remove_orphaned_image_asset(package, old_data_identifier.map(MediaAssetId::get))?;
     Ok(())
 }
 
@@ -119,7 +127,7 @@ pub(crate) fn set_chart_background_image_fill_data(
     }
     let mut staged = media.into_package();
     let mut image = ShapeImageFill::embedded(
-        ShapeImageDataIdentifier::new(asset.data_identifier)?,
+        ShapeImageDataIdentifier::new(asset.data_identifier.get())?,
         technique,
         fill_size,
     )?;
@@ -200,8 +208,8 @@ fn patch_chart_background_fill(data: &[u8], fill: &ShapeFill) -> Result<Vec<u8>>
 fn adjust_chart_style_data_reference(
     package: &mut IWorkPackage,
     slot: &ChartStyleSlot,
-    old_data_identifier: Option<u64>,
-    new_data_identifier: Option<u64>,
+    old_data_identifier: Option<MediaAssetId>,
+    new_data_identifier: Option<MediaAssetId>,
 ) -> Result<()> {
     if old_data_identifier == new_data_identifier {
         return Ok(());
@@ -209,10 +217,10 @@ fn adjust_chart_style_data_reference(
     let component_id = component_identifier_for_entry(package, slot.archive_name())?
         .ok_or_else(|| Error::InvalidFormat("Chart style has no owning component".to_owned()))?;
     if let Some(identifier) = old_data_identifier {
-        remove_component_data_reference(package, component_id, identifier, slot.object_id())?;
+        remove_component_data_reference(package, component_id, identifier.get(), slot.object_id())?;
     }
     if let Some(identifier) = new_data_identifier {
-        add_component_data_reference(package, component_id, identifier, slot.object_id())?;
+        add_component_data_reference(package, component_id, identifier.get(), slot.object_id())?;
     }
     Ok(())
 }
@@ -230,7 +238,7 @@ fn validate_patched_chart_background_fill(data: &[u8], expected: &ShapeFill) -> 
 mod tests {
     use super::*;
     use crate::protobuf::tss;
-    use crate::shapes::StrokePattern;
+    use crate::shapes::Pattern;
     use crate::wire::{append_length_delimited_field, append_varint_field, parse_wire_fields};
 
     const UNMAPPED_OUTER_FIELD: u32 = 4_096;
@@ -267,10 +275,10 @@ mod tests {
     #[test]
     fn background_fill_patch_retains_other_style_fields_and_unmapped_data() {
         let original_fill = solid_fill();
-        let replacement = ShapeFill::Gradient(ShapeGradient::linear(
+        let replacement = ShapeFill::Gradient(Gradient::linear(
             color(0.8, 0.2, 0.1),
             color(0.1, 0.4, 0.9),
-            ShapeGradientAngle::from_degrees(90.0).unwrap(),
+            Angle::from_degrees(90.0).unwrap(),
         ));
         let original = style_with_unknown_fields(tsch::generated::ChartStyleArchive {
             tschchartinfodefaultgridbackgroundfill: Some(fill_to_native(&original_fill)),
@@ -301,10 +309,10 @@ mod tests {
             tschchartinfodefaultgridbackgroundfill: Some(fill_to_native(&solid_fill())),
             tschchartinfodefaultshowborder: Some(true),
             tschchartinfodefaultborderstroke: Some(crate::shapes::stroke_to_native(
-                crate::shapes::ShapeStroke::new(
+                crate::shapes::Stroke::new(
                     RgbaColor::black(),
-                    crate::shapes::StrokeWidth::ONE,
-                    StrokePattern::Solid,
+                    crate::shapes::Width::ONE,
+                    Pattern::Solid,
                 ),
             )),
             ..Default::default()
@@ -378,8 +386,8 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .into_iter()
-            .filter(|field| field.number == number)
-            .map(|field| data[field.start..field.end].to_vec())
+            .filter(|field| field.number() == number)
+            .map(|field| data[field.start()..field.end()].to_vec())
             .collect()
     }
 }

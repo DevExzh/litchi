@@ -1,11 +1,12 @@
 use std::env;
 
 use litchi_iwa::pages::{
-    PagesCellValue, PagesDocumentBuilder, PagesTableCellUpdate, PagesTableColumnInsertion,
-    PagesTableDimensionSize, PagesTableFormulaCachedValue, PagesTableFormulaCellReference,
-    PagesTableFormulaExpression, PagesTableHeaderCount, PagesTableHeaderSettings,
-    PagesTableRowInsertion, PagesTableTitleSettings,
+    PagesCellValue, PagesDocumentBuilder, PagesTableCellUpdate, PagesTableDimensionSize,
+    PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
+    PagesTableTitleSettings,
 };
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
+use litchi_numbers::table::topology::{ColumnInsertion, RowInsertion};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
@@ -23,8 +24,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             PagesTableCellUpdate::new(0, 1, PagesCellValue::Text("Revenue".to_owned())),
             PagesTableCellUpdate::new(0, 2, PagesCellValue::Text("Growth".to_owned())),
             PagesTableCellUpdate::new(1, 0, PagesCellValue::Text("Q1".to_owned())),
-            PagesTableCellUpdate::new(1, 1, PagesCellValue::Number(125_000.0)),
-            PagesTableCellUpdate::new(1, 2, PagesCellValue::Number(0.18)),
+            PagesTableCellUpdate::new(1, 1, PagesCellValue::number(125_000.0)?),
+            PagesTableCellUpdate::new(1, 2, PagesCellValue::number(0.18)?),
         ],
     )?;
     editor.set_table_formula(
@@ -38,23 +39,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 PagesTableFormulaCellReference::relative(2, 1),
             )],
         ),
-        PagesTableFormulaCachedValue::Number(125_000.0),
+        PagesTableFormulaCachedValue::Number(125_000.0.try_into()?),
     )?;
     editor.set_table_header_settings(
         table.model_object_id,
-        PagesTableHeaderSettings {
-            header_rows: Some(PagesTableHeaderCount::ONE),
-            header_columns: Some(PagesTableHeaderCount::ONE),
-            footer_rows: Some(PagesTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;
     editor.set_table_title_settings(
         table.model_object_id,
-        PagesTableTitleSettings {
-            visible: Some(true),
-            outlined: Some(true),
-        },
+        PagesTableTitleSettings::new(Some(true), Some(true)),
     )?;
     for (column, width) in [120.0, 160.0, 100.0].into_iter().enumerate() {
         editor.set_table_column_width(
@@ -70,15 +68,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             PagesTableDimensionSize::points(height)?,
         )?;
     }
-    editor.insert_table_row(table.model_object_id, PagesTableRowInsertion::body(2))?;
-    editor.insert_table_column(table.model_object_id, PagesTableColumnInsertion::body(1))?;
+    editor.insert_table_row(table.model_object_id, RowInsertion::body(2))?;
+    editor.insert_table_column(table.model_object_id, ColumnInsertion::body(1))?;
     editor.set_table_cells(
         table.model_object_id,
         [
             PagesTableCellUpdate::new(3, 0, PagesCellValue::Text("Q2".to_owned())),
-            PagesTableCellUpdate::new(3, 1, PagesCellValue::Number(142_000.0)),
+            PagesTableCellUpdate::new(3, 1, PagesCellValue::number(142_000.0)?),
             PagesTableCellUpdate::new(3, 2, PagesCellValue::Text("provisional".to_owned())),
-            PagesTableCellUpdate::new(3, 3, PagesCellValue::Number(0.14)),
+            PagesTableCellUpdate::new(3, 3, PagesCellValue::number(0.14)?),
             PagesTableCellUpdate::new(0, 2, PagesCellValue::Text("Status".to_owned())),
         ],
     )?;

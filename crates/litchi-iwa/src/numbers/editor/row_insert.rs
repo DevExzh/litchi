@@ -21,7 +21,12 @@ impl NumbersEditor {
     /// column slots. The operation is transactional: table features whose row
     /// topology cannot yet be rewritten safely are rejected without changing
     /// the package.
-    pub fn insert_table_row(&mut self, table_id: u64, insertion: TableRowInsertion) -> Result<()> {
+    pub fn insert_table_row(
+        &mut self,
+        selector: litchi_numbers::TableSelector<'_>,
+        insertion: RowInsertion,
+    ) -> Result<()> {
+        let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
         let new_rows = insert_attached_table_row(&mut staged, table_id, insertion)?;
         let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
@@ -45,7 +50,7 @@ impl NumbersEditor {
 pub(super) fn insert_attached_table_row(
     package: &mut IWorkPackage,
     table_id: u64,
-    insertion: TableRowInsertion,
+    insertion: RowInsertion,
 ) -> Result<usize> {
     let descriptor = attached_table_descriptor(package, table_id)?;
     let old_rows = descriptor.model.number_of_rows as usize;
@@ -102,15 +107,15 @@ pub(super) fn insert_attached_table_row(
 struct ResolvedRowInsertion {
     physical_index: usize,
     footer_range_insertion: FooterRangeInsertion,
-    updated_header_settings: Option<NumbersTableHeaderSettings>,
+    updated_header_settings: Option<HeaderSettings>,
 }
 
 fn resolve_row_insertion(
     model: &TableModelArchive,
-    insertion: TableRowInsertion,
+    insertion: RowInsertion,
 ) -> Result<ResolvedRowInsertion> {
     let rows = model.number_of_rows as usize;
-    let mut settings = NumbersTableHeaderSettings::from_model(model)?;
+    let mut settings = table_headers::settings_from_model(model)?;
     let header_rows = settings.header_row_count();
     let footer_rows = settings.footer_row_count();
     let body_rows = rows
@@ -122,16 +127,16 @@ fn resolve_row_insertion(
             )
         })?;
     match insertion {
-        TableRowInsertion::Header { index } => {
+        RowInsertion::Header { index } => {
             validate_section_insertion(index, header_rows, "header row")?;
-            settings.header_rows = Some(NumbersTableHeaderCount::new(header_rows + 1)?);
+            settings.header_rows = Some(HeaderCount::new(header_rows + 1)?);
             Ok(ResolvedRowInsertion {
                 physical_index: index,
                 footer_range_insertion: FooterRangeInsertion::FixedSection,
                 updated_header_settings: Some(settings),
             })
         },
-        TableRowInsertion::Body { index } => {
+        RowInsertion::Body { index } => {
             validate_section_insertion(index, body_rows, "body row")?;
             Ok(ResolvedRowInsertion {
                 physical_index: header_rows + index,
@@ -139,9 +144,9 @@ fn resolve_row_insertion(
                 updated_header_settings: None,
             })
         },
-        TableRowInsertion::Footer { index } => {
+        RowInsertion::Footer { index } => {
             validate_section_insertion(index, footer_rows, "footer row")?;
-            settings.footer_rows = Some(NumbersTableHeaderCount::new(footer_rows + 1)?);
+            settings.footer_rows = Some(HeaderCount::new(footer_rows + 1)?);
             Ok(ResolvedRowInsertion {
                 physical_index: rows - footer_rows + index,
                 footer_range_insertion: FooterRangeInsertion::FixedSection,

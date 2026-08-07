@@ -12,22 +12,32 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Range;
 use std::path::Path;
 
+use litchi_iwa_common::table::cell::BorderSide;
+use litchi_iwa_common::table::cell::number_format::NumberFormat;
+use litchi_iwa_text::position::TextPosition;
+use litchi_numbers::cell::data_format::{
+    Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,
+    Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,
+};
+pub use litchi_numbers::table::dimension::{Dimension, Points, Size};
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
+use litchi_numbers::table::merge::Region;
+use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
+use litchi_numbers::{SheetSelector, TableSelector};
 use prost::Message;
 
 use super::bnc::{BncCell, CachedScalar, StoredValue};
 use super::cell::{CellValue, TableCellUpdate};
 use super::formula::{
     ExternalFormulaTable, ExternalPivotCategory, FormulaCachedValue, FormulaExpression,
-    FormulaPivotCategoryReference, FormulaUuid, PivotFormulaKey,
+    FormulaPivotCategoryReference, FormulaUuid, PivotFormulaKey, compile_formula,
 };
-use super::table::{NumbersCellComment, NumbersCommentUuid};
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::comments::{
-    DrawableCommentInfo, DrawableCommentReplyInfo, IWorkDrawableCommentEditor, IWorkDrawableInfo,
-    IWorkTableCellCommentInfo, IWorkTableCellCommentReplyInfo, advance_save_tokens_for_entries,
-    clone_comment_storage_exact, current_apple_reference_date, fresh_comment_storage_uuid,
-    insert_comment_storage, preferred_or_ensure_table_annotation_author,
-    remove_generated_annotation_author_if_unused, update_comment_reply_reference,
+    IWorkDrawableCommentEditor, advance_save_tokens_for_entries, clone_comment_storage_exact,
+    current_apple_reference_date, fresh_comment_storage_uuid, insert_comment_storage,
+    preferred_or_ensure_table_annotation_author, remove_generated_annotation_author_if_unused,
+    update_comment_reply_reference,
 };
 use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
@@ -40,29 +50,25 @@ use crate::protobuf::tst::{
     self, TableDataList, TableDataListSegment, TableModelArchive, Tile, TileRowInfo,
 };
 use crate::protobuf::{tn, tsce, tsd, tsp, tss, tswp};
-use crate::registry::{Application, detect_application_from_document};
 use crate::shapes::{
-    DrawableGeometry, DrawableProperties, RgbaColor, ShapeTextLayout, reset_shape_text_columns,
+    DrawableGeometry, DrawableProperties, RgbaColor, reset_shape_text_columns,
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::table_appearance::TableAppearance;
-use crate::table_cell_conditional_highlight::TableCellConditionalHighlightRule;
-use crate::table_lock::TableLockState;
+use crate::text::layout::Layout;
 use crate::text::{
-    IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,
-    ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphFlow,
-    ParagraphIndents, ParagraphLineSpacing, ParagraphList, ParagraphListBullet,
-    ParagraphListBulletGeometry, ParagraphListIndentation, ParagraphListLabelColor,
-    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
-    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering,
-    ParagraphListPlacement, ParagraphSpacing, ParagraphStart, ParagraphTabStops,
-    ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumns, TextComment, TextCommentBody,
-    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
-    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
-    TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition, TextRange, TextScript,
-    TextShadow, TextStorageInfo, TextStyle,
+    Alignment, Background, Borders, IWorkTextEditor, Indents, LineSpacing, Outline,
+    ParagraphBackground, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
+    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
+    ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
+    ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
+    ParagraphListNumbering, ParagraphListPlacement, ParagraphTabStops, ParagraphWritingDirection,
+    Shadow, Spacing, TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextComment,
+    TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId,
+    TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId,
+    TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextRange, TextScript,
+    TextStorageId, TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -77,6 +83,12 @@ use formula_clone::{
     remap_cloned_formula_owner_storage, remap_cloned_formula_storage, remove_table_formula_graph,
     table_formula_graph_is_self_contained,
 };
+use litchi_iwa_common::comment::{
+    AuthorId, Comment, DrawableComment, DrawableId, DrawableInfo, DrawableReply, ListId, StorageId,
+    TableCellComment, TableCellReply, Uuid,
+};
+use litchi_iwa_common::table::cell::conditional_highlight::Rule;
+use litchi_iwa_common::table::lock::State as TableLockState;
 
 const MAX_TABLE_UIDS: usize = 1_100_000;
 const HEADER_BUCKET_ROWS: usize = 65_536;
@@ -93,12 +105,53 @@ const TABLE_DUPLICATE_OFFSET: f32 = DRAWABLE_DUPLICATE_OFFSET;
 const EMPTY_TABLE_POSITION_OFFSET: f32 = 40.0;
 const CONDITIONAL_STYLE_NO_APPLIED_RULE: u32 = 15;
 
+/// Numbers-owned table editing vocabulary.
+pub mod table {
+    /// Cell-level table editing vocabulary.
+    pub mod cell {
+        use litchi_iwa_common::shape::stroke::Stroke;
+        use litchi_iwa_common::table::cell::BorderSide;
+
+        /// Effective explicit borders stored for one native Numbers table cell.
+        ///
+        /// `None` means the table style supplies the edge, or a later native
+        /// stroke run explicitly clears it.
+        #[derive(Clone, Copy, Debug, Default, PartialEq)]
+        pub struct Borders {
+            pub left: Option<Stroke>,
+            pub right: Option<Stroke>,
+            pub top: Option<Stroke>,
+            pub bottom: Option<Stroke>,
+        }
+
+        impl Borders {
+            pub const fn get(self, side: BorderSide) -> Option<Stroke> {
+                match side {
+                    BorderSide::Left => self.left,
+                    BorderSide::Right => self.right,
+                    BorderSide::Top => self.top,
+                    BorderSide::Bottom => self.bottom,
+                }
+            }
+
+            pub(crate) fn set(&mut self, side: BorderSide, stroke: Option<Stroke>) {
+                match side {
+                    BorderSide::Left => self.left = stroke,
+                    BorderSide::Right => self.right = stroke,
+                    BorderSide::Top => self.top = stroke,
+                    BorderSide::Bottom => self.bottom = stroke,
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct NumbersTextBoxGraph {
     sheet_id: u64,
     archive_name: String,
     drawable_id: u64,
-    storage_id: u64,
+    storage_id: TextStorageId,
     object_ids: Vec<u64>,
     uuid_object_ids: Vec<u64>,
 }
@@ -125,6 +178,7 @@ mod formula_dependency_shift;
 mod model;
 mod named_paragraph_styles;
 mod row_insert;
+mod selectors;
 mod sheet_audio;
 mod sheet_charts;
 mod sheet_delete;
@@ -135,8 +189,6 @@ mod sheet_shapes;
 mod storage;
 mod stroke_layers;
 mod table_appearance;
-mod table_axis_deletion;
-mod table_axis_insertion;
 mod table_bootstrap;
 mod table_cells;
 mod table_create;
@@ -155,25 +207,56 @@ mod table_topology;
 mod text_box_create;
 mod text_box_duplicate;
 
-pub use crate::charts::ChartSeriesDirection;
-pub use cell_merge::IWorkTableCellRegion;
+pub use crate::charts::Direction;
+pub use litchi_numbers::table::title::Settings;
 use model::*;
+
+#[cfg(test)]
+pub(crate) fn test_sheet_selector(
+    editor: &NumbersEditor,
+    native_id: u64,
+) -> SheetSelector<'static> {
+    let index = editor
+        .sheets()
+        .ok()
+        .and_then(|sheets| {
+            sheets
+                .iter()
+                .position(|sheet| sheet.native_id() == native_id)
+        })
+        .unwrap_or(usize::MAX);
+    SheetSelector::index(index)
+}
+
+#[cfg(test)]
+pub(crate) fn test_table_selector(
+    editor: &NumbersEditor,
+    native_id: u64,
+) -> TableSelector<'static> {
+    let index = editor
+        .tables()
+        .ok()
+        .and_then(|tables| {
+            tables
+                .iter()
+                .position(|table| table.native_id() == native_id)
+        })
+        .unwrap_or(usize::MAX);
+    TableSelector::index(index)
+}
+
 pub use semantic::*;
 pub use sheet_audio::{NumbersSheetAudioInfo, NumbersSheetAudioOptions, RemovedNumbersSheetAudio};
 pub use sheet_charts::{NumbersSheetChartInfo, RemovedNumbersSheetChart};
 pub use sheet_images::{NumbersSheetImageInfo, NumbersSheetImageOptions, RemovedNumbersSheetImage};
 pub use sheet_movies::{NumbersSheetMovieInfo, NumbersSheetMovieOptions, RemovedNumbersSheetMovie};
-pub use sheet_shapes::{NumbersSheetShapeInfo, NumbersSheetShapeKind, RemovedNumbersSheetShape};
+pub use sheet_shapes::{NumbersSheetShapeInfo, RemovedNumbersSheetShape};
 use storage::*;
-pub use table_axis_deletion::{TableColumnDeletion, TableRowDeletion};
-pub use table_axis_insertion::{TableColumnInsertion, TableRowInsertion};
 pub(crate) use table_cells::TableCellBatch;
-pub use table_dimension::{NumbersTableDimension, NumbersTableDimensionSize, NumbersTablePoints};
 pub(crate) use table_duplicate::{duplicate_attached_table_graph_in_package, duplicate_table_name};
 use table_duplicate::{
     register_cloned_numbers_objects, register_numbers_component_reference, table_owned_graph,
 };
-pub use table_headers::{NumbersTableHeaderCount, NumbersTableHeaderSettings};
 pub use table_sort::{
     NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
     NumbersTableSortRowRange, NumbersTableSortRule, NumbersTableSortScope,
@@ -183,7 +266,6 @@ pub(crate) use table_sort::{
     clear_table_sort_order_in_package, set_table_sort_order_in_package,
     table_sort_order_in_package,
 };
-pub use table_title::NumbersTableTitleSettings;
 pub(crate) use table_title::{
     set_table_title_settings_in_package, table_title_settings_in_package,
 };

@@ -1,15 +1,11 @@
 //! Typed hidden-row and hidden-column CRUD for Pages body tables.
 
 use super::*;
-
-/// One zero-based row or column position in a Pages body table.
-pub type PagesTableAxisIndex = crate::table_hidden_axes::TableAxisIndex;
-/// Canonical, duplicate-free user-hidden axes of a Pages body table.
-pub type PagesTableHiddenAxes = crate::table_hidden_axes::TableHiddenAxes;
+use litchi_iwa_common::table::axis::HiddenAxes;
 
 impl PagesEditor {
     /// Read the canonical user-hidden rows and columns of a body table.
-    pub fn table_hidden_axes(&self, model_object_id: u64) -> Result<PagesTableHiddenAxes> {
+    pub fn table_hidden_axes(&self, model_object_id: u64) -> Result<HiddenAxes> {
         self.require_body_table(model_object_id)?;
         crate::table_hidden_axes::table_hidden_axes(self.package(), model_object_id)
     }
@@ -18,7 +14,7 @@ impl PagesEditor {
     pub fn set_table_hidden_axes(
         &mut self,
         model_object_id: u64,
-        hidden: &PagesTableHiddenAxes,
+        hidden: &HiddenAxes,
     ) -> Result<()> {
         self.require_body_table(model_object_id)?;
         if self.table_hidden_axes(model_object_id)? == *hidden {
@@ -42,6 +38,7 @@ impl PagesEditor {
 mod tests {
     use super::*;
     use crate::pages::PagesDocumentBuilder;
+    use litchi_iwa_common::table::axis::AxisIndex;
 
     #[test]
     fn scratch_body_table_roundtrips_hidden_axes_transactionally() {
@@ -50,11 +47,7 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].model_object_id;
-        let hidden = PagesTableHiddenAxes::new([
-            PagesTableAxisIndex::row(2),
-            PagesTableAxisIndex::column(1),
-        ])
-        .unwrap();
+        let hidden = HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)]).unwrap();
 
         editor.set_table_hidden_axes(table_id, &hidden).unwrap();
         assert_eq!(editor.table_hidden_axes(table_id).unwrap(), hidden);
@@ -62,12 +55,12 @@ mod tests {
         assert_eq!(reopened.table_hidden_axes(table_id).unwrap(), hidden);
 
         let before = editor.to_bytes().unwrap();
-        let invalid = PagesTableHiddenAxes::new([PagesTableAxisIndex::row(4)]).unwrap();
+        let invalid = HiddenAxes::new([AxisIndex::row(4)]).unwrap();
         assert!(editor.set_table_hidden_axes(table_id, &invalid).is_err());
         assert_eq!(editor.to_bytes().unwrap(), before);
 
         editor
-            .set_table_hidden_axes(table_id, &PagesTableHiddenAxes::empty())
+            .set_table_hidden_axes(table_id, &HiddenAxes::empty())
             .unwrap();
         assert!(editor.table_hidden_axes(table_id).unwrap().is_empty());
     }

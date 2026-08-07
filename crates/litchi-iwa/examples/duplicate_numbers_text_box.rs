@@ -35,8 +35,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "sheet={sheet_index} source={} clone={} storage={} text={:?}",
         source.drawable_object_id,
         created.drawable_object_id,
-        created.storage.object_id,
-        created.storage.text
+        created.storage.id,
+        created.storage.storage.text()
     );
     Ok(())
 }

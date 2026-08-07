@@ -4,13 +4,15 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::pages::{PagesEditor, PagesMovieOptions};
-use litchi_iwa::shapes::{DrawableFlipAxis, DrawablePoint, DrawableSize};
+use litchi_iwa::pages::PagesEditor;
+use litchi_iwa::shapes::DrawableFlipAxis;
+use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_pages::movie::Options as PagesMovieOptions;
 
 const BODY_TEXT: &str = "This mirrored movie was created entirely by litchi-iwa.";
 const MOVIE_DURATION: Duration = Duration::from_secs(8);
-const MOVIE_POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 144.0 };
-const MOVIE_SIZE: DrawableSize = DrawableSize {
+const MOVIE_POSITION: Point = Point { x: 96.0, y: 144.0 };
+const MOVIE_SIZE: Size = Size {
     width: 320.0,
     height: 180.0,
 };
@@ -42,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &movie,
         poster_filename,
         &poster,
-        PagesMovieOptions::new(MOVIE_POSITION, MOVIE_SIZE, MOVIE_DURATION),
+        PagesMovieOptions::new(MOVIE_POSITION, MOVIE_SIZE, MOVIE_DURATION)?,
     )?;
     editor.flip_body_movie(created.drawable_object_id, DrawableFlipAxis::Horizontal)?;
     editor.save(output)?;

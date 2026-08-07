@@ -20,10 +20,10 @@
 //! let slides = doc.slides()?;
 //!
 //! for slide in slides {
-//!     if let Some(title) = &slide.title {
-//!         println!("Slide {}: {}", slide.index + 1, title);
+//!     if let Some(title) = slide.title() {
+//!         println!("Slide {}: {}", slide.index() + 1, title);
 //!     }
-//!     for text in &slide.text_content {
+//!     for text in slide.text_content() {
 //!         println!("  - {}", text);
 //!     }
 //! }
@@ -33,68 +33,42 @@
 pub mod creation;
 pub mod document;
 pub mod editor;
-pub mod show;
-pub mod slide;
 
 pub use creation::KeynoteDocumentBuilder;
 pub use document::KeynoteDocument;
+pub use editor::Effect;
 pub use editor::{
-    KeynoteBuildAcceleration, KeynoteBuildChunkInfo, KeynoteBuildCustomParameters,
-    KeynoteBuildInfo, KeynoteBuildSettings, KeynoteBuildStart, KeynoteBuildTimingCurve,
-    KeynoteEditor, KeynoteEmphasisAction, KeynoteFlipDirection, KeynoteGradient,
-    KeynoteGradientAngle, KeynoteGradientKind, KeynoteGradientStop,
-    KeynoteHorizontalBuildDirection, KeynoteJiggleIntensity, KeynoteKeyboardBuild,
-    KeynoteKeyboardDirection, KeynoteMotionPath, KeynoteMotionPathNode, KeynoteMotionPathNodeType,
-    KeynoteMotionPathPoint, KeynoteMotionSubpath, KeynoteMoveAction, KeynoteObjectBuildEffect,
-    KeynoteOpacityAction, KeynoteRgbColorSpace, KeynoteRgbaColor, KeynoteRotationAction,
-    KeynoteRotationDirection, KeynoteScaleAction, KeynoteShowMode, KeynoteShowSettings,
-    KeynoteSlideAudioInfo, KeynoteSlideAudioOptions, KeynoteSlideBackground, KeynoteSlideChartInfo,
-    KeynoteSlideImageInfo, KeynoteSlideImageKind, KeynoteSlideImageOptions, KeynoteSlideInfo,
-    KeynoteSlideLayoutId, KeynoteSlideLayoutInfo, KeynoteSlideMovieInfo, KeynoteSlideMovieKind,
-    KeynoteSlideMovieOptions, KeynoteSlideShapeInfo, KeynoteSlideShapeKind, KeynoteSlideTable,
+    Angle, Background, BuildAcceleration, BuildStart, Gradient, KeynoteBuildChunkInfo,
+    KeynoteBuildCustomParameters, KeynoteBuildInfo, KeynoteBuildSettings, KeynoteBuildTimingCurve,
+    KeynoteEditor, KeynoteEmphasisAction, KeynoteFlipDirection, KeynoteHorizontalBuildDirection,
+    KeynoteJiggleIntensity, KeynoteKeyboardBuild, KeynoteKeyboardDirection, KeynoteMotionPath,
+    KeynoteMotionPathNode, KeynoteMotionPathNodeType, KeynoteMotionPathPoint, KeynoteMotionSubpath,
+    KeynoteMoveAction, KeynoteObjectBuildEffect, KeynoteOpacityAction, KeynoteRotationAction,
+    KeynoteRotationDirection, KeynoteScaleAction, KeynoteSlideAudioInfo, KeynoteSlideChartInfo,
+    KeynoteSlideImageInfo, KeynoteSlideImageKind, KeynoteSlideInfo, KeynoteSlideLayoutId,
+    KeynoteSlideLayoutInfo, KeynoteSlideMovieInfo, KeynoteSlideShapeInfo, KeynoteSlideTable,
     KeynoteSlideTableInfo, KeynoteSlideTextInfo, KeynoteSlideTextPlaceholder, KeynoteSlideTextRole,
-    KeynoteSoundtrackItemInfo, KeynoteSoundtrackMode, KeynoteSoundtrackSettings,
-    KeynoteSwooshDirection, KeynoteTableAxisIndex, KeynoteTableCellCheckboxFormat,
-    KeynoteTableCellCurrencyFormat, KeynoteTableCellDataFormat, KeynoteTableCellDateTimeFormat,
-    KeynoteTableCellDecimalPlaces, KeynoteTableCellDurationFormat, KeynoteTableCellDurationStyle,
-    KeynoteTableCellDurationUnit, KeynoteTableCellDurationUnitRange, KeynoteTableCellDurationUnits,
-    KeynoteTableCellFixedDecimalPlaces, KeynoteTableCellFractionFormat, KeynoteTableCellInset,
-    KeynoteTableCellInsets, KeynoteTableCellLayout, KeynoteTableCellNegativeNumberStyle,
-    KeynoteTableCellNumberFormat, KeynoteTableCellNumeralSystemFormat,
-    KeynoteTableCellParagraphIndents, KeynoteTableCellParagraphLineSpacing,
-    KeynoteTableCellParagraphList, KeynoteTableCellParagraphListBullet,
-    KeynoteTableCellParagraphListBulletGeometry, KeynoteTableCellParagraphListIndentation,
-    KeynoteTableCellParagraphListLabelColor, KeynoteTableCellParagraphListLevel,
-    KeynoteTableCellParagraphListLevelPlacement, KeynoteTableCellParagraphListNumberFormat,
-    KeynoteTableCellParagraphListNumberScale, KeynoteTableCellParagraphListNumberTiering,
-    KeynoteTableCellParagraphListNumbering, KeynoteTableCellParagraphListPlacement,
-    KeynoteTableCellParagraphSpacing, KeynoteTableCellParagraphTabStops,
-    KeynoteTableCellPercentageFormat, KeynoteTableCellPopUpMenuFormat,
-    KeynoteTableCellPopUpMenuInitialSelection, KeynoteTableCellPopUpMenuItem,
-    KeynoteTableCellRegion, KeynoteTableCellScientificFormat, KeynoteTableCellSliderDisplayFormat,
-    KeynoteTableCellSliderFormat, KeynoteTableCellSliderRange, KeynoteTableCellStarRatingFormat,
-    KeynoteTableCellStepperDisplayFormat, KeynoteTableCellStepperFormat,
-    KeynoteTableCellStepperRange, KeynoteTableCellTextAlignment, KeynoteTableCellTextBackground,
-    KeynoteTableCellTextBaselineShift, KeynoteTableCellTextCapitalization,
-    KeynoteTableCellTextCharacterSpacing, KeynoteTableCellTextColor,
-    KeynoteTableCellTextDecorations, KeynoteTableCellTextFont, KeynoteTableCellTextFormat,
+    KeynoteSoundtrackItemInfo, KeynoteSwooshDirection, KeynoteTableCellParagraphList,
+    KeynoteTableCellParagraphListBullet, KeynoteTableCellParagraphListBulletGeometry,
+    KeynoteTableCellParagraphListIndentation, KeynoteTableCellParagraphListLabelColor,
+    KeynoteTableCellParagraphListLevel, KeynoteTableCellParagraphListLevelPlacement,
+    KeynoteTableCellParagraphListNumberFormat, KeynoteTableCellParagraphListNumberScale,
+    KeynoteTableCellParagraphListNumberTiering, KeynoteTableCellParagraphListNumbering,
+    KeynoteTableCellParagraphListPlacement, KeynoteTableCellParagraphTabStops,
+    KeynoteTableCellTextBackground, KeynoteTableCellTextBaselineShift,
+    KeynoteTableCellTextCapitalization, KeynoteTableCellTextCharacterSpacing,
+    KeynoteTableCellTextColor, KeynoteTableCellTextDecorations, KeynoteTableCellTextFont,
     KeynoteTableCellTextLigatures, KeynoteTableCellTextOutline, KeynoteTableCellTextScript,
-    KeynoteTableCellTextShadow, KeynoteTableCellTextStyle, KeynoteTableCellTextWrap,
-    KeynoteTableCellThousandsSeparator, KeynoteTableCellUpdate, KeynoteTableCellValue,
-    KeynoteTableCellVerticalAlignment, KeynoteTableColumnDeletion, KeynoteTableColumnInsertion,
-    KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTableFormulaAxisReference,
-    KeynoteTableFormulaBinaryOperator, KeynoteTableFormulaCachedValue,
-    KeynoteTableFormulaCellReference, KeynoteTableFormulaExpression, KeynoteTableHeaderCount,
-    KeynoteTableHeaderSettings, KeynoteTableHiddenAxes, KeynoteTablePoints,
-    KeynoteTableRowDeletion, KeynoteTableRowInsertion, KeynoteTableSortColumnIndex,
-    KeynoteTableSortDirection, KeynoteTableSortOrder, KeynoteTableSortRowRange,
-    KeynoteTableSortRule, KeynoteTableSortScope, KeynoteTableTitleSettings,
-    KeynoteTransitionAcceleration, KeynoteTransitionAnimationParameters,
-    KeynoteTransitionCustomParameters, KeynoteTransitionDirection, KeynoteTransitionEffect,
-    KeynoteTransitionMosaicType, KeynoteTransitionSettings, KeynoteTransitionTextDelivery,
-    RemovedKeynoteSlideAudio, RemovedKeynoteSlideChart, RemovedKeynoteSlideImage,
-    RemovedKeynoteSlideMovie, RemovedKeynoteSlideShape, RemovedKeynoteSlideTable,
-    RemovedKeynoteTextBox,
+    KeynoteTableCellTextShadow, KeynoteTableCellTextStyle, KeynoteTableCellUpdate,
+    KeynoteTableCellValue, KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTablePoints,
+    KeynoteTableTitleSettings, Kind, MovieKind, Opaque, RemovedKeynoteSlideAudio,
+    RemovedKeynoteSlideChart, RemovedKeynoteSlideImage, RemovedKeynoteSlideMovie,
+    RemovedKeynoteSlideShape, RemovedKeynoteSlideTable, RemovedKeynoteTextBox, RgbColorSpace, Rgba,
+    Stop,
 };
-pub use show::KeynoteShow;
-pub use slide::{BuildAnimation, KeynoteSlide, SlideTransition};
+pub use litchi_keynote::transition::{
+    Acceleration, AccelerationKind, AnimationParameters, CustomParameters, Direction, MosaicType,
+    TextDelivery, TextDeliveryKind,
+};
+pub use litchi_keynote::{AnimationType, Build, Document, Show, Slide, Transition};
+pub use litchi_keynote::{Mode, Seconds, Settings, Size};

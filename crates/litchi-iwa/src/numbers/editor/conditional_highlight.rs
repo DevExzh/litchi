@@ -16,11 +16,8 @@ use prost::Message;
 
 use super::*;
 use crate::numbers::formula_owner::{formula_owner_uuid_for_table, uuid_as_cfuuid};
-use crate::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightCondition, TableCellConditionalHighlightDate,
-    TableCellConditionalHighlightDateOffsetDirection, TableCellConditionalHighlightDatePeriod,
-    TableCellConditionalHighlightDatePeriodUnit, TableCellConditionalHighlightDateRange,
-    TableCellConditionalHighlightRule,
+use litchi_iwa_common::table::cell::conditional_highlight::{
+    Condition, Date, DateRange, OffsetDirection, Period, PeriodUnit, Rule,
 };
 use native::{
     BINARY_FUNCTION_ARGUMENT_COUNT, BOOLEAN_VALUE_TYPE_CODE, BooleanPredicateKind,
@@ -75,7 +72,7 @@ pub(super) fn rules_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<Vec<TableCellConditionalHighlightRule>>> {
+) -> Result<Option<Vec<Rule>>> {
     let location = locate_cell(package, table_id, row, column)?;
     read::rules_at_location(package, &location, column)
 }
@@ -85,7 +82,7 @@ pub(super) fn attached_rules_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<Vec<TableCellConditionalHighlightRule>>> {
+) -> Result<Option<Vec<Rule>>> {
     let location = locate_attached_cell(package, table_id, row, column)?;
     read::rules_at_location(package, &location, column)
 }
@@ -192,7 +189,7 @@ pub(super) fn set_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    rules: &[TableCellConditionalHighlightRule],
+    rules: &[Rule],
 ) -> Result<()> {
     validate_rules(rules)?;
     let location = locate_cell(package, table_id, row, column)?;
@@ -209,7 +206,7 @@ pub(super) fn set_attached_in_package(
     table_id: u64,
     row: usize,
     column: usize,
-    rules: &[TableCellConditionalHighlightRule],
+    rules: &[Rule],
 ) -> Result<()> {
     validate_rules(rules)?;
     let location = locate_attached_cell(package, table_id, row, column)?;
@@ -221,7 +218,7 @@ pub(super) fn set_attached_in_package(
     set_at_location(package, &location, row, column, rules)
 }
 
-fn validate_rules(rules: &[TableCellConditionalHighlightRule]) -> Result<()> {
+fn validate_rules(rules: &[Rule]) -> Result<()> {
     if rules.is_empty() {
         return Err(Error::ParseError(
             "conditional highlighting requires at least one rule".to_owned(),
@@ -240,7 +237,7 @@ fn set_at_location(
     location: &CellLocation,
     row: usize,
     column: usize,
-    rules: &[TableCellConditionalHighlightRule],
+    rules: &[Rule],
 ) -> Result<()> {
     let list_id = location
         .descriptor
@@ -527,15 +524,15 @@ fn cfuuid_as_uuid(uuid: &tsp::CfuuidArchive) -> Option<tsp::Uuid> {
     words().or_else(bytes)
 }
 
-fn is_volatile_date_condition(condition: &TableCellConditionalHighlightCondition) -> bool {
+fn is_volatile_date_condition(condition: &Condition) -> bool {
     matches!(
         condition,
-        TableCellConditionalHighlightCondition::DateIsToday
-            | TableCellConditionalHighlightCondition::DateIsYesterday
-            | TableCellConditionalHighlightCondition::DateIsTomorrow
-            | TableCellConditionalHighlightCondition::DateIsInNext(_)
-            | TableCellConditionalHighlightCondition::DateIsInLast(_)
-            | TableCellConditionalHighlightCondition::DateIsOffsetFromToday(_)
+        Condition::DateIsToday
+            | Condition::DateIsYesterday
+            | Condition::DateIsTomorrow
+            | Condition::DateIsInNext(_)
+            | Condition::DateIsInLast(_)
+            | Condition::DateIsOffsetFromToday(_)
     )
 }
 
@@ -608,7 +605,7 @@ fn applied_rule_for_cell(
     package: &IWorkPackage,
     location: &CellLocation,
     column: usize,
-    rules: &[TableCellConditionalHighlightRule],
+    rules: &[Rule],
 ) -> Result<u32> {
     let data = read_tile_cell(
         package,
@@ -642,8 +639,8 @@ fn applied_rule_for_cell(
                 ConditionalCellValue::Text(value)
             },
             _ => match cell.cached_scalar()? {
-                Some(CachedScalar::Number(value)) => ConditionalCellValue::Number(value),
-                Some(CachedScalar::Date(value)) => ConditionalCellValue::Date(value),
+                Some(CachedScalar::Number(value)) => ConditionalCellValue::Number(value.get()),
+                Some(CachedScalar::Date(value)) => ConditionalCellValue::Date(value.get()),
                 Some(CachedScalar::Boolean(value))
                     if cell.cell_format_kind()
                         == Some(crate::numbers::bnc::CHECKBOX_CELL_FORMAT_KIND)
@@ -661,12 +658,12 @@ fn applied_rule_for_cell(
         .any(|rule| {
             matches!(
                 rule.condition,
-                TableCellConditionalHighlightCondition::DateIsToday
-                    | TableCellConditionalHighlightCondition::DateIsYesterday
-                    | TableCellConditionalHighlightCondition::DateIsTomorrow
-                    | TableCellConditionalHighlightCondition::DateIsInNext(_)
-                    | TableCellConditionalHighlightCondition::DateIsInLast(_)
-                    | TableCellConditionalHighlightCondition::DateIsOffsetFromToday(_)
+                Condition::DateIsToday
+                    | Condition::DateIsYesterday
+                    | Condition::DateIsTomorrow
+                    | Condition::DateIsInNext(_)
+                    | Condition::DateIsInLast(_)
+                    | Condition::DateIsOffsetFromToday(_)
             )
         })
         .then(current_date_context);
@@ -699,22 +696,19 @@ struct ConditionalDateContext {
 }
 
 #[cfg(test)]
-fn condition_matches(
-    condition: &TableCellConditionalHighlightCondition,
-    value: &ConditionalCellValue,
-) -> bool {
+fn condition_matches(condition: &Condition, value: &ConditionalCellValue) -> bool {
     condition_matches_at(condition, value, Some(current_date_context()))
 }
 
 fn condition_matches_at(
-    condition: &TableCellConditionalHighlightCondition,
+    condition: &Condition,
     value: &ConditionalCellValue,
     date_context: Option<ConditionalDateContext>,
 ) -> bool {
     match (condition, value) {
-        (TableCellConditionalHighlightCondition::CellIsBlank, ConditionalCellValue::Blank) => true,
+        (Condition::CellIsBlank, ConditionalCellValue::Blank) => true,
         (
-            TableCellConditionalHighlightCondition::CellIsNotBlank,
+            Condition::CellIsNotBlank,
             ConditionalCellValue::Number(_)
             | ConditionalCellValue::Boolean(_)
             | ConditionalCellValue::Checkbox(_)
@@ -722,172 +716,121 @@ fn condition_matches_at(
             | ConditionalCellValue::Other
             | ConditionalCellValue::Text(_),
         ) => true,
+        (Condition::CheckboxIsChecked, ConditionalCellValue::Checkbox(value)) => *value,
+        (Condition::CheckboxIsNotChecked, ConditionalCellValue::Checkbox(value)) => !*value,
         (
-            TableCellConditionalHighlightCondition::CheckboxIsChecked,
-            ConditionalCellValue::Checkbox(value),
-        ) => *value,
-        (
-            TableCellConditionalHighlightCondition::CheckboxIsNotChecked,
-            ConditionalCellValue::Checkbox(value),
-        ) => !*value,
-        (
-            TableCellConditionalHighlightCondition::BooleanIsTrue,
+            Condition::BooleanIsTrue,
             ConditionalCellValue::Boolean(value) | ConditionalCellValue::Checkbox(value),
         ) => *value,
         (
-            TableCellConditionalHighlightCondition::BooleanIsFalse,
+            Condition::BooleanIsFalse,
             ConditionalCellValue::Boolean(value) | ConditionalCellValue::Checkbox(value),
         ) => !*value,
-        (
-            TableCellConditionalHighlightCondition::NumberIsPositive,
-            ConditionalCellValue::Number(value),
-        ) => *value > 0.0,
-        (
-            TableCellConditionalHighlightCondition::NumberIsNegative,
-            ConditionalCellValue::Number(value),
-        ) => *value < 0.0,
-        (
-            TableCellConditionalHighlightCondition::DateIsToday,
-            ConditionalCellValue::Date(value),
-        ) => date_context.is_some_and(|context| {
-            *value >= context.apple_seconds && *value < context.apple_seconds + SECONDS_PER_DAY
-        }),
-        (
-            TableCellConditionalHighlightCondition::DateIsYesterday,
-            ConditionalCellValue::Date(value),
-        ) => date_context.is_some_and(|context| {
-            *value >= context.apple_seconds - SECONDS_PER_DAY && *value < context.apple_seconds
-        }),
-        (
-            TableCellConditionalHighlightCondition::DateIsTomorrow,
-            ConditionalCellValue::Date(value),
-        ) => date_context.is_some_and(|context| {
-            *value >= context.apple_seconds + SECONDS_PER_DAY
-                && *value < context.apple_seconds + 2.0 * SECONDS_PER_DAY
-        }),
-        (
-            TableCellConditionalHighlightCondition::DateIsInNext(period),
-            ConditionalCellValue::Date(value),
-        ) => date_context.is_some_and(|context| {
-            shifted_date(
-                context.today,
-                *period,
-                TableCellConditionalHighlightDateOffsetDirection::FromNow,
-            )
-            .is_some_and(|upper| {
-                *value >= context.apple_seconds
-                    && *value < date_to_apple_seconds(upper) + SECONDS_PER_DAY
+        (Condition::NumberIsPositive, ConditionalCellValue::Number(value)) => *value > 0.0,
+        (Condition::NumberIsNegative, ConditionalCellValue::Number(value)) => *value < 0.0,
+        (Condition::DateIsToday, ConditionalCellValue::Date(value)) => {
+            date_context.is_some_and(|context| {
+                *value >= context.apple_seconds && *value < context.apple_seconds + SECONDS_PER_DAY
             })
-        }),
-        (
-            TableCellConditionalHighlightCondition::DateIsInLast(period),
-            ConditionalCellValue::Date(value),
-        ) => date_context.is_some_and(|context| {
-            shifted_date(
-                context.today,
-                *period,
-                TableCellConditionalHighlightDateOffsetDirection::Ago,
-            )
-            .is_some_and(|lower| {
-                *value >= date_to_apple_seconds(lower)
-                    && *value < context.apple_seconds + SECONDS_PER_DAY
+        },
+        (Condition::DateIsYesterday, ConditionalCellValue::Date(value)) => date_context
+            .is_some_and(|context| {
+                *value >= context.apple_seconds - SECONDS_PER_DAY && *value < context.apple_seconds
+            }),
+        (Condition::DateIsTomorrow, ConditionalCellValue::Date(value)) => {
+            date_context.is_some_and(|context| {
+                *value >= context.apple_seconds + SECONDS_PER_DAY
+                    && *value < context.apple_seconds + 2.0 * SECONDS_PER_DAY
             })
-        }),
-        (
-            TableCellConditionalHighlightCondition::DateIsOffsetFromToday(offset),
-            ConditionalCellValue::Date(value),
-        ) => date_context.is_some_and(|context| {
-            shifted_date(context.today, offset.period(), offset.direction()).is_some_and(|target| {
-                let lower = date_to_apple_seconds(target);
-                *value >= lower && *value < lower + SECONDS_PER_DAY
+        },
+        (Condition::DateIsInNext(period), ConditionalCellValue::Date(value)) => date_context
+            .is_some_and(|context| {
+                shifted_date(context.today, *period, OffsetDirection::FromNow).is_some_and(
+                    |upper| {
+                        *value >= context.apple_seconds
+                            && *value < date_to_apple_seconds(upper) + SECONDS_PER_DAY
+                    },
+                )
+            }),
+        (Condition::DateIsInLast(period), ConditionalCellValue::Date(value)) => date_context
+            .is_some_and(|context| {
+                shifted_date(context.today, *period, OffsetDirection::Ago).is_some_and(|lower| {
+                    *value >= date_to_apple_seconds(lower)
+                        && *value < context.apple_seconds + SECONDS_PER_DAY
+                })
+            }),
+        (Condition::DateIsOffsetFromToday(offset), ConditionalCellValue::Date(value)) => {
+            date_context.is_some_and(|context| {
+                shifted_date(context.today, offset.period(), offset.direction()).is_some_and(
+                    |target| {
+                        let lower = date_to_apple_seconds(target);
+                        *value >= lower && *value < lower + SECONDS_PER_DAY
+                    },
+                )
             })
-        }),
-        (
-            TableCellConditionalHighlightCondition::DateIs(date),
-            ConditionalCellValue::Date(value),
-        ) => {
+        },
+        (Condition::DateIs(date), ConditionalCellValue::Date(value)) => {
             let lower = date.apple_seconds();
             *value >= lower && *value < lower + SECONDS_PER_DAY
         },
-        (
-            TableCellConditionalHighlightCondition::DateIsBefore(date),
-            ConditionalCellValue::Date(value),
-        ) => *value < date.apple_seconds(),
-        (
-            TableCellConditionalHighlightCondition::DateIsAfter(date),
-            ConditionalCellValue::Date(value),
-        ) => *value >= date.apple_seconds() + SECONDS_PER_DAY,
-        (
-            TableCellConditionalHighlightCondition::DateIsBetween(range),
-            ConditionalCellValue::Date(value),
-        ) => {
+        (Condition::DateIsBefore(date), ConditionalCellValue::Date(value)) => {
+            *value < date.apple_seconds()
+        },
+        (Condition::DateIsAfter(date), ConditionalCellValue::Date(value)) => {
+            *value >= date.apple_seconds() + SECONDS_PER_DAY
+        },
+        (Condition::DateIsBetween(range), ConditionalCellValue::Date(value)) => {
             *value >= range.lower().apple_seconds()
                 && *value < range.upper().apple_seconds() + SECONDS_PER_DAY
         },
-        (
-            TableCellConditionalHighlightCondition::EqualTo(operand),
-            ConditionalCellValue::Number(value),
-        ) => *value == operand.get(),
-        (
-            TableCellConditionalHighlightCondition::NotEqualTo(operand),
-            ConditionalCellValue::Number(value),
-        ) => *value != operand.get(),
-        (
-            TableCellConditionalHighlightCondition::GreaterThan(operand),
-            ConditionalCellValue::Number(value),
-        ) => *value > operand.get(),
-        (
-            TableCellConditionalHighlightCondition::GreaterThanOrEqualTo(operand),
-            ConditionalCellValue::Number(value),
-        ) => *value >= operand.get(),
-        (
-            TableCellConditionalHighlightCondition::LessThan(operand),
-            ConditionalCellValue::Number(value),
-        ) => *value < operand.get(),
-        (
-            TableCellConditionalHighlightCondition::LessThanOrEqualTo(operand),
-            ConditionalCellValue::Number(value),
-        ) => *value <= operand.get(),
-        (
-            TableCellConditionalHighlightCondition::Between(range),
-            ConditionalCellValue::Number(value),
-        ) => *value >= range.lower().get() && *value <= range.upper().get(),
-        (
-            TableCellConditionalHighlightCondition::NotBetween(range),
-            ConditionalCellValue::Number(value),
-        ) => *value < range.lower().get() || *value > range.upper().get(),
-        (
-            TableCellConditionalHighlightCondition::TextEqualTo(needle),
-            ConditionalCellValue::Text(value),
-        ) => equals_case_insensitive(value, needle.as_str()),
-        (
-            TableCellConditionalHighlightCondition::TextNotEqualTo(needle),
-            ConditionalCellValue::Text(value),
-        ) => !equals_case_insensitive(value, needle.as_str()),
-        (
-            TableCellConditionalHighlightCondition::TextStartsWith(needle),
-            ConditionalCellValue::Text(value),
-        ) => starts_with_case_insensitive(value, needle.as_str()),
-        (
-            TableCellConditionalHighlightCondition::TextDoesNotStartWith(needle),
-            ConditionalCellValue::Text(value),
-        ) => !starts_with_case_insensitive(value, needle.as_str()),
-        (
-            TableCellConditionalHighlightCondition::TextEndsWith(needle),
-            ConditionalCellValue::Text(value),
-        ) => ends_with_case_insensitive(value, needle.as_str()),
-        (
-            TableCellConditionalHighlightCondition::TextDoesNotEndWith(needle),
-            ConditionalCellValue::Text(value),
-        ) => !ends_with_case_insensitive(value, needle.as_str()),
-        (
-            TableCellConditionalHighlightCondition::TextContains(needle),
-            ConditionalCellValue::Text(value),
-        ) => contains_case_insensitive(value, needle.as_str()),
-        (
-            TableCellConditionalHighlightCondition::TextDoesNotContain(needle),
-            ConditionalCellValue::Text(value),
-        ) => !contains_case_insensitive(value, needle.as_str()),
+        (Condition::EqualTo(operand), ConditionalCellValue::Number(value)) => {
+            *value == operand.get()
+        },
+        (Condition::NotEqualTo(operand), ConditionalCellValue::Number(value)) => {
+            *value != operand.get()
+        },
+        (Condition::GreaterThan(operand), ConditionalCellValue::Number(value)) => {
+            *value > operand.get()
+        },
+        (Condition::GreaterThanOrEqualTo(operand), ConditionalCellValue::Number(value)) => {
+            *value >= operand.get()
+        },
+        (Condition::LessThan(operand), ConditionalCellValue::Number(value)) => {
+            *value < operand.get()
+        },
+        (Condition::LessThanOrEqualTo(operand), ConditionalCellValue::Number(value)) => {
+            *value <= operand.get()
+        },
+        (Condition::Between(range), ConditionalCellValue::Number(value)) => {
+            *value >= range.lower().get() && *value <= range.upper().get()
+        },
+        (Condition::NotBetween(range), ConditionalCellValue::Number(value)) => {
+            *value < range.lower().get() || *value > range.upper().get()
+        },
+        (Condition::TextEqualTo(needle), ConditionalCellValue::Text(value)) => {
+            equals_case_insensitive(value, needle.as_str())
+        },
+        (Condition::TextNotEqualTo(needle), ConditionalCellValue::Text(value)) => {
+            !equals_case_insensitive(value, needle.as_str())
+        },
+        (Condition::TextStartsWith(needle), ConditionalCellValue::Text(value)) => {
+            starts_with_case_insensitive(value, needle.as_str())
+        },
+        (Condition::TextDoesNotStartWith(needle), ConditionalCellValue::Text(value)) => {
+            !starts_with_case_insensitive(value, needle.as_str())
+        },
+        (Condition::TextEndsWith(needle), ConditionalCellValue::Text(value)) => {
+            ends_with_case_insensitive(value, needle.as_str())
+        },
+        (Condition::TextDoesNotEndWith(needle), ConditionalCellValue::Text(value)) => {
+            !ends_with_case_insensitive(value, needle.as_str())
+        },
+        (Condition::TextContains(needle), ConditionalCellValue::Text(value)) => {
+            contains_case_insensitive(value, needle.as_str())
+        },
+        (Condition::TextDoesNotContain(needle), ConditionalCellValue::Text(value)) => {
+            !contains_case_insensitive(value, needle.as_str())
+        },
         _ => false,
     }
 }
@@ -906,31 +849,20 @@ fn date_to_apple_seconds(date: NaiveDate) -> f64 {
     date.signed_duration_since(epoch).num_days() as f64 * SECONDS_PER_DAY
 }
 
-fn shifted_date(
-    date: NaiveDate,
-    period: TableCellConditionalHighlightDatePeriod,
-    direction: TableCellConditionalHighlightDateOffsetDirection,
-) -> Option<NaiveDate> {
-    let forward = matches!(
-        direction,
-        TableCellConditionalHighlightDateOffsetDirection::FromNow
-    );
+fn shifted_date(date: NaiveDate, period: Period, direction: OffsetDirection) -> Option<NaiveDate> {
+    let forward = matches!(direction, OffsetDirection::FromNow);
     match period.unit() {
-        TableCellConditionalHighlightDatePeriodUnit::Days => {
-            shift_days(date, u64::from(period.count()), forward)
-        },
-        TableCellConditionalHighlightDatePeriodUnit::Weeks => period
+        PeriodUnit::Days => shift_days(date, u64::from(period.count()), forward),
+        PeriodUnit::Weeks => period
             .count()
             .checked_mul(7)
             .and_then(|days| shift_days(date, u64::from(days), forward)),
-        TableCellConditionalHighlightDatePeriodUnit::Months => {
-            shift_months(date, period.count(), forward)
-        },
-        TableCellConditionalHighlightDatePeriodUnit::Quarters => period
+        PeriodUnit::Months => shift_months(date, period.count(), forward),
+        PeriodUnit::Quarters => period
             .count()
             .checked_mul(3)
             .and_then(|months| shift_months(date, months, forward)),
-        TableCellConditionalHighlightDatePeriodUnit::Years => period
+        PeriodUnit::Years => period
             .count()
             .checked_mul(12)
             .and_then(|months| shift_months(date, months, forward)),

@@ -3,18 +3,21 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use litchi_iwa_common::media::Type as MediaType;
+
 use super::sheet_movies::graph::{
     MovieObjectIds, movie_creation_context, set_movie_geometry, set_movie_properties,
 };
 use super::*;
-use crate::MediaPlaybackSettings;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media::MediaAssetId;
 use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableProperties, offset_drawable_geometry,
 };
+use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 
 mod graph;
 
@@ -88,7 +91,7 @@ impl NumbersEditor {
 
         let mut media = IWorkMediaEditor::from_package(self.package.clone())?;
         let asset = media.insert_unreferenced(preferred_filename, data)?;
-        if asset.media_type != crate::MediaType::Audio {
+        if asset.media_type != MediaType::Audio {
             return Err(Error::ParseError(format!(
                 "Numbers sheet audio requires audio data, not {}",
                 asset.media_type.name()
@@ -99,7 +102,7 @@ impl NumbersEditor {
             ids,
             sheet_id,
             context.style_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             geometry,
             duration_seconds,
         )?;
@@ -120,7 +123,7 @@ impl NumbersEditor {
         add_component_data_reference(
             &mut staged,
             context.component_id,
-            asset.data_identifier,
+            asset.data_identifier.get(),
             ids.drawable,
         )?;
         if context.stylesheet_component_id != context.component_id {
@@ -142,13 +145,13 @@ impl NumbersEditor {
                 Error::InvalidFormat("Numbers audio creation failed validation".to_owned())
             })?;
         let created_graph = audio_graph(&verified, sheet_id, ids.drawable)?;
-        if created.audio_data_identifier != asset.data_identifier
+        if created.audio_data_identifier != asset.data_identifier.get()
             || created.position != options.position
             || created.duration.as_secs_f32() != duration_seconds
             || created_graph.object_ids != ids.all()
             || created_graph.uuid_object_ids != ids.all()
-            || created_graph.data_references != [(asset.data_identifier, ids.drawable)]
-            || verified.extract_media(asset.data_identifier)? != data
+            || created_graph.data_references != [(asset.data_identifier.get(), ids.drawable)]
+            || verified.extract_media(asset.data_identifier.get())? != data
         {
             return Err(Error::InvalidFormat(
                 "Numbers audio creation produced an inconsistent graph".to_owned(),
@@ -351,7 +354,7 @@ impl NumbersEditor {
                 clone_numbers_drawable_graph_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
+                Ok(archive.insert_object(cloned)?)
             })?;
         }
 
@@ -464,7 +467,9 @@ impl NumbersEditor {
     ) -> Result<RemovedNumbersSheetAudio> {
         let source = audio_graph(self, sheet_id, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
+            drawable_object_id,
+        )?)?;
         let mut staged = comments.into_package();
         patch_numbers_sheet_drawable_reference(
             &mut staged,
@@ -515,12 +520,13 @@ impl NumbersEditor {
             .map(|(data, _)| *data)
             .collect::<HashSet<_>>();
         for identifier in data_identifiers {
+            let identifier = MediaAssetId::try_from(identifier)?;
             if media
                 .asset(identifier)
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier);
+                removed_data_identifiers.push(identifier.get());
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -534,7 +540,7 @@ impl NumbersEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_assets
                     .iter()
-                    .any(|asset| asset.data_identifier == *identifier)
+                    .any(|asset| asset.data_identifier.get() == *identifier)
             })
         {
             return Err(Error::InvalidFormat(
@@ -554,7 +560,7 @@ mod tests {
     use super::*;
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::DrawableSize;
-    use crate::{MediaLoopMode, MediaVolume};
+    use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-numbers-audio";
     const REPLACEMENT_AUDIO: &[u8] = b"FORM\0\0\0\x10AIFFreplacement-numbers-audio";

@@ -310,7 +310,7 @@ impl MarkdownWriter {
         feature = "docx",
         feature = "odt",
         feature = "rtf",
-        feature = "iwork"
+        feature = "pages"
     ))]
     #[allow(irrefutable_let_patterns)]
     pub fn write_paragraph(&mut self, para: &Paragraph) -> Result<()> {
@@ -574,7 +574,7 @@ impl MarkdownWriter {
         feature = "docx",
         feature = "odt",
         feature = "rtf",
-        feature = "iwork"
+        feature = "pages"
     ))]
     #[allow(irrefutable_let_patterns)]
     pub fn write_run(&mut self, run: &Run) -> Result<()> {
@@ -635,7 +635,7 @@ impl MarkdownWriter {
         // For rtf, odf features (without doc/ooxml)
         #[cfg(all(
             not(any(feature = "doc", feature = "docx")),
-            any(feature = "rtf", feature = "odt", feature = "iwork")
+            any(feature = "rtf", feature = "odt", feature = "pages")
         ))]
         let (text, bold, italic, strikethrough) = {
             let text = run.text()?;
@@ -1388,7 +1388,7 @@ impl MarkdownWriter {
         feature = "docx",
         feature = "odt",
         feature = "rtf",
-        feature = "iwork"
+        feature = "pages"
     ))]
     #[allow(irrefutable_let_patterns)]
     fn extract_formula_from_run(&self, _run: &Run) -> Result<Option<String>> {
@@ -1508,7 +1508,7 @@ impl MarkdownWriter {
         feature = "docx",
         feature = "odt",
         feature = "rtf",
-        feature = "iwork"
+        feature = "pages"
     ))]
     fn write_list_item(&mut self, _para: &Paragraph, list_info: &ListItemInfo) -> Result<()> {
         // Add indentation for nested lists
@@ -1566,7 +1566,7 @@ impl MarkdownWriter {
         feature = "docx",
         feature = "odt",
         feature = "rtf",
-        feature = "iwork"
+        feature = "pages"
     ))]
     fn extract_text_from_runs(&self, runs: &[Run]) -> Result<String> {
         // Pre-allocate capacity based on number of runs
@@ -1590,7 +1590,7 @@ impl MarkdownWriter {
         feature = "docx",
         feature = "odt",
         feature = "rtf",
-        feature = "iwork"
+        feature = "pages"
     ))]
     fn write_list_item_from_runs(&mut self, runs: &[Run], list_info: &ListItemInfo) -> Result<()> {
         // Add indentation for nested lists

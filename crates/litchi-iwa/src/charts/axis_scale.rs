@@ -6,7 +6,8 @@
 
 use prost::Message;
 
-use crate::charts::ChartAxis;
+use litchi_iwa_common::chart::axis::{Axis, scale::Scale};
+
 use crate::charts::axis::{
     GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD, axis_non_style_slot,
     generated_axis_non_style_extension,
@@ -18,56 +19,19 @@ use crate::{Error, IWorkPackage, Result};
 /// `tschchartaxisvaluescale` in `TSCH.Generated.ChartAxisNonStyleArchive`.
 const VALUE_AXIS_SCALE_FIELD: u32 = 8;
 
-/// The numeric scale used for a native chart's primary value axis.
-///
-/// The known values correspond to the `Axis Scale` pop-up in Pages, Numbers,
-/// and Keynote. `Unsupported` preserves a future native value without
-/// changing it during a read-modify-write cycle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-#[non_exhaustive]
-pub enum ChartValueAxisScale {
-    /// Plot values along a linear scale.
-    #[default]
-    Linear,
-    /// Plot values along a logarithmic scale.
-    Logarithmic,
-    /// Preserve an unrecognized native iWork value.
-    Unsupported(i32),
-}
-
-impl ChartValueAxisScale {
-    /// Decode the integer stored by the iWork protobuf schema.
-    pub const fn from_raw(value: i32) -> Self {
-        match value {
-            1 => Self::Linear,
-            2 => Self::Logarithmic,
-            value => Self::Unsupported(value),
-        }
-    }
-
-    /// Return the integer used by the iWork protobuf schema.
-    pub const fn into_raw(self) -> i32 {
-        match self {
-            Self::Linear => 1,
-            Self::Logarithmic => 2,
-            Self::Unsupported(value) => value,
-        }
-    }
-}
-
 /// Read the scale mode of one native chart's primary value axis.
 pub(crate) fn chart_value_axis_scale(
     package: &IWorkPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-) -> Result<ChartValueAxisScale> {
+) -> Result<Scale> {
     axis_non_style_slot(
         package,
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Value,
+        Axis::Value,
     )?
     .read(package, read_value_axis_scale)
 }
@@ -78,14 +42,14 @@ pub(crate) fn set_chart_value_axis_scale(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    scale: ChartValueAxisScale,
+    scale: Scale,
 ) -> Result<()> {
     let slot = axis_non_style_slot(
         package,
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Value,
+        Axis::Value,
     )?;
     if slot.read(package, read_value_axis_scale)? == scale {
         return Ok(());
@@ -100,24 +64,24 @@ pub(crate) fn set_chart_value_axis_scale(
     Ok(())
 }
 
-fn read_value_axis_scale(data: &[u8]) -> Result<ChartValueAxisScale> {
+fn read_value_axis_scale(data: &[u8]) -> Result<Scale> {
     let Some(extension) = generated_axis_non_style_extension(data)? else {
-        return Ok(ChartValueAxisScale::default());
+        return Ok(Scale::default());
     };
     let generated = tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
     Ok(generated
         .tschchartaxisvaluescale
-        .map(ChartValueAxisScale::from_raw)
+        .map(Scale::from_native)
         .unwrap_or_default())
 }
 
-fn patch_value_axis_scale(data: &[u8], scale: ChartValueAxisScale) -> Result<Vec<u8>> {
+fn patch_value_axis_scale(data: &[u8], scale: Scale) -> Result<Vec<u8>> {
     let Some(extension) = generated_axis_non_style_extension(data)? else {
-        if scale == ChartValueAxisScale::default() {
+        if scale == Scale::default() {
             return Ok(data.to_vec());
         }
         let generated = tsch::generated::ChartAxisNonStyleArchive {
-            tschchartaxisvaluescale: Some(scale.into_raw()),
+            tschchartaxisvaluescale: Some(scale.native_value()),
             ..Default::default()
         };
         let patched = patch_length_delimited_field(
@@ -132,8 +96,7 @@ fn patch_value_axis_scale(data: &[u8], scale: ChartValueAxisScale) -> Result<Vec
 
     let generated = tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
     let scale_present = generated.tschchartaxisvaluescale.is_some();
-    let value = (scale_present || scale != ChartValueAxisScale::default())
-        .then_some(scale.into_raw() as u64);
+    let value = (scale_present || scale != Scale::default()).then_some(scale.native_value() as u64);
     let extension = patch_varint_field(extension, VALUE_AXIS_SCALE_FIELD, scale_present, value)?;
     let patched = patch_length_delimited_field(
         data,
@@ -145,7 +108,7 @@ fn patch_value_axis_scale(data: &[u8], scale: ChartValueAxisScale) -> Result<Vec
     Ok(patched)
 }
 
-fn validate_patched_value_axis_scale(data: &[u8], expected: ChartValueAxisScale) -> Result<()> {
+fn validate_patched_value_axis_scale(data: &[u8], expected: Scale) -> Result<()> {
     if read_value_axis_scale(data)? != expected {
         return Err(Error::InvalidFormat(
             "chart value-axis scale wire patch failed validation".to_owned(),
@@ -166,27 +129,21 @@ mod tests {
 
     #[test]
     fn value_axis_scales_round_trip_known_and_future_native_values() {
-        let known = [
-            (1, ChartValueAxisScale::Linear),
-            (2, ChartValueAxisScale::Logarithmic),
-        ];
+        let known = [(1, Scale::Linear), (2, Scale::Logarithmic)];
         for (raw, scale) in known {
-            assert_eq!(ChartValueAxisScale::from_raw(raw), scale);
-            assert_eq!(scale.into_raw(), raw);
+            assert_eq!(Scale::from_native(raw), scale);
+            assert_eq!(scale.native_value(), raw);
         }
-        assert_eq!(ChartValueAxisScale::default(), ChartValueAxisScale::Linear);
-        assert_eq!(
-            ChartValueAxisScale::from_raw(0),
-            ChartValueAxisScale::Unsupported(0)
-        );
+        assert_eq!(Scale::default(), Scale::Linear);
+        assert_eq!(Scale::from_native(0), Scale::Unsupported(0));
 
         const FUTURE_SCALE: i32 = 9_001;
         assert_eq!(
-            ChartValueAxisScale::from_raw(FUTURE_SCALE),
-            ChartValueAxisScale::Unsupported(FUTURE_SCALE)
+            Scale::from_native(FUTURE_SCALE),
+            Scale::Unsupported(FUTURE_SCALE)
         );
         assert_eq!(
-            ChartValueAxisScale::Unsupported(FUTURE_SCALE).into_raw(),
+            Scale::Unsupported(FUTURE_SCALE).native_value(),
             FUTURE_SCALE
         );
     }
@@ -195,17 +152,16 @@ mod tests {
     fn value_axis_scale_patch_retains_other_fields_and_unmapped_data() {
         let original =
             axis_non_style_with_unknown_fields(tsch::generated::ChartAxisNonStyleArchive {
-                tschchartaxisvaluescale: Some(ChartValueAxisScale::Linear.into_raw()),
+                tschchartaxisvaluescale: Some(Scale::Linear.native_value()),
                 tschchartaxisvaluenumberofmajorgridlines: Some(5),
                 tschchartaxiscategorytitle: Some("Month".to_owned()),
                 ..Default::default()
             });
 
-        let logarithmic =
-            patch_value_axis_scale(&original, ChartValueAxisScale::Logarithmic).unwrap();
+        let logarithmic = patch_value_axis_scale(&original, Scale::Logarithmic).unwrap();
         assert_eq!(
             read_value_axis_scale(&logarithmic).unwrap(),
-            ChartValueAxisScale::Logarithmic
+            Scale::Logarithmic
         );
         let generated = tsch::generated::ChartAxisNonStyleArchive::decode(
             generated_axis_non_style_extension(&logarithmic)
@@ -220,7 +176,7 @@ mod tests {
         );
         assert_unknown_fields_retained(&original, &logarithmic);
 
-        let restored = patch_value_axis_scale(&logarithmic, ChartValueAxisScale::Linear).unwrap();
+        let restored = patch_value_axis_scale(&logarithmic, Scale::Linear).unwrap();
         assert_eq!(restored, original);
     }
 
@@ -230,20 +186,16 @@ mod tests {
             super_: Some(tss::StyleArchive::default()),
         }
         .encode_to_vec();
+        assert_eq!(read_value_axis_scale(&original).unwrap(), Scale::Linear);
         assert_eq!(
-            read_value_axis_scale(&original).unwrap(),
-            ChartValueAxisScale::Linear
-        );
-        assert_eq!(
-            patch_value_axis_scale(&original, ChartValueAxisScale::Linear).unwrap(),
+            patch_value_axis_scale(&original, Scale::Linear).unwrap(),
             original
         );
 
-        let logarithmic =
-            patch_value_axis_scale(&original, ChartValueAxisScale::Logarithmic).unwrap();
+        let logarithmic = patch_value_axis_scale(&original, Scale::Logarithmic).unwrap();
         assert_eq!(
             read_value_axis_scale(&logarithmic).unwrap(),
-            ChartValueAxisScale::Logarithmic
+            Scale::Logarithmic
         );
         assert!(
             generated_axis_non_style_extension(&logarithmic)
@@ -262,14 +214,11 @@ mod tests {
             });
         assert_eq!(
             read_value_axis_scale(&original).unwrap(),
-            ChartValueAxisScale::Unsupported(FUTURE_SCALE)
+            Scale::Unsupported(FUTURE_SCALE)
         );
 
-        let patched = patch_value_axis_scale(&original, ChartValueAxisScale::Logarithmic).unwrap();
-        assert_eq!(
-            read_value_axis_scale(&patched).unwrap(),
-            ChartValueAxisScale::Logarithmic
-        );
+        let patched = patch_value_axis_scale(&original, Scale::Logarithmic).unwrap();
+        assert_eq!(read_value_axis_scale(&patched).unwrap(), Scale::Logarithmic);
         assert_unknown_fields_retained(&original, &patched);
     }
 
@@ -317,8 +266,8 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .into_iter()
-            .filter(|field| field.number == number)
-            .map(|field| data[field.start..field.end].to_vec())
+            .filter(|field| field.number() == number)
+            .map(|field| data[field.start()..field.end()].to_vec())
             .collect()
     }
 }

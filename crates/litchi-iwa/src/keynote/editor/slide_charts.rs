@@ -36,7 +36,7 @@ mod pie_wedge_explosion;
 mod radar_grid_shape;
 mod radar_series_style;
 mod radar_start_angle;
-mod reference_lines;
+mod reference_line;
 mod rounded_corners;
 mod scene_3d;
 mod series_connection_line;
@@ -64,7 +64,8 @@ use theme::{chart_theme_context, patch_theme_chart_preset};
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::charts::reference_lines::chart_reference_line_objects;
+use crate::charts::options::chart_title;
+use crate::charts::reference_line::chart_reference_line_objects;
 use crate::charts::source::{
     AXIS_NON_STYLE_MESSAGE_TYPE, AXIS_STYLE_MESSAGE_TYPE, CHART_MESSAGE_TYPE,
     CHART_NON_STYLE_MESSAGE_TYPE, CHART_PRESET_MESSAGE_TYPE, CHART_STYLE_MESSAGE_TYPE,
@@ -72,11 +73,11 @@ use crate::charts::source::{
     SERIES_NON_STYLE_MESSAGE_TYPE, SERIES_STYLE_MESSAGE_TYPE, STANDIN_MESSAGE_TYPE,
     SourceChartObjectIds, chart_data, chart_geometry, chart_grid, drawable_geometry,
     geometry_archive, local_chart_style_ids, reference, register_chart_styles,
-    require_creatable_kind, source_chart_objects, unregister_chart_styles,
+    require_creatable_kind, single_message_index, source_chart_objects, unregister_chart_styles,
     validate_chart_styles_registered,
 };
 use crate::charts::{
-    ChartArrangement, ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive,
+    ChartArrangement, ChartData, Direction, DirectionKind, IWorkChartArchive, Kind,
 };
 use crate::data_reference_registry::{
     clone_component_data_references, remove_component_data_references_for_objects,
@@ -86,6 +87,7 @@ use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry,
     remove_orphaned_image_asset,
 };
+use litchi_keynote::ChartSelector;
 
 const KEYNOTE_THEME_MESSAGE_TYPE: u32 = 10;
 
@@ -95,8 +97,8 @@ pub struct KeynoteSlideChartInfo {
     pub slide_index: usize,
     pub slide_id: u64,
     pub drawable_object_id: u64,
-    pub kind: ChartKind,
-    pub direction: ChartSeriesDirection,
+    pub kind: Kind,
+    pub direction: Direction,
     pub data: ChartData,
     pub geometry: DrawableGeometry,
     pub arrangement: ChartArrangement,
@@ -138,7 +140,7 @@ impl KeynoteEditor {
     pub fn add_slide_chart(
         &mut self,
         slide_index: usize,
-        kind: ChartKind,
+        kind: Kind,
         data: ChartData,
         position: DrawablePoint,
         size: DrawableSize,
@@ -229,7 +231,7 @@ impl KeynoteEditor {
         )?;
         let created = chart_graph(&verified, slide_index, ids.drawable)?;
         if created.info.kind != kind
-            || created.info.direction != ChartSeriesDirection::Rows
+            || created.info.direction != Direction::Rows
             || created.info.data != data
             || created.info.geometry != geometry
             || created.object_ids != object_ids
@@ -243,128 +245,164 @@ impl KeynoteEditor {
     }
 
     /// Change the native kind of one slide chart while preserving its data.
+    /// `selector` uses checked chart order or an exact visible chart title.
     pub fn set_slide_chart_kind(
         &mut self,
         slide_index: usize,
-        drawable_object_id: u64,
-        kind: ChartKind,
+        selector: ChartSelector<'_>,
+        kind: Kind,
     ) -> Result<()> {
+        let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
         require_creatable_kind(kind)?;
-        self.update_slide_chart(slide_index, drawable_object_id, |chart| {
-            chart
-                .chart
-                .as_mut()
-                .ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Keynote chart {drawable_object_id} has no chart payload"
-                    ))
-                })?
-                .chart_type = Some(kind.into_raw());
-            Ok(())
-        })?;
-        if chart_graph(self, slide_index, drawable_object_id)?
-            .info
-            .kind
-            != kind
-        {
-            return Err(Error::InvalidFormat(
-                "Keynote chart kind update failed validation".to_owned(),
-            ));
-        }
+        self.update_slide_chart(
+            slide_index,
+            drawable_object_id,
+            |chart| {
+                chart
+                    .chart
+                    .as_mut()
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Keynote chart {drawable_object_id} has no chart payload"
+                        ))
+                    })?
+                    .chart_type = Some(kind.native_value());
+                Ok(())
+            },
+            |verified| {
+                if chart_graph(verified, slide_index, drawable_object_id)?
+                    .info
+                    .kind
+                    != kind
+                {
+                    return Err(Error::InvalidFormat(
+                        "Keynote chart kind update failed validation".to_owned(),
+                    ));
+                }
+                Ok(())
+            },
+        )?;
         Ok(())
     }
 
     /// Replace the complete inline data grid of one slide chart.
+    /// `selector` uses checked chart order or an exact visible chart title.
     pub fn set_slide_chart_data(
         &mut self,
         slide_index: usize,
-        drawable_object_id: u64,
+        selector: ChartSelector<'_>,
         data: ChartData,
     ) -> Result<()> {
-        self.update_slide_chart(slide_index, drawable_object_id, |chart| {
-            let payload = chart.chart.as_mut().ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Keynote chart {drawable_object_id} has no chart payload"
-                ))
-            })?;
-            payload.grid = Some(chart_grid(drawable_object_id, data.clone())?);
-            payload.is_dirty = Some(false);
-            Ok(())
-        })?;
-        if chart_graph(self, slide_index, drawable_object_id)?
-            .info
-            .data
-            != data
-        {
-            return Err(Error::InvalidFormat(
-                "Keynote chart data update failed validation".to_owned(),
-            ));
-        }
+        let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
+        self.update_slide_chart(
+            slide_index,
+            drawable_object_id,
+            |chart| {
+                let payload = chart.chart.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote chart {drawable_object_id} has no chart payload"
+                    ))
+                })?;
+                payload.grid = Some(chart_grid(drawable_object_id, data.clone())?);
+                payload.is_dirty = Some(false);
+                Ok(())
+            },
+            |verified| {
+                if chart_graph(verified, slide_index, drawable_object_id)?
+                    .info
+                    .data
+                    != data
+                {
+                    return Err(Error::InvalidFormat(
+                        "Keynote chart data update failed validation".to_owned(),
+                    ));
+                }
+                Ok(())
+            },
+        )?;
         Ok(())
     }
 
     /// Set whether rows or columns form one slide chart's series.
+    /// `selector` uses checked chart order or an exact visible chart title.
     pub fn set_slide_chart_direction(
         &mut self,
         slide_index: usize,
-        drawable_object_id: u64,
-        direction: ChartSeriesDirection,
+        selector: ChartSelector<'_>,
+        direction: Direction,
     ) -> Result<()> {
-        if matches!(direction, ChartSeriesDirection::Unsupported(_)) {
+        let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
+        if direction.is_unsupported() {
             return Err(Error::ParseError(
                 "cannot assign an unsupported chart series direction".to_owned(),
             ));
         }
-        self.update_slide_chart(slide_index, drawable_object_id, |chart| {
-            chart
-                .chart
-                .as_mut()
-                .ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Keynote chart {drawable_object_id} has no chart payload"
-                    ))
-                })?
-                .series_direction = Some(direction.into_raw());
-            Ok(())
-        })?;
-        if chart_graph(self, slide_index, drawable_object_id)?
-            .info
-            .direction
-            != direction
-        {
-            return Err(Error::InvalidFormat(
-                "Keynote chart direction update failed validation".to_owned(),
-            ));
-        }
+        self.update_slide_chart(
+            slide_index,
+            drawable_object_id,
+            |chart| {
+                chart
+                    .chart
+                    .as_mut()
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Keynote chart {drawable_object_id} has no chart payload"
+                        ))
+                    })?
+                    .series_direction = Some(direction.native_value());
+                Ok(())
+            },
+            |verified| {
+                if chart_graph(verified, slide_index, drawable_object_id)?
+                    .info
+                    .direction
+                    != direction
+                {
+                    return Err(Error::InvalidFormat(
+                        "Keynote chart direction update failed validation".to_owned(),
+                    ));
+                }
+                Ok(())
+            },
+        )?;
         Ok(())
     }
 
     /// Update one chart's slide-space geometry.
+    /// `selector` uses checked chart order or an exact visible chart title.
     pub fn set_slide_chart_geometry(
         &mut self,
         slide_index: usize,
-        drawable_object_id: u64,
+        selector: ChartSelector<'_>,
         geometry: DrawableGeometry,
     ) -> Result<()> {
+        let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
         geometry.validate()?;
-        self.update_slide_chart(slide_index, drawable_object_id, |chart| {
-            let drawable = chart.drawable.super_.as_mut().ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Keynote chart {drawable_object_id} has no drawable payload"
-                ))
-            })?;
-            drawable.geometry = Some(geometry_archive(geometry)?);
-            Ok(())
-        })?;
-        if chart_graph(self, slide_index, drawable_object_id)?
-            .info
-            .geometry
-            != geometry
-        {
-            return Err(Error::InvalidFormat(
-                "Keynote chart geometry update failed validation".to_owned(),
-            ));
-        }
+        self.update_slide_chart(
+            slide_index,
+            drawable_object_id,
+            |chart| {
+                let drawable = chart.drawable.super_.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote chart {drawable_object_id} has no drawable payload"
+                    ))
+                })?;
+                drawable.geometry = Some(geometry_archive(geometry)?);
+                Ok(())
+            },
+            |verified| {
+                if chart_graph(verified, slide_index, drawable_object_id)?
+                    .info
+                    .geometry
+                    != geometry
+                {
+                    return Err(Error::InvalidFormat(
+                        "Keynote chart geometry update failed validation".to_owned(),
+                    ));
+                }
+                Ok(())
+            },
+        )?;
         Ok(())
     }
 
@@ -374,11 +412,13 @@ impl KeynoteEditor {
     /// identities while retaining editable inline data and opaque protobuf
     /// fields. It is owned by the same slide but has an independent chart grid
     /// and geometry.
+    /// `selector` uses checked chart order or an exact visible chart title.
     pub fn duplicate_slide_chart(
         &mut self,
         slide_index: usize,
-        source_drawable_object_id: u64,
+        selector: ChartSelector<'_>,
     ) -> Result<KeynoteSlideChartInfo> {
+        let source_drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
         let source = chart_graph(self, slide_index, source_drawable_object_id)?;
         let source_style_ids =
             local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
@@ -403,7 +443,7 @@ impl KeynoteEditor {
                 clone_slide_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
+                Ok(archive.insert_object(cloned)?)
             })?;
         }
         let new_style_ids = source_style_ids
@@ -517,16 +557,20 @@ impl KeynoteEditor {
     }
 
     /// Remove a standalone slide chart and its private title, caption, and styles.
+    /// `selector` uses checked chart order or an exact visible chart title.
     pub fn remove_slide_chart(
         &mut self,
         slide_index: usize,
-        drawable_object_id: u64,
+        selector: ChartSelector<'_>,
     ) -> Result<RemovedKeynoteSlideChart> {
+        let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
         let source = chart_graph(self, slide_index, drawable_object_id)?;
         let style_ids =
             local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
+            drawable_object_id,
+        )?)?;
         let mut staged = comments.into_package();
         patch_slide_drawable_references(
             &mut staged,
@@ -594,11 +638,62 @@ impl KeynoteEditor {
         Ok(RemovedKeynoteSlideChart { chart: source.info })
     }
 
+    fn resolve_chart_selector(
+        &self,
+        slide_index: usize,
+        selector: ChartSelector<'_>,
+    ) -> Result<u64> {
+        let charts = self.slide_charts(slide_index)?;
+        match selector {
+            ChartSelector::Index(index) => charts
+                .get(index)
+                .map(|chart| chart.drawable_object_id)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote slide {slide_index} has no chart at position {index}"
+                    ))
+                }),
+            ChartSelector::Name(name) => {
+                if name.is_empty() {
+                    return Err(Error::ParseError(
+                        "Keynote chart selector name cannot be empty".to_owned(),
+                    ));
+                }
+                let graph = ObjectGraph::read(self.package())?;
+                let context = text_box_create::text_box_context(&graph, slide_index)?;
+                let archive_name = graph.archive_name(context.slide_id)?;
+                let mut match_id = None;
+                for chart in charts {
+                    let title = chart_title(
+                        self.package(),
+                        archive_name,
+                        chart.drawable_object_id,
+                        "Keynote",
+                    )?;
+                    if title.as_deref() != Some(name) {
+                        continue;
+                    }
+                    if match_id.replace(chart.drawable_object_id).is_some() {
+                        return Err(Error::InvalidFormat(format!(
+                            "Keynote slide {slide_index} has multiple charts named {name:?}"
+                        )));
+                    }
+                }
+                match_id.ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote slide {slide_index} has no chart named {name:?}"
+                    ))
+                })
+            },
+        }
+    }
+
     fn update_slide_chart(
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
         update: impl FnOnce(&mut IWorkChartArchive) -> Result<()>,
+        verify: impl FnOnce(&Self) -> Result<()>,
     ) -> Result<()> {
         let source = chart_graph(self, slide_index, drawable_object_id)?;
         let mut staged = self.package().clone();
@@ -608,9 +703,25 @@ impl KeynoteEditor {
             drawable_object_id,
             update,
         )?;
-        *self = Self::from_bytes(&staged.to_bytes()?)?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        verify(&verified)?;
+        *self = verified;
         Ok(())
     }
+}
+
+#[cfg(test)]
+pub(crate) fn chart_selector(
+    editor: &KeynoteEditor,
+    chart: &KeynoteSlideChartInfo,
+) -> ChartSelector<'static> {
+    let index = editor
+        .slide_charts(chart.slide_index)
+        .expect("chart selector test catalog")
+        .iter()
+        .position(|candidate| candidate.drawable_object_id == chart.drawable_object_id)
+        .expect("chart selector test chart");
+    ChartSelector::index(index)
 }
 
 fn update_chart_payload(
@@ -623,22 +734,15 @@ fn update_chart_payload(
         let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
             Error::InvalidFormat(format!("Keynote chart {drawable_object_id} is missing"))
         })?;
-        let message_indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == CHART_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [message_index] = message_indexes.as_slice() else {
+        let Some(message_index) = single_message_index(&object.messages, CHART_MESSAGE_TYPE) else {
             return Err(Error::InvalidFormat(format!(
                 "Keynote chart {drawable_object_id} must contain exactly one chart payload"
             )));
         };
-        let mut chart = IWorkChartArchive::decode(&object.messages[*message_index].data)?;
+        let mut chart = IWorkChartArchive::decode(&object.messages[message_index].data)?;
         update(&mut chart)?;
         object.replace_message(
-            *message_index,
+            message_index,
             RawMessage {
                 type_: CHART_MESSAGE_TYPE,
                 data: chart.encode()?,

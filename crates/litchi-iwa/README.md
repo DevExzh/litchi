@@ -115,7 +115,7 @@ remain independent through duplicate, delete, and package round-trip
 operations.
 
 The native Axis formatter is available through the typed
-`ChartAxis::{Category, Value}` selector. Use `body_chart_axis_title`,
+`Axis::{Category, Value}` selector. Use `body_chart_axis_title`,
 `sheet_chart_axis_title`, or `slide_chart_axis_title` to read an axis name,
 then `set_*_chart_axis_title` or `remove_*_chart_axis_title` to update the
 same `Axis > Category (X) / Value (Y) > Axis Name` controls that Pages,
@@ -124,12 +124,12 @@ titles remain independent through duplicate, delete, and package round-trip
 operations.
 
 The value-axis `Min` and `Max` fields are represented without sentinel values
-by `ChartValueAxisBounds` and `ChartAxisBound`. Read them through
+by `Bounds` and `Bound`. Read them through
 `body_chart_value_axis_bounds`, `sheet_chart_value_axis_bounds`, or
 `slide_chart_value_axis_bounds`, then use the matching
 `set_*_chart_value_axis_bounds` method to modify the native
 `Axis > Value (Y) > Axis Scale` controls. Each endpoint is independently optional (`None` means
-the app's `Auto` value); `ChartValueAxisBounds::automatic()` restores both
+the app's `Auto` value); `Bounds::automatic()` restores both
 endpoints, while invalid non-finite or inverted ranges are rejected before any
 package mutation.
 
@@ -332,7 +332,7 @@ source drawable or package is copied:
 
 ```rust
 use litchi_iwa::pages::PagesEditor;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapePreset};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Preset};
 
 let body = "Quarterly report";
 let mut pages = PagesEditor::create_with_text(body)?;
@@ -341,10 +341,10 @@ let shape = pages.add_body_shape(
     "A fully editable shape",
     DrawablePoint { x: 180.0, y: 240.0 },
     DrawableSize { width: 300.0, height: 150.0 },
-    ShapePreset::RightArrow,
+    Preset::RightArrow,
 )?;
 pages.set_body_shape_text(shape.drawable_object_id, "Updated")?;
-pages.set_body_shape_preset(shape.drawable_object_id, ShapePreset::DoubleArrow)?;
+pages.set_body_shape_preset(shape.drawable_object_id, Preset::DoubleArrow)?;
 let duplicate = pages.duplicate_body_shape(
     shape.drawable_object_id,
     pages.body_text()?.encode_utf16().count(),
@@ -360,14 +360,14 @@ style inheritance, and UUID graph are all source-built:
 
 ```rust
 use litchi_iwa::pages::PagesEditor;
-use litchi_iwa::shapes::{DrawablePoint, LineEndpoint, LineEndpoints};
+use litchi_iwa::shapes::{DrawablePoint, Endpoint, Endpoints};
 
 let mut pages = PagesEditor::create_with_text("Built without a template")?;
 let line = pages.add_body_line_with_endpoints(
     pages.body_text()?.encode_utf16().count(),
     DrawablePoint { x: 180.0, y: 240.0 },
     DrawablePoint { x: 480.0, y: 390.0 },
-    LineEndpoints::new(LineEndpoint::OpenCircle, LineEndpoint::FilledArrow),
+    Endpoints::new(Endpoint::OpenCircle, Endpoint::FilledArrow),
 )?;
 pages.set_body_line_segment(
     line.drawable_object_id,
@@ -376,7 +376,7 @@ pages.set_body_line_segment(
 )?;
 assert_eq!(
     pages.body_line_endpoints(line.drawable_object_id)?.end,
-    LineEndpoint::FilledArrow,
+    Endpoint::FilledArrow,
 );
 // pages.reset_body_line_endpoints(line.drawable_object_id)?; // delete decorations
 pages.save("created-with-line.pages")?;
@@ -425,8 +425,9 @@ without an input package:
 ```rust
 use std::fs;
 use std::time::Duration;
-use litchi_iwa::pages::{PagesEditor, PagesMovieOptions};
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::pages::PagesEditor;
+use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_pages::movie::Options as PagesMovieOptions;
 
 let body = "Quarterly report";
 let movie = fs::read("demo.mov")?;
@@ -439,10 +440,10 @@ let source = pages.add_body_movie(
     "demo-poster.png",
     &poster,
     PagesMovieOptions::new(
-        DrawablePoint { x: 96.0, y: 144.0 },
-        DrawableSize { width: 320.0, height: 180.0 },
+        Point { x: 96.0, y: 144.0 },
+        Size { width: 320.0, height: 180.0 },
         Duration::from_secs(8),
-    ),
+    )?,
 )?;
 let duplicate_anchor = pages.body_text()?.encode_utf16().count();
 let duplicate = pages.duplicate_body_movie(source.drawable_object_id, duplicate_anchor)?;
@@ -467,8 +468,9 @@ created directly from typed objects:
 ```rust
 use std::fs;
 use std::time::Duration;
-use litchi_iwa::pages::{PagesAudioOptions, PagesEditor};
-use litchi_iwa::shapes::DrawablePoint;
+use litchi_iwa::pages::PagesEditor;
+use litchi_iwa_common::shape::geometry::Point;
+use litchi_pages::audio::Options as PagesAudioOptions;
 
 let body = "Interview notes";
 let audio = fs::read("interview.aiff")?;
@@ -477,10 +479,7 @@ let source = pages.add_body_audio(
     body.encode_utf16().count(),
     "interview.aiff",
     &audio,
-    PagesAudioOptions::new(
-        DrawablePoint { x: 180.0, y: 240.0 },
-        Duration::from_secs(30),
-    ),
+    PagesAudioOptions::new(Point { x: 180.0, y: 240.0 }, Duration::from_secs(30))?,
 )?;
 let duplicate_anchor = pages.body_text()?.encode_utf16().count();
 let duplicate = pages.duplicate_body_audio(source.drawable_object_id, duplicate_anchor)?;
@@ -525,7 +524,7 @@ drawable or package is copied:
 
 ```rust
 use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapePreset};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Preset};
 
 let mut numbers = NumbersDocumentBuilder::new().build()?;
 let sheet_id = numbers.sheets()?[0].object_id;
@@ -534,10 +533,10 @@ let shape = numbers.add_sheet_shape(
     "A fully editable shape",
     DrawablePoint { x: 420.0, y: 300.0 },
     DrawableSize { width: 300.0, height: 150.0 },
-    ShapePreset::RightArrow,
+    Preset::RightArrow,
 )?;
 numbers.set_sheet_shape_text(sheet_id, shape.drawable_object_id, "Updated")?;
-numbers.set_sheet_shape_preset(sheet_id, shape.drawable_object_id, ShapePreset::DoubleArrow)?;
+numbers.set_sheet_shape_preset(sheet_id, shape.drawable_object_id, Preset::DoubleArrow)?;
 let duplicate = numbers.duplicate_sheet_shape(sheet_id, shape.drawable_object_id)?;
 numbers.set_sheet_shape_text(sheet_id, duplicate.drawable_object_id, "Independent copy")?;
 numbers.save("created-with-shape.numbers")?;
@@ -550,7 +549,7 @@ inheritance, and UUID graph are emitted without a source package:
 
 ```rust
 use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, LineEndpoint, LineEndpoints};
+use litchi_iwa::shapes::{DrawablePoint, Endpoint, Endpoints};
 
 let mut numbers = NumbersDocumentBuilder::new().build()?;
 let sheet_id = numbers.sheets()?[0].object_id;
@@ -558,7 +557,7 @@ let line = numbers.add_sheet_line_with_endpoints(
     sheet_id,
     DrawablePoint { x: 420.0, y: 300.0 },
     DrawablePoint { x: 720.0, y: 450.0 },
-    LineEndpoints::new(LineEndpoint::FilledCircle, LineEndpoint::SimpleArrow),
+    Endpoints::new(Endpoint::FilledCircle, Endpoint::SimpleArrow),
 )?;
 numbers.set_sheet_line_segment(
     sheet_id,
@@ -570,7 +569,7 @@ assert_eq!(
     numbers
         .sheet_line_endpoints(sheet_id, line.drawable_object_id)?
         .start,
-    LineEndpoint::FilledCircle,
+    Endpoint::FilledCircle,
 );
 // numbers.reset_sheet_line_endpoints(sheet_id, line.drawable_object_id)?;
 numbers.save("created-with-line.numbers")?;
@@ -689,7 +688,7 @@ retained hidden for later toggling; fresh slides cloned from the layout preserve
 the same native behavior:
 
 ```rust
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideImageOptions};
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
 
 let mut keynote = KeynoteDocumentBuilder::new()
     .title("Native slide numbers")
@@ -758,7 +757,7 @@ drawable or package is copied:
 
 ```rust
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapePreset};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Preset};
 
 let mut keynote = KeynoteDocumentBuilder::new().build()?;
 let shape = keynote.add_slide_shape(
@@ -766,10 +765,10 @@ let shape = keynote.add_slide_shape(
     "A fully editable shape",
     DrawablePoint { x: 720.0, y: 660.0 },
     DrawableSize { width: 480.0, height: 240.0 },
-    ShapePreset::RightArrow,
+    Preset::RightArrow,
 )?;
 keynote.set_slide_shape_text(0, shape.drawable_object_id, "Updated")?;
-keynote.set_slide_shape_preset(0, shape.drawable_object_id, ShapePreset::DoubleArrow)?;
+keynote.set_slide_shape_preset(0, shape.drawable_object_id, Preset::DoubleArrow)?;
 let duplicate = keynote.duplicate_slide_shape(0, shape.drawable_object_id)?;
 keynote.set_slide_shape_text(0, duplicate.drawable_object_id, "Independent copy")?;
 keynote.save("created-with-shape.key")?;
@@ -782,14 +781,14 @@ stand-ins, ownership, z-order, style inheritance, and UUIDs are source-built:
 
 ```rust
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, LineEndpoint, LineEndpoints};
+use litchi_iwa::shapes::{DrawablePoint, Endpoint, Endpoints};
 
 let mut keynote = KeynoteDocumentBuilder::new().build()?;
 let line = keynote.add_slide_line_with_endpoints(
     0,
     DrawablePoint { x: 720.0, y: 660.0 },
     DrawablePoint { x: 1_200.0, y: 900.0 },
-    LineEndpoints::new(LineEndpoint::OpenSquare, LineEndpoint::FilledDiamond),
+    Endpoints::new(Endpoint::OpenSquare, Endpoint::FilledDiamond),
 )?;
 keynote.set_slide_line_segment(
     0,
@@ -801,7 +800,7 @@ assert_eq!(
     keynote
         .slide_line_endpoints(0, line.drawable_object_id)?
         .end,
-    LineEndpoint::FilledDiamond,
+    Endpoint::FilledDiamond,
 );
 // keynote.reset_slide_line_endpoints(0, line.drawable_object_id)?;
 keynote.save("created-with-line.key")?;
@@ -815,7 +814,8 @@ asset are all created directly; no blank Keynote package is embedded:
 ```rust
 use std::fs;
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_keynote::slide::image::Options as ImageOptions;
 
 let image = fs::read("chart.png")?;
 let mut keynote = KeynoteDocumentBuilder::new().build()?;
@@ -823,10 +823,10 @@ let source = keynote.add_slide_image(
     0,
     "chart.png",
     &image,
-    KeynoteSlideImageOptions::new(
-        DrawablePoint { x: 704.0, y: 284.0 },
-        DrawableSize { width: 512.0, height: 512.0 },
-    ),
+    ImageOptions::new(
+        Point { x: 704.0, y: 284.0 },
+        Size { width: 512.0, height: 512.0 },
+    )?,
 )?;
 keynote.set_slide_image_title(0, source.drawable_object_id, "Quarterly revenue")?;
 keynote.set_slide_image_caption(0, source.drawable_object_id, "North America, Q4")?;
@@ -847,8 +847,9 @@ build and timing chunk are generated from typed values:
 ```rust
 use std::fs;
 use std::time::Duration;
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideMovieOptions};
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_keynote::slide::movie::Options as SlideMovieOptions;
 
 let movie = fs::read("demo.mov")?;
 let poster = fs::read("demo-poster.png")?;
@@ -859,11 +860,11 @@ let source = keynote.add_slide_movie(
     &movie,
     "demo-poster.png",
     &poster,
-    KeynoteSlideMovieOptions::new(
-        DrawablePoint { x: 640.0, y: 360.0 },
-        DrawableSize { width: 640.0, height: 360.0 },
+    SlideMovieOptions::new(
+        Point { x: 640.0, y: 360.0 },
+        Size { width: 640.0, height: 360.0 },
         Duration::from_secs(8),
-    ),
+    )?,
 )?;
 let duplicate = keynote.duplicate_slide_movie(0, source.drawable_object_id)?;
 assert_eq!(duplicate.movie_data_identifier, source.movie_data_identifier);
@@ -886,8 +887,9 @@ without copying a package or drawable:
 ```rust
 use std::fs;
 use std::time::Duration;
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteSlideAudioOptions};
-use litchi_iwa::shapes::DrawablePoint;
+use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa_common::shape::geometry::Point;
+use litchi_keynote::slide::audio::Options as SlideAudioOptions;
 
 let audio = fs::read("narration.aiff")?;
 let mut keynote = KeynoteDocumentBuilder::new().build()?;
@@ -895,10 +897,7 @@ let source = keynote.add_slide_audio(
     0,
     "narration.aiff",
     &audio,
-    KeynoteSlideAudioOptions::new(
-        DrawablePoint { x: 960.0, y: 540.0 },
-        Duration::from_secs(12),
-    ),
+    SlideAudioOptions::new(Point { x: 960.0, y: 540.0 }, Duration::from_secs(12))?,
 )?;
 let duplicate = keynote.duplicate_slide_audio(0, source.drawable_object_id)?;
 assert_eq!(duplicate.audio_data_identifier, source.audio_data_identifier);
@@ -918,42 +917,47 @@ field you need, then write it back—for example,
 Numbers, and Keynote movie/audio APIs preserve unknown movie-archive fields and
 carry the properties through native-style duplication.
 
-The same media APIs expose `MediaPlaybackSettings` for typed trim boundaries,
-poster position, repeat mode, and `MediaVolume`. Update the returned settings
-and write them through the matching `*_playback_settings` method (for example,
+The same media APIs expose the archive-free
+`litchi_iwa_common::media::playback::{MediaPlaybackSettings, MediaVolume,
+MediaLoopMode}` vocabulary for typed trim boundaries, poster position, repeat
+mode, and volume. Update the returned settings and write them through the
+matching `*_playback_settings` method (for example,
 `set_body_movie_playback_settings` or
 `set_slide_audio_playback_settings`). The update preserves unrelated and
-unknown movie-archive fields; `MediaVolume::new` rejects invalid levels, and
-`MediaLoopMode::Unknown` allows a newer native repeat value to round-trip.
+unknown movie-archive fields; the common builders reject invalid levels and
+trim ranges, and `MediaLoopMode::Unknown` allows a newer native repeat value to
+round-trip.
 
 ### Edit existing documents
 
 ```rust
 use litchi_iwa::numbers::{
     CellValue, FormulaAxisReference, FormulaCellReference, FormulaExpression, NumbersEditor,
-    NumbersTableHeaderCount,
-    NumbersTableTitleSettings,
+    Settings as TableTitleSettings,
 };
-use litchi_iwa::pages::{PagesDocumentOptions, PagesEditor};
+use litchi_iwa::pages::PagesEditor;
+use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+use litchi_pages::header_footer::Kind;
+use litchi_pages::page_layout::Orientation;
+use litchi_pages::section::{Background, PageNumber, PageNumbering, Start};
 use litchi_iwa::keynote::{
     KeynoteBuildSettings, KeynoteBuildStart, KeynoteEditor, KeynoteFlipDirection,
     KeynoteHorizontalBuildDirection, KeynoteKeyboardDirection, KeynoteRotationDirection,
     KeynoteSlideTextRole, KeynoteSwooshDirection,
 };
+use litchi_keynote::transition::{Acceleration, Effect, TextDelivery};
+use litchi_numbers::table::headers::Count as HeaderCount;
 
 let mut numbers = NumbersEditor::open("input.numbers")?;
 let table = numbers.tables()?.remove(0);
 let mut headers = numbers.table_header_settings(table.object_id)?;
-headers.header_rows = Some(NumbersTableHeaderCount::TWO);
-headers.footer_rows = Some(NumbersTableHeaderCount::ONE);
+headers.header_rows = Some(HeaderCount::TWO);
+headers.footer_rows = Some(HeaderCount::ONE);
 headers.header_rows_frozen = Some(true);
 numbers.set_table_header_settings(table.object_id, headers)?;
 numbers.set_table_title_settings(
     table.object_id,
-    NumbersTableTitleSettings {
-        visible: Some(true),
-        outlined: Some(false),
-    },
+    TableTitleSettings::new(Some(true), Some(false)),
 )?;
 numbers.set_cell(table.object_id, 1, 2, CellValue::Number(42.0))?;
 // Existing rich-text cells use the same call. Their TSWP formatting storage is
@@ -1061,47 +1065,37 @@ numbers.save("updated.numbers")?;
 
 let mut pages = PagesEditor::open("input.pages")?;
 let mut document_options = pages.document_options()?;
-document_options.facing_pages = Some(true);
-document_options.automatic_hyphenation = Some(true);
-document_options.ligatures_enabled = Some(false);
+document_options.set_facing_pages(Some(true));
+document_options.set_automatic_hyphenation(Some(true));
+document_options.set_ligatures_enabled(Some(false));
 pages.set_document_options(document_options)?;
 let section_id = pages.sections()[0].object_id;
 pages.set_section_text(section_id, "Updated body")?;
 let first_header = pages
     .header_footers()?
     .into_iter()
-    .find(|region| matches!(region.kind, litchi_iwa::pages::PagesHeaderFooterKind::Header))
+    .find(|region| matches!(region.kind, Kind::Header))
     .expect("document header");
 pages.set_header_footer_text(first_header.storage.object_id, "Quarterly report")?;
 pages.set_section_name(section_id, Some("Executive summary"))?;
 let mut section_settings = pages.section_settings(section_id)?;
-section_settings.inherit_previous_header_footer = Some(false);
-section_settings.first_page_hides_header_footer = Some(true);
-section_settings.start = Some(litchi_iwa::pages::PagesSectionStart::NextPage);
-section_settings.page_numbering = Some(
-    litchi_iwa::pages::PagesSectionPageNumbering::Restart,
-);
-section_settings.starting_page_number = Some(
-    litchi_iwa::pages::PagesPageNumber::new(3)?,
-);
+section_settings.set_inherit_previous_header_footer(Some(false));
+section_settings.set_first_page_hides_header_footer(Some(true));
+section_settings.set_start(Some(Start::NextPage))?;
+section_settings.set_page_numbering(Some(PageNumbering::Restart))?;
+section_settings.set_starting_page_number(Some(PageNumber::new(3)?));
 pages.set_section_settings(section_id, section_settings)?;
 pages.set_section_background(
     section_id,
-    litchi_iwa::pages::PagesSectionBackground::Solid(litchi_iwa::pages::PagesRgbaColor {
-        red: 1.0,
-        green: 0.59,
-        blue: 0.55,
-        alpha: 1.0,
-        color_space: litchi_iwa::pages::PagesRgbColorSpace::Srgb,
-    }),
+    Background::Solid(Rgba::new(1.0, 0.59, 0.55, 1.0, RgbColorSpace::Srgb)?),
 )?;
 let inserted = pages.insert_section(section_id, 8, "Methods")?;
 pages.remove_section(inserted.object_id)?;
 let appended = pages.append_section(section_id, "Appendix")?;
 pages.remove_section(appended.object_id)?;
 let mut layout = pages.page_layout()?;
-layout.top_margin = Some(54.0);
-layout.orientation = Some(litchi_iwa::pages::PagesPageOrientation::Portrait);
+layout.set_top_margin(Some(54.0))?;
+layout.set_orientation(Some(Orientation::Portrait))?;
 pages.set_page_layout(layout)?;
 if let Some(text_box) = pages.drawable_text_storages()?.first() {
     pages.set_drawable_text(text_box.drawable_object_id, "Updated text box")?;
@@ -1146,18 +1140,24 @@ let layout = keynote.default_slide_layout()?;
 let fresh = keynote.add_slide(layout)?;
 keynote.set_slide_title(fresh.index, "New from theme")?;
 let mut transition = keynote.slides()?[0].transition.clone().expect("transition");
-transition.effect = Some(litchi_iwa::keynote::KeynoteTransitionEffect::Dissolve);
+transition.effect = Some(Effect::Dissolve);
 transition.duration = Some(1.5);
 transition.custom_parameters.acceleration =
-    Some(litchi_iwa::keynote::KeynoteTransitionAcceleration::EaseInOut);
+    Some(Acceleration::EaseInOut);
 transition.custom_parameters.text_delivery =
-    Some(litchi_iwa::keynote::KeynoteTransitionTextDelivery::ByWord);
+    Some(TextDelivery::ByWord);
 keynote.set_slide_transition(0, transition)?;
 keynote.clear_slide_transition(0)?;
 let mut show = keynote.show_settings()?;
-show.loop_presentation = Some(true);
-show.mode = Some(litchi_iwa::keynote::KeynoteShowMode::SelfPlaying);
+show.set_loop_presentation(Some(true));
+show.set_mode(Some(litchi_iwa::keynote::Mode::SelfPlaying))?;
 keynote.set_show_settings(show)?;
+let mut soundtrack = keynote
+    .soundtrack_settings()?
+    .ok_or("presentation has no soundtrack object")?;
+soundtrack.mode = Some(litchi_keynote::soundtrack::Mode::Loop);
+soundtrack.volume = Some(0.8);
+keynote.set_soundtrack_settings(soundtrack)?;
 if let Some(drawable) = keynote.slide_drawables(0)?.first() {
     keynote.set_slide_drawable_comment(0, drawable.object_id, "Review this slide object")?;
     let _comment = keynote.slide_drawable_comment(0, drawable.object_id)?;
@@ -1476,6 +1476,13 @@ timing-curve payloads, random seeds, effect detail, curve theme names, and
 right-to-left writing direction are writable as well. Unknown nested transition
 extensions remain byte-exact at the slide, transition, transition-attributes,
 and animation-attributes levels.
+Soundtrack playback values are owned by the archive-free
+`litchi_keynote::soundtrack::{Mode, Settings}` module. `Mode` preserves future
+native discriminants and `Settings` validates finite `0.0..=1.0` volume values;
+the IWA editor keeps soundtrack media references, package identifiers,
+unknown fields, and transactional wire replacement private to the package
+adapter. Settings edits therefore never rebuild or reorder the media
+collection.
 Slide-owned `TSWP.ShapeInfoArchive` storages are enumerated in drawable order
 and classified as title, body, or ordinary text boxes. Their content supports
 UTF-16 range replacement, whole-value update, and clear operations while
@@ -1579,6 +1586,11 @@ metadata-backed editor retains stable data identifiers and reference counts,
 and patches only the digest and materialized length fields at the protobuf wire
 level so unknown Apple extensions remain byte-exact.
 
+`MediaAsset::media_type` uses the compact, archive-free
+`litchi_iwa_common::media::Type` value. It is a one-byte copyable classification
+for image, video, audio, PDF, and unknown assets; package discovery, metadata,
+limits, and replacement validation remain owned by this crate.
+
 ```rust
 use litchi_iwa::IWorkMediaEditor;
 
@@ -1605,7 +1617,8 @@ and `DataMetadataMap`; referenced deletion is rejected transactionally.
 ## Low-level CRUD
 
 ```rust
-use litchi_iwa::{IWorkPackage, archive::RawMessage};
+use litchi_iwa::raw::package::IWorkPackage;
+use litchi_iwa_core::RawMessage;
 
 let mut package = IWorkPackage::open("document.pages")?;
 package.update_archive("Index/Document.iwa", |archive| {
@@ -1627,7 +1640,8 @@ paths, so semantic and low-level edits use the same APIs as current documents.
 
 ## Build Requirements
 
-This crate compiles protobuf definitions via `prost-build`. The `protoc` compiler must be available on `PATH`:
+The companion `litchi-iwa-protos` crate compiles the raw protobuf definitions
+via `prost-build`; the `protoc` compiler must be available on `PATH`:
 
 - Debian / Ubuntu: `apt install protobuf-compiler`
 - macOS (Homebrew): `brew install protobuf`

@@ -16,7 +16,7 @@ pub enum Paragraph {
     Doc(doc::Paragraph),
     #[cfg(feature = "docx")]
     Docx(crate::docx::Paragraph),
-    #[cfg(feature = "iwork")]
+    #[cfg(feature = "pages")]
     Pages(String),
     #[cfg(feature = "rtf")]
     Rtf(litchi_rtf::ParagraphContent<'static>),
@@ -35,7 +35,7 @@ impl Paragraph {
                 .text()
                 .map(|s| s.to_string())
                 .map_err(crate::map_ooxml_error),
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "pages")]
             Paragraph::Pages(text) => Ok(text.clone()),
             #[cfg(feature = "rtf")]
             Paragraph::Rtf(p) => Ok(p.text()),
@@ -59,7 +59,7 @@ impl Paragraph {
                 let runs = p.runs().map_err(crate::map_ooxml_error)?;
                 Ok(runs.into_iter().map(Run::Docx).collect())
             },
-            #[cfg(feature = "iwork")]
+            #[cfg(feature = "pages")]
             Paragraph::Pages(text) => {
                 // Pages paragraphs are simple strings without run-level formatting
                 // Return a single run with the entire text

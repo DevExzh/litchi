@@ -2,26 +2,30 @@
 
 use std::env;
 
+use litchi_iwa_common::chart::axis::style::Visibility as AxisVisibility;
+use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
+use litchi_iwa_common::chart::error_bar::{
+    Direction as ErrorBarDirection, FixedValue as ErrorBarFixedValue,
+    Percentage as ErrorBarPercentage, Series as ErrorBarSeries,
+};
+use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
+
 use litchi_iwa::charts::{
-    ChartAxis, ChartAxisBound, ChartAxisGridline, ChartAxisGridlineStroke, ChartAxisMajorStepCount,
-    ChartAxisMinorStepCount, ChartAxisTickMarkLocation, ChartCornerRadius, ChartData,
-    ChartErrorBarDirection, ChartErrorBarFixedValue, ChartErrorBarPercentage, ChartFont,
-    ChartFontSize, ChartGapPercentage, ChartGapSpacing, ChartKind, ChartLegendFill,
-    ChartLegendFont, ChartLegendFontSize, ChartLegendShadow, ChartLegendStroke,
-    ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesErrorBars, ChartSeriesStroke,
-    ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
-    ChartSeriesValueLabelAffixes, ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelDecimalPlaces,
-    ChartSeriesValueLabelLocation, ChartSeriesValueLabelNegativeStyle,
-    ChartSeriesValueLabelNumberFormat, ChartSeriesValueLabelVisibility, ChartShadow,
-    ChartValueAxisBounds, ChartValueAxisScale, ChartValueAxisSteps,
+    Bound, Bounds, ChartAxisGridline, ChartAxisGridlineStroke, ChartCornerRadius, ChartData,
+    ChartFont, ChartFontSize, ChartLegendFill, ChartLegendFont, ChartLegendFontSize,
+    ChartLegendShadow, ChartLegendStroke, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
+    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
+    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesValueLabelAutoFit,
+    ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Kind, LabelAffixes, MajorStepCount,
+    MinorStepCount, NegativeStyle, NumberFormat, Scale, Steps, Visibility,
 };
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeDropShadow, ShapeFill,
-    ShapeGradient, ShapeGradientAngle, ShapeShadowAngle, ShapeShadowAppearance,
-    ShapeShadowBlurRadius, ShapeShadowOffset, ShapeShadowOpacity, ShapeStroke, StrokePattern,
-    StrokeWidth,
+    Appearance, BlurRadius, DrawablePoint, DrawableSize, Drop, Offset, Pattern, RgbColorSpace,
+    RgbaColor, ShapeFill, Stroke, Width,
 };
+use litchi_iwa_common::shape::fill::{Angle, Gradient};
+use litchi_iwa_common::shape::shadow::{Angle as ShadowAngle, Opacity};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -44,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let chart = editor.add_body_chart(
         body.encode_utf16().count(),
-        ChartKind::Column2d,
+        Kind::Column2d,
         data,
         DrawablePoint { x: 96.0, y: 144.0 },
         DrawableSize {
@@ -60,10 +64,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_chart_series_fills(
         chart.drawable_object_id,
         &[
-            ShapeFill::Gradient(ShapeGradient::linear(
+            ShapeFill::Gradient(Gradient::linear(
                 RgbaColor::new(0.95, 0.25, 0.18, 1.0, RgbColorSpace::Srgb)?,
                 RgbaColor::new(0.55, 0.05, 0.35, 1.0, RgbColorSpace::Srgb)?,
-                ShapeGradientAngle::from_degrees(0.0)?,
+                Angle::from_degrees(0.0)?,
             )),
             ShapeFill::Solid(RgbaColor::new(0.10, 0.65, 0.35, 1.0, RgbColorSpace::Srgb)?),
         ],
@@ -73,12 +77,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &[
             Some(ChartSeriesStroke::new(
                 RgbaColor::black(),
-                StrokeWidth::new(3.5)?,
+                Width::new(3.5)?,
                 ChartSeriesStrokePattern::RoundedDash,
             )),
             Some(ChartSeriesStroke::new(
                 RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb)?,
-                StrokeWidth::new(2.0)?,
+                Width::new(2.0)?,
                 ChartSeriesStrokePattern::MediumDash,
             )),
         ],
@@ -86,10 +90,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_chart_border_visible(chart.drawable_object_id, true)?;
     editor.set_body_chart_border_stroke(
         chart.drawable_object_id,
-        Some(ShapeStroke::new(
+        Some(Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb)?,
-            StrokeWidth::new(3.0)?,
-            StrokePattern::MediumDash,
+            Width::new(3.0)?,
+            Pattern::MediumDash,
         )),
     )?;
     editor.set_body_chart_rounded_corners(
@@ -98,76 +102,70 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_body_chart_gap_spacing(
         chart.drawable_object_id,
-        ChartGapSpacing::new(
-            ChartGapPercentage::new(25.0)?,
-            ChartGapPercentage::new(70.0)?,
-        ),
+        Spacing::new(Percentage::new(25.0)?, Percentage::new(70.0)?),
     )?;
     editor.set_body_chart_shadow(
         chart.drawable_object_id,
-        ChartShadow::Grouped(ShapeDropShadow::new(
-            ShapeShadowAppearance::new(
+        ChartShadow::Grouped(Drop::new(
+            Appearance::new(
                 RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb)?,
-                ShapeShadowBlurRadius::from_points(15)?,
-                ShapeShadowOffset::from_points(8.0)?,
-                ShapeShadowOpacity::new(0.6)?,
+                BlurRadius::from_points(15)?,
+                Offset::from_points(8.0)?,
+                Opacity::new(0.6)?,
             ),
-            ShapeShadowAngle::from_degrees(60.0)?,
+            ShadowAngle::from_degrees(60.0)?,
         )),
     )?;
-    editor.set_body_chart_axis_title(chart.drawable_object_id, ChartAxis::Category, "Quarter")?;
-    editor.set_body_chart_axis_title(chart.drawable_object_id, ChartAxis::Value, "Revenue")?;
+    editor.set_body_chart_axis_title(chart.drawable_object_id, Axis::Category, "Quarter")?;
+    editor.set_body_chart_axis_title(chart.drawable_object_id, Axis::Value, "Revenue")?;
     editor.set_body_chart_value_axis_bounds(
         chart.drawable_object_id,
-        ChartValueAxisBounds::fixed(ChartAxisBound::new(1.0)?, ChartAxisBound::new(30.0)?)?,
+        Bounds::fixed(Bound::new(1.0)?, Bound::new(30.0)?)?,
     )?;
-    editor.set_body_chart_value_axis_scale(
-        chart.drawable_object_id,
-        ChartValueAxisScale::Logarithmic,
-    )?;
+    editor.set_body_chart_value_axis_scale(chart.drawable_object_id, Scale::Logarithmic)?;
     editor.set_body_chart_value_axis_steps(
         chart.drawable_object_id,
-        ChartValueAxisSteps::fixed(
-            ChartAxisMajorStepCount::new(6)?,
-            ChartAxisMinorStepCount::new(2)?,
-        ),
+        Steps::fixed(MajorStepCount::new(6)?, MinorStepCount::new(2)?),
     )?;
-    editor.set_body_chart_value_axis_minimum_label_visible(chart.drawable_object_id, false)?;
-    editor.set_body_chart_category_axis_series_names_visible(chart.drawable_object_id, true)?;
-    editor.set_body_chart_axis_labels_visible(
+    editor.set_body_chart_value_axis_minimum_label_visible(
         chart.drawable_object_id,
-        ChartAxis::Category,
-        false,
+        AxisVisibility::Hidden,
     )?;
+    editor.set_body_chart_category_axis_series_names_visible(chart.drawable_object_id, true)?;
+    editor.set_body_chart_axis_labels_visible(chart.drawable_object_id, Axis::Category, false)?;
     editor.set_body_chart_axis_minor_tick_marks_visible(
         chart.drawable_object_id,
-        ChartAxis::Category,
-        false,
+        Axis::Category,
+        AxisVisibility::Hidden,
     )?;
     editor.set_body_chart_axis_tick_mark_location(
         chart.drawable_object_id,
-        ChartAxis::Category,
-        ChartAxisTickMarkLocation::Outside,
+        Axis::Category,
+        TickMarkLocation::Outside,
     )?;
-    editor.set_body_chart_axis_line_visible(chart.drawable_object_id, ChartAxis::Value, false)?;
+    editor.set_body_chart_axis_line_visible(
+        chart.drawable_object_id,
+        Axis::Value,
+        AxisVisibility::Hidden,
+    )?;
     editor.set_body_chart_axis_major_gridlines_visible(
         chart.drawable_object_id,
-        ChartAxis::Value,
-        false,
+        Axis::Value,
+        AxisVisibility::Hidden,
     )?;
     editor.set_body_chart_axis_minor_gridlines_visible(
         chart.drawable_object_id,
-        ChartAxis::Value,
-        true,
+        Axis::Value,
+        AxisVisibility::Visible,
     )?;
     editor.set_body_chart_axis_gridline_stroke(
         chart.drawable_object_id,
-        ChartAxis::Value,
+        Axis::Value,
         ChartAxisGridline::Minor,
-        ChartAxisGridlineStroke::Stroke(ShapeStroke::new(
+        ChartAxisGridlineStroke::Stroke(Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb)?,
-            StrokeWidth::new(2.0)?,
-            StrokePattern::MediumDash,
+            Width::new(2.0)?,
+            Pattern::MediumDash,
         )),
     )?;
     editor.set_body_chart_legend_visible(chart.drawable_object_id, true)?;
@@ -191,27 +189,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_body_chart_legend_stroke(
         chart.drawable_object_id,
-        ChartLegendStroke::Stroke(ShapeStroke::new(
+        ChartLegendStroke::Stroke(Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb)?,
-            StrokeWidth::new(2.5)?,
-            StrokePattern::MediumDash,
+            Width::new(2.5)?,
+            Pattern::MediumDash,
         )),
     )?;
     editor.set_body_chart_legend_shadow(
         chart.drawable_object_id,
-        ChartLegendShadow::Shadow(ShapeDropShadow::new(
-            ShapeShadowAppearance::new(
+        ChartLegendShadow::Shadow(Drop::new(
+            Appearance::new(
                 RgbaColor::black(),
-                ShapeShadowBlurRadius::from_points(12)?,
-                ShapeShadowOffset::from_points(8.0)?,
-                ShapeShadowOpacity::new(0.6)?,
+                BlurRadius::from_points(12)?,
+                Offset::from_points(8.0)?,
+                Opacity::new(0.6)?,
             ),
-            ShapeShadowAngle::from_degrees(30.0)?,
+            ShadowAngle::from_degrees(30.0)?,
         )),
     )?;
     editor.set_body_chart_series_value_label_visibilities(
         chart.drawable_object_id,
-        &[ChartSeriesValueLabelVisibility::Visible; 2],
+        &[Visibility::Visible; 2],
     )?;
     editor.set_body_chart_series_value_label_locations(
         chart.drawable_object_id,
@@ -220,23 +218,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_chart_series_value_label_affixes(
         chart.drawable_object_id,
         &[
-            ChartSeriesValueLabelAffixes::new("$", " USD"),
-            ChartSeriesValueLabelAffixes::new("€", " EUR"),
+            LabelAffixes::new("$", " USD").unwrap(),
+            LabelAffixes::new("€", " EUR").unwrap(),
         ],
     )?;
     editor.set_body_chart_series_value_label_number_formats(
         chart.drawable_object_id,
         &[
-            ChartSeriesValueLabelNumberFormat::new(
-                ChartSeriesValueLabelDecimalPlaces::fixed(2)?,
-                ChartSeriesValueLabelNegativeStyle::Parentheses,
-                false,
-            ),
-            ChartSeriesValueLabelNumberFormat::new(
-                ChartSeriesValueLabelDecimalPlaces::fixed(1)?,
-                ChartSeriesValueLabelNegativeStyle::MinusSign,
-                true,
-            ),
+            NumberFormat::new(DecimalPlaces::fixed(2)?, NegativeStyle::Parentheses, false),
+            NumberFormat::new(DecimalPlaces::fixed(1)?, NegativeStyle::MinusSign, true),
         ],
     )?;
     editor.set_body_chart_series_value_label_auto_fits(
@@ -260,13 +250,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_body_chart_series_error_bars(
         chart.drawable_object_id,
         &[
-            ChartSeriesErrorBars::FixedValue {
-                direction: ChartErrorBarDirection::PositiveAndNegative,
-                value: ChartErrorBarFixedValue::new(12.5)?,
+            ErrorBarSeries::FixedValue {
+                direction: ErrorBarDirection::PositiveAndNegative,
+                value: ErrorBarFixedValue::new(12.5)?,
             },
-            ChartSeriesErrorBars::Percentage {
-                direction: ChartErrorBarDirection::PositiveOnly,
-                percentage: ChartErrorBarPercentage::new(17)?,
+            ErrorBarSeries::Percentage {
+                direction: ErrorBarDirection::PositiveOnly,
+                percentage: ErrorBarPercentage::new(17)?,
             },
         ],
     )?;

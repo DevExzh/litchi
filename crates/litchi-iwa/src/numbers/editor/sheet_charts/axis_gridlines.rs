@@ -11,7 +11,9 @@ use crate::charts::axis_style::{
     set_chart_axis_major_gridlines_visible as set_native_chart_axis_major_gridlines_visible,
     set_chart_axis_minor_gridlines_visible as set_native_chart_axis_minor_gridlines_visible,
 };
-use crate::charts::{ChartAxis, ChartAxisGridline, ChartAxisGridlineStroke};
+use crate::charts::{ChartAxisGridline, ChartAxisGridlineStroke};
+use litchi_iwa_common::chart::axis::Axis;
+use litchi_iwa_common::chart::axis::style::Visibility;
 
 impl NumbersEditor {
     /// Read whether Numbers shows major gridlines for one native sheet-chart axis.
@@ -19,8 +21,8 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
-    ) -> Result<bool> {
+        axis: Axis,
+    ) -> Result<Visibility> {
         sheet_chart_axis_major_gridlines_visible(self, sheet_id, drawable_object_id, axis)
     }
 
@@ -29,8 +31,8 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
-        visible: bool,
+        axis: Axis,
+        visible: Visibility,
     ) -> Result<()> {
         set_sheet_chart_axis_major_gridlines_visible(
             self,
@@ -46,8 +48,8 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
-    ) -> Result<bool> {
+        axis: Axis,
+    ) -> Result<Visibility> {
         sheet_chart_axis_minor_gridlines_visible(self, sheet_id, drawable_object_id, axis)
     }
 
@@ -56,8 +58,8 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
-        visible: bool,
+        axis: Axis,
+        visible: Visibility,
     ) -> Result<()> {
         set_sheet_chart_axis_minor_gridlines_visible(
             self,
@@ -73,7 +75,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         gridline: ChartAxisGridline,
     ) -> Result<ChartAxisGridlineStroke> {
         let graph = chart_graph(self, sheet_id, drawable_object_id)?;
@@ -92,7 +94,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         gridline: ChartAxisGridline,
         stroke: ChartAxisGridlineStroke,
     ) -> Result<()> {
@@ -128,8 +130,8 @@ fn sheet_chart_axis_major_gridlines_visible(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
-) -> Result<bool> {
+    axis: Axis,
+) -> Result<Visibility> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     read_native_chart_axis_major_gridlines_visible(
         &editor.package,
@@ -144,8 +146,8 @@ fn set_sheet_chart_axis_major_gridlines_visible(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
-    visible: bool,
+    axis: Axis,
+    visible: Visibility,
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let mut staged = editor.package.clone();
@@ -173,8 +175,8 @@ fn sheet_chart_axis_minor_gridlines_visible(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
-) -> Result<bool> {
+    axis: Axis,
+) -> Result<Visibility> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     read_native_chart_axis_minor_gridlines_visible(
         &editor.package,
@@ -189,8 +191,8 @@ fn set_sheet_chart_axis_minor_gridlines_visible(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    axis: ChartAxis,
-    visible: bool,
+    axis: Axis,
+    visible: Visibility,
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     let mut staged = editor.package.clone();
@@ -217,11 +219,10 @@ fn set_sheet_chart_axis_minor_gridlines_visible(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartKind};
+    use crate::charts::{ChartData, Kind};
     use crate::numbers::NumbersDocumentBuilder;
     use crate::shapes::{
-        DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeStroke, StrokePattern,
-        StrokeWidth,
+        DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Stroke, Width,
     };
 
     #[test]
@@ -231,7 +232,7 @@ mod tests {
         let chart = editor
             .add_sheet_chart(
                 sheet_id,
-                ChartKind::Column2d,
+                Kind::Column2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -247,7 +248,7 @@ mod tests {
             .set_sheet_chart_axis_gridline_stroke(
                 sheet_id,
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 ChartAxisGridline::Major,
                 stroke,
             )
@@ -257,7 +258,7 @@ mod tests {
                 .sheet_chart_axis_gridline_stroke(
                     sheet_id,
                     chart.drawable_object_id,
-                    ChartAxis::Value,
+                    Axis::Value,
                     ChartAxisGridline::Major,
                 )
                 .unwrap(),
@@ -268,15 +269,16 @@ mod tests {
                 .sheet_chart_axis_major_gridlines_visible(
                     sheet_id,
                     chart.drawable_object_id,
-                    ChartAxis::Value,
+                    Axis::Value,
                 )
                 .unwrap()
+                .is_visible()
         );
         editor
             .set_sheet_chart_axis_gridline_stroke(
                 sheet_id,
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 ChartAxisGridline::Major,
                 ChartAxisGridlineStroke::Inherited,
             )
@@ -293,11 +295,11 @@ mod tests {
         .unwrap()
     }
 
-    fn test_stroke() -> ShapeStroke {
-        ShapeStroke::new(
+    fn test_stroke() -> Stroke {
+        Stroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(2.5).unwrap(),
-            StrokePattern::LongDash,
+            Width::new(2.5).unwrap(),
+            Pattern::LongDash,
         )
     }
 }

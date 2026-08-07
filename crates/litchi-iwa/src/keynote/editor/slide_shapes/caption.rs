@@ -289,7 +289,7 @@ fn set_slide_shape_caption(
     }
     let staged = if let Some(storage_id) = slot.storage_id {
         let mut text_editor = IWorkTextEditor::from_package(editor.package().clone());
-        text_editor.set_text(storage_id, text)?;
+        text_editor.set_text(crate::text::native_storage_id(storage_id)?, text)?;
         text_editor.into_package()
     } else {
         let (theme, language) = slide_shape_caption_theme(editor, slide_index)?;
@@ -551,7 +551,8 @@ fn require_exact_message_count(
 mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
-    use crate::shapes::{DrawablePoint, DrawableSize, ShapePreset};
+    use crate::shapes::{DrawablePoint, DrawableSize};
+    use litchi_iwa_common::shape::path::Preset;
 
     const POSITION: DrawablePoint = DrawablePoint { x: 360.0, y: 420.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -566,13 +567,7 @@ mod tests {
             .build()
             .unwrap();
         let shape = editor
-            .add_slide_shape(
-                0,
-                "Quarterly trend",
-                POSITION,
-                SIZE,
-                ShapePreset::RightArrow,
-            )
+            .add_slide_shape(0, "Quarterly trend", POSITION, SIZE, Preset::RightArrow)
             .unwrap();
         assert_eq!(
             editor

@@ -1,0 +1,18 @@
+[package]
+name        = "litchi-iwa-protos"
+description = "Generated raw Protocol Buffer schemas for Apple iWork IWA archives."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+prost = { workspace = true }
+
+[build-dependencies]
+prost-build = { workspace = true }
+
+[lints]
+workspace = true

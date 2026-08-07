@@ -9,19 +9,19 @@ use crate::text::style_registry::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::super::drop_cap::ParagraphStart;
-use super::types::{
-    ParagraphList, ParagraphListIndentation, ParagraphListLabelIndent, ParagraphListTextGap,
-};
 use super::variation::{
     effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
 };
 use super::{levels, native, storage};
+use litchi_iwa_text::paragraph::list::{
+    ParagraphList, ParagraphListIndentation, ParagraphListLabelIndent, ParagraphListTextGap,
+};
+use litchi_iwa_text::position::TextPosition;
 
 pub(crate) fn paragraph_list_indentation(
     package: &IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListIndentation> {
     let level = levels::paragraph_list_level(package, storage_id, paragraph)?;
     let boundaries = storage::locate_boundaries(package, storage_id)?;
@@ -43,7 +43,7 @@ pub(crate) fn paragraph_list_indentation(
 pub(in crate::text) fn set_paragraph_list_indentation(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     indentation: ParagraphListIndentation,
 ) -> Result<()> {
     if paragraph_list_indentation(package, storage_id, paragraph)? == indentation {
@@ -127,7 +127,7 @@ pub(in crate::text) fn set_paragraph_list_indentation(
 pub(in crate::text) fn reset_paragraph_list_indentation(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     let level = levels::paragraph_list_level(package, storage_id, paragraph)?;
     let boundaries = storage::locate_boundaries(package, storage_id)?;
@@ -145,7 +145,7 @@ pub(in crate::text) fn reset_paragraph_list_indentation(
 fn collapse_or_clear_redundant_indentation(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<()> {
     let located = storage::locate_boundaries_with_archive(package, storage_id)?;
     let boundaries = &located.location;

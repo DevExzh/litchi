@@ -1,17 +1,7 @@
 //! Typed formula CRUD for Keynote slide tables.
 
 use super::*;
-
-/// A typed whole-row or whole-column reference used by a table formula.
-pub type KeynoteTableFormulaAxisReference = crate::numbers::FormulaAxisReference;
-/// A typed binary operator used by a table formula.
-pub type KeynoteTableFormulaBinaryOperator = crate::numbers::FormulaBinaryOperator;
-/// A formula result displayed before Keynote next recalculates the cell.
-pub type KeynoteTableFormulaCachedValue = crate::numbers::FormulaCachedValue;
-/// A typed cell address used by a table formula.
-pub type KeynoteTableFormulaCellReference = crate::numbers::FormulaCellReference;
-/// A typed formula AST compiled into native iWork table storage.
-pub type KeynoteTableFormulaExpression = crate::numbers::FormulaExpression;
+use litchi_keynote::slide::table::formula::{FormulaCachedValue, FormulaExpression};
 
 impl KeynoteEditor {
     /// Read a cell's canonical formula source, including the leading equals sign.
@@ -36,8 +26,8 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        expression: KeynoteTableFormulaExpression,
-        cached_value: KeynoteTableFormulaCachedValue,
+        expression: FormulaExpression,
+        cached_value: FormulaCachedValue,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();

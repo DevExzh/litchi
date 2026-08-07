@@ -6,15 +6,15 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::series_style::{
     ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
     effective_chart_series_style_slots, generated_chart_series_style_extension,
 };
 use crate::protobuf::{tsch, tsd};
 use crate::shapes::{
-    RgbaColor, ShapeStroke, StrokeJoin, StrokePattern, StrokeWidth, empty_stroke_archive,
-    stroke_from_native, stroke_to_native,
+    Join, Pattern, RgbaColor, Stroke, Width, empty_stroke_archive, stroke_from_native,
+    stroke_to_native,
 };
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
@@ -40,16 +40,12 @@ pub enum ChartSeriesStrokePattern {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ChartSeriesStroke {
     pub color: RgbaColor,
-    pub width: StrokeWidth,
+    pub width: Width,
     pub pattern: ChartSeriesStrokePattern,
 }
 
 impl ChartSeriesStroke {
-    pub const fn new(
-        color: RgbaColor,
-        width: StrokeWidth,
-        pattern: ChartSeriesStrokePattern,
-    ) -> Self {
+    pub const fn new(color: RgbaColor, width: Width, pattern: ChartSeriesStrokePattern) -> Self {
         Self {
             color,
             width,
@@ -62,10 +58,10 @@ impl ChartSeriesStroke {
             return Ok(None);
         };
         let pattern = match stroke.pattern {
-            StrokePattern::Solid => ChartSeriesStrokePattern::Solid,
-            StrokePattern::MediumDash => ChartSeriesStrokePattern::MediumDash,
-            StrokePattern::RoundedDash => ChartSeriesStrokePattern::RoundedDash,
-            StrokePattern::ShortDash | StrokePattern::LongDash => {
+            Pattern::Solid => ChartSeriesStrokePattern::Solid,
+            Pattern::MediumDash => ChartSeriesStrokePattern::MediumDash,
+            Pattern::RoundedDash => ChartSeriesStrokePattern::RoundedDash,
+            Pattern::ShortDash | Pattern::LongDash => {
                 return Err(Error::InvalidFormat(format!(
                     "unsupported native chart series stroke pattern {:?}",
                     stroke.pattern
@@ -77,13 +73,11 @@ impl ChartSeriesStroke {
 
     pub(crate) fn to_native(self) -> tsd::StrokeArchive {
         let pattern = match self.pattern {
-            ChartSeriesStrokePattern::Solid => StrokePattern::Solid,
-            ChartSeriesStrokePattern::MediumDash => StrokePattern::MediumDash,
-            ChartSeriesStrokePattern::RoundedDash => StrokePattern::RoundedDash,
+            ChartSeriesStrokePattern::Solid => Pattern::Solid,
+            ChartSeriesStrokePattern::MediumDash => Pattern::MediumDash,
+            ChartSeriesStrokePattern::RoundedDash => Pattern::RoundedDash,
         };
-        stroke_to_native(
-            ShapeStroke::new(self.color, self.width, pattern).with_join(StrokeJoin::Miter),
-        )
+        stroke_to_native(Stroke::new(self.color, self.width, pattern).with_join(Join::Miter))
     }
 }
 
@@ -101,20 +95,20 @@ pub enum ChartSeriesStrokeKind {
 
 impl ChartSeriesStrokeKind {
     /// Resolve the stroke family displayed by iWork for a chart kind.
-    pub fn for_chart_kind(kind: ChartKind) -> Result<Self> {
+    pub fn for_chart_kind(kind: Kind) -> Result<Self> {
         match kind {
-            ChartKind::Area2d | ChartKind::StackedArea2d => Ok(Self::Area2d),
-            ChartKind::Bar2d
-            | ChartKind::StackedBar2d
-            | ChartKind::MultiDataBar2d
-            | ChartKind::Column2d
-            | ChartKind::StackedColumn2d
-            | ChartKind::MultiDataColumn2d => Ok(Self::BarOrColumn2d),
-            ChartKind::Bubble2d => Ok(Self::Bubble2d),
-            ChartKind::Line2d => Ok(Self::Line2d),
-            ChartKind::Pie2d | ChartKind::Donut2d => Ok(Self::Pie2d),
-            ChartKind::Radar2d => Ok(Self::Radar2d),
-            ChartKind::Scatter2d => Ok(Self::Scatter2d),
+            Kind::Area2d | Kind::StackedArea2d => Ok(Self::Area2d),
+            Kind::Bar2d
+            | Kind::StackedBar2d
+            | Kind::MultiDataBar2d
+            | Kind::Column2d
+            | Kind::StackedColumn2d
+            | Kind::MultiDataColumn2d => Ok(Self::BarOrColumn2d),
+            Kind::Bubble2d => Ok(Self::Bubble2d),
+            Kind::Line2d => Ok(Self::Line2d),
+            Kind::Pie2d | Kind::Donut2d => Ok(Self::Pie2d),
+            Kind::Radar2d => Ok(Self::Radar2d),
+            Kind::Scatter2d => Ok(Self::Scatter2d),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no unambiguous series stroke"
             ))),
@@ -140,7 +134,7 @@ pub(crate) fn chart_series_strokes(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
 ) -> Result<Vec<Option<ChartSeriesStroke>>> {
     let storage = ChartSeriesStrokeKind::for_chart_kind(kind)?;
@@ -162,7 +156,7 @@ pub(crate) fn set_chart_series_strokes(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     expected: &[Option<ChartSeriesStroke>],
 ) -> Result<()> {
@@ -215,7 +209,7 @@ pub(crate) fn reset_chart_series_stroke(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     series_index: usize,
 ) -> Result<Option<ChartSeriesStroke>> {
@@ -325,7 +319,7 @@ fn patch_local_stroke(
 mod tests {
     use super::*;
     use crate::protobuf::tss;
-    use crate::shapes::{RgbColorSpace, RgbaColor, StrokeWidth};
+    use crate::shapes::{RgbColorSpace, RgbaColor, Width};
     use crate::wire::{append_varint_field, parse_wire_fields};
 
     const UNKNOWN_OUTER_FIELD: u32 = 4_096;
@@ -334,31 +328,31 @@ mod tests {
     #[test]
     fn every_unambiguous_stroke_kind_has_a_typed_storage_family() {
         for kind in [
-            ChartKind::Area2d,
-            ChartKind::StackedArea2d,
-            ChartKind::Bar2d,
-            ChartKind::StackedBar2d,
-            ChartKind::MultiDataBar2d,
-            ChartKind::Column2d,
-            ChartKind::StackedColumn2d,
-            ChartKind::MultiDataColumn2d,
-            ChartKind::Bubble2d,
-            ChartKind::Line2d,
-            ChartKind::Pie2d,
-            ChartKind::Donut2d,
-            ChartKind::Radar2d,
-            ChartKind::Scatter2d,
+            Kind::Area2d,
+            Kind::StackedArea2d,
+            Kind::Bar2d,
+            Kind::StackedBar2d,
+            Kind::MultiDataBar2d,
+            Kind::Column2d,
+            Kind::StackedColumn2d,
+            Kind::MultiDataColumn2d,
+            Kind::Bubble2d,
+            Kind::Line2d,
+            Kind::Pie2d,
+            Kind::Donut2d,
+            Kind::Radar2d,
+            Kind::Scatter2d,
         ] {
             assert!(ChartSeriesStrokeKind::for_chart_kind(kind).is_ok());
         }
         for kind in [
-            ChartKind::Mixed2d,
-            ChartKind::TwoAxis2d,
-            ChartKind::Area3d,
-            ChartKind::Bar3d,
-            ChartKind::Column3d,
-            ChartKind::Line3d,
-            ChartKind::Pie3d,
+            Kind::Mixed2d,
+            Kind::TwoAxis2d,
+            Kind::Area3d,
+            Kind::Bar3d,
+            Kind::Column3d,
+            Kind::Line3d,
+            Kind::Pie3d,
         ] {
             assert!(ChartSeriesStrokeKind::for_chart_kind(kind).is_err());
         }
@@ -369,7 +363,7 @@ mod tests {
         let original = style_with_unknown_fields();
         let stroke = ChartSeriesStroke::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
-            StrokeWidth::new(3.5).unwrap(),
+            Width::new(3.5).unwrap(),
             ChartSeriesStrokePattern::RoundedDash,
         );
         let visible = patch_local_stroke(
@@ -417,8 +411,8 @@ mod tests {
             parse_wire_fields(data)
                 .unwrap()
                 .into_iter()
-                .find(|field| field.number == UNKNOWN_OUTER_FIELD)
-                .map(|field| data[field.start..field.end].to_vec())
+                .find(|field| field.number() == UNKNOWN_OUTER_FIELD)
+                .map(|field| data[field.start()..field.end()].to_vec())
         };
         assert_eq!(outer(patched), outer(original));
         let original_generated = generated_chart_series_style_extension(original)
@@ -431,8 +425,8 @@ mod tests {
             parse_wire_fields(data)
                 .unwrap()
                 .into_iter()
-                .find(|field| field.number == UNKNOWN_GENERATED_FIELD)
-                .map(|field| data[field.start..field.end].to_vec())
+                .find(|field| field.number() == UNKNOWN_GENERATED_FIELD)
+                .map(|field| data[field.start()..field.end()].to_vec())
         };
         assert_eq!(generated(patched_generated), generated(original_generated));
     }

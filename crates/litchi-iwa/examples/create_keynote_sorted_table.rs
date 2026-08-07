@@ -1,13 +1,11 @@
 //! Create and physically sort a plain-text Keynote table without an input presentation.
+use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 use std::env;
 
-use litchi_iwa::keynote::{
-    KeynoteDocumentBuilder, KeynoteTableCellUpdate, KeynoteTableCellValue, KeynoteTableHeaderCount,
-    KeynoteTableHeaderSettings, KeynoteTableSortColumnIndex, KeynoteTableSortDirection,
-    KeynoteTableSortOrder, KeynoteTableSortRule,
-};
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteTableCellUpdate, KeynoteTableCellValue};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_numbers::table::sort::{ColumnIndex, Direction, Order, Rule};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
@@ -31,8 +29,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_table_header_settings(
         0,
         table.model_object_id,
-        KeynoteTableHeaderSettings {
-            header_rows: Some(KeynoteTableHeaderCount::ONE),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
             ..Default::default()
         },
     )?;
@@ -77,10 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_table_sort_order(
         0,
         table.model_object_id,
-        KeynoteTableSortOrder::new([KeynoteTableSortRule::new(
-            KeynoteTableSortColumnIndex::new(0)?,
-            KeynoteTableSortDirection::Ascending,
-        )])?,
+        Order::new([Rule::new(ColumnIndex::new(0)?, Direction::Ascending)])?,
     )?;
     if !editor.apply_slide_table_sort_order(0, table.model_object_id)? {
         return Err("expected the source table to be reordered".into());
@@ -91,7 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let moved_reply_id = editor
         .slide_table_cell_comment_replies(0, table.model_object_id, 4, 1)?
         .first()
-        .map(|reply| reply.storage_object_id);
+        .map(|reply| reply.storage_id.get());
     if moved.comment.text != "Zebra comment follows its sorted row"
         || moved_reply_id != Some(reply_id)
     {

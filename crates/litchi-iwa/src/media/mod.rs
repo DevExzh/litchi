@@ -9,14 +9,14 @@ mod package;
 #[cfg(test)]
 mod tests;
 
-pub use model::{EmbeddedMediaAsset, MediaAsset, MediaLimits, MediaStats, MediaType};
+pub use model::{EmbeddedMediaAsset, MediaAsset, MediaAssetId, MediaLimits, MediaStats, MediaType};
 pub use package::{IWorkMediaEditor, MediaManager};
 
 pub(crate) use codec::{embedded_assets, reachable_embedded_assets};
 
 #[cfg(test)]
-pub(crate) use codec::{
-    PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE, field_payload, parse_wire_fields,
-};
+pub(crate) use codec::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE, field_payload};
+#[cfg(test)]
+pub(crate) use litchi_iwa_common::wire::parse_wire_fields;
 #[cfg(test)]
 pub(crate) use model::format_bytes;

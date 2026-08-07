@@ -34,7 +34,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &image,
         PagesImageOptions::new(IMAGE_POSITION, IMAGE_SIZE),
     )?;
-    editor.flip_body_image(created.drawable_object_id, DrawableFlipAxis::Horizontal)?;
+    let drawable_id = litchi_iwa_common::comment::DrawableId::new(created.drawable_object_id)
+        .ok_or("created image has an invalid drawable identifier")?;
+    editor.flip_body_image(drawable_id, DrawableFlipAxis::Horizontal)?;
     editor.save(output)?;
     println!(
         "created horizontally flipped Pages image {}",

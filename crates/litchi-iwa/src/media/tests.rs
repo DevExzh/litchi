@@ -7,11 +7,15 @@ use sha1::{Digest, Sha1};
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::package::{IWorkPackage, PackageLimits};
-use crate::varint::encode_varint;
+use litchi_iwa_common::varint::encode_varint;
 
 use super::*;
 
 const PNG: &[u8] = b"\x89PNG\r\n\x1a\nreplacement";
+
+fn asset_id(raw: u64) -> MediaAssetId {
+    MediaAssetId::new(raw).expect("test media asset identifiers are non-zero")
+}
 
 fn append_varint_field(output: &mut Vec<u8>, number: u64, value: u64) {
     output.extend(encode_varint(number << 3));
@@ -87,26 +91,15 @@ fn nested_field_bytes(metadata: &[u8], field_number: u32) -> Vec<u8> {
     let outer = parse_wire_fields(metadata).unwrap();
     let data_info = outer
         .iter()
-        .find(|field| field.number == 4)
+        .find(|field| field.number() == 4)
         .map(|field| field_payload(metadata, field).unwrap())
         .unwrap();
     let nested = parse_wire_fields(data_info).unwrap();
     let field = nested
         .iter()
-        .find(|field| field.number == field_number)
+        .find(|field| field.number() == field_number)
         .unwrap();
-    data_info[field.start..field.end].to_vec()
-}
-
-#[test]
-fn detects_extensions_and_signatures() {
-    assert_eq!(MediaType::from_extension("PNG"), MediaType::Image);
-    assert_eq!(MediaType::from_extension("mov"), MediaType::Video);
-    assert_eq!(MediaType::from_extension("m4a"), MediaType::Audio);
-    assert_eq!(MediaType::from_extension("pdf"), MediaType::Pdf);
-    assert_eq!(MediaType::from_bytes(PNG), MediaType::Image);
-    assert_eq!(MediaType::from_bytes(b"%PDF-1.7\n"), MediaType::Pdf);
-    assert_eq!(MediaType::from_bytes(b"ID3\x04\0\0"), MediaType::Audio);
+    data_info[field.start()..field.end()].to_vec()
 }
 
 #[test]
@@ -360,14 +353,14 @@ fn replaces_asset_and_preserves_unknown_metadata_fields() {
     let outer_unknown_before = parse_wire_fields(before)
         .unwrap()
         .into_iter()
-        .find(|field| field.number == 100)
-        .map(|field| before[field.start..field.end].to_vec())
+        .find(|field| field.number() == 100)
+        .map(|field| before[field.start()..field.end()].to_vec())
         .unwrap();
 
-    let previous = editor.replace(7, PNG).unwrap();
+    let previous = editor.replace(asset_id(7), PNG).unwrap();
     assert_eq!(previous, b"\x89PNG\r\n\x1a\noriginal");
-    assert_eq!(editor.extract(7).unwrap(), PNG);
-    let asset = editor.asset(7).unwrap();
+    assert_eq!(editor.extract(asset_id(7)).unwrap(), PNG);
+    let asset = editor.asset(asset_id(7)).unwrap();
     assert_eq!(asset.digest, Sha1::digest(PNG).to_vec());
     assert_eq!(asset.declared_size, Some(PNG.len() as u64));
     assert_eq!(asset.message_reference_count, 1);
@@ -378,8 +371,8 @@ fn replaces_asset_and_preserves_unknown_metadata_fields() {
     let outer_unknown_after = parse_wire_fields(after)
         .unwrap()
         .into_iter()
-        .find(|field| field.number == 100)
-        .map(|field| after[field.start..field.end].to_vec())
+        .find(|field| field.number() == 100)
+        .map(|field| after[field.start()..field.end()].to_vec())
         .unwrap();
     assert_eq!(outer_unknown_after, outer_unknown_before);
 }
@@ -388,15 +381,19 @@ fn replaces_asset_and_preserves_unknown_metadata_fields() {
 fn rejects_type_mismatch_transactionally() {
     let mut editor = IWorkMediaEditor::from_package(synthetic_package()).unwrap();
     let before = editor.to_bytes().unwrap();
-    assert!(editor.replace(7, b"%PDF-1.7\nnot-an-image").is_err());
+    assert!(
+        editor
+            .replace(asset_id(7), b"%PDF-1.7\nnot-an-image")
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
 #[test]
 fn removes_only_unreferenced_assets_transactionally() {
     let mut referenced = IWorkMediaEditor::from_package(synthetic_package()).unwrap();
-    assert!(referenced.remove_unreferenced(7).is_err());
-    assert!(referenced.asset(7).is_some());
+    assert!(referenced.remove_unreferenced(asset_id(7)).is_err());
+    assert!(referenced.asset(asset_id(7)).is_some());
 
     let mut package = synthetic_package();
     package
@@ -412,14 +409,14 @@ fn removes_only_unreferenced_assets_transactionally() {
     let outer_unknown_before = parse_wire_fields(before)
         .unwrap()
         .into_iter()
-        .find(|field| field.number == 100)
-        .map(|field| before[field.start..field.end].to_vec())
+        .find(|field| field.number() == 100)
+        .map(|field| before[field.start()..field.end()].to_vec())
         .unwrap();
 
     let mut editor = IWorkMediaEditor::from_package(package).unwrap();
-    let removed = editor.remove_unreferenced(7).unwrap().unwrap();
+    let removed = editor.remove_unreferenced(asset_id(7)).unwrap().unwrap();
     assert_eq!(removed, b"\x89PNG\r\n\x1a\noriginal");
-    assert!(editor.asset(7).is_none());
+    assert!(editor.asset(asset_id(7)).is_none());
     assert!(!editor.package().contains_entry("Data/image-7.png"));
 
     let after_archive = editor.package().archive(PACKAGE_METADATA_ENTRY).unwrap();
@@ -427,8 +424,8 @@ fn removes_only_unreferenced_assets_transactionally() {
     let outer_unknown_after = parse_wire_fields(after)
         .unwrap()
         .into_iter()
-        .find(|field| field.number == 100)
-        .map(|field| after[field.start..field.end].to_vec())
+        .find(|field| field.number() == 100)
+        .map(|field| after[field.start()..field.end()].to_vec())
         .unwrap();
     assert_eq!(outer_unknown_after, outer_unknown_before);
 }
@@ -446,12 +443,15 @@ fn inserts_and_removes_unreferenced_asset_without_metadata_drift() {
         .clone();
     let mut editor = IWorkMediaEditor::from_package(package).unwrap();
     let inserted = editor.insert_unreferenced("new.png", PNG).unwrap();
-    assert_eq!(inserted.data_identifier, 8);
+    assert_eq!(inserted.data_identifier, asset_id(8));
     assert_eq!(inserted.package_path.as_deref(), Some("Data/new-8.png"));
     assert!(!inserted.is_referenced());
-    assert_eq!(editor.extract(8).unwrap(), PNG);
+    assert_eq!(editor.extract(asset_id(8)).unwrap(), PNG);
 
-    assert_eq!(editor.remove_unreferenced(8).unwrap().unwrap(), PNG);
+    assert_eq!(
+        editor.remove_unreferenced(asset_id(8)).unwrap().unwrap(),
+        PNG
+    );
     let final_metadata = editor
         .package()
         .archive(PACKAGE_METADATA_ENTRY)
@@ -462,7 +462,7 @@ fn inserts_and_removes_unreferenced_asset_without_metadata_drift() {
         .data
         .clone();
     assert_eq!(final_metadata, initial_metadata);
-    assert!(editor.asset(8).is_none());
+    assert!(editor.asset(asset_id(8)).is_none());
 }
 
 #[test]

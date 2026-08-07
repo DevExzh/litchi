@@ -7,9 +7,10 @@ use std::sync::Arc;
 
 use super::sheet::NumbersSheet;
 use super::table::NumbersTable;
+use crate::application::Application;
 use crate::bundle::{Bundle, BundleLimits};
+use crate::detect::detect_application_from_document;
 use crate::object_index::ObjectIndex;
-use crate::registry::{Application, detect_application_from_document};
 use crate::text::TextExtractor;
 use crate::{Error, Result};
 
@@ -25,6 +26,8 @@ struct NumbersDocumentState {
     bundle: Bundle,
     /// Object index for cross-referencing
     object_index: ObjectIndex,
+    /// Immutable archive-free semantic state shared by document clones.
+    semantic_document: litchi_numbers::Document,
 }
 
 impl NumbersDocument {
@@ -46,10 +49,10 @@ impl NumbersDocument {
     /// Open a Numbers document under caller-selected bundle ingress ceilings.
     pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
         let bundle = Bundle::open_with_limits(path, limits)?;
-        Self::verify_application(&bundle)?;
+        let root_document = Self::root_document(&bundle)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
-        Ok(Self::from_parts(bundle, object_index))
+        Self::from_parts(bundle, object_index, root_document)
     }
 
     /// Open a Numbers document from raw bytes
@@ -72,19 +75,43 @@ impl NumbersDocument {
     /// ceilings.
     pub fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
         let bundle = Bundle::from_bytes_with_limits(bytes, limits)?;
-        Self::verify_application(&bundle)?;
+        let root_document = Self::root_document(&bundle)?;
         let object_index = ObjectIndex::from_bundle(&bundle)?;
 
-        Ok(Self::from_parts(bundle, object_index))
+        Self::from_parts(bundle, object_index, root_document)
     }
 
-    fn from_parts(bundle: Bundle, object_index: ObjectIndex) -> Self {
-        Self {
+    fn from_parts(
+        bundle: Bundle,
+        object_index: ObjectIndex,
+        root_document: crate::protobuf::tn::DocumentArchive,
+    ) -> Result<Self> {
+        let archive_sheets = Self::decode_sheets(&bundle, &object_index, &root_document)?;
+        let mut semantic_sheets = Vec::new();
+        semantic_sheets
+            .try_reserve(archive_sheets.len())
+            .map_err(|_| {
+                crate::Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                    resource: "Numbers semantic sheets",
+                    amount: archive_sheets.len(),
+                })
+            })?;
+        for sheet in archive_sheets {
+            semantic_sheets.push(sheet.into_semantic()?);
+        }
+        let semantic_document =
+            litchi_numbers::Document::from_sheets(semantic_sheets).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "Numbers semantic document is invalid at ingress: {error}"
+                ))
+            })?;
+        Ok(Self {
             state: Arc::new(NumbersDocumentState {
                 bundle,
                 object_index,
+                semantic_document,
             }),
-        }
+        })
     }
 
     /// Capture a cheap immutable snapshot that shares all parsed document state.
@@ -104,10 +131,6 @@ impl NumbersDocument {
     /// ingress ceilings.
     pub fn from_archive_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
         Self::from_bytes_with_limits(bytes, limits)
-    }
-
-    fn verify_application(bundle: &Bundle) -> Result<()> {
-        Self::root_document(bundle).map(|_| ())
     }
 
     fn root_document(bundle: &Bundle) -> Result<crate::protobuf::tn::DocumentArchive> {
@@ -149,10 +172,12 @@ impl NumbersDocument {
         Ok(extractor.get_text())
     }
 
-    /// Extract sheets from the document
+    /// Extract archive-aware sheet adapters.
     ///
     /// Numbers documents consist of multiple sheets, each containing tables.
-    /// This method parses the document structure and returns all sheets.
+    /// Native comments and other sidecars remain available through this
+    /// archive-boundary view. Use [`Self::semantic_sheets`] for the immutable
+    /// dependency-free model.
     ///
     /// # Examples
     ///
@@ -162,9 +187,9 @@ impl NumbersDocument {
     /// let doc = NumbersDocument::open("spreadsheet.numbers")?;
     /// let sheets = doc.sheets()?;
     ///
-    /// for sheet in sheets {
-    ///     println!("Sheet: {}", sheet.name);
-    ///     for table in &sheet.tables {
+    /// for sheet in doc.sheets()? {
+    ///     println!("Sheet: {}", sheet.name());
+    ///     for table in sheet.tables() {
     ///         println!("  Table: {} ({}x{})",
     ///             table.name(), table.row_count(), table.column_count());
     ///     }
@@ -172,15 +197,21 @@ impl NumbersDocument {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn sheets(&self) -> Result<Vec<NumbersSheet>> {
+        let root_document = Self::root_document(&self.state.bundle)?;
+        Self::decode_sheets(&self.state.bundle, &self.state.object_index, &root_document)
+    }
+
+    fn decode_sheets(
+        bundle: &Bundle,
+        object_index: &ObjectIndex,
+        document: &crate::protobuf::tn::DocumentArchive,
+    ) -> Result<Vec<NumbersSheet>> {
         use super::table_extractor::TableDataExtractor;
 
-        let document = Self::root_document(&self.state.bundle)?;
-        let extractor = TableDataExtractor::new(&self.state.bundle, &self.state.object_index);
+        let extractor = TableDataExtractor::new(bundle, object_index);
         let mut sheets = Vec::with_capacity(document.sheets.len());
-        for (index, reference) in document.sheets.into_iter().enumerate() {
-            let object = self
-                .state
-                .bundle
+        for (index, reference) in document.sheets.iter().enumerate() {
+            let object = bundle
                 .iter_archives()
                 .map(|(_, archive)| archive)
                 .find_map(|archive| archive.object(reference.identifier))
@@ -190,14 +221,45 @@ impl NumbersDocument {
                         reference.identifier
                     ))
                 })?;
-            sheets.push(self.parse_sheet(index, object, &extractor)?);
+            sheets.push(Self::parse_sheet(
+                bundle,
+                object_index,
+                index,
+                object,
+                &extractor,
+            )?);
         }
+
         Ok(sheets)
+    }
+
+    /// Return the immutable semantic sheet snapshot.
+    ///
+    /// The `Arc` is shared across repeated calls and cheap document snapshots;
+    /// native IDs, protobuf records, package state, and comments stay in the
+    /// archive-boundary view returned by [`Self::sheets`].
+    pub fn semantic_sheets(&self) -> Arc<[litchi_numbers::Sheet]> {
+        self.state.semantic_document.shared_sheets()
+    }
+
+    /// Borrow the immutable archive-free semantic Numbers document.
+    ///
+    /// Borrow the immutable archive-free semantic Numbers document.
+    #[must_use]
+    pub fn semantic_document(&self) -> &litchi_numbers::Document {
+        &self.state.semantic_document
+    }
+
+    /// Capture a cheap handle to the immutable semantic Numbers snapshot.
+    #[must_use]
+    pub fn semantic_snapshot(&self) -> litchi_numbers::Document {
+        self.state.semantic_document.snapshot()
     }
 
     /// Parse a single sheet from an object
     fn parse_sheet(
-        &self,
+        bundle: &Bundle,
+        object_index: &ObjectIndex,
         index: usize,
         object: &crate::archive::ArchiveObject,
         extractor: &super::table_extractor::TableDataExtractor<'_>,
@@ -224,9 +286,12 @@ impl NumbersDocument {
             })?;
         let mut sheet = NumbersSheet::new(sheet_archive.name, index);
         for drawable_ref in &sheet_archive.drawable_infos {
-            if let Some(table) =
-                self.extract_table_from_drawable(drawable_ref.identifier, extractor)?
-            {
+            if let Some(table) = Self::extract_table_from_drawable(
+                bundle,
+                object_index,
+                drawable_ref.identifier,
+                extractor,
+            )? {
                 sheet.add_table(table);
             }
         }
@@ -236,16 +301,15 @@ impl NumbersDocument {
 
     /// Extract a table from a drawable reference
     fn extract_table_from_drawable(
-        &self,
+        bundle: &Bundle,
+        object_index: &ObjectIndex,
         drawable_id: u64,
         extractor: &super::table_extractor::TableDataExtractor<'_>,
     ) -> Result<Option<NumbersTable>> {
         use prost::Message;
 
-        let resolved = self
-            .state
-            .object_index
-            .resolve_ref_id(&self.state.bundle, drawable_id)?
+        let resolved = object_index
+            .resolve_ref_id(bundle, drawable_id)?
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Numbers sheet references missing drawable object {drawable_id}"
@@ -260,11 +324,7 @@ impl NumbersDocument {
                 continue;
             };
             let table_model_id = table_info.table_model.identifier;
-            let Some(model) = self
-                .state
-                .object_index
-                .resolve_ref_id(&self.state.bundle, table_model_id)?
-            else {
+            let Some(model) = object_index.resolve_ref_id(bundle, table_model_id)? else {
                 continue;
             };
             if !model.messages.iter().any(|message| {
@@ -274,8 +334,7 @@ impl NumbersDocument {
             }) {
                 continue;
             }
-            return self
-                .extract_table_from_model(table_model_id, extractor)
+            return Self::extract_table_from_model(bundle, object_index, table_model_id, extractor)
                 .map(Some);
         }
 
@@ -284,14 +343,12 @@ impl NumbersDocument {
 
     /// Extract a table from a TableModelArchive reference
     fn extract_table_from_model(
-        &self,
+        bundle: &Bundle,
+        object_index: &ObjectIndex,
         table_model_id: u64,
         extractor: &super::table_extractor::TableDataExtractor<'_>,
     ) -> Result<NumbersTable> {
-        if let Some(resolved) = self
-            .state
-            .object_index
-            .resolve_ref_id(&self.state.bundle, table_model_id)?
+        if let Some(resolved) = object_index.resolve_ref_id(bundle, table_model_id)?
             && let Some(table) = extractor.extract_table_from_object(&resolved)?
         {
             return Ok(table);

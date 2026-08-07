@@ -1,216 +1,56 @@
-//! Strict public paragraph ruler tab-stop types.
+//! IWA-native adapters for archive-free paragraph ruler values.
 
-/// Default distance between implicit paragraph tab stops.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct ParagraphDefaultTabInterval(f32);
+use crate::{Error, Result};
 
-impl ParagraphDefaultTabInterval {
-    /// Native iWork default: half an inch, or 36 typographic points.
-    pub const DEFAULT: Self = Self(36.0);
+pub use litchi_iwa_text::paragraph::tabs::{
+    Alignment as ParagraphTabAlignment, DecimalCharacter as ParagraphDecimalTabCharacter,
+    DefaultInterval as ParagraphDefaultTabInterval, Leader as ParagraphTabLeader,
+    Position as ParagraphTabPosition, Stop as ParagraphTabStop, Stops as ParagraphTabStops,
+};
 
-    /// Construct a finite, positive interval in typographic points.
-    pub fn from_points(points: f32) -> crate::Result<Self> {
-        if !points.is_finite() || points <= 0.0 {
-            return Err(crate::Error::InvalidFormat(
-                "paragraph default tab interval must be finite and positive".to_owned(),
-            ));
-        }
-        Ok(Self(points))
-    }
-
-    /// Return the interval in typographic points.
-    pub const fn points(self) -> f32 {
-        self.0
+impl From<litchi_iwa_text::paragraph::tabs::Error> for Error {
+    fn from(error: litchi_iwa_text::paragraph::tabs::Error) -> Self {
+        Self::InvalidFormat(error.to_string())
     }
 }
 
-impl Default for ParagraphDefaultTabInterval {
-    fn default() -> Self {
-        Self::DEFAULT
+/// Decode native iWork's tab-stop alignment discriminant.
+pub(crate) fn alignment_from_native(value: i32) -> Result<ParagraphTabAlignment> {
+    match value {
+        0 => Ok(ParagraphTabAlignment::Left),
+        1 => Ok(ParagraphTabAlignment::Center),
+        2 => Ok(ParagraphTabAlignment::Right),
+        3 => Ok(ParagraphTabAlignment::Decimal),
+        _ => Err(Error::InvalidFormat(format!(
+            "unsupported native iWork tab-stop alignment {value}"
+        ))),
     }
 }
 
-/// Character used to align decimal tab stops.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ParagraphDecimalTabCharacter(char);
-
-impl ParagraphDecimalTabCharacter {
-    pub const PERIOD: Self = Self('.');
-    pub const COMMA: Self = Self(',');
-
-    /// Construct a decimal-tab character from one non-control Unicode scalar.
-    pub fn new(character: char) -> crate::Result<Self> {
-        if character.is_control() {
-            return Err(crate::Error::InvalidFormat(
-                "paragraph decimal-tab character must not be a control character".to_owned(),
-            ));
-        }
-        Ok(Self(character))
-    }
-
-    /// Return the Unicode scalar used for decimal alignment.
-    pub const fn character(self) -> char {
-        self.0
-    }
-
-    pub(crate) fn from_native(value: &str) -> crate::Result<Self> {
-        let mut characters = value.chars();
-        let Some(character) = characters.next() else {
-            return Err(crate::Error::InvalidFormat(
-                "native iWork decimal-tab character is empty".to_owned(),
-            ));
-        };
-        if characters.next().is_some() {
-            return Err(crate::Error::InvalidFormat(
-                "native iWork decimal-tab character contains multiple Unicode scalars".to_owned(),
-            ));
-        }
-        Self::new(character)
+/// Encode a semantic tab-stop alignment as native iWork's discriminant.
+pub(crate) const fn alignment_to_native(value: ParagraphTabAlignment) -> i32 {
+    match value {
+        ParagraphTabAlignment::Left => 0,
+        ParagraphTabAlignment::Center => 1,
+        ParagraphTabAlignment::Right => 2,
+        ParagraphTabAlignment::Decimal => 3,
     }
 }
 
-impl Default for ParagraphDecimalTabCharacter {
-    fn default() -> Self {
-        Self::PERIOD
+/// Decode native iWork's one-scalar decimal-tab string.
+pub(crate) fn decimal_character_from_native(value: &str) -> Result<ParagraphDecimalTabCharacter> {
+    let mut characters = value.chars();
+    let Some(character) = characters.next() else {
+        return Err(Error::InvalidFormat(
+            "native iWork decimal-tab character is empty".to_owned(),
+        ));
+    };
+    if characters.next().is_some() {
+        return Err(Error::InvalidFormat(
+            "native iWork decimal-tab character contains multiple Unicode scalars".to_owned(),
+        ));
     }
-}
-
-/// Nonnegative tab-stop position measured from the left text boundary.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
-pub struct ParagraphTabPosition(f32);
-
-impl ParagraphTabPosition {
-    pub const ZERO: Self = Self(0.0);
-
-    /// Construct a finite, nonnegative tab-stop position in typographic points.
-    pub fn from_points(points: f32) -> crate::Result<Self> {
-        if !points.is_finite() || points < 0.0 {
-            return Err(crate::Error::InvalidFormat(
-                "paragraph tab-stop position must be finite and nonnegative".to_owned(),
-            ));
-        }
-        Ok(if points == 0.0 {
-            Self::ZERO
-        } else {
-            Self(points)
-        })
-    }
-
-    /// Return the position in typographic points.
-    pub const fn points(self) -> f32 {
-        self.0
-    }
-}
-
-/// Native iWork tab-stop alignment.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum ParagraphTabAlignment {
-    #[default]
-    Left,
-    Center,
-    Right,
-    Decimal,
-}
-
-impl ParagraphTabAlignment {
-    pub(crate) const fn native_value(self) -> i32 {
-        match self {
-            Self::Left => 0,
-            Self::Center => 1,
-            Self::Right => 2,
-            Self::Decimal => 3,
-        }
-    }
-
-    pub(crate) fn from_native_value(value: i32) -> crate::Result<Self> {
-        match value {
-            0 => Ok(Self::Left),
-            1 => Ok(Self::Center),
-            2 => Ok(Self::Right),
-            3 => Ok(Self::Decimal),
-            _ => Err(crate::Error::InvalidFormat(format!(
-                "unsupported native iWork tab-stop alignment {value}"
-            ))),
-        }
-    }
-}
-
-/// Nonempty leader text repeated between content and a tab stop.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ParagraphTabLeader(Box<str>);
-
-impl ParagraphTabLeader {
-    pub fn new(text: impl Into<String>) -> crate::Result<Self> {
-        let text = text.into();
-        if text.is_empty() || text.chars().any(char::is_control) {
-            return Err(crate::Error::InvalidFormat(
-                "paragraph tab leader must be nonempty and contain no control characters"
-                    .to_owned(),
-            ));
-        }
-        Ok(Self(text.into_boxed_str()))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-/// One explicit paragraph ruler tab stop.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ParagraphTabStop {
-    pub position: ParagraphTabPosition,
-    pub alignment: ParagraphTabAlignment,
-    pub leader: Option<ParagraphTabLeader>,
-}
-
-impl ParagraphTabStop {
-    pub const fn new(position: ParagraphTabPosition, alignment: ParagraphTabAlignment) -> Self {
-        Self {
-            position,
-            alignment,
-            leader: None,
-        }
-    }
-
-    pub fn with_leader(mut self, leader: ParagraphTabLeader) -> Self {
-        self.leader = Some(leader);
-        self
-    }
-}
-
-/// Ordered explicit paragraph tab stops.
-///
-/// Native iWork ruler state requires positions to be strictly increasing.
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct ParagraphTabStops(Box<[ParagraphTabStop]>);
-
-impl ParagraphTabStops {
-    pub fn new(stops: Vec<ParagraphTabStop>) -> crate::Result<Self> {
-        if stops
-            .windows(2)
-            .any(|pair| pair[0].position >= pair[1].position)
-        {
-            return Err(crate::Error::InvalidFormat(
-                "paragraph tab-stop positions must be strictly increasing".to_owned(),
-            ));
-        }
-        Ok(Self(stops.into_boxed_slice()))
-    }
-
-    pub fn as_slice(&self) -> &[ParagraphTabStop] {
-        &self.0
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-}
-
-impl AsRef<[ParagraphTabStop]> for ParagraphTabStops {
-    fn as_ref(&self) -> &[ParagraphTabStop] {
-        self.as_slice()
-    }
+    ParagraphDecimalTabCharacter::new(character).map_err(Into::into)
 }
 
 #[cfg(test)]
@@ -218,64 +58,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tab_stops_are_strict_typed_and_ordered() {
-        assert_eq!(ParagraphDefaultTabInterval::default().points(), 36.0);
-        assert_eq!(
-            ParagraphDefaultTabInterval::from_points(54.0)
-                .unwrap()
-                .points(),
-            54.0
-        );
-        assert!(ParagraphDefaultTabInterval::from_points(0.0).is_err());
-        assert!(ParagraphDefaultTabInterval::from_points(f32::INFINITY).is_err());
-        assert_eq!(ParagraphDecimalTabCharacter::COMMA.character(), ',');
-        assert_eq!(
-            ParagraphDecimalTabCharacter::from_native("٫")
-                .unwrap()
-                .character(),
-            '٫'
-        );
-        assert!(ParagraphDecimalTabCharacter::new('\n').is_err());
-        assert!(ParagraphDecimalTabCharacter::from_native("").is_err());
-        assert!(ParagraphDecimalTabCharacter::from_native("..").is_err());
-        let stops = ParagraphTabStops::new(vec![
-            ParagraphTabStop::new(
-                ParagraphTabPosition::from_points(48.5).unwrap(),
-                ParagraphTabAlignment::Left,
-            ),
-            ParagraphTabStop::new(
-                ParagraphTabPosition::from_points(72.0).unwrap(),
-                ParagraphTabAlignment::Decimal,
-            )
-            .with_leader(ParagraphTabLeader::new(".").unwrap()),
-        ])
-        .unwrap();
-        assert_eq!(stops.as_slice().len(), 2);
-        assert_eq!(stops.as_slice()[1].leader.as_ref().unwrap().as_str(), ".");
-        assert_eq!(
-            ParagraphTabPosition::from_points(-0.0)
-                .unwrap()
-                .points()
-                .to_bits(),
-            0.0_f32.to_bits()
-        );
-        assert!(ParagraphTabPosition::from_points(-0.1).is_err());
-        assert!(ParagraphTabPosition::from_points(f32::NAN).is_err());
-        assert!(ParagraphTabLeader::new("").is_err());
-        assert!(ParagraphTabLeader::new("\t").is_err());
-        assert!(
-            ParagraphTabStops::new(vec![
-                ParagraphTabStop::new(
-                    ParagraphTabPosition::from_points(12.0).unwrap(),
-                    ParagraphTabAlignment::Center,
-                ),
-                ParagraphTabStop::new(
-                    ParagraphTabPosition::from_points(12.0).unwrap(),
-                    ParagraphTabAlignment::Right,
-                ),
-            ])
-            .is_err()
-        );
-        assert!(ParagraphTabAlignment::from_native_value(4).is_err());
+    fn native_tab_alignment_values_round_trip_at_the_iwa_boundary() {
+        for alignment in [
+            ParagraphTabAlignment::Left,
+            ParagraphTabAlignment::Center,
+            ParagraphTabAlignment::Right,
+            ParagraphTabAlignment::Decimal,
+        ] {
+            assert_eq!(
+                alignment_from_native(alignment_to_native(alignment)).unwrap(),
+                alignment
+            );
+        }
+    }
+
+    #[test]
+    fn native_decimal_string_validation_stays_in_the_adapter() {
+        assert_eq!(decimal_character_from_native("٫").unwrap().character(), '٫');
+        assert!(decimal_character_from_native("").is_err());
+        assert!(decimal_character_from_native("..").is_err());
+        assert!(decimal_character_from_native("\n").is_err());
+    }
+
+    #[test]
+    fn leaf_errors_map_to_the_iwa_error_at_the_boundary() {
+        let error: Error = litchi_iwa_text::paragraph::tabs::Error::LeaderEmpty.into();
+        assert!(matches!(error, Error::InvalidFormat(message) if message.contains("tab leader")));
     }
 }

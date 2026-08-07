@@ -1,13 +1,11 @@
 //! Typed native table-cell merge storage shared by the iWork suite.
 
-use std::num::NonZeroUsize;
-
 use prost::Message;
 
 use super::*;
 use crate::numbers::formula_owner::{formula_owner_uuid_for_table, uuid_as_cfuuid};
+use litchi_numbers::table::merge::{self, Deletion as MergeDeletion, Region};
 
-mod axis;
 mod formula;
 mod wire;
 
@@ -21,9 +19,8 @@ use wire::{
     remove_formula, remove_merge_owner, transform_formula_store, transform_merge_owner,
 };
 
-pub(crate) use axis::{MergeAnchorRelocation, MergeAxis};
-use axis::{
-    MergeDeletion, anchor_relocation_after_deletion, region_after_deletion, region_after_insertion,
+pub(crate) use litchi_numbers::table::merge::{
+    AnchorRelocation as MergeAnchorRelocation, Axis as MergeAxis,
 };
 
 #[derive(Debug)]
@@ -33,95 +30,7 @@ struct MergeFormulaMutation {
     current: Option<tsce::FormulaArchive>,
 }
 
-/// A validated rectangular region containing at least two table cells.
-///
-/// Coordinates are zero-based and counts are non-zero. Construction also
-/// rejects coordinate overflow, so all inclusive end-coordinate accessors are
-/// infallible.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct IWorkTableCellRegion {
-    row: usize,
-    column: usize,
-    row_count: NonZeroUsize,
-    column_count: NonZeroUsize,
-}
-
-impl IWorkTableCellRegion {
-    /// Construct a mergeable rectangular cell region.
-    pub fn new(row: usize, column: usize, row_count: usize, column_count: usize) -> Result<Self> {
-        let row_count = NonZeroUsize::new(row_count)
-            .ok_or_else(|| Error::ParseError("Table-cell region has no rows".to_owned()))?;
-        let column_count = NonZeroUsize::new(column_count)
-            .ok_or_else(|| Error::ParseError("Table-cell region has no columns".to_owned()))?;
-        if row_count.get() == 1 && column_count.get() == 1 {
-            return Err(Error::ParseError(
-                "A table-cell merge must contain at least two cells".to_owned(),
-            ));
-        }
-        row.checked_add(row_count.get() - 1)
-            .ok_or_else(|| Error::ParseError("Table-cell region row overflow".to_owned()))?;
-        column
-            .checked_add(column_count.get() - 1)
-            .ok_or_else(|| Error::ParseError("Table-cell region column overflow".to_owned()))?;
-        Ok(Self {
-            row,
-            column,
-            row_count,
-            column_count,
-        })
-    }
-
-    #[must_use]
-    pub const fn row(self) -> usize {
-        self.row
-    }
-
-    #[must_use]
-    pub const fn column(self) -> usize {
-        self.column
-    }
-
-    #[must_use]
-    pub const fn row_count(self) -> usize {
-        self.row_count.get()
-    }
-
-    #[must_use]
-    pub const fn column_count(self) -> usize {
-        self.column_count.get()
-    }
-
-    #[must_use]
-    pub const fn end_row(self) -> usize {
-        self.row + self.row_count.get() - 1
-    }
-
-    #[must_use]
-    pub const fn end_column(self) -> usize {
-        self.column + self.column_count.get() - 1
-    }
-
-    #[must_use]
-    pub const fn contains(self, row: usize, column: usize) -> bool {
-        row >= self.row
-            && row <= self.end_row()
-            && column >= self.column
-            && column <= self.end_column()
-    }
-
-    #[must_use]
-    pub const fn overlaps(self, other: Self) -> bool {
-        self.row <= other.end_row()
-            && other.row <= self.end_row()
-            && self.column <= other.end_column()
-            && other.column <= self.end_column()
-    }
-}
-
-pub(crate) fn regions_in_package(
-    package: &IWorkPackage,
-    table_id: u64,
-) -> Result<Vec<IWorkTableCellRegion>> {
+pub(crate) fn regions_in_package(package: &IWorkPackage, table_id: u64) -> Result<Vec<Region>> {
     let descriptor = model::attached_table_descriptor(package, table_id)?;
     parse_regions(&descriptor.model)
 }
@@ -137,6 +46,8 @@ pub(super) fn shift_merges_for_axis_insertion(
     axis: MergeAxis,
     insertion: usize,
 ) -> Result<()> {
+    let insertion = u32::try_from(insertion)
+        .map_err(|_| Error::ParseError("iWork merge insertion exceeds u32".to_owned()))?;
     let descriptor = model::attached_table_descriptor(package, table_id)?;
     let existing = parse_regions(&descriptor.model)?;
     let Some(store) = descriptor
@@ -159,7 +70,7 @@ pub(super) fn shift_merges_for_axis_insertion(
     let mut expected = Vec::with_capacity(existing.len());
     let mut rewrites = Vec::new();
     for (pair, region) in store.formulas.iter().zip(existing) {
-        let updated = region_after_insertion(region, axis, insertion)?;
+        let updated = merge::after_insertion(region, axis, insertion)?;
         if updated != region {
             rewrites.push(MergeFormulaMutation {
                 formula_index: pair.formula_index,
@@ -200,10 +111,12 @@ pub(super) fn merge_anchor_relocations_for_axis_deletion(
     axis: MergeAxis,
     deletion: usize,
 ) -> Result<Vec<MergeAnchorRelocation>> {
+    let deletion = u32::try_from(deletion)
+        .map_err(|_| Error::ParseError("iWork merge deletion exceeds u32".to_owned()))?;
     let regions = parse_regions(&model::attached_table_descriptor(package, table_id)?.model)?;
     let mut relocations = Vec::new();
     for region in regions {
-        if let Some(relocation) = anchor_relocation_after_deletion(region, axis, deletion)? {
+        if let Some(relocation) = merge::anchor_relocation_after_deletion(region, axis, deletion)? {
             relocations.push(relocation);
         }
     }
@@ -221,6 +134,8 @@ pub(super) fn shift_merges_for_axis_deletion(
     axis: MergeAxis,
     deletion: usize,
 ) -> Result<()> {
+    let deletion = u32::try_from(deletion)
+        .map_err(|_| Error::ParseError("iWork merge deletion exceeds u32".to_owned()))?;
     let descriptor = model::attached_table_descriptor(package, table_id)?;
     let existing = parse_regions(&descriptor.model)?;
     let Some(store) = descriptor
@@ -243,7 +158,7 @@ pub(super) fn shift_merges_for_axis_deletion(
     let mut expected = Vec::with_capacity(existing.len());
     let mut mutations = Vec::new();
     for (pair, region) in store.formulas.iter().zip(existing) {
-        match region_after_deletion(region, axis, deletion)? {
+        match merge::after_deletion(region, axis, deletion)? {
             MergeDeletion::Retain(updated) => {
                 if updated != region {
                     mutations.push(MergeFormulaMutation {
@@ -287,7 +202,7 @@ pub(super) fn shift_merges_for_axis_deletion(
 pub(crate) fn merge_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    region: IWorkTableCellRegion,
+    region: Region,
 ) -> Result<()> {
     let descriptor = model::attached_table_descriptor(package, table_id)?;
     validate_region_bounds(&descriptor.model, region)?;
@@ -365,7 +280,7 @@ pub(crate) fn merge_in_package(
 pub(crate) fn unmerge_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
-    region: IWorkTableCellRegion,
+    region: Region,
 ) -> Result<bool> {
     let descriptor = model::attached_table_descriptor(package, table_id)?;
     let existing = parse_regions(&descriptor.model)?;
@@ -420,13 +335,15 @@ mod tests {
     use crate::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
     use crate::numbers::{
         FormulaAxisReference, FormulaCachedValue, FormulaCellReference, FormulaExpression,
-        NumbersDocument, NumbersDocumentBuilder, TableColumnDeletion, TableColumnInsertion,
-        TableRowDeletion, TableRowInsertion,
+        NumbersDocument, NumbersDocumentBuilder,
     };
     use crate::pages::{PagesDocumentBuilder, PagesEditor};
     use crate::shapes::{DrawablePoint, DrawableSize};
     use crate::wire::{
         repeated_length_delimited_payloads, transform_length_delimited_fields_at_path,
+    };
+    use litchi_numbers::table::topology::{
+        ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion,
     };
 
     const RANGE_PROXY_OWNER_KIND: u32 = 5;
@@ -479,19 +396,19 @@ mod tests {
 
     #[test]
     fn region_validates_shape_overflow_and_overlap() {
-        assert!(IWorkTableCellRegion::new(0, 0, 0, 2).is_err());
-        assert!(IWorkTableCellRegion::new(0, 0, 1, 1).is_err());
-        assert!(IWorkTableCellRegion::new(usize::MAX, 0, 2, 1).is_err());
-        let region = IWorkTableCellRegion::new(2, 3, 2, 3).unwrap();
+        assert!(Region::new(0, 0, 0, 2).is_err());
+        assert!(Region::new(0, 0, 1, 1).is_err());
+        assert!(Region::new(u32::MAX, 0, 2, 1).is_err());
+        let region = Region::new(2, 3, 2, 3).unwrap();
         assert_eq!((region.end_row(), region.end_column()), (3, 5));
         assert!(region.contains(3, 5));
-        assert!(region.overlaps(IWorkTableCellRegion::new(3, 5, 2, 1).unwrap()));
-        assert!(!region.overlaps(IWorkTableCellRegion::new(4, 3, 1, 2).unwrap()));
+        assert!(region.overlaps(Region::new(3, 5, 2, 1).unwrap()));
+        assert!(!region.overlaps(Region::new(4, 3, 1, 2).unwrap()));
     }
 
     #[test]
     fn merge_formula_round_trips_exact_region() {
-        let region = IWorkTableCellRegion::new(2, 3, 2, 4).unwrap();
+        let region = Region::new(2, 3, 2, 4).unwrap();
         let table = tsp::CfuuidArchive {
             uuid_w0: Some(1),
             uuid_w1: Some(2),
@@ -511,8 +428,8 @@ mod tests {
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
         let baseline = editor.to_bytes().unwrap();
-        let region = IWorkTableCellRegion::new(1, 1, 2, 3).unwrap();
-        let second = IWorkTableCellRegion::new(0, 0, 1, 2).unwrap();
+        let region = Region::new(1, 1, 2, 3).unwrap();
+        let second = Region::new(0, 0, 1, 2).unwrap();
 
         editor.merge_cells(table_id, region).unwrap();
         editor.merge_cells(table_id, second).unwrap();
@@ -530,7 +447,7 @@ mod tests {
         let before_invalid = reopened.to_bytes().unwrap();
         assert!(
             reopened
-                .merge_cells(table_id, IWorkTableCellRegion::new(2, 3, 2, 1).unwrap())
+                .merge_cells(table_id, Region::new(2, 3, 2, 1).unwrap())
                 .is_err()
         );
         assert_eq!(reopened.to_bytes().unwrap(), before_invalid);
@@ -549,27 +466,39 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let original = IWorkTableCellRegion::new(1, 1, 2, 3).unwrap();
+        let original = Region::new(1, 1, 2, 3).unwrap();
 
         editor.merge_cells(table_id, original).unwrap();
         editor
-            .insert_table_row(table_id, TableRowInsertion::body(0))
+            .insert_table_row(
+                test_table_selector(&editor, table_id),
+                RowInsertion::body(0),
+            )
             .unwrap();
         assert_eq!(
             editor.table_cell_merges(table_id).unwrap(),
-            vec![IWorkTableCellRegion::new(2, 1, 2, 3).unwrap()]
+            vec![Region::new(2, 1, 2, 3).unwrap()]
         );
         editor
-            .insert_table_row(table_id, TableRowInsertion::body(2))
+            .insert_table_row(
+                test_table_selector(&editor, table_id),
+                RowInsertion::body(2),
+            )
             .unwrap();
         editor
-            .insert_table_column(table_id, TableColumnInsertion::body(0))
+            .insert_table_column(
+                test_table_selector(&editor, table_id),
+                ColumnInsertion::body(0),
+            )
             .unwrap();
         editor
-            .insert_table_column(table_id, TableColumnInsertion::body(2))
+            .insert_table_column(
+                test_table_selector(&editor, table_id),
+                ColumnInsertion::body(2),
+            )
             .unwrap();
 
-        let expected = IWorkTableCellRegion::new(2, 2, 3, 4).unwrap();
+        let expected = Region::new(2, 2, 3, 4).unwrap();
         assert_eq!(editor.table_cell_merges(table_id).unwrap(), vec![expected]);
         assert_eq!(editor.tables().unwrap()[0].rows, 7);
         assert_eq!(editor.tables().unwrap()[0].columns, 8);
@@ -587,7 +516,7 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let region = IWorkTableCellRegion::new(1, 1, 3, 3).unwrap();
+        let region = Region::new(1, 1, 3, 3).unwrap();
         editor
             .set_cell(table_id, 1, 1, CellValue::Text("Merged".to_owned()))
             .unwrap();
@@ -597,11 +526,11 @@ mod tests {
         editor.merge_cells(table_id, region).unwrap();
 
         editor
-            .remove_table_row(table_id, TableRowDeletion::body(0))
+            .remove_table_row(test_table_selector(&editor, table_id), RowDeletion::body(0))
             .unwrap();
         assert_eq!(
             editor.table_cell_merges(table_id).unwrap(),
-            vec![IWorkTableCellRegion::new(1, 1, 2, 3).unwrap()]
+            vec![Region::new(1, 1, 2, 3).unwrap()]
         );
         assert_eq!(
             editor
@@ -614,21 +543,27 @@ mod tests {
         );
 
         editor
-            .remove_table_column(table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, table_id),
+                ColumnDeletion::body(0),
+            )
             .unwrap();
         assert_eq!(
             editor.table_cell_merges(table_id).unwrap(),
-            vec![IWorkTableCellRegion::new(1, 1, 2, 2).unwrap()]
+            vec![Region::new(1, 1, 2, 2).unwrap()]
         );
         editor
-            .remove_table_row(table_id, TableRowDeletion::body(0))
+            .remove_table_row(test_table_selector(&editor, table_id), RowDeletion::body(0))
             .unwrap();
         assert_eq!(
             editor.table_cell_merges(table_id).unwrap(),
-            vec![IWorkTableCellRegion::new(1, 1, 1, 2).unwrap()]
+            vec![Region::new(1, 1, 1, 2).unwrap()]
         );
         editor
-            .remove_table_column(table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, table_id),
+                ColumnDeletion::body(0),
+            )
             .unwrap();
         assert!(editor.table_cell_merges(table_id).unwrap().is_empty());
         assert_eq!(editor.tables().unwrap()[0].rows, 3);
@@ -659,27 +594,27 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+        let region = Region::new(1, 1, 2, 2).unwrap();
         editor
-            .set_cell(table_id, 3, 4, CellValue::Number(7.0))
+            .set_cell(table_id, 3, 4, CellValue::number(7.0).unwrap())
             .unwrap();
         editor
             .set_formula_with_cached_value(
                 table_id,
-                region.row(),
-                region.column(),
+                region.row() as usize,
+                region.column() as usize,
                 FormulaExpression::cell(FormulaCellReference::relative(3, 4)),
-                FormulaCachedValue::Number(7.0),
+                FormulaCachedValue::number(7.0).unwrap(),
             )
             .unwrap();
         editor.merge_cells(table_id, region).unwrap();
 
         editor
-            .remove_table_row(table_id, TableRowDeletion::body(0))
+            .remove_table_row(test_table_selector(&editor, table_id), RowDeletion::body(0))
             .unwrap();
         assert_eq!(
             editor.table_cell_merges(table_id).unwrap(),
-            vec![IWorkTableCellRegion::new(1, 1, 1, 2).unwrap()]
+            vec![Region::new(1, 1, 1, 2).unwrap()]
         );
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -688,7 +623,10 @@ mod tests {
         );
 
         editor
-            .remove_table_column(table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, table_id),
+                ColumnDeletion::body(0),
+            )
             .unwrap();
         assert!(editor.table_cell_merges(table_id).unwrap().is_empty());
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -697,7 +635,7 @@ mod tests {
             Some(&CellValue::Formula("=D3".to_owned()))
         );
         editor
-            .set_cell(table_id, 2, 3, CellValue::Number(11.0))
+            .set_cell(table_id, 2, 3, CellValue::number(11.0).unwrap())
             .unwrap();
         assert_eq!(cached_formula_number(&editor, table_id, 1, 1), 11.0);
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -713,22 +651,27 @@ mod tests {
         let source_table_id = editor.tables().unwrap()[0].object_id;
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let target_table = editor
-            .add_empty_table(sheet_id, "Referenced", 5, 6)
+            .add_empty_table(test_sheet_selector(&editor, sheet_id), "Referenced", 5, 6)
             .unwrap();
-        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+        let region = Region::new(1, 1, 2, 2).unwrap();
         editor
-            .set_cell(target_table.object_id, 1, 0, CellValue::Number(7.0))
+            .set_cell(
+                target_table.object_id,
+                1,
+                0,
+                CellValue::number(7.0).unwrap(),
+            )
             .unwrap();
         editor
             .set_formula_with_cached_value(
                 source_table_id,
-                region.row(),
-                region.column(),
+                region.row() as usize,
+                region.column() as usize,
                 FormulaExpression::table_cell(
                     target_table.object_id,
                     FormulaCellReference::relative(1, 0),
                 ),
-                FormulaCachedValue::Number(7.0),
+                FormulaCachedValue::number(7.0).unwrap(),
             )
             .unwrap();
         editor.merge_cells(source_table_id, region).unwrap();
@@ -747,11 +690,14 @@ mod tests {
             .internal_owner_id_for_edge[0];
 
         editor
-            .remove_table_row(source_table_id, TableRowDeletion::body(0))
+            .remove_table_row(
+                test_table_selector(&editor, source_table_id),
+                RowDeletion::body(0),
+            )
             .unwrap();
         assert_eq!(
             editor.table_cell_merges(source_table_id).unwrap(),
-            vec![IWorkTableCellRegion::new(1, 1, 1, 2).unwrap()]
+            vec![Region::new(1, 1, 1, 2).unwrap()]
         );
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -762,7 +708,10 @@ mod tests {
         assert_formula_host_dependencies(&editor, external_owner_id, 2, 0);
 
         editor
-            .remove_table_column(source_table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, source_table_id),
+                ColumnDeletion::body(0),
+            )
             .unwrap();
         assert!(
             editor
@@ -790,20 +739,30 @@ mod tests {
         let source_table_id = editor.tables().unwrap()[0].object_id;
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let target_table = editor
-            .add_empty_table(sheet_id, "Referenced", 5, 6)
+            .add_empty_table(test_sheet_selector(&editor, sheet_id), "Referenced", 5, 6)
             .unwrap();
-        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+        let region = Region::new(1, 1, 2, 2).unwrap();
         editor
-            .set_cell(target_table.object_id, 1, 0, CellValue::Number(7.0))
+            .set_cell(
+                target_table.object_id,
+                1,
+                0,
+                CellValue::number(7.0).unwrap(),
+            )
             .unwrap();
         editor
-            .set_cell(target_table.object_id, 2, 0, CellValue::Number(3.0))
+            .set_cell(
+                target_table.object_id,
+                2,
+                0,
+                CellValue::number(3.0).unwrap(),
+            )
             .unwrap();
         editor
             .set_formula_with_cached_value(
                 source_table_id,
-                region.row(),
-                region.column(),
+                region.row() as usize,
+                region.column() as usize,
                 FormulaExpression::function(
                     "SUM",
                     [FormulaExpression::table_range(
@@ -812,7 +771,7 @@ mod tests {
                         FormulaCellReference::relative(2, 0),
                     )],
                 ),
-                FormulaCachedValue::Number(10.0),
+                FormulaCachedValue::number(10.0).unwrap(),
             )
             .unwrap();
         editor.merge_cells(source_table_id, region).unwrap();
@@ -830,7 +789,10 @@ mod tests {
             .internal_owner_id_for_edge[0];
 
         editor
-            .remove_table_row(source_table_id, TableRowDeletion::body(0))
+            .remove_table_row(
+                test_table_selector(&editor, source_table_id),
+                RowDeletion::body(0),
+            )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -843,7 +805,10 @@ mod tests {
         assert_formula_host_range_edges(&editor, external_owner_id, &[2, 3], &[0, 0]);
 
         editor
-            .remove_table_column(source_table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, source_table_id),
+                ColumnDeletion::body(0),
+            )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -867,20 +832,30 @@ mod tests {
         let source_table_id = editor.tables().unwrap()[0].object_id;
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let target_table = editor
-            .add_empty_table(sheet_id, "Referenced", 5, 6)
+            .add_empty_table(test_sheet_selector(&editor, sheet_id), "Referenced", 5, 6)
             .unwrap();
-        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+        let region = Region::new(1, 1, 2, 2).unwrap();
         editor
-            .set_cell(target_table.object_id, 1, 0, CellValue::Number(7.0))
+            .set_cell(
+                target_table.object_id,
+                1,
+                0,
+                CellValue::number(7.0).unwrap(),
+            )
             .unwrap();
         editor
-            .set_cell(target_table.object_id, 2, 0, CellValue::Number(3.0))
+            .set_cell(
+                target_table.object_id,
+                2,
+                0,
+                CellValue::number(3.0).unwrap(),
+            )
             .unwrap();
         editor
             .set_formula_with_cached_value(
                 source_table_id,
-                region.row(),
-                region.column(),
+                region.row() as usize,
+                region.column() as usize,
                 FormulaExpression::function(
                     "SUM",
                     [FormulaExpression::table_range(
@@ -889,7 +864,7 @@ mod tests {
                         FormulaCellReference::relative(2, 0),
                     )],
                 ),
-                FormulaCachedValue::Number(10.0),
+                FormulaCachedValue::number(10.0).unwrap(),
             )
             .unwrap();
         editor.merge_cells(source_table_id, region).unwrap();
@@ -910,7 +885,10 @@ mod tests {
         let mut editor = NumbersEditor::from_package(package).unwrap();
 
         editor
-            .remove_table_row(source_table_id, TableRowDeletion::body(0))
+            .remove_table_row(
+                test_table_selector(&editor, source_table_id),
+                RowDeletion::body(0),
+            )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -933,7 +911,10 @@ mod tests {
         );
 
         editor
-            .remove_table_column(source_table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, source_table_id),
+                ColumnDeletion::body(0),
+            )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -977,20 +958,30 @@ mod tests {
         let source_table_id = editor.tables().unwrap()[0].object_id;
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let target_table = editor
-            .add_empty_table(sheet_id, "Referenced", 5, 6)
+            .add_empty_table(test_sheet_selector(&editor, sheet_id), "Referenced", 5, 6)
             .unwrap();
-        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+        let region = Region::new(1, 1, 2, 2).unwrap();
         editor
-            .set_cell(target_table.object_id, 1, 0, CellValue::Number(7.0))
+            .set_cell(
+                target_table.object_id,
+                1,
+                0,
+                CellValue::number(7.0).unwrap(),
+            )
             .unwrap();
         editor
-            .set_cell(target_table.object_id, 2, 0, CellValue::Number(3.0))
+            .set_cell(
+                target_table.object_id,
+                2,
+                0,
+                CellValue::number(3.0).unwrap(),
+            )
             .unwrap();
         editor
             .set_formula_with_cached_value(
                 source_table_id,
-                region.row(),
-                region.column(),
+                region.row() as usize,
+                region.column() as usize,
                 FormulaExpression::function(
                     "SUM",
                     [FormulaExpression::table_rows(
@@ -999,7 +990,7 @@ mod tests {
                         FormulaAxisReference::relative(2),
                     )],
                 ),
-                FormulaCachedValue::Number(10.0),
+                FormulaCachedValue::number(10.0).unwrap(),
             )
             .unwrap();
         editor.merge_cells(source_table_id, region).unwrap();
@@ -1026,7 +1017,10 @@ mod tests {
         );
 
         editor
-            .remove_table_row(source_table_id, TableRowDeletion::body(0))
+            .remove_table_row(
+                test_table_selector(&editor, source_table_id),
+                RowDeletion::body(0),
+            )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1062,20 +1056,30 @@ mod tests {
         let source_table_id = editor.tables().unwrap()[0].object_id;
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let target_table = editor
-            .add_empty_table(sheet_id, "Referenced", 5, 6)
+            .add_empty_table(test_sheet_selector(&editor, sheet_id), "Referenced", 5, 6)
             .unwrap();
-        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+        let region = Region::new(1, 1, 2, 2).unwrap();
         editor
-            .set_cell(target_table.object_id, 0, 1, CellValue::Number(7.0))
+            .set_cell(
+                target_table.object_id,
+                0,
+                1,
+                CellValue::number(7.0).unwrap(),
+            )
             .unwrap();
         editor
-            .set_cell(target_table.object_id, 0, 2, CellValue::Number(3.0))
+            .set_cell(
+                target_table.object_id,
+                0,
+                2,
+                CellValue::number(3.0).unwrap(),
+            )
             .unwrap();
         editor
             .set_formula_with_cached_value(
                 source_table_id,
-                region.row(),
-                region.column(),
+                region.row() as usize,
+                region.column() as usize,
                 FormulaExpression::function(
                     "SUM",
                     [FormulaExpression::table_columns(
@@ -1084,7 +1088,7 @@ mod tests {
                         FormulaAxisReference::relative(2),
                     )],
                 ),
-                FormulaCachedValue::Number(10.0),
+                FormulaCachedValue::number(10.0).unwrap(),
             )
             .unwrap();
         editor.merge_cells(source_table_id, region).unwrap();
@@ -1105,7 +1109,10 @@ mod tests {
         let mut editor = NumbersEditor::from_package(package).unwrap();
 
         editor
-            .remove_table_column(source_table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, source_table_id),
+                ColumnDeletion::body(0),
+            )
             .unwrap();
         let document = NumbersDocument::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1147,16 +1154,19 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
-        let collapsed = IWorkTableCellRegion::new(1, 1, 1, 2).unwrap();
-        let shifted = IWorkTableCellRegion::new(2, 2, 2, 2).unwrap();
+        let collapsed = Region::new(1, 1, 1, 2).unwrap();
+        let shifted = Region::new(2, 2, 2, 2).unwrap();
         editor.merge_cells(table_id, collapsed).unwrap();
         editor.merge_cells(table_id, shifted).unwrap();
 
         editor
-            .remove_table_column(table_id, TableColumnDeletion::body(0))
+            .remove_table_column(
+                test_table_selector(&editor, table_id),
+                ColumnDeletion::body(0),
+            )
             .unwrap();
 
-        let expected = IWorkTableCellRegion::new(2, 1, 2, 2).unwrap();
+        let expected = Region::new(2, 1, 2, 2).unwrap();
         assert_eq!(editor.table_cell_merges(table_id).unwrap(), vec![expected]);
         let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -1192,7 +1202,7 @@ mod tests {
             .unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
         editor
-            .merge_cells(table_id, IWorkTableCellRegion::new(1, 1, 2, 2).unwrap())
+            .merge_cells(table_id, Region::new(1, 1, 2, 2).unwrap())
             .unwrap();
         let mut package = editor.into_package();
         let archive_name = super::super::object_locations(&package)
@@ -1284,11 +1294,14 @@ mod tests {
         let mut editor = NumbersEditor::from_package(package).unwrap();
 
         editor
-            .insert_table_row(table_id, TableRowInsertion::body(1))
+            .insert_table_row(
+                test_table_selector(&editor, table_id),
+                RowInsertion::body(1),
+            )
             .unwrap();
         assert_eq!(
             editor.table_cell_merges(table_id).unwrap(),
-            vec![IWorkTableCellRegion::new(1, 1, 3, 2).unwrap()]
+            vec![Region::new(1, 1, 3, 2).unwrap()]
         );
 
         let archive = editor.package().archive(&archive_name).unwrap();
@@ -1341,7 +1354,7 @@ mod tests {
             .build()
             .unwrap();
         let table_id = editor.tables().unwrap()[0].model_object_id;
-        let region = IWorkTableCellRegion::new(1, 2, 3, 2).unwrap();
+        let region = Region::new(1, 2, 3, 2).unwrap();
 
         editor.merge_table_cells(table_id, region).unwrap();
         assert_eq!(editor.table(table_id).unwrap().merges(), &[region]);
@@ -1360,18 +1373,15 @@ mod tests {
             .unwrap();
         let pages_table_id = pages.tables().unwrap()[0].model_object_id;
         pages
-            .merge_table_cells(
-                pages_table_id,
-                IWorkTableCellRegion::new(1, 1, 2, 2).unwrap(),
-            )
+            .merge_table_cells(pages_table_id, Region::new(1, 1, 2, 2).unwrap())
             .unwrap();
         pages
-            .insert_table_row(pages_table_id, TableRowInsertion::body(1))
+            .insert_table_row(pages_table_id, RowInsertion::body(1))
             .unwrap();
         pages
-            .insert_table_column(pages_table_id, TableColumnInsertion::body(0))
+            .insert_table_column(pages_table_id, ColumnInsertion::body(0))
             .unwrap();
-        let pages_expected = IWorkTableCellRegion::new(1, 2, 3, 2).unwrap();
+        let pages_expected = Region::new(1, 2, 3, 2).unwrap();
         assert_eq!(
             pages.table_cell_merges(pages_table_id).unwrap(),
             vec![pages_expected]
@@ -1400,20 +1410,16 @@ mod tests {
             .merge_slide_table_cells(
                 0,
                 keynote_table.model_object_id,
-                IWorkTableCellRegion::new(1, 1, 2, 2).unwrap(),
+                Region::new(1, 1, 2, 2).unwrap(),
             )
             .unwrap();
         keynote
-            .insert_slide_table_row(0, keynote_table.model_object_id, TableRowInsertion::body(1))
+            .insert_slide_table_row(0, keynote_table.model_object_id, RowInsertion::body(1))
             .unwrap();
         keynote
-            .insert_slide_table_column(
-                0,
-                keynote_table.model_object_id,
-                TableColumnInsertion::body(0),
-            )
+            .insert_slide_table_column(0, keynote_table.model_object_id, ColumnInsertion::body(0))
             .unwrap();
-        let keynote_expected = IWorkTableCellRegion::new(1, 2, 3, 2).unwrap();
+        let keynote_expected = Region::new(1, 2, 3, 2).unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_merges(0, keynote_table.model_object_id)
@@ -1437,25 +1443,25 @@ mod tests {
             .build()
             .unwrap();
         let pages_table_id = pages.tables().unwrap()[0].model_object_id;
-        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+        let region = Region::new(1, 1, 2, 2).unwrap();
         pages
             .set_table_cell(
                 pages_table_id,
-                region.row(),
-                region.column(),
+                region.row() as usize,
+                region.column() as usize,
                 CellValue::Text("Merged".to_owned()),
             )
             .unwrap();
         pages.merge_table_cells(pages_table_id, region).unwrap();
         pages
-            .remove_table_row(pages_table_id, TableRowDeletion::body(0))
+            .remove_table_row(pages_table_id, RowDeletion::body(0))
             .unwrap();
         assert_eq!(
             pages.table_cell_merges(pages_table_id).unwrap(),
-            vec![IWorkTableCellRegion::new(1, 1, 1, 2).unwrap()]
+            vec![Region::new(1, 1, 1, 2).unwrap()]
         );
         pages
-            .remove_table_column(pages_table_id, TableColumnDeletion::body(0))
+            .remove_table_column(pages_table_id, ColumnDeletion::body(0))
             .unwrap();
         assert!(pages.table_cell_merges(pages_table_id).unwrap().is_empty());
         assert_eq!(
@@ -1483,8 +1489,8 @@ mod tests {
             .set_slide_table_cell(
                 0,
                 keynote_table.model_object_id,
-                region.row(),
-                region.column(),
+                region.row() as usize,
+                region.column() as usize,
                 CellValue::Text("Merged".to_owned()),
             )
             .unwrap();
@@ -1492,20 +1498,16 @@ mod tests {
             .merge_slide_table_cells(0, keynote_table.model_object_id, region)
             .unwrap();
         keynote
-            .remove_slide_table_row(0, keynote_table.model_object_id, TableRowDeletion::body(0))
+            .remove_slide_table_row(0, keynote_table.model_object_id, RowDeletion::body(0))
             .unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_merges(0, keynote_table.model_object_id)
                 .unwrap(),
-            vec![IWorkTableCellRegion::new(1, 1, 1, 2).unwrap()]
+            vec![Region::new(1, 1, 1, 2).unwrap()]
         );
         keynote
-            .remove_slide_table_column(
-                0,
-                keynote_table.model_object_id,
-                TableColumnDeletion::body(0),
-            )
+            .remove_slide_table_column(0, keynote_table.model_object_id, ColumnDeletion::body(0))
             .unwrap();
         assert!(
             keynote
@@ -1531,7 +1533,7 @@ mod tests {
 
     #[test]
     fn scratch_pages_and_keynote_merged_formula_anchors_survive_axis_deletions() {
-        let region = IWorkTableCellRegion::new(1, 1, 2, 2).unwrap();
+        let region = Region::new(1, 1, 2, 2).unwrap();
 
         let mut pages = PagesDocumentBuilder::new()
             .body_table("Merge Formula", 5, 6)
@@ -1539,27 +1541,27 @@ mod tests {
             .unwrap();
         let pages_table_id = pages.tables().unwrap()[0].model_object_id;
         pages
-            .set_table_cell(pages_table_id, 3, 4, CellValue::Number(7.0))
+            .set_table_cell(pages_table_id, 3, 4, CellValue::number(7.0).unwrap())
             .unwrap();
         pages
             .set_table_formula(
                 pages_table_id,
-                region.row(),
-                region.column(),
+                region.row() as usize,
+                region.column() as usize,
                 FormulaExpression::cell(FormulaCellReference::relative(3, 4)),
-                FormulaCachedValue::Number(7.0),
+                FormulaCachedValue::number(7.0).unwrap(),
             )
             .unwrap();
         pages.merge_table_cells(pages_table_id, region).unwrap();
         pages
-            .remove_table_row(pages_table_id, TableRowDeletion::body(0))
+            .remove_table_row(pages_table_id, RowDeletion::body(0))
             .unwrap();
         assert_eq!(
             pages.table_formula(pages_table_id, 1, 1).unwrap(),
             Some("=E3".to_owned())
         );
         pages
-            .remove_table_column(pages_table_id, TableColumnDeletion::body(0))
+            .remove_table_column(pages_table_id, ColumnDeletion::body(0))
             .unwrap();
         assert!(pages.table_cell_merges(pages_table_id).unwrap().is_empty());
         assert_eq!(
@@ -1592,24 +1594,24 @@ mod tests {
                 keynote_table.model_object_id,
                 3,
                 4,
-                CellValue::Number(7.0),
+                CellValue::number(7.0).unwrap(),
             )
             .unwrap();
         keynote
             .set_slide_table_formula(
                 0,
                 keynote_table.model_object_id,
-                region.row(),
-                region.column(),
+                region.row() as usize,
+                region.column() as usize,
                 FormulaExpression::cell(FormulaCellReference::relative(3, 4)),
-                FormulaCachedValue::Number(7.0),
+                FormulaCachedValue::number(7.0).unwrap(),
             )
             .unwrap();
         keynote
             .merge_slide_table_cells(0, keynote_table.model_object_id, region)
             .unwrap();
         keynote
-            .remove_slide_table_row(0, keynote_table.model_object_id, TableRowDeletion::body(0))
+            .remove_slide_table_row(0, keynote_table.model_object_id, RowDeletion::body(0))
             .unwrap();
         assert_eq!(
             keynote
@@ -1618,11 +1620,7 @@ mod tests {
             Some("=E3".to_owned())
         );
         keynote
-            .remove_slide_table_column(
-                0,
-                keynote_table.model_object_id,
-                TableColumnDeletion::body(0),
-            )
+            .remove_slide_table_column(0, keynote_table.model_object_id, ColumnDeletion::body(0))
             .unwrap();
         assert!(
             keynote
@@ -1661,7 +1659,7 @@ mod tests {
                 },
             )
             .unwrap();
-        let region = IWorkTableCellRegion::new(2, 1, 1, 3).unwrap();
+        let region = Region::new(2, 1, 1, 3).unwrap();
 
         editor
             .merge_slide_table_cells(0, table.model_object_id, region)
@@ -1688,8 +1686,10 @@ mod tests {
     }
 
     fn append_unknown_varint(data: &mut Vec<u8>, field: u32, value: u64) {
-        data.extend(crate::varint::encode_varint(u64::from(field) << 3));
-        data.extend(crate::varint::encode_varint(value));
+        data.extend(litchi_iwa_common::varint::encode_varint(
+            u64::from(field) << 3,
+        ));
+        data.extend(litchi_iwa_common::varint::encode_varint(value));
     }
 
     fn install_uuid_host_references(package: &mut IWorkPackage, row: u32, column: u32) {
@@ -2402,7 +2402,7 @@ mod tests {
         .unwrap()
         .unwrap();
         match BncCell::parse(&data).unwrap().cached_scalar().unwrap() {
-            Some(crate::numbers::bnc::CachedScalar::Number(value)) => value,
+            Some(crate::numbers::bnc::CachedScalar::Number(value)) => value.get(),
             value => panic!("Expected numeric formula cache, found {value:?}"),
         }
     }

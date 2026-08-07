@@ -5,7 +5,7 @@ use crate::charts::border_stroke::{
     chart_border_stroke as read_native_chart_border_stroke,
     set_chart_border_stroke as set_native_chart_border_stroke,
 };
-use crate::shapes::ShapeStroke;
+use crate::shapes::Stroke;
 
 impl KeynoteEditor {
     /// Read the chart-area border stroke independently of border visibility.
@@ -15,7 +15,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<Option<ShapeStroke>> {
+    ) -> Result<Option<Stroke>> {
         slide_chart_border_stroke(self, slide_index, drawable_object_id)
     }
 
@@ -24,7 +24,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        stroke: Option<ShapeStroke>,
+        stroke: Option<Stroke>,
     ) -> Result<()> {
         set_slide_chart_border_stroke(self, slide_index, drawable_object_id, stroke)
     }
@@ -34,7 +34,7 @@ fn slide_chart_border_stroke(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-) -> Result<Option<ShapeStroke>> {
+) -> Result<Option<Stroke>> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     read_native_chart_border_stroke(
         editor.package(),
@@ -48,7 +48,7 @@ fn set_slide_chart_border_stroke(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    stroke: Option<ShapeStroke>,
+    stroke: Option<Stroke>,
 ) -> Result<()> {
     if slide_chart_border_stroke(editor, slide_index, drawable_object_id)? == stroke {
         return Ok(());

@@ -104,7 +104,7 @@
     feature = "docx",
     feature = "odt",
     feature = "rtf",
-    feature = "iwork"
+    feature = "pages"
 ))]
 mod writer;
 
@@ -114,11 +114,16 @@ mod writer;
     feature = "docx",
     feature = "odt",
     feature = "rtf",
-    feature = "iwork"
+    feature = "pages"
 ))]
 mod document;
 
-#[cfg(any(feature = "ppt", feature = "pptx", feature = "odp", feature = "iwork"))]
+#[cfg(any(
+    feature = "ppt",
+    feature = "pptx",
+    feature = "odp",
+    feature = "keynote"
+))]
 mod presentation;
 
 // Re-export public API (format-agnostic helpers live in litchi-markdown)

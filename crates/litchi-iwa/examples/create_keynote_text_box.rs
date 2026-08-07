@@ -3,24 +3,25 @@
 use std::env;
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa::shapes::{
-    DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor, ShapeTextAutoSize, ShapeTextInset,
-    ShapeTextInsets, ShapeTextLayout, ShapeTextVerticalAlignment, StrokePattern, StrokeWidth,
-};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Pattern, RgbColorSpace, RgbaColor, Width};
+use litchi_iwa::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
 use litchi_iwa::text::{
-    DropCapCharacterCount, DropCapLineCount, DropCapOutdent, DropCapPadding, DropCapRaisedLines,
-    DropCapWrap, ParagraphBackground, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
-    ParagraphBorders, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphDropCap,
-    ParagraphFlow, ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents,
-    ParagraphLineSpacing, ParagraphLineSpacingPoints, ParagraphList, ParagraphListLevel,
-    ParagraphSpacing, ParagraphSpacingPoints, ParagraphStart, ParagraphStyleName,
+    Alignment, Background, Border, Borders, IndentPoints, Indents, LineSpacing, LineSpacingPoints,
+    Outline, ParagraphBackground, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval,
+    ParagraphFlow, ParagraphHyphenation, ParagraphList, ParagraphListLevel, ParagraphStyleName,
     ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop,
-    ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns, TextCommentBody,
+    ParagraphTabStops, ParagraphWritingDirection, Shadow, Spacing, SpacingPoints,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextCommentBody,
     TextCommentReplyBody, TextDecorations, TextFont, TextHyperlinkTarget, TextLanguage,
-    TextLigatures, TextOutline, TextPointSize, TextPosition, TextRange, TextScript, TextShadow,
-    TextStrikethrough, TextStyle, TextUnderline,
+    TextLigatures, TextPointSize, TextRange, TextScript, TextStrikethrough, TextStyle,
+    TextUnderline,
 };
+use litchi_iwa_text::columns::{Columns, Count};
+use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
+use litchi_iwa_text::paragraph::drop_cap::{
+    CharacterCount, DropCap, LineCount, Outdent, Padding, RaisedLines, Wrap,
+};
+use litchi_iwa_text::position::TextPosition;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -51,15 +52,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_text_box_columns(
         0,
         created.drawable_object_id,
-        &TextColumns::equal(TextColumnCount::new(4)?, None),
+        &Columns::equal(Count::new(4)?, None),
     )?;
     editor.set_slide_text_box_text_layout(
         0,
         created.drawable_object_id,
-        ShapeTextLayout::new(
-            ShapeTextVerticalAlignment::Middle,
-            ShapeTextInsets::uniform(ShapeTextInset::from_points(12.0)?),
-            ShapeTextAutoSize::ShrinkToFit,
+        Layout::new(
+            VerticalAlignment::Middle,
+            Insets::uniform(Inset::from_points(12.0)?),
+            AutoSize::ShrinkToFit,
         ),
     )?;
     editor.set_slide_text_box_text_style(
@@ -109,16 +110,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         created.drawable_object_id,
         TextLigatures::Standard,
     )?;
-    editor.set_slide_text_box_text_outline(
-        0,
-        created.drawable_object_id,
-        TextOutline::standard(),
-    )?;
-    editor.set_slide_text_box_text_shadow(0, created.drawable_object_id, TextShadow::standard())?;
+    editor.set_slide_text_box_text_outline(0, created.drawable_object_id, Outline::standard())?;
+    editor.set_slide_text_box_text_shadow(0, created.drawable_object_id, Shadow::standard())?;
     editor.set_slide_text_box_text_background(
         0,
         created.drawable_object_id,
-        TextBackground::Color(RgbaColor::new(0.72, 0.84, 1.0, 1.0, RgbColorSpace::Srgb)?),
+        Background::Color(RgbaColor::new(0.72, 0.84, 1.0, 1.0, RgbColorSpace::Srgb)?),
     )?;
     editor.set_slide_text_box_paragraph_background(
         0,
@@ -134,12 +131,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_text_box_paragraph_borders(
         0,
         created.drawable_object_id,
-        ParagraphBorders::Bordered(ParagraphBorder::new(
+        Borders::Bordered(Border::new(
             RgbaColor::black(),
-            StrokeWidth::new(3.0)?,
-            StrokePattern::Solid,
-            ParagraphBorderSides::ALL,
-            ParagraphBorderOffset::from_points(9.0)?,
+            Width::new(3.0)?,
+            Pattern::Solid,
+            BorderSides::ALL,
+            BorderOffset::from_points(9.0)?,
             true,
         )?),
     )?;
@@ -161,28 +158,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_text_box_paragraph_alignment(
         0,
         created.drawable_object_id,
-        TextAlignment::Justified,
+        Alignment::Justified,
     )?;
     editor.set_slide_text_box_paragraph_line_spacing(
         0,
         created.drawable_object_id,
-        ParagraphLineSpacing::Between(ParagraphLineSpacingPoints::from_points(6.0)?),
+        LineSpacing::Between(LineSpacingPoints::from_points(6.0)?),
     )?;
     editor.set_slide_text_box_paragraph_spacing(
         0,
         created.drawable_object_id,
-        ParagraphSpacing::new(
-            ParagraphSpacingPoints::from_points(13.0)?,
-            ParagraphSpacingPoints::from_points(19.0)?,
+        Spacing::new(
+            SpacingPoints::from_points(13.0)?,
+            SpacingPoints::from_points(19.0)?,
         ),
     )?;
     editor.set_slide_text_box_paragraph_indents(
         0,
         created.drawable_object_id,
-        ParagraphIndents::new(
-            ParagraphIndentPoints::from_points(23.0)?,
-            ParagraphIndentPoints::from_points(13.0)?,
-            ParagraphIndentPoints::from_points(10.5)?,
+        Indents::new(
+            IndentPoints::from_points(23.0)?,
+            IndentPoints::from_points(13.0)?,
+            IndentPoints::from_points(10.5)?,
         ),
     )?;
     editor.set_slide_text_box_paragraph_list(
@@ -213,13 +210,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         editor.add_slide_text_box_comment_reply(
             0,
             created.drawable_object_id,
-            comment.id,
+            comment.id(),
             TextCommentReplyBody::new("Created reply by litchi-iwa")?,
         )?;
     }
     if let Some(newline) = text.find('\n') {
         let start_index = text[..=newline].encode_utf16().count();
-        let start = ParagraphStart::from_utf16_index(start_index)?;
+        let start = TextPosition::from_utf16_index(start_index)?;
         editor.set_slide_text_box_paragraph_list_level(
             0,
             created.drawable_object_id,
@@ -249,12 +246,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_text_box_paragraph_drop_cap(
         0,
         created.drawable_object_id,
-        ParagraphStart::ZERO,
-        ParagraphDropCap::new(DropCapLineCount::new(6)?, DropCapCharacterCount::new(2)?)
-            .with_raised_lines(DropCapRaisedLines::new(3)?)
-            .with_wrap(DropCapWrap::Contour)
-            .with_padding(DropCapPadding::from_points(8.0)?)
-            .with_outdent(DropCapOutdent::from_ratio(0.40)?),
+        TextPosition::ZERO,
+        DropCap::new(LineCount::new(6)?, CharacterCount::new(2)?)
+            .with_raised_lines(RaisedLines::new(3)?)
+            .with_wrap(Wrap::Contour)
+            .with_padding(Padding::from_points(8.0)?)
+            .with_outdent(Outdent::from_ratio(0.40)?),
     )?;
     editor.set_slide_text_box_paragraph_tab_stops(
         0,
@@ -320,7 +317,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_text_box_paragraph_alignment(
         0,
         named_style_box.drawable_object_id,
-        TextAlignment::Center,
+        Alignment::Center,
     )?;
     editor.redefine_applied_slide_text_box_named_paragraph_style(
         0,
@@ -340,7 +337,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.save(output)?;
     println!(
         "created four-column Keynote text box {} with storage {}",
-        created.drawable_object_id, created.storage.object_id
+        created.drawable_object_id, created.storage.id
     );
     Ok(())
 }

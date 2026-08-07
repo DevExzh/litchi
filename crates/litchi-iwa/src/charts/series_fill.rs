@@ -6,7 +6,9 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use litchi_iwa_common::media::Type as MediaType;
+
+use crate::charts::Kind;
 use crate::charts::series_style::{
     ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
     effective_chart_series_style_slots, generated_chart_series_style_extension,
@@ -14,6 +16,7 @@ use crate::charts::series_style::{
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
+use crate::media::MediaAssetId;
 use crate::package_metadata::component_identifier_for_entry;
 use crate::protobuf::tsch;
 use crate::shapes::{
@@ -22,7 +25,7 @@ use crate::shapes::{
     remove_orphaned_image_asset, validate_image_asset,
 };
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkMediaEditor, IWorkPackage, MediaType, Result};
+use crate::{Error, IWorkMediaEditor, IWorkPackage, Result};
 
 const AREA_3D_FILL_FIELD: u32 = 6;
 const BAR_3D_FILL_FIELD: u32 = 7;
@@ -53,22 +56,18 @@ pub enum ChartSeriesFillKind {
 
 impl ChartSeriesFillKind {
     /// Resolve the fill family displayed by iWork for a chart kind.
-    pub fn for_chart_kind(kind: ChartKind) -> Result<Self> {
+    pub fn for_chart_kind(kind: Kind) -> Result<Self> {
         match kind {
-            ChartKind::Area2d | ChartKind::StackedArea2d => Ok(Self::Area2d),
-            ChartKind::Bar2d | ChartKind::StackedBar2d | ChartKind::MultiDataBar2d => {
-                Ok(Self::Bar2d)
-            },
-            ChartKind::Column2d | ChartKind::StackedColumn2d | ChartKind::MultiDataColumn2d => {
-                Ok(Self::Column2d)
-            },
-            ChartKind::Pie2d | ChartKind::Donut2d => Ok(Self::Pie2d),
-            ChartKind::Radar2d => Ok(Self::Radar2d),
-            ChartKind::Area3d | ChartKind::StackedArea3d => Ok(Self::Area3d),
-            ChartKind::Bar3d | ChartKind::StackedBar3d => Ok(Self::Bar3d),
-            ChartKind::Column3d | ChartKind::StackedColumn3d => Ok(Self::Column3d),
-            ChartKind::Line3d => Ok(Self::Line3d),
-            ChartKind::Pie3d | ChartKind::Donut3d => Ok(Self::Pie3d),
+            Kind::Area2d | Kind::StackedArea2d => Ok(Self::Area2d),
+            Kind::Bar2d | Kind::StackedBar2d | Kind::MultiDataBar2d => Ok(Self::Bar2d),
+            Kind::Column2d | Kind::StackedColumn2d | Kind::MultiDataColumn2d => Ok(Self::Column2d),
+            Kind::Pie2d | Kind::Donut2d => Ok(Self::Pie2d),
+            Kind::Radar2d => Ok(Self::Radar2d),
+            Kind::Area3d | Kind::StackedArea3d => Ok(Self::Area3d),
+            Kind::Bar3d | Kind::StackedBar3d => Ok(Self::Bar3d),
+            Kind::Column3d | Kind::StackedColumn3d => Ok(Self::Column3d),
+            Kind::Line3d => Ok(Self::Line3d),
+            Kind::Pie3d | Kind::Donut3d => Ok(Self::Pie3d),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no unambiguous series fill"
             ))),
@@ -97,7 +96,7 @@ pub(crate) fn chart_series_fills(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
 ) -> Result<Vec<ShapeFill>> {
     let storage = ChartSeriesFillKind::for_chart_kind(kind)?;
@@ -119,7 +118,7 @@ pub(crate) fn set_chart_series_fills(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     expected: &[ShapeFill],
 ) -> Result<()> {
@@ -153,13 +152,16 @@ pub(crate) fn set_chart_series_fills(
         slot.update(package, |data| {
             patch_local_fill(data, storage, Some(replacement))
         })?;
-        adjust_data_reference(
-            package,
-            slot,
-            old_local.as_ref().and_then(image_data_identifier),
-            image_data_identifier(replacement),
-        )?;
-        remove_orphaned_image_asset(package, old_local.as_ref().and_then(image_data_identifier))?;
+        let old_data_identifier = old_local
+            .as_ref()
+            .and_then(image_data_identifier)
+            .map(MediaAssetId::try_from)
+            .transpose()?;
+        let new_data_identifier = image_data_identifier(replacement)
+            .map(MediaAssetId::try_from)
+            .transpose()?;
+        adjust_data_reference(package, slot, old_data_identifier, new_data_identifier)?;
+        remove_orphaned_image_asset(package, old_data_identifier.map(MediaAssetId::get))?;
     }
     if chart_series_fills(
         package,
@@ -183,7 +185,7 @@ pub(crate) fn reset_chart_series_fill(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     series_index: usize,
 ) -> Result<ShapeFill> {
@@ -207,13 +209,13 @@ pub(crate) fn reset_chart_series_fill(
     }
     slot.ensure_exclusive(package, drawable_object_id, drawable_label)?;
     slot.update(package, |data| patch_local_fill(data, storage, None))?;
-    adjust_data_reference(
-        package,
-        slot,
-        old_local.as_ref().and_then(image_data_identifier),
-        None,
-    )?;
-    remove_orphaned_image_asset(package, old_local.as_ref().and_then(image_data_identifier))?;
+    let old_data_identifier = old_local
+        .as_ref()
+        .and_then(image_data_identifier)
+        .map(MediaAssetId::try_from)
+        .transpose()?;
+    adjust_data_reference(package, slot, old_data_identifier, None)?;
+    remove_orphaned_image_asset(package, old_data_identifier.map(MediaAssetId::get))?;
     read_effective_fill(slot, package, storage)
 }
 
@@ -224,7 +226,7 @@ pub(crate) fn set_chart_series_image_fill_data(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     series_index: usize,
     preferred_filename: &str,
@@ -249,7 +251,7 @@ pub(crate) fn set_chart_series_image_fill_data(
     }
     let mut staged = media.into_package();
     let mut image = ShapeImageFill::embedded(
-        ShapeImageDataIdentifier::new(asset.data_identifier)?,
+        ShapeImageDataIdentifier::new(asset.data_identifier.get())?,
         technique,
         fill_size,
     )?;
@@ -365,8 +367,8 @@ fn patch_local_fill(
 fn adjust_data_reference(
     package: &mut IWorkPackage,
     slot: &ChartSeriesStyleSlot,
-    old_data_identifier: Option<u64>,
-    new_data_identifier: Option<u64>,
+    old_data_identifier: Option<MediaAssetId>,
+    new_data_identifier: Option<MediaAssetId>,
 ) -> Result<()> {
     if old_data_identifier == new_data_identifier {
         return Ok(());
@@ -374,10 +376,10 @@ fn adjust_data_reference(
     let component_id = component_identifier_for_entry(package, slot.archive_name())?
         .ok_or_else(|| Error::InvalidFormat("Chart series style has no component".to_owned()))?;
     if let Some(identifier) = old_data_identifier {
-        remove_component_data_reference(package, component_id, identifier, slot.object_id())?;
+        remove_component_data_reference(package, component_id, identifier.get(), slot.object_id())?;
     }
     if let Some(identifier) = new_data_identifier {
-        add_component_data_reference(package, component_id, identifier, slot.object_id())?;
+        add_component_data_reference(package, component_id, identifier.get(), slot.object_id())?;
     }
     Ok(())
 }
@@ -386,8 +388,9 @@ fn adjust_data_reference(
 mod tests {
     use super::*;
     use crate::protobuf::tss;
-    use crate::shapes::{RgbColorSpace, ShapeGradient, ShapeGradientAngle};
+    use crate::shapes::RgbColorSpace;
     use crate::wire::{append_varint_field, parse_wire_fields};
+    use litchi_iwa_common::shape::fill::{Angle, Gradient};
 
     const UNKNOWN_OUTER_FIELD: u32 = 4_096;
     const UNKNOWN_GENERATED_FIELD: u32 = 4_097;
@@ -395,35 +398,35 @@ mod tests {
     #[test]
     fn every_unambiguous_fill_kind_has_a_typed_storage_family() {
         for kind in [
-            ChartKind::Area2d,
-            ChartKind::StackedArea2d,
-            ChartKind::Bar2d,
-            ChartKind::StackedBar2d,
-            ChartKind::MultiDataBar2d,
-            ChartKind::Column2d,
-            ChartKind::StackedColumn2d,
-            ChartKind::MultiDataColumn2d,
-            ChartKind::Pie2d,
-            ChartKind::Donut2d,
-            ChartKind::Radar2d,
-            ChartKind::Area3d,
-            ChartKind::StackedArea3d,
-            ChartKind::Bar3d,
-            ChartKind::StackedBar3d,
-            ChartKind::Column3d,
-            ChartKind::StackedColumn3d,
-            ChartKind::Line3d,
-            ChartKind::Pie3d,
-            ChartKind::Donut3d,
+            Kind::Area2d,
+            Kind::StackedArea2d,
+            Kind::Bar2d,
+            Kind::StackedBar2d,
+            Kind::MultiDataBar2d,
+            Kind::Column2d,
+            Kind::StackedColumn2d,
+            Kind::MultiDataColumn2d,
+            Kind::Pie2d,
+            Kind::Donut2d,
+            Kind::Radar2d,
+            Kind::Area3d,
+            Kind::StackedArea3d,
+            Kind::Bar3d,
+            Kind::StackedBar3d,
+            Kind::Column3d,
+            Kind::StackedColumn3d,
+            Kind::Line3d,
+            Kind::Pie3d,
+            Kind::Donut3d,
         ] {
             assert!(ChartSeriesFillKind::for_chart_kind(kind).is_ok());
         }
         for kind in [
-            ChartKind::Line2d,
-            ChartKind::Scatter2d,
-            ChartKind::Bubble2d,
-            ChartKind::Mixed2d,
-            ChartKind::TwoAxis2d,
+            Kind::Line2d,
+            Kind::Scatter2d,
+            Kind::Bubble2d,
+            Kind::Mixed2d,
+            Kind::TwoAxis2d,
         ] {
             assert!(ChartSeriesFillKind::for_chart_kind(kind).is_err());
         }
@@ -432,10 +435,10 @@ mod tests {
     #[test]
     fn series_fill_patch_is_lossless_and_resets_exactly() {
         let original = style_with_unknown_fields(solid(0.2, 0.5, 0.8));
-        let replacement = ShapeFill::Gradient(ShapeGradient::linear(
+        let replacement = ShapeFill::Gradient(Gradient::linear(
             color(0.8, 0.1, 0.2),
             color(0.1, 0.3, 0.9),
-            ShapeGradientAngle::from_degrees(35.0).unwrap(),
+            Angle::from_degrees(35.0).unwrap(),
         ));
         let patched =
             patch_local_fill(&original, ChartSeriesFillKind::Column2d, Some(&replacement)).unwrap();
@@ -474,13 +477,13 @@ mod tests {
         let original_outer = parse_wire_fields(original)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == UNKNOWN_OUTER_FIELD)
-            .map(|field| original[field.start..field.end].to_vec());
+            .find(|field| field.number() == UNKNOWN_OUTER_FIELD)
+            .map(|field| original[field.start()..field.end()].to_vec());
         let patched_outer = parse_wire_fields(patched)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == UNKNOWN_OUTER_FIELD)
-            .map(|field| patched[field.start..field.end].to_vec());
+            .find(|field| field.number() == UNKNOWN_OUTER_FIELD)
+            .map(|field| patched[field.start()..field.end()].to_vec());
         assert_eq!(patched_outer, original_outer);
         let original_generated = generated_chart_series_style_extension(original)
             .unwrap()
@@ -491,13 +494,13 @@ mod tests {
         let original_unknown = parse_wire_fields(original_generated)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == UNKNOWN_GENERATED_FIELD)
-            .map(|field| original_generated[field.start..field.end].to_vec());
+            .find(|field| field.number() == UNKNOWN_GENERATED_FIELD)
+            .map(|field| original_generated[field.start()..field.end()].to_vec());
         let patched_unknown = parse_wire_fields(patched_generated)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == UNKNOWN_GENERATED_FIELD)
-            .map(|field| patched_generated[field.start..field.end].to_vec());
+            .find(|field| field.number() == UNKNOWN_GENERATED_FIELD)
+            .map(|field| patched_generated[field.start()..field.end()].to_vec());
         assert_eq!(patched_unknown, original_unknown);
     }
 

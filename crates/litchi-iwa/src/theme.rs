@@ -93,14 +93,14 @@ impl IWorkThemeArchive {
         let opaque_base_fields = base_fields
             .iter()
             .filter(|field| {
-                !BASE_THEME_FIELDS.contains(&field.number) && !is_known_extension(field.number)
+                !BASE_THEME_FIELDS.contains(&field.number()) && !is_known_extension(field.number())
             })
-            .map(|field| theme_data[field.start..field.end].to_vec())
+            .map(|field| theme_data[field.start()..field.end()].to_vec())
             .collect();
         let opaque_wrapper_fields = wrapper_fields
             .iter()
-            .filter(|field| field.number != THEME_SUPER_FIELD)
-            .map(|field| data[field.start..field.end].to_vec())
+            .filter(|field| field.number() != THEME_SUPER_FIELD)
+            .map(|field| data[field.start()..field.end()].to_vec())
             .collect();
 
         Ok(Self {
@@ -163,7 +163,7 @@ fn decode_extension<M: Message + Default>(
 }
 
 fn unique_field(fields: &[WireField], field_number: u32) -> Result<Option<&WireField>> {
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let first = matches.next();
     if matches.next().is_some() {
         return Err(Error::InvalidFormat(format!(
@@ -185,13 +185,13 @@ fn append_message<M: Message>(
 }
 
 fn length_delimited_payload<'a>(data: &'a [u8], field: &WireField) -> Result<&'a [u8]> {
-    if field.wire_type != 2 {
+    if field.wire_type() != 2 {
         return Err(Error::InvalidFormat(format!(
             "iWork theme field {} is not length-delimited",
-            field.number
+            field.number()
         )));
     }
-    Ok(&data[field.payload_start..field.end])
+    Ok(&data[field.payload_start()..field.end()])
 }
 
 const fn is_known_extension(field_number: u32) -> bool {
@@ -245,7 +245,7 @@ mod tests {
         let fields = parse_wire_fields(&encoded).unwrap();
         let super_field = fields
             .iter()
-            .find(|field| field.number == THEME_SUPER_FIELD)
+            .find(|field| field.number() == THEME_SUPER_FIELD)
             .unwrap();
         let mut theme_data = length_delimited_payload(&encoded, super_field)
             .unwrap()

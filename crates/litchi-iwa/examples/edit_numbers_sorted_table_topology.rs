@@ -4,9 +4,10 @@ use std::path::PathBuf;
 
 use litchi_iwa::numbers::{
     NumbersEditor, NumbersTableSortColumnIndex, NumbersTableSortDirection, NumbersTableSortOrder,
-    NumbersTableSortRule, TableColumnDeletion, TableColumnInsertion, TableRowDeletion,
-    TableRowInsertion,
+    NumbersTableSortRule,
 };
+use litchi_numbers::TableSelector;
+use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = std::env::args().skip(1);
@@ -25,25 +26,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )])?;
 
     let mut editor = NumbersEditor::open(&source)?;
-    let table_id = editor.tables()?.remove(0).object_id;
-    assert_eq!(editor.table_sort_order(table_id)?, Some(expected.clone()));
-    editor.insert_table_row(table_id, TableRowInsertion::body(0))?;
-    editor.insert_table_column(table_id, TableColumnInsertion::body(0))?;
-    assert_eq!(editor.table_sort_order(table_id)?, Some(expected));
+    let table = TableSelector::index(0);
+    assert_eq!(editor.table_sort_order(table)?, Some(expected.clone()));
+    editor.insert_table_row(table, RowInsertion::body(0))?;
+    editor.insert_table_column(table, ColumnInsertion::body(0))?;
+    assert_eq!(editor.table_sort_order(table)?, Some(expected));
     editor.save(inserted)?;
 
     let mut editor = NumbersEditor::open(source)?;
-    let table_id = editor.tables()?.remove(0).object_id;
+    let table = TableSelector::index(0);
     let body_sort_column = 1usize
-        .checked_sub(
-            editor
-                .table_header_settings(table_id)?
-                .header_column_count(),
-        )
+        .checked_sub(editor.table_header_settings(table)?.header_column_count())
         .ok_or("the sort column is inside the fixed header-column region")?;
-    editor.remove_table_row(table_id, TableRowDeletion::body(0))?;
-    editor.remove_table_column(table_id, TableColumnDeletion::body(body_sort_column))?;
-    assert_eq!(editor.table_sort_order(table_id)?, None);
+    editor.remove_table_row(table, RowDeletion::body(0))?;
+    editor.remove_table_column(table, ColumnDeletion::body(body_sort_column))?;
+    assert_eq!(editor.table_sort_order(table)?, None);
     editor.save(deleted)?;
     Ok(())
 }

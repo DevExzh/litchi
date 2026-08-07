@@ -10,11 +10,11 @@ use crate::wire::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::number_attachment_types::{
+use super::storage_wire::{LocatedStorage, update_parsed_archive};
+use litchi_iwa_text::number_attachment::{
     TextNumberAttachmentFormat, TextNumberAttachmentKind, TextNumberAttachmentSettings,
     TextNumberAttachmentText,
 };
-use super::storage_wire::{LocatedStorage, update_parsed_archive};
 
 const SUPER_FIELD: u32 = 1;
 const STRING_EQUIVALENT_FIELD: u32 = 1;
@@ -61,18 +61,18 @@ pub(super) fn validate_number_attachment_object(
         kind: TextNumberAttachmentKind::from_raw(kind),
         string_equivalent: textual
             .string_equivalent
-            .map(|value| TextNumberAttachmentText::new(value.into_boxed_str()))
+            .map(|value| TextNumberAttachmentText::from_boxed(value.into_boxed_str()))
             .transpose()?,
         number_format: attachment
             .number_format
             .map(TextNumberAttachmentFormat::from_native_value),
         string_value: attachment
             .string_value
-            .map(|value| TextNumberAttachmentText::new(value.into_boxed_str()))
+            .map(|value| TextNumberAttachmentText::from_boxed(value.into_boxed_str()))
             .transpose()?,
         number_format_name: attachment
             .number_format_name
-            .map(|value| TextNumberAttachmentText::new(value.into_boxed_str()))
+            .map(|value| TextNumberAttachmentText::from_boxed(value.into_boxed_str()))
             .transpose()?,
     }))
 }
@@ -99,13 +99,13 @@ pub(super) fn new_number_attachment_object(
             .as_ref()
             .map(|value| value.as_str().to_owned()),
     };
-    ArchiveObject::new(
+    Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: NUMBER_ATTACHMENT_MESSAGE_TYPE,
             data: attachment.encode_to_vec(),
         }],
-    )
+    )?)
 }
 
 pub(super) fn patch_number_attachment_settings(

@@ -18,13 +18,14 @@ use super::number_attachment_storage::{
     decoded_attachment_entries, insert_attachment_reference, locate_attachment_storage,
     locate_attachment_storage_with_archive,
 };
-use super::number_attachment_types::{
-    TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings,
-};
-use super::position::TextPosition;
 use super::smart_field_object::{
     ensure_no_metadata_reference, require_exclusive_storage_reference,
 };
+use litchi_iwa_text::number_attachment::{
+    TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings,
+    raw::{from_object_id, object_id as native_object_id},
+};
+use litchi_iwa_text::position::TextPosition;
 
 const OBJECT_REPLACEMENT_CHARACTER: &str = "\u{fffc}";
 
@@ -54,8 +55,8 @@ pub(crate) fn text_number_attachments(
             )));
         }
         attachments.push(TextNumberAttachment::new(
-            TextNumberAttachmentId::from_native(entry.object_id),
-            TextPosition::from_native(entry.index),
+            from_object_id(entry.object_id)?,
+            TextPosition::from_utf16_code_units(entry.index),
             settings,
         ));
     }
@@ -94,11 +95,7 @@ pub(crate) fn insert_text_number_attachment(
     set_package_last_object_identifier(&mut staged, identifier)?;
 
     let verified = roundtrip(&staged)?;
-    let created = number_attachment_by_id(
-        &verified,
-        storage_id,
-        TextNumberAttachmentId::from_native(identifier),
-    )?;
+    let created = number_attachment_by_id(&verified, storage_id, from_object_id(identifier)?)?;
     if created.position != position || created.settings != *settings {
         return Err(Error::InvalidFormat(
             "iWork number-attachment insertion failed validation".to_owned(),
@@ -118,10 +115,15 @@ pub(crate) fn update_text_number_attachment(
     if current.settings == *settings {
         return Ok(current);
     }
-    require_exclusive_storage_reference(package, storage_id, id.object_id(), "number attachment")?;
+    require_exclusive_storage_reference(
+        package,
+        storage_id,
+        native_object_id(id),
+        "number attachment",
+    )?;
     let located = locate_attachment_storage_with_archive(package, storage_id)?;
     let mut staged = package.clone();
-    patch_number_attachment_settings(&mut staged, located, id.object_id(), settings)?;
+    patch_number_attachment_settings(&mut staged, located, native_object_id(id), settings)?;
     let verified = roundtrip(&staged)?;
     let updated = number_attachment_by_id(&verified, storage_id, id)?;
     if updated.position != current.position || updated.settings != *settings {
@@ -139,7 +141,12 @@ pub(crate) fn remove_text_number_attachment(
     id: TextNumberAttachmentId,
 ) -> Result<TextNumberAttachment> {
     let removed = number_attachment_by_id(package, storage_id, id)?;
-    require_exclusive_storage_reference(package, storage_id, id.object_id(), "number attachment")?;
+    require_exclusive_storage_reference(
+        package,
+        storage_id,
+        native_object_id(id),
+        "number attachment",
+    )?;
     let start = usize::try_from(removed.position.utf16_index())
         .map_err(|_| Error::ParseError("number-attachment position exceeds usize".to_owned()))?;
     let end = start
@@ -226,13 +233,13 @@ fn number_attachment_by_id(
     let Some(attachment) = matches.next() else {
         return Err(Error::InvalidFormat(format!(
             "text storage {storage_id} does not own number-attachment object {}",
-            id.object_id()
+            native_object_id(id)
         )));
     };
     if matches.next().is_some() {
         return Err(Error::InvalidFormat(format!(
             "text storage {storage_id} references number-attachment object {} more than once",
-            id.object_id()
+            native_object_id(id)
         )));
     }
     Ok(attachment)

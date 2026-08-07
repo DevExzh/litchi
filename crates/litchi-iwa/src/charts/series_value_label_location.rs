@@ -5,7 +5,7 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::series_style::{
     GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD, chart_series_style_slots,
     generated_chart_series_style_extension,
@@ -61,7 +61,7 @@ pub(crate) fn chart_series_value_label_locations(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
 ) -> Result<Vec<ChartSeriesValueLabelLocation>> {
     let storage = LocationStorage::for_kind(kind)?;
@@ -90,7 +90,7 @@ pub(crate) fn set_chart_series_value_label_locations(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
     expected: &[ChartSeriesValueLabelLocation],
 ) -> Result<()> {
@@ -142,18 +142,18 @@ enum LocationStorage {
 }
 
 impl LocationStorage {
-    fn for_kind(kind: ChartKind) -> Result<Self> {
+    fn for_kind(kind: Kind) -> Result<Self> {
         match kind {
-            ChartKind::Column2d
-            | ChartKind::Column3d
-            | ChartKind::Bar2d
-            | ChartKind::Bar3d
-            | ChartKind::MultiDataColumn2d
-            | ChartKind::MultiDataBar2d => Ok(Self::Bar),
-            ChartKind::StackedColumn2d
-            | ChartKind::StackedColumn3d
-            | ChartKind::StackedBar2d
-            | ChartKind::StackedBar3d => Ok(Self::StackedBar),
+            Kind::Column2d
+            | Kind::Column3d
+            | Kind::Bar2d
+            | Kind::Bar3d
+            | Kind::MultiDataColumn2d
+            | Kind::MultiDataBar2d => Ok(Self::Bar),
+            Kind::StackedColumn2d
+            | Kind::StackedColumn3d
+            | Kind::StackedBar2d
+            | Kind::StackedBar3d => Ok(Self::StackedBar),
             _ => Err(Error::InvalidFormat(format!(
                 "chart kind {kind:?} has no supported series value-label location"
             ))),
@@ -217,7 +217,7 @@ fn patch_location(
 
 fn strict_optional_location(data: &[u8], field_number: u32) -> Result<Option<u64>> {
     let fields = parse_wire_fields(data)?;
-    let mut matches = fields.iter().filter(|field| field.number == field_number);
+    let mut matches = fields.iter().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
     };
@@ -226,21 +226,20 @@ fn strict_optional_location(data: &[u8], field_number: u32) -> Result<Option<u64
             "singular chart series value-label location field {field_number} occurs more than once"
         )));
     }
-    if field.wire_type != 0 {
+    if field.wire_type() != 0 {
         return Err(Error::InvalidFormat(format!(
             "chart series value-label location field {field_number} is not a varint"
         )));
     }
-    let (value, consumed) = crate::varint::decode_varint_from_bytes(
-        &data[field.key_end..field.end],
-    )
-    .map_err(|error| {
-        Error::InvalidFormat(format!(
-            "chart series value-label location field {field_number} is invalid: {error}"
-        ))
-    })?;
-    if consumed != field.end - field.key_end
-        || crate::varint::encode_varint(value).len() != consumed
+    let (value, consumed) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(&data[field.key_end()..field.end()])
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "chart series value-label location field {field_number} is invalid: {error}"
+                ))
+            })?;
+    if consumed != field.end() - field.key_end()
+        || litchi_iwa_common::varint::encoded_len(value) != consumed
     {
         return Err(Error::InvalidFormat(format!(
             "chart series value-label location field {field_number} is not canonical"
@@ -272,9 +271,9 @@ mod tests {
     fn bar_and_stacked_bar_use_distinct_native_fields() {
         assert_eq!(LocationStorage::Bar.field_number(), 88);
         assert_eq!(LocationStorage::StackedBar.field_number(), 97);
-        assert!(LocationStorage::for_kind(ChartKind::Column2d).is_ok());
-        assert!(LocationStorage::for_kind(ChartKind::StackedColumn2d).is_ok());
-        assert!(LocationStorage::for_kind(ChartKind::Pie2d).is_err());
+        assert!(LocationStorage::for_kind(Kind::Column2d).is_ok());
+        assert!(LocationStorage::for_kind(Kind::StackedColumn2d).is_ok());
+        assert!(LocationStorage::for_kind(Kind::Pie2d).is_err());
     }
 
     #[test]
@@ -326,7 +325,7 @@ mod tests {
         )
         .unwrap();
         let fields = parse_wire_fields(&patched).unwrap();
-        assert!(fields.iter().any(|field| field.number == 4_096));
+        assert!(fields.iter().any(|field| field.number() == 4_096));
         let extension = generated_chart_series_style_extension(&patched)
             .unwrap()
             .unwrap();
@@ -334,7 +333,7 @@ mod tests {
             parse_wire_fields(extension)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == 4_097)
+                .any(|field| field.number() == 4_097)
         );
     }
 

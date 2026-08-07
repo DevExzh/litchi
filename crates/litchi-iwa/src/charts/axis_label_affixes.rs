@@ -10,7 +10,7 @@ use crate::charts::axis::{
     generated_axis_non_style_extension,
 };
 use crate::charts::number_format::{DualNumberFormatFields, patch_dual_affixes, read_dual_affixes};
-use crate::charts::{ChartAxis, ChartLabelAffixes, ChartNumberFormat};
+use crate::charts::{Axis, LabelAffixes, NumberFormat};
 use crate::protobuf::tsch;
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
@@ -28,8 +28,8 @@ pub(crate) fn chart_axis_label_affixes(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
-) -> Result<ChartLabelAffixes> {
+    axis: Axis,
+) -> Result<LabelAffixes> {
     axis_non_style_slot(
         package,
         chart_archive_name,
@@ -46,8 +46,8 @@ pub(crate) fn set_chart_axis_label_affixes(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    axis: ChartAxis,
-    affixes: &ChartLabelAffixes,
+    axis: Axis,
+    affixes: &LabelAffixes,
 ) -> Result<()> {
     let slot = axis_non_style_slot(
         package,
@@ -64,13 +64,13 @@ pub(crate) fn set_chart_axis_label_affixes(
     if slot.read(package, read_axis_label_affixes)? != *affixes {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} {}-axis label-affix update failed validation",
-            axis.label()
+            axis.as_str()
         )));
     }
     Ok(())
 }
 
-fn read_axis_label_affixes(data: &[u8]) -> Result<ChartLabelAffixes> {
+fn read_axis_label_affixes(data: &[u8]) -> Result<LabelAffixes> {
     let extension = generated_axis_non_style_extension(data)?;
     if let Some(extension) = extension {
         tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
@@ -78,7 +78,7 @@ fn read_axis_label_affixes(data: &[u8]) -> Result<ChartLabelAffixes> {
     read_dual_affixes(extension, AXIS_NUMBER_FORMAT_FIELDS, FORMAT_CONTEXT)
 }
 
-fn patch_axis_label_affixes(data: &[u8], expected: &ChartLabelAffixes) -> Result<Vec<u8>> {
+fn patch_axis_label_affixes(data: &[u8], expected: &LabelAffixes) -> Result<Vec<u8>> {
     let existing_extension = generated_axis_non_style_extension(data)?;
     if existing_extension.is_none() && expected.is_empty() {
         return Ok(data.to_vec());
@@ -89,7 +89,7 @@ fn patch_axis_label_affixes(data: &[u8], expected: &ChartLabelAffixes) -> Result
         extension,
         AXIS_NUMBER_FORMAT_FIELDS,
         expected,
-        ChartNumberFormat::AXIS_NATIVE_DEFAULT,
+        NumberFormat::AXIS_NATIVE_DEFAULT,
         FORMAT_CONTEXT,
     )?
     else {
@@ -112,15 +112,15 @@ fn patch_axis_label_affixes(data: &[u8], expected: &ChartLabelAffixes) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartDecimalPlaces, ChartNegativeStyle};
+    use crate::charts::{DecimalPlaces, NegativeStyle};
     use crate::protobuf::tss;
     use crate::wire::{append_length_delimited_field, append_varint_field, parse_wire_fields};
 
     const UNKNOWN_OUTER_FIELD: u32 = 4_096;
     const UNKNOWN_GENERATED_FIELD: u32 = 4_097;
 
-    fn custom_affixes() -> ChartLabelAffixes {
-        ChartLabelAffixes::new("USD ", " net")
+    fn custom_affixes() -> LabelAffixes {
+        LabelAffixes::new("USD ", " net").unwrap()
     }
 
     #[test]
@@ -142,7 +142,7 @@ mod tests {
                 parse_wire_fields(extension)
                     .unwrap()
                     .iter()
-                    .filter(|wire| wire.number == field)
+                    .filter(|wire| wire.number() == field)
                     .count(),
                 1
             );
@@ -152,18 +152,18 @@ mod tests {
     #[test]
     fn clearing_axis_affixes_preserves_number_format_and_unknown_fields() {
         let original = axis_non_style_with_unknown_fields();
-        let format = ChartNumberFormat::new(
-            ChartDecimalPlaces::fixed(2).unwrap(),
-            ChartNegativeStyle::Parentheses,
+        let format = NumberFormat::new(
+            DecimalPlaces::fixed(2).unwrap(),
+            NegativeStyle::Parentheses,
             true,
         );
         let formatted =
             super::super::axis_number_format::patch_axis_number_format(&original, format).unwrap();
         let customized = patch_axis_label_affixes(&formatted, &custom_affixes()).unwrap();
-        let cleared = patch_axis_label_affixes(&customized, &ChartLabelAffixes::default()).unwrap();
+        let cleared = patch_axis_label_affixes(&customized, &LabelAffixes::default()).unwrap();
         assert_eq!(
             read_axis_label_affixes(&cleared).unwrap(),
-            ChartLabelAffixes::default()
+            LabelAffixes::default()
         );
         assert_eq!(
             super::super::axis_number_format::read_axis_number_format(&cleared).unwrap(),
@@ -176,7 +176,7 @@ mod tests {
             parse_wire_fields(extension)
                 .unwrap()
                 .iter()
-                .any(|field| field.number == UNKNOWN_GENERATED_FIELD)
+                .any(|field| field.number() == UNKNOWN_GENERATED_FIELD)
         );
     }
 
@@ -190,13 +190,13 @@ mod tests {
         let legacy = parse_wire_fields(extension)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == AXIS_NUMBER_FORMAT_FIELDS.legacy)
+            .find(|field| field.number() == AXIS_NUMBER_FORMAT_FIELDS.legacy)
             .unwrap();
         let mut duplicate_extension = extension.to_vec();
         append_length_delimited_field(
             &mut duplicate_extension,
             AXIS_NUMBER_FORMAT_FIELDS.legacy,
-            &extension[legacy.payload_start..legacy.end],
+            &extension[legacy.payload_start()..legacy.end()],
         )
         .unwrap();
         let duplicate = patch_length_delimited_field(

@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for reply in editor.cell_comment_replies(table_id, row, column)? {
         println!(
             "reply={} author={:?} text={:?}",
-            reply.storage_object_id, reply.comment.author_object_id, reply.comment.text
+            reply.storage_id, reply.comment.author_id, reply.comment.text
         );
     }
     Ok(())

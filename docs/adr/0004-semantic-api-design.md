@@ -5,6 +5,14 @@
 
 ## Names and types
 
+Presentation-level Keynote settings use the focused
+`litchi-keynote::show::{Mode, Settings}` module. `Settings` stores validated,
+private dimensions and exposes checked setters for playback delays and mode;
+the IWA adapter cannot publish a non-finite size or delay through the ordinary
+semantic API. Unknown native mode values remain lossless, while values already
+assigned to a named mode are rejected as non-canonical rather than silently
+rewritten.
+
 Public types use short names inside focused modules. Prefer
 `chart3d::BarShape` to `Chart3dBarShape`. Type tags plus unrelated optional
 fields are replaced by non-exhaustive data-bearing enums:
@@ -27,6 +35,310 @@ The same rule applies to fills, transitions, plots, axes, fields, records, and
 other sum types. `Unknown` retains bounded lossless content. Common read methods
 live on the enum or narrow static-dispatch traits; the facade does not use boxed
 trait objects.
+
+Numbers table header and footer configuration uses the focused
+`litchi_numbers::table::headers::{Count, Settings}` module. `Count` is a
+one-byte, `NonZeroU8`-backed value with the checked native `1..=5` domain;
+`Option<Count>` therefore preserves presence without an extra storage byte.
+`Settings` contains only archive-free optional counts and Boolean fields plus
+effective-value helpers. Its non-exhaustive typed error rejects zero, overflow,
+and out-of-range counts. Native protobuf presence, canonical wire framing,
+unknown-field preservation, table-bound validation, and transaction readback
+remain private to the IWA adapter. Pages and Keynote consume these canonical
+short names directly, with no format-prefixed compatibility aliases.
+
+Pages header/footer roles follow the focused-module rule at
+`litchi_pages::header_footer::{Template, Kind}`. These one-byte enums contain
+only semantic page-template and region roles; IWA keeps native object lookup,
+storage metadata, protobuf decoding, and package mutation at the boundary.
+
+Pages formatter values use focused modules and short names:
+`litchi_pages::section::{Start, PageNumbering, PageNumber}`,
+`litchi_pages::page_layout::{Layout, Orientation}`,
+`litchi_pages::document_options::Options`, and
+`litchi_pages::footnote::{Kind, Format, Numbering, Gap, Settings}`. Unknown
+native discriminants remain lossless but cannot shadow named values, page
+geometry validates finite positive dimensions and non-negative margins before
+construction, and layout/options presence is packed into compact values. The
+IWA side retains only native field mapping, protobuf validation, opaque fill
+payloads, discovery/package identifiers, and transactional publication; the
+former flat `Pages*` formatter aliases are removed.
+
+Pages body-footnote values use the focused
+`litchi_pages::footnote::body::{Footnote, Position, Selector}` module. A
+`Footnote` contains its checked UTF-16 body position, bounded text, and
+optional bounded custom marker; its native reference, contained storage, and
+marker identifiers are deliberately absent. Body-footnote reads and edits use
+`Selector::At` or `Selector::Index`, resolve ambiguity or absence as adapter
+errors, and publish only after staged wire and graph validation.
+
+Keynote build values use the focused `litchi_keynote::build` module. `Settings`
+and `Effect` expose typed start relationships, bounded unknown text, finite
+effect parameters, and boxed path/node collections; failed setters validate
+the candidate before mutation. Native object identifiers, archive fields, and
+raw direction/delivery integers are not part of this leaf's ordinary API.
+
+The dependency-free Numbers formula vocabulary is an intentional naming
+exception. `litchi-numbers::formula` is consumed by Numbers, Pages, and Keynote,
+so `FormulaExpression`, `FormulaCellReference`, and the other `Formula*` names
+remain explicit when re-exported from format facades; this prevents collisions
+between otherwise identical cross-format concepts without restoring a flat
+monolith. The compact reference and UUID structs are copyable value inputs, and
+the archive compiler validates their table bounds and formula resource budgets
+before emitting wire nodes. The formula compiler also validates arity for the
+known fixed-arity functions; recognized functions without arity metadata and
+unknown functions fail closed as typed parse errors.
+
+Numbers table axis sizing uses the focused
+`litchi-numbers::table::dimension::{Dimension, Points, Size}` API. `Points`
+rejects zero, negative, infinite, and NaN values before construction, while
+`Size::Default` remains distinct from `Size::Points(_)` so native default
+sentinel semantics are not conflated with an explicit override. Archive
+bounds, header-bucket storage, wire preservation, and transactional
+publication remain in the IWA adapter; the former flat semantic owners are
+removed rather than duplicated.
+
+The same focused-module rule applies to the dependency-free iWork text leaf:
+`litchi_iwa_text::font::{Font, Name}` owns the shared font identity, while
+`NameError` reports its bounded validation failures. Format crates may expose
+contextual aliases at their archive boundary, but they do not duplicate the
+allocation-bearing model or publish a flat `TextFontName` implementation in
+each application owner. `Name` validates before allocating borrowed input and
+stores exactly one boxed identifier; no unchecked font-name constructor exists.
+
+Text-frame columns use the adjacent focused
+`litchi_iwa_text::columns::{Columns, Count, Gap, Width, Equal, Following,
+Variable}` module. `Count` rejects zero and values above the explicit 256-column
+budget, gaps reject non-finite and negative (including negative-zero) values,
+and widths reject non-finite or non-positive values. `Variable` requires at
+least two columns and stores the following widths and gaps in one bounded boxed
+slice. Native `ColumnsArchive` presence, protobuf conversion, and package
+mutation remain in `litchi-iwa`; no archive type or facade-wide error enters
+the semantic leaf, and the former `TextColumn*` names are removed rather than
+aliased.
+
+Numbers cell display formats use the focused
+`litchi_numbers::cell::data_format` API. `DataFormat` is the typed sum over
+checked number, currency, percentage, scientific, fraction, numeral-system,
+date/time, duration, checkbox, star-rating, slider, stepper, pop-up, text, and
+custom values. Child modules validate finite/range/bounded text inputs before
+allocation and use boxed slices only where the semantic value is inherently
+variable-sized. The IWA adapter alone maps native format-table identifiers,
+control-cell metadata, custom UUID registries, BNC scalar state, protobuf
+fields, and transactional package changes. The old `TableCell*` semantic
+owners and facade aliases are removed; Pages and Keynote use the Numbers leaf
+types directly.
+Rich-text storage uses the focused `litchi_iwa_text::storage` module. `Storage`
+contains only owned UTF-8 text and validated semantic byte ranges; `Run` exposes
+range geometry rather than a native style or object identifier, and `Fragment`
+borrows text without allocating. Empty runs remain in the validated run slice
+for lossless semantic retention but do not produce fragments. Out-of-bounds,
+overflowing, or non-UTF-8-boundary ranges return typed errors before
+publication. Protobuf decoding, UTF-16/native boundary conversion, archive
+lookup, and unsupported wire-field preservation stay in the IWA adapter.
+
+Pages document state follows the same raw/semantic split:
+`litchi_pages::document::{Root, Body, Document}` owns an immutable, bounded
+semantic snapshot, while `litchi-iwa` decodes native root and body payloads
+before constructing it. The semantic model exposes borrowed section views and
+checked zero-based selection; native object identifiers and protobuf messages
+do not appear in its ordinary signatures. Snapshot cloning shares the IWA
+state and never reparses or mutates the source document.
+
+The same focused-module rule applies to neutral visual values:
+`litchi_iwa_common::color::{RgbColorSpace, Rgba}` owns the validated RGBA
+model and `color::Error`. The value has no protobuf or archive dependency, stores
+only fixed-size channel data, and rejects non-finite or out-of-range channels
+before a caller can publish it. Concrete IWA modules retain only native color
+conversion and map the leaf error at their archive boundary.
+
+The same focused-module rule applies to table appearance:
+`litchi_iwa_common::table::appearance::{Appearance, Banding, RowSizing,
+GridlineVisibility, Gridlines}` owns the compact semantic value. The common
+module uses short names in its table context and stores no archive state;
+native style inheritance and protobuf conversion remain in the IWA adapter.
+Contextual `Table*` aliases are migration adapters for the concrete facade,
+not duplicate value owners.
+
+Table-cell text layout uses the same focused module:
+`litchi_iwa_common::table::cell::layout::{TextWrap, VerticalAlignment, Inset,
+Insets, Layout}`. `Inset` is a four-byte transparent value constructed only
+through finite, non-negative validation, and `Layout` is a fixed-size
+composable value. Native alignment and padding conversion remain outside this
+leaf; the facade only adapts its typed error at the archive boundary.
+
+Table hidden-axis semantics use the focused
+`litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes}` module. `AxisIndex`
+is a zero-based row-or-column value, while `HiddenAxes` validates duplicates
+and stores canonical row-then-column ordering in one boxed slice. Its typed
+duplicate error is independent of archive state. Native hidden-state UUIDs,
+protobuf field mapping, graph traversal, bounds validation, and transactional
+package mutation remain in the IWA adapter, and concrete Numbers, Pages, and
+Keynote APIs consume the common values without contextual compatibility aliases.
+
+Shape and ordinary text-box frame layout uses a separate focused module:
+`litchi_iwa_common::text::layout::{VerticalAlignment, AutoSize, Inset, Insets,
+Layout}`. It deliberately does not reuse table-cell `TextWrap` semantics: shape
+autosizing and four-way frame alignment are independent values. All five values
+are copyable and heap-free; `Inset::from_points` returns a typed, allocation-free
+error for non-finite or negative input. Native protobuf conversion, bounded
+style inheritance, and package transactions remain in `litchi-iwa`, and the
+facade exposes the common module through `litchi_iwa::text::layout`.
+
+Media classification uses the focused `litchi_iwa_common::media::Type`
+module. The five variants are a one-byte, copyable value with no archive or
+filesystem state; extension matching is ASCII-case-insensitive and signature
+sniffing borrows only the supplied byte prefix. Unknown bytes stay `Unknown`,
+while an unrecognized ISO-BMFF brand remains conservatively classified as
+`Video` to match iWork replacement semantics. Archive discovery, asset
+metadata, limits, and replacement validation remain in the IWA adapter.
+
+Media movie/audio playback uses the focused archive-free
+`litchi_iwa_common::media::playback` module. `MediaVolume` is a compact,
+validated linear multiplier; `MediaLoopMode` maps named native values while
+retaining genuinely unknown discriminants; and `MediaPlaybackSettings` uses
+consuming builders plus checked trim canonicalization. The semantic module has
+no archive, protobuf, graph, package, or IWA-error dependency. Native duration
+decoding, legacy/modern loop reconciliation, unknown-field-preserving wire
+patches, and transactional publication remain in `litchi-iwa`, while all three
+iWork consumers use the common owners directly and the old facade owners are
+deleted rather than aliased.
+
+Keynote slide movie classification uses the focused
+`litchi_keynote::slide::media::MovieKind` value. Its compact, non-exhaustive
+variants (`File`, `Audio`, `Placeholder`, and `LiveVideo`) contain no
+archive, package, or native media identifiers. Movie creation uses the adjacent
+`litchi_keynote::slide::movie::Options` value, which validates finite placement,
+strictly positive displayed and natural dimensions, and a positive duration in
+the native finite `f32`-seconds domain. `litchi-iwa` retains
+`KeynoteSlideMovieInfo`, graph-aware CRUD, native media identifiers, and the
+mapping from native movie flags to this product value.
+
+Keynote slide-audio creation uses the focused
+`litchi_keynote::slide::audio::Options` value. The fields are private, and
+construction validates finite placement plus a positive duration that fits
+the native finite `f32`-seconds domain; accessors expose the canonical point
+and duration without archive state. The IWA adapter retains audio graph
+discovery, native identifiers, zero-size geometry, wire-preserving mutations,
+package transactions, and the IWA-owned info/removal values. Shared
+`MediaPlaybackSettings` optional fields, loop discriminants, and volume
+validation remain format-neutral IWA playback semantics until their own
+cross-format extraction.
+
+Shape paths use the focused `litchi_iwa_common::shape::path` module. Its
+`Preset`, `CornerRadius`, `PolygonSides`, `StarPoints`, and `InnerRadiusRatio`
+names are concise in their path context, fixed-size where scalar, and
+validated before they can enter a public preset. The star control stores an
+inner-to-outer radius ratio in `[0, 1)`; it is not an archive-owned absolute
+radius. Structural `ShapePathKind`, native path-family decoding, natural-size
+constraints, and protobuf/wire mutation remain in `litchi-iwa`, so the common
+leaf stays dependency-free and allocation-free.
+
+Drawable geometry uses the adjacent focused
+`litchi_iwa_common::shape::geometry::{Point, Size, FlipAxis}` module for its
+fixed-size neutral values. The IWA-only `DrawableGeometry` aggregate retains
+optional native field presence, reflection flags, rotation conventions, and
+wire conversion; those protobuf details do not leak into the common leaf.
+
+Shape fills keep their neutral gradient vocabulary in the focused
+`litchi_iwa_common::shape::fill` module. `Kind`, `Angle`, `StopPosition`,
+`StopMidpoint`, `Opacity`, `Stop`, and `Gradient` use typed validation, fixed
+scalar storage, `color::Rgba`, and boxed stops without archive or protobuf
+state. `ShapeFill` remains the IWA boundary aggregate because image fills and
+native data references are format-specific; the former `ShapeGradient*`
+semantic owners are removed rather than retained as aliases.
+
+Shape line endpoints and chart kinds use the same focused common-value rule:
+`litchi_iwa_common::shape::line::{Endpoint, Endpoints}` and
+`litchi_iwa_common::chart::kind::Kind` are compact, lossless, archive-free
+inputs. Native endpoint inheritance, field numbers, protobuf conversion, and
+wire-preserving mutation remain private to `litchi-iwa`.
+
+Chart axis controls use the focused `litchi_iwa_common::chart::axis` module.
+`Axis::{Category, Value}` is the compact semantic selector shared by all three
+iWork owners, and `TickMarkLocation` models the exclusive formatter choices
+with an explicit `Unsupported(i32)` case for future native values. Native
+integer conversion, archive lookup, shared-object ownership, and protobuf
+patching remain in `litchi-iwa`; the common values stay copyable and free of
+package state.
+
+The child modules keep the axis vocabulary contextual and short:
+`axis::bounds::{Bound, Bounds}`, `axis::label_angle::LabelAngle`,
+`axis::label_position_3d::LabelPosition3d`, `axis::scale::Scale`, and
+`axis::steps::{MajorStepCount, MinorStepCount, Steps}`. Their constructors
+return module-owned typed errors for finite/range validation; unknown native
+integer values remain explicit in the enum variants rather than being silently
+mapped to defaults.
+
+Chart number formatting uses the focused
+`litchi_iwa_common::chart::number_format` vocabulary:
+`FixedDecimalPlaces`, `DecimalPlaces`, `NegativeStyle`, `NumberFormat`, and
+`LabelAffixes`. Fixed decimal places are checked at construction, the packed
+`NumberFormat` occupies one byte, and `LabelAffixes::new` returns a typed error
+before accepting more than its bounded UTF-8 budget. Affixes expose borrowed
+prefix/suffix views over one allocation. There is no ambiguous generic format
+default: callers select the explicit axis or series native default because
+those defaults differ on thousands separators. Native field IDs, protobuf
+decoding, dual-field conflict checks, and wire-preserving patching remain
+outside the semantic module.
+
+Chart series orientation uses the focused `litchi_iwa_common::chart` module's
+four-byte `Direction` value. `Rows` and `Columns` are ergonomic named
+constants, while `DirectionKind` projects recognized values and every other
+native integer is preserved losslessly. The common value owns only this
+lossless integer conversion; protobuf field mapping, archive lookup, and
+mutation remain in the IWA adapter. The long `ChartSeriesDirection` name is
+removed rather than retained as a facade alias.
+
+Keynote transition semantics use the focused
+`litchi_keynote::transition::{Settings, AnimationParameters, CustomParameters}`
+API. The module owns memory-conscious opaque semantic payload containers and
+retains `Effect` plus the existing `Direction`, `MosaicType`, `Acceleration`,
+and `TextDelivery` scalar values; its constructors enforce bounded ownership,
+finite numbers, NUL-free text, and canonical semantic values. No raw native
+IDs or archives leak upward. The IWA adapter is limited to native/protobuf
+decoding, payload structural validation, wire patching, graph lookup, and
+transactions, and opaque payload decoding remains at that boundary.
+
+Chart series value-label selectors use the focused
+`litchi_iwa_common::chart::series_labels::{Visibility, Index}` module.
+`Visibility` is a compact two-state value with boolean conversion, while
+`Index` is a copyable zero-based series-position value. Visibility does not
+provide an ambiguous common default: native defaults are chart-family-specific
+(pie is visible; other supported families are hidden). The IWA adapter retains
+chart-kind field selection, generated extension decoding, canonical boolean
+validation, sparse default insertion/removal, unknown-field preservation, and
+package mutation. Unsupported chart kinds remain typed failures, and the former
+`ChartSeriesValueLabelVisibility` and `ChartSeriesIndex` owners are removed
+rather than retained as aliases.
+
+Pie and donut label settings use the focused
+`litchi_iwa_common::chart::pie` vocabulary. `LabelVisibility` packs the two
+independent label toggles into one byte with explicit native defaults;
+`LeaderLineVisibility` retains the signed native integer so unknown future
+states can be read, compared, and written without information loss. The IWA
+adapter owns field 31/44 and field 102 decoding, canonical varint checks,
+lossless unknown-field patching, and the styled versus geometry-only series
+allocation boundary. Concrete Numbers, Pages, and Keynote APIs consume these
+short semantic values directly.
+
+Chart category-label settings use the focused
+`litchi_iwa_common::chart::category_labels::{Interval, Frequency, Layout}`
+module. `Interval` validates the explicit native range before construction;
+`Frequency` distinguishes hidden, automatic, all, and custom labels while
+retaining unknown signed native intervals losslessly; and `Layout` composes
+that frequency with final-category visibility. The IWA adapter owns native
+field mapping, strict int32/boolean validation, unknown-field-preserving wire
+patches, axis visibility, and package transactions. The old long semantic
+owners are removed rather than retained as aliases.
+
+Chart reference-line settings use the focused
+`litchi_iwa_common::chart::reference_line` module. `Value` rejects non-finite
+custom positions, `Kind` keeps known calculations distinct from checked
+future native kinds, and `Line` uses an optional bounded name plus packed
+visibility state so default labels do not allocate. The focused IWA facade
+module exposes `Line`, `Kind`, and `Value`; raw extension messages and graph
+identifiers are not part of ordinary CRUD signatures.
 
 PresentationML implements this rule as `litchi-pptx::shape::{Scene, Shape}`.
 `Scene` is a bounded semantic index over one slide-like owner, not a vector of
@@ -248,6 +560,16 @@ move-first recovery path, so cloning a resource does not copy its bytes.
 Bounded canonical `p:extLst` content is retained as inert XML rather than
 discarded or interpreted as executable markup.
 
+Keynote soundtrack playback uses the focused archive-free
+`litchi_keynote::soundtrack::{Mode, Settings}` API. `Mode` preserves unknown
+native discriminants losslessly and rejects known values disguised as
+`Unknown`; `Settings` validates finite volume in the native `0.0..=1.0`
+domain. The current native soundtrack schema has no string or time fields, so
+the semantic owner does not invent filename or duration state. Protobuf
+presence, media references, package IDs, unknown bytes, graph lookup, and
+transactional edits remain in `litchi-iwa`, where changing playback settings
+cannot reorder or rebuild the media collection.
+
 The DrawingML diagram data model uses `Id::{Number(i32), Guid([u8; 16])}` for
 the complete `ST_ModelId` union and the concise `Point`, `PointType`,
 `Connection`, and `ConnectionType` names inside `diagram::data`. Transition and
@@ -341,6 +663,13 @@ Disjoint structural ranges move into one edit without public locks or wrapper
 types. The low-level writer preserves untouched merge records, namespace
 spelling, unknown attributes, and schema order; a safe facade never exposes
 relationship IDs or physical merge record positions.
+
+The iWork table adapters use the same semantic ownership rule. Their shared
+`litchi-numbers::table::merge::Region` is a compact checked rectangle, and its
+pure axis rebase algebra is independent of protobuf or package state. Native
+IWA merge formulas, formula-store ordering, anchor payload movement, and
+transactional publication remain private to `litchi-iwa`; Pages and Keynote
+retain only their format-owned comment and merge sidecars.
 
 Bitflags represent small orthogonal settings, Roaring bitmaps represent large
 sparse integer sets, enums represent exclusive states, and inheritance uses an

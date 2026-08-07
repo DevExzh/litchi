@@ -1,14 +1,27 @@
 //! Native table CRUD for Keynote slides.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use super::*;
 use crate::bundle::Bundle;
+use crate::numbers::editor::table::cell::Borders;
 use crate::numbers::table_extractor::TableDataExtractor;
 use crate::object_index::ObjectIndex;
 use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
 use crate::table_appearance::TableAppearance;
-use crate::table_lock::TableLockState;
+use litchi_iwa_common::table::cell::BorderSide;
+use litchi_iwa_common::table::lock::State as TableLockState;
+use litchi_numbers::cell::data_format::control::{Slider, Stepper};
+use litchi_numbers::cell::data_format::custom::Custom;
+use litchi_numbers::cell::data_format::date_time::DateTime;
+use litchi_numbers::cell::data_format::duration::Duration;
+use litchi_numbers::cell::data_format::number::{
+    Currency, Fraction, Number, Percentage, Scientific,
+};
+use litchi_numbers::cell::data_format::numeral_system::NumeralSystem;
+use litchi_numbers::cell::data_format::pop_up_menu::PopUpMenu;
+use litchi_numbers::cell::data_format::{Checkbox, DataFormat, StarRating, Text};
+use litchi_numbers::table::headers::Settings as HeaderSettings;
 
 mod appearance;
 mod comments;
@@ -22,21 +35,11 @@ mod storage;
 mod title;
 mod topology;
 
-pub use comments::{
-    KeynoteTableCellComment, KeynoteTableCellCommentInfo, KeynoteTableCellCommentReplyInfo,
-};
 pub use conditional_highlight::KeynoteTableCellConditionalHighlightInfo;
-pub use formula::{
-    KeynoteTableFormulaAxisReference, KeynoteTableFormulaBinaryOperator,
-    KeynoteTableFormulaCachedValue, KeynoteTableFormulaCellReference,
-    KeynoteTableFormulaExpression,
-};
 use graph::{require_table_model, slide_table_graph, table_template};
-pub use hidden_axes::{KeynoteTableAxisIndex, KeynoteTableHiddenAxes};
-pub use sort::{
-    KeynoteTableSortColumnIndex, KeynoteTableSortDirection, KeynoteTableSortOrder,
-    KeynoteTableSortRowRange, KeynoteTableSortRule, KeynoteTableSortScope,
-};
+use litchi_iwa_common::comment::Comment;
+use litchi_numbers::table::merge::Region;
+use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 use storage::{remove_objects, set_table_geometry_in_package, set_uniform_table_dimensions};
 pub use title::KeynoteTableTitleSettings;
 
@@ -46,64 +49,12 @@ const TABLE_GEOMETRY_FLAGS: u32 = 3;
 const TABLE_ANGLE_DEGREES: f32 = 0.0;
 
 /// Strongly typed value stored in a Keynote table cell.
-pub type KeynoteTableCellValue = crate::numbers::CellValue;
+pub type KeynoteTableCellValue = litchi_numbers::cell::Value;
 /// One mutation in a transactional Keynote table-cell batch.
-pub type KeynoteTableCellUpdate = crate::numbers::TableCellUpdate;
-/// Section-relative row deletion shared by native iWork tables.
-pub type KeynoteTableRowDeletion = crate::numbers::TableRowDeletion;
-/// Section-relative column deletion shared by native iWork tables.
-pub type KeynoteTableColumnDeletion = crate::numbers::TableColumnDeletion;
-/// Section-relative row insertion shared by native iWork tables.
-pub type KeynoteTableRowInsertion = crate::numbers::TableRowInsertion;
-/// Section-relative column insertion shared by native iWork tables.
-pub type KeynoteTableColumnInsertion = crate::numbers::TableColumnInsertion;
-/// A validated native merged-cell rectangle.
-pub type KeynoteTableCellRegion = crate::numbers::editor::IWorkTableCellRegion;
+pub type KeynoteTableCellUpdate = litchi_numbers::cell::Update;
 pub use crate::shapes::RgbaColor as KeynoteTableCellTextColor;
-pub use crate::table_cell_border::{
-    TableCellBorderSide as KeynoteTableCellBorderSide, TableCellBorders as KeynoteTableCellBorders,
-};
-pub use crate::table_cell_data_format::{
-    TableCellCheckboxFormat as KeynoteTableCellCheckboxFormat,
-    TableCellCurrencyFormat as KeynoteTableCellCurrencyFormat,
-    TableCellCustomFormat as KeynoteTableCellCustomFormat,
-    TableCellDataFormat as KeynoteTableCellDataFormat,
-    TableCellDateTimeFormat as KeynoteTableCellDateTimeFormat,
-    TableCellDurationFormat as KeynoteTableCellDurationFormat,
-    TableCellDurationStyle as KeynoteTableCellDurationStyle,
-    TableCellDurationUnit as KeynoteTableCellDurationUnit,
-    TableCellDurationUnitRange as KeynoteTableCellDurationUnitRange,
-    TableCellDurationUnits as KeynoteTableCellDurationUnits,
-    TableCellFractionFormat as KeynoteTableCellFractionFormat,
-    TableCellNumeralSystemFormat as KeynoteTableCellNumeralSystemFormat,
-    TableCellPercentageFormat as KeynoteTableCellPercentageFormat,
-    TableCellPopUpMenuFormat as KeynoteTableCellPopUpMenuFormat,
-    TableCellPopUpMenuInitialSelection as KeynoteTableCellPopUpMenuInitialSelection,
-    TableCellPopUpMenuItem as KeynoteTableCellPopUpMenuItem,
-    TableCellScientificFormat as KeynoteTableCellScientificFormat,
-    TableCellSliderDisplayFormat as KeynoteTableCellSliderDisplayFormat,
-    TableCellSliderFormat as KeynoteTableCellSliderFormat,
-    TableCellSliderRange as KeynoteTableCellSliderRange,
-    TableCellStarRatingFormat as KeynoteTableCellStarRatingFormat,
-    TableCellStepperDisplayFormat as KeynoteTableCellStepperDisplayFormat,
-    TableCellStepperFormat as KeynoteTableCellStepperFormat,
-    TableCellStepperRange as KeynoteTableCellStepperRange,
-    TableCellTextFormat as KeynoteTableCellTextFormat,
-};
-pub use crate::table_cell_layout::{
-    TableCellInset as KeynoteTableCellInset, TableCellInsets as KeynoteTableCellInsets,
-    TableCellLayout as KeynoteTableCellLayout, TableCellTextWrap as KeynoteTableCellTextWrap,
-    TableCellVerticalAlignment as KeynoteTableCellVerticalAlignment,
-};
-pub use crate::table_cell_number_format::{
-    TableCellDecimalPlaces as KeynoteTableCellDecimalPlaces,
-    TableCellFixedDecimalPlaces as KeynoteTableCellFixedDecimalPlaces,
-    TableCellNegativeNumberStyle as KeynoteTableCellNegativeNumberStyle,
-    TableCellNumberFormat as KeynoteTableCellNumberFormat,
-    TableCellThousandsSeparator as KeynoteTableCellThousandsSeparator,
-};
-pub use crate::text::ParagraphIndents as KeynoteTableCellParagraphIndents;
-pub use crate::text::ParagraphLineSpacing as KeynoteTableCellParagraphLineSpacing;
+pub use crate::text::Background as KeynoteTableCellTextBackground;
+pub use crate::text::Outline as KeynoteTableCellTextOutline;
 pub use crate::text::ParagraphList as KeynoteTableCellParagraphList;
 pub use crate::text::ParagraphListBullet as KeynoteTableCellParagraphListBullet;
 pub use crate::text::ParagraphListBulletGeometry as KeynoteTableCellParagraphListBulletGeometry;
@@ -116,24 +67,21 @@ pub use crate::text::ParagraphListNumberScale as KeynoteTableCellParagraphListNu
 pub use crate::text::ParagraphListNumberTiering as KeynoteTableCellParagraphListNumberTiering;
 pub use crate::text::ParagraphListNumbering as KeynoteTableCellParagraphListNumbering;
 pub use crate::text::ParagraphListPlacement as KeynoteTableCellParagraphListPlacement;
-pub use crate::text::ParagraphSpacing as KeynoteTableCellParagraphSpacing;
 pub use crate::text::ParagraphTabStops as KeynoteTableCellParagraphTabStops;
-pub use crate::text::TextAlignment as KeynoteTableCellTextAlignment;
-pub use crate::text::TextBackground as KeynoteTableCellTextBackground;
+pub use crate::text::Shadow as KeynoteTableCellTextShadow;
 pub use crate::text::TextBaselineShift as KeynoteTableCellTextBaselineShift;
 pub use crate::text::TextCapitalization as KeynoteTableCellTextCapitalization;
 pub use crate::text::TextCharacterSpacing as KeynoteTableCellTextCharacterSpacing;
 pub use crate::text::TextDecorations as KeynoteTableCellTextDecorations;
 pub use crate::text::TextFont as KeynoteTableCellTextFont;
 pub use crate::text::TextLigatures as KeynoteTableCellTextLigatures;
-pub use crate::text::TextOutline as KeynoteTableCellTextOutline;
 pub use crate::text::TextScript as KeynoteTableCellTextScript;
-pub use crate::text::TextShadow as KeynoteTableCellTextShadow;
 pub use crate::text::TextStyle as KeynoteTableCellTextStyle;
-/// A validated non-zero native header or footer count.
-pub type KeynoteTableHeaderCount = crate::numbers::NumbersTableHeaderCount;
-/// Lossless header/footer configuration shared by native iWork tables.
-pub type KeynoteTableHeaderSettings = crate::numbers::NumbersTableHeaderSettings;
+pub use litchi_iwa_common::table::cell::layout::{
+    Inset as KeynoteTableCellInset, Insets as KeynoteTableCellInsets,
+    Layout as KeynoteTableCellLayout, TextWrap as KeynoteTableCellTextWrap,
+    VerticalAlignment as KeynoteTableCellVerticalAlignment,
+};
 /// One row or column addressed by zero-based index.
 pub type KeynoteTableDimension = crate::numbers::NumbersTableDimension;
 /// A validated positive point measurement for a table axis.
@@ -162,39 +110,47 @@ pub struct KeynoteSlideTableInfo {
 #[derive(Debug, Clone)]
 pub struct KeynoteSlideTable {
     pub info: KeynoteSlideTableInfo,
-    cells: HashMap<(usize, usize), KeynoteTableCellValue>,
-    comments: HashMap<(usize, usize), KeynoteTableCellComment>,
-    merges: Vec<KeynoteTableCellRegion>,
+    semantic_table: litchi_numbers::Table,
+    comments: Box<[((usize, usize), Comment)]>,
+    merges: Vec<Region>,
 }
 
 impl KeynoteSlideTable {
     pub fn get_cell(&self, row: usize, column: usize) -> Option<&KeynoteTableCellValue> {
-        self.cells.get(&(row, column))
+        let position = litchi_numbers::Position::try_from_usize(row, column).ok()?;
+        self.semantic_table.get(position)
     }
 
     /// Iterate over materialized cells without exposing the backing map.
     pub fn iter_cells(
         &self,
     ) -> impl Iterator<Item = ((usize, usize), &KeynoteTableCellValue)> + '_ {
-        self.cells
-            .iter()
-            .map(|(position, value)| (*position, value))
+        self.semantic_table.iter_cells().map(|cell| {
+            (
+                (
+                    cell.position().row() as usize,
+                    cell.position().column() as usize,
+                ),
+                cell.value(),
+            )
+        })
     }
 
     /// Return the number of materialized cells, including explicit empty cells.
     pub fn cell_count(&self) -> usize {
-        self.cells.len()
+        self.semantic_table.cell_count()
     }
 
     /// Borrow the comment attached to a materialized cell, if any.
-    pub fn get_comment(&self, row: usize, column: usize) -> Option<&KeynoteTableCellComment> {
-        self.comments.get(&(row, column))
+    pub fn get_comment(&self, row: usize, column: usize) -> Option<&Comment> {
+        self.comments
+            .binary_search_by_key(&(row, column), |(position, _comment)| *position)
+            .ok()
+            .map(|index| &self.comments[index].1)
     }
 
     /// Iterate over cell comments without exposing the backing map.
-    pub fn iter_comments(
-        &self,
-    ) -> impl Iterator<Item = ((usize, usize), &KeynoteTableCellComment)> + '_ {
+    pub fn iter_comments(&self) -> impl Iterator<Item = ((usize, usize), &Comment)> + '_ {
         self.comments
             .iter()
             .map(|(position, comment)| (*position, comment))
@@ -206,7 +162,7 @@ impl KeynoteSlideTable {
     }
 
     /// Borrow native merged-cell rectangles in formula-store order.
-    pub fn merges(&self) -> &[KeynoteTableCellRegion] {
+    pub fn merges(&self) -> &[Region] {
         &self.merges
     }
 }
@@ -270,10 +226,10 @@ impl KeynoteEditor {
                     "Keynote object {model_object_id} has no native table model"
                 ))
             })?;
-        let (cells, comments) = table.into_parts();
+        let (semantic_table, comments) = table.into_semantic_parts()?;
         Ok(KeynoteSlideTable {
             info,
-            cells,
+            semantic_table,
             comments,
             merges: crate::numbers::editor::table_cell_merges_in_package(
                 self.package(),
@@ -287,7 +243,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         model_object_id: u64,
-    ) -> Result<Vec<KeynoteTableCellRegion>> {
+    ) -> Result<Vec<Region>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_merges_in_package(self.package(), model_object_id)
     }
@@ -297,7 +253,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        region: KeynoteTableCellRegion,
+        region: Region,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -321,7 +277,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        region: KeynoteTableCellRegion,
+        region: Region,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -545,7 +501,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<KeynoteTableCellDataFormat> {
+    ) -> Result<DataFormat> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_data_format_in_package(
             self.package(),
@@ -562,7 +518,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: KeynoteTableCellDataFormat,
+        format: DataFormat,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -595,9 +551,9 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellNumberFormat>> {
+    ) -> Result<Option<Number>> {
         require_table_model(self, slide_index, model_object_id)?;
-        crate::numbers::editor::table_cell_number_format_in_package(
+        crate::numbers::editor::common_table_cell_number_format_in_package(
             self.package(),
             model_object_id,
             row,
@@ -612,11 +568,11 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: KeynoteTableCellNumberFormat,
+        format: Number,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
-        crate::numbers::editor::set_table_cell_number_format_in_package(
+        crate::numbers::editor::set_common_table_cell_number_format_in_package(
             &mut staged,
             model_object_id,
             row,
@@ -675,7 +631,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellTextFormat>> {
+    ) -> Result<Option<Text>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_text_format_in_package(
             self.package(),
@@ -698,7 +654,7 @@ impl KeynoteEditor {
             model_object_id,
             row,
             column,
-            KeynoteTableCellTextFormat.into(),
+            Text.into(),
         )
     }
 
@@ -722,7 +678,7 @@ impl KeynoteEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             require_table_model(&verified, slide_index, model_object_id)?;
             if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
-                != KeynoteTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Keynote Text-format reset failed package validation".to_owned(),
@@ -740,7 +696,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellCustomFormat>> {
+    ) -> Result<Option<Custom>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_custom_format_in_package(
             self.package(),
@@ -757,7 +713,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: KeynoteTableCellCustomFormat,
+        format: Custom,
     ) -> Result<()> {
         self.set_slide_table_cell_data_format(
             slide_index,
@@ -788,7 +744,7 @@ impl KeynoteEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             require_table_model(&verified, slide_index, model_object_id)?;
             if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
-                != KeynoteTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Keynote Custom-format reset failed package validation".to_owned(),
@@ -806,7 +762,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellCurrencyFormat>> {
+    ) -> Result<Option<Currency>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_currency_format_in_package(
             self.package(),
@@ -823,7 +779,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: KeynoteTableCellCurrencyFormat,
+        format: Currency,
     ) -> Result<()> {
         self.set_slide_table_cell_data_format(
             slide_index,
@@ -854,7 +810,7 @@ impl KeynoteEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             require_table_model(&verified, slide_index, model_object_id)?;
             if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
-                != KeynoteTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Keynote currency-format reset failed package validation".to_owned(),
@@ -872,7 +828,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellPercentageFormat>> {
+    ) -> Result<Option<Percentage>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_percentage_format_in_package(
             self.package(),
@@ -889,7 +845,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: KeynoteTableCellPercentageFormat,
+        format: Percentage,
     ) -> Result<()> {
         self.set_slide_table_cell_data_format(
             slide_index,
@@ -920,7 +876,7 @@ impl KeynoteEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             require_table_model(&verified, slide_index, model_object_id)?;
             if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
-                != KeynoteTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Keynote percentage-format reset failed package validation".to_owned(),
@@ -938,7 +894,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellScientificFormat>> {
+    ) -> Result<Option<Scientific>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_scientific_format_in_package(
             self.package(),
@@ -955,7 +911,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: KeynoteTableCellScientificFormat,
+        format: Scientific,
     ) -> Result<()> {
         self.set_slide_table_cell_data_format(
             slide_index,
@@ -986,7 +942,7 @@ impl KeynoteEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             require_table_model(&verified, slide_index, model_object_id)?;
             if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
-                != KeynoteTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Keynote scientific-format reset failed package validation".to_owned(),
@@ -1004,7 +960,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellFractionFormat>> {
+    ) -> Result<Option<Fraction>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_fraction_format_in_package(
             self.package(),
@@ -1021,7 +977,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: KeynoteTableCellFractionFormat,
+        format: Fraction,
     ) -> Result<()> {
         self.set_slide_table_cell_data_format(
             slide_index,
@@ -1052,7 +1008,7 @@ impl KeynoteEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             require_table_model(&verified, slide_index, model_object_id)?;
             if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
-                != KeynoteTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Keynote fraction-format reset failed package validation".to_owned(),
@@ -1070,7 +1026,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellNumeralSystemFormat>> {
+    ) -> Result<Option<NumeralSystem>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_numeral_system_format_in_package(
             self.package(),
@@ -1087,7 +1043,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: KeynoteTableCellNumeralSystemFormat,
+        format: NumeralSystem,
     ) -> Result<()> {
         self.set_slide_table_cell_data_format(
             slide_index,
@@ -1118,7 +1074,7 @@ impl KeynoteEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             require_table_model(&verified, slide_index, model_object_id)?;
             if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
-                != KeynoteTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Keynote numeral-system reset failed package validation".to_owned(),
@@ -1136,7 +1092,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellDateTimeFormat>> {
+    ) -> Result<Option<DateTime>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_date_time_format_in_package(
             self.package(),
@@ -1153,7 +1109,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: KeynoteTableCellDateTimeFormat,
+        format: DateTime,
     ) -> Result<()> {
         self.set_slide_table_cell_data_format(
             slide_index,
@@ -1184,7 +1140,7 @@ impl KeynoteEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             require_table_model(&verified, slide_index, model_object_id)?;
             if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
-                != KeynoteTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Keynote Date & Time reset failed package validation".to_owned(),
@@ -1202,7 +1158,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellDurationFormat>> {
+    ) -> Result<Option<Duration>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_duration_format_in_package(
             self.package(),
@@ -1219,7 +1175,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: KeynoteTableCellDurationFormat,
+        format: Duration,
     ) -> Result<()> {
         self.set_slide_table_cell_data_format(
             slide_index,
@@ -1250,7 +1206,7 @@ impl KeynoteEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             require_table_model(&verified, slide_index, model_object_id)?;
             if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
-                != KeynoteTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Keynote Duration reset failed package validation".to_owned(),
@@ -1268,7 +1224,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellCheckboxFormat>> {
+    ) -> Result<Option<Checkbox>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_checkbox_format_in_package(
             self.package(),
@@ -1285,7 +1241,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: KeynoteTableCellCheckboxFormat,
+        format: Checkbox,
     ) -> Result<()> {
         self.set_slide_table_cell_data_format(
             slide_index,
@@ -1316,7 +1272,7 @@ impl KeynoteEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             require_table_model(&verified, slide_index, model_object_id)?;
             if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
-                != KeynoteTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Keynote Checkbox reset failed package validation".to_owned(),
@@ -1334,7 +1290,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellStarRatingFormat>> {
+    ) -> Result<Option<StarRating>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_star_rating_format_in_package(
             self.package(),
@@ -1351,7 +1307,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: KeynoteTableCellStarRatingFormat,
+        format: StarRating,
     ) -> Result<()> {
         self.set_slide_table_cell_data_format(
             slide_index,
@@ -1382,7 +1338,7 @@ impl KeynoteEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             require_table_model(&verified, slide_index, model_object_id)?;
             if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
-                != KeynoteTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Keynote Star Rating reset failed package validation".to_owned(),
@@ -1400,7 +1356,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellSliderFormat>> {
+    ) -> Result<Option<Slider>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_slider_format_in_package(
             self.package(),
@@ -1417,7 +1373,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: KeynoteTableCellSliderFormat,
+        format: Slider,
     ) -> Result<()> {
         self.set_slide_table_cell_data_format(
             slide_index,
@@ -1448,7 +1404,7 @@ impl KeynoteEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             require_table_model(&verified, slide_index, model_object_id)?;
             if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
-                != KeynoteTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Keynote Slider reset failed package validation".to_owned(),
@@ -1466,7 +1422,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellStepperFormat>> {
+    ) -> Result<Option<Stepper>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_stepper_format_in_package(
             self.package(),
@@ -1483,7 +1439,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: KeynoteTableCellStepperFormat,
+        format: Stepper,
     ) -> Result<()> {
         self.set_slide_table_cell_data_format(
             slide_index,
@@ -1514,7 +1470,7 @@ impl KeynoteEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             require_table_model(&verified, slide_index, model_object_id)?;
             if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
-                != KeynoteTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Keynote Stepper reset failed package validation".to_owned(),
@@ -1532,7 +1488,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<Option<KeynoteTableCellPopUpMenuFormat>> {
+    ) -> Result<Option<PopUpMenu>> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_pop_up_menu_format_in_package(
             self.package(),
@@ -1549,7 +1505,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        format: KeynoteTableCellPopUpMenuFormat,
+        format: PopUpMenu,
     ) -> Result<()> {
         self.set_slide_table_cell_data_format(
             slide_index,
@@ -1580,7 +1536,7 @@ impl KeynoteEditor {
             let verified = Self::from_bytes(&staged.to_bytes()?)?;
             require_table_model(&verified, slide_index, model_object_id)?;
             if verified.slide_table_cell_data_format(slide_index, model_object_id, row, column)?
-                != KeynoteTableCellDataFormat::Automatic
+                != DataFormat::Automatic
             {
                 return Err(Error::InvalidFormat(
                     "Keynote Pop-Up Menu reset failed package validation".to_owned(),
@@ -1668,7 +1624,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<KeynoteTableCellTextAlignment> {
+    ) -> Result<Alignment> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_text_alignment_in_package(
             self.package(),
@@ -1685,7 +1641,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        alignment: KeynoteTableCellTextAlignment,
+        alignment: Alignment,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -1740,7 +1696,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<KeynoteTableCellParagraphLineSpacing> {
+    ) -> Result<LineSpacing> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_line_spacing_in_package(
             self.package(),
@@ -1757,7 +1713,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        spacing: KeynoteTableCellParagraphLineSpacing,
+        spacing: LineSpacing,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -1816,7 +1772,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<KeynoteTableCellParagraphSpacing> {
+    ) -> Result<Spacing> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_spacing_in_package(
             self.package(),
@@ -1833,7 +1789,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        spacing: KeynoteTableCellParagraphSpacing,
+        spacing: Spacing,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2031,7 +1987,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         level: KeynoteTableCellParagraphListLevel,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2074,7 +2030,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2100,7 +2056,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListNumbering> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_numbering_in_package(
@@ -2119,7 +2075,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         numbering: KeynoteTableCellParagraphListNumbering,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2157,7 +2113,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListNumberFormat> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_number_format_in_package(
@@ -2176,7 +2132,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         format: KeynoteTableCellParagraphListNumberFormat,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2215,7 +2171,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2242,7 +2198,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListNumberTiering> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_number_tiering_in_package(
@@ -2261,7 +2217,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         tiering: KeynoteTableCellParagraphListNumberTiering,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2300,7 +2256,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2327,7 +2283,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListNumberScale> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_number_scale_in_package(
@@ -2346,7 +2302,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         scale: KeynoteTableCellParagraphListNumberScale,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2385,7 +2341,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2412,7 +2368,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListBullet> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_bullet_in_package(
@@ -2431,7 +2387,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         bullet: &KeynoteTableCellParagraphListBullet,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2469,7 +2425,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2495,7 +2451,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListBulletGeometry> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_bullet_geometry_in_package(
@@ -2514,7 +2470,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         geometry: KeynoteTableCellParagraphListBulletGeometry,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2552,7 +2508,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2579,7 +2535,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListIndentation> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_indentation_in_package(
@@ -2598,7 +2554,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         indentation: KeynoteTableCellParagraphListIndentation,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2637,7 +2593,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2664,7 +2620,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<KeynoteTableCellParagraphListLabelColor> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_list_label_color_in_package(
@@ -2683,7 +2639,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         color: KeynoteTableCellParagraphListLabelColor,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
@@ -2722,7 +2678,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -2749,7 +2705,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<KeynoteTableCellParagraphIndents> {
+    ) -> Result<Indents> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_paragraph_indents_in_package(
             self.package(),
@@ -2766,7 +2722,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        indents: KeynoteTableCellParagraphIndents,
+        indents: Indents,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -3839,7 +3795,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-    ) -> Result<KeynoteTableCellBorders> {
+    ) -> Result<Borders> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_cell_borders_in_package(
             self.package(),
@@ -3856,8 +3812,8 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        side: KeynoteTableCellBorderSide,
-        stroke: crate::shapes::ShapeStroke,
+        side: BorderSide,
+        stroke: crate::shapes::Stroke,
     ) -> Result<()> {
         self.update_slide_table_cell_border(
             slide_index,
@@ -3876,7 +3832,7 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        side: KeynoteTableCellBorderSide,
+        side: BorderSide,
     ) -> Result<()> {
         self.update_slide_table_cell_border(slide_index, model_object_id, row, column, side, None)
     }
@@ -3887,8 +3843,8 @@ impl KeynoteEditor {
         model_object_id: u64,
         row: usize,
         column: usize,
-        side: KeynoteTableCellBorderSide,
-        stroke: Option<crate::shapes::ShapeStroke>,
+        side: BorderSide,
+        stroke: Option<crate::shapes::Stroke>,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
@@ -3970,7 +3926,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         model_object_id: u64,
-    ) -> Result<KeynoteTableHeaderSettings> {
+    ) -> Result<HeaderSettings> {
         require_table_model(self, slide_index, model_object_id)?;
         crate::numbers::editor::table_header_settings_in_package(self.package(), model_object_id)
     }
@@ -3980,7 +3936,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         model_object_id: u64,
-        settings: KeynoteTableHeaderSettings,
+        settings: HeaderSettings,
     ) -> Result<()> {
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();

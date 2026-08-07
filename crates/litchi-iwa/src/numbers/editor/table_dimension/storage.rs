@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::wire::patch_fixed32_field;
+use litchi_numbers::table::dimension::Dimension;
 
 const HEADER_ENTRIES_FIELD: u32 = 2;
 const HEADER_SIZE_FIELD: u32 = 2;
@@ -10,7 +11,7 @@ pub(super) fn read_dimension_size(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
-    dimension: NumbersTableDimension,
+    dimension: Dimension,
 ) -> Result<Option<f32>> {
     let identifier = header_bucket_identifier(model, dimension)?;
     if identifier == 0 {
@@ -52,7 +53,7 @@ pub(super) fn write_dimension_size(
     package: &mut IWorkPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
-    dimension: NumbersTableDimension,
+    dimension: Dimension,
     points: f32,
 ) -> Result<()> {
     let identifier = header_bucket_identifier(model, dimension)?;
@@ -148,13 +149,10 @@ pub(super) fn write_dimension_size(
     })
 }
 
-fn header_bucket_identifier(
-    model: &TableModelArchive,
-    dimension: NumbersTableDimension,
-) -> Result<u64> {
+fn header_bucket_identifier(model: &TableModelArchive, dimension: Dimension) -> Result<u64> {
     match dimension {
-        NumbersTableDimension::Column(_) => Ok(model.base_data_store.column_headers.identifier),
-        NumbersTableDimension::Row(row) => model
+        Dimension::Column(_) => Ok(model.base_data_store.column_headers.identifier),
+        Dimension::Row(row) => model
             .base_data_store
             .row_headers
             .buckets

@@ -2,7 +2,8 @@
 
 use std::env;
 
-use litchi_iwa::numbers::{CellValue, NumbersEditor};
+use litchi_iwa::numbers::NumbersEditor;
+use litchi_numbers::cell::Value as CellValue;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);

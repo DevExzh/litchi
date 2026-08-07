@@ -3,51 +3,29 @@
 #![allow(unused_imports)]
 
 use super::*;
+use crate::text::layout::Layout;
+use litchi_iwa_text::columns::Columns;
+use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
+use litchi_iwa_text::position::TextPosition;
 
 impl NumbersEditor {
     /// List ordinary text boxes owned by a reachable Numbers sheet.
     pub fn sheet_text_boxes(&self, sheet_id: u64) -> Result<Vec<NumbersTextBoxInfo>> {
-        let (_, _, sheet) = numbers_sheet(&self.package, sheet_id)?;
-        let locations = object_locations(&self.package)?;
-        let text_editor = IWorkTextEditor::from_package(self.package.clone());
+        let mut catalog = NumbersObjectCatalog::build(&self.package)?;
+        let drawable_ids = catalog
+            .sheet_drawable_ids(&self.package, sheet_id)?
+            .to_vec();
         let mut result = Vec::new();
-        for reference in sheet.drawable_infos {
-            let archive_name = locations.get(&reference.identifier).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Numbers sheet {sheet_id} drawable {} is missing",
-                    reference.identifier
-                ))
-            })?;
-            let archive = self.package.archive(archive_name)?;
-            let object = archive.object(reference.identifier).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Numbers sheet {sheet_id} drawable {} is missing",
-                    reference.identifier
-                ))
-            })?;
-            let shape_messages = object
-                .messages
-                .iter()
-                .filter(|message| message.type_ == SHAPE_INFO_MESSAGE_TYPE)
-                .collect::<Vec<_>>();
-            if shape_messages.is_empty() {
+        for drawable_id in drawable_ids {
+            let Some(graph) =
+                catalog.text_box_graph_if_supported(&self.package, sheet_id, drawable_id)?
+            else {
                 continue;
-            }
-            if shape_messages.len() != 1 {
-                return Err(Error::InvalidFormat(format!(
-                    "Numbers drawable {} has multiple shape payloads",
-                    reference.identifier
-                )));
-            }
-            let shape = tswp::ShapeInfoArchive::decode(shape_messages[0].data.as_slice())?;
-            if shape.is_text_box != Some(true) {
-                continue;
-            }
-            let graph = numbers_text_box_graph(&self.package, sheet_id, reference.identifier)?;
-            let storage = text_editor.storage(graph.storage_id)?;
+            };
+            let storage = catalog.text_storage_info(&self.package, graph.storage_id)?;
             result.push(NumbersTextBoxInfo {
                 sheet_id,
-                drawable_object_id: reference.identifier,
+                drawable_object_id: drawable_id,
                 storage,
             });
         }
@@ -89,7 +67,7 @@ impl NumbersEditor {
             .ok_or_else(|| {
                 Error::InvalidFormat("Numbers text-box update lost its drawable".to_owned())
             })?;
-        if updated.storage.text != replacement {
+        if updated.storage.storage.text() != replacement {
             return Err(Error::InvalidFormat(
                 "Numbers text-box update failed validation".to_owned(),
             ));
@@ -182,7 +160,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<ShapeTextLayout> {
+    ) -> Result<Layout> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         shape_text_layout(&self.package, &graph.archive_name, drawable_object_id)
     }
@@ -192,7 +170,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        layout: ShapeTextLayout,
+        layout: Layout,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let staged = set_shape_text_layout(
@@ -234,7 +212,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<TextColumns> {
+    ) -> Result<Columns> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         shape_text_columns(&self.package, &graph.archive_name, drawable_object_id)
     }
@@ -244,7 +222,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        columns: &TextColumns,
+        columns: &Columns,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let staged = set_shape_text_columns(
@@ -708,7 +686,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListLevel> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone())
@@ -720,7 +698,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         level: ParagraphListLevel,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
@@ -735,7 +713,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -751,7 +729,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumbering> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone())
@@ -763,7 +741,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         numbering: ParagraphListNumbering,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
@@ -778,7 +756,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumberFormat> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone())
@@ -790,7 +768,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         format: ParagraphListNumberFormat,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
@@ -805,7 +783,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -821,7 +799,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumberTiering> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone())
@@ -833,7 +811,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         tiering: ParagraphListNumberTiering,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
@@ -848,7 +826,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -864,7 +842,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumberScale> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone())
@@ -876,7 +854,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         scale: ParagraphListNumberScale,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
@@ -891,7 +869,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -907,7 +885,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListBullet> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone())
@@ -919,7 +897,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         bullet: &ParagraphListBullet,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
@@ -934,7 +912,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -950,7 +928,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListBulletGeometry> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone())
@@ -962,7 +940,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         geometry: ParagraphListBulletGeometry,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
@@ -977,7 +955,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -993,7 +971,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListIndentation> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone())
@@ -1005,7 +983,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         indentation: ParagraphListIndentation,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
@@ -1020,7 +998,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -1036,7 +1014,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListLabelColor> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone())
@@ -1048,7 +1026,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         color: ParagraphListLabelColor,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
@@ -1063,7 +1041,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -1397,7 +1375,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<TextOutline> {
+    ) -> Result<Outline> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).text_outline(graph.storage_id)
     }
@@ -1407,7 +1385,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        outline: TextOutline,
+        outline: Outline,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -1442,7 +1420,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<TextShadow> {
+    ) -> Result<Shadow> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).text_shadow(graph.storage_id)
     }
@@ -1452,7 +1430,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        shadow: TextShadow,
+        shadow: Shadow,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -1487,7 +1465,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<TextBackground> {
+    ) -> Result<Background> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).text_background(graph.storage_id)
     }
@@ -1497,7 +1475,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        background: TextBackground,
+        background: Background,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -1578,7 +1556,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<ParagraphBorders> {
+    ) -> Result<Borders> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).paragraph_borders(graph.storage_id)
     }
@@ -1588,7 +1566,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        borders: ParagraphBorders,
+        borders: Borders,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -1716,7 +1694,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<TextAlignment> {
+    ) -> Result<Alignment> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).paragraph_alignment(graph.storage_id)
     }
@@ -1726,7 +1704,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        alignment: TextAlignment,
+        alignment: Alignment,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -1761,7 +1739,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<ParagraphLineSpacing> {
+    ) -> Result<LineSpacing> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).paragraph_line_spacing(graph.storage_id)
     }
@@ -1771,7 +1749,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        spacing: ParagraphLineSpacing,
+        spacing: LineSpacing,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -1807,7 +1785,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<ParagraphSpacing> {
+    ) -> Result<Spacing> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).paragraph_spacing(graph.storage_id)
     }
@@ -1817,7 +1795,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        spacing: ParagraphSpacing,
+        spacing: Spacing,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -1852,7 +1830,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<ParagraphIndents> {
+    ) -> Result<Indents> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).paragraph_indents(graph.storage_id)
     }
@@ -1862,7 +1840,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        indents: ParagraphIndents,
+        indents: Indents,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
@@ -2039,7 +2017,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<Vec<ParagraphDropCapPlacement>> {
+    ) -> Result<Vec<Placement>> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone()).paragraph_drop_caps(graph.storage_id)
     }
@@ -2049,11 +2027,11 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
-    ) -> Result<Option<ParagraphDropCap>> {
+        paragraph: TextPosition,
+    ) -> Result<Option<DropCap>> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         IWorkTextEditor::from_package(self.package.clone())
-            .paragraph_drop_cap(graph.storage_id, paragraph_start)
+            .paragraph_drop_cap(graph.storage_id, paragraph)
     }
 
     /// Atomically create or replace a text-box Drop Cap.
@@ -2061,18 +2039,15 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
-        drop_cap: ParagraphDropCap,
+        paragraph: TextPosition,
+        drop_cap: DropCap,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
-        text.set_paragraph_drop_cap(graph.storage_id, paragraph_start, drop_cap)?;
+        text.set_paragraph_drop_cap(graph.storage_id, paragraph, drop_cap)?;
         let verified = Self::from_package(text.into_package())?;
-        if verified.sheet_text_box_paragraph_drop_cap(
-            sheet_id,
-            drawable_object_id,
-            paragraph_start,
-        )? != Some(drop_cap)
+        if verified.sheet_text_box_paragraph_drop_cap(sheet_id, drawable_object_id, paragraph)?
+            != Some(drop_cap)
         {
             return Err(Error::InvalidFormat(
                 "Numbers text-box Drop Cap update failed validation".to_owned(),
@@ -2087,11 +2062,11 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let mut text = IWorkTextEditor::from_package(self.package.clone());
-        let changed = text.remove_paragraph_drop_cap(graph.storage_id, paragraph_start)?;
+        let changed = text.remove_paragraph_drop_cap(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
         }
@@ -2116,7 +2091,7 @@ impl NumbersEditor {
             })?;
 
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(DrawableId::from_raw(drawable_object_id)?)?;
         let mut staged = comments.into_package();
         patch_numbers_sheet_drawable_reference(
             &mut staged,

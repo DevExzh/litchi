@@ -36,7 +36,7 @@ mod pie_wedge_explosion;
 mod radar_grid_shape;
 mod radar_series_style;
 mod radar_start_angle;
-mod reference_lines;
+mod reference_line;
 mod rounded_corners;
 mod scene_3d;
 mod series_connection_line;
@@ -64,7 +64,7 @@ use theme::{chart_theme_context, patch_theme_chart_preset};
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::charts::reference_lines::chart_reference_line_objects;
+use crate::charts::reference_line::chart_reference_line_objects;
 use crate::charts::source::{
     AXIS_NON_STYLE_MESSAGE_TYPE, AXIS_STYLE_MESSAGE_TYPE, CHART_MESSAGE_TYPE,
     CHART_NON_STYLE_MESSAGE_TYPE, CHART_PRESET_MESSAGE_TYPE, CHART_STYLE_MESSAGE_TYPE,
@@ -72,10 +72,11 @@ use crate::charts::source::{
     SERIES_NON_STYLE_MESSAGE_TYPE, SERIES_STYLE_MESSAGE_TYPE, STANDIN_MESSAGE_TYPE,
     SourceChartObjectIds, chart_data, chart_geometry, chart_grid, drawable_geometry,
     geometry_archive, reference, register_chart_styles, require_creatable_kind,
-    source_chart_objects, unregister_chart_styles, validate_chart_styles_registered,
+    single_message_index, source_chart_objects, unregister_chart_styles,
+    validate_chart_styles_registered,
 };
 use crate::charts::{
-    ChartArrangement, ChartData, ChartKind, ChartSeriesDirection, IWorkChartArchive,
+    ChartArrangement, ChartData, Direction, DirectionKind, IWorkChartArchive, Kind,
 };
 use crate::data_reference_registry::{
     clone_component_data_references, remove_component_data_references_for_objects,
@@ -94,8 +95,8 @@ pub struct PagesBodyChartInfo {
     /// UTF-16 index of the object-replacement character in the body text.
     pub anchor_character_index: u32,
     pub drawable_object_id: u64,
-    pub kind: ChartKind,
-    pub direction: ChartSeriesDirection,
+    pub kind: Kind,
+    pub direction: Direction,
     pub data: ChartData,
     pub geometry: DrawableGeometry,
     pub arrangement: ChartArrangement,
@@ -121,7 +122,7 @@ impl PagesEditor {
     pub fn add_body_chart(
         &mut self,
         anchor_character_index: usize,
-        kind: ChartKind,
+        kind: Kind,
         data: ChartData,
         position: DrawablePoint,
         size: DrawableSize,
@@ -135,7 +136,7 @@ impl PagesEditor {
             .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?
             .identifier;
         let theme = chart_theme_context(self.package(), theme_id)?;
-        let archive_name = find_object_archive(self.package(), self.body_storage_id)?;
+        let archive_name = find_object_archive(self.package(), self.body_storage_id.get())?;
         let component_id = component_identifier_for_entry(self.package(), &archive_name)?
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
@@ -169,7 +170,7 @@ impl PagesEditor {
             .ok_or_else(|| Error::ParseError("iWork object identifier overflow".into()))?;
         let mut objects = source_chart_objects(
             ids,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             kind,
             data.clone(),
             geometry,
@@ -209,7 +210,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             attachment_id,
         )?;
@@ -249,7 +250,7 @@ impl PagesEditor {
             .map_err(|_| Error::ParseError("Pages body attachment index exceeds u32".into()))?;
         if created.info.anchor_character_index != expected_anchor
             || created.info.kind != kind
-            || created.info.direction != ChartSeriesDirection::Rows
+            || created.info.direction != Direction::Rows
             || created.info.data != data
             || created.info.geometry != geometry
             || created.object_ids != expected_object_ids
@@ -263,7 +264,7 @@ impl PagesEditor {
     }
 
     /// Change one body chart's native kind while preserving its data.
-    pub fn set_body_chart_kind(&mut self, drawable_object_id: u64, kind: ChartKind) -> Result<()> {
+    pub fn set_body_chart_kind(&mut self, drawable_object_id: u64, kind: Kind) -> Result<()> {
         require_creatable_kind(kind)?;
         self.update_body_chart(drawable_object_id, |chart| {
             chart
@@ -274,7 +275,7 @@ impl PagesEditor {
                         "Pages chart {drawable_object_id} has no chart payload"
                     ))
                 })?
-                .chart_type = Some(kind.into_raw());
+                .chart_type = Some(kind.native_value());
             Ok(())
         })?;
         if body_chart_graph(self, drawable_object_id)?.info.kind != kind {
@@ -309,9 +310,9 @@ impl PagesEditor {
     pub fn set_body_chart_direction(
         &mut self,
         drawable_object_id: u64,
-        direction: ChartSeriesDirection,
+        direction: Direction,
     ) -> Result<()> {
-        if matches!(direction, ChartSeriesDirection::Unsupported(_)) {
+        if direction.is_unsupported() {
             return Err(Error::ParseError(
                 "cannot assign an unsupported chart series direction".into(),
             ));
@@ -325,7 +326,7 @@ impl PagesEditor {
                         "Pages chart {drawable_object_id} has no chart payload"
                     ))
                 })?
-                .series_direction = Some(direction.into_raw());
+                .series_direction = Some(direction.native_value());
             Ok(())
         })?;
         if body_chart_graph(self, drawable_object_id)?.info.direction != direction {
@@ -427,8 +428,9 @@ impl PagesEditor {
                     })?;
                     clone_pages_drawable_graph_object(source_object, &remap)?
                 };
-                staged
-                    .update_archive(&group.archive_name, |archive| archive.insert_object(cloned))?;
+                staged.update_archive(&group.archive_name, |archive| {
+                    Ok(archive.insert_object(cloned)?)
+                })?;
             }
         }
         let root = root_document(&staged)?;
@@ -502,7 +504,7 @@ impl PagesEditor {
         staged = text_editor.into_package();
         add_body_drawable_attachment(
             &mut staged,
-            self.body_storage_id,
+            self.body_storage_id.get(),
             anchor_character_index,
             new_attachment_id,
         )?;
@@ -576,7 +578,9 @@ impl PagesEditor {
     pub fn remove_body_chart(&mut self, drawable_object_id: u64) -> Result<RemovedPagesBodyChart> {
         let source = body_chart_graph(self, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
+            drawable_object_id,
+        )?)?;
         let mut text_editor = IWorkTextEditor::from_package(comments.into_package());
         let anchor = source.info.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
@@ -705,21 +709,15 @@ fn update_chart_payload(
         let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
             Error::InvalidFormat(format!("Pages chart {drawable_object_id} is missing"))
         })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter_map(|(index, message)| (message.type_ == CHART_MESSAGE_TYPE).then_some(index))
-            .collect::<Vec<_>>();
-        let [message_index] = indexes.as_slice() else {
+        let Some(message_index) = single_message_index(&object.messages, CHART_MESSAGE_TYPE) else {
             return Err(Error::InvalidFormat(format!(
                 "Pages chart {drawable_object_id} must contain exactly one chart payload"
             )));
         };
-        let mut chart = IWorkChartArchive::decode(&object.messages[*message_index].data)?;
+        let mut chart = IWorkChartArchive::decode(&object.messages[message_index].data)?;
         update(&mut chart)?;
         object.replace_message(
-            *message_index,
+            message_index,
             RawMessage {
                 type_: CHART_MESSAGE_TYPE,
                 data: chart.encode()?,

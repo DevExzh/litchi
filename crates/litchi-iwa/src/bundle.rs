@@ -6,19 +6,17 @@
 //! - `Metadata/`: Document metadata and properties
 //! - Preview images at root level
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 use std::fs;
+use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use plist::Value;
-use soapberry_zip::office::{ArchiveLimits, ArchiveReader};
-
-use crate::archive::{Archive, ArchiveObject};
-use crate::snappy::{SnappyLimits, SnappyStream};
-use crate::zip_utils::parse_iwa_files_from_archive_with_limits;
+use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits, ArchiveObject, extract_text};
+use crate::snappy::SnappyStream;
 use crate::{Error, Result};
+use plist::Value;
 
 /// Represents an iWork document bundle
 #[derive(Debug, Clone)]
@@ -38,6 +36,7 @@ pub struct BundleLimits {
     max_entry_bytes: u64,
     max_total_bytes: u64,
     max_iwa_stream_bytes: usize,
+    iwa_archive_limits: IwaArchiveLimits,
 }
 
 impl BundleLimits {
@@ -107,6 +106,7 @@ impl BundleLimits {
             max_entry_bytes,
             max_total_bytes,
             max_iwa_stream_bytes,
+            iwa_archive_limits: IwaArchiveLimits::default(),
         })
     }
 
@@ -135,20 +135,24 @@ impl BundleLimits {
         self.max_iwa_stream_bytes
     }
 
-    pub(crate) fn archive_limits(self) -> ArchiveLimits {
-        ArchiveLimits {
-            max_files: self.max_entries,
-            max_entry_size: self.max_entry_bytes,
-            max_total_size: self.max_total_bytes,
-        }
+    /// Resource budget retained for one IWA archive parse.
+    pub const fn archive_limits(self) -> IwaArchiveLimits {
+        self.iwa_archive_limits
     }
 
-    pub(crate) fn snappy_limits(self) -> Result<SnappyLimits> {
-        SnappyLimits::new(
+    /// Set the checked resource budget applied to every parsed IWA archive in
+    /// this bundle, including archives inside a nested `Index.zip`.
+    pub fn with_archive_limits(mut self, limits: IwaArchiveLimits) -> Result<Self> {
+        limits.with_archive_bytes(limits.max_archive_bytes())?;
+        self.iwa_archive_limits = limits;
+        Ok(self)
+    }
+
+    pub(crate) fn effective_archive_limits(self) -> Result<IwaArchiveLimits> {
+        Ok(self.iwa_archive_limits.with_archive_bytes(
             self.max_iwa_stream_bytes
-                .min(SnappyStream::MAX_UNCOMPRESSED_CHUNK),
-            self.max_iwa_stream_bytes,
-        )
+                .min(self.iwa_archive_limits.max_archive_bytes()),
+        )?)
     }
 
     pub(crate) fn check_input_size(self, size: u64, label: &str) -> Result<()> {
@@ -160,6 +164,17 @@ impl BundleLimits {
         }
         Ok(())
     }
+
+    fn archive_ingress_limits(self) -> Result<litchi_iwa_archive::Limits> {
+        let limits = litchi_iwa_archive::Limits::new(
+            self.max_input_bytes,
+            self.max_entries,
+            self.max_entry_bytes,
+            self.max_total_bytes,
+            self.max_iwa_stream_bytes,
+        )?;
+        Ok(limits.with_archive_limits(self.effective_archive_limits()?)?)
+    }
 }
 
 impl Default for BundleLimits {
@@ -170,6 +185,7 @@ impl Default for BundleLimits {
             max_entry_bytes: Self::MAX_ENTRY_BYTES,
             max_total_bytes: Self::MAX_TOTAL_BYTES,
             max_iwa_stream_bytes: Self::MAX_IWA_STREAM_BYTES,
+            iwa_archive_limits: IwaArchiveLimits::default(),
         }
     }
 }
@@ -434,7 +450,7 @@ impl Bundle {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_iwa::Bundle;
+    /// use litchi_iwa::raw::bundle::Bundle;
     /// use std::fs;
     ///
     /// let data = fs::read("document.pages")?;
@@ -489,10 +505,7 @@ impl Bundle {
         })?;
         limits.check_input_size(input_size, "iWork bundle input")?;
 
-        // Parse IWA files from the ZIP archive
-        let archive = ArchiveReader::new_with_limits(bytes, limits.archive_limits())
-            .map_err(|e| Error::Bundle(format!("Failed to open ZIP archive: {}", e)))?;
-        let archives = parse_iwa_files_from_archive_with_limits(&archive, limits)?;
+        let archives = Self::parse_zip_bytes(bytes, limits)?;
 
         // For single-file bundles, metadata is typically embedded
         let metadata = BundleMetadata {
@@ -521,7 +534,7 @@ impl Bundle {
         let archives = Self::parse_index_zip(bundle_path, limits)?;
 
         // Parse metadata
-        let metadata = Self::parse_metadata(bundle_path)?;
+        let metadata = Self::parse_metadata(bundle_path, limits)?;
 
         Ok(Self::from_parts(
             bundle_path.to_path_buf(),
@@ -555,11 +568,12 @@ impl Bundle {
 
     fn from_parts(
         bundle_path: PathBuf,
-        archives: HashMap<String, Archive>,
+        // ComponentCatalog emits its normalized names in lexical order. Test
+        // fixtures must provide the same invariant because this constructor is
+        // intentionally allocation-free at the bundle boundary.
+        archives: Vec<(String, Archive)>,
         metadata: BundleMetadata,
     ) -> Self {
-        let mut archives: Vec<_> = archives.into_iter().collect();
-        archives.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
         Self {
             state: Arc::new(BundleState {
                 bundle_path,
@@ -637,42 +651,37 @@ impl Bundle {
     }
 
     /// Parse Index.zip and extract all IWA files
-    fn parse_index_zip(
-        bundle_path: &Path,
-        limits: BundleLimits,
-    ) -> Result<HashMap<String, Archive>> {
+    fn parse_index_zip(bundle_path: &Path, limits: BundleLimits) -> Result<Vec<(String, Archive)>> {
         let index_zip_path = bundle_path.join("Index.zip");
         let data = read_bounded_file(&index_zip_path, limits, "iWork Index.zip")?;
 
-        let archive = ArchiveReader::new_with_limits(&data, limits.archive_limits())
-            .map_err(|e| Error::Bundle(format!("Failed to open Index.zip: {}", e)))?;
-
-        parse_iwa_files_from_archive_with_limits(&archive, limits)
+        Self::parse_zip_bytes(&data, limits)
     }
 
     /// Parse a single-file bundle (zip archive) and extract all IWA files
     fn parse_zip_bundle(
         bundle_path: &Path,
         limits: BundleLimits,
-    ) -> Result<HashMap<String, Archive>> {
+    ) -> Result<Vec<(String, Archive)>> {
         let data = read_bounded_file(bundle_path, limits, "iWork bundle")?;
 
-        let archive = ArchiveReader::new_with_limits(&data, limits.archive_limits())
-            .map_err(|e| Error::Bundle(format!("Failed to open bundle file: {}", e)))?;
-
-        parse_iwa_files_from_archive_with_limits(&archive, limits)
+        Self::parse_zip_bytes(&data, limits)
     }
 
     /// Parse a ZIP archive from raw bytes and extract all IWA files
-    fn parse_zip_bytes(bytes: &[u8], limits: BundleLimits) -> Result<HashMap<String, Archive>> {
-        let archive = ArchiveReader::new_with_limits(bytes, limits.archive_limits())
-            .map_err(|e| Error::Bundle(format!("Failed to open ZIP archive from bytes: {}", e)))?;
-
-        parse_iwa_files_from_archive_with_limits(&archive, limits)
+    fn parse_zip_bytes(bytes: &[u8], limits: BundleLimits) -> Result<Vec<(String, Archive)>> {
+        let ingress_limits = limits.archive_ingress_limits()?;
+        let catalog =
+            litchi_iwa_archive::ComponentCatalog::from_bytes_with_limits(bytes, ingress_limits)
+                .map_err(map_archive_ingress_error)?;
+        Ok(catalog
+            .into_iter()
+            .map(litchi_iwa_archive::Component::into_parts)
+            .collect())
     }
 
     /// Parse metadata from Metadata/ directory
-    fn parse_metadata(bundle_path: &Path) -> Result<BundleMetadata> {
+    fn parse_metadata(bundle_path: &Path, limits: BundleLimits) -> Result<BundleMetadata> {
         let metadata_dir = bundle_path.join("Metadata");
         let mut metadata = BundleMetadata::default();
 
@@ -684,15 +693,18 @@ impl Bundle {
         let properties_path = metadata_dir.join("Properties.plist");
         if optional_regular_file(&properties_path, "Properties.plist")? {
             metadata.has_properties = true;
-            if let Ok(value) = Value::from_file(&properties_path) {
-                metadata.properties = Self::parse_plist_value(&value);
+            let bytes = read_bounded_file(&properties_path, limits, "Properties.plist")?;
+            let value = Self::parse_plist_bytes(&bytes, "Properties.plist")?;
+            metadata.properties = Self::parse_plist_value(&value, "Properties.plist")?;
 
-                // Try to detect application from properties
-                if let Some(PropertyValue::String(app_name)) =
-                    metadata.properties.get("Application")
-                {
-                    metadata.detected_application = Some(app_name.clone());
-                }
+            // Try to detect application from properties.
+            if let Some(app_name) = metadata.properties.get("Application") {
+                let PropertyValue::String(app_name) = app_name else {
+                    return Err(Error::InvalidFormat(
+                        "Properties.plist Application must be a string".to_owned(),
+                    ));
+                };
+                metadata.detected_application = Some(app_name.clone());
             }
         }
 
@@ -700,75 +712,131 @@ impl Bundle {
         let build_version_path = metadata_dir.join("BuildVersionHistory.plist");
         if optional_regular_file(&build_version_path, "BuildVersionHistory.plist")? {
             metadata.has_build_version_history = true;
-            if let Ok(value) = Value::from_file(&build_version_path) {
-                metadata.build_versions = Self::parse_build_versions(&value).into_boxed_slice();
-            }
+            let bytes =
+                read_bounded_file(&build_version_path, limits, "BuildVersionHistory.plist")?;
+            let value = Self::parse_plist_bytes(&bytes, "BuildVersionHistory.plist")?;
+            metadata.build_versions =
+                Self::parse_build_versions(&value, "BuildVersionHistory.plist")?.into_boxed_slice();
         }
 
         // Read DocumentIdentifier
         let doc_id_path = metadata_dir.join("DocumentIdentifier");
         if optional_regular_file(&doc_id_path, "DocumentIdentifier")? {
             metadata.has_document_identifier = true;
-            if let Ok(id) = fs::read_to_string(&doc_id_path) {
-                metadata.document_id = Some(id.trim().to_string());
+            let bytes = read_bounded_file(&doc_id_path, limits, "DocumentIdentifier")?;
+            let id = String::from_utf8(bytes).map_err(|error| {
+                Error::InvalidFormat(format!("DocumentIdentifier is not valid UTF-8: {error}"))
+            })?;
+            let id = id.trim();
+            if id.is_empty() {
+                return Err(Error::InvalidFormat(
+                    "DocumentIdentifier must not be empty".to_owned(),
+                ));
             }
+            metadata.document_id = Some(id.to_owned());
         }
 
         Ok(metadata)
     }
 
     /// Parse a plist Value into our PropertyValue structure
-    fn parse_plist_value(value: &Value) -> PropertyMap {
+    fn parse_plist_bytes(bytes: &[u8], label: &str) -> Result<Value> {
+        Value::from_reader(Cursor::new(bytes))
+            .map_err(|error| Error::InvalidFormat(format!("failed to parse {label}: {error}")))
+    }
+
+    /// Parse a plist Value into our PropertyValue structure.
+    fn parse_plist_value(value: &Value, label: &str) -> Result<PropertyMap> {
         match value {
             Value::Dictionary(dict) => dict
                 .iter()
-                .map(|(key, value)| (key.clone(), Self::convert_plist_value(value)))
+                .map(|(key, value)| {
+                    let context = format!("{label}.{key}");
+                    Ok((key.clone(), Self::convert_plist_value(value, &context)?))
+                })
                 .collect(),
-            _ => PropertyMap::default(),
+            _ => Err(Error::InvalidFormat(format!(
+                "{label} must contain a dictionary at its root"
+            ))),
         }
     }
 
-    /// Convert a plist Value to PropertyValue
-    fn convert_plist_value(value: &Value) -> PropertyValue {
+    /// Convert a plist Value to PropertyValue.
+    fn convert_plist_value(value: &Value, context: &str) -> Result<PropertyValue> {
         match value {
-            Value::String(s) => PropertyValue::String(s.clone()),
-            Value::Integer(i) => PropertyValue::Integer(i.as_signed().unwrap_or(0)),
-            Value::Real(r) => PropertyValue::Real(*r),
-            Value::Boolean(b) => PropertyValue::Boolean(*b),
-            Value::Date(d) => PropertyValue::Date(format!("{:?}", d)),
-            Value::Array(arr) => {
-                PropertyValue::Array(arr.iter().map(Self::convert_plist_value).collect())
-            },
-            Value::Dictionary(dict) => PropertyValue::Dictionary(
-                dict.iter()
-                    .map(|(key, value)| (key.clone(), Self::convert_plist_value(value)))
-                    .collect(),
-            ),
-            Value::Data(_) => PropertyValue::String("<binary data>".to_string()),
-            _ => PropertyValue::String("<unknown>".to_string()),
+            Value::String(s) => Ok(PropertyValue::String(s.clone())),
+            Value::Integer(i) => i.as_signed().map(PropertyValue::Integer).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "{context} contains an unsigned integer outside the supported i64 range"
+                ))
+            }),
+            Value::Real(r) => Ok(PropertyValue::Real(*r)),
+            Value::Boolean(b) => Ok(PropertyValue::Boolean(*b)),
+            Value::Date(d) => Ok(PropertyValue::Date(format!("{d:?}"))),
+            Value::Array(arr) => arr
+                .iter()
+                .enumerate()
+                .map(|(index, value)| {
+                    Self::convert_plist_value(value, &format!("{context}[{index}]"))
+                })
+                .collect::<Result<Vec<_>>>()
+                .map(PropertyValue::Array),
+            Value::Dictionary(dict) => dict
+                .iter()
+                .map(|(key, value)| {
+                    let nested_context = format!("{context}.{key}");
+                    Ok((
+                        key.clone(),
+                        Self::convert_plist_value(value, &nested_context)?,
+                    ))
+                })
+                .collect::<Result<PropertyMap>>()
+                .map(PropertyValue::Dictionary),
+            Value::Data(_) => Err(Error::InvalidFormat(format!(
+                "{context} contains unsupported binary data"
+            ))),
+            Value::Uid(_) => Err(Error::InvalidFormat(format!(
+                "{context} contains an unsupported UID"
+            ))),
+            _ => Err(Error::InvalidFormat(format!(
+                "{context} contains an unsupported plist value"
+            ))),
         }
     }
 
-    /// Parse build versions from BuildVersionHistory.plist
-    fn parse_build_versions(value: &Value) -> Vec<String> {
-        let mut versions = Vec::new();
+    /// Parse build versions from BuildVersionHistory.plist.
+    fn parse_build_versions(value: &Value, label: &str) -> Result<Vec<String>> {
+        let Value::Array(arr) = value else {
+            return Err(Error::InvalidFormat(format!(
+                "{label} must contain an array at its root"
+            )));
+        };
 
-        if let Value::Array(arr) = value {
-            for item in arr {
-                if let Value::String(version) = item {
-                    versions.push(version.clone());
-                } else if let Value::Dictionary(dict) = item {
-                    // BuildVersionHistory might be an array of dictionaries with version info
-                    if let Some(Value::String(version)) = dict.get("Version") {
-                        versions.push(version.clone());
-                    } else if let Some(Value::String(build)) = dict.get("Build") {
-                        versions.push(build.clone());
+        arr.iter()
+            .enumerate()
+            .map(|(index, item)| match item {
+                Value::String(version) => Ok(version.clone()),
+                Value::Dictionary(dict) => {
+                    let version = dict
+                        .get("Version")
+                        .or_else(|| dict.get("Build"))
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(format!(
+                                "{label}[{index}] dictionary has neither Version nor Build"
+                            ))
+                        })?;
+                    match version {
+                        Value::String(version) => Ok(version.clone()),
+                        _ => Err(Error::InvalidFormat(format!(
+                            "{label}[{index}] Version/Build must be a string"
+                        ))),
                     }
-                }
-            }
-        }
-
-        versions
+                },
+                _ => Err(Error::InvalidFormat(format!(
+                    "{label}[{index}] must be a string or dictionary"
+                ))),
+            })
+            .collect()
     }
 
     /// Get a specific archive by name
@@ -938,7 +1006,7 @@ impl Bundle {
 
         for (_, archive) in self.iter_archives() {
             for object in &archive.objects {
-                text_parts.extend(object.extract_text());
+                text_parts.extend(extract_text(object));
             }
         }
 
@@ -1147,6 +1215,13 @@ impl BundleMetadata {
     }
 }
 
+fn map_archive_ingress_error(error: litchi_iwa_archive::Error) -> Error {
+    match error {
+        litchi_iwa_archive::Error::Iwa(error) => Error::IwaCore(error.into()),
+        error => error.into(),
+    }
+}
+
 /// Detect the application type from a bundle path
 pub fn detect_application_type<P: AsRef<Path>>(bundle_path: P) -> Result<String> {
     Ok(match crate::detect::path(bundle_path)? {
@@ -1178,9 +1253,20 @@ fn ensure_regular_file(path: &Path, label: &str) -> Result<()> {
 }
 
 fn read_bounded_file(path: &Path, limits: BundleLimits, label: &str) -> Result<Vec<u8>> {
-    let size = fs::metadata(path)?.len();
-    limits.check_input_size(size, label)?;
-    fs::read(path).map_err(Error::Io)
+    let file = fs::File::open(path)?;
+    let declared_size = file.metadata()?.len();
+    limits.check_input_size(declared_size, label)?;
+
+    let max_read = limits
+        .max_input_bytes()
+        .checked_add(1)
+        .ok_or_else(|| Error::InvalidFormat(format!("{label} size limit overflow")))?;
+    let mut bytes = Vec::new();
+    file.take(max_read).read_to_end(&mut bytes)?;
+    let actual_size = u64::try_from(bytes.len())
+        .map_err(|_| Error::InvalidFormat(format!("{label} size does not fit u64")))?;
+    limits.check_input_size(actual_size, label)?;
+    Ok(bytes)
 }
 
 fn optional_regular_file(path: &Path, label: &str) -> Result<bool> {
@@ -1202,8 +1288,16 @@ fn optional_regular_file(path: &Path, label: &str) -> Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::archive::{Archive, ArchiveObject, RawMessage};
+    use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits, ArchiveObject, RawMessage};
     use std::fs;
+
+    fn zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        litchi_iwa_archive::package::to_bytes(
+            entries.iter().copied(),
+            litchi_iwa_archive::Limits::default(),
+        )
+        .unwrap()
+    }
 
     #[test]
     fn test_bundle_validation() {
@@ -1330,6 +1424,52 @@ mod tests {
     }
 
     #[test]
+    fn custom_archive_limits_reach_nested_index_before_materialization() -> crate::Result<()> {
+        let source = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 99,
+                        data: vec![1, 2, 3],
+                    }],
+                )?,
+                ArchiveObject::new(
+                    2,
+                    vec![RawMessage {
+                        type_: 100,
+                        data: vec![4, 5, 6],
+                    }],
+                )?,
+            ],
+        };
+        let compressed = SnappyStream::compress(&source.to_bytes()?)?;
+        let index = zip(&[("Index/Document.iwa", &compressed)]);
+        let bytes = zip(&[("legacy.pages/Index.zip", &index)]);
+
+        let archive_limits = IwaArchiveLimits::default().with_objects(1)?;
+        let limits = BundleLimits::default().with_archive_limits(archive_limits)?;
+        let error = Bundle::from_archive_bytes_with_limits(&bytes, limits).unwrap_err();
+        assert!(error.to_string().contains("IWA object limit exceeded"));
+
+        let byte_limits = IwaArchiveLimits::default().with_archive_bytes(1)?;
+        let limits = BundleLimits::default().with_archive_limits(byte_limits)?;
+        let error = Bundle::from_archive_bytes_with_limits(&bytes, limits).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::IwaCore(core)
+                if matches!(
+                    core.as_ref(),
+                    litchi_iwa_core::Error::Limit {
+                        kind: litchi_iwa_core::LimitKind::SnappyChunkBytes,
+                        ..
+                    }
+                )
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn property_map_is_sorted_and_duplicate_keys_are_deterministic() {
         let properties: PropertyMap = [
             (
@@ -1367,11 +1507,7 @@ mod tests {
         assert!(BundleLimits::new(BundleLimits::MAX_INPUT_BYTES + 1, 1, 1, 1, 1).is_err());
 
         let compressed = SnappyStream::compress(&[0_u8; 64])?;
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
-        writer
-            .write_stored("Index/Document.iwa", &compressed)
-            .unwrap();
-        let bytes = writer.finish_to_bytes().unwrap();
+        let bytes = zip(&[("Index/Document.iwa", &compressed)]);
 
         let tight_stream = BundleLimits::new(
             bytes.len() as u64,
@@ -1381,7 +1517,17 @@ mod tests {
             8,
         )?;
         let error = Bundle::from_bytes_with_limits(&bytes, tight_stream).unwrap_err();
-        assert!(error.to_string().contains("Snappy block expands"));
+        assert!(matches!(
+            error,
+            Error::IwaCore(core)
+                if matches!(
+                    core.as_ref(),
+                    litchi_iwa_core::Error::Limit {
+                        kind: litchi_iwa_core::LimitKind::SnappyChunkBytes,
+                        ..
+                    }
+                )
+        ));
 
         let tight_input = BundleLimits::new(
             (bytes.len() - 1) as u64,
@@ -1397,6 +1543,148 @@ mod tests {
         fs::write(file.path(), &bytes)?;
         let error = Bundle::open_with_limits(file.path(), tight_input).unwrap_err();
         assert!(error.to_string().contains("iWork bundle is"));
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_ingress_preserves_valid_values() -> crate::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let metadata_dir = temp.path().join("Metadata");
+        fs::create_dir(&metadata_dir)?;
+
+        let properties = plist::Dictionary::from_iter([
+            ("Application".to_owned(), Value::String("Pages".to_owned())),
+            ("Revision".to_owned(), Value::Integer(42_i64.into())),
+        ]);
+        write_test_plist(
+            &metadata_dir.join("Properties.plist"),
+            &Value::Dictionary(properties),
+        )?;
+
+        let history = Value::Array(vec![
+            Value::String("14.4.1".to_owned()),
+            Value::Dictionary(plist::Dictionary::from_iter([(
+                "Build".to_owned(),
+                Value::String("7029".to_owned()),
+            )])),
+        ]);
+        write_test_plist(&metadata_dir.join("BuildVersionHistory.plist"), &history)?;
+        fs::write(metadata_dir.join("DocumentIdentifier"), b"document-id\n")?;
+
+        let metadata = Bundle::parse_metadata(temp.path(), BundleLimits::default())?;
+        assert_eq!(metadata.detected_application(), Some("Pages"));
+        assert_eq!(metadata.get_property_int("Revision"), Some(42));
+        assert_eq!(metadata.build_version_history(), ["14.4.1", "7029"]);
+        assert_eq!(metadata.document_identifier(), Some("document-id"));
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_ingress_rejects_malformed_plist() -> crate::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let metadata_dir = temp.path().join("Metadata");
+        fs::create_dir(&metadata_dir)?;
+        fs::write(metadata_dir.join("Properties.plist"), b"not a plist")?;
+
+        let result = Bundle::parse_metadata(temp.path(), BundleLimits::default());
+        let error = result
+            .err()
+            .ok_or_else(|| Error::InvalidFormat("malformed plist was accepted".to_owned()))?;
+        assert!(error.to_string().contains("Properties.plist"));
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_ingress_rejects_semantically_invalid_history() -> crate::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let metadata_dir = temp.path().join("Metadata");
+        fs::create_dir(&metadata_dir)?;
+        write_test_plist(
+            &metadata_dir.join("BuildVersionHistory.plist"),
+            &Value::Dictionary(plist::Dictionary::new()),
+        )?;
+
+        let result = Bundle::parse_metadata(temp.path(), BundleLimits::default());
+        let error = result
+            .err()
+            .ok_or_else(|| Error::InvalidFormat("invalid history was accepted".to_owned()))?;
+        assert!(error.to_string().contains("BuildVersionHistory.plist"));
+        assert!(error.to_string().contains("array"));
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_ingress_rejects_invalid_document_identifier_utf8() -> crate::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let metadata_dir = temp.path().join("Metadata");
+        fs::create_dir(&metadata_dir)?;
+        fs::write(metadata_dir.join("DocumentIdentifier"), [0xff_u8, 0xfe])?;
+
+        let result = Bundle::parse_metadata(temp.path(), BundleLimits::default());
+        let error = result
+            .err()
+            .ok_or_else(|| Error::InvalidFormat("invalid UTF-8 was accepted".to_owned()))?;
+        assert!(error.to_string().contains("DocumentIdentifier"));
+        assert!(error.to_string().contains("UTF-8"));
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_ingress_rejects_unsigned_integer_outside_property_range() -> crate::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let metadata_dir = temp.path().join("Metadata");
+        fs::create_dir(&metadata_dir)?;
+        let properties = plist::Dictionary::from_iter([(
+            "TooLarge".to_owned(),
+            Value::Integer(u64::MAX.into()),
+        )]);
+        write_test_plist(
+            &metadata_dir.join("Properties.plist"),
+            &Value::Dictionary(properties),
+        )?;
+
+        let result = Bundle::parse_metadata(temp.path(), BundleLimits::default());
+        let error = result
+            .err()
+            .ok_or_else(|| Error::InvalidFormat("oversized integer was accepted".to_owned()))?;
+        assert!(error.to_string().contains("TooLarge"));
+        assert!(
+            error
+                .to_string()
+                .contains("outside the supported i64 range")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_ingress_bounds_each_metadata_file() -> crate::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let metadata_dir = temp.path().join("Metadata");
+        fs::create_dir(&metadata_dir)?;
+        fs::write(metadata_dir.join("DocumentIdentifier"), [b'x'; 32])?;
+        let limits = BundleLimits::new(
+            8,
+            BundleLimits::MAX_ENTRIES,
+            BundleLimits::MAX_ENTRY_BYTES,
+            BundleLimits::MAX_TOTAL_BYTES,
+            BundleLimits::MAX_IWA_STREAM_BYTES,
+        )?;
+
+        let result = Bundle::parse_metadata(temp.path(), limits);
+        let error = result
+            .err()
+            .ok_or_else(|| Error::InvalidFormat("oversized metadata was accepted".to_owned()))?;
+        assert!(error.to_string().contains("DocumentIdentifier"));
+        assert!(error.to_string().contains("8 byte limit"));
+        Ok(())
+    }
+
+    fn write_test_plist(path: &Path, value: &Value) -> crate::Result<()> {
+        let mut bytes = Vec::new();
+        value.to_writer_binary(&mut bytes).map_err(|error| {
+            Error::InvalidFormat(format!("failed to encode test plist: {error}"))
+        })?;
+        fs::write(path, bytes)?;
         Ok(())
     }
 
@@ -1441,7 +1729,7 @@ mod tests {
     fn snapshots_share_immutable_bundle_state() {
         let bundle = Bundle::from_parts(
             PathBuf::from("<test>"),
-            HashMap::new(),
+            Vec::new(),
             BundleMetadata::default(),
         );
         let snapshot = bundle.snapshot();
@@ -1455,7 +1743,7 @@ mod tests {
     }
 
     #[test]
-    fn bundle_queries_are_deterministic_across_archive_hash_map_order() -> Result<()> {
+    fn bundle_queries_preserve_sorted_archive_order() -> Result<()> {
         let archive_a = Archive {
             objects: vec![
                 ArchiveObject::new(
@@ -1494,10 +1782,10 @@ mod tests {
         };
         let bundle = Bundle::from_parts(
             PathBuf::from("<test>"),
-            HashMap::from([
-                ("Index/Z.iwa".to_owned(), archive_z),
+            vec![
                 ("Index/A.iwa".to_owned(), archive_a),
-            ]),
+                ("Index/Z.iwa".to_owned(), archive_z),
+            ],
             BundleMetadata::default(),
         );
 
@@ -1569,13 +1857,7 @@ mod tests {
 
         let bundle = Bundle::from_parts(
             PathBuf::from("<test>"),
-            HashMap::from([
-                (
-                    "Index/C.iwa".to_owned(),
-                    Archive {
-                        objects: vec![duplicate],
-                    },
-                ),
+            vec![
                 ("Index/A.iwa".to_owned(), empty),
                 (
                     "Index/B.iwa".to_owned(),
@@ -1583,7 +1865,13 @@ mod tests {
                         objects: vec![length_mismatch],
                     },
                 ),
-            ]),
+                (
+                    "Index/C.iwa".to_owned(),
+                    Archive {
+                        objects: vec![duplicate],
+                    },
+                ),
+            ],
             BundleMetadata::default(),
         );
 

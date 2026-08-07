@@ -3,6 +3,8 @@
 use super::*;
 use crate::IWorkThemeArchive;
 use crate::image_caption::CaptionThemeStyle;
+use litchi_keynote::slide::audio::Options as SlideAudioOptions;
+use litchi_keynote::slide::movie::Options as SlideMovieOptions;
 
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const MEDIA_STYLE_MESSAGE_TYPE: u32 = 3_016;
@@ -75,39 +77,23 @@ pub(in crate::keynote::editor) struct MovieCreationContext {
 }
 
 pub(in crate::keynote::editor) fn movie_creation_values(
-    options: KeynoteSlideMovieOptions,
+    options: SlideMovieOptions,
 ) -> Result<(DrawableGeometry, f32)> {
-    if options.size.width <= 0.0 || options.size.height <= 0.0 {
-        return Err(Error::ParseError(
-            "Keynote movie display size must be greater than zero".to_owned(),
-        ));
-    }
-    if !options.natural_size.width.is_finite()
-        || !options.natural_size.height.is_finite()
-        || options.natural_size.width <= 0.0
-        || options.natural_size.height <= 0.0
-    {
-        return Err(Error::ParseError(
-            "Keynote movie natural size must be finite and greater than zero".to_owned(),
-        ));
-    }
-    let duration_seconds = media_duration_seconds(options.duration, "movie")?;
     let geometry = DrawableGeometry {
-        position: Some(options.position),
-        size: Some(options.size),
+        position: Some(options.position()),
+        size: Some(options.size()),
         flags: Some(DEFAULT_DRAWABLE_FLAGS),
         angle: Some(DEFAULT_MOVIE_ROTATION_DEGREES),
     }
     .validate()?;
-    Ok((geometry, duration_seconds))
+    Ok((geometry, options.duration_seconds()))
 }
 
 pub(in crate::keynote::editor) fn audio_creation_values(
-    position: DrawablePoint,
-    duration: Duration,
+    options: SlideAudioOptions,
 ) -> Result<(DrawableGeometry, f32)> {
     let geometry = DrawableGeometry {
-        position: Some(position),
+        position: Some(options.position()),
         size: Some(DrawableSize {
             width: 0.0,
             height: 0.0,
@@ -116,17 +102,7 @@ pub(in crate::keynote::editor) fn audio_creation_values(
         angle: Some(DEFAULT_MOVIE_ROTATION_DEGREES),
     }
     .validate()?;
-    Ok((geometry, media_duration_seconds(duration, "audio")?))
-}
-
-fn media_duration_seconds(duration: Duration, kind: &str) -> Result<f32> {
-    let duration_seconds = duration.as_secs_f64();
-    if duration_seconds == 0.0 || duration_seconds > f64::from(f32::MAX) {
-        return Err(Error::ParseError(format!(
-            "Keynote {kind} duration must be greater than zero and fit in f32 seconds"
-        )));
-    }
-    Ok(duration_seconds as f32)
+    Ok((geometry, options.duration_seconds()))
 }
 
 pub(in crate::keynote::editor) fn movie_creation_context(

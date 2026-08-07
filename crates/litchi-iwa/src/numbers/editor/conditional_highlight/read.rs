@@ -4,12 +4,8 @@ use prost::Message;
 
 use super::native::DatePeriodPredicateKind;
 use super::*;
-use crate::table_cell_conditional_highlight::{
-    TableCellConditionalHighlightDateOffset, TableCellConditionalHighlightDateOffsetDirection,
-    TableCellConditionalHighlightDatePeriod, TableCellConditionalHighlightDatePeriodUnit,
-    TableCellConditionalHighlightNumber, TableCellConditionalHighlightRange,
-    TableCellConditionalHighlightRule, TableCellConditionalHighlightStyle,
-    TableCellConditionalHighlightText,
+use litchi_iwa_common::table::cell::conditional_highlight::{
+    Number, Offset, OffsetDirection, Period, PeriodUnit, Range, Rule, Style, Text,
 };
 
 const CONDITIONAL_STYLE_SET_MESSAGE_TYPE: u32 = 6_010;
@@ -20,7 +16,7 @@ pub(super) fn rules_at_location(
     package: &IWorkPackage,
     location: &CellLocation,
     column: usize,
-) -> Result<Option<Vec<TableCellConditionalHighlightRule>>> {
+) -> Result<Option<Vec<Rule>>> {
     let Some(cell) = read_tile_cell(
         package,
         &location.tile_archive,
@@ -75,7 +71,7 @@ fn decode_rules(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
     set: &tst::ConditionalStyleSetArchive,
-) -> Result<Vec<TableCellConditionalHighlightRule>> {
+) -> Result<Vec<Rule>> {
     let current = set.rules.as_ref().ok_or_else(unsupported_rule_graph)?;
     let declared = usize::try_from(set.rule_count).map_err(|_| {
         Error::InvalidFormat("conditional-highlight rule count overflow".to_owned())
@@ -100,7 +96,7 @@ fn decode_rule(
     locations: &HashMap<u64, String>,
     rule: &tst::conditional_style_set_archive::ConditionalStyleRule,
     prepivot: Option<&tst::conditional_style_set_archive::ConditionalStyleRulePrePivot>,
-) -> Result<TableCellConditionalHighlightRule> {
+) -> Result<Rule> {
     if prepivot.is_some_and(|prepivot| {
         rule.cell_style.identifier != prepivot.cell_style.identifier
             || rule.text_style.identifier != prepivot.text_style.identifier
@@ -111,9 +107,9 @@ fn decode_rule(
     let condition = decode_predicate(predicate, prepivot.map(|prepivot| &prepivot.predicate))?;
     let fill = decode_cell_style(package, locations, rule.cell_style.identifier)?;
     let (text_color, bold) = decode_text_style(package, locations, rule.text_style.identifier)?;
-    Ok(TableCellConditionalHighlightRule::new(
+    Ok(Rule::new(
         condition,
-        TableCellConditionalHighlightStyle::new(fill, text_color, bold).map_err(|_| {
+        Style::new(fill, text_color, bold).map_err(|_| {
             Error::InvalidFormat(
                 "conditional-highlight rule has no supported visual override".to_owned(),
             )
@@ -124,7 +120,7 @@ fn decode_rule(
 fn decode_predicate(
     predicate: &tst::FormulaPredicateArchive,
     prepivot: Option<&tst::FormulaPredicatePrePivotArchive>,
-) -> Result<TableCellConditionalHighlightCondition> {
+) -> Result<Condition> {
     let kind = NativePredicateKind::try_from(predicate.predicate_type)
         .map_err(|_| unsupported_rule_graph())?;
     let base_indexes = match kind {
@@ -248,7 +244,7 @@ fn decode_predicate(
 fn decode_date_period_predicate(
     predicate: &tst::FormulaPredicateArchive,
     kind: DatePeriodPredicateKind,
-) -> Result<TableCellConditionalHighlightCondition> {
+) -> Result<Condition> {
     if predicate
         .param_value2
         .as_ref()
@@ -267,25 +263,21 @@ fn decode_date_period_predicate(
         .as_ref()
         .ok_or_else(unsupported_rule_graph)?;
     let units = [
-        TableCellConditionalHighlightDatePeriodUnit::Days,
-        TableCellConditionalHighlightDatePeriodUnit::Weeks,
-        TableCellConditionalHighlightDatePeriodUnit::Months,
-        TableCellConditionalHighlightDatePeriodUnit::Quarters,
-        TableCellConditionalHighlightDatePeriodUnit::Years,
+        PeriodUnit::Days,
+        PeriodUnit::Weeks,
+        PeriodUnit::Months,
+        PeriodUnit::Quarters,
+        PeriodUnit::Years,
     ];
     for unit in units {
-        let period = TableCellConditionalHighlightDatePeriod::new(count, unit)
-            .map_err(|_| unsupported_rule_graph())?;
+        let period = Period::new(count, unit).map_err(|_| unsupported_rule_graph())?;
         if let Some(condition) = kind.period_condition(period)
             && formula::validate(formula, NativePredicateKind::DatePeriod(kind), &condition).is_ok()
         {
             return Ok(condition);
         }
-        for direction in [
-            TableCellConditionalHighlightDateOffsetDirection::Ago,
-            TableCellConditionalHighlightDateOffsetDirection::FromNow,
-        ] {
-            let offset = TableCellConditionalHighlightDateOffset::new(period, direction);
+        for direction in [OffsetDirection::Ago, OffsetDirection::FromNow] {
+            let offset = Offset::new(period, direction);
             if let Some(condition) = kind.offset_condition(offset)
                 && formula::validate(formula, NativePredicateKind::DatePeriod(kind), &condition)
                     .is_ok()
@@ -300,7 +292,7 @@ fn decode_date_period_predicate(
 fn decode_checkbox_predicate(
     predicate: &tst::FormulaPredicateArchive,
     kind: CheckboxPredicateKind,
-) -> Result<TableCellConditionalHighlightCondition> {
+) -> Result<Condition> {
     validate_operand_free_predicate(predicate)?;
     Ok(kind.condition())
 }
@@ -308,7 +300,7 @@ fn decode_checkbox_predicate(
 fn decode_boolean_predicate(
     predicate: &tst::FormulaPredicateArchive,
     kind: BooleanPredicateKind,
-) -> Result<TableCellConditionalHighlightCondition> {
+) -> Result<Condition> {
     validate_operand_free_predicate(predicate)?;
     Ok(kind.condition())
 }
@@ -316,7 +308,7 @@ fn decode_boolean_predicate(
 fn decode_cell_predicate(
     predicate: &tst::FormulaPredicateArchive,
     kind: CellPredicateKind,
-) -> Result<TableCellConditionalHighlightCondition> {
+) -> Result<Condition> {
     validate_operand_free_predicate(predicate)?;
     Ok(kind.condition())
 }
@@ -324,7 +316,7 @@ fn decode_cell_predicate(
 fn decode_sign_predicate(
     predicate: &tst::FormulaPredicateArchive,
     kind: NumericSignPredicateKind,
-) -> Result<TableCellConditionalHighlightCondition> {
+) -> Result<Condition> {
     validate_operand_free_predicate(predicate)?;
     Ok(kind.condition())
 }
@@ -332,7 +324,7 @@ fn decode_sign_predicate(
 fn decode_date_predicate(
     predicate: &tst::FormulaPredicateArchive,
     kind: RelativeDatePredicateKind,
-) -> Result<TableCellConditionalHighlightCondition> {
+) -> Result<Condition> {
     validate_operand_free_predicate(predicate)?;
     Ok(kind.condition())
 }
@@ -340,12 +332,11 @@ fn decode_date_predicate(
 fn decode_fixed_date_predicate(
     predicate: &tst::FormulaPredicateArchive,
     kind: FixedDatePredicateKind,
-) -> Result<TableCellConditionalHighlightCondition> {
+) -> Result<Condition> {
     let lower = decode_date_argument(predicate.param_value1.as_ref())?;
     if kind.is_range() {
         let upper = decode_date_argument(predicate.param_value2.as_ref())?;
-        let range = TableCellConditionalHighlightDateRange::new(lower, upper)
-            .map_err(|_| unsupported_rule_graph())?;
+        let range = DateRange::new(lower, upper).map_err(|_| unsupported_rule_graph())?;
         return kind
             .range_condition(range)
             .ok_or_else(unsupported_rule_graph);
@@ -377,7 +368,7 @@ fn validate_operand_free_predicate(predicate: &tst::FormulaPredicateArchive) -> 
 fn decode_numeric_predicate(
     predicate: &tst::FormulaPredicateArchive,
     kind: NumericPredicateKind,
-) -> Result<TableCellConditionalHighlightCondition> {
+) -> Result<Condition> {
     let first = decode_number_argument(predicate.param_value1.as_ref())?;
     let second = if kind.is_range() {
         Some(decode_number_argument(predicate.param_value2.as_ref())?)
@@ -393,18 +384,12 @@ fn decode_numeric_predicate(
         None
     };
     match (kind, second) {
-        (NumericPredicateKind::Between, Some(upper)) => {
-            Ok(TableCellConditionalHighlightCondition::Between(
-                TableCellConditionalHighlightRange::new(first, upper)
-                    .map_err(|_| unsupported_rule_graph())?,
-            ))
-        },
-        (NumericPredicateKind::NotBetween, Some(upper)) => {
-            Ok(TableCellConditionalHighlightCondition::NotBetween(
-                TableCellConditionalHighlightRange::new(first, upper)
-                    .map_err(|_| unsupported_rule_graph())?,
-            ))
-        },
+        (NumericPredicateKind::Between, Some(upper)) => Ok(Condition::Between(
+            Range::new(first, upper).map_err(|_| unsupported_rule_graph())?,
+        )),
+        (NumericPredicateKind::NotBetween, Some(upper)) => Ok(Condition::NotBetween(
+            Range::new(first, upper).map_err(|_| unsupported_rule_graph())?,
+        )),
         (_, None) => kind
             .single_condition(first)
             .ok_or_else(unsupported_rule_graph),
@@ -415,7 +400,7 @@ fn decode_numeric_predicate(
 fn decode_text_predicate(
     predicate: &tst::FormulaPredicateArchive,
     kind: TextPredicateKind,
-) -> Result<TableCellConditionalHighlightCondition> {
+) -> Result<Condition> {
     if predicate
         .param_value2
         .as_ref()
@@ -431,31 +416,26 @@ fn decode_text_predicate(
         .and_then(|argument| argument.arg_value.as_ref())
         .and_then(|value| value.string_value.as_deref())
         .ok_or_else(unsupported_rule_graph)?;
-    let text =
-        TableCellConditionalHighlightText::new(value).map_err(|_| unsupported_rule_graph())?;
+    let text = Text::new(value).map_err(|_| unsupported_rule_graph())?;
     Ok(kind.condition(text))
 }
 
-fn decode_number_argument(
-    argument: Option<&tst::FormulaPredArgArchive>,
-) -> Result<TableCellConditionalHighlightNumber> {
+fn decode_number_argument(argument: Option<&tst::FormulaPredArgArchive>) -> Result<Number> {
     let value = argument
         .filter(|argument| argument.arg_type == PREDICATE_ARGUMENT_NUMBER)
         .and_then(|argument| argument.arg_value.as_ref())
         .and_then(|value| value.double_value)
         .ok_or_else(unsupported_rule_graph)?;
-    TableCellConditionalHighlightNumber::new(value).map_err(|_| unsupported_rule_graph())
+    Number::new(value).map_err(|_| unsupported_rule_graph())
 }
 
-fn decode_date_argument(
-    argument: Option<&tst::FormulaPredArgArchive>,
-) -> Result<TableCellConditionalHighlightDate> {
+fn decode_date_argument(argument: Option<&tst::FormulaPredArgArchive>) -> Result<Date> {
     let value = argument
         .filter(|argument| argument.arg_type == PREDICATE_ARGUMENT_DATE)
         .and_then(|argument| argument.arg_value.as_ref())
         .and_then(|value| value.date_value)
         .ok_or_else(unsupported_rule_graph)?;
-    TableCellConditionalHighlightDate::new(value).map_err(|_| unsupported_rule_graph())
+    Date::new(value).map_err(|_| unsupported_rule_graph())
 }
 
 fn decode_cell_style(

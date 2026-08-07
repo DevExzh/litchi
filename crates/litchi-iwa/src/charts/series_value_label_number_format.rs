@@ -7,7 +7,9 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use litchi_iwa_common::chart::number_format::NumberFormat;
+
+use crate::charts::Kind;
 use crate::charts::number_format::{
     DualNumberFormatFields, patch_dual_number_format, read_dual_number_format,
 };
@@ -18,13 +20,6 @@ use crate::charts::series_non_style::{
 };
 use crate::protobuf::tsch;
 use crate::{Error, IWorkPackage, Result};
-
-pub use crate::charts::number_format::{
-    ChartDecimalPlaces as ChartSeriesValueLabelDecimalPlaces,
-    ChartFixedDecimalPlaces as ChartSeriesValueLabelFixedDecimalPlaces,
-    ChartNegativeStyle as ChartSeriesValueLabelNegativeStyle,
-    ChartNumberFormat as ChartSeriesValueLabelNumberFormat,
-};
 
 const SERIES_NUMBER_FORMAT_FIELDS: DualNumberFormatFields = DualNumberFormatFields {
     legacy: 21,
@@ -39,9 +34,9 @@ pub(crate) fn chart_series_value_label_number_formats(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     series_count: usize,
-) -> Result<Vec<ChartSeriesValueLabelNumberFormat>> {
+) -> Result<Vec<NumberFormat>> {
     ensure_supported_kind(kind)?;
     chart_series_non_style_values(
         package,
@@ -49,7 +44,7 @@ pub(crate) fn chart_series_value_label_number_formats(
         drawable_object_id,
         drawable_label,
         series_count,
-        ChartSeriesValueLabelNumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
+        NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
         read_number_format,
     )
 }
@@ -60,8 +55,8 @@ pub(crate) fn set_chart_series_value_label_number_formats(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
-    expected: &[ChartSeriesValueLabelNumberFormat],
+    kind: Kind,
+    expected: &[NumberFormat],
 ) -> Result<()> {
     ensure_supported_kind(kind)?;
     set_chart_series_non_style_values(
@@ -72,14 +67,14 @@ pub(crate) fn set_chart_series_value_label_number_formats(
         "series value-label number formats",
         NewChartSeriesNonStyleBase::Styled,
         expected,
-        ChartSeriesValueLabelNumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
+        NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
         read_number_format,
         patch_number_format,
     )
 }
 
-fn ensure_supported_kind(kind: ChartKind) -> Result<()> {
-    if matches!(kind, ChartKind::Undefined | ChartKind::Unsupported(_)) {
+fn ensure_supported_kind(kind: Kind) -> Result<()> {
+    if kind == Kind::Undefined || kind.is_unsupported() {
         return Err(Error::InvalidFormat(format!(
             "chart kind {kind:?} has no supported series value-label number format"
         )));
@@ -87,7 +82,7 @@ fn ensure_supported_kind(kind: ChartKind) -> Result<()> {
     Ok(())
 }
 
-fn read_number_format(data: &[u8]) -> Result<ChartSeriesValueLabelNumberFormat> {
+fn read_number_format(data: &[u8]) -> Result<NumberFormat> {
     let extension = generated_chart_series_non_style_extension(data)?;
     if let Some(extension) = extension {
         tsch::generated::ChartSeriesNonStyleArchive::decode(extension)?;
@@ -95,18 +90,14 @@ fn read_number_format(data: &[u8]) -> Result<ChartSeriesValueLabelNumberFormat> 
     read_dual_number_format(
         extension,
         SERIES_NUMBER_FORMAT_FIELDS,
-        ChartSeriesValueLabelNumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
+        NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
         FORMAT_CONTEXT,
     )
 }
 
-fn patch_number_format(
-    data: &[u8],
-    expected: &ChartSeriesValueLabelNumberFormat,
-) -> Result<Vec<u8>> {
+fn patch_number_format(data: &[u8], expected: &NumberFormat) -> Result<Vec<u8>> {
     let existing_extension = generated_chart_series_non_style_extension(data)?;
-    if existing_extension.is_none()
-        && *expected == ChartSeriesValueLabelNumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT
+    if existing_extension.is_none() && *expected == NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT
     {
         return Ok(data.to_vec());
     }
@@ -116,7 +107,7 @@ fn patch_number_format(
         extension,
         SERIES_NUMBER_FORMAT_FIELDS,
         *expected,
-        ChartSeriesValueLabelNumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
+        NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
         FORMAT_CONTEXT,
     )?
     else {
@@ -140,11 +131,12 @@ mod tests {
     use super::*;
     use crate::charts::series_non_style::canonical_empty_chart_series_non_style_data;
     use crate::wire::{append_varint_field, parse_wire_fields};
+    use litchi_iwa_common::chart::number_format::{DecimalPlaces, NegativeStyle};
 
-    fn custom_format() -> ChartSeriesValueLabelNumberFormat {
-        ChartSeriesValueLabelNumberFormat::new(
-            ChartSeriesValueLabelDecimalPlaces::fixed(2).unwrap(),
-            ChartSeriesValueLabelNegativeStyle::Parentheses,
+    fn custom_format() -> NumberFormat {
+        NumberFormat::new(
+            DecimalPlaces::fixed(2).unwrap(),
+            NegativeStyle::Parentheses,
             false,
         )
     }
@@ -167,7 +159,7 @@ mod tests {
                 parse_wire_fields(extension)
                     .unwrap()
                     .iter()
-                    .filter(|wire| wire.number == field)
+                    .filter(|wire| wire.number() == field)
                     .count(),
                 1
             );
@@ -193,11 +185,11 @@ mod tests {
         let unknown = parse_wire_fields(extension)
             .unwrap()
             .into_iter()
-            .find(|field| field.number == UNKNOWN_FIELD)
+            .find(|field| field.number() == UNKNOWN_FIELD)
             .unwrap();
         assert_eq!(
-            &extension[unknown.key_end..unknown.end],
-            crate::varint::encode_varint(73)
+            &extension[unknown.key_end()..unknown.end()],
+            litchi_iwa_common::varint::encode_varint(73)
         );
     }
 
@@ -205,11 +197,8 @@ mod tests {
     fn default_format_does_not_materialize_sparse_storage() {
         let original = canonical_empty_chart_series_non_style_data().unwrap();
         assert_eq!(
-            patch_number_format(
-                &original,
-                &ChartSeriesValueLabelNumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT
-            )
-            .unwrap(),
+            patch_number_format(&original, &NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT)
+                .unwrap(),
             original
         );
     }

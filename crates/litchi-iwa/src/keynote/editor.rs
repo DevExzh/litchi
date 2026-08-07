@@ -3,13 +3,19 @@
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::path::Path;
+use std::rc::Rc;
 
+use litchi_iwa_common::comment::{
+    DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId,
+};
+use litchi_iwa_text::columns::Columns;
+use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
+use litchi_iwa_text::position::TextPosition;
 use prost::Message;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
-use crate::comments::{
-    DrawableCommentInfo, DrawableCommentReplyInfo, IWorkDrawableCommentEditor, IWorkDrawableInfo,
-};
+use crate::comments::IWorkDrawableCommentEditor;
+use crate::media::MediaAssetId;
 use crate::media::reachable_embedded_assets;
 use crate::package_metadata::{
     add_component_external_reference, add_component_link, add_component_object_uuids,
@@ -20,25 +26,25 @@ use crate::package_metadata::{
     set_package_last_object_identifier,
 };
 use crate::protobuf::{kn, tsd, tsp, tss, tswp};
-use crate::ref_graph::ObjectId;
 use crate::shapes::{
-    DrawableGeometry, DrawableProperties, RgbaColor, ShapeTextLayout, reset_shape_text_columns,
+    DrawableGeometry, DrawableProperties, RgbaColor, reset_shape_text_columns,
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
+use crate::text::layout::Layout;
 use crate::text::{
-    IWorkTextEditor, ParagraphBackground, ParagraphBorders, ParagraphDecimalTabCharacter,
-    ParagraphDefaultTabInterval, ParagraphDropCap, ParagraphDropCapPlacement, ParagraphFlow,
-    ParagraphIndents, ParagraphLineSpacing, ParagraphList, ParagraphListBullet,
+    Alignment, Background as TextAppearanceBackground, Borders, IWorkTextEditor, Indents,
+    LineSpacing, Outline, ParagraphBackground, ParagraphDecimalTabCharacter,
+    ParagraphDefaultTabInterval, ParagraphFlow, ParagraphList, ParagraphListBullet,
     ParagraphListBulletGeometry, ParagraphListIndentation, ParagraphListLabelColor,
     ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
-    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering, ParagraphSpacing,
-    ParagraphStart, ParagraphTabStops, ParagraphWritingDirection, TextAlignment, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumns, TextComment,
-    TextCommentBody, TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId,
-    TextDecorations, TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId,
-    TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextOutline, TextPosition,
-    TextRange, TextScript, TextShadow, TextStorageInfo, TextStyle,
+    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering,
+    ParagraphTabStops, ParagraphWritingDirection, Shadow, Spacing, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextComment, TextCommentBody, TextCommentId,
+    TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations, TextFont,
+    TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    TextLanguage, TextLanguageRun, TextLigatures, TextRange, TextScript, TextStorageId,
+    TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
@@ -49,6 +55,10 @@ use crate::wire::{
     transform_length_delimited_field, transform_length_delimited_fields_at_path,
 };
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
+use litchi_iwa_graph::ObjectId;
+use litchi_keynote::build as semantic_build;
+pub use litchi_keynote::build::{Acceleration as BuildAcceleration, Start as BuildStart};
+use litchi_keynote::transition::Settings as TransitionSettings;
 
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3_097;
@@ -73,6 +83,12 @@ const SWOOSH_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.BLTSwoosh";
 const TRACE_BUILD_EFFECT: &str = "com.apple.iWork.Keynote.Trace";
 const DRAWABLE_DUPLICATE_OFFSET: f32 = 10.0;
 const TABLE_DUPLICATE_OFFSET: f32 = DRAWABLE_DUPLICATE_OFFSET;
+// These caches are deliberately operation-scoped.  Keeping only the compact
+// slide ownership data lets `slide_text_storages` reuse the decode performed
+// by `slides` without retaining decoded protobufs on a mutable editor.
+const MAX_OPERATION_CACHED_SLIDES: usize = 128;
+const MAX_OPERATION_CACHED_DRAWABLES_PER_SLIDE: usize = 512;
+const MAX_OPERATION_CACHED_DRAWABLE_STORAGES: usize = 1_024;
 
 /// Writable text targets resolved from one slide in presentation order.
 #[derive(Debug, Clone, PartialEq)]
@@ -97,12 +113,12 @@ pub struct KeynoteSlideInfo {
     /// `None` means the selected layout has no body placeholder. Hidden
     /// placeholders retain their storage, so [`Self::body`] remains readable.
     pub is_body_visible: Option<bool>,
-    pub transition: Option<KeynoteTransitionSettings>,
-    pub title_storage_id: Option<u64>,
+    pub transition: Option<TransitionSettings>,
+    pub title_storage_id: Option<TextStorageId>,
     pub title: Option<String>,
-    pub body_storage_id: Option<u64>,
+    pub body_storage_id: Option<TextStorageId>,
     pub body: Option<String>,
-    pub notes_storage_id: Option<u64>,
+    pub notes_storage_id: Option<TextStorageId>,
     pub notes: Option<String>,
 }
 
@@ -169,7 +185,7 @@ struct KeynoteTextBoxGraph {
     slide_id: u64,
     archive_name: String,
     drawable_id: u64,
-    storage_id: u64,
+    storage_id: TextStorageId,
     object_ids: Vec<u64>,
     uuid_object_ids: Vec<u64>,
 }
@@ -196,29 +212,6 @@ fn required_length_delimited_payload<'a>(
     })
 }
 
-/// Native start relationship for one Keynote build event.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteBuildStart {
-    /// Advance to this build with a presenter click.
-    OnClick,
-    /// Start automatically after the slide transition.
-    AfterTransition,
-    /// Start concurrently with the preceding build event.
-    WithPrevious,
-    /// Start after the preceding build event completes.
-    AfterPrevious,
-}
-
-/// Speed curve for a Keynote action build.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KeynoteBuildAcceleration {
-    None,
-    EaseIn,
-    EaseOut,
-    EaseInOut,
-    Custom,
-}
-
 /// Rotation direction for a Keynote Rotate action build.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KeynoteRotationDirection {
@@ -232,7 +225,7 @@ pub struct KeynoteRotationAction {
     /// Total rotation in degrees. For example, two full turns plus 90° is 810°.
     pub total_degrees: f64,
     pub direction: KeynoteRotationDirection,
-    pub acceleration: KeynoteBuildAcceleration,
+    pub acceleration: BuildAcceleration,
 }
 
 /// Typed parameters for Keynote's object Scale action.
@@ -240,7 +233,7 @@ pub struct KeynoteRotationAction {
 pub struct KeynoteScaleAction {
     /// Final size as a factor of the object's original size (`1.5` is 150%).
     pub scale_factor: f64,
-    pub acceleration: KeynoteBuildAcceleration,
+    pub acceleration: BuildAcceleration,
 }
 
 /// Typed parameters for Keynote's object Opacity action.
@@ -248,7 +241,7 @@ pub struct KeynoteScaleAction {
 pub struct KeynoteOpacityAction {
     /// Final opacity in Keynote percentage points (`37.0` is 37%).
     pub opacity_percent: f64,
-    pub acceleration: KeynoteBuildAcceleration,
+    pub acceleration: BuildAcceleration,
 }
 
 /// Node kind used by Keynote's editable Bézier motion paths.
@@ -420,7 +413,7 @@ impl KeynoteBuildTimingCurve {
 pub struct KeynoteMoveAction {
     pub path: KeynoteMotionPath,
     pub align_to_path: bool,
-    pub acceleration: KeynoteBuildAcceleration,
+    pub acceleration: BuildAcceleration,
 }
 
 /// Horizontal direction used by Keynote's Flip emphasis action.
@@ -539,44 +532,200 @@ impl KeynoteBuildCustomParameters {
 /// preserves effects introduced by newer Keynote releases.
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeynoteBuildSettings {
-    pub delivery: String,
-    pub animation_type: String,
-    pub effect: String,
-    pub duration: f64,
+    pub(crate) delivery: String,
+    pub(crate) animation_type: String,
+    pub(crate) effect: String,
+    pub(crate) duration: f64,
     /// Delay before an `AfterTransition` or `AfterPrevious` build starts.
-    pub delay: f64,
-    pub start: KeynoteBuildStart,
-    pub direction: Option<u32>,
+    pub(crate) delay: f64,
+    pub(crate) start: BuildStart,
+    pub(crate) direction: Option<u32>,
     /// Raw `BuildAttributesTextDelivery` value for forward compatibility.
-    pub text_delivery: Option<i32>,
+    pub(crate) text_delivery: Option<i32>,
     /// Raw `BuildAttributesDeliveryOption` value for forward compatibility.
-    pub delivery_option: Option<i32>,
-    pub event_trigger: Option<u32>,
+    pub(crate) delivery_option: Option<i32>,
+    pub(crate) event_trigger: Option<u32>,
     /// Present for Keynote's native `apple:action-rotation` action effect.
-    pub rotation: Option<KeynoteRotationAction>,
+    pub(crate) rotation: Option<KeynoteRotationAction>,
     /// Present for Keynote's native `apple:action-scale` action effect.
-    pub scale: Option<KeynoteScaleAction>,
+    pub(crate) scale: Option<KeynoteScaleAction>,
     /// Present for Keynote's native `apple:action-opacity` action effect.
-    pub opacity: Option<KeynoteOpacityAction>,
+    pub(crate) opacity: Option<KeynoteOpacityAction>,
     /// Present for Keynote's native `apple:action-motion-path` action effect.
-    pub move_action: Option<KeynoteMoveAction>,
+    pub(crate) move_action: Option<KeynoteMoveAction>,
     /// Present for Keynote's Blink/Bounce/Flip/Jiggle/Pop/Pulse actions.
-    pub emphasis: Option<KeynoteEmphasisAction>,
+    pub(crate) emphasis: Option<KeynoteEmphasisAction>,
     /// Present for Keynote's native `apple:keyboard` build-in/build-out effect.
-    pub keyboard: Option<KeynoteKeyboardBuild>,
+    pub(crate) keyboard: Option<KeynoteKeyboardBuild>,
     /// Present for typed Dissolve, Shimmer, Skid, Swoosh, and Trace builds.
-    pub object_effect: Option<KeynoteObjectBuildEffect>,
+    pub(crate) object_effect: Option<KeynoteObjectBuildEffect>,
     /// Inline curve for a typed action whose acceleration is
-    /// [`KeynoteBuildAcceleration::Custom`].
+    /// [`BuildAcceleration::Custom`].
     ///
     /// `None` preserves an opaque app-native custom curve while updating an
     /// existing build. New custom-curve actions require `Some`.
-    pub timing_curve: Option<KeynoteBuildTimingCurve>,
+    pub(crate) timing_curve: Option<KeynoteBuildTimingCurve>,
     /// Raw parameters for native effects without a dedicated typed model.
-    pub custom_parameters: KeynoteBuildCustomParameters,
+    pub(crate) custom_parameters: KeynoteBuildCustomParameters,
 }
 
 impl KeynoteBuildSettings {
+    /// Project the native adapter state into the bounded archive-free model.
+    ///
+    /// Native identifiers, presence bits, and opaque parameter fields stay in
+    /// this crate; callers receive only the validated semantic build value.
+    pub fn semantic(&self) -> Result<semantic_build::Settings> {
+        builds::semantic_settings(self)
+    }
+
+    /// Return the semantic effect after validation.
+    pub fn effect(&self) -> Result<semantic_build::Effect> {
+        self.semantic().map(|settings| settings.effect().clone())
+    }
+
+    /// Replace the native build effect from a checked semantic value.
+    pub fn set_effect(&mut self, effect: litchi_keynote::build::Effect) -> Result<()> {
+        let mut candidate = self.clone();
+        apply_semantic_build_effect(&mut candidate, effect)?;
+        builds::validate_build_settings(&candidate)?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Return the semantic start relationship.
+    pub fn start(&self) -> Result<BuildStart> {
+        self.semantic().map(|settings| settings.start())
+    }
+
+    /// Return the semantic duration.
+    pub fn duration(&self) -> Result<litchi_keynote::Seconds> {
+        self.semantic().map(|settings| settings.duration())
+    }
+
+    /// Return the semantic delay.
+    pub fn delay(&self) -> Result<litchi_keynote::Seconds> {
+        self.semantic().map(|settings| settings.delay())
+    }
+
+    /// Replace the start relationship transactionally.
+    pub fn set_start(&mut self, start: BuildStart) -> Result<()> {
+        let mut candidate = self.semantic()?;
+        candidate.set_start(start).map_err(|error| {
+            Error::ParseError(format!("invalid Keynote build start relationship: {error}"))
+        })?;
+        self.start = start;
+        Ok(())
+    }
+
+    /// Replace the delay transactionally.
+    pub fn set_delay(&mut self, delay: litchi_keynote::Seconds) -> Result<()> {
+        let mut candidate = self.semantic()?;
+        candidate
+            .set_delay(delay)
+            .map_err(|error| Error::ParseError(format!("invalid Keynote build delay: {error}")))?;
+        self.delay = delay.as_f64();
+        Ok(())
+    }
+
+    /// Replace the duration with a validated semantic value.
+    pub fn set_duration(&mut self, duration: litchi_keynote::Seconds) -> Result<()> {
+        let mut candidate = self.semantic()?;
+        candidate.set_duration(duration);
+        candidate.validate().map_err(|error| {
+            Error::ParseError(format!("invalid Keynote build duration: {error}"))
+        })?;
+        self.duration = duration.as_f64();
+        Ok(())
+    }
+
+    /// Replace the timing acceleration of a typed Rotate, Scale, Opacity, or
+    /// Move action.
+    pub fn set_action_acceleration(&mut self, acceleration: BuildAcceleration) -> Result<()> {
+        if acceleration.kind().is_none() {
+            return Err(Error::ParseError(
+                "Keynote action acceleration is not a recognized value".to_owned(),
+            ));
+        }
+        let mut candidate = self.clone();
+        let mut found = false;
+        if let Some(action) = candidate.rotation.as_mut() {
+            action.acceleration = acceleration;
+            found = true;
+        } else if let Some(action) = candidate.scale.as_mut() {
+            action.acceleration = acceleration;
+            found = true;
+        } else if let Some(action) = candidate.opacity.as_mut() {
+            action.acceleration = acceleration;
+            found = true;
+        } else if let Some(action) = candidate.move_action.as_mut() {
+            action.acceleration = acceleration;
+            found = true;
+        }
+        if !found {
+            return Err(Error::ParseError(
+                "Keynote action acceleration requires a typed action".to_owned(),
+            ));
+        }
+        if acceleration != BuildAcceleration::Custom {
+            candidate.timing_curve = None;
+        }
+        builds::validate_build_settings(&candidate)?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Replace the editable path of a typed Move action.
+    pub fn set_move_path(&mut self, path: KeynoteMotionPath) -> Result<()> {
+        if self.move_action.is_none() {
+            return Err(Error::ParseError(
+                "Keynote Move path requires a typed Move action".to_owned(),
+            ));
+        }
+        builds::validate_motion_path(&path)?;
+        let mut candidate = self.clone();
+        let Some(action) = candidate.move_action.as_mut() else {
+            return Err(Error::ParseError(
+                "Keynote Move path requires a typed Move action".to_owned(),
+            ));
+        };
+        action.path = path;
+        builds::validate_build_settings(&candidate)?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Replace whether a typed Move action follows its path tangent.
+    pub fn set_move_alignment(&mut self, align_to_path: bool) -> Result<()> {
+        let mut candidate = self.clone();
+        let Some(action) = candidate.move_action.as_mut() else {
+            return Err(Error::ParseError(
+                "Keynote Move alignment requires a typed Move action".to_owned(),
+            ));
+        };
+        action.align_to_path = align_to_path;
+        builds::validate_build_settings(&candidate)?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Replace the start relationship in a consuming builder step.
+    pub fn with_start(mut self, start: BuildStart) -> Result<Self> {
+        self.set_start(start)?;
+        Ok(self)
+    }
+
+    /// Replace the delay in a consuming builder step.
+    pub fn with_delay(mut self, delay: litchi_keynote::Seconds) -> Result<Self> {
+        self.set_delay(delay)?;
+        Ok(self)
+    }
+
+    /// Replace the duration in a consuming builder step.
+    pub fn with_duration(mut self, duration: litchi_keynote::Seconds) -> Result<Self> {
+        self.set_duration(duration)?;
+        Ok(self)
+    }
+
     /// Native playback trigger attached to a newly inserted audio clip.
     pub(crate) fn audio_start() -> Self {
         Self {
@@ -607,7 +756,7 @@ impl KeynoteBuildSettings {
             effect: "apple:bc-appear".to_owned(),
             duration: 1.0,
             delay: 0.0,
-            start: KeynoteBuildStart::OnClick,
+            start: BuildStart::OnClick,
             direction: None,
             text_delivery: Some(
                 kn::build_attributes_archive::BuildAttributesTextDelivery::KTextDeliveryByObject
@@ -721,7 +870,7 @@ impl KeynoteBuildSettings {
             rotation: Some(KeynoteRotationAction {
                 total_degrees,
                 direction,
-                acceleration: KeynoteBuildAcceleration::EaseInOut,
+                acceleration: BuildAcceleration::EaseInOut,
             }),
             scale: None,
             opacity: None,
@@ -740,7 +889,7 @@ impl KeynoteBuildSettings {
             rotation: None,
             scale: Some(KeynoteScaleAction {
                 scale_factor,
-                acceleration: KeynoteBuildAcceleration::EaseInOut,
+                acceleration: BuildAcceleration::EaseInOut,
             }),
             opacity: None,
             move_action: None,
@@ -759,7 +908,7 @@ impl KeynoteBuildSettings {
             scale: None,
             opacity: Some(KeynoteOpacityAction {
                 opacity_percent,
-                acceleration: KeynoteBuildAcceleration::EaseInOut,
+                acceleration: BuildAcceleration::EaseInOut,
             }),
             move_action: None,
             ..Self::appear_in()
@@ -784,7 +933,7 @@ impl KeynoteBuildSettings {
             move_action: Some(KeynoteMoveAction {
                 path,
                 align_to_path: false,
-                acceleration: KeynoteBuildAcceleration::EaseInOut,
+                acceleration: BuildAcceleration::EaseInOut,
             }),
             ..Self::appear_in()
         }
@@ -793,7 +942,7 @@ impl KeynoteBuildSettings {
     /// Attach a custom timing curve to a typed action.
     ///
     /// This changes the action's acceleration to
-    /// [`KeynoteBuildAcceleration::Custom`]. It returns an error when this is
+    /// [`BuildAcceleration::Custom`]. It returns an error when this is
     /// not a Rotate, Scale, Opacity, or Move action.
     pub fn with_custom_timing_curve(
         mut self,
@@ -806,7 +955,7 @@ impl KeynoteBuildSettings {
     /// Replace the custom timing curve of a typed action.
     ///
     /// This changes the action's acceleration to
-    /// [`KeynoteBuildAcceleration::Custom`]. It returns an error when this is
+    /// [`BuildAcceleration::Custom`]. It returns an error when this is
     /// not a Rotate, Scale, Opacity, or Move action.
     pub fn set_custom_timing_curve(&mut self, timing_curve: KeynoteBuildTimingCurve) -> Result<()> {
         validate_timing_curve(&timing_curve)?;
@@ -823,7 +972,7 @@ impl KeynoteBuildSettings {
                 "Keynote custom timing curves require a typed action".to_owned(),
             ));
         };
-        *acceleration = KeynoteBuildAcceleration::Custom;
+        *acceleration = BuildAcceleration::Custom;
         self.timing_curve = Some(timing_curve);
         Ok(())
     }
@@ -938,6 +1087,337 @@ impl KeynoteBuildSettings {
     }
 }
 
+fn apply_semantic_build_effect(
+    settings: &mut KeynoteBuildSettings,
+    effect: litchi_keynote::build::Effect,
+) -> Result<()> {
+    effect
+        .validate()
+        .map_err(|error| Error::ParseError(format!("invalid Keynote build effect: {error}")))?;
+    let previous_timing_curve = settings.timing_curve.clone();
+    settings.direction = None;
+    settings.rotation = None;
+    settings.scale = None;
+    settings.opacity = None;
+    settings.move_action = None;
+    settings.emphasis = None;
+    settings.keyboard = None;
+    settings.object_effect = None;
+    settings.timing_curve = None;
+    settings.custom_parameters = KeynoteBuildCustomParameters::default();
+
+    match effect {
+        litchi_keynote::build::Effect::Appear => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            settings.effect = "apple:bc-appear".to_owned();
+        },
+        litchi_keynote::build::Effect::Dissolve => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            settings.effect = "apple:bc-dissolve".to_owned();
+        },
+        litchi_keynote::build::Effect::MoveIn => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            settings.effect = "apple:bc-move".to_owned();
+        },
+        litchi_keynote::build::Effect::Scale => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            settings.effect = "apple:bc-scale".to_owned();
+        },
+        litchi_keynote::build::Effect::FadeAndScale => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            settings.effect = "apple:bc-fade-scale".to_owned();
+        },
+        litchi_keynote::build::Effect::Action(action) => {
+            settings.animation_type = "Action".to_owned();
+            settings.effect = action.identifier().to_owned();
+            match action {
+                litchi_keynote::build::Action::Rotate(action) => {
+                    settings.rotation = Some(KeynoteRotationAction {
+                        total_degrees: action.total_degrees(),
+                        direction: match action.direction() {
+                            litchi_keynote::build::RotationDirection::Clockwise => {
+                                KeynoteRotationDirection::Clockwise
+                            },
+                            litchi_keynote::build::RotationDirection::Counterclockwise => {
+                                KeynoteRotationDirection::Counterclockwise
+                            },
+                        },
+                        acceleration: action.acceleration(),
+                    });
+                },
+                litchi_keynote::build::Action::Scale(action) => {
+                    settings.scale = Some(KeynoteScaleAction {
+                        scale_factor: action.factor(),
+                        acceleration: action.acceleration(),
+                    });
+                },
+                litchi_keynote::build::Action::Opacity(action) => {
+                    settings.opacity = Some(KeynoteOpacityAction {
+                        opacity_percent: action.percent(),
+                        acceleration: action.acceleration(),
+                    });
+                },
+                litchi_keynote::build::Action::Move(action) => {
+                    settings.move_action = Some(KeynoteMoveAction {
+                        path: native_motion_path_from_semantic(action.path())?,
+                        align_to_path: action.align_to_path(),
+                        acceleration: action.acceleration(),
+                    });
+                },
+                litchi_keynote::build::Action::Unknown(_) => {
+                    return Err(Error::ParseError(
+                        "Keynote unknown actions cannot be written without native parameters"
+                            .to_owned(),
+                    ));
+                },
+                _ => {
+                    return Err(Error::ParseError(
+                        "Keynote action variant is not supported by this adapter".to_owned(),
+                    ));
+                },
+            }
+        },
+        litchi_keynote::build::Effect::Emphasis(emphasis) => {
+            settings.animation_type = "Action".to_owned();
+            settings.effect = emphasis.identifier().to_owned();
+            let (action, direction) = native_emphasis_action(emphasis)?;
+            settings.emphasis = Some(action);
+            settings.direction = direction;
+        },
+        litchi_keynote::build::Effect::Keyboard(keyboard) => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            settings.effect = KEYBOARD_BUILD_EFFECT.to_owned();
+            settings.direction = Some(builds::native_keyboard_direction(
+                match keyboard.direction() {
+                    litchi_keynote::build::KeyboardDirection::Forward => {
+                        KeynoteKeyboardDirection::Forward
+                    },
+                    litchi_keynote::build::KeyboardDirection::Backward => {
+                        KeynoteKeyboardDirection::Backward
+                    },
+                },
+            ));
+            settings.keyboard = Some(KeynoteKeyboardBuild {
+                direction: match keyboard.direction() {
+                    litchi_keynote::build::KeyboardDirection::Forward => {
+                        KeynoteKeyboardDirection::Forward
+                    },
+                    litchi_keynote::build::KeyboardDirection::Backward => {
+                        KeynoteKeyboardDirection::Backward
+                    },
+                },
+                show_cursor: keyboard.show_cursor(),
+            });
+        },
+        litchi_keynote::build::Effect::Object(object) => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            let object = native_object_build_effect(object)?;
+            settings.effect = builds::object_build_effect_identifier(object).to_owned();
+            settings.direction = builds::native_object_build_direction(object);
+            settings.object_effect = Some(object);
+        },
+        litchi_keynote::build::Effect::Unknown(value) => {
+            settings.animation_type = build_in_or_out(settings.animation_type.as_str()).to_owned();
+            settings.effect = value.as_str().to_owned();
+        },
+        _ => {
+            return Err(Error::ParseError(
+                "Keynote effect variant is not supported by this adapter".to_owned(),
+            ));
+        },
+    }
+
+    if builds::typed_action_acceleration(settings) == Some(BuildAcceleration::Custom) {
+        settings.timing_curve = previous_timing_curve;
+    }
+    Ok(())
+}
+
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Reject future semantic build variants until their native parameters are modeled."
+)]
+fn native_emphasis_action(
+    emphasis: litchi_keynote::build::Emphasis,
+) -> Result<(KeynoteEmphasisAction, Option<u32>)> {
+    use litchi_keynote::build::{FlipDirection, JiggleIntensity};
+
+    match emphasis {
+        litchi_keynote::build::Emphasis::Blink(action) => Ok((
+            KeynoteEmphasisAction::Blink {
+                repeat_count: action.repeat_count(),
+                fade: action.fade(),
+            },
+            None,
+        )),
+        litchi_keynote::build::Emphasis::Bounce(action) => Ok((
+            KeynoteEmphasisAction::Bounce {
+                repeat_count: action.repeat_count(),
+                decay: action.decay(),
+            },
+            None,
+        )),
+        litchi_keynote::build::Emphasis::Flip(action) => Ok((
+            KeynoteEmphasisAction::Flip {
+                repeat_count: action.repeat_count(),
+                direction: match action.direction() {
+                    FlipDirection::LeftToRight => KeynoteFlipDirection::LeftToRight,
+                    FlipDirection::RightToLeft => KeynoteFlipDirection::RightToLeft,
+                },
+            },
+            Some(builds::native_flip_direction(match action.direction() {
+                FlipDirection::LeftToRight => KeynoteFlipDirection::LeftToRight,
+                FlipDirection::RightToLeft => KeynoteFlipDirection::RightToLeft,
+            })),
+        )),
+        litchi_keynote::build::Emphasis::Jiggle(action) => Ok((
+            KeynoteEmphasisAction::Jiggle {
+                intensity: match action.intensity() {
+                    JiggleIntensity::Small => KeynoteJiggleIntensity::Small,
+                    JiggleIntensity::Medium => KeynoteJiggleIntensity::Medium,
+                    JiggleIntensity::Large => KeynoteJiggleIntensity::Large,
+                },
+            },
+            None,
+        )),
+        litchi_keynote::build::Emphasis::Pop(action) => Ok((
+            KeynoteEmphasisAction::Pop {
+                scale_percent: action.scale_percent(),
+            },
+            None,
+        )),
+        litchi_keynote::build::Emphasis::Pulse(action) => Ok((
+            KeynoteEmphasisAction::Pulse {
+                repeat_count: action.repeat_count(),
+                scale_percent: action.scale_percent(),
+            },
+            None,
+        )),
+        litchi_keynote::build::Emphasis::Unknown(_) => Err(Error::ParseError(
+            "Keynote unknown emphasis actions cannot be written without native parameters"
+                .to_owned(),
+        )),
+        _ => Err(Error::ParseError(
+            "Keynote emphasis variant is not supported by this adapter".to_owned(),
+        )),
+    }
+}
+
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Reject future semantic build variants until their native parameters are modeled."
+)]
+fn native_object_build_effect(
+    effect: litchi_keynote::build::ObjectEffect,
+) -> Result<KeynoteObjectBuildEffect> {
+    use litchi_keynote::build::{HorizontalDirection, SwooshDirection};
+
+    match effect {
+        litchi_keynote::build::ObjectEffect::Dissolve => Ok(KeynoteObjectBuildEffect::Dissolve),
+        litchi_keynote::build::ObjectEffect::Shimmer => Ok(KeynoteObjectBuildEffect::Shimmer),
+        litchi_keynote::build::ObjectEffect::Skid(direction) => {
+            Ok(KeynoteObjectBuildEffect::Skid {
+                direction: match direction {
+                    HorizontalDirection::LeftToRight => {
+                        KeynoteHorizontalBuildDirection::LeftToRight
+                    },
+                    HorizontalDirection::RightToLeft => {
+                        KeynoteHorizontalBuildDirection::RightToLeft
+                    },
+                },
+            })
+        },
+        litchi_keynote::build::ObjectEffect::Swoosh(direction) => {
+            Ok(KeynoteObjectBuildEffect::Swoosh {
+                direction: match direction {
+                    SwooshDirection::Center => KeynoteSwooshDirection::Center,
+                    SwooshDirection::FromLeft => KeynoteSwooshDirection::FromLeft,
+                    SwooshDirection::FromRight => KeynoteSwooshDirection::FromRight,
+                },
+            })
+        },
+        litchi_keynote::build::ObjectEffect::Trace(direction) => {
+            Ok(KeynoteObjectBuildEffect::Trace {
+                direction: match direction {
+                    HorizontalDirection::LeftToRight => {
+                        KeynoteHorizontalBuildDirection::LeftToRight
+                    },
+                    HorizontalDirection::RightToLeft => {
+                        KeynoteHorizontalBuildDirection::RightToLeft
+                    },
+                },
+            })
+        },
+        _ => Err(Error::ParseError(
+            "Keynote object effect variant is not supported by this adapter".to_owned(),
+        )),
+    }
+}
+
+fn native_motion_path_from_semantic(
+    path: &litchi_keynote::build::Path,
+) -> Result<KeynoteMotionPath> {
+    let finite_f32 = |value: f64| -> Result<f32> {
+        if !value.is_finite() || value.abs() > f64::from(f32::MAX) {
+            return Err(Error::ParseError(
+                "Keynote Move path values must fit in finite native f32 coordinates".to_owned(),
+            ));
+        }
+        Ok(value as f32)
+    };
+    let point = |point: litchi_keynote::build::Point| -> Result<KeynoteMotionPathPoint> {
+        Ok(KeynoteMotionPathPoint::new(
+            finite_f32(point.x())?,
+            finite_f32(point.y())?,
+        ))
+    };
+    let subpaths = path
+        .subpaths()
+        .iter()
+        .map(|subpath| {
+            let nodes = subpath
+                .nodes()
+                .iter()
+                .map(|node| {
+                    Ok(KeynoteMotionPathNode {
+                        in_control_point: point(node.in_control_point())?,
+                        point: point(node.point())?,
+                        out_control_point: point(node.out_control_point())?,
+                        node_type: match node.kind() {
+                            litchi_keynote::build::NodeKind::Sharp => {
+                                KeynoteMotionPathNodeType::Sharp
+                            },
+                            litchi_keynote::build::NodeKind::Bezier => {
+                                KeynoteMotionPathNodeType::Bezier
+                            },
+                            litchi_keynote::build::NodeKind::Smooth => {
+                                KeynoteMotionPathNodeType::Smooth
+                            },
+                        },
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+            Ok(KeynoteMotionSubpath {
+                nodes,
+                closed: subpath.closed(),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let native = KeynoteMotionPath {
+        subpaths,
+        natural_width: finite_f32(path.natural_width())?,
+        natural_height: finite_f32(path.natural_height())?,
+        horizontal_flip: path.horizontal_flip(),
+        vertical_flip: path.vertical_flip(),
+    };
+    builds::validate_motion_path(&native)?;
+    Ok(native)
+}
+
+fn build_in_or_out(animation_type: &str) -> &'static str {
+    if animation_type == "Out" { "Out" } else { "In" }
+}
+
 /// One timing chunk owned by a Keynote build.
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeynoteBuildChunkInfo {
@@ -959,6 +1439,95 @@ pub struct KeynoteBuildInfo {
     pub chunks: Vec<KeynoteBuildChunkInfo>,
 }
 
+#[derive(Debug)]
+struct CachedSlideGraph {
+    title_placeholder: Option<u64>,
+    body_placeholder: Option<u64>,
+    owned_drawables: Box<[u64]>,
+}
+
+impl CachedSlideGraph {
+    fn from_archive(slide: &kn::SlideArchive) -> Self {
+        Self {
+            title_placeholder: slide
+                .title_placeholder
+                .as_ref()
+                .map(|reference| reference.identifier),
+            body_placeholder: slide
+                .body_placeholder
+                .as_ref()
+                .map(|reference| reference.identifier),
+            owned_drawables: slide
+                .owned_drawables
+                .iter()
+                .map(|reference| reference.identifier)
+                .collect(),
+        }
+    }
+
+    fn fits_cache_budget(&self) -> bool {
+        self.owned_drawables.len() <= MAX_OPERATION_CACHED_DRAWABLES_PER_SLIDE
+    }
+}
+
+/// Decode state shared by the reads that make up one editor operation.
+///
+/// The cache owns no mutable package state and is never stored on
+/// [`KeynoteEditor`]. Dropping this value at the end of the operation is the
+/// invalidation boundary for all entries, including after a staged mutation.
+struct KeynoteOperation {
+    graph: ObjectGraph,
+    slide_cache: HashMap<u64, Rc<CachedSlideGraph>>,
+    drawable_storage_cache: HashMap<u64, Option<u64>>,
+}
+
+impl KeynoteOperation {
+    fn new(package: &IWorkPackage) -> Result<Self> {
+        Ok(Self {
+            graph: ObjectGraph::read(package)?,
+            slide_cache: HashMap::with_capacity(MAX_OPERATION_CACHED_SLIDES),
+            drawable_storage_cache: HashMap::with_capacity(MAX_OPERATION_CACHED_DRAWABLE_STORAGES),
+        })
+    }
+
+    fn decode_slide(&self, identifier: u64) -> Result<kn::SlideArchive> {
+        self.graph.decode(identifier, "KN.SlideArchive")
+    }
+
+    fn remember_slide(&mut self, identifier: u64, slide: &kn::SlideArchive) {
+        if self.slide_cache.len() >= MAX_OPERATION_CACHED_SLIDES
+            || slide.owned_drawables.len() > MAX_OPERATION_CACHED_DRAWABLES_PER_SLIDE
+        {
+            return;
+        }
+        self.slide_cache
+            .insert(identifier, Rc::new(CachedSlideGraph::from_archive(slide)));
+    }
+
+    fn slide(&mut self, identifier: u64) -> Result<Rc<CachedSlideGraph>> {
+        if let Some(slide) = self.slide_cache.get(&identifier) {
+            return Ok(Rc::clone(slide));
+        }
+        let slide = self.decode_slide(identifier)?;
+        let cached = Rc::new(CachedSlideGraph::from_archive(&slide));
+        if self.slide_cache.len() < MAX_OPERATION_CACHED_SLIDES && cached.fits_cache_budget() {
+            self.slide_cache.insert(identifier, Rc::clone(&cached));
+        }
+        Ok(cached)
+    }
+
+    fn drawable_storage(&mut self, identifier: u64) -> Result<Option<u64>> {
+        if let Some(storage) = self.drawable_storage_cache.get(&identifier) {
+            return Ok(*storage);
+        }
+        let storage = self.graph.drawable_storage(identifier)?;
+        if self.drawable_storage_cache.len() < MAX_OPERATION_CACHED_DRAWABLE_STORAGES {
+            self.drawable_storage_cache.insert(identifier, storage);
+        }
+        Ok(storage)
+    }
+}
+
 /// Transactional editor for a Keynote package.
 #[derive(Debug, Clone)]
 pub struct KeynoteEditor {
@@ -974,7 +1543,7 @@ impl KeynoteEditor {
         Self::from_package(IWorkPackage::from_bytes(bytes)?)
     }
 
-    pub fn from_package(package: IWorkPackage) -> Result<Self> {
+    pub(crate) fn from_package(package: IWorkPackage) -> Result<Self> {
         let editor = Self {
             text: IWorkTextEditor::from_package(package),
         };
@@ -983,31 +1552,45 @@ impl KeynoteEditor {
     }
 
     pub fn slides(&self) -> Result<Vec<KeynoteSlideInfo>> {
-        let graph = ObjectGraph::read(self.text.package())?;
-        let document: kn::DocumentArchive = graph.decode(1, "KN.DocumentArchive")?;
-        let show: kn::ShowArchive = graph.decode(document.show.identifier, "KN.ShowArchive")?;
+        let mut operation = KeynoteOperation::new(self.package())?;
+        self.slides_with_operation(&mut operation)
+    }
+
+    fn slides_with_operation(
+        &self,
+        operation: &mut KeynoteOperation,
+    ) -> Result<Vec<KeynoteSlideInfo>> {
+        let document: kn::DocumentArchive = operation.graph.decode(1, "KN.DocumentArchive")?;
+        let show: kn::ShowArchive = operation
+            .graph
+            .decode(document.show.identifier, "KN.ShowArchive")?;
 
         let mut slides = Vec::with_capacity(show.slide_tree.slides.len());
         let mut layout_catalog = None;
         for (index, node_reference) in show.slide_tree.slides.into_iter().enumerate() {
-            let node: kn::SlideNodeArchive =
-                graph.decode(node_reference.identifier, "KN.SlideNodeArchive")?;
+            let node: kn::SlideNodeArchive = operation
+                .graph
+                .decode(node_reference.identifier, "KN.SlideNodeArchive")?;
             let slide_reference = node.slide.ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Keynote slide node {} has no slide reference",
                     node_reference.identifier
                 ))
             })?;
-            let slide: kn::SlideArchive =
-                graph.decode(slide_reference.identifier, "KN.SlideArchive")?;
+            let slide = operation.decode_slide(slide_reference.identifier)?;
+            operation.remember_slide(slide_reference.identifier, &slide);
             let layout = match slide.template_slide.as_ref() {
                 Some(template_slide) => {
                     let catalog = match layout_catalog.as_ref() {
                         Some(catalog) => catalog,
                         None => {
-                            let theme = graph.decode(show.theme.identifier, "KN.ThemeArchive")?;
-                            layout_catalog
-                                .insert(slide_create::layout::LayoutCatalog::read(&graph, &theme)?)
+                            let theme = operation
+                                .graph
+                                .decode(show.theme.identifier, "KN.ThemeArchive")?;
+                            layout_catalog.insert(slide_create::layout::LayoutCatalog::read(
+                                &operation.graph,
+                                &theme,
+                            )?)
                         },
                     };
                     Some(catalog.current(template_slide.identifier)?)
@@ -1040,34 +1623,47 @@ impl KeynoteEditor {
                 .transpose()?;
             let title_storage_id = slide
                 .title_placeholder
-                .map(|reference| graph.drawable_storage(reference.identifier))
+                .map(|reference| operation.drawable_storage(reference.identifier))
                 .transpose()?
                 .flatten();
+            let title_storage_id = title_storage_id
+                .map(crate::text::native_storage_id)
+                .transpose()?;
             let body_storage_id = slide
                 .body_placeholder
-                .map(|reference| graph.drawable_storage(reference.identifier))
+                .map(|reference| operation.drawable_storage(reference.identifier))
                 .transpose()?
                 .flatten();
+            let body_storage_id = body_storage_id
+                .map(crate::text::native_storage_id)
+                .transpose()?;
             let title = title_storage_id
-                .map(|identifier| graph.storage_text(identifier))
+                .map(|identifier| operation.graph.storage_text(identifier.get()))
                 .transpose()?;
             let body = body_storage_id
-                .map(|identifier| graph.storage_text(identifier))
+                .map(|identifier| operation.graph.storage_text(identifier.get()))
                 .transpose()?;
             let notes_storage_id = slide
                 .note
                 .map(|reference| {
-                    graph
+                    operation
+                        .graph
                         .decode::<kn::NoteArchive>(reference.identifier, "KN.NoteArchive")
                         .map(|note| note.contained_storage.identifier)
                 })
                 .transpose()?;
+            let notes_storage_id = notes_storage_id
+                .map(crate::text::native_storage_id)
+                .transpose()?;
             let notes = notes_storage_id
-                .map(|identifier| graph.storage_text(identifier))
+                .map(|identifier| operation.graph.storage_text(identifier.get()))
                 .transpose()?;
             let transition = if slide.transition.attributes.animation_attributes.is_some() {
-                let original =
-                    graph.message_data_type(slide_reference.identifier, 5, "KN.SlideArchive")?;
+                let original = operation.graph.message_data_type(
+                    slide_reference.identifier,
+                    5,
+                    "KN.SlideArchive",
+                )?;
                 let transition =
                     transition_settings_from_wire(original, &slide.transition.attributes)?;
                 validate_transition_wire(original, &slide.transition.attributes)?;
@@ -1104,39 +1700,33 @@ impl KeynoteEditor {
     /// [`KeynoteSlideInfo`] because they are owned by `KN.NoteArchive` rather
     /// than a drawable.
     pub fn slide_text_storages(&self, slide_index: usize) -> Result<Vec<KeynoteSlideTextInfo>> {
-        let slides = self.slides()?;
+        let mut operation = KeynoteOperation::new(self.package())?;
+        let slides = self.slides_with_operation(&mut operation)?;
         slides.get(slide_index).ok_or_else(|| {
             Error::ParseError(format!(
                 "Keynote slide index {slide_index} is out of range for {} slides",
                 slides.len()
             ))
         })?;
-        let graph = ObjectGraph::read(self.package())?;
         let mut storage_owners = HashMap::<u64, (usize, u64)>::new();
         let mut result = Vec::new();
         for (owner_slide_index, owner) in slides.iter().enumerate() {
-            let slide: kn::SlideArchive = graph.decode(owner.slide_id, "KN.SlideArchive")?;
-            let title = slide
-                .title_placeholder
-                .as_ref()
-                .map(|reference| reference.identifier);
-            let body = slide
-                .body_placeholder
-                .as_ref()
-                .map(|reference| reference.identifier);
+            let slide = operation.slide(owner.slide_id)?;
+            let title = slide.title_placeholder;
+            let body = slide.body_placeholder;
             let mut seen_drawables = HashSet::with_capacity(slide.owned_drawables.len());
-            for reference in &slide.owned_drawables {
-                let drawable_id = reference.identifier;
+            for &drawable_id in &slide.owned_drawables {
                 if !seen_drawables.insert(drawable_id) {
                     return Err(Error::InvalidFormat(format!(
                         "Keynote slide {owner_slide_index} repeats owned drawable {drawable_id}"
                     )));
                 }
-                let Some(storage_id) = graph.drawable_storage(drawable_id)? else {
+                let Some(storage_id) = operation.drawable_storage(drawable_id)? else {
                     continue;
                 };
+                let storage_id = crate::text::native_storage_id(storage_id)?;
                 if let Some((previous_slide, previous_drawable)) =
-                    storage_owners.insert(storage_id, (owner_slide_index, drawable_id))
+                    storage_owners.insert(storage_id.get(), (owner_slide_index, drawable_id))
                 {
                     return Err(Error::InvalidFormat(format!(
                         "Keynote slide {previous_slide} drawable {previous_drawable} and slide {owner_slide_index} drawable {drawable_id} share owned text storage {storage_id}"
@@ -1155,7 +1745,7 @@ impl KeynoteEditor {
                 } else if body == Some(drawable_id) {
                     KeynoteSlideTextRole::Body
                 } else {
-                    let shape: tswp::ShapeInfoArchive = graph.decode_type(
+                    let shape: tswp::ShapeInfoArchive = operation.graph.decode_type(
                         drawable_id,
                         SHAPE_INFO_MESSAGE_TYPE,
                         "TSWP.ShapeInfoArchive",
@@ -1299,7 +1889,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<ShapeTextLayout> {
+    ) -> Result<Layout> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         shape_text_layout(self.package(), &graph.archive_name, drawable_object_id)
     }
@@ -1309,7 +1899,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        layout: ShapeTextLayout,
+        layout: Layout,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let staged = set_shape_text_layout(
@@ -1351,7 +1941,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<TextColumns> {
+    ) -> Result<Columns> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         shape_text_columns(self.package(), &graph.archive_name, drawable_object_id)
     }
@@ -1361,7 +1951,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        columns: &TextColumns,
+        columns: &Columns,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let staged = set_shape_text_columns(
@@ -1824,7 +2414,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListLevel> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_list_level(graph.storage_id, paragraph)
@@ -1835,7 +2425,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         level: ParagraphListLevel,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -1850,7 +2440,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1866,7 +2456,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumbering> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text
@@ -1878,7 +2468,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         numbering: ParagraphListNumbering,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -1893,7 +2483,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumberFormat> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text
@@ -1905,7 +2495,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         format: ParagraphListNumberFormat,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -1920,7 +2510,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1936,7 +2526,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumberTiering> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text
@@ -1948,7 +2538,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         tiering: ParagraphListNumberTiering,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -1963,7 +2553,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -1979,7 +2569,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListNumberScale> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text
@@ -1991,7 +2581,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         scale: ParagraphListNumberScale,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -2006,7 +2596,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2022,7 +2612,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListBullet> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_list_bullet(graph.storage_id, paragraph)
@@ -2033,7 +2623,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         bullet: &ParagraphListBullet,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -2048,7 +2638,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2064,7 +2654,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListBulletGeometry> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text
@@ -2076,7 +2666,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         geometry: ParagraphListBulletGeometry,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -2091,7 +2681,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2107,7 +2697,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListIndentation> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text
@@ -2119,7 +2709,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         indentation: ParagraphListIndentation,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -2134,7 +2724,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2150,7 +2740,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<ParagraphListLabelColor> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text
@@ -2162,7 +2752,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
         color: ParagraphListLabelColor,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
@@ -2177,7 +2767,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2513,7 +3103,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<TextOutline> {
+    ) -> Result<Outline> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.text_outline(graph.storage_id)
     }
@@ -2523,7 +3113,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        outline: TextOutline,
+        outline: Outline,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2558,7 +3148,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<TextShadow> {
+    ) -> Result<Shadow> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.text_shadow(graph.storage_id)
     }
@@ -2568,7 +3158,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        shadow: TextShadow,
+        shadow: Shadow,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2603,7 +3193,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<TextBackground> {
+    ) -> Result<TextAppearanceBackground> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.text_background(graph.storage_id)
     }
@@ -2613,7 +3203,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        background: TextBackground,
+        background: TextAppearanceBackground,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2695,7 +3285,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<ParagraphBorders> {
+    ) -> Result<Borders> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_borders(graph.storage_id)
     }
@@ -2705,7 +3295,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        borders: ParagraphBorders,
+        borders: Borders,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2832,7 +3422,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<TextAlignment> {
+    ) -> Result<Alignment> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_alignment(graph.storage_id)
     }
@@ -2842,7 +3432,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        alignment: TextAlignment,
+        alignment: Alignment,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2879,7 +3469,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<ParagraphLineSpacing> {
+    ) -> Result<LineSpacing> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_line_spacing(graph.storage_id)
     }
@@ -2889,7 +3479,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        spacing: ParagraphLineSpacing,
+        spacing: LineSpacing,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2926,7 +3516,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<ParagraphSpacing> {
+    ) -> Result<Spacing> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_spacing(graph.storage_id)
     }
@@ -2936,7 +3526,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        spacing: ParagraphSpacing,
+        spacing: Spacing,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -2971,7 +3561,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<ParagraphIndents> {
+    ) -> Result<Indents> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_indents(graph.storage_id)
     }
@@ -2981,7 +3571,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        indents: ParagraphIndents,
+        indents: Indents,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
@@ -3159,7 +3749,7 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<Vec<ParagraphDropCapPlacement>> {
+    ) -> Result<Vec<Placement>> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         self.text.paragraph_drop_caps(graph.storage_id)
     }
@@ -3169,11 +3759,10 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
-    ) -> Result<Option<ParagraphDropCap>> {
+        paragraph: TextPosition,
+    ) -> Result<Option<DropCap>> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
-        self.text
-            .paragraph_drop_cap(graph.storage_id, paragraph_start)
+        self.text.paragraph_drop_cap(graph.storage_id, paragraph)
     }
 
     /// Atomically create or replace a text-box Drop Cap.
@@ -3181,18 +3770,15 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
-        drop_cap: ParagraphDropCap,
+        paragraph: TextPosition,
+        drop_cap: DropCap,
     ) -> Result<()> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
-        staged.set_paragraph_drop_cap(graph.storage_id, paragraph_start, drop_cap)?;
+        staged.set_paragraph_drop_cap(graph.storage_id, paragraph, drop_cap)?;
         let verified = Self::from_package(staged.package().clone())?;
-        if verified.slide_text_box_paragraph_drop_cap(
-            slide_index,
-            drawable_object_id,
-            paragraph_start,
-        )? != Some(drop_cap)
+        if verified.slide_text_box_paragraph_drop_cap(slide_index, drawable_object_id, paragraph)?
+            != Some(drop_cap)
         {
             return Err(Error::InvalidFormat(
                 "Keynote text-box Drop Cap update failed validation".to_owned(),
@@ -3207,11 +3793,11 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        paragraph_start: ParagraphStart,
+        paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let mut staged = self.text.clone();
-        let changed = staged.remove_paragraph_drop_cap(graph.storage_id, paragraph_start)?;
+        let changed = staged.remove_paragraph_drop_cap(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(staged.into_package())?;
         }
@@ -3252,12 +3838,12 @@ impl KeynoteEditor {
                 clone_slide_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                archive.insert_object(cloned)
+                Ok(archive.insert_object(cloned)?)
             })?;
         }
 
         let new_drawable_id = remap[&source.drawable_id];
-        let new_storage_id = remap[&source.storage_id];
+        let new_storage_id = crate::text::native_storage_id(remap[&source.storage_id.get()])?;
         offset_keynote_drawable_clone(
             &mut staged,
             &source.archive_name,
@@ -3295,8 +3881,8 @@ impl KeynoteEditor {
             })?;
         let created_graph = verified.text_box_graph(slide_index, new_drawable_id)?;
         if created.role != KeynoteSlideTextRole::TextBox
-            || created.storage.object_id != new_storage_id
-            || created.storage.text != text
+            || created.storage.id != new_storage_id
+            || created.storage.storage.text() != text
             || created_graph.object_ids.len() != source.object_ids.len()
         {
             return Err(Error::InvalidFormat(
@@ -3325,7 +3911,7 @@ impl KeynoteEditor {
             })?;
 
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(DrawableId::from_raw(drawable_object_id)?)?;
         let mut staged = comments.into_package();
         patch_slide_drawable_references(
             &mut staged,
@@ -3362,14 +3948,14 @@ impl KeynoteEditor {
     }
 
     /// List supported direct-comment drawables owned by one slide.
-    pub fn slide_drawables(&self, slide_index: usize) -> Result<Vec<IWorkDrawableInfo>> {
+    pub fn slide_drawables(&self, slide_index: usize) -> Result<Vec<DrawableInfo>> {
         let owned = self.slide_owned_drawable_ids(slide_index)?;
         let mut drawables = IWorkDrawableCommentEditor::from_package(self.package().clone())?
             .drawables()?
             .into_iter()
-            .filter(|drawable| owned.contains(&drawable.object_id))
+            .filter(|drawable| owned.contains(&drawable.id.get()))
             .collect::<Vec<_>>();
-        drawables.sort_by_key(|drawable| drawable.object_id);
+        drawables.sort_by_key(|drawable| drawable.id.get());
         Ok(drawables)
     }
 
@@ -3378,10 +3964,10 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<Option<DrawableCommentInfo>> {
+    ) -> Result<Option<DrawableComment>> {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         IWorkDrawableCommentEditor::from_package(self.package().clone())?
-            .comment(drawable_object_id)
+            .comment(DrawableId::from_raw(drawable_object_id)?)
     }
 
     /// Create or replace a direct drawable comment on one slide.
@@ -3393,7 +3979,7 @@ impl KeynoteEditor {
     ) -> Result<()> {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.set_comment(drawable_object_id, text)?;
+        comments.set_comment(DrawableId::from_raw(drawable_object_id)?, text)?;
         let staged = comments.into_package();
         Self::from_package(staged.clone())?;
         self.text = IWorkTextEditor::from_package(staged);
@@ -3408,7 +3994,7 @@ impl KeynoteEditor {
     ) -> Result<()> {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.clear_comment(drawable_object_id)?;
+        comments.clear_comment(DrawableId::from_raw(drawable_object_id)?)?;
         let staged = comments.into_package();
         Self::from_package(staged.clone())?;
         self.text = IWorkTextEditor::from_package(staged);
@@ -3420,10 +4006,10 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<Vec<DrawableCommentReplyInfo>> {
+    ) -> Result<Vec<DrawableReply>> {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         IWorkDrawableCommentEditor::from_package(self.package().clone())?
-            .replies(drawable_object_id)
+            .replies(DrawableId::from_raw(drawable_object_id)?)
     }
 
     /// Add a reply to a direct comment on one slide drawable.
@@ -3435,11 +4021,11 @@ impl KeynoteEditor {
     ) -> Result<u64> {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        let reply_id = comments.add_reply(drawable_object_id, text)?;
+        let reply_id = comments.add_reply(DrawableId::from_raw(drawable_object_id)?, text)?;
         let staged = comments.into_package();
         Self::from_package(staged.clone())?;
         self.text = IWorkTextEditor::from_package(staged);
-        Ok(reply_id)
+        Ok(reply_id.get())
     }
 
     /// Update a direct reply, returning its current storage identifier.
@@ -3452,11 +4038,15 @@ impl KeynoteEditor {
     ) -> Result<u64> {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        let reply_id = comments.set_reply(drawable_object_id, reply_storage_object_id, text)?;
+        let reply_id = comments.set_reply(
+            DrawableId::from_raw(drawable_object_id)?,
+            StorageId::from_raw(reply_storage_object_id)?,
+            text,
+        )?;
         let staged = comments.into_package();
         Self::from_package(staged.clone())?;
         self.text = IWorkTextEditor::from_package(staged);
-        Ok(reply_id)
+        Ok(reply_id.get())
     }
 
     /// Remove a direct reply from a comment on one slide drawable.
@@ -3468,7 +4058,10 @@ impl KeynoteEditor {
     ) -> Result<()> {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
-        comments.remove_reply(drawable_object_id, reply_storage_object_id)?;
+        comments.remove_reply(
+            DrawableId::from_raw(drawable_object_id)?,
+            StorageId::from_raw(reply_storage_object_id)?,
+        )?;
         let staged = comments.into_package();
         Self::from_package(staged.clone())?;
         self.text = IWorkTextEditor::from_package(staged);
@@ -3719,7 +4312,7 @@ impl KeynoteEditor {
         settings: KeynoteBuildSettings,
     ) -> Result<KeynoteBuildInfo> {
         validate_build_settings(&settings)?;
-        if typed_action_acceleration(&settings) == Some(KeynoteBuildAcceleration::Custom)
+        if typed_action_acceleration(&settings) == Some(BuildAcceleration::Custom)
             && settings.timing_curve.is_none()
         {
             return Err(Error::ParseError(
@@ -3826,8 +4419,8 @@ impl KeynoteEditor {
                     "Keynote build {build_object_id} is not owned by slide {slide_index}"
                 ))
             })?;
-        if typed_action_acceleration(&settings) == Some(KeynoteBuildAcceleration::Custom)
-            && typed_action_acceleration(&build.settings) != Some(KeynoteBuildAcceleration::Custom)
+        if typed_action_acceleration(&settings) == Some(BuildAcceleration::Custom)
+            && typed_action_acceleration(&build.settings) != Some(BuildAcceleration::Custom)
             && settings.timing_curve.is_none()
         {
             return Err(Error::ParseError(
@@ -4536,7 +5129,7 @@ impl KeynoteEditor {
         Ok(created)
     }
 
-    pub fn package(&self) -> &IWorkPackage {
+    pub(crate) fn package(&self) -> &IWorkPackage {
         self.text.package()
     }
 
@@ -4558,6 +5151,7 @@ impl KeynoteEditor {
     }
 
     pub fn extract_media(&self, data_identifier: u64) -> Result<Vec<u8>> {
+        let data_identifier = MediaAssetId::try_from(data_identifier)?;
         if !self
             .media_assets()?
             .iter()
@@ -4572,6 +5166,7 @@ impl KeynoteEditor {
 
     /// Replace a referenced materialized asset without changing its data identifier.
     pub fn replace_media(&mut self, data_identifier: u64, replacement: &[u8]) -> Result<Vec<u8>> {
+        let data_identifier = MediaAssetId::try_from(data_identifier)?;
         if !self
             .media_assets()?
             .iter()
@@ -4589,7 +5184,9 @@ impl KeynoteEditor {
         Ok(old)
     }
 
-    pub fn into_package(self) -> IWorkPackage {
+    // Used by crate-internal mutation fixtures; ordinary callers publish via `to_bytes`/`save`.
+    #[allow(dead_code)]
+    pub(crate) fn into_package(self) -> IWorkPackage {
         self.text.into_package()
     }
 
@@ -4605,11 +5202,11 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<u64> {
+    ) -> Result<TextStorageId> {
         self.slide_text_storages(slide_index)?
             .into_iter()
             .find(|text| text.drawable_object_id == drawable_object_id)
-            .map(|text| text.storage.object_id)
+            .map(|text| text.storage.id)
             .ok_or_else(|| {
                 Error::ParseError(format!(
                     "drawable object {drawable_object_id} does not own writable text on Keynote slide {slide_index}"
@@ -4705,7 +5302,7 @@ impl KeynoteEditor {
             .as_ref()
             .map(|reference| reference.identifier)
             != Some(storage_id)
-            || storage_id != text.storage.object_id
+            || storage_id != text.storage.id.get()
         {
             return Err(Error::InvalidFormat(format!(
                 "Keynote text box {drawable_object_id} has inconsistent storage ownership"
@@ -4835,13 +5432,13 @@ impl KeynoteEditor {
             slide_id: slide_info.slide_id,
             archive_name,
             drawable_id: drawable_object_id,
-            storage_id,
+            storage_id: crate::text::native_storage_id(storage_id)?,
             object_ids,
             uuid_object_ids,
         })
     }
 
-    fn slide_storage(&self, slide_index: usize, title: bool) -> Result<u64> {
+    fn slide_storage(&self, slide_index: usize, title: bool) -> Result<TextStorageId> {
         let slides = self.slides()?;
         let slide = slides.get(slide_index).ok_or_else(|| {
             Error::ParseError(format!(
@@ -4861,7 +5458,7 @@ impl KeynoteEditor {
         })
     }
 
-    fn slide_notes_storage(&self, slide_index: usize) -> Result<u64> {
+    fn slide_notes_storage(&self, slide_index: usize) -> Result<TextStorageId> {
         let slides = self.slides()?;
         let slide = slides.get(slide_index).ok_or_else(|| {
             Error::ParseError(format!(
@@ -4905,7 +5502,7 @@ impl KeynoteEditor {
         if !self
             .slide_drawables(slide_index)?
             .iter()
-            .any(|drawable| drawable.object_id == drawable_object_id)
+            .any(|drawable| drawable.id.get() == drawable_object_id)
         {
             return Err(Error::InvalidFormat(format!(
                 "Keynote slide drawable {drawable_object_id} has no supported direct drawable payload"
@@ -4925,7 +5522,6 @@ mod show_settings;
 mod slide_audio;
 mod slide_background;
 mod slide_background_color;
-mod slide_background_gradient;
 mod slide_background_gradient_wire;
 mod slide_background_reset;
 mod slide_background_wire;
@@ -4949,77 +5545,47 @@ mod soundtrack_items;
 mod soundtrack_wire;
 mod text_box_create;
 mod transition;
-mod transition_effect;
 mod transition_lifecycle;
 mod transition_wire;
 
 use builds::*;
-pub use show_settings::{KeynoteShowMode, KeynoteShowSettings};
-pub use slide_audio::{KeynoteSlideAudioInfo, KeynoteSlideAudioOptions, RemovedKeynoteSlideAudio};
-pub use slide_background::KeynoteSlideBackground;
-pub use slide_background_color::{KeynoteRgbColorSpace, KeynoteRgbaColor};
-pub use slide_background_gradient::{
-    KeynoteGradient, KeynoteGradientAngle, KeynoteGradientKind, KeynoteGradientStop,
+pub use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+pub use litchi_keynote::background::{Angle, Background, Gradient, Kind, Opaque, Stop};
+pub use litchi_keynote::slide::media::MovieKind;
+pub use litchi_keynote::transition::Effect;
+pub use litchi_keynote::transition::{
+    Acceleration, AccelerationKind, AnimationParameters, CustomParameters, Direction, MosaicType,
+    TextDelivery, TextDeliveryKind,
 };
+pub use litchi_keynote::{Mode, Seconds, Settings, Size};
+pub use slide_audio::{KeynoteSlideAudioInfo, RemovedKeynoteSlideAudio};
 pub use slide_charts::{KeynoteSlideChartInfo, RemovedKeynoteSlideChart};
 use slide_graph::*;
-pub use slide_images::{
-    KeynoteSlideImageInfo, KeynoteSlideImageKind, KeynoteSlideImageOptions,
-    RemovedKeynoteSlideImage,
-};
-pub use slide_movies::{
-    KeynoteSlideMovieInfo, KeynoteSlideMovieKind, KeynoteSlideMovieOptions,
-    RemovedKeynoteSlideMovie,
-};
-pub use slide_shapes::{KeynoteSlideShapeInfo, KeynoteSlideShapeKind, RemovedKeynoteSlideShape};
+pub use slide_images::{KeynoteSlideImageInfo, KeynoteSlideImageKind, RemovedKeynoteSlideImage};
+pub use slide_movies::{KeynoteSlideMovieInfo, RemovedKeynoteSlideMovie};
+pub use slide_shapes::{KeynoteSlideShapeInfo, RemovedKeynoteSlideShape};
 pub use slide_tables::{
-    KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableAxisIndex,
-    KeynoteTableCellCheckboxFormat, KeynoteTableCellComment, KeynoteTableCellCommentInfo,
-    KeynoteTableCellCommentReplyInfo, KeynoteTableCellConditionalHighlightInfo,
-    KeynoteTableCellCurrencyFormat, KeynoteTableCellDataFormat, KeynoteTableCellDateTimeFormat,
-    KeynoteTableCellDecimalPlaces, KeynoteTableCellDurationFormat, KeynoteTableCellDurationStyle,
-    KeynoteTableCellDurationUnit, KeynoteTableCellDurationUnitRange, KeynoteTableCellDurationUnits,
-    KeynoteTableCellFixedDecimalPlaces, KeynoteTableCellFractionFormat, KeynoteTableCellInset,
-    KeynoteTableCellInsets, KeynoteTableCellLayout, KeynoteTableCellNegativeNumberStyle,
-    KeynoteTableCellNumberFormat, KeynoteTableCellNumeralSystemFormat,
-    KeynoteTableCellParagraphIndents, KeynoteTableCellParagraphLineSpacing,
+    KeynoteSlideTable, KeynoteSlideTableInfo, KeynoteTableCellConditionalHighlightInfo,
+    KeynoteTableCellInset, KeynoteTableCellInsets, KeynoteTableCellLayout,
     KeynoteTableCellParagraphList, KeynoteTableCellParagraphListBullet,
     KeynoteTableCellParagraphListBulletGeometry, KeynoteTableCellParagraphListIndentation,
     KeynoteTableCellParagraphListLabelColor, KeynoteTableCellParagraphListLevel,
     KeynoteTableCellParagraphListLevelPlacement, KeynoteTableCellParagraphListNumberFormat,
     KeynoteTableCellParagraphListNumberScale, KeynoteTableCellParagraphListNumberTiering,
     KeynoteTableCellParagraphListNumbering, KeynoteTableCellParagraphListPlacement,
-    KeynoteTableCellParagraphSpacing, KeynoteTableCellParagraphTabStops,
-    KeynoteTableCellPercentageFormat, KeynoteTableCellPopUpMenuFormat,
-    KeynoteTableCellPopUpMenuInitialSelection, KeynoteTableCellPopUpMenuItem,
-    KeynoteTableCellRegion, KeynoteTableCellScientificFormat, KeynoteTableCellSliderDisplayFormat,
-    KeynoteTableCellSliderFormat, KeynoteTableCellSliderRange, KeynoteTableCellStarRatingFormat,
-    KeynoteTableCellStepperDisplayFormat, KeynoteTableCellStepperFormat,
-    KeynoteTableCellStepperRange, KeynoteTableCellTextAlignment, KeynoteTableCellTextBackground,
+    KeynoteTableCellParagraphTabStops, KeynoteTableCellTextBackground,
     KeynoteTableCellTextBaselineShift, KeynoteTableCellTextCapitalization,
     KeynoteTableCellTextCharacterSpacing, KeynoteTableCellTextColor,
-    KeynoteTableCellTextDecorations, KeynoteTableCellTextFont, KeynoteTableCellTextFormat,
-    KeynoteTableCellTextLigatures, KeynoteTableCellTextOutline, KeynoteTableCellTextScript,
-    KeynoteTableCellTextShadow, KeynoteTableCellTextStyle, KeynoteTableCellTextWrap,
-    KeynoteTableCellThousandsSeparator, KeynoteTableCellUpdate, KeynoteTableCellValue,
-    KeynoteTableCellVerticalAlignment, KeynoteTableColumnDeletion, KeynoteTableColumnInsertion,
-    KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTableFormulaAxisReference,
-    KeynoteTableFormulaBinaryOperator, KeynoteTableFormulaCachedValue,
-    KeynoteTableFormulaCellReference, KeynoteTableFormulaExpression, KeynoteTableHeaderCount,
-    KeynoteTableHeaderSettings, KeynoteTableHiddenAxes, KeynoteTablePoints,
-    KeynoteTableRowDeletion, KeynoteTableRowInsertion, KeynoteTableSortColumnIndex,
-    KeynoteTableSortDirection, KeynoteTableSortOrder, KeynoteTableSortRowRange,
-    KeynoteTableSortRule, KeynoteTableSortScope, KeynoteTableTitleSettings,
+    KeynoteTableCellTextDecorations, KeynoteTableCellTextFont, KeynoteTableCellTextLigatures,
+    KeynoteTableCellTextOutline, KeynoteTableCellTextScript, KeynoteTableCellTextShadow,
+    KeynoteTableCellTextStyle, KeynoteTableCellTextWrap, KeynoteTableCellUpdate,
+    KeynoteTableCellValue, KeynoteTableCellVerticalAlignment, KeynoteTableDimension,
+    KeynoteTableDimensionSize, KeynoteTablePoints, KeynoteTableTitleSettings,
     RemovedKeynoteSlideTable,
 };
-pub use soundtrack::{KeynoteSoundtrackMode, KeynoteSoundtrackSettings};
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;
-pub use transition::{
-    KeynoteTransitionAcceleration, KeynoteTransitionAnimationParameters,
-    KeynoteTransitionCustomParameters, KeynoteTransitionDirection, KeynoteTransitionMosaicType,
-    KeynoteTransitionSettings, KeynoteTransitionTextDelivery,
-};
-pub use transition_effect::KeynoteTransitionEffect;
 use transition_wire::{transition_settings_from_wire, validate_transition_wire};
+#[cfg(test)]
+mod operation_cache_tests;
 #[cfg(test)]
 mod tests;

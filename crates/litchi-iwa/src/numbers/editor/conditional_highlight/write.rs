@@ -20,7 +20,7 @@ pub(super) fn insert_conditional_style_graph(
     package: &mut IWorkPackage,
     archive_name: &str,
     style_set_id: u64,
-    rules: &[TableCellConditionalHighlightRule],
+    rules: &[Rule],
     formula_owner_uuid: &tsp::Uuid,
 ) -> Result<()> {
     let identifiers = sequential_rule_style_identifiers(style_set_id, rules.len())?;
@@ -39,7 +39,7 @@ pub(super) fn replace_conditional_style_graph(
     archive_name: &str,
     object_locations: &HashMap<u64, String>,
     style_set_id: u64,
-    rules: &[TableCellConditionalHighlightRule],
+    rules: &[Rule],
     formula_owner_uuid: &tsp::Uuid,
     identifiers: &[RuleStyleIdentifiers],
 ) -> Result<()> {
@@ -88,7 +88,7 @@ pub(super) fn replace_conditional_style_graph(
 
 fn conditional_style_graph_objects(
     style_set_id: u64,
-    rules: &[TableCellConditionalHighlightRule],
+    rules: &[Rule],
     formula_owner_uuid: &tsp::Uuid,
     identifiers: &[RuleStyleIdentifiers],
 ) -> Result<Vec<ArchiveObject>> {
@@ -285,10 +285,7 @@ fn sequential_rule_style_identifiers(
         .collect()
 }
 
-fn paragraph_style_object(
-    identifier: u64,
-    rule: &TableCellConditionalHighlightRule,
-) -> Result<ArchiveObject> {
+fn paragraph_style_object(identifier: u64, rule: &Rule) -> Result<ArchiveObject> {
     let style = rule.style;
     let text_override_count = u32::from(style.bold()) + u32::from(style.text_color().is_some());
     let data = tswp::ParagraphStyleArchive {
@@ -307,10 +304,7 @@ fn paragraph_style_object(
     style_object(identifier, PARAGRAPH_STYLE_MESSAGE_TYPE, data)
 }
 
-fn cell_style_object(
-    identifier: u64,
-    rule: &TableCellConditionalHighlightRule,
-) -> Result<ArchiveObject> {
+fn cell_style_object(identifier: u64, rule: &Rule) -> Result<ArchiveObject> {
     let fill = rule.style.fill().map(|color| tsd::FillArchive {
         color: Some(crate::shapes::color_to_native(color)),
         ..Default::default()
@@ -340,7 +334,7 @@ fn style_object(identifier: u64, message_type: u32, data: Vec<u8>) -> Result<Arc
 }
 
 fn predicate_arguments(
-    condition: &TableCellConditionalHighlightCondition,
+    condition: &Condition,
 ) -> Result<(tst::FormulaPredArgArchive, tst::FormulaPredArgArchive)> {
     let none = || tst::FormulaPredArgArchive {
         arg_type: PREDICATE_ARGUMENT_NONE,
@@ -348,17 +342,17 @@ fn predicate_arguments(
     };
     if matches!(
         condition,
-        TableCellConditionalHighlightCondition::CellIsBlank
-            | TableCellConditionalHighlightCondition::CellIsNotBlank
-            | TableCellConditionalHighlightCondition::CheckboxIsChecked
-            | TableCellConditionalHighlightCondition::CheckboxIsNotChecked
-            | TableCellConditionalHighlightCondition::BooleanIsTrue
-            | TableCellConditionalHighlightCondition::BooleanIsFalse
-            | TableCellConditionalHighlightCondition::NumberIsPositive
-            | TableCellConditionalHighlightCondition::NumberIsNegative
-            | TableCellConditionalHighlightCondition::DateIsToday
-            | TableCellConditionalHighlightCondition::DateIsYesterday
-            | TableCellConditionalHighlightCondition::DateIsTomorrow
+        Condition::CellIsBlank
+            | Condition::CellIsNotBlank
+            | Condition::CheckboxIsChecked
+            | Condition::CheckboxIsNotChecked
+            | Condition::BooleanIsTrue
+            | Condition::BooleanIsFalse
+            | Condition::NumberIsPositive
+            | Condition::NumberIsNegative
+            | Condition::DateIsToday
+            | Condition::DateIsYesterday
+            | Condition::DateIsTomorrow
     ) {
         return Ok((none(), none()));
     }
@@ -408,7 +402,7 @@ fn number_argument(value: f64) -> Result<tst::FormulaPredArgArchive> {
     })
 }
 
-fn date_argument(value: TableCellConditionalHighlightDate) -> tst::FormulaPredArgArchive {
+fn date_argument(value: Date) -> tst::FormulaPredArgArchive {
     tst::FormulaPredArgArchive {
         arg_type: PREDICATE_ARGUMENT_DATE,
         arg_value: Some(tst::FormulaPredArgDataArchive {

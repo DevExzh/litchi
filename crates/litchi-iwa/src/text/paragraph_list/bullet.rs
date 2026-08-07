@@ -8,17 +8,17 @@ use crate::text::style_registry::{
 };
 use crate::{Error, IWorkPackage, Result};
 
-use super::super::drop_cap::ParagraphStart;
-use super::types::{ParagraphList, ParagraphListBullet};
 use super::variation::{
     effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
 };
 use super::{levels, native, storage};
+use litchi_iwa_text::paragraph::list::{ParagraphList, ParagraphListBullet};
+use litchi_iwa_text::position::TextPosition;
 
 pub(crate) fn paragraph_list_bullet(
     package: &IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<ParagraphListBullet> {
     let level = levels::paragraph_list_level(package, storage_id, paragraph)?;
     let boundaries = storage::locate_boundaries(package, storage_id)?;
@@ -30,13 +30,15 @@ pub(crate) fn paragraph_list_bullet(
         )));
     }
     let strings = native::effective_bullet_strings(package, style_id)?;
-    ParagraphListBullet::new(strings[usize::from(level.get())].clone())
+    Ok(ParagraphListBullet::from_boxed(
+        strings[usize::from(level.get())].clone().into_boxed_str(),
+    )?)
 }
 
 pub(in crate::text) fn set_paragraph_list_bullet(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
     bullet: &ParagraphListBullet,
 ) -> Result<()> {
     if paragraph_list_bullet(package, storage_id, paragraph)?.as_str() == bullet.as_str() {
@@ -107,7 +109,7 @@ pub(in crate::text) fn set_paragraph_list_bullet(
 pub(in crate::text) fn reset_paragraph_list_bullet(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<bool> {
     if paragraph_list_bullet(package, storage_id, paragraph)?.as_str()
         == ParagraphListBullet::STANDARD
@@ -127,7 +129,7 @@ pub(in crate::text) fn reset_paragraph_list_bullet(
 fn collapse_redundant_variation(
     package: &mut IWorkPackage,
     storage_id: u64,
-    paragraph: ParagraphStart,
+    paragraph: TextPosition,
 ) -> Result<()> {
     let located = storage::locate_boundaries_with_archive(package, storage_id)?;
     let boundaries = &located.location;

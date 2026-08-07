@@ -1,7 +1,7 @@
 //! Native axis-title CRUD for Pages body charts.
 
 use super::*;
-use crate::charts::ChartAxis;
+use crate::charts::Axis;
 use crate::charts::axis::{
     chart_axis_title as read_native_chart_axis_title,
     remove_chart_axis_title as remove_native_chart_axis_title,
@@ -13,7 +13,7 @@ impl PagesEditor {
     pub fn body_chart_axis_title(
         &self,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<Option<String>> {
         body_chart_axis_title(self, drawable_object_id, axis)
     }
@@ -22,7 +22,7 @@ impl PagesEditor {
     pub fn set_body_chart_axis_title(
         &mut self,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
         title: &str,
     ) -> Result<()> {
         set_body_chart_axis_title(self, drawable_object_id, axis, title)
@@ -34,7 +34,7 @@ impl PagesEditor {
     pub fn remove_body_chart_axis_title(
         &mut self,
         drawable_object_id: u64,
-        axis: ChartAxis,
+        axis: Axis,
     ) -> Result<bool> {
         remove_body_chart_axis_title(self, drawable_object_id, axis)
     }
@@ -43,7 +43,7 @@ impl PagesEditor {
 fn body_chart_axis_title(
     editor: &PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<Option<String>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_axis_title(
@@ -58,7 +58,7 @@ fn body_chart_axis_title(
 fn set_body_chart_axis_title(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
     title: &str,
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -88,7 +88,7 @@ fn set_body_chart_axis_title(
 fn remove_body_chart_axis_title(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    axis: ChartAxis,
+    axis: Axis,
 ) -> Result<bool> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let mut staged = editor.package().clone();

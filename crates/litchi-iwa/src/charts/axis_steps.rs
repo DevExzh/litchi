@@ -5,11 +5,13 @@
 //! module represents automatic versus explicit step counts with distinct types,
 //! preserves both protobuf layers losslessly, and patches only those fields.
 
-use std::num::NonZeroU32;
-
 use prost::Message;
 
-use crate::charts::ChartAxis;
+use litchi_iwa_common::chart::axis::{
+    Axis,
+    steps::{MajorStepCount, MinorStepCount, Steps},
+};
+
 use crate::charts::axis::{
     GENERATED_CHART_AXIS_NON_STYLE_EXTENSION_FIELD, axis_non_style_slot,
     generated_axis_non_style_extension,
@@ -24,128 +26,19 @@ const VALUE_AXIS_MAJOR_STEPS_FIELD: u32 = 5;
 /// `tschchartaxisvaluenumberofminorgridlines` in
 /// `TSCH.Generated.ChartAxisNonStyleArchive`.
 const VALUE_AXIS_MINOR_STEPS_FIELD: u32 = 6;
-/// Largest non-negative step count representable by iWork's native `int32`
-/// fields.
-const MAX_NATIVE_AXIS_STEP_COUNT: u32 = i32::MAX as u32;
-
-/// One positive number of major intervals in an iWork value-axis scale.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ChartAxisMajorStepCount(NonZeroU32);
-
-impl ChartAxisMajorStepCount {
-    /// One major interval.
-    pub const ONE: Self = Self(NonZeroU32::MIN);
-
-    /// Create a positive major-step count supported by iWork.
-    pub fn new(value: u32) -> Result<Self> {
-        if value > MAX_NATIVE_AXIS_STEP_COUNT {
-            return Err(Error::InvalidFormat(format!(
-                "chart value-axis major step count exceeds {MAX_NATIVE_AXIS_STEP_COUNT}"
-            )));
-        }
-        NonZeroU32::new(value).map(Self).ok_or_else(|| {
-            Error::InvalidFormat("chart value-axis major step count must be positive".to_owned())
-        })
-    }
-
-    /// Return the number shown in iWork's `Major Steps` inspector field.
-    pub const fn value(self) -> u32 {
-        self.0.get()
-    }
-}
-
-impl TryFrom<u32> for ChartAxisMajorStepCount {
-    type Error = Error;
-
-    fn try_from(value: u32) -> Result<Self> {
-        Self::new(value)
-    }
-}
-
-/// One non-negative number of minor intervals between major value-axis steps.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ChartAxisMinorStepCount(u32);
-
-impl ChartAxisMinorStepCount {
-    /// Create a minor-step count supported by iWork.
-    pub fn new(value: u32) -> Result<Self> {
-        if value > MAX_NATIVE_AXIS_STEP_COUNT {
-            return Err(Error::InvalidFormat(format!(
-                "chart value-axis minor step count exceeds {MAX_NATIVE_AXIS_STEP_COUNT}"
-            )));
-        }
-        Ok(Self(value))
-    }
-
-    /// Return the number shown in iWork's `Minor Steps` inspector field.
-    pub const fn value(self) -> u32 {
-        self.0
-    }
-}
-
-impl TryFrom<u32> for ChartAxisMinorStepCount {
-    type Error = Error;
-
-    fn try_from(value: u32) -> Result<Self> {
-        Self::new(value)
-    }
-}
-
-/// Major and minor step settings for a native chart's primary value axis.
-///
-/// A missing setting uses the automatic value calculated by Pages, Numbers, or
-/// Keynote. Construct with [`Self::new`] for independent automatic settings,
-/// [`Self::automatic`] for both automatic values, or [`Self::fixed`] for a
-/// fully manual scale.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ChartValueAxisSteps {
-    major: Option<ChartAxisMajorStepCount>,
-    minor: Option<ChartAxisMinorStepCount>,
-}
-
-impl ChartValueAxisSteps {
-    /// Build value-axis steps from optional manual major and minor counts.
-    pub const fn new(
-        major: Option<ChartAxisMajorStepCount>,
-        minor: Option<ChartAxisMinorStepCount>,
-    ) -> Self {
-        Self { major, minor }
-    }
-
-    /// Use iWork's automatic major and minor step counts.
-    pub const fn automatic() -> Self {
-        Self::new(None, None)
-    }
-
-    /// Build a fully manual value-axis scale.
-    pub const fn fixed(major: ChartAxisMajorStepCount, minor: ChartAxisMinorStepCount) -> Self {
-        Self::new(Some(major), Some(minor))
-    }
-
-    /// Return the optional manual major-step count.
-    pub const fn major(self) -> Option<ChartAxisMajorStepCount> {
-        self.major
-    }
-
-    /// Return the optional manual minor-step count.
-    pub const fn minor(self) -> Option<ChartAxisMinorStepCount> {
-        self.minor
-    }
-}
-
 /// Read the scale steps of one native chart's primary value axis.
 pub(crate) fn chart_value_axis_steps(
     package: &IWorkPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-) -> Result<ChartValueAxisSteps> {
+) -> Result<Steps> {
     axis_non_style_slot(
         package,
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Value,
+        Axis::Value,
     )?
     .read(package, read_value_axis_steps)
 }
@@ -156,14 +49,14 @@ pub(crate) fn set_chart_value_axis_steps(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    steps: ChartValueAxisSteps,
+    steps: Steps,
 ) -> Result<()> {
     let slot = axis_non_style_slot(
         package,
         chart_archive_name,
         drawable_object_id,
         drawable_label,
-        ChartAxis::Value,
+        Axis::Value,
     )?;
     if slot.read(package, read_value_axis_steps)? == steps {
         return Ok(());
@@ -178,33 +71,31 @@ pub(crate) fn set_chart_value_axis_steps(
     Ok(())
 }
 
-fn read_value_axis_steps(data: &[u8]) -> Result<ChartValueAxisSteps> {
+fn read_value_axis_steps(data: &[u8]) -> Result<Steps> {
     let Some(extension) = generated_axis_non_style_extension(data)? else {
-        return Ok(ChartValueAxisSteps::automatic());
+        return Ok(Steps::automatic());
     };
     let generated = tsch::generated::ChartAxisNonStyleArchive::decode(extension)?;
-    Ok(ChartValueAxisSteps::new(
+    Ok(Steps::new(
         decode_major_steps(generated.tschchartaxisvaluenumberofmajorgridlines)?,
         decode_minor_steps(generated.tschchartaxisvaluenumberofminorgridlines)?,
     ))
 }
 
-fn decode_major_steps(value: Option<i32>) -> Result<Option<ChartAxisMajorStepCount>> {
-    value
-        .map(|value| {
-            let value = native_step_count(value, "major")?;
-            ChartAxisMajorStepCount::new(value)
-        })
-        .transpose()
+fn decode_major_steps(value: Option<i32>) -> Result<Option<MajorStepCount>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let value = native_step_count(value, "major")?;
+    Ok(Some(MajorStepCount::new(value)?))
 }
 
-fn decode_minor_steps(value: Option<i32>) -> Result<Option<ChartAxisMinorStepCount>> {
-    value
-        .map(|value| {
-            let value = native_step_count(value, "minor")?;
-            ChartAxisMinorStepCount::new(value)
-        })
-        .transpose()
+fn decode_minor_steps(value: Option<i32>) -> Result<Option<MinorStepCount>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let value = native_step_count(value, "minor")?;
+    Ok(Some(MinorStepCount::new(value)?))
 }
 
 fn native_step_count(value: i32, label: &str) -> Result<u32> {
@@ -215,9 +106,9 @@ fn native_step_count(value: i32, label: &str) -> Result<u32> {
     })
 }
 
-fn patch_value_axis_steps(data: &[u8], steps: ChartValueAxisSteps) -> Result<Vec<u8>> {
+fn patch_value_axis_steps(data: &[u8], steps: Steps) -> Result<Vec<u8>> {
     let Some(extension) = generated_axis_non_style_extension(data)? else {
-        if steps == ChartValueAxisSteps::automatic() {
+        if steps == Steps::automatic() {
             return Ok(data.to_vec());
         }
         let generated = tsch::generated::ChartAxisNonStyleArchive {
@@ -262,7 +153,7 @@ fn patch_value_axis_steps(data: &[u8], steps: ChartValueAxisSteps) -> Result<Vec
     Ok(patched)
 }
 
-fn validate_patched_value_axis_steps(data: &[u8], expected: ChartValueAxisSteps) -> Result<()> {
+fn validate_patched_value_axis_steps(data: &[u8], expected: Steps) -> Result<()> {
     if read_value_axis_steps(data)? != expected {
         return Err(Error::InvalidFormat(
             "chart value-axis steps wire patch failed validation".to_owned(),
@@ -280,14 +171,15 @@ mod tests {
     const UNMAPPED_OUTER_FIELD: u32 = 4_096;
     const UNMAPPED_GENERATED_FIELD: u32 = 4_097;
     const UNMAPPED_VALUE: u64 = 42;
+    const MAX_NATIVE_AXIS_STEP_COUNT: u32 = i32::MAX as u32;
 
     #[test]
     fn step_counts_reject_values_outside_native_ranges() {
-        assert!(ChartAxisMajorStepCount::new(0).is_err());
-        assert_eq!(ChartAxisMajorStepCount::ONE.value(), 1);
-        assert!(ChartAxisMajorStepCount::new(MAX_NATIVE_AXIS_STEP_COUNT + 1).is_err());
-        assert_eq!(ChartAxisMinorStepCount::new(0).unwrap().value(), 0);
-        assert!(ChartAxisMinorStepCount::new(MAX_NATIVE_AXIS_STEP_COUNT + 1).is_err());
+        assert!(MajorStepCount::new(0).is_err());
+        assert_eq!(MajorStepCount::ONE.value(), 1);
+        assert!(MajorStepCount::new(MAX_NATIVE_AXIS_STEP_COUNT + 1).is_err());
+        assert_eq!(MinorStepCount::new(0).unwrap().value(), 0);
+        assert!(MinorStepCount::new(MAX_NATIVE_AXIS_STEP_COUNT + 1).is_err());
     }
 
     #[test]
@@ -315,9 +207,9 @@ mod tests {
                 tschchartaxisvaluenumberofminorgridlines: Some(1),
                 ..Default::default()
             });
-        let replacement = ChartValueAxisSteps::fixed(
-            ChartAxisMajorStepCount::new(6).unwrap(),
-            ChartAxisMinorStepCount::new(2).unwrap(),
+        let replacement = Steps::fixed(
+            MajorStepCount::new(6).unwrap(),
+            MinorStepCount::new(2).unwrap(),
         );
 
         let patched = patch_value_axis_steps(&original, replacement).unwrap();
@@ -336,9 +228,9 @@ mod tests {
 
         let restored = patch_value_axis_steps(
             &patched,
-            ChartValueAxisSteps::fixed(
-                ChartAxisMajorStepCount::new(5).unwrap(),
-                ChartAxisMinorStepCount::new(1).unwrap(),
+            Steps::fixed(
+                MajorStepCount::new(5).unwrap(),
+                MinorStepCount::new(1).unwrap(),
             ),
         )
         .unwrap();
@@ -356,11 +248,10 @@ mod tests {
                 ..Default::default()
             });
 
-        let automatic =
-            patch_value_axis_steps(&original, ChartValueAxisSteps::automatic()).unwrap();
+        let automatic = patch_value_axis_steps(&original, Steps::automatic()).unwrap();
         assert_eq!(
             read_value_axis_steps(&automatic).unwrap(),
-            ChartValueAxisSteps::automatic()
+            Steps::automatic()
         );
         let generated = tsch::generated::ChartAxisNonStyleArchive::decode(
             generated_axis_non_style_extension(&automatic)
@@ -381,18 +272,17 @@ mod tests {
             super_: Some(tss::StyleArchive::default()),
         }
         .encode_to_vec();
-        let steps = ChartValueAxisSteps::new(Some(ChartAxisMajorStepCount::new(4).unwrap()), None);
+        let steps = Steps::new(Some(MajorStepCount::new(4).unwrap()), None);
 
         let patched = patch_value_axis_steps(&original, steps).unwrap();
         assert_eq!(read_value_axis_steps(&patched).unwrap(), steps);
 
-        let minor_only =
-            ChartValueAxisSteps::new(None, Some(ChartAxisMinorStepCount::new(0).unwrap()));
+        let minor_only = Steps::new(None, Some(MinorStepCount::new(0).unwrap()));
         let patched = patch_value_axis_steps(&original, minor_only).unwrap();
         assert_eq!(read_value_axis_steps(&patched).unwrap(), minor_only);
 
         assert_eq!(
-            patch_value_axis_steps(&original, ChartValueAxisSteps::automatic()).unwrap(),
+            patch_value_axis_steps(&original, Steps::automatic()).unwrap(),
             original
         );
     }
@@ -441,8 +331,8 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .into_iter()
-            .filter(|field| field.number == number)
-            .map(|field| data[field.start..field.end].to_vec())
+            .filter(|field| field.number() == number)
+            .map(|field| data[field.start()..field.end()].to_vec())
             .collect()
     }
 }

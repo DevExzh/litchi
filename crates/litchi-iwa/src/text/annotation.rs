@@ -2,6 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::archive::Archive;
 use crate::comments::{ensure_annotation_author, remove_generated_annotation_author_if_unused};
 use crate::package_metadata::{
     add_component_external_reference, component_identifier_for_entry,
@@ -14,15 +15,15 @@ use crate::{Error, IWorkPackage, Result};
 use super::highlight_object::{
     AnnotationGraph, ensure_no_metadata_reference, insert_annotation_comment_storage,
     new_highlight_object, require_exclusive_reference, update_annotation_comment_text,
-    validate_annotation_graph, validate_highlight_object,
+    validate_annotation_graph_in_archive, validate_highlight_object,
 };
 use super::highlight_storage::{
-    Boundary, add_range, decoded_boundaries, encode_table, ensure_range_available, locate_storage,
+    Boundary, add_range, decoded_boundaries, encode_table, ensure_range_available,
     locate_storage_with_archive, patch_highlight_table, raw_boundaries, remove_range,
     validate_range,
 };
-use super::position::{TextPosition, TextRange};
 use super::storage_wire::{StorageLocation, text_utf16_len};
+use litchi_iwa_text::position::{TextPosition, TextRange};
 
 const OBJECT_IDENTIFIER_INCREMENT: u64 = 1;
 
@@ -56,9 +57,10 @@ pub(super) fn annotations(
     package: &IWorkPackage,
     storage_id: u64,
 ) -> Result<Vec<AnnotationRecord>> {
-    let location = locate_storage(package, storage_id)?;
-    let boundaries = decoded_boundaries(storage_id, &location)?;
-    collect_annotations(package, storage_id, &location, &boundaries)
+    let located = locate_storage_with_archive(package, storage_id)?;
+    let location = &located.location;
+    let boundaries = decoded_boundaries(storage_id, location)?;
+    collect_annotations(storage_id, location, &located.archive, &boundaries)
 }
 
 pub(super) fn annotation_by_id(
@@ -113,7 +115,7 @@ pub(super) fn add_annotation(
         encode_table(table, boundaries).map(|table| (Some(table), Some(annotation_id), None))
     })?;
     staged.update_archive(&archive_name, |archive| {
-        archive.insert_object(new_highlight_object(annotation_id, comment_storage_id)?)
+        Ok(archive.insert_object(new_highlight_object(annotation_id, comment_storage_id)?)?)
     })?;
     insert_annotation_comment_storage(
         &mut staged,
@@ -339,7 +341,7 @@ fn remove_detached_annotations(
         let object = archive.object(*identifier).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork annotation object {identifier} is missing"))
         })?;
-        let graph = validate_annotation_graph(package, archive_name, *identifier, object)?
+        let graph = validate_annotation_graph_in_archive(&archive, *identifier, object)?
             .ok_or_else(|| {
                 Error::InvalidFormat(format!("object {identifier} is not a text annotation"))
             })?;
@@ -432,13 +434,12 @@ pub(super) fn remove_registered_object(
 }
 
 fn collect_annotations(
-    package: &IWorkPackage,
     storage_id: u64,
     location: &StorageLocation,
+    archive: &Archive,
     boundaries: &[Boundary],
 ) -> Result<Vec<AnnotationRecord>> {
     let text_len = text_utf16_len(&location.storage.text)?;
-    let archive = package.archive(&location.archive_name)?;
     let mut seen = HashSet::new();
     let mut annotations = Vec::new();
     for (position, boundary) in boundaries.iter().enumerate() {
@@ -453,9 +454,7 @@ fn collect_annotations(
                 "iWork text storage {storage_id} references missing annotation object {identifier}"
             ))
         })?;
-        let Some(graph) =
-            validate_annotation_graph(package, &location.archive_name, identifier, object)?
-        else {
+        let Some(graph) = validate_annotation_graph_in_archive(archive, identifier, object)? else {
             continue;
         };
         if !seen.insert(identifier) {
@@ -466,8 +465,8 @@ fn collect_annotations(
         annotations.push(AnnotationRecord {
             object_id: identifier,
             range: TextRange::new(
-                TextPosition::from_native(boundary.index),
-                TextPosition::from_native(end),
+                TextPosition::from_utf16_code_units(boundary.index),
+                TextPosition::from_utf16_code_units(end),
             )?,
             graph,
         });

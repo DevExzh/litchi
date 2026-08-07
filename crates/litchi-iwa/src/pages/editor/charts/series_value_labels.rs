@@ -10,16 +10,14 @@ use crate::charts::series_value_labels::{
     chart_series_value_label_visibilities as read_native_value_labels,
     set_chart_series_value_label_visibilities as set_native_value_labels,
 };
-use crate::charts::{
-    ChartSeriesIndex, ChartSeriesValueLabelLocation, ChartSeriesValueLabelVisibility,
-};
+use crate::charts::{ChartSeriesValueLabelLocation, Index, Visibility};
 
 impl PagesEditor {
     /// Read every series' value-label visibility in native series order.
     pub fn body_chart_series_value_label_visibilities(
         &self,
         drawable_object_id: u64,
-    ) -> Result<Vec<ChartSeriesValueLabelVisibility>> {
+    ) -> Result<Vec<Visibility>> {
         body_chart_series_value_label_visibilities(self, drawable_object_id)
     }
 
@@ -27,8 +25,8 @@ impl PagesEditor {
     pub fn body_chart_series_value_label_visibility(
         &self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
-    ) -> Result<ChartSeriesValueLabelVisibility> {
+        series: Index,
+    ) -> Result<Visibility> {
         let visibilities = body_chart_series_value_label_visibilities(self, drawable_object_id)?;
         visibilities
             .get(series.zero_based())
@@ -42,7 +40,7 @@ impl PagesEditor {
     pub fn set_body_chart_series_value_label_visibilities(
         &mut self,
         drawable_object_id: u64,
-        visibilities: &[ChartSeriesValueLabelVisibility],
+        visibilities: &[Visibility],
     ) -> Result<()> {
         set_body_chart_series_value_label_visibilities(self, drawable_object_id, visibilities)
     }
@@ -51,8 +49,8 @@ impl PagesEditor {
     pub fn set_body_chart_series_value_label_visibility(
         &mut self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
-        visibility: ChartSeriesValueLabelVisibility,
+        series: Index,
+        visibility: Visibility,
     ) -> Result<()> {
         let mut visibilities =
             body_chart_series_value_label_visibilities(self, drawable_object_id)?;
@@ -79,7 +77,7 @@ impl PagesEditor {
     pub fn body_chart_series_value_label_location(
         &self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesValueLabelLocation> {
         let locations = body_chart_series_value_label_locations(self, drawable_object_id)?;
         locations.get(series.zero_based()).copied().ok_or_else(|| {
@@ -100,7 +98,7 @@ impl PagesEditor {
     pub fn set_body_chart_series_value_label_location(
         &mut self,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         location: ChartSeriesValueLabelLocation,
     ) -> Result<()> {
         let mut locations = body_chart_series_value_label_locations(self, drawable_object_id)?;
@@ -119,7 +117,7 @@ impl PagesEditor {
 fn body_chart_series_value_label_visibilities(
     editor: &PagesEditor,
     drawable_object_id: u64,
-) -> Result<Vec<ChartSeriesValueLabelVisibility>> {
+) -> Result<Vec<Visibility>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
         graph.info.kind,
@@ -141,7 +139,7 @@ fn body_chart_series_value_label_visibilities(
 fn set_body_chart_series_value_label_visibilities(
     editor: &mut PagesEditor,
     drawable_object_id: u64,
-    visibilities: &[ChartSeriesValueLabelVisibility],
+    visibilities: &[Visibility],
 ) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let series_count = value_label_series_count(
@@ -262,8 +260,8 @@ fn set_body_chart_series_value_label_locations(
 }
 
 pub(super) fn value_label_series_count(
-    kind: ChartKind,
-    direction: ChartSeriesDirection,
+    kind: Kind,
+    direction: Direction,
     data: &ChartData,
     drawable_label: &str,
     drawable_object_id: u64,
@@ -274,7 +272,7 @@ pub(super) fn value_label_series_count(
 fn value_label_index_error(
     drawable_label: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     series_count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

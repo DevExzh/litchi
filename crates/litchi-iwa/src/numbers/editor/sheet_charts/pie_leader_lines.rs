@@ -5,7 +5,7 @@ use crate::charts::pie_leader_lines::{
     chart_pie_leader_line_visibilities as read_native_leader_line_visibilities,
     set_chart_pie_leader_line_visibilities as set_native_leader_line_visibilities,
 };
-use crate::charts::{ChartPieLeaderLineVisibility, ChartPieWedgeIndex};
+use crate::charts::{ChartPieWedgeIndex, LeaderLineVisibility};
 
 impl NumbersEditor {
     /// Read every pie or donut wedge's leader-line visibility.
@@ -13,7 +13,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<Vec<ChartPieLeaderLineVisibility>> {
+    ) -> Result<Vec<LeaderLineVisibility>> {
         sheet_chart_pie_leader_line_visibilities(self, sheet_id, drawable_object_id)
     }
 
@@ -23,7 +23,7 @@ impl NumbersEditor {
         sheet_id: u64,
         drawable_object_id: u64,
         wedge: ChartPieWedgeIndex,
-    ) -> Result<ChartPieLeaderLineVisibility> {
+    ) -> Result<LeaderLineVisibility> {
         let visibilities =
             sheet_chart_pie_leader_line_visibilities(self, sheet_id, drawable_object_id)?;
         visibilities
@@ -39,7 +39,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        visibilities: &[ChartPieLeaderLineVisibility],
+        visibilities: &[LeaderLineVisibility],
     ) -> Result<()> {
         set_sheet_chart_pie_leader_line_visibilities(
             self,
@@ -55,7 +55,7 @@ impl NumbersEditor {
         sheet_id: u64,
         drawable_object_id: u64,
         wedge: ChartPieWedgeIndex,
-        visibility: ChartPieLeaderLineVisibility,
+        visibility: LeaderLineVisibility,
     ) -> Result<()> {
         let mut visibilities =
             sheet_chart_pie_leader_line_visibilities(self, sheet_id, drawable_object_id)?;
@@ -80,7 +80,7 @@ fn sheet_chart_pie_leader_line_visibilities(
     editor: &NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-) -> Result<Vec<ChartPieLeaderLineVisibility>> {
+) -> Result<Vec<LeaderLineVisibility>> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     require_pie_leader_lines(graph.info.kind, drawable_object_id)?;
     let series_count = leader_line_series_count(
@@ -102,7 +102,7 @@ fn set_sheet_chart_pie_leader_line_visibilities(
     editor: &mut NumbersEditor,
     sheet_id: u64,
     drawable_object_id: u64,
-    visibilities: &[ChartPieLeaderLineVisibility],
+    visibilities: &[LeaderLineVisibility],
 ) -> Result<()> {
     let graph = chart_graph(editor, sheet_id, drawable_object_id)?;
     require_pie_leader_lines(graph.info.kind, drawable_object_id)?;
@@ -148,7 +148,7 @@ fn set_sheet_chart_pie_leader_line_visibilities(
     Ok(())
 }
 
-fn require_pie_leader_lines(kind: ChartKind, drawable_object_id: u64) -> Result<()> {
+fn require_pie_leader_lines(kind: Kind, drawable_object_id: u64) -> Result<()> {
     if !kind.supports_pie_start_angle() {
         return Err(Error::InvalidFormat(format!(
             "Numbers chart {drawable_object_id} kind {kind:?} has no pie leader lines"
@@ -158,16 +158,17 @@ fn require_pie_leader_lines(kind: ChartKind, drawable_object_id: u64) -> Result<
 }
 
 fn leader_line_series_count(
-    direction: ChartSeriesDirection,
+    direction: Direction,
     data: &ChartData,
     drawable_label: &str,
     drawable_object_id: u64,
 ) -> Result<usize> {
-    match direction {
-        ChartSeriesDirection::Rows => Ok(data.row_names().len()),
-        ChartSeriesDirection::Columns => Ok(data.column_names().len()),
-        ChartSeriesDirection::Unsupported(value) => Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} has unsupported series direction {value}"
+    match direction.kind() {
+        Some(DirectionKind::Rows) => Ok(data.row_names().len()),
+        Some(DirectionKind::Columns) => Ok(data.column_names().len()),
+        None => Err(Error::InvalidFormat(format!(
+            "{drawable_label} chart {drawable_object_id} has unsupported series direction {}",
+            direction.native_value()
         ))),
     }
 }

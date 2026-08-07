@@ -6,7 +6,7 @@ use crate::charts::series_trendline::{
     chart_series_trendlines as read_native_trendlines,
     set_chart_series_trendlines as set_native_trendlines,
 };
-use crate::charts::{ChartSeriesIndex, ChartSeriesTrendline};
+use crate::charts::{ChartSeriesTrendline, Index};
 
 impl NumbersEditor {
     /// Read every series' trendline in native series order.
@@ -23,7 +23,7 @@ impl NumbersEditor {
         &self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
     ) -> Result<ChartSeriesTrendline> {
         let trendlines = sheet_chart_series_trendlines(self, sheet_id, drawable_object_id)?;
         trendlines.get(series.zero_based()).cloned().ok_or_else(|| {
@@ -46,7 +46,7 @@ impl NumbersEditor {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-        series: ChartSeriesIndex,
+        series: Index,
         trendline: ChartSeriesTrendline,
     ) -> Result<()> {
         let mut trendlines = sheet_chart_series_trendlines(self, sheet_id, drawable_object_id)?;
@@ -136,7 +136,7 @@ fn set_sheet_chart_series_trendlines(
 fn trendline_index_error(
     suite: &str,
     drawable_object_id: u64,
-    series: ChartSeriesIndex,
+    series: Index,
     count: usize,
 ) -> Error {
     Error::InvalidFormat(format!(

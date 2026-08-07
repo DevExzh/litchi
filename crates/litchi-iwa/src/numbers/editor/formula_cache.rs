@@ -1035,7 +1035,7 @@ impl FormulaEvaluator<'_> {
             return Ok(EvalScalar::Empty);
         };
         match cell.cached_scalar()? {
-            Some(CachedScalar::Number(number)) => Ok(EvalScalar::Number(number)),
+            Some(CachedScalar::Number(number)) => Ok(EvalScalar::Number(number.get())),
             Some(CachedScalar::Boolean(boolean)) => Ok(EvalScalar::Boolean(boolean)),
             Some(
                 CachedScalar::Date(_) | CachedScalar::Duration(_) | CachedScalar::Unsupported(_),
@@ -1171,6 +1171,7 @@ fn read_cell(
         .as_deref()
         .map(BncCell::parse)
         .transpose()
+        .map_err(Into::into)
 }
 
 #[derive(Debug, Default)]

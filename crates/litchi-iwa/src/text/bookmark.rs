@@ -19,11 +19,11 @@ use super::hyperlink_storage::{
     ensure_range_available, locate_storage_with_archive, patch_ranged_object_table, raw_boundaries,
     remove_range, validate_range,
 };
-use super::position::{TextPosition, TextRange};
 use super::smart_field_object::{
     ensure_no_metadata_reference, require_exclusive_storage_reference,
 };
 use super::storage_wire::{StorageLocation, text_utf16_len};
+use litchi_iwa_text::position::{TextPosition, TextRange};
 
 const BOOKMARK_TABLE: RangedObjectTable = RangedObjectTable::Bookmark;
 
@@ -54,7 +54,7 @@ pub(crate) fn add_text_bookmark(
     )?;
 
     let identifier = next_object_identifier(package)?;
-    let id = TextBookmarkId::from_native(identifier);
+    let id = TextBookmarkId::new(identifier)?;
     let bookmark_object = new_bookmark_object(identifier, settings)?;
     let archive_name = location.archive_name.clone();
     let mut staged = package.clone();
@@ -78,7 +78,7 @@ pub(crate) fn add_text_bookmark(
         },
     )?;
     staged.update_archive(&archive_name, |archive| {
-        archive.insert_object(bookmark_object)
+        Ok(archive.insert_object(bookmark_object)?)
     })?;
     set_package_last_object_identifier(&mut staged, identifier)?;
     let verified = roundtrip(&staged)?;
@@ -111,11 +111,11 @@ pub(crate) fn update_text_bookmark(
         storage_id,
         range,
         &boundaries,
-        Some(id.object_id()),
+        Some(id.get()),
         &location.storage.text,
         BOOKMARK_TABLE,
     )?;
-    require_exclusive_storage_reference(package, storage_id, id.object_id(), "bookmark")?;
+    require_exclusive_storage_reference(package, storage_id, id.get(), "bookmark")?;
 
     let archive_name = location.archive_name.clone();
     let mut staged = package.clone();
@@ -126,7 +126,7 @@ pub(crate) fn update_text_bookmark(
         BOOKMARK_TABLE,
         |table, storage| {
             let mut boundaries = raw_boundaries(storage_id, table, storage, BOOKMARK_TABLE)?;
-            remove_range(&mut boundaries, id.object_id(), BOOKMARK_TABLE)?;
+            remove_range(&mut boundaries, id.get(), BOOKMARK_TABLE)?;
             ensure_range_available(
                 storage_id,
                 range,
@@ -135,11 +135,11 @@ pub(crate) fn update_text_bookmark(
                 &storage.text,
                 BOOKMARK_TABLE,
             )?;
-            add_range(&mut boundaries, range, id.object_id())?;
+            add_range(&mut boundaries, range, id.get())?;
             encode_table(table, boundaries).map(|table| (Some(table), None, None))
         },
     )?;
-    patch_bookmark_settings(&mut staged, &archive_name, id.object_id(), settings)?;
+    patch_bookmark_settings(&mut staged, &archive_name, id.get(), settings)?;
     let verified = roundtrip(&staged)?;
     let updated = bookmark_by_id(&verified, storage_id, id)?;
     if updated.range != range || updated.settings != *settings {
@@ -159,8 +159,8 @@ pub(crate) fn remove_text_bookmark(
     let removed = bookmark_by_id(package, storage_id, id)?;
     let located = locate_storage_with_archive(package, storage_id, BOOKMARK_TABLE)?;
     let location = &located.location;
-    require_exclusive_storage_reference(package, storage_id, id.object_id(), "bookmark")?;
-    let registered_component = component_identifier_for_object_uuid(package, id.object_id())?;
+    require_exclusive_storage_reference(package, storage_id, id.get(), "bookmark")?;
+    let registered_component = component_identifier_for_object_uuid(package, id.get())?;
     let owning_component = component_identifier_for_entry(package, &location.archive_name)?;
 
     let archive_name = location.archive_name.clone();
@@ -172,35 +172,34 @@ pub(crate) fn remove_text_bookmark(
         BOOKMARK_TABLE,
         |table, storage| {
             let mut boundaries = raw_boundaries(storage_id, table, storage, BOOKMARK_TABLE)?;
-            remove_range(&mut boundaries, id.object_id(), BOOKMARK_TABLE)?;
+            remove_range(&mut boundaries, id.get(), BOOKMARK_TABLE)?;
             if boundaries
                 .iter()
                 .any(|boundary| boundary.object_id.is_some())
             {
-                encode_table(table, boundaries)
-                    .map(|table| (Some(table), None, Some(id.object_id())))
+                encode_table(table, boundaries).map(|table| (Some(table), None, Some(id.get())))
             } else {
-                Ok((None, None, Some(id.object_id())))
+                Ok((None, None, Some(id.get())))
             }
         },
     )?;
-    ensure_no_metadata_reference(&staged, id.object_id(), "bookmark")?;
+    ensure_no_metadata_reference(&staged, id.get(), "bookmark")?;
     staged.update_archive(&archive_name, |archive| {
-        let object = archive.remove_object(id.object_id()).ok_or_else(|| {
+        let object = archive.remove_object(id.get()).ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "iWork bookmark object {} disappeared during deletion",
-                id.object_id()
+                id.get()
             ))
         })?;
-        validate_bookmark_object(id.object_id(), &object).map(|_| ())
+        validate_bookmark_object(id.get(), &object).map(|_| ())
     })?;
     if let Some(component) = owning_component {
-        remove_component_external_references_to_object(&mut staged, component, id.object_id())?;
+        remove_component_external_references_to_object(&mut staged, component, id.get())?;
     }
     if let Some(component) = registered_component {
-        remove_component_object_uuids(&mut staged, component, &[id.object_id()])?;
+        remove_component_object_uuids(&mut staged, component, &[id.get()])?;
     }
-    release_package_identifier_suffix(&mut staged, &[id.object_id()])?;
+    release_package_identifier_suffix(&mut staged, &[id.get()])?;
     let verified = roundtrip(&staged)?;
     if text_bookmarks(&verified, storage_id)?
         .iter()
@@ -283,11 +282,11 @@ fn bookmark_by_id(
         [bookmark] => Ok(bookmark.clone()),
         [] => Err(Error::InvalidFormat(format!(
             "text storage {storage_id} does not own bookmark object {}",
-            id.object_id()
+            id.get()
         ))),
         _ => Err(Error::InvalidFormat(format!(
             "text storage {storage_id} references bookmark object {} more than once",
-            id.object_id()
+            id.get()
         ))),
     }
 }
@@ -322,10 +321,10 @@ fn collect_bookmarks(
             )));
         }
         bookmarks.push(TextBookmark::new(
-            TextBookmarkId::from_native(identifier),
+            TextBookmarkId::new(identifier)?,
             TextRange::new(
-                TextPosition::from_native(boundary.index),
-                TextPosition::from_native(end),
+                TextPosition::from_utf16_code_units(boundary.index),
+                TextPosition::from_utf16_code_units(end),
             )?,
             settings,
         ));

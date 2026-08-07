@@ -2,7 +2,7 @@
 
 use crate::protobuf::{tsd, tsp};
 
-use super::LineEndpoint;
+use super::Endpoint;
 
 const CANONICAL_MIN: f32 = 0.0;
 const CANONICAL_MID: f32 = 3.0;
@@ -19,14 +19,14 @@ const OPEN_SQUARE_ATTACHMENT_Y: f32 = 0.2;
 const OPEN_CIRCLE_ATTACHMENT_Y: f32 = -0.3;
 const LINE_ATTACHMENT_Y: f32 = -0.8;
 
-pub(super) fn endpoint_archive(endpoint: LineEndpoint) -> tsd::LineEndArchive {
+pub(super) fn endpoint_archive(endpoint: Endpoint) -> tsd::LineEndArchive {
     use tsp::path::ElementType;
 
     let miter = tsd::LineJoin::MiterJoin as i32;
     let round = tsd::LineJoin::RoundJoin as i32;
     match endpoint {
-        LineEndpoint::None => line_end("none", miter, vec![], None, None),
-        LineEndpoint::SimpleArrow => line_end(
+        Endpoint::None => line_end("none", miter, vec![], None, None),
+        Endpoint::SimpleArrow => line_end(
             "simple arrow",
             miter,
             vec![
@@ -38,8 +38,8 @@ pub(super) fn endpoint_archive(endpoint: LineEndpoint) -> tsd::LineEndArchive {
             Some((CANONICAL_MID, CANONICAL_MIN)),
             Some(true),
         ),
-        LineEndpoint::FilledCircle => circle_end("filled circle", CIRCLE_INSET, Some(true)),
-        LineEndpoint::FilledDiamond => line_end(
+        Endpoint::FilledCircle => circle_end("filled circle", CIRCLE_INSET, Some(true)),
+        Endpoint::FilledDiamond => line_end(
             "filled diamond",
             miter,
             vec![
@@ -52,7 +52,7 @@ pub(super) fn endpoint_archive(endpoint: LineEndpoint) -> tsd::LineEndArchive {
             Some((CANONICAL_MID, DIAMOND_ATTACHMENT_Y)),
             Some(true),
         ),
-        LineEndpoint::OpenArrow => line_end(
+        Endpoint::OpenArrow => line_end(
             "open arrow",
             round,
             vec![
@@ -65,7 +65,7 @@ pub(super) fn endpoint_archive(endpoint: LineEndpoint) -> tsd::LineEndArchive {
             Some((CANONICAL_MID, CANONICAL_MIN)),
             None,
         ),
-        LineEndpoint::FilledArrow => line_end(
+        Endpoint::FilledArrow => line_end(
             "filled arrow",
             miter,
             vec![
@@ -81,20 +81,20 @@ pub(super) fn endpoint_archive(endpoint: LineEndpoint) -> tsd::LineEndArchive {
             Some((CANONICAL_MID, FILLED_ARROW_NOTCH_Y)),
             Some(true),
         ),
-        LineEndpoint::FilledSquare => square_end(
+        Endpoint::FilledSquare => square_end(
             "filled square",
             FILLED_SQUARE_INSET,
             Some(true),
             FILLED_SQUARE_INSET,
         ),
-        LineEndpoint::OpenSquare => square_end(
+        Endpoint::OpenSquare => square_end(
             "open square",
             OPEN_SQUARE_INSET,
             None,
             OPEN_SQUARE_ATTACHMENT_Y,
         ),
-        LineEndpoint::OpenCircle => circle_end("open circle", OPEN_CIRCLE_ATTACHMENT_Y, None),
-        LineEndpoint::InvertedArrow => line_end(
+        Endpoint::OpenCircle => circle_end("open circle", OPEN_CIRCLE_ATTACHMENT_Y, None),
+        Endpoint::InvertedArrow => line_end(
             "inverted arrow",
             miter,
             vec![
@@ -106,7 +106,7 @@ pub(super) fn endpoint_archive(endpoint: LineEndpoint) -> tsd::LineEndArchive {
             Some((CANONICAL_MID, DIAMOND_ATTACHMENT_Y)),
             Some(true),
         ),
-        LineEndpoint::Line => line_end(
+        Endpoint::Line => line_end(
             "line",
             miter,
             vec![

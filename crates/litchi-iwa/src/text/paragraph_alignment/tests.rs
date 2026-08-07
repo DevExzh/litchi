@@ -12,16 +12,17 @@ use crate::shapes::{
     ShapeShadowOpacity, ShapeShadowPerspective, StrokePattern, StrokeWidth,
 };
 use crate::text::{
-    IWorkTextEditor, ParagraphBorder, ParagraphBorderOffset, ParagraphBorderSides,
-    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFollowingStyle,
-    ParagraphHyphenation, ParagraphIndentPoints, ParagraphIndents, ParagraphLineSpacingMultiple,
-    ParagraphLineSpacingPoints, ParagraphSpacing, ParagraphSpacingPoints, ParagraphStyleId,
-    ParagraphStyleName, ParagraphTabAlignment, ParagraphTabLeader, ParagraphTabPosition,
-    ParagraphTabStop, ParagraphTabStops, ParagraphWritingDirection, TextBackground,
-    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextColumnCount, TextColumns,
-    TextDecorations, TextFont, TextLigatures, TextOutline, TextPointSize, TextScript, TextShadow,
-    TextStrikethrough, TextStyle, TextUnderline,
+    Background, Border, IWorkTextEditor, IndentPoints, Indents, LineSpacingMultiple,
+    LineSpacingPoints, Outline, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval,
+    ParagraphFollowingStyle, ParagraphHyphenation, ParagraphStyleName, ParagraphTabAlignment,
+    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
+    ParagraphWritingDirection, Shadow, Spacing, SpacingPoints, TextBaselineShift,
+    TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont, TextLigatures,
+    TextPointSize, TextScript, TextStrikethrough, TextStyle, TextUnderline,
 };
+use litchi_iwa_text::columns::{Columns, Count};
+use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
+use litchi_iwa_text::paragraph::style::raw::{from_native_id, native_id};
 
 const SOURCE_PAGES_OBJECT_TITLE_STYLE_ID: u64 = 121;
 
@@ -62,9 +63,8 @@ fn pages_following_paragraph_style_catalog_round_trips_and_resets() {
     let body = styles.iter().find(|style| style.name() == "Body").unwrap();
     let expected = ParagraphFollowingStyle::Named(body.id());
     let before = pages.to_bytes().unwrap();
-    let hidden_object_title = ParagraphFollowingStyle::Named(
-        ParagraphStyleId::new(SOURCE_PAGES_OBJECT_TITLE_STYLE_ID).unwrap(),
-    );
+    let hidden_object_title =
+        ParagraphFollowingStyle::Named(from_native_id(SOURCE_PAGES_OBJECT_TITLE_STYLE_ID).unwrap());
     assert!(
         pages
             .set_text_box_paragraph_following_style(
@@ -111,7 +111,7 @@ fn source_theme_paragraph_presets_are_deduplicated_across_suite_wrappers() {
     let numbers_text = IWorkTextEditor::from_package(numbers.into_package());
     assert_eq!(
         numbers_text
-            .named_paragraph_styles(numbers_box.storage.object_id)
+            .named_paragraph_styles(numbers_box.storage.id)
             .unwrap()
             .iter()
             .map(|style| style.name())
@@ -141,7 +141,7 @@ fn source_theme_paragraph_presets_are_deduplicated_across_suite_wrappers() {
     let keynote_text = IWorkTextEditor::from_package(keynote.into_package());
     assert_eq!(
         keynote_text
-            .named_paragraph_styles(keynote_box.storage.object_id)
+            .named_paragraph_styles(keynote_box.storage.id)
             .unwrap()
             .iter()
             .map(|style| style.name())
@@ -297,19 +297,19 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
     let mut numbers_text = IWorkTextEditor::from_package(numbers.into_package());
     let initial_numbers = numbers_text.package().to_bytes().unwrap();
     let body = numbers_text
-        .named_paragraph_styles(numbers_box.storage.object_id)
+        .named_paragraph_styles(numbers_box.storage.id)
         .unwrap()[0]
         .id();
     let numbers_created = numbers_text
         .create_named_paragraph_style(
-            numbers_box.storage.object_id,
+            numbers_box.storage.id,
             body,
             ParagraphStyleName::new("Numbers Detail").unwrap(),
         )
         .unwrap();
     let numbers_renamed = numbers_text
         .rename_named_paragraph_style(
-            numbers_box.storage.object_id,
+            numbers_box.storage.id,
             numbers_created.id(),
             ParagraphStyleName::new("Numbers Summary").unwrap(),
         )
@@ -319,7 +319,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
         IWorkTextEditor::from_package(IWorkPackage::from_bytes(&numbers_bytes).unwrap());
     assert_eq!(
         numbers_text
-            .named_paragraph_styles(numbers_box.storage.object_id)
+            .named_paragraph_styles(numbers_box.storage.id)
             .unwrap()
             .last()
             .unwrap()
@@ -329,7 +329,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
     let mut numbers_text = numbers_text;
     assert_eq!(
         numbers_text
-            .delete_named_paragraph_style(numbers_box.storage.object_id, numbers_created.id(),)
+            .delete_named_paragraph_style(numbers_box.storage.id, numbers_created.id(),)
             .unwrap(),
         numbers_renamed
     );
@@ -350,19 +350,19 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
     let mut keynote_text = IWorkTextEditor::from_package(keynote.into_package());
     let initial_keynote = keynote_text.package().to_bytes().unwrap();
     let body = keynote_text
-        .named_paragraph_styles(keynote_box.storage.object_id)
+        .named_paragraph_styles(keynote_box.storage.id)
         .unwrap()[0]
         .id();
     let keynote_created = keynote_text
         .create_named_paragraph_style(
-            keynote_box.storage.object_id,
+            keynote_box.storage.id,
             body,
             ParagraphStyleName::new("Keynote Detail").unwrap(),
         )
         .unwrap();
     let keynote_renamed = keynote_text
         .rename_named_paragraph_style(
-            keynote_box.storage.object_id,
+            keynote_box.storage.id,
             keynote_created.id(),
             ParagraphStyleName::new("Keynote Summary").unwrap(),
         )
@@ -372,7 +372,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
         IWorkTextEditor::from_package(IWorkPackage::from_bytes(&keynote_bytes).unwrap());
     assert_eq!(
         keynote_text
-            .named_paragraph_styles(keynote_box.storage.object_id)
+            .named_paragraph_styles(keynote_box.storage.id)
             .unwrap()
             .last()
             .unwrap()
@@ -382,7 +382,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
     let mut keynote_text = keynote_text;
     assert_eq!(
         keynote_text
-            .delete_named_paragraph_style(keynote_box.storage.object_id, keynote_created.id(),)
+            .delete_named_paragraph_style(keynote_box.storage.id, keynote_created.id(),)
             .unwrap(),
         keynote_renamed
     );
@@ -464,7 +464,7 @@ fn named_paragraph_style_application_and_replacement_deletion_are_transactional(
         .apply_text_box_named_paragraph_style(second.drawable_object_id, body)
         .unwrap();
     pages
-        .set_text_box_paragraph_alignment(first.drawable_object_id, TextAlignment::Center)
+        .set_text_box_paragraph_alignment(first.drawable_object_id, Alignment::Center)
         .unwrap();
     pages
         .set_text_box_paragraph_default_tab_interval(
@@ -575,7 +575,7 @@ fn assert_numbers_style_lifecycle(
         .apply_sheet_text_box_named_paragraph_style(sheet_id, drawable_object_id, display.id())
         .unwrap();
     editor
-        .set_sheet_text_box_paragraph_alignment(sheet_id, drawable_object_id, TextAlignment::Right)
+        .set_sheet_text_box_paragraph_alignment(sheet_id, drawable_object_id, Alignment::Right)
         .unwrap();
     editor
         .set_sheet_text_box_paragraph_default_tab_interval(
@@ -643,7 +643,7 @@ fn assert_keynote_style_lifecycle(editor: &mut KeynoteEditor, drawable_object_id
         .apply_slide_text_box_named_paragraph_style(0, drawable_object_id, display.id())
         .unwrap();
     editor
-        .set_slide_text_box_paragraph_alignment(0, drawable_object_id, TextAlignment::Right)
+        .set_slide_text_box_paragraph_alignment(0, drawable_object_id, Alignment::Right)
         .unwrap();
     editor
         .set_slide_text_box_paragraph_default_tab_interval(
@@ -721,7 +721,7 @@ fn named_paragraph_style_redefinition_propagates_across_suites() {
     );
     assert_eq!(pages.to_bytes().unwrap(), unchanged);
     pages
-        .set_text_box_paragraph_alignment(first.drawable_object_id, TextAlignment::Center)
+        .set_text_box_paragraph_alignment(first.drawable_object_id, Alignment::Center)
         .unwrap();
     assert_eq!(
         pages
@@ -733,7 +733,7 @@ fn named_paragraph_style_redefinition_propagates_across_suites() {
     for object_id in [first.drawable_object_id, second.drawable_object_id] {
         assert_eq!(
             pages.text_box_paragraph_alignment(object_id).unwrap(),
-            TextAlignment::Center
+            Alignment::Center
         );
         assert!(
             !pages
@@ -789,7 +789,7 @@ fn named_paragraph_style_redefinition_propagates_across_suites() {
         .set_sheet_text_box_paragraph_alignment(
             sheet_id,
             first.drawable_object_id,
-            TextAlignment::Right,
+            Alignment::Right,
         )
         .unwrap();
     numbers
@@ -801,7 +801,7 @@ fn named_paragraph_style_redefinition_propagates_across_suites() {
             numbers
                 .sheet_text_box_paragraph_alignment(sheet_id, object_id)
                 .unwrap(),
-            TextAlignment::Right
+            Alignment::Right
         );
     }
 
@@ -847,11 +847,7 @@ fn named_paragraph_style_redefinition_propagates_across_suites() {
             .unwrap();
     }
     keynote
-        .set_slide_text_box_paragraph_alignment(
-            0,
-            first.drawable_object_id,
-            TextAlignment::Justified,
-        )
+        .set_slide_text_box_paragraph_alignment(0, first.drawable_object_id, Alignment::Justified)
         .unwrap();
     keynote
         .redefine_applied_slide_text_box_named_paragraph_style(0, first.drawable_object_id)
@@ -862,7 +858,7 @@ fn named_paragraph_style_redefinition_propagates_across_suites() {
             keynote
                 .slide_text_box_paragraph_alignment(0, object_id)
                 .unwrap(),
-            TextAlignment::Justified
+            Alignment::Justified
         );
     }
 }
@@ -870,19 +866,19 @@ fn named_paragraph_style_redefinition_propagates_across_suites() {
 #[test]
 fn all_native_alignment_values_are_strict_and_reversible() {
     for alignment in [
-        TextAlignment::Natural,
-        TextAlignment::Right,
-        TextAlignment::Center,
-        TextAlignment::Justified,
-        TextAlignment::Left,
+        Alignment::Natural,
+        Alignment::Right,
+        Alignment::Center,
+        Alignment::Justified,
+        Alignment::Left,
     ] {
         assert_eq!(
-            TextAlignment::from_native_value(alignment.native_value()).unwrap(),
+            native::alignment_from_native(native::alignment_to_native(alignment)).unwrap(),
             alignment
         );
     }
-    assert!(TextAlignment::from_native_value(-1).is_err());
-    assert!(TextAlignment::from_native_value(5).is_err());
+    assert!(native::alignment_from_native(-1).is_err());
+    assert!(native::alignment_from_native(5).is_err());
 }
 
 #[test]
@@ -891,7 +887,7 @@ fn native_decoration_overrides_are_minimal_and_reversible() {
         bold: Some(true),
         underline: Some(TextUnderline::Wavy),
         strikethrough: Some(TextStrikethrough::Triple),
-        alignment: Some(TextAlignment::Center),
+        alignment: Some(Alignment::Center),
         ..Default::default()
     };
     let object = native::variation_object(10, 11, 12, overrides.clone()).unwrap();
@@ -919,7 +915,9 @@ fn native_writing_direction_override_is_minimal_and_reversible() {
             .char_properties
             .as_ref()
             .and_then(|properties| properties.writing_direction),
-        Some(ParagraphWritingDirection::RightToLeft.native_value())
+        Some(crate::text::paragraph_direction::to_native(
+            ParagraphWritingDirection::RightToLeft,
+        ))
     );
     assert_eq!(
         archive
@@ -1181,7 +1179,7 @@ fn native_ligature_values_are_strict_canonical_and_reversible() {
 
 #[test]
 fn native_text_outline_overrides_are_canonical_strict_and_reversible() {
-    for outline in [TextOutline::None, TextOutline::standard()] {
+    for outline in [Outline::None, Outline::standard()] {
         let overrides = ParagraphStyleOverrides {
             outline: Some(outline),
             ..Default::default()
@@ -1192,11 +1190,11 @@ fn native_text_outline_overrides_are_canonical_strict_and_reversible() {
         let properties = archive.char_properties.as_ref().unwrap();
         assert_eq!(archive.override_count, Some(1));
         match outline {
-            TextOutline::None => {
+            Outline::None => {
                 assert_eq!(properties.tsd_stroke_null, Some(true));
                 assert!(properties.tsd_stroke.is_none());
             },
-            TextOutline::Stroke(_) => {
+            Outline::Stroke(_) => {
                 assert!(properties.tsd_stroke_null.is_none());
                 assert!(properties.tsd_stroke.is_some());
                 assert!(
@@ -1215,12 +1213,10 @@ fn native_text_outline_overrides_are_canonical_strict_and_reversible() {
 
     let malformed = tswp::CharacterStylePropertiesArchive {
         tsd_stroke_null: Some(true),
-        tsd_stroke: Some(crate::shapes::stroke_to_native(
-            match TextOutline::standard() {
-                TextOutline::Stroke(stroke) => stroke,
-                TextOutline::None => unreachable!(),
-            },
-        )),
+        tsd_stroke: Some(crate::shapes::stroke_to_native(match Outline::standard() {
+            Outline::Stroke(stroke) => stroke,
+            Outline::None => unreachable!(),
+        })),
         ..Default::default()
     };
     assert!(native::text_outline_from_character(&malformed).is_err());
@@ -1228,7 +1224,7 @@ fn native_text_outline_overrides_are_canonical_strict_and_reversible() {
 
 #[test]
 fn native_text_shadow_overrides_are_canonical_strict_and_reversible() {
-    let custom = TextShadow::Drop(ShapeDropShadow::new(
+    let custom = Shadow::Drop(ShapeDropShadow::new(
         ShapeShadowAppearance::new(
             RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::DisplayP3).unwrap(),
             ShapeShadowBlurRadius::from_points(7).unwrap(),
@@ -1237,7 +1233,7 @@ fn native_text_shadow_overrides_are_canonical_strict_and_reversible() {
         ),
         ShapeShadowAngle::from_degrees(135.0).unwrap(),
     ));
-    for shadow in [TextShadow::None, TextShadow::standard(), custom] {
+    for shadow in [Shadow::None, Shadow::standard(), custom] {
         let overrides = ParagraphStyleOverrides {
             shadow: Some(shadow),
             ..Default::default()
@@ -1248,11 +1244,11 @@ fn native_text_shadow_overrides_are_canonical_strict_and_reversible() {
         let properties = archive.char_properties.as_ref().unwrap();
         assert_eq!(archive.override_count, Some(1));
         match shadow {
-            TextShadow::None => {
+            Shadow::None => {
                 assert_eq!(properties.shadow_null, Some(true));
                 assert!(properties.shadow.is_none());
             },
-            TextShadow::Drop(_) => {
+            Shadow::Drop(_) => {
                 assert!(properties.shadow_null.is_none());
                 assert!(properties.shadow.is_some());
                 assert!(
@@ -1272,7 +1268,7 @@ fn native_text_shadow_overrides_are_canonical_strict_and_reversible() {
     let malformed = tswp::CharacterStylePropertiesArchive {
         shadow_null: Some(true),
         shadow: Some(crate::shapes::shadow_to_native(
-            TextShadow::standard().into_shape_shadow(),
+            Shadow::standard().into_shape_shadow(),
         )),
         ..Default::default()
     };
@@ -1287,15 +1283,15 @@ fn native_text_shadow_overrides_are_canonical_strict_and_reversible() {
         ),
         ShapeShadowPerspective::LEVEL,
     ));
-    assert!(TextShadow::from_shape_shadow(contact).is_err());
+    assert!(Shadow::from_shape_shadow(contact).is_err());
 }
 
 #[test]
 fn native_text_background_overrides_are_canonical_strict_and_reversible() {
-    let custom = TextBackground::Color(
+    let custom = Background::Color(
         RgbaColor::new(0.18, 0.72, 0.32, 0.65, RgbColorSpace::DisplayP3).unwrap(),
     );
-    for background in [TextBackground::None, custom] {
+    for background in [Background::None, custom] {
         let overrides = ParagraphStyleOverrides {
             background: Some(background),
             ..Default::default()
@@ -1306,11 +1302,11 @@ fn native_text_background_overrides_are_canonical_strict_and_reversible() {
         let properties = archive.char_properties.as_ref().unwrap();
         assert_eq!(archive.override_count, Some(1));
         match background {
-            TextBackground::None => {
+            Background::None => {
                 assert_eq!(properties.background_color_null, Some(true));
                 assert!(properties.background_color.is_none());
             },
-            TextBackground::Color(_) => {
+            Background::Color(_) => {
                 assert!(properties.background_color_null.is_none());
                 assert!(properties.background_color.is_some());
                 assert!(
@@ -1386,17 +1382,17 @@ fn native_paragraph_background_overrides_match_app_authored_wire() {
 
 #[test]
 fn native_paragraph_border_overrides_match_app_authored_wire() {
-    let border = ParagraphBorder::new(
+    let border = Border::new(
         RgbaColor::black(),
         StrokeWidth::new(3.0).unwrap(),
         StrokePattern::Solid,
-        ParagraphBorderSides::ALL,
-        ParagraphBorderOffset::from_points(9.0).unwrap(),
+        BorderSides::ALL,
+        BorderOffset::from_points(9.0).unwrap(),
         true,
     )
     .unwrap();
     let overrides = ParagraphStyleOverrides {
-        paragraph_borders: Some(ParagraphBorders::Bordered(border)),
+        paragraph_borders: Some(Borders::Bordered(border)),
         ..Default::default()
     };
     let object = native::variation_object(64, 65, 66, overrides.clone()).unwrap();
@@ -1416,7 +1412,7 @@ fn native_paragraph_border_overrides_match_app_authored_wire() {
     );
 
     let none = ParagraphStyleOverrides {
-        paragraph_borders: Some(ParagraphBorders::None),
+        paragraph_borders: Some(Borders::None),
         ..Default::default()
     };
     let object = native::variation_object(67, 68, 69, none.clone()).unwrap();
@@ -1447,36 +1443,34 @@ fn native_paragraph_border_parser_rejects_conflicting_wire() {
         historical_rule_offset: Some(crate::protobuf::tsp::Point { x: 1.0, y: 2.0 }),
         deprecated_borders: Some(1),
         border_positions: Some(1),
-        stroke: Some(crate::shapes::stroke_to_native(
-            ParagraphBorder::new(
+        stroke: Some(crate::shapes::stroke_to_native(native::border_stroke(
+            Border::new(
                 RgbaColor::black(),
                 StrokeWidth::new(1.0).unwrap(),
                 StrokePattern::Solid,
-                ParagraphBorderSides::TOP,
-                ParagraphBorderOffset::DEFAULT,
+                BorderSides::TOP,
+                BorderOffset::DEFAULT,
                 false,
             )
-            .unwrap()
-            .native_stroke(),
-        )),
+            .unwrap(),
+        ))),
         ..Default::default()
     };
     assert!(native::paragraph_borders_from_properties(&mismatched_offset).is_err());
 
     let null_and_stroke = tswp::ParagraphStylePropertiesArchive {
         stroke_null: Some(true),
-        stroke: Some(crate::shapes::stroke_to_native(
-            ParagraphBorder::new(
+        stroke: Some(crate::shapes::stroke_to_native(native::border_stroke(
+            Border::new(
                 RgbaColor::black(),
                 StrokeWidth::new(1.0).unwrap(),
                 StrokePattern::Solid,
-                ParagraphBorderSides::TOP,
-                ParagraphBorderOffset::DEFAULT,
+                BorderSides::TOP,
+                BorderOffset::DEFAULT,
                 false,
             )
-            .unwrap()
-            .native_stroke(),
-        )),
+            .unwrap(),
+        ))),
         ..Default::default()
     };
     assert!(native::paragraph_borders_from_properties(&null_and_stroke).is_err());
@@ -1529,14 +1523,15 @@ fn native_paragraph_flow_rejects_noncanonical_boolean_wire() {
     let paragraph = crate::wire::parse_wire_fields(&data)
         .unwrap()
         .into_iter()
-        .find(|field| field.number == PARAGRAPH_PROPERTIES_FIELD)
+        .find(|field| field.number() == PARAGRAPH_PROPERTIES_FIELD)
         .unwrap();
-    let hyphenate = crate::wire::parse_wire_fields(&data[paragraph.payload_start..paragraph.end])
-        .unwrap()
-        .into_iter()
-        .find(|field| field.number == HYPHENATE_FIELD)
-        .unwrap();
-    data[paragraph.payload_start + hyphenate.payload_start] = NONCANONICAL_TRUE;
+    let hyphenate =
+        crate::wire::parse_wire_fields(&data[paragraph.payload_start()..paragraph.end()])
+            .unwrap()
+            .into_iter()
+            .find(|field| field.number() == HYPHENATE_FIELD)
+            .unwrap();
+    data[paragraph.payload_start() + hyphenate.payload_start()] = NONCANONICAL_TRUE;
     let archive = tswp::ParagraphStyleArchive::decode(data.as_slice()).unwrap();
     assert!(native::direct_overrides(&archive, &data).unwrap().is_none());
 }
@@ -2192,20 +2187,20 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
         .set_text_box_text_character_spacing(pages_box.drawable_object_id, pages_spacing)
         .unwrap();
     pages
-        .set_text_box_text_outline(pages_box.drawable_object_id, TextOutline::standard())
+        .set_text_box_text_outline(pages_box.drawable_object_id, Outline::standard())
         .unwrap();
     assert_eq!(
         pages
             .text_box_text_outline(pages_sibling.drawable_object_id)
             .unwrap(),
-        TextOutline::None
+        Outline::None
     );
     let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_outline(pages_box.drawable_object_id)
             .unwrap(),
-        TextOutline::standard()
+        Outline::standard()
     );
     assert!(
         pages
@@ -2244,7 +2239,7 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
         .set_sheet_text_box_text_outline(
             sheet_id,
             numbers_box.drawable_object_id,
-            TextOutline::standard(),
+            Outline::standard(),
         )
         .unwrap();
     let mut numbers =
@@ -2253,7 +2248,7 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
         numbers
             .sheet_text_box_text_outline(sheet_id, numbers_box.drawable_object_id)
             .unwrap(),
-        TextOutline::standard()
+        Outline::standard()
     );
     assert!(
         numbers
@@ -2287,7 +2282,7 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
         )
         .unwrap();
     keynote
-        .set_slide_text_box_text_outline(0, keynote_box.drawable_object_id, TextOutline::standard())
+        .set_slide_text_box_text_outline(0, keynote_box.drawable_object_id, Outline::standard())
         .unwrap();
     let mut keynote =
         crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
@@ -2295,7 +2290,7 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
         keynote
             .slide_text_box_text_outline(0, keynote_box.drawable_object_id)
             .unwrap(),
-        TextOutline::standard()
+        Outline::standard()
     );
     assert!(
         keynote
@@ -2340,20 +2335,20 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
         .set_text_box_text_character_spacing(pages_box.drawable_object_id, pages_spacing)
         .unwrap();
     pages
-        .set_text_box_text_shadow(pages_box.drawable_object_id, TextShadow::standard())
+        .set_text_box_text_shadow(pages_box.drawable_object_id, Shadow::standard())
         .unwrap();
     assert_eq!(
         pages
             .text_box_text_shadow(pages_sibling.drawable_object_id)
             .unwrap(),
-        TextShadow::None
+        Shadow::None
     );
     let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_shadow(pages_box.drawable_object_id)
             .unwrap(),
-        TextShadow::standard()
+        Shadow::standard()
     );
     assert!(
         pages
@@ -2392,7 +2387,7 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
         .set_sheet_text_box_text_shadow(
             sheet_id,
             numbers_box.drawable_object_id,
-            TextShadow::standard(),
+            Shadow::standard(),
         )
         .unwrap();
     let mut numbers =
@@ -2401,7 +2396,7 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
         numbers
             .sheet_text_box_text_shadow(sheet_id, numbers_box.drawable_object_id)
             .unwrap(),
-        TextShadow::standard()
+        Shadow::standard()
     );
     assert!(
         numbers
@@ -2435,7 +2430,7 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
         )
         .unwrap();
     keynote
-        .set_slide_text_box_text_shadow(0, keynote_box.drawable_object_id, TextShadow::standard())
+        .set_slide_text_box_text_shadow(0, keynote_box.drawable_object_id, Shadow::standard())
         .unwrap();
     let mut keynote =
         crate::keynote::KeynoteEditor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
@@ -2443,7 +2438,7 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
         keynote
             .slide_text_box_text_shadow(0, keynote_box.drawable_object_id)
             .unwrap(),
-        TextShadow::standard()
+        Shadow::standard()
     );
     assert!(
         keynote
@@ -2460,7 +2455,7 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
 
 #[test]
 fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
-    let pages_background = TextBackground::Color(
+    let pages_background = Background::Color(
         RgbaColor::new(0.95, 0.42, 0.17, 0.72, RgbColorSpace::DisplayP3).unwrap(),
     );
     let pages_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
@@ -2497,7 +2492,7 @@ fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
         pages
             .text_box_text_background(pages_sibling.drawable_object_id)
             .unwrap(),
-        TextBackground::None
+        Background::None
     );
     let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -2519,7 +2514,7 @@ fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
     );
 
     let numbers_background =
-        TextBackground::Color(RgbaColor::new(0.22, 0.82, 0.38, 1.0, RgbColorSpace::Srgb).unwrap());
+        Background::Color(RgbaColor::new(0.22, 0.82, 0.38, 1.0, RgbColorSpace::Srgb).unwrap());
     let numbers_shift = TextBaselineShift::from_points(-3.0).unwrap();
     let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
@@ -2568,7 +2563,7 @@ fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
         numbers_shift
     );
 
-    let keynote_background = TextBackground::Color(
+    let keynote_background = Background::Color(
         RgbaColor::new(0.18, 0.44, 0.92, 0.84, RgbColorSpace::DisplayP3).unwrap(),
     );
     let mut keynote = KeynoteDocumentBuilder::new().build().unwrap();
@@ -2721,13 +2716,13 @@ fn paragraph_background_round_trips_isolates_and_resets_in_every_suite() {
 
 #[test]
 fn paragraph_borders_round_trip_isolate_and_reset_in_every_suite() {
-    let borders = ParagraphBorders::Bordered(
-        ParagraphBorder::new(
+    let borders = Borders::Bordered(
+        Border::new(
             RgbaColor::black(),
             StrokeWidth::new(3.0).unwrap(),
             StrokePattern::Solid,
-            ParagraphBorderSides::ALL,
-            ParagraphBorderOffset::from_points(9.0).unwrap(),
+            BorderSides::ALL,
+            BorderOffset::from_points(9.0).unwrap(),
             true,
         )
         .unwrap(),
@@ -2764,7 +2759,7 @@ fn paragraph_borders_round_trip_isolate_and_reset_in_every_suite() {
         pages
             .text_box_paragraph_borders(pages_sibling.drawable_object_id)
             .unwrap(),
-        ParagraphBorders::None
+        Borders::None
     );
     let mut pages = PagesEditor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -3271,7 +3266,7 @@ fn paragraph_tab_defaults_round_trip_compose_and_reset_in_every_suite() {
 fn uniform_text_font_round_trips_isolates_and_resets_in_every_suite() {
     let pages_font = TextFont::named("Georgia-Bold").unwrap();
     let pages_background =
-        TextBackground::Color(RgbaColor::new(0.95, 0.72, 0.52, 1.0, RgbColorSpace::Srgb).unwrap());
+        Background::Color(RgbaColor::new(0.95, 0.72, 0.52, 1.0, RgbColorSpace::Srgb).unwrap());
     let mut pages = PagesEditor::create_with_text("Fonts").unwrap();
     let pages_box = pages
         .add_text_box(
@@ -3759,7 +3754,7 @@ fn uniform_text_decorations_round_trip_and_reset_independently_in_every_suite() 
         .set_sheet_text_box_paragraph_alignment(
             sheet_id,
             numbers_box.drawable_object_id,
-            TextAlignment::Right,
+            Alignment::Right,
         )
         .unwrap();
     numbers
@@ -3786,7 +3781,7 @@ fn uniform_text_decorations_round_trip_and_reset_independently_in_every_suite() 
         numbers
             .sheet_text_box_paragraph_alignment(sheet_id, numbers_box.drawable_object_id)
             .unwrap(),
-        TextAlignment::Right
+        Alignment::Right
     );
 
     let keynote_decorations = TextDecorations::new(TextUnderline::Wavy, TextStrikethrough::Single);
@@ -3856,7 +3851,7 @@ fn uniform_text_style_round_trips_and_resets_independently_in_every_suite() {
         .text_box_text_style(pages_box.drawable_object_id)
         .unwrap();
     pages
-        .set_text_box_paragraph_alignment(pages_box.drawable_object_id, TextAlignment::Center)
+        .set_text_box_paragraph_alignment(pages_box.drawable_object_id, Alignment::Center)
         .unwrap();
     pages
         .set_text_box_text_style(pages_box.drawable_object_id, pages_style)
@@ -3889,7 +3884,7 @@ fn uniform_text_style_round_trips_and_resets_independently_in_every_suite() {
         pages
             .text_box_paragraph_alignment(pages_box.drawable_object_id)
             .unwrap(),
-        TextAlignment::Center
+        Alignment::Center
     );
 
     let numbers_style = TextStyle::new(TextPointSize::from_points(21.0).unwrap()).with_italic(true);
@@ -3913,7 +3908,7 @@ fn uniform_text_style_round_trips_and_resets_independently_in_every_suite() {
         .set_sheet_text_box_paragraph_alignment(
             sheet_id,
             numbers_box.drawable_object_id,
-            TextAlignment::Right,
+            Alignment::Right,
         )
         .unwrap();
     numbers
@@ -3942,7 +3937,7 @@ fn uniform_text_style_round_trips_and_resets_independently_in_every_suite() {
         numbers
             .sheet_text_box_paragraph_alignment(sheet_id, numbers_box.drawable_object_id)
             .unwrap(),
-        TextAlignment::Right
+        Alignment::Right
     );
 
     let keynote_style = TextStyle::new(TextPointSize::from_points(23.0).unwrap())
@@ -3967,7 +3962,7 @@ fn uniform_text_style_round_trips_and_resets_independently_in_every_suite() {
         .set_slide_text_box_paragraph_alignment(
             0,
             keynote_box.drawable_object_id,
-            TextAlignment::Justified,
+            Alignment::Justified,
         )
         .unwrap();
     keynote
@@ -3996,7 +3991,7 @@ fn uniform_text_style_round_trips_and_resets_independently_in_every_suite() {
         keynote
             .slide_text_box_paragraph_alignment(0, keynote_box.drawable_object_id)
             .unwrap(),
-        TextAlignment::Justified
+        Alignment::Justified
     );
 }
 
@@ -4025,19 +4020,19 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
             },
         )
         .unwrap();
-    let columns = TextColumns::equal(TextColumnCount::new(2).unwrap(), None);
+    let columns = Columns::equal(Count::new(2).unwrap(), None);
     editor
         .set_text_box_columns(first.drawable_object_id, &columns)
         .unwrap();
-    let spacing = ParagraphLineSpacing::Relative(ParagraphLineSpacingMultiple::ONE_POINT_FIVE);
-    let paragraph_spacing = ParagraphSpacing::new(
-        ParagraphSpacingPoints::from_points(9.0).unwrap(),
-        ParagraphSpacingPoints::from_points(15.0).unwrap(),
+    let spacing = LineSpacing::Relative(LineSpacingMultiple::ONE_POINT_FIVE);
+    let paragraph_spacing = Spacing::new(
+        SpacingPoints::from_points(9.0).unwrap(),
+        SpacingPoints::from_points(15.0).unwrap(),
     );
-    let indents = ParagraphIndents::new(
-        ParagraphIndentPoints::from_points(26.0).unwrap(),
-        ParagraphIndentPoints::from_points(12.5).unwrap(),
-        ParagraphIndentPoints::from_points(12.0).unwrap(),
+    let indents = Indents::new(
+        IndentPoints::from_points(26.0).unwrap(),
+        IndentPoints::from_points(12.5).unwrap(),
+        IndentPoints::from_points(12.0).unwrap(),
     );
     let tab_stops = ParagraphTabStops::new(vec![
         ParagraphTabStop::new(
@@ -4053,7 +4048,7 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
     .unwrap();
 
     editor
-        .set_text_box_paragraph_alignment(first.drawable_object_id, TextAlignment::Center)
+        .set_text_box_paragraph_alignment(first.drawable_object_id, Alignment::Center)
         .unwrap();
     editor
         .set_text_box_paragraph_line_spacing(first.drawable_object_id, spacing)
@@ -4071,25 +4066,25 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
         editor
             .text_box_paragraph_alignment(second.drawable_object_id)
             .unwrap(),
-        TextAlignment::Natural
+        Alignment::Natural
     );
     assert_eq!(
         editor
             .text_box_paragraph_line_spacing(second.drawable_object_id)
             .unwrap(),
-        ParagraphLineSpacing::default()
+        LineSpacing::default()
     );
     assert_eq!(
         editor
             .text_box_paragraph_spacing(second.drawable_object_id)
             .unwrap(),
-        ParagraphSpacing::NONE
+        Spacing::NONE
     );
     assert_eq!(
         editor
             .text_box_paragraph_indents(second.drawable_object_id)
             .unwrap(),
-        ParagraphIndents::NONE
+        Indents::NONE
     );
     assert!(
         editor
@@ -4103,7 +4098,7 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
         reopened
             .text_box_paragraph_alignment(first.drawable_object_id)
             .unwrap(),
-        TextAlignment::Center
+        Alignment::Center
     );
     assert_eq!(
         reopened
@@ -4171,7 +4166,7 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
         reopened
             .text_box_paragraph_line_spacing(first.drawable_object_id)
             .unwrap(),
-        ParagraphLineSpacing::default()
+        LineSpacing::default()
     );
     assert!(
         reopened
@@ -4182,7 +4177,7 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
         reopened
             .text_box_paragraph_spacing(first.drawable_object_id)
             .unwrap(),
-        ParagraphSpacing::NONE
+        Spacing::NONE
     );
     assert_eq!(
         reopened
@@ -4199,7 +4194,7 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
         reopened
             .text_box_paragraph_indents(first.drawable_object_id)
             .unwrap(),
-        ParagraphIndents::NONE
+        Indents::NONE
     );
     assert!(
         reopened
@@ -4234,15 +4229,15 @@ fn every_native_line_spacing_mode_round_trips_in_numbers() {
             },
         )
         .unwrap();
-    let twelve = ParagraphLineSpacingPoints::from_points(12.0).unwrap();
-    let paragraph_spacing = ParagraphSpacing::new(
-        ParagraphSpacingPoints::from_points(11.0).unwrap(),
-        ParagraphSpacingPoints::from_points(17.0).unwrap(),
+    let twelve = LineSpacingPoints::from_points(12.0).unwrap();
+    let paragraph_spacing = Spacing::new(
+        SpacingPoints::from_points(11.0).unwrap(),
+        SpacingPoints::from_points(17.0).unwrap(),
     );
-    let indents = ParagraphIndents::new(
-        ParagraphIndentPoints::from_points(23.0).unwrap(),
-        ParagraphIndentPoints::from_points(13.0).unwrap(),
-        ParagraphIndentPoints::from_points(2.833_333_3).unwrap(),
+    let indents = Indents::new(
+        IndentPoints::from_points(23.0).unwrap(),
+        IndentPoints::from_points(13.0).unwrap(),
+        IndentPoints::from_points(2.833_333_3).unwrap(),
     );
     let tab_stops = ParagraphTabStops::new(vec![
         ParagraphTabStop::new(
@@ -4270,11 +4265,11 @@ fn every_native_line_spacing_mode_round_trips_in_numbers() {
         )
         .unwrap();
     for spacing in [
-        ParagraphLineSpacing::AtLeast(twelve),
-        ParagraphLineSpacing::Exactly(twelve),
-        ParagraphLineSpacing::Maximum(twelve),
-        ParagraphLineSpacing::Between(twelve),
-        ParagraphLineSpacing::Relative(ParagraphLineSpacingMultiple::DOUBLE),
+        LineSpacing::AtLeast(twelve),
+        LineSpacing::Exactly(twelve),
+        LineSpacing::Maximum(twelve),
+        LineSpacing::Between(twelve),
+        LineSpacing::Relative(LineSpacingMultiple::DOUBLE),
     ] {
         editor
             .set_sheet_text_box_paragraph_line_spacing(
@@ -4346,16 +4341,15 @@ fn keynote_spacing_reset_preserves_alignment() {
             },
         )
         .unwrap();
-    let spacing =
-        ParagraphLineSpacing::Between(ParagraphLineSpacingPoints::from_points(6.0).unwrap());
-    let paragraph_spacing = ParagraphSpacing::new(
-        ParagraphSpacingPoints::from_points(13.0).unwrap(),
-        ParagraphSpacingPoints::from_points(19.0).unwrap(),
+    let spacing = LineSpacing::Between(LineSpacingPoints::from_points(6.0).unwrap());
+    let paragraph_spacing = Spacing::new(
+        SpacingPoints::from_points(13.0).unwrap(),
+        SpacingPoints::from_points(19.0).unwrap(),
     );
-    let indents = ParagraphIndents::new(
-        ParagraphIndentPoints::from_points(23.0).unwrap(),
-        ParagraphIndentPoints::from_points(13.0).unwrap(),
-        ParagraphIndentPoints::from_points(10.5).unwrap(),
+    let indents = Indents::new(
+        IndentPoints::from_points(23.0).unwrap(),
+        IndentPoints::from_points(13.0).unwrap(),
+        IndentPoints::from_points(10.5).unwrap(),
     );
     let tab_stops = ParagraphTabStops::new(vec![
         ParagraphTabStop::new(
@@ -4366,11 +4360,7 @@ fn keynote_spacing_reset_preserves_alignment() {
     ])
     .unwrap();
     editor
-        .set_slide_text_box_paragraph_alignment(
-            0,
-            created.drawable_object_id,
-            TextAlignment::Justified,
-        )
+        .set_slide_text_box_paragraph_alignment(0, created.drawable_object_id, Alignment::Justified)
         .unwrap();
     editor
         .set_slide_text_box_paragraph_line_spacing(0, created.drawable_object_id, spacing)
@@ -4447,7 +4437,7 @@ fn keynote_spacing_reset_preserves_alignment() {
         reopened
             .slide_text_box_paragraph_alignment(0, created.drawable_object_id)
             .unwrap(),
-        TextAlignment::Justified
+        Alignment::Justified
     );
     assert!(
         reopened
@@ -4470,13 +4460,13 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
             },
         )
         .unwrap();
-    let storage_id = created.storage.object_id;
+    let storage_id = created.storage.id;
     let mut package = pages.into_package();
-    let location = storage::locate(&package, storage_id).unwrap();
+    let location = storage::locate(&package, storage_id.get()).unwrap();
     let archive_name = location.wire.archive_name.clone();
     package
         .update_archive(&archive_name, |archive| {
-            let object = archive.object_mut(storage_id).unwrap();
+            let object = archive.object_mut(storage_id.get()).unwrap();
             let index = location.wire.message_index;
             let message_type = location.wire.message_type;
             let mut text_storage =
@@ -4505,7 +4495,7 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
-            .set_paragraph_alignment(storage_id, TextAlignment::Center)
+            .set_paragraph_alignment(storage_id, Alignment::Center)
             .is_err()
     );
     assert!(
@@ -4524,7 +4514,7 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
         editor
             .set_paragraph_line_spacing(
                 storage_id,
-                ParagraphLineSpacing::Relative(ParagraphLineSpacingMultiple::DOUBLE),
+                LineSpacing::Relative(LineSpacingMultiple::DOUBLE),
             )
             .is_err()
     );
@@ -4532,9 +4522,9 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
         editor
             .set_paragraph_spacing(
                 storage_id,
-                ParagraphSpacing::new(
-                    ParagraphSpacingPoints::from_points(8.0).unwrap(),
-                    ParagraphSpacingPoints::from_points(12.0).unwrap(),
+                Spacing::new(
+                    SpacingPoints::from_points(8.0).unwrap(),
+                    SpacingPoints::from_points(12.0).unwrap(),
                 ),
             )
             .is_err()
@@ -4543,10 +4533,10 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
         editor
             .set_paragraph_indents(
                 storage_id,
-                ParagraphIndents::new(
-                    ParagraphIndentPoints::from_points(18.0).unwrap(),
-                    ParagraphIndentPoints::from_points(24.0).unwrap(),
-                    ParagraphIndentPoints::from_points(12.0).unwrap(),
+                Indents::new(
+                    IndentPoints::from_points(18.0).unwrap(),
+                    IndentPoints::from_points(24.0).unwrap(),
+                    IndentPoints::from_points(12.0).unwrap(),
                 ),
             )
             .is_err()
@@ -4610,19 +4600,19 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
     );
     assert!(
         editor
-            .set_text_outline(storage_id, TextOutline::standard())
+            .set_text_outline(storage_id, Outline::standard())
             .is_err()
     );
     assert!(
         editor
-            .set_text_shadow(storage_id, TextShadow::standard())
+            .set_text_shadow(storage_id, Shadow::standard())
             .is_err()
     );
     assert!(
         editor
             .set_text_background(
                 storage_id,
-                TextBackground::Color(
+                Background::Color(
                     RgbaColor::new(0.2, 0.6, 0.9, 1.0, RgbColorSpace::Srgb).unwrap(),
                 ),
             )
@@ -4645,9 +4635,9 @@ fn paragraph_style_mutations_use_the_resolved_storage_with_a_2022_style_sibling(
             },
         )
         .unwrap();
-    let storage_id = created.storage.object_id;
+    let storage_id = created.storage.id;
     let mut package = pages.into_package();
-    let location = storage::locate(&package, storage_id).unwrap();
+    let location = storage::locate(&package, storage_id.get()).unwrap();
     let style_data = tswp::ParagraphStyleArchive {
         super_: crate::protobuf::tss::StyleArchive::default(),
         ..Default::default()
@@ -4656,7 +4646,7 @@ fn paragraph_style_mutations_use_the_resolved_storage_with_a_2022_style_sibling(
     package
         .update_archive(&location.wire.archive_name, |archive| {
             archive
-                .object_mut(storage_id)
+                .object_mut(storage_id.get())
                 .unwrap()
                 .push_message(RawMessage {
                     type_: 2_022,
@@ -4668,17 +4658,17 @@ fn paragraph_style_mutations_use_the_resolved_storage_with_a_2022_style_sibling(
 
     let mut editor = IWorkTextEditor::from_package(package);
     editor
-        .set_paragraph_alignment(storage_id, TextAlignment::Center)
+        .set_paragraph_alignment(storage_id, Alignment::Center)
         .unwrap();
     editor
-        .set_paragraph_alignment(storage_id, TextAlignment::Right)
+        .set_paragraph_alignment(storage_id, Alignment::Right)
         .unwrap();
     assert!(editor.reset_paragraph_alignment(storage_id).unwrap());
 
     let package = editor.into_package();
-    let location = storage::locate(&package, storage_id).unwrap();
+    let location = storage::locate(&package, storage_id.get()).unwrap();
     let archive = package.archive(&location.wire.archive_name).unwrap();
-    let object = archive.object(storage_id).unwrap();
+    let object = archive.object(storage_id.get()).unwrap();
     assert_eq!(
         object.messages[location.wire.message_index].type_,
         location.wire.message_type
@@ -4705,13 +4695,13 @@ fn paragraph_style_anchor_rejects_a_stale_message_type_transactionally() {
             },
         )
         .unwrap();
-    let storage_id = created.storage.object_id;
+    let storage_id = created.storage.id;
     let mut package = pages.into_package();
-    let location = storage::locate(&package, storage_id).unwrap();
+    let location = storage::locate(&package, storage_id.get()).unwrap();
     let archive_name = location.wire.archive_name.clone();
     package
         .update_archive(&archive_name, |archive| {
-            let object = archive.object_mut(storage_id).unwrap();
+            let object = archive.object_mut(storage_id.get()).unwrap();
             let original = object.messages[location.wire.message_index].clone();
             object.replace_message(
                 location.wire.message_index,
@@ -4751,11 +4741,11 @@ fn paragraph_style_mutation_uses_exact_native_style_anchor_with_sibling_payload(
         )
         .unwrap();
     pages
-        .set_text_box_paragraph_alignment(created.drawable_object_id, TextAlignment::Center)
+        .set_text_box_paragraph_alignment(created.drawable_object_id, Alignment::Center)
         .unwrap();
-    let storage_id = created.storage.object_id;
+    let storage_id = created.storage.id;
     let mut package = pages.into_package();
-    let storage = storage::locate(&package, storage_id).unwrap();
+    let storage = storage::locate(&package, storage_id.get()).unwrap();
     let style = native::locate_style(&package, storage.style_id).unwrap();
     let sibling_data = vec![0x98, 0x06, 0x07];
     package
@@ -4781,7 +4771,7 @@ fn paragraph_style_mutation_uses_exact_native_style_anchor_with_sibling_payload(
 
     let mut editor = IWorkTextEditor::from_package(package);
     editor
-        .set_paragraph_alignment(storage_id, TextAlignment::Right)
+        .set_paragraph_alignment(storage_id, Alignment::Right)
         .unwrap();
     let package = editor.into_package();
     let style_after = native::locate_style(&package, storage.style_id).unwrap();
@@ -4855,9 +4845,9 @@ fn named_paragraph_style_rename_uses_exact_native_anchor_with_sibling_payload() 
             ParagraphStyleName::new("Rename source").unwrap(),
         )
         .unwrap();
-    let storage_id = text_box.storage.object_id;
+    let storage_id = text_box.storage.id;
     let mut package = pages.into_package();
-    let location = native::locate_style(&package, created.id().get()).unwrap();
+    let location = native::locate_style(&package, native_id(created.id())).unwrap();
     let sibling_data = vec![0x98, 0x06, 0x09];
     package
         .update_archive(&location.archive_name, |archive| {
@@ -4882,13 +4872,13 @@ fn named_paragraph_style_rename_uses_exact_native_anchor_with_sibling_payload() 
 
     let renamed = super::rename_named_paragraph_style(
         &mut package,
-        storage_id,
+        storage_id.get(),
         created.id(),
         ParagraphStyleName::new("Rename target").unwrap(),
     )
     .unwrap();
     assert_eq!(renamed.name(), "Rename target");
-    let style_after = native::locate_style(&package, created.id().get()).unwrap();
+    let style_after = native::locate_style(&package, native_id(created.id())).unwrap();
     assert_eq!(style_after.message_index, location.message_index + 1);
     let archive = package.archive(&style_after.archive_name).unwrap();
     let object = archive.object(style_after.object_id).unwrap();

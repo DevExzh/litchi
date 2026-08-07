@@ -12,8 +12,10 @@
       "litchi-fonts",
       "litchi-formula",
       "litchi-imgconv",
-      "litchi-iwa",
+      "litchi-iwa-detect",
+      "litchi-keynote",
       "litchi-markdown",
+      "litchi-numbers",
       "litchi-odf-common",
       "litchi-odp",
       "litchi-odraw",
@@ -22,6 +24,7 @@
       "litchi-ole-common",
       "litchi-ooxml-common",
       "litchi-opc",
+      "litchi-pages",
       "litchi-ppt",
       "litchi-pptx",
       "litchi-rtf",
@@ -33,7 +36,6 @@
     ],
     "litchi-biff": [],
     "litchi-cfb": [
-      "litchi-codepage",
       "litchi-core"
     ],
     "litchi-codepage": [],
@@ -81,10 +83,75 @@
     ],
     "litchi-iwa": [
       "litchi-core",
+      "litchi-iwa-archive",
+      "litchi-iwa-cache",
+      "litchi-iwa-common",
+      "litchi-iwa-core",
+      "litchi-iwa-detect",
+      "litchi-iwa-graph",
+      "litchi-iwa-index",
+      "litchi-iwa-package",
+      "litchi-iwa-protos",
+      "litchi-iwa-structured",
+      "litchi-iwa-text",
+      "litchi-iwa-text-wire",
+      "litchi-keynote",
+      "litchi-numbers",
+      "litchi-pages"
+    ],
+    "litchi-iwa-archive": [
+      "litchi-core",
+      "litchi-iwa-core",
       "soapberry-zip"
+    ],
+    "litchi-iwa-cache": [],
+    "litchi-iwa-common": [],
+    "litchi-iwa-core": [
+      "litchi-iwa-protos"
+    ],
+    "litchi-iwa-detect": [
+      "litchi-iwa-archive",
+      "litchi-iwa-common",
+      "litchi-iwa-core",
+      "litchi-iwa-protos"
+    ],
+    "litchi-iwa-graph": [],
+    "litchi-iwa-index": [
+      "litchi-iwa-graph"
+    ],
+    "litchi-iwa-package": [],
+    "litchi-iwa-protos": [],
+    "litchi-iwa-structured": [
+      "litchi-keynote",
+      "litchi-numbers",
+      "litchi-pages"
+    ],
+    "litchi-iwa-text": [
+      "litchi-iwa-common"
+    ],
+    "litchi-iwa-text-wire": [
+      "litchi-iwa-common",
+      "litchi-iwa-protos",
+      "litchi-iwa-text"
+    ],
+    "litchi-keynote": [
+      "litchi-core",
+      "litchi-iwa-archive",
+      "litchi-iwa-common",
+      "litchi-iwa-core",
+      "litchi-iwa-detect",
+      "litchi-iwa-protos",
+      "litchi-iwa-text"
     ],
     "litchi-markdown": [
       "litchi-core"
+    ],
+    "litchi-numbers": [
+      "litchi-iwa-archive",
+      "litchi-iwa-common",
+      "litchi-iwa-core",
+      "litchi-iwa-protos",
+      "soapberry-zip"
     ],
     "litchi-odb": [
       "litchi-core",
@@ -140,7 +207,6 @@
     ],
     "litchi-odt": [
       "litchi-core",
-      "litchi-odc",
       "litchi-odf-common",
       "soapberry-zip",
       "xml-minifier"
@@ -168,6 +234,16 @@
     "litchi-oth": [
       "litchi-core",
       "litchi-odf-common"
+    ],
+    "litchi-pages": [
+      "litchi-core",
+      "litchi-iwa-archive",
+      "litchi-iwa-common",
+      "litchi-iwa-core",
+      "litchi-iwa-protos",
+      "litchi-iwa-text",
+      "litchi-iwa-text-wire",
+      "soapberry-zip"
     ],
     "litchi-ppt": [
       "litchi-cfb",
@@ -260,6 +336,20 @@
     "litchi-docx",
     "litchi-drawingml",
     "litchi-eval",
+    "litchi-iwa-archive",
+    "litchi-iwa-cache",
+    "litchi-iwa-common",
+    "litchi-iwa-core",
+    "litchi-iwa-detect",
+    "litchi-iwa-graph",
+    "litchi-iwa-index",
+    "litchi-iwa-package",
+    "litchi-iwa-protos",
+    "litchi-iwa-structured",
+    "litchi-iwa-text",
+    "litchi-iwa-text-wire",
+    "litchi-keynote",
+    "litchi-numbers",
     "litchi-odb",
     "litchi-odc",
     "litchi-odf-common",
@@ -274,6 +364,7 @@
     "litchi-ograph",
     "litchi-ole-common",
     "litchi-ooxml-common",
+    "litchi-pages",
     "litchi-pptx",
     "litchi-sheet",
     "litchi-sign",

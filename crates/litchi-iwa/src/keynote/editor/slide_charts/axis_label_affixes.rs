@@ -5,7 +5,7 @@ use crate::charts::axis_label_affixes::{
     chart_axis_label_affixes as read_native_axis_label_affixes,
     set_chart_axis_label_affixes as set_native_axis_label_affixes,
 };
-use crate::charts::{ChartAxis, ChartLabelAffixes};
+use crate::charts::{Axis, LabelAffixes};
 
 impl KeynoteEditor {
     /// Read the prefix and suffix applied to one slide-chart axis' labels.
@@ -13,8 +13,8 @@ impl KeynoteEditor {
         &self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
-    ) -> Result<ChartLabelAffixes> {
+        axis: Axis,
+    ) -> Result<LabelAffixes> {
         slide_chart_axis_label_affixes(self, slide_index, drawable_object_id, axis)
     }
 
@@ -23,8 +23,8 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        axis: ChartAxis,
-        affixes: ChartLabelAffixes,
+        axis: Axis,
+        affixes: LabelAffixes,
     ) -> Result<()> {
         set_slide_chart_axis_label_affixes(self, slide_index, drawable_object_id, axis, affixes)
     }
@@ -34,8 +34,8 @@ fn slide_chart_axis_label_affixes(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
-) -> Result<ChartLabelAffixes> {
+    axis: Axis,
+) -> Result<LabelAffixes> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     read_native_axis_label_affixes(
         editor.package(),
@@ -50,8 +50,8 @@ fn set_slide_chart_axis_label_affixes(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    axis: ChartAxis,
-    affixes: ChartLabelAffixes,
+    axis: Axis,
+    affixes: LabelAffixes,
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
     let mut staged = editor.package().clone();
@@ -76,7 +76,7 @@ fn set_slide_chart_axis_label_affixes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::charts::{ChartData, ChartKind};
+    use crate::charts::{ChartData, Kind};
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
@@ -86,7 +86,7 @@ mod tests {
         let chart = editor
             .add_slide_chart(
                 0,
-                ChartKind::Line2d,
+                Kind::Line2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -95,26 +95,26 @@ mod tests {
                 },
             )
             .unwrap();
-        let expected = ChartLabelAffixes::new("USD ", " net");
+        let expected = LabelAffixes::new("USD ", " net").unwrap();
         assert_eq!(
             editor
-                .slide_chart_axis_label_affixes(0, chart.drawable_object_id, ChartAxis::Value,)
+                .slide_chart_axis_label_affixes(0, chart.drawable_object_id, Axis::Value,)
                 .unwrap(),
-            ChartLabelAffixes::default()
+            LabelAffixes::default()
         );
         let baseline = editor.to_bytes().unwrap();
         editor
             .set_slide_chart_axis_label_affixes(
                 0,
                 chart.drawable_object_id,
-                ChartAxis::Value,
+                Axis::Value,
                 expected.clone(),
             )
             .unwrap();
         let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
-                .slide_chart_axis_label_affixes(0, chart.drawable_object_id, ChartAxis::Value,)
+                .slide_chart_axis_label_affixes(0, chart.drawable_object_id, Axis::Value,)
                 .unwrap(),
             expected
         );
@@ -122,15 +122,15 @@ mod tests {
             .set_slide_chart_axis_label_affixes(
                 0,
                 chart.drawable_object_id,
-                ChartAxis::Value,
-                ChartLabelAffixes::default(),
+                Axis::Value,
+                LabelAffixes::default(),
             )
             .unwrap();
         assert_eq!(
             reopened
-                .slide_chart_axis_label_affixes(0, chart.drawable_object_id, ChartAxis::Value,)
+                .slide_chart_axis_label_affixes(0, chart.drawable_object_id, Axis::Value,)
                 .unwrap(),
-            ChartLabelAffixes::default()
+            LabelAffixes::default()
         );
         assert_eq!(reopened.to_bytes().unwrap(), baseline);
     }

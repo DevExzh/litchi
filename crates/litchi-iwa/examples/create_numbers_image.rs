@@ -5,7 +5,7 @@ use std::path::Path;
 
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersSheetImageOptions};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_iwa::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
+use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 
 const IMAGE_POSITION: DrawablePoint = DrawablePoint { x: 420.0, y: 180.0 };
 const IMAGE_SIZE: DrawableSize = DrawableSize {

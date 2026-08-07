@@ -6,7 +6,7 @@
 
 use prost::Message;
 
-use crate::charts::ChartKind;
+use crate::charts::Kind;
 use crate::charts::non_style::{
     GENERATED_CHART_NON_STYLE_EXTENSION_FIELD, chart_non_style_slot,
     generated_chart_non_style_extension,
@@ -99,7 +99,7 @@ pub(crate) fn chart_3d_series_gap(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
 ) -> Result<Chart3dSeriesGap> {
     require_supported_kind(kind, drawable_object_id, drawable_label)?;
     chart_non_style_slot(
@@ -117,7 +117,7 @@ pub(crate) fn set_chart_3d_series_gap(
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
-    kind: ChartKind,
+    kind: Kind,
     gap: Chart3dSeriesGap,
 ) -> Result<()> {
     require_supported_kind(kind, drawable_object_id, drawable_label)?;
@@ -140,11 +140,7 @@ pub(crate) fn set_chart_3d_series_gap(
     Ok(())
 }
 
-fn require_supported_kind(
-    kind: ChartKind,
-    drawable_object_id: u64,
-    drawable_label: &str,
-) -> Result<()> {
+fn require_supported_kind(kind: Kind, drawable_object_id: u64, drawable_label: &str) -> Result<()> {
     if !kind.supports_3d_series_gap() {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} chart {drawable_object_id} kind {kind:?} has no 3D Between Series gap"
@@ -245,16 +241,16 @@ mod tests {
 
     #[test]
     fn capability_matches_only_unstacked_3d_line_and_area() {
-        for kind in [ChartKind::Line3d, ChartKind::Area3d] {
+        for kind in [Kind::Line3d, Kind::Area3d] {
             assert!(kind.supports_3d_series_gap(), "{kind:?}");
         }
         for kind in [
-            ChartKind::Line2d,
-            ChartKind::Area2d,
-            ChartKind::Column3d,
-            ChartKind::Bar3d,
-            ChartKind::StackedArea3d,
-            ChartKind::Pie3d,
+            Kind::Line2d,
+            Kind::Area2d,
+            Kind::Column3d,
+            Kind::Bar3d,
+            Kind::StackedArea3d,
+            Kind::Pie3d,
         ] {
             assert!(!kind.supports_3d_series_gap(), "{kind:?}");
         }
@@ -339,8 +335,8 @@ mod tests {
         parse_wire_fields(data)
             .unwrap()
             .into_iter()
-            .filter(|field| field.number == number)
-            .flat_map(|field| data[field.start..field.end].iter().copied())
+            .filter(|field| field.number() == number)
+            .flat_map(|field| data[field.start()..field.end()].iter().copied())
             .collect()
     }
 }

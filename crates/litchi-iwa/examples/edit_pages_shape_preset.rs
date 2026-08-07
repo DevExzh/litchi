@@ -3,7 +3,7 @@
 use std::env;
 
 use litchi_iwa::pages::PagesEditor;
-use litchi_iwa::shapes::ShapePreset;
+use litchi_iwa_common::shape::path::Preset;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -13,14 +13,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = arguments.next().ok_or("missing output path")?;
     let shape_index: usize = arguments.next().ok_or("missing shape index")?.parse()?;
     let preset = match arguments.next().as_deref() {
-        Some("rectangle") => ShapePreset::Rectangle,
-        Some("rounded-rectangle") => ShapePreset::ROUNDED_RECTANGLE,
-        Some("ellipse") => ShapePreset::Ellipse,
-        Some("left-arrow") => ShapePreset::LeftArrow,
-        Some("right-arrow") => ShapePreset::RightArrow,
-        Some("double-arrow") => ShapePreset::DoubleArrow,
-        Some("pentagon") => ShapePreset::PENTAGON,
-        Some("star") => ShapePreset::STAR,
+        Some("rectangle") => Preset::Rectangle,
+        Some("rounded-rectangle") => Preset::ROUNDED_RECTANGLE,
+        Some("ellipse") => Preset::Ellipse,
+        Some("left-arrow") => Preset::LeftArrow,
+        Some("right-arrow") => Preset::RightArrow,
+        Some("double-arrow") => Preset::DoubleArrow,
+        Some("pentagon") => Preset::PENTAGON,
+        Some("star") => Preset::STAR,
         Some(other) => return Err(format!("unsupported shape preset {other:?}").into()),
         None => return Err("missing shape preset".into()),
     };

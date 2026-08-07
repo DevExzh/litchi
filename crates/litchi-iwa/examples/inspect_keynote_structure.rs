@@ -1,18 +1,16 @@
 use std::collections::HashMap;
 use std::env;
 
-use litchi_iwa::IWorkPackage;
-use litchi_iwa::archive::ArchiveObject;
-use litchi_iwa::keynote::{
-    KeynoteEditor, KeynoteShowMode, KeynoteTransitionAcceleration, KeynoteTransitionTextDelivery,
-};
-use litchi_iwa::protobuf::kn::{
+use litchi_iwa::keynote::{Acceleration, KeynoteEditor, Mode, TextDelivery};
+use litchi_iwa::raw::package::IWorkPackage;
+use litchi_iwa_core::ArchiveObject;
+use litchi_iwa_protos::kn::{
     BuildArchive, BuildChunkArchive, DocumentArchive, PlaceholderArchive, ShowArchive,
     SlideArchive, SlideNodeArchive, Soundtrack, ThemeArchive,
 };
-use litchi_iwa::protobuf::tsd::{ImageArchive, MovieArchive};
-use litchi_iwa::protobuf::tsp::PackageMetadata;
-use litchi_iwa::protobuf::tswp::{ShapeInfoArchive, StorageArchive};
+use litchi_iwa_protos::tsd::{ImageArchive, MovieArchive};
+use litchi_iwa_protos::tsp::PackageMetadata;
+use litchi_iwa_protos::tswp::{ShapeInfoArchive, StorageArchive};
 use prost::Message;
 
 const STORAGELESS_PLACEHOLDER_STORAGE_ID: u64 = 0;
@@ -94,7 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         show.size.height,
         show.slide_numbers_visible,
         show.loop_presentation,
-        show.mode.map(KeynoteShowMode::from_raw),
+        show.mode.map(Mode::from_raw),
         show.autoplay_transition_delay,
         show.autoplay_build_delay,
         show.automatically_plays_upon_open,
@@ -288,10 +286,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     transition.animation_attributes,
                     transition
                         .custom_timing_curve
-                        .map(KeynoteTransitionAcceleration::from_raw),
+                        .map(Acceleration::from_native),
                     transition
                         .custom_text_delivery_type
-                        .map(KeynoteTransitionTextDelivery::from_raw),
+                        .map(TextDelivery::from_native),
                     transition.custom_mosaic_type,
                     transition.database_animation_type,
                     transition.database_effect,
@@ -414,7 +412,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if let Some(note_id) = note_id {
                     let (name, object) = objects.get(&note_id).ok_or("note object is missing")?;
-                    let note = decode::<litchi_iwa::protobuf::kn::NoteArchive>(object)
+                    let note = decode::<litchi_iwa_protos::kn::NoteArchive>(object)
                         .ok_or("no note payload")?;
                     let storage_id = note.contained_storage.identifier;
                     let (storage_name, storage_object) = objects

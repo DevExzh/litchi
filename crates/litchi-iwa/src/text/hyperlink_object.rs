@@ -7,8 +7,8 @@ use crate::protobuf::tswp;
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
 
-use super::hyperlink_types::TextHyperlinkTarget;
 use super::smart_field_object::{generated_text_attribute_uuid, validate_text_attribute_uuid};
+use litchi_iwa_text::hyperlink::TextHyperlinkTarget;
 
 const HYPERLINK_TARGET_FIELD: u32 = 2;
 pub(super) const HYPERLINK_MESSAGE_TYPE: u32 = 2_032;
@@ -51,7 +51,9 @@ pub(super) fn validate_hyperlink_object(
             "iWork hyperlink object {identifier} is missing its target"
         ))
     })?;
-    TextHyperlinkTarget::new(target.into_boxed_str()).map(Some)
+    Ok(Some(TextHyperlinkTarget::from_boxed(
+        target.into_boxed_str(),
+    )?))
 }
 
 pub(super) fn new_hyperlink_object(
@@ -65,13 +67,13 @@ pub(super) fn new_hyperlink_object(
         }),
         url_ref: Some(target.as_str().to_owned()),
     };
-    ArchiveObject::new(
+    Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: HYPERLINK_MESSAGE_TYPE,
             data: hyperlink.encode_to_vec(),
         }],
-    )
+    )?)
 }
 
 pub(super) fn patch_hyperlink_target(

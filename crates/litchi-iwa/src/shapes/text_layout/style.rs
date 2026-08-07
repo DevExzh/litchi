@@ -21,7 +21,7 @@ use super::native::{
     auto_size_from_native, auto_size_to_native, insets_from_native, insets_to_native,
     vertical_alignment_from_native, vertical_alignment_to_native,
 };
-use super::{ShapeTextAutoSize, ShapeTextInsets, ShapeTextLayout, ShapeTextVerticalAlignment};
+use litchi_iwa_common::text::layout::{AutoSize, Insets, Layout, VerticalAlignment};
 
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
 
@@ -29,7 +29,7 @@ pub(crate) fn shape_text_layout(
     package: &IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-) -> Result<ShapeTextLayout> {
+) -> Result<Layout> {
     let style_id = shape_payload(package, archive_name, drawable_id)?
         .super_
         .style
@@ -43,7 +43,7 @@ pub(crate) fn set_shape_text_layout(
     mut package: IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-    layout: ShapeTextLayout,
+    layout: Layout,
 ) -> Result<IWorkPackage> {
     if shape_text_layout(&package, archive_name, drawable_id)? == layout {
         return Ok(package);
@@ -163,13 +163,13 @@ pub(crate) fn reset_shape_text_layout(
     Ok((package, true))
 }
 
-fn layout_overrides(layout: ShapeTextLayout) -> ShapeStyleOverrides {
+fn layout_overrides(layout: Layout) -> ShapeStyleOverrides {
     let mut overrides = ShapeStyleOverrides::default();
     apply_layout(&mut overrides, layout);
     overrides
 }
 
-fn apply_layout(overrides: &mut ShapeStyleOverrides, layout: ShapeTextLayout) {
+fn apply_layout(overrides: &mut ShapeStyleOverrides, layout: Layout) {
     overrides.shrink_to_fit = Some(auto_size_to_native(layout.auto_size()));
     overrides.vertical_alignment = Some(vertical_alignment_to_native(layout.vertical_alignment()));
     overrides.padding_null = None;
@@ -195,7 +195,7 @@ fn insert_layout_variation(
     mut package: IWorkPackage,
     location: LayoutVariationLocation<'_>,
     overrides: ShapeStyleOverrides,
-    expected: ShapeTextLayout,
+    expected: Layout,
 ) -> Result<IWorkPackage> {
     let LayoutVariationLocation {
         drawable_archive_name,
@@ -245,7 +245,7 @@ fn validate_layout(
     package: &IWorkPackage,
     archive_name: &str,
     drawable_id: u64,
-    expected: ShapeTextLayout,
+    expected: Layout,
 ) -> Result<()> {
     if shape_text_layout(package, archive_name, drawable_id)? != expected {
         return Err(Error::InvalidFormat(
@@ -292,10 +292,7 @@ fn parent_style_id(style_id: u64, style: &tswp::ShapeStyleArchive) -> Result<u64
         })
 }
 
-fn inherited_shape_text_layout(
-    package: &IWorkPackage,
-    first_style_id: u64,
-) -> Result<ShapeTextLayout> {
+fn inherited_shape_text_layout(package: &IWorkPackage, first_style_id: u64) -> Result<Layout> {
     let mut visited = HashSet::new();
     let mut style_id = Some(first_style_id);
     let mut vertical_alignment = None;
@@ -303,10 +300,10 @@ fn inherited_shape_text_layout(
     let mut auto_size = None;
     for _ in 0..MAX_STYLE_INHERITANCE_DEPTH {
         let Some(identifier) = style_id else {
-            return Ok(ShapeTextLayout::new(
-                vertical_alignment.unwrap_or(ShapeTextVerticalAlignment::Top),
-                insets.unwrap_or(ShapeTextInsets::ZERO),
-                auto_size.unwrap_or(ShapeTextAutoSize::Fixed),
+            return Ok(Layout::new(
+                vertical_alignment.unwrap_or(VerticalAlignment::Top),
+                insets.unwrap_or(Insets::ZERO),
+                auto_size.unwrap_or(AutoSize::Fixed),
             ));
         };
         if !visited.insert(identifier) {
@@ -334,7 +331,7 @@ fn inherited_shape_text_layout(
         if let (Some(vertical_alignment), Some(insets), Some(auto_size)) =
             (vertical_alignment, insets, auto_size)
         {
-            return Ok(ShapeTextLayout::new(vertical_alignment, insets, auto_size));
+            return Ok(Layout::new(vertical_alignment, insets, auto_size));
         }
         style_id = style
             .super_
@@ -347,11 +344,9 @@ fn inherited_shape_text_layout(
     )))
 }
 
-fn direct_insets(
-    properties: &tswp::ShapeStylePropertiesArchive,
-) -> Result<Option<ShapeTextInsets>> {
+fn direct_insets(properties: &tswp::ShapeStylePropertiesArchive) -> Result<Option<Insets>> {
     match (properties.padding_null, properties.padding.as_ref()) {
-        (Some(true), None) => Ok(Some(ShapeTextInsets::ZERO)),
+        (Some(true), None) => Ok(Some(Insets::ZERO)),
         (Some(true), Some(_)) => Err(Error::InvalidFormat(
             "iWork shape text padding is both null and populated".to_owned(),
         )),
@@ -369,8 +364,9 @@ mod tests {
     use crate::keynote::KeynoteEditor;
     use crate::numbers::NumbersEditor;
     use crate::pages::PagesEditor;
-    use crate::shapes::{DrawablePoint, DrawableSize, ShapeTextInset};
-    use crate::text::{TextColumnCount, TextColumns};
+    use crate::shapes::{DrawablePoint, DrawableSize};
+    use litchi_iwa_common::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+    use litchi_iwa_text::columns::{Columns, Count};
 
     const POSITION: DrawablePoint = DrawablePoint { x: 96.0, y: 120.0 };
     const SIZE: DrawableSize = DrawableSize {
@@ -404,19 +400,19 @@ mod tests {
                 ..Default::default()
             })
             .unwrap(),
-            Some(ShapeTextInsets::ZERO)
+            Some(Insets::ZERO)
         );
     }
 
     #[test]
     fn scratch_suite_text_boxes_support_composable_layout_crud() {
-        let inset = ShapeTextInset::from_points(9.0).unwrap();
-        let layout = ShapeTextLayout::new(
-            ShapeTextVerticalAlignment::Middle,
-            ShapeTextInsets::uniform(inset),
-            ShapeTextAutoSize::ShrinkToFit,
+        let inset = Inset::from_points(9.0).unwrap();
+        let layout = Layout::new(
+            VerticalAlignment::Middle,
+            Insets::uniform(inset),
+            AutoSize::ShrinkToFit,
         );
-        let columns = TextColumns::equal(TextColumnCount::new(2).unwrap(), None);
+        let columns = Columns::equal(Count::new(2).unwrap(), None);
 
         let mut pages = PagesEditor::create_with_text("Body").unwrap();
         let pages_box = pages

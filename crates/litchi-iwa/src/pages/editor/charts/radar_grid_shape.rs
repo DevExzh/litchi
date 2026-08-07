@@ -72,7 +72,7 @@ mod tests {
         let chart = editor
             .add_body_chart(
                 0,
-                ChartKind::Radar2d,
+                Kind::Radar2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {
@@ -105,7 +105,7 @@ mod tests {
         let chart = editor
             .add_body_chart(
                 0,
-                ChartKind::Line2d,
+                Kind::Line2d,
                 data(),
                 DrawablePoint { x: 20.0, y: 20.0 },
                 DrawableSize {

@@ -18,11 +18,11 @@
 //!
 //! let doc = PagesDocument::open("document.pages")?;
 //! let text = doc.text()?;
-//! let sections = doc.sections()?;
+//! let sections = doc.sections();
 //!
 //! for section in sections {
-//!     println!("Section: {:?}", section.heading);
-//!     for para in &section.paragraphs {
+//!     println!("Section: {:?}", section.heading());
+//!     for para in section.paragraphs() {
 //!         println!("  {}", para);
 //!     }
 //! }
@@ -32,51 +32,29 @@
 mod creation;
 pub mod document;
 pub mod editor;
-pub mod section;
 
 pub use creation::PagesDocumentBuilder;
 pub use document::PagesDocument;
 pub use editor::{
-    PagesAudioInfo, PagesAudioOptions, PagesBodyChartInfo, PagesBodyShapeInfo, PagesBodyShapeKind,
-    PagesCellValue, PagesDocumentOptions, PagesDrawableTextInfo, PagesEditor, PagesFootnote,
-    PagesFootnoteFormat, PagesFootnoteGap, PagesFootnoteId, PagesFootnoteKind,
-    PagesFootnoteNumbering, PagesFootnoteSettings, PagesHeaderFooterInfo, PagesHeaderFooterKind,
-    PagesImageInfo, PagesImageOptions, PagesMovieInfo, PagesMovieOptions, PagesPageLayout,
-    PagesPageNumber, PagesPageOrientation, PagesRgbColorSpace, PagesRgbaColor,
-    PagesSectionBackground, PagesSectionInfo, PagesSectionPageNumbering, PagesSectionSettings,
-    PagesSectionStart, PagesTable, PagesTableAxisIndex, PagesTableCellCheckboxFormat,
-    PagesTableCellCurrencyFormat, PagesTableCellDataFormat, PagesTableCellDateTimeFormat,
-    PagesTableCellDecimalPlaces, PagesTableCellDurationFormat, PagesTableCellDurationStyle,
-    PagesTableCellDurationUnit, PagesTableCellDurationUnitRange, PagesTableCellDurationUnits,
-    PagesTableCellFixedDecimalPlaces, PagesTableCellFractionFormat, PagesTableCellInset,
-    PagesTableCellInsets, PagesTableCellLayout, PagesTableCellNegativeNumberStyle,
-    PagesTableCellNumberFormat, PagesTableCellNumeralSystemFormat, PagesTableCellParagraphIndents,
-    PagesTableCellParagraphLineSpacing, PagesTableCellParagraphList,
-    PagesTableCellParagraphListBullet, PagesTableCellParagraphListBulletGeometry,
-    PagesTableCellParagraphListIndentation, PagesTableCellParagraphListLabelColor,
-    PagesTableCellParagraphListLevel, PagesTableCellParagraphListLevelPlacement,
-    PagesTableCellParagraphListNumberFormat, PagesTableCellParagraphListNumberScale,
-    PagesTableCellParagraphListNumberTiering, PagesTableCellParagraphListNumbering,
-    PagesTableCellParagraphListPlacement, PagesTableCellParagraphSpacing,
-    PagesTableCellParagraphTabStops, PagesTableCellPercentageFormat, PagesTableCellPopUpMenuFormat,
-    PagesTableCellPopUpMenuInitialSelection, PagesTableCellPopUpMenuItem, PagesTableCellRegion,
-    PagesTableCellScientificFormat, PagesTableCellSliderDisplayFormat, PagesTableCellSliderFormat,
-    PagesTableCellSliderRange, PagesTableCellStarRatingFormat, PagesTableCellStepperDisplayFormat,
-    PagesTableCellStepperFormat, PagesTableCellStepperRange, PagesTableCellTextAlignment,
-    PagesTableCellTextBackground, PagesTableCellTextBaselineShift,
+    PagesAudioInfo, PagesBodyChartInfo, PagesBodyShapeInfo, PagesCellValue, PagesDrawableTextInfo,
+    PagesEditor, PagesHeaderFooterInfo, PagesImageInfo, PagesMovieInfo, PagesSectionInfo,
+    PagesTable, PagesTableCellParagraphList, PagesTableCellParagraphListBullet,
+    PagesTableCellParagraphListBulletGeometry, PagesTableCellParagraphListIndentation,
+    PagesTableCellParagraphListLabelColor, PagesTableCellParagraphListLevel,
+    PagesTableCellParagraphListLevelPlacement, PagesTableCellParagraphListNumberFormat,
+    PagesTableCellParagraphListNumberScale, PagesTableCellParagraphListNumberTiering,
+    PagesTableCellParagraphListNumbering, PagesTableCellParagraphListPlacement,
+    PagesTableCellParagraphTabStops, PagesTableCellTextBackground, PagesTableCellTextBaselineShift,
     PagesTableCellTextCapitalization, PagesTableCellTextCharacterSpacing, PagesTableCellTextColor,
-    PagesTableCellTextDecorations, PagesTableCellTextFont, PagesTableCellTextFormat,
-    PagesTableCellTextLigatures, PagesTableCellTextOutline, PagesTableCellTextScript,
-    PagesTableCellTextShadow, PagesTableCellTextStyle, PagesTableCellTextWrap,
-    PagesTableCellThousandsSeparator, PagesTableCellUpdate, PagesTableCellVerticalAlignment,
-    PagesTableColumnDeletion, PagesTableColumnInsertion, PagesTableDimension,
-    PagesTableDimensionSize, PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator,
-    PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
-    PagesTableHeaderCount, PagesTableHeaderSettings, PagesTableHiddenAxes, PagesTableInfo,
-    PagesTablePoints, PagesTableRowDeletion, PagesTableRowInsertion, PagesTableSortColumnIndex,
-    PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule,
-    PagesTableSortScope, PagesTableTitleSettings, PagesTemplateKind, RemovedPagesAudio,
-    RemovedPagesBodyChart, RemovedPagesBodyShape, RemovedPagesImage, RemovedPagesMovie,
-    RemovedPagesTextBox,
+    PagesTableCellTextDecorations, PagesTableCellTextFont, PagesTableCellTextLigatures,
+    PagesTableCellTextOutline, PagesTableCellTextScript, PagesTableCellTextShadow,
+    PagesTableCellTextStyle, PagesTableCellUpdate, PagesTableDimension, PagesTableDimensionSize,
+    PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
+    PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableInfo, PagesTablePoints,
+    PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder,
+    PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope, PagesTableTitleSettings,
+    RemovedPagesAudio, RemovedPagesBodyChart, RemovedPagesBodyShape, RemovedPagesImage,
+    RemovedPagesMovie, RemovedPagesTextBox,
 };
-pub use section::{PagesSection, PagesSectionType};
+pub use litchi_pages::footnote::body::{Footnote, Position, Selector};
+pub use litchi_pages::{Section, SectionType};
