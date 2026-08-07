@@ -1,4 +1,4 @@
-//! Typed semantic models for OfficeArt properties.
+//! Typed semantic models for `OfficeArt` properties.
 //!
 //! The facade keeps the concise `prop::{Id, Prop, Value, ...}` API while the
 //! implementation is divided by ownership: identifier vocabulary, borrowed

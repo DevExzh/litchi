@@ -75,10 +75,10 @@ fn rejects_wrong_scope_namespace_cardinality_content_and_values() {
     const SUFFIX: &str =
         "</s:page-layout-properties></s:page-layout></o:automatic-styles></o:document-styles>";
     for fragment in [
-        r#"<x:footnote-sep/>"#,
-        r#"<s:footnote-sep/><s:footnote-sep/>"#,
-        r#"<s:footnote-sep>text</s:footnote-sep>"#,
-        r#"<s:footnote-sep><s:footnote-sep/></s:footnote-sep>"#,
+        r"<x:footnote-sep/>",
+        r"<s:footnote-sep/><s:footnote-sep/>",
+        r"<s:footnote-sep>text</s:footnote-sep>",
+        r"<s:footnote-sep><s:footnote-sep/></s:footnote-sep>",
         r#"<s:footnote-sep x:width="1cm"/>"#,
         r#"<s:footnote-sep s:width="1em"/>"#,
         r#"<s:footnote-sep s:rel-width="25"/>"#,

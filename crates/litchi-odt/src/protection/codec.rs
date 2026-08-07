@@ -119,8 +119,7 @@ pub(crate) fn rewrite(
     let actual = parse(source, kind)?;
     if &actual != expected {
         return invalid(format!(
-            "protection transaction source changed: expected {:?}, found {:?}",
-            expected, actual
+            "protection transaction source changed: expected {expected:?}, found {actual:?}"
         ));
     }
     if expected == replacement {
@@ -302,7 +301,7 @@ fn item_text(xml: &str, item: &ItemSpan) -> Result<String> {
         ));
     }
     quick_xml::escape::unescape(content)
-        .map(|value| value.into_owned())
+        .map(std::borrow::Cow::into_owned)
         .map_err(|error| {
             Error::InvalidFormat(format!(
                 "configuration item '{}' has invalid escaped text: {error}",
@@ -354,8 +353,7 @@ fn render_item(field: Field, value: Value<'_>) -> Result<Vec<u8>> {
 
 fn render_configuration(items: &[u8]) -> Vec<u8> {
     let mut output = format!(
-        "<config:config-item-set xmlns:config=\"{}\" config:name=\"{}\">",
-        CONFIG_NAMESPACE_TEXT, CONFIGURATION_SET
+        "<config:config-item-set xmlns:config=\"{CONFIG_NAMESPACE_TEXT}\" config:name=\"{CONFIGURATION_SET}\">"
     )
     .into_bytes();
     output.extend_from_slice(items);

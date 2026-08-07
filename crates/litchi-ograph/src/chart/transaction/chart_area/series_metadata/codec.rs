@@ -34,7 +34,7 @@ pub(super) fn scan(chart: &Chart) -> Result<Scan> {
         }
         let metadata = decode(record)?;
         let index = entries.len();
-        entries.try_reserve(1).map_err(|_| Error::Allocation {
+        entries.try_reserve(1).ok().ok_or(Error::Allocation {
             resource: "series metadata inventory",
         })?;
         entries.push(Entry {
@@ -75,12 +75,14 @@ pub(super) fn patch(chart: &mut Chart, expected_source: u64, changes: &[Change])
     let mut edits = Vec::new();
     edits
         .try_reserve_exact(changes.len())
-        .map_err(|_| Error::Allocation {
+        .ok()
+        .ok_or(Error::Allocation {
             resource: "physical Series patches",
         })?;
     let mut seen = Vec::new();
     seen.try_reserve_exact(changes.len())
-        .map_err(|_| Error::Allocation {
+        .ok()
+        .ok_or(Error::Allocation {
             resource: "Series patch markers",
         })?;
     for change in changes {

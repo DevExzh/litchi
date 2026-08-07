@@ -1,4 +1,4 @@
-//! Inert, bounded OpenDocument text DDE connection declarations.
+//! Inert, bounded `OpenDocument` text DDE connection declarations.
 //!
 //! The owner keeps its public declaration and reference model separate from
 //! the XML codec, package-wide aggregation, and focused regression tests.

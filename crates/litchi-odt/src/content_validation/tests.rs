@@ -35,7 +35,7 @@ fn parses_messages_macro_metadata_and_round_trips() {
 fn rejects_invalid_validation_grammar() {
     for body in [
         "<table:content-validations/>",
-        r#"<table:content-validations><table:content-validation/></table:content-validations>"#,
+        r"<table:content-validations><table:content-validation/></table:content-validations>",
         r#"<table:content-validations><table:content-validation table:name="x" table:display-list="sorted"/></table:content-validations>"#,
         r#"<table:content-validations><table:content-validation table:name="x"><table:error-message/><table:help-message/></table:content-validation></table:content-validations>"#,
         r#"<table:content-validations><table:content-validation table:name="x"><office:event-listeners/></table:content-validation></table:content-validations>"#,

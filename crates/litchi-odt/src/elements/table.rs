@@ -58,7 +58,7 @@ impl Table {
     /// Get all rows in the table
     pub fn rows(&self) -> Result<Vec<TableRow>> {
         let mut rows = Vec::new();
-        for child in self.element.children.iter() {
+        for child in &self.element.children {
             if child.tag_name() == "table:table-row"
                 && let Ok(row) = TableRow::from_element(child.clone())
             {
@@ -130,7 +130,7 @@ impl Table {
         let rows = self.rows()?;
         let max_cols = rows
             .iter()
-            .map(|row| row.cells().map(|cells| cells.len()).unwrap_or(0))
+            .map(|row| row.cells().map_or(0, |cells| cells.len()))
             .max()
             .unwrap_or(0);
         Ok(max_cols)
@@ -176,7 +176,7 @@ impl TableRow {
     /// Get all cells in the row
     pub fn cells(&self) -> Result<Vec<TableCell>> {
         let mut cells = Vec::new();
-        for child in self.element.children.iter() {
+        for child in &self.element.children {
             if child.tag_name() == "table:table-cell"
                 && let Ok(cell) = TableCell::from_element(child.clone())
             {
@@ -231,8 +231,7 @@ impl TableRow {
     pub fn repeat_count(&self) -> usize {
         self.element
             .get_int_attribute("table:number-rows-repeated")
-            .map(|n| n as usize)
-            .unwrap_or(1)
+            .map_or(1, |n| n as usize)
     }
 
     /// Set the number of times this row should be repeated.
@@ -306,7 +305,7 @@ impl TableCell {
         let value_type = self.element.get_attribute("office:value-type");
 
         match value_type {
-            Some("float") | Some("double") | Some("decimal") => {
+            Some("float" | "double" | "decimal") => {
                 if let Some(val_str) = self.element.get_attribute("office:value")
                     && let Ok(num) = val_str.parse::<f64>()
                 {
@@ -354,9 +353,8 @@ impl TableCell {
                 let text = self.text()?;
                 if text.trim().is_empty() {
                     return Ok(CellValue::Empty);
-                } else {
-                    return Ok(CellValue::Text(text));
                 }
+                return Ok(CellValue::Text(text));
             },
         }
 
@@ -393,8 +391,7 @@ impl TableCell {
     pub fn colspan(&self) -> usize {
         self.element
             .get_int_attribute("table:number-columns-spanned")
-            .map(|n| n as usize)
-            .unwrap_or(1)
+            .map_or(1, |n| n as usize)
     }
 
     /// Set the number of columns this cell spans
@@ -407,8 +404,7 @@ impl TableCell {
     pub fn rowspan(&self) -> usize {
         self.element
             .get_int_attribute("table:number-rows-spanned")
-            .map(|n| n as usize)
-            .unwrap_or(1)
+            .map_or(1, |n| n as usize)
     }
 
     /// Set the number of rows this cell spans
@@ -433,8 +429,7 @@ impl TableCell {
     pub fn repeat_count(&self) -> usize {
         self.element
             .get_int_attribute("table:number-columns-repeated")
-            .map(|n| n as usize)
-            .unwrap_or(1)
+            .map_or(1, |n| n as usize)
     }
 
     /// Set the number of times this cell should be repeated.
@@ -518,8 +513,7 @@ impl TableColumn {
     pub fn repeated(&self) -> usize {
         self.element
             .get_int_attribute("table:number-columns-repeated")
-            .map(|n| n as usize)
-            .unwrap_or(1)
+            .map_or(1, |n| n as usize)
     }
 
     /// Set the number of columns this column definition represents
@@ -597,7 +591,7 @@ impl TableElements {
                         && let Ok(text) = String::from_utf8(t.to_vec())
                     {
                         let current_text = current.text().to_string();
-                        current.set_text(&format!("{}{}", current_text, text));
+                        current.set_text(&format!("{current_text}{text}"));
                     }
                 },
                 Ok(quick_xml::events::Event::End(ref e)) => {
@@ -656,8 +650,7 @@ impl TableElements {
                         let repeated = cell
                             .element
                             .get_int_attribute("table:number-columns-repeated")
-                            .map(|n| n as usize)
-                            .unwrap_or(1);
+                            .map_or(1, |n| n as usize);
 
                         for _ in 0..repeated {
                             let mut new_cell = TableCell::new();

@@ -75,7 +75,7 @@ fn parses_aliases_equal_width_and_round_trips_deterministically() {
 fn rejects_wrong_namespace_order_cardinality_values_and_caps() {
     let malformed = [
         format!(r#"<s:columns xmlns:s="{STYLE}" xmlns:f="{FO}" f:column-count="2"/>"#),
-        wrap(r#"<s:columns/>"#),
+        wrap(r"<s:columns/>"),
         wrap(r#"<s:columns f:column-count="0"/>"#),
         wrap(r#"<s:columns f:column-count="65"/>"#),
         wrap(r#"<s:columns f:column-count="2"><s:column s:rel-width="1*"/></s:columns>"#),

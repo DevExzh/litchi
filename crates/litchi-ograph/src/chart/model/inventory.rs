@@ -54,16 +54,19 @@ pub struct Raw {
 
 impl Raw {
     /// BIFF record identifier.
+    #[must_use]
     pub const fn kind(&self) -> litchi_biff::Kind {
         self.kind
     }
 
     /// Exact record payload.
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.data
     }
 
     /// Original byte offset in the chart substream.
+    #[must_use]
     pub const fn offset(&self) -> usize {
         self.offset
     }

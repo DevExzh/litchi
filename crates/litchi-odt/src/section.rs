@@ -653,12 +653,12 @@ fn update_table_end(ns: bool, local: &[u8], depth: usize, table: &mut Option<Tab
         b"table" if table.as_ref().is_some_and(|t| t.depth == depth) => *table = None,
         b"table-row" => {
             if let Some(t) = table {
-                t.row = None
+                t.row = None;
             }
         },
         b"table-cell" | b"covered-table-cell" => {
             if let Some(t) = table {
-                t.cell = None
+                t.cell = None;
             }
         },
         _ => {},

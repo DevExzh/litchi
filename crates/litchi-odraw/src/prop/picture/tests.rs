@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::{Flags, Kind, MAX_NAME_UNITS, Snapshot};
 use crate::prop::{Id, Props};
 use crate::{Error, Record, RecordKind};

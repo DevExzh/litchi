@@ -21,7 +21,7 @@ fn complete_family_round_trips() {
     assert_eq!(
         StyleProperties::from_xml_fragment(&fragment).unwrap(),
         *value
-    )
+    );
 }
 #[test]
 fn parses_real_libreoffice_standard_style() {
@@ -36,7 +36,7 @@ fn parses_real_libreoffice_standard_style() {
     let value = set.get("ch3").unwrap().properties.as_ref().unwrap();
     assert_eq!(value.stacked, Some(true));
     assert_eq!(value.series_source, Some(SeriesSource::Rows));
-    assert_eq!(value.treat_empty_cells, Some(EmptyCellTreatment::LeaveGap))
+    assert_eq!(value.treat_empty_cells, Some(EmptyCellTreatment::LeaveGap));
 }
 #[test]
 fn lossless_replace_insert_remove() {
@@ -59,7 +59,7 @@ fn lossless_replace_insert_remove() {
     let b = StyleRecord::named("b", None).unwrap();
     let removed = set_chart_style_properties_xml(&restored, &b).unwrap();
     assert!(!removed.contains("chart:lines=\"true\""));
-    assert!(removed.contains("<!--keep-->"))
+    assert!(removed.contains("<!--keep-->"));
 }
 #[test]
 fn rejects_malformed_lexicals_namespaces_placement_and_children() {
@@ -78,6 +78,6 @@ fn rejects_malformed_lexicals_namespaces_placement_and_children() {
         assert!(
             parse_chart_style_properties(&doc(case)).is_err(),
             "accepted {case}"
-        )
+        );
     }
 }

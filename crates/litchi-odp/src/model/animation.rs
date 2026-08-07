@@ -109,7 +109,7 @@ pub enum Namespace {
     Draw,
     /// The ODF SVG-compatible namespace.
     Svg,
-    /// The W3C XLink namespace.
+    /// The W3C `XLink` namespace.
     Xlink,
     /// The reserved XML namespace.
     Xml,
@@ -186,16 +186,19 @@ impl Attribute {
     }
 
     /// Return the attribute namespace.
+    #[must_use]
     pub fn namespace(&self) -> &Namespace {
         &self.namespace
     }
 
     /// Return the attribute local name.
+    #[must_use]
     pub fn local_name(&self) -> &str {
         &self.local_name
     }
 
     /// Return the unescaped attribute value.
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -231,6 +234,7 @@ pub struct Node {
 
 impl Node {
     /// Create an empty animation node.
+    #[must_use]
     pub fn new(kind: Kind) -> Self {
         Self {
             kind,
@@ -240,11 +244,13 @@ impl Node {
     }
 
     /// Return the schema-defined node kind.
+    #[must_use]
     pub fn kind(&self) -> Kind {
         self.kind
     }
 
     /// Return the node's expanded-name attributes.
+    #[must_use]
     pub fn attributes(&self) -> &[Attribute] {
         &self.attributes
     }
@@ -266,6 +272,7 @@ impl Node {
     }
 
     /// Find an attribute by expanded name.
+    #[must_use]
     pub fn attribute(&self, namespace: &Namespace, local_name: &str) -> Option<&str> {
         self.attributes
             .iter()
@@ -276,6 +283,7 @@ impl Node {
     }
 
     /// Return the schema-defined child nodes.
+    #[must_use]
     pub fn children(&self) -> &[Node] {
         &self.children
     }

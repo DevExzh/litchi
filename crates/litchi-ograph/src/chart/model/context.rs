@@ -10,6 +10,7 @@ impl Count {
     pub const ZERO: Self = Self(0);
 
     /// Creates a checked BIFF chart count.
+    #[must_use]
     pub const fn new(value: u16) -> Option<Self> {
         if value <= 32_767 {
             Some(Self(value))
@@ -19,6 +20,7 @@ impl Count {
     }
 
     /// Returns the stored count.
+    #[must_use]
     pub const fn get(self) -> u16 {
         self.0
     }
@@ -34,11 +36,13 @@ impl GroupId {
     pub const ZERO: Self = Self(0);
 
     /// Creates a checked BIFF chart-group identifier.
+    #[must_use]
     pub const fn new(value: u8) -> Option<Self> {
         if value <= 9 { Some(Self(value)) } else { None }
     }
 
     /// Returns the stored identifier.
+    #[must_use]
     pub const fn get(self) -> u8 {
         self.0
     }
@@ -54,11 +58,13 @@ impl Order {
     pub const ZERO: Self = Self(0);
 
     /// Creates a checked drawing order.
+    #[must_use]
     pub const fn new(value: u8) -> Option<Self> {
         if value <= 9 { Some(Self(value)) } else { None }
     }
 
     /// Returns the stored drawing order.
+    #[must_use]
     pub const fn get(self) -> u8 {
         self.0
     }
@@ -73,6 +79,7 @@ pub struct Context {
 
 impl Context {
     /// Excel-hosted chart context.
+    #[must_use]
     pub const fn excel() -> Self {
         Self {
             kind: Kind::Excel,
@@ -81,6 +88,7 @@ impl Context {
     }
 
     /// Standalone Microsoft Graph chart context.
+    #[must_use]
     pub const fn graph() -> Self {
         Self {
             kind: Kind::Graph,
@@ -96,11 +104,13 @@ impl Context {
     }
 
     /// Chart BOF grammar selected by this context.
+    #[must_use]
     pub const fn kind(self) -> Kind {
         self.kind
     }
 
     /// Known external-sheet table size, when supplied by the host.
+    #[must_use]
     pub const fn external_sheet_count(self) -> Option<usize> {
         self.external_sheets
     }
@@ -138,9 +148,9 @@ impl Default for Rect {
 /// Sheet-level chart properties.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Props {
-    /// Raw defined ShtProps flags and blank-display mode.
+    /// Raw defined `ShtProps` flags and blank-display mode.
     pub flags: u32,
-    /// Whether a PlotArea record is present.
+    /// Whether a `PlotArea` record is present.
     pub plot_area: bool,
 }
 

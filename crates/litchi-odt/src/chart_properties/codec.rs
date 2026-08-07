@@ -70,9 +70,9 @@ pub(super) fn validate_paragraph(xml: &str) -> Result<()> {
                     if paragraph || current.0 != Ns::Text || current.1 != b"p" {
                         return Err(bad("chart label separator requires one text:p"));
                     }
-                    paragraph = true
+                    paragraph = true;
                 }
-                depth += 1
+                depth += 1;
             },
             Ok(Event::Empty(start)) => {
                 let current = element(&reader, start.name());
@@ -80,7 +80,7 @@ pub(super) fn validate_paragraph(xml: &str) -> Result<()> {
                     if paragraph || current.0 != Ns::Text || current.1 != b"p" {
                         return Err(bad("chart label separator requires one text:p"));
                     }
-                    paragraph = true
+                    paragraph = true;
                 }
             },
             Ok(Event::Text(text)) => {
@@ -98,9 +98,9 @@ pub(super) fn validate_paragraph(xml: &str) -> Result<()> {
             Ok(Event::End(_)) => {
                 depth = depth
                     .checked_sub(1)
-                    .ok_or_else(|| bad("invalid chart label paragraph"))?
+                    .ok_or_else(|| bad("invalid chart label paragraph"))?;
             },
-            Ok(Event::Decl(_)) | Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::Decl(_) | Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad(
                     "declarations, DTDs, and processing instructions are not allowed in chart labels",
                 ));
@@ -335,14 +335,14 @@ impl StyleProperties {
         if self.symbol_image.is_some() || self.label_separator.is_some() {
             xml.push('>');
             if let Some(image) = &self.symbol_image {
-                xml.push_str(&image.to_xml_fragment()?)
+                xml.push_str(&image.to_xml_fragment()?);
             }
             if let Some(label) = &self.label_separator {
-                xml.push_str(&label.to_xml_fragment()?)
+                xml.push_str(&label.to_xml_fragment()?);
             }
-            xml.push_str("</style:chart-properties>")
+            xml.push_str("</style:chart-properties>");
         } else {
-            xml.push_str("/>")
+            xml.push_str("/>");
         }
         Ok(xml)
     }
@@ -358,20 +358,20 @@ impl StyleRecord {
         };
         let mut xml = format!(r#"<style:{tag} xmlns:style="{STYLE_NS}" style:family="chart""#);
         if let Some(value) = &self.name {
-            xml.push_str(&format!(r#" style:name="{}""#, escape_xml(value)))
+            xml.push_str(&format!(r#" style:name="{}""#, escape_xml(value)));
         }
         if let Some(value) = &self.parent_style_name {
             xml.push_str(&format!(
                 r#" style:parent-style-name="{}""#,
                 escape_xml(value)
-            ))
+            ));
         }
         if let Some(value) = &self.properties {
             xml.push('>');
             xml.push_str(&value.to_xml_fragment()?);
-            xml.push_str(&format!("</style:{tag}>"))
+            xml.push_str(&format!("</style:{tag}>"));
         } else {
-            xml.push_str("/>")
+            xml.push_str("/>");
         }
         Ok(xml)
     }
@@ -426,7 +426,7 @@ fn attrs(
             .map_err(|error| bad(format!("invalid chart property value: {error}")))?
             .into_owned();
         safe(&value, "chart property value", true)?;
-        out.push((key.0, key.1, value))
+        out.push((key.0, key.1, value));
     }
     Ok(out)
 }
@@ -733,7 +733,7 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                             label_depth: None,
                             paragraph_depth: None,
                             paragraph_start: None,
-                        })
+                        });
                     }
                     continue;
                 }
@@ -750,7 +750,7 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                         }
                         value.seen = true;
                         value.style.properties = Some(properties(&reader, version, &start)?);
-                        value.property_depth = Some(depth)
+                        value.property_depth = Some(depth);
                     } else if current.1 == b"chart-properties" {
                         return Err(bad(
                             "style:chart-properties has invalid namespace or parent",
@@ -771,7 +771,7 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                         }
                         value.style.properties.as_mut().unwrap().symbol_image =
                             Some(symbol_image(&reader, version, &start)?);
-                        value.symbol_depth = Some(depth)
+                        value.symbol_depth = Some(depth);
                     } else if value.property_depth.is_some_and(|p| depth == p + 1)
                         && current.0 == Ns::Chart
                         && current.1 == b"label-separator"
@@ -788,7 +788,7 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                             return Err(bad("duplicate chart:label-separator"));
                         }
                         no_attrs(&reader, version, &start, "chart:label-separator")?;
-                        value.label_depth = Some(depth)
+                        value.label_depth = Some(depth);
                     } else if value.label_depth.is_some_and(|l| depth == l + 1)
                         && current.0 == Ns::Text
                         && current.1 == b"p"
@@ -797,7 +797,7 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                             return Err(bad("duplicate text:p in chart:label-separator"));
                         }
                         value.paragraph_depth = Some(depth);
-                        value.paragraph_start = Some(begin)
+                        value.paragraph_start = Some(begin);
                     } else if value.property_depth.is_some_and(|p| depth > p) {
                         return Err(bad("unexpected style:chart-properties child"));
                     }
@@ -818,7 +818,7 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                     if let Some(style) =
                         header(&reader, version, &start, current.1 == b"default-style")?
                     {
-                        push(&mut out, style, &mut total)?
+                        push(&mut out, style, &mut total)?;
                     }
                     continue;
                 }
@@ -836,7 +836,7 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                         value.seen = true;
                         let parsed = properties(&reader, version, &start)?;
                         parsed.validate()?;
-                        value.style.properties = Some(parsed)
+                        value.style.properties = Some(parsed);
                     } else if current.1 == b"chart-properties" {
                         return Err(bad(
                             "style:chart-properties has invalid namespace or parent",
@@ -856,7 +856,7 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                             return Err(bad("duplicate chart:symbol-image"));
                         }
                         value.style.properties.as_mut().unwrap().symbol_image =
-                            Some(symbol_image(&reader, version, &start)?)
+                            Some(symbol_image(&reader, version, &start)?);
                     } else if value.property_depth.is_some_and(|p| depth == p + 1)
                         && current.0 == Ns::Chart
                         && current.1 == b"label-separator"
@@ -877,7 +877,7 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                             return Err(bad("duplicate text:p in chart:label-separator"));
                         }
                         value.style.properties.as_mut().unwrap().label_separator =
-                            Some(LabelSeparator::from_paragraph_xml(&xml[begin..end])?)
+                            Some(LabelSeparator::from_paragraph_xml(&xml[begin..end])?);
                     } else if value.property_depth.is_some_and(|p| depth > p) {
                         return Err(bad("unexpected style:chart-properties child"));
                     }
@@ -911,10 +911,10 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                         let begin = value.paragraph_start.take().unwrap();
                         value.style.properties.as_mut().unwrap().label_separator =
                             Some(LabelSeparator::from_paragraph_xml(&xml[begin..end])?);
-                        value.paragraph_depth = None
+                        value.paragraph_depth = None;
                     }
                     if value.symbol_depth == Some(depth) {
-                        value.symbol_depth = None
+                        value.symbol_depth = None;
                     }
                     if value.label_depth == Some(depth) {
                         if value
@@ -927,24 +927,24 @@ pub fn parse_chart_style_properties(xml: &str) -> Result<StylePropertiesSet> {
                         {
                             return Err(bad("chart:label-separator requires text:p"));
                         }
-                        value.label_depth = None
+                        value.label_depth = None;
                     }
                     if value.property_depth == Some(depth) {
                         value.style.properties.as_ref().unwrap().validate()?;
-                        value.property_depth = None
+                        value.property_depth = None;
                     }
                 }
                 if active.as_ref().is_some_and(|value| value.depth == depth) {
-                    push(&mut out, active.take().unwrap().style, &mut total)?
+                    push(&mut out, active.take().unwrap().style, &mut total)?;
                 }
                 stack.pop();
             },
             Ok(Event::Decl(decl)) => {
                 version = decl
                     .xml_version()
-                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?
+                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,
@@ -1025,7 +1025,7 @@ pub fn set_chart_style_properties_xml(xml: &str, requested: &StyleRecord) -> Res
                                 ..Default::default()
                             },
                             ..Default::default()
-                        })
+                        });
                     }
                 } else if target_depth.is_some_and(|d| depth == d + 1)
                     && current.0 == Ns::Style
@@ -1070,7 +1070,7 @@ pub fn set_chart_style_properties_xml(xml: &str, requested: &StyleRecord) -> Res
                         found = Some(Target {
                             style: span,
                             ..Default::default()
-                        })
+                        });
                     }
                 } else if target_depth.is_some_and(|d| depth == d + 1)
                     && current.0 == Ns::Style
@@ -1090,13 +1090,13 @@ pub fn set_chart_style_properties_xml(xml: &str, requested: &StyleRecord) -> Res
                     {
                         let span = spans.properties.as_mut().unwrap();
                         span.end_start = begin;
-                        span.end = end
+                        span.end = end;
                     }
                     if target_depth == Some(depth) {
                         spans.style.end_start = begin;
                         spans.style.end = end;
                         found = active.take();
-                        target_depth = None
+                        target_depth = None;
                     }
                 }
                 stack.pop();
@@ -1104,9 +1104,9 @@ pub fn set_chart_style_properties_xml(xml: &str, requested: &StyleRecord) -> Res
             Ok(Event::Decl(decl)) => {
                 version = decl
                     .xml_version()
-                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?
+                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,

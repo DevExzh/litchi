@@ -52,6 +52,7 @@ pub enum NonPartReason {
 
 impl NonPartReason {
     /// Return a short, stable description of the reason.
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::UnmappablePartName => "ZIP item name is not a valid OPC part name",
@@ -99,12 +100,14 @@ impl NonPartMember {
 
     /// The raw ZIP item name, without a leading slash.
     #[inline]
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Why the item was not treated as a part.
     #[inline]
+    #[must_use]
     pub fn reason(&self) -> NonPartReason {
         self.reason
     }
@@ -300,6 +303,11 @@ fn conflict_error(existing: &PackURI, candidate: &PackURI, conflict: PartNameCon
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     fn uri(value: &str) -> PackURI {

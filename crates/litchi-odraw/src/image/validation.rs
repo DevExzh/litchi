@@ -1,4 +1,4 @@
-//! OfficeArt image invariants and cross-record validation.
+//! `OfficeArt` image invariants and cross-record validation.
 
 use super::model::{Blip, Block, Context, Entry, Kind, Limits, Offset, Storage, Store};
 use crate::{Error, ImageLimit, Record, RecordKind, Result};
@@ -29,7 +29,7 @@ impl<'data> Entry<'data> {
     pub fn storage(&self) -> Result<Storage<'data>> {
         if !self.embedded.is_empty() {
             let instance =
-                u8::try_from(self.record.instance()).map_err(|_| Error::MalformedImage {
+                u8::try_from(self.record.instance()).map_err(|_err| Error::MalformedImage {
                     reason: "FBSE instance is not an MSOBLIPTYPE value",
                 })?;
             for blip in self.embedded() {
@@ -74,9 +74,10 @@ impl<'data> Entry<'data> {
     }
 
     pub(super) fn validate_selected(&self, blip: &Blip<'_>, delayed: bool) -> Result<()> {
-        let instance = u8::try_from(self.record.instance()).map_err(|_| Error::MalformedImage {
-            reason: "FBSE instance is not an MSOBLIPTYPE value",
-        })?;
+        let instance =
+            u8::try_from(self.record.instance()).map_err(|_err| Error::MalformedImage {
+                reason: "FBSE instance is not an MSOBLIPTYPE value",
+            })?;
         if !matches_instance(blip, instance) {
             return Err(Error::MalformedImage {
                 reason: "resolved BLIP kind does not match the FBSE instance",
@@ -91,7 +92,7 @@ impl<'data> Entry<'data> {
                     context: "resolved BLIP wire length",
                 })?;
             if actual != self.size {
-                let actual = usize::try_from(actual).map_err(|_| Error::ArithmeticOverflow {
+                let actual = usize::try_from(actual).map_err(|_err| Error::ArithmeticOverflow {
                     context: "resolved BLIP wire length",
                 })?;
                 return Err(Error::ImageSizeMismatch {
@@ -119,12 +120,12 @@ pub(super) fn matches_instance(blip: &Blip<'_>, instance: u8) -> bool {
 }
 
 impl<'data> Store<'data> {
-    /// Validates a previously parsed BStore record.
+    /// Validates a previously parsed `BStore` record.
     pub fn from_record(record: Record<'data>) -> Result<Self> {
         Self::from_record_with(record, Limits::default())
     }
 
-    /// Validates a previously parsed BStore record under explicit limits.
+    /// Validates a previously parsed `BStore` record under explicit limits.
     pub fn from_record_with(record: Record<'data>, limits: Limits) -> Result<Self> {
         if record.kind() != RecordKind::BStoreContainer
             || record.version() != 0x0F

@@ -18,10 +18,10 @@ impl Riser {
         match value {
             0 => Ok(Self::Rectangle),
             1 => Ok(Self::Ellipse),
-            value => Err(Error::InvalidRecordValue {
+            other => Err(Error::InvalidRecordValue {
                 kind: BarShape::KIND.get(),
                 field: "riser",
-                value: u64::from(value),
+                value: u64::from(other),
             }),
         }
     }
@@ -68,6 +68,7 @@ impl BarShape {
     pub const KIND: Kind = Kind::from_wire(0x105F);
 
     /// Creates a 3-D bar shape.
+    #[must_use]
     pub const fn new(riser: Riser, taper: Taper) -> Self {
         Self { riser, taper }
     }
@@ -94,16 +95,19 @@ impl BarShape {
     }
 
     /// Base shape.
+    #[must_use]
     pub const fn riser(self) -> Riser {
         self.riser
     }
 
     /// Taper behavior.
+    #[must_use]
     pub const fn taper(self) -> Taper {
         self.taper
     }
 
     /// Encodes the fixed-size payload without allocating.
+    #[must_use]
     pub const fn payload(self) -> [u8; 2] {
         [self.riser as u8, self.taper as u8]
     }
@@ -117,6 +121,11 @@ impl BarShape {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
     use super::*;
 
     #[test]

@@ -186,11 +186,13 @@ impl ContentSource {
     }
 
     /// Number of slides retained from the source document.
+    #[must_use]
     pub fn page_count(&self) -> usize {
         self.pages.len()
     }
 
     /// The verbatim `draw:page` element at `index`, when it exists.
+    #[must_use]
     pub fn page(&self, index: usize) -> Option<&str> {
         self.pages.get(index).map(|span| self.slice(*span))
     }
@@ -233,6 +235,7 @@ impl ContentSource {
     }
 
     /// Whether `name` is already declared inside `office:automatic-styles`.
+    #[must_use]
     pub fn defines_style(&self, name: &str) -> bool {
         self.style_names.contains(name)
     }
@@ -271,11 +274,13 @@ impl ContentSource {
     }
 
     /// The `office:body` start tag, verbatim.
+    #[must_use]
     pub fn body_start_tag(&self) -> &str {
         self.slice(self.body_open)
     }
 
     /// The `office:presentation` start tag, verbatim.
+    #[must_use]
     pub fn presentation_start_tag(&self) -> &str {
         self.slice(self.presentation_open)
     }
@@ -285,6 +290,7 @@ impl ContentSource {
     /// The qualified names are taken from the retained start tags so a document
     /// that binds the `office` namespace to a non-conventional prefix still
     /// round-trips.
+    #[must_use]
     pub fn close_tags(&self) -> String {
         let root = qname_of(self.slice(self.root_open));
         let body = qname_of(self.slice(self.body_open));

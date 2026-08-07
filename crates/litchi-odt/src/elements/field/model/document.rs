@@ -17,8 +17,7 @@ impl Field {
         let tag = element.tag_name();
         if !Self::is_field_tag(tag) {
             return Err(Error::InvalidFormat(format!(
-                "Element {} is not a field",
-                tag
+                "Element {tag} is not a field"
             )));
         }
         Ok(Self { element })
@@ -1263,8 +1262,7 @@ impl ReferenceField {
             "text:reference-ref" | "text:bookmark-ref" | "text:sequence-ref"
         ) {
             return Err(Error::InvalidFormat(format!(
-                "Element {} is not a reference field",
-                tag
+                "Element {tag} is not a reference field"
             )));
         }
         Ok(Self { element })

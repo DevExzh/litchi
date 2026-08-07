@@ -1,8 +1,8 @@
-//! Typed OfficeArt solver-rule atoms.
+//! Typed `OfficeArt` solver-rule atoms.
 //!
 //! The owner is deliberately limited to the fixed-layout rule records defined
 //! by `[MS-ODRAW]` sections 2.2.34--2.2.36.  Known records are decoded into
-//! semantic fields, while unrecognized OfficeArt record types remain borrowed
+//! semantic fields, while unrecognized `OfficeArt` record types remain borrowed
 //! and byte-for-byte writable through [`Opaque`].
 //!
 //! The implementation is split by responsibility: [`model`] owns the typed

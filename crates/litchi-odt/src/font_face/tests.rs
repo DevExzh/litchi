@@ -45,7 +45,7 @@ fn parses_and_round_trips_complete_font_face_metadata() {
 #[test]
 fn rejects_malformed_font_face_grammar() {
     for body in [
-        r#"<o:font-face-decls><s:font-face/></o:font-face-decls>"#,
+        r"<o:font-face-decls><s:font-face/></o:font-face-decls>",
         r#"<o:font-face-decls><s:font-face s:name="A"/><s:font-face s:name="A"/></o:font-face-decls>"#,
         r#"<o:font-face-decls><s:font-face s:name="A" v:font-weight="950"/></o:font-face-decls>"#,
         r#"<o:font-face-decls><s:font-face s:name="A" v:font-size="0pt"/></o:font-face-decls>"#,
@@ -59,6 +59,6 @@ fn rejects_malformed_font_face_grammar() {
 
 #[test]
 fn rejects_misplaced_or_duplicate_containers() {
-    assert!(parse(&document(r#"<o:body><o:font-face-decls/></o:body>"#)).is_err());
-    assert!(parse(&document(r#"<o:font-face-decls/><o:font-face-decls/>"#)).is_err());
+    assert!(parse(&document(r"<o:body><o:font-face-decls/></o:body>")).is_err());
+    assert!(parse(&document(r"<o:font-face-decls/><o:font-face-decls/>")).is_err());
 }

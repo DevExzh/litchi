@@ -360,7 +360,7 @@ fn attr_value(
     attr: &quick_xml::events::attributes::Attribute<'_>,
 ) -> Result<String> {
     attr.decoded_and_normalized_value(version, reader.decoder())
-        .map(|v| v.into_owned())
+        .map(std::borrow::Cow::into_owned)
         .map_err(|e| invalid(format!("invalid XML attribute: {e}")))
 }
 fn boolean(value: &str, label: &str) -> Result<bool> {
@@ -711,7 +711,7 @@ pub fn parse_section_style_properties(xml: &[u8]) -> Result<SectionStyleProperti
             Event::Decl(declaration) => {
                 version = declaration
                     .xml_version()
-                    .map_err(|e| invalid(format!("unsupported XML version: {e}")))?
+                    .map_err(|e| invalid(format!("unsupported XML version: {e}")))?;
             },
             Event::Eof => break,
             _ => {},

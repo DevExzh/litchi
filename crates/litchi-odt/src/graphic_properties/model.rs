@@ -123,17 +123,17 @@ impl Properties {
             xml.push_str(kind.local_name());
             xml.push_str("=\"");
             xml.push_str(&escape_xml(&value.lexical()));
-            xml.push('"')
+            xml.push('"');
         }
         if self.children.is_empty() {
-            xml.push_str("/>")
+            xml.push_str("/>");
         } else {
             xml.push('>');
             for child in self.children.values() {
                 super::codec::validate_child(child.kind, &child.xml)?;
-                xml.push_str(&child.xml)
+                xml.push_str(&child.xml);
             }
-            xml.push_str("</style:graphic-properties>")
+            xml.push_str("</style:graphic-properties>");
         }
         Ok(xml)
     }
@@ -187,20 +187,20 @@ impl Style {
         };
         let mut xml = format!(r#"<style:{tag} xmlns:style="{STYLE_NS}" style:family="graphic""#);
         if let Some(value) = &self.name {
-            xml.push_str(&format!(r#" style:name="{}""#, escape_xml(value)))
+            xml.push_str(&format!(r#" style:name="{}""#, escape_xml(value)));
         }
         if let Some(value) = &self.parent_style_name {
             xml.push_str(&format!(
                 r#" style:parent-style-name="{}""#,
                 escape_xml(value)
-            ))
+            ));
         }
         if let Some(value) = &self.properties {
             xml.push('>');
             xml.push_str(&value.to_xml_fragment()?);
-            xml.push_str(&format!("</style:{tag}>"))
+            xml.push_str(&format!("</style:{tag}>"));
         } else {
-            xml.push_str("/>")
+            xml.push_str("/>");
         }
         Ok(xml)
     }

@@ -1,6 +1,6 @@
 use crate::{Error, Result};
 
-/// A lossless OfficeArt color reference.
+/// A lossless `OfficeArt` color reference.
 ///
 /// Indirect palette, scheme, and system colors retain their exact bit pattern.
 /// Call [`Self::rgb`] only when direct RGB semantics are required.
@@ -11,16 +11,19 @@ impl ColorRef {
     const FLAGS_MASK: u32 = 0xFF00_0000;
 
     /// Wraps an exact `OfficeArtCOLORREF` value.
+    #[must_use]
     pub const fn from_raw(raw: u32) -> Self {
         Self(raw)
     }
 
     /// Returns the exact value read from the wire.
+    #[must_use]
     pub const fn raw(self) -> u32 {
         self.0
     }
 
     /// Returns the high-byte flags without interpreting producer extensions.
+    #[must_use]
     pub const fn flags(self) -> u8 {
         (self.0 >> 24) as u8
     }
@@ -30,6 +33,7 @@ impl ColorRef {
     /// `OfficeArtCOLORREF` stores red in the low byte, followed by green and
     /// blue. Flagged values are palette, scheme, or system references and are
     /// deliberately not flattened here.
+    #[must_use]
     pub const fn rgb(self) -> Option<(u8, u8, u8)> {
         if self.0 & Self::FLAGS_MASK != 0 {
             return None;
@@ -100,24 +104,28 @@ impl<'data> Array<'data> {
 
     /// Returns the number of encoded elements.
     #[inline]
+    #[must_use]
     pub fn element_count(&self) -> u16 {
         u16::from_le_bytes([self.data[0], self.data[1]])
     }
 
     /// Returns the maximum number of elements the producer allocated.
     #[inline]
+    #[must_use]
     pub fn element_count_in_memory(&self) -> u16 {
         u16::from_le_bytes([self.data[2], self.data[3]])
     }
 
     /// Returns the exact unsigned `cbElem` field.
     #[inline]
+    #[must_use]
     pub fn raw_element_size(&self) -> u16 {
         u16::from_le_bytes([self.data[4], self.data[5]])
     }
 
     /// Returns the number of encoded bytes per element.
     #[inline]
+    #[must_use]
     pub fn element_size(&self) -> usize {
         match self.raw_element_size() {
             0xFFF0 => 4,
@@ -127,6 +135,7 @@ impl<'data> Array<'data> {
 
     /// Borrows one encoded element.
     #[inline]
+    #[must_use]
     pub fn get_element(&self, index: usize) -> Option<&'data [u8]> {
         if index >= usize::from(self.element_count()) {
             return None;
@@ -154,6 +163,7 @@ impl<'data> Array<'data> {
 
     /// Returns the complete encoded array, including its header.
     #[inline]
+    #[must_use]
     pub fn raw_data(&self) -> &'data [u8] {
         self.data
     }

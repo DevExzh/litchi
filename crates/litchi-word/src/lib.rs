@@ -57,6 +57,7 @@ pub struct Pos<Unit> {
 }
 
 impl<Unit> Pos<Unit> {
+    #[must_use]
     pub const fn new(offset: u64, affinity: Affinity) -> Self {
         Self {
             offset,
@@ -65,10 +66,12 @@ impl<Unit> Pos<Unit> {
         }
     }
 
+    #[must_use]
     pub const fn offset(self) -> u64 {
         self.offset
     }
 
+    #[must_use]
     pub const fn affinity(self) -> Affinity {
         self.affinity
     }
@@ -77,13 +80,11 @@ impl<Unit> Pos<Unit> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::mem::size_of;
 
     #[test]
     fn positions_keep_units_out_of_runtime_storage() {
-        assert_eq!(
-            std::mem::size_of::<Pos<Grapheme>>(),
-            std::mem::size_of::<Pos<Utf16>>()
-        );
+        assert_eq!(size_of::<Pos<Grapheme>>(), size_of::<Pos<Utf16>>());
         let pos = Pos::<Grapheme>::new(4, Affinity::After);
         assert_eq!(pos.offset(), 4);
     }

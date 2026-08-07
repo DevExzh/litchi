@@ -32,6 +32,7 @@ impl ContentType {
 
     /// Return the serialized content type.
     #[inline]
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -379,6 +380,11 @@ fn allocation(resource: &'static str, source: TryReserveError) -> OpcError {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     const NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";

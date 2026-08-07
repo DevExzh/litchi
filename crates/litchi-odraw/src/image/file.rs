@@ -1,8 +1,8 @@
-//! Move-first OfficeArt image-file discovery.
+//! Move-first `OfficeArt` image-file discovery.
 //!
 //! A [`File`] is either a zero-copy view over caller-owned bytes or an owned
-//! OfficeArt record produced by consuming a view.  The scanner understands
-//! OfficeArt framing only; DOC and PPT remain responsible for locating their
+//! `OfficeArt` record produced by consuming a view.  The scanner understands
+//! `OfficeArt` framing only; DOC and PPT remain responsible for locating their
 //! host streams, and image codecs remain in `litchi-imgconv`.
 
 use super::{Blip, Block, Context, Delay, Entry, Id, Kind, Store};
@@ -12,7 +12,7 @@ const MAX_FILES: usize = 0x0fff;
 const MAX_DEPTH: usize = 64;
 const MAX_RECORDS: u32 = 1_000_000;
 
-/// One validated OfficeArt image file.
+/// One validated `OfficeArt` image file.
 #[derive(Debug)]
 pub struct File<'data> {
     source: Source<'data>,
@@ -29,6 +29,7 @@ enum Source<'data> {
 
 impl<'data> File<'data> {
     /// Wraps an already validated BLIP without copying its file data.
+    #[must_use]
     pub fn new(blip: Blip<'data>, name: Option<String>, index: usize) -> Self {
         let kind = blip.kind();
         Self {
@@ -47,27 +48,32 @@ impl<'data> File<'data> {
         }
     }
 
-    /// Returns the native OfficeArt image kind.
+    /// Returns the native `OfficeArt` image kind.
+    #[must_use]
     pub const fn kind(&self) -> Kind {
         self.kind
     }
 
     /// Returns the conventional extension for the native image bytes.
+    #[must_use]
     pub const fn extension(&self) -> &'static str {
         self.kind.extension()
     }
 
     /// Returns the optional producer-supplied filename hint.
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
 
     /// Returns the zero-based position in the discovered image collection.
+    #[must_use]
     pub const fn index(&self) -> usize {
         self.index
     }
 
     /// Reassigns the collection position when a host builds a semantic view.
+    #[must_use]
     pub const fn with_index(mut self, index: usize) -> Self {
         self.index = index;
         self
@@ -95,14 +101,14 @@ impl<'data> File<'data> {
         }
     }
 
-    /// Consumes this view into an independently owned OfficeArt record.
+    /// Consumes this view into an independently owned `OfficeArt` record.
     pub fn into_owned(self) -> Result<File<'static>> {
         let (record, data_start) = match self.source {
             Source::Owned { record, data_start } => (record, data_start),
             Source::View(blip) => {
                 let data_len = blip.data().len();
                 let mut record = Vec::new();
-                super::write::copy(&mut record, &blip).map_err(|_| Error::MalformedImage {
+                super::write::copy(&mut record, &blip).map_err(|_err| Error::MalformedImage {
                     reason: "owned BLIP framing could not be encoded",
                 })?;
                 let data_start =
@@ -124,7 +130,7 @@ impl<'data> File<'data> {
     }
 }
 
-/// Finds the unique BStore below an OfficeArt drawing root.
+/// Finds the unique `BStore` below an `OfficeArt` drawing root.
 pub fn store(data: &[u8]) -> Result<Option<Store<'_>>> {
     let mut found = None;
     for record in Parser::new(data).records() {
@@ -143,7 +149,7 @@ pub fn store(data: &[u8]) -> Result<Option<Store<'_>>> {
     found.map(Store::from_record).transpose()
 }
 
-/// Resolves one checked semantic BStore ID against an optional delay store.
+/// Resolves one checked semantic `BStore` ID against an optional delay store.
 pub fn get<'data>(
     store: &Store<'data>,
     id: Id,
@@ -159,7 +165,7 @@ pub fn get<'data>(
     }
 }
 
-/// Resolves every semantic BStore slot in one-based ID order.
+/// Resolves every semantic `BStore` slot in one-based ID order.
 pub fn all<'data>(
     store: &Store<'data>,
     delay_store: Option<&'data [u8]>,
@@ -199,7 +205,7 @@ pub fn record_with_delay<'data>(
     })
 }
 
-/// Recursively discovers image files in an OfficeArt record sequence.
+/// Recursively discovers image files in an `OfficeArt` record sequence.
 pub fn scan(data: &[u8]) -> Result<Vec<File<'_>>> {
     let mut files = Vec::new();
     collect(data, None, &mut files)?;
@@ -209,7 +215,7 @@ pub fn scan(data: &[u8]) -> Result<Vec<File<'_>>> {
     Ok(files)
 }
 
-/// Discovers files below one already checked OfficeArt container.
+/// Discovers files below one already checked `OfficeArt` container.
 pub fn container<'data>(
     container: &Container<'data>,
     delay_store: Option<&'data [u8]>,
@@ -222,7 +228,7 @@ pub fn container<'data>(
     Ok(files)
 }
 
-/// Parses a headerless BStoreDelay sequence, such as PPT's `Pictures` stream.
+/// Parses a headerless `BStoreDelay` sequence, such as PPT's `Pictures` stream.
 pub fn delay(data: &[u8]) -> Result<Vec<File<'_>>> {
     let delay = Delay::new(data);
     let mut files = Vec::new();
@@ -296,7 +302,7 @@ fn set_store<'data>(slot: &mut Option<Record<'data>>, record: Record<'data>) -> 
 }
 
 fn entry_name(entry: &Entry<'_>) -> Result<Option<String>> {
-    entry.name().map(|name| name.to_string()).transpose()
+    entry.name().map(super::model::Name::to_string).transpose()
 }
 
 fn file_from_entry<'data>(
@@ -377,6 +383,11 @@ fn collect<'data>(
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     fn png_blip(data: &[u8]) -> Vec<u8> {

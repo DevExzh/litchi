@@ -34,7 +34,8 @@ pub(crate) fn patch(chart: &mut Chart, requests: &[Request]) -> Result<()> {
     let mut found = Vec::new();
     found
         .try_reserve_exact(requests.len())
-        .map_err(|_| Error::Allocation {
+        .ok()
+        .ok_or(Error::Allocation {
             resource: "cache patch markers",
         })?;
     found.resize(requests.len(), false);
@@ -42,7 +43,8 @@ pub(crate) fn patch(chart: &mut Chart, requests: &[Request]) -> Result<()> {
     let mut edits = Vec::new();
     edits
         .try_reserve_exact(requests.len())
-        .map_err(|_| Error::Allocation {
+        .ok()
+        .ok_or(Error::Allocation {
             resource: "physical cache patches",
         })?;
 
@@ -243,7 +245,8 @@ fn encode_replacement(
     let mut payload = Vec::new();
     payload
         .try_reserve_exact(record.payload().len())
-        .map_err(|_| Error::Allocation {
+        .ok()
+        .ok_or(Error::Allocation {
             resource: "replacement cache payload",
         })?;
     payload.extend_from_slice(record.payload());

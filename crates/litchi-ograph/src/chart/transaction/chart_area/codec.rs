@@ -34,16 +34,16 @@ pub(crate) fn locate(chart: &Chart, expected: Rect) -> Result<usize> {
         }
         let data = crate::record::payload_bytes(CHART, record.payload(), PAYLOAD_BYTES)?;
         let actual = Rect {
-            x: i32::from_le_bytes(data[0..4].try_into().map_err(|_| Error::SizeOverflow {
+            x: i32::from_le_bytes(data[0..4].try_into().ok().ok_or(Error::SizeOverflow {
                 resource: "Chart rectangle",
             })?),
-            y: i32::from_le_bytes(data[4..8].try_into().map_err(|_| Error::SizeOverflow {
+            y: i32::from_le_bytes(data[4..8].try_into().ok().ok_or(Error::SizeOverflow {
                 resource: "Chart rectangle",
             })?),
-            width: i32::from_le_bytes(data[8..12].try_into().map_err(|_| Error::SizeOverflow {
+            width: i32::from_le_bytes(data[8..12].try_into().ok().ok_or(Error::SizeOverflow {
                 resource: "Chart rectangle",
             })?),
-            height: i32::from_le_bytes(data[12..16].try_into().map_err(|_| {
+            height: i32::from_le_bytes(data[12..16].try_into().ok().ok_or({
                 Error::SizeOverflow {
                     resource: "Chart rectangle",
                 }

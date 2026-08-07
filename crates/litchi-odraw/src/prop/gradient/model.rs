@@ -2,7 +2,7 @@ use crate::prop::{Array, ColorRef};
 
 /// Maximum number of shade stops accepted by the typed decoder or encoder.
 ///
-/// The OfficeArt array count is a `u16`, but the smaller explicit ceiling keeps
+/// The `OfficeArt` array count is a `u16`, but the smaller explicit ceiling keeps
 /// a hostile property table from turning one optional visual property into an
 /// unbounded validation walk.
 pub const MAX_STOPS: usize = 4096;
@@ -19,6 +19,7 @@ impl Position {
 
     /// Creates a position when it is within the inclusive `[0.0, 1.0]` range
     /// required by `[MS-ODRAW]`.
+    #[must_use]
     pub const fn new(raw: i32) -> Option<Self> {
         if raw >= 0 && raw <= Self::END.0 {
             Some(Self(raw))
@@ -28,6 +29,7 @@ impl Position {
     }
 
     /// Returns the exact signed 16.16 wire value.
+    #[must_use]
     pub const fn raw(self) -> i32 {
         self.0
     }
@@ -42,16 +44,19 @@ pub struct Stop {
 
 impl Stop {
     /// Creates a shade stop from already checked semantic values.
+    #[must_use]
     pub const fn new(color: ColorRef, position: Position) -> Self {
         Self { color, position }
     }
 
-    /// Returns the exact OfficeArt color reference, including indirect flags.
+    /// Returns the exact `OfficeArt` color reference, including indirect flags.
+    #[must_use]
     pub const fn color(self) -> ColorRef {
         self.color
     }
 
     /// Returns the checked relative gradient position.
+    #[must_use]
     pub const fn position(self) -> Position {
         self.position
     }
@@ -69,16 +74,19 @@ impl<'data> Stops<'data> {
     }
 
     /// Returns the number of shade stops.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.array.element_count() as usize
     }
 
     /// Returns whether the array contains no shade stops.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.array.element_count() == 0
     }
 
     /// Returns one typed shade stop without copying its source array.
+    #[must_use]
     pub fn get(&self, index: usize) -> Option<Stop> {
         let element = self.array.get_element(index)?;
         let color = u32::from_le_bytes(element.get(..4)?.try_into().ok()?);
@@ -95,11 +103,13 @@ impl<'data> Stops<'data> {
     }
 
     /// Returns the exact source `IMsoArray`, including its header.
+    #[must_use]
     pub fn array(&self) -> Array<'data> {
         self.array
     }
 
     /// Returns the exact source bytes for lossless replay.
+    #[must_use]
     pub fn payload(&self) -> &'data [u8] {
         self.array.raw_data()
     }

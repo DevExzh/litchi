@@ -14,6 +14,7 @@ impl ParentId {
     pub const SECONDARY: Self = Self(1);
 
     /// Creates a checked axis-parent identifier.
+    #[must_use]
     pub const fn new(value: u8) -> Option<Self> {
         match value {
             0 => Some(Self::PRIMARY),
@@ -23,6 +24,7 @@ impl ParentId {
     }
 
     /// Raw primary-or-secondary index.
+    #[must_use]
     pub const fn get(self) -> u8 {
         self.0
     }
@@ -43,6 +45,7 @@ pub struct Parent {
 
 impl Parent {
     /// Creates a primary axis-parent collection.
+    #[must_use]
     pub const fn primary(pos: layout::Pos) -> Self {
         Self {
             id: ParentId::PRIMARY,
@@ -51,6 +54,7 @@ impl Parent {
     }
 
     /// Creates a secondary axis-parent collection.
+    #[must_use]
     pub const fn secondary(pos: layout::Pos) -> Self {
         Self {
             id: ParentId::SECONDARY,
@@ -59,16 +63,19 @@ impl Parent {
     }
 
     /// Stable primary-or-secondary identifier.
+    #[must_use]
     pub const fn id(self) -> ParentId {
         self.id
     }
 
     /// Whether this is the secondary axis group.
+    #[must_use]
     pub const fn is_secondary(self) -> bool {
         matches!(self.id, ParentId::SECONDARY)
     }
 
     /// Mandatory axis-group plot position.
+    #[must_use]
     pub const fn pos(self) -> layout::Pos {
         self.pos
     }
@@ -98,7 +105,7 @@ pub struct Scale {
     pub minor: f64,
     /// Axis crossing value.
     pub crossing: f64,
-    /// Raw ValueRange flags, including preserved producer bits.
+    /// Raw `ValueRange` flags, including preserved producer bits.
     pub flags: u16,
 }
 
@@ -137,7 +144,7 @@ pub enum LineKind {
 pub struct Line {
     /// Line role.
     pub kind: LineKind,
-    /// Required line appearance from the immediately following LineFormat.
+    /// Required line appearance from the immediately following `LineFormat`.
     pub format: format::Line,
 }
 
@@ -158,11 +165,13 @@ pub struct Axis {
 
 impl Axis {
     /// Creates an axis with no explicit scale, ticks, or lines.
+    #[must_use]
     pub const fn new(kind: Kind) -> Self {
         Self::in_parent(kind, ParentId::PRIMARY)
     }
 
     /// Creates an axis owned by a selected primary or secondary group.
+    #[must_use]
     pub const fn in_parent(kind: Kind, parent: ParentId) -> Self {
         Self {
             parent,

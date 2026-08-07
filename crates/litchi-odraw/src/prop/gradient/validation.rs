@@ -18,7 +18,7 @@ pub(super) fn validate(array: &Array<'_>) -> Result<()> {
                     reason: "gradient stop element is truncated",
                 })?
                 .try_into()
-                .map_err(|_| Error::MalformedProperties {
+                .map_err(|_err| Error::MalformedProperties {
                     reason: "gradient stop element is not eight bytes",
                 })?,
         );
@@ -27,12 +27,12 @@ pub(super) fn validate(array: &Array<'_>) -> Result<()> {
                 reason: "gradient stop position is outside the inclusive 0..1 range",
             })?
             .raw();
-        if let Some(previous) = previous {
-            if current <= previous {
-                return Err(Error::MalformedProperties {
-                    reason: "gradient stop positions are not strictly ascending",
-                });
-            }
+        if let Some(previous_position) = previous
+            && current <= previous_position
+        {
+            return Err(Error::MalformedProperties {
+                reason: "gradient stop positions are not strictly ascending",
+            });
         }
         previous = Some(current);
     }

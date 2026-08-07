@@ -1,4 +1,4 @@
-//! Inert, bounded semantic inventory of classic OpenDocument forms.
+//! Inert, bounded semantic inventory of classic `OpenDocument` forms.
 //!
 //! The owner is intentionally layered: [`model`] contains the public semantic
 //! vocabulary, [`codec`] owns bounded XML inspection, and the focused writing

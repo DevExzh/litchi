@@ -795,7 +795,7 @@ fn replace_first_columns(xml: &str, replacement: &str) -> Result<String> {
                     && is_columns
                     && element.local_name().as_ref() == b"columns" =>
             {
-                active = Some((start, 1))
+                active = Some((start, 1));
             },
             Event::Empty(ref element)
                 if active.is_none()

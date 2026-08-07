@@ -1,4 +1,4 @@
-//! Namespace-aware access to a standalone OpenDocument chart package.
+//! Namespace-aware access to a standalone `OpenDocument` chart package.
 
 use crate::{Family, Package, constants, core::PackageWriter};
 use litchi_core::{Error, Metadata, Result};
@@ -8,7 +8,7 @@ use litchi_odf_common::chart::{Element, read};
 use std::io::Read;
 use std::path::Path;
 
-/// A validated standalone OpenDocument chart or chart template.
+/// A validated standalone `OpenDocument` chart or chart template.
 pub struct Document {
     pub(crate) package: Package,
     pub(crate) chart: Element,

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::{Bounds, Flags, Kind, Native, parse, parse_with};
 use crate::write::{self, Atom, Container as OutContainer, ShapeBuilder};
 use crate::{Error, Limit, Limits, Record, RecordKind};

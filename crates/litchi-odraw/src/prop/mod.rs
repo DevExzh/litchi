@@ -1,4 +1,4 @@
-//! OfficeArt shape-property parsing (`Opt` records).
+//! `OfficeArt` shape-property parsing (`Opt` records).
 //!
 //! Properties control shape appearance: position, size, colors, rotation, etc.
 //! Based on MS-ODRAW specification section 2.3.

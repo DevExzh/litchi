@@ -16,7 +16,7 @@ impl crate::Package {
 }
 
 impl crate::FlatDocument {
-    /// Parse inert master-page metadata from a flat OpenDocument.
+    /// Parse inert master-page metadata from a flat `OpenDocument`.
     pub fn master_pages(&self) -> Result<Vec<Master>> {
         litchi_odf_common::style::master::reader::read(self.xml())
     }

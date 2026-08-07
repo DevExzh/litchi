@@ -1,3 +1,8 @@
+#![allow(
+    clippy::unwrap_used,
+    reason = "test code panics on failure; unwrap keeps assertions concise"
+)]
+
 use litchi_odi::{Builder, Image, frame::Frame, source::Source};
 
 #[test]

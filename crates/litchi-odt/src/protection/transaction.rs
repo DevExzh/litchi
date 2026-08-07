@@ -21,7 +21,7 @@ impl Transaction {
         Self::new(source.as_ref(), Kind::Package)
     }
 
-    /// Start an edit against a flat OpenDocument XML source.
+    /// Start an edit against a flat `OpenDocument` XML source.
     pub(crate) fn flat(source: impl AsRef<[u8]>) -> Result<Self> {
         Self::new(source.as_ref(), Kind::Flat)
     }

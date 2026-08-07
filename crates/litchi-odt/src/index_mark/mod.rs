@@ -1,4 +1,4 @@
-//! Layered semantic owner for OpenDocument index source marks.
+//! Layered semantic owner for `OpenDocument` index source marks.
 //!
 //! The facade keeps the public mark vocabulary and mutation entry points stable;
 //! parsing, semantic values, package edits, and regression tests live in their

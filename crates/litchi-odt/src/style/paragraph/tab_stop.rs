@@ -790,7 +790,7 @@ fn zero(value: &str) -> bool {
     value.bytes().all(|b| matches!(b, b'0' | b'.'))
 }
 fn validate_text(value: &str, name: &str) -> Result<()> {
-    if value.is_empty() || value.len() > MAX_VALUE_BYTES || value.chars().any(|c| c.is_control()) {
+    if value.is_empty() || value.len() > MAX_VALUE_BYTES || value.chars().any(char::is_control) {
         return invalid(format!("invalid {name}"));
     }
     Ok(())

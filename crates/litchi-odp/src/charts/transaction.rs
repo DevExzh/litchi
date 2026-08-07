@@ -42,6 +42,7 @@ impl<'source> Inventory<'source> {
     }
 
     /// Iterate chart occurrences in source order.
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &Chart> {
         self.charts.iter()
     }
@@ -66,6 +67,7 @@ impl<'source> Inventory<'source> {
     }
 
     /// Start an isolated clone-staged transaction.
+    #[must_use]
     pub fn transaction(&self) -> Transaction<'source> {
         Transaction {
             source: self.source,
@@ -88,6 +90,7 @@ pub struct Transaction<'source> {
 
 impl<'source> Transaction<'source> {
     /// Borrow the current staged chart values.
+    #[must_use]
     pub fn charts(&self) -> &[Chart] {
         &self.draft
     }
@@ -143,8 +146,9 @@ pub struct Editor<'transaction, 'source> {
     transaction: &'transaction mut Transaction<'source>,
 }
 
-impl<'transaction, 'source> Editor<'transaction, 'source> {
+impl Editor<'_, '_> {
     /// Borrow the current staged chart values.
+    #[must_use]
     pub fn charts(&self) -> &[Chart] {
         self.transaction.charts()
     }
@@ -273,11 +277,13 @@ impl Commit<'_> {
 
 impl<'source> Commit<'source> {
     /// Consume the commit while retaining a borrow for an unchanged result.
+    #[must_use]
     pub fn into_bytes(self) -> Cow<'source, [u8]> {
         self.bytes
     }
 
     /// Consume the commit into owned package bytes.
+    #[must_use]
     pub fn into_owned_bytes(self) -> Vec<u8> {
         self.bytes.into_owned()
     }

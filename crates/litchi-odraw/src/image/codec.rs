@@ -1,4 +1,4 @@
-//! OfficeArt image wire decoding and lazy record traversal.
+//! `OfficeArt` image wire decoding and lazy record traversal.
 
 use super::model::{
     Bitmap, Blip, Block, Compression, Context, Delay, DelayBlocks, Embedded, Entry, Kind, Limits,
@@ -28,12 +28,12 @@ impl<'data> Blip<'data> {
         Self::from_record_with(record, limits)
     }
 
-    /// Parses a previously checked OfficeArt record.
+    /// Parses a previously checked `OfficeArt` record.
     pub fn from_record(record: Record<'data>) -> Result<Self> {
         Self::from_record_with(record, Limits::default())
     }
 
-    /// Parses a previously checked OfficeArt record under explicit limits.
+    /// Parses a previously checked `OfficeArt` record under explicit limits.
     pub fn from_record_with(record: Record<'data>, limits: Limits) -> Result<Self> {
         if record.len() > limits.max_blip_bytes {
             return Err(Error::ImageLimitExceeded {
@@ -100,9 +100,10 @@ impl<'data> Blip<'data> {
                 }
                 offset = end;
                 let data = &body[offset..];
-                let actual = u64::try_from(data.len()).map_err(|_| Error::ArithmeticOverflow {
-                    context: "metafile BLIP data length",
-                })?;
+                let actual =
+                    u64::try_from(data.len()).map_err(|_err| Error::ArithmeticOverflow {
+                        context: "metafile BLIP data length",
+                    })?;
                 if u64::from(saved) != actual {
                     return Err(Error::ImageSizeMismatch {
                         field: "cbSave",
@@ -235,7 +236,7 @@ impl<'data> Entry<'data> {
                 reason: "FBSE record version is not two",
             });
         }
-        let instance = u8::try_from(record.instance()).map_err(|_| Error::MalformedImage {
+        let instance = u8::try_from(record.instance()).map_err(|_err| Error::MalformedImage {
             reason: "FBSE instance is not an MSOBLIPTYPE value",
         })?;
         let body = record.data();
@@ -295,7 +296,7 @@ impl<'data> Entry<'data> {
         };
         let embedded = &body[name_end..];
         let embedded_len =
-            u64::try_from(embedded.len()).map_err(|_| Error::ArithmeticOverflow {
+            u64::try_from(embedded.len()).map_err(|_err| Error::ArithmeticOverflow {
                 context: "embedded BLIP byte length",
             })?;
         if !embedded.is_empty() && u64::from(size) != embedded_len {
@@ -339,6 +340,7 @@ impl<'data> Entry<'data> {
 
 impl<'data> Entry<'data> {
     /// Iterates all embedded BLIPs without allocating.
+    #[must_use]
     pub fn embedded(&self) -> Embedded<'data> {
         Embedded {
             records: crate::Children::new(self.embedded),
@@ -359,7 +361,7 @@ impl<'data> Iterator for Embedded<'data> {
 
 impl std::iter::FusedIterator for Embedded<'_> {}
 
-pub(super) fn block<'data>(record: Record<'data>, limits: Limits) -> Result<Block<'data>> {
+pub(super) fn block(record: Record<'_>, limits: Limits) -> Result<Block<'_>> {
     if record.kind() == RecordKind::Bse {
         Entry::parse_with(record, limits).map(Block::Entry)
     } else if record.kind().is_blip() {
@@ -372,12 +374,12 @@ pub(super) fn block<'data>(record: Record<'data>, limits: Limits) -> Result<Bloc
 }
 
 impl<'data> Store<'data> {
-    /// Parses exactly one BStore container.
+    /// Parses exactly one `BStore` container.
     pub fn parse(data: &'data [u8]) -> Result<Self> {
         Self::parse_with(data, Limits::default())
     }
 
-    /// Parses exactly one BStore container under explicit limits.
+    /// Parses exactly one `BStore` container under explicit limits.
     pub fn parse_with(data: &'data [u8], limits: Limits) -> Result<Self> {
         let (record, consumed) = Record::parse(data, 0)?;
         if consumed != data.len() {
@@ -387,16 +389,19 @@ impl<'data> Store<'data> {
     }
 
     /// Returns the number declared by the container header.
+    #[must_use]
     pub const fn len(&self) -> u16 {
         self.count
     }
 
     /// Returns whether the store is empty.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.count == 0
     }
 
     /// Iterates file blocks lazily and validates the exact declared count.
+    #[must_use]
     pub fn iter(&self) -> super::model::Blocks<'data> {
         super::model::Blocks {
             records: crate::Children::new(self.record.data()),
@@ -435,7 +440,8 @@ impl<'data> Store<'data> {
         }
     }
 
-    /// Returns the underlying BStore record.
+    /// Returns the underlying `BStore` record.
+    #[must_use]
     pub const fn record(&self) -> &Record<'data> {
         &self.record
     }
@@ -481,6 +487,7 @@ impl std::iter::FusedIterator for super::model::Blocks<'_> {}
 
 impl<'data> Delay<'data> {
     /// Borrows a delay-store byte sequence.
+    #[must_use]
     pub const fn new(data: &'data [u8]) -> Self {
         Self::with_limits(
             data,
@@ -492,11 +499,13 @@ impl<'data> Delay<'data> {
     }
 
     /// Borrows a delay store under explicit image limits.
+    #[must_use]
     pub const fn with_limits(data: &'data [u8], limits: Limits) -> Self {
         Self { data, limits }
     }
 
     /// Iterates every file block in order.
+    #[must_use]
     pub fn iter(self) -> DelayBlocks<'data> {
         DelayBlocks {
             records: crate::Children::new(self.data),
@@ -508,10 +517,11 @@ impl<'data> Delay<'data> {
 
     /// Parses the file block beginning at an exact delay offset.
     pub fn at(self, offset: Offset) -> Result<Block<'data>> {
-        let start = usize::try_from(offset.get()).map_err(|_| Error::DelayOffsetOutOfBounds {
-            offset: offset.get(),
-            available: self.data.len(),
-        })?;
+        let start =
+            usize::try_from(offset.get()).map_err(|_err| Error::DelayOffsetOutOfBounds {
+                offset: offset.get(),
+                available: self.data.len(),
+            })?;
         if start >= self.data.len() {
             return Err(Error::DelayOffsetOutOfBounds {
                 offset: offset.get(),
@@ -523,6 +533,7 @@ impl<'data> Delay<'data> {
     }
 
     /// Returns the borrowed delay-store bytes.
+    #[must_use]
     pub const fn as_bytes(self) -> &'data [u8] {
         self.data
     }

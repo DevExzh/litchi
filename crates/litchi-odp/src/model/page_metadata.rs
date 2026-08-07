@@ -40,6 +40,7 @@ pub struct Page {
 
 impl Page {
     /// Create empty metadata for a zero-based slide index.
+    #[must_use]
     pub fn new(slide_index: usize) -> Self {
         Self {
             slide_index,
@@ -113,11 +114,13 @@ impl Collection {
     }
 
     /// Return pages in slide order.
+    #[must_use]
     pub fn pages(&self) -> &[Page] {
         &self.pages
     }
 
     /// Return metadata for a zero-based slide index.
+    #[must_use]
     pub fn page(&self, slide_index: usize) -> Option<&Page> {
         self.pages
             .binary_search_by_key(&slide_index, |value| value.slide_index)
@@ -167,6 +170,7 @@ impl Collection {
     }
 
     /// Return whether no page metadata is retained.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.pages.is_empty()
     }

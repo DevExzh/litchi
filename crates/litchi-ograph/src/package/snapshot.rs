@@ -58,16 +58,19 @@ impl Snapshot {
     }
 
     /// Exact compound-file source bytes.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Validated root-stream topology captured from the source.
+    #[must_use]
     pub const fn topology(&self) -> Topology {
         self.topology
     }
 
     /// Resource limits retained for projections and subsequent edits.
+    #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
     }
@@ -88,6 +91,7 @@ impl Snapshot {
     }
 
     /// Recovers the owned source bytes.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.bytes.to_vec()
     }

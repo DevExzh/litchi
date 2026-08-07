@@ -277,9 +277,11 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 }
                 if depth == 1 {
                     let parent_count =
-                        u16::try_from(chart.parents.len()).map_err(|_| Error::SizeOverflow {
-                            resource: "axis-parent count",
-                        })?;
+                        u16::try_from(chart.parents.len())
+                            .ok()
+                            .ok_or(Error::SizeOverflow {
+                                resource: "axis-parent count",
+                            })?;
                     if strict_excel
                         && (!zoom_seen
                             || !growth_seen
@@ -427,7 +429,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     reason: "SerToCrt appears outside a Series collection",
                 })?;
                 let raw = u16_at(data, 0, record)?;
-                let raw = u8::try_from(raw).map_err(|_| Error::InvalidChart {
+                let raw = u8::try_from(raw).ok().ok_or(Error::InvalidChart {
                     offset: record.offset(),
                     reason: "series chart-group index exceeds nine",
                 })?;
@@ -452,13 +454,12 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                         "SerParent is duplicated or outside a Series owner branch",
                     );
                 }
-                series_parent =
-                    Some(crate::record::series::Parent::parse(record).map_err(|_| {
-                        Error::InvalidChart {
-                            offset: record.offset(),
-                            reason: "SerParent series index is outside 1 through 254",
-                        }
-                    })?);
+                series_parent = Some(crate::record::series::Parent::parse(record).ok().ok_or({
+                    Error::InvalidChart {
+                        offset: record.offset(),
+                        reason: "SerParent series index is outside 1 through 254",
+                    }
+                })?);
             },
             SER_AUX_TREND | SER_AUX_ERR_BAR => {
                 if series_depth != Some(depth) || series_owner_seen {
@@ -475,7 +476,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     exact(record, 28)?;
                     Owner::Trend {
                         parent,
-                        data: data.try_into().map_err(|_| Error::InvalidChart {
+                        data: data.try_into().ok().ok_or(Error::InvalidChart {
                             offset: record.offset(),
                             reason: "SerAuxTrend payload is not 28 bytes",
                         })?,
@@ -484,7 +485,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     exact(record, 14)?;
                     Owner::ErrorBar {
                         parent,
-                        data: data.try_into().map_err(|_| Error::InvalidChart {
+                        data: data.try_into().ok().ok_or(Error::InvalidChart {
                             offset: record.offset(),
                             reason: "SerAuxErrBar payload is not 14 bytes",
                         })?,
@@ -516,7 +517,8 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                         .ai
                         .get_mut(role)
                         .set_text(text)
-                        .map_err(|_| Error::InvalidChart {
+                        .ok()
+                        .ok_or(Error::InvalidChart {
                             offset: record.offset(),
                             reason: "one AI has more than one SeriesText",
                         })?;
@@ -542,7 +544,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 }
                 check_add(chart.groups.len(), limits.max_groups, "group count")?;
                 let raw = u16_at(data, 18, record)?;
-                let raw = u8::try_from(raw).map_err(|_| Error::InvalidChart {
+                let raw = u8::try_from(raw).ok().ok_or(Error::InvalidChart {
                     offset: record.offset(),
                     reason: "chart-group order exceeds nine",
                 })?;
@@ -601,7 +603,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                         "CrtLink is missing, duplicated, or outside ChartFormat",
                     );
                 }
-                let link = crate::record::line::Link::from_payload(data).map_err(|_| {
+                let link = crate::record::line::Link::from_payload(data).ok().ok_or({
                     Error::InvalidChart {
                         offset: record.offset(),
                         reason: "CrtLink payload is not ten bytes",
@@ -621,7 +623,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 if group_depth != Some(depth) {
                     return invalid(record, "CrtLine appears outside ChartFormat");
                 }
-                let value = crate::record::line::Line::from_payload(data).map_err(|_| {
+                let value = crate::record::line::Line::from_payload(data).ok().ok_or({
                     Error::InvalidChart {
                         offset: record.offset(),
                         reason: "CrtLine kind or payload is invalid",
@@ -1018,7 +1020,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                             return invalid(record, "Graph Dimensions reserved fields are nonzero");
                         }
                         let longest =
-                            RowCol::new(u16::try_from(u32_at(data, 4, record)?).map_err(|_| {
+                            RowCol::new(u16::try_from(u32_at(data, 4, record)?).ok().ok_or({
                                 Error::InvalidChart {
                                     offset: record.offset(),
                                     reason: "Graph Dimensions longest row exceeds u16",
@@ -1028,7 +1030,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                                 offset: record.offset(),
                                 reason: "Graph Dimensions longest row exceeds 3,999",
                             })?;
-                        let rows = u8::try_from(u16_at(data, 10, record)?).map_err(|_| {
+                        let rows = u8::try_from(u16_at(data, 10, record)?).ok().ok_or({
                             Error::InvalidChart {
                                 offset: record.offset(),
                                 reason: "Graph Dimensions row count exceeds 255",
@@ -1280,9 +1282,11 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
     if (strict_excel || axes_used.is_some())
         && axes_used
             != Some(
-                u16::try_from(chart.parents.len()).map_err(|_| Error::SizeOverflow {
-                    resource: "axis-parent count",
-                })?,
+                u16::try_from(chart.parents.len())
+                    .ok()
+                    .ok_or(Error::SizeOverflow {
+                        resource: "axis-parent count",
+                    })?,
             )
     {
         return Err(Error::InvalidChart {

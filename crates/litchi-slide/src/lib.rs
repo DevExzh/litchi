@@ -44,10 +44,11 @@ pub type SlideSelector<'a, Id> = Selector<'a, Id>;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::mem::size_of;
 
     #[test]
     fn semantic_layout_roles_are_small_values() {
-        assert_eq!(std::mem::size_of::<LayoutRole>(), 1);
+        assert_eq!(size_of::<LayoutRole>(), 1);
         assert_ne!(LayoutRole::Blank, LayoutRole::TitleAndContent);
     }
 }

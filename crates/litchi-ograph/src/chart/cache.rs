@@ -36,11 +36,13 @@ pub struct Xf(u16);
 
 impl Xf {
     /// Preserves one Excel XF index.
+    #[must_use]
     pub const fn new(value: u16) -> Self {
         Self(value)
     }
 
     /// Raw BIFF XF index.
+    #[must_use]
     pub const fn get(self) -> u16 {
         self.0
     }
@@ -52,12 +54,14 @@ impl Xf {
 pub struct Ifmt(u16);
 
 impl Ifmt {
-    /// Preserves one Graph IFmt index.
+    /// Preserves one Graph `IFmt` index.
+    #[must_use]
     pub const fn new(value: u16) -> Self {
         Self(value)
     }
 
-    /// Raw Graph IFmt index.
+    /// Raw Graph `IFmt` index.
+    #[must_use]
     pub const fn get(self) -> u16 {
         self.0
     }
@@ -113,6 +117,7 @@ pub struct ExcelDims {
 impl ExcelDims {
     /// Creates checked BIFF8 used-range bounds. Zero `row_after`/`col_after`
     /// denotes an empty cache.
+    #[must_use]
     pub const fn new(
         first_row: u32,
         row_after: u32,
@@ -140,21 +145,25 @@ impl ExcelDims {
     }
 
     /// First used row.
+    #[must_use]
     pub const fn first_row(self) -> u32 {
         self.first_row
     }
 
     /// Row immediately after the used range.
+    #[must_use]
     pub const fn row_after(self) -> u32 {
         self.row_after
     }
 
     /// First used column.
+    #[must_use]
     pub const fn first_col(self) -> u16 {
         self.first_col
     }
 
     /// Column immediately after the used range.
+    #[must_use]
     pub const fn col_after(self) -> u16 {
         self.col_after
     }
@@ -170,6 +179,7 @@ pub struct GraphDims {
 impl GraphDims {
     /// Creates dimensions from the longest non-empty row width and the number
     /// of non-empty rows.
+    #[must_use]
     pub const fn new(longest_row: RowCol, rows: u8) -> Option<Self> {
         if (longest_row.get() == 0) != (rows == 0) {
             return None;
@@ -178,11 +188,13 @@ impl GraphDims {
     }
 
     /// Number of non-empty cells in the longest row.
+    #[must_use]
     pub const fn longest_row(self) -> RowCol {
         self.longest_row
     }
 
     /// Number of non-empty rows.
+    #[must_use]
     pub const fn rows(self) -> u8 {
         self.rows
     }
@@ -214,6 +226,7 @@ impl Dims {
     }
 
     /// Whether these dimensions belong to the requested producer grammar.
+    #[must_use]
     pub const fn matches(self, kind: Kind) -> bool {
         matches!(
             (self, kind),
@@ -224,6 +237,11 @@ impl Dims {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
     use super::*;
 
     #[test]

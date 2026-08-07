@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use super::{MAX_STOPS, Position, Stop, encode, parse_payload};
 use crate::prop::{ColorRef, Id, Props};
 use crate::{Error, Record, RecordKind};

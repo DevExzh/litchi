@@ -35,13 +35,15 @@ const MAX_ATTRIBUTES: usize = 64;
 fn owned_attribute(namespace: Ns, local: &[u8]) -> bool {
     matches!(
         (namespace, local),
-        (Ns::Fo, b"margin")
-            | (Ns::Fo, b"margin-left")
-            | (Ns::Fo, b"margin-right")
-            | (Ns::Fo, b"margin-top")
-            | (Ns::Fo, b"margin-bottom")
-            | (Ns::Fo, b"text-indent")
-            | (Ns::Style, b"contextual-spacing")
+        (
+            Ns::Fo,
+            b"margin"
+                | b"margin-left"
+                | b"margin-right"
+                | b"margin-top"
+                | b"margin-bottom"
+                | b"text-indent"
+        ) | (Ns::Style, b"contextual-spacing")
     )
 }
 
@@ -329,7 +331,7 @@ fn attribute_value(
 ) -> Result<String> {
     attribute
         .decoded_and_normalized_value(version, reader.decoder())
-        .map(|value| value.into_owned())
+        .map(std::borrow::Cow::into_owned)
         .map_err(|error| bad(format!("invalid attribute value: {error}")))
 }
 
@@ -549,7 +551,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     .xml_version()
                     .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,
@@ -842,7 +844,7 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                     .xml_version()
                     .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,

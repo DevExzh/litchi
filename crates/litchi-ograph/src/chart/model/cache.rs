@@ -80,6 +80,7 @@ impl Cache {
     }
 
     /// Creates a standalone Graph cache cell.
+    #[must_use]
     pub const fn graph(row: RowCol, col: RowCol, ifmt: chart_cache::Ifmt, value: Value) -> Self {
         Self::Graph {
             row,
@@ -90,6 +91,7 @@ impl Cache {
     }
 
     /// Producer grammar owned by this cell.
+    #[must_use]
     pub const fn kind(&self) -> Kind {
         match self {
             Self::Excel { .. } => Kind::Excel,
@@ -98,6 +100,7 @@ impl Cache {
     }
 
     /// Cached value.
+    #[must_use]
     pub fn value(&self) -> ValueRef<'_> {
         match self {
             Self::Excel { value, .. } => match value {

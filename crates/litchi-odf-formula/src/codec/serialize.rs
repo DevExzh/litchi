@@ -1,9 +1,9 @@
-//! MathML tree serialization back to well-formed XML.
+//! `MathML` tree serialization back to well-formed XML.
 //!
 //! The parser expands namespace prefixes and discards `xmlns` declarations,
 //! so serialization reconstructs a self-contained document: MathML-namespace
 //! elements use the default namespace declared on the subtree root, while
-//! foreign namespaces (vendor extensions, content MathML inside
+//! foreign namespaces (vendor extensions, content `MathML` inside
 //! `annotation-xml`) receive generated `ns1..nsN` prefixes in first-use
 //! order.
 //!
@@ -15,20 +15,6 @@
 
 use crate::model::{Content, Element, MATHML_NAMESPACE};
 use std::collections::HashMap;
-use std::fmt::Write as _;
-
-/// Serialize a MathML subtree to a well-formed, self-contained XML string.
-pub fn serialize(root: &Element) -> String {
-    write_mathml(root)
-}
-
-pub(crate) fn write_mathml(root: &Element) -> String {
-    let mut namespaces = NamespaceMap::default();
-    namespaces.collect(root);
-    let mut output = String::new();
-    write_element(root, true, &namespaces, &mut output);
-    output
-}
 
 /// Generated prefixes for foreign namespaces, in first-use document order.
 #[derive(Default)]
@@ -72,23 +58,43 @@ impl NamespaceMap {
     }
 }
 
+/// Serialize a `MathML` subtree to a well-formed, self-contained XML string.
+#[must_use]
+pub fn serialize(root: &Element) -> String {
+    write_mathml(root)
+}
+
+pub(crate) fn write_mathml(root: &Element) -> String {
+    let mut namespaces = NamespaceMap::default();
+    namespaces.collect(root);
+    let mut output = String::new();
+    write_element(root, true, &namespaces, &mut output);
+    output
+}
+
 fn write_element(element: &Element, root: bool, namespaces: &NamespaceMap, output: &mut String) {
     let name = namespaces.qualify(element.namespace_uri(), element.local_name());
     output.push('<');
     output.push_str(&name);
     if root {
         if element.namespace_uri() == Some(MATHML_NAMESPACE) {
-            let _ = write!(output, " xmlns=\"{MATHML_NAMESPACE}\"");
+            output.push_str(" xmlns=\"");
+            output.push_str(MATHML_NAMESPACE);
+            output.push('"');
         }
         for (uri, prefix) in &namespaces.prefixes {
-            let _ = write!(output, " xmlns:{prefix}=\"");
+            output.push_str(" xmlns:");
+            output.push_str(prefix);
+            output.push_str("=\"");
             escape_attribute(uri, output);
             output.push('"');
         }
     }
     for attribute in element.attributes() {
-        let name = namespaces.qualify(attribute.namespace_uri(), attribute.local_name());
-        let _ = write!(output, " {name}=\"");
+        let attribute_name = namespaces.qualify(attribute.namespace_uri(), attribute.local_name());
+        output.push(' ');
+        output.push_str(&attribute_name);
+        output.push_str("=\"");
         escape_attribute(attribute.value(), output);
         output.push('"');
     }

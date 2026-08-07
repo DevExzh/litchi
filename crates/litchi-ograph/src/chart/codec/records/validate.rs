@@ -132,10 +132,12 @@ pub(super) fn validate(chart: &Chart, limits: Limits, require_topology: bool) ->
                             field: "series",
                             reason: "auxiliary parent is not a one-based series index",
                         })?;
-                let zero_based = usize::try_from(zero_based).map_err(|_| Error::InvalidModel {
-                    field: "series",
-                    reason: "auxiliary parent index exceeds this platform",
-                })?;
+                let zero_based = usize::try_from(zero_based)
+                    .ok()
+                    .ok_or(Error::InvalidModel {
+                        field: "series",
+                        reason: "auxiliary parent index exceeds this platform",
+                    })?;
                 if chart
                     .series
                     .get(zero_based)

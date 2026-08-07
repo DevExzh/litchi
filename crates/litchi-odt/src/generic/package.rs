@@ -50,25 +50,25 @@ impl Package {
         Ok(())
     }
 
-    /// Open and validate a packaged OpenDocument file.
+    /// Open and validate a packaged `OpenDocument` file.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let file = std::fs::File::open(path)?;
         Self::from_reader(file)
     }
 
-    /// Open and validate a password-encrypted packaged OpenDocument file.
+    /// Open and validate a password-encrypted packaged `OpenDocument` file.
     pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
         let file = std::fs::File::open(path)?;
         Self::from_reader_with_password(file, password)
     }
 
-    /// Read and validate a packaged OpenDocument file.
+    /// Read and validate a packaged `OpenDocument` file.
     pub fn from_reader(reader: impl Read) -> Result<Self> {
         let package = OwnedPackage::from_reader(reader)?;
         Self::from_owned(package)
     }
 
-    /// Read and validate a password-encrypted packaged OpenDocument file.
+    /// Read and validate a password-encrypted packaged `OpenDocument` file.
     pub fn from_reader_with_password(
         reader: impl Read,
         password: impl Into<String>,
@@ -76,13 +76,13 @@ impl Package {
         Self::from_owned(OwnedPackage::from_reader_with_password(reader, password)?)
     }
 
-    /// Validate a packaged OpenDocument file from owned bytes.
+    /// Validate a packaged `OpenDocument` file from owned bytes.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let package = OwnedPackage::from_bytes(bytes)?;
         Self::from_owned(package)
     }
 
-    /// Validate password-encrypted packaged OpenDocument bytes.
+    /// Validate password-encrypted packaged `OpenDocument` bytes.
     pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
         Self::from_owned(OwnedPackage::from_bytes_with_password(bytes, password)?)
     }

@@ -87,7 +87,7 @@ fn double(value: &str) -> bool {
     let (mut base, mut exponent) = (value, None);
     if let Some(index) = value.find(['e', 'E']) {
         base = &value[..index];
-        exponent = Some(&value[index + 1..])
+        exponent = Some(&value[index + 1..]);
     }
     decimal(base, false) && exponent.is_none_or(integer)
 }
@@ -300,10 +300,10 @@ impl StyleProperties {
             },
         }
         if let Some(image) = &self.symbol_image {
-            image.validate()?
+            image.validate()?;
         }
         if let Some(label) = &self.label_separator {
-            super::codec::validate_paragraph(label.paragraph_xml())?
+            super::codec::validate_paragraph(label.paragraph_xml())?;
         }
         Ok(())
     }
@@ -345,10 +345,10 @@ impl StyleRecord {
             if self.is_default_style {
                 return Err(bad("default chart style cannot have a parent"));
             }
-            ncname(value, "parent chart style name")?
+            ncname(value, "parent chart style name")?;
         }
         if let Some(value) = &self.properties {
-            value.validate()?
+            value.validate()?;
         }
         Ok(())
     }

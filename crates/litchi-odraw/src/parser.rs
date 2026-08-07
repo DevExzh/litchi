@@ -1,20 +1,22 @@
-//! Concise entry point for checked OfficeArt record traversal.
+//! Concise entry point for checked `OfficeArt` record traversal.
 
 use crate::{Children, Container, Record, RecordKind, Result};
 
-/// A zero-copy parser over one OfficeArt drawing stream.
+/// A zero-copy parser over one `OfficeArt` drawing stream.
 #[derive(Debug, Clone, Copy)]
 pub struct Parser<'data> {
     data: &'data [u8],
 }
 
 impl<'data> Parser<'data> {
-    /// Borrows an OfficeArt drawing stream.
+    /// Borrows an `OfficeArt` drawing stream.
+    #[must_use]
     pub const fn new(data: &'data [u8]) -> Self {
         Self { data }
     }
 
     /// Returns the original drawing bytes.
+    #[must_use]
     pub const fn data(&self) -> &'data [u8] {
         self.data
     }
@@ -23,6 +25,13 @@ impl<'data> Parser<'data> {
     ///
     /// An empty stream or a valid leading atom yields `Ok(None)`; malformed data
     /// yields `Err` so absence is never conflated with corruption.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error from `Record::parse` if the leading record is malformed
+    /// (`Error::TruncatedHeader`, `Error::TruncatedPayload`, or
+    /// `Error::ArithmeticOverflow`), or `Error::TrailingData` if bytes follow
+    /// the first top-level record.
     pub fn root(&self) -> Result<Option<Container<'data>>> {
         if self.data.is_empty() {
             return Ok(None);
@@ -39,11 +48,18 @@ impl<'data> Parser<'data> {
     }
 
     /// Lazily parses the top-level record sequence.
+    #[must_use]
     pub const fn records(&self) -> Children<'data> {
         Children::new(self.data)
     }
 
     /// Collects every shape container below the root container.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error from `Parser::root` if the stream is malformed, or from
+    /// `Container::find_recursive` if a descendant record is malformed or the
+    /// default traversal limits are exceeded.
     pub fn shapes(&self) -> Result<Vec<Record<'data>>> {
         match self.root()? {
             Some(root) => root.find_recursive(RecordKind::SpContainer),
@@ -52,6 +68,12 @@ impl<'data> Parser<'data> {
     }
 
     /// Collects every client-textbox record below the root container.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error from `Parser::root` if the stream is malformed, or from
+    /// `Container::find_recursive` if a descendant record is malformed or the
+    /// default traversal limits are exceeded.
     pub fn textboxes(&self) -> Result<Vec<Record<'data>>> {
         match self.root()? {
             Some(root) => root.find_recursive(RecordKind::ClientTextbox),
@@ -68,6 +90,11 @@ impl<'data> From<&'data [u8]> for Parser<'data> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]

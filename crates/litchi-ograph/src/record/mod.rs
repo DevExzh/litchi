@@ -1,4 +1,4 @@
-//! Small typed codecs for host-neutral OGraph records.
+//! Small typed codecs for host-neutral `OGraph` records.
 //!
 //! Module context keeps public names short: for example,
 //! [`chart3d::BarShape`] instead of `Chart3dBarShape`.
@@ -13,7 +13,7 @@ pub mod series;
 use crate::{Error, Result};
 use litchi_biff::{Kind, RecordRef};
 
-pub(crate) fn payload<'a>(record: RecordRef<'a>, expected: Kind, len: usize) -> Result<&'a [u8]> {
+pub(crate) fn payload(record: RecordRef<'_>, expected: Kind, len: usize) -> Result<&[u8]> {
     if record.kind() != expected {
         return Err(Error::WrongRecord {
             expected: expected.get(),

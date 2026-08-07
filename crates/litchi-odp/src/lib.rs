@@ -1,4 +1,4 @@
-//! OpenDocument Presentation (`.odp`) support.
+//! `OpenDocument` Presentation (`.odp`) support.
 //!
 //! The crate is organized by responsibility: semantic value types live in
 //! [`model`], XML parsing in [`codec`], package access in [`package`], document

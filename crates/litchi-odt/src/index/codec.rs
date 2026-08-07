@@ -1,4 +1,4 @@
-//! XML codec for generated OpenDocument text indexes.
+//! XML codec for generated `OpenDocument` text indexes.
 
 use super::model::{
     TextIndex, TextIndexAttribute, TextIndexContent, TextIndexElement, TextIndexKind,

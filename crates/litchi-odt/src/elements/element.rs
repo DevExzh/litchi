@@ -56,7 +56,7 @@ pub trait ElementBase {
 
     /// Get attribute value by name
     fn get_attribute(&self, name: &str) -> Option<&str> {
-        self.attributes().get(name).map(|s| s.as_str())
+        self.attributes().get(name).map(String::as_str)
     }
 
     /// Set attribute value
@@ -295,7 +295,7 @@ impl Element {
                     }
                 },
                 Ok(Event::Eof) => break,
-                Err(e) => return Err(Error::InvalidFormat(format!("XML parsing error: {}", e))),
+                Err(e) => return Err(Error::InvalidFormat(format!("XML parsing error: {e}"))),
                 _ => {},
             }
             buf.clear();

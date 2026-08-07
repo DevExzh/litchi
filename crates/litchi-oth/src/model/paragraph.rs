@@ -11,6 +11,8 @@ impl Paragraph {
         Self { text: text.into() }
     }
 
+    /// Returns the paragraph text.
+    #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }

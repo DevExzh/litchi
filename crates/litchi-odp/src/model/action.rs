@@ -134,6 +134,7 @@ impl Action {
     }
 
     /// Return every schema-defined action value.
+    #[must_use]
     pub fn supported_values() -> &'static [&'static str] {
         PRESENTATION_ACTIONS
     }
@@ -155,11 +156,13 @@ impl Effect {
     }
 
     /// Return the ODF lexical value.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     /// Return every schema-defined value.
+    #[must_use]
     pub fn supported_values() -> &'static [&'static str] {
         PRESENTATION_EFFECTS
     }
@@ -181,11 +184,13 @@ impl EffectDirection {
     }
 
     /// Return the ODF lexical value.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     /// Return every schema-defined value.
+    #[must_use]
     pub fn supported_values() -> &'static [&'static str] {
         PRESENTATION_DIRECTIONS
     }
@@ -200,7 +205,7 @@ pub struct EventListener {
     pub direction: Option<EffectDirection>,
     pub speed: Option<Speed>,
     pub start_scale: Option<String>,
-    /// Optional action target. Its serialized XLink type is always `simple`.
+    /// Optional action target. Its serialized `XLink` type is always `simple`.
     pub href: Option<String>,
     pub show_embed: bool,
     pub actuate_on_request: bool,
@@ -362,7 +367,7 @@ pub struct DrawingHyperlink {
 }
 
 impl DrawingHyperlink {
-    /// Create a hyperlink. The serialized XLink type is always `simple`.
+    /// Create a hyperlink. The serialized `XLink` type is always `simple`.
     pub fn new(href: impl Into<String>) -> Result<Self> {
         let href = href.into();
         validate_href(&href)?;
@@ -378,6 +383,7 @@ impl DrawingHyperlink {
         })
     }
 
+    #[must_use]
     pub fn href(&self) -> &str {
         &self.href
     }
@@ -389,6 +395,7 @@ impl DrawingHyperlink {
         Ok(())
     }
 
+    #[must_use]
     pub fn actuate_on_request(&self) -> bool {
         self.actuate_on_request
     }
@@ -397,6 +404,7 @@ impl DrawingHyperlink {
         self.actuate_on_request = value;
     }
 
+    #[must_use]
     pub fn show(&self) -> Option<HyperlinkShow> {
         self.show
     }
@@ -405,6 +413,7 @@ impl DrawingHyperlink {
         self.show = value;
     }
 
+    #[must_use]
     pub fn target_frame_name(&self) -> Option<&str> {
         self.target_frame_name.as_deref()
     }
@@ -415,6 +424,7 @@ impl DrawingHyperlink {
         Ok(())
     }
 
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
@@ -425,6 +435,7 @@ impl DrawingHyperlink {
         Ok(())
     }
 
+    #[must_use]
     pub fn title(&self) -> Option<&str> {
         self.title.as_deref()
     }
@@ -435,6 +446,7 @@ impl DrawingHyperlink {
         Ok(())
     }
 
+    #[must_use]
     pub fn server_map(&self) -> Option<bool> {
         self.server_map
     }
@@ -443,6 +455,7 @@ impl DrawingHyperlink {
         self.server_map = value;
     }
 
+    #[must_use]
     pub fn xml_id(&self) -> Option<&str> {
         self.xml_id.as_deref()
     }

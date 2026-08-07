@@ -982,7 +982,7 @@ fn validate_optional(label: &str, value: Option<&str>, limit: usize) -> Result<(
 
 fn validate_string(label: &str, value: &str, limit: usize) -> Result<()> {
     if value.len() > limit {
-        return invalid(format!("{label} exceeds {} bytes", limit));
+        return invalid(format!("{label} exceeds {limit} bytes"));
     }
     if value
         .chars()

@@ -122,19 +122,19 @@ impl TextIndexMark {
             Ok(TextIndexMarkFragments::Range { start, end })
         } else {
             let mut attributes = self.attributes.clone();
-            if self.kind != TextIndexMarkKind::Bibliography {
-                set_attribute(&mut attributes, "string-value", self.value.clone());
-                let fragment = empty_fragment(point_name(self.kind), &attributes);
-                if fragment.len() > MAX_FRAGMENT_BYTES {
-                    return invalid("index mark fragment exceeds 4 MiB");
-                }
-                Ok(TextIndexMarkFragments::Point(fragment))
-            } else {
+            if self.kind == TextIndexMarkKind::Bibliography {
                 let mut fragment = start_fragment("bibliography-mark", &attributes);
                 escape_text(&self.value, &mut fragment);
                 fragment.push_str("</text:bibliography-mark>");
                 if fragment.len() > MAX_FRAGMENT_BYTES {
                     return invalid("bibliography mark fragment exceeds 4 MiB");
+                }
+                Ok(TextIndexMarkFragments::Point(fragment))
+            } else {
+                set_attribute(&mut attributes, "string-value", self.value.clone());
+                let fragment = empty_fragment(point_name(self.kind), &attributes);
+                if fragment.len() > MAX_FRAGMENT_BYTES {
+                    return invalid("index mark fragment exceeds 4 MiB");
                 }
                 Ok(TextIndexMarkFragments::Point(fragment))
             }
@@ -247,7 +247,7 @@ pub fn remove_text_index_mark_xml(xml: &str, mark_index: usize) -> Result<String
     })?;
     let output = match location {
         MarkLocation::Point { span, inner } => {
-            let replacement = inner.map(|span| &xml[span.start..span.end]).unwrap_or("");
+            let replacement = inner.map_or("", |span| &xml[span.start..span.end]);
             splice_one(xml, span.start, span.end, replacement)
         },
         MarkLocation::Range { start, end } => {
@@ -420,8 +420,8 @@ fn validate_mark(mark: &TextIndexMark) -> Result<()> {
         && level
             .parse::<u64>()
             .ok()
-            .filter(|value| *value > 0)
-            .is_none()
+            .as_ref()
+            .is_none_or(|value| *value <= 0)
     {
         return invalid("index mark outline level must be positive");
     }
@@ -751,7 +751,7 @@ fn close_range_location(
         .ok_or_else(|| Error::InvalidFormat("index range end has no start".to_string()))?;
     match marks[order].take() {
         Some(MarkLocation::Range { start, .. }) => {
-            marks[order] = Some(MarkLocation::Range { start, end })
+            marks[order] = Some(MarkLocation::Range { start, end });
         },
         None => return invalid("range start marker scan is incomplete"),
         _ => return invalid("range marker scan shape mismatch"),

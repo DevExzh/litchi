@@ -192,10 +192,10 @@ impl Builder {
         configuration.validate()?;
         match configuration.note_class {
             crate::notes_configuration::Class::Footnote => {
-                self.notes_configurations.footnote = Some(configuration)
+                self.notes_configurations.footnote = Some(configuration);
             },
             crate::notes_configuration::Class::Endnote => {
-                self.notes_configurations.endnote = Some(configuration)
+                self.notes_configurations.endnote = Some(configuration);
             },
         }
         Ok(self)
@@ -301,9 +301,9 @@ impl Builder {
             .iter_mut()
             .find(|x| x.level == level)
         {
-            *old = item
+            *old = item;
         } else {
-            self.list_level_label_alignments.push(item)
+            self.list_level_label_alignments.push(item);
         }
         Ok(self)
     }
@@ -736,7 +736,7 @@ impl Builder {
 
     /// Add a paragraph containing one simple ODF hyperlink.
     ///
-    /// Hyperlink targets are serialized as inert `text:a` XLink attributes;
+    /// Hyperlink targets are serialized as inert `text:a` `XLink` attributes;
     /// this library never follows or fetches them.
     pub fn add_hyperlink(
         &mut self,
@@ -790,7 +790,7 @@ impl Builder {
     ///
     /// # Arguments
     ///
-    /// * `spans` - Vector of (text, style_name) tuples for formatted text
+    /// * `spans` - Vector of (text, `style_name`) tuples for formatted text
     ///
     /// # Examples
     ///

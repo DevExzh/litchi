@@ -13,20 +13,20 @@ impl FlatDocument {
         crate::settings::parse_flat(self.xml())
     }
 
-    /// Open and validate a flat OpenDocument XML file.
+    /// Open and validate a flat `OpenDocument` XML file.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let file = std::fs::File::open(path)?;
         Self::from_reader(file)
     }
 
-    /// Read and validate a flat OpenDocument XML stream.
+    /// Read and validate a flat `OpenDocument` XML stream.
     pub fn from_reader(mut reader: impl Read) -> Result<Self> {
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes)?;
         Self::from_bytes(bytes)
     }
 
-    /// Validate flat OpenDocument XML from owned bytes.
+    /// Validate flat `OpenDocument` XML from owned bytes.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let mimetype = crate::detect::flat_mime(&bytes)
             .ok_or_else(|| Error::InvalidFormat("invalid flat OpenDocument root".to_string()))?;
@@ -58,7 +58,7 @@ impl FlatDocument {
         &self.mimetype
     }
 
-    /// Return the conventional flat OpenDocument extension.
+    /// Return the conventional flat `OpenDocument` extension.
     pub fn extension(&self) -> &'static str {
         match self.family {
             Family::Text => "fodt",

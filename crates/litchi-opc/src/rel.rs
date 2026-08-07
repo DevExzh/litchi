@@ -7,6 +7,7 @@ use crate::error::{OpcError, Result};
 use crate::packuri::PackURI;
 use litchi_core::xml::escape_xml;
 use std::collections::{HashMap, hash_map::Entry};
+use std::fmt::Write as _;
 
 /// Whether a relationship target is inside or outside the OPC package.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -70,6 +71,7 @@ impl Relationship {
     /// * `target_ref` - Target reference (part URI or external URL)
     /// * `base_uri` - Base URI for resolving relative references
     /// * `is_external` - Whether this is an external relationship
+    #[must_use]
     pub fn new(
         r_id: String,
         reltype: String,
@@ -92,6 +94,7 @@ impl Relationship {
     }
 
     /// Create a relationship with an explicit target mode.
+    #[must_use]
     pub fn new_with_mode(
         r_id: String,
         reltype: String,
@@ -122,12 +125,14 @@ impl Relationship {
 
     /// Get the relationship ID.
     #[inline]
+    #[must_use]
     pub fn r_id(&self) -> &str {
         &self.r_id
     }
 
     /// Get the relationship type.
     #[inline]
+    #[must_use]
     pub fn reltype(&self) -> &str {
         &self.reltype
     }
@@ -137,33 +142,39 @@ impl Relationship {
     /// For internal relationships, this is a relative part reference.
     /// For external relationships, this is an absolute URL.
     #[inline]
+    #[must_use]
     pub fn target_ref(&self) -> &str {
         &self.target_ref
     }
 
     /// Return the path component of the original target URI reference.
+    #[must_use]
     pub fn target_path(&self) -> &str {
         relationship_target_components(&self.target_ref).0
     }
 
     /// Return the query component without the leading `?`.
+    #[must_use]
     pub fn target_query(&self) -> Option<&str> {
         relationship_target_components(&self.target_ref).1
     }
 
     /// Return the fragment component without the leading `#`.
+    #[must_use]
     pub fn target_fragment(&self) -> Option<&str> {
         relationship_target_components(&self.target_ref).2
     }
 
     /// Return the typed target mode.
     #[inline]
+    #[must_use]
     pub fn target_mode(&self) -> TargetMode {
         self.target_mode
     }
 
     /// Check if this is an external relationship.
     #[inline]
+    #[must_use]
     pub fn is_external(&self) -> bool {
         self.target_mode == TargetMode::External
     }
@@ -210,7 +221,7 @@ pub(crate) fn relationship_target_components(
 
 /// Collection of relationships from a single source.
 ///
-/// Uses a HashMap for O(1) lookup by relationship ID while maintaining
+/// Uses a `HashMap` for O(1) lookup by relationship ID while maintaining
 /// efficient memory usage by storing references rather than cloning data.
 #[derive(Debug, Clone)]
 pub struct Relationships {
@@ -229,6 +240,7 @@ impl Relationships {
     ///
     /// # Arguments
     /// * `base_uri` - Base URI for resolving relative references
+    #[must_use]
     pub fn new(base_uri: String) -> Self {
         Self {
             base_uri,
@@ -312,6 +324,7 @@ impl Relationships {
 
     /// Get a relationship by its ID.
     #[inline]
+    #[must_use]
     pub fn get(&self, r_id: &str) -> Option<&Relationship> {
         self.rels.get(r_id)
     }
@@ -367,7 +380,7 @@ impl Relationships {
     /// Get the next available relationship ID.
     ///
     /// Generates IDs in the format "rId1", "rId2", etc., filling in gaps
-    /// if any exist. Uses efficient integer parsing with atoi_simd.
+    /// if any exist. Uses efficient integer parsing with `atoi_simd`.
     fn next_r_id(&self) -> String {
         // Find the highest existing rId number and any gaps
         let mut used_numbers: Vec<u32> = self
@@ -396,7 +409,7 @@ impl Relationships {
             }
         }
 
-        format!("rId{}", next_num)
+        format!("rId{next_num}")
     }
 
     /// Get the relationship of a specific type.
@@ -412,13 +425,11 @@ impl Relationships {
 
         match matching.len() {
             0 => Err(OpcError::RelationshipNotFound(format!(
-                "No relationship of type '{}'",
-                reltype
+                "No relationship of type '{reltype}'"
             ))),
             1 => Ok(matching[0]),
             _ => Err(OpcError::InvalidRelationship(format!(
-                "Multiple relationships of type '{}'",
-                reltype
+                "Multiple relationships of type '{reltype}'"
             ))),
         }
     }
@@ -431,12 +442,14 @@ impl Relationships {
 
     /// Get the number of relationships in the collection.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.rels.len()
     }
 
     /// Check if the collection is empty.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.rels.is_empty()
     }
@@ -454,6 +467,7 @@ impl Relationships {
     ///
     /// Generates the XML for a .rels file, with relationships sorted by rId
     /// for consistent output.
+    #[must_use]
     pub fn to_xml(&self) -> String {
         let mut xml = String::with_capacity(1024);
 
@@ -475,13 +489,14 @@ impl Relationships {
                 },
             };
 
-            xml.push_str(&format!(
+            let _ignored = write!(
+                xml,
                 r#"<Relationship Id="{}" Type="{}" Target="{}"{}/>"#,
                 escape_xml(rel.r_id()),
                 escape_xml(rel.reltype()),
                 escape_xml(rel.target_ref()),
                 target_mode
-            ));
+            );
         }
 
         xml.push_str("</Relationships>");
@@ -498,6 +513,11 @@ impl Default for Relationships {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]

@@ -11,6 +11,8 @@ impl Page {
         Self { name: name.into() }
     }
 
+    /// Returns the page name.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }

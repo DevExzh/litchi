@@ -143,10 +143,10 @@ pub mod content_type {
         "application/vnd.openxmlformats-officedocument.presentationml.template.main+xml";
     pub const PML_PRES_MACRO_MAIN: &str =
         "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml";
-    /// MS-OFFMACRO2 macro-enabled PowerPoint slideshow main-part content type.
+    /// MS-OFFMACRO2 macro-enabled `PowerPoint` slideshow main-part content type.
     pub const PML_SLIDESHOW_MACRO_MAIN: &str =
         "application/vnd.ms-powerpoint.slideshow.macroEnabled.main+xml";
-    /// MS-OFFMACRO2 macro-enabled PowerPoint template main-part content type.
+    /// MS-OFFMACRO2 macro-enabled `PowerPoint` template main-part content type.
     pub const PML_TEMPLATE_MACRO_MAIN: &str =
         "application/vnd.ms-powerpoint.template.macroEnabled.main+xml";
     pub const PML_SLIDE: &str =
@@ -188,7 +188,7 @@ pub mod content_type {
 
 /// XML namespace URIs used in OPC packages
 pub mod namespace {
-    /// DrawingML wordprocessing drawing namespace
+    /// `DrawingML` wordprocessing drawing namespace
     pub const DML_WORDPROCESSING_DRAWING: &str =
         "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
 
@@ -204,7 +204,7 @@ pub mod namespace {
     pub const OPC_CONTENT_TYPES: &str =
         "http://schemas.openxmlformats.org/package/2006/content-types";
 
-    /// WordprocessingML main namespace
+    /// `WordprocessingML` main namespace
     pub const WML_MAIN: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 }
 

@@ -68,7 +68,7 @@ fn parses_typed_dynamic_text_fields_in_document_order_without_evaluation() {
 #[test]
 fn rejects_missing_required_attributes_invalid_enums_and_invalid_booleans() {
     for field in [
-        r#"<t:placeholder>missing type</t:placeholder>"#,
+        r"<t:placeholder>missing type</t:placeholder>",
         r#"<t:placeholder t:placeholder-type="video">bad type</t:placeholder>"#,
         r#"<t:conditional-text t:condition="x" t:string-value-if-true="yes">missing false</t:conditional-text>"#,
         r#"<t:conditional-text t:condition="x" t:string-value-if-true="yes" t:string-value-if-false="no" t:current-value="yes">bad bool</t:conditional-text>"#,
@@ -387,7 +387,7 @@ fn sequence_references_support_namespace_aware_document_mutation() {
 #[test]
 fn sequence_references_reject_missing_empty_and_invalid_reference_metadata() {
     assert!(
-        document(r#"<t:sequence-ref>missing</t:sequence-ref>"#)
+        document(r"<t:sequence-ref>missing</t:sequence-ref>")
             .dynamic_text_fields()
             .is_err()
     );
@@ -750,7 +750,7 @@ fn interactive_fields_reject_required_type_name_and_display_violations() {
         r#"<t:variable-input xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" t:name="x" o:value-type="float" o:value="1">value not allowed</t:variable-input>"#,
         r#"<t:user-field-get t:display="value">missing name</t:user-field-get>"#,
         r#"<t:user-field-get t:name="x" t:display="caption">bad display</t:user-field-get>"#,
-        r#"<t:user-field-input>missing name</t:user-field-input>"#,
+        r"<t:user-field-input>missing name</t:user-field-input>",
     ] {
         assert!(
             document(invalid).dynamic_text_fields().is_err(),
@@ -892,7 +892,7 @@ fn measure_fields_support_namespace_aware_insert_replace_and_remove() {
 #[test]
 fn measure_fields_reject_missing_spoofed_invalid_and_extra_attributes() {
     for invalid in [
-        r#"<t:measure>missing</t:measure>"#,
+        r"<t:measure>missing</t:measure>",
         r#"<t:measure t:kind="distance">bad kind</t:measure>"#,
         r#"<t:measure xmlns:x="urn:not-text" x:kind="unit">spoof</t:measure>"#,
         r#"<t:measure xmlns:x="urn:extension" t:kind="unit" x:extra="1">extra</t:measure>"#,

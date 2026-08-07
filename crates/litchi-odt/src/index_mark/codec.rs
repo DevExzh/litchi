@@ -1,4 +1,4 @@
-//! Namespace-aware parsing for OpenDocument index source marks.
+//! Namespace-aware parsing for `OpenDocument` index source marks.
 
 use super::model::{TextIndexMark, TextIndexMarkKind};
 use super::{MAX_MARK_DEPTH, MAX_MARKS};
@@ -342,8 +342,8 @@ fn validate_mark_attributes(
     )? && level
         .parse::<usize>()
         .ok()
-        .filter(|level| *level > 0)
-        .is_none()
+        .as_ref()
+        .is_none_or(|level| *level <= 0)
     {
         return Err(Error::InvalidFormat(
             "text:outline-level must be a positive integer".to_string(),

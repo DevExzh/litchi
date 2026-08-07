@@ -22,6 +22,11 @@ const MIN_COPY_BYTES: usize = 3;
 /// A raw final chunk is padded with zero bytes to 4096 bytes, as required by
 /// [MS-OVBA]. Consequently, decompressing an incompressible final partial
 /// chunk can produce trailing zero bytes beyond the original input.
+///
+/// # Errors
+///
+/// Returns an error if `decompressed` or the encoded container exceeds the
+/// configured [`Limits`], or if an internal size conversion overflows.
 pub fn encode(decompressed: &[u8], limits: &Limits) -> Result<Vec<u8>, Error> {
     check_limit(
         "decompressed VBA stream bytes",
@@ -70,10 +75,12 @@ fn compress_chunk(chunk: &[u8]) -> Result<Vec<u8>, Error> {
                     return Ok(raw_chunk(chunk));
                 }
                 let length_bits = copy_length_bits(current);
-                let encoded_offset = u16::try_from(offset - 1)
-                    .map_err(|_| invalid("compression copy offset exceeds u16"))?;
-                let encoded_length = u16::try_from(length - MIN_COPY_BYTES)
-                    .map_err(|_| invalid("compression copy length exceeds u16"))?;
+                let Ok(encoded_offset) = u16::try_from(offset - 1) else {
+                    return Err(invalid("compression copy offset exceeds u16"));
+                };
+                let Ok(encoded_length) = u16::try_from(length - MIN_COPY_BYTES) else {
+                    return Err(invalid("compression copy length exceeds u16"));
+                };
                 let token = (encoded_offset << length_bits) | encoded_length;
                 data.extend_from_slice(&token.to_le_bytes());
                 flags |= 1u8 << token_index;
@@ -98,10 +105,10 @@ fn compress_chunk(chunk: &[u8]) -> Result<Vec<u8>, Error> {
     }
 
     let total_size = data.len() + CHUNK_HEADER_BYTES;
-    let header = COMPRESSED_CHUNK_FLAG
-        | CHUNK_SIGNATURE
-        | u16::try_from(total_size - 3)
-            .map_err(|_| invalid("compressed chunk size exceeds u16"))?;
+    let Ok(encoded_size) = u16::try_from(total_size - 3) else {
+        return Err(invalid("compressed chunk size exceeds u16"));
+    };
+    let header = COMPRESSED_CHUNK_FLAG | CHUNK_SIGNATURE | encoded_size;
     let mut output = Vec::with_capacity(total_size);
     output.extend_from_slice(&header.to_le_bytes());
     output.extend_from_slice(&data);
@@ -125,14 +132,16 @@ fn find_match(
     // replacing only on a longer match preserves the spec's nearest-match
     // tie behavior.
     for &candidate in candidates.iter().rev() {
-        let candidate = usize::from(candidate);
+        let candidate_position = usize::from(candidate);
         let mut length = MIN_COPY_BYTES;
-        while length < maximum_length && chunk[current + length] == chunk[candidate + length] {
+        while length < maximum_length
+            && chunk[current + length] == chunk[candidate_position + length]
+        {
             length += 1;
         }
         if length > best_length {
             best_length = length;
-            best_candidate = candidate;
+            best_candidate = candidate_position;
             if length == maximum_length {
                 break;
             }
@@ -151,8 +160,9 @@ fn insert_match_position(
         return Ok(());
     };
     let key = [bytes[0], bytes[1], bytes[2]];
-    let encoded_position = u16::try_from(position)
-        .map_err(|_| invalid("compression dictionary position exceeds u16"))?;
+    let Ok(encoded_position) = u16::try_from(position) else {
+        return Err(invalid("compression dictionary position exceeds u16"));
+    };
     positions.entry(key).or_default().push(encoded_position);
     Ok(())
 }
@@ -188,6 +198,11 @@ fn append_compressed_checked(
 /// The decoder validates chunk signatures, raw-chunk sizes, copy-token
 /// back-references, chunk output size, truncation, and the configured input
 /// and output limits.
+///
+/// # Errors
+///
+/// Returns an error if the container is malformed or truncated, or if the
+/// input or decompressed output exceeds the configured [`Limits`].
 pub fn decode(compressed: &[u8], limits: &Limits) -> Result<Vec<u8>, Error> {
     check_limit(
         "compressed VBA stream bytes",
@@ -359,6 +374,11 @@ fn append_byte_checked(
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        reason = "test fixtures and assertions panic intentionally on failure"
+    )]
+
     use super::*;
 
     const NO_COMPRESSION: &[u8] = &[
@@ -418,7 +438,7 @@ mod tests {
             vec![b'x'; RAW_CHUNK_BYTES],
             vec![b'x'; RAW_CHUNK_BYTES + 1],
             (0..RAW_CHUNK_BYTES * 3 + 271)
-                .map(|index| b'a' + (index % 23) as u8)
+                .map(|index| b'a' + u8::try_from(index % 23).unwrap())
                 .collect(),
         ] {
             let compressed = encode(&input, &limits).unwrap();
@@ -433,7 +453,9 @@ mod tests {
             15usize, 16, 17, 31, 32, 33, 63, 64, 65, 127, 128, 129, 255, 256, 257, 511, 512, 513,
             1023, 1024, 1025, 2047, 2048, 2049, 4095, 4096,
         ] {
-            let input: Vec<u8> = (0..size).map(|index| b'a' + (index % 11) as u8).collect();
+            let input: Vec<u8> = (0..size)
+                .map(|index| b'a' + u8::try_from(index % 11).unwrap())
+                .collect();
             let compressed = encode(&input, &limits).unwrap();
             assert_eq!(
                 decode(&compressed, &limits).unwrap(),
@@ -451,7 +473,7 @@ mod tests {
                 state ^= state << 13;
                 state ^= state >> 17;
                 state ^= state << 5;
-                state as u8
+                state.to_le_bytes()[0]
             })
             .collect();
 
@@ -479,7 +501,7 @@ mod tests {
     #[test]
     fn decodes_raw_chunk() {
         let mut bytes = vec![CONTAINER_SIGNATURE, 0xff, 0x3f];
-        bytes.extend((0..RAW_CHUNK_BYTES).map(|value| value as u8));
+        bytes.extend((0..RAW_CHUNK_BYTES).map(|value| value.to_le_bytes()[0]));
         let decoded = decode(&bytes, &Limits::default()).unwrap();
         assert_eq!(decoded.len(), RAW_CHUNK_BYTES);
         assert_eq!(decoded[257], 1);

@@ -31,10 +31,10 @@ const MAX_ATTRIBUTES: usize = 64;
 fn owned_attribute(namespace: Ns, local: &[u8]) -> bool {
     matches!(
         (namespace, local),
-        (Ns::Style, b"writing-mode")
-            | (Ns::Style, b"writing-mode-automatic")
-            | (Ns::Style, b"register-true")
-            | (Ns::Style, b"join-border")
+        (
+            Ns::Style,
+            b"writing-mode" | b"writing-mode-automatic" | b"register-true" | b"join-border"
+        )
     )
 }
 
@@ -250,7 +250,7 @@ fn attribute_value(
 ) -> Result<String> {
     attribute
         .decoded_and_normalized_value(version, reader.decoder())
-        .map(|value| value.into_owned())
+        .map(std::borrow::Cow::into_owned)
         .map_err(|error| bad(format!("invalid attribute value: {error}")))
 }
 
@@ -465,7 +465,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     .xml_version()
                     .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,
@@ -668,7 +668,7 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                     .xml_version()
                     .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,

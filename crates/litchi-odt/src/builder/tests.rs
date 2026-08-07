@@ -489,7 +489,7 @@ fn test_heading_levels() {
     let mut builder = Builder::new();
     for level in 1..=6 {
         builder
-            .add_heading(&format!("Level {}", level), level)
+            .add_heading(&format!("Level {level}"), level)
             .unwrap();
     }
     assert_eq!(builder.elements.len(), 6);

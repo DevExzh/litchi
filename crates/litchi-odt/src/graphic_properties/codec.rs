@@ -45,9 +45,9 @@ pub(super) fn validate_child(kind: ChildKind, xml: &str) -> Result<()> {
                     {
                         return Err(bad("graphic property child has the wrong expanded name"));
                     }
-                    found = true
+                    found = true;
                 }
-                depth += 1
+                depth += 1;
             },
             Ok(Event::Empty(start)) => {
                 let current = element(&reader, start.name());
@@ -58,7 +58,7 @@ pub(super) fn validate_child(kind: ChildKind, xml: &str) -> Result<()> {
                     {
                         return Err(bad("graphic property child has the wrong expanded name"));
                     }
-                    found = true
+                    found = true;
                 }
             },
             Ok(Event::Text(text)) => {
@@ -76,9 +76,9 @@ pub(super) fn validate_child(kind: ChildKind, xml: &str) -> Result<()> {
             Ok(Event::End(_)) => {
                 depth = depth
                     .checked_sub(1)
-                    .ok_or_else(|| bad("invalid graphic property child"))?
+                    .ok_or_else(|| bad("invalid graphic property child"))?;
             },
-            Ok(Event::Decl(_)) | Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::Decl(_) | Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad(
                     "declarations, DTDs, and processing instructions are not allowed in graphic children",
                 ));
@@ -170,7 +170,7 @@ fn raw_attrs(
             .map_err(|error| bad(format!("invalid graphic property value: {error}")))?
             .into_owned();
         safe(&value, "graphic property value", true)?;
-        out.push((namespace, local.as_ref().to_vec(), value))
+        out.push((namespace, local.as_ref().to_vec(), value));
     }
     Ok(out)
 }
@@ -312,7 +312,7 @@ pub fn parse_graphic_style_properties(xml: &str) -> Result<Styles> {
                             seen: false,
                             property_depth: None,
                             child: None,
-                        })
+                        });
                     }
                     continue;
                 }
@@ -329,7 +329,7 @@ pub fn parse_graphic_style_properties(xml: &str) -> Result<Styles> {
                         }
                         value.seen = true;
                         value.style.properties = Some(parse_properties(&reader, version, &start)?);
-                        value.property_depth = Some(depth)
+                        value.property_depth = Some(depth);
                     } else if current.1 == b"graphic-properties" {
                         return Err(bad(
                             "style:graphic-properties has invalid namespace or parent",
@@ -347,7 +347,7 @@ pub fn parse_graphic_style_properties(xml: &str) -> Result<Styles> {
                         {
                             return Err(bad("duplicate graphic property child"));
                         }
-                        value.child = Some((kind, depth, begin))
+                        value.child = Some((kind, depth, begin));
                     } else if value.property_depth.is_some_and(|p| depth > p) {
                         return Err(bad("unexpected style:graphic-properties child"));
                     }
@@ -368,7 +368,7 @@ pub fn parse_graphic_style_properties(xml: &str) -> Result<Styles> {
                     if let Some(style) =
                         style_header(&reader, version, &start, current.1 == b"default-style")?
                     {
-                        push(&mut out, style, &mut total)?
+                        push(&mut out, style, &mut total)?;
                     }
                     continue;
                 }
@@ -384,7 +384,7 @@ pub fn parse_graphic_style_properties(xml: &str) -> Result<Styles> {
                             return Err(bad("duplicate style:graphic-properties"));
                         }
                         value.seen = true;
-                        value.style.properties = Some(parse_properties(&reader, version, &start)?)
+                        value.style.properties = Some(parse_properties(&reader, version, &start)?);
                     } else if current.1 == b"graphic-properties" {
                         return Err(bad(
                             "style:graphic-properties has invalid namespace or parent",
@@ -442,20 +442,20 @@ pub fn parse_graphic_style_properties(xml: &str) -> Result<Styles> {
                         value.style.properties.as_mut().unwrap().set_child(child);
                     }
                     if value.property_depth == Some(depth) {
-                        value.property_depth = None
+                        value.property_depth = None;
                     }
                 }
                 if active.as_ref().is_some_and(|value| value.depth == depth) {
-                    push(&mut out, active.take().unwrap().style, &mut total)?
+                    push(&mut out, active.take().unwrap().style, &mut total)?;
                 }
                 stack.pop();
             },
             Ok(Event::Decl(decl)) => {
                 version = decl
                     .xml_version()
-                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?
+                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,
@@ -537,7 +537,7 @@ pub fn set_graphic_style_properties_xml(xml: &str, requested: &Style) -> Result<
                                 ..Default::default()
                             },
                             ..Default::default()
-                        })
+                        });
                     }
                 } else if target_depth.is_some_and(|d| depth == d + 1)
                     && current.0 == ElementNs::Style
@@ -583,7 +583,7 @@ pub fn set_graphic_style_properties_xml(xml: &str, requested: &Style) -> Result<
                         found = Some(Target {
                             style: span,
                             ..Default::default()
-                        })
+                        });
                     }
                 } else if target_depth.is_some_and(|d| depth == d + 1)
                     && current.0 == ElementNs::Style
@@ -603,13 +603,13 @@ pub fn set_graphic_style_properties_xml(xml: &str, requested: &Style) -> Result<
                     {
                         let span = spans.properties.as_mut().unwrap();
                         span.end_start = begin;
-                        span.end = end
+                        span.end = end;
                     }
                     if target_depth == Some(depth) {
                         spans.style.end_start = begin;
                         spans.style.end = end;
                         found = active.take();
-                        target_depth = None
+                        target_depth = None;
                     }
                 }
                 stack.pop();
@@ -617,9 +617,9 @@ pub fn set_graphic_style_properties_xml(xml: &str, requested: &Style) -> Result<
             Ok(Event::Decl(decl)) => {
                 version = decl
                     .xml_version()
-                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?
+                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,

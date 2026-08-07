@@ -351,7 +351,7 @@ pub struct Metric {
     pub value: i64,
 }
 
-/// An inert simple XLink used by font resources.
+/// An inert simple `XLink` used by font resources.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Link {
     pub href: String,

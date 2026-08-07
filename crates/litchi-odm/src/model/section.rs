@@ -17,10 +17,14 @@ impl Section {
         }
     }
 
+    /// Returns the section name.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the subdocuments contained in the section.
+    #[must_use]
     pub fn children(&self) -> &[Subdocument] {
         &self.children
     }

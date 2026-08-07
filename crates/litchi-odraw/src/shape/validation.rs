@@ -1,4 +1,4 @@
-//! OfficeArt shape topology, budget, and record validation.
+//! `OfficeArt` shape topology, budget, and record validation.
 
 use crate::prop::{Anchor, Id, Props};
 use crate::{Container, Error, Limit, Record, RecordKind, Result};
@@ -137,14 +137,14 @@ pub(crate) fn validate_meta(
     let sp = meta.sp.as_ref().ok_or(Error::MalformedShape {
         reason: "SpContainer has no shape atom",
     })?;
-    let data: &[u8; 8] = sp.data().try_into().map_err(|_| Error::MalformedShape {
+    let data: &[u8; 8] = sp.data().try_into().map_err(|_err| Error::MalformedShape {
         reason: "shape atom payload is not eight bytes",
     })?;
-    let id = u32::from_le_bytes(data[..4].try_into().map_err(|_| Error::MalformedShape {
+    let id = u32::from_le_bytes(data[..4].try_into().map_err(|_err| Error::MalformedShape {
         reason: "shape identifier is truncated",
     })?);
     let raw_flags =
-        u32::from_le_bytes(data[4..].try_into().map_err(|_| Error::MalformedShape {
+        u32::from_le_bytes(data[4..].try_into().map_err(|_err| Error::MalformedShape {
             reason: "shape flags are truncated",
         })?);
     let native = Native::from_raw(sp.instance());
@@ -314,7 +314,7 @@ pub(crate) fn coordinate(data: &[u8], offset: usize) -> Result<i32> {
     let bytes = data.get(offset..end).ok_or(Error::MalformedShape {
         reason: "group coordinate atom payload is truncated",
     })?;
-    let bytes: [u8; 4] = bytes.try_into().map_err(|_| Error::MalformedShape {
+    let bytes: [u8; 4] = bytes.try_into().map_err(|_err| Error::MalformedShape {
         reason: "group coordinate atom payload is truncated",
     })?;
     Ok(i32::from_le_bytes(bytes))

@@ -36,7 +36,7 @@ pub(crate) fn locate(chart: &Chart, expected: Props) -> Result<usize> {
                 record.payload(),
                 PAYLOAD_BYTES,
             )?;
-            let flags = u32::from_le_bytes(data.try_into().map_err(|_| Error::SizeOverflow {
+            let flags = u32::from_le_bytes(data.try_into().ok().ok_or(Error::SizeOverflow {
                 resource: "ShtProps flags",
             })?);
             if flags != expected.flags {

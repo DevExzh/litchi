@@ -183,10 +183,7 @@ pub(crate) fn validate_anchor_host(host: AnnotationHost, anchor: &AnnotationAnch
                 | (
                     AnnotationHost::Presentation,
                     AnnotationPosition::PresentationPage { .. }
-                )
-                | (
-                    AnnotationHost::Presentation,
-                    AnnotationPosition::PresentationShape { .. }
+                        | AnnotationPosition::PresentationShape { .. }
                 )
         )
     };

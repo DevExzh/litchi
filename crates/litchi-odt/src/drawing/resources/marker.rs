@@ -195,7 +195,7 @@ impl crate::Package {
 }
 
 impl crate::FlatDocument {
-    /// Parse named marker resources from this flat OpenDocument.
+    /// Parse named marker resources from this flat `OpenDocument`.
     pub fn drawing_markers(&self) -> Result<Collection> {
         parse_drawing_markers(self.xml())
     }

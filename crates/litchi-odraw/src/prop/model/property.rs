@@ -13,16 +13,19 @@ pub struct Prop<'data> {
 
 impl<'data> Prop<'data> {
     /// Returns the typed identifier.
+    #[must_use]
     pub const fn id(&self) -> Id {
         self.id
     }
 
     /// Returns the exact 14-bit identifier without flags.
+    #[must_use]
     pub const fn raw_id(&self) -> u16 {
         self.raw_id
     }
 
     /// Reassembles the exact 16-bit identifier-and-flags field.
+    #[must_use]
     pub const fn raw_opid(&self) -> u16 {
         self.raw_id
             | if self.blip { IS_BLIP } else { 0 }
@@ -30,21 +33,25 @@ impl<'data> Prop<'data> {
     }
 
     /// Returns whether `fBid` was set on the wire.
+    #[must_use]
     pub const fn is_blip(&self) -> bool {
         self.blip
     }
 
     /// Returns whether `fComplex` was set on the wire.
+    #[must_use]
     pub const fn is_complex(&self) -> bool {
         self.complex
     }
 
     /// Returns the exact signed four-byte `op` value.
+    #[must_use]
     pub const fn raw_value(&self) -> i32 {
         self.raw_value
     }
 
     /// Borrows the decoded value.
+    #[must_use]
     pub const fn value(&self) -> &Value<'data> {
         &self.value
     }

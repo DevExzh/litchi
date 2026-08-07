@@ -9,7 +9,7 @@ use std::path::Path;
 
 const BODY_MARKER: &str = "<office:presentation";
 
-/// An OpenDocument presentation (.odp).
+/// An `OpenDocument` presentation (.odp).
 ///
 /// This struct represents a complete ODP presentation and provides methods to access
 /// its slides and metadata.
@@ -112,6 +112,7 @@ impl Presentation {
     }
 
     /// Borrow the validated `content.xml` snapshot without reparsing it.
+    #[must_use]
     pub fn content_xml(&self) -> &str {
         self.package.content_xml()
     }
@@ -138,6 +139,7 @@ impl Presentation {
     }
 
     /// Borrow the optional validated `styles.xml` snapshot without reparsing it.
+    #[must_use]
     pub fn styles_xml(&self) -> Option<&str> {
         self.package.styles_xml()
     }
@@ -362,7 +364,7 @@ impl Presentation {
         Ok(())
     }
 
-    /// Get the complete format-specific OpenDocument metadata model.
+    /// Get the complete format-specific `OpenDocument` metadata model.
     // Note: For presentation modification operations, see `MutablePresentation` which provides
     // full CRUD operations on slides and shapes including add/remove/update slides, add/remove
     // shapes, and clear operations.

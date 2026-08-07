@@ -1,4 +1,4 @@
-//! Structured failures produced while validating OfficeArt data.
+//! Structured failures produced while validating `OfficeArt` data.
 
 use crate::record::RecordKind;
 
@@ -11,7 +11,7 @@ pub enum Limit {
     Records,
 }
 
-/// A bounded resource used while parsing OfficeArt image records.
+/// A bounded resource used while parsing `OfficeArt` image records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageLimit {
     /// Maximum size of one BLIP record body.
@@ -20,7 +20,7 @@ pub enum ImageLimit {
     StoreEntries,
 }
 
-/// A checked OfficeArt parsing or validation failure.
+/// A checked `OfficeArt` parsing or validation failure.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
@@ -52,27 +52,27 @@ pub enum Error {
         /// Exact kind value read from the wire.
         raw_kind: u16,
     },
-    /// An OfficeArt property table is structurally invalid.
+    /// An `OfficeArt` property table is structurally invalid.
     MalformedProperties {
         /// Concise validation failure description.
         reason: &'static str,
     },
-    /// A custom OfficeArt geometry property violates `[MS-ODRAW]`.
+    /// A custom `OfficeArt` geometry property violates `[MS-ODRAW]`.
     MalformedGeometry {
         /// Concise validation failure description.
         reason: &'static str,
     },
-    /// A shape container violates an OfficeArt structural invariant.
+    /// A shape container violates an `OfficeArt` structural invariant.
     MalformedShape {
         /// Concise validation failure description.
         reason: &'static str,
     },
-    /// An OfficeArt BLIP, FBSE, or BLIP-store invariant is invalid.
+    /// An `OfficeArt` BLIP, FBSE, or BLIP-store invariant is invalid.
     MalformedImage {
         /// Concise validation failure description.
         reason: &'static str,
     },
-    /// A record is not an OfficeArt image record.
+    /// A record is not an `OfficeArt` image record.
     NotImageRecord {
         /// Exact record type read from the wire.
         raw_kind: u16,
@@ -215,5 +215,5 @@ impl core::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-/// Result type for checked OfficeArt parsing and validation.
+/// Result type for checked `OfficeArt` parsing and validation.
 pub type Result<T> = core::result::Result<T, Error>;

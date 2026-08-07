@@ -88,7 +88,8 @@ fn parse_string_content(
     let mut output = String::new();
     output
         .try_reserve_exact(reserve)
-        .map_err(|_| Error::Allocation {
+        .ok()
+        .ok_or(Error::Allocation {
             resource: "chart string",
         })?;
     if wide {
@@ -97,7 +98,7 @@ fn parse_string_content(
             _ => 0,
         });
         for value in char::decode_utf16(units) {
-            output.push(value.map_err(|_| Error::InvalidChart {
+            output.push(value.ok().ok_or(Error::InvalidChart {
                 offset: record.offset(),
                 reason: "chart string contains invalid UTF-16",
             })?);
@@ -125,7 +126,7 @@ pub(super) fn biff_string(value: &str) -> Result<Vec<u8>> {
             resource: "chart string",
         })?;
     let mut data = vec_with_capacity(capacity, "chart string")?;
-    data.push(u8::try_from(count).map_err(|_| Error::InvalidModel {
+    data.push(u8::try_from(count).ok().ok_or(Error::InvalidModel {
         field: "text",
         reason: "chart string exceeds 255 UTF-16 code units",
     })?);
@@ -134,7 +135,7 @@ pub(super) fn biff_string(value: &str) -> Result<Vec<u8>> {
         if wide {
             data.extend_from_slice(&unit.to_le_bytes());
         } else {
-            data.push(u8::try_from(unit).map_err(|_| Error::InvalidModel {
+            data.push(u8::try_from(unit).ok().ok_or(Error::InvalidModel {
                 field: "text",
                 reason: "narrow chart string contains a wide code unit",
             })?);
@@ -145,7 +146,7 @@ pub(super) fn biff_string(value: &str) -> Result<Vec<u8>> {
 
 pub(super) fn xl_unicode_string(value: &str) -> Result<Vec<u8>> {
     let count = value.encode_utf16().count();
-    let count = u16::try_from(count).map_err(|_| Error::InvalidModel {
+    let count = u16::try_from(count).ok().ok_or(Error::InvalidModel {
         field: "cached text",
         reason: "Excel chart string exceeds 65,535 UTF-16 code units",
     })?;
@@ -169,7 +170,7 @@ pub(super) fn xl_unicode_string(value: &str) -> Result<Vec<u8>> {
         if wide {
             data.extend_from_slice(&unit.to_le_bytes());
         } else {
-            data.push(u8::try_from(unit).map_err(|_| Error::InvalidModel {
+            data.push(u8::try_from(unit).ok().ok_or(Error::InvalidModel {
                 field: "cached text",
                 reason: "narrow Excel chart string contains a wide code unit",
             })?);

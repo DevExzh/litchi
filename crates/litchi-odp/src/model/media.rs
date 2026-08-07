@@ -3,7 +3,7 @@
 use litchi_core::{Error, Result, xml::escape_xml};
 use std::collections::BTreeMap;
 
-/// XLink `show` behavior stored on a presentation media plugin.
+/// `XLink` `show` behavior stored on a presentation media plugin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Show {
     /// Open in a new presentation context.
@@ -43,7 +43,7 @@ impl Show {
     }
 }
 
-/// XLink `actuate` behavior stored on a presentation media plugin.
+/// `XLink` `actuate` behavior stored on a presentation media plugin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Actuate {
     /// Load the media with its containing document.
@@ -97,11 +97,13 @@ impl Parameter {
     }
 
     /// Return the parameter name.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Return the parameter value.
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -124,7 +126,7 @@ pub struct Reference {
 impl Reference {
     /// Create the minimal schema-valid plugin reference.
     ///
-    /// The serialized XLink type is always `simple`, as required by ODF.
+    /// The serialized `XLink` type is always `simple`, as required by ODF.
     pub fn new(href: impl Into<String>) -> Result<Self> {
         let href = href.into();
         validate_href(&href)?;
@@ -138,12 +140,14 @@ impl Reference {
         })
     }
 
-    /// Return the unescaped XLink target.
+    /// Return the unescaped `XLink` target.
+    #[must_use]
     pub fn href(&self) -> &str {
         &self.href
     }
 
     /// Return a safe package-relative path, or `None` for an external/fragment link.
+    #[must_use]
     pub fn package_path(&self) -> Option<&str> {
         let path = self.href.strip_prefix("./").unwrap_or(&self.href);
         let first_component = path.split('/').next()?;
@@ -164,7 +168,7 @@ impl Reference {
         }
     }
 
-    /// Replace the XLink target.
+    /// Replace the `XLink` target.
     pub fn set_href(&mut self, href: impl Into<String>) -> Result<()> {
         let href = href.into();
         validate_href(&href)?;
@@ -173,6 +177,7 @@ impl Reference {
     }
 
     /// Return the optional plugin MIME type.
+    #[must_use]
     pub fn mime_type(&self) -> Option<&str> {
         self.mime_type.as_deref()
     }
@@ -190,27 +195,30 @@ impl Reference {
         self.mime_type = None;
     }
 
-    /// Return the optional XLink show behavior.
+    /// Return the optional `XLink` show behavior.
+    #[must_use]
     pub fn show(&self) -> Option<Show> {
         self.show
     }
 
-    /// Set or remove the XLink show behavior.
+    /// Set or remove the `XLink` show behavior.
     pub fn set_show(&mut self, show: Option<Show>) {
         self.show = show;
     }
 
-    /// Return the optional XLink activation behavior.
+    /// Return the optional `XLink` activation behavior.
+    #[must_use]
     pub fn actuate(&self) -> Option<Actuate> {
         self.actuate
     }
 
-    /// Set or remove the XLink activation behavior.
+    /// Set or remove the `XLink` activation behavior.
     pub fn set_actuate(&mut self, actuate: Option<Actuate>) {
         self.actuate = actuate;
     }
 
     /// Return the optional XML ID.
+    #[must_use]
     pub fn xml_id(&self) -> Option<&str> {
         self.xml_id.as_deref()
     }
@@ -229,6 +237,7 @@ impl Reference {
     }
 
     /// Return the inert plugin parameters.
+    #[must_use]
     pub fn parameters(&self) -> &[Parameter] {
         &self.parameters
     }

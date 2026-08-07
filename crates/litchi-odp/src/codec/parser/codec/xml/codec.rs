@@ -418,7 +418,7 @@ impl Parser {
         )?;
         listener.verb = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"verb")?
             .map(|value| {
-                value.parse::<u64>().map_err(|_| {
+                value.parse::<u64>().map_err(|_err| {
                     Error::InvalidFormat(format!("invalid presentation:verb '{value}'"))
                 })
             })

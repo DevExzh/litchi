@@ -81,7 +81,7 @@ fn rejects_malformed() {
             r#"<t:list-style s:name="L"><t:list-level-style-number t:level="1"><s:list-level-properties t:list-level-position-and-space-mode="label-alignment"><s:list-level-label-alignment t:label-followed-by="space" f:margin-left="1em"/></s:list-level-properties></t:list-level-style-number></t:list-style>"#,
         ),
         format!(
-            r#"<!DOCTYPE x>{}"#,
+            r"<!DOCTYPE x>{}",
             wrap(
                 r#"<t:list-style s:name="L"><t:list-level-style-number t:level="1"><s:list-level-properties t:list-level-position-and-space-mode="label-alignment"><s:list-level-label-alignment t:label-followed-by="space"/></s:list-level-properties></t:list-level-style-number></t:list-style>"#
             )

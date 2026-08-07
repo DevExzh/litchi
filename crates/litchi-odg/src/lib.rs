@@ -1,4 +1,4 @@
-//! OpenDocument Drawing support with semantic responsibility layers.
+//! `OpenDocument` Drawing support with semantic responsibility layers.
 #![forbid(unsafe_code)]
 
 mod authoring;

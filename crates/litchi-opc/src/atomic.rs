@@ -119,6 +119,11 @@ fn invalid_path(message: &'static str) -> OpcError {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use std::io::Write;
 
     use super::*;

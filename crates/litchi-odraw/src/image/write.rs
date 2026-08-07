@@ -1,4 +1,4 @@
-//! Streaming OfficeArt BLIP and BStore writers.
+//! Streaming `OfficeArt` BLIP and `BStore` writers.
 
 use std::{
     borrow::Cow,
@@ -13,11 +13,11 @@ use crate::write::{self as record_write, Atom, Container};
 pub enum Placement {
     /// Store the BLIP inside its FBSE.
     Embedded,
-    /// Store the BLIP in the host's associated BStoreDelay sequence.
+    /// Store the BLIP in the host's associated `BStoreDelay` sequence.
     Delay,
 }
 
-/// Move-friendly builder for one known OfficeArt BLIP.
+/// Move-friendly builder for one known `OfficeArt` BLIP.
 #[derive(Debug)]
 pub struct BlipBuilder<'data> {
     kind: Kind,
@@ -82,6 +82,7 @@ impl<'data> BlipBuilder<'data> {
     }
 
     /// Sets the application-defined bitmap resource tag.
+    #[must_use]
     pub const fn tag(mut self, tag: u8) -> Self {
         self.tag = tag;
         self
@@ -97,22 +98,26 @@ impl<'data> BlipBuilder<'data> {
     }
 
     /// Emits the two-UID form. Both fields contain the required MD4 digest.
+    #[must_use]
     pub const fn two_uids(mut self) -> Self {
         self.two_uids = true;
         self
     }
 
     /// Returns the image persistence kind.
+    #[must_use]
     pub const fn kind(&self) -> Kind {
         self.kind
     }
 
     /// Borrows the uncompressed image file data.
+    #[must_use]
     pub fn data(&self) -> &[u8] {
         &self.data
     }
 
     /// Returns the MD4 UID required by MS-ODRAW.
+    #[must_use]
     pub const fn uid(&self) -> Uid {
         self.uid
     }
@@ -128,7 +133,7 @@ impl<'data> BlipBuilder<'data> {
         let uid_bytes = if self.two_uids { 32u32 } else { 16 };
         let framing = if self.kind.is_meta() { 34 } else { 1 };
         let data = u32::try_from(self.data.len())
-            .map_err(|_| invalid("BLIP file data length exceeds u32"))?;
+            .map_err(|_err| invalid("BLIP file data length exceeds u32"))?;
         uid_bytes
             .checked_add(framing)
             .and_then(|value| value.checked_add(data))
@@ -182,7 +187,7 @@ impl<'data> BlipBuilder<'data> {
         }
         if self.kind.is_meta() {
             let size = u32::try_from(self.data.len())
-                .map_err(|_| invalid("metafile data length exceeds u32"))?;
+                .map_err(|_err| invalid("metafile data length exceeds u32"))?;
             writer.write_all(&size.to_le_bytes())?;
             writer.write_all(&self.bounds.left.to_le_bytes())?;
             writer.write_all(&self.bounds.top.to_le_bytes())?;
@@ -213,11 +218,13 @@ pub struct EntryBuilder<'data> {
 
 impl<'data> EntryBuilder<'data> {
     /// Creates an embedded FBSE.
+    #[must_use]
     pub fn embedded(blip: BlipBuilder<'data>) -> Self {
         Self::new(blip, Placement::Embedded)
     }
 
     /// Creates a delay-loaded FBSE.
+    #[must_use]
     pub fn delayed(blip: BlipBuilder<'data>) -> Self {
         Self::new(blip, Placement::Delay)
     }
@@ -236,6 +243,7 @@ impl<'data> EntryBuilder<'data> {
     }
 
     /// Sets both platform persistence fields.
+    #[must_use]
     pub const fn platforms(mut self, win: Kind, mac: Kind) -> Self {
         self.win = win;
         self.mac = mac;
@@ -243,12 +251,14 @@ impl<'data> EntryBuilder<'data> {
     }
 
     /// Sets the internal resource tag.
+    #[must_use]
     pub const fn tag(mut self, tag: u16) -> Self {
         self.tag = tag;
         self
     }
 
     /// Sets the reference count.
+    #[must_use]
     pub const fn refs(mut self, refs: u32) -> Self {
         self.refs = refs;
         self
@@ -284,7 +294,7 @@ impl<'data> EntryBuilder<'data> {
         if bytes > 0xFE {
             return Err(invalid("FBSE name exceeds 254 encoded bytes"));
         }
-        u8::try_from(bytes).map_err(|_| invalid("FBSE name length exceeds u8"))
+        u8::try_from(bytes).map_err(|_err| invalid("FBSE name length exceeds u8"))
     }
 
     fn body_len(&self) -> io::Result<u32> {
@@ -337,7 +347,7 @@ impl<'data> EntryBuilder<'data> {
     }
 }
 
-/// Move-first builder for a BStore container and its associated delay store.
+/// Move-first builder for a `BStore` container and its associated delay store.
 #[derive(Debug, Default)]
 pub struct StoreBuilder<'data> {
     entries: Vec<EntryBuilder<'data>>,
@@ -345,6 +355,7 @@ pub struct StoreBuilder<'data> {
 
 impl<'data> StoreBuilder<'data> {
     /// Creates an empty store builder.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             entries: Vec::new(),
@@ -359,7 +370,8 @@ impl<'data> StoreBuilder<'data> {
             .len()
             .checked_add(1)
             .ok_or_else(|| invalid("BStore entry count overflows usize"))?;
-        let value = u32::try_from(next).map_err(|_| invalid("BStore entry count exceeds u32"))?;
+        let value =
+            u32::try_from(next).map_err(|_err| invalid("BStore entry count exceeds u32"))?;
         let id = Id::new(value).map_err(|error| invalid(error.to_string()))?;
         self.entries.push(entry);
         Ok(id)
@@ -376,11 +388,13 @@ impl<'data> StoreBuilder<'data> {
     }
 
     /// Returns the number of FBSEs.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
     /// Returns whether no FBSEs have been added.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -405,10 +419,10 @@ impl<'data> StoreBuilder<'data> {
         })
     }
 
-    /// Streams the BStore container. Delayed payloads are not copied here.
+    /// Streams the `BStore` container. Delayed payloads are not copied here.
     pub fn write_store<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         let count = u16::try_from(self.entries.len())
-            .map_err(|_| invalid("BStore entry count exceeds u16"))?;
+            .map_err(|_err| invalid("BStore entry count exceeds u16"))?;
         if count > 0x0FFF {
             return Err(invalid("BStore entry count exceeds 4095"));
         }
@@ -427,7 +441,7 @@ impl<'data> StoreBuilder<'data> {
         Ok(())
     }
 
-    /// Streams the headerless BStoreDelay sequence.
+    /// Streams the headerless `BStoreDelay` sequence.
     pub fn write_delay<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         self.delay_body_len()?;
         for entry in &self.entries {
@@ -457,7 +471,8 @@ pub fn copy<W: Write>(writer: &mut W, blip: &super::Blip<'_>) -> io::Result<()> 
     writer.write_all(record.data())
 }
 
-/// Computes the RFC1320 MD4 digest used for OfficeArt image UIDs.
+/// Computes the RFC1320 MD4 digest used for `OfficeArt` image UIDs.
+#[must_use]
 pub fn digest(data: &[u8]) -> Uid {
     let mut state = [0x6745_2301, 0xEFCD_AB89, 0x98BA_DCFE, 0x1032_5476];
     let mut chunks = data.chunks_exact(64);
@@ -538,6 +553,11 @@ fn invalid(error: impl Into<String>) -> io::Error {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
     use crate::image::{Blip, Compression, Context, Delay, Store};
 

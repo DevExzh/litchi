@@ -5,7 +5,7 @@ const NS: &str = r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1
 
 fn document(body: &str) -> String {
     format!(
-        r#"<office:document-content {NS}><office:body><office:presentation>{body}</office:presentation></office:body></office:document-content>"#
+        r"<office:document-content {NS}><office:body><office:presentation>{body}</office:presentation></office:body></office:document-content>"
     )
 }
 

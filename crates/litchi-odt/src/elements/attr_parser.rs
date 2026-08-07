@@ -279,7 +279,7 @@ pub fn parse_uint(value: &[u8]) -> Result<u64> {
     })
 }
 
-/// Parse a floating-point attribute value using fast_float2
+/// Parse a floating-point attribute value using `fast_float2`
 ///
 /// # Arguments
 ///
@@ -303,7 +303,7 @@ pub fn parse_float(value: &[u8]) -> Result<f64> {
 
     match parse_partial::<f64, _>(s) {
         Ok((num, _)) => Ok(num),
-        Err(_) => Err(Error::InvalidFormat(format!("Invalid float value: {}", s))),
+        Err(_) => Err(Error::InvalidFormat(format!("Invalid float value: {s}"))),
     }
 }
 
@@ -317,7 +317,7 @@ pub fn parse_float(value: &[u8]) -> Result<f64> {
 ///
 /// # Returns
 ///
-/// A tuple of (numeric_value, unit_string), or error if invalid
+/// A tuple of (`numeric_value`, `unit_string`), or error if invalid
 ///
 /// # Examples
 ///
@@ -342,7 +342,7 @@ pub fn parse_length(value: &[u8]) -> Result<(f64, Cow<'_, str>)> {
                 Ok((num, Cow::Borrowed(unit)))
             }
         },
-        Err(_) => Err(Error::InvalidFormat(format!("Invalid length value: {}", s))),
+        Err(_) => Err(Error::InvalidFormat(format!("Invalid length value: {s}"))),
     }
 }
 
@@ -366,8 +366,7 @@ pub fn parse_percentage(value: &[u8]) -> Result<f64> {
     match parse_partial::<f64, _>(trimmed) {
         Ok((num, _)) => Ok(num / 100.0),
         Err(_) => Err(Error::InvalidFormat(format!(
-            "Invalid percentage value: {}",
-            s
+            "Invalid percentage value: {s}"
         ))),
     }
 }
@@ -448,10 +447,7 @@ pub fn validate_enum(value: &str, valid_set: &Set<&'static str>) -> Result<()> {
     if valid_set.contains(value) {
         Ok(())
     } else {
-        Err(Error::InvalidFormat(format!(
-            "Invalid enum value: {}",
-            value
-        )))
+        Err(Error::InvalidFormat(format!("Invalid enum value: {value}")))
     }
 }
 

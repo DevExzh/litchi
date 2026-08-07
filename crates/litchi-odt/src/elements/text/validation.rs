@@ -4,14 +4,14 @@ use super::model::{LinkActuate, LinkShow};
 use crate::elements::element::{Element, ElementBase};
 use litchi_core::{Error, Result};
 
-/// Validate an XLink target before it is inserted into a document.
+/// Validate an `XLink` target before it is inserted into a document.
 pub(super) fn href(href: &str) -> Result<()> {
     if href.is_empty() {
         return Err(Error::InvalidFormat(
             "text:a hyperlink href must not be empty".to_string(),
         ));
     }
-    if href.chars().any(|character| character.is_control()) {
+    if href.chars().any(char::is_control) {
         return Err(Error::InvalidFormat(
             "text:a hyperlink href must not contain control characters".to_string(),
         ));

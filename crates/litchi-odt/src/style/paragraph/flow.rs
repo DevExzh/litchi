@@ -122,19 +122,19 @@ impl Properties {
         self.validate()?;
         let mut x = format!(r#"<style:paragraph-properties xmlns:style="{SS}" xmlns:fo="{FS}""#);
         if let Some(v) = self.keep_together {
-            x.push_str(&format!(r#" fo:keep-together="{}""#, v.xml()))
+            x.push_str(&format!(r#" fo:keep-together="{}""#, v.xml()));
         }
         if let Some(v) = self.keep_with_next {
-            x.push_str(&format!(r#" fo:keep-with-next="{}""#, v.xml()))
+            x.push_str(&format!(r#" fo:keep-with-next="{}""#, v.xml()));
         }
         if let Some(v) = self.widows {
-            x.push_str(&format!(r#" fo:widows="{v}""#))
+            x.push_str(&format!(r#" fo:widows="{v}""#));
         }
         if let Some(v) = self.orphans {
-            x.push_str(&format!(r#" fo:orphans="{v}""#))
+            x.push_str(&format!(r#" fo:orphans="{v}""#));
         }
         if let Some(v) = self.hyphenation_keep {
-            x.push_str(&format!(r#" fo:hyphenation-keep="{}""#, v.xml()))
+            x.push_str(&format!(r#" fo:hyphenation-keep="{}""#, v.xml()));
         }
         if let Some(v) = self.hyphenation_ladder_count {
             x.push_str(&format!(
@@ -143,7 +143,7 @@ impl Properties {
                     HyphenationLadder::NoLimit => "no-limit".into(),
                     HyphenationLadder::Lines(n) => n.to_string(),
                 }
-            ))
+            ));
         }
         if let Some(v) = self.line_break {
             x.push_str(&format!(
@@ -152,7 +152,7 @@ impl Properties {
                     LineBreak::Normal => "normal",
                     LineBreak::Strict => "strict",
                 }
-            ))
+            ));
         }
         if let Some(v) = self.punctuation_wrap {
             x.push_str(&format!(
@@ -161,7 +161,7 @@ impl Properties {
                     PunctuationWrap::Simple => "simple",
                     PunctuationWrap::Hanging => "hanging",
                 }
-            ))
+            ));
         }
         x.push_str("/>");
         Ok(x)
@@ -206,7 +206,7 @@ impl Style {
             return Err(bad("invalid parent style name"));
         }
         if let Some(p) = &self.properties {
-            p.validate()?
+            p.validate()?;
         }
         Ok(())
     }
@@ -219,17 +219,17 @@ impl Style {
         };
         let mut x = format!(r#"<style:{tag} xmlns:style="{SS}" style:family="paragraph""#);
         if let Some(n) = &self.name {
-            x.push_str(&format!(r#" style:name="{}""#, escape_xml(n)))
+            x.push_str(&format!(r#" style:name="{}""#, escape_xml(n)));
         }
         if let Some(n) = &self.parent_style_name {
-            x.push_str(&format!(r#" style:parent-style-name="{}""#, escape_xml(n)))
+            x.push_str(&format!(r#" style:parent-style-name="{}""#, escape_xml(n)));
         }
         if let Some(p) = &self.properties {
             x.push('>');
             x.push_str(&p.to_xml_fragment()?);
-            x.push_str(&format!("</style:{tag}>"))
+            x.push_str(&format!("</style:{tag}>"));
         } else {
-            x.push_str("/>")
+            x.push_str("/>");
         }
         Ok(x)
     }
@@ -289,7 +289,7 @@ fn attrs(
         if x.len() > MAX_VALUE {
             return Err(bad("flow value too large"));
         }
-        o.push((k.0, k.1, x))
+        o.push((k.0, k.1, x));
     }
     Ok(o)
 }
@@ -373,7 +373,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
             Ok(Event::Decl(d)) => {
                 v = d
                     .xml_version()
-                    .map_err(|e| bad(format!("unsupported XML version: {e}")))?
+                    .map_err(|e| bad(format!("unsupported XML version: {e}")))?;
             },
             Ok(Event::Start(e)) => {
                 if stack.len() >= MAX_DEPTH {
@@ -398,7 +398,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             properties: None,
                         };
                         style.validate()?;
-                        active = Some((d, style, false))
+                        active = Some((d, style, false));
                     }
                 } else if let Some((sd, style, seen)) = active.as_mut() {
                     if d == *sd + 1 && c.0 == Ns::S && c.1 == b"paragraph-properties" {
@@ -406,7 +406,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             return Err(bad("duplicate style:paragraph-properties"));
                         }
                         *seen = true;
-                        style.properties = Some(properties(&r, v, &e)?)
+                        style.properties = Some(properties(&r, v, &e)?);
                     } else if c.1 == b"paragraph-properties" && c.0 != Ns::S {
                         return Err(bad("paragraph-properties wrong namespace"));
                     }
@@ -421,7 +421,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             return Err(bad("duplicate style:paragraph-properties"));
                         }
                         *seen = true;
-                        style.properties = Some(properties(&r, v, &e)?)
+                        style.properties = Some(properties(&r, v, &e)?);
                     } else if c.1 == b"paragraph-properties" && c.0 != Ns::S {
                         return Err(bad("paragraph-properties wrong namespace"));
                     }
@@ -440,11 +440,11 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     }) {
                         return Err(bad("duplicate paragraph style identity"));
                     }
-                    out.push(s)
+                    out.push(s);
                 }
                 stack.pop();
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,

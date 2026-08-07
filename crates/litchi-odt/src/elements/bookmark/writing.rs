@@ -620,7 +620,7 @@ mod tests {
             r#"<t:p><t:bookmark t:name="x"/><t:bookmark-start t:name="x"/><t:bookmark-end t:name="x"/></t:p>"#,
             r#"<t:p><t:bookmark-start t:name="x"/></t:p>"#,
             r#"<t:p><t:bookmark t:name="x">bad</t:bookmark></t:p>"#,
-            r#"<!DOCTYPE x><t:p/>"#,
+            r"<!DOCTYPE x><t:p/>",
         ] {
             let xml = format!(
                 r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="{TEXT}" xmlns:u="urn:hostile">{body}</o:text>"#

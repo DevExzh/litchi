@@ -349,7 +349,7 @@ fn replace_first(xml: &str, replacement: &str) -> Result<String> {
                     && selected
                     && element.local_name().as_ref() == b"footnote-sep" =>
             {
-                active = Some((start, 1))
+                active = Some((start, 1));
             },
             Event::Empty(ref element)
                 if active.is_none()

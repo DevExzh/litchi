@@ -1,4 +1,4 @@
-//! Structural validation for OfficeArt solver-rule records.
+//! Structural validation for `OfficeArt` solver-rule records.
 
 use crate::{Error, Record, RecordKind, Result};
 

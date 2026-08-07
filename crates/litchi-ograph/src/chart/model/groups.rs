@@ -42,7 +42,7 @@ pub struct Group {
     pub order: Order,
     pub vary_colors: bool,
     pub family: Family,
-    /// Excel-mandatory written-but-unused CrtLink owned by this chart group.
+    /// Excel-mandatory written-but-unused `CrtLink` owned by this chart group.
     ///
     /// Standalone Graph preserves this record when present but does not require
     /// it without the unavailable normative chart-sheet grammar.
@@ -53,6 +53,7 @@ pub struct Group {
 
 impl Group {
     /// Primary line-chart group used by a new chart.
+    #[must_use]
     pub const fn line() -> Self {
         Self {
             parent: axis::ParentId::PRIMARY,

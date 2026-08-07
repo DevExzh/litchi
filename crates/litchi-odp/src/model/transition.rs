@@ -172,11 +172,13 @@ impl Style {
     }
 
     /// Return the ODF lexical value.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
     /// Return every transition style allowed by the ODF schema.
+    #[must_use]
     pub fn supported_values() -> &'static [&'static str] {
         TRANSITION_STYLES
     }
@@ -217,7 +219,7 @@ pub struct Sound {
     pub play_full: Option<bool>,
     /// Whether `xlink:actuate="onRequest"` is explicitly present.
     pub actuate_on_request: bool,
-    /// Optional XLink presentation behavior.
+    /// Optional `XLink` presentation behavior.
     pub show: Option<SoundShow>,
     /// Optional XML identifier.
     pub xml_id: Option<String>,
@@ -252,11 +254,13 @@ pub struct Transition {
 
 impl Transition {
     /// Create an empty transition configuration.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Legacy transition trigger behavior.
+    #[must_use]
     pub fn transition_type(&self) -> Option<Type> {
         self.transition_type
     }
@@ -268,6 +272,7 @@ impl Transition {
     }
 
     /// Legacy ODF transition style.
+    #[must_use]
     pub fn style(&self) -> Option<&Style> {
         self.style.as_ref()
     }
@@ -279,6 +284,7 @@ impl Transition {
     }
 
     /// Transition speed.
+    #[must_use]
     pub fn speed(&self) -> Option<Speed> {
         self.speed
     }
@@ -290,6 +296,7 @@ impl Transition {
     }
 
     /// SMIL transition type.
+    #[must_use]
     pub fn smil_type(&self) -> Option<&str> {
         self.smil_type.as_deref()
     }
@@ -301,6 +308,7 @@ impl Transition {
     }
 
     /// SMIL transition subtype.
+    #[must_use]
     pub fn smil_subtype(&self) -> Option<&str> {
         self.smil_subtype.as_deref()
     }
@@ -312,6 +320,7 @@ impl Transition {
     }
 
     /// SMIL transition direction.
+    #[must_use]
     pub fn direction(&self) -> Option<Direction> {
         self.direction
     }
@@ -323,6 +332,7 @@ impl Transition {
     }
 
     /// SMIL fade color as `#RRGGBB`.
+    #[must_use]
     pub fn fade_color(&self) -> Option<&str> {
         self.fade_color.as_deref()
     }
@@ -340,6 +350,7 @@ impl Transition {
     }
 
     /// Automatic slide duration as an XML Schema duration.
+    #[must_use]
     pub fn duration(&self) -> Option<&str> {
         self.duration.as_deref()
     }
@@ -357,6 +368,7 @@ impl Transition {
     }
 
     /// Transition sound.
+    #[must_use]
     pub fn sound(&self) -> Option<&Sound> {
         self.sound.as_ref()
     }

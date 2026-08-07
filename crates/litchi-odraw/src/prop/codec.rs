@@ -75,7 +75,7 @@ impl<'data> Props<'data> {
         let mut complex_offset = header_size;
         for descriptor in descriptors {
             let value = if descriptor.complex {
-                let complex_len = usize::try_from(descriptor.raw_value).map_err(|_| {
+                let complex_len = usize::try_from(descriptor.raw_value).map_err(|_err| {
                     Error::MalformedProperties {
                         reason: "negative complex-property length",
                     }
@@ -121,6 +121,7 @@ impl<'data> Props<'data> {
 }
 
 impl Anchor {
+    #[must_use]
     pub fn from_child_anchor(anchor: &Record<'_>) -> Option<Self> {
         if anchor.kind() != RecordKind::ChildAnchor || anchor.data().len() != 16 {
             return None;

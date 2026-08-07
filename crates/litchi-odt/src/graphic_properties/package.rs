@@ -1,4 +1,4 @@
-//! Flat and packaged OpenDocument access for graphic styles.
+//! Flat and packaged `OpenDocument` access for graphic styles.
 
 use super::codec::parse_graphic_style_properties;
 use super::model::Styles;

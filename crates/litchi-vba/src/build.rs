@@ -79,11 +79,13 @@ impl Id {
     pub const NIL: Self = Self([0; 16]);
 
     /// Construct an identifier from bytes in canonical textual GUID order.
+    #[must_use]
     pub const fn from_bytes(bytes: [u8; 16]) -> Self {
         Self(bytes)
     }
 
     /// Return bytes in canonical textual GUID order.
+    #[must_use]
     pub const fn as_bytes(self) -> [u8; 16] {
         self.0
     }
@@ -152,10 +154,10 @@ impl Module {
     }
 
     fn new(name: impl Into<String>, source_body: impl Into<String>, kind: Kind) -> Self {
-        let name = name.into();
+        let module_name = name.into();
         Self {
-            stream_name: name.clone(),
-            name,
+            stream_name: module_name.clone(),
+            name: module_name,
             kind,
             source_body: source_body.into(),
             description: String::new(),
@@ -166,41 +168,48 @@ impl Module {
     }
 
     /// Override the CFB stream name. By default it equals the module name.
+    #[must_use]
     pub fn stream_name(mut self, stream_name: impl Into<String>) -> Self {
         self.stream_name = stream_name.into();
         self
     }
 
     /// Set the module description.
+    #[must_use]
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = description.into();
         self
     }
 
     /// Set the module Help context identifier.
+    #[must_use]
     pub fn help_context(mut self, help_context: u32) -> Self {
         self.help_context = help_context;
         self
     }
 
     /// Mark the module read-only.
+    #[must_use]
     pub fn read_only(mut self, read_only: bool) -> Self {
         self.read_only = read_only;
         self
     }
 
     /// Mark the module private to its project.
+    #[must_use]
     pub fn private(mut self, private: bool) -> Self {
         self.private = private;
         self
     }
 
     /// Module identifier.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Project-level module category.
+    #[must_use]
     pub fn kind(&self) -> Kind {
         self.kind
     }
@@ -210,7 +219,7 @@ impl Module {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Project {
     name: String,
-    project_id: Id,
+    id: Id,
     platform: Platform,
     page: Mbcs,
     description: String,
@@ -225,7 +234,7 @@ impl Project {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            project_id: Id::NIL,
+            id: Id::NIL,
             platform: Platform::Windows32,
             page: Mbcs::WINDOWS_1252,
             description: String::new(),
@@ -237,42 +246,54 @@ impl Project {
     }
 
     /// Set the project Automation type-library identifier.
+    #[must_use]
     pub fn id(mut self, project_id: Id) -> Self {
-        self.project_id = project_id;
+        self.id = project_id;
         self
     }
 
     /// Set the target platform.
+    #[must_use]
     pub fn platform(mut self, platform: Platform) -> Self {
         self.platform = platform;
         self
     }
 
     /// Set the checked MBCS page used for project text and module source.
+    #[must_use]
     pub fn page(mut self, page: Mbcs) -> Self {
         self.page = page;
         self
     }
 
     /// Validate a raw MBCS identifier and set the project page.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnsupportedCodePage`] if `page` is not a checked MBCS
+    /// code page known to the encoding layer.
+    #[must_use]
     pub fn page_id(mut self, page: u16) -> Result<Self, Error> {
         self.page = Mbcs::new(u32::from(page)).ok_or(Error::UnsupportedCodePage(page))?;
         Ok(self)
     }
 
     /// Set the project description.
+    #[must_use]
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = description.into();
         self
     }
 
     /// Set the project Help context identifier.
+    #[must_use]
     pub fn help_context(mut self, help_context: i32) -> Self {
         self.help_context = help_context;
         self
     }
 
     /// Set the project version mirrored into the `dir` stream.
+    #[must_use]
     pub fn version(mut self, major: u32, minor: u16) -> Self {
         self.version_major = major;
         self.version_minor = minor;
@@ -280,12 +301,19 @@ impl Project {
     }
 
     /// Append a module and return the builder.
+    #[must_use]
     pub fn module(mut self, module: Module) -> Self {
         self.modules.push(module);
         self
     }
 
     /// Serialize and validate the project without executing or compiling source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if project metadata or module source is invalid, a
+    /// configured [`Limits`] ceiling is exceeded, or the underlying CFB writer
+    /// fails.
     pub fn finish(self, limits: &Limits) -> Result<Payload, Error> {
         check_limit(
             "standalone VBA CFB bytes",
@@ -306,16 +334,16 @@ impl Project {
         let mut total_source_bytes = 0usize;
         for module in &self.modules {
             let source = module_source(module);
-            let source = encode_mbcs(&source, encoding, "module source")?;
+            let encoded_source = encode_mbcs(&source, encoding, "module source")?;
             total_source_bytes = total_source_bytes
-                .checked_add(source.len())
+                .checked_add(encoded_source.len())
                 .ok_or_else(|| invalid("aggregate VBA source size overflow"))?;
             check_limit(
                 "aggregate VBA module source bytes",
                 total_source_bytes,
                 limits.max_total_source_bytes,
             )?;
-            let compressed_source = codec::encode(&source, limits)?;
+            let compressed_source = codec::encode(&encoded_source, limits)?;
             compressed_modules.push(compressed_source);
         }
 
@@ -417,10 +445,7 @@ impl BoundedCursor {
     }
 
     fn reject_limit(&mut self, actual: u64) -> io::Error {
-        let actual = match usize::try_from(actual) {
-            Ok(actual) => actual,
-            Err(_) => self.maximum.saturating_add(1),
-        };
+        let actual = usize::try_from(actual).unwrap_or_else(|_| self.maximum.saturating_add(1));
         self.exceeded_actual = Some(
             self.exceeded_actual
                 .map_or(actual, |previous| previous.max(actual)),
@@ -435,9 +460,8 @@ impl BoundedCursor {
 
 impl Write for BoundedCursor {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        let byte_count = match u64::try_from(bytes.len()) {
-            Ok(byte_count) => byte_count,
-            Err(_) => return Err(self.reject_limit(u64::MAX)),
+        let Ok(byte_count) = u64::try_from(bytes.len()) else {
+            return Err(self.reject_limit(u64::MAX));
         };
         let end = self.inner.position().saturating_add(byte_count);
         if end > self.maximum_u64() {
@@ -526,6 +550,11 @@ pub struct Payload {
 
 impl Payload {
     /// Consume and validate standalone CFB bytes without copying them.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `bytes` exceeds `limits`, is not a readable CFB
+    /// file, or contains a malformed MS-OVBA project.
     pub fn read(bytes: Vec<u8>, limits: &Limits) -> Result<Self, Error> {
         check_limit(
             "standalone VBA CFB bytes",
@@ -542,26 +571,35 @@ impl Payload {
     }
 
     /// Borrow the exact validated standalone bytes.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Move out the exact validated standalone bytes without copying them.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.bytes
     }
 
     /// Number of module streams declared and validated by the project.
+    #[must_use]
     pub fn module_count(&self) -> usize {
         self.module_count
     }
 
     /// Whether the project contains no standard, class, or document modules.
+    #[must_use]
     pub fn is_module_free(&self) -> bool {
         self.module_count == 0
     }
 
     /// Copy all payload streams into an existing CFB writer at a project root.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the validated payload cannot be re-read, or if the
+    /// destination CFB writer rejects a storage or stream.
     pub fn write_into(
         &self,
         writer: &mut OleWriter,
@@ -734,7 +772,7 @@ fn encode_project_stream(
     encoding: Mbcs,
     limits: &Limits,
 ) -> Result<Vec<u8>, Error> {
-    let project_id = project.project_id.braced_uppercase();
+    let project_id = project.id.braced_uppercase();
     let mut text = String::new();
     text.push_str("ID=\"");
     text.push_str(&project_id);
@@ -749,7 +787,7 @@ fn encode_project_stream(
                 text.push_str("Document=");
                 text.push_str(&module.name);
                 text.push_str("/&H");
-                text.push_str(&format!("{type_library_version:08X}"));
+                push_upper_hex(&mut text, &type_library_version.to_be_bytes());
                 text.push_str("\r\n");
                 continue;
             },
@@ -839,9 +877,7 @@ fn version_project_stream() -> Vec<u8> {
 
 fn encrypt_project_data(data: &[u8], project_id: &str) -> Result<Vec<u8>, Error> {
     let seed = DETERMINISTIC_OBFUSCATION_SEED;
-    let project_key = project_id
-        .bytes()
-        .fold(0u8, |sum, byte| sum.wrapping_add(byte));
+    let project_key = project_id.bytes().fold(0u8, u8::wrapping_add);
     let version_encrypted = seed ^ ENCRYPTION_VERSION;
     let project_key_encrypted = seed ^ project_key;
     let mut output = Vec::with_capacity(7 + data.len());
@@ -850,8 +886,10 @@ fn encrypt_project_data(data: &[u8], project_id: &str) -> Result<Vec<u8>, Error>
     let mut unencrypted_byte_1 = project_key;
     let mut encrypted_byte_1 = project_key_encrypted;
     let mut encrypted_byte_2 = version_encrypted;
-    for byte in u32::try_from(data.len())
-        .map_err(|_| invalid("PROJECT encryption input exceeds u32"))?
+    let Ok(data_length) = u32::try_from(data.len()) else {
+        return Err(invalid("PROJECT encryption input exceeds u32"));
+    };
+    for byte in data_length
         .to_le_bytes()
         .into_iter()
         .chain(data.iter().copied())
@@ -876,6 +914,11 @@ fn push_upper_hex(output: &mut String, bytes: &[u8]) {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        reason = "test fixtures and assertions panic intentionally on failure"
+    )]
+
     use super::*;
     use litchi_cfb::OleFile;
 
@@ -1021,10 +1064,10 @@ mod tests {
         assert_eq!(payload.bytes.capacity(), capacity);
         assert_eq!(payload.bytes(), expected);
 
-        let bytes = payload.into_bytes();
-        assert_eq!(bytes.as_ptr(), pointer);
-        assert_eq!(bytes.capacity(), capacity);
-        assert_eq!(bytes, expected);
+        let returned_bytes = payload.into_bytes();
+        assert_eq!(returned_bytes.as_ptr(), pointer);
+        assert_eq!(returned_bytes.capacity(), capacity);
+        assert_eq!(returned_bytes, expected);
     }
 
     #[test]
@@ -1148,12 +1191,7 @@ mod tests {
         let seed = encrypted[0];
         assert_eq!(encrypted[1] ^ seed, ENCRYPTION_VERSION);
         let project_key = encrypted[2] ^ seed;
-        assert_eq!(
-            project_key,
-            project_id
-                .bytes()
-                .fold(0u8, |sum, byte| sum.wrapping_add(byte))
-        );
+        assert_eq!(project_key, project_id.bytes().fold(0u8, u8::wrapping_add));
         let ignored_length = usize::from((seed & 6) / 2);
         let mut cursor = 3 + ignored_length;
         let mut unencrypted_byte_1 = project_key;
@@ -1175,9 +1213,9 @@ mod tests {
             encrypted_byte_1 = byte;
             unencrypted_byte_1 = plain;
         }
-        let length = usize::try_from(u32::from_le_bytes(length)).unwrap();
-        let mut output = Vec::with_capacity(length);
-        for &byte in &encrypted[cursor..cursor + length] {
+        let data_length = usize::try_from(u32::from_le_bytes(length)).unwrap();
+        let mut output = Vec::with_capacity(data_length);
+        for &byte in &encrypted[cursor..cursor + data_length] {
             let plain = byte ^ encrypted_byte_2.wrapping_add(unencrypted_byte_1);
             output.push(plain);
             encrypted_byte_2 = encrypted_byte_1;

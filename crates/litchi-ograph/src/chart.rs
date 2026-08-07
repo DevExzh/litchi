@@ -2,7 +2,7 @@
 //!
 //! A standalone Microsoft Graph workbook uses a chart BOF with document type
 //! `0x8000`. Excel workbooks, including `Excel.Chart` OLE payloads embedded by
-//! PowerPoint, use document type `0x0020`. [`Refs`] recognizes both without
+//! `PowerPoint`, use document type `0x0020`. [`Refs`] recognizes both without
 //! depending on either host format.
 
 use std::iter::FusedIterator;
@@ -98,26 +98,31 @@ impl<'a> Ref<'a> {
     }
 
     /// Exact BOF-through-EOF bytes, including every unknown record.
+    #[must_use]
     pub const fn as_bytes(self) -> &'a [u8] {
         self.bytes
     }
 
     /// Chart BOF grammar detected from the input.
+    #[must_use]
     pub const fn kind(self) -> Kind {
         self.kind
     }
 
     /// Byte offset relative to the Workbook supplied to discovery.
+    #[must_use]
     pub const fn offset(self) -> usize {
         self.offset
     }
 
     /// Resource bounds under which this chart was validated.
+    #[must_use]
     pub const fn limits(self) -> Limits {
         self.limits
     }
 
     /// Traverse all records in original order without allocation.
+    #[must_use]
     pub fn records(self) -> Records<'a> {
         Records::new(self.bytes)
     }
@@ -141,7 +146,8 @@ impl<'a> Ref<'a> {
         let mut bytes = Vec::new();
         bytes
             .try_reserve_exact(self.bytes.len())
-            .map_err(|_| Error::Allocation {
+            .ok()
+            .ok_or(Error::Allocation {
                 resource: "chart bytes",
             })?;
         bytes.extend_from_slice(self.bytes);
@@ -183,31 +189,37 @@ impl Stream {
     }
 
     /// Borrow this chart without copying or revalidation.
+    #[must_use]
     pub fn as_ref(&self) -> Ref<'_> {
         Ref::from_validated(&self.bytes, self.kind, self.offset, self.limits)
     }
 
     /// Exact BOF-through-EOF bytes.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Chart BOF grammar detected from the input.
+    #[must_use]
     pub const fn kind(&self) -> Kind {
         self.kind
     }
 
     /// Original Workbook-relative offset, or zero for an isolated input.
+    #[must_use]
     pub const fn offset(&self) -> usize {
         self.offset
     }
 
     /// Traverse all records in original order without allocation.
+    #[must_use]
     pub fn records(&self) -> Records<'_> {
         self.as_ref().records()
     }
 
     /// Recover the original allocation without copying.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.bytes
     }
@@ -271,16 +283,19 @@ impl Book {
     }
 
     /// Exact caller-supplied Workbook stream bytes.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Traverse every validated chart in source order without allocation.
+    #[must_use]
     pub fn charts(&self) -> Refs<'_> {
         Refs::from_validated(&self.bytes, self.limits)
     }
 
     /// Resource limits under which all charts were validated.
+    #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
     }
@@ -300,6 +315,7 @@ impl Book {
     }
 
     /// Recover the original Workbook allocation without copying.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.bytes
     }
@@ -529,6 +545,11 @@ fn chart_error<T>(offset: usize, reason: &'static str) -> Result<T> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
     use super::*;
     use litchi_biff::{Encoder, Kind as RecordKind, Record as OwnedRecord, Records};
 

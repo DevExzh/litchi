@@ -1,4 +1,4 @@
-//! OfficeArt shape wire traversal and typed decoding.
+//! `OfficeArt` shape wire traversal and typed decoding.
 
 use crate::prop::{Id, Props};
 use crate::{Container, Error, Limit, Limits, Record, RecordKind, Result};
@@ -9,7 +9,7 @@ use super::validation::{
     validate_container_header, validate_container_record, validate_meta,
 };
 
-/// Parses the user-visible shapes in one OfficeArt drawing.
+/// Parses the user-visible shapes in one `OfficeArt` drawing.
 pub fn parse(data: &[u8]) -> Result<Vec<Shape<'_>>> {
     parse_with(data, Limits::default())
 }

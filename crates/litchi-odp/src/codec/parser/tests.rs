@@ -183,21 +183,21 @@ fn preserves_recursive_inert_three_dimensional_scenes() {
     assert!(regenerated.starts_with("<dr3d:scene"));
     assert!(regenerated.contains(r#"dr3d:projection="perspective""#));
     assert!(regenerated.contains(r#"dr3d:direction="(0 0 -1)""#));
-    assert!(regenerated.contains(r#"<dr3d:cube"#));
-    assert!(regenerated.contains(r#"<dr3d:sphere"#));
+    assert!(regenerated.contains(r"<dr3d:cube"));
+    assert!(regenerated.contains(r"<dr3d:sphere"));
     assert!(regenerated.contains(r#"svg:d="M 0 0 L 10 10""#));
 }
 
 #[test]
 fn rejects_invalid_three_dimensional_shape_hierarchies() {
     for body in [
-        r#"<r:cube/>"#,
-        r#"<d:g><r:sphere/></d:g>"#,
-        r#"<r:scene><d:rect/></r:scene>"#,
+        r"<r:cube/>",
+        r"<d:g><r:sphere/></d:g>",
+        r"<r:scene><d:rect/></r:scene>",
         r#"<r:scene><r:cube/><r:light r:direction="(0 0 -1)"/></r:scene>"#,
-        r#"<r:scene><r:cube>not empty</r:cube></r:scene>"#,
-        r#"<r:scene><r:cube><d:glue-point/></r:cube></r:scene>"#,
-        r#"<r:scene><r:light/></r:scene>"#,
+        r"<r:scene><r:cube>not empty</r:cube></r:scene>",
+        r"<r:scene><r:cube><d:glue-point/></r:cube></r:scene>",
+        r"<r:scene><r:light/></r:scene>",
         r#"<r:scene><r:extrude s:d="M 0 0"/></r:scene>"#,
         r#"<r:scene><r:rotate s:viewBox="0 0 10 10"/></r:scene>"#,
     ] {
@@ -310,7 +310,7 @@ fn test_slide_debug() {
         legacy_animation: None,
         shapes: vec![],
     };
-    let debug_str = format!("{:?}", slide);
+    let debug_str = format!("{slide:?}");
     assert!(debug_str.contains("Slide"));
     assert!(debug_str.contains("Test"));
 }
@@ -345,7 +345,7 @@ fn test_shape_debug() {
         style_name: Some("Style1".to_string()),
         ..Shape::new()
     };
-    let debug_str = format!("{:?}", shape);
+    let debug_str = format!("{shape:?}");
     assert!(debug_str.contains("Shape"));
     assert!(debug_str.contains("TextBox"));
 }
@@ -396,7 +396,7 @@ fn test_shape_type_variants() {
             style_name: None,
             ..Shape::new()
         };
-        let _ = format!("{:?}", shape);
+        let _ = format!("{shape:?}");
     }
 }
 
@@ -579,7 +579,7 @@ fn parses_arbitrary_odf_namespace_prefixes() {
 
 #[test]
 fn resolves_transition_styles_across_package_parts_and_inheritance() {
-    let styles = r##"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:m="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:l="http://www.w3.org/1999/xlink"><o:styles><s:default-style s:family="drawing-page"><s:drawing-page-properties p:transition-speed="slow"/></s:default-style><s:style s:name="Base" s:family="drawing-page"><s:drawing-page-properties p:transition-type="automatic" p:duration="PT8S"><p:sound l:type="simple" l:href="Sounds/a&amp;b.ogg" l:actuate="onRequest" l:show="replace" p:play-full="true"/></s:drawing-page-properties></s:style></o:styles></o:document-styles>"##;
+    let styles = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:m="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:l="http://www.w3.org/1999/xlink"><o:styles><s:default-style s:family="drawing-page"><s:drawing-page-properties p:transition-speed="slow"/></s:default-style><s:style s:name="Base" s:family="drawing-page"><s:drawing-page-properties p:transition-type="automatic" p:duration="PT8S"><p:sound l:type="simple" l:href="Sounds/a&amp;b.ogg" l:actuate="onRequest" l:show="replace" p:play-full="true"/></s:drawing-page-properties></s:style></o:styles></o:document-styles>"#;
     let content = r##"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:m="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0"><o:automatic-styles><s:style s:name="Child" s:family="drawing-page" s:parent-style-name="Base"><s:drawing-page-properties p:transition-style="fade-from-left" p:transition-speed="fast" m:type="fade" m:subtype="crossfade" m:direction="reverse" m:fadeColor="#aB09fF"/></s:style></o:automatic-styles><o:body><o:presentation><d:page d:style-name="Child"/></o:presentation></o:body></o:document-content>"##;
 
     let slides = Parser::parse_slides_with_styles(content, Some(styles)).unwrap();
@@ -757,7 +757,7 @@ fn rejects_invalid_shape_hyperlinks_and_event_bindings() {
         r#"<d:rect><o:event-listeners><sc:event-listener sc:event-name="dom:click" sc:language="ooo:script" sc:macro-name="M" x:type="simple" x:href="S"/></o:event-listeners></d:rect>"#,
         r#"<d:rect><o:event-listeners><p:event-listener sc:event-name="dom:click" p:action="invalid"/></o:event-listeners></d:rect>"#,
         r#"<d:rect><o:event-listeners><p:event-listener sc:event-name="dom:click" p:action="sound"><p:sound x:href="a" x:type="extended"/></p:event-listener></o:event-listeners></d:rect>"#,
-        r#"<d:rect><o:event-listeners/><o:event-listeners/></d:rect>"#,
+        r"<d:rect><o:event-listeners/><o:event-listeners/></d:rect>",
     ];
     for fragment in invalid {
         let xml = format!(
@@ -795,11 +795,11 @@ fn parses_legacy_presentation_effect_trees() {
 fn rejects_invalid_legacy_presentation_effects() {
     let invalid = [
         r#"<p:show-shape d:shape-id="orphan"/>"#,
-        r#"<p:animations><p:show-shape/></p:animations>"#,
+        r"<p:animations><p:show-shape/></p:animations>",
         r#"<p:animations><p:dim d:shape-id="s"/></p:animations>"#,
         r#"<p:animations><p:play d:shape-id="s"><p:sound x:href="a" x:type="simple"/></p:play></p:animations>"#,
         r#"<p:animations><p:show-shape d:shape-id="s"><p:sound x:href="a" x:type="extended"/></p:show-shape></p:animations>"#,
-        r#"<p:animations>text</p:animations>"#,
+        r"<p:animations>text</p:animations>",
     ];
     for effects in invalid {
         let xml = format!(

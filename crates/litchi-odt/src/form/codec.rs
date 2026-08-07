@@ -1,4 +1,4 @@
-//! Bounded XML codec for classic OpenDocument forms.
+//! Bounded XML codec for classic `OpenDocument` forms.
 
 use super::{
     Actuate, Attribute, Control, ControlKind, ControlRef, DRAW, FORM, Form, Forms, Group, Listener,
@@ -803,7 +803,7 @@ fn collect_form(
         match node {
             Node::Form(value) => collect_form(value, group, form_index, part, scope, path, index)?,
             Node::Control(value) => {
-                collect_control(value, group, form_index, part, scope, path, index)?
+                collect_control(value, group, form_index, part, scope, path, index)?;
             },
         }
         path.pop();
@@ -844,7 +844,7 @@ fn collect_control(
         path.push(position);
         match node {
             Node::Control(value) => {
-                collect_control(value, group, form_index, part, scope, path, index)?
+                collect_control(value, group, form_index, part, scope, path, index)?;
             },
             Node::Form(_) => return Err(err("form nested inside control")),
         }
@@ -911,8 +911,7 @@ fn bool_attr(attributes: &[Attribute], namespace: &str, local: &str) -> Result<O
 fn current_scope(scopes: &[ScopeFrame]) -> Scope {
     scopes
         .last()
-        .map(|scope| scope.1.clone())
-        .unwrap_or(Scope::Document)
+        .map_or(Scope::Document, |scope| scope.1.clone())
 }
 
 fn mark_xforms(result: &mut Forms, group: Option<&mut (usize, Group)>) {

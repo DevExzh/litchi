@@ -50,7 +50,7 @@ pub(super) fn generate_text_paragraphs(text: &str, style_name: Option<&str>) -> 
     for paragraph in text.split('\n') {
         output.push_str("<text:p");
         if let Some(style) = escaped_style.as_deref() {
-            output.push_str(r#" text:style-name="#);
+            output.push_str(r" text:style-name=");
             output.push('"');
             output.push_str(style);
             output.push('"');

@@ -11,7 +11,7 @@ fn paragraph(body: &str) -> String {
 
 #[test]
 fn locates_a_balanced_inline_range() {
-    let xml = paragraph(r#"A<text:span>漢</text:span><text:span>字</text:span>Z"#);
+    let xml = paragraph(r"A<text:span>漢</text:span><text:span>字</text:span>Z");
     let spans = locate_balanced_ruby_ranges(&xml, 0, &(1.."漢字".len() + 1)).unwrap();
     assert_eq!(spans.len(), 1);
     assert_eq!(
@@ -23,7 +23,7 @@ fn locates_a_balanced_inline_range() {
 #[test]
 fn rejects_a_range_crossing_an_existing_ruby() {
     let xml = paragraph(
-        r#"A<text:ruby><text:ruby-base>X</text:ruby-base><text:ruby-text>x</text:ruby-text></text:ruby>B"#,
+        r"A<text:ruby><text:ruby-base>X</text:ruby-base><text:ruby-text>x</text:ruby-text></text:ruby>B",
     );
     let range = Range { start: 0, end: 2 };
     assert!(

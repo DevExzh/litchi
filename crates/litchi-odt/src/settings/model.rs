@@ -1,4 +1,4 @@
-//! Typed OpenDocument configuration settings values.
+//! Typed `OpenDocument` configuration settings values.
 
 /// Semantic contents of one `office:settings` element.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -45,7 +45,7 @@ pub struct ConfigMapEntry {
     pub children: Vec<ConfigNode>,
 }
 
-/// The scalar types defined for OpenDocument configuration items.
+/// The scalar types defined for `OpenDocument` configuration items.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum ConfigValue {

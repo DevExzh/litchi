@@ -1,4 +1,4 @@
-//! OpenDocument Text document builder.
+//! `OpenDocument` Text document builder.
 //!
 //! This module provides a builder pattern for creating new ODT documents from scratch.
 

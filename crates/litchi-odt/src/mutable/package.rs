@@ -204,8 +204,8 @@ impl MutableDocument {
             .elements
             .iter()
             .map(|e| match e {
-                DocumentElement::Paragraph(p) => p.text().map(|t| t.len()).unwrap_or(0),
-                DocumentElement::Heading(h) => h.text().map(|t| t.len()).unwrap_or(0),
+                DocumentElement::Paragraph(p) => p.text().map_or(0, |t| t.len()),
+                DocumentElement::Heading(h) => h.text().map_or(0, |t| t.len()),
                 DocumentElement::Table(_) => 256,
                 DocumentElement::List(_) => 256,
                 DocumentElement::Frame(_) => 256,
@@ -276,21 +276,11 @@ impl MutableDocument {
     fn generate_meta_xml_from_scratch(&self) -> String {
         let now = chrono::Utc::now().to_rfc3339();
         let mut estimated = 64usize;
-        estimated += self.metadata.title.as_ref().map(|s| s.len()).unwrap_or(0);
-        estimated += self.metadata.author.as_ref().map(|s| s.len()).unwrap_or(0);
-        estimated += self.metadata.subject.as_ref().map(|s| s.len()).unwrap_or(0);
-        estimated += self
-            .metadata
-            .description
-            .as_ref()
-            .map(|s| s.len())
-            .unwrap_or(0);
-        estimated += self
-            .metadata
-            .keywords
-            .as_ref()
-            .map(|s| s.len())
-            .unwrap_or(0);
+        estimated += self.metadata.title.as_ref().map_or(0, |s| s.len());
+        estimated += self.metadata.author.as_ref().map_or(0, |s| s.len());
+        estimated += self.metadata.subject.as_ref().map_or(0, |s| s.len());
+        estimated += self.metadata.description.as_ref().map_or(0, |s| s.len());
+        estimated += self.metadata.keywords.as_ref().map_or(0, |s| s.len());
         let mut meta_fields = String::with_capacity(estimated);
 
         // Add optional metadata fields

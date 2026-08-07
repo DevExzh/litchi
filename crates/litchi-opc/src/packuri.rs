@@ -1,10 +1,10 @@
-/// Provides the PackURI value type and utilities for working with package URIs.
+/// Provides the `PackURI` value type and utilities for working with package URIs.
 ///
-/// A PackURI represents a part name within an OPC package, following the URI format
+/// A `PackURI` represents a part name within an OPC package, following the URI format
 /// defined by the Open Packaging Conventions specification.
 /// Represents a package URI, which is a partname within an OPC package.
 ///
-/// PackURIs always begin with a forward slash and use forward slashes as path separators,
+/// `PackURIs` always begin with a forward slash and use forward slashes as path separators,
 /// following the OPC specification. They provide access to various components like
 /// the base URI (directory), filename, extension, and index.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -21,7 +21,7 @@ pub(crate) enum PartNameConflict {
 }
 
 impl PackURI {
-    /// Create a new PackURI from a string.
+    /// Create a new `PackURI` from a string.
     ///
     /// # Arguments
     /// * `uri` - The URI string, which must begin with a forward slash
@@ -32,7 +32,7 @@ impl PackURI {
     pub fn new<S: Into<String>>(uri: S) -> Result<Self, String> {
         let uri = uri.into();
         if !uri.starts_with('/') {
-            return Err(format!("PackURI must begin with slash, got '{}'", uri));
+            return Err(format!("PackURI must begin with slash, got '{uri}'"));
         }
         if uri == "/" {
             return Ok(PackURI { uri });
@@ -89,10 +89,10 @@ impl PackURI {
         Ok(PackURI { uri })
     }
 
-    /// Create a PackURI from a relative reference and a base URI.
+    /// Create a `PackURI` from a relative reference and a base URI.
     ///
     /// This translates a relative reference (like "../styles.xml") onto a base URI
-    /// (like "/word") to produce an absolute PackURI (like "/styles.xml").
+    /// (like "/word") to produce an absolute `PackURI` (like "/styles.xml").
     ///
     /// # Arguments
     /// * `base_uri` - The base URI to resolve from
@@ -130,10 +130,11 @@ impl PackURI {
         Self::new(normalized)
     }
 
-    /// Get the base URI (directory portion) of this PackURI.
+    /// Get the base URI (directory portion) of this `PackURI`.
     ///
     /// For example, "/ppt/slides" for "/ppt/slides/slide1.xml".
     /// For the package pseudo-partname "/", returns "/".
+    #[must_use]
     pub fn base_uri(&self) -> &str {
         if self.uri == "/" {
             return "/";
@@ -146,10 +147,11 @@ impl PackURI {
         }
     }
 
-    /// Get the filename portion of this PackURI.
+    /// Get the filename portion of this `PackURI`.
     ///
     /// For example, "slide1.xml" for "/ppt/slides/slide1.xml".
     /// For the package pseudo-partname "/", returns an empty string.
+    #[must_use]
     pub fn filename(&self) -> &str {
         if let Some(pos) = self.uri.rfind('/') {
             &self.uri[pos + 1..]
@@ -158,9 +160,10 @@ impl PackURI {
         }
     }
 
-    /// Get the extension portion of this PackURI.
+    /// Get the extension portion of this `PackURI`.
     ///
     /// For example, "xml" for "/word/document.xml" (note: no leading period).
+    #[must_use]
     pub fn ext(&self) -> &str {
         let filename = self.filename();
         if let Some(pos) = filename.rfind('.') {
@@ -173,6 +176,7 @@ impl PackURI {
     /// Get the partname index for tuple partnames, or None for singleton partnames.
     ///
     /// For example, returns 21 for "/ppt/slides/slide21.xml" and None for "/ppt/presentation.xml".
+    #[must_use]
     pub fn idx(&self) -> Option<u32> {
         let filename = self.filename();
         if filename.is_empty() {
@@ -214,14 +218,16 @@ impl PackURI {
     ///
     /// This is the form used as the Zip file membername for the package item.
     /// Returns an empty string for the package pseudo-partname "/".
+    #[must_use]
     pub fn membername(&self) -> &str {
         if self.uri == "/" { "" } else { &self.uri[1..] }
     }
 
-    /// Get the relative reference from a base URI to this PackURI.
+    /// Get the relative reference from a base URI to this `PackURI`.
     ///
     /// For example, PackURI("/ppt/slideLayouts/slideLayout1.xml") would return
-    /// "../slideLayouts/slideLayout1.xml" for base_uri "/ppt/slides".
+    /// "../slideLayouts/slideLayout1.xml" for `base_uri` "/ppt/slides".
+    #[must_use]
     pub fn relative_ref(&self, base_uri: &str) -> String {
         // Special case for root base URI
         if base_uri == "/" {
@@ -258,29 +264,31 @@ impl PackURI {
         result
     }
 
-    /// Get the PackURI of the .rels part corresponding to this PackURI.
+    /// Get the `PackURI` of the .rels part corresponding to this `PackURI`.
     ///
     /// For example, "/word/_rels/document.xml.rels" for "/word/document.xml".
     pub fn rels_uri(&self) -> Result<PackURI, String> {
         let filename = self.filename();
         let base_uri = self.base_uri();
 
-        let rels_filename = format!("{}.rels", filename);
+        let rels_filename = format!("{filename}.rels");
         let rels_uri_str = if base_uri == "/" {
-            format!("/_rels/{}", rels_filename)
+            format!("/_rels/{rels_filename}")
         } else {
-            format!("{}/_rels/{}", base_uri, rels_filename)
+            format!("{base_uri}/_rels/{rels_filename}")
         };
 
         Self::new(rels_uri_str)
     }
 
     /// Get the full URI string.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.uri
     }
 
     /// Whether two part names are equivalent under OPC's ASCII case-insensitive rule.
+    #[must_use]
     pub fn is_equivalent_to(&self, other: &Self) -> bool {
         self.uri.eq_ignore_ascii_case(&other.uri)
     }
@@ -301,9 +309,9 @@ impl PackURI {
     /// Helper function to join two paths using forward slashes
     fn join_paths(base: &str, rel: &str) -> String {
         if base.ends_with('/') {
-            format!("{}{}", base, rel)
+            format!("{base}{rel}")
         } else {
-            format!("{}/{}", base, rel)
+            format!("{base}/{rel}")
         }
     }
 
@@ -446,6 +454,11 @@ pub const CONTENT_TYPES_URI: &str = "/[Content_Types].xml";
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]

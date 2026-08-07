@@ -116,7 +116,7 @@ fn hostile_namespaces_identity_content_and_resources_are_rejected() {
         r#"<t:p><t:reference-mark t:name="x"/><t:reference-mark t:name="x"/></t:p>"#,
         r#"<t:p><t:reference-mark t:name="x"/><t:reference-mark-start t:name="x"/><t:reference-mark-end t:name="x"/></t:p>"#,
         r#"<t:p><t:reference-mark t:name="x">bad</t:reference-mark></t:p>"#,
-        r#"<!DOCTYPE x><t:p/>"#,
+        r"<!DOCTYPE x><t:p/>",
     ] {
         let xml = format!(
             r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="{TEXT}" xmlns:u="urn:hostile">{body}</o:text>"#
@@ -141,7 +141,7 @@ fn hostile_namespaces_identity_content_and_resources_are_rejected() {
 #[test]
 fn producer_shaped_point_field_and_overlapping_ranges_round_trip() {
     // LibreOffice/Zotero emits long metadata-bearing names and adjacent range markers.
-    let name = r#"ZOTERO_ITEM CSL_CITATION {&quot;citationID&quot;:&quot;abc&quot;} RNDxyz"#;
+    let name = r"ZOTERO_ITEM CSL_CITATION {&quot;citationID&quot;:&quot;abc&quot;} RNDxyz";
     let xml = wrapped(&format!(
         r#"<t:p><t:reference-mark-start t:name="{name}"/>(<t:span t:style-name="T1">Author</t:span>, 2026)<t:reference-mark-start t:name="second"/> tail<t:reference-mark-end t:name="{name}"/><t:reference-mark-end t:name="second"/></t:p><t:p><t:reference-mark t:name="anchor"/><t:reference-ref t:reference-format="page" t:ref-name="anchor">1</t:reference-ref></t:p>"#
     ));

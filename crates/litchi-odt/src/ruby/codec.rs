@@ -1,4 +1,4 @@
-//! Namespace-aware XML codec for OpenDocument ruby annotations.
+//! Namespace-aware XML codec for `OpenDocument` ruby annotations.
 
 use super::model::Annotation;
 use super::{MAX_DEPTH, MAX_RUBIES};

@@ -1,4 +1,4 @@
-//! Flat and packaged OpenDocument access for footnote separators.
+//! Flat and packaged `OpenDocument` access for footnote separators.
 
 use litchi_core::Result;
 

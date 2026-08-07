@@ -25,10 +25,10 @@ impl Kind {
             1 => Ok(Self::HighLow),
             2 => Ok(Self::Series),
             3 => Ok(Self::Leader),
-            value => Err(Error::InvalidRecordValue {
+            other => Err(Error::InvalidRecordValue {
                 kind: Line::KIND.get(),
                 field: "id",
-                value: u64::from(value),
+                value: u64::from(other),
             }),
         }
     }
@@ -45,6 +45,7 @@ impl Line {
     pub const KIND: RecordKind = RecordKind::from_wire(0x101C);
 
     /// Creates a line marker.
+    #[must_use]
     pub const fn new(kind: Kind) -> Self {
         Self { kind }
     }
@@ -66,11 +67,13 @@ impl Line {
     }
 
     /// Line type.
+    #[must_use]
     pub const fn kind(self) -> Kind {
         self.kind
     }
 
     /// Encodes the fixed-size payload without allocating.
+    #[must_use]
     pub fn payload(self) -> [u8; 2] {
         (self.kind as u16).to_le_bytes()
     }
@@ -93,6 +96,7 @@ impl Link {
     pub const KIND: RecordKind = RecordKind::from_wire(0x1022);
 
     /// Creates a link from the ten opaque bytes that will be preserved.
+    #[must_use]
     pub const fn new(bytes: [u8; 10]) -> Self {
         Self { bytes }
     }
@@ -105,20 +109,24 @@ impl Link {
     /// Decodes a payload supplied by an embedding host.
     pub fn from_payload(payload: &[u8]) -> Result<Self> {
         let payload = record::payload_bytes(Self::KIND, payload, 10)?;
-        let bytes = <[u8; 10]>::try_from(payload).map_err(|_| Error::InvalidRecordLength {
-            kind: Self::KIND.get(),
-            expected: 10,
-            actual: payload.len(),
-        })?;
+        let bytes = <[u8; 10]>::try_from(payload)
+            .ok()
+            .ok_or(Error::InvalidRecordLength {
+                kind: Self::KIND.get(),
+                expected: 10,
+                actual: payload.len(),
+            })?;
         Ok(Self::new(bytes))
     }
 
     /// Opaque bytes retained from input.
+    #[must_use]
     pub const fn bytes(self) -> [u8; 10] {
         self.bytes
     }
 
     /// Encodes the fixed-size payload without allocating.
+    #[must_use]
     pub const fn payload(self) -> [u8; 10] {
         self.bytes
     }
@@ -132,6 +140,11 @@ impl Link {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
     use super::*;
 
     #[test]

@@ -1,9 +1,9 @@
-//! Inert, namespace-aware MathML data model.
+//! Inert, namespace-aware `MathML` data model.
 
-/// The MathML namespace used by Formula documents.
+/// The `MathML` namespace used by Formula documents.
 pub(crate) const MATHML_NAMESPACE: &str = "http://www.w3.org/1998/Math/MathML";
 
-/// A commonly used MathML element kind.
+/// A commonly used `MathML` element kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Kind {
@@ -40,7 +40,7 @@ pub enum Kind {
     TableCell,
     AlignGroup,
     AlignMark,
-    /// A future MathML element or a vendor element in another namespace.
+    /// A future `MathML` element or a vendor element in another namespace.
     Other,
 }
 
@@ -66,35 +66,38 @@ impl Attribute {
     }
 
     /// Return the expanded namespace URI, or `None` for an unqualified attribute.
+    #[must_use]
     pub fn namespace_uri(&self) -> Option<&str> {
         self.namespace_uri.as_deref()
     }
 
     /// Return the XML local name.
+    #[must_use]
     pub fn local_name(&self) -> &str {
         &self.local_name
     }
 
     /// Return the decoded and normalized XML attribute value.
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
 }
 
-/// Ordered mixed content within a MathML element.
+/// Ordered mixed content within a `MathML` element.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Content {
     /// Decoded character content, including CDATA and character references.
     ///
-    /// Named references other than XML's five predefined entities are retained
-    /// in `&name;` notation because MathML 2 documents may declare them in a
+    /// Named references other than `XML`'s five predefined entities are retained
+    /// in `&name;` notation because `MathML` 2 documents may declare them in a
     /// document type definition that is intentionally not evaluated here.
     Text(String),
     /// A child element.
     Element(Element),
 }
 
-/// A complete element in the formula's MathML subtree.
+/// A complete element in the formula's `MathML` subtree.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Element {
     namespace_uri: Option<String>,
@@ -127,16 +130,19 @@ impl Element {
     }
 
     /// Return the element's expanded namespace URI.
+    #[must_use]
     pub fn namespace_uri(&self) -> Option<&str> {
         self.namespace_uri.as_deref()
     }
 
     /// Return the element's XML local name.
+    #[must_use]
     pub fn local_name(&self) -> &str {
         &self.local_name
     }
 
-    /// Classify common MathML elements without discarding unknown ones.
+    /// Classify common `MathML` elements without discarding unknown ones.
+    #[must_use]
     pub fn kind(&self) -> Kind {
         if self.namespace_uri() != Some(MATHML_NAMESPACE) {
             return Kind::Other;
@@ -180,6 +186,7 @@ impl Element {
     }
 
     /// Return all decoded attributes in document order.
+    #[must_use]
     pub fn attributes(&self) -> &[Attribute] {
         &self.attributes
     }
@@ -195,6 +202,7 @@ impl Element {
     }
 
     /// Return ordered mixed content.
+    #[must_use]
     pub fn content(&self) -> &[Content] {
         &self.content
     }
@@ -208,6 +216,7 @@ impl Element {
     }
 
     /// Compose all descendant character content in exact element/text order.
+    #[must_use]
     pub fn all_text(&self) -> String {
         fn append(element: &Element, output: &mut String) {
             for content in &element.content {

@@ -20,16 +20,19 @@ impl Change {
     }
 
     /// Properties required before this change can be applied.
+    #[must_use]
     pub const fn before(self) -> Props {
         self.before
     }
 
     /// Properties produced by this change.
+    #[must_use]
     pub const fn after(self) -> Props {
         self.after
     }
 
     /// Source-relative byte offset of the fixed `ShtProps` record header.
+    #[must_use]
     pub const fn offset(self) -> usize {
         self.offset
     }

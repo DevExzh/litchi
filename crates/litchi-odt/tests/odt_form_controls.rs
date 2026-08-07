@@ -123,7 +123,7 @@ fn reads_fixture_form_controls_as_typed_inert_data() {
     let document = litchi_odt::generic::FlatDocument::open(FIXTURE).unwrap();
     let forms = document.forms().unwrap();
     assert_eq!(forms.groups.len(), 1);
-    assert!(forms.groups[0].apply_design_mode == Some(true));
+    assert_eq!(forms.groups[0].apply_design_mode, Some(true));
     assert_eq!(forms.groups[0].forms.len(), 1);
     let form = &forms.groups[0].forms[0];
     assert_eq!(form.name.as_deref(), Some("registration"));

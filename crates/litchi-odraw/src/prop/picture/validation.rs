@@ -17,7 +17,7 @@ pub(super) fn decode<'data>(
 }
 
 pub(super) fn validate_name(raw: &[u8]) -> Result<()> {
-    if raw.is_empty() || raw.len() > MAX_NAME_BYTES || raw.len() % 2 != 0 {
+    if raw.is_empty() || raw.len() > MAX_NAME_BYTES || !raw.len().is_multiple_of(2) {
         return Err(Error::MalformedProperties {
             reason: "picture name must be a bounded even-length UTF-16 string",
         });
@@ -36,7 +36,7 @@ pub(super) fn validate_name(raw: &[u8]) -> Result<()> {
             reason: "picture name contains an interior NUL",
         });
     }
-    String::from_utf16(&units[..units.len() - 1]).map_err(|_| Error::MalformedProperties {
+    String::from_utf16(&units[..units.len() - 1]).map_err(|_err| Error::MalformedProperties {
         reason: "picture name is not valid UTF-16",
     })?;
     Ok(())
@@ -79,7 +79,7 @@ fn picture_name<'data>(properties: &Props<'data>) -> Result<Option<Name<'data>>>
     }
     let raw = match property.value() {
         Value::Complex(raw) => *raw,
-        _ => {
+        Value::Simple(_) | Value::Array(_) => {
             return Err(Error::MalformedProperties {
                 reason: "picture name is not a scalar Unicode payload",
             });

@@ -10,7 +10,7 @@ impl crate::Package {
 }
 
 impl crate::FlatDocument {
-    /// Every `draw:image-map` in a flat OpenDocument, in document order.
+    /// Every `draw:image-map` in a flat `OpenDocument`, in document order.
     pub fn image_maps(&self) -> Result<Vec<ImageMap>> {
         parse_image_maps(self.xml())
     }

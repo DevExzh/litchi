@@ -91,7 +91,7 @@ impl Paragraph {
     /// Get all text spans within this paragraph
     pub fn spans(&self) -> Result<Vec<Span>> {
         let mut spans = Vec::new();
-        for child in self.element.children.iter() {
+        for child in &self.element.children {
             if child.tag_name() == "text:span"
                 && let Ok(span) = Span::from_element(child.clone())
             {
@@ -353,7 +353,7 @@ impl Default for Hyperlink {
 }
 
 impl Hyperlink {
-    /// Create a new `text:a` hyperlink with its XLink type set to `simple`.
+    /// Create a new `text:a` hyperlink with its `XLink` type set to `simple`.
     ///
     /// Set a target with [`Self::set_href`] before inserting the hyperlink,
     /// or use [`Self::with_href`] to create a fully valid link in one step.
@@ -442,7 +442,7 @@ impl Hyperlink {
         self.element.get_attribute("xlink:type")
     }
 
-    /// Get the optional XLink display behavior (`xlink:show`).
+    /// Get the optional `XLink` display behavior (`xlink:show`).
     ///
     /// Returns `None` when the attribute is absent or malformed; use
     /// [`Self::validate`] to distinguish those cases.
@@ -452,7 +452,7 @@ impl Hyperlink {
             .and_then(LinkShow::parse)
     }
 
-    /// Set or omit the XLink display behavior (`xlink:show`).
+    /// Set or omit the `XLink` display behavior (`xlink:show`).
     pub fn set_show(&mut self, show: Option<LinkShow>) {
         match show {
             Some(show) => self.element.set_attribute("xlink:show", show.as_str()),
@@ -460,7 +460,7 @@ impl Hyperlink {
         }
     }
 
-    /// Get the optional explicit XLink activation behavior (`xlink:actuate`).
+    /// Get the optional explicit `XLink` activation behavior (`xlink:actuate`).
     ///
     /// Returns `None` when the attribute is absent or malformed; use
     /// [`Self::validate`] to distinguish those cases.
@@ -470,7 +470,7 @@ impl Hyperlink {
             .and_then(LinkActuate::parse)
     }
 
-    /// Set or omit the explicit XLink activation behavior (`xlink:actuate`).
+    /// Set or omit the explicit `XLink` activation behavior (`xlink:actuate`).
     pub fn set_actuate(&mut self, actuate: Option<LinkActuate>) {
         match actuate {
             Some(actuate) => self
@@ -663,7 +663,7 @@ impl List {
     /// Get list items
     pub fn items(&self) -> Result<Vec<ListItem>> {
         let mut items = Vec::new();
-        for child in self.element.children.iter() {
+        for child in &self.element.children {
             if child.tag_name() == "text:list-item"
                 && let Ok(item) = ListItem::from_element(child.clone())
             {
@@ -680,7 +680,7 @@ impl List {
     /// the author typed just like any item, so it is reported separately from
     /// [`items`](Self::items) rather than dropped.
     pub fn header(&self) -> Result<Option<ListHeader>> {
-        for child in self.element.children.iter() {
+        for child in &self.element.children {
             if child.tag_name() == LIST_HEADER_TAG {
                 return ListHeader::from_element(child.clone()).map(Some);
             }
@@ -765,7 +765,7 @@ impl ListHeader {
     /// Get the paragraphs the header contains.
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         let mut paragraphs = Vec::new();
-        for child in self.element.children.iter() {
+        for child in &self.element.children {
             if child.tag_name() == "text:p"
                 && let Ok(paragraph) = Paragraph::from_element(child.clone())
             {
@@ -830,7 +830,7 @@ impl ListItem {
     /// Get nested paragraphs
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         let mut paragraphs = Vec::new();
-        for child in self.element.children.iter() {
+        for child in &self.element.children {
             if child.tag_name() == "text:p"
                 && let Ok(para) = Paragraph::from_element(child.clone())
             {

@@ -9,6 +9,7 @@ pub struct Anchor {
 
 impl Anchor {
     #[inline]
+    #[must_use]
     pub const fn new(left: i32, top: i32, right: i32, bottom: i32) -> Self {
         Self {
             left,
@@ -19,11 +20,13 @@ impl Anchor {
     }
 
     #[inline]
+    #[must_use]
     pub const fn width(&self) -> Option<i32> {
         self.right.checked_sub(self.left)
     }
 
     #[inline]
+    #[must_use]
     pub const fn height(&self) -> Option<i32> {
         self.bottom.checked_sub(self.top)
     }

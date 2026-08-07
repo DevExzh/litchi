@@ -1,13 +1,13 @@
 use crate::{Error, Result};
 
-/// Maximum number of UTF-16 code units accepted in one OfficeArt name,
+/// Maximum number of UTF-16 code units accepted in one `OfficeArt` name,
 /// excluding its terminating NUL.
 pub const MAX_NAME_UNITS: usize = 4096;
 
-/// Maximum encoded byte length of one OfficeArt name, including its NUL.
+/// Maximum encoded byte length of one `OfficeArt` name, including its NUL.
 pub const MAX_NAME_BYTES: usize = (MAX_NAME_UNITS + 1) * 2;
 
-/// Maximum OfficeArt property-record body retained by a picture snapshot.
+/// Maximum `OfficeArt` property-record body retained by a picture snapshot.
 pub const MAX_SNAPSHOT_BYTES: usize = 16 * 1024 * 1024;
 
 /// The semantic meaning of a picture name.
@@ -36,6 +36,11 @@ impl Flags {
     const DEFINED_MASK: u32 = Self::KIND_MASK | Self::DO_NOT_SAVE | Self::LINK_TO_FILE;
 
     /// Creates checked flags from their semantic components.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedProperties` if `do_not_save` is set without
+    /// `link_to_file`, or if `link_to_file` is set for a comment name.
     pub fn new(kind: Kind, link_to_file: bool, do_not_save: bool) -> Result<Self> {
         if do_not_save && !link_to_file {
             return Err(Error::MalformedProperties {
@@ -59,6 +64,12 @@ impl Flags {
     }
 
     /// Decodes flags while retaining undefined producer bits.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MalformedProperties` if the kind bits hold the reserved
+    /// value 3, if do-not-save is set without link-to-file, or if link-to-file
+    /// is set for a comment name.
     pub fn from_raw(raw: u32) -> Result<Self> {
         let kind = raw & Self::KIND_MASK;
         if kind == 3 {
@@ -82,11 +93,13 @@ impl Flags {
     }
 
     /// Returns the exact 32-bit flags value, including reserved bits.
+    #[must_use]
     pub const fn raw(self) -> u32 {
         self.0
     }
 
     /// Returns the semantic name kind.
+    #[must_use]
     pub const fn kind(self) -> Kind {
         match self.0 & Self::KIND_MASK {
             1 => Kind::File,
@@ -96,22 +109,25 @@ impl Flags {
     }
 
     /// Returns whether the BLIP is linked to a file or URL.
+    #[must_use]
     pub const fn link_to_file(self) -> bool {
         self.0 & Self::LINK_TO_FILE != 0
     }
 
     /// Returns whether the BLIP must not be embedded on save.
+    #[must_use]
     pub const fn do_not_save(self) -> bool {
         self.0 & Self::DO_NOT_SAVE != 0
     }
 
     /// Returns the exact undefined bits retained from the producer.
+    #[must_use]
     pub const fn reserved(self) -> u32 {
         self.0 & !Self::DEFINED_MASK
     }
 }
 
-/// A checked, zero-copy view of one null-terminated OfficeArt Unicode name.
+/// A checked, zero-copy view of one null-terminated `OfficeArt` Unicode name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Name<'data> {
     raw: &'data [u8],
@@ -123,11 +139,13 @@ impl<'data> Name<'data> {
     }
 
     /// Returns the exact UTF-16LE bytes, including the terminating NUL.
+    #[must_use]
     pub const fn raw_bytes(self) -> &'data [u8] {
         self.raw
     }
 
     /// Returns the number of UTF-16 code units excluding the terminator.
+    #[must_use]
     pub fn unit_len(self) -> usize {
         self.raw.len() / 2 - 1
     }
@@ -139,7 +157,7 @@ impl<'data> Name<'data> {
             .chunks_exact(2)
             .take(self.unit_len())
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
-        String::from_utf16(&units.collect::<Vec<_>>()).map_err(|_| Error::MalformedProperties {
+        String::from_utf16(&units.collect::<Vec<_>>()).map_err(|_err| Error::MalformedProperties {
             reason: "picture name is not valid UTF-16",
         })
     }
@@ -158,11 +176,13 @@ impl<'data> Metadata<'data> {
     }
 
     /// Returns the optional picture comment, file name, or URL.
+    #[must_use]
     pub const fn name(self) -> Option<Name<'data>> {
         self.name
     }
 
     /// Returns the effective BLIP-name flags, including retained reserved bits.
+    #[must_use]
     pub const fn flags(self) -> Flags {
         self.flags
     }

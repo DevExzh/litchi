@@ -300,7 +300,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     return Err(bad("list-level-label-alignment must be empty"));
                 }
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,

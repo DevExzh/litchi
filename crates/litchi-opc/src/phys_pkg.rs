@@ -13,7 +13,7 @@ use std::path::Path;
 
 /// Physical package reader that provides access to parts in a ZIP-based OPC package.
 ///
-/// Uses soapberry_zip for high-performance zero-copy ZIP parsing with lazy decompression.
+/// Uses `soapberry_zip` for high-performance zero-copy ZIP parsing with lazy decompression.
 /// File contents are decompressed on-demand and cached for efficiency. This enables
 /// pipelining of decompression with XML parsing for better throughput.
 pub struct PhysPkgReader<'data> {
@@ -21,7 +21,7 @@ pub struct PhysPkgReader<'data> {
     archive: LazyArchiveReader<'data>,
 }
 
-/// Owned version of PhysPkgReader that owns the data buffer.
+/// Owned version of `PhysPkgReader` that owns the data buffer.
 ///
 /// This is used when reading from files or readers where we need to own the data.
 pub struct OwnedPhysPkgReader {
@@ -36,7 +36,7 @@ impl OwnedPhysPkgReader {
     /// * `path` - Path to the OPC package file (.docx, .xlsx, .pptx, etc.)
     ///
     /// # Returns
-    /// A new OwnedPhysPkgReader instance
+    /// A new `OwnedPhysPkgReader` instance
     ///
     /// # Errors
     /// Returns an error if the file doesn't exist, isn't a valid ZIP file,
@@ -52,20 +52,20 @@ impl OwnedPhysPkgReader {
         Self::from_bytes(data)
     }
 
-    /// Create a new OwnedPhysPkgReader from owned bytes.
+    /// Create a new `OwnedPhysPkgReader` from owned bytes.
     pub fn from_bytes(data: Vec<u8>) -> Result<Self> {
         // Validate the ZIP archive can be parsed
         let _ = LazyArchiveReader::new(&data)?;
         Ok(Self { data })
     }
 
-    /// Create a new OwnedPhysPkgReader from a reader.
+    /// Create a new `OwnedPhysPkgReader` from a reader.
     ///
     /// # Arguments
     /// * `reader` - A reader that implements Read
     ///
     /// # Returns
-    /// A new OwnedPhysPkgReader instance
+    /// A new `OwnedPhysPkgReader` instance
     pub fn from_reader<R: Read>(mut reader: R) -> Result<Self> {
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
@@ -78,7 +78,7 @@ impl OwnedPhysPkgReader {
         PhysPkgReader::new(&self.data)
     }
 
-    /// Get the binary content for a part by its PackURI.
+    /// Get the binary content for a part by its `PackURI`.
     #[inline]
     pub fn blob_for(&self, pack_uri: &PackURI) -> Result<Vec<u8>> {
         self.reader()?.blob_for(pack_uri)
@@ -122,37 +122,39 @@ impl OwnedPhysPkgReader {
 
     /// Consume self and return the underlying data.
     #[inline]
+    #[must_use]
     pub fn into_inner(self) -> Vec<u8> {
         self.data
     }
 
     /// Get a reference to the underlying data.
     #[inline]
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.data
     }
 }
 
 impl<'data> PhysPkgReader<'data> {
-    /// Create a new PhysPkgReader from a byte slice.
+    /// Create a new `PhysPkgReader` from a byte slice.
     ///
     /// # Arguments
     /// * `data` - The ZIP archive data as a byte slice
     ///
     /// # Returns
-    /// A new PhysPkgReader instance
+    /// A new `PhysPkgReader` instance
     pub fn new(data: &'data [u8]) -> Result<Self> {
         let archive = LazyArchiveReader::new(data)?;
         Ok(Self { archive })
     }
 
-    /// Get the binary content for a part by its PackURI.
+    /// Get the binary content for a part by its `PackURI`.
     ///
     /// Uses efficient lazy decompression. The returned vector contains
     /// the decompressed content.
     ///
     /// # Arguments
-    /// * `pack_uri` - The PackURI of the part to read
+    /// * `pack_uri` - The `PackURI` of the part to read
     ///
     /// # Returns
     /// The binary content of the part
@@ -161,7 +163,7 @@ impl<'data> PhysPkgReader<'data> {
 
         self.archive
             .read(membername)
-            .map_err(|_| OpcError::PartNotFound(pack_uri.to_string()))
+            .map_err(|_err| OpcError::PartNotFound(pack_uri.to_string()))
     }
 
     /// Get the `[Content_Types].xml` content.
@@ -179,7 +181,7 @@ impl<'data> PhysPkgReader<'data> {
     /// Returns None if the source has no relationships file.
     ///
     /// # Arguments
-    /// * `source_uri` - The PackURI of the source (part or package)
+    /// * `source_uri` - The `PackURI` of the source (part or package)
     pub fn rels_xml_for(&self, source_uri: &PackURI) -> Result<Option<Vec<u8>>> {
         let rels_uri = source_uri.rels_uri().map_err(OpcError::InvalidPackUri)?;
 
@@ -213,7 +215,7 @@ impl<'data> PhysPkgReader<'data> {
     /// Uses the pre-built index for O(1) lookup.
     ///
     /// # Arguments
-    /// * `pack_uri` - The PackURI to check
+    /// * `pack_uri` - The `PackURI` to check
     pub fn contains(&self, pack_uri: &PackURI) -> bool {
         let membername = pack_uri.membername();
         self.archive.contains(membername)
@@ -225,13 +227,13 @@ impl<'data> PhysPkgReader<'data> {
     /// when reading many parts at once.
     ///
     /// # Arguments
-    /// * `uris` - Slice of PackURIs to read
+    /// * `uris` - Slice of `PackURIs` to read
     ///
     /// # Returns
-    /// A HashMap mapping member names to their decompressed contents.
+    /// A `HashMap` mapping member names to their decompressed contents.
     /// Parts that fail to read are not included in the result.
     pub fn blobs_parallel(&self, uris: &[PackURI]) -> std::collections::HashMap<String, Vec<u8>> {
-        let names: Vec<&str> = uris.iter().map(|uri| uri.membername()).collect();
+        let names: Vec<&str> = uris.iter().map(PackURI::membername).collect();
         self.archive.read_many_parallel(&names)
     }
 
@@ -256,6 +258,7 @@ pub struct PhysPkgWriter<W: Write = Cursor<Vec<u8>>> {
 
 impl PhysPkgWriter<Cursor<Vec<u8>>> {
     /// Create a new package writer that writes to memory.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             archive: soapberry_zip::office::StreamingArchiveWriter::new(),
@@ -283,7 +286,7 @@ impl<W: Write> PhysPkgWriter<W> {
     /// Write a part to the package with Deflate compression.
     ///
     /// # Arguments
-    /// * `pack_uri` - The PackURI for the part
+    /// * `pack_uri` - The `PackURI` for the part
     /// * `blob` - The binary content to write
     pub fn write(&mut self, pack_uri: &PackURI, blob: &[u8]) -> Result<()> {
         self.archive
@@ -294,7 +297,7 @@ impl<W: Write> PhysPkgWriter<W> {
     /// Write a part to the package without compression (stored).
     ///
     /// # Arguments
-    /// * `pack_uri` - The PackURI for the part
+    /// * `pack_uri` - The `PackURI` for the part
     /// * `blob` - The binary content to write
     pub fn write_stored(&mut self, pack_uri: &PackURI, blob: &[u8]) -> Result<()> {
         self.archive
@@ -318,6 +321,11 @@ impl Default for PhysPkgWriter<Cursor<Vec<u8>>> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]

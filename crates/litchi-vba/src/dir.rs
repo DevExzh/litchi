@@ -62,14 +62,287 @@ pub(crate) struct WriteModule<'a> {
     pub(crate) private: bool,
 }
 
+/// Parsed metadata from an MS-OVBA `dir` stream.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Dir {
+    page: Mbcs,
+    project_name: String,
+    modules: Vec<Module>,
+}
+
+impl Dir {
+    /// Parse a complete compressed `dir` stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the compressed container or the decompressed
+    /// records are malformed, a configured [`Limits`] ceiling is exceeded, or
+    /// the declared code page is unsupported.
+    pub fn parse(compressed: &[u8], limits: &Limits) -> Result<Self, Error> {
+        let decompressed = codec::decode(compressed, limits)?;
+        Self::parse_decompressed(&decompressed, limits)
+    }
+
+    /// Checked page used by MBCS strings and module source.
+    #[must_use]
+    pub fn page(&self) -> Mbcs {
+        self.page
+    }
+
+    /// Numeric page identifier stored in `PROJECTCODEPAGE`.
+    #[must_use]
+    pub fn page_id(&self) -> u16 {
+        self.page.id16()
+    }
+
+    /// VBA project identifier from `PROJECTNAME`.
+    #[must_use]
+    pub fn project_name(&self) -> &str {
+        &self.project_name
+    }
+
+    /// Module metadata in directory order.
+    #[must_use]
+    pub fn modules(&self) -> &[Module] {
+        &self.modules
+    }
+
+    fn parse_decompressed(data: &[u8], limits: &Limits) -> Result<Self, Error> {
+        let (information_end, page, project_name_bytes) = parse_project_information(data, limits)?;
+        let project_name = decode_mbcs(&project_name_bytes, page, "PROJECTNAME")?;
+        let modules = find_modules(&data[information_end..], page, limits)?;
+        Ok(Self {
+            page,
+            project_name,
+            modules,
+        })
+    }
+}
+
+/// Broad module category encoded by `MODULETYPE`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Kind {
+    /// Standard procedural module.
+    Procedural,
+    /// Document, class, or designer module.
+    DocumentClassOrDesigner,
+}
+
+/// Metadata locating one module's inert source stream.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Module {
+    name: String,
+    stream_name: String,
+    text_offset: u32,
+    kind: Kind,
+    read_only: bool,
+    private: bool,
+}
+
+impl Module {
+    /// VBA identifier for this module.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// CFB stream name containing this module.
+    #[must_use]
+    pub fn stream_name(&self) -> &str {
+        &self.stream_name
+    }
+
+    /// Byte offset at which compressed source begins in the module stream.
+    #[must_use]
+    pub fn text_offset(&self) -> u32 {
+        self.text_offset
+    }
+
+    /// Broad module category from `MODULETYPE`.
+    #[must_use]
+    pub fn kind(&self) -> Kind {
+        self.kind
+    }
+
+    /// Whether `MODULEREADONLY` is present.
+    #[must_use]
+    pub fn is_read_only(&self) -> bool {
+        self.read_only
+    }
+
+    /// Whether `MODULEPRIVATE` is present.
+    #[must_use]
+    pub fn is_private(&self) -> bool {
+        self.private
+    }
+}
+
+struct Reader<'a> {
+    data: &'a [u8],
+    position: usize,
+}
+
+impl<'a> Reader<'a> {
+    fn new(data: &'a [u8], position: usize) -> Self {
+        Self { data, position }
+    }
+
+    fn peek_u16(&self) -> Option<u16> {
+        read_u16_at(self.data, self.position)
+    }
+
+    fn read_u16(&mut self) -> Result<u16, Error> {
+        let value = read_u16_at(self.data, self.position)
+            .ok_or_else(|| invalid("truncated 16-bit dir-stream field"))?;
+        self.position += 2;
+        Ok(value)
+    }
+
+    fn read_u32(&mut self) -> Result<u32, Error> {
+        let value = read_u32_at(self.data, self.position)
+            .ok_or_else(|| invalid("truncated 32-bit dir-stream field"))?;
+        self.position += 4;
+        Ok(value)
+    }
+
+    fn read_bytes(&mut self, length: usize) -> Result<&'a [u8], Error> {
+        let end = self
+            .position
+            .checked_add(length)
+            .ok_or_else(|| invalid("dir-stream field length overflow"))?;
+        let value = self
+            .data
+            .get(self.position..end)
+            .ok_or_else(|| invalid("truncated dir-stream field"))?;
+        self.position = end;
+        Ok(value)
+    }
+
+    fn expect_id(&mut self, expected: u16) -> Result<(), Error> {
+        let actual = self.read_u16()?;
+        if actual != expected {
+            return Err(invalid(format!(
+                "expected dir record {expected:#06x}, found {actual:#06x}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn expect_u32(&mut self, expected: u32, field: &'static str) -> Result<(), Error> {
+        let actual = self.read_u32()?;
+        if actual != expected {
+            return Err(invalid(format!(
+                "{field} must be {expected:#010x}, found {actual:#010x}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn expect_sized_u32(&mut self, id: u16, size: u32) -> Result<(), Error> {
+        self.expect_id(id)?;
+        self.expect_u32(size, "dir record size")
+    }
+
+    fn length_prefixed(&mut self, limits: &Limits) -> Result<&'a [u8], Error> {
+        let Ok(length) = usize::try_from(self.read_u32()?) else {
+            return Err(invalid("dir-stream string length does not fit usize"));
+        };
+        check_limit("VBA string bytes", length, limits.max_string_bytes)?;
+        self.read_bytes(length)
+    }
+
+    fn length_prefixed_bounded(
+        &mut self,
+        limits: &Limits,
+        protocol_maximum: usize,
+        field: &'static str,
+    ) -> Result<&'a [u8], Error> {
+        let value = self.length_prefixed(limits)?;
+        if value.len() > protocol_maximum {
+            return Err(invalid(format!(
+                "{field} length {} exceeds {protocol_maximum}",
+                value.len()
+            )));
+        }
+        Ok(value)
+    }
+
+    fn string_pair(
+        &mut self,
+        encoding: Mbcs,
+        reserved: u16,
+        field: &'static str,
+        limits: &Limits,
+    ) -> Result<String, Error> {
+        self.string_pair_bounded(encoding, reserved, field, limits, usize::MAX)
+    }
+
+    fn string_pair_bounded(
+        &mut self,
+        encoding: Mbcs,
+        reserved: u16,
+        field: &'static str,
+        limits: &Limits,
+        protocol_maximum: usize,
+    ) -> Result<String, Error> {
+        let mbcs = decode_mbcs(
+            self.length_prefixed_bounded(limits, protocol_maximum, field)?,
+            encoding,
+            field,
+        )?;
+        let actual_reserved = self.read_u16()?;
+        if actual_reserved != reserved {
+            return Err(invalid(format!(
+                "{field} reserved id must be {reserved:#06x}, found {actual_reserved:#06x}"
+            )));
+        }
+        let unicode_bytes =
+            self.length_prefixed_bounded(limits, protocol_maximum.saturating_mul(2), field)?;
+        let unicode = decode_utf16(unicode_bytes, field)?;
+        if unicode != mbcs {
+            return Err(invalid(format!(
+                "{field} Unicode value does not match its MBCS value"
+            )));
+        }
+        Ok(unicode)
+    }
+
+    fn mbcs_pair_bounded(
+        &mut self,
+        encoding: Mbcs,
+        reserved: u16,
+        field: &'static str,
+        limits: &Limits,
+        protocol_maximum: usize,
+    ) -> Result<String, Error> {
+        let first_bytes = self.length_prefixed_bounded(limits, protocol_maximum, field)?;
+        let first = decode_mbcs(first_bytes, encoding, field)?;
+        let actual_reserved = self.read_u16()?;
+        if actual_reserved != reserved {
+            return Err(invalid(format!(
+                "{field} reserved id must be {reserved:#06x}, found {actual_reserved:#06x}"
+            )));
+        }
+        let second_bytes = self.length_prefixed_bounded(limits, protocol_maximum, field)?;
+        let second = decode_mbcs(second_bytes, encoding, field)?;
+        if first_bytes != second_bytes || first != second {
+            return Err(invalid(format!(
+                "{field} duplicate path values do not match"
+            )));
+        }
+        Ok(first)
+    }
+}
+
 pub(crate) fn encode_dir(project: &WriteProject<'_>, limits: &Limits) -> Result<Vec<u8>, Error> {
     check_limit(
         "VBA module count",
         project.modules.len(),
         limits.max_modules,
     )?;
-    let module_count = u16::try_from(project.modules.len())
-        .map_err(|_| invalid("VBA module count exceeds the dir-stream field"))?;
+    let Ok(module_count) = u16::try_from(project.modules.len()) else {
+        return Err(invalid("VBA module count exceeds the dir-stream field"));
+    };
     let encoding = project.page;
     let mut output = Vec::new();
 
@@ -211,15 +484,15 @@ fn encode_module(
 }
 
 fn push_record(output: &mut Vec<u8>, id: u16, value: &[u8]) -> Result<(), Error> {
-    let length =
-        u32::try_from(value.len()).map_err(|_| invalid("dir-stream record length exceeds u32"))?;
+    let Ok(length) = u32::try_from(value.len()) else {
+        return Err(invalid("dir-stream record length exceeds u32"));
+    };
     output.extend_from_slice(&id.to_le_bytes());
     output.extend_from_slice(&length.to_le_bytes());
     output.extend_from_slice(value);
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn push_string_pair(
     output: &mut Vec<u8>,
     id: u16,
@@ -241,7 +514,6 @@ fn push_string_pair(
     push_length_prefixed(output, &unicode)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn push_mbcs_pair(
     output: &mut Vec<u8>,
     id: u16,
@@ -261,8 +533,9 @@ fn push_mbcs_pair(
 }
 
 fn push_length_prefixed(output: &mut Vec<u8>, value: &[u8]) -> Result<(), Error> {
-    let length =
-        u32::try_from(value.len()).map_err(|_| invalid("dir-stream string length exceeds u32"))?;
+    let Ok(length) = u32::try_from(value.len()) else {
+        return Err(invalid("dir-stream string length exceeds u32"));
+    };
     output.extend_from_slice(&length.to_le_bytes());
     output.extend_from_slice(value);
     Ok(())
@@ -285,11 +558,14 @@ pub(crate) fn encode_mbcs(
     if value.contains('\0') {
         return Err(invalid(format!("{field} contains a null character")));
     }
-    let encoded = encoding.encode(value).map_err(|_| {
-        invalid(format!(
-            "{field} is not representable in the project code page"
-        ))
-    })?;
+    let encoded = match encoding.encode(value) {
+        Ok(encoded) => encoded,
+        Err(_) => {
+            return Err(invalid(format!(
+                "{field} is not representable in the project code page"
+            )));
+        },
+    };
     if encoded.contains(&0) {
         return Err(invalid(format!("{field} encodes to a null byte")));
     }
@@ -301,105 +577,6 @@ fn encode_utf16(value: &str, field: &'static str) -> Result<Vec<u8>, Error> {
         return Err(invalid(format!("{field} contains a null character")));
     }
     Ok(value.encode_utf16().flat_map(u16::to_le_bytes).collect())
-}
-
-/// Parsed metadata from an MS-OVBA `dir` stream.
-#[derive(Debug, PartialEq, Eq)]
-pub struct Dir {
-    page: Mbcs,
-    project_name: String,
-    modules: Vec<Module>,
-}
-
-impl Dir {
-    /// Parse a complete compressed `dir` stream.
-    pub fn parse(compressed: &[u8], limits: &Limits) -> Result<Self, Error> {
-        let decompressed = codec::decode(compressed, limits)?;
-        Self::parse_decompressed(&decompressed, limits)
-    }
-
-    /// Checked page used by MBCS strings and module source.
-    pub fn page(&self) -> Mbcs {
-        self.page
-    }
-
-    /// Numeric page identifier stored in `PROJECTCODEPAGE`.
-    pub fn page_id(&self) -> u16 {
-        self.page.id16()
-    }
-
-    /// VBA project identifier from `PROJECTNAME`.
-    pub fn project_name(&self) -> &str {
-        &self.project_name
-    }
-
-    /// Module metadata in directory order.
-    pub fn modules(&self) -> &[Module] {
-        &self.modules
-    }
-
-    fn parse_decompressed(data: &[u8], limits: &Limits) -> Result<Self, Error> {
-        let (information_end, page, project_name) = parse_project_information(data, limits)?;
-        let project_name = decode_mbcs(&project_name, page, "PROJECTNAME")?;
-        let modules = find_modules(&data[information_end..], page, limits)?;
-        Ok(Self {
-            page,
-            project_name,
-            modules,
-        })
-    }
-}
-
-/// Broad module category encoded by `MODULETYPE`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Kind {
-    /// Standard procedural module.
-    Procedural,
-    /// Document, class, or designer module.
-    DocumentClassOrDesigner,
-}
-
-/// Metadata locating one module's inert source stream.
-#[derive(Debug, PartialEq, Eq)]
-pub struct Module {
-    name: String,
-    stream_name: String,
-    text_offset: u32,
-    kind: Kind,
-    read_only: bool,
-    private: bool,
-}
-
-impl Module {
-    /// VBA identifier for this module.
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// CFB stream name containing this module.
-    pub fn stream_name(&self) -> &str {
-        &self.stream_name
-    }
-
-    /// Byte offset at which compressed source begins in the module stream.
-    pub fn text_offset(&self) -> u32 {
-        self.text_offset
-    }
-
-    /// Broad module category from `MODULETYPE`.
-    pub fn kind(&self) -> Kind {
-        self.kind
-    }
-
-    /// Whether `MODULEREADONLY` is present.
-    pub fn is_read_only(&self) -> bool {
-        self.read_only
-    }
-
-    /// Whether `MODULEPRIVATE` is present.
-    pub fn is_private(&self) -> bool {
-        self.private
-    }
 }
 
 fn parse_project_information(
@@ -467,24 +644,6 @@ fn parse_project_information(
         )?;
     }
     Ok((reader.position, encoding, project_name))
-}
-
-impl<'a> Reader<'a> {
-    fn length_prefixed_bounded(
-        &mut self,
-        limits: &Limits,
-        protocol_maximum: usize,
-        field: &'static str,
-    ) -> Result<&'a [u8], Error> {
-        let value = self.length_prefixed(limits)?;
-        if value.len() > protocol_maximum {
-            return Err(invalid(format!(
-                "{field} length {} exceeds {protocol_maximum}",
-                value.len()
-            )));
-        }
-        Ok(value)
-    }
 }
 
 fn find_modules(data: &[u8], encoding: Mbcs, limits: &Limits) -> Result<Vec<Module>, Error> {
@@ -601,9 +760,14 @@ fn decode_mbcs(bytes: &[u8], encoding: Mbcs, field: &'static str) -> Result<Stri
     if bytes.contains(&0) {
         return Err(invalid(format!("{field} contains a null byte")));
     }
-    let decoded = encoding
-        .decode(bytes)
-        .map_err(|_| invalid(format!("{field} is invalid for the project code page")))?;
+    let decoded = match encoding.decode(bytes) {
+        Ok(decoded) => decoded,
+        Err(_) => {
+            return Err(invalid(format!(
+                "{field} is invalid for the project code page"
+            )));
+        },
+    };
     Ok(decoded.into_owned())
 }
 
@@ -616,154 +780,16 @@ fn decode_utf16(bytes: &[u8], field: &'static str) -> Result<String, Error> {
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
     let mut value = String::with_capacity(bytes.len() / 2);
     for character in char::decode_utf16(code_units) {
-        let character =
-            character.map_err(|_| invalid(format!("{field} contains invalid UTF-16")))?;
+        let character = match character {
+            Ok(character) => character,
+            Err(_) => return Err(invalid(format!("{field} contains invalid UTF-16"))),
+        };
         if character == '\0' {
             return Err(invalid(format!("{field} contains a null character")));
         }
         value.push(character);
     }
     Ok(value)
-}
-
-struct Reader<'a> {
-    data: &'a [u8],
-    position: usize,
-}
-
-impl<'a> Reader<'a> {
-    fn new(data: &'a [u8], position: usize) -> Self {
-        Self { data, position }
-    }
-
-    fn peek_u16(&self) -> Option<u16> {
-        read_u16_at(self.data, self.position)
-    }
-
-    fn read_u16(&mut self) -> Result<u16, Error> {
-        let value = read_u16_at(self.data, self.position)
-            .ok_or_else(|| invalid("truncated 16-bit dir-stream field"))?;
-        self.position += 2;
-        Ok(value)
-    }
-
-    fn read_u32(&mut self) -> Result<u32, Error> {
-        let value = read_u32_at(self.data, self.position)
-            .ok_or_else(|| invalid("truncated 32-bit dir-stream field"))?;
-        self.position += 4;
-        Ok(value)
-    }
-
-    fn read_bytes(&mut self, length: usize) -> Result<&'a [u8], Error> {
-        let end = self
-            .position
-            .checked_add(length)
-            .ok_or_else(|| invalid("dir-stream field length overflow"))?;
-        let value = self
-            .data
-            .get(self.position..end)
-            .ok_or_else(|| invalid("truncated dir-stream field"))?;
-        self.position = end;
-        Ok(value)
-    }
-
-    fn expect_id(&mut self, expected: u16) -> Result<(), Error> {
-        let actual = self.read_u16()?;
-        if actual != expected {
-            return Err(invalid(format!(
-                "expected dir record {expected:#06x}, found {actual:#06x}"
-            )));
-        }
-        Ok(())
-    }
-
-    fn expect_u32(&mut self, expected: u32, field: &'static str) -> Result<(), Error> {
-        let actual = self.read_u32()?;
-        if actual != expected {
-            return Err(invalid(format!(
-                "{field} must be {expected:#010x}, found {actual:#010x}"
-            )));
-        }
-        Ok(())
-    }
-
-    fn expect_sized_u32(&mut self, id: u16, size: u32) -> Result<(), Error> {
-        self.expect_id(id)?;
-        self.expect_u32(size, "dir record size")
-    }
-
-    fn length_prefixed(&mut self, limits: &Limits) -> Result<&'a [u8], Error> {
-        let length = usize::try_from(self.read_u32()?)
-            .map_err(|_| invalid("dir-stream string length does not fit usize"))?;
-        check_limit("VBA string bytes", length, limits.max_string_bytes)?;
-        self.read_bytes(length)
-    }
-
-    fn string_pair(
-        &mut self,
-        encoding: Mbcs,
-        reserved: u16,
-        field: &'static str,
-        limits: &Limits,
-    ) -> Result<String, Error> {
-        self.string_pair_bounded(encoding, reserved, field, limits, usize::MAX)
-    }
-
-    fn string_pair_bounded(
-        &mut self,
-        encoding: Mbcs,
-        reserved: u16,
-        field: &'static str,
-        limits: &Limits,
-        protocol_maximum: usize,
-    ) -> Result<String, Error> {
-        let mbcs = decode_mbcs(
-            self.length_prefixed_bounded(limits, protocol_maximum, field)?,
-            encoding,
-            field,
-        )?;
-        let actual_reserved = self.read_u16()?;
-        if actual_reserved != reserved {
-            return Err(invalid(format!(
-                "{field} reserved id must be {reserved:#06x}, found {actual_reserved:#06x}"
-            )));
-        }
-        let unicode_bytes =
-            self.length_prefixed_bounded(limits, protocol_maximum.saturating_mul(2), field)?;
-        let unicode = decode_utf16(unicode_bytes, field)?;
-        if unicode != mbcs {
-            return Err(invalid(format!(
-                "{field} Unicode value does not match its MBCS value"
-            )));
-        }
-        Ok(unicode)
-    }
-
-    fn mbcs_pair_bounded(
-        &mut self,
-        encoding: Mbcs,
-        reserved: u16,
-        field: &'static str,
-        limits: &Limits,
-        protocol_maximum: usize,
-    ) -> Result<String, Error> {
-        let first_bytes = self.length_prefixed_bounded(limits, protocol_maximum, field)?;
-        let first = decode_mbcs(first_bytes, encoding, field)?;
-        let actual_reserved = self.read_u16()?;
-        if actual_reserved != reserved {
-            return Err(invalid(format!(
-                "{field} reserved id must be {reserved:#06x}, found {actual_reserved:#06x}"
-            )));
-        }
-        let second_bytes = self.length_prefixed_bounded(limits, protocol_maximum, field)?;
-        let second = decode_mbcs(second_bytes, encoding, field)?;
-        if first_bytes != second_bytes || first != second {
-            return Err(invalid(format!(
-                "{field} duplicate path values do not match"
-            )));
-        }
-        Ok(first)
-    }
 }
 
 fn read_u16_at(data: &[u8], position: usize) -> Option<u16> {
@@ -778,11 +804,16 @@ fn read_u32_at(data: &[u8], position: usize) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        reason = "test fixtures and assertions panic intentionally on failure"
+    )]
+
     use super::*;
 
     fn push_record(bytes: &mut Vec<u8>, id: u16, value: &[u8]) {
         bytes.extend_from_slice(&id.to_le_bytes());
-        bytes.extend_from_slice(&(value.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&u32::try_from(value.len()).unwrap().to_le_bytes());
         bytes.extend_from_slice(value);
     }
 
@@ -790,7 +821,7 @@ mod tests {
         push_record(bytes, id, value.as_bytes());
         bytes.extend_from_slice(&reserved.to_le_bytes());
         let utf16: Vec<u8> = value.encode_utf16().flat_map(u16::to_le_bytes).collect();
-        bytes.extend_from_slice(&(utf16.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&u32::try_from(utf16.len()).unwrap().to_le_bytes());
         bytes.extend_from_slice(&utf16);
     }
 

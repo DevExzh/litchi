@@ -338,37 +338,38 @@ fn parse_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resul
         validate_value(&value, "line-numbering attribute", true)?;
         match (namespace, local.as_ref()) {
             (NamespaceKind::Text, b"number-lines") => {
-                configuration.number_lines = Some(parse_bool(&value, "text:number-lines")?)
+                configuration.number_lines = Some(parse_bool(&value, "text:number-lines")?);
             },
             (NamespaceKind::Style, b"num-format") => {
-                configuration.number_format = Some(Format::parse(value)?)
+                configuration.number_format = Some(Format::parse(value)?);
             },
             (NamespaceKind::Style, b"num-letter-sync") => {
-                configuration.letter_sync = Some(parse_bool(&value, "style:num-letter-sync")?)
+                configuration.letter_sync = Some(parse_bool(&value, "style:num-letter-sync")?);
             },
             (NamespaceKind::Text, b"style-name") => {
                 validate_value(&value, "text:style-name", false)?;
                 configuration.style_name = Some(value);
             },
             (NamespaceKind::Text, b"increment") => {
-                configuration.increment = Some(parse_nonnegative_integer(&value, "text:increment")?)
+                configuration.increment =
+                    Some(parse_nonnegative_integer(&value, "text:increment")?);
             },
             (NamespaceKind::Text, b"number-position") => {
-                configuration.number_position = Some(Position::parse(&value)?)
+                configuration.number_position = Some(Position::parse(&value)?);
             },
             (NamespaceKind::Text, b"offset") => {
-                configuration.offset = Some(NonNegativeLength::new(value)?)
+                configuration.offset = Some(NonNegativeLength::new(value)?);
             },
             (NamespaceKind::Text, b"count-empty-lines") => {
                 configuration.count_empty_lines =
-                    Some(parse_bool(&value, "text:count-empty-lines")?)
+                    Some(parse_bool(&value, "text:count-empty-lines")?);
             },
             (NamespaceKind::Text, b"count-in-text-boxes") => {
                 configuration.count_in_text_boxes =
-                    Some(parse_bool(&value, "text:count-in-text-boxes")?)
+                    Some(parse_bool(&value, "text:count-in-text-boxes")?);
             },
             (NamespaceKind::Text, b"restart-on-page") => {
-                configuration.restart_on_page = Some(parse_bool(&value, "text:restart-on-page")?)
+                configuration.restart_on_page = Some(parse_bool(&value, "text:restart-on-page")?);
             },
             _ => return invalid("unsupported line-numbering configuration attribute"),
         }

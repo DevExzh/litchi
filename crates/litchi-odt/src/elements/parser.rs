@@ -190,7 +190,7 @@ impl Parser {
                             Error::InvalidFormat(format!("invalid ODF element text: {error}"))
                         })?;
                         let current_text = element.text().to_string();
-                        element.set_text(&format!("{}{}", current_text, text));
+                        element.set_text(&format!("{current_text}{text}"));
                     }
                 },
                 Event::CData(ref value) => {
@@ -201,14 +201,14 @@ impl Parser {
                                 Error::InvalidFormat(format!("invalid ODF element CDATA: {error}"))
                             })?;
                         let current_text = element.text().to_string();
-                        element.set_text(&format!("{}{}", current_text, text));
+                        element.set_text(&format!("{current_text}{text}"));
                     }
                 },
                 Event::GeneralRef(ref reference) => {
                     if let Some((_, element)) = element_stack.last_mut() {
                         let text = decode_reference(reference)?;
                         let current_text = element.text().to_string();
-                        element.set_text(&format!("{}{}", current_text, text));
+                        element.set_text(&format!("{current_text}{text}"));
                     }
                 },
                 Event::End(ref e) => {

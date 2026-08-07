@@ -11,6 +11,8 @@ impl Subdocument {
         Self { href: href.into() }
     }
 
+    /// Returns the subdocument reference target.
+    #[must_use]
     pub fn href(&self) -> &str {
         &self.href
     }

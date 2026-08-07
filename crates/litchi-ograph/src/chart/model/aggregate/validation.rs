@@ -48,7 +48,8 @@ pub(in crate::chart) fn cache_dimensions(
             let mut coordinates = Vec::new();
             coordinates
                 .try_reserve_exact(values.len())
-                .map_err(|_| Error::Allocation {
+                .ok()
+                .ok_or(Error::Allocation {
                     resource: "Graph cache coordinates",
                 })?;
             for value in values {
@@ -82,16 +83,16 @@ pub(in crate::chart) fn cache_dimensions(
                 })?;
             }
             longest = longest.max(width);
-            let rows = u8::try_from(rows).map_err(|_| Error::InvalidModel {
+            let row_count = u8::try_from(rows).ok().ok_or(Error::InvalidModel {
                 field: "Dimensions",
                 reason: "Graph cache has more than 255 non-empty rows",
             })?;
-            let longest = RowCol::new(longest).ok_or(Error::InvalidModel {
+            let longest_row = RowCol::new(longest).ok_or(Error::InvalidModel {
                 field: "Dimensions",
                 reason: "Graph cache row has more than 3,999 cells",
             })?;
             let dimensions =
-                chart_cache::GraphDims::new(longest, rows).ok_or(Error::InvalidModel {
+                chart_cache::GraphDims::new(longest_row, row_count).ok_or(Error::InvalidModel {
                     field: "Dimensions",
                     reason: "Graph cache dimensions are inconsistent",
                 })?;
@@ -127,7 +128,8 @@ pub(in crate::chart) const fn dimensions_cover(
 pub(super) fn reserve_one<T>(values: &mut Vec<T>, resource: &'static str) -> Result<()> {
     values
         .try_reserve(1)
-        .map_err(|_| Error::Allocation { resource })
+        .ok()
+        .ok_or(Error::Allocation { resource })
 }
 
 pub(super) fn check_add(current: usize, maximum: usize, resource: &'static str) -> Result<()> {

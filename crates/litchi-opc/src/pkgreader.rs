@@ -1,6 +1,6 @@
 //! Low-level, read-only API to a serialized Open Packaging Convention (OPC) package.
 //!
-//! This module provides the PackageReader for parsing OPC packages, including
+//! This module provides the `PackageReader` for parsing OPC packages, including
 //! content type mapping, relationship resolution, and part loading. It uses
 //! efficient algorithms for parsing and minimal memory allocation.
 
@@ -34,12 +34,17 @@ pub struct SerializedPart {
     pub blob: Vec<u8>,
 
     /// Serialized relationships from this part
-    /// Uses SmallVec for efficient storage of typically small relationship collections
+    /// Uses `SmallVec` for efficient storage of typically small relationship collections
     pub srels: SmallVec<[SerializedRelationship; 8]>,
 }
 
 #[cfg(test)]
 mod physical_part_tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::PackageReader;
     use crate::{BlobPart, OpcPackage, PackURI, PackageWriter};
 
@@ -111,6 +116,7 @@ pub struct SerializedRelationship {
 impl SerializedRelationship {
     /// Check if this is an external relationship.
     #[inline]
+    #[must_use]
     pub fn is_external(&self) -> bool {
         self.target_mode == TargetMode::External
     }
@@ -118,7 +124,7 @@ impl SerializedRelationship {
     /// Get the target partname for internal relationships.
     ///
     /// Resolves the relative target reference against the base URI
-    /// to produce an absolute PackURI.
+    /// to produce an absolute `PackURI`.
     pub fn target_partname(&self) -> Result<PackURI> {
         if self.is_external() {
             return Err(OpcError::InvalidRelationship(
@@ -148,7 +154,7 @@ impl SerializedRelationship {
 /// the package structure, resolving relationships, and loading parts efficiently.
 pub struct PackageReader {
     /// Package-level relationships
-    /// Uses SmallVec for efficient storage of typically small relationship collections
+    /// Uses `SmallVec` for efficient storage of typically small relationship collections
     pkg_srels: SmallVec<[SerializedRelationship; 8]>,
 
     /// All serialized parts in the package
@@ -197,7 +203,7 @@ impl PackageReader {
     /// * `phys_reader` - Physical package reader for accessing ZIP contents
     ///
     /// # Returns
-    /// A new PackageReader with all parts and relationships loaded
+    /// A new `PackageReader` with all parts and relationships loaded
     pub fn from_phys_reader(phys_reader: &PhysPkgReader<'_>) -> Result<Self> {
         let archive = phys_reader.archive();
 
@@ -259,7 +265,7 @@ impl PackageReader {
             .ok_or_else(|| OpcError::PartNotFound(CONTENT_TYPES_MEMBER.to_string()))
     }
 
-    /// Parse relationships XML into SerializedRelationship structs.
+    /// Parse relationships XML into `SerializedRelationship` structs.
     #[cfg(test)]
     fn parse_rels_xml(
         rels_xml: &[u8],
@@ -638,6 +644,7 @@ impl PackageReader {
     }
 
     /// Get package-level relationships.
+    #[must_use]
     pub fn pkg_srels(&self) -> &[SerializedRelationship] {
         &self.pkg_srels
     }
@@ -656,6 +663,7 @@ impl PackageReader {
     ///
     /// Their contents are never decompressed; the entries exist so that
     /// tolerating archive junk does not hide it from the caller.
+    #[must_use]
     pub fn non_part_members(&self) -> &[NonPartMember] {
         &self.non_part_members
     }
@@ -840,6 +848,11 @@ fn allocation(resource: &'static str, source: TryReserveError) -> OpcError {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     fn package_bytes(root_relationships: &[u8], document: &[u8]) -> Vec<u8> {

@@ -45,24 +45,32 @@ pub struct Chart {
 
 impl Chart {
     /// Creates a fresh chart using conservative limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidLimit`] if the limits are inconsistent or
+    /// [`Error::Allocation`] if an initial collection cannot be allocated.
     pub fn new(context: Context) -> Result<Self> {
         Self::new_with(context, Limits::default())
     }
 
     /// Creates a fresh chart with explicit authoring bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidLimit`] if the limits are inconsistent or
+    /// [`Error::Allocation`] if an initial collection cannot be allocated.
     pub fn new_with(context: Context, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
+        let validated = limits.validate()?;
         let mut groups = Vec::new();
-        groups.try_reserve_exact(1).map_err(|_| Error::Allocation {
+        groups.try_reserve_exact(1).ok().ok_or(Error::Allocation {
             resource: "chart groups",
         })?;
         groups.push(Group::line());
         let mut parents = Vec::new();
-        parents
-            .try_reserve_exact(1)
-            .map_err(|_| Error::Allocation {
-                resource: "axis parents",
-            })?;
+        parents.try_reserve_exact(1).ok().ok_or(Error::Allocation {
+            resource: "axis parents",
+        })?;
         parents.push(axis::Parent::primary(layout::Pos::default()));
         Ok(Self {
             context,
@@ -83,37 +91,59 @@ impl Chart {
             unknown: Vec::new(),
             origin: Origin::Fresh,
             dirty: false,
-            limits,
+            limits: validated,
             authoring_proven: false,
         })
     }
 
     /// Parses a borrowed chart and retains an exact bounded copy for replay.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stream is malformed or crosses its own limits;
+    /// see [`Self::parse_with`].
     pub fn parse(input: Ref<'_>, context: Context) -> Result<Self> {
         let limits = input.limits();
         Self::parse_with(input, context, limits)
     }
 
     /// Parses a borrowed chart under explicit semantic limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidLimit`] if the limits are inconsistent, or an
+    /// error if the BIFF stream is malformed, crosses a configured bound, or
+    /// cannot be copied within the allocation limits.
     pub fn parse_with(input: Ref<'_>, context: Context, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
-        let mut chart = codec::parse(input, context, limits)?;
-        chart.origin = Origin::Parsed(input.own_with(limits)?);
+        let validated = limits.validate()?;
+        let mut chart = codec::parse(input, context, validated)?;
+        chart.origin = Origin::Parsed(input.own_with(validated)?);
         Ok(chart)
     }
 
     /// Parses a move-owned stream without copying its input allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stream is malformed or crosses its own limits;
+    /// see [`Self::open_with`].
     pub fn open(input: Stream, context: Context) -> Result<Self> {
         let limits = input.as_ref().limits();
         Self::open_with(input, context, limits)
     }
 
     /// Parses a move-owned stream under explicit semantic limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidLimit`] if the limits are inconsistent, or an
+    /// error if the stream cannot be rebounded, is malformed, or crosses a
+    /// configured bound while parsing.
     pub fn open_with(input: Stream, context: Context, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
-        let input = input.relimit(limits)?;
-        let mut chart = codec::parse(input.as_ref(), context, limits)?;
-        chart.origin = Origin::Parsed(input);
+        let validated = limits.validate()?;
+        let relimited = input.relimit(validated)?;
+        let mut chart = codec::parse(relimited.as_ref(), context, validated)?;
+        chart.origin = Origin::Parsed(relimited);
         Ok(chart)
     }
 
@@ -154,10 +184,12 @@ impl Chart {
         }
     }
 
+    #[must_use]
     pub const fn context(&self) -> Context {
         self.context
     }
 
+    #[must_use]
     pub const fn rect(&self) -> Rect {
         self.rect
     }
@@ -167,6 +199,7 @@ impl Chart {
         self.rect = value;
     }
 
+    #[must_use]
     pub const fn props(&self) -> Props {
         self.props
     }
@@ -177,6 +210,7 @@ impl Chart {
     }
 
     /// Chart-window zoom.
+    #[must_use]
     pub const fn zoom(&self) -> layout::Zoom {
         self.zoom
     }
@@ -188,6 +222,7 @@ impl Chart {
     }
 
     /// Plot-area font growth factors.
+    #[must_use]
     pub const fn growth(&self) -> layout::Growth {
         self.growth
     }
@@ -198,6 +233,7 @@ impl Chart {
         self.growth = value;
     }
 
+    #[must_use]
     pub fn title(&self) -> Option<&str> {
         self.title.as_deref()
     }
@@ -207,6 +243,7 @@ impl Chart {
         self.title = value;
     }
 
+    #[must_use]
     pub fn series(&self) -> &[Series] {
         &self.series
     }
@@ -229,7 +266,7 @@ impl Chart {
                 });
             },
             Owner::Trend { parent, .. } | Owner::ErrorBar { parent, .. } => {
-                let zero_based = usize::try_from(parent.series().get() - 1).map_err(|_| {
+                let zero_based = usize::try_from(parent.series().get() - 1).ok().ok_or({
                     Error::InvalidModel {
                         field: "series",
                         reason: "auxiliary parent index exceeds this platform",
@@ -274,7 +311,7 @@ impl Chart {
         let one_based = index.checked_add(1).ok_or(Error::SizeOverflow {
             resource: "series index",
         })?;
-        let one_based = u32::try_from(one_based).map_err(|_| Error::InvalidModel {
+        let one_based = u32::try_from(one_based).ok().ok_or(Error::InvalidModel {
             field: "series",
             reason: "series index exceeds the auxiliary-parent range",
         })?;
@@ -284,10 +321,12 @@ impl Chart {
                 Owner::Group(_) => continue,
             };
             let zero_based =
-                usize::try_from(parent.series().get() - 1).map_err(|_| Error::InvalidModel {
-                    field: "series",
-                    reason: "auxiliary parent index exceeds this platform",
-                })?;
+                usize::try_from(parent.series().get() - 1)
+                    .ok()
+                    .ok_or(Error::InvalidModel {
+                        field: "series",
+                        reason: "auxiliary parent index exceeds this platform",
+                    })?;
             if self
                 .series
                 .get(zero_based)
@@ -317,22 +356,27 @@ impl Chart {
             };
             if parent.series().get() > one_based {
                 let shifted =
-                    u16::try_from(parent.series().get() - 1).map_err(|_| Error::InvalidModel {
-                        field: "series",
-                        reason: "auxiliary parent index exceeds its checked range",
+                    u16::try_from(parent.series().get() - 1)
+                        .ok()
+                        .ok_or(Error::InvalidModel {
+                            field: "series",
+                            reason: "auxiliary parent index exceeds its checked range",
+                        })?;
+                *parent = crate::record::series::Parent::try_new(shifted)
+                    .ok()
+                    .ok_or({
+                        Error::InvalidModel {
+                            field: "series",
+                            reason: "auxiliary parent index became invalid",
+                        }
                     })?;
-                *parent = crate::record::series::Parent::try_new(shifted).map_err(|_| {
-                    Error::InvalidModel {
-                        field: "series",
-                        reason: "auxiliary parent index became invalid",
-                    }
-                })?;
             }
         }
         self.touch();
         Ok(Some(self.series.remove(index)))
     }
 
+    #[must_use]
     pub fn groups(&self) -> &[Group] {
         &self.groups
     }
@@ -378,7 +422,7 @@ impl Chart {
         if index >= self.groups.len() {
             return Ok(None);
         }
-        let raw = u8::try_from(index).map_err(|_| Error::InvalidModel {
+        let raw = u8::try_from(index).ok().ok_or(Error::InvalidModel {
             field: "group",
             reason: "chart-group index exceeds nine",
         })?;
@@ -421,6 +465,7 @@ impl Chart {
         Ok(Some(self.groups.remove(index)))
     }
 
+    #[must_use]
     pub fn axes(&self) -> &[axis::Axis] {
         &self.axes
     }
@@ -461,6 +506,7 @@ impl Chart {
     }
 
     /// Primary and optional secondary axis-parent collections.
+    #[must_use]
     pub fn parents(&self) -> &[axis::Parent] {
         &self.parents
     }
@@ -474,6 +520,7 @@ impl Chart {
         }
     }
 
+    #[must_use]
     pub const fn legend(&self) -> Option<Legend> {
         self.legend
     }
@@ -483,11 +530,13 @@ impl Chart {
         self.legend = value;
     }
 
+    #[must_use]
     pub fn caches(&self) -> &[Cache] {
         &self.caches
     }
 
     /// Context-specific mandatory cache dimensions.
+    #[must_use]
     pub const fn dimensions(&self) -> chart_cache::Dims {
         self.dimensions
     }
@@ -574,6 +623,7 @@ impl Chart {
         Ok(())
     }
 
+    #[must_use]
     pub fn formats(&self) -> &[format::Format] {
         &self.formats
     }
@@ -598,6 +648,7 @@ impl Chart {
         Ok(())
     }
 
+    #[must_use]
     pub fn labels(&self) -> &[Label] {
         &self.labels
     }
@@ -623,11 +674,13 @@ impl Chart {
     }
 
     /// Unknown and recognized-but-opaque records in original encounter order.
+    #[must_use]
     pub fn unknown(&self) -> &[Raw] {
         &self.unknown
     }
 
     /// Whether this parsed chart still has an exact replayable source stream.
+    #[must_use]
     pub fn is_pristine(&self) -> bool {
         matches!(&self.origin, Origin::Parsed(_)) && !self.dirty
     }

@@ -3,7 +3,7 @@
 use crate::core::{Content, Meta, OwnedPackage, Styles};
 use crate::elements::style::StyleRegistry;
 
-/// An OpenDocument text document (`.odt`).
+/// An `OpenDocument` text document (`.odt`).
 ///
 /// The document owns its validated package and parsed XML parts. The public
 /// facade exposes semantic queries and atomic package edits while keeping the

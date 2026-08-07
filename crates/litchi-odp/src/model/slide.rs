@@ -76,6 +76,7 @@ impl Slide {
     /// Get the slide index.
     ///
     /// Returns the 0-based index of this slide in the presentation.
+    #[must_use]
     pub fn index(&self) -> usize {
         self.index
     }
@@ -88,6 +89,7 @@ impl Slide {
     }
 
     /// Get the slide transition configuration.
+    #[must_use]
     pub fn transition(&self) -> Option<&Transition> {
         self.transition.as_ref()
     }
@@ -103,6 +105,7 @@ impl Slide {
     }
 
     /// Return the slide's inert animation and timing trees.
+    #[must_use]
     pub fn animations(&self) -> &[Node] {
         &self.animations
     }
@@ -129,6 +132,7 @@ impl Slide {
     }
 
     /// Return the optional legacy presentation effect tree.
+    #[must_use]
     pub fn legacy_animation(&self) -> Option<&AnimationNode> {
         self.legacy_animation.as_ref()
     }
@@ -234,13 +238,13 @@ impl DrawingShapeKind {
 /// Namespace of an unmodeled drawing-shape attribute.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DrawingAttributeNamespace {
-    /// OpenDocument drawing namespace (`draw:*`).
+    /// `OpenDocument` drawing namespace (`draw:*`).
     Drawing,
     /// ODF SVG-compatible namespace (`svg:*`).
     Svg,
-    /// OpenDocument 3D namespace (`dr3d:*`).
+    /// `OpenDocument` 3D namespace (`dr3d:*`).
     Dr3d,
-    /// OpenDocument table namespace (`table:*`), used by spreadsheet
+    /// `OpenDocument` table namespace (`table:*`), used by spreadsheet
     /// shape anchoring attributes such as `table:end-cell-address`.
     Table,
 }
@@ -285,16 +289,19 @@ impl DrawingAttribute {
     }
 
     /// Return the attribute namespace.
+    #[must_use]
     pub fn namespace(&self) -> DrawingAttributeNamespace {
         self.namespace
     }
 
     /// Return the attribute local name.
+    #[must_use]
     pub fn local_name(&self) -> &str {
         &self.local_name
     }
 
     /// Return the decoded attribute value.
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -327,6 +334,7 @@ pub struct EnhancedGeometryChild {
 
 impl EnhancedGeometryChild {
     /// Create an empty equation or handle declaration.
+    #[must_use]
     pub fn new(kind: EnhancedGeometryChildKind) -> Self {
         Self {
             kind,
@@ -335,11 +343,13 @@ impl EnhancedGeometryChild {
     }
 
     /// Return the child kind.
+    #[must_use]
     pub fn kind(&self) -> EnhancedGeometryChildKind {
         self.kind
     }
 
     /// Return exact attributes in document order.
+    #[must_use]
     pub fn attributes(&self) -> &[DrawingAttribute] {
         &self.attributes
     }
@@ -359,11 +369,13 @@ pub struct EnhancedGeometry {
 
 impl EnhancedGeometry {
     /// Create an empty enhanced-geometry declaration.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Return exact geometry attributes in document order.
+    #[must_use]
     pub fn attributes(&self) -> &[DrawingAttribute] {
         &self.attributes
     }
@@ -374,6 +386,7 @@ impl EnhancedGeometry {
     }
 
     /// Return inert equations and handles in document order.
+    #[must_use]
     pub fn children(&self) -> &[EnhancedGeometryChild] {
         &self.children
     }
@@ -450,6 +463,7 @@ pub struct Shape {
 
 impl Shape {
     /// Create a new empty shape
+    #[must_use]
     pub fn new() -> Self {
         Self {
             shape_type: litchi_core::ShapeType::AutoShape,
@@ -483,21 +497,25 @@ impl Shape {
     }
 
     /// Get the shape type.
+    #[must_use]
     pub fn shape_type(&self) -> litchi_core::ShapeType {
         self.shape_type
     }
 
     /// Get the exact ODF drawing element kind, when parsed or explicitly set.
+    #[must_use]
     pub fn drawing_kind(&self) -> Option<DrawingShapeKind> {
         self.drawing_kind
     }
 
     /// Return unmodeled drawing and SVG attributes in source order.
+    #[must_use]
     pub fn drawing_attributes(&self) -> &[DrawingAttribute] {
         &self.drawing_attributes
     }
 
     /// Return nested group shapes in document order.
+    #[must_use]
     pub fn children(&self) -> &[Shape] {
         &self.children
     }
@@ -508,6 +526,7 @@ impl Shape {
     }
 
     /// Return inert custom-shape enhanced geometry.
+    #[must_use]
     pub fn enhanced_geometry(&self) -> Option<&EnhancedGeometry> {
         self.enhanced_geometry.as_ref()
     }
@@ -518,31 +537,37 @@ impl Shape {
     }
 
     /// Check if this is a text shape.
+    #[must_use]
     pub fn has_text(&self) -> bool {
         !self.text.trim().is_empty()
     }
 
     /// Get the shape name/ID.
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
 
     /// Get the shape position as (x, y).
+    #[must_use]
     pub fn position(&self) -> (Option<&str>, Option<&str>) {
         (self.x.as_deref(), self.y.as_deref())
     }
 
     /// Get the shape dimensions as (width, height).
+    #[must_use]
     pub fn dimensions(&self) -> (Option<&str>, Option<&str>) {
         (self.width.as_deref(), self.height.as_deref())
     }
 
     /// Get the drawing layer containing this shape.
+    #[must_use]
     pub fn layer(&self) -> Option<&str> {
         self.layer.as_deref()
     }
 
     /// Get the exact non-negative stacking index.
+    #[must_use]
     pub fn z_index(&self) -> Option<&str> {
         self.z_index.as_deref()
     }
@@ -557,26 +582,31 @@ impl Shape {
     }
 
     /// Get the ODF drawing transformation list.
+    #[must_use]
     pub fn transform(&self) -> Option<&str> {
         self.transform.as_deref()
     }
 
     /// Get the exact presentation role for this shape.
+    #[must_use]
     pub fn presentation_class(&self) -> Option<&str> {
         self.presentation_class.as_deref()
     }
 
     /// Get the image source referenced by this shape.
+    #[must_use]
     pub fn image_href(&self) -> Option<&str> {
         self.image_href.as_deref()
     }
 
     /// Return the inert audio/video plugin referenced by this shape.
+    #[must_use]
     pub fn media(&self) -> Option<&Reference> {
         self.media.as_ref()
     }
 
     /// Attach an inert audio/video plugin and mark this shape as a graphic frame.
+    #[must_use]
     pub fn with_media(mut self, media: Reference) -> Self {
         self.shape_type = litchi_core::ShapeType::GraphicFrame;
         self.image_href = None;
@@ -585,6 +615,7 @@ impl Shape {
     }
 
     /// Return the optional hyperlink wrapping this shape.
+    #[must_use]
     pub fn hyperlink(&self) -> Option<&DrawingHyperlink> {
         self.hyperlink.as_ref()
     }
@@ -595,6 +626,7 @@ impl Shape {
     }
 
     /// Return inert event bindings attached to the shape.
+    #[must_use]
     pub fn event_listeners(&self) -> &[ShapeEventListener] {
         &self.event_listeners
     }
@@ -971,7 +1003,7 @@ mod tests {
     #[test]
     fn test_shape_debug() {
         let shape = Shape::new();
-        let debug_str = format!("{:?}", shape);
+        let debug_str = format!("{shape:?}");
         assert!(debug_str.contains("Shape"));
     }
 }

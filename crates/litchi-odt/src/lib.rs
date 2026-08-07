@@ -1,7 +1,7 @@
-//! OpenDocument Text (.odt) implementation.
+//! `OpenDocument` Text (.odt) implementation.
 //!
 //! This module provides comprehensive support for parsing, creating, and manipulating
-//! OpenDocument Text documents (.odt files), which are the open standard
+//! `OpenDocument` Text documents (.odt files), which are the open standard
 //! equivalent of Microsoft Word documents.
 //!
 //! # Implementation Progress

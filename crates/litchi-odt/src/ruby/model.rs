@@ -1,4 +1,4 @@
-//! Typed object model for an OpenDocument ruby annotation.
+//! Typed object model for an `OpenDocument` ruby annotation.
 
 /// A ruby base/pronunciation annotation.
 #[derive(Debug, Clone, PartialEq, Eq)]

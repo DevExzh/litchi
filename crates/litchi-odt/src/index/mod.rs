@@ -1,4 +1,4 @@
-//! Inert semantic access to generated OpenDocument text indexes.
+//! Inert semantic access to generated `OpenDocument` text indexes.
 //!
 //! The owner keeps typed index snapshots in model, namespace-aware XML
 //! decoding in codec, and authored index construction/mutation in writing.

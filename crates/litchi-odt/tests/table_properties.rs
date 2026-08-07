@@ -164,6 +164,6 @@ fn rejects_malformed() {
         ),
     ];
     for x in bad {
-        assert!(table::parse(&x).is_err(), "accepted {x}")
+        assert!(table::parse(&x).is_err(), "accepted {x}");
     }
 }

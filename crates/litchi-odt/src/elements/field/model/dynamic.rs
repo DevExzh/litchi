@@ -302,7 +302,7 @@ impl DynamicTextField {
 
     /// Effective `text:active` value for a page-variable setter.
     ///
-    /// ODF and LibreOffice default the omitted attribute to `true`.
+    /// ODF and `LibreOffice` default the omitted attribute to `true`.
     pub fn effective_page_variable_active(&self) -> Option<bool> {
         match self {
             Self::PageVariableSet { active, .. } => Some(active.unwrap_or(true)),

@@ -39,16 +39,16 @@ impl Sound {
             escape_xml(&self.href)
         );
         if self.actuate_on_request {
-            xml.push_str(r#" xlink:actuate="onRequest""#)
+            xml.push_str(r#" xlink:actuate="onRequest""#);
         }
         if let Some(show) = self.show {
-            xml.push_str(&format!(r#" xlink:show="{}""#, show.xml()))
+            xml.push_str(&format!(r#" xlink:show="{}""#, show.xml()));
         }
         if let Some(value) = self.play_full {
-            xml.push_str(&format!(r#" presentation:play-full="{value}""#))
+            xml.push_str(&format!(r#" presentation:play-full="{value}""#));
         }
         if let Some(id) = &self.xml_id {
-            xml.push_str(&format!(r#" xml:id="{}""#, escape_xml(id)))
+            xml.push_str(&format!(r#" xml:id="{}""#, escape_xml(id)));
         }
         xml.push_str("/>");
         Ok(xml)
@@ -143,7 +143,7 @@ impl StyleProperties {
                 r#" draw:tile-repeat-offset="{} {}""#,
                 value.percentage,
                 value.direction.xml()
-            ))
+            ));
         }
         attr!(self.opacity.as_ref(), "draw:opacity", |v: &Percent| v
             .as_str()
@@ -170,10 +170,10 @@ impl StyleProperties {
             |v: TransitionSpeed| v.xml()
         );
         if let Some(value) = &self.smil_type {
-            xml.push_str(&format!(r#" smil:type="{}""#, escape_xml(value)))
+            xml.push_str(&format!(r#" smil:type="{}""#, escape_xml(value)));
         }
         if let Some(value) = &self.smil_subtype {
-            xml.push_str(&format!(r#" smil:subtype="{}""#, escape_xml(value)))
+            xml.push_str(&format!(r#" smil:subtype="{}""#, escape_xml(value)));
         }
         attr!(
             self.direction,
@@ -231,9 +231,9 @@ impl StyleProperties {
         if let Some(sound) = &self.sound {
             xml.push('>');
             xml.push_str(&sound.to_xml_fragment()?);
-            xml.push_str("</style:drawing-page-properties>")
+            xml.push_str("</style:drawing-page-properties>");
         } else {
-            xml.push_str("/>")
+            xml.push_str("/>");
         }
         Ok(xml)
     }
@@ -250,20 +250,20 @@ impl Style {
         let mut xml =
             format!(r#"<style:{tag} xmlns:style="{STYLE_NS}" style:family="drawing-page""#);
         if let Some(value) = &self.name {
-            xml.push_str(&format!(r#" style:name="{}""#, escape_xml(value)))
+            xml.push_str(&format!(r#" style:name="{}""#, escape_xml(value)));
         }
         if let Some(value) = &self.parent_style_name {
             xml.push_str(&format!(
                 r#" style:parent-style-name="{}""#,
                 escape_xml(value)
-            ))
+            ));
         }
         if let Some(value) = &self.properties {
             xml.push('>');
             xml.push_str(&value.to_xml_fragment()?);
-            xml.push_str(&format!("</style:{tag}>"))
+            xml.push_str(&format!("</style:{tag}>"));
         } else {
-            xml.push_str("/>")
+            xml.push_str("/>");
         }
         Ok(xml)
     }
@@ -324,7 +324,7 @@ fn attrs(
             .map_err(|error| bad(format!("invalid drawing-page property value: {error}")))?
             .into_owned();
         safe(&value, "drawing-page property value", true)?;
-        out.push((key.0, key.1, value))
+        out.push((key.0, key.1, value));
     }
     Ok(out)
 }
@@ -588,7 +588,7 @@ pub fn parse_drawing_page_style_properties(xml: &str) -> Result<Styles> {
                             seen: false,
                             properties_depth: None,
                             sound_depth: None,
-                        })
+                        });
                     }
                     continue;
                 }
@@ -602,7 +602,7 @@ pub fn parse_drawing_page_style_properties(xml: &str) -> Result<Styles> {
                         }
                         value.seen = true;
                         value.style.properties = Some(parse_properties(&reader, version, &start)?);
-                        value.properties_depth = Some(depth)
+                        value.properties_depth = Some(depth);
                     } else if current.1 == b"drawing-page-properties" {
                         return Err(bad(
                             "style:drawing-page-properties has invalid namespace or parent",
@@ -616,7 +616,7 @@ pub fn parse_drawing_page_style_properties(xml: &str) -> Result<Styles> {
                         }
                         value.style.properties.as_mut().unwrap().sound =
                             Some(parse_sound(&reader, version, &start)?);
-                        value.sound_depth = Some(depth)
+                        value.sound_depth = Some(depth);
                     } else if value.properties_depth.is_some_and(|p| depth > p) {
                         return Err(bad("unexpected style:drawing-page-properties child"));
                     }
@@ -635,7 +635,7 @@ pub fn parse_drawing_page_style_properties(xml: &str) -> Result<Styles> {
                     if let Some(style) =
                         header(&reader, version, &start, current.1 == b"default-style")?
                     {
-                        push_style(&mut out, style, &mut total)?
+                        push_style(&mut out, style, &mut total)?;
                     }
                     continue;
                 }
@@ -648,7 +648,7 @@ pub fn parse_drawing_page_style_properties(xml: &str) -> Result<Styles> {
                             return Err(bad("duplicate style:drawing-page-properties"));
                         }
                         value.seen = true;
-                        value.style.properties = Some(parse_properties(&reader, version, &start)?)
+                        value.style.properties = Some(parse_properties(&reader, version, &start)?);
                     } else if current.1 == b"drawing-page-properties" {
                         return Err(bad(
                             "style:drawing-page-properties has invalid namespace or parent",
@@ -661,7 +661,7 @@ pub fn parse_drawing_page_style_properties(xml: &str) -> Result<Styles> {
                             return Err(bad("duplicate presentation:sound"));
                         }
                         value.style.properties.as_mut().unwrap().sound =
-                            Some(parse_sound(&reader, version, &start)?)
+                            Some(parse_sound(&reader, version, &start)?);
                     } else if value.properties_depth.is_some_and(|p| depth > p) {
                         return Err(bad("unexpected style:drawing-page-properties child"));
                     }
@@ -691,23 +691,23 @@ pub fn parse_drawing_page_style_properties(xml: &str) -> Result<Styles> {
                 let depth = stack.len();
                 if let Some(value) = active.as_mut() {
                     if value.sound_depth == Some(depth) {
-                        value.sound_depth = None
+                        value.sound_depth = None;
                     }
                     if value.properties_depth == Some(depth) {
-                        value.properties_depth = None
+                        value.properties_depth = None;
                     }
                 }
                 if active.as_ref().is_some_and(|value| value.depth == depth) {
-                    push_style(&mut out, active.take().unwrap().style, &mut total)?
+                    push_style(&mut out, active.take().unwrap().style, &mut total)?;
                 }
                 stack.pop();
             },
             Ok(Event::Decl(decl)) => {
                 version = decl
                     .xml_version()
-                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?
+                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,
@@ -796,7 +796,7 @@ pub fn set_drawing_page_style_properties_xml(xml: &str, requested: &Style) -> Re
                                 ..Default::default()
                             },
                             ..Default::default()
-                        })
+                        });
                     }
                 } else if target_depth.is_some_and(|value| depth == value + 1)
                     && current.0 == Ns::Style
@@ -842,7 +842,7 @@ pub fn set_drawing_page_style_properties_xml(xml: &str, requested: &Style) -> Re
                         found = Some(TargetSpans {
                             style: span,
                             ..Default::default()
-                        })
+                        });
                     }
                 } else if target_depth.is_some_and(|value| depth == value + 1)
                     && current.0 == Ns::Style
@@ -862,13 +862,13 @@ pub fn set_drawing_page_style_properties_xml(xml: &str, requested: &Style) -> Re
                     {
                         let span = spans.properties.as_mut().unwrap();
                         span.end_start = begin;
-                        span.end = end
+                        span.end = end;
                     }
                     if target_depth == Some(depth) {
                         spans.style.end_start = begin;
                         spans.style.end = end;
                         found = active.take();
-                        target_depth = None
+                        target_depth = None;
                     }
                 }
                 stack.pop();
@@ -876,9 +876,9 @@ pub fn set_drawing_page_style_properties_xml(xml: &str, requested: &Style) -> Re
             Ok(Event::Decl(decl)) => {
                 version = decl
                     .xml_version()
-                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?
+                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,

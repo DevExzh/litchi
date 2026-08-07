@@ -314,7 +314,7 @@ impl SvgStop {
     }
 }
 
-/// Color representation used by LibreOffice multi-color gradient stops.
+/// Color representation used by `LibreOffice` multi-color gradient stops.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum LibreOfficeColorType {
@@ -341,7 +341,7 @@ impl LibreOfficeColorType {
     }
 }
 
-/// Inert LibreOffice multi-color stop metadata retained on a legacy gradient.
+/// Inert `LibreOffice` multi-color stop metadata retained on a legacy gradient.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LibreOfficeStop {
     pub offset: StopOffset,
@@ -955,8 +955,7 @@ fn is_gradient(namespace: NamespaceKind, local: &str) -> bool {
     matches!(
         (namespace, local),
         (NamespaceKind::Draw, "gradient")
-            | (NamespaceKind::Svg, "linearGradient")
-            | (NamespaceKind::Svg, "radialGradient")
+            | (NamespaceKind::Svg, "linearGradient" | "radialGradient")
     )
 }
 

@@ -18,7 +18,7 @@ fn styles(presentation: &Presentation) -> Result<&str> {
 impl Presentation {
     /// Read the package's optional, singleton handout master.
     pub fn handout_master(&self) -> Result<Option<Master>> {
-        codec::read(styles(self)?).map_err(Into::into)
+        codec::read(styles(self)?)
     }
 
     /// Resolve the optional presentation-layout layer once and return an owned

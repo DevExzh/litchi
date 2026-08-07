@@ -46,7 +46,7 @@ fn parses_and_round_trips_footnote_and_endnote_configurations() {
 #[test]
 fn rejects_malformed_or_duplicate_note_configuration() {
     for body in [
-        r#"<t:notes-configuration/>"#,
+        r"<t:notes-configuration/>",
         r#"<t:notes-configuration t:note-class="margin"/>"#,
         r#"<t:notes-configuration t:note-class="footnote" s:num-format="1" s:num-letter-sync="true"/>"#,
         r#"<t:notes-configuration t:note-class="footnote" t:start-value="-1"/>"#,

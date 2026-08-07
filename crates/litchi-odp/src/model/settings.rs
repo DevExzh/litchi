@@ -128,6 +128,7 @@ impl Settings {
     }
 
     /// Return whether no settings or custom shows are explicitly present.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.animations.is_none()
             && self.endless.is_none()
@@ -405,7 +406,7 @@ fn parse_settings_attributes(
             ));
         }
         let local = std::str::from_utf8(local_name.as_ref())
-            .map_err(|_| invalid("presentation setting attribute name is not UTF-8"))?;
+            .map_err(|_err| invalid("presentation setting attribute name is not UTF-8"))?;
         if !seen.insert(local.to_string()) {
             return Err(invalid(format!("duplicate presentation:{local} attribute")));
         }
@@ -427,16 +428,16 @@ fn parse_settings_attributes(
             },
             "show" => settings.show = Some(value),
             "show-end-of-presentation-slide" => {
-                settings.show_end_of_presentation_slide = Some(parse_bool(local, &value)?)
+                settings.show_end_of_presentation_slide = Some(parse_bool(local, &value)?);
             },
             "show-logo" => settings.show_logo = Some(parse_bool(local, &value)?),
             "start-page" => settings.start_page = Some(value),
             "start-with-navigator" => {
-                settings.start_with_navigator = Some(parse_bool(local, &value)?)
+                settings.start_with_navigator = Some(parse_bool(local, &value)?);
             },
             "stay-on-top" => settings.stay_on_top = Some(parse_bool(local, &value)?),
             "transition-on-click" => {
-                settings.transition_on_click = Some(FeatureState::parse(local, &value)?)
+                settings.transition_on_click = Some(FeatureState::parse(local, &value)?);
             },
             _ => {
                 return Err(invalid(format!(
@@ -746,7 +747,7 @@ mod tests {
             r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"><p:settings/>{PREFIX}{SUFFIX}</o:document-content>"#
         );
         assert!(parse(&outside).is_err());
-        let active = format!(r#"{PREFIX}<!DOCTYPE x><p:settings/>{SUFFIX}"#);
+        let active = format!(r"{PREFIX}<!DOCTYPE x><p:settings/>{SUFFIX}");
         assert!(parse(&active).is_err());
     }
 }

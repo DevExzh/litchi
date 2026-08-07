@@ -24,65 +24,83 @@ impl Format {
     pub const KIND: Kind = Kind::from_wire(0x105D);
 
     /// Creates formatting with all effects disabled.
+    #[must_use]
     pub const fn new() -> Self {
         Self { flags: 0 }
     }
 
     /// Decodes a framed record.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::WrongRecord`] if the record identifier differs, or
+    /// [`Error::InvalidRecordLength`] if the payload size is invalid.
     pub fn parse(input: RecordRef<'_>) -> Result<Self> {
         Self::from_payload(record::payload(input, Self::KIND, FORMAT_LEN)?)
     }
 
     /// Decodes a payload supplied by an embedding host.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidRecordLength`] if the payload size is invalid.
     pub fn from_payload(payload: &[u8]) -> Result<Self> {
-        let payload = record::payload_bytes(Self::KIND, payload, FORMAT_LEN)?;
-        let flags = record::u16_at(payload, 0).ok_or(Error::InvalidRecordLength {
+        let bytes = record::payload_bytes(Self::KIND, payload, FORMAT_LEN)?;
+        let flags = record::u16_at(bytes, 0).ok_or(Error::InvalidRecordLength {
             kind: Self::KIND.get(),
             expected: FORMAT_LEN,
-            actual: payload.len(),
+            actual: bytes.len(),
         })?;
         Ok(Self { flags })
     }
 
     /// Enables or disables smooth lines in builder style.
+    #[must_use]
     pub const fn smooth(mut self, enabled: bool) -> Self {
         self.flags = set(self.flags, SMOOTH, enabled);
         self
     }
 
     /// Enables or disables the 3-D bubble effect in builder style.
+    #[must_use]
     pub const fn bubbles_3d(mut self, enabled: bool) -> Self {
         self.flags = set(self.flags, BUBBLES_3D, enabled);
         self
     }
 
     /// Enables or disables marker shadows in builder style.
+    #[must_use]
     pub const fn shadow(mut self, enabled: bool) -> Self {
         self.flags = set(self.flags, SHADOW, enabled);
         self
     }
 
     /// Whether smooth lines are enabled.
+    #[must_use]
     pub const fn is_smooth(self) -> bool {
         self.flags & SMOOTH != 0
     }
 
     /// Whether the 3-D bubble effect is enabled.
+    #[must_use]
     pub const fn has_3d_bubbles(self) -> bool {
         self.flags & BUBBLES_3D != 0
     }
 
     /// Whether marker shadows are enabled.
+    #[must_use]
     pub const fn has_shadow(self) -> bool {
         self.flags & SHADOW != 0
     }
 
     /// Raw flags, including ignored reserved bits retained from input.
+    #[must_use]
     pub const fn raw_flags(self) -> u16 {
         self.flags
     }
 
     /// Encodes the fixed-size payload without allocating.
+    #[must_use]
     pub fn payload(self) -> [u8; FORMAT_LEN] {
         self.flags.to_le_bytes()
     }
@@ -108,6 +126,7 @@ impl Parent {
     pub const KIND: Kind = Kind::from_wire(0x104A);
 
     /// Creates a parent from an already range-proven series index.
+    #[must_use]
     pub const fn new(series: Index) -> Self {
         Self { series }
     }
@@ -139,11 +158,13 @@ impl Parent {
     }
 
     /// Range-proven one-based series index.
+    #[must_use]
     pub const fn series(self) -> Index {
         self.series
     }
 
     /// Encodes the fixed-size payload without allocating.
+    #[must_use]
     pub fn payload(self) -> [u8; 2] {
         (self.series.get() as u16).to_le_bytes()
     }
@@ -161,6 +182,11 @@ const fn set(flags: u16, mask: u16, enabled: bool) -> u16 {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
     use super::*;
 
     #[test]

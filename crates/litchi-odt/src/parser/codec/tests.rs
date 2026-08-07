@@ -7,12 +7,9 @@ use super::validation::{
 
 #[test]
 fn accepts_schema_boolean_forms() {
-    assert_eq!(parse_boolean("true", "flag").unwrap(), true);
-    assert_eq!(parse_boolean("0", "flag").unwrap(), false);
-    assert_eq!(
-        parse_tracked_change_bool("track-changes", "1").unwrap(),
-        true
-    );
+    assert!(parse_boolean("true", "flag").unwrap());
+    assert!(!parse_boolean("0", "flag").unwrap());
+    assert!(parse_tracked_change_bool("track-changes", "1").unwrap());
 }
 
 #[test]

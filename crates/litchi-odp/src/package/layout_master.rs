@@ -67,6 +67,7 @@ impl MasterPage {
         })
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.master_page.name
     }
@@ -486,7 +487,7 @@ fn scan(xml: &str) -> Result<Vec<Span>> {
                     .pop()
                     .ok_or_else(|| error("ODF XML element stack underflow"))?;
                 spans[index].end = usize::try_from(reader.buffer_position())
-                    .map_err(|_| error("XML position overflow"))?;
+                    .map_err(|_err| error("XML position overflow"))?;
             },
             Event::Eof => break,
             _ => {},
@@ -511,7 +512,7 @@ fn push_span(
         return invalid("ODF XML exceeds 262144 elements");
     }
     let tag_end =
-        usize::try_from(reader.buffer_position()).map_err(|_| error("XML position overflow"))?;
+        usize::try_from(reader.buffer_position()).map_err(|_err| error("XML position overflow"))?;
     let start = xml[..tag_end]
         .rfind('<')
         .ok_or_else(|| error("XML element start is missing"))?;
@@ -1148,7 +1149,7 @@ fn escape_attr(value: &str) -> String {
 fn decode(bytes: &[u8], context: &str) -> Result<String> {
     str::from_utf8(bytes)
         .map(str::to_string)
-        .map_err(|_| error(format!("{context} is not UTF-8")))
+        .map_err(|_err| error(format!("{context} is not UTF-8")))
 }
 
 fn error(message: impl Into<String>) -> Error {

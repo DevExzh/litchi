@@ -5,7 +5,7 @@
     reason = "semantic field owners share the stable model facade namespace"
 )]
 use super::*;
-/// One of the five OpenDocument database field elements.
+/// One of the five `OpenDocument` database field elements.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum DatabaseFieldKind {

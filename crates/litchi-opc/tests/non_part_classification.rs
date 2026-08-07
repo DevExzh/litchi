@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Where the reader draws the line between an OPC part and archive junk.
 //!
 //! Each case builds a minimal package so the rule under test is the only thing
@@ -135,7 +141,7 @@ fn keeps_dangling_relationships_without_inventing_their_target_part() {
             .rels()
             .iter()
             .find(|relationship| relationship.r_id() == "rId2")
-            .map(|relationship| relationship.target_ref()),
+            .map(litchi_opc::Relationship::target_ref),
         Some("word/footer1.xml")
     );
 }

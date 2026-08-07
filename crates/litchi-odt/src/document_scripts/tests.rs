@@ -43,7 +43,7 @@ fn rejects_active_or_malformed_script_metadata() {
         )
     };
     for body in [
-        r#"<o:script/>"#,
+        r"<o:script/>",
         r#"<o:event-listeners/><o:script s:language="Python"/>"#,
         r#"<o:event-listeners><s:event-listener s:event-name="load" s:language="x"/></o:event-listeners>"#,
         r#"<o:event-listeners><s:event-listener s:event-name="load" s:language="x" s:macro-name="M" x:type="simple" x:href="S"/></o:event-listeners>"#,

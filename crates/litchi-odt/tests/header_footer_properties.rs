@@ -63,8 +63,8 @@ fn malformed_namespaces_order_cardinality_and_caps() {
         r#"<s:header-style><s:header-footer-properties s:dynamic-spacing="yes"/></s:header-style>"#,
         r#"<s:header-style><s:header-footer-properties f:border="wide solid #000000"/></s:header-style>"#,
         r#"<s:header-style><s:header-footer-properties f:padding="-1cm"/></s:header-style>"#,
-        r#"<s:header-style><s:header-footer-properties><s:background-image/><s:background-image/></s:header-footer-properties></s:header-style>"#,
-        r#"<s:header-style><s:header-footer-properties><s:columns/></s:header-footer-properties></s:header-style>"#,
+        r"<s:header-style><s:header-footer-properties><s:background-image/><s:background-image/></s:header-footer-properties></s:header-style>",
+        r"<s:header-style><s:header-footer-properties><s:columns/></s:header-footer-properties></s:header-style>",
     ] {
         assert!(
             parse_page_layout_header_footer_properties(&doc(body)).is_err(),

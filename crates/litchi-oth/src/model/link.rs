@@ -15,10 +15,14 @@ impl Link {
         }
     }
 
+    /// Returns the hyperlink target.
+    #[must_use]
     pub fn href(&self) -> &str {
         &self.href
     }
 
+    /// Returns the hyperlink label.
+    #[must_use]
     pub fn label(&self) -> &str {
         &self.label
     }

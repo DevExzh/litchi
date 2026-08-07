@@ -315,7 +315,7 @@ impl Sound {
     pub fn validate(&self) -> Result<()> {
         safe(&self.href, "xlink:href", true)?;
         if let Some(id) = &self.xml_id {
-            ncname(id, "xml:id", false)?
+            ncname(id, "xml:id", false)?;
         }
         Ok(())
     }
@@ -363,13 +363,13 @@ pub struct StyleProperties {
 impl StyleProperties {
     pub fn validate(&self) -> Result<()> {
         if let Some(value) = &self.smil_type {
-            safe(value, "smil:type", true)?
+            safe(value, "smil:type", true)?;
         }
         if let Some(value) = &self.smil_subtype {
-            safe(value, "smil:subtype", true)?
+            safe(value, "smil:subtype", true)?;
         }
         if let Some(value) = &self.sound {
-            value.validate()?
+            value.validate()?;
         }
         Ok(())
     }
@@ -411,10 +411,10 @@ impl Style {
             if self.is_default_style {
                 return Err(bad("default drawing-page style cannot have a parent"));
             }
-            ncname(value, "parent drawing-page style name", false)?
+            ncname(value, "parent drawing-page style name", false)?;
         }
         if let Some(value) = &self.properties {
-            value.validate()?
+            value.validate()?;
         }
         Ok(())
     }

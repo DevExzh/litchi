@@ -39,7 +39,7 @@ pub enum Error {
     #[error("invalid OPC signature graph: {0}")]
     Graph(String),
 
-    /// Cryptographic or XMLDSig processing failed in the neutral engine.
+    /// Cryptographic or `XMLDSig` processing failed in the neutral engine.
     #[error(transparent)]
     Signature(#[from] litchi_sign::Error),
 
@@ -64,46 +64,55 @@ pub struct Report {
 
 impl Report {
     /// Signature XML part URI.
+    #[must_use]
     pub const fn part(&self) -> &PackURI {
         &self.part
     }
 
-    /// Trust-neutral XMLDSig details.
+    /// Trust-neutral `XMLDSig` details.
+    #[must_use]
     pub const fn details(&self) -> &litchi_sign::Report {
         &self.details
     }
 
     /// Whether every signed reference has the expected digest.
+    #[must_use]
     pub fn integrity(&self) -> Status {
         self.details.integrity()
     }
 
     /// Whether the cryptographic signature matches its authenticated key.
+    #[must_use]
     pub fn signature(&self) -> Status {
         self.details.signature()
     }
 
     /// Whether the signature covers every eligible OPC resource.
+    #[must_use]
     pub fn coverage(&self) -> Coverage {
         self.details.coverage()
     }
 
     /// Certificate trust status, which remains neutral until evaluated by a caller.
+    #[must_use]
     pub fn trust(&self) -> Trust {
         self.details.trust()
     }
 
     /// Whether any accepted signature or digest algorithm uses SHA-1.
+    #[must_use]
     pub fn uses_sha1(&self) -> bool {
         self.details.uses_sha1()
     }
 
     /// Claimed signing time, when the signature contains one.
+    #[must_use]
     pub fn time(&self) -> Option<&str> {
         self.details.time()
     }
 
     /// Separates the package URI from the neutral report.
+    #[must_use]
     pub fn into_parts(self) -> (PackURI, litchi_sign::Report) {
         (self.part, self.details)
     }
@@ -131,13 +140,13 @@ fn verify_graph(package: &OpcPackage, graph: &Graph, policy: &Policy) -> Result<
     let mut reports = Vec::new();
     reports
         .try_reserve(graph.signatures.len())
-        .map_err(|_| litchi_sign::Error::Limit("signature report allocation failed".into()))?;
+        .map_err(|_err| litchi_sign::Error::Limit("signature report allocation failed".into()))?;
     for signature in &graph.signatures {
         let part = package.get_part(&signature.part).map_err(graph_error)?;
         let mut certificates = Vec::new();
         certificates
             .try_reserve(signature.certificates.len())
-            .map_err(|_| limit("certificate reference allocation failed"))?;
+            .map_err(|_err| limit("certificate reference allocation failed"))?;
         for uri in &signature.certificates {
             certificates.push(package.get_part(uri).map_err(graph_error)?.blob());
         }
@@ -238,8 +247,7 @@ impl Graph {
             Some(_) => {
                 let count = origins.count().saturating_add(2);
                 return Err(Error::Graph(format!(
-                    "expected one signature-origin relationship, found {}",
-                    count
+                    "expected one signature-origin relationship, found {count}"
                 )));
             },
         };
@@ -286,14 +294,14 @@ impl Graph {
         let mut signatures = Vec::new();
         signatures
             .try_reserve(signature_count)
-            .map_err(|_| limit("signature graph allocation failed"))?;
+            .map_err(|_err| limit("signature graph allocation failed"))?;
         let reachable_capacity = signature_count
             .checked_add(1)
             .ok_or_else(|| limit("signature graph capacity overflow"))?;
         let mut reachable = HashSet::new();
         reachable
             .try_reserve(reachable_capacity)
-            .map_err(|_| limit("signature graph allocation failed"))?;
+            .map_err(|_err| limit("signature graph allocation failed"))?;
         reachable.insert(origin.clone());
         let mut certificate_count = 0usize;
         let mut certificate_bytes = 0usize;
@@ -344,7 +352,7 @@ impl Graph {
             }
             certificates
                 .try_reserve(related_certificates)
-                .map_err(|_| limit("certificate graph allocation failed"))?;
+                .map_err(|_err| limit("certificate graph allocation failed"))?;
             for certificate_relationship in signature_part.rels().iter() {
                 let requested = internal_target(certificate_relationship, "certificate")?;
                 let certificate_part = package.get_part(&requested).map_err(graph_error)?;
@@ -385,7 +393,7 @@ impl Graph {
                 }
                 reachable
                     .try_reserve(1)
-                    .map_err(|_| limit("signature graph allocation failed"))?;
+                    .map_err(|_err| limit("signature graph allocation failed"))?;
                 reachable.insert(certificate_uri.clone());
                 certificates.push(certificate_uri);
             }
@@ -592,7 +600,7 @@ impl<'a> PackageResolver<'a> {
         let mut parts = Vec::new();
         parts
             .try_reserve(shape.parts)
-            .map_err(|_| limit("OPC part reference allocation failed"))?;
+            .map_err(|_err| limit("OPC part reference allocation failed"))?;
         parts.extend(
             package
                 .iter_parts()
@@ -656,7 +664,7 @@ impl<'a> PackageResolver<'a> {
         let mut references = Vec::new();
         references
             .try_reserve(self.entries.len())
-            .map_err(|_| litchi_sign::Error::Limit("reference allocation failed".into()))?;
+            .map_err(|_err| litchi_sign::Error::Limit("reference allocation failed".into()))?;
         for (uri, resource) in self.entries {
             let reference = match resource {
                 Resource::Part(part) => xml::Ref::borrowed_uri(uri, part.blob())?,
@@ -856,7 +864,7 @@ fn eligible_relationship_summary(relationships: &Relationships) -> Result<(usize
 fn eligible_relationship_ids(relationships: &Relationships, count: usize) -> Result<Vec<String>> {
     let mut ids = Vec::new();
     ids.try_reserve(count)
-        .map_err(|_| limit("relationship selection allocation failed"))?;
+        .map_err(|_err| limit("relationship selection allocation failed"))?;
     for relationship in relationships
         .iter()
         .filter(|relationship| !is_signature_relationship(relationship.reltype()))
@@ -870,7 +878,7 @@ fn eligible_relationship_ids(relationships: &Relationships, count: usize) -> Res
 fn copy_string(value: &str, description: &str) -> Result<String> {
     let mut copy = String::new();
     copy.try_reserve(value.len())
-        .map_err(|_| limit(format!("{description} allocation failed")))?;
+        .map_err(|_err| limit(format!("{description} allocation failed")))?;
     copy.push_str(value);
     Ok(copy)
 }
@@ -963,7 +971,7 @@ fn bounded_join(components: &[&str], maximum: usize, description: &str) -> Resul
     let mut output = String::new();
     output
         .try_reserve(length)
-        .map_err(|_| limit(format!("{description} allocation failed")))?;
+        .map_err(|_err| limit(format!("{description} allocation failed")))?;
     for component in components {
         output.push_str(component);
     }
@@ -1018,7 +1026,7 @@ fn push(output: &mut Vec<u8>, bytes: &[u8], maximum: usize) -> litchi_sign::Resu
     }
     output
         .try_reserve(bytes.len())
-        .map_err(|_| litchi_sign::Error::Limit("relationship XML allocation failed".into()))?;
+        .map_err(|_err| litchi_sign::Error::Limit("relationship XML allocation failed".into()))?;
     output.extend_from_slice(bytes);
     Ok(())
 }
@@ -1127,6 +1135,11 @@ fn next_relationship_id(relationships: &Relationships) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use p256::ecdsa::SigningKey;
 
     use super::*;

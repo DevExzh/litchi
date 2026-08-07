@@ -1,4 +1,4 @@
-//! Semantic model for inert, classic OpenDocument form controls.
+//! Semantic model for inert, classic `OpenDocument` form controls.
 
 use litchi_core::Result;
 
@@ -59,7 +59,7 @@ pub enum Target {
     },
 }
 
-/// XLink activation mode retained for an event declaration.
+/// `XLink` activation mode retained for an event declaration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Actuate {
     OnLoad,
@@ -80,7 +80,7 @@ pub struct Listener {
     /// URI retained verbatim; it is never fetched or resolved.
     pub href: Option<String>,
     pub actuate: Option<Actuate>,
-    /// Whether the optional XLink type was explicitly `simple`.
+    /// Whether the optional `XLink` type was explicitly `simple`.
     pub simple_link: bool,
     pub attributes: Vec<Attribute>,
 }

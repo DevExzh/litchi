@@ -71,7 +71,7 @@ fn write_validation(output: &mut String, value: &ContentValidation) {
     if let Some(failure) = &value.failure {
         match failure {
             ValidationFailure::Message(message) => {
-                write_message(output, "error-message", message, true)
+                write_message(output, "error-message", message, true);
             },
             ValidationFailure::Macro {
                 execute,
@@ -754,7 +754,7 @@ fn finish_capture(
                 Some(ValidationFailure::Macro {
                     event_listeners, ..
                 }) if event_listeners.is_none() => {
-                    *event_listeners = Some(ValidationEventListeners(xml))
+                    *event_listeners = Some(ValidationEventListeners(xml));
                 },
                 _ => return invalid("captured event listeners do not follow a macro"),
             }
@@ -875,8 +875,7 @@ fn required(attributes: &mut Attributes, local: &str) -> Result<String> {
 fn reject_remaining(attributes: Attributes, context: &str) -> Result<()> {
     if let Some(((namespace, local), _)) = attributes.into_iter().next() {
         return invalid(format!(
-            "unsupported {:?} {context} attribute '{local}'",
-            namespace
+            "unsupported {namespace:?} {context} attribute '{local}'"
         ));
     }
     Ok(())

@@ -855,7 +855,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     .xml_version()
                     .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,
@@ -1108,7 +1108,7 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                     .xml_version()
                     .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,
@@ -1186,29 +1186,29 @@ fn base64_decode(value: &str) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(clean.len() / 4 * 3);
     for (index, chunk) in clean.chunks(4).enumerate() {
         let last = index + 1 == clean.len() / 4;
-        let pad = (chunk[2] == b'=') as usize + (chunk[3] == b'=') as usize;
+        let pad = usize::from(chunk[2] == b'=') + usize::from(chunk[3] == b'=');
         if !last && pad != 0 || chunk[2] == b'=' && chunk[3] != b'=' || pad > 2 {
             return Err(bad("invalid office:binary-data padding"));
         }
-        let a = val(chunk[0]).ok_or_else(|| bad("invalid office:binary-data base64"))? as u32;
-        let b = val(chunk[1]).ok_or_else(|| bad("invalid office:binary-data base64"))? as u32;
+        let a = u32::from(val(chunk[0]).ok_or_else(|| bad("invalid office:binary-data base64"))?);
+        let b = u32::from(val(chunk[1]).ok_or_else(|| bad("invalid office:binary-data base64"))?);
         let c = if chunk[2] == b'=' {
             0
         } else {
-            val(chunk[2]).ok_or_else(|| bad("invalid office:binary-data base64"))? as u32
+            u32::from(val(chunk[2]).ok_or_else(|| bad("invalid office:binary-data base64"))?)
         };
         let d = if chunk[3] == b'=' {
             0
         } else {
-            val(chunk[3]).ok_or_else(|| bad("invalid office:binary-data base64"))? as u32
+            u32::from(val(chunk[3]).ok_or_else(|| bad("invalid office:binary-data base64"))?)
         };
         let n = a << 18 | b << 12 | c << 6 | d;
         out.push((n >> 16) as u8);
         if pad < 2 {
-            out.push((n >> 8) as u8)
+            out.push((n >> 8) as u8);
         }
         if pad < 1 {
-            out.push(n as u8)
+            out.push(n as u8);
         }
         if out.len() > MAX_BINARY {
             return Err(bad("office:binary-data is too large"));

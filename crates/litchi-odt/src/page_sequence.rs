@@ -596,8 +596,8 @@ mod tests {
     #[test]
     fn rejects_invalid_page_sequence_structure() {
         for body in [
-            r#"<t:page-sequence/>"#,
-            r#"<t:page-sequence><t:page/></t:page-sequence>"#,
+            r"<t:page-sequence/>",
+            r"<t:page-sequence><t:page/></t:page-sequence>",
             r#"<t:page-sequence><t:page t:master-page-name="A" xml:lang="en"/></t:page-sequence>"#,
             r#"<t:page-sequence><t:page t:master-page-name="A"> </t:page></t:page-sequence>"#,
             r#"<t:page-sequence>not a page<t:page t:master-page-name="A"/></t:page-sequence>"#,

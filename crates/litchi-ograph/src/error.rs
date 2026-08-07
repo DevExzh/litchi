@@ -3,7 +3,7 @@ use thiserror::Error;
 /// Result type used by this crate.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Checked OGraph parsing and encoding failures.
+/// Checked `OGraph` parsing and encoding failures.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
@@ -82,7 +82,7 @@ pub enum Error {
         name: String,
     },
 
-    /// Standalone OGraph packages reject unknown streams and all storages.
+    /// Standalone `OGraph` packages reject unknown streams and all storages.
     #[error("unexpected root entry {name:?} with type {entry_type}")]
     UnexpectedEntry {
         /// Directory entry name.
@@ -91,7 +91,7 @@ pub enum Error {
         entry_type: u8,
     },
 
-    /// The Workbook stream does not have the standalone OGraph substream shape.
+    /// The Workbook stream does not have the standalone `OGraph` substream shape.
     #[error("invalid standalone OGraph Workbook at offset {offset}: {reason}")]
     InvalidWorkbook {
         /// Record offset nearest the failure.

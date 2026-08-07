@@ -1,8 +1,8 @@
-//! Checked, lazy traversal of OfficeArt container records.
+//! Checked, lazy traversal of `OfficeArt` container records.
 
 use crate::{Error, Limit, Record, RecordKind, Result};
 
-/// Resource ceilings for recursive OfficeArt traversal.
+/// Resource ceilings for recursive `OfficeArt` traversal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
     /// Maximum nested-container depth.
@@ -30,6 +30,7 @@ pub struct Children<'data> {
 
 impl<'data> Children<'data> {
     /// Creates an iterator over a validated container body or record sequence.
+    #[must_use]
     pub const fn new(data: &'data [u8]) -> Self {
         Self {
             data,
@@ -56,17 +57,16 @@ impl<'data> Iterator for Children<'data> {
         }
 
         match Record::parse(self.data, self.offset) {
-            Ok((record, consumed)) => match self.offset.checked_add(consumed) {
-                Some(next) => {
+            Ok((record, consumed)) => {
+                if let Some(next) = self.offset.checked_add(consumed) {
                     self.offset = next;
                     Some(Ok(record))
-                },
-                None => {
+                } else {
                     self.done = true;
                     Some(Err(Error::ArithmeticOverflow {
                         context: "child-record cursor",
                     }))
-                },
+                }
             },
             Err(error) => {
                 self.done = true;
@@ -86,7 +86,7 @@ impl<'data> Iterator for Children<'data> {
 
 impl std::iter::FusedIterator for Children<'_> {}
 
-/// A record proven to be an OfficeArt container.
+/// A record proven to be an `OfficeArt` container.
 #[derive(Debug, Clone)]
 pub struct Container<'data> {
     record: Record<'data>,
@@ -94,6 +94,11 @@ pub struct Container<'data> {
 
 impl<'data> Container<'data> {
     /// Validates and wraps a container record.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::NotContainer` if `record` does not carry record version
+    /// 15 and therefore cannot contain children.
     pub fn try_new(record: Record<'data>) -> Result<Self> {
         if !record.is_container() {
             return Err(Error::NotContainer {
@@ -105,11 +110,13 @@ impl<'data> Container<'data> {
     }
 
     /// Returns the proven container record.
+    #[must_use]
     pub const fn record(&self) -> &Record<'data> {
         &self.record
     }
 
     /// Lazily visits direct children without copying their payloads.
+    #[must_use]
     pub const fn children(&self) -> Children<'data> {
         Children::new(self.record.data())
     }
@@ -118,9 +125,15 @@ impl<'data> Container<'data> {
     ///
     /// Absence is distinct from malformed input: any malformed child encountered
     /// before a match is returned to the caller.
+    ///
+    /// # Errors
+    ///
+    /// Returns the `Error` produced by the first malformed child encountered
+    /// before a match, such as `Error::TruncatedHeader` or
+    /// `Error::TruncatedPayload`.
     pub fn find(&self, kind: RecordKind) -> Result<Option<Record<'data>>> {
-        for child in self.children() {
-            let child = child?;
+        for child_result in self.children() {
+            let child = child_result?;
             if child.kind() == kind {
                 return Ok(Some(child));
             }
@@ -129,10 +142,15 @@ impl<'data> Container<'data> {
     }
 
     /// Collects every direct child of `kind`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the `Error` produced by the first malformed child encountered,
+    /// such as `Error::TruncatedHeader` or `Error::TruncatedPayload`.
     pub fn find_all(&self, kind: RecordKind) -> Result<Vec<Record<'data>>> {
         let mut matches = Vec::new();
-        for child in self.children() {
-            let child = child?;
+        for child_result in self.children() {
+            let child = child_result?;
             if child.kind() == kind {
                 matches.push(child);
             }
@@ -141,11 +159,22 @@ impl<'data> Container<'data> {
     }
 
     /// Collects matching descendants using an iterative depth-first traversal.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error from `Container::find_recursive_with` if a descendant
+    /// record is malformed or the default `Limits` are exceeded.
     pub fn find_recursive(&self, kind: RecordKind) -> Result<Vec<Record<'data>>> {
         self.find_recursive_with(kind, Limits::default())
     }
 
     /// Collects matching descendants within explicit resource ceilings.
+    ///
+    /// # Errors
+    ///
+    /// Returns the `Error` produced by a malformed descendant record, or
+    /// `Error::LimitExceeded` when `limits.max_records` or `limits.max_depth`
+    /// is exceeded during traversal.
     pub fn find_recursive_with(
         &self,
         kind: RecordKind,
@@ -203,6 +232,11 @@ impl<'data> TryFrom<Record<'data>> for Container<'data> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     fn atom(kind: u16, body: &[u8]) -> Vec<u8> {

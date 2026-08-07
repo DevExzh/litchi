@@ -11,6 +11,7 @@ pub struct Gap(u16);
 impl Gap {
     pub const ZERO: Self = Self(0);
 
+    #[must_use]
     pub const fn new(value: u16) -> Option<Self> {
         if value <= 500 {
             Some(Self(value))
@@ -19,6 +20,7 @@ impl Gap {
         }
     }
 
+    #[must_use]
     pub const fn get(self) -> u16 {
         self.0
     }
@@ -32,6 +34,7 @@ pub struct Overlap(i16);
 impl Overlap {
     pub const ZERO: Self = Self(0);
 
+    #[must_use]
     pub const fn new(value: i16) -> Option<Self> {
         if value >= -100 && value <= 100 {
             Some(Self(value))
@@ -40,6 +43,7 @@ impl Overlap {
         }
     }
 
+    #[must_use]
     pub const fn get(self) -> i16 {
         self.0
     }
@@ -53,6 +57,7 @@ pub struct BubblePercent(u16);
 impl BubblePercent {
     pub const ZERO: Self = Self(0);
 
+    #[must_use]
     pub const fn new(value: u16) -> Option<Self> {
         if value <= 300 {
             Some(Self(value))
@@ -61,6 +66,7 @@ impl BubblePercent {
         }
     }
 
+    #[must_use]
     pub const fn get(self) -> u16 {
         self.0
     }

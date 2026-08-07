@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 use crate::{Error, Record, RecordKind};
 
 use super::{Array, ColorRef, IS_BLIP, IS_COMPLEX, Id, Props, Value};

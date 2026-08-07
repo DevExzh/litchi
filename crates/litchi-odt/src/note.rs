@@ -440,7 +440,7 @@ pub(crate) fn parse_notes(xml: &str) -> Result<Vec<Note>> {
                 append_note_text(&mut active, &value)?;
             },
             Event::GeneralRef(ref reference) if !active.is_empty() => {
-                append_note_text(&mut active, &decode_reference(reference, "note")?)?
+                append_note_text(&mut active, &decode_reference(reference, "note")?)?;
             },
             Event::End(_) => {
                 document_depth = document_depth

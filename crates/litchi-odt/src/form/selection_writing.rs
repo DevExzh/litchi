@@ -88,11 +88,11 @@ impl ComboItem {
         let mut out = "<form:item".to_string();
         push_string(&mut out, "form:label", self.label.as_deref());
         if self.text.is_empty() {
-            out.push_str("/>")
+            out.push_str("/>");
         } else {
             out.push('>');
             out.push_str(&escape(&self.text));
-            out.push_str("</form:item>")
+            out.push_str("</form:item>");
         }
         Ok(out)
     }
@@ -124,11 +124,11 @@ impl ListOption {
         push_bool(&mut out, "form:selected", self.selected);
         push_bool(&mut out, "form:current-selected", self.current_selected);
         if self.text.is_empty() {
-            out.push_str("/>")
+            out.push_str("/>");
         } else {
             out.push('>');
             out.push_str(&escape(&self.text));
-            out.push_str("</form:option>")
+            out.push_str("</form:option>");
         }
         Ok(out)
     }
@@ -432,13 +432,13 @@ fn combobox_xml(v: &ComboboxControl) -> Result<String> {
     );
     push_bool(&mut out, "form:auto-complete", v.auto_complete);
     if v.items.is_empty() {
-        out.push_str("/>")
+        out.push_str("/>");
     } else {
         out.push('>');
         for item in &v.items {
             out.push_str(&item.to_xml_fragment()?);
         }
-        out.push_str("</form:combobox>")
+        out.push_str("</form:combobox>");
     }
     Ok(out)
 }
@@ -473,13 +473,13 @@ fn listbox_xml(v: &ListboxControl) -> Result<String> {
     );
     push_bool(&mut out, "form:multiple", v.multiple);
     if v.options.is_empty() {
-        out.push_str("/>")
+        out.push_str("/>");
     } else {
         out.push('>');
         for option in &v.options {
             out.push_str(&option.to_xml_fragment()?);
         }
-        out.push_str("</form:listbox>")
+        out.push_str("</form:listbox>");
     }
     Ok(out)
 }
@@ -555,7 +555,7 @@ where
         validate_entry(label.as_deref(), value.map(String::as_str), text)?;
         total = total
             .checked_add(
-                text.len() + label.as_ref().map_or(0, |v| v.len()) + value.map_or(0, |v| v.len()),
+                text.len() + label.as_ref().map_or(0, String::len) + value.map_or(0, String::len),
             )
             .ok_or_else(|| {
                 Error::InvalidFormat("selection entry content is too large".to_string())

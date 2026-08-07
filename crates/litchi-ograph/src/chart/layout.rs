@@ -16,6 +16,7 @@ impl Zoom {
     };
 
     /// Creates a checked zoom fraction.
+    #[must_use]
     pub const fn new(numerator: u16, denominator: u16) -> Option<Self> {
         if numerator == 0
             || denominator == 0
@@ -36,11 +37,13 @@ impl Zoom {
     }
 
     /// Fraction numerator.
+    #[must_use]
     pub const fn numerator(self) -> u16 {
         self.numerator
     }
 
     /// Fraction denominator.
+    #[must_use]
     pub const fn denominator(self) -> u16 {
         self.denominator
     }
@@ -62,11 +65,13 @@ impl Fixed {
     pub const ONE: Self = Self(1 << 16);
 
     /// Preserves one signed 16.16 wire value.
+    #[must_use]
     pub const fn from_raw(value: i32) -> Self {
         Self(value)
     }
 
     /// Returns the signed 16.16 wire value.
+    #[must_use]
     pub const fn raw(self) -> i32 {
         self.0
     }
@@ -137,6 +142,7 @@ pub struct Pos {
 
 impl Pos {
     /// Creates the mandatory primary-axis-group plot position.
+    #[must_use]
     pub const fn plot(x: i16, y: i16, width: i16, height: i16) -> Self {
         Self {
             top_left: Mode::Parent,
@@ -167,31 +173,37 @@ impl Pos {
     }
 
     /// Upper-left positioning mode.
+    #[must_use]
     pub const fn top_left(self) -> Mode {
         self.top_left
     }
 
     /// Lower-right positioning mode.
+    #[must_use]
     pub const fn bottom_right(self) -> Mode {
         self.bottom_right
     }
 
     /// Horizontal position.
+    #[must_use]
     pub const fn x(self) -> i16 {
         self.x
     }
 
     /// Vertical position.
+    #[must_use]
     pub const fn y(self) -> i16 {
         self.y
     }
 
     /// Width or second horizontal coordinate, according to the modes.
+    #[must_use]
     pub const fn width(self) -> i16 {
         self.width
     }
 
     /// Height or second vertical coordinate, according to the modes.
+    #[must_use]
     pub const fn height(self) -> i16 {
         self.height
     }
@@ -209,6 +221,11 @@ impl Default for Pos {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
     use super::*;
 
     #[test]

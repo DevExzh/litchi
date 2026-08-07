@@ -51,6 +51,11 @@ impl Package {
     }
 
     /// Read and validate a Formula-family package from owned bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bytes are not a valid Formula-family package
+    /// (bad archive, wrong MIME type, or missing or non-UTF-8 `content.xml`).
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let owned = OwnedPackage::from_bytes(bytes)?;
         let flavor = Flavor::from_mimetype(&owned.mimetype()?)?;
@@ -60,13 +65,20 @@ impl Package {
             ));
         }
         let content = owned.get_file(ODF_CONTENT)?;
-        std::str::from_utf8(&content).map_err(|_| {
-            Error::InvalidFormat("Formula content.xml is not valid UTF-8".to_string())
-        })?;
+        if std::str::from_utf8(&content).is_err() {
+            return Err(Error::InvalidFormat(
+                "Formula content.xml is not valid UTF-8".to_string(),
+            ));
+        }
         Ok(Self { owned, flavor })
     }
 
     /// Read and validate a Formula-family package from a stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when reading fails or the bytes are not a valid
+    /// Formula-family package.
     pub fn from_reader(mut reader: impl Read) -> Result<Self> {
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes)?;
@@ -74,33 +86,49 @@ impl Package {
     }
 
     /// Return the exact package MIME type.
+    #[must_use]
     pub fn mimetype(&self) -> &'static str {
         self.flavor.mimetype()
     }
 
     /// Whether this package uses the Formula template MIME type.
+    #[must_use]
     pub const fn is_template(&self) -> bool {
         matches!(self.flavor, Flavor::Template)
     }
 
     /// Read the package's exact `content.xml` bytes as UTF-8.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` is missing or not valid UTF-8.
     pub fn content_xml(&self) -> Result<String> {
         let bytes = self.owned.get_file(ODF_CONTENT)?;
-        String::from_utf8(bytes)
-            .map_err(|_| Error::InvalidFormat("Formula content.xml is not valid UTF-8".to_string()))
+        match String::from_utf8(bytes) {
+            Ok(text) => Ok(text),
+            Err(_) => Err(Error::InvalidFormat(
+                "Formula content.xml is not valid UTF-8".to_string(),
+            )),
+        }
     }
 
     /// List the package members in archive order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the archive member list cannot be read.
     pub fn files(&self) -> Result<Vec<String>> {
         self.owned.files()
     }
 
     /// Return the exact original package bytes.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.owned.as_bytes()
     }
 
     /// Consume the package and return its exact bytes.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.owned.into_inner()
     }

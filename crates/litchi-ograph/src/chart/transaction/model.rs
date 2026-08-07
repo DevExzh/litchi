@@ -52,7 +52,7 @@ impl CacheValue {
 /// Stable semantic identity of an existing cache cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Identity {
-    /// Graph row, column, and IFmt identity.
+    /// Graph row, column, and `IFmt` identity.
     Graph {
         row: RowCol,
         col: RowCol,
@@ -116,21 +116,25 @@ impl Change {
     }
 
     /// Zero-based position in the chart's existing cache inventory.
+    #[must_use]
     pub const fn index(&self) -> usize {
         self.index
     }
 
     /// Stable source identity retained by this change.
+    #[must_use]
     pub const fn identity(&self) -> &Identity {
         &self.identity
     }
 
     /// Value required before this change can be applied.
+    #[must_use]
     pub const fn before(&self) -> &CacheValue {
         &self.before
     }
 
     /// Value produced by this change.
+    #[must_use]
     pub const fn after(&self) -> &CacheValue {
         &self.after
     }
@@ -158,11 +162,13 @@ impl Patch {
     }
 
     /// Ordered cache changes in their transaction staging order.
+    #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Number of effective semantic changes, including the optional chart area.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.changes
             .len()
@@ -171,22 +177,26 @@ impl Patch {
     }
 
     /// Whether the transaction was a semantic no-op.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.changes.is_empty() && self.chart_area.is_none() && self.sheet_props.is_none()
     }
 
     /// One reversible change to the fixed-size `[MS-OGRAPH]` `Chart` record.
+    #[must_use]
     pub const fn chart_area(&self) -> Option<&chart_area::Change> {
         self.chart_area.as_ref()
     }
 
     /// One reversible change to the fixed-size `[MS-OGRAPH]` `ShtProps`
     /// record.
+    #[must_use]
     pub const fn sheet_props(&self) -> Option<&sheet_props::Change> {
         self.sheet_props.as_ref()
     }
 
     /// Returns the source-checked inverse patch.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             changes: self
@@ -222,21 +232,25 @@ impl Commit {
     }
 
     /// Borrow the post-edit chart snapshot.
+    #[must_use]
     pub const fn chart(&self) -> &Chart {
         &self.chart
     }
 
     /// Borrow the reversible semantic patch.
+    #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consume the commit and return the post-edit chart snapshot.
+    #[must_use]
     pub fn into_chart(self) -> Chart {
         self.chart
     }
 
     /// Split the commit into the chart snapshot and reversible patch.
+    #[must_use]
     pub fn into_parts(self) -> (Chart, Patch) {
         (self.chart, self.patch)
     }

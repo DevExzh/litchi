@@ -641,13 +641,13 @@ fn reject_active(name: &Name) -> Result<()> {
 fn element_name(element: &BytesStart<'_>) -> Result<String> {
     std::str::from_utf8(element.name().as_ref())
         .map(str::to_owned)
-        .map_err(|_| invalid("handout element name is not UTF-8"))
+        .map_err(|_err| invalid("handout element name is not UTF-8"))
 }
 
 fn end_name(element: &quick_xml::events::BytesEnd<'_>) -> Result<String> {
     std::str::from_utf8(element.name().as_ref())
         .map(str::to_owned)
-        .map_err(|_| invalid("handout closing element name is not UTF-8"))
+        .map_err(|_err| invalid("handout closing element name is not UTF-8"))
 }
 
 fn find_open_end(xml: &str, start: usize, end: usize) -> Result<usize> {
@@ -849,7 +849,7 @@ fn parse_start_attributes(xml: &str) -> Result<(String, Vec<Attribute>)> {
             raw.map_err(|error| invalid(format!("invalid handout source attribute: {error}")))?;
         let qname = std::str::from_utf8(raw.key.as_ref())
             .map(str::to_owned)
-            .map_err(|_| invalid("handout source attribute name is not UTF-8"))?;
+            .map_err(|_err| invalid("handout source attribute name is not UTF-8"))?;
         let (namespace, local) = reader.resolver().resolve_attribute(raw.key);
         let namespace = match namespace {
             ResolveResult::Bound(Namespace(value)) => Some(value.to_vec()),
@@ -858,7 +858,7 @@ fn parse_start_attributes(xml: &str) -> Result<(String, Vec<Attribute>)> {
         };
         let local = std::str::from_utf8(local.as_ref())
             .map(str::to_owned)
-            .map_err(|_| invalid("handout source attribute local name is not UTF-8"))?;
+            .map_err(|_err| invalid("handout source attribute local name is not UTF-8"))?;
         let value = raw
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| invalid(format!("invalid handout source attribute value: {error}")))?

@@ -21,7 +21,7 @@ fn complete_family_round_trips() {
         "https://example.invalid/a&b.ogg"
     );
     let fragment = p.to_xml_fragment().unwrap();
-    assert_eq!(StyleProperties::from_xml_fragment(&fragment).unwrap(), *p)
+    assert_eq!(StyleProperties::from_xml_fragment(&fragment).unwrap(), *p);
 }
 #[test]
 fn parses_real_libreoffice_remote_background_without_loading_it() {
@@ -32,7 +32,7 @@ fn parses_real_libreoffice_remote_background_without_loading_it() {
     let p = set.get("dp1").unwrap().properties.as_ref().unwrap();
     assert_eq!(p.fill, Some(Fill::Bitmap));
     assert_eq!(p.fill_image_name.as_ref().unwrap().as_str(), "remote_bg");
-    assert_eq!(p.repeat, Some(Repeat::Stretch))
+    assert_eq!(p.repeat, Some(Repeat::Stretch));
 }
 #[test]
 fn lossless_replace_insert_and_remove() {
@@ -56,7 +56,7 @@ fn lossless_replace_insert_and_remove() {
     let b = Style::named("b", None).unwrap();
     let removed = set_drawing_page_style_properties_xml(&removed_a, &b).unwrap();
     assert!(!removed.contains("draw:fill=\"none\""));
-    assert!(removed.contains("<!--keep-->"))
+    assert!(removed.contains("<!--keep-->"));
 }
 #[test]
 fn rejects_malformed_namespaces_lexicals_duplicates_and_children() {
@@ -73,6 +73,6 @@ fn rejects_malformed_namespaces_lexicals_duplicates_and_children() {
         assert!(
             parse_drawing_page_style_properties(&doc(case)).is_err(),
             "accepted {case}"
-        )
+        );
     }
 }

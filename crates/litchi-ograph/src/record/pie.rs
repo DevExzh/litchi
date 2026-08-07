@@ -21,11 +21,17 @@ impl Format {
     pub const KIND: Kind = Kind::from_wire(0x100B);
 
     /// Creates a format from an already range-proven value.
+    #[must_use]
     pub const fn new(explode: Explode) -> Self {
         Self { explode }
     }
 
     /// Convenient checked construction from a primitive percentage.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidRecordValue`] if the percentage exceeds the
+    /// `pcExplode` range.
     pub fn try_new(explode: u16) -> Result<Self> {
         let value = Explode::new(u32::from(explode)).ok_or(Error::InvalidRecordValue {
             kind: Self::KIND.get(),
@@ -52,11 +58,13 @@ impl Format {
     }
 
     /// Range-proven explosion percentage.
+    #[must_use]
     pub const fn explode(self) -> Explode {
         self.explode
     }
 
     /// Encodes the fixed-size payload without allocating.
+    #[must_use]
     pub fn payload(self) -> [u8; LEN] {
         (self.explode.get() as u16).to_le_bytes()
     }
@@ -70,6 +78,11 @@ impl Format {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
     use super::*;
 
     #[test]

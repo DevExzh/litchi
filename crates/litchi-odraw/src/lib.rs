@@ -1,4 +1,4 @@
-//! Format-neutral Microsoft OfficeArt drawing primitives.
+//! Format-neutral Microsoft `OfficeArt` drawing primitives.
 //!
 //! The crate provides checked, zero-copy parsing over caller-owned bytes and
 //! runtime-neutral writing helpers shared by the legacy Office formats.

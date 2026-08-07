@@ -86,11 +86,9 @@ impl Editor {
                 maximum: u64::try_from(self.chart.limits.max_cached_values).unwrap_or(u64::MAX),
             });
         }
-        self.requests
-            .try_reserve(1)
-            .map_err(|_| Error::Allocation {
-                resource: "cache edits",
-            })?;
+        self.requests.try_reserve(1).ok().ok_or(Error::Allocation {
+            resource: "cache edits",
+        })?;
         self.requests.push(Request { index, value });
         Ok(self)
     }
@@ -146,14 +144,16 @@ impl Editor {
         let mut effective = Vec::new();
         effective
             .try_reserve_exact(requests.len())
-            .map_err(|_| Error::Allocation {
+            .ok()
+            .ok_or(Error::Allocation {
                 resource: "effective cache edits",
             })?;
 
         let mut changes = Vec::new();
         changes
             .try_reserve_exact(requests.len())
-            .map_err(|_| Error::Allocation {
+            .ok()
+            .ok_or(Error::Allocation {
                 resource: "chart patch changes",
             })?;
         for request in requests {

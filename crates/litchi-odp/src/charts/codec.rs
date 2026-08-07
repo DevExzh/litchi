@@ -71,7 +71,7 @@ pub(crate) fn inventory(source: &OwnedPackage, limits: Limits) -> Result<Vec<Cha
                 }
                 let bytes = source.get_file(&content_path)?;
                 let xml = String::from_utf8(bytes)
-                    .map_err(|_| invalid_error("embedded ODP chart content.xml is not UTF-8"))?;
+                    .map_err(|_err| invalid_error("embedded ODP chart content.xml is not UTF-8"))?;
                 (
                     Part::from_xml_with_limit(xml, limits.max_part_bytes())?,
                     Storage::PackageSubdocument,
@@ -167,7 +167,7 @@ impl Part {
 
 pub(crate) fn content_xml(source: &OwnedPackage) -> Result<String> {
     let bytes = source.get_file("content.xml")?;
-    String::from_utf8(bytes).map_err(|_| invalid_error("ODP content.xml is not UTF-8"))
+    String::from_utf8(bytes).map_err(|_err| invalid_error("ODP content.xml is not UTF-8"))
 }
 
 fn is_chart_object(object: &litchi_odf_common::embedded::Object) -> bool {
@@ -556,7 +556,7 @@ fn rename_document_root(
     }
     let replacement = format!("{prefix}:{replacement_local}");
     let mut output = String::with_capacity(xml.len() + 96);
-    output.push_str(&xml[..root_start + 1]);
+    output.push_str(&xml[..=root_start]);
     output.push_str(&replacement);
     if let Some((name, value)) = added_attribute {
         output.push(' ');
@@ -619,7 +619,7 @@ fn is_object_name(local: &[u8]) -> bool {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid_error("ODP XML position exceeds platform limits"))
+        .map_err(|_err| invalid_error("ODP XML position exceeds platform limits"))
 }
 
 fn checked_depth(depth: usize) -> Result<usize> {

@@ -11,6 +11,8 @@ impl Layer {
         Self { name: name.into() }
     }
 
+    /// Returns the layer name.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }

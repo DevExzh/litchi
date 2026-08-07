@@ -44,7 +44,7 @@ impl std::str::FromStr for StyleFamily {
             "page-layout" => Ok(Self::PageLayout),
             "master-page" => Ok(Self::MasterPage),
             "graphic" => Ok(Self::Graphic),
-            _ => Err(format!("Invalid style family: {}", s)),
+            _ => Err(format!("Invalid style family: {s}")),
         }
     }
 }

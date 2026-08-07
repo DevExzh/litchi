@@ -15,11 +15,13 @@ impl Change {
     }
 
     /// Rectangle required before this change can be applied.
+    #[must_use]
     pub const fn before(self) -> Rect {
         self.before
     }
 
     /// Rectangle produced by this change.
+    #[must_use]
     pub const fn after(self) -> Rect {
         self.after
     }

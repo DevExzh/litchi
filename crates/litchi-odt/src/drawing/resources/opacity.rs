@@ -118,7 +118,7 @@ impl Angle {
     }
 }
 
-/// A LibreOffice extension stop coordinate or opacity.
+/// A `LibreOffice` extension stop coordinate or opacity.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum StopValue {
@@ -152,7 +152,7 @@ impl fmt::Display for StopValue {
     }
 }
 
-/// One ordered LibreOffice opacity stop.
+/// One ordered `LibreOffice` opacity stop.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Stop {
     pub offset: StopValue,

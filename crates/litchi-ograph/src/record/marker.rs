@@ -15,18 +15,34 @@ macro_rules! marker {
             pub const KIND: Kind = Kind::from_wire($kind);
 
             /// Decodes a framed record and rejects a non-empty payload.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`crate::Error::WrongRecord`] if the record identifier
+            /// differs, or [`crate::Error::InvalidRecordLength`] if the
+            /// payload is not empty.
             pub fn parse(input: RecordRef<'_>) -> Result<Self> {
                 record::payload(input, Self::KIND, 0)?;
                 Ok(Self)
             }
 
             /// Decodes a payload supplied by an embedding host.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`crate::Error::InvalidRecordLength`] if the payload is
+            /// not empty.
             pub fn from_payload(payload: &[u8]) -> Result<Self> {
                 record::payload_bytes(Self::KIND, payload, 0)?;
                 Ok(Self)
             }
 
             /// Appends the complete record to a bounded encoder.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`crate::Error::Biff`] if the encoder rejects the
+            /// record.
             pub fn write(self, out: &mut Encoder) -> Result<()> {
                 out.push(Self::KIND, &[])?;
                 Ok(())
@@ -52,6 +68,11 @@ marker! {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
     use super::*;
     use litchi_biff::{Error as BiffError, Limits, Records, Resource};
 

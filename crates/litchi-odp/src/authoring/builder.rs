@@ -1,4 +1,4 @@
-//! OpenDocument Presentation builder.
+//! `OpenDocument` Presentation builder.
 //!
 //! This module provides a builder pattern for creating new ODP presentations from scratch.
 
@@ -113,6 +113,7 @@ impl Builder {
     ///
     /// let builder = Builder::new();
     /// ```
+    #[must_use]
     pub fn new() -> Self {
         Self {
             slides: Vec::new(),
@@ -126,6 +127,7 @@ impl Builder {
     }
 
     /// Return validated page-layout definitions that will be written to `styles.xml`.
+    #[must_use]
     pub fn layouts(&self) -> &crate::model::page_layout::Collection {
         &self.page_layouts
     }
@@ -150,6 +152,7 @@ impl Builder {
     }
 
     /// Return the inert slide-show settings.
+    #[must_use]
     pub fn settings(&self) -> Option<&crate::Settings> {
         self.settings.as_ref()
     }
@@ -164,6 +167,7 @@ impl Builder {
     }
 
     /// Return inert presentation declarations and page bindings.
+    #[must_use]
     pub fn declarations(&self) -> Option<&crate::model::declaration::Collection> {
         self.declarations.as_ref()
     }
@@ -181,6 +185,7 @@ impl Builder {
     }
 
     /// Return static page names, IDs, and layout/master references.
+    #[must_use]
     pub fn pages(&self) -> Option<&crate::model::page_metadata::Collection> {
         self.page_metadata.as_ref()
     }
@@ -451,8 +456,7 @@ impl Builder {
             )
         {
             return Err(litchi_core::Error::InvalidFormat(format!(
-                "ODP media shape '{}' must use the graphic-frame or picture shape type",
-                name
+                "ODP media shape '{name}' must use the graphic-frame or picture shape type"
             )));
         }
 
@@ -504,21 +508,18 @@ impl Builder {
         validate_required_three_dimensional_attributes(element_kind, &shape.drawing_attributes)?;
         if element_kind.is_three_dimensional() && !shape.event_listeners.is_empty() {
             return Err(litchi_core::Error::InvalidFormat(format!(
-                "3D shape '{}' cannot contain presentation event listeners",
-                name
+                "3D shape '{name}' cannot contain presentation event listeners"
             )));
         }
         if parent_kind == Some(DrawingShapeKind::ThreeDimensionalScene) && shape.hyperlink.is_some()
         {
             return Err(litchi_core::Error::InvalidFormat(format!(
-                "3D scene child '{}' cannot be wrapped in draw:a",
-                name
+                "3D scene child '{name}' cannot be wrapped in draw:a"
             )));
         }
         if shape.enhanced_geometry.is_some() && element_kind != DrawingShapeKind::CustomShape {
             return Err(litchi_core::Error::InvalidFormat(format!(
-                "enhanced geometry requires draw:custom-shape for shape '{}'",
-                name
+                "enhanced geometry requires draw:custom-shape for shape '{name}'"
             )));
         }
         let element_name = element_kind.element_name();
@@ -526,17 +527,14 @@ impl Builder {
             ShapeType::TextBox | ShapeType::Placeholder => {
                 if shape.has_text() {
                     format!(
-                        r#"<draw:frame{}{}><draw:text-box>{}</draw:text-box></draw:frame>"#,
+                        r"<draw:frame{}{}><draw:text-box>{}</draw:text-box></draw:frame>",
                         shape_attributes,
                         position_attributes,
                         generate_text_paragraphs(&shape.text, Some("P2"))
                     )
                 } else {
                     // Empty frame
-                    format!(
-                        r#"<draw:frame{}{}/>"#,
-                        shape_attributes, position_attributes
-                    )
+                    format!(r"<draw:frame{shape_attributes}{position_attributes}/>")
                 }
             },
             ShapeType::AutoShape => {
@@ -548,14 +546,10 @@ impl Builder {
                         || !shape.event_listeners.is_empty()
                     {
                         return Err(litchi_core::Error::InvalidFormat(format!(
-                            "3D object '{}' contains unsupported 2D shape payload",
-                            name
+                            "3D object '{name}' contains unsupported 2D shape payload"
                         )));
                     }
-                    format!(
-                        r#"<{}{}{}/>"#,
-                        element_name, shape_attributes, position_attributes
-                    )
+                    format!(r"<{element_name}{shape_attributes}{position_attributes}/>")
                 } else {
                     let geometry = shape
                         .enhanced_geometry
@@ -571,18 +565,10 @@ impl Builder {
                         };
                         contents.push_str(&geometry);
                         format!(
-                            r#"<{}{}{}>{}</{}>"#,
-                            element_name,
-                            shape_attributes,
-                            position_attributes,
-                            contents,
-                            element_name
+                            r"<{element_name}{shape_attributes}{position_attributes}>{contents}</{element_name}>"
                         )
                     } else {
-                        format!(
-                            r#"<{}{}{}/>"#,
-                            element_name, shape_attributes, position_attributes
-                        )
+                        format!(r"<{element_name}{shape_attributes}{position_attributes}/>")
                     }
                 }
             },
@@ -605,15 +591,11 @@ impl Builder {
                     None => {},
                 }
                 format!(
-                    r#"<draw:frame{}{}>{}</draw:frame>"#,
-                    shape_attributes, position_attributes, contents
+                    r"<draw:frame{shape_attributes}{position_attributes}>{contents}</draw:frame>"
                 )
             },
             ShapeType::Line | ShapeType::Connector => {
-                format!(
-                    r#"<{}{}{}/>"#,
-                    element_name, shape_attributes, line_attributes
-                )
+                format!(r"<{element_name}{shape_attributes}{line_attributes}/>")
             },
             ShapeType::GraphicFrame if shape.media.is_some() => {
                 let mut plugin = String::new();
@@ -622,10 +604,7 @@ impl Builder {
                     .as_ref()
                     .expect("media checked by match guard")
                     .write_xml(&mut plugin)?;
-                format!(
-                    r#"<draw:frame{}{}>{}</draw:frame>"#,
-                    shape_attributes, position_attributes, plugin
-                )
+                format!(r"<draw:frame{shape_attributes}{position_attributes}>{plugin}</draw:frame>")
             },
             ShapeType::Group => {
                 if shape.has_text()
@@ -634,8 +613,7 @@ impl Builder {
                     || shape.enhanced_geometry.is_some()
                 {
                     return Err(litchi_core::Error::InvalidFormat(format!(
-                        "ODP group shape '{}' contains non-group payload",
-                        name
+                        "ODP group shape '{name}' contains non-group payload"
                     )));
                 }
                 let container_position = if element_kind == DrawingShapeKind::ThreeDimensionalScene
@@ -645,7 +623,7 @@ impl Builder {
                     ""
                 };
                 if shape.children.is_empty() {
-                    format!(r#"<{element_name}{shape_attributes}{container_position}/>"#)
+                    format!(r"<{element_name}{shape_attributes}{container_position}/>")
                 } else {
                     if element_kind == DrawingShapeKind::ThreeDimensionalScene {
                         validate_three_dimensional_child_order(&shape.children)?;
@@ -661,7 +639,7 @@ impl Builder {
                         )?);
                     }
                     format!(
-                        r#"<{element_name}{shape_attributes}{container_position}>{children}</{element_name}>"#
+                        r"<{element_name}{shape_attributes}{container_position}>{children}</{element_name}>"
                     )
                 }
             },
@@ -859,8 +837,7 @@ impl Builder {
         let transition_styles = generate_transition_styles(&self.slides);
 
         Ok(format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:anim="urn:oasis:names:tc:opendocument:xmlns:animation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:ooo="http://openoffice.org/2004/office"{} office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles>{}</office:automatic-styles><office:body><office:presentation>{}</office:presentation></office:body></office:document-content>"#,
-            extension_declarations, transition_styles, body
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:anim="urn:oasis:names:tc:opendocument:xmlns:animation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:dr3d="urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0" xmlns:math="http://www.w3.org/1998/Math/MathML" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:ooo="http://openoffice.org/2004/office"{extension_declarations} office:version="1.3"><office:scripts/><office:font-face-decls/><office:automatic-styles>{transition_styles}</office:automatic-styles><office:body><office:presentation>{body}</office:presentation></office:body></office:document-content>"#
         ))
     }
 
@@ -869,8 +846,7 @@ impl Builder {
         let now = chrono::Utc::now().to_rfc3339();
 
         let mut meta = format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator><meta:creation-date>{}</meta:creation-date><dc:date>{}</dc:date>"#,
-            now, now
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"><office:meta><meta:generator>Litchi/0.0.1</meta:generator><meta:creation-date>{now}</meta:creation-date><dc:date>{now}</dc:date>"#
         );
 
         // Add optional metadata fields

@@ -37,7 +37,7 @@ pub enum EmbeddedResourceKind {
     Image,
 }
 
-/// One file in an authored embedded OpenDocument subdocument.
+/// One file in an authored embedded `OpenDocument` subdocument.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EmbeddedResourceFile {
     /// Path relative to the subdocument root, such as `content.xml`.
@@ -59,7 +59,7 @@ pub enum EmbeddedResourceSource {
         media_type: String,
         preferred_path: Option<String>,
     },
-    /// An embedded OpenDocument package rooted at one package directory.
+    /// An embedded `OpenDocument` package rooted at one package directory.
     PackageSubdocument {
         files: Vec<EmbeddedResourceFile>,
         media_type: String,

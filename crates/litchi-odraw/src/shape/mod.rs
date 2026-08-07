@@ -1,4 +1,4 @@
-//! Typed, bounded views over OfficeArt shape containers.
+//! Typed, bounded views over `OfficeArt` shape containers.
 //!
 //! The facade keeps the ergonomic shape API flat while the implementation is
 //! split by responsibility: [`model`] owns borrowed typed objects, [`codec`]

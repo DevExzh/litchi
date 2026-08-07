@@ -488,7 +488,7 @@ fn serialize_form(form: &AuthoredForm, depth: usize, nodes: &mut usize) -> Resul
     for child in &form.children {
         match child {
             AuthoredFormNode::Form(value) => {
-                out.push_str(&serialize_form(value, depth + 1, nodes)?)
+                out.push_str(&serialize_form(value, depth + 1, nodes)?);
             },
             AuthoredFormNode::Control(value) => {
                 *nodes = nodes

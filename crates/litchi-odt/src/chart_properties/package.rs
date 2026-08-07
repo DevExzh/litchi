@@ -1,4 +1,4 @@
-//! Flat and packaged OpenDocument access for chart styles.
+//! Flat and packaged `OpenDocument` access for chart styles.
 
 use super::codec::parse_chart_style_properties;
 use super::model::StylePropertiesSet;

@@ -41,6 +41,7 @@ pub struct RowCol(u16);
 impl RowCol {
     pub const ZERO: Self = Self(0);
 
+    #[must_use]
     pub const fn new(value: u16) -> Option<Self> {
         if value <= 0x0F9F {
             Some(Self(value))
@@ -49,6 +50,7 @@ impl RowCol {
         }
     }
 
+    #[must_use]
     pub const fn get(self) -> u16 {
         self.0
     }
@@ -75,7 +77,7 @@ pub enum Link {
         number_format: u16,
         row_col: RowCol,
     },
-    /// Variable-size `[MS-XLS]` BRAI using a ChartParsedFormula.
+    /// Variable-size `[MS-XLS]` BRAI using a `ChartParsedFormula`.
     Excel {
         role: Role,
         source: Source,
@@ -88,6 +90,7 @@ pub enum Link {
 
 impl Link {
     /// Creates a standalone Graph link.
+    #[must_use]
     pub const fn graph(role: Role, source: Source, row_col: RowCol) -> Self {
         Self::Graph {
             role,
@@ -99,6 +102,7 @@ impl Link {
     }
 
     /// Creates an Excel link, moving its inert formula token allocation.
+    #[must_use]
     pub const fn excel(role: Role, source: Source, formula: Vec<u8>) -> Self {
         Self::Excel {
             role,
@@ -110,12 +114,14 @@ impl Link {
         }
     }
 
+    #[must_use]
     pub const fn role(&self) -> Role {
         match self {
             Self::Graph { role, .. } | Self::Excel { role, .. } => *role,
         }
     }
 
+    #[must_use]
     pub const fn source(&self) -> Source {
         match self {
             Self::Graph { source, .. } | Self::Excel { source, .. } => *source,
@@ -133,16 +139,19 @@ pub struct Binding {
 
 impl Binding {
     /// Creates a binding by moving its inert link and optional text.
+    #[must_use]
     pub const fn new(link: Link, text: Option<String>) -> Self {
         Self { link, text }
     }
 
     /// Producer-specific data link.
+    #[must_use]
     pub const fn link(&self) -> &Link {
         &self.link
     }
 
     /// Optional cached display text attached to this AI.
+    #[must_use]
     pub fn text(&self) -> Option<&str> {
         self.text.as_deref()
     }
@@ -208,6 +217,7 @@ impl Ai {
     }
 
     /// Creates four automatic bindings for a producer context.
+    #[must_use]
     pub fn automatic(context: Context) -> Self {
         fn link(context: Context, role: Role) -> Link {
             match context.kind() {
@@ -224,6 +234,7 @@ impl Ai {
     }
 
     /// Looks up one binding by semantic role.
+    #[must_use]
     pub const fn get(&self, role: Role) -> &Binding {
         match role {
             Role::Name => &self.name,
@@ -280,6 +291,7 @@ pub struct Series {
 
 impl Series {
     /// Creates an empty text-category series in the primary chart group.
+    #[must_use]
     pub fn new(context: Context) -> Self {
         Self {
             category_kind: DataKind::Text,
@@ -316,6 +328,7 @@ impl Owner {
     pub const PRIMARY: Self = Self::Group(GroupId::ZERO);
 
     /// Returns the regular chart group, or `None` for an auxiliary series.
+    #[must_use]
     pub const fn group(&self) -> Option<GroupId> {
         match self {
             Self::Group(group) => Some(*group),

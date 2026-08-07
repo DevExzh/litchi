@@ -1,4 +1,4 @@
-//! OpenDocument standalone chart (`.odc` and `.otc`) support.
+//! `OpenDocument` standalone chart (`.odc` and `.otc`) support.
 
 mod document;
 mod mutation;

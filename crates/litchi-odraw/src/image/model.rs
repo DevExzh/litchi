@@ -1,4 +1,4 @@
-//! Borrowed, typed OfficeArt image objects.
+//! Borrowed, typed `OfficeArt` image objects.
 //!
 //! The model layer contains no traversal policy and no wire parsing entry
 //! points.  It owns the zero-copy objects exposed by the image facade; the
@@ -11,7 +11,7 @@ use crate::{Error, Record, Result};
 pub(super) const FBSE_FIXED_LEN: usize = 36;
 pub(super) const MAX_STORE_ENTRIES: u16 = 0x0FFF;
 
-/// Resource ceilings for OfficeArt image parsing.
+/// Resource ceilings for `OfficeArt` image parsing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
     /// Largest accepted BLIP body.
@@ -29,7 +29,7 @@ impl Default for Limits {
     }
 }
 
-/// Persistence format used by an OfficeArt BLIP or FBSE platform field.
+/// Persistence format used by an `OfficeArt` BLIP or FBSE platform field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Kind {
     /// Error reading an image.
@@ -58,6 +58,7 @@ pub enum Kind {
 
 impl Kind {
     /// Decodes an `MSOBLIPTYPE` wire value without losing extensions.
+    #[must_use]
     pub const fn from_raw(raw: u8) -> Self {
         match raw {
             0x00 => Self::Error,
@@ -75,6 +76,7 @@ impl Kind {
     }
 
     /// Returns the exact `MSOBLIPTYPE` value.
+    #[must_use]
     pub const fn raw(self) -> u8 {
         match self {
             Self::Error => 0x00,
@@ -91,12 +93,14 @@ impl Kind {
         }
     }
 
-    /// Returns whether this format is an OfficeArt metafile.
+    /// Returns whether this format is an `OfficeArt` metafile.
+    #[must_use]
     pub const fn is_meta(self) -> bool {
         matches!(self, Self::Emf | Self::Wmf | Self::Pict)
     }
 
     /// Returns the conventional file extension.
+    #[must_use]
     pub const fn extension(self) -> &'static str {
         match self {
             Self::Emf => "emf",
@@ -120,28 +124,32 @@ pub enum JpegFlavor {
     Alternate,
 }
 
-/// A 16-byte OfficeArt image identifier.
+/// A 16-byte `OfficeArt` image identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[repr(transparent)]
 pub struct Uid([u8; 16]);
 
 impl Uid {
     /// Creates an identifier from its wire bytes.
+    #[must_use]
     pub const fn new(bytes: [u8; 16]) -> Self {
         Self(bytes)
     }
 
     /// Returns the wire bytes.
+    #[must_use]
     pub const fn bytes(self) -> [u8; 16] {
         self.0
     }
 
     /// Borrows the wire bytes.
+    #[must_use]
     pub const fn as_bytes(&self) -> &[u8; 16] {
         &self.0
     }
 
     /// Returns whether every byte is zero.
+    #[must_use]
     pub fn is_zero(self) -> bool {
         self.0 == [0; 16]
     }
@@ -168,21 +176,25 @@ pub struct Uids {
 
 impl Uids {
     /// Creates a UID pair.
+    #[must_use]
     pub const fn new(first: Uid, second: Option<Uid>) -> Self {
         Self { first, second }
     }
 
     /// Returns the first UID.
+    #[must_use]
     pub const fn first(self) -> Uid {
         self.first
     }
 
     /// Returns the optional second UID.
+    #[must_use]
     pub const fn second(self) -> Option<Uid> {
         self.second
     }
 
     /// Returns the effective UID defined by MS-ODRAW.
+    #[must_use]
     pub fn effective(self) -> Uid {
         self.second
             .filter(|uid| !uid.is_zero())
@@ -199,7 +211,7 @@ pub enum Compression {
     None,
 }
 
-/// Signed OfficeArt rectangle.
+/// Signed `OfficeArt` rectangle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Rect {
     /// Left coordinate.
@@ -212,7 +224,7 @@ pub struct Rect {
     pub bottom: i32,
 }
 
-/// Signed OfficeArt point or extent.
+/// Signed `OfficeArt` point or extent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Point {
     /// Horizontal component.
@@ -248,26 +260,31 @@ pub struct Meta<'data> {
 
 impl<'data> Meta<'data> {
     /// Returns the persistence kind.
+    #[must_use]
     pub const fn kind(&self) -> Kind {
         self.kind
     }
 
     /// Returns both UID fields.
+    #[must_use]
     pub const fn uids(&self) -> Uids {
         self.uids
     }
 
     /// Returns the metafile header.
+    #[must_use]
     pub const fn header(&self) -> MetaHeader {
         self.header
     }
 
     /// Returns the stored, possibly compressed metafile bytes.
+    #[must_use]
     pub const fn data(&self) -> &'data [u8] {
         self.data
     }
 
-    /// Returns the underlying OfficeArt record.
+    /// Returns the underlying `OfficeArt` record.
+    #[must_use]
     pub const fn record(&self) -> &Record<'data> {
         &self.record
     }
@@ -285,11 +302,13 @@ pub struct Bitmap<'data> {
 
 impl<'data> Bitmap<'data> {
     /// Returns the persistence kind.
+    #[must_use]
     pub const fn kind(&self) -> Kind {
         self.kind
     }
 
     /// Returns the JPEG record flavor, when applicable.
+    #[must_use]
     pub fn jpeg_flavor(&self) -> Option<JpegFlavor> {
         match self.record.raw_kind() {
             0xF01D => Some(JpegFlavor::Original),
@@ -299,21 +318,25 @@ impl<'data> Bitmap<'data> {
     }
 
     /// Returns both UID fields.
+    #[must_use]
     pub const fn uids(&self) -> Uids {
         self.uids
     }
 
     /// Returns the application-defined resource tag.
+    #[must_use]
     pub const fn tag(&self) -> u8 {
         self.tag
     }
 
     /// Returns the encoded image bytes.
+    #[must_use]
     pub const fn data(&self) -> &'data [u8] {
         self.data
     }
 
-    /// Returns the underlying OfficeArt record.
+    /// Returns the underlying `OfficeArt` record.
+    #[must_use]
     pub const fn record(&self) -> &Record<'data> {
         &self.record
     }
@@ -327,22 +350,25 @@ pub struct Opaque<'data> {
 
 impl<'data> Opaque<'data> {
     /// Returns the exact record type.
+    #[must_use]
     pub const fn raw_kind(&self) -> u16 {
         self.record.raw_kind()
     }
 
     /// Returns the uninterpreted record body.
+    #[must_use]
     pub const fn data(&self) -> &'data [u8] {
         self.record.data()
     }
 
-    /// Returns the underlying OfficeArt record.
+    /// Returns the underlying `OfficeArt` record.
+    #[must_use]
     pub const fn record(&self) -> &Record<'data> {
         &self.record
     }
 }
 
-/// A borrowed OfficeArt BLIP.
+/// A borrowed `OfficeArt` BLIP.
 #[derive(Debug, Clone)]
 pub enum Blip<'data> {
     /// Enhanced Metafile.
@@ -365,6 +391,7 @@ pub enum Blip<'data> {
 
 impl<'data> Blip<'data> {
     /// Returns the persistence kind when known.
+    #[must_use]
     pub const fn kind(&self) -> Kind {
         match self {
             Self::Emf(meta) | Self::Wmf(meta) | Self::Pict(meta) => meta.kind(),
@@ -375,12 +402,14 @@ impl<'data> Blip<'data> {
         }
     }
 
-    /// Returns the exact OfficeArt record type.
+    /// Returns the exact `OfficeArt` record type.
+    #[must_use]
     pub const fn raw_kind(&self) -> u16 {
         self.record().raw_kind()
     }
 
-    /// Returns the underlying OfficeArt record.
+    /// Returns the underlying `OfficeArt` record.
+    #[must_use]
     pub const fn record(&self) -> &Record<'data> {
         match self {
             Self::Emf(meta) | Self::Wmf(meta) | Self::Pict(meta) => meta.record(),
@@ -392,6 +421,7 @@ impl<'data> Blip<'data> {
     }
 
     /// Returns the stored file data without decompression or adaptation.
+    #[must_use]
     pub const fn data(&self) -> &'data [u8] {
         match self {
             Self::Emf(meta) | Self::Wmf(meta) | Self::Pict(meta) => meta.data(),
@@ -403,6 +433,7 @@ impl<'data> Blip<'data> {
     }
 
     /// Returns the one or two declared UIDs for a known BLIP.
+    #[must_use]
     pub const fn uids(&self) -> Option<Uids> {
         match self {
             Self::Emf(meta) | Self::Wmf(meta) | Self::Pict(meta) => Some(meta.uids()),
@@ -414,6 +445,7 @@ impl<'data> Blip<'data> {
     }
 
     /// Borrows metafile metadata when this is EMF, WMF, or PICT.
+    #[must_use]
     pub const fn meta(&self) -> Option<&Meta<'data>> {
         match self {
             Self::Emf(meta) | Self::Wmf(meta) | Self::Pict(meta) => Some(meta),
@@ -422,6 +454,7 @@ impl<'data> Blip<'data> {
     }
 
     /// Borrows bitmap metadata when this is JPEG, PNG, DIB, or TIFF.
+    #[must_use]
     pub const fn bitmap(&self) -> Option<&Bitmap<'data>> {
         match self {
             Self::Jpeg(bitmap) | Self::Png(bitmap) | Self::Dib(bitmap) | Self::Tiff(bitmap) => {
@@ -432,15 +465,15 @@ impl<'data> Blip<'data> {
     }
 }
 
-/// A checked one-based index into a BStore container.
+/// A checked one-based index into a `BStore` container.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct Id(NonZeroU16);
 
 impl Id {
-    /// Creates an identifier in the representable OfficeArt range.
+    /// Creates an identifier in the representable `OfficeArt` range.
     pub fn new(value: u32) -> Result<Self> {
-        let value = u16::try_from(value).map_err(|_| Error::InvalidBlipId { value })?;
+        let value = u16::try_from(value).map_err(|_err| Error::InvalidBlipId { value })?;
         if value > MAX_STORE_ENTRIES {
             return Err(Error::InvalidBlipId {
                 value: u32::from(value),
@@ -452,6 +485,7 @@ impl Id {
     }
 
     /// Returns the one-based numeric value.
+    #[must_use]
     pub const fn get(self) -> u16 {
         self.0.get()
     }
@@ -471,13 +505,14 @@ impl From<Id> for u32 {
     }
 }
 
-/// A checked byte offset in an OfficeArt delay store.
+/// A checked byte offset in an `OfficeArt` delay store.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct Offset(pub(super) u32);
 
 impl Offset {
     /// Returns the byte offset.
+    #[must_use]
     pub const fn get(self) -> u32 {
         self.0
     }
@@ -491,6 +526,7 @@ pub struct Name<'data> {
 
 impl<'data> Name<'data> {
     /// Returns the encoded bytes, including the terminating NUL.
+    #[must_use]
     pub const fn as_bytes(self) -> &'data [u8] {
         self.bytes
     }
@@ -503,7 +539,7 @@ impl<'data> Name<'data> {
                 .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]])),
         )
         .collect::<core::result::Result<String, _>>()
-        .map_err(|_| Error::MalformedImage {
+        .map_err(|_err| Error::MalformedImage {
             reason: "FBSE name is not valid UTF-16",
         })
     }
@@ -520,7 +556,7 @@ pub enum Storage<'data> {
     Empty,
 }
 
-/// A borrowed OfficeArt FBSE.
+/// A borrowed `OfficeArt` FBSE.
 #[derive(Debug, Clone)]
 pub struct Entry<'data> {
     pub(super) record: Record<'data>,
@@ -541,44 +577,51 @@ pub struct Entry<'data> {
 
 impl<'data> Entry<'data> {
     /// Returns the Windows persistence kind.
+    #[must_use]
     pub const fn win(&self) -> Kind {
         self.win
     }
 
     /// Returns the persistence kind selected by the FBSE record instance.
     pub fn kind(&self) -> Result<Kind> {
-        let raw = u8::try_from(self.record.instance()).map_err(|_| Error::MalformedImage {
+        let raw = u8::try_from(self.record.instance()).map_err(|_err| Error::MalformedImage {
             reason: "FBSE instance is not an MSOBLIPTYPE value",
         })?;
         Ok(Kind::from_raw(raw))
     }
 
     /// Returns the Macintosh persistence kind.
+    #[must_use]
     pub const fn mac(&self) -> Kind {
         self.mac
     }
 
     /// Returns the FBSE UID.
+    #[must_use]
     pub const fn uid(&self) -> Uid {
         self.uid
     }
 
     /// Returns the application-defined resource tag.
+    #[must_use]
     pub const fn tag(&self) -> u16 {
         self.tag
     }
 
     /// Returns the declared BLIP size.
+    #[must_use]
     pub const fn size(&self) -> u32 {
         self.size
     }
 
     /// Returns the reference count.
+    #[must_use]
     pub const fn refs(&self) -> u32 {
         self.refs
     }
 
     /// Returns a delay offset when the entry declares one.
+    #[must_use]
     pub const fn delay_offset(&self) -> Option<Offset> {
         if self.delay == u32::MAX {
             None
@@ -588,16 +631,19 @@ impl<'data> Entry<'data> {
     }
 
     /// Returns the optional borrowed name.
+    #[must_use]
     pub const fn name(&self) -> Option<Name<'data>> {
         self.name
     }
 
     /// Returns the undefined bytes without interpreting producer extensions.
+    #[must_use]
     pub const fn unused(&self) -> [u8; 3] {
         [self.unused1, self.unused2, self.unused3]
     }
 
     /// Returns the underlying FBSE record.
+    #[must_use]
     pub const fn record(&self) -> &Record<'data> {
         &self.record
     }
@@ -610,7 +656,7 @@ pub struct Embedded<'data> {
     pub(super) limits: Limits,
 }
 
-/// One file block in a BStore container or delay store.
+/// One file block in a `BStore` container or delay store.
 #[derive(Debug, Clone)]
 pub enum Block<'data> {
     /// File BLIP Store Entry.
@@ -619,7 +665,7 @@ pub enum Block<'data> {
     Blip(Blip<'data>),
 }
 
-/// A checked, lazy view of an OfficeArt BStore container.
+/// A checked, lazy view of an `OfficeArt` `BStore` container.
 #[derive(Debug, Clone)]
 pub struct Store<'data> {
     pub(super) record: Record<'data>,
@@ -627,7 +673,7 @@ pub struct Store<'data> {
     pub(super) limits: Limits,
 }
 
-/// Lazy, count-validating BStore iterator.
+/// Lazy, count-validating `BStore` iterator.
 #[derive(Debug, Clone)]
 pub struct Blocks<'data> {
     pub(super) records: crate::Children<'data>,
@@ -637,7 +683,7 @@ pub struct Blocks<'data> {
     pub(super) limits: Limits,
 }
 
-/// Headerless OfficeArt BStoreDelay sequence.
+/// Headerless `OfficeArt` `BStoreDelay` sequence.
 #[derive(Debug, Clone, Copy)]
 pub struct Delay<'data> {
     pub(super) data: &'data [u8],
@@ -661,11 +707,13 @@ pub struct Context<'data> {
 
 impl<'data> Context<'data> {
     /// Creates a context without a delay store.
+    #[must_use]
     pub const fn new() -> Self {
         Self { delay: None }
     }
 
     /// Adds the host's associated delay store.
+    #[must_use]
     pub const fn with_delay(mut self, delay: Delay<'data>) -> Self {
         self.delay = Some(delay);
         self

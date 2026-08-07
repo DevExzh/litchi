@@ -69,6 +69,7 @@ impl Role {
         })
     }
 
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Title => "title",
@@ -133,10 +134,12 @@ impl Measure {
         Ok(Self { value, unit })
     }
 
+    #[must_use]
     pub const fn value(self) -> f64 {
         self.value
     }
 
+    #[must_use]
     pub const fn unit(self) -> Unit {
         self.unit
     }
@@ -166,7 +169,7 @@ impl FromStr for Measure {
         validate_decimal(number, value)?;
         let number = number
             .parse::<f64>()
-            .map_err(|_| make_error(format!("invalid presentation measure '{value}'")))?;
+            .map_err(|_err| make_error(format!("invalid presentation measure '{value}'")))?;
         Self::new(number, unit)
     }
 }
@@ -189,6 +192,7 @@ pub struct Placeholder {
 }
 
 impl Placeholder {
+    #[must_use]
     pub fn new(role: Role, x: Measure, y: Measure, width: Measure, height: Measure) -> Self {
         Self {
             role,
@@ -247,6 +251,7 @@ pub struct Collection {
 }
 
 impl Collection {
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&Layout> {
         self.layouts.iter().find(|layout| layout.name == name)
     }
@@ -823,7 +828,7 @@ fn validate_text(value: &str, context: &str, empty_allowed: bool) -> Result<()> 
 fn decode_name(value: &[u8], context: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_string)
-        .map_err(|_| make_error(format!("invalid UTF-8 in page-layout {context} name")))
+        .map_err(|_err| make_error(format!("invalid UTF-8 in page-layout {context} name")))
 }
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {

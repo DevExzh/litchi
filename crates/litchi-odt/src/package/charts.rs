@@ -1,4 +1,4 @@
-//! Atomic authoring of inert embedded OpenDocument chart objects.
+//! Atomic authoring of inert embedded `OpenDocument` chart objects.
 
 use crate::constants;
 use crate::core::{OwnedPackage, PackageWriter};
@@ -436,7 +436,7 @@ fn rename_document_root(
         format!("{prefix}:{replacement_local}")
     };
     let mut out = String::with_capacity(xml.len() + 96);
-    out.push_str(&xml[root_start..root_start + 1]);
+    out.push_str(&xml[root_start..=root_start]);
     out.push_str(&replacement);
     if let Some((name, value)) = added_attribute {
         out.push(' ');

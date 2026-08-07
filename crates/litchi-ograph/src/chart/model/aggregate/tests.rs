@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic by design"
+)]
+
 use super::super::super::{Kind, RowCol, cache};
 use super::super::{Cache, Value};
 use super::validation::{cache_dimensions, dimensions_cover};
@@ -21,16 +27,16 @@ fn excel_cache_dimensions_are_derived_from_the_used_range() {
         ),
     ];
     let derived = cache_dimensions(&values, Kind::Excel).expect("Excel dimensions");
-    let cache::Dims::Excel(derived) = derived else {
+    let cache::Dims::Excel(excel_dims) = derived else {
         panic!("expected Excel dimensions");
     };
-    assert_eq!(derived.first_row(), 4);
-    assert_eq!(derived.row_after(), 8);
-    assert_eq!(derived.first_col(), 2);
-    assert_eq!(derived.col_after(), 6);
+    assert_eq!(excel_dims.first_row(), 4);
+    assert_eq!(excel_dims.row_after(), 8);
+    assert_eq!(excel_dims.first_col(), 2);
+    assert_eq!(excel_dims.col_after(), 6);
     assert!(dimensions_cover(
         cache::Dims::Excel(cache::ExcelDims::new(0, 10, 0, 8).expect("covering range")),
-        cache::Dims::Excel(derived),
+        cache::Dims::Excel(excel_dims),
     ));
 }
 

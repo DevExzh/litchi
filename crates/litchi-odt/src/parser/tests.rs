@@ -172,7 +172,7 @@ fn rejects_invalid_tracked_change_policy_and_attributes() {
 #[test]
 fn tracked_changes_reject_ambiguous_declarations_and_ranges() {
     let prelude = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:u="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:d="http://purl.org/dc/elements/1.1/"><o:body><o:text>"#;
-    let info = r#"<o:change-info><d:creator>A</d:creator><d:date>D</d:date></o:change-info>"#;
+    let info = r"<o:change-info><d:creator>A</d:creator><d:date>D</d:date></o:change-info>";
     let suffix = "</o:text></o:body></o:document-content>";
 
     let missing_id = format!(
@@ -380,7 +380,7 @@ fn test_track_change_debug() {
         merge_last_paragraph: None,
         content: "content".to_string(),
     };
-    let debug_str = format!("{:?}", change);
+    let debug_str = format!("{change:?}");
     assert!(debug_str.contains("TrackChange"));
     assert!(debug_str.contains("test1"));
 }
@@ -416,7 +416,7 @@ fn test_comment_debug() {
         content: "Comment text".to_string(),
         reference: None,
     };
-    let debug_str = format!("{:?}", comment);
+    let debug_str = format!("{comment:?}");
     assert!(debug_str.contains("Comment"));
     assert!(debug_str.contains("cmt1"));
 }
@@ -436,7 +436,7 @@ fn test_section_debug() {
         dde_source: None,
         content: "Content".to_string(),
     };
-    let debug_str = format!("{:?}", section);
+    let debug_str = format!("{section:?}");
     assert!(debug_str.contains("Section"));
     assert!(debug_str.contains("Sec1"));
 }

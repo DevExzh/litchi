@@ -116,7 +116,8 @@ pub(crate) fn encode(chart: &Chart, limits: Limits) -> Result<Vec<u8>> {
         &mut out,
         AXES_USED,
         &u16::try_from(chart.parents.len())
-            .map_err(|_| Error::SizeOverflow {
+            .ok()
+            .ok_or(Error::SizeOverflow {
                 resource: "axis-parent count",
             })?
             .to_le_bytes(),

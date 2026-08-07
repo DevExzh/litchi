@@ -28,7 +28,7 @@ fn numbered_paragraphs_are_extracted_with_numbering_attributes() {
     assert_eq!(para.level().unwrap().unwrap(), 2);
     assert_eq!(para.list_id(), Some("list1"));
     assert_eq!(para.start_value().unwrap().unwrap(), 5);
-    assert!(para.element().tag_name() == "text:numbered-paragraph");
+    assert_eq!(para.element().tag_name(), "text:numbered-paragraph");
 }
 
 #[test]

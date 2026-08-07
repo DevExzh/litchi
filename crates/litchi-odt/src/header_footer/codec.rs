@@ -351,7 +351,7 @@ pub fn parse_page_layout_header_footer_properties(xml: &str) -> Result<Vec<Prope
             Ok(Event::Decl(d)) => {
                 version = d
                     .xml_version()
-                    .map_err(|e| bad(format!("unsupported XML version: {e}")))?
+                    .map_err(|e| bad(format!("unsupported XML version: {e}")))?;
             },
             Ok(Event::Start(e)) => {
                 if stack.len() >= MAX_DEPTH {
@@ -449,7 +449,7 @@ pub fn parse_page_layout_header_footer_properties(xml: &str) -> Result<Vec<Prope
                     return Err(bad("CDATA is not allowed in header/footer properties"));
                 }
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are forbidden"));
             },
             Ok(Event::Eof) => break,
@@ -576,12 +576,12 @@ fn replace_in_wrapper(wrapper: &str, property: &str) -> Result<String> {
                     out.replace_range(begin..event_end, property);
                     return Ok(out);
                 }
-                depth = depth.saturating_sub(1)
+                depth = depth.saturating_sub(1);
             },
             Event::Eof => break,
             _ => {},
         }
-        buffer.clear()
+        buffer.clear();
     }
     if wrapper.trim_end().ends_with("/>") {
         let close = wrapper.rfind("/>").unwrap();

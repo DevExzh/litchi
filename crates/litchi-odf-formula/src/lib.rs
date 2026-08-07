@@ -1,6 +1,6 @@
-//! Standalone OpenDocument Formula (`.odf` and `.otf`) support.
+//! Standalone `OpenDocument` Formula (`.odf` and `.otf`) support.
 //!
-//! The crate keeps MathML tree ownership, XML validation, package handling,
+//! The crate keeps `MathML` tree ownership, XML validation, package handling,
 //! authoring, and the public facade in separate layers. Formula markup is
 //! inert data: this crate never evaluates it.
 

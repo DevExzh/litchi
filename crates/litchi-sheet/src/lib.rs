@@ -30,6 +30,10 @@ impl Row {
     pub const LAST: Self = Self(ROWS - 1);
 
     /// Validate a zero-based row coordinate.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoordinateError::Row`] when `value` lies outside the grid.
     #[inline]
     pub const fn new(value: u32) -> Result<Self, CoordinateError> {
         if value < ROWS {
@@ -41,12 +45,14 @@ impl Row {
 
     /// Return the zero-based coordinate.
     #[inline]
+    #[must_use]
     pub const fn get(self) -> u32 {
         self.0
     }
 
     /// Next checked row, or `None` at the grid boundary.
     #[inline]
+    #[must_use]
     pub const fn next(self) -> Option<Self> {
         if self.0 < Self::LAST.0 {
             Some(Self(self.0 + 1))
@@ -57,6 +63,7 @@ impl Row {
 
     /// Previous checked row, or `None` at the grid boundary.
     #[inline]
+    #[must_use]
     pub const fn previous(self) -> Option<Self> {
         if self.0 > Self::FIRST.0 {
             Some(Self(self.0 - 1))
@@ -101,6 +108,11 @@ pub enum RowAt {
 
 impl RowAt {
     /// Resolve this input into a checked row coordinate.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoordinateError::Row`] when the raw index lies outside the
+    /// grid.
     #[inline]
     pub const fn resolve(self) -> Result<Row, CoordinateError> {
         match self {
@@ -134,6 +146,10 @@ impl Column {
     pub const LAST: Self = Self(COLUMNS - 1);
 
     /// Validate a zero-based column coordinate.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoordinateError::Column`] when `value` lies outside the grid.
     #[inline]
     pub const fn new(value: u32) -> Result<Self, CoordinateError> {
         if value < COLUMNS {
@@ -145,11 +161,17 @@ impl Column {
 
     /// Return the zero-based coordinate.
     #[inline]
+    #[must_use]
     pub const fn get(self) -> u32 {
         self.0
     }
 
     /// Parse one absolute or relative A1 column label.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoordinateError::ColumnA1`] when `reference` is not one
+    /// in-grid A1 column label.
     pub fn from_a1(reference: &str) -> Result<Self, CoordinateError> {
         let bytes = reference.as_bytes();
         let start = usize::from(bytes.first() == Some(&b'$'));
@@ -169,19 +191,22 @@ impl Column {
                     reference: reference.into(),
                 })?;
         }
-        Self::new(
-            column
-                .checked_sub(1)
-                .ok_or_else(|| CoordinateError::ColumnA1 {
-                    reference: reference.into(),
-                })?,
-        )
-        .map_err(|_| CoordinateError::ColumnA1 {
-            reference: reference.into(),
-        })
+        let zero_based = column
+            .checked_sub(1)
+            .ok_or_else(|| CoordinateError::ColumnA1 {
+                reference: reference.into(),
+            })?;
+        if zero_based < COLUMNS {
+            Ok(Self(zero_based))
+        } else {
+            Err(CoordinateError::ColumnA1 {
+                reference: reference.into(),
+            })
+        }
     }
 
     /// Render this coordinate as an A1 column label.
+    #[must_use]
     pub fn a1(self) -> String {
         let mut column = self.get() + 1;
         let mut reversed = String::with_capacity(3);
@@ -195,6 +220,7 @@ impl Column {
 
     /// Next checked column, or `None` at the grid boundary.
     #[inline]
+    #[must_use]
     pub const fn next(self) -> Option<Self> {
         if self.0 < Self::LAST.0 {
             Some(Self(self.0 + 1))
@@ -205,6 +231,7 @@ impl Column {
 
     /// Previous checked column, or `None` at the grid boundary.
     #[inline]
+    #[must_use]
     pub const fn previous(self) -> Option<Self> {
         if self.0 > Self::FIRST.0 {
             Some(Self(self.0 - 1))
@@ -252,6 +279,11 @@ pub enum ColumnAt<'a> {
 
 impl ColumnAt<'_> {
     /// Resolve this input into a checked column coordinate.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoordinateError`] when the raw index or A1 label does not
+    /// resolve to an in-grid column.
     #[inline]
     pub fn resolve(self) -> Result<Column, CoordinateError> {
         match self {
@@ -262,13 +294,13 @@ impl ColumnAt<'_> {
     }
 }
 
-impl<'a> From<Column> for ColumnAt<'a> {
+impl From<Column> for ColumnAt<'_> {
     fn from(value: Column) -> Self {
         Self::Checked(value)
     }
 }
 
-impl<'a> From<u32> for ColumnAt<'a> {
+impl From<u32> for ColumnAt<'_> {
     fn from(value: u32) -> Self {
         Self::Index(value)
     }
@@ -286,7 +318,7 @@ impl<'a> From<&'a String> for ColumnAt<'a> {
     }
 }
 
-impl<'a> From<String> for ColumnAt<'a> {
+impl From<String> for ColumnAt<'_> {
     fn from(value: String) -> Self {
         Self::A1(Cow::Owned(value))
     }
@@ -302,19 +334,30 @@ pub struct Cell {
 impl Cell {
     /// Combine coordinates that have already been validated.
     #[inline]
+    #[must_use]
     pub const fn new(row: Row, column: Column) -> Self {
         Self { row, column }
     }
 
     /// Validate raw zero-based coordinates and create an address.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoordinateError`] when either coordinate lies outside the
+    /// grid.
     #[inline]
     pub fn at(row: u32, column: u32) -> Result<Self, CoordinateError> {
-        let row = Row::new(row)?;
-        let column = Column::new(column)?;
-        Ok(Self::new(row, column))
+        let checked_row = Row::new(row)?;
+        let checked_column = Column::new(column)?;
+        Ok(Self::new(checked_row, checked_column))
     }
 
     /// Parse one absolute or relative A1 cell reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoordinateError::A1`] when `reference` is not one in-grid A1
+    /// cell reference.
     pub fn from_a1(reference: &str) -> Result<Self, CoordinateError> {
         let bytes = reference.as_bytes();
         let mut index = usize::from(bytes.first() == Some(&b'$'));
@@ -366,6 +409,7 @@ impl Cell {
     }
 
     /// Render this address in relative A1 notation.
+    #[must_use]
     pub fn a1(self) -> String {
         let mut column = self.column.get() + 1;
         let mut reversed = String::with_capacity(3);
@@ -382,12 +426,14 @@ impl Cell {
 
     /// Zero-based row coordinate.
     #[inline]
+    #[must_use]
     pub const fn row(self) -> Row {
         self.row
     }
 
     /// Zero-based column coordinate.
     #[inline]
+    #[must_use]
     pub const fn column(self) -> Column {
         self.column
     }
@@ -431,6 +477,11 @@ pub enum At<'a> {
 
 impl At<'_> {
     /// Resolve this input into a checked address.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoordinateError`] when the input does not resolve to an
+    /// in-grid address.
     #[inline]
     pub fn resolve(self) -> Result<Cell, CoordinateError> {
         match self {
@@ -441,19 +492,19 @@ impl At<'_> {
     }
 }
 
-impl<'a> From<Cell> for At<'a> {
+impl From<Cell> for At<'_> {
     fn from(value: Cell) -> Self {
         Self::Address(value)
     }
 }
 
-impl<'a> From<(Row, Column)> for At<'a> {
+impl From<(Row, Column)> for At<'_> {
     fn from(value: (Row, Column)) -> Self {
         Self::Address(value.into())
     }
 }
 
-impl<'a> From<(u32, u32)> for At<'a> {
+impl From<(u32, u32)> for At<'_> {
     fn from((row, column): (u32, u32)) -> Self {
         Self::Indices { row, column }
     }
@@ -471,7 +522,7 @@ impl<'a> From<&'a String> for At<'a> {
     }
 }
 
-impl<'a> From<String> for At<'a> {
+impl From<String> for At<'_> {
     fn from(value: String) -> Self {
         Self::A1(Cow::Owned(value))
     }
@@ -499,6 +550,7 @@ impl Rect {
 
     /// Create a one-cell range.
     #[inline]
+    #[must_use]
     pub const fn single(cell: Cell) -> Self {
         Self {
             start: cell,
@@ -508,6 +560,12 @@ impl Rect {
     }
 
     /// Create a range from a checked start and raw exclusive end coordinates.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RangeError::EndOutsideGrid`] when an exclusive end exceeds the
+    /// grid boundary, or [`RangeError::EmptyOrInverted`] when the end does not
+    /// lie below and to the right of the start.
     pub const fn new(start: Cell, end_row: u32, end_column: u32) -> Result<Self, RangeError> {
         if end_row > ROWS || end_column > COLUMNS {
             return Err(RangeError::EndOutsideGrid {
@@ -530,6 +588,11 @@ impl Rect {
     }
 
     /// Validate raw start and exclusive end coordinates.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RangeError::Start`] when the start lies outside the grid, or
+    /// the errors of [`Rect::new`] when the end is invalid.
     pub fn at(
         start_row: u32,
         start_column: u32,
@@ -541,6 +604,12 @@ impl Rect {
     }
 
     /// Parse one bounded A1 cell or rectangular range.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RangeError::A1`] when `reference` is not one bounded A1 cell
+    /// or rectangular range, or the errors of [`Rect::new`] when the parsed
+    /// range is empty or inverted.
     pub fn from_a1(reference: &str) -> Result<Self, RangeError> {
         let (first, last) = reference.split_once(':').unwrap_or((reference, reference));
         if last.contains(':') {
@@ -551,43 +620,52 @@ impl Rect {
                 },
             });
         }
-        let first = Cell::from_a1(first).map_err(|source| RangeError::A1 {
+        let first_cell = Cell::from_a1(first).map_err(|source| RangeError::A1 {
             reference: reference.into(),
             source,
         })?;
-        let last = Cell::from_a1(last).map_err(|source| RangeError::A1 {
+        let last_cell = Cell::from_a1(last).map_err(|source| RangeError::A1 {
             reference: reference.into(),
             source,
         })?;
-        Self::new(first, last.row.get() + 1, last.column.get() + 1)
+        Self::new(
+            first_cell,
+            last_cell.row.get() + 1,
+            last_cell.column.get() + 1,
+        )
     }
 
     /// Checked inclusive start address.
     #[inline]
+    #[must_use]
     pub const fn start(self) -> Cell {
         self.start
     }
 
     /// Raw zero-based exclusive end coordinates.
     #[inline]
+    #[must_use]
     pub const fn end(self) -> (u32, u32) {
         (self.end_row, self.end_column)
     }
 
     /// Number of selected rows.
     #[inline]
+    #[must_use]
     pub const fn rows(self) -> u32 {
         self.end_row - self.start.row.get()
     }
 
     /// Number of selected columns.
     #[inline]
+    #[must_use]
     pub const fn columns(self) -> u32 {
         self.end_column - self.start.column.get()
     }
 
     /// Whether the range contains an address.
     #[inline]
+    #[must_use]
     pub const fn contains(self, address: Cell) -> bool {
         address.row.get() >= self.start.row.get()
             && address.row.get() < self.end_row
@@ -597,6 +675,7 @@ impl Rect {
 
     /// Smallest rectangle containing both inputs.
     #[inline]
+    #[must_use]
     pub const fn union(self, other: Self) -> Self {
         let start_row = if self.start.row.get() < other.start.row.get() {
             self.start.row
@@ -624,6 +703,7 @@ impl Rect {
     }
 
     /// Render this range in compact relative A1 notation.
+    #[must_use]
     pub fn a1(self) -> String {
         if self.rows() == 1 && self.columns() == 1 {
             return self.start.a1();
@@ -671,6 +751,11 @@ pub enum Area<'a> {
 
 impl Area<'_> {
     /// Resolve this input into a checked rectangle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RangeError`] when the input does not resolve to a valid
+    /// rectangle.
     #[inline]
     pub fn resolve(self) -> Result<Rect, RangeError> {
         match self {
@@ -686,13 +771,13 @@ impl Area<'_> {
     }
 }
 
-impl<'a> From<Rect> for Area<'a> {
+impl From<Rect> for Area<'_> {
     fn from(value: Rect) -> Self {
         Self::Range(value)
     }
 }
 
-impl<'a> From<(u32, u32, u32, u32)> for Area<'a> {
+impl From<(u32, u32, u32, u32)> for Area<'_> {
     fn from((start_row, start_column, end_row, end_column): (u32, u32, u32, u32)) -> Self {
         Self::Bounds {
             start_row,
@@ -715,7 +800,7 @@ impl<'a> From<&'a String> for Area<'a> {
     }
 }
 
-impl<'a> From<String> for Area<'a> {
+impl From<String> for Area<'_> {
     fn from(value: String) -> Self {
         Self::A1(Cow::Owned(value))
     }
@@ -772,6 +857,11 @@ pub type SheetSelector<'a, Id> = Selector<'a, Id>;
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::expect_used,
+        reason = "tests deliberately panic on unexpected parse and validation failures"
+    )]
+
     use super::*;
 
     #[test]

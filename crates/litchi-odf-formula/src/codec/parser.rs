@@ -1,4 +1,4 @@
-//! Bounded MathML parsing for OpenDocument Formula packages.
+//! Bounded `MathML` parsing for `OpenDocument` Formula packages.
 
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
@@ -14,6 +14,18 @@ const MAX_ATTRIBUTES: usize = 256;
 const MAX_ATTRIBUTE_BYTES: usize = 1_048_576;
 const MAX_TEXT_BYTES: usize = 32 * 1_048_576;
 
+/// Parse bounded `MathML` markup into an inert element tree.
+///
+/// # Errors
+///
+/// Returns an error when the markup is not well-formed, when the root is not
+/// a `math` element in the `MathML` namespace, or when a safety limit on
+/// depth, node count, attribute count or size, or text size is exceeded.
+///
+/// # Panics
+///
+/// Panics only on internal stack-guard invariant violations, which the
+/// surrounding guards make unreachable.
 pub fn parse(xml: &str) -> Result<Element> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
@@ -74,11 +86,10 @@ pub fn parse(xml: &str) -> Result<Element> {
                 }
                 let resolved_namespace_uri = namespace_uri(&namespace)?;
                 let node = make_element(&reader, resolved_namespace_uri, element, &mut node_count)?;
-                stack
-                    .last_mut()
-                    .expect("parent exists")
-                    .content_mut()
-                    .push(Content::Element(node));
+                let Some(parent) = stack.last_mut() else {
+                    unreachable!("parent exists")
+                };
+                parent.content_mut().push(Content::Element(node));
             },
             Event::End(_) => {
                 let node = stack.pop().ok_or_else(|| {
@@ -100,28 +111,25 @@ pub fn parse(xml: &str) -> Result<Element> {
                 let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                     Error::InvalidFormat(format!("invalid MathML text: {error}"))
                 })?;
-                push_text(
-                    stack.last_mut().expect("element exists"),
-                    value.into_owned(),
-                    &mut text_bytes,
-                )?;
+                let Some(top) = stack.last_mut() else {
+                    unreachable!("element exists")
+                };
+                push_text(top, value.into_owned(), &mut text_bytes)?;
             },
             Event::CData(ref text) if !stack.is_empty() => {
                 let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                     Error::InvalidFormat(format!("invalid MathML CDATA: {error}"))
                 })?;
-                push_text(
-                    stack.last_mut().expect("element exists"),
-                    value.into_owned(),
-                    &mut text_bytes,
-                )?;
+                let Some(top) = stack.last_mut() else {
+                    unreachable!("element exists")
+                };
+                push_text(top, value.into_owned(), &mut text_bytes)?;
             },
             Event::GeneralRef(ref reference) if !stack.is_empty() => {
-                push_text(
-                    stack.last_mut().expect("element exists"),
-                    decode_reference(reference)?,
-                    &mut text_bytes,
-                )?;
+                let Some(top) = stack.last_mut() else {
+                    unreachable!("element exists")
+                };
+                push_text(top, decode_reference(reference)?, &mut text_bytes)?;
             },
             Event::Text(ref text) if !text.iter().all(u8::is_ascii_whitespace) => {
                 return Err(Error::InvalidFormat(
@@ -134,7 +142,13 @@ pub fn parse(xml: &str) -> Result<Element> {
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
         }
         buffer.clear();
     }
@@ -167,21 +181,21 @@ fn make_element(
     }
     let local_name = decode_utf8(element.local_name().as_ref(), "element name")?;
     let mut attributes = Vec::new();
-    for attribute in element.attributes() {
-        let attribute = attribute
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute
             .map_err(|error| Error::InvalidFormat(format!("invalid MathML attribute: {error}")))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace_uri = namespace_uri(&namespace)?;
-        let local_name = decode_utf8(local.as_ref(), "attribute name")?;
+        let attribute_local_name = decode_utf8(local.as_ref(), "attribute name")?;
         if attributes.iter().any(|existing: &Attribute| {
             existing.namespace_uri() == namespace_uri.as_deref()
-                && existing.local_name() == local_name
+                && existing.local_name() == attribute_local_name
         }) {
             return Err(Error::InvalidFormat(format!(
-                "duplicate expanded MathML attribute '{local_name}'"
+                "duplicate expanded MathML attribute '{attribute_local_name}'"
             )));
         }
         let value = attribute
@@ -195,7 +209,11 @@ fn make_element(
                 "MathML attribute exceeds 1 MiB".to_string(),
             ));
         }
-        attributes.push(Attribute::from_parts(namespace_uri, local_name, value));
+        attributes.push(Attribute::from_parts(
+            namespace_uri,
+            attribute_local_name,
+            value,
+        ));
     }
     Ok(Element::from_parts(
         resolved_namespace_uri,
@@ -234,9 +252,10 @@ fn namespace_uri(namespace: &ResolveResult<'_>) -> Result<Option<String>> {
 }
 
 fn decode_utf8(bytes: &[u8], kind: &str) -> Result<String> {
-    std::str::from_utf8(bytes)
-        .map(str::to_string)
-        .map_err(|_| Error::InvalidFormat(format!("non-UTF-8 MathML {kind}")))
+    match std::str::from_utf8(bytes) {
+        Ok(text) => Ok(text.to_string()),
+        Err(_) => Err(Error::InvalidFormat(format!("non-UTF-8 MathML {kind}"))),
+    }
 }
 
 fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {

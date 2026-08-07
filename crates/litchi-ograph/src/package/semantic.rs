@@ -4,7 +4,7 @@ use crate::{Limits, Result};
 use super::validation::WorkbookLayout;
 use super::{codec, validation};
 
-/// Validated root-stream topology of a standalone OGraph compound file.
+/// Validated root-stream topology of a standalone `OGraph` compound file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Topology {
     pub(super) workbook_bytes: u64,
@@ -14,27 +14,31 @@ pub struct Topology {
 
 impl Topology {
     /// Declared byte size of the required `Workbook` stream.
+    #[must_use]
     pub const fn workbook_bytes(self) -> u64 {
         self.workbook_bytes
     }
 
     /// Declared size of the optional `\u{1}CompObj` stream.
+    #[must_use]
     pub const fn comp_obj_bytes(self) -> Option<u64> {
         self.comp_obj_bytes
     }
 
     /// Declared size of the optional `\u{1}Ole` stream.
+    #[must_use]
     pub const fn ole_bytes(self) -> Option<u64> {
         self.ole_bytes
     }
 
     /// Number of allowed root streams present in the package.
+    #[must_use]
     pub const fn stream_count(self) -> usize {
         1 + self.comp_obj_bytes.is_some() as usize + self.ole_bytes.is_some() as usize
     }
 }
 
-/// Borrowed, validated standalone OGraph package.
+/// Borrowed, validated standalone `OGraph` package.
 ///
 /// The compound-file bytes remain caller-owned. CFB stream extraction returns
 /// an owned buffer because a logical stream can span non-contiguous sectors;
@@ -67,16 +71,19 @@ impl<'a> PackageRef<'a> {
     }
 
     /// Original compound-file bytes.
+    #[must_use]
     pub const fn as_bytes(self) -> &'a [u8] {
         self.bytes
     }
 
     /// Validated stream topology.
+    #[must_use]
     pub const fn topology(self) -> Topology {
         self.topology
     }
 
     /// Resource limits used to validate the package.
+    #[must_use]
     pub const fn limits(self) -> Limits {
         self.limits
     }
@@ -92,7 +99,7 @@ impl<'a> PackageRef<'a> {
     }
 }
 
-/// Move-owned, validated standalone OGraph package.
+/// Move-owned, validated standalone `OGraph` package.
 #[derive(Debug)]
 pub struct Package {
     bytes: Vec<u8>,
@@ -122,6 +129,7 @@ impl Package {
     }
 
     /// Borrows this package without revalidation or copying.
+    #[must_use]
     pub fn as_ref(&self) -> PackageRef<'_> {
         PackageRef {
             bytes: &self.bytes,
@@ -133,6 +141,7 @@ impl Package {
 
     /// Converts this validated package into an exact source snapshot for
     /// contextual typed edits.
+    #[must_use]
     pub fn snapshot(self) -> super::snapshot::Snapshot {
         super::snapshot::Snapshot::from_package(self)
     }
@@ -147,6 +156,7 @@ impl Package {
     }
 
     /// Validated stream topology.
+    #[must_use]
     pub const fn topology(&self) -> Topology {
         self.topology
     }
@@ -160,6 +170,7 @@ impl Package {
     ///
     /// This is a move: the compound-file allocation is neither cloned nor
     /// rebuilt.
+    #[must_use]
     pub fn finish(self) -> Payload {
         Payload {
             bytes: self.bytes,
@@ -170,7 +181,7 @@ impl Package {
     }
 }
 
-/// Opaque standalone OGraph bytes with validated CFB topology and BIFF framing.
+/// Opaque standalone `OGraph` bytes with validated CFB topology and BIFF framing.
 ///
 /// This capability does not claim that the still-opaque chart records satisfy
 /// the complete `[MS-OGRAPH]` chart grammar. Hosts that require that guarantee
@@ -195,11 +206,13 @@ impl Payload {
     }
 
     /// Borrows the validated attachment bytes.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// Borrows the validated package view without copying.
+    #[must_use]
     pub fn as_package(&self) -> PackageRef<'_> {
         PackageRef {
             bytes: &self.bytes,
@@ -210,12 +223,13 @@ impl Payload {
     }
 
     /// Recovers the original allocation without copying.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.bytes
     }
 }
 
-/// Borrowed, validated standalone OGraph `Workbook` stream.
+/// Borrowed, validated standalone `OGraph` `Workbook` stream.
 #[derive(Debug, Clone, Copy)]
 pub struct WorkbookRef<'a> {
     bytes: &'a [u8],
@@ -242,11 +256,13 @@ impl<'a> WorkbookRef<'a> {
     }
 
     /// Exact Workbook stream bytes.
+    #[must_use]
     pub const fn as_bytes(self) -> &'a [u8] {
         self.bytes
     }
 
     /// The one standalone Microsoft Graph chart substream.
+    #[must_use]
     pub fn chart(self) -> chart::Ref<'a> {
         let bytes = match self
             .bytes
@@ -264,12 +280,13 @@ impl<'a> WorkbookRef<'a> {
     }
 
     /// Resource limits under which the Workbook was validated.
+    #[must_use]
     pub const fn limits(self) -> Limits {
         self.limits
     }
 }
 
-/// Move-owned, validated standalone OGraph `Workbook` stream.
+/// Move-owned, validated standalone `OGraph` `Workbook` stream.
 #[derive(Debug)]
 pub struct Workbook {
     bytes: Vec<u8>,
@@ -296,6 +313,7 @@ impl Workbook {
     }
 
     /// Borrow without copying or revalidation.
+    #[must_use]
     pub fn as_ref(&self) -> WorkbookRef<'_> {
         WorkbookRef {
             bytes: &self.bytes,
@@ -305,16 +323,19 @@ impl Workbook {
     }
 
     /// Exact Workbook stream bytes.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// The one standalone Microsoft Graph chart substream.
+    #[must_use]
     pub fn chart(&self) -> chart::Ref<'_> {
         self.as_ref().chart()
     }
 
     /// Recover the original Workbook allocation without copying.
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         self.bytes
     }

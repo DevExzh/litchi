@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic by design"
+)]
+
 use super::{Metadata, Snapshot};
 use crate::chart::{Cache, Chart, Context, Count, DataKind, RowCol, Series, Stream, Value, cache};
 use crate::{Error, Result};

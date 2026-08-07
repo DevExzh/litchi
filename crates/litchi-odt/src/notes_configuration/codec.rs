@@ -268,24 +268,24 @@ fn parse_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resul
             (NamespaceKind::Text, b"note-class") => note_class = Some(Class::parse(&value)?),
             (NamespaceKind::Text, b"citation-style-name") => citation_style_name = Some(value),
             (NamespaceKind::Text, b"citation-body-style-name") => {
-                citation_body_style_name = Some(value)
+                citation_body_style_name = Some(value);
             },
             (NamespaceKind::Text, b"default-style-name") => default_style_name = Some(value),
             (NamespaceKind::Text, b"master-page-name") => master_page_name = Some(value),
             (NamespaceKind::Text, b"start-value") => {
-                start_value = Some(parse_nonnegative_integer(&value, "text:start-value")?)
+                start_value = Some(parse_nonnegative_integer(&value, "text:start-value")?);
             },
             (NamespaceKind::Style, b"num-prefix") => number_prefix = Some(value),
             (NamespaceKind::Style, b"num-suffix") => number_suffix = Some(value),
             (NamespaceKind::Style, b"num-format") => number_format = Some(Format::parse(value)?),
             (NamespaceKind::Style, b"num-letter-sync") => {
-                letter_sync = Some(parse_bool(&value, "style:num-letter-sync")?)
+                letter_sync = Some(parse_bool(&value, "style:num-letter-sync")?);
             },
             (NamespaceKind::Text, b"start-numbering-at") => {
-                start_numbering_at = Some(NumberingScope::parse(&value)?)
+                start_numbering_at = Some(NumberingScope::parse(&value)?);
             },
             (NamespaceKind::Text, b"footnotes-position") => {
-                footnotes_position = Some(Position::parse(&value)?)
+                footnotes_position = Some(Position::parse(&value)?);
             },
             _ => return invalid("unsupported text:notes-configuration attribute"),
         }
@@ -374,7 +374,7 @@ fn parse_notices(reader: &mut NsReader<&[u8]>, configuration: &mut Configuration
                 break;
             },
             Event::Text(text) => {
-                require_whitespace(&text.decode().map_err(xml_error)?, "notes-configuration")?
+                require_whitespace(&text.decode().map_err(xml_error)?, "notes-configuration")?;
             },
             Event::Comment(_) | Event::PI(_) => {},
             Event::DocType(_) => return invalid("DOCTYPE is not allowed in notes configuration"),

@@ -1,4 +1,4 @@
-//! Flat and packaged OpenDocument access for note configurations.
+//! Flat and packaged `OpenDocument` access for note configurations.
 
 use super::Configurations;
 use super::codec::parse;

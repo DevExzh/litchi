@@ -237,7 +237,7 @@ fn parse_declarations(reader: &mut NsReader<&[u8]>) -> Result<Declarations> {
                 break;
             },
             Event::Text(text) => {
-                require_whitespace(&text.decode().map_err(xml_error)?, "font-face-decls")?
+                require_whitespace(&text.decode().map_err(xml_error)?, "font-face-decls")?;
             },
             Event::Comment(_) | Event::PI(_) => {},
             Event::DocType(_) => {
@@ -273,7 +273,7 @@ fn parse_face_attributes(
             },
             (NamespaceKind::Style, b"font-adornments") => face.font_adornments = Some(value),
             (NamespaceKind::Style, b"font-family-generic") => {
-                face.generic_family = Some(Family::parse(&value)?)
+                face.generic_family = Some(Family::parse(&value)?);
             },
             (NamespaceKind::Style, b"font-pitch") => face.pitch = Some(Pitch::parse(&value)?),
             (NamespaceKind::Style, b"font-charset") => {
@@ -373,7 +373,7 @@ fn parse_face_children(
                 break;
             },
             Event::Text(text) => {
-                require_whitespace(&text.decode().map_err(xml_error)?, "font-face")?
+                require_whitespace(&text.decode().map_err(xml_error)?, "font-face")?;
             },
             Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => return invalid("unterminated style:font-face"),
@@ -445,7 +445,7 @@ fn parse_sources(reader: &mut NsReader<&[u8]>, text_bytes: &mut usize) -> Result
                 break;
             },
             Event::Text(text) => {
-                require_whitespace(&text.decode().map_err(xml_error)?, "font-face-src")?
+                require_whitespace(&text.decode().map_err(xml_error)?, "font-face-src")?;
             },
             Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => return invalid("unterminated svg:font-face-src"),
@@ -509,7 +509,7 @@ fn parse_formats(
                 break;
             },
             Event::Text(text) => {
-                require_whitespace(&text.decode().map_err(xml_error)?, "font-face-uri")?
+                require_whitespace(&text.decode().map_err(xml_error)?, "font-face-uri")?;
             },
             Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => return invalid("unterminated svg:font-face-uri"),
@@ -593,7 +593,7 @@ fn require_empty(
                 return Ok(());
             },
             Event::Text(text) => {
-                require_whitespace(&text.decode().map_err(xml_error)?, "empty font source")?
+                require_whitespace(&text.decode().map_err(xml_error)?, "empty font source")?;
             },
             Event::Comment(_) | Event::PI(_) => {},
             Event::Eof => return invalid("unterminated empty font source element"),

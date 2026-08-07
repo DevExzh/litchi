@@ -1,6 +1,6 @@
 use super::PROPERTY_ID_MASK;
 
-/// A property identifier not assigned by the OfficeArt specification known to
+/// A property identifier not assigned by the `OfficeArt` specification known to
 /// this crate.
 ///
 /// The numeric value is private so an `UnknownId` can never contain flag bits
@@ -10,12 +10,13 @@ pub struct UnknownId(u16);
 
 impl UnknownId {
     /// Returns the exact 14-bit identifier read from the wire.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         self.0
     }
 }
 
-/// Comprehensive OfficeArt property identifier from [MS-ODRAW].
+/// Comprehensive `OfficeArt` property identifier from [MS-ODRAW].
 ///
 /// [MS-ODRAW]: https://learn.microsoft.com/openspecs/office_file_formats/ms-odraw/
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -541,6 +542,7 @@ impl Id {
     ///
     /// Returns `None` when `raw` contains property flags or is already modeled
     /// by a typed variant.
+    #[must_use]
     pub fn unknown(raw: u16) -> Option<Self> {
         if raw > PROPERTY_ID_MASK {
             return None;
@@ -552,6 +554,7 @@ impl Id {
     }
 
     /// Returns this property's exact wire identifier without flag bits.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         match self {
             Self::Rotation => 0x0004,
@@ -815,6 +818,7 @@ impl Id {
     /// Classification is based on the property identifier, never on whether
     /// arbitrary complex bytes happen to resemble an array header.
     ///
+    #[must_use]
     pub const fn is_array(self) -> bool {
         matches!(
             self.raw(),

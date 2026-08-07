@@ -304,9 +304,9 @@ mod script_field_tests {
             r#"<t:script l:type="simple" l:href="https://example.invalid" l:actuate="onLoad">payload</t:script>"#,
             r#"<t:script l:type="simple" l:href="https://example.invalid">payload</t:script>"#,
             r#"<t:script xmlns:fake="urn:not-xlink" fake:type="simple" fake:href="https://example.invalid">payload</t:script>"#,
-            r#"<t:script><t:span>nested</t:span></t:script>"#,
+            r"<t:script><t:span>nested</t:span></t:script>",
             r#"<t:script><foreign:node xmlns:foreign="urn:foreign"/></t:script>"#,
-            r#"<t:script>before<?unsafe data?>after</t:script>"#,
+            r"<t:script>before<?unsafe data?>after</t:script>",
         ] {
             assert!(
                 FieldParser::parse_dynamic_text_fields(&document(invalid)).is_err(),
@@ -407,7 +407,7 @@ mod drop_down_field_tests {
     #[test]
     fn drop_down_fields_reject_schema_and_resource_limit_violations() {
         for invalid in [
-            r#"<t:drop-down>missing name</t:drop-down>"#,
+            r"<t:drop-down>missing name</t:drop-down>",
             r#"<t:drop-down xmlns:x="urn:not-text" x:name="spoof">value</t:drop-down>"#,
             r#"<t:drop-down t:name="choice" t:extra="no">value</t:drop-down>"#,
             r#"<t:drop-down t:name="choice"><t:label>text is forbidden</t:label></t:drop-down>"#,
@@ -536,7 +536,7 @@ mod fixed_page_date_time_tests {
             r#"<t:date t:date-value="2024-01-01" t:extra="x">date</t:date>"#,
             r#"<t:time t:time-value="12:00:00" t:date-adjust="P1D">time</t:time>"#,
             r#"<t:page-continuation t:select-page="current">continued</t:page-continuation>"#,
-            r#"<t:page-continuation>continued</t:page-continuation>"#,
+            r"<t:page-continuation>continued</t:page-continuation>",
         ];
         for body in invalid {
             assert!(
@@ -914,7 +914,7 @@ mod document_identity_fixed_field_tests {
     #[test]
     fn document_identity_fixed_fields_preserve_omission_and_namespace_aliases() {
         let xml = document(
-            r#"<t:initial-creator>first</t:initial-creator>
+            r"<t:initial-creator>first</t:initial-creator>
                <t:description>description</t:description>
                <t:printed-by>printer</t:printed-by>
                <t:title>title</t:title>
@@ -922,7 +922,7 @@ mod document_identity_fixed_field_tests {
                <t:keywords>one, two</t:keywords>
                <t:creator>last</t:creator>
                <t:author-name>author</t:author-name>
-               <t:author-initials>au</t:author-initials>"#,
+               <t:author-initials>au</t:author-initials>",
         );
         let fields = FieldParser::parse_dynamic_text_fields(&xml).unwrap();
         assert_eq!(fields.len(), 9);
@@ -1056,9 +1056,9 @@ mod document_context_field_tests {
     #[test]
     fn document_context_fields_preserve_attribute_omission() {
         let xml = document(
-            r#"<t:file-name>cached.odt</t:file-name>
+            r"<t:file-name>cached.odt</t:file-name>
                <t:template-name>Letter</t:template-name>
-               <t:sheet-name>Budget</t:sheet-name>"#,
+               <t:sheet-name>Budget</t:sheet-name>",
         );
         let fields = FieldParser::parse_dynamic_text_fields(&xml).unwrap();
         assert_eq!(fields.len(), 3);
@@ -1434,7 +1434,7 @@ mod user_defined_metadata_field_tests {
     #[test]
     fn user_defined_metadata_field_rejects_nonstandard_invalid_and_hostile_input() {
         let invalid = [
-            r#"<t:user-defined>missing name</t:user-defined>"#,
+            r"<t:user-defined>missing name</t:user-defined>",
             r#"<t:user-defined t:name="x" o:value-type="float" xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"/>"#,
             r#"<t:user-defined t:name="x" o:currency="USD" xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"/>"#,
             r#"<t:user-defined t:name="x" o:value="1e" xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"/>"#,
@@ -1569,7 +1569,7 @@ mod meta_field_tests {
     #[test]
     fn meta_field_rejects_invalid_identity_placement_and_markup() {
         let invalid = [
-            r#"<text:p><text:meta-field>missing</text:meta-field></text:p>"#,
+            r"<text:p><text:meta-field>missing</text:meta-field></text:p>",
             r#"<text:p><text:meta-field xml:id="">empty</text:meta-field></text:p>"#,
             r#"<text:p><text:meta-field xml:id="1bad">bad</text:meta-field></text:p>"#,
             r#"<text:p><text:meta-field xml:id="bad:id">bad</text:meta-field></text:p>"#,
@@ -1622,7 +1622,7 @@ mod meta_field_tests {
         let allowed = [
             r#"text<text:span><text:a xlink:type="simple" xlink:href="urn:test"><text:date>2026-07-18</text:date></text:a></text:span>"#,
             r#"<text:meta xml:id="nested-meta"><text:meta-field xml:id="nested-field">nested</text:meta-field></text:meta>"#,
-            r#"<text:ruby><text:ruby-base>base<text:span>span</text:span></text:ruby-base><text:ruby-text>reading</text:ruby-text></text:ruby>"#,
+            r"<text:ruby><text:ruby-base>base<text:span>span</text:span></text:ruby-base><text:ruby-text>reading</text:ruby-text></text:ruby>",
             r#"<text:note text:note-class="footnote"><text:note-citation>1</text:note-citation><text:note-body><text:p>body</text:p></text:note-body></text:note>"#,
             r#"<text:execute-macro xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0"><office:event-listeners><script:event-listener script:event-name="dom:click" script:language="ooo:script" script:macro-name="M"/></office:event-listeners>cached</text:execute-macro>"#,
             r#"<office:annotation><dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/">A</dc:creator><text:p>comment</text:p></office:annotation>"#,
@@ -1644,17 +1644,17 @@ mod meta_field_tests {
     fn meta_field_rejects_wrong_rng_descendant_elements_and_cardinality() {
         let disallowed = [
             r#"<text:a xlink:type="simple" xlink:href="urn:outer"><text:a xlink:type="simple" xlink:href="urn:inner">nested</text:a></text:a>"#,
-            r#"<text:date><text:span>not cached text</text:span></text:date>"#,
-            r#"<text:s>not empty</text:s>"#,
-            r#"<text:number>heading-only vocabulary</text:number>"#,
-            r#"<text:ruby><text:ruby-text>wrong order</text:ruby-text><text:ruby-base>base</text:ruby-base></text:ruby>"#,
-            r#"<text:ruby><text:ruby-base>missing reading</text:ruby-base></text:ruby>"#,
+            r"<text:date><text:span>not cached text</text:span></text:date>",
+            r"<text:s>not empty</text:s>",
+            r"<text:number>heading-only vocabulary</text:number>",
+            r"<text:ruby><text:ruby-text>wrong order</text:ruby-text><text:ruby-base>base</text:ruby-base></text:ruby>",
+            r"<text:ruby><text:ruby-base>missing reading</text:ruby-base></text:ruby>",
             r#"<text:note text:note-class="footnote"><text:note-body/><text:note-citation>1</text:note-citation></text:note>"#,
             r#"<text:note text:note-class="footnote"><text:note-citation>1</text:note-citation><text:note-body><style:style/></text:note-body></text:note>"#,
-            r#"<text:execute-macro>text<office:event-listeners/></text:execute-macro>"#,
-            r#"<office:event-listeners/>"#,
-            r#"<text:span><table:table/></text:span>"#,
-            r#"<text:span><style:style/></text:span>"#,
+            r"<text:execute-macro>text<office:event-listeners/></text:execute-macro>",
+            r"<office:event-listeners/>",
+            r"<text:span><table:table/></text:span>",
+            r"<text:span><style:style/></text:span>",
             r#"<draw:line xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><table:table/></draw:line>"#,
         ];
         for (index, content) in disallowed.into_iter().enumerate() {

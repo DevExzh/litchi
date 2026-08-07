@@ -20,6 +20,7 @@ pub struct Metadata {
 impl Metadata {
     /// Creates typed series metadata.  Wire-range validation is performed by
     /// [`Transaction::set`] before the value can be published.
+    #[must_use]
     pub const fn new(
         category_kind: DataKind,
         category_count: Count,
@@ -35,21 +36,25 @@ impl Metadata {
     }
 
     /// Data kind of category or horizontal values (`sdtX`).
+    #[must_use]
     pub const fn category_kind(self) -> DataKind {
         self.category_kind
     }
 
     /// Number of category or horizontal values (`cValx`).
+    #[must_use]
     pub const fn category_count(self) -> Count {
         self.category_count
     }
 
     /// Number of vertical values (`cValy`).
+    #[must_use]
     pub const fn value_count(self) -> Count {
         self.value_count
     }
 
     /// Number of bubble-size values (`cValBSize`).
+    #[must_use]
     pub const fn bubble_count(self) -> Count {
         self.bubble_count
     }
@@ -96,21 +101,25 @@ impl Change {
     }
 
     /// Zero-based index of the existing semantic series.
+    #[must_use]
     pub const fn index(self) -> usize {
         self.index
     }
 
     /// Source offset of the fixed-width `Series` record.
+    #[must_use]
     pub const fn offset(self) -> usize {
         self.offset
     }
 
     /// Metadata required before this change can be applied.
+    #[must_use]
     pub const fn before(self) -> Metadata {
         self.before
     }
 
     /// Metadata produced by this change.
+    #[must_use]
     pub const fn after(self) -> Metadata {
         self.after
     }
@@ -138,31 +147,37 @@ impl Patch {
     }
 
     /// Ordered series changes in transaction staging order.
+    #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
     }
 
     /// Number of effective metadata changes.
+    #[must_use]
     pub const fn len(&self) -> usize {
         self.changes.len()
     }
 
     /// Whether this patch is a semantic no-op.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.changes.is_empty()
     }
 
     /// FNV-1a source fingerprint required before application.
+    #[must_use]
     pub const fn source_before(&self) -> u64 {
         self.source_before
     }
 
     /// FNV-1a source fingerprint produced after application.
+    #[must_use]
     pub const fn source_after(&self) -> u64 {
         self.source_after
     }
 
     /// Returns the source-checked inverse patch.
+    #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
             source_before: self.source_after,
@@ -221,31 +236,37 @@ impl Snapshot {
     }
 
     /// Borrow the unchanged chart snapshot.
+    #[must_use]
     pub const fn chart(&self) -> &Chart {
         &self.chart
     }
 
     /// Number of series records in the snapshot.
+    #[must_use]
     pub const fn len(&self) -> usize {
         self.entries.len()
     }
 
     /// Whether the chart contains no series records.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
     /// Returns one typed series metadata value by zero-based index.
+    #[must_use]
     pub fn get(&self, index: usize) -> Option<Metadata> {
         self.entries.get(index).map(|entry| entry.metadata)
     }
 
     /// Iterates metadata in the source `Series` order without allocation.
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = Metadata> + '_ {
         self.entries.iter().map(|entry| entry.metadata)
     }
 
     /// Starts a transaction consuming this snapshot.
+    #[must_use]
     pub fn edit(self) -> Transaction {
         Transaction {
             chart: self.chart,
@@ -256,6 +277,7 @@ impl Snapshot {
     }
 
     /// Consumes the snapshot without editing it.
+    #[must_use]
     pub fn into_chart(self) -> Chart {
         self.chart
     }
@@ -274,21 +296,25 @@ impl Commit {
     }
 
     /// Borrow the post-edit chart snapshot.
+    #[must_use]
     pub const fn chart(&self) -> &Chart {
         &self.chart
     }
 
     /// Borrow the reversible source-checked patch.
+    #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Consume the commit and return the post-edit chart.
+    #[must_use]
     pub fn into_chart(self) -> Chart {
         self.chart
     }
 
     /// Split the commit into chart and patch.
+    #[must_use]
     pub fn into_parts(self) -> (Chart, Patch) {
         (self.chart, self.patch)
     }
@@ -305,11 +331,13 @@ pub struct Transaction {
 
 impl Transaction {
     /// Number of distinct staged metadata replacements.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.requests.len()
     }
 
     /// Whether no metadata replacement is staged.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.requests.is_empty()
     }
@@ -336,11 +364,9 @@ impl Transaction {
                 maximum: u64::try_from(self.chart.limits.max_series).unwrap_or(u64::MAX),
             });
         }
-        self.requests
-            .try_reserve(1)
-            .map_err(|_| Error::Allocation {
-                resource: "series metadata edits",
-            })?;
+        self.requests.try_reserve(1).ok().ok_or(Error::Allocation {
+            resource: "series metadata edits",
+        })?;
         let _ = entry;
         self.requests.push(Request { index, metadata });
         Ok(self)
@@ -365,7 +391,8 @@ impl Transaction {
         let mut changes = Vec::new();
         changes
             .try_reserve_exact(requests.len())
-            .map_err(|_| Error::Allocation {
+            .ok()
+            .ok_or(Error::Allocation {
                 resource: "series metadata patch changes",
             })?;
         for request in requests {

@@ -336,7 +336,7 @@ impl TextStyleProperties {
             xml.push_str(kind.local_name());
             xml.push_str("=\"");
             xml.push_str(&escape_xml(&value.lexical()));
-            xml.push('"')
+            xml.push('"');
         }
         xml.push_str("/>");
         Ok(xml)
@@ -407,20 +407,20 @@ impl TextStyleRecord {
             escape_xml(&self.family)
         );
         if let Some(value) = &self.name {
-            xml.push_str(&format!(r#" style:name="{}""#, escape_xml(value)))
+            xml.push_str(&format!(r#" style:name="{}""#, escape_xml(value)));
         }
         if let Some(value) = &self.parent_style_name {
             xml.push_str(&format!(
                 r#" style:parent-style-name="{}""#,
                 escape_xml(value)
-            ))
+            ));
         }
         if let Some(value) = &self.properties {
             xml.push('>');
             xml.push_str(&value.to_xml_fragment()?);
-            xml.push_str(&format!("</style:{tag}>"))
+            xml.push_str(&format!("</style:{tag}>"));
         } else {
-            xml.push_str("/>")
+            xml.push_str("/>");
         }
         Ok(xml)
     }
@@ -493,7 +493,7 @@ fn attrs(
             .map_err(|error| bad(format!("invalid text property value: {error}")))?
             .into_owned();
         safe(&value, "text property value", true)?;
-        out.push((property_ns(namespace), local.as_ref().to_vec(), value))
+        out.push((property_ns(namespace), local.as_ref().to_vec(), value));
     }
     Ok(out)
 }
@@ -631,7 +631,7 @@ pub fn parse_text_style_properties(xml: &str) -> Result<TextStylePropertiesSet> 
                         }
                         value.seen = true;
                         value.style.properties = Some(properties(&reader, version, &start)?);
-                        value.property_depth = Some(depth)
+                        value.property_depth = Some(depth);
                     } else if current.1 == b"text-properties" {
                         return Err(bad("style:text-properties has invalid namespace or parent"));
                     } else if value.property_depth.is_some_and(|p| depth > p) {
@@ -665,7 +665,7 @@ pub fn parse_text_style_properties(xml: &str) -> Result<TextStylePropertiesSet> 
                             return Err(bad("duplicate style:text-properties"));
                         }
                         value.seen = true;
-                        value.style.properties = Some(properties(&reader, version, &start)?)
+                        value.style.properties = Some(properties(&reader, version, &start)?);
                     } else if current.1 == b"text-properties" {
                         return Err(bad("style:text-properties has invalid namespace or parent"));
                     } else if value.property_depth.is_some_and(|p| depth > p) {
@@ -698,19 +698,19 @@ pub fn parse_text_style_properties(xml: &str) -> Result<TextStylePropertiesSet> 
                 if let Some(value) = active.as_mut()
                     && value.property_depth == Some(depth)
                 {
-                    value.property_depth = None
+                    value.property_depth = None;
                 }
                 if active.as_ref().is_some_and(|value| value.depth == depth) {
-                    push(&mut out, active.take().unwrap().style, &mut total)?
+                    push(&mut out, active.take().unwrap().style, &mut total)?;
                 }
                 stack.pop();
             },
             Ok(Event::Decl(decl)) => {
                 version = decl
                     .xml_version()
-                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?
+                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,
@@ -791,7 +791,7 @@ pub fn set_text_style_properties_xml(xml: &str, requested: &TextStyleRecord) -> 
                                 ..Default::default()
                             },
                             ..Default::default()
-                        })
+                        });
                     }
                 } else if target_depth.is_some_and(|d| depth == d + 1)
                     && current.0 == Ns::Style
@@ -837,7 +837,7 @@ pub fn set_text_style_properties_xml(xml: &str, requested: &TextStyleRecord) -> 
                         found = Some(Target {
                             style: span,
                             ..Default::default()
-                        })
+                        });
                     }
                 } else if target_depth.is_some_and(|d| depth == d + 1)
                     && current.0 == Ns::Style
@@ -857,13 +857,13 @@ pub fn set_text_style_properties_xml(xml: &str, requested: &TextStyleRecord) -> 
                     {
                         let span = spans.properties.as_mut().unwrap();
                         span.end_start = begin;
-                        span.end = end
+                        span.end = end;
                     }
                     if target_depth == Some(depth) {
                         spans.style.end_start = begin;
                         spans.style.end = end;
                         found = active.take();
-                        target_depth = None
+                        target_depth = None;
                     }
                 }
                 stack.pop();
@@ -871,9 +871,9 @@ pub fn set_text_style_properties_xml(xml: &str, requested: &TextStyleRecord) -> 
             Ok(Event::Decl(decl)) => {
                 version = decl
                     .xml_version()
-                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?
+                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,
@@ -937,7 +937,7 @@ mod tests {
             TextStyleProperties::from_xml_fragment(&fragment).unwrap(),
             value
         );
-        assert_eq!(value.iter().count(), 84)
+        assert_eq!(value.iter().count(), 84);
     }
     #[test]
     fn parses_real_libreoffice_style() {
@@ -961,7 +961,7 @@ mod tests {
                 .unwrap()
                 .lexical(),
             "Noto Sans"
-        )
+        );
     }
     #[test]
     fn lossless_replace_insert_remove() {
@@ -983,7 +983,7 @@ mod tests {
             &TextStyleRecord::named("b", "paragraph", None).unwrap(),
         )
         .unwrap();
-        assert!(!removed.contains("fo:font-size=\"12pt\""))
+        assert!(!removed.contains("fo:font-size=\"12pt\""));
     }
     #[test]
     fn rejects_lexical_namespace_placement_and_caps() {
@@ -997,14 +997,14 @@ mod tests {
             assert!(
                 parse_text_style_properties(&doc(body)).is_err(),
                 "accepted {body}"
-            )
+            );
         }
         let huge = "x".repeat(MAX_VALUE + 1);
         assert!(TextProperty::new(TextPropertyKind::FoFontFamily, &huge).is_err());
         let mut attrs = String::new();
         for index in 0..=MAX_ATTRIBUTES {
-            attrs.push_str(&format!(" x:a{index}=\"1\""))
+            attrs.push_str(&format!(" x:a{index}=\"1\""));
         }
-        assert!(parse_text_style_properties(&doc(&format!(r#"<style:style style:name="a" style:family="text"><style:text-properties xmlns:x="urn:x"{attrs}/></style:style>"#))).is_err())
+        assert!(parse_text_style_properties(&doc(&format!(r#"<style:style style:name="a" style:family="text"><style:text-properties xmlns:x="urn:x"{attrs}/></style:style>"#))).is_err());
     }
 }

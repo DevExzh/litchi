@@ -1,4 +1,4 @@
-//! Typed, layered OpenDocument bibliography-configuration ownership.
+//! Typed, layered `OpenDocument` bibliography-configuration ownership.
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";

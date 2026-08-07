@@ -40,8 +40,7 @@ pub(crate) fn parse_parts(parts: &[(&str, Part)]) -> Result<Declarations> {
     for (kind, name) in all_uses {
         if !names.contains(&(kind, name.clone())) {
             return Err(codec::invalid(format!(
-                "ODF {:?} variable '{name}' is used without a declaration",
-                kind
+                "ODF {kind:?} variable '{name}' is used without a declaration"
             )));
         }
     }

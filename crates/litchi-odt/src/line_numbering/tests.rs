@@ -51,8 +51,8 @@ fn rejects_malformed_or_misplaced_configurations() {
         r#"<t:linenumbering-configuration t:number-position="center"/>"#,
         r#"<t:linenumbering-configuration t:offset="-1cm"/>"#,
         r#"<t:linenumbering-configuration t:increment="-1"/>"#,
-        r#"<t:linenumbering-configuration><t:linenumbering-separator/><t:linenumbering-separator/></t:linenumbering-configuration>"#,
-        r#"<t:linenumbering-configuration><t:linenumbering-separator><t:span/></t:linenumbering-separator></t:linenumbering-configuration>"#,
+        r"<t:linenumbering-configuration><t:linenumbering-separator/><t:linenumbering-separator/></t:linenumbering-configuration>",
+        r"<t:linenumbering-configuration><t:linenumbering-separator><t:span/></t:linenumbering-separator></t:linenumbering-configuration>",
     ] {
         assert!(parse(&styles(body)).is_err(), "{body}");
     }
@@ -62,7 +62,7 @@ fn rejects_malformed_or_misplaced_configurations() {
     assert!(parse(&misplaced).is_err());
     assert!(
         parse(&styles(
-            r#"<t:linenumbering-configuration/><t:linenumbering-configuration/>"#
+            r"<t:linenumbering-configuration/><t:linenumbering-configuration/>"
         ))
         .is_err()
     );

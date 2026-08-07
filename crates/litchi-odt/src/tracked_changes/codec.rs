@@ -421,7 +421,7 @@ pub(super) fn scan_mutable_tracked_xml(xml: &str) -> Result<XmlSites> {
                         empty: None,
                     });
                 }
-                if tracked == Some((depth, tracked.map(|value| value.1).unwrap_or(0))) {
+                if tracked == Some((depth, tracked.map_or(0, |value| value.1))) {
                     let (_, start) = tracked.take().expect("checked tracked container");
                     if tracked_changes.replace(start..span.end).is_some() {
                         return invalid("multiple text:tracked-changes elements are not allowed");

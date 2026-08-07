@@ -121,7 +121,7 @@ pub(super) fn u32_at(data: &[u8], offset: usize, record: RecordRef<'_>) -> Resul
             offset: record.offset(),
             reason: "record u32 is truncated",
         })?;
-    let array = <[u8; 4]>::try_from(bytes).map_err(|_| Error::InvalidChart {
+    let array = <[u8; 4]>::try_from(bytes).ok().ok_or(Error::InvalidChart {
         offset: record.offset(),
         reason: "record u32 is truncated",
     })?;
@@ -145,7 +145,7 @@ pub(super) fn f64_at(data: &[u8], offset: usize, record: RecordRef<'_>) -> Resul
             offset: record.offset(),
             reason: "record f64 is truncated",
         })?;
-    let array = <[u8; 8]>::try_from(bytes).map_err(|_| Error::InvalidChart {
+    let array = <[u8; 8]>::try_from(bytes).ok().ok_or(Error::InvalidChart {
         offset: record.offset(),
         reason: "record f64 is truncated",
     })?;
@@ -163,7 +163,7 @@ pub(super) fn array4_at(data: &[u8], offset: usize, record: RecordRef<'_>) -> Re
             offset: record.offset(),
             reason: "record array is truncated",
         })?;
-    <[u8; 4]>::try_from(bytes).map_err(|_| Error::InvalidChart {
+    <[u8; 4]>::try_from(bytes).ok().ok_or(Error::InvalidChart {
         offset: record.offset(),
         reason: "record array is truncated",
     })
@@ -208,7 +208,8 @@ pub(super) fn check_add(current: usize, maximum: usize, resource: &'static str) 
 pub(super) fn push<T>(values: &mut Vec<T>, value: T, resource: &'static str) -> Result<()> {
     values
         .try_reserve(1)
-        .map_err(|_| Error::Allocation { resource })?;
+        .ok()
+        .ok_or(Error::Allocation { resource })?;
     values.push(value);
     Ok(())
 }
@@ -220,7 +221,8 @@ pub(super) fn copy(data: &[u8], resource: &'static str, maximum: usize) -> Resul
     let mut output = Vec::new();
     output
         .try_reserve_exact(data.len())
-        .map_err(|_| Error::Allocation { resource })?;
+        .ok()
+        .ok_or(Error::Allocation { resource })?;
     output.extend_from_slice(data);
     Ok(output)
 }
@@ -229,7 +231,8 @@ pub(super) fn vec_with_capacity(capacity: usize, resource: &'static str) -> Resu
     let mut output = Vec::new();
     output
         .try_reserve_exact(capacity)
-        .map_err(|_| Error::Allocation { resource })?;
+        .ok()
+        .ok_or(Error::Allocation { resource })?;
     Ok(output)
 }
 

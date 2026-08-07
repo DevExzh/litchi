@@ -290,7 +290,7 @@ impl Properties {
             return Err(bad("style:page-number out of range"));
         }
         if let Some(x) = &self.background_image {
-            x.validate()?
+            x.validate()?;
         }
         Ok(())
     }
@@ -300,13 +300,13 @@ impl Properties {
             r#"<style:table-properties xmlns:style="{STYLE_NS}" xmlns:office="{OFFICE_NS}" xmlns:fo="{FO_NS}" xmlns:table="{TABLE_NS}" xmlns:draw="{DRAW_NS}" xmlns:xlink="{XLINK_NS}""#
         );
         if let Some(v) = &self.width {
-            x.push_str(&format!(r#" style:width="{}""#, v.as_str()))
+            x.push_str(&format!(r#" style:width="{}""#, v.as_str()));
         }
         if let Some(v) = &self.relative_width {
-            x.push_str(&format!(r#" style:rel-width="{}""#, v.as_str()))
+            x.push_str(&format!(r#" style:rel-width="{}""#, v.as_str()));
         }
         if let Some(v) = self.align {
-            x.push_str(&format!(r#" table:align="{}""#, v.xml()))
+            x.push_str(&format!(r#" table:align="{}""#, v.xml()));
         }
         for (n, v) in [
             ("margin-left", &self.margin_left),
@@ -316,45 +316,45 @@ impl Properties {
             ("margin", &self.margin),
         ] {
             if let Some(v) = v {
-                x.push_str(&format!(r#" fo:{n}="{}""#, v.as_str()))
+                x.push_str(&format!(r#" fo:{n}="{}""#, v.as_str()));
             }
         }
         if let Some(v) = self.page_number {
-            x.push_str(&format!(r#" style:page-number="{}""#, v.xml()))
+            x.push_str(&format!(r#" style:page-number="{}""#, v.xml()));
         }
         if let Some(v) = self.break_before {
-            x.push_str(&format!(r#" fo:break-before="{}""#, break_xml(v)))
+            x.push_str(&format!(r#" fo:break-before="{}""#, break_xml(v)));
         }
         if let Some(v) = self.break_after {
-            x.push_str(&format!(r#" fo:break-after="{}""#, break_xml(v)))
+            x.push_str(&format!(r#" fo:break-after="{}""#, break_xml(v)));
         }
         if let Some(v) = &self.background_color {
-            x.push_str(&format!(r#" fo:background-color="{}""#, v.as_str()))
+            x.push_str(&format!(r#" fo:background-color="{}""#, v.as_str()));
         }
         if let Some(v) = &self.shadow {
-            x.push_str(&format!(r#" style:shadow="{}""#, escape_xml(v.as_str())))
+            x.push_str(&format!(r#" style:shadow="{}""#, escape_xml(v.as_str())));
         }
         if let Some(v) = self.keep_with_next {
-            x.push_str(&format!(r#" fo:keep-with-next="{}""#, keep_xml(v)))
+            x.push_str(&format!(r#" fo:keep-with-next="{}""#, keep_xml(v)));
         }
         if let Some(v) = self.may_break_between_rows {
-            x.push_str(&format!(r#" style:may-break-between-rows="{v}""#))
+            x.push_str(&format!(r#" style:may-break-between-rows="{v}""#));
         }
         if let Some(v) = self.border_model {
-            x.push_str(&format!(r#" table:border-model="{}""#, v.xml()))
+            x.push_str(&format!(r#" table:border-model="{}""#, v.xml()));
         }
         if let Some(v) = self.writing_mode {
-            x.push_str(&format!(r#" style:writing-mode="{}""#, v.xml()))
+            x.push_str(&format!(r#" style:writing-mode="{}""#, v.xml()));
         }
         if let Some(v) = self.display {
-            x.push_str(&format!(r#" table:display="{v}""#))
+            x.push_str(&format!(r#" table:display="{v}""#));
         }
         if let Some(v) = &self.background_image {
             x.push('>');
             x.push_str(&v.to_xml_fragment()?);
-            x.push_str("</style:table-properties>")
+            x.push_str("</style:table-properties>");
         } else {
-            x.push_str("/>")
+            x.push_str("/>");
         }
         Ok(x)
     }
@@ -409,10 +409,10 @@ impl Style {
             if self.is_default_style {
                 return Err(bad("default table style cannot have a parent"));
             }
-            safe(x, "parent table style name", false)?
+            safe(x, "parent table style name", false)?;
         }
         if let Some(x) = &self.properties {
-            x.validate()?
+            x.validate()?;
         }
         Ok(())
     }
@@ -425,17 +425,17 @@ impl Style {
         };
         let mut x = format!(r#"<style:{tag} xmlns:style="{STYLE_NS}" style:family="table""#);
         if let Some(v) = &self.name {
-            x.push_str(&format!(r#" style:name="{}""#, escape_xml(v)))
+            x.push_str(&format!(r#" style:name="{}""#, escape_xml(v)));
         }
         if let Some(v) = &self.parent_style_name {
-            x.push_str(&format!(r#" style:parent-style-name="{}""#, escape_xml(v)))
+            x.push_str(&format!(r#" style:parent-style-name="{}""#, escape_xml(v)));
         }
         if let Some(v) = &self.properties {
             x.push('>');
             x.push_str(&v.to_xml_fragment()?);
-            x.push_str(&format!("</style:{tag}>"))
+            x.push_str(&format!("</style:{tag}>"));
         } else {
-            x.push_str("/>")
+            x.push_str("/>");
         }
         Ok(x)
     }
@@ -505,7 +505,7 @@ fn attrs(
         if x.len() > MAX_VALUE {
             return Err(bad("table property value too large"));
         }
-        o.push((k.0, k.1, x))
+        o.push((k.0, k.1, x));
     }
     Ok(o)
 }
@@ -670,7 +670,7 @@ fn image(r: &NsReader<&[u8]>, v: XmlVersion, e: &BytesStart<'_>) -> Result<Image
         .transpose()?;
     let filter = take(&mut a, Ns::S, b"filter-name");
     if let Some(x) = &filter {
-        safe(x, "style:filter-name", true)?
+        safe(x, "style:filter-name", true)?;
     }
     let opacity = take(&mut a, Ns::D, b"opacity")
         .map(Opacity::new)
@@ -771,7 +771,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             bd: None,
                             binary: String::new(),
                             linked: false,
-                        })
+                        });
                     }
                     continue;
                 }
@@ -782,7 +782,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         }
                         s.seen = true;
                         s.style.properties = Some(properties(&r, ver, &e)?);
-                        s.pd = Some(d)
+                        s.pd = Some(d);
                     } else if c.1 == b"table-properties" {
                         return Err(bad(
                             "style:table-properties has invalid namespace or parent",
@@ -803,7 +803,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         let i = image(&r, ver, &e)?;
                         s.style.properties.as_mut().unwrap().background_image = Some(i.value);
                         s.linked = i.linked;
-                        s.id = Some(d)
+                        s.id = Some(d);
                     } else if c.1 == b"background-image" {
                         return Err(bad("background-image has invalid namespace or parent"));
                     } else if s.id.is_some_and(|i| d == i + 1)
@@ -814,7 +814,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             return Err(bad("invalid office:binary-data"));
                         }
                         s.bd = Some(d);
-                        s.binary.clear()
+                        s.binary.clear();
                     } else if s.pd.is_some_and(|p| d > p) {
                         return Err(bad("unexpected table-properties child"));
                     }
@@ -830,7 +830,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     && matches!(c.1.as_slice(), b"style" | b"default-style");
                 if direct {
                     if let Some(x) = header(&r, ver, &e, c.1 == b"default-style")? {
-                        push(&mut out, x, &mut total)?
+                        push(&mut out, x, &mut total)?;
                     }
                     continue;
                 }
@@ -840,7 +840,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             return Err(bad("duplicate style:table-properties"));
                         }
                         s.seen = true;
-                        s.style.properties = Some(properties(&r, ver, &e)?)
+                        s.style.properties = Some(properties(&r, ver, &e)?);
                     } else if c.1 == b"table-properties" {
                         return Err(bad(
                             "style:table-properties has invalid namespace or parent",
@@ -859,7 +859,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             return Err(bad("duplicate style:background-image"));
                         }
                         s.style.properties.as_mut().unwrap().background_image =
-                            Some(image(&r, ver, &e)?.value)
+                            Some(image(&r, ver, &e)?.value);
                     } else if c.1 == b"background-image" {
                         return Err(bad("background-image has invalid namespace or parent"));
                     } else if s.id.is_some_and(|i| d == i + 1)
@@ -876,7 +876,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             .background_image
                             .as_mut()
                             .unwrap()
-                            .source = BackgroundSource::Embedded(Vec::new())
+                            .source = BackgroundSource::Embedded(Vec::new());
                     } else if s.pd.is_some_and(|p| d > p) {
                         return Err(bad("unexpected table-properties child"));
                     }
@@ -889,7 +889,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         if s.binary.len() + bytes.len() > MAX_BINARY * 2 {
                             return Err(bad("encoded binary data too large"));
                         }
-                        s.binary.push_str(&String::from_utf8_lossy(bytes))
+                        s.binary.push_str(&String::from_utf8_lossy(bytes));
                     } else if s.pd.is_some() && !bytes.iter().all(u8::is_ascii_whitespace) {
                         return Err(bad("unexpected text in table-properties"));
                     }
@@ -902,7 +902,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                         if s.binary.len() + bytes.len() > MAX_BINARY * 2 {
                             return Err(bad("encoded binary data too large"));
                         }
-                        s.binary.push_str(&String::from_utf8_lossy(bytes))
+                        s.binary.push_str(&String::from_utf8_lossy(bytes));
                     } else if s.pd.is_some() && !bytes.iter().all(u8::is_ascii_whitespace) {
                         return Err(bad("unexpected text in table-properties"));
                     }
@@ -921,26 +921,26 @@ pub fn parse(xml: &str) -> Result<Styles> {
                             .as_mut()
                             .unwrap()
                             .source = BackgroundSource::Embedded(data);
-                        s.bd = None
+                        s.bd = None;
                     }
                     if s.id == Some(d) {
-                        s.id = None
+                        s.id = None;
                     }
                     if s.pd == Some(d) {
-                        s.pd = None
+                        s.pd = None;
                     }
                 }
                 if active.as_ref().is_some_and(|x| x.depth == d) {
-                    push(&mut out, active.take().unwrap().style, &mut total)?
+                    push(&mut out, active.take().unwrap().style, &mut total)?;
                 }
                 stack.pop();
             },
             Ok(Event::Decl(d)) => {
                 ver = d
                     .xml_version()
-                    .map_err(|e| bad(format!("unsupported XML version: {e}")))?
+                    .map_err(|e| bad(format!("unsupported XML version: {e}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,
@@ -969,29 +969,29 @@ fn b64_decode(x: &str) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(x.len() / 4 * 3);
     let groups = x.len() / 4;
     for (i, c) in x.chunks(4).enumerate() {
-        let pad = (c[2] == b'=') as usize + (c[3] == b'=') as usize;
+        let pad = usize::from(c[2] == b'=') + usize::from(c[3] == b'=');
         if (i + 1 < groups && pad != 0) || (c[2] == b'=' && c[3] != b'=') || pad > 2 {
             return Err(bad("invalid binary-data padding"));
         }
-        let a = val(c[0]).ok_or_else(|| bad("invalid base64"))? as u32;
-        let b = val(c[1]).ok_or_else(|| bad("invalid base64"))? as u32;
+        let a = u32::from(val(c[0]).ok_or_else(|| bad("invalid base64"))?);
+        let b = u32::from(val(c[1]).ok_or_else(|| bad("invalid base64"))?);
         let z = if c[2] == b'=' {
             0
         } else {
-            val(c[2]).ok_or_else(|| bad("invalid base64"))? as u32
+            u32::from(val(c[2]).ok_or_else(|| bad("invalid base64"))?)
         };
         let q = if c[3] == b'=' {
             0
         } else {
-            val(c[3]).ok_or_else(|| bad("invalid base64"))? as u32
+            u32::from(val(c[3]).ok_or_else(|| bad("invalid base64"))?)
         };
         let n = a << 18 | b << 12 | z << 6 | q;
         out.push((n >> 16) as u8);
         if pad < 2 {
-            out.push((n >> 8) as u8)
+            out.push((n >> 8) as u8);
         }
         if pad < 1 {
-            out.push(n as u8)
+            out.push(n as u8);
         }
         if out.len() > MAX_BINARY {
             return Err(bad("binary data too large"));
@@ -1073,7 +1073,7 @@ pub fn set_xml(xml: &str, want: &Style) -> Result<String> {
                                 ..Default::default()
                             },
                             ..Default::default()
-                        })
+                        });
                     }
                 } else if td.is_some_and(|x| d == x + 1)
                     && c.0 == Ns::S
@@ -1117,7 +1117,7 @@ pub fn set_xml(xml: &str, want: &Style) -> Result<String> {
                         found = Some(Spans {
                             style: s,
                             ..Default::default()
-                        })
+                        });
                     }
                 } else if td.is_some_and(|x| d == x + 1)
                     && c.0 == Ns::S
@@ -1137,13 +1137,13 @@ pub fn set_xml(xml: &str, want: &Style) -> Result<String> {
                     {
                         let x = s.properties.as_mut().unwrap();
                         x.end_start = begin;
-                        x.end = end
+                        x.end = end;
                     }
                     if td == Some(d) {
                         s.style.end_start = begin;
                         s.style.end = end;
                         found = active.take();
-                        td = None
+                        td = None;
                     }
                 }
                 stack.pop();
@@ -1151,9 +1151,9 @@ pub fn set_xml(xml: &str, want: &Style) -> Result<String> {
             Ok(Event::Decl(d)) => {
                 ver = d
                     .xml_version()
-                    .map_err(|e| bad(format!("unsupported XML version: {e}")))?
+                    .map_err(|e| bad(format!("unsupported XML version: {e}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,

@@ -22,10 +22,10 @@ impl Kind {
         match value {
             0x0000 => Ok(Self::Surrounding),
             0x0004 => Ok(Self::Shadowed),
-            value => Err(Error::InvalidRecordValue {
+            other => Err(Error::InvalidRecordValue {
                 kind: Frame::KIND.get(),
                 field: "frt",
-                value: u64::from(value),
+                value: u64::from(other),
             }),
         }
     }
@@ -45,6 +45,7 @@ impl Frame {
     pub const KIND: RecordKind = RecordKind::from_wire(0x1032);
 
     /// Creates a frame with explicit size and position.
+    #[must_use]
     pub const fn new(kind: Kind) -> Self {
         Self { kind, flags: 0 }
     }
@@ -74,38 +75,45 @@ impl Frame {
     }
 
     /// Selects automatic sizing in builder style.
+    #[must_use]
     pub const fn auto_size(mut self, enabled: bool) -> Self {
         self.flags = set(self.flags, AUTO_SIZE, enabled);
         self
     }
 
     /// Selects automatic positioning in builder style.
+    #[must_use]
     pub const fn auto_position(mut self, enabled: bool) -> Self {
         self.flags = set(self.flags, AUTO_POSITION, enabled);
         self
     }
 
     /// Frame drawing style.
+    #[must_use]
     pub const fn kind(self) -> Kind {
         self.kind
     }
 
     /// Whether the size is calculated automatically.
+    #[must_use]
     pub const fn is_auto_size(self) -> bool {
         self.flags & AUTO_SIZE != 0
     }
 
     /// Whether the position is calculated automatically.
+    #[must_use]
     pub const fn is_auto_position(self) -> bool {
         self.flags & AUTO_POSITION != 0
     }
 
     /// Raw flags, including ignored reserved bits retained from input.
+    #[must_use]
     pub const fn raw_flags(self) -> u16 {
         self.flags
     }
 
     /// Encodes the fixed-size payload without allocating.
+    #[must_use]
     pub fn payload(self) -> [u8; LEN] {
         let mut bytes = [0; LEN];
         bytes[..2].copy_from_slice(&(self.kind as u16).to_le_bytes());
@@ -126,6 +134,11 @@ const fn set(flags: u16, mask: u16, enabled: bool) -> u16 {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic by design"
+    )]
     use super::*;
 
     #[test]

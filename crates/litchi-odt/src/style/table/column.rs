@@ -501,9 +501,9 @@ pub fn parse(xml: &str) -> Result<Styles> {
             Ok(Event::Decl(decl)) => {
                 version = decl
                     .xml_version()
-                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?
+                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,
@@ -671,9 +671,9 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
             Ok(Event::Decl(decl)) => {
                 version = decl
                     .xml_version()
-                    .map_err(|e| bad(format!("unsupported XML version: {e}")))?
+                    .map_err(|e| bad(format!("unsupported XML version: {e}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,

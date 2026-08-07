@@ -1,6 +1,6 @@
 //! Objects that implement reading and writing OPC packages.
 //!
-//! This module provides the main OpcPackage type, which represents an Open Packaging
+//! This module provides the main `OpcPackage` type, which represents an Open Packaging
 //! Convention package in memory. It manages parts, relationships, and provides
 //! high-level operations for working with office documents.
 
@@ -37,7 +37,7 @@ pub enum FontEmbedding {
 
 /// Main API class for working with OPC packages.
 ///
-/// OpcPackage represents an Open Packaging Convention package in memory,
+/// `OpcPackage` represents an Open Packaging Convention package in memory,
 /// providing access to parts, relationships, and package-level operations.
 /// Uses efficient data structures and minimal cloning for best performance.
 #[derive(Clone)]
@@ -47,7 +47,7 @@ pub struct OpcPackage {
 
     /// All parts in the package, indexed by partname
     /// Using Box<dyn Part + Send + Sync> for trait objects to allow different part types
-    /// PackURI keys avoid string allocations compared to String keys
+    /// `PackURI` keys avoid string allocations compared to String keys
     parts: HashMap<PackURI, Box<dyn Part + Send + Sync>>,
 
     /// ZIP items the reader found but did not model as parts
@@ -69,6 +69,7 @@ impl std::fmt::Debug for OpcPackage {
 
 impl OpcPackage {
     /// Create a new empty OPC package.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             rels: Relationships::new(PACKAGE_URI.to_string()),
@@ -84,6 +85,7 @@ impl OpcPackage {
     /// archive, but it must not hide the junk either. Each entry names the ZIP
     /// item and why it was not modelled as a part; the bytes stay in the source
     /// archive and are never decompressed.
+    #[must_use]
     pub fn non_part_members(&self) -> &[NonPartMember] {
         &self.non_part_members
     }
@@ -94,6 +96,7 @@ impl OpcPackage {
     }
 
     /// Get current save options.
+    #[must_use]
     pub fn save_options(&self) -> &SaveOptions {
         &self.save_options
     }
@@ -110,7 +113,7 @@ impl OpcPackage {
     /// * `path` - Path to the package file (.docx, .xlsx, .pptx, etc.)
     ///
     /// # Returns
-    /// A new OpcPackage instance loaded with the package contents
+    /// A new `OpcPackage` instance loaded with the package contents
     ///
     /// # Example
     /// ```no_run
@@ -214,7 +217,7 @@ impl OpcPackage {
     ///
     /// For Word documents, this is the document.xml part.
     /// For Excel, the workbook.xml part.
-    /// For PowerPoint, the presentation.xml part.
+    /// For `PowerPoint`, the presentation.xml part.
     pub fn main_document_part(&self) -> Result<&dyn Part> {
         let mut matching = self.rels.iter().filter(|relationship| {
             matches!(
@@ -242,7 +245,7 @@ impl OpcPackage {
     /// Get a part by its partname.
     ///
     /// # Arguments
-    /// * `partname` - The PackURI of the part to retrieve
+    /// * `partname` - The `PackURI` of the part to retrieve
     pub fn get_part(&self, partname: &PackURI) -> Result<&dyn Part> {
         if let Some(part) = self.parts.get(partname) {
             let part: &dyn Part = &**part;
@@ -348,11 +351,13 @@ impl OpcPackage {
     }
 
     /// Get the number of parts in the package.
+    #[must_use]
     pub fn part_count(&self) -> usize {
         self.parts.len()
     }
 
     /// Get a reference to the package-level relationships.
+    #[must_use]
     pub fn rels(&self) -> &Relationships {
         &self.rels
     }
@@ -366,6 +371,7 @@ impl OpcPackage {
     ///
     /// This is a cheap capability check. Use [`Self::signatures`] when graph
     /// validation and cryptographic verification are required.
+    #[must_use]
     pub fn is_signed(&self) -> bool {
         crate::sign::is_signed(self)
     }
@@ -485,8 +491,9 @@ impl OpcPackage {
             candidate_bytes.extend_from_slice(&template.as_bytes()[percent_d_pos + 2..]);
 
             // Create PackURI from bytes to avoid intermediate string allocation
-            let candidate_str = std::str::from_utf8(&candidate_bytes)
-                .map_err(|_| OpcError::InvalidPackUri("Invalid UTF-8 in partname".to_string()))?;
+            let candidate_str = std::str::from_utf8(&candidate_bytes).map_err(|_err| {
+                OpcError::InvalidPackUri("Invalid UTF-8 in partname".to_string())
+            })?;
 
             let candidate_uri = PackURI::new(candidate_str).map_err(OpcError::InvalidPackUri)?;
             if !self.parts.contains_key(&candidate_uri) {
@@ -504,6 +511,7 @@ impl OpcPackage {
     }
 
     /// Check if a part exists in the package.
+    #[must_use]
     pub fn contains_part(&self, partname: &PackURI) -> bool {
         self.parts.contains_key(partname)
     }
@@ -614,6 +622,11 @@ impl Default for OpcPackage {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
     use crate::part::BlobPart;
     use soapberry_zip::office::StreamingArchiveWriter;

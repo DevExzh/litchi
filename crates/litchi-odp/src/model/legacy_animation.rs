@@ -79,6 +79,7 @@ pub struct Node {
 
 impl Node {
     /// Create an empty legacy effect node.
+    #[must_use]
     pub fn new(kind: Kind) -> Self {
         Self {
             kind,
@@ -88,11 +89,13 @@ impl Node {
     }
 
     /// Return the element kind.
+    #[must_use]
     pub fn kind(&self) -> Kind {
         self.kind
     }
 
     /// Return the expanded-name attributes.
+    #[must_use]
     pub fn attributes(&self) -> &[Attribute] {
         &self.attributes
     }
@@ -125,6 +128,7 @@ impl Node {
     }
 
     /// Return child effects.
+    #[must_use]
     pub fn children(&self) -> &[Node] {
         &self.children
     }

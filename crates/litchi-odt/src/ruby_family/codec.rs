@@ -117,10 +117,10 @@ fn parse_properties(reader: &NsReader<&[u8]>, start: &BytesStart<'_>) -> Result<
         }
         match local.as_str() {
             "ruby-position" if value.position.is_none() => {
-                value.position = Some(Position::parse(&lexical)?)
+                value.position = Some(Position::parse(&lexical)?);
             },
             "ruby-align" if value.alignment.is_none() => {
-                value.alignment = Some(Alignment::parse(&lexical)?)
+                value.alignment = Some(Alignment::parse(&lexical)?);
             },
             _ => return Err(bad("unknown or duplicate ruby property")),
         }

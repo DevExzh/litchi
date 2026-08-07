@@ -406,7 +406,7 @@ pub fn parse_outline_styles(xml: &str) -> Result<Styles> {
                     return invalid("outline style elements cannot contain CDATA");
                 }
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return invalid("DTD and processing instructions are not allowed");
             },
             Ok(Event::Eof) => break,

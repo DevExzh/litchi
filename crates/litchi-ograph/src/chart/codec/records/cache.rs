@@ -153,7 +153,7 @@ pub(super) fn excel_cache(
     Ok(Cache::excel(
         section,
         row,
-        u8::try_from(col).map_err(|_| Error::InvalidChart {
+        u8::try_from(col).ok().ok_or(Error::InvalidChart {
             offset: record.offset(),
             reason: "Excel cache column exceeds the BIFF8 grid",
         })?,

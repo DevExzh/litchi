@@ -177,7 +177,7 @@ impl Parser {
             let namespace_uri = match namespace {
                 ResolveResult::Unbound => None,
                 ResolveResult::Bound(XmlNamespace(uri)) => {
-                    Some(std::str::from_utf8(uri).map_err(|_| {
+                    Some(std::str::from_utf8(uri).map_err(|_err| {
                         Error::InvalidFormat("non-UTF-8 animation namespace URI".to_string())
                     })?)
                 },
@@ -189,7 +189,7 @@ impl Parser {
                 },
             };
             let local_name = std::str::from_utf8(local_name.as_ref())
-                .map_err(|_| {
+                .map_err(|_err| {
                     Error::InvalidFormat("non-UTF-8 animation attribute name".to_string())
                 })?
                 .to_string();
@@ -244,7 +244,7 @@ impl Parser {
                 .into_owned();
             attributes.push(DrawingAttribute::new(
                 namespace,
-                String::from_utf8(local_name.as_ref().to_vec()).map_err(|_| {
+                String::from_utf8(local_name.as_ref().to_vec()).map_err(|_err| {
                     Error::InvalidFormat("non-UTF-8 enhanced-geometry attribute name".to_string())
                 })?,
                 value,

@@ -39,9 +39,9 @@ pub enum Format {
     Line(Line),
     /// Area formatting.
     Area(Area),
-    /// Opaque MarkerFormat payload.
+    /// Opaque `MarkerFormat` payload.
     Marker {
-        /// Exact MarkerFormat record payload.
+        /// Exact `MarkerFormat` record payload.
         data: Vec<u8>,
     },
     /// Data-point or whole-series formatting selector.
@@ -50,7 +50,7 @@ pub enum Format {
         point: u16,
         /// Series index.
         series: u16,
-        /// Raw DataFormat flags.
+        /// Raw `DataFormat` flags.
         flags: u16,
     },
     /// Pie data-point explosion distance.

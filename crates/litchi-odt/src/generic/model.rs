@@ -2,7 +2,7 @@
 
 use crate::core::OwnedPackage;
 
-/// Standard packaged OpenDocument document family.
+/// Standard packaged `OpenDocument` document family.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Family {
@@ -28,9 +28,9 @@ pub enum Family {
     Database,
 }
 
-/// Validated, format-neutral OpenDocument package.
+/// Validated, format-neutral `OpenDocument` package.
 ///
-/// This provides lossless package access for every standard OpenDocument
+/// This provides lossless package access for every standard `OpenDocument`
 /// family, including document types that do not yet have a specialized object
 /// model. Saving an unmodified package returns the original bytes exactly.
 pub struct Package {
@@ -40,13 +40,13 @@ pub struct Package {
     pub(super) mimetype: String,
 }
 
-/// Validated flat OpenDocument XML file.
+/// Validated flat `OpenDocument` XML file.
 ///
 /// Flat documents combine content, styles, settings, and metadata under one
 /// `office:document` root and are conventionally stored as `.fodt`, `.fods`,
 /// `.fodp`, `.fodg`, `.fodc`, or `.fodi`. The `.fodf` extension is also
 /// accepted for compatibility with odfdo's non-standard `office:formula`
-/// convention; conforming packaged `.odf` formulas use a direct MathML root.
+/// convention; conforming packaged `.odf` formulas use a direct `MathML` root.
 pub struct FlatDocument {
     pub(super) xml: String,
     pub(super) family: Family,

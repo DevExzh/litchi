@@ -1,4 +1,4 @@
-//! Format-neutral access to any packaged OpenDocument document family.
+//! Format-neutral access to any packaged `OpenDocument` document family.
 
 mod codec;
 mod flat;

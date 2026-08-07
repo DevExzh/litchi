@@ -1,12 +1,12 @@
 use crate::error::{OpcError, Result};
 use crate::packuri::PackURI;
-use crate::rel::Relationships;
+use crate::rel::{Relationship, Relationships};
 use memchr::memmem;
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
 /// Open Packaging Convention (OPC) objects related to package parts.
 ///
-/// This module provides the Part trait and XmlPart implementation for representing
+/// This module provides the Part trait and `XmlPart` implementation for representing
 /// parts within an OPC package. Parts are the fundamental units of content in an
 /// OPC package, each with a unique partname, content type, and optional relationships.
 use std::collections::HashMap;
@@ -40,7 +40,7 @@ impl Clone for Box<dyn Part + Send + Sync> {
 /// Trait representing a part in an OPC package.
 ///
 /// Parts are the fundamental units of content in an OPC package. Each part
-/// has a unique partname (PackURI), a content type, and may have relationships
+/// has a unique partname (`PackURI`), a content type, and may have relationships
 /// to other parts.
 pub trait Part: PartClone + Send + Sync {
     /// Get the partname of this part.
@@ -114,8 +114,8 @@ pub trait Part: PartClone + Send + Sync {
     fn target_ref(&self, r_id: &str) -> Result<&str> {
         self.rels()
             .get(r_id)
-            .map(|rel| rel.target_ref())
-            .ok_or_else(|| OpcError::RelationshipNotFound(format!("rId: {}", r_id)))
+            .map(Relationship::target_ref)
+            .ok_or_else(|| OpcError::RelationshipNotFound(format!("rId: {r_id}")))
     }
 
     /// Count references to a relationship ID in the part content.
@@ -124,7 +124,7 @@ pub trait Part: PartClone + Send + Sync {
     fn rel_ref_count(&self, r_id: &str) -> usize {
         // Fast byte-level search for r:id attribute references
         let blob = self.blob();
-        let pattern = format!(r#"r:id="{}""#, r_id);
+        let pattern = format!(r#"r:id="{r_id}""#);
 
         // Use memmem from memchr for fast substring searching
         let finder = memmem::Finder::new(pattern.as_bytes());
@@ -153,12 +153,13 @@ pub struct BlobPart {
 }
 
 impl BlobPart {
-    /// Create a new BlobPart.
+    /// Create a new `BlobPart`.
     ///
     /// # Arguments
     /// * `partname` - The partname (URI) of this part
     /// * `content_type` - The content type of this part
     /// * `blob` - The binary content of this part
+    #[must_use]
     pub fn new(partname: PackURI, content_type: String, blob: Vec<u8>) -> Self {
         Self::new_shared(partname, content_type, Arc::new(blob))
     }
@@ -171,6 +172,7 @@ impl BlobPart {
     /// * `partname` - The partname (URI) of this part
     /// * `content_type` - The content type of this part
     /// * `blob` - The shared binary content of this part
+    #[must_use]
     pub fn new_shared(partname: PackURI, content_type: String, blob: Arc<Vec<u8>>) -> Self {
         let rels = Relationships::for_source(&partname);
         Self {
@@ -182,6 +184,7 @@ impl BlobPart {
     }
 
     /// Load a part from raw data.
+    #[must_use]
     pub fn load(partname: PackURI, content_type: String, blob: Vec<u8>) -> Self {
         Self::new(partname, content_type, blob)
     }
@@ -228,7 +231,7 @@ impl Part for BlobPart {
 
 /// An XML part that provides parsed access to its XML content.
 ///
-/// XmlPart extends the basic Part functionality with XML parsing capabilities.
+/// `XmlPart` extends the basic Part functionality with XML parsing capabilities.
 /// It stores the raw XML as bytes and provides methods for efficient XML processing
 /// using quick-xml with zero-copy parsing where possible. Uses Arc for efficient
 /// sharing of XML data.
@@ -266,12 +269,13 @@ impl Clone for XmlPart {
 }
 
 impl XmlPart {
-    /// Create a new XmlPart.
+    /// Create a new `XmlPart`.
     ///
     /// # Arguments
     /// * `partname` - The partname (URI) of this part
     /// * `content_type` - The content type of this part
     /// * `xml_bytes` - The XML content as raw bytes
+    #[must_use]
     pub fn new(partname: PackURI, content_type: String, xml_bytes: Vec<u8>) -> Self {
         let rels = Relationships::for_source(&partname);
         Self {
@@ -288,6 +292,7 @@ impl XmlPart {
     /// Note: UTF-8 validation is deferred until actual parsing/access for performance.
     /// Invalid UTF-8 will be caught by quick-xml during parsing or by `xml_str()`.
     #[inline]
+    #[must_use]
     pub fn load(partname: PackURI, content_type: String, xml_bytes: Vec<u8>) -> Self {
         Self::new(partname, content_type, xml_bytes)
     }
@@ -296,6 +301,7 @@ impl XmlPart {
     ///
     /// Returns a quick-xml Reader configured for efficient parsing.
     /// The reader uses zero-copy parsing where possible.
+    #[must_use]
     pub fn reader(&self) -> Reader<&[u8]> {
         let mut reader = Reader::from_reader(self.xml_bytes.as_slice());
         reader.config_mut().trim_text(true);
@@ -350,7 +356,7 @@ impl XmlPart {
                     }
                 },
                 Ok(Event::Eof) => break,
-                Err(e) => return Err(OpcError::XmlError(format!("XML parse error: {}", e))),
+                Err(e) => return Err(OpcError::XmlError(format!("XML parse error: {e}"))),
                 _ => {},
             }
         }
@@ -360,7 +366,7 @@ impl XmlPart {
 
     /// Find all elements matching a tag name and extract their attributes.
     ///
-    /// Returns a vector of HashMaps, where each HashMap contains the attributes
+    /// Returns a vector of `HashMaps`, where each `HashMap` contains the attributes
     /// of one matching element. Uses efficient streaming parsing.
     pub fn find_elements_with_attrs(
         &self,
@@ -388,7 +394,7 @@ impl XmlPart {
                     results.push(attrs);
                 },
                 Ok(Event::Eof) => break,
-                Err(e) => return Err(OpcError::XmlError(format!("XML parse error: {}", e))),
+                Err(e) => return Err(OpcError::XmlError(format!("XML parse error: {e}"))),
                 _ => {},
             }
         }
@@ -449,7 +455,7 @@ impl Part for XmlPart {
 /// Factory for creating Part instances based on content type.
 ///
 /// The factory uses a type-based dispatch system to create the appropriate
-/// Part implementation (BlobPart for binary content, XmlPart for XML content).
+/// Part implementation (`BlobPart` for binary content, `XmlPart` for XML content).
 pub struct PartFactory;
 
 impl PartFactory {
@@ -487,6 +493,11 @@ impl PartFactory {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]

@@ -107,6 +107,7 @@ pub struct Binding {
 
 impl Binding {
     /// Create an empty binding for a zero-based slide index.
+    #[must_use]
     pub fn new(slide_index: usize, target: Target) -> Self {
         Self {
             slide_index,
@@ -195,6 +196,7 @@ impl Collection {
     }
 
     /// Find a binding for a slide or its notes page.
+    #[must_use]
     pub fn binding(&self, slide_index: usize, target: Target) -> Option<&Binding> {
         self.bindings
             .iter()
@@ -202,6 +204,7 @@ impl Collection {
     }
 
     /// Return whether no declarations or bindings are present.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.headers.is_empty()
             && self.footers.is_empty()
@@ -518,14 +521,14 @@ fn parse_declaration_start(
             (ResolveResult::Bound(found), b"name")
                 if found == Namespace(PRESENTATION_NAMESPACE) && name.is_none() =>
             {
-                name = Some(value)
+                name = Some(value);
             },
             (ResolveResult::Bound(found), b"source")
                 if found == Namespace(PRESENTATION_NAMESPACE)
                     && kind == DeclarationKind::DateTime
                     && source.is_none() =>
             {
-                source = Some(Source::parse(&value)?)
+                source = Some(Source::parse(&value)?);
             },
             (ResolveResult::Bound(found), b"data-style-name")
                 if found == Namespace(STYLE_NAMESPACE)
@@ -577,7 +580,7 @@ fn parse_binding(
             b"use-header-name" if value.header_name.is_none() => value.header_name = Some(decoded),
             b"use-footer-name" if value.footer_name.is_none() => value.footer_name = Some(decoded),
             b"use-date-time-name" if value.date_time_name.is_none() => {
-                value.date_time_name = Some(decoded)
+                value.date_time_name = Some(decoded);
             },
             b"use-header-name" | b"use-footer-name" | b"use-date-time-name" => {
                 return Err(invalid(

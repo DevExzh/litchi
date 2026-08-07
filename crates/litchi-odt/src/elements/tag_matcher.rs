@@ -546,10 +546,10 @@ pub fn match_tags_batch(tags: &[&[u8]]) -> Vec<(usize, Tag)> {
         .enumerate()
         .filter_map(|(idx, tag)| {
             let matched = match_tag(tag);
-            if matched != Tag::Unknown {
-                Some((idx, matched))
-            } else {
+            if matched == Tag::Unknown {
                 None
+            } else {
+                Some((idx, matched))
             }
         })
         .collect()

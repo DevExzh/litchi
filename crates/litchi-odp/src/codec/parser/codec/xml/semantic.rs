@@ -219,7 +219,7 @@ impl Parser {
                 .into_owned();
             attributes.push(DrawingAttribute::new(
                 namespace,
-                String::from_utf8(local_name.to_vec()).map_err(|_| {
+                String::from_utf8(local_name.to_vec()).map_err(|_err| {
                     Error::InvalidFormat("non-UTF-8 ODP shape attribute name".to_string())
                 })?,
                 value,
@@ -379,7 +379,7 @@ impl Parser {
             Element::TextSpace => {
                 let count = Self::get_attr(reader, element, TEXT_NAMESPACE, b"c")?
                     .map(|value| {
-                        value.parse::<usize>().map_err(|_| {
+                        value.parse::<usize>().map_err(|_err| {
                             Error::InvalidFormat(format!("invalid text:s count '{value}'"))
                         })
                     })

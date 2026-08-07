@@ -484,8 +484,7 @@ fn required(
 fn reject_attributes(values: &Attributes) -> Result<()> {
     if let Some(((namespace, local), _)) = values.iter().next() {
         return invalid(format!(
-            "unsupported stroke-dash attribute {:?}:{local}",
-            namespace
+            "unsupported stroke-dash attribute {namespace:?}:{local}"
         ));
     }
     Ok(())

@@ -1,6 +1,6 @@
 //! ODT-specific parsing utilities.
 //!
-//! This module provides parsing functionality that is specific to OpenDocument Text
+//! This module provides parsing functionality that is specific to `OpenDocument` Text
 //! documents (.odt). For generic ODF element parsing (paragraphs, tables, lists, etc.)
 //! that works across all ODF formats, see `crate::elements::parser::Parser`.
 //!

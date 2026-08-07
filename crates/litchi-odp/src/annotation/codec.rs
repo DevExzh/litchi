@@ -673,13 +673,13 @@ fn namespace(value: &ResolveResult<'_>) -> NamespaceKind {
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
-        .map_err(|_| invalid_error("presentation XML position overflow"))
+        .map_err(|_err| invalid_error("presentation XML position overflow"))
 }
 
 fn qname(value: &[u8]) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_string)
-        .map_err(|_| invalid_error("invalid presentation qualified name"))
+        .map_err(|_err| invalid_error("invalid presentation qualified name"))
 }
 
 fn invalid_error(message: impl Into<String>) -> Error {

@@ -1,4 +1,4 @@
-//! Borrowed, format-neutral OfficeArt shape objects.
+//! Borrowed, format-neutral `OfficeArt` shape objects.
 
 use bitflags::bitflags;
 
@@ -42,7 +42,7 @@ impl From<u32> for Flags {
     }
 }
 
-/// A format-neutral OfficeArt shape family.
+/// A format-neutral `OfficeArt` shape family.
 ///
 /// Host applications project `ClientData` and `ClientTextbox` records into
 /// their own richer shape enums instead of adding host-specific variants here.
@@ -64,11 +64,11 @@ pub enum Kind {
     Polygon,
     /// Shape group.
     Group,
-    /// Table group identified by OfficeArt table properties.
+    /// Table group identified by `OfficeArt` table properties.
     Table,
     /// Picture-frame primitive.
     Picture,
-    /// Other recognized OfficeArt primitive.
+    /// Other recognized `OfficeArt` primitive.
     AutoShape,
     /// Unknown or extension primitive.
     Unknown,
@@ -101,11 +101,13 @@ impl Native {
     pub const TEXT_BOX: Self = Self(202);
 
     /// Preserves a native value read from a producer or specification extension.
+    #[must_use]
     pub const fn from_raw(raw: u16) -> Self {
         Self(raw)
     }
 
     /// Returns the exact native wire value.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         self.0
     }
@@ -117,7 +119,7 @@ impl From<u16> for Native {
     }
 }
 
-/// The coordinate-space bounds carried by an OfficeArt `FSPGR` atom.
+/// The coordinate-space bounds carried by an `OfficeArt` `FSPGR` atom.
 ///
 /// The bounds define the coordinate system in which child-shape anchors are
 /// expressed. The original `Spgr` record remains available through
@@ -137,6 +139,7 @@ pub struct Bounds {
 impl Bounds {
     /// Creates group coordinate-space bounds from their four wire values.
     #[inline]
+    #[must_use]
     pub const fn new(left: i32, top: i32, right: i32, bottom: i32) -> Self {
         Self {
             left,
@@ -148,18 +151,20 @@ impl Bounds {
 
     /// Returns the checked horizontal extent.
     #[inline]
+    #[must_use]
     pub const fn width(&self) -> Option<i32> {
         self.right.checked_sub(self.left)
     }
 
     /// Returns the checked vertical extent.
     #[inline]
+    #[must_use]
     pub const fn height(&self) -> Option<i32> {
         self.bottom.checked_sub(self.top)
     }
 }
 
-/// A parsed OfficeArt shape borrowing all variable-length data from its input.
+/// A parsed `OfficeArt` shape borrowing all variable-length data from its input.
 ///
 /// The type intentionally does not implement `Clone`: callers move shape trees
 /// or borrow them through [`Shape::children`] rather than accidentally copying
@@ -183,26 +188,31 @@ pub struct Shape<'data> {
 
 impl<'data> Shape<'data> {
     /// Returns the format-neutral shape family.
+    #[must_use]
     pub const fn kind(&self) -> Kind {
         self.kind
     }
 
-    /// Returns the OfficeArt shape identifier.
+    /// Returns the `OfficeArt` shape identifier.
+    #[must_use]
     pub const fn id(&self) -> u32 {
         self.id
     }
 
     /// Returns the native `MSOSPT` value from the shape atom.
+    #[must_use]
     pub const fn native_kind(&self) -> Native {
         self.native_kind
     }
 
     /// Returns the typed flags from the shape atom.
+    #[must_use]
     pub const fn flags(&self) -> Flags {
         self.flags
     }
 
     /// Returns the primary shape property table.
+    #[must_use]
     pub const fn props(&self) -> &Props<'data> {
         &self.props
     }
@@ -218,21 +228,25 @@ impl<'data> Shape<'data> {
     ///
     /// `ClientAnchor` payloads are defined by the host application, so DOC,
     /// PPT, and XLS callers decode those through [`Shape::client_anchor`].
+    #[must_use]
     pub const fn anchor(&self) -> Option<&Anchor> {
         self.anchor.as_ref()
     }
 
     /// Returns the group coordinate system used by child-shape anchors.
+    #[must_use]
     pub const fn group_bounds(&self) -> Option<&Bounds> {
         self.group_bounds.as_ref()
     }
 
     /// Borrows child shapes without copying the tree.
+    #[must_use]
     pub fn children(&self) -> &[Shape<'data>] {
         &self.children
     }
 
     /// Returns the outer shape or shape-group container.
+    #[must_use]
     pub const fn container(&self) -> &Container<'data> {
         &self.container
     }
@@ -241,21 +255,25 @@ impl<'data> Shape<'data> {
     ///
     /// For a group this is its first `SpContainer`; for other shapes it is the
     /// same container returned by [`Shape::container`].
+    #[must_use]
     pub const fn meta(&self) -> &Container<'data> {
         &self.meta
     }
 
     /// Borrows the host `ClientData` record without interpreting it.
+    #[must_use]
     pub const fn client_data(&self) -> Option<&Record<'data>> {
         self.client_data.as_ref()
     }
 
     /// Borrows the host `ClientTextbox` record without interpreting it.
+    #[must_use]
     pub const fn textbox(&self) -> Option<&Record<'data>> {
         self.textbox.as_ref()
     }
 
     /// Borrows the host `ClientAnchor` record without interpreting it.
+    #[must_use]
     pub const fn client_anchor(&self) -> Option<&Record<'data>> {
         self.client_anchor.as_ref()
     }

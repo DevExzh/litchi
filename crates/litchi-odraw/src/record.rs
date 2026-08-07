@@ -1,8 +1,8 @@
-//! Checked, zero-copy OfficeArt record parsing.
+//! Checked, zero-copy `OfficeArt` record parsing.
 
 use crate::{Error, Result};
 
-/// The semantic kind encoded by an OfficeArt record header.
+/// The semantic kind encoded by an `OfficeArt` record header.
 ///
 /// Unknown values retain their original numeric representation so callers can
 /// inspect or round-trip records introduced by newer producers.
@@ -78,6 +78,7 @@ pub enum RecordKind {
 
 impl RecordKind {
     /// Converts a wire value into a lossless semantic kind.
+    #[must_use]
     pub const fn from_raw(raw: u16) -> Self {
         match raw {
             0xF000 => Self::DggContainer,
@@ -117,6 +118,7 @@ impl RecordKind {
     }
 
     /// Returns the canonical wire value for this kind.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         match self {
             Self::DggContainer => 0xF000,
@@ -156,6 +158,7 @@ impl RecordKind {
     }
 
     /// Returns whether records of this kind contain child records.
+    #[must_use]
     pub const fn is_container(self) -> bool {
         matches!(
             self,
@@ -169,11 +172,13 @@ impl RecordKind {
     }
 
     /// Returns whether this kind can carry text-related records.
+    #[must_use]
     pub const fn can_contain_text(self) -> bool {
         matches!(self, Self::ClientTextbox | Self::SpContainer)
     }
 
     /// Returns whether this kind stores an image BLIP.
+    #[must_use]
     pub const fn is_blip(self) -> bool {
         matches!(
             self,
@@ -200,7 +205,7 @@ impl From<RecordKind> for u16 {
     }
 }
 
-/// A checked, zero-copy view of one OfficeArt record.
+/// A checked, zero-copy view of one `OfficeArt` record.
 #[derive(Clone)]
 pub struct Record<'data> {
     kind: RecordKind,
@@ -232,7 +237,7 @@ impl<'data> Record<'data> {
         instance: u16,
         data: &'data [u8],
     ) -> Result<Self> {
-        let len = u32::try_from(data.len()).map_err(|_| Error::ArithmeticOverflow {
+        let len = u32::try_from(data.len()).map_err(|_err| Error::ArithmeticOverflow {
             context: "test record body length",
         })?;
         Ok(Self {
@@ -249,6 +254,13 @@ impl<'data> Record<'data> {
     ///
     /// The declared `recLen` is authoritative. Truncated atoms, containers, and
     /// BLIPs are all rejected rather than silently shortened.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::ArithmeticOverflow` if the offset or length arithmetic
+    /// cannot be represented, `Error::TruncatedHeader` if fewer than eight
+    /// header bytes remain at `offset`, or `Error::TruncatedPayload` if the
+    /// declared `recLen` extends past the supplied slice.
     pub fn parse(data: &'data [u8], offset: usize) -> Result<(Self, usize)> {
         let header_end = offset.checked_add(8).ok_or(Error::ArithmeticOverflow {
             context: "record header extent",
@@ -261,7 +273,7 @@ impl<'data> Record<'data> {
         let ver_inst = u16::from_le_bytes([header[0], header[1]]);
         let raw_kind = u16::from_le_bytes([header[2], header[3]]);
         let len = u32::from_le_bytes([header[4], header[5], header[6], header[7]]);
-        let body_len = usize::try_from(len).map_err(|_| Error::ArithmeticOverflow {
+        let body_len = usize::try_from(len).map_err(|_err| Error::ArithmeticOverflow {
             context: "record body length",
         })?;
         let body_end = header_end
@@ -296,51 +308,61 @@ impl<'data> Record<'data> {
     }
 
     /// Returns the semantic record kind.
+    #[must_use]
     pub const fn kind(&self) -> RecordKind {
         self.kind
     }
 
     /// Returns the exact record-kind value read from the wire.
+    #[must_use]
     pub const fn raw_kind(&self) -> u16 {
         self.raw_kind
     }
 
     /// Returns the four-bit record version.
+    #[must_use]
     pub const fn version(&self) -> u8 {
         self.version
     }
 
     /// Returns the twelve-bit record instance.
+    #[must_use]
     pub const fn instance(&self) -> u16 {
         self.instance
     }
 
     /// Returns the declared body length.
+    #[must_use]
     pub const fn len(&self) -> u32 {
         self.len
     }
 
     /// Returns whether the record body is empty.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.len == 0
     }
 
     /// Returns the borrowed body bytes.
+    #[must_use]
     pub const fn data(&self) -> &'data [u8] {
         self.data
     }
 
     /// Returns whether this record can contain child records.
+    #[must_use]
     pub const fn is_container(&self) -> bool {
         self.version == 0x0F
     }
 
     /// Returns whether this record kind can contain text.
+    #[must_use]
     pub const fn can_contain_text(&self) -> bool {
         self.kind.can_contain_text()
     }
 
     /// Returns the body offset when this record borrows from `parent`.
+    #[must_use]
     pub fn data_offset(&self, parent: &[u8]) -> Option<usize> {
         let offset = (self.data.as_ptr() as usize).checked_sub(parent.as_ptr() as usize)?;
         let end = offset.checked_add(self.data.len())?;
@@ -350,6 +372,11 @@ impl<'data> Record<'data> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]

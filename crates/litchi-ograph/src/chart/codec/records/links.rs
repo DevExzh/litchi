@@ -85,7 +85,7 @@ fn parse_refs(tokens: &[u8], record: RecordRef<'_>) -> Result<Vec<CellRef>> {
     let value = match (opcode, tokens.len()) {
         (0x1A, 7) => {
             let col = u16_at(tokens, 5, record)? & 0x3FFF;
-            let col = u8::try_from(col).map_err(|_| Error::InvalidChart {
+            let col = u8::try_from(col).ok().ok_or(Error::InvalidChart {
                 offset: record.offset(),
                 reason: "chart formula column exceeds the BIFF8 grid",
             })?;
@@ -104,11 +104,11 @@ fn parse_refs(tokens: &[u8], record: RecordRef<'_>) -> Result<Vec<CellRef>> {
                 external_sheet: u16_at(tokens, 1, record)?,
                 first_row: u16_at(tokens, 3, record)?,
                 last_row: u16_at(tokens, 5, record)?,
-                first_col: u8::try_from(first_col).map_err(|_| Error::InvalidChart {
+                first_col: u8::try_from(first_col).ok().ok_or(Error::InvalidChart {
                     offset: record.offset(),
                     reason: "chart formula column exceeds the BIFF8 grid",
                 })?,
-                last_col: u8::try_from(last_col).map_err(|_| Error::InvalidChart {
+                last_col: u8::try_from(last_col).ok().ok_or(Error::InvalidChart {
                     offset: record.offset(),
                     reason: "chart formula column exceeds the BIFF8 grid",
                 })?,
@@ -120,7 +120,7 @@ fn parse_refs(tokens: &[u8], record: RecordRef<'_>) -> Result<Vec<CellRef>> {
         return Ok(Vec::new());
     };
     let mut refs = Vec::new();
-    refs.try_reserve_exact(1).map_err(|_| Error::Allocation {
+    refs.try_reserve_exact(1).ok().ok_or(Error::Allocation {
         resource: "chart references",
     })?;
     refs.push(value);
@@ -225,10 +225,12 @@ pub(super) fn encode_link(link: &Link, context: Context, limits: Limits) -> Resu
             data.push(*source as u8);
             data.extend_from_slice(&u16::from(*unlinked_format).to_le_bytes());
             data.extend_from_slice(&number_format.to_le_bytes());
-            let length = u16::try_from(formula.len()).map_err(|_| Error::InvalidModel {
-                field: "link",
-                reason: "formula length exceeds u16",
-            })?;
+            let length = u16::try_from(formula.len())
+                .ok()
+                .ok_or(Error::InvalidModel {
+                    field: "link",
+                    reason: "formula length exceeds u16",
+                })?;
             data.extend_from_slice(&length.to_le_bytes());
             data.extend_from_slice(formula);
             Ok(data)

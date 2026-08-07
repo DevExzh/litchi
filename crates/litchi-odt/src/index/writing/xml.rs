@@ -1593,15 +1593,14 @@ fn namespace_prefixes(namespaces: &BTreeSet<String>) -> BTreeMap<String, String>
     let mut result = BTreeMap::new();
     let mut unknown = 0usize;
     for namespace in namespaces {
-        let prefix = known
-            .iter()
-            .find(|(uri, _)| *uri == namespace)
-            .map(|(_, prefix)| (*prefix).to_string())
-            .unwrap_or_else(|| {
+        let prefix = known.iter().find(|(uri, _)| *uri == namespace).map_or_else(
+            || {
                 let prefix = format!("ns{unknown}");
                 unknown += 1;
                 prefix
-            });
+            },
+            |(_, prefix)| (*prefix).to_string(),
+        );
         result.insert(namespace.clone(), prefix);
     }
     result

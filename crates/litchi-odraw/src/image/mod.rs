@@ -1,9 +1,9 @@
-//! Checked, borrowed OfficeArt BLIP stores and image records.
+//! Checked, borrowed `OfficeArt` BLIP stores and image records.
 //!
 //! This facade owns the format grammar shared by DOC, PPT, and XLS.  The
 //! implementation is layered by responsibility: [`model`] contains borrowed
 //! typed objects, [`codec`] performs wire decoding and lazy traversal, and
-//! [`validation`] enforces cross-record OfficeArt invariants.  Image payloads
+//! [`validation`] enforces cross-record `OfficeArt` invariants.  Image payloads
 //! are never decompressed or rendered here.
 
 mod codec;

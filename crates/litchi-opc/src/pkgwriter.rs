@@ -10,6 +10,7 @@ use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
 use crate::phys_pkg::PhysPkgWriter;
 use litchi_core::xml::escape_xml;
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::io::Write;
 use std::path::Path;
 
@@ -118,7 +119,7 @@ impl PackageWriter {
         Self::write_parts(physical, package)
     }
 
-    /// Write the [Content_Types].xml part.
+    /// Write the `[Content_Types].xml` part.
     ///
     /// This file maps file extensions and part names to content types.
     fn write_content_types<W: Write>(
@@ -182,7 +183,7 @@ impl PackageWriter {
     }
 }
 
-/// Helper for building [Content_Types].xml content.
+/// Helper for building `[Content_Types].xml` content.
 ///
 /// Manages Default and Override elements for content type mapping.
 struct ContentTypesItem {
@@ -194,7 +195,7 @@ struct ContentTypesItem {
 }
 
 impl ContentTypesItem {
-    /// Create a new ContentTypesItem.
+    /// Create a new `ContentTypesItem`.
     fn new() -> Result<Self> {
         let mut defaults = HashMap::new();
 
@@ -208,7 +209,7 @@ impl ContentTypesItem {
         })
     }
 
-    /// Build ContentTypesItem from an OPC package.
+    /// Build `ContentTypesItem` from an OPC package.
     fn from_package(package: &OpcPackage) -> Result<Self> {
         let mut cti = Self::new()?;
 
@@ -256,7 +257,7 @@ impl ContentTypesItem {
         )
     }
 
-    /// Generate the XML for [Content_Types].xml.
+    /// Generate the XML for `[Content_Types].xml`.
     fn to_xml(&self) -> String {
         let mut xml = String::with_capacity(4096);
 
@@ -270,11 +271,12 @@ impl ContentTypesItem {
         exts.sort();
         for ext in exts {
             let content_type = &self.defaults[ext];
-            xml.push_str(&format!(
+            let _ignored = write!(
+                xml,
                 r#"<Default Extension="{}" ContentType="{}"/>"#,
                 escape_xml(ext),
                 escape_xml(content_type.as_str())
-            ));
+            );
         }
 
         // Write Override elements (sorted by partname)
@@ -282,11 +284,12 @@ impl ContentTypesItem {
         partnames.sort();
         for partname in partnames {
             let content_type = &self.overrides[partname];
-            xml.push_str(&format!(
+            let _ignored = write!(
+                xml,
                 r#"<Override PartName="{}" ContentType="{}"/>"#,
                 escape_xml(partname),
                 escape_xml(content_type.as_str())
-            ));
+            );
         }
 
         xml.push_str("</Types>");
@@ -297,6 +300,11 @@ impl ContentTypesItem {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use std::io;
 
     use super::*;

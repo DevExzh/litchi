@@ -1,8 +1,8 @@
-//! Typed semantic models for generated OpenDocument text indexes.
+//! Typed semantic models for generated `OpenDocument` text indexes.
 
 use crate::elements::xml::TEXT_NAMESPACE;
 
-/// The seven generated-index families defined by OpenDocument Text.
+/// The seven generated-index families defined by `OpenDocument` Text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum TextIndexKind {

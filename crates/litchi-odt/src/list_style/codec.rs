@@ -159,7 +159,7 @@ fn value(
     attr: &quick_xml::events::attributes::Attribute<'_>,
 ) -> Result<String> {
     attr.decoded_and_normalized_value(version, reader.decoder())
-        .map(|value| value.into_owned())
+        .map(std::borrow::Cow::into_owned)
         .map_err(|error| bad(format!("invalid attribute value: {error}")))
 }
 
@@ -628,9 +628,9 @@ pub fn parse(xml: &str) -> Result<Styles> {
             Ok(Event::Decl(decl)) => {
                 version = decl
                     .xml_version()
-                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?
+                    .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,

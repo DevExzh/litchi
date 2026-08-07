@@ -1,7 +1,7 @@
 //! ODF XML element classes.
 //!
 //! This module provides a comprehensive set of classes for parsing and manipulating
-//! OpenDocument XML elements, inspired by odfdo/odfpy libraries.
+//! `OpenDocument` XML elements, inspired by odfdo/odfpy libraries.
 
 /// Efficient attribute parsing with SIMD acceleration
 pub mod attr_parser;

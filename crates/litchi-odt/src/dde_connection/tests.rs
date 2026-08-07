@@ -53,7 +53,7 @@ fn rejects_malformed_active_and_unresolved_connections() {
         r#"<t:dde-connection-decls><t:dde-connection-decl o:name="x" o:dde-application="a" o:dde-topic="t" o:dde-item="i" o:automatic-update="yes"/></t:dde-connection-decls>"#,
         r#"<t:dde-connection-decls><t:dde-connection-decl o:name="x" o:dde-application="a" o:dde-topic="t" o:dde-item="i">payload</t:dde-connection-decl></t:dde-connection-decls>"#,
         r#"<t:dde-connection t:connection-name="missing"/>"#,
-        r#"<t:dde-connection-decls><t:p/></t:dde-connection-decls>"#,
+        r"<t:dde-connection-decls><t:p/></t:dde-connection-decls>",
     ];
     for body in bodies {
         let xml = format!("{PREFIX}{body}{SUFFIX}");

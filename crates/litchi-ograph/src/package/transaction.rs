@@ -25,21 +25,25 @@ impl Transaction {
     }
 
     /// Immutable package source used for conflict checks and rollback.
+    #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.source
     }
 
     /// Number of typed chart operations staged in this transaction.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.editor.len()
     }
 
     /// Whether no chart payload has been staged.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.editor.is_empty()
     }
 
     /// Whether the package will differ after a successful commit.
+    #[must_use]
     pub fn is_changed(&self) -> bool {
         !self.is_empty()
     }
@@ -84,6 +88,7 @@ impl Transaction {
     }
 
     /// Discard staged operations and recover the exact source snapshot.
+    #[must_use]
     pub fn rollback(self) -> Snapshot {
         self.source
     }

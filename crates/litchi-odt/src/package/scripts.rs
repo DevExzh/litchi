@@ -565,9 +565,9 @@ fn validate_inert_xml(bytes: &[u8], allow_legacy_doctype: bool) -> Result<()> {
             },
             Event::Empty(_) if depth == 0 => roots += 1,
             Event::End(_) => {
-                depth = depth
-                    .checked_sub(1)
-                    .ok_or_else(|| Error::InvalidFormat("script XML depth underflow".to_string()))?
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("script XML depth underflow".to_string())
+                })?;
             },
             Event::DocType(value) => {
                 let declaration = value.decode().map_err(|error| {

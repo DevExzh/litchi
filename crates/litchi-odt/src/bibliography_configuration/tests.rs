@@ -39,7 +39,7 @@ fn parses_complete_bibliography_policy_and_ordered_keys() {
 
 #[test]
 fn applies_effective_defaults_and_accepts_empty_configuration() {
-    let xml = format!(r#"{PREFIX}<t:bibliography-configuration/>{SUFFIX}"#);
+    let xml = format!(r"{PREFIX}<t:bibliography-configuration/>{SUFFIX}");
     let configuration = parse_bibliography_configuration(&xml).unwrap().unwrap();
     assert!(!configuration.effective_numbered_entries());
     assert!(configuration.effective_sort_by_position());
@@ -49,12 +49,12 @@ fn applies_effective_defaults_and_accepts_empty_configuration() {
 #[test]
 fn rejects_invalid_structure_values_and_duplicates() {
     let bodies = [
-        r#"<t:p><t:bibliography-configuration/></t:p>"#,
+        r"<t:p><t:bibliography-configuration/></t:p>",
         r#"<t:bibliography-configuration t:numbered-entries="yes"/>"#,
-        r#"<t:bibliography-configuration><t:sort-key/></t:bibliography-configuration>"#,
+        r"<t:bibliography-configuration><t:sort-key/></t:bibliography-configuration>",
         r#"<t:bibliography-configuration><t:sort-key t:key="unknown"/></t:bibliography-configuration>"#,
         r#"<t:bibliography-configuration><t:sort-key t:key="author">x</t:sort-key></t:bibliography-configuration>"#,
-        r#"<t:bibliography-configuration/><t:bibliography-configuration/>"#,
+        r"<t:bibliography-configuration/><t:bibliography-configuration/>",
     ];
     for body in bodies {
         let xml = format!("{PREFIX}{body}{SUFFIX}");

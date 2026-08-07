@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "integration tests deliberately panic on unexpected parse and package failures"
+)]
+
 use litchi_odf_common::constants::ODF_TEXT;
 use litchi_odf_common::core::PackageWriter;
 use litchi_odf_formula::authoring::{self, Display, Variant};

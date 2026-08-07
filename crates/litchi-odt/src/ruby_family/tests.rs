@@ -53,10 +53,10 @@ fn parses_real_libreoffice_fixture() {
 #[test]
 fn rejects_malformed_order_namespace_and_lexicals() {
     for body in [
-        r#"<text:ruby><text:ruby-text>x</text:ruby-text><text:ruby-base>X</text:ruby-base></text:ruby>"#,
-        r#"<text:ruby><text:ruby-base>X</text:ruby-base><text:ruby-text><text:span>x</text:span></text:ruby-text></text:ruby>"#,
+        r"<text:ruby><text:ruby-text>x</text:ruby-text><text:ruby-base>X</text:ruby-base></text:ruby>",
+        r"<text:ruby><text:ruby-base>X</text:ruby-base><text:ruby-text><text:span>x</text:span></text:ruby-text></text:ruby>",
         r#"<text:ruby text:style-name="1bad"><text:ruby-base>X</text:ruby-base><text:ruby-text>x</text:ruby-text></text:ruby>"#,
-        r#"<text:ruby><text:ruby-base><text:unknown/></text:ruby-base><text:ruby-text>x</text:ruby-text></text:ruby>"#,
+        r"<text:ruby><text:ruby-base><text:unknown/></text:ruby-base><text:ruby-text>x</text:ruby-text></text:ruby>",
     ] {
         let xml = format!(
             r#"<text:p xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">{body}</text:p>"#

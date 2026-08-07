@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic on failure by design"
+)]
+
 //! Real-world packages whose archives carry items that are not OPC parts.
 //!
 //! Each case checks two things: the package opens, and the content that is
@@ -7,10 +13,10 @@
 use litchi_opc::{NonPartReason, OpcPackage, Part};
 use std::path::PathBuf;
 
-/// Content type of the WordprocessingML main document part.
+/// Content type of the `WordprocessingML` main document part.
 const WML_DOCUMENT_MAIN: &str =
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
-/// Content type of the SpreadsheetML workbook part.
+/// Content type of the `SpreadsheetML` workbook part.
 const SML_SHEET_MAIN: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
 

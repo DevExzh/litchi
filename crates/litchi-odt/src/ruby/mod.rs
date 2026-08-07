@@ -1,4 +1,4 @@
-//! Semantic parsing of OpenDocument ruby annotations.
+//! Semantic parsing of `OpenDocument` ruby annotations.
 
 mod codec;
 mod model;

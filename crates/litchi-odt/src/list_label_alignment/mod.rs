@@ -1,7 +1,7 @@
 //! ODF 1.2/1.3 list-level label alignment.
 //!
 //! The public owner facade keeps the contextual list-alignment vocabulary at
-//! list_label_alignment, while models, XML codecs, and package adapters live
+//! `list_label_alignment`, while models, XML codecs, and package adapters live
 //! in their respective layers.
 
 mod codec;

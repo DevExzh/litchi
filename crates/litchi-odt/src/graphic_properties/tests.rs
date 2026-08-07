@@ -30,7 +30,7 @@ fn every_normative_property_kind_round_trips() {
     );
     let fragment = value.to_xml_fragment().unwrap();
     assert_eq!(Properties::from_xml_fragment(&fragment).unwrap(), value);
-    assert_eq!(value.iter().count(), 174)
+    assert_eq!(value.iter().count(), 174);
 }
 #[test]
 fn parses_real_odfdo_fixture_values() {
@@ -45,7 +45,7 @@ fn parses_real_odfdo_fixture_values() {
     assert_eq!(
         value.get(Kind::FoClip).unwrap().lexical(),
         "rect(0cm, 0cm, 0cm, 0cm)"
-    )
+    );
 }
 #[test]
 fn lossless_replace_insert_remove() {
@@ -63,7 +63,7 @@ fn lossless_replace_insert_remove() {
     let removed =
         set_graphic_style_properties_xml(&restored, &Style::named("b", None).unwrap()).unwrap();
     assert!(!removed.contains("draw:fill=\"none\""));
-    assert!(removed.contains("<!--keep-->"))
+    assert!(removed.contains("<!--keep-->"));
 }
 #[test]
 fn rejects_malformed_and_capped_input() {
@@ -77,16 +77,16 @@ fn rejects_malformed_and_capped_input() {
         assert!(
             parse_graphic_style_properties(&doc(body)).is_err(),
             "accepted {body}"
-        )
+        );
     }
     let huge = "x".repeat(MAX_VALUE + 1);
     assert!(Property::new(Kind::DrawStrokeDash, &huge).is_err());
     let mut attributes = String::new();
     for index in 0..=MAX_ATTRIBUTES {
-        attributes.push_str(&format!(" x:a{index}=\"1\""))
+        attributes.push_str(&format!(" x:a{index}=\"1\""));
     }
     let xml = doc(&format!(
         r#"<style:style style:name="a" style:family="graphic"><style:graphic-properties xmlns:x="urn:x"{attributes}/></style:style>"#
     ));
-    assert!(parse_graphic_style_properties(&xml).is_err())
+    assert!(parse_graphic_style_properties(&xml).is_err());
 }

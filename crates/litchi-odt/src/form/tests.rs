@@ -41,7 +41,7 @@ fn accepts_expanded_empty_listener_and_rejects_active_or_malformed_content() {
         r#"<o:event-listeners><s:event-listener s:event-name="" s:language="none"/></o:event-listeners>"#,
         r#"<o:event-listeners><s:event-listener s:event-name="x" s:language="none" x:type="extended"/></o:event-listeners>"#,
         r#"<o:event-listeners><s:event-listener s:event-name="x" s:language="none"><f:property/></s:event-listener></o:event-listeners>"#,
-        r#"<o:event-listeners>active text</o:event-listeners>"#,
+        r"<o:event-listeners>active text</o:event-listeners>",
     ] {
         let xml = format!("{PREFIX}{body}{SUFFIX}");
         assert!(

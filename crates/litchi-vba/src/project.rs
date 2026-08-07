@@ -16,32 +16,35 @@ const VERSION_PROJECT_HEADER_BYTES: usize = 7;
 #[derive(Debug, PartialEq, Eq)]
 pub struct Text {
     raw: Vec<u8>,
-    text: String,
+    decoded: String,
     had_decode_errors: bool,
 }
 
 impl Text {
     /// Original bytes after decompression, before character decoding.
+    #[must_use]
     pub fn raw(&self) -> &[u8] {
         &self.raw
     }
 
     /// Text decoded with the project's declared code page.
+    #[must_use]
     pub fn text(&self) -> &str {
-        &self.text
+        &self.decoded
     }
 
     /// Whether malformed byte sequences were replaced while decoding.
+    #[must_use]
     pub fn had_decode_errors(&self) -> bool {
         self.had_decode_errors
     }
 
     fn decode(raw: Vec<u8>, page: Mbcs) -> Self {
-        let (text, had_decode_errors) = page.recover(&raw);
-        let text = text.into_owned();
+        let (decoded, had_decode_errors) = page.recover(&raw);
+        let decoded = decoded.into_owned();
         Self {
             raw,
-            text,
+            decoded,
             had_decode_errors,
         }
     }
@@ -61,36 +64,43 @@ pub struct Module {
 
 impl Module {
     /// VBA identifier for this module.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// CFB stream containing this module.
+    #[must_use]
     pub fn stream_name(&self) -> &str {
         &self.stream_name
     }
 
     /// Byte offset at which compressed source begins in the module stream.
+    #[must_use]
     pub fn text_offset(&self) -> u32 {
         self.text_offset
     }
 
     /// Broad module category from the `dir` stream.
+    #[must_use]
     pub fn kind(&self) -> Kind {
         self.kind
     }
 
     /// Whether this module is marked read-only.
+    #[must_use]
     pub fn is_read_only(&self) -> bool {
         self.read_only
     }
 
     /// Whether this module is private to its project.
+    #[must_use]
     pub fn is_private(&self) -> bool {
         self.private
     }
 
     /// Decompressed, inert module source.
+    #[must_use]
     pub fn source(&self) -> &Text {
         &self.source
     }
@@ -99,10 +109,10 @@ impl Module {
 /// A complete inert VBA project loaded from a CFB project-root storage.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Project {
-    project_root_path: Vec<String>,
+    root_path: Vec<String>,
     page: Mbcs,
     name: String,
-    project_properties: Text,
+    properties: Text,
     modules: Vec<Module>,
 }
 
@@ -110,6 +120,11 @@ impl Project {
     /// Parse a standalone `vbaProject.bin` payload with safe default limits.
     ///
     /// The CFB bytes are borrowed and never copied.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload is not a readable CFB file, the project
+    /// structures are malformed, or the default resource limits are exceeded.
     pub fn read(bytes: &[u8]) -> Result<Self, Error> {
         Self::read_with(bytes, &Limits::default())
     }
@@ -119,6 +134,11 @@ impl Project {
     /// This is the container-independent entry point for OOXML hosts. The
     /// borrowed payload is retained only for the duration of parsing; the
     /// returned project owns its bounded semantic metadata and inert source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload is not a readable CFB file, the project
+    /// structures are malformed, or `limits` are exceeded.
     pub fn read_with(bytes: &[u8], limits: &Limits) -> Result<Self, Error> {
         check_limit(
             "standalone VBA CFB bytes",
@@ -135,6 +155,11 @@ impl Project {
     /// CFB root and this path is empty. Legacy Excel normally passes
     /// `["_VBA_PROJECT_CUR"]`; other hosts use the storage discovered from
     /// their CFB directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if required streams are missing from `ole`, the
+    /// project structures are malformed, or `limits` are exceeded.
     pub fn open<R: Read + Seek>(
         ole: &mut OleFile<R>,
         project_root_path: &[&str],
@@ -171,8 +196,9 @@ impl Project {
             module_path.extend([VBA_STORAGE_NAME, metadata.stream_name()]);
             let stream =
                 read_limited_stream(ole, &module_path, limits.max_compressed_stream_bytes)?;
-            let text_offset = usize::try_from(metadata.text_offset())
-                .map_err(|_| invalid("module text offset does not fit usize"))?;
+            let Ok(text_offset) = usize::try_from(metadata.text_offset()) else {
+                return Err(invalid("module text offset does not fit usize"));
+            };
             let compressed_source = stream.get(text_offset..).ok_or_else(|| {
                 invalid(format!(
                     "module {} text offset {} exceeds stream size {}",
@@ -202,43 +228,49 @@ impl Project {
         }
 
         Ok(Self {
-            project_root_path: project_root_path
+            root_path: project_root_path
                 .iter()
                 .map(|component| (*component).to_owned())
                 .collect(),
             page,
             name: directory.project_name().to_owned(),
-            project_properties,
+            properties: project_properties,
             modules,
         })
     }
 
     /// CFB path of the MS-OVBA project root.
+    #[must_use]
     pub fn project_root_path(&self) -> &[String] {
-        &self.project_root_path
+        &self.root_path
     }
 
     /// Checked project page used to decode MBCS text.
+    #[must_use]
     pub fn page(&self) -> Mbcs {
         self.page
     }
 
     /// Numeric project-page identifier.
+    #[must_use]
     pub fn page_id(&self) -> u16 {
         self.page.id16()
     }
 
     /// VBA project identifier.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Decoded text of the uncompressed `PROJECT` stream.
+    #[must_use]
     pub fn project_properties(&self) -> &Text {
-        &self.project_properties
+        &self.properties
     }
 
     /// Modules in `dir`-stream order.
+    #[must_use]
     pub fn modules(&self) -> &[Module] {
         &self.modules
     }
@@ -258,8 +290,9 @@ fn read_limited_stream<R: Read + Seek>(
         .into_iter()
         .find(|entry| entry.name.eq_ignore_ascii_case(stream_name))
         .ok_or(OleError::StreamNotFound)?;
-    let size =
-        usize::try_from(entry.size).map_err(|_| invalid("VBA stream size does not fit usize"))?;
+    let Ok(size) = usize::try_from(entry.size) else {
+        return Err(invalid("VBA stream size does not fit usize"));
+    };
     check_limit("VBA CFB stream bytes", size, maximum)?;
     let stream = ole.open_stream(path)?;
     check_limit("VBA CFB stream bytes", stream.len(), maximum)?;
@@ -268,13 +301,19 @@ fn read_limited_stream<R: Read + Seek>(
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test fixtures and assertions panic intentionally on failure"
+    )]
+
     use super::*;
     use litchi_cfb::OleWriter;
     use std::io::Cursor;
 
     fn push_record(bytes: &mut Vec<u8>, id: u16, value: &[u8]) {
         bytes.extend_from_slice(&id.to_le_bytes());
-        bytes.extend_from_slice(&(value.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&u32::try_from(value.len()).unwrap().to_le_bytes());
         bytes.extend_from_slice(value);
     }
 
@@ -282,7 +321,7 @@ mod tests {
         push_record(bytes, id, value.as_bytes());
         bytes.extend_from_slice(&reserved.to_le_bytes());
         let unicode: Vec<u8> = value.encode_utf16().flat_map(u16::to_le_bytes).collect();
-        bytes.extend_from_slice(&(unicode.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&u32::try_from(unicode.len()).unwrap().to_le_bytes());
         bytes.extend_from_slice(&unicode);
     }
 
@@ -458,9 +497,9 @@ mod tests {
     fn version_stream_requires_header_but_ignores_header_values_and_cache() {
         for version_stream in [None, Some(&[1, 2, 3, 4, 5, 6][..])] {
             let mut writer = OleWriter::new();
-            if let Some(version_stream) = version_stream {
+            if let Some(stream_bytes) = version_stream {
                 writer
-                    .create_stream(&["VBA", "_VBA_PROJECT"], version_stream)
+                    .create_stream(&["VBA", "_VBA_PROJECT"], stream_bytes)
                     .unwrap();
             }
             let mut cursor = Cursor::new(Vec::new());

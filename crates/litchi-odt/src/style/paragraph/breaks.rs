@@ -39,11 +39,9 @@ const MAX_LINE_NUMBER: u64 = 1_000_000_000;
 fn owned_attribute(namespace: Ns, local: &[u8]) -> bool {
     matches!(
         (namespace, local),
-        (Ns::Fo, b"break-before")
-            | (Ns::Fo, b"break-after")
+        (Ns::Fo, b"break-before" | b"break-after")
             | (Ns::Style, b"page-number")
-            | (Ns::Text, b"number-lines")
-            | (Ns::Text, b"line-number")
+            | (Ns::Text, b"number-lines" | b"line-number")
     )
 }
 
@@ -286,7 +284,7 @@ fn attribute_value(
 ) -> Result<String> {
     attribute
         .decoded_and_normalized_value(version, reader.decoder())
-        .map(|value| value.into_owned())
+        .map(std::borrow::Cow::into_owned)
         .map_err(|error| bad(format!("invalid attribute value: {error}")))
 }
 
@@ -502,7 +500,7 @@ pub fn parse(xml: &str) -> Result<Styles> {
                     .xml_version()
                     .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,
@@ -729,7 +727,7 @@ pub fn set_xml(xml: &str, requested: &Style) -> Result<String> {
                     .xml_version()
                     .map_err(|error| bad(format!("unsupported XML version: {error}")))?;
             },
-            Ok(Event::DocType(_)) | Ok(Event::PI(_)) => {
+            Ok(Event::DocType(_) | Event::PI(_)) => {
                 return Err(bad("DTD and processing instructions are not allowed"));
             },
             Ok(Event::Eof) => break,

@@ -614,9 +614,7 @@ pub(super) fn parse_part(
             },
             Event::End(_) => {
                 if let Some(pending_declaration) = pending.take() {
-                    if pending_declaration.depth != depth {
-                        pending = Some(pending_declaration);
-                    } else {
+                    if pending_declaration.depth == depth {
                         let group = active
                             .as_mut()
                             .ok_or_else(|| invalid("orphan declaration"))?;
@@ -628,6 +626,8 @@ pub(super) fn parse_part(
                             part,
                             declaration_count,
                         )?;
+                    } else {
+                        pending = Some(pending_declaration);
                     }
                 }
                 if active.as_ref().is_some_and(|group| group.depth == depth) {
@@ -748,14 +748,12 @@ fn add_declaration(
         name: name.clone(),
     }) {
         return Err(invalid(format!(
-            "ODF {:?} variable '{name}' is declared after its use",
-            kind
+            "ODF {kind:?} variable '{name}' is declared after its use"
         )));
     }
     if !names.insert((kind, name.clone())) {
         return Err(invalid(format!(
-            "duplicate ODF {:?} variable declaration '{name}'",
-            kind
+            "duplicate ODF {kind:?} variable declaration '{name}'"
         )));
     }
     *declaration_count += 1;

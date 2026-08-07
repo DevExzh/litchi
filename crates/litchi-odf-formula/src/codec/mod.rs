@@ -1,4 +1,4 @@
-//! Bounded MathML parsing and canonical XML serialization.
+//! Bounded `MathML` parsing and canonical XML serialization.
 
 mod parser;
 pub(crate) mod serialize;

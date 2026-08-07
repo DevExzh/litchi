@@ -7,7 +7,7 @@
 //! - [`chart`] discovers standalone and Excel-hosted chart substreams;
 //! - [`chart::Editor`] provides bounded, source-checked cache, chart-area, and
 //!   fixed-metadata patches;
-//! - [`PackageRef`] and [`Package`] validate standalone OGraph compound files.
+//! - [`PackageRef`] and [`Package`] validate standalone `OGraph` compound files.
 //!
 //! Parsing preserves record order, unknown records, reserved bits, and unused
 //! bytes. Editing hosts such as XLS and PPT remain responsible for their own

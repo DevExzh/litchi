@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions panic by design"
+)]
+
 use std::io::Cursor;
 
 use litchi_biff::{Encoder, Kind, Records};

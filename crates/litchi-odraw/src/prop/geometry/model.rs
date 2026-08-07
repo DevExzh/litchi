@@ -1,6 +1,6 @@
 use super::super::model::Array;
 
-/// One coordinate in OfficeArt geometry space.
+/// One coordinate in `OfficeArt` geometry space.
 ///
 /// Values in the `0x80000000..=0x8000007F` range are guide references rather
 /// than literal coordinates.  Keeping that distinction typed prevents a
@@ -15,6 +15,7 @@ pub enum Coordinate {
 
 impl Coordinate {
     /// Decodes the coordinate marker defined by `[MS-ODRAW]` section 2.3.6.7.
+    #[must_use]
     pub const fn from_raw(raw: i32) -> Self {
         let bits = raw as u32;
         if bits >= 0x8000_0000 && bits <= 0x8000_007F {
@@ -25,6 +26,7 @@ impl Coordinate {
     }
 
     /// Returns the exact signed wire value represented by this coordinate.
+    #[must_use]
     pub const fn raw(self) -> i32 {
         match self {
             Self::Value(value) => value,
@@ -33,6 +35,7 @@ impl Coordinate {
     }
 
     /// Returns the guide index when this coordinate is guide-driven.
+    #[must_use]
     pub const fn guide(self) -> Option<u8> {
         match self {
             Self::Guide(index) => Some(index),
@@ -41,7 +44,7 @@ impl Coordinate {
     }
 }
 
-/// A typed `POINT` from an OfficeArt geometry array.
+/// A typed `POINT` from an `OfficeArt` geometry array.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Point {
     x: Coordinate,
@@ -50,21 +53,25 @@ pub struct Point {
 
 impl Point {
     /// Creates a point from typed geometry-space coordinates.
+    #[must_use]
     pub const fn new(x: Coordinate, y: Coordinate) -> Self {
         Self { x, y }
     }
 
     /// Returns the x-coordinate.
+    #[must_use]
     pub const fn x(self) -> Coordinate {
         self.x
     }
 
     /// Returns the y-coordinate.
+    #[must_use]
     pub const fn y(self) -> Coordinate {
         self.y
     }
 
     /// Returns the exact pair of signed wire coordinates.
+    #[must_use]
     pub const fn raw(self) -> (i32, i32) {
         (self.x.raw(), self.y.raw())
     }
@@ -97,6 +104,7 @@ pub enum PathKind {
 
 impl PathKind {
     /// Decodes an `MSOSHAPEPATH` value without discarding extensions.
+    #[must_use]
     pub const fn from_raw(raw: u32) -> Self {
         match raw {
             0 => Self::Lines,
@@ -109,6 +117,7 @@ impl PathKind {
     }
 
     /// Returns the exact wire enumeration value.
+    #[must_use]
     pub const fn raw(self) -> u32 {
         match self {
             Self::Lines => 0,
@@ -144,6 +153,7 @@ pub enum Instruction {
 
 impl Instruction {
     /// Returns the three-bit path-type value.
+    #[must_use]
     pub const fn raw(self) -> u8 {
         match self {
             Self::LineTo => 0,
@@ -158,6 +168,7 @@ impl Instruction {
     }
 
     /// Returns the escape code when this instruction carries one.
+    #[must_use]
     pub const fn escape(self) -> Option<EscapeKind> {
         match self {
             Self::Escape(value) | Self::ClientEscape(value) => Some(value),
@@ -221,6 +232,7 @@ pub enum EscapeKind {
 
 impl EscapeKind {
     /// Decodes an `MSOPATHESCAPE` value without discarding extensions.
+    #[must_use]
     pub const fn from_raw(raw: u8) -> Self {
         match raw {
             0 => Self::Extension,
@@ -251,6 +263,7 @@ impl EscapeKind {
     }
 
     /// Returns the exact five-bit escape code.
+    #[must_use]
     pub const fn raw(self) -> u8 {
         match self {
             Self::Extension => 0,
@@ -316,6 +329,7 @@ pub struct PathInfo {
 
 impl PathInfo {
     /// Decodes the exact 16-bit `MSOPATHINFO` value.
+    #[must_use]
     pub const fn from_raw(raw: u16) -> Self {
         let kind = (raw & 0x0007) as u8;
         let instruction = match kind {
@@ -341,16 +355,19 @@ impl PathInfo {
     }
 
     /// Returns the typed path instruction.
+    #[must_use]
     pub const fn instruction(self) -> Instruction {
         self.instruction
     }
 
     /// Returns the number of segments encoded by this element.
+    #[must_use]
     pub const fn segments(self) -> u16 {
         self.segments
     }
 
     /// Returns the exact wire element.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         self.raw
     }
@@ -397,10 +414,9 @@ impl Iterator for Points<'_> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self
-            .array
-            .map(|array| usize::from(array.element_count()).saturating_sub(self.index))
-            .unwrap_or(0);
+        let remaining = self.array.map_or(0, |array| {
+            usize::from(array.element_count()).saturating_sub(self.index)
+        });
         (remaining, Some(remaining))
     }
 }
@@ -432,10 +448,9 @@ impl Iterator for PathInfos<'_> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self
-            .array
-            .map(|array| usize::from(array.element_count()).saturating_sub(self.index))
-            .unwrap_or(0);
+        let remaining = self.array.map_or(0, |array| {
+            usize::from(array.element_count()).saturating_sub(self.index)
+        });
         (remaining, Some(remaining))
     }
 }
@@ -464,21 +479,25 @@ impl<'data> Geometry<'data> {
     }
 
     /// Returns the `shapePath` semantic value.
+    #[must_use]
     pub const fn path_kind(self) -> PathKind {
         self.shape_path
     }
 
     /// Iterates over typed vertices without allocating or copying the array.
+    #[must_use]
     pub const fn vertices(self) -> Points<'data> {
         Points::new(self.vertices)
     }
 
     /// Iterates over typed path instructions without allocating or copying.
+    #[must_use]
     pub const fn segment_info(self) -> PathInfos<'data> {
         PathInfos::new(self.segment_info)
     }
 
     /// Returns the number of vertices in the geometry.
+    #[must_use]
     pub fn vertex_count(self) -> usize {
         match self.vertices {
             Some(array) => usize::from(array.element_count()),
@@ -487,6 +506,7 @@ impl<'data> Geometry<'data> {
     }
 
     /// Returns the number of path-info instructions.
+    #[must_use]
     pub fn segment_count(self) -> usize {
         match self.segment_info {
             Some(array) => usize::from(array.element_count()),
@@ -495,6 +515,7 @@ impl<'data> Geometry<'data> {
     }
 
     /// Returns the exact encoded vertex array, including its `IMsoArray` header.
+    #[must_use]
     pub fn raw_vertices(self) -> Option<&'data [u8]> {
         match self.vertices {
             Some(array) => Some(array.raw_data()),
@@ -503,6 +524,7 @@ impl<'data> Geometry<'data> {
     }
 
     /// Returns the exact encoded path-info array, including its `IMsoArray` header.
+    #[must_use]
     pub fn raw_segment_info(self) -> Option<&'data [u8]> {
         match self.segment_info {
             Some(array) => Some(array.raw_data()),

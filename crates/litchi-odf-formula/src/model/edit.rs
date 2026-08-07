@@ -1,4 +1,4 @@
-//! Mutation support for the inert MathML element tree.
+//! Mutation support for the inert `MathML` element tree.
 //!
 //! These methods keep the tree well-formed by construction: element and
 //! attribute names are validated as XML names and expanded attributes stay
@@ -9,30 +9,15 @@
 use super::{Attribute, Content, Element, MATHML_NAMESPACE};
 use litchi_core::{Error, Result};
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
-}
-
-/// Validate an XML element or attribute local name (NCName subset).
-fn validate_name(name: &str, kind: &str) -> Result<()> {
-    let mut characters = name.chars();
-    let Some(first) = characters.next() else {
-        return Err(invalid(format!("MathML {kind} name is empty")));
-    };
-    if !(first.is_alphabetic() || first == '_')
-        || !characters
-            .all(|character| character.is_alphanumeric() || matches!(character, '_' | '-' | '.'))
-    {
-        return Err(invalid(format!("invalid MathML {kind} name '{name}'")));
-    }
-    Ok(())
-}
-
 impl Element {
     /// Create an empty MathML-namespace element.
     ///
     /// The local name is validated so the tree always serializes to
     /// well-formed XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `local_name` is not a valid XML name.
     pub fn new(local_name: &str) -> Result<Self> {
         Self::with_namespace(Some(MATHML_NAMESPACE), local_name)
     }
@@ -40,6 +25,11 @@ impl Element {
     /// Create an empty element in an explicit namespace.
     ///
     /// Names are validated so the tree always serializes to well-formed XML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `local_name` is not a valid XML name or the
+    /// namespace URI is empty.
     pub fn with_namespace(namespace_uri: Option<&str>, local_name: &str) -> Result<Self> {
         validate_name(local_name, "element")?;
         if namespace_uri.is_some_and(str::is_empty) {
@@ -54,6 +44,11 @@ impl Element {
     }
 
     /// Set or replace an attribute by expanded name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `local_name` is not a valid XML name or the
+    /// namespace URI is empty.
     pub fn set_attribute(
         &mut self,
         namespace_uri: Option<&str>,
@@ -87,8 +82,8 @@ impl Element {
         let position = self.attributes().iter().position(|attribute| {
             attribute.namespace_uri() == namespace_uri && attribute.local_name() == local_name
         });
-        if let Some(position) = position {
-            self.attributes_mut().remove(position);
+        if let Some(index) = position {
+            self.attributes_mut().remove(index);
             true
         } else {
             false
@@ -116,6 +111,10 @@ impl Element {
     ///
     /// Text runs do not count toward the index. Returns an error when the
     /// index exceeds the current child-element count.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `index` exceeds the current child-element count.
     pub fn insert_child(&mut self, index: usize, child: Element) -> Result<()> {
         let position = self
             .content()
@@ -126,7 +125,9 @@ impl Element {
             })
             .nth(index);
         match position {
-            Some(position) => self.content_mut().insert(position, Content::Element(child)),
+            Some(content_position) => self
+                .content_mut()
+                .insert(content_position, Content::Element(child)),
             None if index == self.children().count() => {
                 self.content_mut().push(Content::Element(child));
             },
@@ -156,10 +157,15 @@ impl Element {
     }
 
     /// Replace the child element at `index`, returning the old element.
+    ///
+    /// # Panics
+    ///
+    /// Panics only on an internal invariant violation: reinsertion at the
+    /// just-vacated index cannot fail.
     pub fn replace_child(&mut self, index: usize, child: Element) -> Option<Element> {
         let removed = self.remove_child(index)?;
         self.insert_child(index, child)
-            .expect("removal vacated the index");
+            .unwrap_or_else(|_| unreachable!("removal vacated the index"));
         Some(removed)
     }
 
@@ -173,7 +179,27 @@ impl Element {
     /// MathML-namespace elements share the default namespace declared on the
     /// subtree root; foreign namespaces receive generated `ns1..nsN`
     /// prefixes in first-use order.
+    #[must_use]
     pub fn to_xml(&self) -> String {
         crate::codec::serialize::write_mathml(self)
     }
+}
+
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidFormat(message.into())
+}
+
+/// Validate an XML element or attribute local name (`NCName` subset).
+fn validate_name(name: &str, kind: &str) -> Result<()> {
+    let mut characters = name.chars();
+    let Some(first) = characters.next() else {
+        return Err(invalid(format!("MathML {kind} name is empty")));
+    };
+    if !(first.is_alphabetic() || first == '_')
+        || !characters
+            .all(|character| character.is_alphanumeric() || matches!(character, '_' | '-' | '.'))
+    {
+        return Err(invalid(format!("invalid MathML {kind} name '{name}'")));
+    }
+    Ok(())
 }

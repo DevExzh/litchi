@@ -5,7 +5,7 @@ use crate::variable_declaration::{Body, Part, Scope};
 use litchi_core::Result;
 
 const CONTENT_PREFIX: &str = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><o:body><o:text>"#;
-const CONTENT_SUFFIX: &str = r#"</o:text></o:body></o:document-content>"#;
+const CONTENT_SUFFIX: &str = r"</o:text></o:body></o:document-content>";
 
 fn parse(content: &str) -> Result<Vec<AlphabeticalIndexAutoMarkFile>> {
     let xml = format!("{CONTENT_PREFIX}{content}{CONTENT_SUFFIX}");

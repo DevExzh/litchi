@@ -1,28 +1,6 @@
-//! Checked OfficeArt record writing primitives and builders.
+//! Checked `OfficeArt` record writing primitives and builders.
 
-use std::{
-    borrow::Cow,
-    io::{self, Write},
-};
-
-use zerocopy::{
-    IntoBytes as _,
-    byteorder::little_endian::{U16 as LeU16, U32 as LeU32},
-};
-use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
-
-use crate::{
-    Limits, Record, RecordKind,
-    prop::Id,
-    shape::{Flags, Native},
-};
-
-/// Property flag indicating that a simple value is a BLIP-store identifier.
-pub const BLIP_ID: u16 = 0x4000;
-/// Property flag indicating that bytes follow the fixed property table.
-pub const COMPLEX: u16 = 0x8000;
-
-/// Frequently used OfficeArt property values.
+/// Frequently used `OfficeArt` property values.
 pub mod prop_value {
     /// Scheme-color marker.
     pub const SCHEME_COLOR: u32 = 0x0800_0000;
@@ -48,7 +26,7 @@ pub mod prop_value {
     pub const SHADOW_STYLE_ENABLED: u32 = 0x0002_0002;
 }
 
-/// Canonical OfficeArt record identifiers.
+/// Canonical `OfficeArt` record identifiers.
 pub mod record_type {
     use crate::RecordKind;
 
@@ -81,7 +59,29 @@ pub mod shape_type {
     pub const TEXT_BOX: u16 = Native::TEXT_BOX.raw();
 }
 
-/// A validated OfficeArt extension record type.
+use std::{
+    borrow::Cow,
+    io::{self, Write},
+};
+
+use zerocopy::{
+    IntoBytes as _,
+    byteorder::little_endian::{U16 as LeU16, U32 as LeU32},
+};
+use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
+
+use crate::{
+    Limits, Record, RecordKind,
+    prop::Id,
+    shape::{Flags, Native},
+};
+
+/// Property flag indicating that a simple value is a BLIP-store identifier.
+pub const BLIP_ID: u16 = 0x4000;
+/// Property flag indicating that bytes follow the fixed property table.
+pub const COMPLEX: u16 = 0x8000;
+
+/// A validated `OfficeArt` extension record type.
 ///
 /// Known record types have dedicated variants on [`Atom`] or [`Container`];
 /// this route preserves future record types without permitting callers to
@@ -92,6 +92,11 @@ pub struct Ext(u16);
 
 impl Ext {
     /// Validates an extension record type in the OfficeArt-reserved range.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `raw` is below 0xF000 or if it names a known
+    /// `OfficeArt` record type that has a dedicated typed variant.
     pub fn new(raw: u16) -> io::Result<Self> {
         if raw < 0xF000 {
             return Err(invalid_input("OfficeArt record type is below 0xF000"));
@@ -105,12 +110,13 @@ impl Ext {
     }
 
     /// Returns the exact extension wire value.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         self.0
     }
 }
 
-/// A typed OfficeArt atom kind with its required record version.
+/// A typed `OfficeArt` atom kind with its required record version.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Atom {
     /// File drawing-group atom.
@@ -178,6 +184,11 @@ pub enum Atom {
 
 impl Atom {
     /// Creates a lossless future atom while rejecting known kinds and version 15.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `raw` is rejected by `Ext::new` or if `version` is
+    /// 15 or above, which is reserved for container records.
     pub fn unknown(raw: u16, version: u8) -> io::Result<Self> {
         let atom = Self::Unknown {
             kind: Ext::new(raw)?,
@@ -188,6 +199,7 @@ impl Atom {
     }
 
     /// Returns the exact record-type wire value.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         match self {
             Self::Dgg => 0xF006,
@@ -222,6 +234,7 @@ impl Atom {
     }
 
     /// Returns the required record version.
+    #[must_use]
     pub const fn version(self) -> u8 {
         match self {
             Self::Bse | Self::Sp => 2,
@@ -260,7 +273,7 @@ impl Atom {
     }
 }
 
-/// A typed OfficeArt container kind.
+/// A typed `OfficeArt` container kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Container {
     /// File drawing-group container.
@@ -290,6 +303,7 @@ impl Container {
     }
 
     /// Returns the exact record-type wire value.
+    #[must_use]
     pub const fn raw(self) -> u16 {
         match self {
             Self::Dgg => 0xF000,
@@ -305,7 +319,7 @@ impl Container {
     }
 }
 
-/// An endian-stable eight-byte OfficeArt record header.
+/// An endian-stable eight-byte `OfficeArt` record header.
 #[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
 #[repr(C)]
 pub struct Header {
@@ -315,11 +329,12 @@ pub struct Header {
 }
 
 impl Header {
-    /// Constructs a raw header while applying the OfficeArt bit-field masks.
+    /// Constructs a raw header while applying the `OfficeArt` bit-field masks.
     ///
     /// This constructor is intentionally infallible for low-level replay and
     /// fixture builders. Checked typed constructors remain available through
     /// [`Header::atom`] and [`Header::container`].
+    #[must_use]
     pub const fn new(version: u8, instance: u16, raw_kind: u16, len: u32) -> Self {
         let ver_inst = ((version as u16) & 0x000F) | ((instance & 0x0FFF) << 4);
         Self {
@@ -350,26 +365,31 @@ impl Header {
     }
 
     /// Returns the four-bit version.
+    #[must_use]
     pub fn version(self) -> u8 {
         (self.ver_inst.get() & 0x0F) as u8
     }
 
     /// Returns the twelve-bit instance.
+    #[must_use]
     pub fn instance(self) -> u16 {
         self.ver_inst.get() >> 4
     }
 
     /// Returns the record-kind wire value.
+    #[must_use]
     pub fn kind(self) -> RecordKind {
         RecordKind::from_raw(self.kind.get())
     }
 
     /// Returns the declared payload length.
+    #[must_use]
     pub fn len(self) -> u32 {
         self.len.get()
     }
 
     /// Returns whether the declared payload is empty.
+    #[must_use]
     pub fn is_empty(self) -> bool {
         self.len() == 0
     }
@@ -385,6 +405,7 @@ pub struct Sp {
 
 impl Sp {
     /// Creates a shape payload from typed flags.
+    #[must_use]
     pub const fn new(id: u32, flags: Flags) -> Self {
         Self {
             id: LeU32::new(id),
@@ -393,26 +414,31 @@ impl Sp {
     }
 
     /// Creates a shape payload using the historical builder vocabulary.
+    #[must_use]
     pub const fn with_flags(id: u32, flags: Flags) -> Self {
         Self::new(id, flags)
     }
 
     /// Creates a group patriarch shape payload.
+    #[must_use]
     pub const fn group_patriarch(id: u32) -> Self {
         Self::new(id, Flags::GROUP.union(Flags::PATRIARCH))
     }
 
     /// Creates a background shape payload.
+    #[must_use]
     pub const fn background(id: u32) -> Self {
         Self::new(id, Flags::BACKGROUND.union(Flags::HAVE_SPT))
     }
 
     /// Returns the shape identifier.
+    #[must_use]
     pub fn id(self) -> u32 {
         self.id.get()
     }
 
     /// Returns all shape flag bits, retaining producer extensions.
+    #[must_use]
     pub fn flags(self) -> Flags {
         Flags::from_bits_retain(self.flags.get())
     }
@@ -428,6 +454,7 @@ pub struct Property {
 
 impl Property {
     /// Creates a raw property-table entry, retaining all flag bits.
+    #[must_use]
     pub const fn new(raw_id: u16, value: u32) -> Self {
         Self {
             id: LeU16::new(raw_id),
@@ -436,21 +463,25 @@ impl Property {
     }
 
     /// Creates a property-table entry from a typed, unflagged identifier.
+    #[must_use]
     pub const fn from_id(id: Id, value: u32) -> Self {
         Self::new(id.raw(), value)
     }
 
     /// Returns the exact property identifier, including `fBid`/`fComplex`.
+    #[must_use]
     pub const fn raw_id(self) -> u16 {
         self.id.get()
     }
 
     /// Returns the typed property identifier without wire flag bits.
+    #[must_use]
     pub fn id(self) -> Id {
         Id::from(self.id.get())
     }
 
     /// Returns the raw property value.
+    #[must_use]
     pub fn value(self) -> u32 {
         self.value.get()
     }
@@ -466,7 +497,7 @@ pub fn atom_header<W: Write>(
     writer.write_all(Header::atom(instance, kind, len)?.as_bytes())
 }
 
-/// Writes a raw OfficeArt record header for producer-specific replay helpers.
+/// Writes a raw `OfficeArt` record header for producer-specific replay helpers.
 pub fn raw_header<W: Write>(
     writer: &mut W,
     version: u8,
@@ -494,7 +525,7 @@ pub fn raw_container<W: Write>(
     writer.write_all(children)
 }
 
-/// Writes a raw OfficeArt atom without interpreting its record kind.
+/// Writes a raw `OfficeArt` atom without interpreting its record kind.
 pub fn raw_atom<W: Write>(
     writer: &mut W,
     version: u8,
@@ -659,7 +690,7 @@ impl PropertyKey for u16 {
     }
 }
 
-/// Move-or-borrow builder for an OfficeArt Opt property table.
+/// Move-or-borrow builder for an `OfficeArt` Opt property table.
 ///
 /// Owned complex values are moved into the builder and borrowed values retain
 /// their input lifetime. The builder deliberately does not implement `Clone`,
@@ -671,6 +702,7 @@ pub struct PropertyBuilder<'data> {
 
 impl<'data> PropertyBuilder<'data> {
     /// Creates an empty property table.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             properties: Vec::new(),
@@ -715,7 +747,7 @@ impl<'data> PropertyBuilder<'data> {
             .try_fold(base, |size, (_, value)| match value {
                 BuiltValue::Complex(data) => {
                     i32::try_from(data.len())
-                        .map_err(|_| invalid_input("complex property exceeds i32::MAX"))?;
+                        .map_err(|_err| invalid_input("complex property exceeds i32::MAX"))?;
                     size.checked_add(data.len())
                         .ok_or_else(|| invalid_input("property data size overflow"))
                 },
@@ -726,7 +758,7 @@ impl<'data> PropertyBuilder<'data> {
     /// Encodes the complete Opt record.
     pub fn write<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         let count = u16::try_from(self.properties.len())
-            .map_err(|_| invalid_input("too many OfficeArt properties"))?;
+            .map_err(|_err| invalid_input("too many OfficeArt properties"))?;
         if count > 0x0FFF {
             return Err(invalid_input("property count exceeds twelve bits"));
         }
@@ -747,7 +779,7 @@ impl<'data> PropertyBuilder<'data> {
                 BuiltValue::Blip(value) => (*id | BLIP_ID, *value),
                 BuiltValue::Complex(data) => {
                     let len = i32::try_from(data.len())
-                        .map_err(|_| invalid_input("complex property exceeds i32::MAX"))?;
+                        .map_err(|_err| invalid_input("complex property exceeds i32::MAX"))?;
                     (*id | COMPLEX, len)
                 },
             };
@@ -763,7 +795,7 @@ impl<'data> PropertyBuilder<'data> {
     }
 }
 
-/// Builder for one OfficeArt shape atom.
+/// Builder for one `OfficeArt` shape atom.
 #[derive(Debug, Clone, Copy)]
 pub struct ShapeBuilder {
     kind: Native,
@@ -839,7 +871,7 @@ fn coordinates<W: Write>(
 }
 
 fn wire_len(len: usize, context: &'static str) -> io::Result<u32> {
-    u32::try_from(len).map_err(|_| invalid_input(context))
+    u32::try_from(len).map_err(|_err| invalid_input(context))
 }
 
 fn invalid_input(message: &'static str) -> io::Error {
@@ -848,6 +880,11 @@ fn invalid_input(message: &'static str) -> io::Error {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
     use crate::{Record, RecordKind};
     use std::mem::size_of;
