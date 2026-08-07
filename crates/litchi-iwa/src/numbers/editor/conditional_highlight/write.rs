@@ -4,6 +4,7 @@ use prost::Message;
 use std::collections::HashMap;
 
 use super::*;
+use crate::archive::{FieldInfo, FieldPath, FieldType, UnknownFieldRule};
 
 const CONDITIONAL_STYLE_SET_MESSAGE_TYPE: u32 = 6_010;
 const CELL_STYLE_MESSAGE_TYPE: u32 = 6_004;
@@ -241,12 +242,10 @@ fn conditional_style_graph_objects(
     let info = &mut set_object.archive_info.message_infos[0];
     info.versions = NATIVE_MESSAGE_VERSION.to_vec();
     info.object_references = references.clone();
-    info.field_infos.push(tsp::FieldInfo {
-        path: tsp::FieldPath { path: vec![3] },
-        r#type: Some(tsp::field_info::Type::Message as i32),
-        unknown_field_rule: Some(
-            tsp::field_info::UnknownFieldRule::IgnoreAndPreserveUntilModified as i32,
-        ),
+    info.field_infos.push(FieldInfo {
+        path: FieldPath { path: vec![3] },
+        r#type: Some(FieldType::Message),
+        unknown_field_rule: Some(UnknownFieldRule::IgnoreAndPreserveUntilModified),
         object_references: references,
         ..Default::default()
     });

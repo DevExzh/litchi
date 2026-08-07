@@ -81,3 +81,13 @@ manifest no longer declares it, then pass after order 048 is deleted. Format
 detection tests separately establish semantic parity and cursor restoration;
 the boundary change alone is not evidence of native-format compatibility or a
 performance improvement.
+
+## 2026-08-08 amendment: focused iWork detector
+
+The iWork detector named above has moved out of the migration host. The current
+leaf is `litchi-iwa-detect::{Format, bytes, reader, path}`; statements in this
+record naming `litchi_iwa::detect` describe the historical ownership at the
+time of the decision. Shared physical ZIP and IWA limits live below the three
+concrete format owners, while semantic malformed-input policy remains with
+Pages, Numbers, or Keynote. The root facade composes the focused detector and
+does not regain a raw archive dependency.

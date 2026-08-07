@@ -65,6 +65,15 @@ first production archive-header seam uses exact-version Buffa 0.9.1 lazy views
 behind a private codec. This is a staged runtime migration, not permission to
 generate the complete schema corpus eagerly for every format.
 
+Physical iWork ingress bounds the two ZIP name spellings independently before
+copying either one. Local and central names, extras, and comments are charged
+cumulatively; compressed sizes are rejected before payload materialization.
+For legacy packages, catalog, component-catalog, and detection paths reject a
+nested `Index.zip` from its declared uncompressed size before decompression.
+Limit failures retain the resource kind and exact observed and maximum values.
+This layer does not yet promise a semantic object path in every physical ZIP
+diagnostic.
+
 Buffa lazy decoding of untrusted IWA bytes is always preceded by a
 schema-directed common wire-tree preflight. One aggregate policy bounds scanned
 bytes, fields, nesting, repeated metadata items, deferred-message occurrences,
@@ -78,6 +87,24 @@ preflight bounds hostile amplification but does not claim typed recovery from
 global allocator exhaustion or a language-level exact resident-memory bound.
 Strict contracts requiring either property must use a streaming handwritten
 cursor or a corrected Buffa runtime.
+
+The next production Buffa projection is deliberately smaller than a canonical
+format schema root. A derived five-file projection reads only repeated field 3
+of `TSWP.StorageArchive`, is hard-capped at 32 KiB of generated Rust, disables
+unknown retention, and exposes only borrowed text fragments through a private
+wrapper. Common-wire preflight bounds root bytes, fields, field type,
+fragment count, UTF-8 bytes, and the conservative repeated-view allocation
+before stock Buffa 0.9.1 runs. Other length-delimited fields remain opaque by
+design, so this projection is suitable only for call sites whose policy needs
+semantic text rather than eager validation of every unrelated known child.
+The caller-owned source remains authoritative, and no owned Buffa projection
+or lazy re-encoding participates in preservation.
+
+Core archive metadata is projected into core-owned `FieldPath`, `FieldInfo`,
+and closed-enum wrappers. Optional presence and unknown signed enum values are
+retained exactly. Preflight charges both the transient Buffa representation and
+the neutral destination vectors, including unknown closed-enum records, before
+publication.
 
 Lazy re-encoding is not the preservation boundary. Original source-backed
 header bytes and common raw spans remain authoritative for exact no-ops,

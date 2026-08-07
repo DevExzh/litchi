@@ -12,7 +12,10 @@ mod error;
 mod limits;
 mod snappy;
 
-pub use archive::{Archive, ArchiveInfo, ArchiveObject, MessageInfo, RawMessage};
+pub use archive::{
+    Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldPath, FieldType, KnownFieldRule,
+    MessageInfo, RawMessage, UnknownFieldRule,
+};
 pub use error::{Error, HeaderKind, HeaderOperation, LimitKind, Result};
 pub use limits::Limits;
 pub use snappy::{SnappyLimits, SnappyStream};

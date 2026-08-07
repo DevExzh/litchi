@@ -15,6 +15,29 @@ use litchi_ole_common::property_set::PropertySetReader;
 
 use std::path::Path;
 
+/// Borrow the text values that the Pages semantic model renders as document
+/// content, in the same order as `Section::plain_text`.
+///
+/// The unified facade owns its returned paragraphs, but this iterator keeps the
+/// traversal itself allocation-free and avoids `Section::all_text`, which would
+/// allocate an intermediate `Vec<String>` before the facade allocates again.
+#[cfg(feature = "pages")]
+fn pages_paragraph_texts(package: &litchi_pages::Package) -> impl Iterator<Item = &str> {
+    package.sections().iter().flat_map(|section| {
+        section
+            .heading()
+            .into_iter()
+            .chain(section.paragraphs().iter().map(String::as_str))
+            .chain(
+                section
+                    .text_storages()
+                    .iter()
+                    .map(|storage| storage.text())
+                    .filter(|text| !text.is_empty()),
+            )
+    })
+}
+
 #[cfg(feature = "rtf")]
 fn rtf_timestamp_to_naive(
     timestamp: Option<litchi_rtf::RtfTimestamp>,
@@ -388,6 +411,9 @@ impl Document {
 
     /// Get the number of paragraphs in the document.
     ///
+    /// Pages rich-text storages are counted as paragraph-like facade values so
+    /// native body text is not omitted from format-neutral traversal.
+    ///
     /// # Examples
     ///
     /// ```rust,no_run
@@ -408,14 +434,7 @@ impl Document {
                 .and_then(|document| document.paragraph_count())
                 .map_err(crate::map_ooxml_error),
             #[cfg(feature = "pages")]
-            DocumentImpl::Pages(doc) => {
-                // Pages documents are organized by sections
-                Ok(doc
-                    .sections()
-                    .iter()
-                    .map(|section| section.paragraphs().len())
-                    .sum())
-            },
+            DocumentImpl::Pages(doc) => Ok(pages_paragraph_texts(doc).count()),
             #[cfg(feature = "rtf")]
             DocumentImpl::Rtf(doc) => Ok(doc.paragraph_count()),
             #[cfg(feature = "odt")]
@@ -426,6 +445,10 @@ impl Document {
     }
 
     /// Get an iterator over paragraphs in the document.
+    ///
+    /// For Pages, this follows semantic section order and projects headings,
+    /// legacy paragraph values, and non-empty rich-text storages into owned
+    /// facade paragraphs.
     ///
     /// # Examples
     ///
@@ -454,20 +477,9 @@ impl Document {
                 Ok(paras.into_iter().map(Paragraph::Docx).collect())
             },
             #[cfg(feature = "pages")]
-            DocumentImpl::Pages(doc) => {
-                // Pages documents have sections, each with paragraphs
-                let paragraphs: Vec<_> = doc
-                    .sections()
-                    .iter()
-                    .flat_map(|section| {
-                        section
-                            .paragraphs()
-                            .iter()
-                            .map(|text| Paragraph::Pages(text.clone()))
-                    })
-                    .collect();
-                Ok(paragraphs)
-            },
+            DocumentImpl::Pages(doc) => Ok(pages_paragraph_texts(doc)
+                .map(|text| Paragraph::Pages(text.to_owned()))
+                .collect()),
             #[cfg(feature = "rtf")]
             DocumentImpl::Rtf(doc) => {
                 let paras = doc.paragraphs_with_content();
@@ -568,9 +580,10 @@ impl Document {
 
     /// Get all supported document elements in document order.
     ///
-    /// Table elements are included for table-capable formats. Pages currently exposes
-    /// paragraph elements only. The method preserves document order for sequential
-    /// processing such as Markdown conversion.
+    /// Table elements are included for table-capable formats. Pages exposes
+    /// section headings, legacy paragraph values, and non-empty rich-text
+    /// storages as paragraph elements. The method preserves document order for
+    /// sequential processing such as Markdown conversion.
     ///
     /// # Examples
     ///
@@ -627,18 +640,11 @@ impl Document {
             #[cfg(feature = "pages")]
             DocumentImpl::Pages(doc) => {
                 use super::DocumentElement;
-                // Pages documents have sections with paragraphs
-                // Tables are not currently supported in the extraction API
-                let elements: Vec<_> = doc
-                    .sections()
-                    .iter()
-                    .flat_map(|section| {
-                        section.paragraphs().iter().map(|text| {
-                            DocumentElement::Paragraph(Box::new(Paragraph::Pages(text.clone())))
-                        })
+                Ok(pages_paragraph_texts(doc)
+                    .map(|text| {
+                        DocumentElement::Paragraph(Box::new(Paragraph::Pages(text.to_owned())))
                     })
-                    .collect();
-                Ok(elements)
+                    .collect())
             },
             #[cfg(feature = "rtf")]
             DocumentImpl::Rtf(doc) => {

@@ -462,6 +462,25 @@ integration, validation, and source-checked `Snapshot`/`Transaction`/`Commit`/
 `Patch` layers; opaque XML, BIFF, and CFB tails remain preserved and external
 links, macros, add-ins, broadcasts, and formula/runtime behavior remain inert.
 
+## IWA and iWork
+
+The current shared physical substrate is split among `litchi-iwa-archive`
+(ZIP/package preservation), `litchi-iwa-core` (Snappy/IWA framing and neutral
+archive metadata), `litchi-iwa-detect`, `litchi-iwa-index`,
+`litchi-iwa-graph`, `litchi-iwa-package`, `litchi-iwa-protos`,
+`litchi-iwa-text`, and `litchi-iwa-text-wire`. `litchi-pages`,
+`litchi-numbers`, and `litchi-keynote` are the concrete application package
+owners. `litchi-numbers-wire` is a low-level BNC adapter excluded from the
+supported format and root facades.
+
+`litchi-iwa` still exists only as the migration host for editors and
+compatibility tests that have not reached the concrete packages. Its 17
+internal workspace dependencies are all explicit ordered debt, with no
+canonical edge. Physical preservation and comparison examples have moved to
+`litchi-iwa-archive`; structured cross-format extraction remains temporarily
+because the three direct package projections do not yet have exact behavioral
+parity. [ADR 0028](0028-iwa-monolith-exit.md) is the authoritative exit gate.
+
 ## Conversion and interchange
 
 [`litchi-markdown`](../../crates/litchi-markdown/Cargo.toml) is the
@@ -490,5 +509,6 @@ the current terminology without deleting or rewriting those records.
 The audit used current workspace manifests, `cargo metadata --no-deps
 --format-version 1`, focused reference searches, and the existing topology
 decisions in [ADR 0002](0002-crate-topology.md) and
-[ADR 0023](0023-odf-family-crate-split.md). The layered owner paths are
+[ADR 0023](0023-odf-family-crate-split.md), plus the current iWork exit in
+[ADR 0028](0028-iwa-monolith-exit.md). The layered owner paths are
 verified by the affected-crate all-target compile and boundary-policy check.

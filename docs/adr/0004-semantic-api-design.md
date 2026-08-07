@@ -685,6 +685,34 @@ IWA merge formulas, formula-store ordering, anchor payload movement, and
 transactional publication remain private to `litchi-iwa`; Pages and Keynote
 retain only their format-owned comment and merge sidecars.
 
+The supported Numbers API does not expose BNC parsing, storage flags, native
+format indices, generated protobuf values, or IWA object identifiers. Those
+details live in `litchi-numbers-wire` and private package adapters. Semantic
+cells, coordinates, selectors, tables, sheets, and documents are the ordinary
+application vocabulary.
+
+Pages section identity comes from the native section graph, never from a
+heading. `TP.DocumentArchive.section` supplies an optional initial boundary at
+UTF-16 position zero; ordered later boundaries come from
+`TSWP.StorageArchive.table_section`. Each reference must resolve to exactly one
+type-10011 `TP.SectionArchive`, whose field 26 is the producer-visible name.
+The body is split at strictly increasing UTF-16 scalar boundaries. Every later
+boundary requires a preceding U+0004 marker, and that marker is omitted from
+semantic text. Names are copied verbatim, including the distinction between
+absent and empty. Duplicate names are valid authored data, while exact lookup
+returns typed ambiguity. Repeated references, malformed boundaries, missing
+objects, and wrong or duplicate payload types reject ingress.
+
+Keynote navigator identity is likewise distinct from visible title text, and
+read selectors use an exact name or checked position without publishing a
+native ID. Writing `KN.SlideArchive.name` is not yet a supported concrete
+package transaction. A field-10-only prototype passed internal parse/readback
+tests but caused real Keynote to render layout placeholder text and ignore the
+requested label; the legacy editor exhibited the same failure. That API was
+removed rather than publishing a transaction whose internal model disagreed
+with the native application. A future name edit must identify the additional
+producer metadata or graph mutation and pass native content-preservation gates.
+
 Bitflags represent small orthogonal settings, Roaring bitmaps represent large
 sparse integer sets, enums represent exclusive states, and inheritance uses an
 explicit tri-state. The facade exposes named operations rather than bit math.

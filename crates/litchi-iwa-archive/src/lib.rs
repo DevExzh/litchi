@@ -103,6 +103,8 @@ fn inspect_zip(
     let Some(index_name) = nested_name else {
         return Ok(empty_detection_root());
     };
+    let declared_index_size = archive.metadata(&index_name)?.uncompressed_size();
+    limits.check_input_size(declared_index_size, "legacy iWork Index.zip")?;
     let index_data = archive.read(&index_name)?;
     let index_size = u64::try_from(index_data.len()).map_err(|_error| {
         Error::InvalidBundle("legacy iWork Index.zip length does not fit u64".to_owned())

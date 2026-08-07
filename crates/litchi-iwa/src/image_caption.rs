@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use prost::Message;
 
-use crate::archive::{Archive, ArchiveObject, RawMessage};
+use crate::archive::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, UnknownFieldRule};
 use crate::protobuf::{tsa, tsd, tsp, tss, tswp};
 use crate::text::style_registry::{insert_private_style, register_private_style};
 use crate::wire::{patch_length_delimited_field, transform_length_delimited_field};
@@ -909,12 +909,12 @@ fn archive_object(
     Ok(object)
 }
 
-fn preserved_caption_field(path: &[u32]) -> tsp::FieldInfo {
-    tsp::FieldInfo {
-        path: tsp::FieldPath {
+fn preserved_caption_field(path: &[u32]) -> FieldInfo {
+    FieldInfo {
+        path: FieldPath {
             path: path.to_vec(),
         },
-        unknown_field_rule: Some(tsp::field_info::UnknownFieldRule::IgnoreAndPreserve as i32),
+        unknown_field_rule: Some(UnknownFieldRule::IgnoreAndPreserve),
         ..Default::default()
     }
 }
@@ -1007,8 +1007,7 @@ mod tests {
             ]
         );
         assert!(info_metadata.field_infos.iter().all(|field| {
-            field.unknown_field_rule
-                == Some(tsp::field_info::UnknownFieldRule::IgnoreAndPreserve as i32)
+            field.unknown_field_rule == Some(UnknownFieldRule::IgnoreAndPreserve)
         }));
 
         let placement_metadata = &placement.archive_info.message_infos[0];

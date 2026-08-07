@@ -1,8 +1,13 @@
-//! Numbers cell vocabulary and its native wire codec.
+//! Numbers cell vocabulary.
+//!
+//! Native Binary Numbers Cell (BNC) storage is an implementation detail. Use
+//! the semantic [`Value`](crate::cell::Value) and
+//! [`data_format`](crate::cell::data_format) APIs instead of depending on its
+//! byte layout.
 
 /// Checked, archive-free cell display formats.
 pub mod data_format;
-pub mod wire;
+pub(crate) use litchi_numbers_wire as wire;
 
 use std::fmt;
 

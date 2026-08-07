@@ -3,6 +3,7 @@
 use prost::Message;
 
 use super::*;
+use crate::archive::{FieldInfo, FieldPath, FieldType, UnknownFieldRule};
 
 pub(super) mod removal;
 
@@ -290,12 +291,10 @@ pub(super) fn ensure_volatile_owner(
             .iter()
             .any(|field| field.path.path.as_slice() == [2, 6])
         {
-            field_infos.push(tsp::FieldInfo {
-                path: tsp::FieldPath { path: vec![2, 6] },
-                r#type: Some(tsp::field_info::Type::ObjectReference as i32),
-                unknown_field_rule: Some(
-                    tsp::field_info::UnknownFieldRule::IgnoreAndPreserveUntilModified as i32,
-                ),
+            field_infos.push(FieldInfo {
+                path: FieldPath { path: vec![2, 6] },
+                r#type: Some(FieldType::ObjectReference),
+                unknown_field_rule: Some(UnknownFieldRule::IgnoreAndPreserveUntilModified),
                 ..Default::default()
             });
         }

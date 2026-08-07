@@ -4,6 +4,13 @@
 //! the Numbers implementation. This crate starts the downward migration with
 //! the dependency-free cell vocabulary used by Numbers, Pages table editing,
 //! and the shared structured extractor.
+//!
+//! The native cell wire codec is intentionally excluded from the supported
+//! API. The semantic cell API remains available through [`cell`].
+//!
+//! ```compile_fail,E0603
+//! use litchi_numbers::cell::wire::BncCell;
+//! ```
 
 #![forbid(unsafe_code)]
 

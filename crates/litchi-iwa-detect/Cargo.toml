@@ -12,6 +12,8 @@ rust-version.workspace = true
 litchi-iwa-archive = { workspace = true }
 litchi-iwa-common  = { workspace = true }
 litchi-iwa-core    = { workspace = true }
+
+[dev-dependencies]
 litchi-iwa-protos  = { workspace = true }
 prost              = { workspace = true }
 

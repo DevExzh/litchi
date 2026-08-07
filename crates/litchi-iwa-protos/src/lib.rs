@@ -64,6 +64,45 @@ mod buffa_generated {
     include!(concat!(env!("OUT_DIR"), "/buffa/iwa_buffa_protos.rs"));
 }
 
+/// Private Buffa lazy-view projection for `TSWP.StorageArchive.text` only.
+///
+/// It is generated in isolation with unknown retention disabled. The source
+/// IWA payload remains the byte-authoritative preservation representation.
+#[doc(hidden)]
+mod buffa_text_storage_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "buffa-build output is generated from the derived wire projection."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-text-storage/iwa_text_storage_buffa_protos.rs"
+    ));
+}
+
 /// Internal archive-header codec implemented by the private Buffa sidecar.
 ///
 /// This module intentionally exchanges only the existing Prost compatibility
@@ -71,6 +110,11 @@ mod buffa_generated {
 /// leak into the public format APIs.
 #[doc(hidden)]
 pub mod archive_codec;
+
+/// Internal raw-text projection codec implemented by the private Buffa
+/// sidecar. Generated types remain inaccessible to downstream crates.
+#[doc(hidden)]
+pub mod text_storage_codec;
 
 pub use generated::{
     kn, knsos, tn, tnsos, tp, tpsos, tsa, tsasos, tsce, tsch, tschsos, tsck, tscksos, tsd, tsdsos,

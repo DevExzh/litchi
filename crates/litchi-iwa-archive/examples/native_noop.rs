@@ -39,10 +39,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let source = fs::read(&input)?;
     let catalog = Catalog::from_bytes(&source)?;
     let mut rebuilt = Vec::<(String, Vec<u8>)>::new();
-    for entry in catalog
-        .iter()
-        .filter(|entry| entry.name().ends_with(".iwa"))
-    {
+    for entry in catalog.iter().filter(|entry| {
+        #[allow(
+            clippy::case_sensitive_file_extension_comparisons,
+            reason = "IWA member names are case-sensitive protocol names."
+        )]
+        {
+            entry.name().ends_with(".iwa")
+        }
+    }) {
         if entry.is_opaque() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,

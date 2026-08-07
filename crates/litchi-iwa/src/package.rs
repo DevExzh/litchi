@@ -1402,7 +1402,12 @@ mod tests {
         )
         .unwrap();
         let error = IWorkPackage::from_bytes_with_limits(&bytes, one_entry).unwrap_err();
-        assert!(error.to_string().contains("legacy package index"));
+        assert!(
+            error
+                .to_string()
+                .contains("ZIP entries limit exceeded: observed 2, maximum 1"),
+            "{error}"
+        );
     }
 
     #[test]

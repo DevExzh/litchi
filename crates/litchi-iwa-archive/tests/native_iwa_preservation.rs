@@ -2,6 +2,7 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_core::{Archive, SnappyStream};
 
@@ -22,6 +23,26 @@ fn fixture_path(name: &str) -> PathBuf {
 fn verify_fixture(name: &str) -> Result<CorpusSummary, Box<dyn Error>> {
     let source = fs::read(fixture_path(name))?;
     let catalog = Catalog::from_bytes(&source)?;
+    assert!(
+        catalog.source_is_exact(),
+        "native flat package unexpectedly lost exact-source authority: {name}"
+    );
+    assert_eq!(
+        catalog.to_bytes()?,
+        source,
+        "catalog no-op changed package bytes in {name}"
+    );
+    let mut streamed = Vec::new();
+    catalog.write_to(&mut streamed)?;
+    assert_eq!(
+        streamed, source,
+        "streaming catalog no-op changed package bytes in {name}"
+    );
+    assert_eq!(
+        catalog.reassemble_to_bytes(&[], Limits::default())?,
+        source,
+        "empty reassembly changed package bytes in {name}"
+    );
     let mut summary = CorpusSummary {
         components: 0,
         objects: 0,
@@ -29,10 +50,15 @@ fn verify_fixture(name: &str) -> Result<CorpusSummary, Box<dyn Error>> {
         decompressed_bytes: 0,
     };
 
-    for entry in catalog
-        .iter()
-        .filter(|entry| entry.name().ends_with(".iwa"))
-    {
+    for entry in catalog.iter().filter(|entry| {
+        #[allow(
+            clippy::case_sensitive_file_extension_comparisons,
+            reason = "IWA member names are case-sensitive protocol names."
+        )]
+        {
+            entry.name().ends_with(".iwa")
+        }
+    }) {
         assert!(
             !entry.is_opaque(),
             "native IWA component unexpectedly remained opaque: {}",

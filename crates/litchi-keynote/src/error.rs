@@ -72,6 +72,9 @@ pub enum Error {
     /// An opaque background payload cannot be empty.
     #[error("Keynote opaque background payload cannot be empty")]
     EmptyBackgroundPayload,
+    /// An opaque background payload exceeded the bounded semantic storage budget.
+    #[error("Keynote opaque background payload exceeds the semantic byte budget")]
+    BackgroundPayloadTooLarge,
 }
 
 /// Result type for semantic Keynote operations.

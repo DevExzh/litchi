@@ -82,24 +82,7 @@
       "litchi-odraw",
       "xml-minifier"
     ],
-    "litchi-iwa": [
-      "litchi-core",
-      "litchi-iwa-archive",
-      "litchi-iwa-cache",
-      "litchi-iwa-common",
-      "litchi-iwa-core",
-      "litchi-iwa-detect",
-      "litchi-iwa-graph",
-      "litchi-iwa-index",
-      "litchi-iwa-package",
-      "litchi-iwa-protos",
-      "litchi-iwa-structured",
-      "litchi-iwa-text",
-      "litchi-iwa-text-wire",
-      "litchi-keynote",
-      "litchi-numbers",
-      "litchi-pages"
-    ],
+    "litchi-iwa": [],
     "litchi-iwa-archive": [
       "litchi-core",
       "litchi-iwa-core",
@@ -153,7 +136,11 @@
       "litchi-iwa-common",
       "litchi-iwa-core",
       "litchi-iwa-protos",
+      "litchi-numbers-wire",
       "soapberry-zip"
+    ],
+    "litchi-numbers-wire": [
+      "litchi-iwa-common"
     ],
     "litchi-odb": [
       "litchi-core",
@@ -336,8 +323,130 @@
     ],
     "xml-minifier-macros": []
   },
-  "migration_hosts": [],
-  "migration_debt": [],
+  "migration_hosts": [
+    "litchi-iwa"
+  ],
+  "migration_debt": [
+    {
+      "order": 1,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-core",
+      "reason": "The legacy umbrella still hosts unified document, media, and metadata adapters over core primitives.",
+      "exit": "Move each adapter into its concrete format owner or the root facade, then delete litchi-iwa."
+    },
+    {
+      "order": 2,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-iwa-archive",
+      "reason": "Legacy mutation paths still coordinate physical package ingress, preservation, and reassembly.",
+      "exit": "Move all remaining package transactions into Pages, Numbers, or Keynote and delete litchi-iwa."
+    },
+    {
+      "order": 3,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-iwa-cache",
+      "reason": "The legacy package facade still owns parsed-archive cache integration.",
+      "exit": "Give each concrete package owner its required bounded caches and delete litchi-iwa."
+    },
+    {
+      "order": 4,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-iwa-common",
+      "reason": "Unmigrated editors still consume neutral iWork values and wire helpers from the legacy host.",
+      "exit": "Move every editor adapter to its concrete owner and delete litchi-iwa."
+    },
+    {
+      "order": 5,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-iwa-core",
+      "reason": "Unmigrated editors still parse and publish neutral IWA archive objects through the legacy host.",
+      "exit": "Move object-level mutation behind concrete package APIs and delete litchi-iwa."
+    },
+    {
+      "order": 6,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-iwa-detect",
+      "reason": "The legacy unified opener retains a compatibility adapter over focused iWork detection.",
+      "exit": "Route root facade opening directly to concrete packages and delete litchi-iwa."
+    },
+    {
+      "order": 7,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-iwa-graph",
+      "reason": "Legacy media and editor code still traverses native object-reference graphs.",
+      "exit": "Move graph-backed traversal into private concrete-format adapters and delete litchi-iwa."
+    },
+    {
+      "order": 8,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-iwa-index",
+      "reason": "The legacy object index still bridges raw archives to application editors.",
+      "exit": "Adopt the focused index inside concrete package owners and delete litchi-iwa."
+    },
+    {
+      "order": 9,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-iwa-package",
+      "reason": "Legacy mutable package state still uses the extracted ordered entry store.",
+      "exit": "Finish concrete package transaction migration and delete litchi-iwa."
+    },
+    {
+      "order": 10,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-iwa-protos",
+      "reason": "Many legacy format editors still decode generated native protobuf payloads directly.",
+      "exit": "Replace those adapters with private bounded format codecs and delete litchi-iwa."
+    },
+    {
+      "order": 11,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-iwa-structured",
+      "reason": "The legacy unified document API still publishes the archive-free structured snapshot.",
+      "exit": "Provide the verified root-facade aggregation path and delete litchi-iwa without removing litchi-iwa-structured."
+    },
+    {
+      "order": 12,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-iwa-text",
+      "reason": "Unmigrated text editors still adapt native storage graphs to focused semantic text values.",
+      "exit": "Move application-specific text adapters into concrete package owners and delete litchi-iwa."
+    },
+    {
+      "order": 13,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-iwa-text-wire",
+      "reason": "The legacy host still invokes the shared native text-storage wire adapter.",
+      "exit": "Route every call through concrete format packages and delete litchi-iwa."
+    },
+    {
+      "order": 14,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-keynote",
+      "reason": "Keynote semantic values are focused, but native mutation remains in the legacy host.",
+      "exit": "Complete Keynote package editing and move its examples and tests before deleting litchi-iwa."
+    },
+    {
+      "order": 15,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-numbers",
+      "reason": "Numbers semantic values are focused, but substantial native editing remains in the legacy host.",
+      "exit": "Complete Numbers package editing and move its examples and tests before deleting litchi-iwa."
+    },
+    {
+      "order": 16,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-numbers-wire",
+      "reason": "Legacy Numbers, Pages, and Keynote table editors still use the private BNC wire codec.",
+      "exit": "Move all table mutation adapters into concrete format owners and delete litchi-iwa."
+    },
+    {
+      "order": 17,
+      "dependent": "litchi-iwa",
+      "dependency": "litchi-pages",
+      "reason": "Pages semantic values are focused, but native mutation remains in the legacy host.",
+      "exit": "Complete Pages package editing and move its examples and tests before deleting litchi-iwa."
+    }
+  ],
   "runtime_neutral": [
     "litchi-biff",
     "litchi-codepage",
@@ -360,6 +469,7 @@
     "litchi-iwa-text-wire",
     "litchi-keynote",
     "litchi-numbers",
+    "litchi-numbers-wire",
     "litchi-odb",
     "litchi-odc",
     "litchi-odf-common",

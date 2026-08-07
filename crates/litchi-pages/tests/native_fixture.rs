@@ -23,6 +23,13 @@ fn native_pages_fixture_opens_from_path_and_bytes() -> Result<(), Box<dyn std::e
         .select_section(SectionSelector::index(0))?
         .ok_or_else(|| std::io::Error::other("native Pages fixture has no first section"))?;
     assert_eq!(selected.index(), 0);
+    assert_eq!(selected.name(), Some("Blank"));
+    assert_eq!(
+        document
+            .section_named("Blank")?
+            .map(litchi_pages::Section::index),
+        Some(0)
+    );
 
     let bytes = std::fs::read(path)?;
     let from_bytes = Package::from_bytes(&bytes)?;

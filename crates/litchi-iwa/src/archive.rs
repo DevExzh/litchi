@@ -8,7 +8,8 @@
 use crate::protobuf::decode_common;
 
 pub use litchi_iwa_core::{
-    Archive, ArchiveInfo, ArchiveLimits, ArchiveObject, MessageInfo, RawMessage,
+    Archive, ArchiveInfo, ArchiveLimits, ArchiveObject, FieldInfo, FieldPath, FieldType,
+    MessageInfo, RawMessage, UnknownFieldRule,
 };
 
 /// Extract application text from an archive object without storing decoded

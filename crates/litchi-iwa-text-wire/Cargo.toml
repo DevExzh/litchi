@@ -14,5 +14,8 @@ litchi-iwa-protos = { workspace = true }
 litchi-iwa-text   = { workspace = true }
 thiserror        = { workspace = true }
 
+[dev-dependencies]
+prost = { workspace = true }
+
 [lints]
 workspace = true

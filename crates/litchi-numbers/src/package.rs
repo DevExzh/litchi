@@ -31,6 +31,7 @@ mod sheet;
 )]
 mod table;
 
+use std::fmt;
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::Path;
@@ -62,7 +63,7 @@ pub enum Error {
     Archive(#[from] litchi_iwa_archive::Error),
     /// A native protobuf payload could not be decoded.
     #[error("could not decode Numbers protobuf payload: {0}")]
-    Protobuf(#[from] prost::DecodeError),
+    Protobuf(String),
     /// A native IWA value could not be decoded or validated.
     #[error(transparent)]
     Common(#[from] litchi_iwa_common::Error),
@@ -83,6 +84,12 @@ pub enum Error {
         /// Maximum input size selected by the caller.
         maximum: u64,
     },
+}
+
+impl Error {
+    fn protobuf(error: prost::DecodeError) -> Self {
+        Self::Protobuf(error.to_string())
+    }
 }
 
 impl From<crate::cell::wire::Error> for Error {
@@ -143,9 +150,15 @@ impl Components {
 /// Cloning this value or calling [`Self::snapshot`] shares the physical IWA
 /// catalog, object index, and semantic sheet allocation without copying any
 /// ZIP member, protobuf payload, table, or cell value.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Package {
     state: Arc<State>,
+}
+
+impl fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Package").finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug)]

@@ -454,6 +454,37 @@ mod tests {
         DecodeOptions::new(length, length.max(1), 4 * 1024 * 1024, 16)
     }
 
+    fn append_length_delimited(output: &mut Vec<u8>, tag: u8, payload: &[u8]) {
+        output.push(tag);
+        output.push(one_byte_length(payload.len()));
+        output.extend_from_slice(payload);
+    }
+
+    fn one_byte_length(length: usize) -> u8 {
+        match u8::try_from(length) {
+            Ok(byte_length) => byte_length,
+            Err(error) => panic!("test payload must fit one-byte length: {error}"),
+        }
+    }
+
+    fn assert_message_info_parity(
+        source: &[u8],
+    ) -> Result<tsp::MessageInfo, Box<dyn std::error::Error>> {
+        let expected = tsp::MessageInfo::decode(source)?;
+        let actual = decode_message_info(source, options(source.len()))?;
+        assert_eq!(actual, expected);
+        Ok(actual)
+    }
+
+    fn assert_archive_info_parity(
+        source: &[u8],
+    ) -> Result<tsp::ArchiveInfo, Box<dyn std::error::Error>> {
+        let expected = tsp::ArchiveInfo::decode(source)?;
+        let actual = decode_archive_info(source, options(source.len()))?;
+        assert_eq!(actual, expected);
+        Ok(actual)
+    }
+
     #[test]
     fn hostile_noncanonical_headers_match_prost_semantics() -> Result<(), Box<dyn std::error::Error>>
     {
@@ -475,6 +506,108 @@ mod tests {
             decode_archive_info(&archive, options(archive.len()))?,
             tsp::ArchiveInfo::decode(archive.as_slice())?
         );
+        Ok(())
+    }
+
+    #[test]
+    fn duplicate_nested_fields_and_all_unknown_wire_types_match_prost_merge_semantics()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // A singular message field merges all of its occurrences. Exercise
+        // that rule for both FieldInfo.path and MessageInfo.diff_field_path,
+        // while mixing packed/unpacked repeated scalars and duplicate scalar,
+        // enum, and string fields.
+        let mut field_info = Vec::new();
+        append_length_delimited(&mut field_info, 0x0a, &[0x08, 0x01, 0x0a, 0x02, 0x02, 0x03]);
+        field_info.extend_from_slice(&[0x10, 0x03, 0x10, 0x63]);
+        field_info.extend_from_slice(&[0x20, 0x07, 0x22, 0x02, 0x08, 0x09]);
+        field_info.extend_from_slice(&[0x38, 0x01, 0x3a, 0x02, 0x02, 0x03]);
+        append_length_delimited(&mut field_info, 0x42, b"old");
+        append_length_delimited(&mut field_info, 0x0a, &[0x08, 0x04]);
+        append_length_delimited(&mut field_info, 0x42, b"new");
+
+        let mut message = vec![0x08, 0x01, 0x10, 0x01, 0x12, 0x02, 0x02, 0x03, 0x18, 0x04];
+        append_length_delimited(&mut message, 0x22, &field_info);
+        append_length_delimited(&mut message, 0x4a, &[0x08, 0x08]);
+        append_length_delimited(&mut message, 0x4a, &[0x0a, 0x01, 0x09]);
+        message.extend_from_slice(&[0x38, 0x05, 0x38, 0x06]);
+
+        // Unknown fields 100..104 cover varint, fixed64,
+        // length-delimited, group, and fixed32 wire types respectively.
+        message.extend_from_slice(&[0xa0, 0x06, 0x81, 0x00]);
+        message.extend_from_slice(&[0xa9, 0x06, 1, 2, 3, 4, 5, 6, 7, 8]);
+        message.extend_from_slice(&[0xb2, 0x06, 0x81, 0x00, 0xff]);
+        message.extend_from_slice(&[0xbb, 0x06, 0x08, 0x09, 0xbc, 0x06]);
+        message.extend_from_slice(&[0xc5, 0x06, 9, 10, 11, 12]);
+        message.extend_from_slice(&[0x08, 0x07, 0x18, 0x0b]);
+
+        let decoded_message = assert_message_info_parity(&message)?;
+        assert_eq!(decoded_message.r#type, 7);
+        assert_eq!(decoded_message.length, 11);
+        assert_eq!(decoded_message.version, [1, 2, 3]);
+        assert_eq!(decoded_message.base_message_index, Some(6));
+        assert_eq!(decoded_message.field_infos[0].path.path, [1, 2, 3, 4]);
+        assert_eq!(decoded_message.field_infos[0].r#type, Some(99));
+        assert_eq!(decoded_message.field_infos[0].object_references, [7, 8, 9]);
+        assert_eq!(
+            decoded_message.field_infos[0].known_field_version,
+            [1, 2, 3]
+        );
+        assert_eq!(
+            decoded_message.field_infos[0]
+                .known_field_feature_identifier
+                .as_deref(),
+            Some("new")
+        );
+        assert_eq!(
+            decoded_message
+                .diff_field_path
+                .as_ref()
+                .map(|path| path.path.as_slice()),
+            Some([8, 9].as_slice())
+        );
+
+        let mut archive = vec![0x08, 0x01];
+        append_length_delimited(&mut archive, 0x12, &message);
+        archive.extend_from_slice(&[0xa0, 0x06, 0x01, 0x08, 0x2a, 0x18, 0x00, 0x18, 0x01]);
+        let decoded_archive = assert_archive_info_parity(&archive)?;
+        assert_eq!(decoded_archive.identifier, Some(42));
+        assert_eq!(decoded_archive.should_merge, Some(true));
+        assert_eq!(decoded_archive.message_infos, [decoded_message]);
+        Ok(())
+    }
+
+    #[test]
+    fn overlong_keys_lengths_and_values_match_prost_semantics()
+    -> Result<(), Box<dyn std::error::Error>> {
+        // Every known key, the packed length, and the scalar values below use
+        // a valid but non-minimal varint representation.
+        let message = [
+            0x88, 0x00, 0x87, 0x00, // type = 7
+            0x92, 0x00, 0x82, 0x00, 0x81, 0x00, // packed version = [1]
+            0x90, 0x00, 0x82, 0x00, // unpacked version = 2
+            0x98, 0x00, 0x80, 0x00, // length = 0
+        ];
+        let decoded_message = assert_message_info_parity(&message)?;
+        assert_eq!(decoded_message.r#type, 7);
+        assert_eq!(decoded_message.version, [1, 2]);
+        assert_eq!(decoded_message.length, 0);
+
+        let mut archive = vec![
+            0x88,
+            0x00,
+            0xaa,
+            0x00, // identifier = 42
+            0x92,
+            0x00, // overlong MessageInfo key
+            0x80 | u8::try_from(message.len())?,
+            0x00, // overlong child length
+        ];
+        archive.extend_from_slice(&message);
+        archive.extend_from_slice(&[0x98, 0x00, 0x82, 0x00]); // true from non-zero bool
+        let decoded_archive = assert_archive_info_parity(&archive)?;
+        assert_eq!(decoded_archive.identifier, Some(42));
+        assert_eq!(decoded_archive.should_merge, Some(true));
+        assert_eq!(decoded_archive.message_infos, [decoded_message]);
         Ok(())
     }
 
@@ -512,6 +645,74 @@ mod tests {
     fn lazy_adapter_forces_deferred_child_validation() {
         let malformed = [0x08, 0x01, 0x12, 0x01, 0x80];
         assert!(decode_archive_info(&malformed, options(malformed.len())).is_err());
+    }
+
+    #[test]
+    fn every_deferred_child_route_is_validated_before_projection() {
+        let malformed_children: &[(&str, &[u8])] = &[
+            ("FieldInfo body", &[0x22, 0x01, 0x80]),
+            ("required FieldInfo.path", &[0x22, 0x03, 0x0a, 0x01, 0x80]),
+            ("diff_field_path", &[0x4a, 0x01, 0x80]),
+            ("fields_to_remove", &[0x52, 0x01, 0x80]),
+            (
+                "later diff_field_path fragment",
+                &[0x4a, 0x02, 0x08, 0x01, 0x4a, 0x01, 0x80],
+            ),
+            (
+                "later FieldInfo.path fragment",
+                &[0x22, 0x07, 0x0a, 0x02, 0x08, 0x01, 0x0a, 0x01, 0x80],
+            ),
+        ];
+
+        for (context, child) in malformed_children {
+            let mut message = vec![0x08, 0x01, 0x18, 0x00];
+            message.extend_from_slice(child);
+            assert!(
+                tsp::MessageInfo::decode(message.as_slice()).is_err(),
+                "Prost unexpectedly accepted malformed {context}"
+            );
+            assert!(
+                decode_message_info(&message, options(message.len())).is_err(),
+                "Buffa adapter unexpectedly accepted malformed {context}"
+            );
+
+            let mut archive = vec![0x08, 0x01];
+            append_length_delimited(&mut archive, 0x12, &message);
+            assert!(
+                tsp::ArchiveInfo::decode(archive.as_slice()).is_err(),
+                "Prost unexpectedly accepted malformed {context} through ArchiveInfo"
+            );
+            assert!(
+                decode_archive_info(&archive, options(archive.len())).is_err(),
+                "Buffa adapter unexpectedly accepted malformed {context} through ArchiveInfo"
+            );
+        }
+    }
+
+    #[test]
+    fn codec_message_and_unknown_field_limits_are_inclusive() {
+        let message = [0x08, 0x01, 0x18, 0x00];
+        assert!(decode_message_info(&message, options(message.len())).is_ok());
+        assert!(
+            decode_message_info(&message, DecodeOptions::new(message.len() - 1, 1, 1024, 16))
+                .is_err()
+        );
+
+        let with_two_unknowns = [0x08, 0x01, 0x18, 0x00, 0xa0, 0x06, 0x01, 0xa8, 0x06, 0x02];
+        assert!(
+            decode_message_info(
+                &with_two_unknowns,
+                DecodeOptions::new(with_two_unknowns.len(), 2, 1024, 16)
+            )
+            .is_ok()
+        );
+        assert!(
+            decode_message_info(
+                &with_two_unknowns,
+                DecodeOptions::new(with_two_unknowns.len(), 1, 1024, 16)
+            )
+            .is_err()
+        );
     }
 
     #[test]

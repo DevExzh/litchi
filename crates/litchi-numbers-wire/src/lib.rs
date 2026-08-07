@@ -1,10 +1,18 @@
-//! Binary Numbers Cell (BNC) value storage.
+//! Low-level Binary Numbers Cell (BNC) value storage for iWork adapters.
+//!
+//! This adapter crate keeps the byte-preserving codec shared while the legacy
+//! IWA host is migrated into the standalone Numbers owner. It is intentionally
+//! excluded from the `litchi` and `litchi-numbers` facades. Applications
+//! should use `litchi-numbers`; direct use of this crate opts into unstable
+//! native-storage details rather than the supported semantic API.
+
+#![forbid(unsafe_code)]
 
 use std::collections::BTreeMap;
 
 use std::fmt;
 
-use super::FiniteF64;
+use litchi_iwa_common::formula::FiniteF64;
 
 const BNC_VERSION: u8 = 5;
 const BNC_PREFIX_LEN: usize = 8;
@@ -23,19 +31,19 @@ const DECIMAL128_COEFFICIENT_BITS: u32 = 113;
 const DECIMAL128_SIGN_BIT: u32 = 127;
 const SECONDS_PER_DAY: f64 = 86_400.0;
 
-pub const DECIMAL_FLAG: u32 = 0x0000_0001;
-pub const NUMBER_FLAG: u32 = 0x0000_0002;
-pub const DATE_FLAG: u32 = 0x0000_0004;
-pub const STRING_FLAG: u32 = 0x0000_0008;
-pub const RICH_TEXT_FLAG: u32 = 0x0000_0010;
-pub const STYLE_FLAG: u32 = 0x0000_0020;
-pub const TEXT_STYLE_FLAG: u32 = 0x0000_0040;
-pub const CONDITIONAL_STYLE_FLAG: u32 = 0x0000_0080;
-pub const CONDITIONAL_STYLE_APPLIED_RULE_FLAG: u32 = 0x0000_0100;
-pub const FORMULA_FLAG: u32 = 0x0000_0200;
+pub(crate) const DECIMAL_FLAG: u32 = 0x0000_0001;
+pub(crate) const NUMBER_FLAG: u32 = 0x0000_0002;
+pub(crate) const DATE_FLAG: u32 = 0x0000_0004;
+pub(crate) const STRING_FLAG: u32 = 0x0000_0008;
+pub(crate) const RICH_TEXT_FLAG: u32 = 0x0000_0010;
+pub(crate) const STYLE_FLAG: u32 = 0x0000_0020;
+pub(crate) const TEXT_STYLE_FLAG: u32 = 0x0000_0040;
+pub(crate) const CONDITIONAL_STYLE_FLAG: u32 = 0x0000_0080;
+pub(crate) const CONDITIONAL_STYLE_APPLIED_RULE_FLAG: u32 = 0x0000_0100;
+pub(crate) const FORMULA_FLAG: u32 = 0x0000_0200;
 const CONTROL_CELL_SPEC_FLAG: u32 = 0x0000_0400;
-pub const FORMULA_ERROR_FLAG: u32 = 0x0000_0800;
-pub const COMMENT_FLAG: u32 = 0x0008_0000;
+pub(crate) const FORMULA_ERROR_FLAG: u32 = 0x0000_0800;
+pub(crate) const COMMENT_FLAG: u32 = 0x0008_0000;
 const CELL_FORMAT_KIND_FLAG: u32 = 0x0000_1000;
 const CELL_FORMAT_IDENTIFIER_FLAG: u32 = 0x0000_2000;
 const CURRENCY_FORMAT_IDENTIFIER_FLAG: u32 = 0x0000_4000;
@@ -68,7 +76,7 @@ const VALUE_FLAGS: u32 = DECIMAL_FLAG
     | FORMULA_FLAG
     | FORMULA_ERROR_FLAG;
 
-pub const FIELD_LAYOUT: &[(u32, usize)] = &[
+pub(crate) const FIELD_LAYOUT: &[(u32, usize)] = &[
     (0x0000_0001, 16),
     (0x0000_0002, 8),
     (0x0000_0004, 8),
@@ -111,6 +119,7 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+/// Result type for BNC decoding and mutation.
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -135,7 +144,7 @@ pub struct BncCell {
 }
 
 /// Allocation-free semantic view over one encoded BNC cell.
-pub(crate) struct BncCellView<'a> {
+pub struct BncCellView<'a> {
     cell_type: u8,
     fields: [Option<&'a [u8]>; FIELD_COUNT],
     cached_scalar: Option<CachedScalar>,
@@ -829,7 +838,13 @@ impl BncCell {
 
 impl<'a> BncCellView<'a> {
     /// Parses the value-bearing portion of a BNC cell without allocating.
-    pub(crate) fn parse(data: &'a [u8]) -> Result<Self> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the cell is truncated, uses an unsupported
+    /// version, contains an unknown field flag, or decodes a non-finite
+    /// scalar.
+    pub fn parse(data: &'a [u8]) -> Result<Self> {
         if data.len() < BNC_HEADER_LEN {
             return Err(Error::ParseError(
                 "Truncated Numbers BNC cell header".to_string(),
@@ -877,21 +892,27 @@ impl<'a> BncCellView<'a> {
         })
     }
 
+    /// Returns the typed value reference retained by this cell.
     #[must_use]
-    pub(crate) fn stored_value(&self) -> StoredValue {
+    pub fn stored_value(&self) -> StoredValue {
         stored_value_from(self.cell_type, |flag| self.u32_field(flag))
     }
 
+    /// Returns the validated, allocation-free scalar cache when present.
     #[must_use]
-    pub(crate) fn cached_scalar(&self) -> Option<CachedScalar> {
+    pub fn cached_scalar(&self) -> Option<CachedScalar> {
         self.cached_scalar
     }
 
-    pub(crate) fn formula_error_identifier(&self) -> Option<u32> {
+    /// Returns the native formula-error table identifier when present.
+    #[must_use]
+    pub fn formula_error_identifier(&self) -> Option<u32> {
         self.u32_field(FORMULA_ERROR_FLAG)
     }
 
-    pub(crate) fn comment_identifier(&self) -> Option<u32> {
+    /// Returns the native comment table identifier when present.
+    #[must_use]
+    pub fn comment_identifier(&self) -> Option<u32> {
         self.u32_field(COMMENT_FLAG)
     }
 
@@ -1106,6 +1127,12 @@ pub fn decimal128_le(value: f64) -> Result<[u8; 16]> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "the codec fixtures use fixed, locally constructed values whose failure should abort the test"
+    )]
+
     use super::*;
 
     fn finite(value: f64) -> FiniteF64 {
@@ -1130,8 +1157,8 @@ mod tests {
         let encoded = cell.encode();
         let reparsed = BncCell::parse(&encoded).unwrap();
         assert_eq!(reparsed.stored_value(), StoredValue::Number);
-        assert_eq!(reparsed.fields[&0x001000], 5u32.to_le_bytes());
-        assert_eq!(reparsed.fields[&0x020000], 1u32.to_le_bytes());
+        assert_eq!(reparsed.fields[&0x0000_1000], 5u32.to_le_bytes());
+        assert_eq!(reparsed.fields[&0x0002_0000], 1u32.to_le_bytes());
         assert_eq!(reparsed.fields[&DECIMAL_FLAG], decimal128_le(42.5).unwrap());
     }
 
@@ -1190,7 +1217,7 @@ mod tests {
     fn formula_cache_updates_preserve_formula_and_metadata() {
         let mut cell = BncCell::minimal();
         cell.set_comment_identifier(Some(9));
-        cell.fields.insert(0x001000, 5u32.to_le_bytes().to_vec());
+        cell.fields.insert(0x0000_1000, 5u32.to_le_bytes().to_vec());
         cell.set_number(3.0).unwrap();
         cell.set_formula_reference(17);
 
@@ -1201,7 +1228,7 @@ mod tests {
             Some(CachedScalar::Number(finite(42.5)))
         );
         assert_eq!(cell.comment_identifier(), Some(9));
-        assert_eq!(cell.fields[&0x001000], 5u32.to_le_bytes());
+        assert_eq!(cell.fields[&0x0000_1000], 5u32.to_le_bytes());
 
         cell.set_formula_cached_boolean(true).unwrap();
         assert_eq!(cell.stored_value(), StoredValue::Formula(17));
@@ -1210,7 +1237,7 @@ mod tests {
             Some(CachedScalar::Boolean(true))
         );
         assert_eq!(cell.comment_identifier(), Some(9));
-        assert_eq!(cell.fields[&0x001000], 5u32.to_le_bytes());
+        assert_eq!(cell.fields[&0x0000_1000], 5u32.to_le_bytes());
 
         assert!(BncCell::minimal().set_formula_cached_number(1.0).is_err());
     }

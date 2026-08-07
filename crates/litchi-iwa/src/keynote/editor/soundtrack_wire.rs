@@ -1,6 +1,7 @@
 //! Strict native object lookup and wire patching for Keynote soundtracks.
 
 use super::*;
+use crate::archive::FieldType;
 
 const DOCUMENT_OBJECT_ID: u64 = 1;
 const DOCUMENT_ARCHIVE_MESSAGE_TYPE: u32 = 1;
@@ -160,7 +161,7 @@ pub(super) fn replace_soundtrack_message(
         )));
     }
     for field_info in &mut info.field_infos {
-        if field_info.r#type != Some(tsp::field_info::Type::DataReference as i32) {
+        if field_info.r#type != Some(FieldType::DataReference) {
             continue;
         }
         if field_info.path.path != [MEDIA_FIELD] || field_info.data_references != old_identifiers {

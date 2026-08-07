@@ -18,6 +18,8 @@ pub enum AllocationKind {
     ObjectCatalog,
     /// The temporary reference duplicate catalog.
     ReferenceCatalog,
+    /// The immutable object-record storage assembled at build time.
+    SnapshotObjects,
     /// The temporary `(fragment, object)` ordering pairs assembled at build time.
     FragmentObjectPairs,
     /// The immutable object-identity storage grouped by fragment.
@@ -35,6 +37,7 @@ impl fmt::Display for AllocationKind {
             Self::FragmentCatalog => "fragment duplicate catalog",
             Self::ObjectCatalog => "object duplicate catalog",
             Self::ReferenceCatalog => "reference duplicate catalog",
+            Self::SnapshotObjects => "immutable object record storage",
             Self::FragmentObjectPairs => "fragment/object ordering pairs",
             Self::FragmentObjectIds => "fragment object identity storage",
             Self::FragmentEntries => "fragment lookup entries",

@@ -492,7 +492,8 @@ impl<'a> TableDataExtractor<'a> {
                 .iter()
                 .filter(|message| message.type_ == 3056)
                 .map(|message| tsd::CommentStorageArchive::decode(message.data.as_slice()))
-                .collect::<std::result::Result<Vec<_>, _>>()?;
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(Error::protobuf)?;
             let comment = comments.first().ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Object {storage_id} has no TSD comment-storage payload"
@@ -551,7 +552,8 @@ impl<'a> TableDataExtractor<'a> {
             .iter()
             .filter(|message| message.type_ == 6005 || message.type_ == 6201)
             .map(|message| tst::TableDataList::decode(message.data.as_slice()))
-            .collect::<std::result::Result<Vec<_>, _>>()?;
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Error::protobuf)?;
         let mut matching = lists
             .into_iter()
             .filter(|list| list.list_type == list_type as i32);
@@ -610,7 +612,8 @@ impl<'a> TableDataExtractor<'a> {
                     reference.identifier
                 )));
             }
-            let segment = tst::TableDataListSegment::decode(segment_message.data.as_slice())?;
+            let segment = tst::TableDataListSegment::decode(segment_message.data.as_slice())
+                .map_err(Error::protobuf)?;
             validate_table_data_list_segment(reference.identifier, list_type, &segment)?;
             for entry in segment.entries {
                 if !keys.insert(entry.key) {
@@ -1986,9 +1989,11 @@ fn finite_zero() -> Result<FiniteF64> {
 mod tests {
     use super::{CellTables, Error, FormulaReferenceMaps, TableDataExtractor};
     use crate::cell::Value as CellValue;
-    use crate::cell::wire::{BncCell, DECIMAL_FLAG, decimal128_le};
+    use crate::cell::wire::{BncCell, decimal128_le};
     use litchi_iwa_common::comment::Comment;
     use litchi_iwa_protos::tsce;
+
+    const TEST_DECIMAL_FLAG: u32 = 0x0000_0001;
 
     #[test]
     fn padded_missing_cell_offset_slots_are_accepted() {
@@ -2033,7 +2038,7 @@ mod tests {
         };
 
         let mut encoded = vec![5, 9, 0, 0, 0, 0, 0, 0];
-        encoded.extend_from_slice(&DECIMAL_FLAG.to_le_bytes());
+        encoded.extend_from_slice(&TEST_DECIMAL_FLAG.to_le_bytes());
         encoded.extend_from_slice(
             &decimal128_le(-1_234.5)
                 .unwrap_or_else(|error| panic!("test decimal did not encode: {error}")),

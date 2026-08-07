@@ -950,6 +950,32 @@ package/runtime object identifier. Reference, footnote-storage, and marker
 objects remain private to the IWA graph adapter, including cleanup after
 ordinary body edits.
 
+## iWork split and migration host
+
+The current iWork owners are concrete rather than prospective. Shared physical
+ZIP/IWA framing lives in `litchi-iwa-archive`, `litchi-iwa-core`,
+`litchi-iwa-detect`, and their focused leaves. `litchi-pages`,
+`litchi-numbers`, and `litchi-keynote` each own application package ingress and
+publish archive-free semantic documents. In particular,
+`litchi-pages::package` owns native Pages ZIP, IWA, and protobuf traversal;
+`litchi-pages::{document,section}` remain semantic and archive-free.
+
+`litchi-numbers-wire` owns the shared low-level Binary Numbers Cell codec. It
+is a versioned physical adapter so the migration host can depend on it without
+re-exporting a format implementation. `litchi-numbers` uses it privately, and
+the supported `litchi-numbers` and root `litchi::numbers` APIs expose neither a
+`cell::wire` module nor BNC flags, native format indices, or raw object IDs.
+Direct use of the wire crate is an explicit opt-in to unstable native storage
+details.
+
+`litchi-iwa` is now the sole declared iWork migration host, not a canonical
+dependency layer. Every one of its internal workspace edges is an ordered
+migration-debt item with a reason and a deletion condition. The host may be
+removed only after every remaining editor, example, fuzz target, generated
+schema path, and compatibility test has moved to a concrete format or focused
+substrate. No compatibility crate, feature, module, alias, or facade re-export
+may retain it after that gate.
+
 The `litchi-ole` monolith is removed after DOC, PPT, and XLS migrate into their
 concrete crates. It does not remain as a compatibility crate, feature, or
 module. The current `litchi-ooxml` monolith is likewise removed after its

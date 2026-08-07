@@ -475,6 +475,8 @@ pub(crate) fn parse_iwa_components(
     let Some(index_name) = nested_name else {
         return Ok(Vec::new());
     };
+    let declared_index_size = archive.reader.metadata(&index_name)?.uncompressed_size();
+    validated_limits.check_input_size(declared_index_size, "legacy iWork Index.zip")?;
     let index_data = archive.read(&index_name)?;
     let index_size = u64::try_from(index_data.len()).map_err(|_error| {
         Error::InvalidBundle("legacy iWork Index.zip length does not fit u64".to_owned())
@@ -557,6 +559,16 @@ mod tests {
     use super::*;
     use crate::LimitKind;
 
+    #[derive(Clone, Copy)]
+    struct PhysicalTestEntry<'a> {
+        local_name: &'a [u8],
+        local_extra: &'a [u8],
+        central_name: &'a [u8],
+        central_extra: &'a [u8],
+        central_comment: &'a [u8],
+        data: &'a [u8],
+    }
+
     fn push_u16(bytes: &mut Vec<u8>, value: u16) {
         bytes.extend_from_slice(&value.to_le_bytes());
     }
@@ -583,52 +595,69 @@ mod tests {
         central_comment: &[u8],
         data: &[u8],
     ) -> Vec<u8> {
-        let crc32 = soapberry_zip::crc32(data);
-        let mut bytes = Vec::new();
+        physical_zip_entries(&[PhysicalTestEntry {
+            local_name,
+            local_extra,
+            central_name,
+            central_extra,
+            central_comment,
+            data,
+        }])
+    }
 
-        push_u32(&mut bytes, 0x0403_4b50);
-        push_u16(&mut bytes, 20);
-        push_u16(&mut bytes, 0);
-        push_u16(&mut bytes, 0);
-        push_u16(&mut bytes, 0);
-        push_u16(&mut bytes, 0);
-        push_u32(&mut bytes, crc32);
-        push_u32(&mut bytes, checked_u32(data.len()));
-        push_u32(&mut bytes, checked_u32(data.len()));
-        push_u16(&mut bytes, checked_u16(local_name.len()));
-        push_u16(&mut bytes, checked_u16(local_extra.len()));
-        bytes.extend_from_slice(local_name);
-        bytes.extend_from_slice(local_extra);
-        bytes.extend_from_slice(data);
+    fn physical_zip_entries(entries: &[PhysicalTestEntry<'_>]) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        let mut local_offsets = Vec::new();
+        for entry in entries {
+            local_offsets.push(bytes.len());
+            let crc32 = soapberry_zip::crc32(entry.data);
+            push_u32(&mut bytes, 0x0403_4b50);
+            push_u16(&mut bytes, 20);
+            push_u16(&mut bytes, 0);
+            push_u16(&mut bytes, 0);
+            push_u16(&mut bytes, 0);
+            push_u16(&mut bytes, 0);
+            push_u32(&mut bytes, crc32);
+            push_u32(&mut bytes, checked_u32(entry.data.len()));
+            push_u32(&mut bytes, checked_u32(entry.data.len()));
+            push_u16(&mut bytes, checked_u16(entry.local_name.len()));
+            push_u16(&mut bytes, checked_u16(entry.local_extra.len()));
+            bytes.extend_from_slice(entry.local_name);
+            bytes.extend_from_slice(entry.local_extra);
+            bytes.extend_from_slice(entry.data);
+        }
 
         let central_offset = bytes.len();
-        push_u32(&mut bytes, 0x0201_4b50);
-        push_u16(&mut bytes, 20);
-        push_u16(&mut bytes, 20);
-        push_u16(&mut bytes, 0);
-        push_u16(&mut bytes, 0);
-        push_u16(&mut bytes, 0);
-        push_u16(&mut bytes, 0);
-        push_u32(&mut bytes, crc32);
-        push_u32(&mut bytes, checked_u32(data.len()));
-        push_u32(&mut bytes, checked_u32(data.len()));
-        push_u16(&mut bytes, checked_u16(central_name.len()));
-        push_u16(&mut bytes, checked_u16(central_extra.len()));
-        push_u16(&mut bytes, checked_u16(central_comment.len()));
-        push_u16(&mut bytes, 0);
-        push_u16(&mut bytes, 0);
-        push_u32(&mut bytes, 0);
-        push_u32(&mut bytes, 0);
-        bytes.extend_from_slice(central_name);
-        bytes.extend_from_slice(central_extra);
-        bytes.extend_from_slice(central_comment);
+        for (entry, local_offset) in entries.iter().zip(local_offsets) {
+            let crc32 = soapberry_zip::crc32(entry.data);
+            push_u32(&mut bytes, 0x0201_4b50);
+            push_u16(&mut bytes, 20);
+            push_u16(&mut bytes, 20);
+            push_u16(&mut bytes, 0);
+            push_u16(&mut bytes, 0);
+            push_u16(&mut bytes, 0);
+            push_u16(&mut bytes, 0);
+            push_u32(&mut bytes, crc32);
+            push_u32(&mut bytes, checked_u32(entry.data.len()));
+            push_u32(&mut bytes, checked_u32(entry.data.len()));
+            push_u16(&mut bytes, checked_u16(entry.central_name.len()));
+            push_u16(&mut bytes, checked_u16(entry.central_extra.len()));
+            push_u16(&mut bytes, checked_u16(entry.central_comment.len()));
+            push_u16(&mut bytes, 0);
+            push_u16(&mut bytes, 0);
+            push_u32(&mut bytes, 0);
+            push_u32(&mut bytes, checked_u32(local_offset));
+            bytes.extend_from_slice(entry.central_name);
+            bytes.extend_from_slice(entry.central_extra);
+            bytes.extend_from_slice(entry.central_comment);
+        }
         let central_size = bytes.len() - central_offset;
 
         push_u32(&mut bytes, 0x0605_4b50);
         push_u16(&mut bytes, 0);
         push_u16(&mut bytes, 0);
-        push_u16(&mut bytes, 1);
-        push_u16(&mut bytes, 1);
+        push_u16(&mut bytes, checked_u16(entries.len()));
+        push_u16(&mut bytes, checked_u16(entries.len()));
         push_u32(&mut bytes, checked_u32(central_size));
         push_u32(&mut bytes, checked_u32(central_offset));
         push_u16(&mut bytes, 0);
@@ -665,6 +694,24 @@ mod tests {
     }
 
     #[test]
+    fn raw_layout_rejects_central_member_name_before_materialization() -> Result<()> {
+        let bytes = physical_zip(b"a", b"", b"central", b"", b"", b"x");
+        let archive = RawZipArchive::from_slice(bytes.as_slice())?;
+        let mut limits = raw_limits();
+        limits.max_member_name_bytes = 6;
+
+        assert!(matches!(
+            parse_physical_entries(&bytes, &archive, limits),
+            Err(Error::Limit {
+                kind: LimitKind::MemberNameBytes,
+                observed: 7,
+                maximum: 6,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn raw_layout_charges_local_and_central_metadata_before_materialization() -> Result<()> {
         let bytes = physical_zip(b"a", b"xy", b"a", b"z", b"q", b"x");
         let archive = RawZipArchive::from_slice(bytes.as_slice())?;
@@ -677,6 +724,42 @@ mod tests {
                 kind: LimitKind::MetadataBytes,
                 observed: 6,
                 maximum: 5,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn raw_layout_aggregates_physical_metadata_across_entries() -> Result<()> {
+        let entries = [
+            PhysicalTestEntry {
+                local_name: b"a",
+                local_extra: b"x",
+                central_name: b"a",
+                central_extra: b"y",
+                central_comment: b"",
+                data: b"1",
+            },
+            PhysicalTestEntry {
+                local_name: b"b",
+                local_extra: b"z",
+                central_name: b"b",
+                central_extra: b"q",
+                central_comment: b"",
+                data: b"2",
+            },
+        ];
+        let bytes = physical_zip_entries(&entries);
+        let archive = RawZipArchive::from_slice(bytes.as_slice())?;
+        let mut limits = raw_limits();
+        limits.max_metadata_bytes = 7;
+
+        assert!(matches!(
+            parse_physical_entries(&bytes, &archive, limits),
+            Err(Error::Limit {
+                kind: LimitKind::MetadataBytes,
+                observed: 8,
+                maximum: 7,
             })
         ));
         Ok(())
@@ -766,6 +849,36 @@ mod tests {
             &long_local_name,
             b"",
             b"Index/Document.iwa",
+            b"",
+            b"",
+            b"iwa",
+        );
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("legacy.pages/Index.zip", &index)?;
+        let bytes = writer.finish_to_bytes()?;
+        let archive = ZipArchive::new_with_limits(&bytes, Limits::default())?;
+
+        assert!(matches!(
+            parse_iwa_components(&archive, Limits::default()),
+            Err(Error::Limit {
+                kind: LimitKind::MemberNameBytes,
+                observed,
+                maximum: Limits::MAX_MEMBER_NAME_BYTES,
+            }) if observed == Limits::MAX_MEMBER_NAME_BYTES + 1
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn nested_index_applies_raw_central_member_name_limit() -> Result<()> {
+        let maximum_name = usize::try_from(Limits::MAX_MEMBER_NAME_BYTES).map_err(|_error| {
+            Error::InvalidBundle("test member name limit does not fit usize".to_owned())
+        })?;
+        let long_central_name = vec![b'a'; maximum_name + 1];
+        let index = physical_zip(
+            b"Index/Document.iwa",
+            b"",
+            &long_central_name,
             b"",
             b"",
             b"iwa",

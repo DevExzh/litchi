@@ -1,0 +1,15 @@
+[package]
+name        = "litchi-numbers-wire"
+description = "Low-level Binary Numbers Cell codec for iWork format adapters."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+litchi-iwa-common = { workspace = true }
+
+[lints]
+workspace = true

@@ -6698,6 +6698,87 @@ Pages section-name extraction is not yet implemented. Buffa 0.9.1 also retains
 internal infallible `Vec` growth, so these finite preflight budgets are not an
 exact process-RSS or global out-of-memory guarantee.
 
+## 2026-08-08 split-owner and adversarial-ingress slice
+
+The next slice makes the monolith exit measurable. `litchi-iwa` is the only
+declared migration host, and all 17 of its internal edges are ordered debt with
+reasons and exit conditions. Three exact-parity physical examples—package
+preservation, full IWA round trip, and decompressed package comparison—moved to
+`litchi-iwa-archive`; structured extraction stayed in the host because direct
+format packages still differ observably. The boundary checker now inventories
+63 packages and 217 internal declarations.
+
+Numbers BNC storage moved from `litchi-numbers::cell::wire` into the versioned
+low-level `litchi-numbers-wire` crate. Numbers consumes it privately and the
+legacy host depends on it directly; neither `litchi-numbers` nor the root
+facade re-exports the codec. A compile-fail gate proves the old module is
+private. The Numbers package error no longer exposes `prost::DecodeError`.
+Format package and smart-detection `Debug` implementations are redacted so
+ordinary logging cannot dump complete document sources or native catalogs.
+
+Pages now resolves the native section graph: root field 5 supplies the initial
+section, storage field 17 supplies later UTF-16 boundaries, and each reference
+must resolve to one type-10011 section whose field 26 supplies the exact name.
+The adapter validates unique references and boundaries, scalar positions, and
+U+0004 break markers; it omits those markers while remapping text runs and
+preserves absent versus empty names. The native fixture proves the authored
+name `Blank`, and the root facade now traverses section text storages rather
+than reporting a nonempty Pages body as zero paragraphs.
+
+Archive headers still use the stock registry Buffa 0.9.1 dependency; no local
+or git patch is required for downstream correctness. Core metadata is now
+represented by core-owned `FieldPath`, `FieldInfo`, `FieldType`,
+`UnknownFieldRule`, and `KnownFieldRule`. Optional presence and unknown signed
+enum values round-trip exactly, generated public `From` implementations are
+gone, and preflight charges both Buffa and neutral projection allocations.
+Buffa differential tests cover duplicate merges, packed and unpacked scalars,
+all unknown wire kinds, noncanonical encodings, every deferred child route,
+and inclusive limit boundaries.
+
+A separate five-file, at-most-32-KiB Buffa projection reads only repeated
+field 3 of `TSWP.StorageArchive`. Its generated types remain private, unknown
+retention is disabled, source bytes remain authoritative, and common-wire
+preflight bounds bytes, fields, wire type, fragment count, UTF-8, aggregate
+text, and repeated-view memory. The existing Prost-shaped conversion remains a
+temporary compatibility oracle; focused format payload call sites have not yet
+moved because unrelated known submessages are intentionally opaque in the
+narrow projection.
+
+Physical ZIP adversaries now cover independent local and central names,
+nested central names, cumulative metadata, exact observed/maximum diagnostics,
+and corrupt Deflate data whose declared nested `Index.zip` size must fail
+before decompression. Native Numbers, Pages, and Keynote packages preserve
+every decompressed IWA component through `to_bytes`, `write_to`, and empty
+reassembly. Index snapshot construction reserves each derived table fallibly
+and reports its precise allocation kind.
+
+Computer Use opened the fresh Pages no-op and Numbers full round-trip artifacts
+in real Pages and Numbers without repair prompts. Pages exposed all three body
+lines; Numbers exposed the 22-by-7 table, fixture marker, and value `42`. Both
+applications saved new copies under
+`/private/tmp/litchi-iwork-split.tpXqvQ/`; those app-authored copies then passed
+the bounded no-op path with zero changed decompressed components. A prior
+Keynote-authored copy passed the same gate, and the original Keynote fixture
+again exposed its title, body, and date in the real application.
+
+The native gate rejected a proposed Keynote field-10 navigator-name
+transaction even though internal parse/readback and unknown-byte tests passed:
+both the focused prototype and the legacy editor caused Keynote to render
+layout placeholder text and ignore the requested label. The concrete API,
+example, and tests were removed. This is retained as negative evidence that a
+semantic self-read is not a substitute for native application verification.
+
+Focused verification includes 14 protobuf/Buffa tests, 1 core unit plus 28
+framing tests, 12 text-wire tests, 38 archive units plus adversarial and native
+preservation integrations, 8 index tests, 10 detector tests, 17 Numbers-wire
+tests, 58 Numbers units plus its native fixture, 45 Pages units plus its native
+fixture, 53 Keynote units plus five non-edit integration tests, and the root
+Pages facade regression. The legacy 1,471-test library suite remains an
+explicit compatibility gate. Remaining debt includes the monolithic editors and fuzz
+targets, focused-format Prost payload decoders, format-owned error/limit
+vocabularies, the strict Keynote storage-type audit, and a native-correct
+Keynote name mutation design.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

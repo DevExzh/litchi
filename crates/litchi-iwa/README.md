@@ -1410,8 +1410,8 @@ slide's `owned_drawables` list. The `inspect_drawable_comments`,
 and sheet-scoped APIs.
 Nested comment references and comment-storage text/UUID fields are patched at
 the protobuf wire level, retaining unknown Apple fields byte-for-byte; the
-`compare_iwa_packages` example compares decompressed object streams independently
-of Snappy block choices.
+the `litchi-iwa-archive` `compare_iwa_packages` example compares decompressed
+object streams independently of Snappy block choices.
 
 Pages sections can be appended by cloning a reachable section's layout and
 template references at the current UTF-16 body end, then removed without

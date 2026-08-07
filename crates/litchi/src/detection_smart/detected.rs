@@ -16,7 +16,6 @@
 /// iWork and ODF leaf detectors may scan a container before a later document
 /// parser reads the retained bytes again. No parsing-once guarantee is made for
 /// those formats.
-#[derive(Debug)]
 pub enum DetectedFormat {
     // OOXML formats with parsed OPC package
     #[cfg(feature = "docx")]
@@ -58,6 +57,47 @@ pub enum DetectedFormat {
     // RTF format (plain text, no parsing structure needed)
     #[cfg(feature = "rtf")]
     Rtf(Vec<u8>),
+}
+
+impl std::fmt::Debug for DetectedFormat {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            #[cfg(feature = "docx")]
+            Self::Docx(_) => "Docx",
+            #[cfg(feature = "pptx")]
+            Self::Pptx(_) => "Pptx",
+            #[cfg(feature = "xlsx")]
+            Self::Xlsx(_) => "Xlsx",
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(_) => "Xlsb",
+            #[cfg(feature = "doc")]
+            Self::Doc(_) => "Doc",
+            #[cfg(feature = "ppt")]
+            Self::Ppt(_) => "Ppt",
+            #[cfg(feature = "xls")]
+            Self::Xls(_) => "Xls",
+            #[cfg(feature = "pages")]
+            Self::Pages(_) => "Pages",
+            #[cfg(feature = "keynote")]
+            Self::Keynote(_) => "Keynote",
+            #[cfg(feature = "numbers")]
+            Self::Numbers(_) => "Numbers",
+            #[cfg(feature = "odt")]
+            Self::Odt(_) => "Odt",
+            #[cfg(feature = "odp")]
+            Self::Odp(_) => "Odp",
+            #[cfg(feature = "ods")]
+            Self::Ods(_) => "Ods",
+            #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+            Self::FlatOdf(_, _) => "FlatOdf",
+            #[cfg(feature = "rtf")]
+            Self::Rtf(_) => "Rtf",
+        };
+        formatter
+            .debug_tuple("DetectedFormat")
+            .field(&name)
+            .finish()
+    }
 }
 
 /// Detect a format while moving the source into a reusable result.
@@ -382,5 +422,15 @@ mod short_signature_tests {
             Some(super::DetectedFormat::Rtf(bytes)) => assert_eq!(bytes, br#"{\rtf"#),
             _ => panic!("minimal RTF signature was not retained"),
         }
+    }
+
+    #[cfg(feature = "pages")]
+    #[test]
+    fn debug_output_names_the_format_without_dumping_source_bytes() {
+        let detected = super::DetectedFormat::Pages(b"private document marker".to_vec());
+        let debug = format!("{detected:?}");
+
+        assert_eq!(debug, "DetectedFormat(\"Pages\")");
+        assert!(!debug.contains("private document marker"));
     }
 }

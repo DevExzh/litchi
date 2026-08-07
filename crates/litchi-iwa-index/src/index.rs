@@ -172,36 +172,28 @@ impl IndexBuilder {
             }
         }
 
+        // Duplicate catalogs have completed their validation role. Releasing
+        // them before allocating immutable tables keeps builder-only hash
+        // storage out of the publication peak.
+        drop(self.fragment_catalog);
+        drop(self.object_catalog);
+        drop(self.reference_catalog);
+
         self.fragments.sort_unstable();
         self.objects.sort_unstable_by_key(ObjectRecord::id);
         self.references.sort_unstable();
 
-        let mut fragment_pairs = Vec::new();
-        fragment_pairs
-            .try_reserve_exact(self.objects.len())
-            .map_err(|_error| IndexError::Allocation {
-                kind: AllocationKind::FragmentObjectPairs,
-                requested: self.objects.len(),
-            })?;
+        let mut fragment_pairs =
+            try_snapshot_buffer(self.objects.len(), AllocationKind::FragmentObjectPairs)?;
         for object in &self.objects {
             fragment_pairs.push((object.fragment(), object.id()));
         }
         fragment_pairs.sort_unstable();
 
-        let mut fragment_object_ids = Vec::new();
-        fragment_object_ids
-            .try_reserve_exact(fragment_pairs.len())
-            .map_err(|_error| IndexError::Allocation {
-                kind: AllocationKind::FragmentObjectIds,
-                requested: fragment_pairs.len(),
-            })?;
-        let mut fragment_entries = Vec::new();
-        fragment_entries
-            .try_reserve_exact(self.fragments.len())
-            .map_err(|_error| IndexError::Allocation {
-                kind: AllocationKind::FragmentEntries,
-                requested: self.fragments.len(),
-            })?;
+        let mut fragment_object_ids =
+            try_snapshot_buffer(fragment_pairs.len(), AllocationKind::FragmentObjectIds)?;
+        let mut fragment_entries =
+            try_snapshot_buffer(self.fragments.len(), AllocationKind::FragmentEntries)?;
         let mut pair_position = 0;
         for &fragment in &self.fragments {
             let start = pair_position;
@@ -218,13 +210,29 @@ impl IndexBuilder {
             });
         }
 
+        drop(fragment_pairs);
+        drop(self.fragments);
+
+        // Builder vectors deliberately grow geometrically. Moving records into
+        // an exactly reserved buffer when needed makes final immutable
+        // compaction fallible instead of relying on `Vec::into_boxed_slice` to
+        // shrink an over-capacity builder allocation during publication.
+        let snapshot_objects = if self.objects.len() == self.objects.capacity() {
+            self.objects
+        } else {
+            let mut objects =
+                try_snapshot_buffer(self.objects.len(), AllocationKind::SnapshotObjects)?;
+            objects.extend(self.objects);
+            objects
+        };
+
         let mut graph = ReferenceGraph::new();
         for reference in self.references {
             graph.add_object_reference(reference.source(), reference.target());
         }
 
         Ok(ObjectIndex {
-            objects: self.objects.into_boxed_slice(),
+            objects: snapshot_objects.into_boxed_slice(),
             fragments: fragment_entries.into_boxed_slice(),
             fragment_object_ids: fragment_object_ids.into_boxed_slice(),
             graph: graph.snapshot(),
@@ -352,6 +360,14 @@ impl ObjectIndex {
     pub fn has_cycle(&self, start: ObjectId) -> bool {
         self.graph.has_cycle_from(start)
     }
+}
+
+fn try_snapshot_buffer<T>(requested: usize, kind: AllocationKind) -> Result<Vec<T>, IndexError> {
+    let mut buffer = Vec::new();
+    buffer
+        .try_reserve_exact(requested)
+        .map_err(|_error| IndexError::Allocation { kind, requested })?;
+    Ok(buffer)
 }
 
 #[cfg(test)]
@@ -610,5 +626,23 @@ mod tests {
             builder.build_allow_missing_targets(),
             Err(IndexError::UnknownSource(actual)) if actual == source
         ));
+    }
+
+    #[test]
+    fn snapshot_reservation_failures_identify_each_derived_storage() {
+        for kind in [
+            AllocationKind::SnapshotObjects,
+            AllocationKind::FragmentObjectPairs,
+            AllocationKind::FragmentObjectIds,
+            AllocationKind::FragmentEntries,
+        ] {
+            assert_eq!(
+                try_snapshot_buffer::<u8>(usize::MAX, kind),
+                Err(IndexError::Allocation {
+                    kind,
+                    requested: usize::MAX,
+                })
+            );
+        }
     }
 }

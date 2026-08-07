@@ -50,6 +50,206 @@ enum HeaderNode {
     FieldPath,
 }
 
+/// Schema-neutral path to a field nested inside an archive payload.
+///
+/// An empty component list is valid on the wire. Required `FieldInfo.path`
+/// presence is enforced while decoding, before this value is published.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+pub struct FieldPath {
+    /// Field numbers from the payload root to the selected field.
+    pub path: Vec<u32>,
+}
+
+impl FieldPath {
+    /// Construct a field path from its ordered field numbers.
+    #[must_use]
+    pub const fn new(path: Vec<u32>) -> Self {
+        Self { path }
+    }
+
+    /// Borrow the ordered field numbers.
+    #[must_use]
+    pub fn as_slice(&self) -> &[u32] {
+        &self.path
+    }
+}
+
+impl From<Vec<u32>> for FieldPath {
+    fn from(path: Vec<u32>) -> Self {
+        Self::new(path)
+    }
+}
+
+/// Kind of value described by field-level archive metadata.
+///
+/// `Unrecognized` preserves future or producer-specific closed-enum values
+/// exactly instead of coercing them to a known default.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum FieldType {
+    Value,
+    ObjectReference,
+    DataReference,
+    Message,
+    Unrecognized(i32),
+}
+
+impl FieldType {
+    /// Project one raw protobuf enum value without losing unknown values.
+    #[must_use]
+    pub const fn from_raw(value: i32) -> Self {
+        match value {
+            0 => Self::Value,
+            1 => Self::ObjectReference,
+            2 => Self::DataReference,
+            3 => Self::Message,
+            unrecognized => Self::Unrecognized(unrecognized),
+        }
+    }
+
+    /// Return the exact raw protobuf enum value.
+    #[must_use]
+    pub const fn raw_value(self) -> i32 {
+        match self {
+            Self::Value => 0,
+            Self::ObjectReference => 1,
+            Self::DataReference => 2,
+            Self::Message => 3,
+            Self::Unrecognized(value) => value,
+        }
+    }
+}
+
+/// Preservation policy for an unknown payload field.
+///
+/// `Unrecognized` retains future closed-enum values. In particular,
+/// `NotSupported` is the known native value `-1`, not an unknown value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum UnknownFieldRule {
+    IgnoreAndPreserveUntilModified,
+    IgnoreAndPreserve,
+    MustUnderstand,
+    NotSupported,
+    Unrecognized(i32),
+}
+
+impl UnknownFieldRule {
+    /// Project one raw protobuf enum value without losing unknown values.
+    #[must_use]
+    pub const fn from_raw(value: i32) -> Self {
+        match value {
+            0 => Self::IgnoreAndPreserveUntilModified,
+            1 => Self::IgnoreAndPreserve,
+            2 => Self::MustUnderstand,
+            -1 => Self::NotSupported,
+            unrecognized => Self::Unrecognized(unrecognized),
+        }
+    }
+
+    /// Return the exact raw protobuf enum value.
+    #[must_use]
+    pub const fn raw_value(self) -> i32 {
+        match self {
+            Self::IgnoreAndPreserveUntilModified => 0,
+            Self::IgnoreAndPreserve => 1,
+            Self::MustUnderstand => 2,
+            Self::NotSupported => -1,
+            Self::Unrecognized(value) => value,
+        }
+    }
+}
+
+/// Preservation policy for a recognized payload field introduced by a newer
+/// producer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum KnownFieldRule {
+    None,
+    PreserveNewerValueUntilModified,
+    PreserveNewerValue,
+    Unrecognized(i32),
+}
+
+impl KnownFieldRule {
+    /// Project one raw protobuf enum value without losing unknown values.
+    #[must_use]
+    pub const fn from_raw(value: i32) -> Self {
+        match value {
+            0 => Self::None,
+            1 => Self::PreserveNewerValueUntilModified,
+            2 => Self::PreserveNewerValue,
+            unrecognized => Self::Unrecognized(unrecognized),
+        }
+    }
+
+    /// Return the exact raw protobuf enum value.
+    #[must_use]
+    pub const fn raw_value(self) -> i32 {
+        match self {
+            Self::None => 0,
+            Self::PreserveNewerValueUntilModified => 1,
+            Self::PreserveNewerValue => 2,
+            Self::Unrecognized(value) => value,
+        }
+    }
+}
+
+/// Field-level reference and compatibility metadata for one archive payload.
+///
+/// Optional enum fields retain presence separately from their schema default;
+/// this is required for canonical-byte parity after a semantic edit.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FieldInfo {
+    pub path: FieldPath,
+    pub r#type: Option<FieldType>,
+    pub unknown_field_rule: Option<UnknownFieldRule>,
+    pub object_references: Vec<u64>,
+    pub data_references: Vec<u64>,
+    pub known_field_rule: Option<KnownFieldRule>,
+    pub known_field_version: Vec<u32>,
+    pub known_field_feature_identifier: Option<String>,
+}
+
+impl FieldInfo {
+    /// Construct metadata for a field path with every optional wire field
+    /// absent.
+    #[must_use]
+    pub fn new(path: impl Into<FieldPath>) -> Self {
+        Self {
+            path: path.into(),
+            ..Self::default()
+        }
+    }
+
+    /// Resolve the schema default without changing encoded presence.
+    #[must_use]
+    pub const fn effective_type(&self) -> FieldType {
+        match self.r#type {
+            Some(value) => value,
+            None => FieldType::Value,
+        }
+    }
+
+    /// Resolve the schema default without changing encoded presence.
+    #[must_use]
+    pub const fn effective_unknown_field_rule(&self) -> UnknownFieldRule {
+        match self.unknown_field_rule {
+            Some(value) => value,
+            None => UnknownFieldRule::IgnoreAndPreserveUntilModified,
+        }
+    }
+
+    /// Resolve the schema default without changing encoded presence.
+    #[must_use]
+    pub const fn effective_known_field_rule(&self) -> KnownFieldRule {
+        match self.known_field_rule {
+            Some(value) => value,
+            None => KnownFieldRule::None,
+        }
+    }
+}
+
 /// Metadata for one object in an IWA component.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ArchiveInfo {
@@ -97,7 +297,7 @@ impl ArchiveInfo {
                         error.to_string(),
                     )
                 })?;
-        let archive_info = Self::from(decoded);
+        let archive_info = archive_info_from_proto(decoded)?;
         archive_info.validate_with_limits(limits)?;
         Ok(archive_info)
     }
@@ -142,39 +342,19 @@ impl ArchiveInfo {
     }
 }
 
-impl From<tsp::ArchiveInfo> for ArchiveInfo {
-    fn from(value: tsp::ArchiveInfo) -> Self {
-        Self {
-            identifier: value.identifier,
-            message_infos: value.message_infos.into_iter().map(Into::into).collect(),
-            should_merge: value.should_merge,
-        }
-    }
-}
-
-impl From<&ArchiveInfo> for tsp::ArchiveInfo {
-    fn from(value: &ArchiveInfo) -> Self {
-        Self {
-            identifier: value.identifier,
-            message_infos: value.message_infos.iter().map(Into::into).collect(),
-            should_merge: value.should_merge,
-        }
-    }
-}
-
 /// Metadata for one payload in an archive object.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MessageInfo {
     pub type_: u32,
     pub versions: Vec<u32>,
     pub length: u32,
-    pub field_infos: Vec<tsp::FieldInfo>,
+    pub field_infos: Vec<FieldInfo>,
     pub object_references: Vec<u64>,
     pub data_references: Vec<u64>,
     pub base_message_index: Option<u32>,
     pub diff_merge_version: Vec<u32>,
-    pub diff_field_path: Option<tsp::FieldPath>,
-    pub fields_to_remove: Vec<tsp::FieldPath>,
+    pub diff_field_path: Option<FieldPath>,
+    pub fields_to_remove: Vec<FieldPath>,
     pub diff_read_version: Vec<u32>,
 }
 
@@ -237,7 +417,7 @@ impl MessageInfo {
                         error.to_string(),
                     )
                 })?;
-        let message_info = Self::from(decoded);
+        let message_info = message_info_from_proto(decoded)?;
         message_info.validate_with_limits(limits)?;
         Ok(message_info)
     }
@@ -308,42 +488,6 @@ impl MessageInfo {
             add_count(&mut count, path.path.len())?;
         }
         Ok(count)
-    }
-}
-
-impl From<tsp::MessageInfo> for MessageInfo {
-    fn from(value: tsp::MessageInfo) -> Self {
-        Self {
-            type_: value.r#type,
-            versions: value.version,
-            length: value.length,
-            field_infos: value.field_infos,
-            object_references: value.object_references,
-            data_references: value.data_references,
-            base_message_index: value.base_message_index,
-            diff_merge_version: value.diff_merge_version,
-            diff_field_path: value.diff_field_path,
-            fields_to_remove: value.fields_to_remove,
-            diff_read_version: value.diff_read_version,
-        }
-    }
-}
-
-impl From<&MessageInfo> for tsp::MessageInfo {
-    fn from(value: &MessageInfo) -> Self {
-        Self {
-            r#type: value.type_,
-            version: value.versions.clone(),
-            length: value.length,
-            field_infos: value.field_infos.clone(),
-            object_references: value.object_references.clone(),
-            data_references: value.data_references.clone(),
-            base_message_index: value.base_message_index,
-            diff_merge_version: value.diff_merge_version.clone(),
-            diff_field_path: value.diff_field_path.clone(),
-            fields_to_remove: value.fields_to_remove.clone(),
-            diff_read_version: value.diff_read_version.clone(),
-        }
     }
 }
 
@@ -904,6 +1048,204 @@ impl Default for Archive {
     }
 }
 
+fn archive_info_from_proto(value: tsp::ArchiveInfo) -> Result<ArchiveInfo> {
+    let mut message_infos = Vec::new();
+    message_infos
+        .try_reserve_exact(value.message_infos.len())
+        .map_err(|_| {
+            Error::allocation("IWA neutral message metadata", value.message_infos.len())
+        })?;
+    for message_info in value.message_infos {
+        message_infos.push(message_info_from_proto(message_info)?);
+    }
+    Ok(ArchiveInfo {
+        identifier: value.identifier,
+        message_infos,
+        should_merge: value.should_merge,
+    })
+}
+
+fn archive_info_to_proto(value: &ArchiveInfo) -> Result<tsp::ArchiveInfo> {
+    let mut message_infos = Vec::new();
+    message_infos
+        .try_reserve_exact(value.message_infos.len())
+        .map_err(|_| {
+            Error::allocation(
+                "IWA compatibility message metadata",
+                value.message_infos.len(),
+            )
+        })?;
+    for message_info in &value.message_infos {
+        message_infos.push(message_info_to_proto(message_info)?);
+    }
+    Ok(tsp::ArchiveInfo {
+        identifier: value.identifier,
+        message_infos,
+        should_merge: value.should_merge,
+    })
+}
+
+fn message_info_from_proto(value: tsp::MessageInfo) -> Result<MessageInfo> {
+    let mut field_infos = Vec::new();
+    field_infos
+        .try_reserve_exact(value.field_infos.len())
+        .map_err(|_| Error::allocation("IWA neutral field metadata", value.field_infos.len()))?;
+    for field_info in value.field_infos {
+        field_infos.push(field_info_from_proto(field_info));
+    }
+
+    let mut fields_to_remove = Vec::new();
+    fields_to_remove
+        .try_reserve_exact(value.fields_to_remove.len())
+        .map_err(|_| {
+            Error::allocation(
+                "IWA neutral removed field paths",
+                value.fields_to_remove.len(),
+            )
+        })?;
+    for field_path in value.fields_to_remove {
+        fields_to_remove.push(field_path_from_proto(field_path));
+    }
+
+    Ok(MessageInfo {
+        type_: value.r#type,
+        versions: value.version,
+        length: value.length,
+        field_infos,
+        object_references: value.object_references,
+        data_references: value.data_references,
+        base_message_index: value.base_message_index,
+        diff_merge_version: value.diff_merge_version,
+        diff_field_path: value.diff_field_path.map(field_path_from_proto),
+        fields_to_remove,
+        diff_read_version: value.diff_read_version,
+    })
+}
+
+fn message_info_to_proto(value: &MessageInfo) -> Result<tsp::MessageInfo> {
+    let mut field_infos = Vec::new();
+    field_infos
+        .try_reserve_exact(value.field_infos.len())
+        .map_err(|_| {
+            Error::allocation("IWA compatibility field metadata", value.field_infos.len())
+        })?;
+    for field_info in &value.field_infos {
+        field_infos.push(field_info_to_proto(field_info)?);
+    }
+
+    let mut fields_to_remove = Vec::new();
+    fields_to_remove
+        .try_reserve_exact(value.fields_to_remove.len())
+        .map_err(|_| {
+            Error::allocation(
+                "IWA compatibility removed field paths",
+                value.fields_to_remove.len(),
+            )
+        })?;
+    for field_path in &value.fields_to_remove {
+        fields_to_remove.push(field_path_to_proto(field_path)?);
+    }
+
+    Ok(tsp::MessageInfo {
+        r#type: value.type_,
+        version: try_copy_slice(&value.versions, "IWA compatibility message versions")?,
+        length: value.length,
+        field_infos,
+        object_references: try_copy_slice(
+            &value.object_references,
+            "IWA compatibility object references",
+        )?,
+        data_references: try_copy_slice(
+            &value.data_references,
+            "IWA compatibility data references",
+        )?,
+        base_message_index: value.base_message_index,
+        diff_merge_version: try_copy_slice(
+            &value.diff_merge_version,
+            "IWA compatibility diff merge versions",
+        )?,
+        diff_field_path: value
+            .diff_field_path
+            .as_ref()
+            .map(field_path_to_proto)
+            .transpose()?,
+        fields_to_remove,
+        diff_read_version: try_copy_slice(
+            &value.diff_read_version,
+            "IWA compatibility diff read versions",
+        )?,
+    })
+}
+
+fn field_info_from_proto(value: tsp::FieldInfo) -> FieldInfo {
+    FieldInfo {
+        path: field_path_from_proto(value.path),
+        r#type: value.r#type.map(FieldType::from_raw),
+        unknown_field_rule: value.unknown_field_rule.map(UnknownFieldRule::from_raw),
+        object_references: value.object_references,
+        data_references: value.data_references,
+        known_field_rule: value.known_field_rule.map(KnownFieldRule::from_raw),
+        known_field_version: value.known_field_version,
+        known_field_feature_identifier: value.known_field_feature_identifier,
+    }
+}
+
+fn field_info_to_proto(value: &FieldInfo) -> Result<tsp::FieldInfo> {
+    Ok(tsp::FieldInfo {
+        path: field_path_to_proto(&value.path)?,
+        r#type: value.r#type.map(FieldType::raw_value),
+        unknown_field_rule: value.unknown_field_rule.map(UnknownFieldRule::raw_value),
+        object_references: try_copy_slice(
+            &value.object_references,
+            "IWA compatibility field object references",
+        )?,
+        data_references: try_copy_slice(
+            &value.data_references,
+            "IWA compatibility field data references",
+        )?,
+        known_field_rule: value.known_field_rule.map(KnownFieldRule::raw_value),
+        known_field_version: try_copy_slice(
+            &value.known_field_version,
+            "IWA compatibility known field versions",
+        )?,
+        known_field_feature_identifier: value
+            .known_field_feature_identifier
+            .as_deref()
+            .map(|identifier| {
+                try_copy_string(identifier, "IWA compatibility field feature identifier")
+            })
+            .transpose()?,
+    })
+}
+
+fn field_path_from_proto(value: tsp::FieldPath) -> FieldPath {
+    FieldPath { path: value.path }
+}
+
+fn field_path_to_proto(value: &FieldPath) -> Result<tsp::FieldPath> {
+    Ok(tsp::FieldPath {
+        path: try_copy_slice(&value.path, "IWA compatibility field path")?,
+    })
+}
+
+fn try_copy_slice<T: Copy>(source: &[T], resource: &'static str) -> Result<Vec<T>> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(source.len())
+        .map_err(|_| Error::allocation(resource, source.len()))?;
+    output.extend_from_slice(source);
+    Ok(output)
+}
+
+fn try_copy_string(source: &str, resource: &'static str) -> Result<String> {
+    let mut output = String::new();
+    output
+        .try_reserve_exact(source.len())
+        .map_err(|_| Error::allocation(resource, source.len()))?;
+    output.push_str(source);
+    Ok(output)
+}
+
 fn check_header_length(length: usize, limits: Limits) -> Result<()> {
     if length > limits.max_header_bytes() {
         return Err(limit(
@@ -916,7 +1258,7 @@ fn check_header_length(length: usize, limits: Limits) -> Result<()> {
 }
 
 fn encode_archive_info(info: &ArchiveInfo, limits: Limits) -> Result<Vec<u8>> {
-    let encoded_info = tsp::ArchiveInfo::from(info);
+    let encoded_info = archive_info_to_proto(info)?;
     let header_length = usize::try_from(
         archive_codec::archive_info_encoded_len(&encoded_info).map_err(|error| {
             Error::header_codec(
@@ -945,7 +1287,7 @@ fn encode_archive_info(info: &ArchiveInfo, limits: Limits) -> Result<Vec<u8>> {
 }
 
 fn archive_info_encoded_len(info: &ArchiveInfo) -> Result<usize> {
-    let compatibility = tsp::ArchiveInfo::from(info);
+    let compatibility = archive_info_to_proto(info)?;
     usize::try_from(
         archive_codec::archive_info_encoded_len(&compatibility).map_err(|error| {
             Error::header_codec(
@@ -1076,6 +1418,13 @@ fn field_memory_charge(node: Option<HeaderNode>, visit: WireVisit<'_, '_>) -> us
             0
         }
     };
+    let projected_message = |compatibility_width: usize, neutral_width: usize| {
+        if wire_type == 2 {
+            message(compatibility_width).saturating_add(neutral_width)
+        } else {
+            0
+        }
+    };
 
     match (node, number) {
         (Some(HeaderNode::ArchiveInfo), 2) => message(size_of::<MessageInfo>()),
@@ -1083,22 +1432,49 @@ fn field_memory_charge(node: Option<HeaderNode>, visit: WireVisit<'_, '_>) -> us
         (Some(HeaderNode::MessageInfo), 5 | 6) | (Some(HeaderNode::FieldInfo), 4 | 5) => {
             scalar(size_of::<u64>())
         },
-        (Some(HeaderNode::MessageInfo), 4) => message(size_of::<tsp::FieldInfo>()),
-        (Some(HeaderNode::MessageInfo), 9 | 10) | (Some(HeaderNode::FieldInfo), 1) => {
+        (Some(HeaderNode::MessageInfo), 4) => {
+            projected_message(size_of::<tsp::FieldInfo>(), size_of::<FieldInfo>())
+        },
+        (Some(HeaderNode::MessageInfo), 9) | (Some(HeaderNode::FieldInfo), 1) => {
             message(size_of::<tsp::FieldPath>())
+        },
+        (Some(HeaderNode::MessageInfo), 10) => {
+            projected_message(size_of::<tsp::FieldPath>(), size_of::<FieldPath>())
         },
         (Some(HeaderNode::FieldInfo), 7) | (Some(HeaderNode::FieldPath), 1) => {
             scalar(size_of::<u32>())
         },
         (Some(HeaderNode::FieldInfo), 8) if wire_type == 2 => field.payload().len(),
-        (Some(HeaderNode::ArchiveInfo), 1 | 3)
-        | (Some(HeaderNode::MessageInfo), 1 | 3 | 7)
-        | (Some(HeaderNode::FieldInfo), 2 | 3 | 6) => 0,
-        _ => field
-            .raw()
-            .len()
-            .saturating_add(2 * size_of::<[usize; 6]>()),
+        (Some(HeaderNode::FieldInfo), 2 | 3 | 6) => field_info_enum_memory_charge(number, field),
+        (Some(HeaderNode::ArchiveInfo), 1 | 3) | (Some(HeaderNode::MessageInfo), 1 | 3 | 7) => 0,
+        _ => unknown_field_memory_charge(field),
     }
+}
+
+fn field_info_enum_memory_charge(
+    number: u32,
+    field: litchi_iwa_common::wire::WireFieldView<'_>,
+) -> usize {
+    let value = (field.wire_type() == 0)
+        .then(|| litchi_iwa_common::decode_varint_from_bytes(field.payload()).ok())
+        .flatten()
+        .map(|(value, _encoded_length)| value as i32);
+    let known = matches!(
+        (number, value),
+        (2, Some(0..=3)) | (3, Some(-1..=2)) | (6, Some(0..=2))
+    );
+    if known {
+        0
+    } else {
+        unknown_field_memory_charge(field)
+    }
+}
+
+fn unknown_field_memory_charge(field: litchi_iwa_common::wire::WireFieldView<'_>) -> usize {
+    field
+        .raw()
+        .len()
+        .saturating_add(2 * size_of::<[usize; 6]>())
 }
 
 fn metadata_item_charge(

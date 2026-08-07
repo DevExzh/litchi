@@ -37,22 +37,20 @@ pub(crate) mod sheet;
 pub mod table;
 pub mod table_extractor;
 
-pub(crate) use litchi_numbers::cell::wire as bnc;
 pub(crate) use litchi_numbers::table::dimension::{
     Dimension as NumbersTableDimension, Points as NumbersTablePoints,
     Size as NumbersTableDimensionSize,
 };
+pub(crate) use litchi_numbers_wire as bnc;
 mod formula_owner;
 mod function_map;
 mod table_uid_map;
 
-impl From<litchi_numbers::cell::wire::Error> for crate::Error {
-    fn from(error: litchi_numbers::cell::wire::Error) -> Self {
+impl From<bnc::Error> for crate::Error {
+    fn from(error: bnc::Error) -> Self {
         match error {
-            litchi_numbers::cell::wire::Error::InvalidFormat(message) => {
-                Self::InvalidFormat(message)
-            },
-            litchi_numbers::cell::wire::Error::ParseError(message) => Self::ParseError(message),
+            bnc::Error::InvalidFormat(message) => Self::InvalidFormat(message),
+            bnc::Error::ParseError(message) => Self::ParseError(message),
         }
     }
 }

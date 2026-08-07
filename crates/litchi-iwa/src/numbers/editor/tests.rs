@@ -1,5 +1,5 @@
 use super::*;
-use crate::archive::{Archive, ArchiveObject};
+use crate::archive::{Archive, ArchiveObject, FieldInfo, FieldPath};
 use crate::numbers::{NumbersDocument, NumbersDocumentBuilder};
 use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE};
 use crate::protobuf::tn;
@@ -8007,13 +8007,13 @@ fn creates_independent_empty_table_on_an_existing_sheet() {
         .update_archive("Index/Document.iwa", |archive| {
             let object = archive.object_mut(10).unwrap();
             object.archive_info.message_infos[0].object_references = vec![20, 999];
-            object.archive_info.message_infos[0].field_infos.push(
-                crate::protobuf::tsp::FieldInfo {
-                    path: crate::protobuf::tsp::FieldPath { path: vec![4, 4] },
+            object.archive_info.message_infos[0]
+                .field_infos
+                .push(FieldInfo {
+                    path: FieldPath { path: vec![4, 4] },
                     object_references: vec![20, 999],
                     ..Default::default()
-                },
-            );
+                });
             Ok(())
         })
         .unwrap();

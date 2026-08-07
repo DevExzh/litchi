@@ -5,7 +5,9 @@ mod tabs;
 
 use prost::Message;
 
-use crate::archive::{Archive, ArchiveObject, RawMessage};
+use crate::archive::{
+    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, UnknownFieldRule,
+};
 use crate::protobuf::{tsd, tsp, tss, tswp};
 use crate::shapes::{
     Cap, Join, RgbaColor, Stroke, color_from_native, color_to_native, shadow_from_native,
@@ -2201,60 +2203,60 @@ fn has_canonical_color_wire(raw: &[u8]) -> Result<bool> {
     )
 }
 
-fn text_fill_field_info() -> tsp::FieldInfo {
-    tsp::FieldInfo {
-        path: tsp::FieldPath {
+fn text_fill_field_info() -> FieldInfo {
+    FieldInfo {
+        path: FieldPath {
             path: vec![
                 STYLE_CHARACTER_PROPERTIES_FIELD,
                 CHARACTER_DRAWING_FILL_FIELD,
             ],
         },
-        r#type: Some(tsp::field_info::Type::Message as i32),
-        unknown_field_rule: Some(tsp::field_info::UnknownFieldRule::IgnoreAndPreserve as i32),
+        r#type: Some(FieldType::Message),
+        unknown_field_rule: Some(UnknownFieldRule::IgnoreAndPreserve),
         ..Default::default()
     }
 }
 
-fn text_stroke_field_info() -> tsp::FieldInfo {
-    tsp::FieldInfo {
-        path: tsp::FieldPath {
+fn text_stroke_field_info() -> FieldInfo {
+    FieldInfo {
+        path: FieldPath {
             path: vec![
                 STYLE_CHARACTER_PROPERTIES_FIELD,
                 CHARACTER_DRAWING_STROKE_FIELD,
             ],
         },
-        r#type: Some(tsp::field_info::Type::Message as i32),
-        unknown_field_rule: Some(tsp::field_info::UnknownFieldRule::IgnoreAndPreserve as i32),
+        r#type: Some(FieldType::Message),
+        unknown_field_rule: Some(UnknownFieldRule::IgnoreAndPreserve),
         ..Default::default()
     }
 }
 
-fn text_shadow_field_info() -> tsp::FieldInfo {
-    tsp::FieldInfo {
-        path: tsp::FieldPath {
+fn text_shadow_field_info() -> FieldInfo {
+    FieldInfo {
+        path: FieldPath {
             path: vec![STYLE_CHARACTER_PROPERTIES_FIELD, CHARACTER_SHADOW_FIELD],
         },
-        r#type: Some(tsp::field_info::Type::Message as i32),
-        unknown_field_rule: Some(tsp::field_info::UnknownFieldRule::IgnoreAndPreserve as i32),
+        r#type: Some(FieldType::Message),
+        unknown_field_rule: Some(UnknownFieldRule::IgnoreAndPreserve),
         ..Default::default()
     }
 }
 
-fn text_background_field_info() -> tsp::FieldInfo {
-    tsp::FieldInfo {
-        path: tsp::FieldPath {
+fn text_background_field_info() -> FieldInfo {
+    FieldInfo {
+        path: FieldPath {
             path: vec![
                 STYLE_CHARACTER_PROPERTIES_FIELD,
                 CHARACTER_BACKGROUND_COLOR_FIELD,
             ],
         },
-        r#type: Some(tsp::field_info::Type::Message as i32),
-        unknown_field_rule: Some(tsp::field_info::UnknownFieldRule::IgnoreAndPreserve as i32),
+        r#type: Some(FieldType::Message),
+        unknown_field_rule: Some(UnknownFieldRule::IgnoreAndPreserve),
         ..Default::default()
     }
 }
 
-fn is_text_fill_field_info(field: &tsp::FieldInfo) -> bool {
+fn is_text_fill_field_info(field: &FieldInfo) -> bool {
     field.path.path
         == [
             STYLE_CHARACTER_PROPERTIES_FIELD,
@@ -2262,7 +2264,7 @@ fn is_text_fill_field_info(field: &tsp::FieldInfo) -> bool {
         ]
 }
 
-fn is_text_stroke_field_info(field: &tsp::FieldInfo) -> bool {
+fn is_text_stroke_field_info(field: &FieldInfo) -> bool {
     field.path.path
         == [
             STYLE_CHARACTER_PROPERTIES_FIELD,
@@ -2270,11 +2272,11 @@ fn is_text_stroke_field_info(field: &tsp::FieldInfo) -> bool {
         ]
 }
 
-fn is_text_shadow_field_info(field: &tsp::FieldInfo) -> bool {
+fn is_text_shadow_field_info(field: &FieldInfo) -> bool {
     field.path.path == [STYLE_CHARACTER_PROPERTIES_FIELD, CHARACTER_SHADOW_FIELD]
 }
 
-fn is_text_background_field_info(field: &tsp::FieldInfo) -> bool {
+fn is_text_background_field_info(field: &FieldInfo) -> bool {
     field.path.path
         == [
             STYLE_CHARACTER_PROPERTIES_FIELD,
@@ -2283,10 +2285,10 @@ fn is_text_background_field_info(field: &tsp::FieldInfo) -> bool {
 }
 
 fn sync_managed_field_info(
-    field_infos: &mut Vec<tsp::FieldInfo>,
+    field_infos: &mut Vec<FieldInfo>,
     present: bool,
-    is_managed: fn(&tsp::FieldInfo) -> bool,
-    canonical: fn() -> tsp::FieldInfo,
+    is_managed: fn(&FieldInfo) -> bool,
+    canonical: fn() -> FieldInfo,
 ) {
     if present {
         if !field_infos.iter().any(is_managed) {

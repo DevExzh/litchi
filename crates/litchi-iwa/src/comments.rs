@@ -10,7 +10,7 @@ use litchi_iwa_common::comment::{
 use prost::Message;
 
 use crate::application::Application;
-use crate::archive::{ArchiveObject, RawMessage};
+use crate::archive::{ArchiveObject, FieldInfo, FieldPath, RawMessage, UnknownFieldRule};
 use crate::detect::detect_application_from_document;
 use crate::package_metadata::{
     add_component_external_reference, advance_package_save_token_for_components,
@@ -1388,11 +1388,11 @@ fn generated_annotation_author_object(
     )?;
     object.archive_info.message_infos[0].field_infos = [4, 3]
         .into_iter()
-        .map(|field_number| tsp::FieldInfo {
-            path: tsp::FieldPath {
+        .map(|field_number| FieldInfo {
+            path: FieldPath {
                 path: vec![field_number],
             },
-            unknown_field_rule: Some(tsp::field_info::UnknownFieldRule::IgnoreAndPreserve as i32),
+            unknown_field_rule: Some(UnknownFieldRule::IgnoreAndPreserve),
             ..Default::default()
         })
         .collect();

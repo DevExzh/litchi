@@ -1,5 +1,5 @@
 use super::*;
-use crate::archive::{Archive, ArchiveObject};
+use crate::archive::{Archive, ArchiveObject, FieldInfo, FieldPath};
 use crate::media::MediaAssetId;
 use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE};
 use crate::protobuf::tsp::{ComponentInfo, ObjectUuidMapEntry, PackageMetadata, Reference, Uuid};
@@ -305,14 +305,14 @@ fn slide_background_reset_preserves_combined_and_unknown_style_properties() {
             info.object_references.extend([88, 89]);
             info.data_references.extend([98, 99]);
             info.field_infos.extend([
-                tsp::FieldInfo {
-                    path: tsp::FieldPath { path: vec![11, 1] },
+                FieldInfo {
+                    path: FieldPath { path: vec![11, 1] },
                     object_references: vec![88, 89],
                     data_references: vec![98, 99],
                     ..Default::default()
                 },
-                tsp::FieldInfo {
-                    path: tsp::FieldPath { path: vec![11, 3] },
+                FieldInfo {
+                    path: FieldPath { path: vec![11, 3] },
                     object_references: vec![89],
                     data_references: vec![99],
                     ..Default::default()
@@ -5341,13 +5341,13 @@ fn duplicates_slide_graph_with_independent_objects() {
         .update_archive("Index/Slide-4.iwa", |archive| {
             let object = archive.object_mut(4).unwrap();
             object.archive_info.message_infos[0].object_references = vec![5];
-            object.archive_info.message_infos[0].field_infos.push(
-                crate::protobuf::tsp::FieldInfo {
-                    path: crate::protobuf::tsp::FieldPath { path: vec![5] },
+            object.archive_info.message_infos[0]
+                .field_infos
+                .push(FieldInfo {
+                    path: FieldPath { path: vec![5] },
                     object_references: vec![5],
                     ..Default::default()
-                },
-            );
+                });
             Ok(())
         })
         .unwrap();

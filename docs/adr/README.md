@@ -40,6 +40,7 @@ Office round trips.
 | [0025](0025-ograph-chart-area-transactions.md) | Typed OGraph chart-area snapshot transactions |
 | [0026](0026-ole-directory-metadata-binding.md) | Typed shared OLE CFB directory metadata |
 | [0027](0027-xls-sheet-anchor-ownership.md) | Typed XLS sheet-anchor ownership |
+| [0028](0028-iwa-monolith-exit.md) | Ordered exit of the legacy IWA migration host |
 
 The OGraph record retains its original 0025 identity. The later XLS record,
 which duplicated that number, is indexed as 0027; its decision text remains

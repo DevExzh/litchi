@@ -4,6 +4,7 @@
 //! package member in its original byte stream. The archive, Snappy, detection,
 //! and protobuf layers remain in their focused IWA infrastructure crates.
 
+use std::fmt;
 use std::fs::File;
 use std::io::{Cursor, Read};
 use std::path::Path;
@@ -60,9 +61,15 @@ pub enum ReadError {
 /// The original package bytes remain available through [`Self::source_bytes`],
 /// so unsupported IWA members and unmodeled protobuf fields are retained even
 /// when callers inspect only the semantic presentation values.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Package {
     state: Arc<State>,
+}
+
+impl fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Package").finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug)]
@@ -195,7 +202,7 @@ impl Package {
         self.state
             .components
             .iter()
-            .map(|component| component.name())
+            .map(litchi_iwa_archive::Component::name)
     }
 
     /// Extract textual content from native Keynote text storages in package order.
@@ -326,7 +333,7 @@ impl Package {
             return Ok(document);
         }
         let document = Document::from_show(self.decode_show()?);
-        let _ = self.state.semantic.set(document);
+        drop(self.state.semantic.set(document));
         self.state
             .semantic
             .get()
@@ -375,7 +382,7 @@ impl Package {
 
         let mut builder = Show::builder();
         builder.set_settings(settings_from_show(&show)?);
-        builder.set_title(self.object_text(show_object).into_iter().next());
+        builder.set_title(Self::object_text(show_object).into_iter().next());
         for (index, slide_id) in self.slide_ids(&show)?.into_iter().enumerate() {
             let object = self.object(slide_id).ok_or_else(|| {
                 ReadError::Decode(format!(
@@ -390,13 +397,13 @@ impl Package {
     fn slide_ids(&self, show: &kn::ShowArchive) -> ReadResult<Vec<u64>> {
         let mut ids = Vec::with_capacity(show.slide_tree.slides.len());
         for reference in &show.slide_tree.slides {
-            let node = self.object(reference.identifier).ok_or_else(|| {
+            let node_object = self.object(reference.identifier).ok_or_else(|| {
                 ReadError::Decode(format!(
                     "Keynote slide node {} is missing",
                     reference.identifier
                 ))
             })?;
-            let node = node
+            let node_archive = node_object
                 .messages
                 .iter()
                 .find_map(|message| kn::SlideNodeArchive::decode(message.data.as_slice()).ok())
@@ -406,7 +413,7 @@ impl Package {
                         reference.identifier
                     ))
                 })?;
-            if let Some(slide) = node.slide {
+            if let Some(slide) = node_archive.slide {
                 ids.push(slide.identifier);
             }
         }
@@ -415,11 +422,11 @@ impl Package {
 
     fn parse_slide(&self, index: usize, object: &ArchiveObject) -> ReadResult<Slide> {
         let mut builder = Slide::builder(index);
-        let text = self.object_text(object);
-        if let Some(title) = text.first() {
+        let slide_text = Self::object_text(object);
+        if let Some(title) = slide_text.first() {
             builder.set_title(Some(title.clone()));
         }
-        for value in text.into_iter().skip(1) {
+        for value in slide_text.into_iter().skip(1) {
             builder.push_text(value);
         }
 
@@ -434,7 +441,7 @@ impl Package {
             for build in &slide.builds {
                 builder.push_build(self.extract_build(build.identifier)?);
             }
-            builder.set_transition(Some(self.transition(&slide.transition)?));
+            builder.set_transition(Some(Self::transition(&slide.transition)?));
 
             let title = slide
                 .title_placeholder
@@ -445,35 +452,35 @@ impl Package {
                 .as_ref()
                 .map(|reference| reference.identifier);
             if let Some(identifier) = title {
-                let text = self.drawable_text(identifier)?;
-                if !text.is_empty() {
-                    builder.set_title(Some(text));
+                let title_text = self.drawable_text(identifier)?;
+                if !title_text.is_empty() {
+                    builder.set_title(Some(title_text));
                 }
             }
             if let Some(identifier) = body {
-                let text = self.drawable_text(identifier)?;
-                if !text.is_empty() {
-                    builder.push_text(text);
+                let body_text = self.drawable_text(identifier)?;
+                if !body_text.is_empty() {
+                    builder.push_text(body_text);
                 }
             }
             for drawable in &slide.owned_drawables {
                 if Some(drawable.identifier) == title || Some(drawable.identifier) == body {
                     continue;
                 }
-                let text = self.drawable_text(drawable.identifier)?;
-                if !text.is_empty() {
-                    builder.push_text(text);
+                let drawable_text = self.drawable_text(drawable.identifier)?;
+                if !drawable_text.is_empty() {
+                    builder.push_text(drawable_text);
                 }
             }
             if let Some(note) = slide.note {
-                let text = self.notes_text(note.identifier)?;
-                if !text.is_empty() {
-                    builder.set_notes(Some(text));
+                let notes_text = self.notes_text(note.identifier)?;
+                if !notes_text.is_empty() {
+                    builder.set_notes(Some(notes_text));
                 }
             }
         }
 
-        if let Some(storage) = self.text_storage(object) {
+        if let Some(storage) = Self::text_storage(object) {
             builder.push_text_storage(storage);
         }
         Ok(builder.build())
@@ -495,8 +502,11 @@ impl Package {
         let animation = AnimationType::from_identifier(&build.delivery).map_err(|error| {
             ReadError::Decode(format!("invalid Keynote build identifier: {error}"))
         })?;
-        #[allow(deprecated)]
-        let duration = build
+        #[allow(
+            deprecated,
+            reason = "native Keynote schemas retain compatibility duration fields"
+        )]
+        let raw_duration = build
             .attributes
             .animation_attributes
             .as_ref()
@@ -504,25 +514,31 @@ impl Package {
             .or(build.attributes.database_duration)
             .or(build.duration)
             .unwrap_or(0.0);
-        let duration = Seconds::new(duration).map_err(|error| {
+        let duration = Seconds::new(raw_duration).map_err(|error| {
             ReadError::Decode(format!("invalid Keynote build duration: {error}"))
         })?;
         Ok(Build::new(animation, duration))
     }
 
-    fn transition(&self, transition: &kn::TransitionArchive) -> ReadResult<Transition> {
-        #[allow(deprecated)]
-        let duration = transition
+    fn transition(transition: &kn::TransitionArchive) -> ReadResult<Transition> {
+        #[allow(
+            deprecated,
+            reason = "native Keynote schemas retain compatibility duration fields"
+        )]
+        let raw_duration = transition
             .attributes
             .animation_attributes
             .as_ref()
             .and_then(|attributes| attributes.duration)
             .or(transition.attributes.database_duration)
             .unwrap_or(0.0);
-        let duration = Seconds::new(duration).map_err(|error| {
+        let duration = Seconds::new(raw_duration).map_err(|error| {
             ReadError::Decode(format!("invalid Keynote transition duration: {error}"))
         })?;
-        #[allow(deprecated)]
+        #[allow(
+            deprecated,
+            reason = "native Keynote schemas retain compatibility effect fields"
+        )]
         let identifier = transition
             .attributes
             .animation_attributes
@@ -541,7 +557,7 @@ impl Package {
         let drawable = self.object(identifier).ok_or_else(|| {
             ReadError::Decode(format!("Keynote drawable object {identifier} is missing"))
         })?;
-        let storage = drawable.messages.iter().find_map(|message| {
+        let optional_storage_reference = drawable.messages.iter().find_map(|message| {
             kn::PlaceholderArchive::decode(message.data.as_slice())
                 .ok()
                 .and_then(|placeholder| placeholder.super_.owned_storage)
@@ -551,31 +567,29 @@ impl Package {
                         .and_then(|shape| shape.owned_storage)
                 })
         });
-        let Some(storage) = storage else {
+        let Some(storage_reference) = optional_storage_reference else {
             return Ok(String::new());
         };
-        let storage_id = storage.identifier;
-        let storage = self.object(storage_id).ok_or_else(|| {
+        let storage_id = storage_reference.identifier;
+        let storage_object = self.object(storage_id).ok_or_else(|| {
             ReadError::Decode(format!(
-                "Keynote drawable storage object {} is missing",
-                storage_id
+                "Keynote drawable storage object {storage_id} is missing"
             ))
         })?;
-        self.text_storage(storage)
+        Self::text_storage(storage_object)
             .map(Storage::into_text)
             .ok_or_else(|| {
                 ReadError::Decode(format!(
-                    "Keynote drawable storage object {} has no text payload",
-                    storage_id
+                    "Keynote drawable storage object {storage_id} has no text payload"
                 ))
             })
     }
 
     fn notes_text(&self, identifier: u64) -> ReadResult<String> {
-        let note = self.object(identifier).ok_or_else(|| {
+        let note_object = self.object(identifier).ok_or_else(|| {
             ReadError::Decode(format!("Keynote notes object {identifier} is missing"))
         })?;
-        let note = note
+        let note_archive = note_object
             .messages
             .iter()
             .find_map(|message| kn::NoteArchive::decode(message.data.as_slice()).ok())
@@ -585,19 +599,19 @@ impl Package {
                 ))
             })?;
         let storage = self
-            .object(note.contained_storage.identifier)
+            .object(note_archive.contained_storage.identifier)
             .ok_or_else(|| {
                 ReadError::Decode(format!(
                     "Keynote notes storage object {} is missing",
-                    note.contained_storage.identifier
+                    note_archive.contained_storage.identifier
                 ))
             })?;
-        self.text_storage(storage)
+        Self::text_storage(storage)
             .map(Storage::into_text)
             .ok_or_else(|| {
                 ReadError::Decode(format!(
                     "Keynote notes storage object {} has no text payload",
-                    note.contained_storage.identifier
+                    note_archive.contained_storage.identifier
                 ))
             })
     }
@@ -616,7 +630,7 @@ impl Package {
             .find_map(|component| component.archive().object(identifier))
     }
 
-    fn object_text(&self, object: &ArchiveObject) -> Vec<String> {
+    fn object_text(object: &ArchiveObject) -> Vec<String> {
         object
             .messages
             .iter()
@@ -626,7 +640,7 @@ impl Package {
             .collect()
     }
 
-    fn text_storage(&self, object: &ArchiveObject) -> Option<Storage> {
+    fn text_storage(object: &ArchiveObject) -> Option<Storage> {
         object
             .messages
             .iter()
@@ -638,12 +652,20 @@ impl Package {
 fn read_source(path: &Path, limits: Limits) -> ReadResult<Arc<[u8]>> {
     let mut file = File::open(path)?;
     let length = file.metadata()?.len();
-    check_input_size(length, limits)?;
+    read_source_with_reported_length(&mut file, length, limits)
+}
+
+fn read_source_with_reported_length(
+    reader: &mut impl Read,
+    reported_length: u64,
+    limits: Limits,
+) -> ReadResult<Arc<[u8]>> {
+    check_input_size(reported_length, limits)?;
 
     let maximum = usize::try_from(limits.max_input_bytes()).map_err(|_error| {
         ReadError::InvalidFormat("Keynote input limit does not fit usize".to_owned())
     })?;
-    let capacity = usize::try_from(length).map_err(|_error| {
+    let capacity = usize::try_from(reported_length).map_err(|_error| {
         ReadError::InvalidFormat("Keynote input length does not fit usize".to_owned())
     })?;
     let mut bytes = Vec::new();
@@ -661,7 +683,7 @@ fn read_source(path: &Path, limits: Limits) -> ReadResult<Arc<[u8]>> {
         })?;
         if remaining == 0 {
             let mut extra = [0u8; 1];
-            if file.read(&mut extra)? != 0 {
+            if reader.read(&mut extra)? != 0 {
                 return Err(input_limit_error(
                     limits.max_input_bytes().saturating_add(1),
                     limits,
@@ -671,20 +693,38 @@ fn read_source(path: &Path, limits: Limits) -> ReadResult<Arc<[u8]>> {
         }
 
         let read_limit = remaining.min(buffer.len());
-        let read = file.read(&mut buffer[..read_limit])?;
+        let read = reader.read(&mut buffer[..read_limit])?;
         if read == 0 {
             break;
         }
-        bytes.try_reserve(read).map_err(|_error| {
-            ReadError::Archive(litchi_iwa_archive::Error::Allocation {
-                resource: "Keynote package input",
-                amount: read,
-            })
+        let required = bytes.len().checked_add(read).ok_or_else(|| {
+            ReadError::InvalidFormat("Keynote input length exceeds usize".to_owned())
         })?;
+        reserve_source_growth(&mut bytes, required, maximum)?;
         bytes.extend_from_slice(&buffer[..read]);
     }
 
     Ok(bytes.into())
+}
+
+fn reserve_source_growth(bytes: &mut Vec<u8>, required: usize, maximum: usize) -> ReadResult<()> {
+    if required <= bytes.capacity() {
+        return Ok(());
+    }
+
+    // A regular file can grow after `metadata`. Retain amortized linear
+    // growth without ever requesting capacity beyond the physical ceiling.
+    let doubled = bytes.capacity().checked_mul(2).unwrap_or(maximum);
+    let target = required.max(doubled).min(maximum);
+    let additional = target
+        .checked_sub(bytes.len())
+        .ok_or_else(|| ReadError::InvalidFormat("Keynote input length exceeds usize".to_owned()))?;
+    bytes.try_reserve_exact(additional).map_err(|_error| {
+        ReadError::Archive(litchi_iwa_archive::Error::Allocation {
+            resource: "Keynote package input",
+            amount: target,
+        })
+    })
 }
 
 fn copy_source(bytes: &[u8]) -> ReadResult<Arc<[u8]>> {
@@ -760,7 +800,7 @@ fn property(dictionary: &plist::Dictionary, key: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
+    use std::io::{Cursor, Write};
 
     use super::*;
     use tempfile::NamedTempFile;
@@ -807,6 +847,20 @@ mod tests {
         };
 
         assert_input_limit(&error, 2, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn path_growth_past_limit_is_rejected_with_a_typed_limit()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let limits = Limits::new(1, 1, 1, 1, 1)?;
+        let mut reader = Cursor::new([0_u8; 64]);
+        let Err(error) = read_source_with_reported_length(&mut reader, 0, limits) else {
+            panic!("input growing beyond its reported length should fail");
+        };
+
+        assert_input_limit(&error, 2, 1);
+        assert_eq!(reader.position(), 2);
         Ok(())
     }
 }
