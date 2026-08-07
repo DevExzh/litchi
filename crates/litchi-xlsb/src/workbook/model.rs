@@ -1,8 +1,8 @@
 //! Typed XLSB workbook state and its public model accessors.
 
 use crate::calc::Props;
+use crate::external_link::Link;
 use crate::package::Cell;
-use crate::package::external_link::Link;
 use crate::package::formula::{Context, ExternalBook, View, table::Definition as TableDefinition};
 use crate::package::shared_strings::SharedString;
 use crate::package::styles_table::{CellFormat, StylesTable};

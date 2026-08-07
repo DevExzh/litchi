@@ -60,13 +60,13 @@ pub(crate) mod bin_range;
 pub(crate) mod data_validation;
 
 // Re-export main types for public API
-pub use crate::package::drawing_image::{Image, ImageFormat};
-pub use crate::package::external_link::{
+pub use crate::external_link::{
     AreaReference, CachedValue, CellLocation, CellReference, DdeItem, DefinedName, ErrorValue,
     Kind, Link, MAX_XLSB_EXTERNAL_CACHE_COLUMNS, MAX_XLSB_EXTERNAL_CACHE_ROWS,
     MAX_XLSB_EXTERNAL_CACHED_VALUES, NameFormula, NameFormulaKind, OleItem, SheetRange,
     ValueMatrix,
 };
+pub use crate::package::drawing_image::{Image, ImageFormat};
 pub use crate::package::xlsx::writer::{
     ConnectionEndSpec, ConnectionShapeSpec, DrawingObjectSpec, Geometry, GroupSpec, ShapeSpec,
 };

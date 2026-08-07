@@ -1,15 +1,9 @@
 //! Package-facing workbook resolution and merged-cell mutation.
 
 use super::super::model::Workbook;
+use crate::external_link::Kind;
 use crate::merged_cells::{MAX_MERGED_CELL_RANGES, MergedCell};
-use crate::named_ranges::validate_name;
 use crate::package::error::Result;
-use crate::package::external_link::{
-    DATA_ITEM_WANT_ADVISE, DATA_ITEM_WANT_PICTURE, DDE_ITEM_SUPPORTS_OLE, DdeItem, DefinedName,
-    EXTERNAL_NAME_BUILT_IN, EXTERNAL_REFERENCE_DDE, EXTERNAL_REFERENCE_OLE,
-    EXTERNAL_REFERENCE_WORKBOOK, Entries, Kind, Link, MAX_XLSB_EXTERNAL_CACHED_VALUES, NameFormula,
-    OLE_ITEM_DISPLAY_AS_ICON, OleItem, ValueMatrix,
-};
 use crate::package::formula::ExternalBook;
 use crate::raw::{Records, kind};
 use litchi_core::binary;
@@ -35,7 +29,7 @@ struct MergeBlockLayout {
 impl Workbook {
     /// Return inert slicer cache snapshots in workbook relationship order.
     pub fn slicer_caches(&self) -> Result<Vec<crate::slicer::Cache>> {
-        Ok(crate::package::slicers::load_caches(
+        Ok(crate::slicer::package::load_caches(
             &self.package,
             &litchi_opc::PackURI::new("/xl/workbook.bin")?,
         )?
@@ -48,7 +42,7 @@ impl Workbook {
     pub fn set_slicer_caches(&mut self, caches: Vec<crate::slicer::Cache>) -> Result<()> {
         self.edit_opc(|package| {
             let workbook = litchi_opc::PackURI::new("/xl/workbook.bin")?;
-            crate::package::slicers::store_caches(package, &workbook, &caches)
+            crate::slicer::package::store_caches(package, &workbook, &caches)
         })
     }
 
@@ -64,7 +58,7 @@ impl Workbook {
     /// Return inert slicer views attached to one worksheet.
     pub fn slicers(&self, worksheet_index: usize) -> Result<Option<crate::slicer::Views>> {
         let worksheet = self.worksheet_uri(worksheet_index)?;
-        Ok(crate::package::slicers::load_views(&self.package, &worksheet)?.map(|part| part.views))
+        Ok(crate::slicer::package::load_views(&self.package, &worksheet)?.map(|part| part.views))
     }
 
     /// Atomically replace one worksheet's slicer views.
@@ -74,7 +68,7 @@ impl Workbook {
         views: crate::slicer::Views,
     ) -> Result<()> {
         let worksheet = self.worksheet_uri(worksheet_index)?;
-        self.edit_opc(|package| crate::package::slicers::store_views(package, &worksheet, &views))
+        self.edit_opc(|package| crate::slicer::package::store_views(package, &worksheet, &views))
     }
 
     /// Remove one worksheet's slicer views. Returns whether a part was present.
@@ -88,7 +82,7 @@ impl Workbook {
 
     /// Return inert timeline cache snapshots in workbook relationship order.
     pub fn timeline_caches(&self) -> Result<Vec<crate::timeline::Cache>> {
-        Ok(crate::package::timelines::load_caches(
+        Ok(crate::timeline::package::load_caches(
             &self.package,
             &litchi_opc::PackURI::new("/xl/workbook.bin")?,
         )?
@@ -101,7 +95,7 @@ impl Workbook {
     pub fn set_timeline_caches(&mut self, caches: Vec<crate::timeline::Cache>) -> Result<()> {
         self.edit_opc(|package| {
             let workbook = litchi_opc::PackURI::new("/xl/workbook.bin")?;
-            crate::package::timelines::store_caches(package, &workbook, &caches)
+            crate::timeline::package::store_caches(package, &workbook, &caches)
         })
     }
 
@@ -117,10 +111,7 @@ impl Workbook {
     /// Return inert timeline views attached to one worksheet.
     pub fn timelines(&self, worksheet_index: usize) -> Result<Option<crate::timeline::Views>> {
         let worksheet = self.worksheet_uri(worksheet_index)?;
-        Ok(
-            crate::package::timelines::load_views(&self.package, &worksheet)?
-                .map(|part| part.views),
-        )
+        Ok(crate::timeline::package::load_views(&self.package, &worksheet)?.map(|part| part.views))
     }
 
     /// Atomically replace one worksheet's timeline views.
@@ -130,7 +121,7 @@ impl Workbook {
         views: crate::timeline::Views,
     ) -> Result<()> {
         let worksheet = self.worksheet_uri(worksheet_index)?;
-        self.edit_opc(|package| crate::package::timelines::store_views(package, &worksheet, &views))
+        self.edit_opc(|package| crate::timeline::package::store_views(package, &worksheet, &views))
     }
 
     /// Remove one worksheet's timeline views. Returns whether a part was present.
@@ -630,411 +621,63 @@ impl Workbook {
                 part.content_type()
             )));
         }
-        let mut iter = Records::new(part.blob());
-        let mut link_type = None;
-        let mut target_key = String::new();
-        let mut target_detail = String::new();
-        let mut sheet_names = Vec::new();
-        let mut workbook_entries = Vec::new();
-        let mut dde_entries = Vec::new();
-        let mut ole_entries = Vec::new();
-        let mut saw_sup_tabs = false;
-        // 0 = outside a name, 1 = expect formula, 2 = expect bits,
-        // 3 = expect end/value start, 4 = inside a cached matrix.
-        let mut sup_name_state = 0u8;
-        let mut current_name = None;
-        let mut current_formula = None;
-        let mut current_bits = None;
-        let mut current_cache = None;
-        let mut cache_dimensions = None;
-        let mut cache_values = Vec::new();
-        let mut saw_end = false;
 
-        for record in &mut iter {
-            let record = record?;
-            if saw_end {
-                return Err(crate::package::error::Error::InvalidFormula(
-                    "external link has records after BrtEndSupBook".to_string(),
-                ));
-            }
-            if link_type.is_none() && record.kind() != kind::BEGIN_SUP_BOOK {
-                return Err(crate::package::error::Error::InvalidFormula(
-                    "external link does not start with BrtBeginSupBook".to_string(),
-                ));
-            }
-            match record.kind() {
-                kind::BEGIN_SUP_BOOK => {
-                    if link_type.is_some() || record.payload().len() < 10 {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "invalid BrtBeginSupBook framing".to_string(),
-                        ));
-                    }
-                    let kind = binary::read_u16_le_at(record.payload(), 0)?;
-                    let (first, consumed) =
-                        crate::package::records::decode_string(&record.payload()[2..])?;
-                    let mut offset = 2 + consumed;
-                    let (second, consumed) = if kind == EXTERNAL_REFERENCE_WORKBOOK {
-                        Self::parse_nullable_wide_string(&record.payload()[offset..])?
-                    } else {
-                        let (value, consumed) =
-                            crate::package::records::decode_string(&record.payload()[offset..])?;
-                        (Some(value), consumed)
-                    };
-                    offset += consumed;
-                    if offset != record.payload().len()
-                        || kind > EXTERNAL_REFERENCE_OLE
-                        || first.is_empty()
-                    {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "invalid BrtBeginSupBook payload".to_string(),
-                        ));
-                    }
-                    if kind == EXTERNAL_REFERENCE_WORKBOOK && second.is_some() {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "external workbook BrtBeginSupBook string2 is not NULL".to_string(),
-                        ));
-                    }
-                    link_type = Some(kind);
-                    target_key = first;
-                    target_detail = second.unwrap_or_default();
-                },
-                kind::SUP_TABS => {
-                    if link_type != Some(EXTERNAL_REFERENCE_WORKBOOK)
-                        || saw_sup_tabs
-                        || sup_name_state != 0
-                    {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "unexpected BrtSupTabs".to_string(),
-                        ));
-                    }
-                    sheet_names = Self::parse_external_sheet_names(record.payload())?;
-                    saw_sup_tabs = true;
-                },
-                kind::SUP_NAME_START => {
-                    let kind = link_type.ok_or_else(|| {
-                        crate::package::error::Error::InvalidFormula(
-                            "BrtSupNameStart precedes BrtBeginSupBook".to_string(),
-                        )
-                    })?;
-                    if sup_name_state != 0 || (kind == EXTERNAL_REFERENCE_WORKBOOK && !saw_sup_tabs)
-                    {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "unexpected BrtSupNameStart".to_string(),
-                        ));
-                    }
-                    let (name, consumed) =
-                        crate::package::records::decode_string(record.payload())?;
-                    if consumed != record.payload().len() {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "BrtSupNameStart has trailing bytes".to_string(),
-                        ));
-                    }
-                    if kind == EXTERNAL_REFERENCE_WORKBOOK {
-                        validate_name(&name)?;
-                        sup_name_state = 1;
-                    } else {
-                        validate_name(&name)?;
-                        sup_name_state = 2;
-                    }
-                    current_name = Some(name);
-                },
-                kind::SUP_NAME_FORMULA => {
-                    if link_type != Some(EXTERNAL_REFERENCE_WORKBOOK)
-                        || sup_name_state != 1
-                        || record.payload().len() < 4
-                    {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "unexpected BrtSupNameFmla".to_string(),
-                        ));
-                    }
-                    let formula_len = usize::try_from(binary::read_u32_le_at(record.payload(), 0)?)
-                        .map_err(|_| {
-                            crate::package::error::Error::InvalidFormula(
-                                "BrtSupNameFmla size overflow".to_string(),
-                            )
-                        })?;
-                    let expected = formula_len.checked_add(4).ok_or_else(|| {
-                        crate::package::error::Error::InvalidFormula(
-                            "BrtSupNameFmla size overflow".to_string(),
-                        )
-                    })?;
-                    if record.payload().len() != expected {
-                        return Err(crate::package::error::Error::InvalidLength {
-                            expected,
-                            found: record.payload().len(),
-                        });
-                    }
-                    current_formula = if formula_len == 0 {
-                        None
-                    } else {
-                        Some(NameFormula::from_tokens(record.payload()[4..].to_vec())?)
-                    };
-                    sup_name_state = 2;
-                },
-                kind::SUP_NAME_BITS => {
-                    if sup_name_state != 2 || record.payload().len() != 7 {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "unexpected BrtSupNameBits".to_string(),
-                        ));
-                    }
-                    let mut bits = [0u8; 7];
-                    bits.copy_from_slice(record.payload());
-                    Self::validate_external_name_bits(
-                        link_type.expect("external link kind is present"),
-                        &bits,
-                    )?;
-                    current_bits = Some(bits);
-                    sup_name_state = 3;
-                },
-                kind::SUP_NAME_VALUE_START => {
-                    if !matches!(
-                        link_type,
-                        Some(EXTERNAL_REFERENCE_DDE | EXTERNAL_REFERENCE_OLE)
-                    ) || sup_name_state != 3
-                        || record.payload().len() != 8
-                        || current_cache.is_some()
-                    {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "unexpected BrtSupNameValueStart".to_string(),
-                        ));
-                    }
-                    let rows = binary::read_u32_le_at(record.payload(), 0)?;
-                    let columns = binary::read_u32_le_at(record.payload(), 4)?;
-                    let count = usize::try_from(rows)
-                        .ok()
-                        .and_then(|rows| {
-                            usize::try_from(columns)
-                                .ok()
-                                .and_then(|columns| rows.checked_mul(columns))
-                        })
-                        .ok_or_else(|| {
-                            crate::package::error::Error::InvalidFormula(
-                                "external cached-value dimensions overflow".to_string(),
-                            )
-                        })?;
-                    if count > MAX_XLSB_EXTERNAL_CACHED_VALUES {
-                        return Err(crate::package::error::Error::InvalidLength {
-                            expected: MAX_XLSB_EXTERNAL_CACHED_VALUES,
-                            found: count,
-                        });
-                    }
-                    cache_values.clear();
-                    cache_values.reserve(count);
-                    cache_dimensions = Some((rows, columns, count));
-                    sup_name_state = 4;
-                },
-                kind::SUP_NAME_NIL
-                | kind::SUP_NAME_NUM
-                | kind::SUP_NAME_BOOL
-                | kind::SUP_NAME_ERROR
-                | kind::SUP_NAME_STRING => {
-                    let Some((_, _, count)) = cache_dimensions else {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "cached external value occurs outside its matrix".to_string(),
-                        ));
-                    };
-                    if sup_name_state != 4 || cache_values.len() >= count {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "too many or misplaced cached external values".to_string(),
-                        ));
-                    }
-                    cache_values.push(Self::parse_external_cached_value(
-                        record.kind(),
-                        record.payload(),
-                    )?);
-                },
-                kind::SUP_NAME_VALUE_END => {
-                    let Some((rows, columns, count)) = cache_dimensions.take() else {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "unexpected BrtSupNameValueEnd".to_string(),
-                        ));
-                    };
-                    if sup_name_state != 4
-                        || !record.payload().is_empty()
-                        || cache_values.len() != count
-                    {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "invalid cached external value matrix".to_string(),
-                        ));
-                    }
-                    current_cache = Some(ValueMatrix::new(
-                        rows,
-                        columns,
-                        std::mem::take(&mut cache_values),
-                    )?);
-                    sup_name_state = 3;
-                },
-                kind::SUP_NAME_END => {
-                    if sup_name_state != 3 || !record.payload().is_empty() {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "invalid BrtSupNameEnd".to_string(),
-                        ));
-                    }
-                    let kind = link_type.expect("external link kind is present");
-                    let name = current_name.take().ok_or_else(|| {
-                        crate::package::error::Error::InvalidFormula(
-                            "external name block has no name".to_string(),
-                        )
-                    })?;
-                    let bits = current_bits.take().ok_or_else(|| {
-                        crate::package::error::Error::InvalidFormula(
-                            "external name block has no properties".to_string(),
-                        )
-                    })?;
-                    match kind {
-                        EXTERNAL_REFERENCE_WORKBOOK => {
-                            let scope = binary::read_u32_le_at(&bits, 2)?;
-                            let mut entry = DefinedName::new(name)?
-                                .with_built_in(bits[0] & EXTERNAL_NAME_BUILT_IN != 0);
-                            if scope != 0 {
-                                entry = entry.with_sheet_scope(u16::try_from(scope - 1).map_err(
-                                    |_| {
-                                        crate::package::error::Error::InvalidFormula(
-                                            "external defined-name scope overflow".to_string(),
-                                        )
-                                    },
-                                )?);
-                            }
-                            if let Some(formula) = current_formula.take() {
-                                entry = entry.with_formula(formula);
-                            }
-                            workbook_entries.push(entry);
-                        },
-                        EXTERNAL_REFERENCE_DDE => {
-                            let mut item = DdeItem::new(name)?
-                                .with_advise(bits[0] & DATA_ITEM_WANT_ADVISE != 0)
-                                .with_picture(bits[0] & DATA_ITEM_WANT_PICTURE != 0)
-                                .with_ole_support(bits[0] & DDE_ITEM_SUPPORTS_OLE != 0);
-                            if let Some(cache) = current_cache.take() {
-                                item = item.with_cached_values(cache);
-                            }
-                            dde_entries.push(item);
-                        },
-                        EXTERNAL_REFERENCE_OLE => {
-                            let mut item = OleItem::new(name)?
-                                .with_advise(bits[0] & DATA_ITEM_WANT_ADVISE != 0)
-                                .with_picture(bits[0] & DATA_ITEM_WANT_PICTURE != 0)
-                                .with_icon(bits[0] & OLE_ITEM_DISPLAY_AS_ICON != 0);
-                            if let Some(cache) = current_cache.take() {
-                                item = item.with_cached_values(cache);
-                            }
-                            ole_entries.push(item);
-                        },
-                        _ => unreachable!("external link kind was validated above"),
-                    }
-                    sup_name_state = 0;
-                },
-                kind::END_SUP_BOOK => {
-                    if !record.payload().is_empty() {
-                        return Err(crate::package::error::Error::InvalidLength {
-                            expected: 0,
-                            found: record.payload().len(),
-                        });
-                    }
-                    if sup_name_state != 0 {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "BrtEndSupBook occurs inside an external-name block".to_string(),
-                        ));
-                    }
-                    saw_end = true;
-                },
-                _ => {
-                    if sup_name_state == 4
-                        || (link_type == Some(EXTERNAL_REFERENCE_WORKBOOK) && sup_name_state != 0)
-                    {
-                        return Err(crate::package::error::Error::InvalidFormula(
-                            "unexpected record inside an external name or cache".to_string(),
-                        ));
-                    }
-                },
-            }
-        }
-        let kind = link_type.ok_or_else(|| {
-            crate::package::error::Error::InvalidFormula(
-                "external link has no BrtBeginSupBook".to_string(),
-            )
-        })?;
-        if !saw_end {
-            return Err(crate::package::error::Error::InvalidFormula(
-                "external link has no BrtEndSupBook".to_string(),
-            ));
-        }
-        if kind == EXTERNAL_REFERENCE_WORKBOOK && !saw_sup_tabs {
-            return Err(crate::package::error::Error::InvalidFormula(
-                "external workbook link has no BrtSupTabs".to_string(),
-            ));
-        }
-        let (link_kind, source, detail) = match kind {
-            EXTERNAL_REFERENCE_DDE => {
+        let parsed = crate::external_link::parse_external_link(part.blob())?;
+        match parsed.link().kind() {
+            Kind::Dde => {
                 if !part.rels().is_empty() {
                     return Err(crate::package::error::Error::InvalidFormula(
                         "DDE external link must not contain relationships".to_string(),
                     ));
                 }
-                (Kind::Dde, target_key, Some(target_detail))
+                Ok(ExternalBook {
+                    metadata: parsed.into_link(),
+                })
             },
-            EXTERNAL_REFERENCE_WORKBOOK | EXTERNAL_REFERENCE_OLE => {
+            Kind::Workbook | Kind::Ole => {
                 if part.rels().len() != 1 {
                     return Err(crate::package::error::Error::InvalidFormula(
                         "external workbook/OLE link must have exactly one data-source relationship"
                             .to_string(),
                     ));
                 }
-                let relationship = part.rels().get(&target_key).ok_or_else(|| {
+
+                let relationship_id = parsed.relationship_id().ok_or_else(|| {
+                    crate::package::error::Error::InvalidFormula(
+                        "external workbook/OLE link has no data-source relationship ID".to_string(),
+                    )
+                })?;
+                let relationship = part.rels().get(relationship_id).ok_or_else(|| {
                     crate::package::error::Error::InvalidFormula(format!(
-                        "external data relationship {target_key:?} is missing"
+                        "external data relationship {relationship_id:?} is missing"
                     ))
                 })?;
                 if !relationship.is_external() {
                     return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "external data relationship {target_key:?} is internal"
+                        "external data relationship {relationship_id:?} is internal"
                     )));
                 }
-                let allowed_relationship_types = if kind == EXTERNAL_REFERENCE_WORKBOOK {
-                    EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES
-                } else {
-                    OLE_DATA_SOURCE_RELATIONSHIP_TYPES
+
+                let (allowed_relationship_types, source_kind) = match parsed.link().kind() {
+                    Kind::Workbook => (EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES, "external workbook"),
+                    Kind::Ole => (OLE_DATA_SOURCE_RELATIONSHIP_TYPES, "OLE data source"),
+                    Kind::Dde => {
+                        return Err(crate::package::error::Error::InvalidFormula(
+                            "DDE link reached relationship resolution".to_string(),
+                        ));
+                    },
                 };
                 if !allowed_relationship_types.contains(&relationship.reltype()) {
-                    let source_kind = if kind == EXTERNAL_REFERENCE_WORKBOOK {
-                        "external workbook"
-                    } else {
-                        "OLE data source"
-                    };
                     return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "{source_kind} relationship {target_key:?} has invalid type {:?}",
+                        "{source_kind} relationship {relationship_id:?} has invalid type {:?}",
                         relationship.reltype()
                     )));
                 }
-                let target = relationship.target_ref().to_string();
-                let link_kind = if kind == EXTERNAL_REFERENCE_WORKBOOK {
-                    Kind::Workbook
-                } else {
-                    Kind::Ole
-                };
-                let detail = if kind == EXTERNAL_REFERENCE_OLE {
-                    Some(target_detail)
-                } else {
-                    None
-                };
-                (link_kind, target, detail)
+
+                Ok(ExternalBook {
+                    metadata: parsed.resolve_source(relationship.target_ref().to_string())?,
+                })
             },
-            _ => unreachable!("external link kind was validated above"),
-        };
-        let entries = match kind {
-            EXTERNAL_REFERENCE_WORKBOOK => Entries::Workbook(workbook_entries),
-            EXTERNAL_REFERENCE_DDE => Entries::Dde(dde_entries),
-            EXTERNAL_REFERENCE_OLE => Entries::Ole(ole_entries),
-            _ => unreachable!("external link kind was validated above"),
-        };
-        let metadata = Link {
-            kind: link_kind,
-            source,
-            detail,
-            sheet_names,
-            entries,
-        };
-        metadata.validate()?;
-        Ok(ExternalBook { metadata })
+        }
     }
 }

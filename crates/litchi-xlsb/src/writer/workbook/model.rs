@@ -47,7 +47,7 @@ pub struct WorkbookWriter {
     pub(super) calc: Props,
     pub(super) is_1904: bool,
     pub(super) connections: Option<crate::package::connections::Connections>,
-    pub(super) external_links: Vec<crate::package::external_link::Link>,
+    pub(super) external_links: Vec<crate::external_link::Link>,
     pub(super) pivot_caches: Vec<AuthoredPivotCache>,
     pub(super) vba: Option<Arc<Vec<u8>>>,
 }
@@ -230,10 +230,7 @@ impl WorkbookWriter {
     ///
     /// External targets are stored but never followed, contacted, refreshed,
     /// instantiated, evaluated, or executed.
-    pub fn add_external_link(
-        &mut self,
-        link: crate::package::external_link::Link,
-    ) -> Result<&mut Self> {
+    pub fn add_external_link(&mut self, link: crate::external_link::Link) -> Result<&mut Self> {
         link.validate()?;
         if self.external_links.len() >= MAX_AUTHORED_EXTERNAL_LINKS {
             return Err(Error::InvalidFormula(
@@ -245,7 +242,7 @@ impl WorkbookWriter {
     }
 
     /// External links scheduled for authoring, in workbook support-link order.
-    pub fn external_links(&self) -> &[crate::package::external_link::Link] {
+    pub fn external_links(&self) -> &[crate::external_link::Link] {
         &self.external_links
     }
 

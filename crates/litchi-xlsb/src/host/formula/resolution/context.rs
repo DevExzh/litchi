@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
+use crate::external_link::Link;
 use crate::package::error::Result;
-use crate::package::external_link::Link;
 use crate::package::formula::{Definition, ExternalSheet, Scope, View};
 
 use super::relationships::SupportingLink;

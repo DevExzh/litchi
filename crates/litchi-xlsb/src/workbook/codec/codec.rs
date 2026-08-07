@@ -79,11 +79,10 @@ impl Workbook {
         )?;
         worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(blob)?);
         worksheet.set_slicers(
-            crate::package::slicers::load_views(&self.package, &sheet_uri)?.map(|part| part.views),
+            crate::slicer::package::load_views(&self.package, &sheet_uri)?.map(|part| part.views),
         );
         worksheet.set_timelines(
-            crate::package::timelines::load_views(&self.package, &sheet_uri)?
-                .map(|part| part.views),
+            crate::timeline::package::load_views(&self.package, &sheet_uri)?.map(|part| part.views),
         );
         if let Some(uri) = comments_uri {
             let part = self.package.get_part(&uri)?;
@@ -93,7 +92,7 @@ impl Workbook {
                     val: "relationships are not permitted".to_string(),
                 });
             }
-            for comment in crate::package::comments::read_comments(part.blob())? {
+            for comment in crate::comments::read(part.blob())? {
                 worksheet.add_comment(comment);
             }
         }

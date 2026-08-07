@@ -1,10 +1,10 @@
 //! Worksheet implementation for XLSB files
 
+use crate::comments::Record;
 use crate::conditional_formatting::Formatting;
 use crate::hyperlinks::Hyperlink;
 use crate::merged_cells::MergedCell;
 use crate::package::cell::Cell;
-use crate::package::comments::Record;
 use crate::package::data_validation::{Settings, Validation};
 use crate::package::scenarios::Manager;
 use crate::package::sheet_view::SheetView;

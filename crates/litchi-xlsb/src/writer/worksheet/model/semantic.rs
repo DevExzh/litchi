@@ -1,9 +1,9 @@
 //! Mutable XLSB worksheet state and CRUD model.
 
+use crate::comments::Record;
 use crate::conditional_formatting::Formatting;
 use crate::hyperlinks::Hyperlink;
 use crate::merged_cells::MergedCell;
-use crate::package::comments::Record;
 use crate::package::data_validation::{Settings, Validation};
 use crate::package::error::{Error, Result};
 use crate::package::formula::{Compiler, Group, GroupKind, ParsedFormula, Parser, Range};
@@ -663,7 +663,7 @@ impl MutableWorksheet {
     ///
     /// ```ignore
     /// use litchi_xlsb::writer::MutableWorksheet;
-    /// use litchi_xlsb::package::comments::Record;
+    /// use litchi_xlsb::comments::Record;
     ///
     /// let mut sheet = MutableWorksheet::new("Sheet1");
     /// let comment = Record::new(0, 0, "John".to_string(), "Important note".to_string());

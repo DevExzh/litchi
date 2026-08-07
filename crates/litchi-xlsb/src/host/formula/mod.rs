@@ -41,9 +41,9 @@ pub use resolution::{Context, ExternalBook, SupportingLink};
 pub use table::Definition;
 pub(crate) use text::{CompilationContext, DefinedName, excel_name_eq};
 
-use crate::package::error::{Error, Result};
 #[cfg(test)]
-use crate::package::external_link::Link;
+use crate::external_link::Link;
+use crate::package::error::{Error, Result};
 
 pub use parser::{
     ArrayValue, BinaryOperator, Compiler, ExternalTableReference, Group, GroupKind,

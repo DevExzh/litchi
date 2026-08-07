@@ -4,11 +4,6 @@ use super::super::model::Workbook;
 use crate::calc::{self, Props};
 use crate::named_ranges::Definition;
 use crate::package::error::Result;
-use crate::package::external_link::{
-    CachedValue, DATA_ITEM_REQUIRED_TRAILING_FLAG, DDE_ITEM_RESERVED_MASK,
-    EXTERNAL_NAME_RESERVED_MASK, EXTERNAL_REFERENCE_DDE, EXTERNAL_REFERENCE_OLE,
-    EXTERNAL_REFERENCE_WORKBOOK, ErrorValue, OLE_ITEM_REQUIRED_CLASS_FLAG, OLE_ITEM_RESERVED_MASK,
-};
 use crate::package::formula::{
     ExternalSheet, SupportingLink, View, excel_name_eq, table::Definition as TableDefinition,
 };
@@ -166,125 +161,6 @@ impl Workbook {
             });
         }
         Ok(())
-    }
-
-    pub(in crate::workbook) fn validate_external_name_bits(
-        kind: u16,
-        bits: &[u8; 7],
-    ) -> Result<()> {
-        let reserved_word = &bits[2..6];
-        let valid = match kind {
-            EXTERNAL_REFERENCE_WORKBOOK => {
-                bits[0] & EXTERNAL_NAME_RESERVED_MASK == 0
-                    && bits[6] & DATA_ITEM_REQUIRED_TRAILING_FLAG == 0
-            },
-            EXTERNAL_REFERENCE_DDE => {
-                bits[0] & DDE_ITEM_RESERVED_MASK == 0
-                    && reserved_word == [0, 0, 0, 0]
-                    && bits[6] & DATA_ITEM_REQUIRED_TRAILING_FLAG != 0
-            },
-            EXTERNAL_REFERENCE_OLE => {
-                bits[0] & OLE_ITEM_RESERVED_MASK == 0
-                    && bits[0] & OLE_ITEM_REQUIRED_CLASS_FLAG != 0
-                    && reserved_word == [0, 0, 0, 0]
-                    && bits[6] & DATA_ITEM_REQUIRED_TRAILING_FLAG != 0
-            },
-            _ => false,
-        };
-        if !valid {
-            return Err(crate::package::error::Error::InvalidFormula(format!(
-                "invalid BrtSupNameBits properties for external-link kind {kind}"
-            )));
-        }
-        Ok(())
-    }
-
-    pub(in crate::workbook) fn parse_external_cached_value(
-        record_type: crate::raw::Kind,
-        data: &[u8],
-    ) -> Result<CachedValue> {
-        match record_type {
-            kind::SUP_NAME_NIL if data.is_empty() => Ok(CachedValue::Empty),
-            kind::SUP_NAME_NUM if data.len() == 8 => {
-                let number = f64::from_le_bytes(data.try_into().expect("length was checked"));
-                crate::package::external_link::validate_number(number)?;
-                Ok(CachedValue::Number(number))
-            },
-            kind::SUP_NAME_BOOL if data.len() == 1 && data[0] <= 1 => {
-                Ok(CachedValue::Boolean(data[0] != 0))
-            },
-            kind::SUP_NAME_ERROR if data.len() == 1 => {
-                Ok(CachedValue::Error(ErrorValue::from_code(data[0])?))
-            },
-            kind::SUP_NAME_STRING => {
-                let (value, consumed) = crate::package::records::decode_string(data)?;
-                if consumed != data.len() {
-                    return Err(crate::package::error::Error::InvalidFormula(
-                        "BrtSupNameSt has trailing bytes".to_string(),
-                    ));
-                }
-                Ok(CachedValue::String(value))
-            },
-            _ => Err(crate::package::error::Error::InvalidFormula(format!(
-                "invalid cached external value record {record_type}"
-            ))),
-        }
-    }
-
-    pub(in crate::workbook) fn parse_external_sheet_names(data: &[u8]) -> Result<Vec<String>> {
-        if data.len() < 4 {
-            return Err(crate::package::error::Error::InvalidLength {
-                expected: 4,
-                found: data.len(),
-            });
-        }
-        let count = usize::try_from(binary::read_u32_le_at(data, 0)?).map_err(|_| {
-            crate::package::error::Error::InvalidFormula(
-                "external sheet-name count overflow".to_string(),
-            )
-        })?;
-        if count >= 65_535 {
-            return Err(crate::package::error::Error::InvalidFormula(format!(
-                "external sheet-name count {count} exceeds 65,534"
-            )));
-        }
-        let mut names = Vec::with_capacity(count);
-        let mut offset = 4;
-        for _ in 0..count {
-            let (name, consumed) = crate::package::records::decode_string(&data[offset..])?;
-            offset = offset.checked_add(consumed).ok_or_else(|| {
-                crate::package::error::Error::InvalidFormula(
-                    "external sheet-name size overflow".to_string(),
-                )
-            })?;
-            let name_len = name.encode_utf16().count();
-            if name_len == 0
-                || name_len > 31
-                || name.contains(['\0', '\u{0003}', ':', '\\', '*', '?', '/', '[', ']'])
-                || name.starts_with('\'')
-                || name.ends_with('\'')
-            {
-                return Err(crate::package::error::Error::InvalidFormula(format!(
-                    "external sheet name {name:?} does not follow sheet-name grammar"
-                )));
-            }
-            if names
-                .iter()
-                .any(|existing: &String| excel_name_eq(existing, &name))
-            {
-                return Err(crate::package::error::Error::InvalidFormula(format!(
-                    "duplicate external sheet name {name:?}"
-                )));
-            }
-            names.push(name);
-        }
-        if offset != data.len() {
-            return Err(crate::package::error::Error::InvalidFormula(format!(
-                "BrtSupTabs has {} trailing bytes",
-                data.len() - offset
-            )));
-        }
-        Ok(names)
     }
 
     pub(in crate::workbook) fn parse_nullable_wide_string(

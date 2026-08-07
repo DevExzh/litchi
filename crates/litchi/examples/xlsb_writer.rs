@@ -8,9 +8,9 @@
 //! ```
 
 use litchi::sheet::CellValue;
+use litchi::xlsb::comments::Record;
 use litchi::xlsb::hyperlinks::Hyperlink;
 use litchi::xlsb::merged_cells::MergedCell;
-use litchi::xlsb::package::comments::Record;
 use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
 use std::fs::File;
 

@@ -2,8 +2,7 @@
 
 use super::super::WorkbookWriter;
 use crate::calc::{Delta, Mode, Opts, Threads};
-use crate::package::SharedStringRun;
-use crate::package::comments::Record;
+use crate::comments::{Record, Run};
 use crate::raw::kind;
 use crate::writer::{MutableChartSheet, MutableWorksheet};
 use litchi_core::sheet::WorkbookTrait;
@@ -13,7 +12,7 @@ use std::io::Cursor;
 
 #[test]
 fn external_links_round_trip_with_inert_package_topology() {
-    use crate::package::external_link::{
+    use crate::external_link::{
         CachedValue, CellLocation, CellReference, DdeItem, DefinedName, ErrorValue, Kind, Link,
         NameFormula, NameFormulaKind, OleItem, SheetRange, ValueMatrix,
     };
@@ -213,9 +212,7 @@ fn external_links_round_trip_with_inert_package_topology() {
 
 #[test]
 fn external_link_constructors_refuse_malformed_metadata() {
-    use crate::package::external_link::{
-        CachedValue, DdeItem, DefinedName, Link, NameFormula, ValueMatrix,
-    };
+    use crate::external_link::{CachedValue, DdeItem, DefinedName, Link, NameFormula, ValueMatrix};
 
     assert!(Link::workbook("", Vec::new(), Vec::new()).is_err());
     assert!(
@@ -645,7 +642,7 @@ fn comments_survive_package_roundtrip() {
     let mut workbook = WorkbookWriter::new();
     let mut sheet = MutableWorksheet::new("Notes");
     let mut first = Record::new(2, 3, "Author".to_string(), "formatted note".to_string());
-    first.runs = vec![SharedStringRun {
+    first.runs = vec![Run {
         character_index: 0,
         font_id: 0,
     }];

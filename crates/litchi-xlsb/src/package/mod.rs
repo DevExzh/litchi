@@ -23,16 +23,6 @@ pub(crate) mod cells_reader;
 pub(crate) mod chart_resources;
 #[path = "../host/chartsheet/mod.rs"]
 pub mod chartsheet;
-#[path = "../host/comments.rs"]
-pub mod comments;
-
-/// Contextual facade for inert threaded-comments/person package CRUD. The
-/// legacy `package::comments` adapter remains separate and owns BIFF12 notes.
-pub use crate::comments::threaded::package as threaded_comments;
-/// Contextual facade for XLSB slicer cache and worksheet-view parts.
-pub use crate::slicer::package as slicers;
-/// Contextual facade for XLSB timeline cache and worksheet-view parts.
-pub use crate::timeline::package as timelines;
 #[path = "../host/connections/mod.rs"]
 pub mod connections;
 #[path = "../host/data_validation.rs"]
@@ -45,10 +35,7 @@ pub mod drawing_image;
 pub(crate) mod drawing_write;
 #[path = "../host/error.rs"]
 pub mod error;
-#[path = "../host/external_link.rs"]
-pub mod external_link;
-#[path = "../host/external_link_write.rs"]
-pub(crate) mod external_link_write;
+pub(crate) mod external_link;
 #[path = "../host/formula/mod.rs"]
 pub mod formula;
 #[path = "../host/frt.rs"]

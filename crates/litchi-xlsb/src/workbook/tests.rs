@@ -2,8 +2,8 @@
 
 use super::model::Workbook;
 use crate::calc::Props;
+use crate::external_link::Kind;
 use crate::package::error::Result;
-use crate::package::external_link::Kind;
 use crate::package::formula::{Compiler, Context, ExternalBook, Parser};
 use crate::package::shared_strings::SharedString;
 use crate::package::styles_table::StylesTable;

@@ -51,12 +51,10 @@ impl WorkbookWriter {
             let one_based_index = index.checked_add(1).ok_or_else(|| {
                 Error::InvalidFormula("external-link part index overflow".to_string())
             })?;
-            package.add_part(Box::new(
-                crate::package::external_link_write::author_external_link_part(
-                    link,
-                    one_based_index,
-                )?,
-            ));
+            package.add_part(Box::new(crate::package::external_link::author_part(
+                link,
+                one_based_index,
+            )?));
         }
 
         if let Some(payload) = &self.vba {
@@ -401,10 +399,7 @@ impl WorkbookWriter {
                 let comments_name = format!("comments{}.bin", i + 1);
                 sheet_part.relate_to(&format!("../{comments_name}"), rel::COMMENTS);
                 let mut comments_data = Vec::new();
-                crate::package::comments::write_comments(
-                    &mut Writer::new(&mut comments_data),
-                    worksheet.comments(),
-                )?;
+                crate::comments::write(&mut Writer::new(&mut comments_data), worksheet.comments())?;
                 Some(BlobPart::new(
                     PackURI::new(format!("/xl/{comments_name}"))?,
                     "application/vnd.ms-excel.comments".to_string(),

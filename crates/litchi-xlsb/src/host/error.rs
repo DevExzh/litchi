@@ -231,6 +231,43 @@ impl From<crate::hyperlinks::Error> for Error {
     }
 }
 
+impl From<crate::comments::Error> for Error {
+    fn from(error: crate::comments::Error) -> Self {
+        match error {
+            crate::comments::Error::Wire(error) => Self::Wire(error),
+            crate::comments::Error::InvalidRecordType(record_type) => {
+                Self::InvalidRecordType(record_type)
+            },
+            crate::comments::Error::InvalidLength { expected, found } => {
+                Self::InvalidLength { expected, found }
+            },
+            crate::comments::Error::Unrecognized { typ, val } => Self::Unrecognized { typ, val },
+            crate::comments::Error::Encoding(message) => Self::Encoding(message),
+            crate::comments::Error::UnsupportedFeature(feature) => {
+                Self::UnsupportedFeature(feature)
+            },
+            crate::comments::Error::Allocation { resource, source } => {
+                Self::Allocation { resource, source }
+            },
+        }
+    }
+}
+
+impl From<crate::external_link::Error> for Error {
+    fn from(error: crate::external_link::Error) -> Self {
+        match error {
+            crate::external_link::Error::Wire(error) => Self::Wire(error),
+            crate::external_link::Error::InvalidFormula(message) => Self::InvalidFormula(message),
+            crate::external_link::Error::InvalidLength { expected, found } => {
+                Self::InvalidLength { expected, found }
+            },
+            crate::external_link::Error::Allocation { resource, source } => {
+                Self::Allocation { resource, source }
+            },
+        }
+    }
+}
+
 impl From<crate::conditional_formatting::Error> for Error {
     fn from(error: crate::conditional_formatting::Error) -> Self {
         match error {
