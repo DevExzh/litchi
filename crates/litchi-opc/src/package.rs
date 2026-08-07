@@ -6,6 +6,7 @@
 
 use crate::constants::relationship_type;
 use crate::error::{OpcError, Result};
+use crate::limits::ReadLimits;
 use crate::members::NonPartMember;
 use crate::packuri::{PACKAGE_URI, PackURI, PartNameConflict};
 use crate::part::{Part, PartFactory};
@@ -122,7 +123,12 @@ impl OpcPackage {
     /// let pkg = OpcPackage::open("document.docx").unwrap();
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let owned_reader = OwnedPhysPkgReader::open(path)?;
+        Self::open_with_limits(path, ReadLimits::default())
+    }
+
+    /// Open an OPC package from a file with explicit resource limits.
+    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: ReadLimits) -> Result<Self> {
+        let owned_reader = OwnedPhysPkgReader::open_with_limits(path, limits)?;
         let phys_reader = owned_reader.reader()?;
         let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
         Self::unmarshal(pkg_reader)
@@ -133,7 +139,12 @@ impl OpcPackage {
     /// # Arguments
     /// * `reader` - A reader that implements Read
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        let owned_reader = OwnedPhysPkgReader::from_reader(reader)?;
+        Self::from_reader_with_limits(reader, ReadLimits::default())
+    }
+
+    /// Load an OPC package from a reader with explicit resource limits.
+    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
+        let owned_reader = OwnedPhysPkgReader::from_reader_with_limits(reader, limits)?;
         let phys_reader = owned_reader.reader()?;
         let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
         Self::unmarshal(pkg_reader)
@@ -143,7 +154,12 @@ impl OpcPackage {
     ///
     /// This avoids copying the archive buffer before parts are decompressed.
     pub fn from_vec(data: Vec<u8>) -> Result<Self> {
-        let owned_reader = OwnedPhysPkgReader::from_bytes(data)?;
+        Self::from_vec_with_limits(data, ReadLimits::default())
+    }
+
+    /// Move an owned ZIP archive into the package reader with explicit limits.
+    pub fn from_vec_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
+        let owned_reader = OwnedPhysPkgReader::from_bytes_with_limits(data, limits)?;
         let phys_reader = owned_reader.reader()?;
         let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
         Self::unmarshal(pkg_reader)
@@ -154,7 +170,12 @@ impl OpcPackage {
     /// # Arguments
     /// * `data` - The ZIP archive data as a byte slice
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        let phys_reader = PhysPkgReader::new(data)?;
+        Self::from_bytes_with_limits(data, ReadLimits::default())
+    }
+
+    /// Load an OPC package from a byte slice with explicit resource limits.
+    pub fn from_bytes_with_limits(data: &[u8], limits: ReadLimits) -> Result<Self> {
+        let phys_reader = PhysPkgReader::new_with_limits(data, limits)?;
         let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
         Self::unmarshal(pkg_reader)
     }
@@ -697,6 +718,23 @@ mod tests {
     fn moves_owned_archive_into_package_reader() {
         let pkg = OpcPackage::from_vec(create_minimal_docx()).unwrap();
         assert!(pkg.part_count() > 0);
+    }
+
+    #[test]
+    fn bounded_package_constructors_reject_oversized_input() {
+        let limits = ReadLimits::builder()
+            .max_input_bytes(3)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            OpcPackage::from_bytes_with_limits(b"four", limits),
+            Err(OpcError::ReadLimit {
+                resource: crate::ReadResource::InputBytes,
+                actual: 4,
+                maximum: 3,
+            })
+        ));
     }
 
     #[test]

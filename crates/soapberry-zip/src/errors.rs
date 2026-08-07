@@ -72,6 +72,16 @@ pub enum ErrorKind {
     /// An invalid input error with associated message
     InvalidInput { msg: String },
 
+    /// A declared archive resource exceeds the caller-selected ceiling.
+    LimitExceeded {
+        /// The resource whose declared size or count exceeded its ceiling.
+        resource: LimitResource,
+        /// The declared or observed value that exceeded the ceiling.
+        actual: u64,
+        /// The caller-selected ceiling.
+        maximum: u64,
+    },
+
     /// Could not construct an archive with the given end of central directory
     InvalidEndOfCentralDirectory,
 
@@ -139,6 +149,17 @@ impl std::fmt::Display for ErrorKind {
             ErrorKind::InvalidInput { ref msg } => {
                 write!(f, "Invalid input: {}", msg)
             },
+            ErrorKind::LimitExceeded {
+                resource,
+                actual,
+                maximum,
+            } => {
+                write!(
+                    f,
+                    "ZIP {} limit exceeded: declared {}, maximum {}",
+                    resource, actual, maximum
+                )
+            },
             ErrorKind::InvalidEndOfCentralDirectory => {
                 write!(f, "Invalid end of central directory")
             },
@@ -150,6 +171,42 @@ impl std::fmt::Display for ErrorKind {
                 write!(f, "Unsupported compression method: {}", method)
             },
         }
+    }
+}
+
+/// A resource governed by [`ErrorKind::LimitExceeded`].
+///
+/// Values are declared ZIP metadata, except [`Self::FileCount`], which is the
+/// number of non-directory members accepted into an Office archive index.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LimitResource {
+    /// Number of non-directory members.
+    FileCount,
+    /// Bytes in one raw member name.
+    MemberNameBytes,
+    /// Aggregate central-directory variable metadata bytes.
+    ///
+    /// This includes member names, extra fields, and file comments, including
+    /// those on directory entries.
+    MetadataBytes,
+    /// Declared compressed bytes for one non-directory member.
+    CompressedSize,
+    /// Declared uncompressed bytes for one non-directory member.
+    EntrySize,
+    /// Aggregate declared uncompressed bytes for non-directory members.
+    TotalSize,
+}
+
+impl std::fmt::Display for LimitResource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::FileCount => "file count",
+            Self::MemberNameBytes => "member name bytes",
+            Self::MetadataBytes => "central-directory metadata bytes",
+            Self::CompressedSize => "compressed member size",
+            Self::EntrySize => "uncompressed member size",
+            Self::TotalSize => "total uncompressed size",
+        })
     }
 }
 

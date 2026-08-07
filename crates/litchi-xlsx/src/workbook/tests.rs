@@ -1,6 +1,6 @@
 //! Behavioral tests for the immutable workbook facade and OPC graph boundary.
 
-use std::io::Write;
+use std::io::{Cursor, Write};
 use std::mem::size_of;
 use std::path::Path;
 use std::sync::Arc;
@@ -14,7 +14,7 @@ use crate::Cell;
 use crate::cell::{Extents, Value};
 use crate::error::Error;
 use crate::formula::Cache;
-use crate::{LocalStyle, Style, Styles};
+use crate::{LocalStyle, Package, ReadLimits, Style, Styles};
 
 const CHARTSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -90,6 +90,54 @@ fn new_workbook_is_deterministic_and_selector_first() {
         reopened.active_sheet().map(|sheet| sheet.name().to_owned()),
         Some("Sheet1".into())
     );
+}
+
+#[test]
+fn package_and_workbook_ingress_honor_exact_read_limits() {
+    let bytes = Workbook::new()
+        .expect("minimal workbook")
+        .to_bytes()
+        .expect("serialize minimal workbook");
+    let input_bytes = u64::try_from(bytes.len()).expect("input length fits u64");
+    let exact = ReadLimits::builder()
+        .max_input_bytes(input_bytes)
+        .expect("exact input limit")
+        .build()
+        .expect("valid exact limit");
+    let over = ReadLimits::builder()
+        .max_input_bytes(input_bytes - 1)
+        .expect("smaller input limit")
+        .build()
+        .expect("valid smaller limit");
+    let file = tempfile::NamedTempFile::new().expect("temporary workbook path");
+    std::fs::write(file.path(), &bytes).expect("write workbook");
+
+    assert!(Package::open(file.path()).is_ok());
+    assert!(Package::from_bytes(bytes.clone()).is_ok());
+    assert!(Package::from_slice(&bytes).is_ok());
+    assert!(Package::from_reader(Cursor::new(bytes.clone())).is_ok());
+    assert!(Workbook::open(file.path()).is_ok());
+    assert!(Workbook::from_bytes(bytes.clone()).is_ok());
+    assert!(Workbook::from_slice(&bytes).is_ok());
+    assert!(Workbook::from_reader(Cursor::new(bytes.clone())).is_ok());
+
+    assert!(Package::open_with_limits(file.path(), exact).is_ok());
+    assert!(Package::from_bytes_with_limits(bytes.clone(), exact).is_ok());
+    assert!(Package::from_slice_with_limits(&bytes, exact).is_ok());
+    assert!(Package::from_reader_with_limits(Cursor::new(bytes.clone()), exact).is_ok());
+    assert!(Workbook::open_with_limits(file.path(), exact).is_ok());
+    assert!(Workbook::from_bytes_with_limits(bytes.clone(), exact).is_ok());
+    assert!(Workbook::from_slice_with_limits(&bytes, exact).is_ok());
+    assert!(Workbook::from_reader_with_limits(Cursor::new(bytes.clone()), exact).is_ok());
+
+    assert!(Package::open_with_limits(file.path(), over).is_err());
+    assert!(Package::from_bytes_with_limits(bytes.clone(), over).is_err());
+    assert!(Package::from_slice_with_limits(&bytes, over).is_err());
+    assert!(Package::from_reader_with_limits(Cursor::new(bytes.clone()), over).is_err());
+    assert!(Workbook::open_with_limits(file.path(), over).is_err());
+    assert!(Workbook::from_bytes_with_limits(bytes.clone(), over).is_err());
+    assert!(Workbook::from_slice_with_limits(&bytes, over).is_err());
+    assert!(Workbook::from_reader_with_limits(Cursor::new(bytes), over).is_err());
 }
 
 #[test]

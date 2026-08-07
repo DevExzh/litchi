@@ -17,14 +17,6 @@ use crate::error::{OpcError, Result};
 use crate::packuri::{PackURI, PartNameConflict};
 use std::collections::HashMap;
 
-/// Longest ZIP item name this reader maps onto an OPC part name.
-///
-/// ZIP already bounds item names to 65,535 bytes through the `u16` name-length
-/// field, so this is a tighter working limit: real OPC part names are two orders
-/// of magnitude shorter, and the cap keeps the per-name ancestor walk in
-/// [`PartNameIndex`] cheap for hostile central directories.
-const MAX_PART_NAME_BYTES: usize = 4_096;
-
 /// Why a ZIP item present in the archive was not loaded as an OPC part.
 ///
 /// Non-part items are reported rather than discarded so that a caller can tell
@@ -117,8 +109,11 @@ impl NonPartMember {
 ///
 /// Returns `None` when the item cannot denote a part, which makes it archive
 /// junk rather than a malformed package (ECMA-376 Part 2 §9.1.1.1).
-pub(crate) fn part_name_for_member(member_name: &str) -> Option<PackURI> {
-    if member_name.len() > MAX_PART_NAME_BYTES {
+pub(crate) fn part_name_for_member(
+    member_name: &str,
+    max_member_name_bytes: usize,
+) -> Option<PackURI> {
+    if member_name.len() > max_member_name_bytes {
         return None;
     }
     let mut absolute = String::new();
@@ -316,13 +311,20 @@ mod tests {
 
     #[test]
     fn maps_ordinary_members_and_rejects_junk_names() {
+        const MAX_MEMBER_NAME_BYTES: usize = 4;
         assert_eq!(
-            part_name_for_member("word/document.xml").map(|uri| uri.as_str().to_string()),
+            part_name_for_member("word/document.xml", 64).map(|uri| uri.as_str().to_string()),
             Some("/word/document.xml".to_string())
         );
-        assert!(part_name_for_member("[trash]/0000.dat").is_none());
-        assert!(part_name_for_member("word/my document.xml").is_none());
-        assert!(part_name_for_member(&"a".repeat(MAX_PART_NAME_BYTES + 1)).is_none());
+        assert!(part_name_for_member("[trash]/0000.dat", 64).is_none());
+        assert!(part_name_for_member("word/my document.xml", 64).is_none());
+        assert!(
+            part_name_for_member(
+                &"a".repeat(MAX_MEMBER_NAME_BYTES + 1),
+                MAX_MEMBER_NAME_BYTES
+            )
+            .is_none()
+        );
     }
 
     #[test]

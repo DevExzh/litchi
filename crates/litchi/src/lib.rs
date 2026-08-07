@@ -197,6 +197,8 @@ pub mod common {
     /// Detection re-exports — merges `litchi-core`'s signature detection with
     /// the umbrella's smart-detection entry points.
     pub mod detection {
+        #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+        pub use crate::detection_smart::detect_format_smart_with_limits;
         #[cfg(any(
             feature = "doc",
             feature = "ppt",
@@ -562,6 +564,10 @@ mod standalone_ooxml_facade_tests {
         let _: Option<super::pptx::Package> = None;
         let _: Option<super::xlsx::Workbook> = None;
         let _: Option<super::xlsb::Workbook> = None;
+        let _: Option<super::docx::ReadLimits> = None;
+        let _: Option<super::pptx::ReadLimits> = None;
+        let _: Option<super::xlsx::ReadLimits> = None;
+        let _: Option<super::xlsb::ReadLimits> = None;
         let _: Option<super::opc::OpcPackage> = None;
         let _: Option<super::ooxml_common::custom::Props> = None;
     }

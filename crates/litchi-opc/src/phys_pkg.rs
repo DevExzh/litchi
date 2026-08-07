@@ -6,10 +6,39 @@
 //! Uses the high-performance soapberry-zip library for zero-copy ZIP parsing.
 
 use crate::error::{OpcError, Result};
+use crate::limits::{ReadLimits, ReadResource};
 use crate::packuri::PackURI;
-use soapberry_zip::office::LazyArchiveReader;
+use soapberry_zip::office::{LazyArchiveReader, LimitResource};
+use std::collections::HashMap;
 use std::io::{Cursor, Read, Write};
 use std::path::Path;
+use std::sync::{Arc, Mutex};
+
+/// Aggregate limits for OPC part materialization.
+///
+/// A successful read is charged per materialization, not per distinct archive
+/// member: reading the same part again consumes another `max_parts` slot.
+#[derive(Default)]
+struct PartBudget {
+    reserved_parts: usize,
+    reserved_declared: u64,
+    materialized_parts: usize,
+    materialized_actual: u64,
+}
+
+#[derive(Clone, Copy)]
+struct PartReservation {
+    parts: usize,
+    declared: u64,
+}
+
+#[derive(Default)]
+struct RelationshipBudget {
+    reserved_parts: usize,
+    reserved_bytes: u64,
+    materialized_parts: usize,
+    materialized_bytes: u64,
+}
 
 /// Physical package reader that provides access to parts in a ZIP-based OPC package.
 ///
@@ -19,6 +48,12 @@ use std::path::Path;
 pub struct PhysPkgReader<'data> {
     /// The underlying ZIP archive reader (lazy decompression with caching)
     archive: LazyArchiveReader<'data>,
+    /// Validated policy retained for package-level parsing.
+    limits: ReadLimits,
+    /// Shared across readers borrowed from one owned physical package.
+    part_budget: Arc<Mutex<PartBudget>>,
+    /// Public relationship-manifest reads share one aggregate budget.
+    relationship_budget: Arc<Mutex<RelationshipBudget>>,
 }
 
 /// Owned version of `PhysPkgReader` that owns the data buffer.
@@ -27,6 +62,14 @@ pub struct PhysPkgReader<'data> {
 pub struct OwnedPhysPkgReader {
     /// The owned data buffer
     data: Vec<u8>,
+    /// Validated policy retained when creating borrowed readers.
+    limits: ReadLimits,
+    /// Shared with each borrowed reader so repeated owned reads cannot reset
+    /// materialized-part budgets.
+    part_budget: Arc<Mutex<PartBudget>>,
+    /// Shared with each borrowed reader so public relationship reads cannot
+    /// reset their aggregate count or byte budget.
+    relationship_budget: Arc<Mutex<RelationshipBudget>>,
 }
 
 impl OwnedPhysPkgReader {
@@ -42,21 +85,42 @@ impl OwnedPhysPkgReader {
     /// Returns an error if the file doesn't exist, isn't a valid ZIP file,
     /// or cannot be opened.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Self::open_with_limits(path, ReadLimits::default())
+    }
+
+    /// Open an OPC package from a file path with explicit resource limits.
+    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: ReadLimits) -> Result<Self> {
         let path = path.as_ref();
 
         if !path.exists() {
             return Err(OpcError::PackageNotFound(path.display().to_string()));
         }
 
-        let data = std::fs::read(path)?;
-        Self::from_bytes(data)
+        let metadata = std::fs::metadata(path)?;
+        if metadata.is_file() {
+            limits.check_input_bytes(metadata.len())?;
+        }
+        let data = read_limited(std::fs::File::open(path)?, limits)?;
+        Self::from_bytes_with_limits(data, limits)
     }
 
     /// Create a new `OwnedPhysPkgReader` from owned bytes.
     pub fn from_bytes(data: Vec<u8>) -> Result<Self> {
+        Self::from_bytes_with_limits(data, ReadLimits::default())
+    }
+
+    /// Create a new owned physical reader with explicit resource limits.
+    pub fn from_bytes_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
+        limits.check_input_bytes(data.len() as u64)?;
         // Validate the ZIP archive can be parsed
-        let _ = LazyArchiveReader::new(&data)?;
-        Ok(Self { data })
+        let _ = LazyArchiveReader::new_with_limits(&data, limits.zip_limits())
+            .map_err(map_archive_error)?;
+        Ok(Self {
+            data,
+            limits,
+            part_budget: Arc::new(Mutex::new(PartBudget::default())),
+            relationship_budget: Arc::new(Mutex::new(RelationshipBudget::default())),
+        })
     }
 
     /// Create a new `OwnedPhysPkgReader` from a reader.
@@ -67,15 +131,24 @@ impl OwnedPhysPkgReader {
     /// # Returns
     /// A new `OwnedPhysPkgReader` instance
     pub fn from_reader<R: Read>(mut reader: R) -> Result<Self> {
-        let mut data = Vec::new();
-        reader.read_to_end(&mut data)?;
-        Self::from_bytes(data)
+        Self::from_reader_with_limits(&mut reader, ReadLimits::default())
+    }
+
+    /// Create a new owned physical reader from a stream with explicit limits.
+    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
+        let data = read_limited(reader, limits)?;
+        Self::from_bytes_with_limits(data, limits)
     }
 
     /// Get a borrowed reader for accessing archive contents.
     #[inline]
     pub fn reader(&self) -> Result<PhysPkgReader<'_>> {
-        PhysPkgReader::new(&self.data)
+        PhysPkgReader::new_with_limits_and_budget(
+            &self.data,
+            self.limits,
+            Arc::clone(&self.part_budget),
+            Arc::clone(&self.relationship_budget),
+        )
     }
 
     /// Get the binary content for a part by its `PackURI`.
@@ -120,6 +193,15 @@ impl OwnedPhysPkgReader {
         Ok(self.reader()?.contains(pack_uri))
     }
 
+    /// Read an archive member by its normalized ZIP name.
+    ///
+    /// This is physical ZIP access: it observes input and ZIP archive limits,
+    /// but deliberately does not charge the OPC materialized-part budget. Use
+    /// [`Self::blob_for`] for an OPC part.
+    pub fn read_member(&self, name: &str) -> Result<Vec<u8>> {
+        self.reader()?.read_member(name)
+    }
+
     /// Consume self and return the underlying data.
     #[inline]
     #[must_use]
@@ -144,14 +226,41 @@ impl<'data> PhysPkgReader<'data> {
     /// # Returns
     /// A new `PhysPkgReader` instance
     pub fn new(data: &'data [u8]) -> Result<Self> {
-        let archive = LazyArchiveReader::new(data)?;
-        Ok(Self { archive })
+        Self::new_with_limits(data, ReadLimits::default())
+    }
+
+    /// Create a physical reader from a byte slice with explicit resource limits.
+    pub fn new_with_limits(data: &'data [u8], limits: ReadLimits) -> Result<Self> {
+        Self::new_with_limits_and_budget(
+            data,
+            limits,
+            Arc::new(Mutex::new(PartBudget::default())),
+            Arc::new(Mutex::new(RelationshipBudget::default())),
+        )
+    }
+
+    fn new_with_limits_and_budget(
+        data: &'data [u8],
+        limits: ReadLimits,
+        part_budget: Arc<Mutex<PartBudget>>,
+        relationship_budget: Arc<Mutex<RelationshipBudget>>,
+    ) -> Result<Self> {
+        limits.check_input_bytes(data.len() as u64)?;
+        let archive = LazyArchiveReader::new_with_limits(data, limits.zip_limits())
+            .map_err(map_archive_error)?;
+        Ok(Self {
+            archive,
+            limits,
+            part_budget,
+            relationship_budget,
+        })
     }
 
     /// Get the binary content for a part by its `PackURI`.
     ///
     /// Uses efficient lazy decompression. The returned vector contains
-    /// the decompressed content.
+    /// the decompressed content. Every successful materialization consumes one
+    /// `max_parts` slot, including repeated requests for the same URI.
     ///
     /// # Arguments
     /// * `pack_uri` - The `PackURI` of the part to read
@@ -160,10 +269,32 @@ impl<'data> PhysPkgReader<'data> {
     /// The binary content of the part
     pub fn blob_for(&self, pack_uri: &PackURI) -> Result<Vec<u8>> {
         let membername = pack_uri.membername();
+        let label = pack_uri.to_string();
+        let declared = self.declared_part_bytes(membername, &label)?;
+        let reservation = self.reserve_declared_parts(&[declared])?;
+        match self.archive.read(membername) {
+            Ok(blob) => {
+                if let Err(error) =
+                    self.commit_actual_parts(reservation, std::slice::from_ref(&blob))
+                {
+                    return Err(error);
+                }
+                Ok(blob)
+            },
+            Err(error) => {
+                self.release_declared_parts(reservation);
+                Err(map_part_error(&label, error))
+            },
+        }
+    }
 
-        self.archive
-            .read(membername)
-            .map_err(|_err| OpcError::PartNotFound(pack_uri.to_string()))
+    /// Read an archive member by its normalized ZIP name.
+    ///
+    /// This low-level physical operation is archive-budgeted only. It does not
+    /// consume `max_part_bytes` or `max_total_part_bytes`; callers loading OPC
+    /// parts must use [`Self::blob_for`] instead.
+    pub fn read_member(&self, name: &str) -> Result<Vec<u8>> {
+        self.archive.read(name).map_err(map_archive_error)
     }
 
     /// Get the `[Content_Types].xml` content.
@@ -172,7 +303,12 @@ impl<'data> PhysPkgReader<'data> {
     pub fn content_types_xml(&self) -> Result<Vec<u8>> {
         let content_types_uri =
             PackURI::new(crate::packuri::CONTENT_TYPES_URI).map_err(OpcError::InvalidPackUri)?;
-        self.blob_for(&content_types_uri)
+        self.read_bounded_member(
+            content_types_uri.membername(),
+            &content_types_uri.to_string(),
+            ReadResource::ContentTypesBytes,
+            self.limits.max_content_types_bytes() as u64,
+        )
     }
 
     /// Get the relationships XML for a specific source URI.
@@ -185,7 +321,7 @@ impl<'data> PhysPkgReader<'data> {
     pub fn rels_xml_for(&self, source_uri: &PackURI) -> Result<Option<Vec<u8>>> {
         let rels_uri = source_uri.rels_uri().map_err(OpcError::InvalidPackUri)?;
 
-        match self.blob_for(&rels_uri) {
+        match self.read_relationship_member(rels_uri.membername(), &rels_uri.to_string()) {
             Ok(blob) => Ok(Some(blob)),
             Err(OpcError::PartNotFound(_)) => Ok(None),
             Err(e) => Err(e),
@@ -231,10 +367,84 @@ impl<'data> PhysPkgReader<'data> {
     ///
     /// # Returns
     /// A `HashMap` mapping member names to their decompressed contents.
-    /// Parts that fail to read are not included in the result.
-    pub fn blobs_parallel(&self, uris: &[PackURI]) -> std::collections::HashMap<String, Vec<u8>> {
-        let names: Vec<&str> = uris.iter().map(PackURI::membername).collect();
-        self.archive.read_many_parallel(&names)
+    ///
+    /// The operation is all-or-nothing: an error for any requested part drops
+    /// every successful buffer and returns that error. Each URI occurrence
+    /// consumes one `max_parts` slot, including repeated URIs.
+    pub fn blobs_parallel(&self, uris: &[PackURI]) -> Result<HashMap<String, Vec<u8>>> {
+        self.limits.check(
+            ReadResource::Parts,
+            uris.len() as u64,
+            self.limits.max_parts() as u64,
+        )?;
+        let mut names = Vec::new();
+        names
+            .try_reserve(uris.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC parallel part names",
+                source,
+            })?;
+        let mut declared = Vec::new();
+        declared
+            .try_reserve(uris.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC parallel part metadata",
+                source,
+            })?;
+        for uri in uris {
+            let name = uri.membername();
+            declared.push(self.declared_part_bytes(name, uri.as_str())?);
+            names.push(name);
+        }
+        let reservation = self.reserve_declared_parts(&declared)?;
+        let results = self.archive.read_many_parallel_results(&names);
+        let mut materialized = Vec::new();
+        if let Err(source) = materialized.try_reserve(results.len()) {
+            self.release_declared_parts(reservation);
+            return Err(OpcError::Allocation {
+                resource: "OPC parallel part results",
+                source,
+            });
+        }
+        for (name, result) in results {
+            match result {
+                Ok(blob) => materialized.push(blob),
+                Err(error) => {
+                    self.release_declared_parts(reservation);
+                    return Err(map_part_error(name, error));
+                },
+            }
+        }
+        if materialized.len() != names.len() {
+            self.release_declared_parts(reservation);
+            return Err(OpcError::ZipError(
+                "ZIP bulk reader returned an incomplete result set".to_owned(),
+            ));
+        }
+        let mut keys = Vec::new();
+        if let Err(source) = keys.try_reserve(names.len()) {
+            self.release_declared_parts(reservation);
+            return Err(OpcError::Allocation {
+                resource: "OPC parallel part keys",
+                source,
+            });
+        }
+        for name in &names {
+            keys.push((*name).to_owned());
+        }
+        let mut blobs = HashMap::new();
+        if let Err(source) = blobs.try_reserve(materialized.len()) {
+            self.release_declared_parts(reservation);
+            return Err(OpcError::Allocation {
+                resource: "OPC parallel part map",
+                source,
+            });
+        }
+        self.commit_actual_parts(reservation, &materialized)?;
+        for (key, blob) in keys.into_iter().zip(materialized) {
+            blobs.insert(key, blob);
+        }
+        Ok(blobs)
     }
 
     /// Get a reference to the underlying lazy archive reader.
@@ -242,8 +452,455 @@ impl<'data> PhysPkgReader<'data> {
     /// The lazy reader decompresses files on-demand and caches results.
     /// This enables pipelining of decompression with parsing.
     #[inline]
-    pub fn archive(&self) -> &LazyArchiveReader<'data> {
+    pub(crate) fn archive(&self) -> &LazyArchiveReader<'data> {
         &self.archive
+    }
+
+    /// Return the validated policy retained by this reader.
+    #[inline]
+    #[allow(
+        dead_code,
+        reason = "pkgreader consumes the retained profile as parser limits are migrated"
+    )]
+    pub(crate) const fn limits(&self) -> ReadLimits {
+        self.limits
+    }
+
+    fn declared_part_bytes(&self, name: &str, label: &str) -> Result<u64> {
+        self.archive
+            .metadata(name)
+            .map(|metadata| metadata.uncompressed_size())
+            .map_err(|error| map_part_error(label, error))
+    }
+
+    fn read_bounded_member(
+        &self,
+        name: &str,
+        label: &str,
+        resource: ReadResource,
+        maximum: u64,
+    ) -> Result<Vec<u8>> {
+        let declared = self
+            .archive
+            .metadata(name)
+            .map(|metadata| metadata.uncompressed_size())
+            .map_err(|error| map_part_error(label, error))?;
+        self.limits.check(resource, declared, maximum)?;
+        let blob = self
+            .archive
+            .read(name)
+            .map_err(|error| map_part_error(label, error))?;
+        self.limits.check(resource, blob.len() as u64, maximum)?;
+        Ok(blob)
+    }
+
+    fn read_relationship_member(&self, name: &str, label: &str) -> Result<Vec<u8>> {
+        let declared = self
+            .archive
+            .metadata(name)
+            .map(|metadata| metadata.uncompressed_size())
+            .map_err(|error| map_part_error(label, error))?;
+        self.limits.check(
+            ReadResource::RelationshipXmlBytes,
+            declared,
+            self.limits.max_relationship_xml_bytes() as u64,
+        )?;
+        self.reserve_declared_relationship(declared)?;
+        match self.archive.read(name) {
+            Ok(blob) => {
+                if let Err(error) = self.commit_relationship(declared, blob.len() as u64) {
+                    return Err(error);
+                }
+                Ok(blob)
+            },
+            Err(error) => {
+                self.release_declared_relationship(declared);
+                Err(map_part_error(label, error))
+            },
+        }
+    }
+
+    fn reserve_declared_relationship(&self, declared: u64) -> Result<()> {
+        let mut budget = self
+            .relationship_budget
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let parts = budget
+            .materialized_parts
+            .checked_add(budget.reserved_parts)
+            .and_then(|count| count.checked_add(1))
+            .ok_or(OpcError::ReadLimit {
+                resource: ReadResource::RelationshipParts,
+                actual: u64::MAX,
+                maximum: self.limits.max_relationship_parts() as u64,
+            })?;
+        self.limits.check(
+            ReadResource::RelationshipParts,
+            parts as u64,
+            self.limits.max_relationship_parts() as u64,
+        )?;
+        let bytes = budget
+            .materialized_bytes
+            .checked_add(budget.reserved_bytes)
+            .and_then(|bytes| bytes.checked_add(declared))
+            .ok_or(OpcError::ReadLimit {
+                resource: ReadResource::TotalRelationshipXmlBytes,
+                actual: u64::MAX,
+                maximum: self.limits.max_total_relationship_xml_bytes() as u64,
+            })?;
+        self.limits.check(
+            ReadResource::TotalRelationshipXmlBytes,
+            bytes,
+            self.limits.max_total_relationship_xml_bytes() as u64,
+        )?;
+        budget.reserved_parts =
+            budget
+                .reserved_parts
+                .checked_add(1)
+                .ok_or(OpcError::ReadLimit {
+                    resource: ReadResource::RelationshipParts,
+                    actual: u64::MAX,
+                    maximum: self.limits.max_relationship_parts() as u64,
+                })?;
+        budget.reserved_bytes =
+            budget
+                .reserved_bytes
+                .checked_add(declared)
+                .ok_or(OpcError::ReadLimit {
+                    resource: ReadResource::TotalRelationshipXmlBytes,
+                    actual: u64::MAX,
+                    maximum: self.limits.max_total_relationship_xml_bytes() as u64,
+                })?;
+        Ok(())
+    }
+
+    fn release_declared_relationship(&self, declared: u64) {
+        let mut budget = self
+            .relationship_budget
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        budget.reserved_parts = budget.reserved_parts.saturating_sub(1);
+        budget.reserved_bytes = budget.reserved_bytes.saturating_sub(declared);
+    }
+
+    fn commit_relationship(&self, declared: u64, actual: u64) -> Result<()> {
+        let result = (|| {
+            self.limits.check(
+                ReadResource::RelationshipXmlBytes,
+                actual,
+                self.limits.max_relationship_xml_bytes() as u64,
+            )?;
+            let mut budget = self
+                .relationship_budget
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let reserved_parts = budget
+                .reserved_parts
+                .checked_sub(1)
+                .ok_or(OpcError::ZipError(
+                    "OPC relationship budget reservation underflow".to_owned(),
+                ))?;
+            let reserved_bytes =
+                budget
+                    .reserved_bytes
+                    .checked_sub(declared)
+                    .ok_or(OpcError::ZipError(
+                        "OPC relationship byte reservation underflow".to_owned(),
+                    ))?;
+            let materialized_parts =
+                budget
+                    .materialized_parts
+                    .checked_add(1)
+                    .ok_or(OpcError::ReadLimit {
+                        resource: ReadResource::RelationshipParts,
+                        actual: u64::MAX,
+                        maximum: self.limits.max_relationship_parts() as u64,
+                    })?;
+            let materialized_bytes =
+                budget
+                    .materialized_bytes
+                    .checked_add(actual)
+                    .ok_or(OpcError::ReadLimit {
+                        resource: ReadResource::TotalRelationshipXmlBytes,
+                        actual: u64::MAX,
+                        maximum: self.limits.max_total_relationship_xml_bytes() as u64,
+                    })?;
+            let parts =
+                materialized_parts
+                    .checked_add(reserved_parts)
+                    .ok_or(OpcError::ReadLimit {
+                        resource: ReadResource::RelationshipParts,
+                        actual: u64::MAX,
+                        maximum: self.limits.max_relationship_parts() as u64,
+                    })?;
+            self.limits.check(
+                ReadResource::RelationshipParts,
+                parts as u64,
+                self.limits.max_relationship_parts() as u64,
+            )?;
+            let bytes =
+                materialized_bytes
+                    .checked_add(reserved_bytes)
+                    .ok_or(OpcError::ReadLimit {
+                        resource: ReadResource::TotalRelationshipXmlBytes,
+                        actual: u64::MAX,
+                        maximum: self.limits.max_total_relationship_xml_bytes() as u64,
+                    })?;
+            self.limits.check(
+                ReadResource::TotalRelationshipXmlBytes,
+                bytes,
+                self.limits.max_total_relationship_xml_bytes() as u64,
+            )?;
+            budget.reserved_parts = reserved_parts;
+            budget.reserved_bytes = reserved_bytes;
+            budget.materialized_parts = materialized_parts;
+            budget.materialized_bytes = materialized_bytes;
+            Ok(())
+        })();
+        if result.is_err() {
+            self.release_declared_relationship(declared);
+        }
+        result
+    }
+
+    fn reserve_declared_parts(&self, parts: &[u64]) -> Result<PartReservation> {
+        let requested_parts = parts.len();
+        let mut requested = 0u64;
+        for &bytes in parts {
+            self.limits
+                .check(ReadResource::PartBytes, bytes, self.limits.max_part_bytes())?;
+            requested = requested.checked_add(bytes).ok_or(OpcError::ReadLimit {
+                resource: ReadResource::TotalPartBytes,
+                actual: u64::MAX,
+                maximum: self.limits.max_total_part_bytes(),
+            })?;
+        }
+        let mut budget = self
+            .part_budget
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let count = budget
+            .materialized_parts
+            .checked_add(budget.reserved_parts)
+            .and_then(|count| count.checked_add(requested_parts))
+            .ok_or(OpcError::ReadLimit {
+                resource: ReadResource::Parts,
+                actual: u64::MAX,
+                maximum: self.limits.max_parts() as u64,
+            })?;
+        self.limits.check(
+            ReadResource::Parts,
+            count as u64,
+            self.limits.max_parts() as u64,
+        )?;
+        let in_flight = budget
+            .materialized_actual
+            .checked_add(budget.reserved_declared)
+            .and_then(|bytes| bytes.checked_add(requested))
+            .ok_or(OpcError::ReadLimit {
+                resource: ReadResource::TotalPartBytes,
+                actual: u64::MAX,
+                maximum: self.limits.max_total_part_bytes(),
+            })?;
+        self.limits.check(
+            ReadResource::TotalPartBytes,
+            in_flight,
+            self.limits.max_total_part_bytes(),
+        )?;
+        let reserved_parts =
+            budget
+                .reserved_parts
+                .checked_add(requested_parts)
+                .ok_or(OpcError::ReadLimit {
+                    resource: ReadResource::Parts,
+                    actual: u64::MAX,
+                    maximum: self.limits.max_parts() as u64,
+                })?;
+        let reserved_declared =
+            budget
+                .reserved_declared
+                .checked_add(requested)
+                .ok_or(OpcError::ReadLimit {
+                    resource: ReadResource::TotalPartBytes,
+                    actual: u64::MAX,
+                    maximum: self.limits.max_total_part_bytes(),
+                })?;
+        budget.reserved_parts = reserved_parts;
+        budget.reserved_declared = reserved_declared;
+        Ok(PartReservation {
+            parts: requested_parts,
+            declared: requested,
+        })
+    }
+
+    fn release_declared_parts(&self, reservation: PartReservation) {
+        let mut budget = self
+            .part_budget
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        budget.reserved_parts = budget.reserved_parts.saturating_sub(reservation.parts);
+        budget.reserved_declared = budget
+            .reserved_declared
+            .saturating_sub(reservation.declared);
+    }
+
+    fn commit_actual_parts(&self, reservation: PartReservation, blobs: &[Vec<u8>]) -> Result<()> {
+        let result =
+            (|| {
+                let actual_parts = blobs.len();
+                let mut actual = 0u64;
+                for blob in blobs {
+                    let bytes = blob.len() as u64;
+                    self.limits.check(
+                        ReadResource::PartBytes,
+                        bytes,
+                        self.limits.max_part_bytes(),
+                    )?;
+                    actual = actual.checked_add(bytes).ok_or(OpcError::ReadLimit {
+                        resource: ReadResource::TotalPartBytes,
+                        actual: u64::MAX,
+                        maximum: self.limits.max_total_part_bytes(),
+                    })?;
+                }
+
+                let mut budget = self
+                    .part_budget
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                let remaining_parts = budget.reserved_parts.checked_sub(reservation.parts).ok_or(
+                    OpcError::ZipError("OPC part count reservation underflow".to_owned()),
+                )?;
+                let remaining_bytes = budget
+                    .reserved_declared
+                    .checked_sub(reservation.declared)
+                    .ok_or(OpcError::ZipError(
+                        "OPC part byte reservation underflow".to_owned(),
+                    ))?;
+                let next_parts = budget.materialized_parts.checked_add(actual_parts).ok_or(
+                    OpcError::ReadLimit {
+                        resource: ReadResource::Parts,
+                        actual: u64::MAX,
+                        maximum: self.limits.max_parts() as u64,
+                    },
+                )?;
+                let next_actual =
+                    budget
+                        .materialized_actual
+                        .checked_add(actual)
+                        .ok_or(OpcError::ReadLimit {
+                            resource: ReadResource::TotalPartBytes,
+                            actual: u64::MAX,
+                            maximum: self.limits.max_total_part_bytes(),
+                        })?;
+                let parts = next_parts
+                    .checked_add(remaining_parts)
+                    .ok_or(OpcError::ReadLimit {
+                        resource: ReadResource::Parts,
+                        actual: u64::MAX,
+                        maximum: self.limits.max_parts() as u64,
+                    })?;
+                self.limits.check(
+                    ReadResource::Parts,
+                    parts as u64,
+                    self.limits.max_parts() as u64,
+                )?;
+                let bytes =
+                    next_actual
+                        .checked_add(remaining_bytes)
+                        .ok_or(OpcError::ReadLimit {
+                            resource: ReadResource::TotalPartBytes,
+                            actual: u64::MAX,
+                            maximum: self.limits.max_total_part_bytes(),
+                        })?;
+                self.limits.check(
+                    ReadResource::TotalPartBytes,
+                    bytes,
+                    self.limits.max_total_part_bytes(),
+                )?;
+                budget.reserved_parts = remaining_parts;
+                budget.reserved_declared = remaining_bytes;
+                budget.materialized_parts = next_parts;
+                budget.materialized_actual = next_actual;
+                Ok(())
+            })();
+        if result.is_err() {
+            self.release_declared_parts(reservation);
+        }
+        result
+    }
+}
+
+fn read_limited<R: Read>(mut reader: R, limits: ReadLimits) -> Result<Vec<u8>> {
+    let maximum =
+        usize::try_from(limits.max_input_bytes()).map_err(|_| OpcError::InvalidReadLimit {
+            resource: ReadResource::InputBytes,
+            value: limits.max_input_bytes(),
+        })?;
+    let mut data = Vec::new();
+    data.try_reserve(maximum.min(8 * 1024))
+        .map_err(|source| OpcError::Allocation {
+            resource: "OPC package input",
+            source,
+        })?;
+
+    let mut buffer = [0u8; 8 * 1024];
+    loop {
+        let remaining = maximum.saturating_sub(data.len());
+        if remaining == 0 {
+            let mut extra = [0u8; 1];
+            if reader.read(&mut extra)? != 0 {
+                return Err(OpcError::ReadLimit {
+                    resource: ReadResource::InputBytes,
+                    actual: maximum as u64 + 1,
+                    maximum: maximum as u64,
+                });
+            }
+            return Ok(data);
+        }
+
+        let chunk = remaining.min(buffer.len());
+        let read = reader.read(&mut buffer[..chunk])?;
+        if read == 0 {
+            return Ok(data);
+        }
+        data.try_reserve(read)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC package input",
+                source,
+            })?;
+        data.extend_from_slice(&buffer[..read]);
+    }
+}
+
+fn map_archive_error(error: soapberry_zip::Error) -> OpcError {
+    if let soapberry_zip::ErrorKind::LimitExceeded {
+        resource,
+        actual,
+        maximum,
+    } = error.kind()
+    {
+        let resource = match resource {
+            LimitResource::FileCount => ReadResource::ArchiveMembers,
+            LimitResource::MemberNameBytes => ReadResource::ArchiveMemberNameBytes,
+            LimitResource::MetadataBytes => ReadResource::ArchiveMetadataBytes,
+            LimitResource::CompressedSize => ReadResource::ArchiveCompressedBytes,
+            LimitResource::EntrySize => ReadResource::ArchiveEntryBytes,
+            LimitResource::TotalSize => ReadResource::ArchiveTotalBytes,
+        };
+        return OpcError::ReadLimit {
+            resource,
+            actual: *actual,
+            maximum: *maximum,
+        };
+    }
+    OpcError::ZipError(error.to_string())
+}
+
+fn map_part_error(label: &str, error: soapberry_zip::Error) -> OpcError {
+    if matches!(error.kind(), soapberry_zip::ErrorKind::FileNotFound(_)) {
+        OpcError::PartNotFound(label.to_owned())
+    } else {
+        map_archive_error(error)
     }
 }
 
@@ -328,6 +985,196 @@ mod tests {
     )]
     use super::*;
 
+    fn stored_archive(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        let mut writer = PhysPkgWriter::new();
+        for (name, bytes) in entries {
+            let uri = PackURI::new(&format!("/{name}")).unwrap();
+            writer.write_stored(&uri, bytes).unwrap();
+        }
+        writer.finish().unwrap()
+    }
+
+    #[test]
+    fn target_limit_cannot_exceed_the_universal_xml_attribute_limit() {
+        assert!(matches!(
+            ReadLimits::builder()
+                .max_xml_attribute_bytes(3)
+                .unwrap()
+                .max_relationship_target_bytes(4)
+                .unwrap()
+                .build(),
+            Err(OpcError::InvalidReadLimit {
+                resource: ReadResource::RelationshipTargetBytes,
+                value: 4,
+            })
+        ));
+    }
+
+    #[test]
+    fn dedicated_xml_reads_do_not_consume_generic_part_budgets() {
+        let bytes = stored_archive(&[("[Content_Types].xml", b"types"), ("_rels/.rels", b"rels")]);
+        let root = PackURI::new("/").unwrap();
+        let independent = ReadLimits::builder()
+            .max_part_bytes(1)
+            .unwrap()
+            .max_total_part_bytes(1)
+            .unwrap()
+            .max_content_types_bytes(5)
+            .unwrap()
+            .max_relationship_xml_bytes(4)
+            .unwrap()
+            .build()
+            .unwrap();
+        let reader = PhysPkgReader::new_with_limits(&bytes, independent).unwrap();
+        assert_eq!(reader.content_types_xml().unwrap(), b"types");
+        assert_eq!(reader.rels_xml_for(&root).unwrap(), Some(b"rels".to_vec()));
+
+        let content_types_over = ReadLimits::builder()
+            .max_part_bytes(1)
+            .unwrap()
+            .max_total_part_bytes(1)
+            .unwrap()
+            .max_content_types_bytes(4)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            PhysPkgReader::new_with_limits(&bytes, content_types_over)
+                .unwrap()
+                .content_types_xml(),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::ContentTypesBytes,
+                actual: 5,
+                maximum: 4,
+            })
+        ));
+
+        let relationships_over = ReadLimits::builder()
+            .max_part_bytes(1)
+            .unwrap()
+            .max_total_part_bytes(1)
+            .unwrap()
+            .max_relationship_xml_bytes(3)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            PhysPkgReader::new_with_limits(&bytes, relationships_over)
+                .unwrap()
+                .rels_xml_for(&root),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::RelationshipXmlBytes,
+                actual: 4,
+                maximum: 3,
+            })
+        ));
+    }
+
+    #[test]
+    fn relationship_reads_share_count_and_byte_budgets_without_charging_failures() {
+        let bytes = stored_archive(&[("_rels/.rels", b"rels")]);
+        let root = PackURI::new("/").unwrap();
+        let exact = ReadLimits::builder()
+            .max_relationship_parts(1)
+            .unwrap()
+            .max_relationship_xml_bytes(4)
+            .unwrap()
+            .max_total_relationship_xml_bytes(4)
+            .unwrap()
+            .build()
+            .unwrap();
+        let reader = PhysPkgReader::new_with_limits(&bytes, exact).unwrap();
+        assert_eq!(reader.rels_xml_for(&root).unwrap(), Some(b"rels".to_vec()));
+        assert!(matches!(
+            reader.rels_xml_for(&root),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::RelationshipParts,
+                actual: 2,
+                maximum: 1,
+            })
+        ));
+
+        let aggregate = ReadLimits::builder()
+            .max_relationship_parts(2)
+            .unwrap()
+            .max_relationship_xml_bytes(4)
+            .unwrap()
+            .max_total_relationship_xml_bytes(4)
+            .unwrap()
+            .build()
+            .unwrap();
+        let reader = PhysPkgReader::new_with_limits(&bytes, aggregate).unwrap();
+        assert_eq!(reader.rels_xml_for(&root).unwrap(), Some(b"rels".to_vec()));
+        assert!(matches!(
+            reader.rels_xml_for(&root),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::TotalRelationshipXmlBytes,
+                actual: 8,
+                maximum: 4,
+            })
+        ));
+
+        let byte_over = ReadLimits::builder()
+            .max_relationship_parts(2)
+            .unwrap()
+            .max_relationship_xml_bytes(4)
+            .unwrap()
+            .max_total_relationship_xml_bytes(3)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            PhysPkgReader::new_with_limits(&bytes, byte_over)
+                .unwrap()
+                .rels_xml_for(&root),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::TotalRelationshipXmlBytes,
+                actual: 4,
+                maximum: 3,
+            })
+        ));
+
+        let owned = OwnedPhysPkgReader::from_bytes_with_limits(bytes, exact).unwrap();
+        assert_eq!(
+            owned.reader().unwrap().rels_xml_for(&root).unwrap(),
+            Some(b"rels".to_vec())
+        );
+        assert!(matches!(
+            owned.reader().unwrap().rels_xml_for(&root),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::RelationshipParts,
+                actual: 2,
+                maximum: 1,
+            })
+        ));
+
+        let payload = b"\xa5\x5a\xc3";
+        let mut corrupt = stored_archive(&[("_rels/.rels", payload)]);
+        let offset = corrupt
+            .windows(payload.len())
+            .position(|window| window == payload)
+            .unwrap();
+        corrupt[offset] ^= 0xff;
+        let rollback = ReadLimits::builder()
+            .max_relationship_parts(1)
+            .unwrap()
+            .max_relationship_xml_bytes(3)
+            .unwrap()
+            .max_total_relationship_xml_bytes(3)
+            .unwrap()
+            .build()
+            .unwrap();
+        let reader = PhysPkgReader::new_with_limits(&corrupt, rollback).unwrap();
+        assert!(matches!(
+            reader.rels_xml_for(&root),
+            Err(OpcError::ZipError(_))
+        ));
+        assert!(matches!(
+            reader.rels_xml_for(&root),
+            Err(OpcError::ZipError(_))
+        ));
+    }
+
     #[test]
     fn test_round_trip() {
         // Create a ZIP archive with soapberry-zip
@@ -361,5 +1208,335 @@ mod tests {
         assert!(reader.contains(&rels));
         assert!(reader.contains(&document));
         assert_eq!(reader.blob_for(&document).unwrap(), b"<document/>");
+    }
+
+    #[test]
+    fn bounded_ingress_rejects_before_zip_parsing() {
+        let limits = ReadLimits::builder()
+            .max_input_bytes(3)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            PhysPkgReader::new_with_limits(b"four", limits),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::InputBytes,
+                actual: 4,
+                maximum: 3,
+            })
+        ));
+        assert!(matches!(
+            OwnedPhysPkgReader::from_reader_with_limits(Cursor::new(b"four"), limits),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::InputBytes,
+                actual: 4,
+                maximum: 3,
+            })
+        ));
+    }
+
+    #[test]
+    fn maps_zip_member_limit_to_opc_resource() {
+        let mut writer = PhysPkgWriter::new();
+        writer
+            .write(&PackURI::new("/first.xml").unwrap(), b"a")
+            .unwrap();
+        writer
+            .write(&PackURI::new("/second.xml").unwrap(), b"b")
+            .unwrap();
+        let archive = writer.finish().unwrap();
+        let limits = ReadLimits::builder()
+            .max_archive_members(1)
+            .unwrap()
+            .max_parts(1)
+            .unwrap()
+            .max_relationship_parts(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            PhysPkgReader::new_with_limits(&archive, limits),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::ArchiveMembers,
+                actual: 2,
+                maximum: 1,
+            })
+        ));
+    }
+
+    #[test]
+    fn part_reads_enforce_declared_per_part_and_total_budgets() {
+        let bytes = stored_archive(&[("first.bin", b"one"), ("second.bin", b"four")]);
+        let first = PackURI::new("/first.bin").unwrap();
+        let second = PackURI::new("/second.bin").unwrap();
+
+        let exact = ReadLimits::builder()
+            .max_part_bytes(4)
+            .unwrap()
+            .max_total_part_bytes(7)
+            .unwrap()
+            .build()
+            .unwrap();
+        let reader = PhysPkgReader::new_with_limits(&bytes, exact).unwrap();
+        assert_eq!(reader.blob_for(&first).unwrap(), b"one");
+        assert_eq!(reader.blob_for(&second).unwrap(), b"four");
+
+        let per_part = ReadLimits::builder()
+            .max_part_bytes(3)
+            .unwrap()
+            .max_total_part_bytes(7)
+            .unwrap()
+            .build()
+            .unwrap();
+        let reader = PhysPkgReader::new_with_limits(&bytes, per_part).unwrap();
+        assert!(matches!(
+            reader.blob_for(&second),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::PartBytes,
+                actual: 4,
+                maximum: 3,
+            })
+        ));
+
+        let total = ReadLimits::builder()
+            .max_total_part_bytes(6)
+            .unwrap()
+            .build()
+            .unwrap();
+        let reader = PhysPkgReader::new_with_limits(&bytes, total).unwrap();
+        assert_eq!(reader.blob_for(&first).unwrap(), b"one");
+        assert!(matches!(
+            reader.blob_for(&second),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::TotalPartBytes,
+                actual: 7,
+                maximum: 6,
+            })
+        ));
+
+        let owned = OwnedPhysPkgReader::from_bytes_with_limits(bytes, per_part).unwrap();
+        assert!(matches!(
+            owned.blob_for(&second),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::PartBytes,
+                actual: 4,
+                maximum: 3,
+            })
+        ));
+    }
+
+    #[test]
+    fn part_materializations_enforce_exact_max_parts_bound() {
+        let bytes = stored_archive(&[("first.bin", b"one"), ("second.bin", b"two")]);
+        let first = PackURI::new("/first.bin").unwrap();
+        let second = PackURI::new("/second.bin").unwrap();
+        let limits = ReadLimits::builder().max_parts(2).unwrap().build().unwrap();
+        let reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
+
+        assert_eq!(reader.blob_for(&first).unwrap(), b"one");
+        assert_eq!(reader.blob_for(&second).unwrap(), b"two");
+        assert!(matches!(
+            reader.blob_for(&first),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::Parts,
+                actual: 3,
+                maximum: 2,
+            })
+        ));
+    }
+
+    #[test]
+    fn sequential_part_materializations_charge_distinct_and_repeated_uris() {
+        let bytes = stored_archive(&[("first.bin", b"one"), ("second.bin", b"two")]);
+        let first = PackURI::new("/first.bin").unwrap();
+        let second = PackURI::new("/second.bin").unwrap();
+        let limits = ReadLimits::builder().max_parts(1).unwrap().build().unwrap();
+
+        let reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
+        assert_eq!(reader.blob_for(&first).unwrap(), b"one");
+        assert!(matches!(
+            reader.blob_for(&second),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::Parts,
+                actual: 2,
+                maximum: 1,
+            })
+        ));
+
+        let reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
+        assert_eq!(reader.blob_for(&first).unwrap(), b"one");
+        assert!(matches!(
+            reader.blob_for(&first),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::Parts,
+                actual: 2,
+                maximum: 1,
+            })
+        ));
+    }
+
+    #[test]
+    fn repeated_single_item_parallel_batches_charge_max_parts() {
+        let bytes = stored_archive(&[("part.bin", b"one")]);
+        let part = PackURI::new("/part.bin").unwrap();
+        let limits = ReadLimits::builder().max_parts(1).unwrap().build().unwrap();
+        let reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
+
+        assert_eq!(
+            reader.blobs_parallel(std::slice::from_ref(&part)).unwrap(),
+            HashMap::from([("part.bin".to_owned(), b"one".to_vec())])
+        );
+        assert!(matches!(
+            reader.blobs_parallel(std::slice::from_ref(&part)),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::Parts,
+                actual: 2,
+                maximum: 1,
+            })
+        ));
+    }
+
+    #[test]
+    fn corrupt_parallel_read_releases_part_count_and_byte_reservations() {
+        let bad_payload = b"\xa5\x5a\xc3";
+        let mut bytes = stored_archive(&[("good.bin", b"good"), ("bad.bin", bad_payload)]);
+        let offset = bytes
+            .windows(bad_payload.len())
+            .position(|window| window == bad_payload)
+            .unwrap();
+        bytes[offset] ^= 0xff;
+        let good = PackURI::new("/good.bin").unwrap();
+        let bad = PackURI::new("/bad.bin").unwrap();
+        let limits = ReadLimits::builder()
+            .max_parts(2)
+            .unwrap()
+            .max_total_part_bytes(7)
+            .unwrap()
+            .build()
+            .unwrap();
+        let reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
+
+        assert!(matches!(
+            reader.blobs_parallel(&[good.clone(), bad]),
+            Err(OpcError::ZipError(_))
+        ));
+        let budget = reader.part_budget.lock().unwrap();
+        assert_eq!(budget.reserved_parts, 0);
+        assert_eq!(budget.reserved_declared, 0);
+        assert_eq!(budget.materialized_parts, 0);
+        assert_eq!(budget.materialized_actual, 0);
+        drop(budget);
+        assert_eq!(reader.blob_for(&good).unwrap(), b"good");
+    }
+
+    #[test]
+    fn owned_borrowed_readers_share_part_materialization_budget() {
+        let bytes = stored_archive(&[("first.bin", b"one"), ("second.bin", b"two")]);
+        let first = PackURI::new("/first.bin").unwrap();
+        let second = PackURI::new("/second.bin").unwrap();
+        let limits = ReadLimits::builder().max_parts(1).unwrap().build().unwrap();
+        let owned = OwnedPhysPkgReader::from_bytes_with_limits(bytes, limits).unwrap();
+
+        assert_eq!(owned.reader().unwrap().blob_for(&first).unwrap(), b"one");
+        assert!(matches!(
+            owned.reader().unwrap().blob_for(&second),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::Parts,
+                actual: 2,
+                maximum: 1,
+            })
+        ));
+    }
+
+    #[test]
+    fn parallel_part_reads_are_exact_or_fail_without_partial_results() {
+        let bytes = stored_archive(&[("first.bin", b"one"), ("second.bin", b"four")]);
+        let first = PackURI::new("/first.bin").unwrap();
+        let second = PackURI::new("/second.bin").unwrap();
+        let exact = ReadLimits::builder()
+            .max_part_bytes(4)
+            .unwrap()
+            .max_total_part_bytes(7)
+            .unwrap()
+            .build()
+            .unwrap();
+        let reader = PhysPkgReader::new_with_limits(&bytes, exact).unwrap();
+        let blobs = reader
+            .blobs_parallel(&[first.clone(), second.clone()])
+            .unwrap();
+        assert_eq!(blobs.get("first.bin").unwrap(), b"one");
+        assert_eq!(blobs.get("second.bin").unwrap(), b"four");
+
+        let over = ReadLimits::builder()
+            .max_total_part_bytes(6)
+            .unwrap()
+            .build()
+            .unwrap();
+        let reader = PhysPkgReader::new_with_limits(&bytes, over).unwrap();
+        assert!(matches!(
+            reader.blobs_parallel(&[first, second]),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::TotalPartBytes,
+                actual: 7,
+                maximum: 6,
+            })
+        ));
+    }
+
+    #[test]
+    fn post_materialization_failure_releases_its_declared_reservation() {
+        let bytes = stored_archive(&[("part.bin", b"one")]);
+        let limits = ReadLimits::builder()
+            .max_part_bytes(3)
+            .unwrap()
+            .max_total_part_bytes(3)
+            .unwrap()
+            .build()
+            .unwrap();
+        let reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
+        let reservation = reader.reserve_declared_parts(&[3]).unwrap();
+        assert!(matches!(
+            reader.commit_actual_parts(reservation, &[vec![0; 4]]),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::PartBytes,
+                actual: 4,
+                maximum: 3,
+            })
+        ));
+        assert!(reader.reserve_declared_parts(&[3]).is_ok());
+    }
+
+    #[test]
+    fn corrupt_present_parts_stay_zip_errors_and_bulk_reads_do_not_hide_them() {
+        let bad_payload = b"\xa5\x5a\xc3";
+        let mut bytes = stored_archive(&[("good.bin", b"good"), ("bad.bin", bad_payload)]);
+        let offset = bytes
+            .windows(bad_payload.len())
+            .position(|window| window == bad_payload)
+            .unwrap();
+        bytes[offset] ^= 0xff;
+        let good = PackURI::new("/good.bin").unwrap();
+        let bad = PackURI::new("/bad.bin").unwrap();
+        let missing = PackURI::new("/missing.bin").unwrap();
+        let reader = PhysPkgReader::new(&bytes).unwrap();
+
+        assert_eq!(reader.blob_for(&good).unwrap(), b"good");
+        assert!(matches!(reader.blob_for(&bad), Err(OpcError::ZipError(_))));
+        assert!(matches!(
+            reader.blob_for(&missing),
+            Err(OpcError::PartNotFound(name)) if name == "/missing.bin"
+        ));
+
+        let reader = PhysPkgReader::new(&bytes).unwrap();
+        assert!(matches!(
+            reader.blobs_parallel(&[good, bad]),
+            Err(OpcError::ZipError(_))
+        ));
+        assert_eq!(
+            reader
+                .blob_for(&PackURI::new("/good.bin").unwrap())
+                .unwrap(),
+            b"good"
+        );
     }
 }

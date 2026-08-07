@@ -30,6 +30,9 @@ pub mod slicer;
 pub mod styles;
 pub mod timeline;
 pub mod workbook;
+
+/// OPC resource limits used by XLSB package and workbook ingress.
+pub use litchi_opc::ReadLimits;
 pub mod writer;
 
 pub use raw::Error;

@@ -9,7 +9,7 @@ use super::edit::{Commit, Edit, Patch};
 use super::worksheet;
 use super::{codec, package};
 use litchi_core::Selector as CoreSelector;
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, ReadLimits};
 use litchi_sheet::{Area, At, ColumnAt, Rect, RowAt};
 use once_cell::sync::OnceCell;
 
@@ -146,23 +146,45 @@ impl Workbook {
 
     /// Open an XLSX-family package from a filesystem path.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_package(OpcPackage::open(path)?)
+        Self::open_with_limits(path, ReadLimits::default())
+    }
+
+    /// Open an XLSX-family package from a filesystem path with explicit OPC
+    /// resource limits.
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+        Self::from_package(OpcPackage::open_with_limits(path, limits)?)
     }
 
     /// Move bytes into the XLSX parser.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let package = OpcPackage::from_vec(bytes)?;
+        Self::from_bytes_with_limits(bytes, ReadLimits::default())
+    }
+
+    /// Move bytes into the XLSX parser with explicit OPC resource limits.
+    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: ReadLimits) -> Result<Self> {
+        let package = OpcPackage::from_vec_with_limits(bytes, limits)?;
         Self::from_package(package)
     }
 
     /// Open a borrowed XLSX byte slice.
     pub fn from_slice(bytes: &[u8]) -> Result<Self> {
-        Self::from_package(OpcPackage::from_bytes(bytes)?)
+        Self::from_slice_with_limits(bytes, ReadLimits::default())
+    }
+
+    /// Open a borrowed XLSX byte slice with explicit OPC resource limits.
+    pub fn from_slice_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Self> {
+        Self::from_package(OpcPackage::from_bytes_with_limits(bytes, limits)?)
     }
 
     /// Read an XLSX package from a synchronous reader.
     pub fn from_reader(reader: impl Read) -> Result<Self> {
-        Self::from_package(OpcPackage::from_reader(reader)?)
+        Self::from_reader_with_limits(reader, ReadLimits::default())
+    }
+
+    /// Read an XLSX package from a synchronous reader with explicit OPC
+    /// resource limits.
+    pub fn from_reader_with_limits(reader: impl Read, limits: ReadLimits) -> Result<Self> {
+        Self::from_package(OpcPackage::from_reader_with_limits(reader, limits)?)
     }
 
     /// Build a snapshot from a validated OPC package without exposing it in

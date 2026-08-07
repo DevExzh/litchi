@@ -19,6 +19,16 @@ use litchi_core::detection::simd_utils::signature_matches;
 /// This function requires the `ooxml` feature to be enabled.
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 pub fn detect_zip_format(bytes: &[u8]) -> Option<FileFormat> {
+    detect_zip_format_with_limits(bytes, crate::opc::ReadLimits::default())
+}
+
+/// Detect a ZIP-based OOXML format from bytes with an explicit OPC resource
+/// policy.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+pub fn detect_zip_format_with_limits(
+    bytes: &[u8],
+    limits: crate::opc::ReadLimits,
+) -> Option<FileFormat> {
     // Check if it starts with ZIP signature using SIMD
     if bytes.len() < 4 || !signature_matches(bytes, litchi_core::detection::utils::ZIP_SIGNATURE) {
         return None;
@@ -26,7 +36,7 @@ pub fn detect_zip_format(bytes: &[u8]) -> Option<FileFormat> {
 
     // Create a cursor to read the ZIP file
     let cursor = std::io::Cursor::new(bytes);
-    detect_zip_format_from_reader(&mut cursor.clone())
+    detect_zip_format_from_reader_with_limits(&mut cursor.clone(), limits)
 }
 
 /// Stub implementation when `ooxml` feature is disabled.
@@ -43,14 +53,53 @@ pub fn detect_zip_format(_bytes: &[u8]) -> Option<FileFormat> {
 /// This function requires the `ooxml` feature to be enabled.
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 pub fn detect_zip_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileFormat> {
-    // Try to open as OOXML package - this will validate the format and structure
-    let package = match crate::opc::OpcPackage::from_reader(reader) {
+    detect_zip_format_from_reader_with_limits(reader, crate::opc::ReadLimits::default())
+}
+
+/// Detect a ZIP-based OOXML format from a reader with an explicit OPC resource
+/// policy.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+pub fn detect_zip_format_from_reader_with_limits<R: Read + Seek>(
+    reader: &mut R,
+    limits: crate::opc::ReadLimits,
+) -> Option<FileFormat> {
+    let package = match crate::opc::OpcPackage::from_reader_with_limits(reader, limits) {
         Ok(pkg) => pkg,
         Err(_) => return None,
     };
 
     // Determine the specific OOXML format based on content
     detect_ooxml_format_from_package(&package)
+}
+
+/// Detect an OOXML format from bytes with the default bounded OPC policy.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+pub fn detect_ooxml_format(bytes: &[u8]) -> Option<FileFormat> {
+    detect_ooxml_format_with_limits(bytes, crate::opc::ReadLimits::default())
+}
+
+/// Detect an OOXML format from bytes with an explicit OPC resource policy.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+pub fn detect_ooxml_format_with_limits(
+    bytes: &[u8],
+    limits: crate::opc::ReadLimits,
+) -> Option<FileFormat> {
+    detect_zip_format_with_limits(bytes, limits)
+}
+
+/// Detect an OOXML format from bytes with the default bounded OPC policy.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+pub fn detect_ooxml_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
+    detect_ooxml_format_from_bytes_with_limits(bytes, crate::opc::ReadLimits::default())
+}
+
+/// Detect an OOXML format from bytes with an explicit OPC resource policy.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+pub fn detect_ooxml_format_from_bytes_with_limits(
+    bytes: &[u8],
+    limits: crate::opc::ReadLimits,
+) -> Option<FileFormat> {
+    detect_ooxml_format_with_limits(bytes, limits)
 }
 
 /// Detect specific OOXML format from OpcPackage.

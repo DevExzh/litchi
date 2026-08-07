@@ -44,6 +44,8 @@ use flate2::write::DeflateEncoder;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 
+pub use crate::LimitResource;
+
 /// Resource limits applied while indexing an Office ZIP package.
 ///
 /// The defaults accommodate large embedded media while rejecting implausible
@@ -52,6 +54,16 @@ use std::io::{Read, Write};
 pub struct ArchiveLimits {
     /// Maximum number of non-directory entries.
     pub max_files: usize,
+    /// Maximum bytes in one raw member name.
+    pub max_member_name_bytes: u64,
+    /// Maximum aggregate central-directory metadata bytes.
+    ///
+    /// This includes raw member names, extra fields, and file comments for all
+    /// entries, including directories. It is checked before name normalization
+    /// or ownership allocation.
+    pub max_metadata_bytes: u64,
+    /// Maximum declared compressed bytes for one non-directory entry.
+    pub max_compressed_size: u64,
     /// Maximum declared uncompressed size of one entry.
     pub max_entry_size: u64,
     /// Maximum sum of all declared uncompressed entry sizes.
@@ -62,6 +74,9 @@ impl ArchiveLimits {
     /// Disable resource ceilings while retaining integer and allocation checks.
     pub const UNBOUNDED: Self = Self {
         max_files: usize::MAX,
+        max_member_name_bytes: u64::MAX,
+        max_metadata_bytes: u64::MAX,
+        max_compressed_size: u64::MAX,
         max_entry_size: u64::MAX,
         max_total_size: u64::MAX,
     };
@@ -71,6 +86,9 @@ impl Default for ArchiveLimits {
     fn default() -> Self {
         Self {
             max_files: 100_000,
+            max_member_name_bytes: 4 * 1024,
+            max_metadata_bytes: 64 * 1024 * 1024,
+            max_compressed_size: 512 * 1024 * 1024,
             max_entry_size: 512 * 1024 * 1024,
             max_total_size: 2 * 1024 * 1024 * 1024,
         }
@@ -92,6 +110,9 @@ pub struct ArchiveReader<'data> {
     archive: ZipSliceArchive<&'data [u8]>,
     /// Pre-built index for fast file lookup by name
     index: HashMap<String, EntryInfo>,
+    /// Directory declarations, retained for metadata lookup without changing
+    /// the file-only behavior of the main index.
+    directories: HashMap<String, Metadata>,
     /// Physical member order, retained for order-sensitive package formats.
     order: Vec<String>,
 }
@@ -102,6 +123,38 @@ struct EntryInfo {
     wayfinder: crate::ZipArchiveEntryWayfinder,
     compression_method: CompressionMethod,
     uncompressed_size: u64,
+}
+
+/// Declared ZIP member metadata available without accessing member payloads.
+///
+/// The values originate in the central directory and are not independently
+/// verified until a file is read. This compact copyable view supports safe
+/// structural inspection without decompression or cache population.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Metadata {
+    compressed_size: u64,
+    uncompressed_size: u64,
+    directory: bool,
+}
+
+impl Metadata {
+    /// Returns the declared compressed member size.
+    #[inline]
+    pub const fn compressed_size(&self) -> u64 {
+        self.compressed_size
+    }
+
+    /// Returns the declared uncompressed member size.
+    #[inline]
+    pub const fn uncompressed_size(&self) -> u64 {
+        self.uncompressed_size
+    }
+
+    /// Returns whether the central-directory member is a directory.
+    #[inline]
+    pub const fn is_directory(&self) -> bool {
+        self.directory
+    }
 }
 
 impl<'data> ArchiveReader<'data> {
@@ -120,49 +173,86 @@ impl<'data> ArchiveReader<'data> {
 
         // Build index for fast lookup
         let mut index = HashMap::new();
+        let mut directories = HashMap::new();
+        let mut total_metadata_bytes = 0u64;
         let mut total_uncompressed_size = 0u64;
         let mut ordered_names = Vec::new();
         for entry_result in archive.entries() {
             let entry = entry_result?;
             let path = entry.file_path();
 
-            // Normalize path - convert to string, skip directories
-            if entry.is_dir() {
-                continue;
+            let member_name_bytes = path.as_ref().len() as u64;
+            if member_name_bytes > limits.max_member_name_bytes {
+                return Err(limit_error(
+                    LimitResource::MemberNameBytes,
+                    member_name_bytes,
+                    limits.max_member_name_bytes,
+                ));
             }
 
-            if index.len() >= limits.max_files {
-                return Err(ErrorKind::InvalidInput {
-                    msg: format!("archive contains more than {} files", limits.max_files),
-                }
-                .into());
+            let metadata_bytes = entry.metadata_size_hint();
+            total_metadata_bytes = total_metadata_bytes
+                .checked_add(metadata_bytes)
+                .ok_or_else(|| {
+                    Error::from(ErrorKind::InvalidInput {
+                        msg: "archive central-directory metadata total overflows u64".to_string(),
+                    })
+                })?;
+            if total_metadata_bytes > limits.max_metadata_bytes {
+                return Err(limit_error(
+                    LimitResource::MetadataBytes,
+                    total_metadata_bytes,
+                    limits.max_metadata_bytes,
+                ));
+            }
+
+            let directory = entry.is_dir();
+
+            if !directory && index.len() >= limits.max_files {
+                let actual = (index.len() as u64).checked_add(1).ok_or_else(|| {
+                    Error::from(ErrorKind::InvalidInput {
+                        msg: "archive file count overflows u64".to_string(),
+                    })
+                })?;
+                return Err(limit_error(
+                    LimitResource::FileCount,
+                    actual,
+                    limits.max_files as u64,
+                ));
+            }
+
+            let compressed_size = entry.compressed_size_hint();
+            if !directory && compressed_size > limits.max_compressed_size {
+                return Err(limit_error(
+                    LimitResource::CompressedSize,
+                    compressed_size,
+                    limits.max_compressed_size,
+                ));
             }
 
             let uncompressed_size = entry.uncompressed_size_hint();
-            if uncompressed_size > limits.max_entry_size {
-                return Err(ErrorKind::InvalidInput {
-                    msg: format!(
-                        "archive entry declares {uncompressed_size} uncompressed bytes, exceeding the {}-byte limit",
-                        limits.max_entry_size
-                    ),
-                }
-                .into());
+            if !directory && uncompressed_size > limits.max_entry_size {
+                return Err(limit_error(
+                    LimitResource::EntrySize,
+                    uncompressed_size,
+                    limits.max_entry_size,
+                ));
             }
-            total_uncompressed_size = total_uncompressed_size
-                .checked_add(uncompressed_size)
-                .ok_or_else(|| {
-                    Error::from(ErrorKind::InvalidInput {
-                        msg: "archive uncompressed size total overflows u64".to_string(),
-                    })
-                })?;
-            if total_uncompressed_size > limits.max_total_size {
-                return Err(ErrorKind::InvalidInput {
-                    msg: format!(
-                        "archive declares {total_uncompressed_size} total uncompressed bytes, exceeding the {}-byte limit",
-                        limits.max_total_size
-                    ),
+            if !directory {
+                total_uncompressed_size = total_uncompressed_size
+                    .checked_add(uncompressed_size)
+                    .ok_or_else(|| {
+                        Error::from(ErrorKind::InvalidInput {
+                            msg: "archive uncompressed size total overflows u64".to_string(),
+                        })
+                    })?;
+                if total_uncompressed_size > limits.max_total_size {
+                    return Err(limit_error(
+                        LimitResource::TotalSize,
+                        total_uncompressed_size,
+                        limits.max_total_size,
+                    ));
                 }
-                .into());
             }
 
             let name = match path.try_normalize() {
@@ -172,6 +262,19 @@ impl<'data> ArchiveReader<'data> {
                     String::from_utf8_lossy(path.as_ref()).to_string()
                 },
             };
+
+            // Directories are never exposed or decompressed by this API. They
+            // consume name and metadata budgets above, but not file or payload
+            // budgets. Retaining their compact declarations makes structural
+            // inspection possible without changing file lookup behavior.
+            if directory {
+                directories.entry(name).or_insert(Metadata {
+                    compressed_size,
+                    uncompressed_size,
+                    directory: true,
+                });
+                continue;
+            }
 
             let local_header_offset = entry.local_header_offset();
             if index
@@ -199,6 +302,7 @@ impl<'data> ArchiveReader<'data> {
         Ok(Self {
             archive,
             index,
+            directories,
             order,
         })
     }
@@ -225,6 +329,25 @@ impl<'data> ArchiveReader<'data> {
         // Try without leading slash
         let normalized = name.strip_prefix('/').unwrap_or(name);
         self.index.contains_key(normalized)
+    }
+
+    /// Return declared metadata for a normalized member name.
+    ///
+    /// This performs only hash-map lookup over the central-directory index. It
+    /// never reads, decompresses, verifies, or allocates member payload data.
+    pub fn metadata(&self, name: &str) -> Result<Metadata, Error> {
+        let normalized = name.strip_prefix('/').unwrap_or(name);
+        if let Some(info) = self.index.get(normalized) {
+            return Ok(Metadata {
+                compressed_size: info.wayfinder.compressed_size_hint(),
+                uncompressed_size: info.uncompressed_size,
+                directory: false,
+            });
+        }
+        self.directories
+            .get(normalized)
+            .copied()
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(normalized.to_string())))
     }
 
     /// Get an iterator over all file names in the archive.
@@ -359,21 +482,28 @@ impl<'data> ArchiveReader<'data> {
 
     /// Read all files from the archive in parallel.
     ///
-    /// Returns a HashMap mapping file names to their decompressed contents.
-    /// Files that fail to decompress are skipped (not included in result).
+    /// Results retain physical source order. Every member has an explicit
+    /// result, including corrupt or otherwise unreadable members.
     ///
     /// This is optimal when you need to access most/all files in the archive.
-    pub fn read_all_parallel(&self) -> HashMap<String, Vec<u8>> {
+    pub fn read_all_parallel(&self) -> Vec<(String, Result<Vec<u8>, Error>)> {
         use rayon::prelude::*;
 
-        // Collect keys to Vec first for proper parallel iteration
-        // par_bridge() doesn't parallelize HashMap iteration effectively
-        let keys: Vec<&String> = self.index.keys().collect();
-
-        keys.into_par_iter()
-            .filter_map(|name| self.read(name).ok().map(|data| (name.clone(), data)))
+        self.order
+            .par_iter()
+            .map(|name| (name.clone(), self.read(name)))
             .collect()
     }
+}
+
+#[inline]
+fn limit_error(resource: LimitResource, actual: u64, maximum: u64) -> Error {
+    ErrorKind::LimitExceeded {
+        resource,
+        actual,
+        maximum,
+    }
+    .into()
 }
 
 impl std::fmt::Debug for ArchiveReader<'_> {
@@ -501,6 +631,12 @@ impl<'data> LazyArchiveReader<'data> {
         })
     }
 
+    /// Return declared metadata without reading, decompressing, or caching a member.
+    #[inline]
+    pub fn metadata(&self, name: &str) -> Result<Metadata, Error> {
+        self.inner.metadata(name)
+    }
+
     /// Get the number of files in the archive.
     #[inline]
     pub fn len(&self) -> usize {
@@ -563,27 +699,19 @@ impl<'data> LazyArchiveReader<'data> {
         Ok(arc)
     }
 
-    /// Read multiple files in parallel WITHOUT caching.
+    /// Read multiple files in parallel without caching.
     ///
     /// This is the fastest method for bulk decompression when you need to read
     /// many files at once and don't need caching. Avoids all cloning overhead.
     ///
-    /// Returns a HashMap mapping file names to their decompressed contents.
-    /// Files that fail to decompress are not included in the result.
-    pub fn read_many_parallel(&self, names: &[&str]) -> HashMap<String, Vec<u8>> {
-        use rayon::prelude::*;
-
-        // Parallel decompression without caching for maximum performance
-        names
-            .par_iter()
-            .filter_map(|name| {
-                let normalized = name.strip_prefix('/').unwrap_or(name);
-                self.inner
-                    .read(normalized)
-                    .ok()
-                    .map(|data| (normalized.to_string(), data))
-            })
-            .collect()
+    /// Results retain the caller-provided order and preserve every member
+    /// error. Successful results are not added to the lazy cache.
+    #[inline]
+    pub fn read_many_parallel<'a>(
+        &self,
+        names: &'a [&'a str],
+    ) -> Vec<(&'a str, Result<Vec<u8>, Error>)> {
+        self.read_many_parallel_results(names)
     }
 
     /// Read multiple files in parallel while preserving individual errors.
@@ -608,70 +736,32 @@ impl<'data> LazyArchiveReader<'data> {
     /// benefiting from caching. Files already in cache are returned immediately.
     /// Use this when you expect to read the same files multiple times.
     ///
-    /// Returns a HashMap mapping file names to their decompressed contents.
-    /// Files that fail to decompress are not included in the result.
-    pub fn read_many_parallel_cached(&self, names: &[&str]) -> HashMap<String, Vec<u8>> {
+    /// Results retain the caller-provided order and preserve every member
+    /// error. Only successful decompressions are cached.
+    pub fn read_many_parallel_cached<'a>(
+        &self,
+        names: &'a [&'a str],
+    ) -> Vec<(&'a str, Result<Vec<u8>, Error>)> {
         use rayon::prelude::*;
 
-        // Separate cached and uncached files
-        let (cached, uncached): (Vec<&str>, Vec<&str>) = {
-            let cache = self.cache.read().unwrap();
-            names.iter().partition(|name| {
-                let normalized = name.strip_prefix('/').unwrap_or(*name);
-                cache.contains_key(normalized)
-            })
-        };
-
-        // Start with cached results
-        let mut results: HashMap<String, Vec<u8>> = {
-            let cache = self.cache.read().unwrap();
-            cached
-                .into_iter()
-                .filter_map(|name| {
-                    let normalized = name.strip_prefix('/').unwrap_or(name);
-                    cache
-                        .get(normalized)
-                        .map(|arc| (normalized.to_string(), (**arc).clone()))
-                })
-                .collect()
-        };
-
-        // Decompress uncached files in parallel
-        if !uncached.is_empty() {
-            let decompressed: Vec<_> = uncached
-                .into_par_iter()
-                .filter_map(|name| {
-                    let normalized = name.strip_prefix('/').unwrap_or(name);
-                    self.inner
-                        .read(normalized)
-                        .ok()
-                        .map(|data| (normalized.to_string(), data))
-                })
-                .collect();
-
-            // Cache the newly decompressed files
-            {
-                let mut cache = self.cache.write().unwrap();
-                for (name, data) in &decompressed {
-                    if !cache.contains_key(name.as_str()) {
-                        cache.insert(name.clone(), std::sync::Arc::new(data.clone()));
-                    }
-                }
-            }
-
-            results.extend(decompressed);
-        }
-
-        results
+        names
+            .par_iter()
+            .map(|name| (*name, self.read(name)))
+            .collect()
     }
 
     /// Read all files in parallel, caching results.
     ///
-    /// Similar to `ArchiveReader::read_all_parallel()` but caches results
-    /// for potential future access.
-    pub fn read_all_parallel(&self) -> HashMap<String, Vec<u8>> {
+    /// Results retain physical source order and preserve every member error.
+    /// Successful decompressions are cached; failures are never cached.
+    pub fn read_all_parallel(&self) -> Vec<(String, Result<Vec<u8>, Error>)> {
+        use rayon::prelude::*;
+
         let names: Vec<&str> = self.inner.file_names().collect();
-        self.read_many_parallel(&names)
+        names
+            .into_par_iter()
+            .map(|name| (name.to_string(), self.read(name)))
+            .collect()
     }
 
     /// Get the number of cached files.
@@ -781,7 +871,7 @@ mod tests {
             },
         )
         .unwrap_err();
-        assert!(file_error.to_string().contains("more than 1 files"));
+        assert_limit(file_error, LimitResource::FileCount, 2, 1);
 
         let entry_error = ArchiveReader::new_with_limits(
             &bytes,
@@ -791,7 +881,7 @@ mod tests {
             },
         )
         .unwrap_err();
-        assert!(entry_error.to_string().contains("3-byte limit"));
+        assert_limit(entry_error, LimitResource::EntrySize, 4, 3);
 
         let total_error = ArchiveReader::new_with_limits(
             &bytes,
@@ -801,9 +891,446 @@ mod tests {
             },
         )
         .unwrap_err();
-        assert!(total_error.to_string().contains("7-byte limit"));
+        assert_limit(total_error, LimitResource::TotalSize, 8, 7);
 
         assert!(ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).is_ok());
         assert!(LazyArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).is_ok());
+    }
+
+    #[test]
+    fn enforces_member_name_limit_at_the_declared_boundary() {
+        let bytes = fixture(&[FixtureEntry::stored(b"name", b"data")]);
+
+        let mut exact = ArchiveLimits::UNBOUNDED;
+        exact.max_member_name_bytes = 4;
+        assert!(ArchiveReader::new_with_limits(&bytes, exact).is_ok());
+
+        let mut over = exact;
+        over.max_member_name_bytes = 3;
+        assert_limit(
+            ArchiveReader::new_with_limits(&bytes, over).unwrap_err(),
+            LimitResource::MemberNameBytes,
+            4,
+            3,
+        );
+    }
+
+    #[test]
+    fn enforces_aggregate_central_directory_metadata_limit() {
+        let bytes = fixture(&[FixtureEntry {
+            name: b"a",
+            extra: b"xyz",
+            comment: b"q",
+            compressed_size: 0,
+            uncompressed_size: 0,
+            data: b"",
+        }]);
+
+        let mut exact = ArchiveLimits::UNBOUNDED;
+        exact.max_metadata_bytes = 5;
+        assert!(ArchiveReader::new_with_limits(&bytes, exact).is_ok());
+
+        let mut over = exact;
+        over.max_metadata_bytes = 4;
+        assert_limit(
+            ArchiveReader::new_with_limits(&bytes, over).unwrap_err(),
+            LimitResource::MetadataBytes,
+            5,
+            4,
+        );
+    }
+
+    #[test]
+    fn enforces_compressed_member_limit_before_data_access() {
+        let bytes = fixture(&[FixtureEntry {
+            name: b"a",
+            extra: b"",
+            comment: b"",
+            compressed_size: 3,
+            uncompressed_size: 0,
+            data: b"",
+        }]);
+
+        let mut exact = ArchiveLimits::UNBOUNDED;
+        exact.max_compressed_size = 3;
+        assert!(ArchiveReader::new_with_limits(&bytes, exact).is_ok());
+
+        let mut over = exact;
+        over.max_compressed_size = 2;
+        assert_limit(
+            ArchiveReader::new_with_limits(&bytes, over).unwrap_err(),
+            LimitResource::CompressedSize,
+            3,
+            2,
+        );
+    }
+
+    #[test]
+    fn accepts_exact_and_rejects_over_uncompressed_entry_limits() {
+        let bytes = fixture(&[FixtureEntry::stored(b"a", b"abc")]);
+
+        let mut exact = ArchiveLimits::UNBOUNDED;
+        exact.max_entry_size = 3;
+        assert!(ArchiveReader::new_with_limits(&bytes, exact).is_ok());
+
+        let mut over = exact;
+        over.max_entry_size = 2;
+        assert_limit(
+            ArchiveReader::new_with_limits(&bytes, over).unwrap_err(),
+            LimitResource::EntrySize,
+            3,
+            2,
+        );
+    }
+
+    #[test]
+    fn accepts_exact_and_rejects_over_aggregate_uncompressed_limits() {
+        let bytes = fixture(&[
+            FixtureEntry::stored(b"a", b"abc"),
+            FixtureEntry::stored(b"b", b"wxyz"),
+        ]);
+
+        let mut exact = ArchiveLimits::UNBOUNDED;
+        exact.max_total_size = 7;
+        assert!(ArchiveReader::new_with_limits(&bytes, exact).is_ok());
+
+        let mut over = exact;
+        over.max_total_size = 6;
+        assert_limit(
+            ArchiveReader::new_with_limits(&bytes, over).unwrap_err(),
+            LimitResource::TotalSize,
+            7,
+            6,
+        );
+    }
+
+    #[test]
+    fn accepts_exact_and_rejects_over_file_count_limits() {
+        let bytes = fixture(&[
+            FixtureEntry::stored(b"a", b""),
+            FixtureEntry::stored(b"b", b""),
+        ]);
+
+        let mut exact = ArchiveLimits::UNBOUNDED;
+        exact.max_files = 2;
+        assert!(ArchiveReader::new_with_limits(&bytes, exact).is_ok());
+
+        let mut over = exact;
+        over.max_files = 1;
+        assert_limit(
+            ArchiveReader::new_with_limits(&bytes, over).unwrap_err(),
+            LimitResource::FileCount,
+            2,
+            1,
+        );
+    }
+
+    #[test]
+    fn directories_consume_metadata_but_not_payload_or_file_budgets() {
+        let bytes = fixture(&[FixtureEntry {
+            name: b"folder/",
+            extra: b"",
+            comment: b"",
+            compressed_size: u32::MAX,
+            uncompressed_size: u32::MAX,
+            data: b"",
+        }]);
+        let limits = ArchiveLimits {
+            max_files: 0,
+            max_member_name_bytes: 7,
+            max_metadata_bytes: 7,
+            max_compressed_size: 0,
+            max_entry_size: 0,
+            max_total_size: 0,
+        };
+
+        assert!(ArchiveReader::new_with_limits(&bytes, limits).is_ok());
+    }
+
+    #[test]
+    fn rejects_aggregate_uncompressed_size_overflow() {
+        let zip64 = zip64_sizes(u64::MAX, 0);
+        let bytes = fixture(&[
+            FixtureEntry {
+                name: b"a",
+                extra: &zip64,
+                comment: b"",
+                compressed_size: u32::MAX,
+                uncompressed_size: u32::MAX,
+                data: b"",
+            },
+            FixtureEntry {
+                name: b"b",
+                extra: &zip64,
+                comment: b"",
+                compressed_size: u32::MAX,
+                uncompressed_size: u32::MAX,
+                data: b"",
+            },
+        ]);
+
+        let error = ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap_err();
+        assert!(
+            matches!(error.kind(), ErrorKind::InvalidInput { msg } if msg.contains("overflows"))
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_central_directory_variable_declarations() {
+        let mut bytes = fixture(&[FixtureEntry::stored(b"a", b"")]);
+        let end = bytes.len() - 22;
+        let central_directory_offset =
+            u32::from_le_bytes(bytes[end + 16..end + 20].try_into().unwrap()) as usize;
+        bytes[central_directory_offset + 28..central_directory_offset + 30]
+            .copy_from_slice(&2u16.to_le_bytes());
+
+        assert!(ArchiveReader::new(&bytes).is_err());
+    }
+
+    #[test]
+    fn metadata_lookup_uses_only_the_central_directory_index() {
+        let bytes = fixture(&[
+            FixtureEntry {
+                name: b"body.xml",
+                extra: b"",
+                comment: b"",
+                compressed_size: 3,
+                uncompressed_size: 5,
+                data: b"",
+            },
+            FixtureEntry {
+                name: b"assets/",
+                extra: b"",
+                comment: b"",
+                compressed_size: u32::MAX,
+                uncompressed_size: u32::MAX,
+                data: b"",
+            },
+        ]);
+
+        let reader = ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
+        let file = reader.metadata("/body.xml").unwrap();
+        assert_eq!(file.compressed_size(), 3);
+        assert_eq!(file.uncompressed_size(), 5);
+        assert!(!file.is_directory());
+
+        let directory = reader.metadata("assets/").unwrap();
+        assert_eq!(directory.compressed_size(), u64::from(u32::MAX));
+        assert_eq!(directory.uncompressed_size(), u64::from(u32::MAX));
+        assert!(directory.is_directory());
+        assert!(
+            matches!(reader.metadata("missing"), Err(error) if matches!(error.kind(), ErrorKind::FileNotFound(_)))
+        );
+
+        let lazy = LazyArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
+        assert_eq!(lazy.cache_size(), 0);
+        assert_eq!(lazy.metadata("body.xml").unwrap(), file);
+        assert_eq!(lazy.cache_size(), 0);
+    }
+
+    #[test]
+    fn eager_bulk_reads_preserve_source_order_and_all_member_errors() {
+        let mut bytes = bulk_fixture();
+        corrupt_payload(&mut bytes, b"bad");
+        let reader = ArchiveReader::new(&bytes).unwrap();
+
+        let requested = ["last", "bad", "missing", "first"];
+        let results = reader.read_many_parallel(&requested);
+        assert_eq!(results.len(), requested.len());
+        assert_eq!(*results[0].0, "last");
+        assert_eq!(results[0].1.as_ref().unwrap(), b"last");
+        assert_eq!(*results[1].0, "bad");
+        assert!(
+            matches!(results[1].1, Err(ref error) if matches!(error.kind(), ErrorKind::InvalidChecksum { .. }))
+        );
+        assert_eq!(*results[2].0, "missing");
+        assert!(
+            matches!(results[2].1, Err(ref error) if matches!(error.kind(), ErrorKind::FileNotFound(_)))
+        );
+        assert_eq!(*results[3].0, "first");
+        assert_eq!(results[3].1.as_ref().unwrap(), b"first");
+
+        let all = reader.read_all_parallel();
+        assert_eq!(
+            all.iter()
+                .map(|(name, _)| name.as_str())
+                .collect::<Vec<_>>(),
+            ["first", "bad", "last"]
+        );
+        assert!(
+            matches!(all[1].1, Err(ref error) if matches!(error.kind(), ErrorKind::InvalidChecksum { .. }))
+        );
+    }
+
+    #[test]
+    fn lazy_bulk_reads_propagate_errors_and_cache_only_successes() {
+        let mut bytes = bulk_fixture();
+        corrupt_payload(&mut bytes, b"bad");
+        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let requested = ["last", "bad", "missing", "first"];
+
+        let results = reader.read_many_parallel_cached(&requested);
+        assert_eq!(results.len(), requested.len());
+        assert_eq!(results[0].1.as_ref().unwrap(), b"last");
+        assert!(
+            matches!(results[1].1, Err(ref error) if matches!(error.kind(), ErrorKind::InvalidChecksum { .. }))
+        );
+        assert!(
+            matches!(results[2].1, Err(ref error) if matches!(error.kind(), ErrorKind::FileNotFound(_)))
+        );
+        assert_eq!(results[3].1.as_ref().unwrap(), b"first");
+        assert_eq!(reader.cache_size(), 2);
+
+        let all = reader.read_all_parallel();
+        assert_eq!(
+            all.iter()
+                .map(|(name, _)| name.as_str())
+                .collect::<Vec<_>>(),
+            ["first", "bad", "last"]
+        );
+        assert!(
+            matches!(all[1].1, Err(ref error) if matches!(error.kind(), ErrorKind::InvalidChecksum { .. }))
+        );
+        assert_eq!(reader.cache_size(), 2);
+    }
+
+    fn assert_limit(error: Error, resource: LimitResource, actual: u64, maximum: u64) {
+        match error.kind() {
+            ErrorKind::LimitExceeded {
+                resource: found_resource,
+                actual: found_actual,
+                maximum: found_maximum,
+            } => {
+                assert_eq!(
+                    (*found_resource, *found_actual, *found_maximum),
+                    (resource, actual, maximum)
+                );
+            },
+            other => panic!("expected limit error, got {other:?}"),
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    struct FixtureEntry<'a> {
+        name: &'a [u8],
+        extra: &'a [u8],
+        comment: &'a [u8],
+        compressed_size: u32,
+        uncompressed_size: u32,
+        data: &'a [u8],
+    }
+
+    impl<'a> FixtureEntry<'a> {
+        fn stored(name: &'a [u8], data: &'a [u8]) -> Self {
+            let size = u32::try_from(data.len()).unwrap();
+            Self {
+                name,
+                extra: b"",
+                comment: b"",
+                compressed_size: size,
+                uncompressed_size: size,
+                data,
+            }
+        }
+    }
+
+    fn fixture(entries: &[FixtureEntry<'_>]) -> Vec<u8> {
+        let mut archive = Vec::new();
+        let mut central_directory = Vec::new();
+
+        for entry in entries {
+            let local_header_offset = u32::try_from(archive.len()).unwrap();
+            push_u32(&mut archive, 0x0403_4b50);
+            push_u16(&mut archive, 20);
+            push_u16(&mut archive, 0);
+            push_u16(&mut archive, 0);
+            push_u16(&mut archive, 0);
+            push_u16(&mut archive, 0);
+            push_u32(&mut archive, 0);
+            push_u32(&mut archive, entry.compressed_size);
+            push_u32(&mut archive, entry.uncompressed_size);
+            push_u16(&mut archive, u16::try_from(entry.name.len()).unwrap());
+            push_u16(&mut archive, 0);
+            archive.extend_from_slice(entry.name);
+            archive.extend_from_slice(entry.data);
+
+            push_u32(&mut central_directory, 0x0201_4b50);
+            push_u16(&mut central_directory, 20);
+            push_u16(&mut central_directory, 20);
+            push_u16(&mut central_directory, 0);
+            push_u16(&mut central_directory, 0);
+            push_u16(&mut central_directory, 0);
+            push_u16(&mut central_directory, 0);
+            push_u32(&mut central_directory, 0);
+            push_u32(&mut central_directory, entry.compressed_size);
+            push_u32(&mut central_directory, entry.uncompressed_size);
+            push_u16(
+                &mut central_directory,
+                u16::try_from(entry.name.len()).unwrap(),
+            );
+            push_u16(
+                &mut central_directory,
+                u16::try_from(entry.extra.len()).unwrap(),
+            );
+            push_u16(
+                &mut central_directory,
+                u16::try_from(entry.comment.len()).unwrap(),
+            );
+            push_u16(&mut central_directory, 0);
+            push_u16(&mut central_directory, 0);
+            push_u32(&mut central_directory, 0);
+            push_u32(&mut central_directory, local_header_offset);
+            central_directory.extend_from_slice(entry.name);
+            central_directory.extend_from_slice(entry.extra);
+            central_directory.extend_from_slice(entry.comment);
+        }
+
+        let central_directory_offset = u32::try_from(archive.len()).unwrap();
+        let central_directory_size = u32::try_from(central_directory.len()).unwrap();
+        archive.extend_from_slice(&central_directory);
+        push_u32(&mut archive, 0x0605_4b50);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        let count = u16::try_from(entries.len()).unwrap();
+        push_u16(&mut archive, count);
+        push_u16(&mut archive, count);
+        push_u32(&mut archive, central_directory_size);
+        push_u32(&mut archive, central_directory_offset);
+        push_u16(&mut archive, 0);
+        archive
+    }
+
+    fn zip64_sizes(uncompressed_size: u64, compressed_size: u64) -> Vec<u8> {
+        let mut extra = Vec::new();
+        push_u16(&mut extra, 1);
+        push_u16(&mut extra, 16);
+        extra.extend_from_slice(&uncompressed_size.to_le_bytes());
+        extra.extend_from_slice(&compressed_size.to_le_bytes());
+        extra
+    }
+
+    fn push_u16(output: &mut Vec<u8>, value: u16) {
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn push_u32(output: &mut Vec<u8>, value: u32) {
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn bulk_fixture() -> Vec<u8> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("first", b"first").unwrap();
+        writer.write_stored("bad", b"bad").unwrap();
+        writer.write_stored("last", b"last").unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
+    fn corrupt_payload(archive: &mut [u8], payload: &[u8]) {
+        let offsets: Vec<usize> = archive
+            .windows(payload.len())
+            .enumerate()
+            .filter_map(|(offset, candidate)| (candidate == payload).then_some(offset))
+            .collect();
+        archive[offsets[1]] ^= 0x80;
     }
 }

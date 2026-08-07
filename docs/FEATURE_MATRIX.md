@@ -60,7 +60,7 @@ give the authoritative status and limitations for each concrete format.
 | Capability family | Overall scope | Primary owners |
 |--------------------|---------------|----------------|
 | Format detection and unified facades | Office, ODF, RTF, iWork, and tabular APIs where exposed; facade authoring is not implied | `litchi`, `litchi-core`, detailed format crates |
-| OOXML OPC package editing | Parts, relationships, content types, strict/transitional XML, and graph validation | `litchi-opc`, `litchi-ooxml-common`, DOCX/XLSX/XLSB/PPTX matrices |
+| OOXML OPC package editing | Parts, relationships, content types, strict/transitional XML, and graph validation. Ingestion has configurable `ReadLimits`; default ceilings protect package input, ZIP members/names/metadata/compressed and uncompressed sizes, materialized parts, `[Content_Types].xml`, and relationship XML, attributes, targets, events, depth, and graph traversal. These are safety policy rather than spec maxima, grounded in ECMA-376 Part 2 §7.3.6/§10 and [MS-OI29500] §2.1.1749-1752. | `litchi-opc`, `litchi-ooxml-common`, DOCX/XLSX/XLSB/PPTX matrices |
 | OLE/CFB package editing | Streams, storages, property sets, inert OLEDS links, directory catalogs, custom XML stores, VBA signature metadata, and package-preserving editors | `litchi-cfb`, `litchi-ole-common`, DOC/XLS/PPT matrices; `object::{directory,link}`, `custom_xml`, and `vba_signature` provide bounded source-checked transactions with reversible patches and opaque-tail preservation |
 | ODF package and flat XML editing | ZIP package, manifest, metadata, styles, settings, resources, and bounded flat-document handling | `litchi-odf` and ODF matrices |
 | Encryption and integrity | Format-specific Office and ODF profiles; bounded password and integrity handling | `litchi-crypto`, `litchi-sign`, format matrices |
@@ -116,9 +116,9 @@ parsing, and rendering fidelity vary by crate. Typed errors and resource bounds 
 support claim where the detailed matrix says so.
 
 The project treats untrusted Office and ODF content as data: external references are not fetched,
-macros are not executed, and embedded objects are not activated. Macro, VBA, and control payloads
-may only be retained or inspected as inert data; Litchi does not and will not execute them. Actions,
-formulas, and links are likewise never executed as document content. Formula evaluation and conversion
+and macros, VBA, ActiveX, controls, OLE objects, and embedded code are never executed or activated.
+Those payloads may only be retained, inspected, validated, inventoried, or edited as inert blobs.
+Actions, formulas, and links are likewise never executed as document content. Formula evaluation and conversion
 must describe their supported function/AST subset and any caller-provided capabilities. Signature
 verification is integrity-oriented and does not establish certificate trust.
 

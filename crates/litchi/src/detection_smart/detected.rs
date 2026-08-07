@@ -76,6 +76,98 @@ pub enum DetectedFormat {
 /// * `Some(DetectedFormat)` - Format detected with a reusable owner or byte buffer
 /// * `None` - Format not recognized
 pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    {
+        return detect_format_smart_with_limits(bytes, crate::opc::ReadLimits::default());
+    }
+
+    #[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
+    detect_format_smart_without_ooxml(bytes)
+}
+
+#[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
+fn detect_format_smart_without_ooxml(bytes: Vec<u8>) -> Option<DetectedFormat> {
+    use litchi_core::detection::simd_utils::check_office_signatures;
+
+    if bytes.len() < 4 {
+        return None;
+    }
+
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+    if let Some(format) = litchi_odf_common::detect::flat(&bytes) {
+        return Some(DetectedFormat::FlatOdf(format, bytes));
+    }
+
+    let mask = check_office_signatures(&bytes);
+
+    #[cfg(feature = "rtf")]
+    if mask.is_rtf() {
+        return Some(DetectedFormat::Rtf(bytes));
+    }
+
+    #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
+    if mask.is_ole2() {
+        let cursor = std::io::Cursor::new(bytes);
+        if let Ok(ole_file) = litchi_cfb::OleFile::open(cursor) {
+            #[cfg(feature = "doc")]
+            if ole_file.exists(&["WordDocument"]) {
+                return Some(DetectedFormat::Doc(ole_file));
+            }
+            #[cfg(feature = "ppt")]
+            if ole_file.exists(&["PowerPoint Document"]) || ole_file.exists(&["Current User"]) {
+                return Some(DetectedFormat::Ppt(ole_file));
+            }
+            #[cfg(feature = "xls")]
+            if ole_file.exists(&["Workbook"]) || ole_file.exists(&["Book"]) {
+                return Some(DetectedFormat::Xls(ole_file));
+            }
+        }
+        return None;
+    }
+
+    if mask.is_zip() {
+        #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+        if let Some(format) = litchi_odf_common::detect::bytes(&bytes) {
+            return match format {
+                #[cfg(feature = "odt")]
+                litchi_core::detection::FileFormat::Odt => Some(DetectedFormat::Odt(bytes)),
+                #[cfg(feature = "odp")]
+                litchi_core::detection::FileFormat::Odp => Some(DetectedFormat::Odp(bytes)),
+                #[cfg(feature = "ods")]
+                litchi_core::detection::FileFormat::Ods => Some(DetectedFormat::Ods(bytes)),
+                _ => None,
+            };
+        }
+
+        #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
+        if let Ok(Some(format)) = litchi_iwa_detect::bytes(&bytes) {
+            #[allow(unreachable_patterns)]
+            let detected = match format {
+                #[cfg(feature = "pages")]
+                litchi_iwa_detect::Format::Pages => DetectedFormat::Pages(bytes),
+                #[cfg(feature = "keynote")]
+                litchi_iwa_detect::Format::Keynote => DetectedFormat::Keynote(bytes),
+                #[cfg(feature = "numbers")]
+                litchi_iwa_detect::Format::Numbers => DetectedFormat::Numbers(bytes),
+                _ => return None,
+            };
+            return Some(detected);
+        }
+    }
+
+    None
+}
+
+/// Detect a format while applying an explicit OPC resource policy to an OOXML
+/// ZIP candidate.
+///
+/// The policy is used only when the input is an OOXML package. OLE, RTF, ODF,
+/// and iWork detection retains its existing format-specific behavior.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+pub fn detect_format_smart_with_limits(
+    bytes: Vec<u8>,
+    limits: crate::opc::ReadLimits,
+) -> Option<DetectedFormat> {
     #[cfg(any(
         any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
         any(feature = "odt", feature = "ods", feature = "odp")
@@ -132,7 +224,7 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
         // A successful OOXML probe returns the parsed OPC owner directly.
         #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
         {
-            if let Ok(package) = crate::opc::OpcPackage::from_bytes(&bytes) {
+            if let Ok(package) = crate::opc::OpcPackage::from_bytes_with_limits(&bytes, limits) {
                 // Use existing OOXML detection logic
                 if let Some(format) =
                     crate::detection_smart::ooxml::detect_ooxml_format_from_package(&package)
@@ -182,6 +274,96 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
     }
 
     None
+}
+
+/// Parse a path with an OOXML filename extension or ZIP magic under an explicit
+/// resource policy and retain it only when its main content type identifies an
+/// enabled owner.
+///
+/// A non-OPC ZIP returns `Ok(None)` so the unified facade can continue to the
+/// existing ODF and iWork paths. A resource-limit or allocation failure is
+/// returned instead of falling back to an unbounded file read.
+#[cfg(any(feature = "docx", feature = "pptx"))]
+pub(crate) fn detect_ooxml_path_with_limits(
+    path: impl AsRef<std::path::Path>,
+    limits: crate::opc::ReadLimits,
+) -> crate::opc::Result<Option<DetectedFormat>> {
+    let path = path.as_ref();
+    let mut file = std::fs::File::open(path)?;
+    let mut signature = [0_u8; 4];
+    let read = std::io::Read::read(&mut file, &mut signature)?;
+    let ooxml_extension = has_ooxml_extension(path);
+    let zip_magic = read == signature.len()
+        && litchi_core::detection::simd_utils::signature_matches(
+            &signature,
+            litchi_core::detection::utils::ZIP_SIGNATURE,
+        );
+    if !ooxml_extension && !zip_magic {
+        return Ok(None);
+    }
+
+    let input_bytes = file.metadata()?.len();
+    if input_bytes > limits.max_input_bytes() {
+        return Err(crate::opc::OpcError::ReadLimit {
+            resource: crate::opc::ReadResource::InputBytes,
+            actual: input_bytes,
+            maximum: limits.max_input_bytes(),
+        });
+    }
+
+    if !zip_magic {
+        return Err(crate::opc::OpcError::ZipError(
+            "OOXML-suffixed input does not have ZIP magic".to_owned(),
+        ));
+    }
+
+    match crate::opc::OpcPackage::open_with_limits(path, limits) {
+        Ok(package) => Ok(detect_ooxml_package(package)),
+        Err(error @ crate::opc::OpcError::ReadLimit { .. })
+        | Err(error @ crate::opc::OpcError::Allocation { .. }) => Err(error),
+        Err(error) if ooxml_extension => Err(error),
+        Err(_) => {
+            if crate::detection_smart::detect_file_format(path).is_some() {
+                Ok(None)
+            } else {
+                Err(crate::opc::OpcError::ZipError(
+                    "ZIP input is not a supported Office package".to_owned(),
+                ))
+            }
+        },
+    }
+}
+
+#[cfg(any(feature = "docx", feature = "pptx"))]
+fn has_ooxml_extension(path: &std::path::Path) -> bool {
+    let Some(extension) = path.extension().and_then(std::ffi::OsStr::to_str) else {
+        return false;
+    };
+
+    [
+        "docx", "docm", "dotx", "dotm", "pptx", "pptm", "ppsx", "ppsm", "potx", "potm", "xlsx",
+        "xlsm", "xltx", "xltm", "xlsb",
+    ]
+    .iter()
+    .any(|known| extension.eq_ignore_ascii_case(known))
+}
+
+#[cfg(any(feature = "docx", feature = "pptx"))]
+fn detect_ooxml_package(package: crate::opc::OpcPackage) -> Option<DetectedFormat> {
+    use litchi_core::detection::FileFormat;
+
+    let format = crate::detection_smart::ooxml::detect_ooxml_format_from_package(&package)?;
+    match format {
+        #[cfg(feature = "docx")]
+        FileFormat::Docx => Some(DetectedFormat::Docx(package)),
+        #[cfg(feature = "pptx")]
+        FileFormat::Pptx => Some(DetectedFormat::Pptx(package)),
+        #[cfg(feature = "xlsx")]
+        FileFormat::Xlsx => Some(DetectedFormat::Xlsx(package)),
+        #[cfg(feature = "xlsb")]
+        FileFormat::Xlsb => Some(DetectedFormat::Xlsb(package)),
+        _ => None,
+    }
 }
 
 #[cfg(test)]

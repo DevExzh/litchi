@@ -40,7 +40,7 @@ mod writer;
 
 pub use archive::*;
 pub use crc::crc32;
-pub use errors::{Error, ErrorKind};
+pub use errors::{Error, ErrorKind, LimitResource};
 pub use headers::Header;
 pub use locator::*;
 pub use mode::EntryMode;

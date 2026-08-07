@@ -1,11 +1,30 @@
 //! Error types for OPC package operations
 use std::collections::TryReserveError;
 
+use crate::ReadResource;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum OpcError {
+    #[error("invalid OPC read limit for {resource}: {value}")]
+    InvalidReadLimit {
+        /// Limit that was invalid.
+        resource: ReadResource,
+        /// Invalid configured value.
+        value: u64,
+    },
+
+    #[error("OPC read limit exceeded for {resource}: {actual} > {maximum}")]
+    ReadLimit {
+        /// Resource whose configured maximum was exceeded.
+        resource: ReadResource,
+        /// Observed resource use.
+        actual: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+
     #[error("Package not found: {0}")]
     PackageNotFound(String),
 

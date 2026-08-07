@@ -40,6 +40,38 @@ fn main() -> Result<(), litchi::Error> {
 - `Workbook::open` — unified spreadsheet reader (`.xls`, `.xlsx`, `.xlsb`, `.ods`, `.numbers`).
 - `detect_file_format` / `detect_file_format_from_bytes` — format sniffing without parsing.
 
+## Bounded OOXML Ingestion
+
+`docx`, `pptx`, `xlsx`, and `xlsb` re-export `ReadLimits`, the shared checked
+OPC package-ingestion policy. Ordinary constructors use bounded defaults.
+Construct a profile from those defaults with `ReadLimits::builder()` and supply
+it to the matching contextual API: DOCX and PPTX `Package::*_with_limits`,
+XLSX `Package::*_with_limits` or `Workbook::*_with_limits`, and XLSB
+`Workbook::new_with_limits`.
+
+The policy bounds compressed input, ZIP member counts, names, directory
+metadata, compressed and uncompressed member sizes, materialized OPC parts,
+`[Content_Types].xml`, and relationship XML, attributes, targets, events,
+depth, and graph traversal. It operationalizes ECMA-376 Part 2 §7.3.6/§10 and
+MS-OI29500 §2.1.1749-1752 for hostile input; it is a Litchi safety policy,
+not a specification maximum.
+
+```rust
+use litchi::docx::{Package, ReadLimits};
+
+let limits = ReadLimits::builder()
+    .max_input_bytes(32 * 1024 * 1024)?
+    .max_archive_members(10_000)?
+    .build()?;
+let package = Package::open_with_limits("untrusted.docx", limits)?;
+# let _ = package;
+# Ok::<(), litchi::Error>(())
+```
+
+Macros, VBA, ActiveX, controls, OLE objects, and embedded code are only ever
+retained as inert blobs when exposed or preserved. Litchi never executes or
+activates them.
+
 ## Feature Flags
 
 Default features are empty. Enable only what the application needs; spelling

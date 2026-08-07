@@ -5,11 +5,20 @@ use super::types::Result;
 
 /// Open a workbook from a file path.
 ///
-/// **Note**: This requires the `ooxml` feature to be enabled.
+/// Uses the default XLSX OPC resource policy. Use
+/// [`open_workbook_with_limits`] when the input is untrusted.
 #[cfg(feature = "xlsx")]
 pub fn open_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn WorkbookTrait>> {
-    let package = crate::opc::OpcPackage::open(path)?;
-    let workbook = crate::xlsx::Package::from_opc(package)
+    open_workbook_with_limits(path, crate::xlsx::ReadLimits::default())
+}
+
+/// Open an XLSX workbook from a file path with an explicit OPC resource policy.
+#[cfg(feature = "xlsx")]
+pub fn open_workbook_with_limits<P: AsRef<std::path::Path>>(
+    path: P,
+    limits: crate::xlsx::ReadLimits,
+) -> Result<Box<dyn WorkbookTrait>> {
+    let workbook = crate::xlsx::Package::open_with_limits(path, limits)
         .map_err(crate::map_ooxml_error)?
         .into_workbook()
         .map_err(crate::map_ooxml_error)?;
@@ -18,13 +27,20 @@ pub fn open_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<Box<dyn Workb
 
 /// Open a workbook from bytes.
 ///
-/// **Note**: This requires the `ooxml` feature to be enabled.
+/// Uses the default XLSX OPC resource policy. Use
+/// [`open_workbook_from_bytes_with_limits`] when the input is untrusted.
 #[cfg(feature = "xlsx")]
 pub fn open_workbook_from_bytes(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
-    use std::io::Cursor;
-    let cursor = Cursor::new(bytes);
-    let package = crate::opc::OpcPackage::from_reader(cursor)?;
-    let workbook = crate::xlsx::Package::from_opc(package)
+    open_workbook_from_bytes_with_limits(bytes, crate::xlsx::ReadLimits::default())
+}
+
+/// Open XLSX workbook bytes with an explicit OPC resource policy.
+#[cfg(feature = "xlsx")]
+pub fn open_workbook_from_bytes_with_limits(
+    bytes: &[u8],
+    limits: crate::xlsx::ReadLimits,
+) -> Result<Box<dyn WorkbookTrait>> {
+    let workbook = crate::xlsx::Package::from_slice_with_limits(bytes, limits)
         .map_err(crate::map_ooxml_error)?
         .into_workbook()
         .map_err(crate::map_ooxml_error)?;
@@ -79,10 +95,20 @@ pub fn open_xls_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn Workbook
 
 /// Open an XLSB workbook from a file path.
 ///
-/// **Note**: This requires the `ooxml` feature to be enabled.
+/// Uses the default XLSB OPC resource policy. Use
+/// [`open_xlsb_workbook_with_limits`] when the input is untrusted.
 #[cfg(feature = "xlsb")]
 pub fn open_xlsb_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<crate::xlsb::Workbook> {
-    let workbook = crate::xlsb::Package::open(path)
+    open_xlsb_workbook_with_limits(path, crate::xlsb::ReadLimits::default())
+}
+
+/// Open an XLSB workbook from a file path with an explicit OPC resource policy.
+#[cfg(feature = "xlsb")]
+pub fn open_xlsb_workbook_with_limits<P: AsRef<std::path::Path>>(
+    path: P,
+    limits: crate::xlsb::ReadLimits,
+) -> Result<crate::xlsb::Workbook> {
+    let workbook = crate::xlsb::Package::open_with_limits(path, limits)
         .map_err(crate::map_ooxml_error)?
         .into_workbook()
         .map_err(crate::map_ooxml_error)?;
@@ -91,12 +117,20 @@ pub fn open_xlsb_workbook<P: AsRef<std::path::Path>>(path: P) -> Result<crate::x
 
 /// Open an XLSB workbook from bytes.
 ///
-/// **Note**: This requires the `ooxml` feature to be enabled.
+/// Uses the default XLSB OPC resource policy. Use
+/// [`open_xlsb_workbook_from_bytes_with_limits`] when the input is untrusted.
 #[cfg(feature = "xlsb")]
 pub fn open_xlsb_workbook_from_bytes(bytes: &[u8]) -> Result<crate::xlsb::Workbook> {
-    use std::io::Cursor;
-    let cursor = Cursor::new(bytes);
-    let workbook = crate::xlsb::Package::from_reader(cursor)
+    open_xlsb_workbook_from_bytes_with_limits(bytes, crate::xlsb::ReadLimits::default())
+}
+
+/// Open XLSB workbook bytes with an explicit OPC resource policy.
+#[cfg(feature = "xlsb")]
+pub fn open_xlsb_workbook_from_bytes_with_limits(
+    bytes: &[u8],
+    limits: crate::xlsb::ReadLimits,
+) -> Result<crate::xlsb::Workbook> {
+    let workbook = crate::xlsb::Package::from_slice_with_limits(bytes, limits)
         .map_err(crate::map_ooxml_error)?
         .into_workbook()
         .map_err(crate::map_ooxml_error)?;
@@ -105,26 +139,43 @@ pub fn open_xlsb_workbook_from_bytes(bytes: &[u8]) -> Result<crate::xlsb::Workbo
 
 /// Open an XLSB workbook as a trait object from a file path.
 ///
-/// **Note**: This requires the `ooxml` feature to be enabled.
+/// Uses the default XLSB OPC resource policy. Use
+/// [`open_xlsb_workbook_dyn_with_limits`] when the input is untrusted.
 #[cfg(feature = "xlsb")]
 pub fn open_xlsb_workbook_dyn<P: AsRef<std::path::Path>>(
     path: P,
 ) -> Result<Box<dyn WorkbookTrait>> {
-    let workbook = open_xlsb_workbook(path)?;
+    open_xlsb_workbook_dyn_with_limits(path, crate::xlsb::ReadLimits::default())
+}
+
+/// Open an XLSB workbook as a trait object with an explicit OPC resource policy.
+#[cfg(feature = "xlsb")]
+pub fn open_xlsb_workbook_dyn_with_limits<P: AsRef<std::path::Path>>(
+    path: P,
+    limits: crate::xlsb::ReadLimits,
+) -> Result<Box<dyn WorkbookTrait>> {
+    let workbook = open_xlsb_workbook_with_limits(path, limits)?;
     Ok(Box::new(workbook))
 }
 
 /// Open an XLSB workbook as a trait object from bytes.
 ///
-/// **Note**: This requires the `ooxml` feature to be enabled.
+/// Uses the default XLSB OPC resource policy. Use
+/// [`open_xlsb_workbook_from_bytes_dyn_with_limits`] when the input is
+/// untrusted.
 #[cfg(feature = "xlsb")]
 pub fn open_xlsb_workbook_from_bytes_dyn(bytes: &[u8]) -> Result<Box<dyn WorkbookTrait>> {
-    use std::io::Cursor;
-    let cursor = Cursor::new(bytes.to_vec());
-    let workbook = crate::xlsb::Package::from_reader(cursor)
-        .map_err(crate::map_ooxml_error)?
-        .into_workbook()
-        .map_err(crate::map_ooxml_error)?;
+    open_xlsb_workbook_from_bytes_dyn_with_limits(bytes, crate::xlsb::ReadLimits::default())
+}
+
+/// Open XLSB workbook bytes as a trait object with an explicit OPC resource
+/// policy.
+#[cfg(feature = "xlsb")]
+pub fn open_xlsb_workbook_from_bytes_dyn_with_limits(
+    bytes: &[u8],
+    limits: crate::xlsb::ReadLimits,
+) -> Result<Box<dyn WorkbookTrait>> {
+    let workbook = open_xlsb_workbook_from_bytes_with_limits(bytes, limits)?;
     Ok(Box::new(workbook))
 }
 

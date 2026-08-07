@@ -63,6 +63,30 @@ fn generated_workbook() -> Workbook {
 }
 
 #[test]
+fn workbook_ingress_honors_exact_read_limits() {
+    let mut writer = crate::writer::WorkbookWriter::new();
+    writer.add_worksheet(crate::writer::MutableWorksheet::new("Sheet1"));
+    let mut output = Cursor::new(Vec::new());
+    writer.save(&mut output).expect("serialize workbook");
+    let bytes = output.into_inner();
+    let input_bytes = u64::try_from(bytes.len()).expect("input length fits u64");
+    let exact = crate::ReadLimits::builder()
+        .max_input_bytes(input_bytes)
+        .expect("exact input limit")
+        .build()
+        .expect("valid exact limit");
+    let over = crate::ReadLimits::builder()
+        .max_input_bytes(input_bytes - 1)
+        .expect("smaller input limit")
+        .build()
+        .expect("valid smaller limit");
+
+    assert!(Workbook::new(Cursor::new(bytes.clone())).is_ok());
+    assert!(Workbook::new_with_limits(Cursor::new(bytes.clone()), exact).is_ok());
+    assert!(Workbook::new_with_limits(Cursor::new(bytes), over).is_err());
+}
+
+#[test]
 fn raw_opc_edit_publishes_a_reparsed_candidate() {
     let mut workbook = generated_workbook();
     let marker = PackURI::new("/xl/raw-edit-marker.bin").unwrap();

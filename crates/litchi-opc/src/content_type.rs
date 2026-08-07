@@ -2,6 +2,7 @@
 
 use crate::constants::namespace;
 use crate::error::{OpcError, Result};
+use crate::limits::{ReadLimits, ReadResource};
 use crate::packuri::PackURI;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -9,11 +10,6 @@ use quick_xml::reader::NsReader;
 use quick_xml::{Decoder, XmlVersion};
 use std::collections::{HashMap, TryReserveError};
 use std::fmt;
-
-const MAX_CONTENT_TYPE_ENTRIES: usize = 65_536;
-const MAX_CONTENT_TYPES_XML_BYTES: usize = 8 * 1024 * 1024;
-const MAX_XML_EVENTS: usize = 1_000_000;
-const MAX_XML_DEPTH: usize = 256;
 
 /// A content type conforming to the MIME grammar required by OPC.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -127,12 +123,12 @@ pub(crate) struct ContentTypeMap {
 }
 
 impl ContentTypeMap {
-    pub(crate) fn from_xml(xml: &[u8]) -> Result<Self> {
-        if xml.len() > MAX_CONTENT_TYPES_XML_BYTES {
-            return Err(OpcError::InvalidContentTypesManifest(format!(
-                "manifest exceeds {MAX_CONTENT_TYPES_XML_BYTES} bytes"
-            )));
-        }
+    pub(crate) fn from_xml(xml: &[u8], limits: ReadLimits) -> Result<Self> {
+        limits.check(
+            ReadResource::ContentTypesBytes,
+            xml.len() as u64,
+            limits.max_content_types_bytes() as u64,
+        )?;
         let mut map = Self {
             defaults: HashMap::new(),
             overrides: HashMap::new(),
@@ -146,18 +142,13 @@ impl ContentTypeMap {
         let mut events = 0usize;
 
         loop {
-            events = events.checked_add(1).ok_or_else(|| {
-                OpcError::InvalidContentTypesManifest("XML event count overflow".to_string())
-            })?;
-            if events > MAX_XML_EVENTS {
-                return Err(OpcError::InvalidContentTypesManifest(format!(
-                    "manifest exceeds {MAX_XML_EVENTS} XML events"
-                )));
-            }
+            events = checked_increment(events, limits.max_xml_events(), ReadResource::XmlEvents)?;
             let decoder = reader.decoder();
             let (resolved_namespace, event) = reader.read_resolved_event()?;
             match event {
                 Event::Start(element) => {
+                    let next_depth =
+                        checked_increment(depth, limits.max_xml_depth(), ReadResource::XmlDepth)?;
                     inspect_element(
                         &mut map,
                         &resolved_namespace,
@@ -166,17 +157,9 @@ impl ContentTypeMap {
                         depth,
                         &mut root_seen,
                         &mut entry_count,
+                        limits,
                     )?;
-                    depth = depth.checked_add(1).ok_or_else(|| {
-                        OpcError::InvalidContentTypesManifest(
-                            "XML nesting depth overflow".to_string(),
-                        )
-                    })?;
-                    if depth > MAX_XML_DEPTH {
-                        return Err(OpcError::InvalidContentTypesManifest(format!(
-                            "XML nesting exceeds {MAX_XML_DEPTH} levels"
-                        )));
-                    }
+                    depth = next_depth;
                 },
                 Event::Empty(element) => inspect_element(
                     &mut map,
@@ -186,6 +169,7 @@ impl ContentTypeMap {
                     depth,
                     &mut root_seen,
                     &mut entry_count,
+                    limits,
                 )?,
                 Event::End(_) => {
                     depth = depth.checked_sub(1).ok_or_else(|| {
@@ -268,6 +252,7 @@ fn inspect_element(
     depth: usize,
     root_seen: &mut bool,
     entry_count: &mut usize,
+    limits: ReadLimits,
 ) -> Result<()> {
     let in_content_types_namespace = matches!(
         resolved_namespace,
@@ -295,24 +280,21 @@ fn inspect_element(
             "unexpected element or namespace in content types manifest".to_string(),
         ));
     }
-    *entry_count = entry_count.checked_add(1).ok_or_else(|| {
-        OpcError::InvalidContentTypesManifest("content type entry count overflow".to_string())
-    })?;
-    if *entry_count > MAX_CONTENT_TYPE_ENTRIES {
-        return Err(OpcError::InvalidContentTypesManifest(format!(
-            "content types manifest exceeds {MAX_CONTENT_TYPE_ENTRIES} entries"
-        )));
-    }
+    *entry_count = checked_increment(
+        *entry_count,
+        limits.max_content_type_mappings(),
+        ReadResource::ContentTypeMappings,
+    )?;
 
     match element.local_name().as_ref() {
         b"Default" => {
             let (extension, content_type) =
-                required_attributes(element, decoder, "Extension", "Default")?;
+                required_attributes(element, decoder, "Extension", "Default", limits)?;
             map.add_default(extension, ContentType::new(content_type)?)
         },
         b"Override" => {
             let (partname, content_type) =
-                required_attributes(element, decoder, "PartName", "Override")?;
+                required_attributes(element, decoder, "PartName", "Override", limits)?;
             let partname = PackURI::new(&partname).map_err(OpcError::InvalidPackUri)?;
             map.add_override(partname, ContentType::new(content_type)?)
         },
@@ -327,24 +309,38 @@ fn required_attributes(
     decoder: Decoder,
     key_name: &str,
     element_name: &str,
+    limits: ReadLimits,
 ) -> Result<(String, String)> {
     let mut key_value = None;
     let mut content_type = None;
     for attribute in element.attributes() {
         let attribute = attribute?;
+        limits.check(
+            ReadResource::XmlAttributeBytes,
+            attribute.value.as_ref().len() as u64,
+            limits.max_xml_attribute_bytes() as u64,
+        )?;
         let raw_name = attribute.key.as_ref();
         if raw_name == key_name.as_bytes() {
-            key_value = Some(
-                attribute
-                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?
-                    .to_string(),
-            );
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?
+                .to_string();
+            limits.check(
+                ReadResource::XmlAttributeBytes,
+                value.len() as u64,
+                limits.max_xml_attribute_bytes() as u64,
+            )?;
+            key_value = Some(value);
         } else if raw_name == b"ContentType" {
-            content_type = Some(
-                attribute
-                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?
-                    .to_string(),
-            );
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?
+                .to_string();
+            limits.check(
+                ReadResource::XmlAttributeBytes,
+                value.len() as u64,
+                limits.max_xml_attribute_bytes() as u64,
+            )?;
+            content_type = Some(value);
         } else if raw_name != b"xmlns" && !raw_name.starts_with(b"xmlns:") {
             return Err(OpcError::InvalidContentTypesManifest(format!(
                 "unexpected attribute on {element_name}"
@@ -376,6 +372,22 @@ fn validate_extension(extension: &str) -> Result<()> {
 
 fn allocation(resource: &'static str, source: TryReserveError) -> OpcError {
     OpcError::Allocation { resource, source }
+}
+
+fn checked_increment(current: usize, maximum: usize, resource: ReadResource) -> Result<usize> {
+    let actual = current.checked_add(1).ok_or(OpcError::ReadLimit {
+        resource,
+        actual: u64::MAX,
+        maximum: maximum as u64,
+    })?;
+    if actual > maximum {
+        return Err(OpcError::ReadLimit {
+            resource,
+            actual: actual as u64,
+            maximum: maximum as u64,
+        });
+    }
+    Ok(actual)
 }
 
 #[cfg(test)]
@@ -422,7 +434,7 @@ mod tests {
             &manifest(r#"<Other Extension="xml" ContentType="application/xml"/>"#),
         ] {
             assert!(matches!(
-                ContentTypeMap::from_xml(xml.as_bytes()),
+                ContentTypeMap::from_xml(xml.as_bytes(), ReadLimits::default()),
                 Err(OpcError::InvalidContentTypesManifest(_))
             ));
         }
@@ -434,7 +446,7 @@ mod tests {
             r#"<Default Extension="xml" ContentType="application/xml"/><Default Extension="XML" ContentType="text/xml"/>"#,
         );
         assert!(matches!(
-            ContentTypeMap::from_xml(duplicate_defaults.as_bytes()),
+            ContentTypeMap::from_xml(duplicate_defaults.as_bytes(), ReadLimits::default()),
             Err(OpcError::DuplicateContentTypeDefault(_))
         ));
 
@@ -442,7 +454,7 @@ mod tests {
             r#"<Override PartName="/word/document.xml" ContentType="application/xml"/><Override PartName="/WORD/DOCUMENT.XML" ContentType="text/xml"/>"#,
         );
         assert!(matches!(
-            ContentTypeMap::from_xml(duplicate_overrides.as_bytes()),
+            ContentTypeMap::from_xml(duplicate_overrides.as_bytes(), ReadLimits::default()),
             Err(OpcError::DuplicateContentTypeOverride { .. })
         ));
     }
@@ -452,7 +464,7 @@ mod tests {
         let xml = manifest(
             r#"<Default Extension="XML" ContentType="application/xml"/><Override PartName="/word/document.XML" ContentType="text/xml"/>"#,
         );
-        let map = ContentTypeMap::from_xml(xml.as_bytes()).unwrap();
+        let map = ContentTypeMap::from_xml(xml.as_bytes(), ReadLimits::default()).unwrap();
         assert_eq!(
             map.get(&PackURI::new("/custom/data.xml").unwrap()).unwrap(),
             "application/xml"
@@ -469,27 +481,109 @@ mod tests {
         let xml =
             manifest(r#"<Override PartName="word/document.xml" ContentType="application/xml"/>"#);
         assert!(matches!(
-            ContentTypeMap::from_xml(xml.as_bytes()),
+            ContentTypeMap::from_xml(xml.as_bytes(), ReadLimits::default()),
             Err(OpcError::InvalidPackUri(_))
         ));
     }
 
     #[test]
-    fn rejects_oversized_and_event_bomb_manifests() {
-        let oversized = vec![b' '; MAX_CONTENT_TYPES_XML_BYTES + 1];
+    fn honors_content_type_resource_limits_at_exact_boundaries() {
+        let valid = manifest(r#"<Default Extension="xml" ContentType="application/xml"/>"#);
+        let exact = ReadLimits::builder()
+            .max_content_types_bytes(valid.len())
+            .unwrap()
+            .max_content_type_mappings(1)
+            .unwrap()
+            .max_xml_events(4)
+            .unwrap()
+            .max_xml_depth(1)
+            .unwrap()
+            .max_xml_attribute_bytes("application/xml".len())
+            .unwrap()
+            .max_relationship_target_bytes("application/xml".len())
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(ContentTypeMap::from_xml(valid.as_bytes(), exact).is_ok());
+
+        let oversized = vec![b' '; valid.len() + 1];
         assert!(matches!(
-            ContentTypeMap::from_xml(&oversized),
-            Err(OpcError::InvalidContentTypesManifest(_))
+            ContentTypeMap::from_xml(&oversized, exact),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::ContentTypesBytes,
+                ..
+            })
         ));
 
-        let mut bomb = format!(r#"<Types xmlns="{NS}">"#);
-        for _ in 0..MAX_XML_EVENTS {
-            bomb.push_str("<!--x-->");
-        }
-        bomb.push_str("</Types>");
+        let two_mappings = manifest(
+            r#"<Default Extension="xml" ContentType="application/xml"/><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>"#,
+        );
         assert!(matches!(
-            ContentTypeMap::from_xml(bomb.as_bytes()),
-            Err(OpcError::InvalidContentTypesManifest(_))
+            ContentTypeMap::from_xml(
+                two_mappings.as_bytes(),
+                ReadLimits::builder()
+                    .max_content_type_mappings(1)
+                    .unwrap()
+                    .build()
+                    .unwrap()
+            ),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::ContentTypeMappings,
+                actual: 2,
+                maximum: 1,
+            })
+        ));
+
+        let events = two_mappings;
+        assert!(matches!(
+            ContentTypeMap::from_xml(
+                events.as_bytes(),
+                ReadLimits::builder()
+                    .max_xml_events(4)
+                    .unwrap()
+                    .build()
+                    .unwrap()
+            ),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::XmlEvents,
+                ..
+            })
+        ));
+
+        let nested = manifest("<Nested></Nested>");
+        assert!(matches!(
+            ContentTypeMap::from_xml(
+                nested.as_bytes(),
+                ReadLimits::builder()
+                    .max_xml_depth(1)
+                    .unwrap()
+                    .build()
+                    .unwrap()
+            ),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::XmlDepth,
+                actual: 2,
+                maximum: 1,
+            })
+        ));
+
+        let encoded_attribute =
+            manifest(r#"<Default Extension="xml" ContentType="application&#x2f;xml"/>"#);
+        assert!(matches!(
+            ContentTypeMap::from_xml(
+                encoded_attribute.as_bytes(),
+                ReadLimits::builder()
+                    .max_xml_attribute_bytes("application/xml".len())
+                    .unwrap()
+                    .max_relationship_target_bytes("application/xml".len())
+                    .unwrap()
+                    .build()
+                    .unwrap(),
+            ),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::XmlAttributeBytes,
+                ..
+            })
         ));
     }
 }

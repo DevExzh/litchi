@@ -63,6 +63,8 @@ pub use comments::{
 pub use error::{Error, Result};
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;
+/// Resource policy for package ingestion through [`Package`].
+pub use litchi_opc::ReadLimits;
 pub use master_layout::{
     AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID, PlaceholderKind,
     PlaceholderSpec, SlideLayoutKind,

@@ -72,8 +72,8 @@ fn reports_unreferenced_untyped_member_without_losing_the_real_parts() {
     assert_eq!(junk.len(), 1);
     assert_eq!(junk[0].name(), "custom/orphan.bin");
     assert_eq!(junk[0].reason(), NonPartReason::UntypedAndUnreferenced);
-    // The bytes are still reachable through the physical archive.
-    assert_eq!(physical.archive().read(junk[0].name()).unwrap(), b"orphan");
+    // The bytes are still reachable through the bounded physical member API.
+    assert_eq!(physical.read_member(junk[0].name()).unwrap(), b"orphan");
 }
 
 #[test]

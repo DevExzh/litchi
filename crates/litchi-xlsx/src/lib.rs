@@ -70,6 +70,9 @@ pub mod workbook_metadata;
 pub mod writer;
 pub mod xml_maps;
 
+/// OPC resource limits used by XLSX package and workbook ingress.
+pub use litchi_opc::ReadLimits;
+
 pub use active_x::{
     Binary, Control, ControlProperties, ControlSet, Controls, Descriptor, Font, LoadedControl,
     Marker, ObjectAnchor, Persistence, Picture, PreviewImage, Property, PropertyObject,

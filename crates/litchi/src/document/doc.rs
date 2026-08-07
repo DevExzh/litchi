@@ -6,6 +6,8 @@ use super::Table;
 use super::types::DocumentImpl;
 use litchi_core::{Error, Result};
 
+use crate::detection_smart::DetectedFormat;
+
 #[cfg(feature = "doc")]
 use litchi_doc as doc;
 #[cfg(feature = "doc")]
@@ -156,8 +158,35 @@ impl Document {
     /// # Ok::<(), litchi::common::Error>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        // Read once into owned memory; detection transfers that ownership into
-        // the selected format path.
+        #[cfg(feature = "docx")]
+        {
+            return Self::open_with_limits(path, crate::docx::ReadLimits::default());
+        }
+
+        #[cfg(not(feature = "docx"))]
+        {
+            let bytes = std::fs::read(path.as_ref())?;
+            Self::from_bytes(bytes)
+        }
+    }
+
+    /// Open a document with an explicit DOCX/OPC resource policy.
+    ///
+    /// The policy applies to OOXML-suffixed paths and ZIP-magic candidates.
+    /// Legacy Word, RTF, Pages, and OpenDocument inputs continue through their
+    /// native readers.
+    #[cfg(feature = "docx")]
+    pub fn open_with_limits<P: AsRef<Path>>(
+        path: P,
+        limits: crate::docx::ReadLimits,
+    ) -> Result<Self> {
+        if let Some(detected) =
+            crate::detection_smart::detected::detect_ooxml_path_with_limits(path.as_ref(), limits)
+                .map_err(crate::map_ooxml_error)?
+        {
+            return Self::from_detected(detected);
+        }
+
         let bytes = std::fs::read(path.as_ref())?;
         Self::from_bytes(bytes)
     }
@@ -192,12 +221,30 @@ impl Document {
     /// - Ideal for network data, streams, or in-memory content
     /// - No temporary files created
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        // Detection consumes the input and returns either a parsed owner or the
-        // moved source bytes, depending on the format.
-        use crate::detection_smart::{DetectedFormat, detect_format_smart};
+        #[cfg(feature = "docx")]
+        {
+            return Self::from_bytes_with_limits(bytes, crate::docx::ReadLimits::default());
+        }
 
-        let detected = detect_format_smart(bytes).ok_or(Error::NotOfficeFile)?;
+        #[cfg(not(feature = "docx"))]
+        {
+            let detected =
+                crate::detection_smart::detect_format_smart(bytes).ok_or(Error::NotOfficeFile)?;
+            Self::from_detected(detected)
+        }
+    }
 
+    /// Create a document from bytes with an explicit DOCX/OPC resource policy.
+    ///
+    /// The policy is consulted only while probing an OOXML ZIP candidate.
+    #[cfg(feature = "docx")]
+    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: crate::docx::ReadLimits) -> Result<Self> {
+        let detected = crate::detection_smart::detect_format_smart_with_limits(bytes, limits)
+            .ok_or(Error::NotOfficeFile)?;
+        Self::from_detected(detected)
+    }
+
+    fn from_detected(detected: crate::detection_smart::DetectedFormat) -> Result<Self> {
         match detected {
             #[cfg(feature = "doc")]
             DetectedFormat::Doc(ole_file) => {

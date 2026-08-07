@@ -236,48 +236,58 @@ impl Package {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let opc = OpcPackage::open(path)?;
+        Self::open_with_limits(path, litchi_opc::ReadLimits::default())
+    }
 
-        // Verify it's a Word document by checking the main part's content type
-        let main_part = opc
-            .main_document_part()
-            .map_err(|e| Error::PartNotFound(format!("main document part: {}", e)))?;
-
-        validate_document_main_content_type(main_part.content_type())?;
-
-        let custom_props = CustomProps::read_for(&opc, CustomPropsHost::Word)?;
-        let properties = Slot::load(&opc)?;
-
-        Ok(Self {
-            opc,
-            mutable_doc: None,
-            raw_edit_committed: false,
-            properties,
-            custom_props,
-            custom_props_dirty: false,
-            #[cfg(feature = "fonts")]
-            font_embedding: None,
-            #[cfg(feature = "encryption")]
-            source_encryption: None,
-        })
+    /// Open a DOCX package from a file path with explicit OPC resource limits.
+    pub fn open_with_limits<P: AsRef<Path>>(
+        path: P,
+        limits: litchi_opc::ReadLimits,
+    ) -> Result<Self> {
+        Self::from_opc_package(OpcPackage::open_with_limits(path, limits)?)
     }
 
     #[cfg(feature = "encryption")]
     pub fn open_with_password<P: AsRef<Path>>(path: P, password: &str) -> Result<Self> {
-        let file = std::fs::File::open(path.as_ref()).map_err(Error::Io)?;
-        let opened = crate::encryption::load(file, password)?;
-        Self::from_opened(opened)
+        Self::open_with_password_and_limits(
+            path,
+            password,
+            &Limits::default(),
+            litchi_opc::ReadLimits::default(),
+        )
     }
 
     /// Open with explicit outer-encryption limits.
     ///
-    /// The decrypted OPC archive is parsed under its independently bounded
-    /// default policy; a composite host policy remains migration work.
+    /// The decrypted OPC archive uses [`litchi_opc::ReadLimits::default`].
+    /// Use [`Self::open_with_password_and_limits`] to select both independent
+    /// resource policies.
     #[cfg(feature = "encryption")]
     pub fn open_with<P: AsRef<Path>>(path: P, password: &str, limits: &Limits) -> Result<Self> {
+        Self::open_with_password_and_limits(
+            path,
+            password,
+            limits,
+            litchi_opc::ReadLimits::default(),
+        )
+    }
+
+    /// Open an encrypted DOCX with independent outer-encryption and inner-OPC
+    /// resource policies.
+    ///
+    /// `encryption_limits` bounds encrypted input and decryption. `opc_limits`
+    /// is applied to the decrypted archive before it is adopted as a DOCX
+    /// package.
+    #[cfg(feature = "encryption")]
+    pub fn open_with_password_and_limits<P: AsRef<Path>>(
+        path: P,
+        password: &str,
+        encryption_limits: &Limits,
+        opc_limits: litchi_opc::ReadLimits,
+    ) -> Result<Self> {
         let file = std::fs::File::open(path.as_ref()).map_err(Error::Io)?;
-        let opened = crate::encryption::load_with(file, password, limits)?;
-        Self::from_opened(opened)
+        let opened = crate::encryption::load_with(file, password, encryption_limits)?;
+        Self::from_opened_with_limits(opened, opc_limits)
     }
 
     /// Create a Package from an already-parsed OPC package.
@@ -344,51 +354,62 @@ impl Package {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn from_reader<R: Read + Seek>(reader: R) -> Result<Self> {
-        let opc = OpcPackage::from_reader(reader)?;
+        Self::from_reader_with_limits(reader, litchi_opc::ReadLimits::default())
+    }
 
-        // Verify it's a Word document by checking the main part's content type
-        let main_part = opc
-            .main_document_part()
-            .map_err(|e| Error::PartNotFound(format!("main document part: {}", e)))?;
-
-        validate_document_main_content_type(main_part.content_type())?;
-
-        let custom_props = CustomProps::read_for(&opc, CustomPropsHost::Word)?;
-        let properties = Slot::load(&opc)?;
-
-        Ok(Self {
-            opc,
-            mutable_doc: None,
-            raw_edit_committed: false,
-            properties,
-            custom_props,
-            custom_props_dirty: false,
-            #[cfg(feature = "fonts")]
-            font_embedding: None,
-            #[cfg(feature = "encryption")]
-            source_encryption: None,
-        })
+    /// Create a DOCX package from a reader with explicit OPC resource limits.
+    pub fn from_reader_with_limits<R: Read + Seek>(
+        reader: R,
+        limits: litchi_opc::ReadLimits,
+    ) -> Result<Self> {
+        Self::from_opc_package(OpcPackage::from_reader_with_limits(reader, limits)?)
     }
 
     #[cfg(feature = "encryption")]
     pub fn from_reader_with_password<R: Read>(reader: R, password: &str) -> Result<Self> {
-        let opened = crate::encryption::load(reader, password)?;
-        Self::from_opened(opened)
+        Self::from_reader_with_password_and_limits(
+            reader,
+            password,
+            &Limits::default(),
+            litchi_opc::ReadLimits::default(),
+        )
     }
 
     /// Open a reader with explicit outer-encryption limits.
     ///
-    /// The decrypted OPC archive uses its independently bounded defaults.
+    /// The decrypted OPC archive uses [`litchi_opc::ReadLimits::default`].
+    /// Use [`Self::from_reader_with_password_and_limits`] to select both
+    /// independent resource policies.
     #[cfg(feature = "encryption")]
     pub fn from_reader_with<R: Read>(reader: R, password: &str, limits: &Limits) -> Result<Self> {
-        let opened = crate::encryption::load_with(reader, password, limits)?;
-        Self::from_opened(opened)
+        Self::from_reader_with_password_and_limits(
+            reader,
+            password,
+            limits,
+            litchi_opc::ReadLimits::default(),
+        )
+    }
+
+    /// Open an encrypted DOCX reader with independent outer-encryption and
+    /// inner-OPC resource policies.
+    #[cfg(feature = "encryption")]
+    pub fn from_reader_with_password_and_limits<R: Read>(
+        reader: R,
+        password: &str,
+        encryption_limits: &Limits,
+        opc_limits: litchi_opc::ReadLimits,
+    ) -> Result<Self> {
+        let opened = crate::encryption::load_with(reader, password, encryption_limits)?;
+        Self::from_opened_with_limits(opened, opc_limits)
     }
 
     #[cfg(feature = "encryption")]
-    fn from_opened(opened: crate::encryption::Opened) -> Result<Self> {
+    fn from_opened_with_limits(
+        opened: crate::encryption::Opened,
+        limits: litchi_opc::ReadLimits,
+    ) -> Result<Self> {
         let source_encryption = opened.mode();
-        let opc = OpcPackage::from_vec(opened.into_bytes())?;
+        let opc = OpcPackage::from_vec_with_limits(opened.into_bytes(), limits)?;
         let mut package = Self::from_opc_package(opc)?;
         package.source_encryption = source_encryption;
         Ok(package)

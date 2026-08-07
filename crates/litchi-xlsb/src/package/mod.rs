@@ -8,7 +8,7 @@
 use std::io::{Read, Write};
 use std::path::Path;
 
-use litchi_opc::{OpcPackage, PackageWriter};
+use litchi_opc::{OpcPackage, PackageWriter, ReadLimits};
 
 use crate::Workbook;
 use crate::package::error::Result;
@@ -100,22 +100,46 @@ impl Package {
 
     /// Open and validate an XLSB package from a filesystem path.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_opc(OpcPackage::open(path)?)
+        Self::open_with_limits(path, ReadLimits::default())
+    }
+
+    /// Open and validate an XLSB package from a filesystem path with explicit
+    /// OPC resource limits.
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+        Self::from_opc(OpcPackage::open_with_limits(path, limits)?)
     }
 
     /// Read and validate an XLSB package from an owned byte vector.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_opc(OpcPackage::from_vec(bytes)?)
+        Self::from_bytes_with_limits(bytes, ReadLimits::default())
+    }
+
+    /// Read and validate an XLSB package from an owned byte vector with
+    /// explicit OPC resource limits.
+    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: ReadLimits) -> Result<Self> {
+        Self::from_opc(OpcPackage::from_vec_with_limits(bytes, limits)?)
     }
 
     /// Read and validate an XLSB package from a borrowed byte slice.
     pub fn from_slice(bytes: &[u8]) -> Result<Self> {
-        Self::from_opc(OpcPackage::from_bytes(bytes)?)
+        Self::from_slice_with_limits(bytes, ReadLimits::default())
+    }
+
+    /// Read and validate an XLSB package from a borrowed byte slice with
+    /// explicit OPC resource limits.
+    pub fn from_slice_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Self> {
+        Self::from_opc(OpcPackage::from_bytes_with_limits(bytes, limits)?)
     }
 
     /// Read and validate an XLSB package from a synchronous reader.
     pub fn from_reader(reader: impl Read) -> Result<Self> {
-        Self::from_opc(OpcPackage::from_reader(reader)?)
+        Self::from_reader_with_limits(reader, ReadLimits::default())
+    }
+
+    /// Read and validate an XLSB package from a synchronous reader with
+    /// explicit OPC resource limits.
+    pub fn from_reader_with_limits(reader: impl Read, limits: ReadLimits) -> Result<Self> {
+        Self::from_opc(OpcPackage::from_reader_with_limits(reader, limits)?)
     }
 
     /// Validate and adopt an already parsed OPC package.
@@ -169,5 +193,48 @@ impl From<Package> for OpcPackage {
 impl From<OpcPackage> for Package {
     fn from(package: OpcPackage) -> Self {
         Self(package)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use super::*;
+
+    #[test]
+    fn ingress_honors_exact_read_limits() {
+        let bytes = Package::create()
+            .expect("create package")
+            .to_bytes()
+            .expect("serialize package");
+        let input_bytes = u64::try_from(bytes.len()).expect("input length fits u64");
+        let exact = ReadLimits::builder()
+            .max_input_bytes(input_bytes)
+            .expect("exact input limit")
+            .build()
+            .expect("valid exact limit");
+        let over = ReadLimits::builder()
+            .max_input_bytes(input_bytes - 1)
+            .expect("smaller input limit")
+            .build()
+            .expect("valid smaller limit");
+        let file = tempfile::NamedTempFile::new().expect("temporary workbook path");
+        std::fs::write(file.path(), &bytes).expect("write workbook");
+
+        assert!(Package::open(file.path()).is_ok());
+        assert!(Package::from_bytes(bytes.clone()).is_ok());
+        assert!(Package::from_slice(&bytes).is_ok());
+        assert!(Package::from_reader(Cursor::new(bytes.clone())).is_ok());
+
+        assert!(Package::open_with_limits(file.path(), exact).is_ok());
+        assert!(Package::from_bytes_with_limits(bytes.clone(), exact).is_ok());
+        assert!(Package::from_slice_with_limits(&bytes, exact).is_ok());
+        assert!(Package::from_reader_with_limits(Cursor::new(bytes.clone()), exact).is_ok());
+
+        assert!(Package::open_with_limits(file.path(), over).is_err());
+        assert!(Package::from_bytes_with_limits(bytes.clone(), over).is_err());
+        assert!(Package::from_slice_with_limits(&bytes, over).is_err());
+        assert!(Package::from_reader_with_limits(Cursor::new(bytes), over).is_err());
     }
 }

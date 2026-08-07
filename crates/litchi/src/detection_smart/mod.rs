@@ -9,7 +9,9 @@ pub mod functions;
 
 // Format-family probes used by `functions`.
 pub(crate) mod ole2;
-pub(crate) mod ooxml;
+pub mod ooxml;
 
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+pub use detected::detect_format_smart_with_limits;
 pub use detected::{DetectedFormat, detect_format_smart};
 pub use functions::{detect_file_format, detect_file_format_from_bytes, detect_format_from_reader};

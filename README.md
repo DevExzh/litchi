@@ -31,13 +31,25 @@ semantics, and `litchi-fonts` owns font discovery, subsetting, embedding, and
 obfuscation. The `litchi` facade exposes each namespace only when its matching
 opt-in feature is enabled.
 
+OOXML ingestion is bounded by `litchi_opc::ReadLimits`. The standard profile is
+used by ordinary open methods; applications that receive untrusted or
+multi-tenant input can derive a tighter checked profile with
+`ReadLimits::builder()` and pass it to the contextual DOCX, PPTX, XLSX, or XLSB
+`*_with_limits` entry point. The policy covers package input, ZIP members and
+metadata, materialized OPC parts, `[Content_Types].xml`, and relationship XML
+and graph traversal. It implements the defensive-consumer concerns in
+ECMA-376 Part 2 sections 7.3.6 and 10, together with MS-OI29500 sections
+2.1.1749-1752; its ceilings are Litchi safety policy, not maxima prescribed by
+those specifications.
+
 PPTX and XLSX custom document properties use the shared typed
 `litchi_ooxml_common::custom::Props` and `Value` model for parsing and writing,
 following vendored `MS-OI29500` §3.11. A missing custom-properties part is an
 empty `Props`; mutations are transactional and invalidate package signatures.
-Property values are inert data: Litchi never executes macros, VBA, control
-payloads, actions, formulas, or links. Macro, VBA, and control payloads may be
-retained or inspected as inert data only and will never be executed.
+Property values are inert data: Litchi never executes macros, VBA, ActiveX,
+controls, OLE objects, embedded code, actions, formulas, or links. Macro, VBA,
+ActiveX, control, OLE, and embedded-code payloads are retained only as inert
+blobs when exposed or preserved; they are never executed or activated.
 
 ## Quick Start
 

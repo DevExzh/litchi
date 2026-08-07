@@ -22,5 +22,8 @@ litchi-vba = { workspace = true }
 quick-xml = { workspace = true }
 thiserror = { workspace = true }
 
+[dev-dependencies]
+tempfile = { workspace = true }
+
 [lints]
 workspace = true

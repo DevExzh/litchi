@@ -474,8 +474,17 @@ impl Workbook {
         Ok(())
     }
 
+    /// Read and validate an XLSB workbook with the default bounded OPC limits.
     pub fn new<R: Read + Seek>(reader: R) -> Result<Self> {
-        let package = OpcPackage::from_reader(reader)?;
+        Self::new_with_limits(reader, litchi_opc::ReadLimits::default())
+    }
+
+    /// Read and validate an XLSB workbook with explicit OPC resource limits.
+    pub fn new_with_limits<R: Read + Seek>(
+        reader: R,
+        limits: litchi_opc::ReadLimits,
+    ) -> Result<Self> {
+        let package = OpcPackage::from_reader_with_limits(reader, limits)?;
         Self::from_opc_package(package)
     }
 

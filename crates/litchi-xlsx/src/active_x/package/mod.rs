@@ -65,8 +65,8 @@ pub fn store_on_worksheet(
 
 /// Atomically replaces the complete inert ActiveX graph of a worksheet.
 ///
-/// An empty set removes the graph. An in-memory package snapshot is used only
-/// for rollback; ActiveX payloads are still copied and never interpreted.
+/// An empty set removes the graph. A typed package clone is used only for
+/// rollback; ActiveX payloads are still copied and never interpreted.
 pub fn replace_on_worksheet(
     package: &mut OpcPackage,
     worksheet_uri: &PackURI,
@@ -77,13 +77,13 @@ pub fn replace_on_worksheet(
         return Ok(());
     }
     validate_control_set(value)?;
-    let snapshot = litchi_opc::PackageWriter::to_bytes(package)?;
+    let snapshot = package.clone();
     let result = (|| {
         remove_from_worksheet(package, worksheet_uri)?;
         store_on_worksheet(package, worksheet_uri, value)
     })();
     if let Err(error) = result {
-        *package = OpcPackage::from_bytes(&snapshot)?;
+        *package = snapshot;
         return Err(error);
     }
     Ok(())

@@ -164,22 +164,48 @@ impl Package {
 
     /// Open a PPTX from a filesystem path.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::from_opc_package(OpcPackage::open(path)?)
+        Self::open_with_limits(path, litchi_opc::ReadLimits::default())
+    }
+
+    /// Open a PPTX from a filesystem path with explicit OPC resource limits.
+    pub fn open_with_limits<P: AsRef<Path>>(
+        path: P,
+        limits: litchi_opc::ReadLimits,
+    ) -> Result<Self> {
+        Self::from_opc_package(OpcPackage::open_with_limits(path, limits)?)
     }
 
     /// Parse a PPTX from a reader.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_opc_package(OpcPackage::from_reader(reader)?)
+        Self::from_reader_with_limits(reader, litchi_opc::ReadLimits::default())
+    }
+
+    /// Parse a PPTX from a reader with explicit OPC resource limits.
+    pub fn from_reader_with_limits<R: Read>(
+        reader: R,
+        limits: litchi_opc::ReadLimits,
+    ) -> Result<Self> {
+        Self::from_opc_package(OpcPackage::from_reader_with_limits(reader, limits)?)
     }
 
     /// Parse a PPTX from an owned ZIP buffer.
     pub fn from_vec(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_opc_package(OpcPackage::from_vec(bytes)?)
+        Self::from_vec_with_limits(bytes, litchi_opc::ReadLimits::default())
+    }
+
+    /// Parse a PPTX from an owned ZIP buffer with explicit OPC resource limits.
+    pub fn from_vec_with_limits(bytes: Vec<u8>, limits: litchi_opc::ReadLimits) -> Result<Self> {
+        Self::from_opc_package(OpcPackage::from_vec_with_limits(bytes, limits)?)
     }
 
     /// Parse a PPTX from a borrowed ZIP buffer.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_opc_package(OpcPackage::from_bytes(bytes)?)
+        Self::from_bytes_with_limits(bytes, litchi_opc::ReadLimits::default())
+    }
+
+    /// Parse a PPTX from a borrowed ZIP buffer with explicit OPC resource limits.
+    pub fn from_bytes_with_limits(bytes: &[u8], limits: litchi_opc::ReadLimits) -> Result<Self> {
+        Self::from_opc_package(OpcPackage::from_bytes_with_limits(bytes, limits)?)
     }
 
     /// Adopt an already parsed OPC graph without hydrating a mutable model.

@@ -16,7 +16,7 @@ use std::path::Path;
 
 use litchi_ooxml_common::custom::Host;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, ReadLimits, TargetMode};
 
 use crate::Workbook;
 use crate::custom::Props;
@@ -39,22 +39,46 @@ impl Package {
 
     /// Open and validate an XLSX package from a filesystem path.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_opc(OpcPackage::open(path)?)
+        Self::open_with_limits(path, ReadLimits::default())
+    }
+
+    /// Open and validate an XLSX package from a filesystem path with explicit
+    /// OPC resource limits.
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+        Self::from_opc(OpcPackage::open_with_limits(path, limits)?)
     }
 
     /// Read and validate an XLSX package from owned bytes.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_opc(OpcPackage::from_vec(bytes)?)
+        Self::from_bytes_with_limits(bytes, ReadLimits::default())
+    }
+
+    /// Read and validate an XLSX package from owned bytes with explicit OPC
+    /// resource limits.
+    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: ReadLimits) -> Result<Self> {
+        Self::from_opc(OpcPackage::from_vec_with_limits(bytes, limits)?)
     }
 
     /// Read and validate an XLSX package from a borrowed byte slice.
     pub fn from_slice(bytes: &[u8]) -> Result<Self> {
-        Self::from_opc(OpcPackage::from_bytes(bytes)?)
+        Self::from_slice_with_limits(bytes, ReadLimits::default())
+    }
+
+    /// Read and validate an XLSX package from a borrowed byte slice with
+    /// explicit OPC resource limits.
+    pub fn from_slice_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Self> {
+        Self::from_opc(OpcPackage::from_bytes_with_limits(bytes, limits)?)
     }
 
     /// Read and validate an XLSX package from a synchronous reader.
     pub fn from_reader(reader: impl Read) -> Result<Self> {
-        Self::from_opc(OpcPackage::from_reader(reader)?)
+        Self::from_reader_with_limits(reader, ReadLimits::default())
+    }
+
+    /// Read and validate an XLSX package from a synchronous reader with
+    /// explicit OPC resource limits.
+    pub fn from_reader_with_limits(reader: impl Read, limits: ReadLimits) -> Result<Self> {
+        Self::from_opc(OpcPackage::from_reader_with_limits(reader, limits)?)
     }
 
     /// Validate and adopt an already parsed OPC package.
