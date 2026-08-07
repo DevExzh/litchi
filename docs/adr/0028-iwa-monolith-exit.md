@@ -111,3 +111,45 @@ cover inclusive and exceeded budgets, duplicate types and identities, wrong
 types and wire kinds, ambiguous ownership, false-positive payloads, concurrent
 first access, native Prost/Buffa differential output, and exact reversible
 skip-state behavior.
+
+## 2026-08-08 Numbers order and orphan projection progress
+
+The concrete Numbers package now owns both sides of the table-order contract
+required by deletion gate 3. Its ordinary `Document` follows only the strict
+rooted document/sheet/drawable graph and excludes detached models. Its explicit
+`extract_structured_tables` compatibility projection reproduces the migration
+host's archive-wide behavior: first-message classification, type-6001 pass
+before legacy type-6000 pass, ascending object identity within a pass,
+deduplication, and inclusion of valid detached models. A compact package index
+holds one locator and at most one primary-type entry per object; object lookup
+is binary-search based instead of a repeated archive scan. Checked semantic
+limits cover objects, rooted sheets, rooted references, and tables while
+preserving caller-selected physical limits.
+
+Focused/legacy differential tests cover rooted order opposite global order, a
+physically retained orphan, canonical-before-legacy pass order, one object
+carrying both candidate types, object-vector reordering, secondary-message
+exclusion, preferred malformed-model failure, ignorable malformed legacy
+false positives, unrelated typed false positives, duplicate identity and
+ownership rejection, and inclusive/exceeded object, sheet, rooted-reference,
+and table budgets. The ordinary reader also requires exact document and sheet
+types and retains only the fixture-backed type-6003 table-info compatibility
+alias alongside native type 6000.
+
+Computer Use created, saved, closed, and reopened
+`/private/tmp/litchi-numbers-order-oracle-20260808.numbers` in the real Numbers
+application. Its final SHA-256 is
+`781181e89c655da5c92b677b9ba5c939c85379e7b33ccf10e3846fe8588f9c5b`.
+The workbook has `SecondCreated` before `FirstCreated`, a non-table text box,
+and tables whose rooted order is `B-only-table`, `A-new-table`,
+`A-old-table`. Native Arrange ordering makes the global compatibility order
+`B-only-table`, `A-old-table`, `A-new-table`. The focused example reproduced
+both sequences and one materialized marker cell per table.
+
+This closes the focused Numbers order/orphan implementation gap, not the
+monolith deletion gate. The root structured facade still routes Numbers
+through the migration-host adapter, mutation ownership remains largely in
+`litchi-iwa`, and the larger Numbers table graph still uses generated Prost
+messages. The host adapter can be removed only after the root facade consumes
+the focused projection and the remaining compatibility tests move to focused
+owners.

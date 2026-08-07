@@ -758,6 +758,20 @@ semantic access or explicit validation. Complete allocation-envelope
 preflights for every ignored nested generated field remain migration debt until
 the larger Keynote graph moves to focused bounded projections.
 
+Numbers deliberately exposes two table projections with different ownership
+contracts. `Package::document()` and `Package::sheets()` are the ordinary
+semantic view: they follow the canonical document sheet sequence and each
+sheet's drawable sequence, reject duplicate ownership, and never publish a
+detached table model. `Package::extract_structured_tables()` is an explicitly
+allocating compatibility view for replacing the migration host's historical
+structured extractor. It classifies objects by their first native message,
+emits canonical type-6001 table models before compatible type-6000 models in
+object-identity order, deduplicates candidates, and retains valid detached
+models. The method name and documentation make that archive-wide behavior
+visible without adding native IDs, generated messages, or low-level objects to
+the supported signature. Detached compatibility tables do not acquire a fake
+sheet or leak into selector-based ordinary APIs.
+
 Bitflags represent small orthogonal settings, Roaring bitmaps represent large
 sparse integer sets, enums represent exclusive states, and inheritance uses an
 explicit tri-state. The facade exposes named operations rather than bit math.

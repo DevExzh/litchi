@@ -1,15 +1,13 @@
 //! Compact package-local object lookup for the Numbers adapter.
 
-use std::collections::HashSet;
-
 use litchi_iwa_core::RawMessage;
 
-use super::{Components, Error, Result};
+use super::{Components, Error, Result, SemanticLimitKind, SemanticPath};
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Entry {
     identifier: u64,
-    message_type: u32,
+    primary_message_type: u32,
 }
 
 impl Entry {
@@ -24,51 +22,101 @@ pub(super) struct Resolved<'a> {
     pub(super) messages: &'a [RawMessage],
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ObjectLocator {
+    identifier: u64,
+    component: u32,
+    object: u32,
+}
+
 #[derive(Debug)]
 pub(super) struct Index {
-    entries: Box<[Entry]>,
-    object_count: usize,
+    locators: Box<[ObjectLocator]>,
+    primary_entries: Box<[Entry]>,
 }
 
 impl Index {
-    pub(super) fn from_components(components: &Components) -> Result<Self> {
-        let mut identifiers = HashSet::new();
-        let mut entries = Vec::new();
-        let mut object_count = 0usize;
-        for object in components.iter_objects() {
-            let identifier = object.archive_info.identifier.ok_or_else(|| {
-                Error::InvalidFormat("Numbers IWA object has no identifier".to_owned())
+    pub(super) fn from_components(components: &Components, max_objects: usize) -> Result<Self> {
+        let object_count = components
+            .iter_objects()
+            .try_fold(0usize, |count, _object| {
+                count.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("Numbers object count overflows usize".to_owned())
+                })
             })?;
-            if !identifiers.insert(identifier) {
-                return Err(Error::InvalidFormat(format!(
-                    "Numbers package contains duplicate object identifier {identifier}"
-                )));
-            }
-            object_count = object_count.checked_add(1).ok_or_else(|| {
-                Error::InvalidFormat("Numbers object count overflows usize".to_owned())
-            })?;
-            entries
-                .try_reserve(object.messages.len())
-                .map_err(|_error| {
-                    Error::Common(litchi_iwa_common::Error::Allocation {
-                        resource: "Numbers object index entries",
-                        amount: object.messages.len(),
-                    })
-                })?;
-            entries.extend(object.messages.iter().map(|message| Entry {
-                identifier,
-                message_type: message.type_,
-            }));
+        if object_count > max_objects {
+            return Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::Objects,
+                observed: object_count,
+                maximum: max_objects,
+                path: SemanticPath::Package,
+            });
         }
-        entries.sort_unstable_by_key(|entry| (entry.message_type, entry.identifier));
+
+        let mut locators = Vec::new();
+        locators.try_reserve_exact(object_count).map_err(|_error| {
+            Error::Common(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers object locators",
+                amount: object_count,
+            })
+        })?;
+        let mut primary_entries = Vec::new();
+        primary_entries
+            .try_reserve_exact(object_count)
+            .map_err(|_error| {
+                Error::Common(litchi_iwa_common::Error::Allocation {
+                    resource: "Numbers primary object types",
+                    amount: object_count,
+                })
+            })?;
+
+        for (component_index, component_entry) in components.catalog.iter().enumerate() {
+            let component = u32::try_from(component_index).map_err(|_error| {
+                Error::InvalidFormat("Numbers component count exceeds compact indexing".to_owned())
+            })?;
+            for (object_index, object_entry) in component_entry.archive().objects.iter().enumerate()
+            {
+                let identifier = object_entry.archive_info.identifier.ok_or_else(|| {
+                    Error::InvalidFormat("Numbers IWA object has no identifier".to_owned())
+                })?;
+                let object = u32::try_from(object_index).map_err(|_error| {
+                    Error::InvalidFormat(
+                        "Numbers component object count exceeds compact indexing".to_owned(),
+                    )
+                })?;
+                locators.push(ObjectLocator {
+                    identifier,
+                    component,
+                    object,
+                });
+                if let Some(message) = object_entry.messages.first() {
+                    primary_entries.push(Entry {
+                        identifier,
+                        primary_message_type: message.type_,
+                    });
+                }
+            }
+        }
+
+        locators.sort_unstable_by_key(|locator| locator.identifier);
+        if locators
+            .windows(2)
+            .any(|pair| pair[0].identifier == pair[1].identifier)
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers package contains duplicate object identities".to_owned(),
+            ));
+        }
+        primary_entries
+            .sort_unstable_by_key(|entry| (entry.primary_message_type, entry.identifier));
         Ok(Self {
-            entries: entries.into_boxed_slice(),
-            object_count,
+            locators: locators.into_boxed_slice(),
+            primary_entries: primary_entries.into_boxed_slice(),
         })
     }
 
     pub(super) fn object_count(&self) -> usize {
-        self.object_count
+        self.locators.len()
     }
 
     pub(super) fn iter_entries_by_type(
@@ -76,12 +124,12 @@ impl Index {
         message_type: u32,
     ) -> impl Iterator<Item = Entry> + '_ {
         let start = self
-            .entries
-            .partition_point(|entry| entry.message_type < message_type);
+            .primary_entries
+            .partition_point(|entry| entry.primary_message_type < message_type);
         let end = self
-            .entries
-            .partition_point(|entry| entry.message_type <= message_type);
-        self.entries[start..end].iter().copied()
+            .primary_entries
+            .partition_point(|entry| entry.primary_message_type <= message_type);
+        self.primary_entries[start..end].iter().copied()
     }
 
     pub(super) fn resolve_ref<'a>(
@@ -97,7 +145,25 @@ impl Index {
         components: &'a Components,
         identifier: u64,
     ) -> Result<Option<Resolved<'a>>> {
-        Ok(components.find_object(identifier).map(|object| Resolved {
+        let Ok(position) = self
+            .locators
+            .binary_search_by_key(&identifier, |locator| locator.identifier)
+        else {
+            return Ok(None);
+        };
+        let locator = self.locators[position];
+        let component_index = usize::try_from(locator.component).map_err(|_error| {
+            Error::InvalidFormat("Numbers object locator is invalid".to_owned())
+        })?;
+        let object_index = usize::try_from(locator.object).map_err(|_error| {
+            Error::InvalidFormat("Numbers object locator is invalid".to_owned())
+        })?;
+        let object = components
+            .catalog
+            .get_index(component_index)
+            .and_then(|component| component.archive().objects.get(object_index))
+            .ok_or_else(|| Error::InvalidFormat("Numbers object locator is invalid".to_owned()))?;
+        Ok(Some(Resolved {
             messages: &object.messages,
         }))
     }

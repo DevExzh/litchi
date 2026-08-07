@@ -28,9 +28,16 @@ impl DecodedSheet {
         }
     }
 
-    /// Adds an archive-decoded table to the adapter.
-    pub(super) fn add_table(&mut self, table: Table) {
+    /// Adds an archive-decoded table without relying on infallible growth.
+    pub(super) fn try_add_table(&mut self, table: Table) -> super::Result<()> {
+        self.tables.try_reserve(1).map_err(|_error| {
+            super::Error::Common(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers rooted sheet tables",
+                amount: self.tables.len().saturating_add(1),
+            })
+        })?;
         self.tables.push(table);
+        Ok(())
     }
 
     /// Borrows the native sheet name without exposing archive state.
@@ -63,7 +70,13 @@ impl DecodedSheet {
     }
 
     /// Returns the number of addressable cells across all native tables.
-    #[cfg_attr(not(test), allow(dead_code))]
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "Retained for native table-budget accounting once callers migrate to the format-owned adapter."
+        )
+    )]
     pub(super) fn total_cell_count(&self) -> usize {
         self.tables
             .iter()

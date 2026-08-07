@@ -8001,6 +8001,198 @@ fn detached_table_models_are_not_exposed_or_writable() {
 }
 
 #[test]
+fn focused_structured_projection_preserves_detached_table_compatibility() {
+    let mut package = two_sheet_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let root = archive.object_mut(1).unwrap();
+            let mut document = tn::DocumentArchive::decode(root.messages[0].data.as_slice())?;
+            document.sheets.remove(0);
+            root.replace_message(
+                0,
+                RawMessage {
+                    type_: 1,
+                    data: document.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let bytes = package.to_bytes().unwrap();
+
+    let focused = litchi_numbers::Package::from_bytes(&bytes).unwrap();
+    assert_eq!(focused.sheets().len(), 1);
+    assert_eq!(focused.sheets()[0].tables().len(), 0);
+
+    let focused_tables = focused.extract_structured_tables().unwrap();
+    let legacy = crate::Document::from_bytes(&bytes)
+        .unwrap()
+        .extract_structured_data()
+        .unwrap();
+    assert_eq!(focused_tables.as_slice(), legacy.tables());
+    assert_eq!(focused_tables.len(), 1);
+}
+
+#[test]
+#[allow(
+    deprecated,
+    reason = "parity fixture exercises the migration-host table builder"
+)]
+fn focused_structured_projection_preserves_global_order_not_drawable_order() {
+    let mut editor = NumbersEditor::from_package(two_sheet_package()).unwrap();
+    editor
+        .add_empty_table(test_sheet_selector(&editor, 2), "Later model", 2, 2)
+        .unwrap();
+    let mut drawable_order = editor.sheet_drawable_order(2).unwrap();
+    assert_eq!(drawable_order.len(), 2);
+    drawable_order.reverse();
+    editor.set_sheet_drawable_order(2, &drawable_order).unwrap();
+    let bytes = editor.to_bytes().unwrap();
+
+    let focused = litchi_numbers::Package::from_bytes(&bytes).unwrap();
+    let rooted_names = focused.sheets()[0]
+        .tables()
+        .map(litchi_numbers::Table::name)
+        .collect::<Vec<_>>();
+    let focused_tables = focused.extract_structured_tables().unwrap();
+    let global_names = focused_tables
+        .iter()
+        .map(litchi_numbers::Table::name)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        rooted_names,
+        global_names.iter().rev().copied().collect::<Vec<_>>()
+    );
+
+    let legacy = crate::Document::from_bytes(&bytes)
+        .unwrap()
+        .extract_structured_data()
+        .unwrap();
+    assert_eq!(focused_tables.as_slice(), legacy.tables());
+
+    let mut reordered = editor.into_package();
+    reordered
+        .update_archive("Index/Document.iwa", |archive| {
+            archive.objects.reverse();
+            Ok(())
+        })
+        .unwrap();
+    let reordered = litchi_numbers::Package::from_bytes(&reordered.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reordered.extract_structured_tables().unwrap(),
+        focused_tables
+    );
+}
+
+#[test]
+#[allow(
+    deprecated,
+    reason = "parity fixture exercises the migration-host table builder"
+)]
+fn focused_structured_projection_prioritizes_canonical_models_before_legacy_models() {
+    let mut editor = NumbersEditor::from_package(two_sheet_package()).unwrap();
+    let created = editor
+        .add_empty_table(test_sheet_selector(&editor, 2), "Canonical model", 2, 2)
+        .unwrap();
+    let mut package = editor.into_package();
+    let locations = object_locations(&package).unwrap();
+    let archive_name = locations[&created.object_id].clone();
+    package
+        .update_archive(&archive_name, |archive| {
+            let object = archive.object_mut(created.object_id).unwrap();
+            let payload = object.messages[0].data.clone();
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: 6_001,
+                    data: payload.clone(),
+                },
+            )?;
+            object.push_message(RawMessage {
+                type_: 6_000,
+                data: payload,
+            })?;
+            Ok(())
+        })
+        .unwrap();
+    let bytes = package.to_bytes().unwrap();
+
+    let focused = litchi_numbers::Package::from_bytes(&bytes).unwrap();
+    let tables = focused.extract_structured_tables().unwrap();
+    assert_eq!(
+        tables
+            .iter()
+            .map(litchi_numbers::Table::name)
+            .collect::<Vec<_>>(),
+        ["Canonical model", "Table 1"]
+    );
+    let legacy = crate::Document::from_bytes(&bytes)
+        .unwrap()
+        .extract_structured_data()
+        .unwrap();
+    assert_eq!(tables.as_slice(), legacy.tables());
+}
+
+#[test]
+#[allow(
+    deprecated,
+    reason = "limit fixture exercises the migration-host table builder"
+)]
+fn focused_structured_projection_checks_exact_and_exceeded_table_budgets() {
+    let mut editor = NumbersEditor::from_package(two_sheet_package()).unwrap();
+    editor
+        .add_empty_table(test_sheet_selector(&editor, 2), "Second model", 2, 2)
+        .unwrap();
+    let mut package = editor.into_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let root = archive.object_mut(1).unwrap();
+            let mut document = tn::DocumentArchive::decode(root.messages[0].data.as_slice())?;
+            document.sheets.clear();
+            root.replace_message(
+                0,
+                RawMessage {
+                    type_: 1,
+                    data: document.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let bytes = package.to_bytes().unwrap();
+
+    let semantic = |max_tables| {
+        litchi_numbers::PackageSemanticLimits::new(
+            litchi_numbers::MAX_OBJECTS,
+            litchi_numbers::MAX_SHEETS,
+            max_tables,
+            litchi_numbers::MAX_REFERENCES,
+        )
+        .unwrap()
+    };
+    let options = |max_tables| {
+        litchi_numbers::PackageReadOptions::new(
+            litchi_numbers::PackageLimits::default(),
+            semantic(max_tables),
+        )
+    };
+
+    let exact = litchi_numbers::Package::from_bytes_with_options(&bytes, options(2)).unwrap();
+    assert_eq!(exact.extract_structured_tables().unwrap().len(), 2);
+
+    let exceeded = litchi_numbers::Package::from_bytes_with_options(&bytes, options(1)).unwrap();
+    assert!(matches!(
+        exceeded.extract_structured_tables(),
+        Err(litchi_numbers::PackageError::SemanticLimit {
+            kind: litchi_numbers::SemanticLimitKind::Tables,
+            observed: 2,
+            maximum: 1,
+            path: litchi_numbers::PackageSemanticPath::StructuredTables,
+        })
+    ));
+}
+
+#[test]
 fn creates_independent_empty_table_on_an_existing_sheet() {
     let mut package = two_sheet_package();
     package

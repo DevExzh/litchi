@@ -6947,3 +6947,55 @@ and complete allocation-envelope preflight for ignored nested generated fields
 still depends on the physical message ceiling. Most legacy Keynote mutations,
 examples, fuzz targets, and parity tests remain in `litchi-iwa`. The monolith
 deletion gate therefore remains open.
+
+## 2026-08-08 Numbers rooted/global table parity gate
+
+`litchi-numbers::Package` now distinguishes the ordinary rooted workbook from
+the historical global structured-table projection. Rooted decoding requires
+one canonical type-1 document, type-2 or type-3 sheets, and typed table-info
+owners; it preserves sheet/drawable order, ignores typed false positives under
+unrelated messages, and rejects duplicate sheet, drawable, or table-model
+ownership. The native type-6000 and fixture-backed legacy type-6003 table-info
+forms are explicit and mutually exclusive. Referenced table models prefer type
+6001 and use the legacy type-6000 fallback only when canonical ownership is
+absent.
+
+The allocating `extract_structured_tables` method replaces the host algorithm
+without changing ordinary semantics. It indexes only each object's first
+message, runs the type-6001 group before type 6000, sorts by identity inside
+each group, deduplicates candidates, includes valid physically retained
+orphans, errors on malformed preferred models, and skips type-6000 candidates
+that fail complete model extraction. The compact index counts objects before
+fallible exact reservation, stores one sorted locator plus at most one primary
+type entry per object, rejects cross-component duplicate identities, and uses
+binary search for reference lookup. New read options preserve archive limits
+and add hard-bounded object, sheet, table, and rooted-reference profiles with
+content-free semantic paths.
+
+Focused tests cover canonical root typing, duplicate payloads and identities,
+secondary-type exclusion, unrelated false positives, malformed preferred and
+legacy candidates, exact/exceeded object, sheet, and rooted-reference budgets,
+and strict rooted ownership.
+Four migration-host differential tests cover detached models, reversed
+drawable/global order, canonical-before-legacy order with dual-kind
+deduplication, object-vector stability, and exact/exceeded structured table
+budgets. The public `read_numbers` example demonstrates sheet/table traversal
+and the explicitly separate compatibility view without accepting a raw ID.
+
+Computer Use authored and reopened the real Numbers workbook
+`/private/tmp/litchi-numbers-order-oracle-20260808.numbers`. It contains two
+reordered sheets, three named tables and marker cells, and a non-table text box.
+After the native Arrange operation, focused readback reported rooted order
+`B-only-table`, `A-new-table`, `A-old-table` and compatibility order
+`B-only-table`, `A-old-table`, `A-new-table`; the final file is 133,740 bytes with
+SHA-256
+`781181e89c655da5c92b677b9ba5c939c85379e7b33ccf10e3846fe8588f9c5b`.
+Numbers closed and reopened it without a repair or conversion prompt and
+retained both table markers and the reordered sheet/table UI.
+
+Remaining Numbers debt is explicit: the root structured facade has not yet
+been switched from `litchi-iwa`, the focused table decoder still materializes
+the wider generated Prost graph, aggregate sidecar allocations need deeper
+schema preflight, and nearly all mutation paths remain in the migration host.
+The focused order/orphan parity gate is therefore evidence for the next host
+edge removal, not a claim that the monolith may already be deleted.

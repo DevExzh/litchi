@@ -32,6 +32,25 @@ Transitional-compatible baseline unless explicitly pinned to Strict or another
 target. Format and flavor are content-derived, never inferred from a filename.
 Known incompatible extensions are typed errors; extensionless paths are valid.
 
+Numbers rooted traversal never treats successful protobuf decoding as type
+evidence. The document root must contain one type-1 payload, a referenced sheet
+must contain one type-2 or type-3 payload, and a table drawable must contain one
+recognized table-info payload. Canonical type 6000 and the fixture-backed
+legacy type 6003 table-info encodings are mutually exclusive at one owner.
+Referenced models prefer one type-6001 payload and accept one type-6000 legacy
+payload only when the canonical type is absent. Missing references, duplicate
+sheet/drawable/model ownership, duplicate typed payloads, ambiguous canonical
+and legacy ownership, and malformed known payloads fail before publication;
+valid table-info bytes under an unrelated message type remain opaque.
+
+The separate structured compatibility scan preserves its historical primary-
+message classification. A malformed preferred type-6001 model is an error,
+while a type-6000 candidate is emitted only after complete table extraction
+succeeds, allowing genuine table-info objects and malformed legacy false
+positives to be skipped. Secondary messages cannot promote an object into the
+global candidate set. These rules are parity behavior, not permission for the
+ordinary document graph to expose orphans.
+
 Structural identity changes traverse recognized incoming references as one
 atomic graph edit. References to the same document are updated; external-book
 references, VBA source text, and other inert external identities are not

@@ -39,7 +39,10 @@ pub use formula::{
 };
 pub use litchi_iwa_common::table::title::Settings;
 pub use package::{
-    Error as PackageError, Limits as PackageLimits, Package, Result as PackageResult,
+    Error as PackageError, Limits as PackageLimits, MAX_OBJECTS, MAX_REFERENCES, Package,
+    ReadOptions as PackageReadOptions, Result as PackageResult, SemanticLimitKind,
+    SemanticLimits as PackageSemanticLimits, SemanticLimitsError as PackageSemanticLimitsError,
+    SemanticPath as PackageSemanticPath,
 };
 pub use selector::{SheetSelector, TableSelector};
 pub use sheet::{Builder as SheetBuilder, SelectorError as TableSelectorError, Sheet};

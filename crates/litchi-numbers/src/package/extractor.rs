@@ -20,7 +20,7 @@
 
 use super::Components;
 use super::table::Table;
-use super::{Error, Result};
+use super::{Error, Result, SemanticLimitKind, SemanticPath};
 use super::{Index, Resolved};
 use crate::cell::FiniteF64;
 use crate::cell::Value as CellValue;
@@ -93,6 +93,15 @@ impl CellBudget {
 
 fn allocation_error(resource: &'static str, amount: usize) -> Error {
     Error::Common(litchi_iwa_common::Error::Allocation { resource, amount })
+}
+
+fn table_limit_error(observed: usize, maximum: usize) -> Error {
+    Error::SemanticLimit {
+        kind: SemanticLimitKind::Tables,
+        observed,
+        maximum,
+        path: SemanticPath::StructuredTables,
+    }
 }
 
 fn compact_table<T>(entries: impl IntoIterator<Item = (u32, T)>) -> Result<CompactTable<T>> {
@@ -264,7 +273,7 @@ impl<'a> TableDataExtractor<'a> {
     /// Extract all tables from the document
     pub(super) fn extract_all_tables(&self) -> Result<Vec<Table>> {
         let mut tables = Vec::new();
-        self.for_each_table(|table| {
+        self.for_each_table(usize::MAX, |table| {
             tables.try_reserve(1).map_err(|_| {
                 allocation_error("Numbers extracted table results", tables.len() + 1)
             })?;
@@ -280,9 +289,12 @@ impl<'a> TableDataExtractor<'a> {
     /// sparse cell and header buffers move into the leaf table, so this path
     /// avoids first allocating a `Vec<Table>` only to convert every
     /// element into a second result vector for structured extraction.
-    pub(super) fn extract_all_semantic_tables(&self) -> Result<Vec<crate::Table>> {
+    pub(super) fn extract_all_semantic_tables(
+        &self,
+        max_tables: usize,
+    ) -> Result<Vec<crate::Table>> {
         let mut tables = Vec::new();
-        self.for_each_table(|table| {
+        self.for_each_table(max_tables, |table| {
             tables.try_reserve(1).map_err(|_| {
                 allocation_error("Numbers semantic table results", tables.len() + 1)
             })?;
@@ -292,8 +304,13 @@ impl<'a> TableDataExtractor<'a> {
         Ok(tables)
     }
 
-    fn for_each_table(&self, mut visit: impl FnMut(Table) -> Result<()>) -> Result<()> {
+    fn for_each_table(
+        &self,
+        max_tables: usize,
+        mut visit: impl FnMut(Table) -> Result<()>,
+    ) -> Result<()> {
         let mut seen_objects = HashSet::new();
+        let mut table_count = 0usize;
 
         // Real packages index TableModelArchive as 6001. Older generated
         // fixtures may store the same payload under 6000, so the object
@@ -304,9 +321,18 @@ impl<'a> TableDataExtractor<'a> {
                 if !seen_objects.insert(entry.id()) {
                     continue;
                 }
+                if message_type == TABLE_MODEL_MESSAGE_TYPE && table_count >= max_tables {
+                    return Err(table_limit_error(table_count.saturating_add(1), max_tables));
+                }
                 if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())?
                     && let Some(table) = self.extract_table_from_object(&resolved)?
                 {
+                    table_count = table_count
+                        .checked_add(1)
+                        .ok_or_else(|| table_limit_error(usize::MAX, max_tables))?;
+                    if table_count > max_tables {
+                        return Err(table_limit_error(table_count, max_tables));
+                    }
                     visit(table)?;
                 }
             }
@@ -349,6 +375,58 @@ impl<'a> TableDataExtractor<'a> {
         }
 
         Ok(None)
+    }
+
+    /// Extract a table model reached through a schema-proven `TableInfo` edge.
+    ///
+    /// Rooted ownership is stricter than the global compatibility scan: one
+    /// canonical type-6001 payload is preferred, the legacy type-6000 payload
+    /// is accepted only when 6001 is absent, and duplicate candidates fail.
+    pub(super) fn extract_reachable_table_from_object(
+        &self,
+        object: &Resolved<'_>,
+        path: SemanticPath,
+    ) -> Result<Table> {
+        let mut typed = object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE);
+        if let Some(message) = typed.next() {
+            if typed.next().is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers {path} table model contains duplicate canonical payloads"
+                )));
+            }
+            let table_model =
+                tst::TableModelArchive::decode(message.data.as_slice()).map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "Numbers {path} table-model payload is malformed: {error}"
+                    ))
+                })?;
+            return self.parse_table_model(table_model);
+        }
+
+        let mut legacy = object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == 6_000);
+        let Some(message) = legacy.next() else {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers {path} table model has no recognized payload"
+            )));
+        };
+        if legacy.next().is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers {path} table model contains duplicate legacy payloads"
+            )));
+        }
+        let table_model =
+            tst::TableModelArchive::decode(message.data.as_slice()).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "Numbers {path} legacy table-model payload is malformed: {error}"
+                ))
+            })?;
+        self.parse_table_model(table_model)
     }
 
     /// Parse a TableModelArchive protobuf message
@@ -493,7 +571,7 @@ impl<'a> TableDataExtractor<'a> {
                 .filter(|message| message.type_ == 3056)
                 .map(|message| tsd::CommentStorageArchive::decode(message.data.as_slice()))
                 .collect::<std::result::Result<Vec<_>, _>>()
-                .map_err(Error::protobuf)?;
+                .map_err(|error| Error::protobuf(&error))?;
             let comment = comments.first().ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Object {storage_id} has no TSD comment-storage payload"
@@ -553,7 +631,7 @@ impl<'a> TableDataExtractor<'a> {
             .filter(|message| message.type_ == 6005 || message.type_ == 6201)
             .map(|message| tst::TableDataList::decode(message.data.as_slice()))
             .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(Error::protobuf)?;
+            .map_err(|error| Error::protobuf(&error))?;
         let mut matching = lists
             .into_iter()
             .filter(|list| list.list_type == list_type as i32);
@@ -613,7 +691,7 @@ impl<'a> TableDataExtractor<'a> {
                 )));
             }
             let segment = tst::TableDataListSegment::decode(segment_message.data.as_slice())
-                .map_err(Error::protobuf)?;
+                .map_err(|error| Error::protobuf(&error))?;
             validate_table_data_list_segment(reference.identifier, list_type, &segment)?;
             for entry in segment.entries {
                 if !keys.insert(entry.key) {

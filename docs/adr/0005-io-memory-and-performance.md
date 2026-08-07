@@ -123,6 +123,22 @@ bounded only by the physical message profile and require a later focused
 projection. No throughput or RSS improvement is claimed without a
 representative benchmark.
 
+The concrete Numbers package uses the same bounded lookup shape without
+sharing Keynote's format graph. It counts all component objects before exact
+fallible reservation, stores one compact `(identifier, component, object)`
+locator and at most one primary-message classification per object, rejects
+duplicate global identities, sorts both arrays once, and resolves later
+references by binary search. This replaces package-wide linear object lookup
+and the previous one-index-entry-per-message amplification. Checked read
+options combine physical archive limits with non-zero hard-bounded ceilings for
+objects, rooted sheets, semantic tables, and rooted reference occurrences.
+Sheet/reference/table counts are charged before their semantic result vectors
+grow; structured table output is fallibly reserved one item at a time under
+the same table ceiling. Legacy type-6000 model discrimination still requires a
+complete bounded parse because genuine type-6000 table-info payloads are valid
+false positives; the object and physical message ceilings bound that fallback
+until its schema family receives a lazy Buffa projection.
+
 Core archive metadata is projected into core-owned `FieldPath`, `FieldInfo`,
 and closed-enum wrappers. Optional presence and unknown signed enum values are
 retained exactly. Preflight charges both the transient Buffa representation and
