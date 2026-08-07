@@ -739,8 +739,7 @@ impl Workbook {
                 matches!(
                     relationship.reltype(),
                     relationship_type::TABLE | relationship_type::STRICT_TABLE
-                ) || relationship.reltype()
-                    == "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableSingleCells"
+                )
             }) {
                 if relationship.is_external() {
                     return Err(crate::package::error::Error::InvalidFormula(
@@ -749,9 +748,10 @@ impl Workbook {
                 }
                 let part = self.package.get_part(&relationship.target_partname()?)?;
                 let table = Self::parse_table_definition(part.blob(), sheet_index)?;
-                if tables.iter().any(|existing: &TableDefinition| {
-                    existing.table_id() == table.table_id()
-                }) {
+                if tables
+                    .iter()
+                    .any(|existing: &TableDefinition| existing.table_id() == table.table_id())
+                {
                     return Err(crate::package::error::Error::InvalidFormula(format!(
                         "duplicate workbook table ID {}",
                         table.table_id()

@@ -34,7 +34,7 @@ fn fixture_info() -> XmlMapInfo {
             preserve_format: true,
             data_binding: Some(XmlMapDataBinding {
                 data_binding_name: Some("inert binding".into()),
-                file_binding: Some(false),
+                file_binding: Some(true),
                 connection_id: Some(7),
                 file_binding_name: None,
                 load_mode: 1,
@@ -136,7 +136,7 @@ fn reads_libreoffice_unqualified_children_and_binding() {
 fn handles_strict_and_mce_fallback() {
     let strict = std::str::from_utf8(STRICT_NS).unwrap();
     let xml = format!(
-        r#"<MapInfo xmlns="{strict}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:u="urn:future" mc:Ignorable="u" SelectionNamespaces=""><Schema ID="s"><x:schema xmlns:x="urn:x"/></Schema><mc:AlternateContent><mc:Choice Requires="u"><u:Map/></mc:Choice><mc:Fallback><Map ID="1" Name="m" RootElement="r" SchemaID="s" ShowImportExportValidationErrors="0" AutoFit="1" Append="0" PreserveSortAFLayout="1" PreserveFormat="1"/></mc:Fallback></mc:AlternateContent></MapInfo>"#
+        r#"<MapInfo xmlns="{strict}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:u="urn:future" mc:Ignorable="u" SelectionNamespaces=""><Schema ID="s"><x:schema xmlns:x="urn:x"/></Schema><mc:AlternateContent><mc:Choice Requires="u"><u:Map/></mc:Choice><mc:Fallback><Map ID="1" Name="m" RootElement="r" SchemaID="s" ShowImportExportValidationErrors="false" AutoFit="true" Append="false" PreserveSortAFLayout="true" PreserveFormat="true"/></mc:Fallback></mc:AlternateContent></MapInfo>"#
     );
     let parsed = XmlMapInfo::parse(xml.as_bytes()).unwrap();
     assert_eq!(parsed.maps.len(), 1);
@@ -191,6 +191,37 @@ fn serializer_rejects_oversized_output_before_final_append() {
     assert_eq!(
         error.to_string(),
         "serialized custom XML maps part exceeds 32 MiB"
+    );
+}
+
+#[test]
+fn borrowed_codec_view_does_not_clone_large_opaque_payloads() {
+    let mut value = fixture_info();
+    value.schemas[0].payload_xml = Some(vec![b'x'; 4 * 1024 * 1024]);
+    value.maps[0].data_binding.as_mut().unwrap().payload_xml = Some(vec![b'y'; 4 * 1024 * 1024]);
+    let schema_payload = value.schemas[0].payload_xml.as_deref().unwrap();
+    let binding_payload = value.maps[0]
+        .data_binding
+        .as_ref()
+        .unwrap()
+        .payload_xml
+        .as_deref()
+        .unwrap();
+
+    let view = value.to_common_ref().unwrap();
+    assert_eq!(
+        view.schemas[0].payload_xml.unwrap().as_ptr(),
+        schema_payload.as_ptr()
+    );
+    assert_eq!(
+        view.maps[0]
+            .data_binding
+            .as_ref()
+            .unwrap()
+            .payload_xml
+            .unwrap()
+            .as_ptr(),
+        binding_payload.as_ptr()
     );
 }
 
@@ -368,7 +399,7 @@ fn package_with_source(conformance: XmlMapConformance) -> (OpcPackage, XmlMapInf
         std::str::from_utf8(NS).unwrap()
     };
     let raw = format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><MapInfo xmlns="{namespace}" xmlns:future="urn:litchi:future" SelectionNamespaces="xmlns:xs='http://www.w3.org/2001/XMLSchema'"><Schema ID="schema-1" SchemaRef="urn:litchi:example" Namespace="urn:litchi:example"><x:payload xmlns:x="urn:litchi:payload"><x:future marker="keep"/></x:payload></Schema><Map ID="1" Name="Example map" RootElement="example" SchemaID="schema-1" ShowImportExportValidationErrors="1" AutoFit="1" Append="0" PreserveSortAFLayout="1" PreserveFormat="1"><DataBinding DataBindingName="inert binding" FileBinding="0" ConnectionID="7" DataBindingLoadMode="1"><x:binding xmlns:x="urn:litchi:binding"/></DataBinding></Map></MapInfo>"#
+        r#"<?xml version="1.0" encoding="UTF-8"?><MapInfo xmlns="{namespace}" xmlns:future="urn:litchi:future" SelectionNamespaces="xmlns:xs='http://www.w3.org/2001/XMLSchema'"><Schema ID="schema-1" SchemaRef="urn:litchi:example" Namespace="urn:litchi:example"><x:payload xmlns:x="urn:litchi:payload"><x:future marker="keep"/></x:payload></Schema><Map ID="1" Name="Example map" RootElement="example" SchemaID="schema-1" ShowImportExportValidationErrors="true" AutoFit="true" Append="false" PreserveSortAFLayout="true" PreserveFormat="true"><DataBinding DataBindingName="inert binding" FileBinding="true" ConnectionID="7" DataBindingLoadMode="1"><x:binding xmlns:x="urn:litchi:binding"/></DataBinding></Map></MapInfo>"#
     );
     let parsed = XmlMapInfo::parse(raw.as_bytes()).unwrap();
     store_in_package(&mut package, &parsed, conformance).unwrap();

@@ -15,10 +15,10 @@ use litchi_opc::OpcPackage;
 /// XLSB workbook implementation
 #[allow(dead_code)]
 pub struct Workbook {
-    pub(super) package: OpcPackage,
+    pub(crate) package: OpcPackage,
     pub(super) worksheets: Vec<Worksheet>,
     pub(super) worksheet_rel_ids: Vec<Option<String>>,
-    pub(super) formula_context: Context,
+    pub(crate) formula_context: Context,
     pub(super) shared_strings: Vec<SharedString>,
     pub(super) styles: StylesTable,
     pub(super) calc: Props,

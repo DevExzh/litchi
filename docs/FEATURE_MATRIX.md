@@ -56,6 +56,41 @@ formulas, `PtgNameX` references, DDE/OLE, targets, macros, and controls are neve
 resolved, fetched, activated, or executed. New-workbook authoring refuses `PtgNameX`, while
 source data can remain inertly preserved.
 
+For XLSB Custom XML Maps, the shared typed SpreadsheetML `XmlMapInfo` catalog codec belongs to
+`litchi-ooxml-common`; it enforces caller-selected resource ceilings and Office collection,
+ID/reference, string, opaque-XML, and file-binding constraints. The XLSB MapInfo path strictly reads
+and canonically emits only `true`/`false` Boolean words, not numeric `1`/`0`. Unmodeled
+`SchemaLanguage` is semantically ignored but retained by unchanged same-conformance source patches;
+canonical/new output omits it. `litchi-xlsb` owns bounded package snapshots, BIFF12 ordinary-table
+and per-sheet single-cell bindings, fresh writer integration, and source-bound `Snapshot::edit`,
+`Commit`, and reversible `Patch` publication for [MS-XLSB] §§2.1.7.15, 2.1.7.46,
+2.4.202/555, 2.4.104/458, and 2.5.170/171. Reader limits separately bound common XML, each BIFF
+part, package/core traversal, and workbook-aggregate binding count and XPath units; transactions
+reuse those caller limits for drafts, serialization, aggregate validation, and commit. Relationship
+conformance must agree with the MapInfo root namespace. Package validation globally enforces
+Single Cell Tables ownership/no shared or orphan target, table relationship and unique-list-ID
+ownership, Boolean header/totals counts, authoritative `BrtWsDim`, at least one table data row,
+pairwise ordinary-table non-overlap, and ordinary-table/single-cell non-overlap with AutoFilter.
+MapInfo `ConnectionID` and table/single-cell `dwConnID` values are inert references whose External
+Data Connection must exist; they are never contacted or refreshed. Fresh writers preflight the same
+applicable graph before emitting MapInfo, mapped columns on existing XML tables, and at most one
+canonical Single Cell Tables part per sheet; canonical single-cell output uses `dwConnID=0`.
+Transactions can create/replace/remove a dependency-free catalog, edit maps/conformance, edit
+columns only in an already mapped table, and edit bindings only in an already present single-cell
+part; they do not create/remove that part, add a first binding to an otherwise unmodeled table, or
+remove an ordinary table part. Exact no-ops preserve bytes and signatures; changed publication is
+clone-staged through full workbook reparse, removes signatures, rejects stale semantic/owned graph
+state, and has an inverse for owned data/topology but not signatures. Because the vendored §2.1.7.46
+conversion contains a build-path placeholder instead of `Biff12SingleCellTablesGrammar.abnf`, the
+reader tolerates bounded opaque/FRT records around the known minimum structural sequence without a
+claim to the missing grammar. Ordinary-table changes retain unrelated bytes and ignored/reserved
+XML-property bits; canonical/new output zeros them, and opaque property changes are refused.
+Single-cell extra flag bits and valid unmodeled connection/totals metadata are readable and exactly
+preserved, but any changed edit to that noncanonical or opaque/FRT part is refused. XPath validation
+is syntactic only. There is no XML import/export, schema/XPath/XML evaluation, resolution,
+synchronization, or instance processing; no Custom XML Data Storage processing or external access;
+and no formula, macro, or control activation/execution.
+
 For BIFF8 array formulas, the XLS matrix records a strict typed `Array` owner/parser, complete
 rectangle and `PtgExp` Formula binding, bounded `Array`/`RgbExtra` preservation and validation,
 and required Formula-to-Array writer ordering. Conservative textual authoring accepts only its

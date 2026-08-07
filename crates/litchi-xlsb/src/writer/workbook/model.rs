@@ -49,6 +49,7 @@ pub struct WorkbookWriter {
     pub(super) connections: Option<crate::package::connections::Connections>,
     pub(super) external_links: Vec<crate::external_link::Link>,
     pub(super) pivot_caches: Vec<AuthoredPivotCache>,
+    pub(super) xml_maps: Option<crate::xml_maps::XmlMapInfo>,
     pub(super) vba: Option<Arc<Vec<u8>>>,
 }
 
@@ -96,6 +97,7 @@ impl WorkbookWriter {
             connections: None,
             external_links: Vec::new(),
             pivot_caches: Vec::new(),
+            xml_maps: None,
             vba: None,
         }
     }
@@ -244,6 +246,40 @@ impl WorkbookWriter {
     /// External links scheduled for authoring, in workbook support-link order.
     pub fn external_links(&self) -> &[crate::external_link::Link] {
         &self.external_links
+    }
+
+    /// Replace the workbook's inert Custom XML Maps catalog.
+    ///
+    /// Schemas, XPath strings, and data-binding metadata are validated and
+    /// stored only. No referenced resource is resolved, opened, or evaluated.
+    pub fn set_xml_maps(&mut self, value: crate::xml_maps::XmlMapInfo) -> Result<&mut Self> {
+        crate::xml_maps::validate_catalog(&value, crate::xml_maps::XmlMapLimits::DEFAULT)?;
+        crate::xml_maps::serialize_xml_map_info(
+            &value,
+            crate::xml_maps::XmlMapConformance::Transitional,
+        )?;
+        self.xml_maps = Some(value);
+        Ok(self)
+    }
+
+    /// Borrow the Custom XML Maps catalog scheduled for authoring.
+    pub fn xml_maps(&self) -> Option<&crate::xml_maps::XmlMapInfo> {
+        self.xml_maps.as_ref()
+    }
+
+    /// Compatibility alias for [`Self::xml_maps`].
+    pub fn xml_map_info(&self) -> Option<&crate::xml_maps::XmlMapInfo> {
+        self.xml_maps()
+    }
+
+    /// Remove and return the scheduled Custom XML Maps catalog.
+    pub fn clear_xml_maps(&mut self) -> Option<crate::xml_maps::XmlMapInfo> {
+        self.xml_maps.take()
+    }
+
+    /// Compatibility alias for [`Self::clear_xml_maps`].
+    pub fn clear_xml_map_info(&mut self) -> Option<crate::xml_maps::XmlMapInfo> {
+        self.clear_xml_maps()
     }
 
     /// Attach a PivotCache definition (MS-XLSB 2.1.7.38) to the workbook.

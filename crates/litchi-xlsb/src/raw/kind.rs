@@ -161,6 +161,8 @@ pub const SHR_FMLA: Kind = Kind(0x01AB);
 pub const TABLE: Kind = Kind(0x01AC);
 
 // Structured tables (ListObject stream, MS-XLSB 2.1.7.51)
+pub const BEGIN_SINGLE_CELLS: Kind = Kind(341);
+pub const END_SINGLE_CELLS: Kind = Kind(342);
 pub const BEGIN_LIST: Kind = Kind(343);
 pub const END_LIST: Kind = Kind(344);
 pub const BEGIN_LIST_COLS: Kind = Kind(345);

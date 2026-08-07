@@ -31,6 +31,7 @@ pub mod sparkline;
 pub mod styles;
 pub mod timeline;
 pub mod workbook;
+pub mod xml_maps;
 
 /// OPC resource limits used by XLSB package and workbook ingress.
 pub use litchi_opc::ReadLimits;

@@ -15,7 +15,14 @@ pub mod transaction;
 #[cfg(test)]
 mod tests;
 
-pub use model::{XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapSchema};
+pub use codec::{parse_xml_map_info, serialize_xml_map_info};
+pub use codec::{
+    parse_xml_map_info as parse_map_info, serialize_xml_map_info as serialize_map_info,
+};
+pub use model::{
+    DataBinding, XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapLimits,
+    XmlMapSchema, XmlSchema,
+};
 pub use package::{
     load_from_package, load_from_package_with_conformance, remove_from_package, store_in_package,
 };

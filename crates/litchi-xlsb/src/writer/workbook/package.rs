@@ -37,6 +37,11 @@ impl WorkbookWriter {
     /// * `writer` - A writer that implements `Write` and `Seek`
     pub fn save<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
         self.validate_formula_metadata()?;
+        let mut xml_maps_plan = crate::writer::xml_maps::stage(
+            self.xml_maps.as_ref(),
+            self.connections.as_ref(),
+            &self.worksheets,
+        )?;
         let mut package = OpcPackage::new();
 
         // Add document properties (required by Excel)
@@ -47,7 +52,7 @@ impl WorkbookWriter {
 
         // Add worksheets first so that shared_strings is fully populated before we
         // decide whether to create a sharedStrings part and relationship.
-        let formula_sheet_ranges = self.add_worksheet_parts(&mut package)?;
+        let formula_sheet_ranges = self.add_worksheet_parts(&mut package, &mut xml_maps_plan)?;
         self.add_chart_sheet_parts(&mut package)?;
 
         // Add shared strings table only if non-empty. Excel-generated empty XLSB
@@ -63,7 +68,19 @@ impl WorkbookWriter {
         // Finally add the workbook part (after worksheets / shared strings / styles)
         // so that relationships are created with full knowledge of which parts
         // actually exist.
-        self.add_workbook_part(&mut package, &formula_sheet_ranges)?;
+        self.add_workbook_part(
+            &mut package,
+            &formula_sheet_ranges,
+            xml_maps_plan.map_info_xml.is_some(),
+        )?;
+
+        if let Some(xml) = xml_maps_plan.map_info_xml.take() {
+            package.add_part(Box::new(BlobPart::new(
+                PackURI::new("/xl/xmlMaps.xml")?,
+                litchi_ooxml_common::spreadsheet_xml_maps::CONTENT_TYPE.to_string(),
+                xml,
+            )));
+        }
 
         for (index, link) in self.external_links.iter().enumerate() {
             let one_based_index = index.checked_add(1).ok_or_else(|| {
@@ -238,6 +255,7 @@ impl WorkbookWriter {
         &self,
         package: &mut OpcPackage,
         formula_sheet_ranges: &[(u32, u32)],
+        has_xml_maps: bool,
     ) -> Result<()> {
         // Create the workbook part with an empty blob first so that all
         // relationships are attached (with concrete IDs) before the workbook
@@ -293,6 +311,13 @@ impl WorkbookWriter {
                 "theme/theme1.xml",
             );
 
+            if has_xml_maps {
+                rels.get_or_add(
+                    litchi_ooxml_common::spreadsheet_xml_maps::REL,
+                    "xmlMaps.xml",
+                );
+            }
+
             // PivotCache Definition relationships; the BrtBeginPivotCacheID
             // records below carry these relationship IDs.
             for (index, cache) in self.pivot_caches.iter().enumerate() {
@@ -335,7 +360,11 @@ impl WorkbookWriter {
         Ok(())
     }
 
-    fn add_worksheet_parts(&mut self, package: &mut OpcPackage) -> Result<Vec<(u32, u32)>> {
+    fn add_worksheet_parts(
+        &mut self,
+        package: &mut OpcPackage,
+        xml_maps_plan: &mut crate::writer::xml_maps::XmlMapsWritePlan,
+    ) -> Result<Vec<(u32, u32)>> {
         let authored_pivot_tables = self.authored_pivot_tables();
         let worksheet_names = self
             .sheet_order
@@ -399,6 +428,7 @@ impl WorkbookWriter {
         let mut next_chart_index = 1usize;
         let mut next_image_index = 1usize;
         let mut next_pivot_table_index = 1usize;
+        let mut next_single_cell_index = 1usize;
         let write_result = (|| -> Result<()> {
             let mut supporting_links = reserved_vec(1, "sparkline supporting-link context")?;
             supporting_links.push(SupportingLink::SelfWorkbook);
@@ -562,18 +592,41 @@ impl WorkbookWriter {
                 let mut table_parts = Vec::new();
                 if !worksheet.tables().is_empty() {
                     let mut rel_ids = Vec::with_capacity(worksheet.tables().len());
-                    for table in worksheet.tables() {
+                    for table_ordinal in 0..worksheet.tables().len() {
                         let table_name = format!("tables/table{next_table_index}.bin");
                         next_table_index += 1;
                         rel_ids.push(sheet_part.relate_to(&format!("../{table_name}"), rel::TABLE));
                         table_parts.push(BlobPart::new(
                             PackURI::new(format!("/xl/{table_name}"))?,
                             "application/vnd.ms-excel.table".to_string(),
-                            crate::package::table::write::write_table_part(table)?,
+                            std::mem::take(
+                                &mut xml_maps_plan.worksheets[i].table_parts[table_ordinal],
+                            ),
                         ));
                     }
                     worksheet.table_rel_ids = rel_ids;
                 }
+
+                let single_cell_part = if let Some(bytes) =
+                    xml_maps_plan.worksheets[i].single_cells.take()
+                {
+                    let name = format!("tableSingleCells{next_single_cell_index}.bin");
+                    next_single_cell_index =
+                        next_single_cell_index.checked_add(1).ok_or_else(|| {
+                            Error::InvalidFormula("single-cell XML part index overflow".to_string())
+                        })?;
+                    sheet_part.relate_to(
+                            &format!("../tables/{name}"),
+                            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableSingleCells",
+                        );
+                    Some(BlobPart::new(
+                        PackURI::new(format!("/xl/tables/{name}"))?,
+                        "application/vnd.ms-excel.tableSingleCells".to_string(),
+                        bytes,
+                    ))
+                } else {
+                    None
+                };
 
                 // PivotTable definitions are related implicitly from their host
                 // worksheet and back to the exact workbook PivotCache definition.
@@ -721,6 +774,9 @@ impl WorkbookWriter {
                     package.add_part(Box::new(part));
                 }
                 for part in table_parts {
+                    package.add_part(Box::new(part));
+                }
+                if let Some(part) = single_cell_part {
                     package.add_part(Box::new(part));
                 }
                 for part in pivot_table_parts {

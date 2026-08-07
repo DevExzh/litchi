@@ -96,6 +96,10 @@ pub struct MutableWorksheet {
     pub(crate) formula_group_sources: BTreeMap<(u32, u32), String>,
     /// Structured tables (ListObjects) hosted on this sheet.
     pub(crate) tables: Vec<crate::package::table::Table>,
+    /// XML column bindings keyed to structured table IDs on this sheet.
+    pub(crate) mapped_tables: Vec<crate::xml_maps::MappedTable>,
+    /// Singleton XML mappings stored in this sheet's tableSingleCells part.
+    pub(crate) single_cell_mappings: Vec<crate::xml_maps::SingleCellBinding>,
     /// Losslessly preserved PivotTable definition parts hosted on this sheet.
     pub(crate) pivot_table_views: Vec<crate::pivot_view::Part>,
     /// Typed DrawingML charts anchored on this sheet.
@@ -151,6 +155,8 @@ impl MutableWorksheet {
             formula_groups: Vec::new(),
             formula_group_sources: BTreeMap::new(),
             tables: Vec::new(),
+            mapped_tables: Vec::new(),
+            single_cell_mappings: Vec::new(),
             pivot_table_views: Vec::new(),
             charts: Vec::new(),
             images: Vec::new(),
@@ -770,6 +776,132 @@ impl MutableWorksheet {
     /// The structured tables hosted on this sheet.
     pub fn tables(&self) -> &[crate::package::table::Table] {
         &self.tables
+    }
+
+    /// Add or replace XML column bindings for a structured table ID.
+    ///
+    /// The table and catalog dependencies are checked during save. This local
+    /// mutation first proves that the binding has a canonical bounded encoding.
+    pub fn set_mapped_table(&mut self, mapping: crate::xml_maps::MappedTable) -> Result<&mut Self> {
+        crate::xml_maps::serialize_table_bindings(&mapping, crate::xml_maps::Limits::DEFAULT)?;
+        if self
+            .single_cell_mappings
+            .iter()
+            .any(|existing| existing.table_id() == mapping.table_id())
+        {
+            return Err(Error::InvalidFormula(format!(
+                "XML list ID {} is already used by a single-cell mapping",
+                mapping.table_id()
+            )));
+        }
+        if let Some(index) = self
+            .mapped_tables
+            .iter()
+            .position(|existing| existing.table_id() == mapping.table_id())
+        {
+            self.mapped_tables[index] = mapping;
+        } else {
+            self.mapped_tables.push(mapping);
+        }
+        Ok(self)
+    }
+
+    /// XML table bindings in stable insertion order.
+    pub fn mapped_tables(&self) -> &[crate::xml_maps::MappedTable] {
+        &self.mapped_tables
+    }
+
+    /// Remove XML bindings for one structured table ID.
+    pub fn remove_mapped_table(&mut self, table_id: u32) -> Option<crate::xml_maps::MappedTable> {
+        self.mapped_tables
+            .iter()
+            .position(|mapping| mapping.table_id() == table_id)
+            .map(|index| self.mapped_tables.remove(index))
+    }
+
+    /// Clear every structured-table XML binding.
+    pub fn clear_mapped_tables(&mut self) -> bool {
+        let changed = !self.mapped_tables.is_empty();
+        self.mapped_tables.clear();
+        changed
+    }
+
+    /// Add or replace one singleton XML mapping by its workbook list ID.
+    pub fn set_single_cell_mapping(
+        &mut self,
+        mapping: crate::xml_maps::SingleCellBinding,
+    ) -> Result<&mut Self> {
+        crate::xml_maps::serialize_single_cells(
+            std::slice::from_ref(&mapping),
+            crate::xml_maps::Limits::DEFAULT,
+        )?;
+        let cell = mapping.cell();
+        if self
+            .mapped_tables
+            .iter()
+            .any(|existing| existing.table_id() == mapping.table_id())
+        {
+            return Err(Error::InvalidFormula(format!(
+                "XML list ID {} is already used by a mapped table",
+                mapping.table_id()
+            )));
+        }
+        if let Some(index) = self
+            .single_cell_mappings
+            .iter()
+            .position(|existing| existing.table_id() == mapping.table_id())
+        {
+            self.single_cell_mappings[index] = mapping;
+        } else {
+            self.single_cell_mappings.push(mapping);
+        }
+        self.max_row = self.max_row.max(cell.row());
+        self.max_col = self.max_col.max(cell.column());
+        Ok(self)
+    }
+
+    /// Singleton XML mappings in stable insertion order.
+    pub fn single_cell_mappings(&self) -> &[crate::xml_maps::SingleCellBinding] {
+        &self.single_cell_mappings
+    }
+
+    pub(crate) fn xml_mapping_overlaps_auto_filter(&self, row: u32, column: u32) -> bool {
+        self.auto_filter.as_ref().is_some_and(|filter| {
+            row >= filter.row_first
+                && row <= filter.row_last
+                && column >= filter.col_first
+                && column <= filter.col_last
+        })
+    }
+
+    pub(crate) fn xml_table_overlaps_auto_filter(
+        &self,
+        range: &crate::package::table::Range,
+    ) -> bool {
+        self.auto_filter.as_ref().is_some_and(|filter| {
+            range.first_row <= filter.row_last
+                && range.last_row >= filter.row_first
+                && range.first_column <= filter.col_last
+                && range.last_column >= filter.col_first
+        })
+    }
+
+    /// Remove one singleton XML mapping by its workbook list ID.
+    pub fn remove_single_cell_mapping(
+        &mut self,
+        table_id: u32,
+    ) -> Option<crate::xml_maps::SingleCellBinding> {
+        self.single_cell_mappings
+            .iter()
+            .position(|mapping| mapping.table_id() == table_id)
+            .map(|index| self.single_cell_mappings.remove(index))
+    }
+
+    /// Clear every singleton XML mapping.
+    pub fn clear_single_cell_mappings(&mut self) -> bool {
+        let changed = !self.single_cell_mappings.is_empty();
+        self.single_cell_mappings.clear();
+        changed
     }
 
     /// Attach a losslessly preserved PivotTable definition part to this sheet.

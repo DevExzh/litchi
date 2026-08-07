@@ -327,7 +327,7 @@ impl Workbook {
             })
     }
 
-    pub(in crate::workbook) fn worksheet_uri(&self, index: usize) -> Result<litchi_opc::PackURI> {
+    pub(crate) fn worksheet_uri(&self, index: usize) -> Result<litchi_opc::PackURI> {
         let name = self
             .formula_context
             .worksheet_names

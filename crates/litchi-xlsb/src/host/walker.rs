@@ -189,6 +189,7 @@ fn paired_end(record_type: Kind) -> Option<Kind> {
         rt::BEGIN_PN_PAIR => rt::END_PN_PAIR,
         rt::BEGIN_ITEM_UNIQUE_NAMES => rt::END_ITEM_UNIQUE_NAMES,
         // Table stream (2.1.7.51).
+        rt::BEGIN_SINGLE_CELLS => rt::END_SINGLE_CELLS,
         rt::BEGIN_LIST_COLS => rt::END_LIST_COLS,
         rt::BEGIN_LIST_COL => rt::END_LIST_COL,
         rt::BEGIN_LIST_XML_CPR => rt::END_LIST_XML_CPR,

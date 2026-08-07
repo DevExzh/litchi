@@ -279,10 +279,19 @@ impl Workbook {
         data: &[u8],
         sheet_index: usize,
     ) -> Result<TableDefinition> {
+        // Extension content is inert and source-owned by the XML Maps codec.
+        // A fixed stack bounds adversarial nesting without allocating in this
+        // formula-context discovery pass.
+        const MAX_XML_EXTENSION_DEPTH: usize = 64;
+
         let mut table_header: Option<(u32, String, usize)> = None;
         let mut expected_columns = None;
         let mut columns = Vec::new();
         let mut in_column = false;
+        let mut in_xml_properties = false;
+        let mut saw_xml_properties = false;
+        let mut xml_extension_stack = [kind::FRT_BEGIN; MAX_XML_EXTENSION_DEPTH];
+        let mut xml_extension_depth = 0usize;
         let mut ended_columns = false;
         let mut ended_table = false;
         let mut iter = Records::new(data);
@@ -292,6 +301,66 @@ impl Workbook {
                 return Err(crate::package::error::Error::InvalidFormula(
                     "XLSB table part contains records after BrtEndList".to_string(),
                 ));
+            }
+            if in_xml_properties {
+                match record.kind() {
+                    kind::FRT_BEGIN | kind::AC_BEGIN => {
+                        if xml_extension_depth == MAX_XML_EXTENSION_DEPTH {
+                            return Err(crate::package::error::Error::InvalidFormula(
+                                "BrtBeginListXmlCPr extension nesting exceeds 64".to_string(),
+                            ));
+                        }
+                        xml_extension_stack[xml_extension_depth] = record.kind();
+                        xml_extension_depth += 1;
+                    },
+                    kind::FRT_END | kind::AC_END => {
+                        let Some(depth) = xml_extension_depth.checked_sub(1) else {
+                            return Err(crate::package::error::Error::InvalidFormula(
+                                "unmatched extension end in BrtBeginListXmlCPr".to_string(),
+                            ));
+                        };
+                        let begin = xml_extension_stack[depth];
+                        let expected = if begin == kind::FRT_BEGIN {
+                            kind::FRT_END
+                        } else {
+                            kind::AC_END
+                        };
+                        if record.kind() != expected {
+                            return Err(crate::package::error::Error::InvalidFormula(
+                                "mismatched extension wrapper in BrtBeginListXmlCPr".to_string(),
+                            ));
+                        }
+                        xml_extension_depth = depth;
+                    },
+                    kind::END_LIST_XML_CPR if xml_extension_depth == 0 => {
+                        if !record.payload().is_empty() {
+                            return Err(crate::package::error::Error::InvalidFormula(
+                                "nonempty BrtEndListXmlCPr".to_string(),
+                            ));
+                        }
+                        in_xml_properties = false;
+                    },
+                    kind::BEGIN_LIST
+                    | kind::END_LIST
+                    | kind::BEGIN_LIST_COLS
+                    | kind::END_LIST_COLS
+                    | kind::BEGIN_LIST_COL
+                    | kind::END_LIST_COL
+                    | kind::BEGIN_LIST_XML_CPR
+                        if xml_extension_depth == 0 =>
+                    {
+                        return Err(crate::package::error::Error::InvalidFormula(
+                            "table structure occurs inside BrtBeginListXmlCPr".to_string(),
+                        ));
+                    },
+                    _ => {
+                        // Unknown records and all records inside balanced FRT/AC
+                        // wrappers are deliberately left to the source-owning
+                        // XML Maps codec. This pass neither executes nor drops
+                        // their bytes.
+                    },
+                }
+                continue;
             }
             match record.kind() {
                 kind::BEGIN_LIST => {
@@ -334,6 +403,22 @@ impl Workbook {
                     }
                     columns.push(Self::parse_table_column(record.payload(), columns.len())?);
                     in_column = true;
+                    saw_xml_properties = false;
+                },
+                kind::BEGIN_LIST_XML_CPR => {
+                    if !in_column || saw_xml_properties {
+                        return Err(crate::package::error::Error::InvalidFormula(
+                            "BrtBeginListXmlCPr occurs outside a column or is duplicated"
+                                .to_string(),
+                        ));
+                    }
+                    in_xml_properties = true;
+                    saw_xml_properties = true;
+                },
+                kind::END_LIST_XML_CPR => {
+                    return Err(crate::package::error::Error::InvalidFormula(
+                        "unmatched BrtEndListXmlCPr".to_string(),
+                    ));
                 },
                 kind::END_LIST_COL => {
                     if !in_column || !record.payload().is_empty() {

@@ -42,6 +42,7 @@ mod shared_strings;
 /// Styles writer (fonts, fills, borders, number formats)
 pub(crate) mod shape;
 mod styles;
+mod xml_maps;
 
 /// Mutable worksheet with CRUD operations
 mod worksheet;
