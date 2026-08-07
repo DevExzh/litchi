@@ -147,6 +147,19 @@ jobs:
       - name: Check if code is compilable
         run: cargo check --workspace --all-targets --all-features
 
+      - name: Check minimal font and PPT capability boundaries
+        run: |
+          for package in litchi-docx litchi-ppt litchi-pptx; do
+            cargo check -p "$package" --no-default-features
+            cargo check -p "$package" --no-default-features --features fonts
+            cargo check -p "$package" --no-default-features --features font-subset
+            cargo check -p "$package" --no-default-features --features font-discovery
+            cargo check -p "$package" --no-default-features --features automatic-fonts
+          done
+          cargo check -p litchi --no-default-features --features ppt
+          cargo check -p litchi --no-default-features --features ppt,fonts
+          cargo check -p litchi --no-default-features --features ppt,sign
+
       - name: Check if code adheres to best practices
         run: cargo clippy --workspace --all-targets --all-features --no-deps -- -D warnings
 

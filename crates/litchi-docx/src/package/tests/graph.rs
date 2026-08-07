@@ -232,7 +232,7 @@ fn unchanged_stream_preserves_exact_bytes_and_part_payload_sharing() {
     ));
 }
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 #[test]
 fn raw_opc_rejects_automatic_font_embedding_policy() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();

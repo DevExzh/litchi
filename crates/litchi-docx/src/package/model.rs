@@ -125,7 +125,7 @@ pub struct Package {
     /// Whether the custom-property facade has unmaterialized changes.
     pub(super) custom_props_dirty: bool,
     /// Optional managed font-publication policy.
-    #[cfg(feature = "fonts")]
+    #[cfg(feature = "automatic-fonts")]
     pub(super) font_embedding: Option<litchi_fonts::embedding::Mode>,
     /// Encryption profile of the opened outer package, retained to prevent an
     /// accidental plaintext downgrade on save.
@@ -181,12 +181,12 @@ impl WriteRollbackGuard {
     }
 }
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 use litchi_core::id::generate_guid_bytes;
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 use litchi_fonts::CollectGlyphs;
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 impl Package {
     pub(super) fn embed_fonts(&mut self) -> Result<()> {
         let Some(mode) = self.font_embedding else {
@@ -211,7 +211,7 @@ impl Package {
     }
 }
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 impl Package {
     pub(super) fn embed_fonts_for_document(&mut self, document: &MutableDocument) -> Result<()> {
         let Some(mode) = self.font_embedding else {
@@ -256,7 +256,7 @@ impl Package {
     }
 }
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 fn merge_word_font(
     table: &mut font::Table,
     prepared: litchi_fonts::Prepared,
@@ -316,7 +316,7 @@ fn merge_word_font(
     Ok(true)
 }
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 fn word_face_matches(
     font: &font::Font,
     style: font::Style,
@@ -354,7 +354,7 @@ fn word_face_matches(
     Ok(decoded_prefix == clear_prefix && encoded.get(32..) == clear.get(32..))
 }
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 fn word_style(value: litchi_fonts::Style) -> font::Style {
     match value {
         litchi_fonts::Style::Regular => font::Style::Regular,
@@ -364,7 +364,7 @@ fn word_style(value: litchi_fonts::Style) -> font::Style {
     }
 }
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 fn word_family(value: litchi_fonts::Family) -> font::Family {
     match value {
         litchi_fonts::Family::Auto => font::Family::Auto,
@@ -376,7 +376,7 @@ fn word_family(value: litchi_fonts::Family) -> font::Family {
     }
 }
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 fn word_pitch(value: litchi_fonts::Pitch) -> font::Pitch {
     match value {
         litchi_fonts::Pitch::Default => font::Pitch::Default,
@@ -385,12 +385,12 @@ fn word_pitch(value: litchi_fonts::Pitch) -> font::Pitch {
     }
 }
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 fn word_signature(value: litchi_fonts::Signature) -> font::Signature {
     font::Signature::new(*value.unicode(), *value.code_pages())
 }
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 fn word_font_conformance(package: &OpcPackage) -> Result<font::Conformance> {
     const STRICT: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument";
     let mut relationships = package.rels().iter().filter(|relationship| {
@@ -414,7 +414,7 @@ fn word_font_conformance(package: &OpcPackage) -> Result<font::Conformance> {
     })
 }
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 fn ensure_word_font_settings(
     package: &mut OpcPackage,
     conformance: font::Conformance,
@@ -657,7 +657,7 @@ impl Package {
     }
 
     /// Select the font publication policy used by managed save operations.
-    #[cfg(feature = "fonts")]
+    #[cfg(feature = "automatic-fonts")]
     pub fn set_font_embedding(&mut self, mode: litchi_fonts::embedding::Mode) -> Result<&mut Self> {
         if self.mutable_doc.is_none() {
             return Err(Error::UnsafeEdit {
@@ -671,14 +671,14 @@ impl Package {
     }
 
     /// Select the font publication policy and return this package by value.
-    #[cfg(feature = "fonts")]
+    #[cfg(feature = "automatic-fonts")]
     pub fn with_font_embedding(mut self, mode: litchi_fonts::embedding::Mode) -> Result<Self> {
         self.set_font_embedding(mode)?;
         Ok(self)
     }
 
     /// Disable managed font publication for subsequent saves.
-    #[cfg(feature = "fonts")]
+    #[cfg(feature = "automatic-fonts")]
     pub fn clear_font_embedding(&mut self) -> &mut Self {
         self.font_embedding = None;
         self

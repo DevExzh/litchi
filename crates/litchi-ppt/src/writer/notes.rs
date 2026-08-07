@@ -305,7 +305,34 @@ impl NotesContainerBuilder {
         // Mark as notes body placeholder (type 12 per MS-PPT 2.9.39)
         notes_shape.placeholder_type = Some(12); // PT_NotesBody
         if !self.notes.text.is_empty() {
-            notes_shape.text = Some(self.notes.text_content());
+            let mut paragraphs = self.notes.text.clone();
+            if paragraphs
+                .iter()
+                .flat_map(|paragraph| &paragraph.runs)
+                .any(|run| {
+                    run.international_east_asian_font_index.is_some()
+                        || run.complex_script_font_index.is_some()
+                })
+            {
+                let mut mappings = Vec::new();
+                for (ordinal, run) in paragraphs
+                    .iter_mut()
+                    .flat_map(|paragraph| &mut paragraph.runs)
+                    .enumerate()
+                {
+                    run.style.pp9_run_id = Some(
+                        u8::try_from(ordinal % 16)
+                            .expect("a modulo-16 run identifier always fits u8"),
+                    );
+                    mappings.push(super::smart_tags::ShapeTextExtensionRun {
+                        smart_tags: Vec::new(),
+                        international_east_asian_font: run.international_east_asian_font_index,
+                        complex_script_font: run.complex_script_font_index,
+                    });
+                }
+                notes_shape.smart_tag_runs = Some(mappings);
+            }
+            notes_shape.paragraphs = Some(paragraphs);
         }
 
         let shapes = vec![notes_shape];

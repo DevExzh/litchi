@@ -1,11 +1,18 @@
 //! Contextual authoring operations for the PPT semantic writer model.
 
+#[cfg(feature = "encryption")]
+use super::WriterEncryption;
 use super::{
     HyperlinkCollection, Pictures, ShapeProperties, ShapeType, TextAlignment, WritableShape,
-    WritableSlide, WriteError, Writer, WriterEncryption, WriterModifyPassword,
+    WritableSlide, WriteError, Writer, WriterModifyPassword,
 };
 use crate::animation::AnimationInfo;
+#[cfg(feature = "encryption")]
 use crate::encryption::{EncryptionProfile, validate_writer_password};
+use crate::font::{
+    EmbeddedFont, Facet as FontFacet, Font, FontCollection, FontCollections, FontEmbeddingFlags,
+    Scope as FontScope,
+};
 use crate::header_footer::{
     HeaderFooter, HeaderFooterParent, HeaderFooterParentOrdinal, HeaderFooterScope,
 };
@@ -52,7 +59,7 @@ impl Writer {
             slide_height: height,
             blip_store: Pictures::new(),
             hyperlinks: HyperlinkCollection::new(),
-            fonts: vec![FontEntity::arial()], // Default font
+            fonts: default_font_collections(),
             sound_resources: BTreeMap::new(),
             next_sound_resource_id: 21,
             custom_shows: Vec::new(),
@@ -62,6 +69,7 @@ impl Writer {
             presentation_header_footer: None,
             notes_and_handouts_header_footer: None,
             main_master_header_footer: None,
+            #[cfg(feature = "encryption")]
             encryption: None,
             modify_password: None,
             vba_project: None,
@@ -71,6 +79,7 @@ impl Writer {
     /// Protect the generated presentation with CryptoAPI password-to-open encryption.
     ///
     /// Validation is atomic: invalid input leaves any previous setting unchanged.
+    #[cfg(feature = "encryption")]
     pub fn set_password(
         &mut self,
         password: impl Into<String>,
@@ -83,16 +92,19 @@ impl Writer {
     }
 
     /// Remove password-to-open protection and wipe the stored password.
+    #[cfg(feature = "encryption")]
     pub fn clear_password(&mut self) {
         self.encryption = None;
     }
 
     /// Return the configured encryption profile without exposing the password.
+    #[cfg(feature = "encryption")]
     pub fn encryption_profile(&self) -> Option<EncryptionProfile> {
         self.encryption.as_ref().map(|value| value.profile)
     }
 
     /// Configure a complete inert VBA project with safe limits and zlib storage.
+    #[cfg(feature = "vba-inspection")]
     pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<(), WriteError> {
         self.set_vba_with(
             project,
@@ -105,6 +117,7 @@ impl Writer {
     ///
     /// The inner CFB and optional outer zlib stream are fully serialized before
     /// writer state changes. Module source is never compiled or executed.
+    #[cfg(feature = "vba-inspection")]
     pub fn set_vba_with(
         &mut self,
         project: litchi_vba::build::Project,
@@ -116,6 +129,7 @@ impl Writer {
     }
 
     /// Configure an already validated inert VBA project using zlib storage.
+    #[cfg(feature = "vba-inspection")]
     pub fn put_vba(&mut self, payload: litchi_vba::Payload) -> Result<(), WriteError> {
         self.put_vba_with(payload, crate::VbaProjectCompression::Zlib)
     }
@@ -123,6 +137,7 @@ impl Writer {
     /// Configure an already validated inert VBA project with explicit storage.
     ///
     /// Import standalone CFB bytes through [`litchi_vba::Payload::read`] first.
+    #[cfg(feature = "vba-inspection")]
     pub fn put_vba_with(
         &mut self,
         payload: litchi_vba::Payload,
@@ -165,11 +180,13 @@ impl Writer {
     }
 
     /// Remove the configured VBA project and its persisted metadata.
+    #[cfg(feature = "vba-inspection")]
     pub fn clear_vba(&mut self) {
         self.vba_project = None;
     }
 
     /// Whether a complete VBA project is configured for output.
+    #[cfg(feature = "vba-inspection")]
     pub fn has_vba(&self) -> bool {
         self.vba_project.is_some()
     }
@@ -1037,11 +1054,207 @@ impl Writer {
         Ok(())
     }
 
-    /// Add a font to the font collection and return its index
+    /// Add a font to the base collection and return its ordinal.
+    ///
+    /// This compatibility method refuses invalid or over-capacity additions and
+    /// returns `u16::MAX`. New code should use [`Self::add_font_checked`] so the
+    /// validation error is retained.
     pub fn add_font(&mut self, font: FontEntity) -> u16 {
-        let index = self.fonts.len() as u16;
-        self.fonts.push(font);
-        index
+        self.add_font_checked(font).unwrap_or(u16::MAX)
+    }
+
+    /// Atomically add a legacy writer font to the base collection.
+    pub fn add_font_checked(&mut self, font: FontEntity) -> Result<u16, WriteError> {
+        self.add_font_model(FontScope::Base, font.into())
+    }
+
+    /// Atomically add a typed font to the selected collection.
+    ///
+    /// The collection is serialized before publication, enforcing the 129-font
+    /// limit, exact UTF-16 face-name rules, reserved authoring bits, facet order,
+    /// and aggregate embedded-font limits.
+    pub fn add_font_model(&mut self, scope: FontScope, font: Font) -> Result<u16, WriteError> {
+        let mut candidate = self
+            .fonts
+            .collection(scope)
+            .cloned()
+            .unwrap_or_else(|| FontCollection::new(scope));
+        if candidate.len() >= 129 {
+            return Err(WriteError::InvalidData(
+                "PowerPoint font collection exceeds the 129-font format limit".to_string(),
+            ));
+        }
+        let index = candidate
+            .try_push(font)
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
+        candidate
+            .to_record_bytes()
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
+        match scope {
+            FontScope::Base => self.fonts.base = Some(candidate),
+            FontScope::International => self.fonts.international = Some(candidate),
+        }
+        Ok(index)
+    }
+
+    /// Atomically add or replace one inert EOT facet.
+    pub fn set_embedded_font(
+        &mut self,
+        scope: FontScope,
+        index: u16,
+        facet: FontFacet,
+        data: impl Into<crate::font::SharedFontData>,
+    ) -> Result<Option<EmbeddedFont>, WriteError> {
+        let mut candidate = self.fonts.collection(scope).cloned().ok_or_else(|| {
+            WriteError::InvalidData(format!("PowerPoint {scope:?} font collection is absent"))
+        })?;
+        let replaced = candidate
+            .set_facet(index, facet, data)
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
+        candidate
+            .to_record_bytes()
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
+        match scope {
+            FontScope::Base => self.fonts.base = Some(candidate),
+            FontScope::International => self.fonts.international = Some(candidate),
+        }
+        Ok(replaced)
+    }
+
+    /// Prepare and atomically publish one inert PowerPoint EOT font facet.
+    ///
+    /// The facet is derived from `font.style`. This validates the actual
+    /// OpenType `OS/2.fsType`, enforces the explicit document intent and EOT
+    /// bounds, and never installs, loads, renders, or executes the font.
+    #[cfg(feature = "fonts")]
+    pub fn set_prepared_font(
+        &mut self,
+        scope: FontScope,
+        index: u16,
+        font: &mut crate::font::PreparedFont,
+        intent: crate::font::EotIntent,
+        limits: crate::font::EotLimits,
+    ) -> Result<Option<EmbeddedFont>, WriteError> {
+        self.set_prepared_font_with_limits(
+            scope,
+            index,
+            font,
+            intent,
+            limits,
+            crate::font::Limits::default(),
+        )
+    }
+
+    /// Prepare and atomically publish an inert EOT facet under explicit PPT
+    /// record and aggregate-font limits.
+    #[cfg(feature = "fonts")]
+    pub fn set_prepared_font_with_limits(
+        &mut self,
+        scope: FontScope,
+        index: u16,
+        font: &mut crate::font::PreparedFont,
+        intent: crate::font::EotIntent,
+        eot_limits: crate::font::EotLimits,
+        ppt_limits: crate::font::Limits,
+    ) -> Result<Option<EmbeddedFont>, WriteError> {
+        let facet = crate::font::prepared::facet_for_style(font.style);
+        let subsetted = font.subsetted;
+        self.fonts
+            .validate_with_limits(ppt_limits)
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
+        let mut collection = self.fonts.collection(scope).cloned().ok_or_else(|| {
+            WriteError::InvalidData(format!("PowerPoint {scope:?} font collection is absent"))
+        })?;
+        collection
+            .to_record_bytes_with_limits(ppt_limits)
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
+        let current = collection.get(index).ok_or_else(|| {
+            WriteError::InvalidData(format!("unknown PowerPoint font ordinal {index}"))
+        })?;
+        if current
+            .embedded_fonts
+            .iter()
+            .any(|embedded| embedded.style != facet as u8)
+            && current.embedded_subset != subsetted
+        {
+            return Err(WriteError::InvalidData(
+                "one PowerPoint face cannot mix subsetted and complete embedded facets".into(),
+            ));
+        }
+
+        let data = litchi_fonts::embedding::powerpoint::encode(font, intent, eot_limits).map_err(
+            |error| WriteError::InvalidData(format!("font preparation failed: {error}")),
+        )?;
+        let replaced = crate::font::prepared::stage_facet(&mut collection, index, facet, data);
+        let current = collection
+            .get_mut(index)
+            .expect("font ordinal was checked before EOT encoding");
+        current.embedded_subset = subsetted;
+        if subsetted {
+            current.font_flags |= 1;
+        } else {
+            current.font_flags &= !1;
+        }
+        let mut candidate = self.fonts.clone();
+        match scope {
+            FontScope::Base => candidate.base = Some(collection),
+            FontScope::International => candidate.international = Some(collection),
+        }
+        if let Err(error) = candidate.validate_with_limits(ppt_limits) {
+            if let Err(restore) = crate::font::prepared::restore_staged(
+                font,
+                &mut candidate,
+                scope,
+                index,
+                facet,
+                eot_limits,
+            ) {
+                return Err(WriteError::InvalidData(format!(
+                    "prepared-font rollback invariant failed: {restore}"
+                )));
+            }
+            return Err(WriteError::InvalidData(error.to_string()));
+        }
+        let serialized = candidate
+            .collection(scope)
+            .expect("staged collection remains available")
+            .to_record_bytes_with_limits(ppt_limits);
+        if let Err(error) = serialized {
+            if let Err(restore) = crate::font::prepared::restore_staged(
+                font,
+                &mut candidate,
+                scope,
+                index,
+                facet,
+                eot_limits,
+            ) {
+                return Err(WriteError::InvalidData(format!(
+                    "prepared-font rollback invariant failed: {restore}"
+                )));
+            }
+            return Err(WriteError::InvalidData(error.to_string()));
+        }
+        self.fonts = candidate;
+        Ok(replaced)
+    }
+
+    /// Set or clear the PowerPoint 10 document-wide embedding flags.
+    pub fn set_font_embedding_flags(
+        &mut self,
+        flags: Option<FontEmbeddingFlags>,
+    ) -> Result<(), WriteError> {
+        let mut candidate = self.fonts.clone();
+        candidate.embedding_flags = flags;
+        candidate
+            .powerpoint10_records()
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
+        self.fonts = candidate;
+        Ok(())
+    }
+
+    /// Return the complete inert font catalog configured for fresh output.
+    pub const fn font_collections(&self) -> &FontCollections {
+        &self.fonts
     }
 
     /// Set slide notes (simple text)
@@ -1121,7 +1334,15 @@ impl Writer {
 
     /// Get number of fonts in the presentation
     pub fn font_count(&self) -> usize {
-        self.fonts.len()
+        self.fonts.base_font_count()
+    }
+
+    /// Get the number of PowerPoint 10 international fonts.
+    pub fn international_font_count(&self) -> usize {
+        self.fonts
+            .international
+            .as_ref()
+            .map_or(0, FontCollection::len)
     }
 
     /// Register an exact embedded WAV or AIFF resource for interactions or animations.
@@ -1271,5 +1492,16 @@ impl Writer {
 impl Default for Writer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+fn default_font_collections() -> FontCollections {
+    let mut base = FontCollection::new(FontScope::Base);
+    base.try_push(FontEntity::arial().into())
+        .expect("the built-in Arial font is valid");
+    FontCollections {
+        base: Some(base),
+        international: None,
+        embedding_flags: None,
     }
 }

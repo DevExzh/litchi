@@ -4,7 +4,7 @@ use super::directory::SlideDirectory;
 use super::types::Slide;
 use crate::consts::RecordType;
 use crate::odraw::ShapeExt as _;
-use crate::package::{Error, Result};
+use crate::package::{Error, RecordLimits, Result};
 use crate::persist::PersistMapping;
 use crate::records::Record;
 use crate::shapes::ShapeEnum;
@@ -32,8 +32,21 @@ pub(crate) struct NotesIndex {
 }
 
 impl NotesIndex {
+    #[cfg(all(test, feature = "vba-inspection"))]
+    #[allow(
+        dead_code,
+        reason = "retained for focused presentation fixture construction"
+    )]
     pub(crate) fn build(document_data: &[u8], slide_directory: &SlideDirectory) -> Self {
-        match Self::try_build(document_data, slide_directory) {
+        Self::build_with_limits(document_data, slide_directory, RecordLimits::default())
+    }
+
+    pub(crate) fn build_with_limits(
+        document_data: &[u8],
+        slide_directory: &SlideDirectory,
+        limits: RecordLimits,
+    ) -> Self {
+        match Self::try_build_with_limits(document_data, slide_directory, limits) {
             Ok(index) => index,
             Err(error) => Self {
                 error: Some(error.to_string()),
@@ -42,14 +55,28 @@ impl NotesIndex {
         }
     }
 
+    #[cfg(test)]
     fn try_build(document_data: &[u8], slide_directory: &SlideDirectory) -> Result<Self> {
-        let (document, _) = Record::parse(document_data, slide_directory.document_offset())?;
+        Self::try_build_with_limits(document_data, slide_directory, RecordLimits::default())
+    }
+
+    fn try_build_with_limits(
+        document_data: &[u8],
+        slide_directory: &SlideDirectory,
+        limits: RecordLimits,
+    ) -> Result<Self> {
+        let (document, _) =
+            Record::parse_with_limits(document_data, slide_directory.document_offset(), limits)?;
         if document.record_type != RecordType::Document {
             return Err(Error::Corrupted(
                 "live document persist object is not a DocumentContainer".to_string(),
             ));
         }
         let mut index = Self::default();
+        index
+            .slide_ids
+            .try_reserve(slide_directory.entries().len())
+            .map_err(|_| Error::AllocationFailed("PPT notes slide index"))?;
         for entry in slide_directory.entries() {
             index.slide_ids.insert(entry.persist_id(), entry.slide_id());
         }
@@ -163,7 +190,11 @@ pub struct SpeakerNotes {
 }
 
 impl SpeakerNotes {
-    pub(crate) fn parse(descriptor: NoteDescriptor, document_data: &[u8]) -> Result<Self> {
+    pub(crate) fn parse_with_limits(
+        descriptor: NoteDescriptor,
+        document_data: &[u8],
+        limits: RecordLimits,
+    ) -> Result<Self> {
         if descriptor
             .offset
             .checked_add(8)
@@ -174,7 +205,7 @@ impl SpeakerNotes {
                 descriptor.offset
             )));
         }
-        let (record, _) = Record::parse(document_data, descriptor.offset)?;
+        let (record, _) = Record::parse_with_limits(document_data, descriptor.offset, limits)?;
         if record.record_type != RecordType::Notes || record.version != 0x0f || record.instance != 0
         {
             return Err(Error::Corrupted(format!(

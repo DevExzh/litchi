@@ -166,7 +166,7 @@ fn pp10_doc_extension_assigns_every_slot_and_round_trips_exactly() {
 
 #[test]
 fn pp10_doc_extension_allows_minimal_grammar() {
-    // Only the required GridSpacing10Atom.
+    // Only the optional GridSpacing10Atom.
     let payload = atom(0, RecordType::GridSpacing10Atom.as_u16(), &[0; 8]);
     let extension = DocBinaryTagExtension10::parse_records(parse_payload(&payload)).unwrap();
     assert!(extension.grid_spacing.is_some());
@@ -260,7 +260,7 @@ fn pp10_slide_extension_validates_linked_shape_count() {
 }
 
 #[test]
-fn grammars_reject_out_of_order_missing_required_and_trailing_records() {
+fn grammars_accept_optional_grid_and_reject_out_of_order_or_trailing_records() {
     // PP9 doc: OutlineTextProps9 before the broadcast array is out of order.
     let out_of_order = [
         container(RecordType::OutlineTextProps9.as_u16(), &[]),
@@ -269,9 +269,19 @@ fn grammars_reject_out_of_order_missing_required_and_trailing_records() {
     .concat();
     assert!(DocBinaryTagExtension9::parse_records(parse_payload(&out_of_order)).is_err());
 
-    // PP10 doc: the required GridSpacing10Atom is missing.
-    let missing_required = atom(0, RecordType::TextMasterStyle10Atom.as_u16(), &[0; 12]);
-    assert!(DocBinaryTagExtension10::parse_records(parse_payload(&missing_required)).is_err());
+    // PP10 doc: GridSpacing10Atom is genuinely optional.
+    let omitted_grid = atom(0, RecordType::TextMasterStyle10Atom.as_u16(), &[0; 12]);
+    let without_grid =
+        DocBinaryTagExtension10::parse_records(parse_payload(&omitted_grid)).unwrap();
+    assert!(without_grid.grid_spacing.is_none());
+
+    // PP10 doc: GridSpacing10Atom after the comment array is out of order.
+    let pp10_out_of_order = [
+        container(RecordType::CommentIndex10.as_u16(), &[]),
+        atom(0, RecordType::GridSpacing10Atom.as_u16(), &[0; 8]),
+    ]
+    .concat();
+    assert!(DocBinaryTagExtension10::parse_records(parse_payload(&pp10_out_of_order)).is_err());
 
     // PP10 doc: a ModifyPasswordAtom where the CopyrightAtom belongs.
     let wrong_instance = [

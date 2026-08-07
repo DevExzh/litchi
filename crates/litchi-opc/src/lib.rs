@@ -46,6 +46,7 @@ pub mod phys_pkg;
 pub mod pkgreader;
 pub mod pkgwriter;
 pub mod rel;
+#[cfg(feature = "sign")]
 pub mod sign;
 
 // Re-export commonly used types

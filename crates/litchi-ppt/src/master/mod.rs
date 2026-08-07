@@ -26,7 +26,7 @@ use crate::records::Record;
 impl Presentation {
     /// Enumerate the masters referenced by the live `DocumentContainer`.
     pub fn masters(&self) -> Result<Inventory<'_>> {
-        let records = self.parser.find_records_ref();
+        let records = self.parser.try_find_records_ref()?;
         let mut persisted = Vec::new();
         for (&persist_id, &offset) in self.persist_mapping.iter() {
             if persist_id == 0 {
@@ -35,12 +35,16 @@ impl Presentation {
             let offset = usize::try_from(offset).map_err(|_| {
                 crate::package::Error::Corrupted("persist offset exceeds usize".into())
             })?;
-            let (resolved, _) = Record::parse(self.document_stream(), offset)?;
+            let (resolved, _) =
+                Record::parse_with_limits(self.document_stream(), offset, self.record_limits)?;
             if let Some(record) = records
                 .iter()
                 .copied()
                 .find(|candidate| **candidate == resolved)
             {
+                persisted
+                    .try_reserve(1)
+                    .map_err(|_| crate::package::Error::AllocationFailed("PPT master index"))?;
                 persisted.push((persist_id, record));
             }
         }

@@ -15,6 +15,22 @@ fn ole_with_streams(streams: &[(&str, &[u8])]) -> Vec<u8> {
     writer.write_to(&mut output).unwrap();
     output.into_inner()
 }
+
+fn ole_with_path(path: &[&str]) -> Vec<u8> {
+    let mut writer = OleWriter::new();
+    writer.create_stream(path, b"opaque").unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn ole_with_storage(path: &[&str]) -> Vec<u8> {
+    let mut writer = OleWriter::new();
+    writer.create_storage(path).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
 #[test]
 fn generated_property_sets_round_trip_all_office_value_families() {
     let payload = b"untouched payload".to_vec();
@@ -156,9 +172,33 @@ fn mutations_are_atomic_ordered_and_noops_are_byte_exact() {
 }
 
 #[test]
-fn signed_and_encrypted_containers_are_rejected_without_execution() {
-    for name in ["EncryptionInfo", "\u{0005}DigitalSignature"] {
-        assert!(Editor::new(ole_with_streams(&[(name, b"opaque")])).is_err());
+fn protected_containers_are_rejected_at_root_and_nested_case_insensitively() {
+    for marker in [
+        "_xmlsignatures",
+        "_SIGNATURES",
+        "dIGITALsIGNATURE",
+        "\u{0005}dIGITALsIGNATURE",
+        "\u{0006}DATAsPACES",
+        "\u{0009}drmcontent",
+        "\u{0009}drmvIEWERcONTENT",
+        "ENCRYPTEDpACKAGE",
+        "eNCRYPTIONiNFO",
+    ] {
+        assert!(Editor::new(ole_with_path(&[marker])).is_err(), "{marker:?}");
+        assert!(
+            Editor::new(ole_with_path(&["Nested", marker, "Payload"])).is_err(),
+            "nested {marker:?}"
+        );
+    }
+}
+
+#[test]
+fn drm_viewer_content_storages_are_rejected_at_root_and_nested_case_insensitively() {
+    for path in [
+        &["\u{0009}DRMViewerContent"][..],
+        &["Nested", "\u{0009}drmvIEWERcONTENT"][..],
+    ] {
+        assert!(Editor::new(ole_with_storage(path)).is_err(), "{path:?}");
     }
 }
 

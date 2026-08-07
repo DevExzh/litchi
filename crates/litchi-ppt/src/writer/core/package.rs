@@ -5,7 +5,8 @@ use super::super::master_drawing::build_master_ppdrawing;
 use super::super::notes::{NotesContainerBuilder, NotesPage};
 use super::super::persist::{PersistPtrBuilder, UserEditAtom};
 use super::super::records::{
-    RecordBuilder, create_document_atom, create_end_document, create_environment_minimal,
+    RecordBuilder, create_document_atom_with_font_embedding, create_end_document,
+    create_environment_minimal, create_environment_with_font_collection,
     create_main_master_container, create_slide_list_with_text_master, record_type,
     wrap_dg_into_ppdrawing, wrap_dgg_into_ppdrawing_group,
 };
@@ -15,8 +16,103 @@ use super::codec::{
     convert_shape_to_escher_with_sound_mapping,
 };
 use super::model::{WriteError, Writer};
+#[cfg(feature = "encryption")]
 use crate::encryption::{encrypt_pictures_for_write, encrypt_powerpoint_document_for_write};
 use litchi_cfb::writer::OleWriter;
+
+pub(in crate::writer::core) struct FontPublicationPlan {
+    pub(in crate::writer::core) environment: Vec<u8>,
+    pub(in crate::writer::core) powerpoint10_records: Vec<Vec<u8>>,
+    pub(in crate::writer::core) save_with_fonts: bool,
+}
+
+impl Writer {
+    pub(in crate::writer::core) fn font_publication_plan(
+        &self,
+    ) -> Result<FontPublicationPlan, WriteError> {
+        let base_record = self
+            .fonts
+            .base_record_bytes()
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?
+            .ok_or_else(|| {
+                WriteError::InvalidData("PowerPoint base font collection is absent".to_string())
+            })?;
+        let environment = if self.has_historical_default_font_catalog() {
+            create_environment_minimal()?
+        } else {
+            create_environment_with_font_collection(&base_record)?
+        };
+        let powerpoint10_records = self
+            .fonts
+            .powerpoint10_records()
+            .map_err(|error| WriteError::InvalidData(error.to_string()))?;
+        Ok(FontPublicationPlan {
+            environment,
+            powerpoint10_records,
+            save_with_fonts: self.fonts.has_embedded_fonts(),
+        })
+    }
+
+    fn has_historical_default_font_catalog(&self) -> bool {
+        if self.fonts.international.is_some() || self.fonts.embedding_flags.is_some() {
+            return false;
+        }
+        let Some(base) = self.fonts.base.as_ref() else {
+            return false;
+        };
+        let [font] = base.fonts.as_slice() else {
+            return false;
+        };
+        font.index == 0
+            && font.raw_instance == 0
+            && font.name == "Arial"
+            && font.charset == 0
+            && font.font_flags == 0
+            && !font.embedded_subset
+            && font.font_type_flags == 0x04
+            && !font.raster
+            && !font.device
+            && font.truetype
+            && !font.no_substitution
+            && font.pitch_and_family == 0x22
+            && font.embedded_fonts.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod font_plan_tests {
+    use super::*;
+
+    #[test]
+    fn default_catalog_preserves_the_historical_environment_bytes() {
+        let writer = Writer::new();
+        let plan = writer.font_publication_plan().unwrap();
+        assert_eq!(plan.environment, create_environment_minimal().unwrap());
+        assert!(plan.powerpoint10_records.is_empty());
+        assert!(!plan.save_with_fonts);
+    }
+
+    #[test]
+    fn built_in_master_style_font_zero_is_validated_before_destinations_change() {
+        let mut writer = Writer::new();
+        writer.fonts.base = Some(crate::FontCollection::new(crate::FontScope::Base));
+
+        let mut output = std::io::Cursor::new(Vec::new());
+        assert!(writer.write_to(&mut output).is_err());
+        assert!(output.get_ref().is_empty());
+
+        let path = std::env::temp_dir().join(format!(
+            "litchi-ppt-invalid-master-font-{}-{}.ppt",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        assert!(writer.save(&path).is_err());
+        assert!(!path.exists());
+    }
+}
 
 /// Build a minimal, valid Current User stream referencing the given UserEditAtom offset.
 fn build_current_user_stream(offset_to_current_edit: u32, encrypted: bool) -> Vec<u8> {
@@ -131,8 +227,9 @@ impl Writer {
     /// - PersistPtr directory - [MS-PPT] Section 2.4.16
     pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), WriteError> {
         self.validate_encryption()?;
-        self.validate_smart_tag_references()?;
-        let modify_password_tag = self.build_modify_password_programmable_tag()?;
+        self.validate_references()?;
+        let font_plan = self.font_publication_plan()?;
+        let modify_password_atom = self.build_modify_password_atom()?;
         let header_footers = self.serialize_header_footers()?;
         // 1) We'll write DocumentContainer at stream offset 0
         let mut ppt_stream = Vec::new();
@@ -152,18 +249,18 @@ impl Writer {
         let mut doc_container = RecordBuilder::new(0x0F, 0, record_type::DOCUMENT);
 
         // 2.1) DocumentAtom
-        let doc_atom = create_document_atom(
+        let doc_atom = create_document_atom_with_font_embedding(
             self.slide_width as u32,
             self.slide_height as u32,
             self.slides.len() as u32,
             0,
             0,
+            font_plan.save_with_fonts,
         )?;
         doc_container.write_child(&doc_atom);
 
         // 2.2) Environment (with FontCollection)
-        let env = create_environment_minimal()?;
-        doc_container.write_child(&env);
+        doc_container.write_child(&font_plan.environment);
 
         // 2.3) PPDrawingGroup wrapping Dgg Escher
         // Calculate per-slide shape counts (group + background + user shapes)
@@ -193,7 +290,11 @@ impl Writer {
         doc_container.write_child(&slwt_master);
 
         // 2.4) DocInfo List (0x07D0) before SlideListWithText (slides), per POI empty_textbox.ppt
-        let docinfo = self.build_docinfo_list(vba_persist_id)?;
+        let docinfo = self.build_docinfo_list(
+            vba_persist_id,
+            &font_plan.powerpoint10_records,
+            modify_password_atom.as_deref(),
+        )?;
         doc_container.write_child(&docinfo);
 
         if let Some(value) = &header_footers.presentation_slides {
@@ -260,10 +361,6 @@ impl Writer {
             if !named_shows.is_empty() {
                 doc_container.write_child(&named_shows);
             }
-        }
-
-        if let Some(value) = &modify_password_tag {
-            doc_container.write_child(value);
         }
 
         // 2.6) EndDocument
@@ -444,12 +541,16 @@ impl Writer {
             ppt_stream.extend_from_slice(&record);
         }
 
-        let mut pictures_stream = if self.blip_store.is_empty() {
+        let pictures_stream = if self.blip_store.is_empty() {
             None
         } else {
             Some(self.blip_store.delay().map_err(WriteError::Io)?)
         };
+        #[cfg(feature = "encryption")]
+        let mut pictures_stream = pictures_stream;
+        #[cfg(feature = "encryption")]
         let encryption = self.prepare_encryption()?;
+        #[cfg(feature = "encryption")]
         let encryption_session_id = if let Some(encryption) = &encryption {
             let persist_id = persist_builder.allocate_id();
             let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
@@ -467,12 +568,15 @@ impl Writer {
         let persist_dir_block = persist_builder.generate_record();
         ppt_stream.extend_from_slice(&persist_dir_block);
 
-        let mut user_edit = UserEditAtom::new_minimal(
+        let user_edit = UserEditAtom::new_minimal(
             persist_dir_offset,
             doc_persist_id,
             persist_builder.persist_id_seed(),
             self.slides.len() as u32,
         );
+        #[cfg(feature = "encryption")]
+        let mut user_edit = user_edit;
+        #[cfg(feature = "encryption")]
         if let Some(session_id) = encryption_session_id {
             user_edit = user_edit.with_encryption_session(session_id);
         }
@@ -481,10 +585,15 @@ impl Writer {
         ppt_stream.extend_from_slice(&user_edit_record);
 
         // 5) Build Current User and property streams
-        let current_user = build_current_user_stream(user_edit_offset, encryption.is_some());
+        #[cfg(feature = "encryption")]
+        let encrypted = encryption.is_some();
+        #[cfg(not(feature = "encryption"))]
+        let encrypted = false;
+        let current_user = build_current_user_stream(user_edit_offset, encrypted);
         let summary_info = build_summary_information_stream();
         let doc_summary = build_document_summary_information_stream();
 
+        #[cfg(feature = "encryption")]
         if let (Some(encryption), Some(session_id)) = (&encryption, encryption_session_id) {
             encrypt_powerpoint_document_for_write(
                 &mut ppt_stream,
@@ -536,8 +645,9 @@ impl Writer {
         writer: &mut W,
     ) -> Result<(), WriteError> {
         self.validate_encryption()?;
-        self.validate_smart_tag_references()?;
-        let modify_password_tag = self.build_modify_password_programmable_tag()?;
+        self.validate_references()?;
+        let font_plan = self.font_publication_plan()?;
+        let modify_password_atom = self.build_modify_password_atom()?;
         let header_footers = self.serialize_header_footers()?;
         // Same logic as save(), but writing to provided writer
         let mut ppt_stream = Vec::new();
@@ -554,17 +664,17 @@ impl Writer {
 
         let mut doc_container = RecordBuilder::new(0x0F, 0, record_type::DOCUMENT);
 
-        let doc_atom = create_document_atom(
+        let doc_atom = create_document_atom_with_font_embedding(
             self.slide_width as u32,
             self.slide_height as u32,
             self.slides.len() as u32,
             0,
             0,
+            font_plan.save_with_fonts,
         )?;
         doc_container.write_child(&doc_atom);
         // 2.2) Environment (with FontCollection)
-        let env = create_environment_minimal()?;
-        doc_container.write_child(&env);
+        doc_container.write_child(&font_plan.environment);
 
         // 2.3) PPDrawingGroup wrapping Dgg Escher
         // Calculate per-slide shape counts (group + background + user shapes)
@@ -591,7 +701,11 @@ impl Writer {
         doc_container.write_child(&slwt_master);
 
         // DocInfo List before SlideListWithText (slides), matching POI empty_textbox.ppt
-        let docinfo = self.build_docinfo_list(vba_persist_id)?;
+        let docinfo = self.build_docinfo_list(
+            vba_persist_id,
+            &font_plan.powerpoint10_records,
+            modify_password_atom.as_deref(),
+        )?;
         doc_container.write_child(&docinfo);
 
         if let Some(value) = &header_footers.presentation_slides {
@@ -636,10 +750,6 @@ impl Writer {
             if !named_shows.is_empty() {
                 doc_container.write_child(&named_shows);
             }
-        }
-
-        if let Some(value) = &modify_password_tag {
-            doc_container.write_child(value);
         }
 
         let end_doc = create_end_document()?;
@@ -778,12 +888,16 @@ impl Writer {
             ppt_stream.extend_from_slice(&record);
         }
 
-        let mut pictures_stream = if self.blip_store.is_empty() {
+        let pictures_stream = if self.blip_store.is_empty() {
             None
         } else {
             Some(self.blip_store.delay().map_err(WriteError::Io)?)
         };
+        #[cfg(feature = "encryption")]
+        let mut pictures_stream = pictures_stream;
+        #[cfg(feature = "encryption")]
         let encryption = self.prepare_encryption()?;
+        #[cfg(feature = "encryption")]
         let encryption_session_id = if let Some(encryption) = &encryption {
             let persist_id = persist_builder.allocate_id();
             let offset = u32::try_from(ppt_stream.len()).map_err(|_| {
@@ -801,12 +915,15 @@ impl Writer {
         let persist_dir_block = persist_builder.generate_record();
         ppt_stream.extend_from_slice(&persist_dir_block);
 
-        let mut user_edit = UserEditAtom::new_minimal(
+        let user_edit = UserEditAtom::new_minimal(
             persist_dir_offset,
             doc_persist_id,
             persist_builder.persist_id_seed(),
             self.slides.len() as u32,
         );
+        #[cfg(feature = "encryption")]
+        let mut user_edit = user_edit;
+        #[cfg(feature = "encryption")]
         if let Some(session_id) = encryption_session_id {
             user_edit = user_edit.with_encryption_session(session_id);
         }
@@ -814,10 +931,15 @@ impl Writer {
         let user_edit_record = user_edit.generate_record();
         ppt_stream.extend_from_slice(&user_edit_record);
 
-        let current_user = build_current_user_stream(user_edit_offset, encryption.is_some());
+        #[cfg(feature = "encryption")]
+        let encrypted = encryption.is_some();
+        #[cfg(not(feature = "encryption"))]
+        let encrypted = false;
+        let current_user = build_current_user_stream(user_edit_offset, encrypted);
         let summary_info = build_summary_information_stream();
         let doc_summary = build_document_summary_information_stream();
 
+        #[cfg(feature = "encryption")]
         if let (Some(encryption), Some(session_id)) = (&encryption, encryption_session_id) {
             encrypt_powerpoint_document_for_write(
                 &mut ppt_stream,

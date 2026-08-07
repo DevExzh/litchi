@@ -195,6 +195,29 @@ pub fn create_document_atom(
     _notes_count: u32,
     _master_count: u32,
 ) -> Result<Vec<u8>, Error> {
+    create_document_atom_with_font_embedding(
+        slide_size_x_master,
+        slide_size_y_master,
+        _slide_count,
+        _notes_count,
+        _master_count,
+        false,
+    )
+}
+
+/// Create a `DocumentAtom` with an explicit `fSaveWithFonts` value.
+///
+/// The compatibility helper [`create_document_atom`] retains the historical
+/// `false` value. Fresh writers use this variant after validating the complete
+/// font catalog, so the flag cannot disagree with emitted embedded faces.
+pub(crate) fn create_document_atom_with_font_embedding(
+    slide_size_x_master: u32,
+    slide_size_y_master: u32,
+    _slide_count: u32,
+    _notes_count: u32,
+    _master_count: u32,
+    save_with_fonts: bool,
+) -> Result<Vec<u8>, Error> {
     // Match PowerPoint/POI files: recVer = 1, recInstance = 0, 40-byte payload
     let mut builder = RecordBuilder::new(0x01, 0, record_type::DOCUMENT_ATOM);
     let mut data = Vec::with_capacity(40);
@@ -218,7 +241,7 @@ pub fn create_document_atom(
     data.extend_from_slice(&1u16.to_le_bytes()); // firstSlideNum
     data.extend_from_slice(&0u16.to_le_bytes()); // slideSizeType = ON_SCREEN
     // flags bytes
-    data.push(0u8); // saveWithFonts
+    data.push(u8::from(save_with_fonts)); // saveWithFonts
     data.push(0u8); // omitTitlePlace
     data.push(0u8); // rightToLeft
     data.push(1u8); // showComments (visible comments, matches LibreOffice)
@@ -274,6 +297,31 @@ pub fn wrap_dg_into_ppdrawing(dg_blob_and_children: &[u8]) -> Result<Vec<u8>, Er
 
 /// Create a minimal Environment container with an empty FontCollection child.
 pub fn create_environment_minimal() -> Result<Vec<u8>, Error> {
+    let mut fc = RecordBuilder::new(0x0F, 0, record_type::FONT_COLLECTION);
+    let mut fea = RecordBuilder::new(0x00, 0, record_type::FONT_ENTITY_ATOM);
+    let mut fe_data = vec![0u8; 68];
+    for (i, ch) in "Arial\0".encode_utf16().enumerate() {
+        if i * 2 + 1 < 64 {
+            let bytes = ch.to_le_bytes();
+            fe_data[i * 2] = bytes[0];
+            fe_data[i * 2 + 1] = bytes[1];
+        }
+    }
+    fe_data[66] = 4;
+    fea.write_data(&fe_data);
+    fc.write_child(&fea.build()?);
+    create_environment_with_font_collection(&fc.build()?)
+}
+
+/// Create the canonical Environment around one checked base font collection.
+///
+/// `font_collection` must be one complete `FontCollectionContainer` record.
+/// Its bytes are inserted unchanged; all unrelated Environment children retain
+/// their historical order and values.
+pub(crate) fn create_environment_with_font_collection(
+    font_collection: &[u8],
+) -> Result<Vec<u8>, Error> {
+    validate_complete_record(font_collection, 0x0f, record_type::FONT_COLLECTION)?;
     // Environment container (1010)
     let mut env = RecordBuilder::new(0x0F, 0, record_type::ENVIRONMENT);
 
@@ -285,22 +333,8 @@ pub fn create_environment_minimal() -> Result<Vec<u8>, Error> {
     kinsoku.write_child(&kinsoku_atom.build()?);
     env.write_child(&kinsoku.build()?);
 
-    // 2) FontCollection container with FontEntityAtom (Arial)
-    let mut fc = RecordBuilder::new(0x0F, 0, record_type::FONT_COLLECTION);
-    let mut fea = RecordBuilder::new(0x00, 0, record_type::FONT_ENTITY_ATOM);
-    let mut fe_data = vec![0u8; 68];
-    // Write "Arial\0" as UTF-16LE into first 64 bytes
-    for (i, ch) in "Arial\0".encode_utf16().enumerate() {
-        if i * 2 + 1 < 64 {
-            let bytes = ch.to_le_bytes();
-            fe_data[i * 2] = bytes[0];
-            fe_data[i * 2 + 1] = bytes[1];
-        }
-    }
-    fe_data[66] = 4; // fontType = TrueType
-    fea.write_data(&fe_data);
-    fc.write_child(&fea.build()?);
-    env.write_child(&fc.build()?);
+    // 2) Caller-provided deterministic FontCollection container.
+    env.write_child(font_collection);
 
     // 3) TxCFStyleAtom (character formatting defaults)
     let mut txcf = RecordBuilder::new(0x00, 0, record_type::TX_CF_STYLE_ATOM);
@@ -392,6 +426,30 @@ pub(crate) fn create_docinfo_list_container_with_binary_tags<'a>(
     vba_info: VBAInfoAtom,
     additional_binary_tags: impl IntoIterator<Item = &'a [u8]>,
 ) -> Result<Vec<u8>, Error> {
+    create_docinfo_list_container_with_extensions(
+        slide_view_info,
+        notes_view_info,
+        vba_info,
+        std::iter::empty::<&[u8]>(),
+        None,
+        additional_binary_tags,
+    )
+}
+
+/// Create one DocInfo list whose single `DocProgTagsContainer` owns the
+/// canonical `___PPT10` payload and every additional versioned binary tag.
+///
+/// PowerPoint 10 font records are appended to the existing document extension
+/// payload rather than authored as a duplicate tag or duplicate ProgTags
+/// owner. Only the two font record kinds permitted by MS-PPT are accepted.
+pub(crate) fn create_docinfo_list_container_with_extensions<'a, 'b>(
+    slide_view_info: Option<&SlideViewInfo>,
+    notes_view_info: Option<&SlideViewInfo>,
+    vba_info: VBAInfoAtom,
+    ppt10_font_records: impl IntoIterator<Item = &'a [u8]>,
+    modify_password: Option<&[u8]>,
+    additional_binary_tags: impl IntoIterator<Item = &'b [u8]>,
+) -> Result<Vec<u8>, Error> {
     let mut list = RecordBuilder::new(0x0F, 0, record_type::DOC_INFO_LIST);
 
     // SheetProperties (1044) container with timestamp atom
@@ -435,7 +493,58 @@ pub(crate) fn create_docinfo_list_container_with_binary_tags<'a>(
     cstr.write_data(&Tag10::to_bytes());
     prog_bin.write_child(&cstr.build()?);
     let mut bin = RecordBuilder::new(0x00, 0, record_type::BINARY_TAG_DATA);
+    let mut collection = None;
+    let mut flags = None;
+    for record in ppt10_font_records {
+        let kind = complete_record_type(record)?;
+        match kind {
+            record_type::FONT_COLLECTION_10 if collection.is_none() && flags.is_none() => {
+                validate_complete_record(record, 0x0f, kind)?;
+                collection = Some(record);
+            },
+            record_type::FONT_EMBED_FLAGS_10_ATOM if flags.is_none() => {
+                validate_complete_record(record, 0x00, kind)?;
+                flags = Some(record);
+            },
+            record_type::FONT_COLLECTION_10 => {
+                return Err(Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "PowerPoint 10 font collection is duplicated or follows its flags",
+                ));
+            },
+            record_type::FONT_EMBED_FLAGS_10_ATOM => {
+                return Err(Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "PowerPoint 10 font embedding flags are duplicated",
+                ));
+            },
+            _ => {
+                return Err(Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "unsupported record in PowerPoint 10 font extension",
+                ));
+            },
+        }
+    }
+    if let Some(record) = collection {
+        bin.write_child(record);
+    }
+    // The canonical optional GridSpacing10Atom precedes embedding flags.
     bin.write_data(&BinaryTagData::DOCINFO.to_bytes());
+    if let Some(record) = flags {
+        bin.write_child(record);
+    }
+    if let Some(record) = modify_password {
+        validate_complete_record(record, 0x00, record_type::CSTRING)?;
+        let version_and_instance = u16::from_le_bytes([record[0], record[1]]);
+        if version_and_instance >> 4 != 3 {
+            return Err(Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "PowerPoint modify-password atom has an invalid record instance",
+            ));
+        }
+        bin.write_child(record);
+    }
     prog_bin.write_child(&bin.build()?);
     prog_tags.write_child(&prog_bin.build()?);
     for tag in additional_binary_tags {
@@ -445,6 +554,28 @@ pub(crate) fn create_docinfo_list_container_with_binary_tags<'a>(
     list.write_child(&prog_tags.build()?);
 
     list.build()
+}
+
+fn complete_record_type(record: &[u8]) -> Result<u16, Error> {
+    if record.len() < 8 {
+        return Err(Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "PowerPoint extension record is truncated",
+        ));
+    }
+    let payload_len = usize::try_from(u32::from_le_bytes(
+        record[4..8]
+            .try_into()
+            .expect("fixed four-byte record length"),
+    ))
+    .map_err(|_| Error::new(std::io::ErrorKind::InvalidInput, "record length overflows"))?;
+    if payload_len.checked_add(8) != Some(record.len()) {
+        return Err(Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "PowerPoint extension record length is inconsistent",
+        ));
+    }
+    Ok(u16::from_le_bytes([record[2], record[3]]))
 }
 
 /// Create the historical minimal DocInfo List with a default slide view.

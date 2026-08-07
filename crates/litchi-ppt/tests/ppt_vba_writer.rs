@@ -1,6 +1,12 @@
+#![cfg(feature = "vba-inspection")]
+
+#[cfg(feature = "encryption")]
+use litchi_ppt::OpenOptions;
 use litchi_ppt::embedded::storage::{Compression, Kind};
-use litchi_ppt::writer::{EncryptionProfile, Writer};
-use litchi_ppt::{OpenOptions, Package, VbaProjectCompression, VbaProjectError, VbaProjectLimits};
+#[cfg(feature = "encryption")]
+use litchi_ppt::writer::EncryptionProfile;
+use litchi_ppt::writer::Writer;
+use litchi_ppt::{Package, VbaProjectCompression, VbaProjectError, VbaProjectLimits};
 use litchi_vba::{
     Limits,
     build::{Module, Project},
@@ -141,6 +147,7 @@ fn failed_replacement_is_atomic_and_outer_limits_are_enforced() {
 }
 
 #[test]
+#[cfg(feature = "encryption")]
 fn project_remains_available_after_presentation_decryption() {
     let mut writer = Writer::new();
     writer.add_slide().unwrap();
@@ -157,6 +164,7 @@ fn project_remains_available_after_presentation_decryption() {
     let presentation = package
         .presentation_with_options(OpenOptions {
             password: Some("secret"),
+            ..OpenOptions::default()
         })
         .unwrap();
     let project = presentation.vba().unwrap().unwrap();

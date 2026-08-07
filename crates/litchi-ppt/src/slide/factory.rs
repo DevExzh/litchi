@@ -4,7 +4,7 @@ use crate::consts::RecordType;
 /// SlideFactory - Creates slides from persist mapping with zero-copy parsing.
 ///
 /// High-performance implementation using lifetimes to avoid data copying.
-use crate::package::{Error, Result};
+use crate::package::{Error, RecordLimits, Result};
 use crate::persist::PersistMapping;
 use crate::records::Record;
 use once_cell::unsync::OnceCell;
@@ -23,6 +23,7 @@ pub struct SlideFactory<'doc> {
     persist_mapping: &'doc PersistMapping,
     notes_index: OnceCell<NotesIndex>,
     slide_directory: &'doc SlideDirectory,
+    record_limits: RecordLimits,
 }
 
 impl<'doc> SlideFactory<'doc> {
@@ -33,11 +34,26 @@ impl<'doc> SlideFactory<'doc> {
         persist_mapping: &'doc PersistMapping,
         slide_directory: &'doc SlideDirectory,
     ) -> Self {
+        Self::new_with_limits(
+            doc_data,
+            persist_mapping,
+            slide_directory,
+            RecordLimits::default(),
+        )
+    }
+
+    pub(crate) fn new_with_limits(
+        doc_data: &'doc [u8],
+        persist_mapping: &'doc PersistMapping,
+        slide_directory: &'doc SlideDirectory,
+        record_limits: RecordLimits,
+    ) -> Self {
         Self {
             doc_data,
             persist_mapping,
             notes_index: OnceCell::new(),
             slide_directory,
+            record_limits,
         }
     }
 
@@ -89,7 +105,8 @@ impl<'doc> SlideFactory<'doc> {
         }
 
         // Parse the Slide record at this offset
-        let (record, _consumed) = Record::parse(self.doc_data, offset)?;
+        let (record, _consumed) =
+            Record::parse_with_limits(self.doc_data, offset, self.record_limits)?;
 
         if record.record_type != RecordType::Slide {
             return Err(Error::InvalidFormat(format!(
@@ -100,7 +117,13 @@ impl<'doc> SlideFactory<'doc> {
 
         let note_descriptor = self
             .notes_index
-            .get_or_init(|| NotesIndex::build(self.doc_data, self.slide_directory))
+            .get_or_init(|| {
+                NotesIndex::build_with_limits(
+                    self.doc_data,
+                    self.slide_directory,
+                    self.record_limits,
+                )
+            })
             .descriptor(&record, entry.persist_id(), self.persist_mapping);
 
         Ok(SlideData {
@@ -113,6 +136,7 @@ impl<'doc> SlideFactory<'doc> {
             record,
             doc_data: self.doc_data,
             note_descriptor,
+            record_limits: self.record_limits,
         })
     }
 
@@ -153,6 +177,7 @@ pub struct SlideData<'doc> {
     /// Reference to complete document data (for lazy shape parsing)
     doc_data: &'doc [u8],
     pub(crate) note_descriptor: std::result::Result<Option<NoteDescriptor>, String>,
+    pub(crate) record_limits: RecordLimits,
 }
 
 impl<'doc> SlideData<'doc> {
@@ -202,6 +227,7 @@ impl<'doc> SlideData<'doc> {
             record,
             doc_data,
             note_descriptor: Ok(None),
+            record_limits: RecordLimits::default(),
         }
     }
 }

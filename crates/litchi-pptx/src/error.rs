@@ -209,7 +209,7 @@ pub enum Error {
     CustomProperties(#[from] litchi_ooxml_common::Error),
 
     /// Optional system-font discovery, subsetting, or EOT preparation failed.
-    #[cfg(feature = "fonts")]
+    #[cfg(feature = "automatic-fonts")]
     #[error("PPTX font embedding error: {0}")]
     Font(#[from] litchi_fonts::FontError),
 

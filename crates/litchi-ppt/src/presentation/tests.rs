@@ -1,4 +1,5 @@
 use super::model::Presentation;
+use crate::Error;
 use crate::consts::RecordType;
 use crate::parsers::RecordParser;
 use crate::persist::PersistMapping;
@@ -26,6 +27,7 @@ fn record_bytes(version: u16, instance: u16, record_type: RecordType, data: &[u8
     bytes
 }
 
+#[cfg(feature = "vba-inspection")]
 fn presentation_with_vba_storage() -> Presentation {
     let mut atom_data = Vec::new();
     atom_data.extend_from_slice(&41u32.to_le_bytes());
@@ -53,7 +55,31 @@ fn presentation_with_vba_storage() -> Presentation {
         persist_mapping,
         slide_directory: SlideDirectory::new_for_test(0),
         pictures_data: None,
+        record_limits: crate::RecordLimits::default(),
     }
+}
+
+#[test]
+fn lazy_live_document_reuses_presentation_record_limits() {
+    let powerpoint_document = record_bytes(0x0f, 0, RecordType::Document, &[1]);
+    let mut persist_mapping = PersistMapping::new();
+    persist_mapping.add_mapping(1, 0);
+    let presentation = Presentation {
+        powerpoint_document,
+        parser: RecordParser::new(),
+        persist_mapping,
+        slide_directory: SlideDirectory::new_for_test(0),
+        pictures_data: None,
+        record_limits: crate::RecordLimits {
+            max_record_payload_bytes: 0,
+            ..crate::RecordLimits::default()
+        },
+    };
+
+    assert!(matches!(
+        presentation.live_document_record(),
+        Err(Error::ResourceLimit(_))
+    ));
 }
 
 fn named_shows(children: Vec<Record>) -> Record {
@@ -126,6 +152,7 @@ fn skips_named_show_without_name() {
 }
 
 #[test]
+#[cfg(feature = "vba-inspection")]
 fn vba_project_storage_returns_only_outer_metadata() {
     let presentation = presentation_with_vba_storage();
 

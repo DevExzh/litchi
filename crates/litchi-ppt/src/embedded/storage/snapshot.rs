@@ -195,6 +195,7 @@ impl Storage {
     }
 }
 
+#[allow(dead_code)]
 impl<'a> Ref<'a> {
     pub(crate) const fn snapshot(self) -> Snapshot<'a> {
         Snapshot::from_parts(

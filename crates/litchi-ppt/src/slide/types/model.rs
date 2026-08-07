@@ -26,6 +26,7 @@ impl<'doc> Slide<'doc> {
             round_trip_metadata: OnceCell::new(),
             notes_descriptor: data.note_descriptor,
             speaker_notes: OnceCell::new(),
+            record_limits: data.record_limits,
         }
     }
 }

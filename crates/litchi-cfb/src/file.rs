@@ -1657,6 +1657,15 @@ impl<R: Read + Seek> OleFile<R> {
         }
     }
 
+    /// Return a stream's declared length without materializing its contents.
+    pub fn stream_len(&self, path: &[&str]) -> Result<u64, OleError> {
+        let entry = self.find_entry(path)?;
+        if entry.entry_type != STGTY_STREAM {
+            return Err(OleError::InvalidFormat("Not a stream".to_string()));
+        }
+        Ok(entry.size)
+    }
+
     /// Find a directory entry by path
     fn find_entry(&self, path: &[&str]) -> Result<&DirectoryEntry, OleError> {
         if path.is_empty() {

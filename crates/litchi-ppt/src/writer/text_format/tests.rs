@@ -293,6 +293,9 @@ fn test_font_entity() {
     assert_eq!(data[66], 0x04);
     assert_eq!(data[67], 0x22);
 
-    let long = FontEntity::new("12345678901234567890123456789012").build();
-    assert_eq!(&long[62..64], &[0, 0]);
+    let exact_32 = FontEntity::new("12345678901234567890123456789012").build();
+    assert_eq!(&exact_32[62..64], &[b'2', 0]);
+
+    let canonical_31 = FontEntity::new("1234567890123456789012345678901").build();
+    assert_eq!(&canonical_31[62..64], &[0, 0]);
 }

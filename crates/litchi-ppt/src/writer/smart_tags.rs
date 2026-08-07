@@ -16,6 +16,15 @@ const MAX_STYLE_PAYLOAD_BYTES: usize = 1024 * 1024;
 const SPECIAL_INFO_PP10_EXTENSION: u32 = 0x20;
 const SPECIAL_INFO_SMART_TAG: u32 = 0x0200;
 
+/// Versioned text extensions associated with one base character run.
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShapeTextExtensionRun {
+    pub smart_tags: Vec<u32>,
+    pub international_east_asian_font: Option<u16>,
+    pub complex_script_font: Option<u16>,
+}
+
 /// Typed zero-based reference into a PowerPoint 11 smart-tag store.
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -143,10 +152,30 @@ pub(crate) fn build_document_binary_tag(
     Ok(Some(build_binary_tag(PPT11_TAG_NAME, &[store.build()?])?))
 }
 
+#[cfg(test)]
 pub(crate) fn build_shape_programmable_tags(
     runs: &[Vec<u32>],
 ) -> Result<Option<Vec<u8>>, WriteError> {
-    if runs.iter().all(Vec::is_empty) {
+    let runs = runs
+        .iter()
+        .cloned()
+        .map(|smart_tags| ShapeTextExtensionRun {
+            smart_tags,
+            international_east_asian_font: None,
+            complex_script_font: None,
+        })
+        .collect::<Vec<_>>();
+    build_shape_text_extensions(&runs)
+}
+
+pub(crate) fn build_shape_text_extensions(
+    runs: &[ShapeTextExtensionRun],
+) -> Result<Option<Vec<u8>>, WriteError> {
+    let has_smart_tags = runs.iter().any(|run| !run.smart_tags.is_empty());
+    let has_powerpoint10 = runs.iter().any(|run| {
+        run.international_east_asian_font.is_some() || run.complex_script_font.is_some()
+    });
+    if !has_smart_tags && !has_powerpoint10 {
         return Ok(None);
     }
     if runs.len() > MAX_STYLE_RUNS {
@@ -159,11 +188,23 @@ pub(crate) fn build_shape_programmable_tags(
         .ok_or_else(|| {
             WriteError::InvalidData("PowerPoint 9 text-style mapping exceeds 1 MiB".to_string())
         })?;
-    let style11_len = runs.iter().try_fold(0usize, |total, smart_tags| {
-        let entry = if smart_tags.is_empty() {
+    let style10_len = runs.iter().try_fold(0usize, |total, run| {
+        total
+            .checked_add(
+                4 + usize::from(run.international_east_asian_font.is_some()) * 2
+                    + usize::from(run.complex_script_font.is_some()) * 2,
+            )
+            .ok_or_else(|| {
+                WriteError::InvalidData(
+                    "PowerPoint 10 text-style mapping size overflows".to_string(),
+                )
+            })
+    })?;
+    let style11_len = runs.iter().try_fold(0usize, |total, run| {
+        let entry = if run.smart_tags.is_empty() {
             4
         } else {
-            smart_tags
+            run.smart_tags
                 .len()
                 .checked_mul(4)
                 .and_then(|bytes| bytes.checked_add(8))
@@ -177,12 +218,16 @@ pub(crate) fn build_shape_programmable_tags(
             WriteError::InvalidData("PowerPoint 11 smart-tag mapping size overflows".to_string())
         })
     })?;
-    if style11_len > MAX_STYLE_PAYLOAD_BYTES {
+    if style10_len > MAX_STYLE_PAYLOAD_BYTES || style11_len > MAX_STYLE_PAYLOAD_BYTES {
+        if style10_len > MAX_STYLE_PAYLOAD_BYTES {
+            return invalid("PowerPoint 10 text-style mapping exceeds 1 MiB");
+        }
         return invalid("PowerPoint 11 smart-tag mapping exceeds 1 MiB");
     }
     let mut style9 = Vec::with_capacity(style9_len);
+    let mut style10 = Vec::with_capacity(style10_len);
     let mut style11 = Vec::with_capacity(style11_len);
-    for (index, smart_tags) in runs.iter().enumerate() {
+    for (index, run) in runs.iter().enumerate() {
         style9.extend_from_slice(&0u32.to_le_bytes());
         style9.extend_from_slice(&0u32.to_le_bytes());
         style9.extend_from_slice(&SPECIAL_INFO_PP10_EXTENSION.to_le_bytes());
@@ -192,12 +237,27 @@ pub(crate) fn build_shape_programmable_tags(
                 .to_le_bytes(),
         );
 
-        if smart_tags.is_empty() {
+        let mut style10_mask = 0u32;
+        if run.international_east_asian_font.is_some() {
+            style10_mask |= 0x0100_0000;
+        }
+        if run.complex_script_font.is_some() {
+            style10_mask |= 0x0200_0000;
+        }
+        style10.extend_from_slice(&style10_mask.to_le_bytes());
+        if let Some(font) = run.international_east_asian_font {
+            style10.extend_from_slice(&font.to_le_bytes());
+        }
+        if let Some(font) = run.complex_script_font {
+            style10.extend_from_slice(&font.to_le_bytes());
+        }
+
+        if run.smart_tags.is_empty() {
             style11.extend_from_slice(&0u32.to_le_bytes());
         } else {
             style11.extend_from_slice(&SPECIAL_INFO_SMART_TAG.to_le_bytes());
             style11.extend_from_slice(
-                &u32::try_from(smart_tags.len())
+                &u32::try_from(run.smart_tags.len())
                     .map_err(|_| {
                         WriteError::InvalidData(
                             "PowerPoint text run smart-tag count exceeds u32".to_string(),
@@ -205,19 +265,24 @@ pub(crate) fn build_shape_programmable_tags(
                     })?
                     .to_le_bytes(),
             );
-            for index in smart_tags {
+            for index in &run.smart_tags {
                 style11.extend_from_slice(&index.to_le_bytes());
             }
         }
     }
 
     let style9_record = atom(RecordType::StyleTextProp9Atom, &style9)?;
-    let style11_record = atom(RecordType::StyleTextProp11Atom, &style11)?;
     let ppt9 = build_binary_tag("___PPT9", &[style9_record])?;
-    let ppt11 = build_binary_tag(PPT11_TAG_NAME, &[style11_record])?;
     let mut tags = RecordBuilder::new(0x0f, 0, record_type::PROG_TAGS);
     tags.write_child(&ppt9);
-    tags.write_child(&ppt11);
+    if has_powerpoint10 {
+        let style10_record = atom(RecordType::StyleTextProp10Atom, &style10)?;
+        tags.write_child(&build_binary_tag("___PPT10", &[style10_record])?);
+    }
+    if has_smart_tags {
+        let style11_record = atom(RecordType::StyleTextProp11Atom, &style11)?;
+        tags.write_child(&build_binary_tag(PPT11_TAG_NAME, &[style11_record])?);
+    }
     Ok(Some(tags.build()?))
 }
 

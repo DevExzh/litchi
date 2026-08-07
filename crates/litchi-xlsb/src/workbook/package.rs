@@ -254,11 +254,13 @@ impl Workbook {
     }
 
     /// Verify package signatures with the safe strict policy.
+    #[cfg(feature = "sign")]
     pub fn signatures(&self) -> litchi_opc::sign::Result<Vec<litchi_opc::sign::Report>> {
         self.package.signatures()
     }
 
     /// Verify package signatures with an explicit trust-neutral policy.
+    #[cfg(feature = "sign")]
     pub fn signatures_with(
         &self,
         policy: &litchi_sign::Policy,
@@ -267,6 +269,7 @@ impl Workbook {
     }
 
     /// Add a signature while preserving every existing valid signature.
+    #[cfg(feature = "sign")]
     pub fn sign(
         &mut self,
         signer: &litchi_sign::Signer,
@@ -275,6 +278,7 @@ impl Workbook {
     }
 
     /// Add a signature with explicit authoring resource bounds.
+    #[cfg(feature = "sign")]
     pub fn sign_with(
         &mut self,
         signer: &litchi_sign::Signer,
@@ -284,6 +288,7 @@ impl Workbook {
     }
 
     /// Atomically replace all signatures with one signature.
+    #[cfg(feature = "sign")]
     pub fn resign(
         &mut self,
         signer: &litchi_sign::Signer,
@@ -292,6 +297,7 @@ impl Workbook {
     }
 
     /// Atomically replace signatures with explicit authoring resource bounds.
+    #[cfg(feature = "sign")]
     pub fn resign_with(
         &mut self,
         signer: &litchi_sign::Signer,

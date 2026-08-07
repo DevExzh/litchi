@@ -5,6 +5,7 @@ use super::super::model::*;
 use super::package::try_path_refs;
 use super::semantic::validate_section;
 use super::support::allocation;
+use crate::protection::reject_protected_container;
 use litchi_cfb::{OleError, OleFile, OleWriter};
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -18,27 +19,20 @@ pub struct Editor {
 
 impl Editor {
     pub fn new(bytes: Vec<u8>) -> Result<Self, OleError> {
-        let original = try_copy_bytes(&bytes, "property-set editor source")?;
-        let mut ole = OleFile::open(Cursor::new(bytes))?;
-        let paths = ole.list_streams();
-        if paths.iter().flatten().any(|name| {
-            matches!(
-                name.to_ascii_lowercase().as_str(),
-                "encryptedpackage" | "encryptioninfo"
-            ) || name.to_ascii_lowercase().contains("digitalsignature")
-        }) {
-            return Err(invalid(
-                "Property Set mutation is not permitted on encrypted or signed containers",
-            ));
-        }
-        let mut streams = try_vec_with_capacity(paths.len(), "property-set editor streams")?;
-        for path in paths {
-            let refs = try_path_refs(&path)?;
-            let data = ole.open_stream(&refs)?;
-            streams.push((path, data));
-        }
+        let streams = {
+            let mut ole = OleFile::open(Cursor::new(bytes.as_slice()))?;
+            reject_protected_container(&ole, "Property Set editing")?;
+            let paths = ole.list_streams();
+            let mut streams = try_vec_with_capacity(paths.len(), "property-set editor streams")?;
+            for path in paths {
+                let refs = try_path_refs(&path)?;
+                let data = ole.open_stream(&refs)?;
+                streams.push((path, data));
+            }
+            streams
+        };
         Ok(Self {
-            original,
+            original: bytes,
             streams,
             staged: HashMap::new(),
         })

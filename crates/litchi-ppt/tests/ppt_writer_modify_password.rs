@@ -1,3 +1,5 @@
+#![cfg(feature = "encryption")]
+
 use std::io::Cursor;
 
 use litchi_ppt::writer::{EncryptionProfile, Writer};
@@ -20,7 +22,10 @@ fn encrypted_presentation(modify_password: &str, open_password: &str) -> Vec<u8>
 
 fn open(bytes: &[u8], password: Option<&str>) -> Result<litchi_ppt::Presentation, Error> {
     let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
-    package.presentation_with_options(OpenOptions { password })
+    package.presentation_with_options(OpenOptions {
+        password,
+        ..OpenOptions::default()
+    })
 }
 
 #[test]

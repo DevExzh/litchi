@@ -266,7 +266,11 @@ pub(super) fn convert_shape_to_escher_with_sound_mapping(
         if !paragraphs
             .iter()
             .flat_map(|paragraph| &paragraph.runs)
-            .any(|run| !run.smart_tag_indices.is_empty())
+            .any(|run| {
+                !run.smart_tag_indices.is_empty()
+                    || run.international_east_asian_font_index.is_some()
+                    || run.complex_script_font_index.is_some()
+            })
         {
             return None;
         }
@@ -279,12 +283,15 @@ pub(super) fn convert_shape_to_escher_with_sound_mapping(
             run.style.pp9_run_id = Some(
                 u8::try_from(ordinal % 16).expect("a modulo-16 run identifier always fits u8"),
             );
-            mappings.push(
-                run.smart_tag_indices
+            mappings.push(crate::writer::smart_tags::ShapeTextExtensionRun {
+                smart_tags: run
+                    .smart_tag_indices
                     .iter()
                     .map(|index| index.as_u32())
                     .collect(),
-            );
+                international_east_asian_font: run.international_east_asian_font_index,
+                complex_script_font: run.complex_script_font_index,
+            });
         }
         Some(mappings)
     });
@@ -505,10 +512,12 @@ impl Writer {
     pub(super) fn build_docinfo_list(
         &self,
         vba_persist_id: Option<u32>,
+        ppt10_font_records: &[Vec<u8>],
+        modify_password: Option<&[u8]>,
     ) -> Result<Vec<u8>, WriteError> {
         let ppt11 = super::super::smart_tags::build_document_binary_tag(&self.smart_tags)?;
         Ok(
-            super::super::records::create_docinfo_list_container_with_binary_tags(
+            super::super::records::create_docinfo_list_container_with_extensions(
                 self.slide_view_info.as_ref(),
                 self.notes_view_info.as_ref(),
                 super::super::env_data::VBAInfoAtom {
@@ -516,6 +525,8 @@ impl Writer {
                     has_macros: vba_persist_id.is_some(),
                     runtime_version: 2,
                 },
+                ppt10_font_records.iter().map(Vec::as_slice),
+                modify_password,
                 ppt11.as_deref(),
             )?,
         )

@@ -10,7 +10,10 @@ rust-version.workspace = true
 
 [features]
 default = []
-fonts = ["dep:litchi-fonts", "litchi-fonts/automatic"]
+fonts = ["dep:litchi-fonts"]
+font-subset = ["fonts", "litchi-fonts/subset"]
+font-discovery = ["fonts", "litchi-fonts/discovery"]
+automatic-fonts = ["font-subset", "font-discovery", "litchi-fonts/automatic"]
 
 [dependencies]
 base64 = { workspace = true }

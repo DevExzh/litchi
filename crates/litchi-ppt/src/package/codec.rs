@@ -1,11 +1,11 @@
-use super::{Error, OpenOptions, Package, Result};
+use super::{Error, OpenOptions, Package, RecordLimits, Result};
 use crate::presentation::Presentation;
 use litchi_cfb::{OleError, OleFile};
 use litchi_ole_common::property_set::{
     PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
 use std::fs::File;
-use std::io::{Read, Seek};
+use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
 const POWERPOINT_DOCUMENT_STREAM: &[&str] = &["PowerPoint Document"];
@@ -37,8 +37,13 @@ impl Package<File> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Self::open_with_limits(path, RecordLimits::default())
+    }
+
+    /// Open a `.ppt` package with explicit finite presentation-record limits.
+    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: RecordLimits) -> Result<Self> {
         let file = File::open(path)?;
-        Package::from_reader(file)
+        Package::from_reader_with_limits(file, limits)
     }
 }
 
@@ -60,11 +65,28 @@ impl<R: Read + Seek> Package<R> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_reader(reader: R) -> Result<Self> {
+        Self::from_reader_with_limits(reader, RecordLimits::default())
+    }
+
+    /// Create a package whose presentation reads inherit explicit record limits.
+    pub fn from_reader_with_limits(mut reader: R, record_limits: RecordLimits) -> Result<Self> {
+        let original_position = reader.stream_position()?;
+        let input_bytes = reader.seek(SeekFrom::End(0))?;
+        reader.seek(SeekFrom::Start(original_position))?;
+        let input_bytes = usize::try_from(input_bytes).map_err(|_| {
+            Error::ResourceLimit("PPT package size exceeds this platform".to_string())
+        })?;
+        if input_bytes > record_limits.max_package_bytes {
+            return Err(Error::ResourceLimit(format!(
+                "PPT package size {input_bytes} exceeds limit {}",
+                record_limits.max_package_bytes
+            )));
+        }
         let ole = OleFile::open(reader)?;
 
         validate_powerpoint_document_stream(&ole)?;
 
-        Ok(Self { ole })
+        Ok(Self { ole, record_limits })
     }
 
     /// Create a Package from an already-parsed OLE file.
@@ -89,9 +111,14 @@ impl<R: Read + Seek> Package<R> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_ole_file(ole: OleFile<R>) -> Result<Self> {
+        Self::from_ole_file_with_limits(ole, RecordLimits::default())
+    }
+
+    /// Wrap an already-parsed OLE file with explicit presentation-record limits.
+    pub fn from_ole_file_with_limits(ole: OleFile<R>, record_limits: RecordLimits) -> Result<Self> {
         validate_powerpoint_document_stream(&ole)?;
 
-        Ok(Self { ole })
+        Ok(Self { ole, record_limits })
     }
 
     /// Get the main presentation.
@@ -109,12 +136,43 @@ impl<R: Read + Seek> Package<R> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn presentation(&mut self) -> Result<Presentation> {
-        Presentation::from_ole(&mut self.ole)
+        Presentation::from_ole_with_options(
+            &mut self.ole,
+            OpenOptions::default(),
+            self.record_limits,
+        )
     }
 
     /// Get the main presentation using explicit password-to-open options.
     pub fn presentation_with_options(&mut self, options: OpenOptions<'_>) -> Result<Presentation> {
-        Presentation::from_ole_with_options(&mut self.ole, options)
+        Presentation::from_ole_with_options(&mut self.ole, options, self.record_limits)
+    }
+
+    /// Open the presentation with explicit record limits and no password.
+    pub fn presentation_with_limits(&mut self, limits: RecordLimits) -> Result<Presentation> {
+        Presentation::from_ole_with_options(
+            &mut self.ole,
+            OpenOptions::default(),
+            limits.constrained_by(self.record_limits),
+        )
+    }
+
+    /// Open the presentation with password options and explicit record limits.
+    pub fn presentation_with_options_and_limits(
+        &mut self,
+        options: OpenOptions<'_>,
+        limits: RecordLimits,
+    ) -> Result<Presentation> {
+        Presentation::from_ole_with_options(
+            &mut self.ole,
+            options,
+            limits.constrained_by(self.record_limits),
+        )
+    }
+
+    /// Limits inherited by [`Self::presentation`].
+    pub fn record_limits(&self) -> RecordLimits {
+        self.record_limits
     }
 
     /// Read the live document-comparison snapshot from the presentation.
@@ -150,11 +208,13 @@ impl<R: Read + Seek> Package<R> {
 
     /// Verify presentation XML signatures with the safe strict policy, without
     /// evaluating certificate trust or opening any VBA project stream.
+    #[cfg(feature = "sign")]
     pub fn signatures(&mut self) -> litchi_sign::Result<Vec<litchi_sign::cfb::Report>> {
         self.signatures_with(&litchi_sign::Policy::strict())
     }
 
     /// Verify presentation XML signatures with an explicit trust-neutral policy.
+    #[cfg(feature = "sign")]
     pub fn signatures_with(
         &mut self,
         policy: &litchi_sign::Policy,

@@ -8,6 +8,7 @@ use crate::records::Record;
 use super::model::{Compression, Kind, MAX_DECLARED_BYTES, MAX_STORED_BYTES, Ref, Storage};
 use super::snapshot::{Metadata, Snapshot};
 
+#[allow(dead_code)]
 impl<'a> Ref<'a> {
     /// Resolve one strict `ExOleObjStg` record directly from presentation bytes.
     pub(crate) fn parse_at(document: &'a [u8], offset: usize, kind: Kind) -> Result<Self> {

@@ -2,7 +2,7 @@
 
 use crate::consts::RecordType;
 use crate::current_user::CurrentUser;
-use crate::package::{Error, Result};
+use crate::package::{Error, RecordLimits, Result};
 use crate::persist::PersistMapping;
 use crate::records::Record;
 use std::collections::HashMap;
@@ -66,12 +66,34 @@ pub struct SlideDirectory {
 }
 
 impl SlideDirectory {
+    #[cfg(test)]
     pub(crate) fn build(
         document_data: &[u8],
         current_user_data: &[u8],
         persist_mapping: &PersistMapping,
     ) -> Result<Self> {
-        let current_user = CurrentUser::parse(current_user_data)?;
+        Self::build_with_limits(
+            document_data,
+            current_user_data,
+            persist_mapping,
+            RecordLimits::default(),
+        )
+    }
+
+    pub(crate) fn build_with_limits(
+        document_data: &[u8],
+        current_user_data: &[u8],
+        persist_mapping: &PersistMapping,
+        limits: RecordLimits,
+    ) -> Result<Self> {
+        if document_data.len() > limits.max_input_bytes {
+            return Err(Error::ResourceLimit(format!(
+                "PowerPoint Document stream size {} exceeds limit {}",
+                document_data.len(),
+                limits.max_input_bytes
+            )));
+        }
+        let current_user = CurrentUser::parse_with_limits(current_user_data, limits)?;
         let user_edit_offset = usize::try_from(current_user.current_edit_offset())
             .map_err(|_| Error::Corrupted("current edit offset does not fit usize".to_string()))?;
         let user_edit = read_header(document_data, user_edit_offset, "UserEditAtom")?;
@@ -114,7 +136,7 @@ impl SlideDirectory {
         let document_offset = usize::try_from(document_offset).map_err(|_| {
             Error::Corrupted("document persist offset does not fit usize".to_string())
         })?;
-        let (document, _) = Record::parse(document_data, document_offset)?;
+        let (document, _) = Record::parse_with_limits(document_data, document_offset, limits)?;
         if document.record_type != RecordType::Document
             || document.version != 0x0f
             || document.instance != 0
@@ -145,7 +167,15 @@ impl SlideDirectory {
         let mut by_slide_id = HashMap::new();
         let mut by_persist_id = HashMap::new();
         if let Some(slide_list) = slide_list {
-            entries.reserve(slide_list.data.len() / 28);
+            entries
+                .try_reserve(slide_list.children.len())
+                .map_err(|_| Error::AllocationFailed("PPT slide directory"))?;
+            by_slide_id
+                .try_reserve(slide_list.children.len())
+                .map_err(|_| Error::AllocationFailed("PPT slide ID index"))?;
+            by_persist_id
+                .try_reserve(slide_list.children.len())
+                .map_err(|_| Error::AllocationFailed("PPT slide persist index"))?;
             for child in &slide_list.children {
                 if child.record_type != RecordType::SlidePersistAtom {
                     if let Some(entry) = entries.last_mut()

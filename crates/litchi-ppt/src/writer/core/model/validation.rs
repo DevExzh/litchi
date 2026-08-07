@@ -1,6 +1,7 @@
 //! Validation and atomic mutation gates for the PPT writer model.
 
 use super::{WriteError, Writer};
+#[cfg(feature = "encryption")]
 use crate::encryption::validate_writer_password;
 use crate::modify_password::validate_value as validate_modify_password;
 use crate::view_info::{SlideViewInfo, ViewKind};
@@ -8,12 +9,17 @@ use crate::writer::core::codec::{interaction_for_hyperlink, shape_text_unit_coun
 
 impl Writer {
     pub(in crate::writer::core) fn validate_encryption(&self) -> Result<(), WriteError> {
-        if self.modify_password.is_some() && self.encryption.is_none() {
+        #[cfg(feature = "encryption")]
+        let missing_open_password = self.encryption.is_none();
+        #[cfg(not(feature = "encryption"))]
+        let missing_open_password = true;
+        if self.modify_password.is_some() && missing_open_password {
             return Err(WriteError::InvalidData(
                 "PowerPoint modify-password output requires password-to-open encryption"
                     .to_string(),
             ));
         }
+        #[cfg(feature = "encryption")]
         if let Some(value) = &self.encryption {
             validate_writer_password(value.profile, value.password.as_str())
                 .map_err(WriteError::InvalidData)?;
@@ -25,7 +31,12 @@ impl Writer {
         Ok(())
     }
 
-    pub(in crate::writer::core) fn validate_smart_tag_references(&self) -> Result<(), WriteError> {
+    pub(in crate::writer::core) fn validate_references(&self) -> Result<(), WriteError> {
+        self.validate_font_references()?;
+        self.validate_smart_tag_references()
+    }
+
+    fn validate_smart_tag_references(&self) -> Result<(), WriteError> {
         let smart_tag_count = u32::try_from(self.smart_tags.len()).map_err(|_| {
             WriteError::InvalidData("PowerPoint smart-tag count exceeds u32".to_string())
         })?;
@@ -54,6 +65,99 @@ impl Writer {
         }
         Ok(())
     }
+
+    fn validate_font_references(&self) -> Result<(), WriteError> {
+        let font_count = self.fonts.base_font_count();
+        let international_font_count = self
+            .fonts
+            .international
+            .as_ref()
+            .map_or(0, crate::FontCollection::len);
+        if font_count == 0 || font_count > 129 {
+            return Err(WriteError::InvalidData(
+                "PowerPoint base font collection must contain 1..=129 fonts".to_string(),
+            ));
+        }
+        if self
+            .fonts
+            .international
+            .as_ref()
+            .is_some_and(|collection| collection.is_empty() || collection.len() > 129)
+        {
+            return Err(WriteError::InvalidData(
+                "PowerPoint international font collection must contain 1..=129 fonts".to_string(),
+            ));
+        }
+        let validate = |paragraphs: &[crate::writer::text_format::Paragraph], owner: &str| {
+            for (paragraph_index, paragraph) in paragraphs.iter().enumerate() {
+                if let Some(index) = paragraph.bullet_font_index {
+                    validate_font_index(index, font_count, owner, paragraph_index, "bullet")?;
+                }
+                for (run_index, run) in paragraph.runs.iter().enumerate() {
+                    for (kind, index) in [
+                        ("font", Some(run.font_index)),
+                        ("East Asian font", run.asian_font_index),
+                        ("ANSI font", run.ansi_font_index),
+                        ("symbol font", run.symbol_font_index),
+                    ] {
+                        if let Some(index) = index {
+                            if usize::from(index) >= font_count {
+                                return Err(WriteError::InvalidData(format!(
+                                    "PowerPoint {owner} paragraph {paragraph_index} run {run_index} references missing {kind} {index}"
+                                )));
+                            }
+                        }
+                    }
+                    for (kind, index) in [
+                        (
+                            "international East Asian font",
+                            run.international_east_asian_font_index,
+                        ),
+                        ("complex-script font", run.complex_script_font_index),
+                    ] {
+                        if let Some(index) = index
+                            && usize::from(index) >= international_font_count
+                        {
+                            return Err(WriteError::InvalidData(format!(
+                                "PowerPoint {owner} paragraph {paragraph_index} run {run_index} references missing {kind} {index}"
+                            )));
+                        }
+                    }
+                }
+            }
+            Ok(())
+        };
+
+        for (slide_index, slide) in self.slides.iter().enumerate() {
+            for (shape_index, shape) in slide.shapes.iter().enumerate() {
+                if let Some(paragraphs) = shape.properties.paragraphs.as_deref() {
+                    validate(
+                        paragraphs,
+                        &format!("slide {slide_index} shape {shape_index}"),
+                    )?;
+                }
+            }
+            if let Some(notes) = &slide.notes_page {
+                validate(&notes.text, &format!("slide {slide_index} notes"))?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn validate_font_index(
+    index: u16,
+    font_count: usize,
+    owner: &str,
+    paragraph_index: usize,
+    kind: &str,
+) -> Result<(), WriteError> {
+    if usize::from(index) >= font_count {
+        return Err(WriteError::InvalidData(format!(
+            "PowerPoint {owner} paragraph {paragraph_index} references missing {kind} font {index}"
+        )));
+    }
+    Ok(())
 }
 
 impl Writer {

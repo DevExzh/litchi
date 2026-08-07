@@ -425,6 +425,10 @@ pub struct TextRun {
     pub ansi_font_index: Option<u16>,
     /// Symbol font reference
     pub symbol_font_index: Option<u16>,
+    /// East Asian font reference in the PowerPoint 10 international collection.
+    pub international_east_asian_font_index: Option<u16>,
+    /// Complex-script font reference in the PowerPoint 10 international collection.
+    pub complex_script_font_index: Option<u16>,
     /// Baseline position as a percentage of line height
     pub baseline_position: Option<i16>,
     /// Zero-based indices into the presentation-wide PowerPoint 11 smart-tag store.
@@ -443,6 +447,8 @@ impl TextRun {
             asian_font_index: None,
             ansi_font_index: None,
             symbol_font_index: None,
+            international_east_asian_font_index: None,
+            complex_script_font_index: None,
             baseline_position: None,
             smart_tag_indices: Vec::new(),
         }
@@ -607,6 +613,18 @@ impl TextRun {
     /// Set the symbol font reference.
     pub fn symbol_font(mut self, index: u16) -> Self {
         self.symbol_font_index = Some(index);
+        self
+    }
+
+    /// Select an East Asian face from `FontCollection10Container`.
+    pub fn international_east_asian_font(mut self, index: u16) -> Self {
+        self.international_east_asian_font_index = Some(index);
+        self
+    }
+
+    /// Select a complex-script face from `FontCollection10Container`.
+    pub fn complex_script_font(mut self, index: u16) -> Self {
+        self.complex_script_font_index = Some(index);
         self
     }
 
@@ -1001,12 +1019,31 @@ impl FontEntity {
         }
     }
 
-    /// Build FontEntityAtom (68 bytes)
-    pub fn build(&self) -> Vec<u8> {
+    /// Build a checked FontEntityAtom payload (68 bytes).
+    ///
+    /// Names shorter than 32 UTF-16 code units are NUL-terminated by the
+    /// zero-filled field. Exactly 32 units are retained without a terminator.
+    /// Longer names are rejected rather than truncated.
+    pub fn try_build(&self) -> Result<Vec<u8>, crate::writer::WriteError> {
+        if self.name.contains('\0') {
+            return Err(crate::writer::WriteError::InvalidData(
+                "PowerPoint font face names cannot contain NUL".to_string(),
+            ));
+        }
+        let units = self.name.encode_utf16().collect::<Vec<_>>();
+        if units.is_empty() || units.len() > 32 {
+            return Err(crate::writer::WriteError::InvalidData(
+                "PowerPoint font face names must contain 1..=32 UTF-16 code units".to_string(),
+            ));
+        }
+        if self.font_type & 0xf0 != 0 {
+            return Err(crate::writer::WriteError::InvalidData(
+                "PowerPoint font type reserved bits must be zero".to_string(),
+            ));
+        }
         let mut data = vec![0u8; 68];
 
-        // Write font name as UTF-16LE (max 32 chars = 64 bytes)
-        for (i, ch) in self.name.encode_utf16().take(31).enumerate() {
+        for (i, ch) in units.into_iter().enumerate() {
             let bytes = ch.to_le_bytes();
             data[i * 2] = bytes[0];
             data[i * 2 + 1] = bytes[1];
@@ -1018,6 +1055,29 @@ impl FontEntity {
         data[66] = self.font_type;
         data[67] = self.pitch_family;
 
-        data
+        Ok(data)
+    }
+
+    /// Build a FontEntityAtom payload for compatibility with the original API.
+    ///
+    /// Invalid values panic instead of being silently truncated. Prefer
+    /// [`Self::try_build`] in fallible authoring code.
+    pub fn build(&self) -> Vec<u8> {
+        self.try_build()
+            .expect("invalid PowerPoint FontEntity cannot be serialized")
+    }
+}
+
+impl From<FontEntity> for crate::font::Font {
+    fn from(value: FontEntity) -> Self {
+        let mut font = Self::new(value.name);
+        font.charset = value.charset;
+        font.font_type_flags = value.font_type;
+        font.raster = value.font_type & 0x01 != 0;
+        font.device = value.font_type & 0x02 != 0;
+        font.truetype = value.font_type & 0x04 != 0;
+        font.no_substitution = value.font_type & 0x08 != 0;
+        font.pitch_and_family = value.pitch_family;
+        font
     }
 }

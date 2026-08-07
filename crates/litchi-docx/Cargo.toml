@@ -11,10 +11,17 @@ rust-version.workspace = true
 [features]
 default = []
 encryption = ["dep:litchi-crypto"]
-fonts = ["dep:allsorts", "dep:litchi-fonts", "litchi-fonts/automatic"]
+# Format-independent font models, caller-supplied resolution, and glyph collection.
+fonts = ["dep:litchi-fonts"]
+# OpenType glyph subsetting without native system-font discovery.
+font-subset = ["fonts", "litchi-fonts/subset"]
+# Native system-font discovery without OpenType subsetting.
+font-discovery = ["fonts", "litchi-fonts/discovery"]
+# The existing save-time system-resolution and subsetting workflow.
+automatic-fonts = ["font-subset", "font-discovery", "litchi-fonts/automatic"]
+sign = ["dep:litchi-sign", "litchi-opc/sign"]
 
 [dependencies]
-allsorts = { workspace = true, optional = true }
 base64 = { workspace = true }
 bitflags = { workspace = true }
 caseless = { workspace = true }
@@ -22,7 +29,7 @@ atoi_simd = { workspace = true }
 chrono = { workspace = true }
 litchi-core = { workspace = true }
 litchi-drawingml = { workspace = true }
-litchi-sign = { workspace = true }
+litchi-sign = { workspace = true, optional = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
 litchi-vba = { workspace = true }

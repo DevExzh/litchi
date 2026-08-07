@@ -8,6 +8,10 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = []
+sign = ["dep:litchi-sign", "litchi-opc/sign"]
+
 [dependencies]
 bitflags = { workspace = true }
 chrono = { workspace = true }
@@ -15,7 +19,7 @@ litchi-core = { workspace = true }
 litchi-drawingml = { workspace = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
-litchi-sign = { workspace = true }
+litchi-sign = { workspace = true, optional = true }
 litchi-sheet = { workspace = true }
 litchi-spreadsheet-drawing = { workspace = true }
 litchi-vba = { workspace = true }

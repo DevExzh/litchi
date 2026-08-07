@@ -463,8 +463,8 @@ pub(crate) struct UserShapeData {
     pub text: Option<String>,
     /// Rich text paragraphs (with formatting)
     pub paragraphs: Option<Vec<crate::writer::text_format::Paragraph>>,
-    /// PowerPoint 11 document smart-tag indices for each rich-text run.
-    pub smart_tag_runs: Option<Vec<Vec<u32>>>,
+    /// PowerPoint 9/10/11 extensions for each rich-text run.
+    pub smart_tag_runs: Option<Vec<crate::writer::smart_tags::ShapeTextExtensionRun>>,
     /// Text type for TextHeaderAtom (0=Title, 1=Body, 2=Notes, 4=Other)
     pub text_type: u32,
     /// Placeholder type for notes/master shapes (None = not a placeholder)

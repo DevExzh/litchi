@@ -157,7 +157,7 @@ impl Package {
         Ok(Self {
             opc: package,
             mutable_pres: Some(MutablePresentation::new()),
-            #[cfg(feature = "fonts")]
+            #[cfg(feature = "automatic-fonts")]
             font_embedding_dirty: false,
         })
     }
@@ -215,7 +215,7 @@ impl Package {
         Ok(Self {
             opc,
             mutable_pres: None,
-            #[cfg(feature = "fonts")]
+            #[cfg(feature = "automatic-fonts")]
             font_embedding_dirty: false,
         })
     }
@@ -239,7 +239,7 @@ impl Package {
     ) -> Result<T> {
         let before = self.opc.clone();
         let presentation_before = self.mutable_pres.clone();
-        #[cfg(feature = "fonts")]
+        #[cfg(feature = "automatic-fonts")]
         let font_embedding_dirty_before = self.font_embedding_dirty;
 
         let result = (|| {
@@ -251,7 +251,7 @@ impl Package {
             Err(error) => {
                 self.opc = before;
                 self.mutable_pres = presentation_before;
-                #[cfg(feature = "fonts")]
+                #[cfg(feature = "automatic-fonts")]
                 {
                     self.font_embedding_dirty = font_embedding_dirty_before;
                 }
@@ -262,10 +262,10 @@ impl Package {
 
     pub(super) fn flush_presentation(&mut self) -> Result<()> {
         let presentation_modified = self.is_modified();
-        #[cfg(feature = "fonts")]
+        #[cfg(feature = "automatic-fonts")]
         let fonts_requested = self.opc.save_options().fonts != litchi_opc::FontEmbedding::None
             && (presentation_modified || self.font_embedding_dirty);
-        #[cfg(not(feature = "fonts"))]
+        #[cfg(not(feature = "automatic-fonts"))]
         let fonts_requested = false;
         if !presentation_modified && !fonts_requested {
             return Ok(());
@@ -281,13 +281,13 @@ impl Package {
             if presentation_modified {
                 self.materialize_presentation(&presentation)?;
             }
-            #[cfg(feature = "fonts")]
+            #[cfg(feature = "automatic-fonts")]
             self.embed_fonts_for_presentation(&presentation)?;
             Ok(())
         })();
         match result {
             Ok(()) => {
-                #[cfg(feature = "fonts")]
+                #[cfg(feature = "automatic-fonts")]
                 if fonts_requested {
                     self.font_embedding_dirty = false;
                 }

@@ -1,7 +1,9 @@
 use crate::consts::RecordType;
 use crate::document_properties::DocumentProperties12;
 use crate::embedded::object::Collection as OleCollection;
-use crate::embedded::storage::{Kind as StorageKind, Ref as StorageRef, Storage};
+#[cfg(feature = "vba-inspection")]
+use crate::embedded::storage::Ref as StorageRef;
+use crate::embedded::storage::{Kind as StorageKind, Storage};
 use crate::external_media::Collection as MediaCollection;
 use crate::header_footer::{
     HeaderFooterParent, HeaderFooterParentOrdinal, HeaderFooterScope, HeaderFooters,
@@ -10,7 +12,7 @@ use crate::hyperlink::Hyperlinks;
 use crate::main_master::MainMasterMetadata12;
 use crate::non_zoom_view::OutlineSorterViewInformation;
 /// High-performance Presentation API with zero-copy slide parsing.
-use crate::package::{Error, Result};
+use crate::package::{Error, RecordLimits, Result};
 use crate::parsers::RecordParser;
 use crate::persist::PersistMapping;
 use crate::records::Record;
@@ -18,8 +20,10 @@ use crate::routing_slip::Slip;
 use crate::slide::{ParsedComment, Slide, SlideDirectory, SlideFactory};
 use crate::sound_collection::Collection;
 use crate::view_info::SlideViewInformation;
+#[cfg(feature = "vba-inspection")]
 use litchi_cfb::OleFile;
 use litchi_odraw::image::{File as ImageFile, Id as ImageId, Store as ImageStore};
+#[cfg(feature = "vba-inspection")]
 use std::io::Cursor;
 
 /// A PowerPoint presentation (.ppt) with high-performance zero-copy parsing.
@@ -56,6 +60,8 @@ pub struct Presentation {
     pub(super) slide_directory: SlideDirectory,
     /// Pictures stream data (for image extraction)
     pub(super) pictures_data: Option<Vec<u8>>,
+    /// Record limits retained for lazy live-persist parsing.
+    pub(crate) record_limits: RecordLimits,
 }
 
 impl Presentation {
@@ -67,10 +73,11 @@ impl Presentation {
     /// - Zero-copy: slides borrow from document data
     /// - Each slide lazily loads its shapes
     pub fn slides(&self) -> Result<Vec<Slide<'_>>> {
-        let factory = SlideFactory::new(
+        let factory = SlideFactory::new_with_limits(
             &self.powerpoint_document,
             &self.persist_mapping,
             &self.slide_directory,
+            self.record_limits,
         );
 
         factory
@@ -423,7 +430,8 @@ impl Presentation {
         };
         let offset = usize::try_from(offset)
             .map_err(|_| Error::Corrupted("OLE storage offset exceeds usize".to_string()))?;
-        let (record, _) = Record::parse(&self.powerpoint_document, offset)?;
+        let (record, _) =
+            Record::parse_with_limits(&self.powerpoint_document, offset, self.record_limits)?;
         if record.record_type != RecordType::ExternalOleObjectStg {
             return Err(Error::Corrupted(format!(
                 "persist ID {persist_id} does not reference ExOleObjStg"
@@ -456,6 +464,21 @@ impl Presentation {
         crate::document_comparison::package::from_presentation(self)
     }
 
+    /// Parse the base and PowerPoint 10 font owners from the exact live
+    /// `DocumentContainer`. Embedded EOT payloads remain inert.
+    pub fn fonts(&self) -> Result<crate::font::FontCollections> {
+        self.fonts_with_limits(crate::font::Limits::default())
+    }
+
+    /// Parse live font owners with explicit composed record/font limits.
+    pub fn fonts_with_limits(
+        &self,
+        mut limits: crate::font::Limits,
+    ) -> Result<crate::font::FontCollections> {
+        limits.records = limits.records.constrained_by(self.record_limits);
+        crate::font::FontCollections::parse_with_limits(&self.live_document_record()?, limits)
+    }
+
     /// Resolve the live `DocumentContainer` record via the persist directory.
     ///
     /// Incrementally saved presentations can hold several `DocumentContainer`
@@ -467,7 +490,8 @@ impl Presentation {
         })?;
         let offset = usize::try_from(offset)
             .map_err(|_| Error::Corrupted("document offset exceeds usize".to_string()))?;
-        let (record, _) = Record::parse(&self.powerpoint_document, offset)?;
+        let (record, _) =
+            Record::parse_with_limits(&self.powerpoint_document, offset, self.record_limits)?;
         if record.record_type != RecordType::Document {
             return Err(Error::Corrupted(
                 "document persist ID does not resolve to a DocumentContainer".to_string(),
@@ -484,6 +508,7 @@ impl Presentation {
     ///
     /// Macro bytes are not returned, decompressed, interpreted, or executed.
     /// A non-null persist reference must resolve to a `VbaProjectStg` record.
+    #[cfg(feature = "vba-inspection")]
     pub fn vba_project_storage(&self) -> Result<Option<crate::VbaProjectStorage>> {
         let records = self.parser.find_records_ref();
         let Some(info) = crate::VbaInfo::parse_records(&records)? else {
@@ -498,6 +523,7 @@ impl Presentation {
     ///
     /// For richer outer-storage metadata without exposing VBA payload bytes,
     /// use [`Self::vba_project_storage`].
+    #[cfg(feature = "vba-inspection")]
     pub fn vba_info(&self) -> Result<Option<crate::VbaInfo>> {
         Ok(self.vba_project_storage()?.map(|storage| storage.info()))
     }
@@ -507,6 +533,7 @@ impl Presentation {
     /// The outer zlib stream, inner CFB, and MS-OVBA compressed containers are
     /// bounded, and source is never compiled, interpreted, or executed. Use
     /// [`Self::vba_with`] to supply custom ceilings.
+    #[cfg(feature = "vba-inspection")]
     pub fn vba(
         &self,
     ) -> std::result::Result<Option<litchi_vba::project::Project>, crate::VbaProjectError> {
@@ -517,6 +544,7 @@ impl Presentation {
     ///
     /// Stored and declared outer sizes are checked on a borrowed record view
     /// before any VBA payload is copied or decompressed.
+    #[cfg(feature = "vba-inspection")]
     pub fn vba_with(
         &self,
         limits: &crate::VbaProjectLimits,
@@ -550,6 +578,7 @@ impl Presentation {
             .map_err(Into::into)
     }
 
+    #[cfg(feature = "vba-inspection")]
     fn resolve_vba_storage(&self, info: crate::VbaInfo) -> Result<Option<StorageRef<'_>>> {
         if info.persist_id_ref == 0 {
             return Ok(None);
@@ -727,18 +756,23 @@ impl Presentation {
     /// Return the document-wide `DocumentAtom` (MS-PPT 2.4.2), if present.
     ///
     /// Slide geometry, OLE server zoom, master persist references, and display
-    /// flags are inert metadata: no persist object is resolved and nothing is
-    /// rendered. Files with multiple top-level Document containers yield the
-    /// first occurrence.
+    /// flags are inert metadata and nothing is rendered. Incremental histories
+    /// are resolved through the live document persist mapping.
     pub fn document_atom(&self) -> Result<Option<crate::DocumentAtom>> {
-        for record in self.parser.find_records_ref() {
-            if record.record_type == RecordType::Document
-                && let Some(atom) = record.find_child(RecordType::DocumentAtom)
-            {
-                return crate::DocumentAtom::parse(atom).map(Some);
-            }
+        let document = self.live_document_record()?;
+        let mut atoms = document
+            .children
+            .iter()
+            .filter(|record| record.record_type == RecordType::DocumentAtom);
+        let Some(atom) = atoms.next() else {
+            return Ok(None);
+        };
+        if atoms.next().is_some() {
+            return Err(Error::Corrupted(
+                "live DocumentContainer contains multiple DocumentAtom records".into(),
+            ));
         }
-        Ok(None)
+        crate::DocumentAtom::parse(atom).map(Some)
     }
 
     /// Collect the color-scheme atoms of every slide, notes, main master, and
@@ -892,10 +926,11 @@ impl Presentation {
     ///
     /// Vector of (slide_number, text) tuples for each slide
     pub fn extract_text_fast(&self) -> Result<Vec<(usize, String)>> {
-        let factory = SlideFactory::new(
+        let factory = SlideFactory::new_with_limits(
             &self.powerpoint_document,
             &self.persist_mapping,
             &self.slide_directory,
+            self.record_limits,
         );
 
         let mut results = Vec::with_capacity(self.slide_directory.len());

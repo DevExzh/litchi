@@ -70,10 +70,39 @@ ooxml-common = ["dep:litchi-ooxml-common"]
 drawingml = ["dep:litchi-drawingml"]
 odf-common = ["dep:litchi-odf-common"]
 sheet = ["dep:litchi-sheet", "dep:fast-float2"]
-sign = ["dep:litchi-sign"]
-encryption = ["dep:litchi-crypto", "litchi-docx?/encryption"]
+sign = [
+    "dep:litchi-sign",
+    "litchi-opc?/sign",
+    "litchi-docx?/sign",
+    "litchi-ppt?/sign",
+    "litchi-xlsb?/sign",
+]
+encryption = ["dep:litchi-crypto", "litchi-docx?/encryption", "litchi-ppt?/encryption"]
+vba-inspection = ["litchi-ppt?/vba-inspection"]
 formula = ["dep:litchi-formula", "litchi-doc?/formula", "litchi-ppt?/formula"]
-fonts = ["dep:litchi-fonts", "litchi-docx?/fonts", "litchi-pptx?/fonts"]
+fonts = ["dep:litchi-fonts", "litchi-docx?/fonts", "litchi-ppt?/fonts", "litchi-pptx?/fonts"]
+font-subset = [
+    "fonts",
+    "litchi-fonts/subset",
+    "litchi-docx?/font-subset",
+    "litchi-ppt?/font-subset",
+    "litchi-pptx?/font-subset",
+]
+font-discovery = [
+    "fonts",
+    "litchi-fonts/discovery",
+    "litchi-docx?/font-discovery",
+    "litchi-ppt?/font-discovery",
+    "litchi-pptx?/font-discovery",
+]
+automatic-fonts = [
+    "font-subset",
+    "font-discovery",
+    "litchi-fonts/automatic",
+    "litchi-docx?/automatic-fonts",
+    "litchi-ppt?/automatic-fonts",
+    "litchi-pptx?/automatic-fonts",
+]
 images = ["dep:litchi-imgconv", "dep:litchi-odraw"]
 eval = ["dep:litchi-eval"]
 web-functions = ["eval", "litchi-eval/web_functions"]
@@ -100,8 +129,9 @@ all = [
     "sheet",
     "sign",
     "encryption",
+    "vba-inspection",
     "formula",
-    "fonts",
+    "automatic-fonts",
     "images",
     "eval",
     "web-functions",
@@ -119,7 +149,7 @@ litchi-doc = { workspace = true, optional = true } # Legacy Word binary support
 litchi-docx = { workspace = true, optional = true } # WordprocessingML support
 litchi-drawingml = { workspace = true, optional = true } # Shared DrawingML vocabulary
 litchi-eval = { workspace = true, optional = true } # Formula evaluation
-litchi-fonts = { workspace = true, features = ["automatic"], optional = true } # Font support
+litchi-fonts = { workspace = true, optional = true } # Font support
 litchi-formula = { workspace = true, optional = true } # Formula parsing and conversion
 litchi-imgconv = { workspace = true, optional = true } # Legacy image conversion
 litchi-iwa-detect = { workspace = true, optional = true } # Bounded iWork package detection
@@ -159,7 +189,7 @@ zip = { version = "8", default-features = false, features = ["deflate"] }
 
 [[example]]
 name = "docx_with_fonts"
-required-features = ["docx", "fonts"]
+required-features = ["docx", "automatic-fonts"]
 
 [[example]]
 name = "core_props_office"
@@ -167,11 +197,11 @@ required-features = ["opc", "ooxml-common"]
 
 [[example]]
 name = "minimal_font_test"
-required-features = ["docx", "fonts"]
+required-features = ["docx", "automatic-fonts"]
 
 [[example]]
 name = "pptx_with_fonts"
-required-features = ["pptx", "fonts"]
+required-features = ["pptx", "automatic-fonts"]
 
 [[example]]
 name = "pptx_open_password_encryption"

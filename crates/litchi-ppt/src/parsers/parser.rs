@@ -3,8 +3,9 @@
 //! Based on Apache POI's HSLFSlideShow and QuickButCruddyTextExtractor.
 
 use crate::consts::RecordType;
-use crate::package::{Error, Result};
+use crate::package::{Error, RecordLimits, Result};
 use crate::records::Record;
+use crate::records::record::ParseBudget;
 
 /// Parser for PPT binary format that extracts document structure and content.
 pub struct RecordParser {
@@ -30,21 +31,34 @@ impl RecordParser {
     /// 2. Find the Document record
     /// 3. Extract text from all records
     pub fn parse_document(&mut self, data: &[u8]) -> Result<()> {
+        self.parse_document_with_limits(data, RecordLimits::default())
+    }
+
+    /// Parse a complete PPT document with a shared finite record budget.
+    pub fn parse_document_with_limits(&mut self, data: &[u8], limits: RecordLimits) -> Result<()> {
         if data.is_empty() {
             return Ok(());
         }
 
+        let mut budget = ParseBudget::new(limits, data.len())?;
+
         // Parse all top-level records
         let mut offset = 0;
         while offset + 8 <= data.len() {
-            match Record::parse(data, offset) {
+            match Record::parse_with_budget(data, offset, false, &mut budget) {
                 Ok((record, consumed)) => {
+                    self.records
+                        .try_reserve(1)
+                        .map_err(|_| Error::AllocationFailed("PPT top-level record table"))?;
                     self.records.push(record);
                     offset += consumed;
 
                     if consumed == 0 {
                         break;
                     }
+                },
+                Err(error @ (Error::ResourceLimit(_) | Error::AllocationFailed(_))) => {
+                    return Err(error);
                 },
                 Err(_) => {
                     offset += 1;
@@ -62,13 +76,19 @@ impl RecordParser {
     }
 
     /// Parse only the validated live persist objects of an encrypted document.
-    pub(crate) fn parse_document_at_offsets(
+    #[cfg(feature = "encryption")]
+    pub(crate) fn parse_document_at_offsets_with_limits(
         &mut self,
         data: &[u8],
         offsets: &[usize],
+        limits: RecordLimits,
     ) -> Result<()> {
+        let mut budget = ParseBudget::new(limits, data.len())?;
         for &offset in offsets {
-            let (record, _) = Record::parse_strict(data, offset)?;
+            let (record, _) = Record::parse_with_budget(data, offset, true, &mut budget)?;
+            self.records
+                .try_reserve(1)
+                .map_err(|_| Error::AllocationFailed("PPT live-record table"))?;
             self.records.push(record);
         }
         self.extract_slide_text_from_document()
@@ -134,6 +154,27 @@ impl RecordParser {
         all_records
     }
 
+    /// Collect all record references with fallible traversal allocation.
+    pub(crate) fn try_find_records_ref(&self) -> Result<Vec<&Record>> {
+        let mut all_records = Vec::new();
+        let mut pending = Vec::new();
+        pending
+            .try_reserve_exact(self.records.len())
+            .map_err(|_| Error::AllocationFailed("PPT record traversal stack"))?;
+        pending.extend(self.records.iter().rev());
+        while let Some(record) = pending.pop() {
+            all_records
+                .try_reserve(1)
+                .map_err(|_| Error::AllocationFailed("PPT record reference table"))?;
+            all_records.push(record);
+            pending
+                .try_reserve(record.children.len())
+                .map_err(|_| Error::AllocationFailed("PPT record traversal stack"))?;
+            pending.extend(record.children.iter().rev());
+        }
+        Ok(all_records)
+    }
+
     /// Recursively collect all records including children (cloning version).
     ///
     /// # Deprecated
@@ -154,11 +195,10 @@ impl RecordParser {
 
     /// Recursively collect all record references including children (zero-copy).
     fn collect_records_recursive_ref<'a>(records: &'a [Record], collector: &mut Vec<&'a Record>) {
-        for record in records {
+        let mut pending: Vec<&Record> = records.iter().rev().collect();
+        while let Some(record) = pending.pop() {
             collector.push(record);
-            if !record.children.is_empty() {
-                Self::collect_records_recursive_ref(&record.children, collector);
-            }
+            pending.extend(record.children.iter().rev());
         }
     }
 
@@ -222,5 +262,26 @@ mod tests {
         let parser = RecordParser::new();
         assert_eq!(parser.slide_count(), 0);
         assert!(parser.slides().is_empty());
+    }
+
+    #[test]
+    fn document_parser_shares_count_across_top_level_records() {
+        let mut data = Vec::new();
+        for _ in 0..2 {
+            data.extend_from_slice(&0u16.to_le_bytes());
+            data.extend_from_slice(&0x2222u16.to_le_bytes());
+            data.extend_from_slice(&0u32.to_le_bytes());
+        }
+        let mut parser = RecordParser::new();
+        let error = parser
+            .parse_document_with_limits(
+                &data,
+                RecordLimits {
+                    max_records: 1,
+                    ..RecordLimits::default()
+                },
+            )
+            .unwrap_err();
+        assert!(matches!(error, Error::ResourceLimit(message) if message.contains("record count")));
     }
 }

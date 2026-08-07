@@ -104,6 +104,7 @@ pub mod document_atom;
 pub mod document_comparison;
 pub mod document_properties;
 pub mod document_structure;
+#[cfg(feature = "encryption")]
 mod encryption;
 pub mod envelope;
 pub mod envelope_data;
@@ -149,6 +150,7 @@ pub mod text_ruler;
 pub mod text_run;
 pub mod text_si_exception;
 pub mod text_special_info;
+#[cfg(feature = "vba-inspection")]
 pub mod vba_info;
 pub mod view_set_info;
 
@@ -158,11 +160,12 @@ pub use document_comparison::{
     MainMasterDiffFlags, ReviewingToolbarStates, ShapeDiffFlags, SlideCreationEntry,
     SlideDiffFlags, SlideListTable10, TableDiffFlags, TextDiffFlags,
 };
+#[cfg(feature = "encryption")]
 pub use encryption::EncryptionProfile;
 pub use non_zoom_view::{
     NoZoomViewInfo, NonZoomViewKind, OutlineSorterViewInfo, OutlineSorterViewInformation,
 };
-pub use package::{EncryptionKind, Error, OpenOptions, Package};
+pub use package::{EncryptionKind, Error, OpenOptions, Package, RecordLimits};
 pub use presentation::{ParsedCustomShow, ParsedSlideComments, Presentation};
 pub use presentation_advisor::{AdvisorRule, PresentationAdvisorSettings};
 pub use slide::{
@@ -220,7 +223,12 @@ pub use external_media::{
     CdAudio, CdTime, EmbeddedWav, LinkedAudio, LinkedAudioKind, Media, Movie, MovieKind, Object,
     Video,
 };
-pub use font::{EmbeddedFont, Font, FontCollection, FontCollections, FontEmbeddingFlags};
+pub use font::{
+    Commit as FontCommit, EmbeddedFont, EotMetadata, Facet as FontFacet, Font, FontCollection,
+    FontCollections, FontEmbeddingFlags, Limits as FontLimits, PackageLimits as FontPackageLimits,
+    PackageOptions as FontPackageOptions, Patch as FontPatch, Revision as FontRevision,
+    Scope as FontScope, Snapshot as FontSnapshot, Transaction as FontTransaction,
+};
 pub use header_footer::{
     DateTimeFormatId, HeaderFooter, HeaderFooterDisplayText, HeaderFooterOptions,
     HeaderFooterParent, HeaderFooterParentOrdinal, HeaderFooterScope, HeaderFooters,
@@ -316,6 +324,7 @@ pub use text_si_exception::{OutlineTextRef, SpellingFlags, TextSpecialInfoDefaul
 pub use text_special_info::{
     MasterTextPropLevels, MasterTextPropRun, TextSIException, TextSIRun, TextSpecialInfoRuns,
 };
+#[cfg(feature = "vba-inspection")]
 pub use vba_info::{
     VbaInfo, VbaProjectCompression, VbaProjectError, VbaProjectLimits, VbaProjectStorage,
 };

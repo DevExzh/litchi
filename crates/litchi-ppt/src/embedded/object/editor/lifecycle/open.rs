@@ -3,12 +3,66 @@
 use super::super::{Collection, Editor, Result, mapping, rewrite};
 use crate::package::Error;
 use litchi_cfb::OleFile;
-use std::io::Cursor;
+use litchi_ole_common::protection::is_protected_component;
+use std::io::{Cursor, Read, Seek};
+use std::sync::Arc;
 
-pub(crate) fn open(bytes: Vec<u8>, collection: Collection) -> Result<Editor> {
-    let mut ole = OleFile::open(Cursor::new(bytes.clone()))?;
+#[allow(
+    dead_code,
+    reason = "used by capability-specific package snapshot paths"
+)]
+pub(crate) fn inspect_live_document(bytes: &[u8]) -> Result<(u32, Vec<u8>)> {
+    let mut ole = OleFile::open(Cursor::new(bytes))?;
     let paths = ole.list_streams();
-    reject_unsupported_package(&paths)?;
+    let document_path = find_stream(&paths, "PowerPoint Document")?;
+    let current_user_path = find_stream(&paths, "Current User")?;
+    let document = ole.open_stream(&stream_refs(&document_path))?;
+    let current_user = ole.open_stream(&stream_refs(&current_user_path))?;
+    validate_current_user(&current_user)?;
+    let current_edit_offset = rewrite::u32_at(&current_user, 16)?;
+    let (mappings, document_persist_id) = mapping::read(&document, current_edit_offset)?;
+    let offset = *mappings
+        .get(&document_persist_id)
+        .ok_or_else(|| Error::Corrupted("live Document persist mapping is missing".into()))?
+        as usize;
+    Ok((
+        document_persist_id,
+        rewrite::slice(&document, offset)?.to_vec(),
+    ))
+}
+
+pub(crate) fn inspect_live_mapping(
+    document: &[u8],
+    current_user: &[u8],
+) -> Result<crate::persist::PersistMapping> {
+    validate_current_user(current_user)?;
+    let current_edit_offset = rewrite::u32_at(current_user, 16)?;
+    let (mappings, _) = mapping::read(document, current_edit_offset)?;
+    let mut result = crate::persist::PersistMapping::new();
+    for (persist_id, offset) in mappings {
+        result.add_mapping(persist_id, offset);
+    }
+    Ok(result)
+}
+
+pub(crate) fn open(bytes: Arc<[u8]>, collection: Collection) -> Result<Editor> {
+    open_with_limit(bytes, collection, usize::MAX)
+}
+
+fn open_with_limit(
+    bytes: Arc<[u8]>,
+    collection: Collection,
+    max_output_bytes: usize,
+) -> Result<Editor> {
+    if bytes.len() > max_output_bytes {
+        return Err(Error::ResourceLimit(format!(
+            "PowerPoint editor source is {} bytes, exceeding the {max_output_bytes}-byte output limit",
+            bytes.len()
+        )));
+    }
+    let mut ole = OleFile::open(Cursor::new(bytes.clone()))?;
+    reject_unsupported_package(&ole)?;
+    let paths = ole.list_streams();
 
     let document_path = find_stream(&paths, "PowerPoint Document")?;
     let current_user_path = find_stream(&paths, "Current User")?;
@@ -31,6 +85,7 @@ pub(crate) fn open(bytes: Vec<u8>, collection: Collection) -> Result<Editor> {
 
     Ok(Editor {
         original: bytes,
+        max_output_bytes,
         streams,
         document_path,
         current_user_path,
@@ -47,31 +102,42 @@ pub(crate) fn open(bytes: Vec<u8>, collection: Collection) -> Result<Editor> {
     })
 }
 
-pub(crate) fn open_records(bytes: Vec<u8>) -> Result<Editor> {
-    open(
+pub(crate) fn open_records(bytes: Arc<[u8]>) -> Result<Editor> {
+    open_records_arc_with_limit(bytes, usize::MAX)
+}
+
+pub(crate) fn open_records_arc_with_limit(
+    bytes: Arc<[u8]>,
+    max_output_bytes: usize,
+) -> Result<Editor> {
+    open_with_limit(
         bytes,
         Collection {
             id_seed: 1,
             objects: Vec::new(),
             unknown_records: Vec::new(),
         },
+        max_output_bytes,
     )
 }
 
-fn reject_unsupported_package(paths: &[Vec<String>]) -> Result<()> {
-    if paths.iter().flatten().any(|name| {
-        matches!(
-            name.to_ascii_lowercase().as_str(),
-            "\u{6}dataspaces"
-                | "encryptioninfo"
-                | "encryptedpackage"
-                | "_signatures"
-                | "\u{5}digitalsignature"
-        )
-    }) {
-        return Err(Error::Corrupted(
-            "signed or encrypted PPT is not eligible for OLE editing".into(),
-        ));
+fn reject_unsupported_package<R: Read + Seek>(ole: &OleFile<R>) -> Result<()> {
+    let mut pending = vec![Vec::<String>::new()];
+    while let Some(directory) = pending.pop() {
+        let directory_refs: Vec<_> = directory.iter().map(String::as_str).collect();
+        for entry in ole.list_directory_entries(&directory_refs)? {
+            if is_protected_component(&entry.name) {
+                return Err(Error::Corrupted(
+                    "signed or encrypted PPT is not eligible for OLE editing".into(),
+                ));
+            }
+            let mut path = directory.clone();
+            path.push(entry.name.clone());
+            let path_refs: Vec<_> = path.iter().map(String::as_str).collect();
+            if ole.directory_exists(&path_refs) {
+                pending.push(path);
+            }
+        }
     }
     Ok(())
 }

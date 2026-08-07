@@ -1,5 +1,6 @@
 //! Focused unit coverage for mapping and nested-record rewriting.
 
+mod limits;
 mod mapping;
 mod rewrite;
 

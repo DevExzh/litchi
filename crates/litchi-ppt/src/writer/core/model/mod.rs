@@ -22,8 +22,9 @@ use super::super::shape_style::{FillStyle, LineStyleConfig, ShadowStyle};
 use super::super::slide_timing::SlideTiming;
 use super::super::smart_tags::SmartTagDefinition;
 use super::super::table::PositionedTable;
-use super::super::text_format::{FontEntity, Paragraph, TextAlign};
+use super::super::text_format::{Paragraph, TextAlign};
 use crate::animation::AnimationInfo;
+#[cfg(feature = "encryption")]
 use crate::encryption::EncryptionProfile;
 use crate::header_footer::HeaderFooter;
 use crate::view_info::SlideViewInfo;
@@ -40,6 +41,7 @@ pub enum WriteError {
     /// OLE error
     Ole(litchi_cfb::OleError),
     /// MS-OVBA project authoring error
+    #[cfg(feature = "vba-inspection")]
     Vba(litchi_vba::Error),
     /// Host-neutral Office Graph authoring error.
     Graph(litchi_ograph::Error),
@@ -56,6 +58,7 @@ impl From<litchi_cfb::OleError> for WriteError {
     }
 }
 
+#[cfg(feature = "vba-inspection")]
 impl From<litchi_vba::Error> for WriteError {
     fn from(err: litchi_vba::Error) -> Self {
         WriteError::Vba(err)
@@ -74,6 +77,7 @@ impl std::fmt::Display for WriteError {
             WriteError::Io(e) => write!(f, "I/O error: {}", e),
             WriteError::InvalidData(s) => write!(f, "Invalid data: {}", s),
             WriteError::Ole(e) => write!(f, "OLE error: {}", e),
+            #[cfg(feature = "vba-inspection")]
             WriteError::Vba(e) => write!(f, "VBA project error: {}", e),
             WriteError::Graph(e) => write!(f, "Office Graph error: {e}"),
         }
@@ -85,6 +89,7 @@ impl std::error::Error for WriteError {
         match self {
             Self::Io(error) => Some(error),
             Self::Ole(error) => Some(error),
+            #[cfg(feature = "vba-inspection")]
             Self::Vba(error) => Some(error),
             Self::Graph(error) => Some(error),
             Self::InvalidData(_) => None,
@@ -277,8 +282,8 @@ pub struct Writer {
     pub(super) blip_store: Pictures,
     /// Hyperlink collection
     pub(super) hyperlinks: HyperlinkCollection,
-    /// Font collection
-    pub(super) fonts: Vec<FontEntity>,
+    /// Typed base and PowerPoint 10 font collections.
+    pub(super) fonts: crate::font::FontCollections,
     /// Explicit embedded sound resources keyed by writer-local IDs.
     pub(super) sound_resources: BTreeMap<u32, crate::animation::SoundType>,
     /// Next writer-local sound ID; built-in catalog IDs occupy 1 through 20.
@@ -298,6 +303,7 @@ pub struct Writer {
     /// Header/footer defaults attached directly to the main master.
     pub(super) main_master_header_footer: Option<HeaderFooter>,
     /// Password-to-open settings, including a password wiped on replacement or drop.
+    #[cfg(feature = "encryption")]
     encryption: Option<WriterEncryption>,
     /// Inert modify password, wiped on replacement, clear, or drop.
     modify_password: Option<WriterModifyPassword>,
@@ -305,6 +311,7 @@ pub struct Writer {
     pub(super) vba_project: Option<crate::embedded::storage::Storage>,
 }
 
+#[cfg(feature = "encryption")]
 struct WriterEncryption {
     profile: EncryptionProfile,
     password: Zeroizing<String>,

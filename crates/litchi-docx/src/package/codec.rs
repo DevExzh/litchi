@@ -200,7 +200,7 @@ impl Package {
             properties,
             custom_props,
             custom_props_dirty: false,
-            #[cfg(feature = "fonts")]
+            #[cfg(feature = "automatic-fonts")]
             font_embedding: None,
             #[cfg(feature = "encryption")]
             source_encryption: None,
@@ -329,7 +329,7 @@ impl Package {
             properties,
             custom_props,
             custom_props_dirty: false,
-            #[cfg(feature = "fonts")]
+            #[cfg(feature = "automatic-fonts")]
             font_embedding: None,
             #[cfg(feature = "encryption")]
             source_encryption: None,
@@ -1072,7 +1072,7 @@ impl Package {
                 .write_for(&mut self.opc, CustomPropsHost::Word)?;
 
             // Embed fonts if feature enabled and requested in options
-            #[cfg(feature = "fonts")]
+            #[cfg(feature = "automatic-fonts")]
             {
                 if let Some(mutable_doc) = rollback.mutable_doc_mut() {
                     self.embed_fonts_for_document(mutable_doc)?;

@@ -8,7 +8,7 @@ mod tests;
 
 pub use model::{AttachedTemplate, DocumentSettings};
 
-#[cfg(any(feature = "fonts", test))]
+#[cfg(any(feature = "automatic-fonts", test))]
 pub(crate) use codec::patch_font_embedding;
 pub(crate) use codec::{patch_attached_template, patch_document_variables, patch_mail_merge};
 pub(crate) use package::{

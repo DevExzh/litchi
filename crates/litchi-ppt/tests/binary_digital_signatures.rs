@@ -1,3 +1,5 @@
+#![cfg(feature = "sign")]
+
 use std::path::PathBuf;
 
 #[test]

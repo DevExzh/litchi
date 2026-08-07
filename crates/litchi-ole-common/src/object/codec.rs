@@ -4,6 +4,7 @@ use super::directory::{self, EntryKind};
 use super::model::{Limits, Object, Storage, Stream};
 use super::target::Target;
 use crate::property_set::Guid;
+use crate::protection::reject_protected_container;
 use litchi_cfb::{OleError, OleFile, OleWriter};
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Seek};
@@ -540,30 +541,8 @@ fn find_storage<R: Read + Seek>(ole: &OleFile<R>, path: &[String]) -> Result<Sto
     Ok(Storage::new(path.to_vec(), metadata))
 }
 
-fn reject_protected_package<R: Read + Seek>(ole: &OleFile<R>) -> Result<(), OleError> {
-    for path in ole.list_streams() {
-        if path.iter().any(|name| {
-            matches!(
-                name.to_ascii_lowercase().as_str(),
-                "_xmlsignatures"
-                    | "_signatures"
-                    | "\u{5}digitalsignature"
-                    | "\u{6}dataspaces"
-                    | "encryptioninfo"
-                    | "encryptedpackage"
-                    | "\u{9}drmcontent"
-            )
-        }) {
-            return Err(OleError::InvalidFormat(
-                "signed, encrypted, or DRM packages are not eligible for object editing".into(),
-            ));
-        }
-    }
-    Ok(())
-}
-
 pub(crate) fn open<R: Read + Seek>(ole: &OleFile<R>) -> Result<(), OleError> {
-    reject_protected_package(ole)
+    reject_protected_container(ole, "object editing")
 }
 
 fn path_refs(path: &[String]) -> Vec<&str> {

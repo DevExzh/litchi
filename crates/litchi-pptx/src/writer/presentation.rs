@@ -6,7 +6,7 @@ use crate::shape::designer::TAGS_EXTENSION_URI;
 use super::shape::escape_xml;
 use super::slide::{MutableSlide, PreparedDesigner as PreparedSlideDesigner};
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 use litchi_fonts::{CollectGlyphs, GlyphMap};
 
 /// First legal slide ID used by the writer.
@@ -283,7 +283,7 @@ impl PreparedDesigner {
     }
 }
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 impl CollectGlyphs for MutablePresentation {
     fn collect_glyphs(&self) -> GlyphMap {
         let mut glyphs = GlyphMap::new();

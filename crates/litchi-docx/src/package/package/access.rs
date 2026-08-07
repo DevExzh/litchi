@@ -25,11 +25,13 @@ impl Package {
     }
 
     /// Verify package signatures with the safe strict policy.
+    #[cfg(feature = "sign")]
     pub fn signatures(&self) -> litchi_opc::sign::Result<Vec<litchi_opc::sign::Report>> {
         self.opc.signatures()
     }
 
     /// Verify package signatures with an explicit trust-neutral policy.
+    #[cfg(feature = "sign")]
     pub fn signatures_with(
         &self,
         policy: &litchi_sign::Policy,
@@ -38,11 +40,13 @@ impl Package {
     }
 
     /// Add a signature while preserving every existing valid signature.
+    #[cfg(feature = "sign")]
     pub fn sign(&mut self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<PackURI> {
         self.opc.sign(signer)
     }
 
     /// Add a signature with explicit authoring resource bounds.
+    #[cfg(feature = "sign")]
     pub fn sign_with(
         &mut self,
         signer: &litchi_sign::Signer,
@@ -52,11 +56,13 @@ impl Package {
     }
 
     /// Atomically replace all signatures with one signature.
+    #[cfg(feature = "sign")]
     pub fn resign(&mut self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<PackURI> {
         self.opc.resign(signer)
     }
 
     /// Atomically replace signatures with explicit authoring resource bounds.
+    #[cfg(feature = "sign")]
     pub fn resign_with(
         &mut self,
         signer: &litchi_sign::Signer,
@@ -150,7 +156,7 @@ impl Package {
         edit: impl FnOnce(&mut OpcPackage) -> Result<T>,
     ) -> Result<T> {
         self.ensure_opc_current(operation)?;
-        #[cfg(feature = "fonts")]
+        #[cfg(feature = "automatic-fonts")]
         if raw && self.font_embedding.is_some() {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",

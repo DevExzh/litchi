@@ -8,7 +8,7 @@ use crate::{Error, Result};
 
 use super::shape::{MutableShape, escape_xml};
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 use litchi_fonts::{CollectGlyphs, GlyphMap};
 
 /// Mutable slide state owned by [`super::MutablePresentation`].
@@ -433,7 +433,7 @@ pub(crate) struct PreparedDesigner {
     pub(crate) tags: Option<String>,
 }
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 impl CollectGlyphs for MutableSlide {
     fn collect_glyphs(&self) -> GlyphMap {
         let mut glyphs = GlyphMap::new();

@@ -479,6 +479,26 @@ pub enum FontError {
     RequiresStandaloneFace,
     #[error("font program is {actual} bytes, exceeding the {limit}-byte limit")]
     ProgramTooLarge { limit: u64, actual: u64 },
+    #[error("{resource} is {actual}, exceeding the configured limit of {limit}")]
+    LimitExceeded {
+        resource: &'static str,
+        limit: usize,
+        actual: usize,
+    },
+    #[error(
+        "font '{name}' resolver license 0x{declared:04X} does not match OS/2.fsType 0x{actual:04X}"
+    )]
+    LicenseMismatch {
+        name: String,
+        declared: u16,
+        actual: u16,
+    },
+    #[error("font '{name}' with {permission:?} permission cannot be embedded for {intent}")]
+    EmbeddingUseForbidden {
+        name: String,
+        intent: &'static str,
+        permission: Permission,
+    },
     #[error("font allocation for {resource} failed: {source}")]
     Allocation {
         resource: &'static str,

@@ -266,7 +266,7 @@ impl MutableDocument {
     }
 
     /// Whether glyph collection covers every text-bearing node in this value.
-    #[cfg(feature = "fonts")]
+    #[cfg(feature = "automatic-fonts")]
     pub(crate) fn glyphs_are_complete(&self) -> bool {
         self.preserved_prefix.is_none()
     }

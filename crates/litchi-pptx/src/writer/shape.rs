@@ -6,7 +6,7 @@ use crate::shape::designer::{
 };
 use crate::{Error, Result};
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 use litchi_fonts::{CollectGlyphs, GlyphMap, Request, Style};
 
 /// The bounded set of shape kinds emitted by the standalone writer slice.
@@ -395,7 +395,7 @@ impl MutableShape {
     }
 }
 
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 impl CollectGlyphs for MutableShape {
     fn collect_glyphs(&self) -> GlyphMap {
         let mut glyphs = GlyphMap::new();

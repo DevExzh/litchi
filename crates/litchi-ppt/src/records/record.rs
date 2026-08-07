@@ -5,7 +5,7 @@
 
 use super::{DocumentInfo, SlideAtomsSet, SlideInfo};
 use crate::consts::RecordType;
-use crate::package::{Error, Result};
+use crate::package::{Error, RecordLimits, Result};
 use crate::text::extractor::{parse_cstring, parse_text_bytes_atom, parse_text_chars_atom};
 use zerocopy::{
     FromBytes,
@@ -43,15 +43,49 @@ impl Record {
     ///
     /// Tuple of (parsed_record, bytes_consumed)
     pub fn parse(data: &[u8], offset: usize) -> Result<(Self, usize)> {
-        Self::parse_impl(data, offset, false)
+        Self::parse_with_limits(data, offset, RecordLimits::default())
+    }
+
+    /// Parse a PPT record with explicit finite resource limits.
+    pub fn parse_with_limits(
+        data: &[u8],
+        offset: usize,
+        limits: RecordLimits,
+    ) -> Result<(Self, usize)> {
+        let mut budget = ParseBudget::new(limits, data.len())?;
+        Self::parse_impl(data, offset, false, 0, &mut budget)
     }
 
     /// Parse a record without truncation recovery or byte resynchronization.
     pub(crate) fn parse_strict(data: &[u8], offset: usize) -> Result<(Self, usize)> {
-        Self::parse_impl(data, offset, true)
+        Self::parse_strict_with_limits(data, offset, RecordLimits::default())
     }
 
-    fn parse_impl(data: &[u8], offset: usize, strict: bool) -> Result<(Self, usize)> {
+    pub(crate) fn parse_strict_with_limits(
+        data: &[u8],
+        offset: usize,
+        limits: RecordLimits,
+    ) -> Result<(Self, usize)> {
+        let mut budget = ParseBudget::new(limits, data.len())?;
+        Self::parse_impl(data, offset, true, 0, &mut budget)
+    }
+
+    pub(crate) fn parse_with_budget(
+        data: &[u8],
+        offset: usize,
+        strict: bool,
+        budget: &mut ParseBudget,
+    ) -> Result<(Self, usize)> {
+        Self::parse_impl(data, offset, strict, 0, budget)
+    }
+
+    fn parse_impl(
+        data: &[u8],
+        offset: usize,
+        strict: bool,
+        depth: usize,
+        budget: &mut ParseBudget,
+    ) -> Result<(Self, usize)> {
         const HEADER_LEN: usize = 8;
 
         let header_end = offset
@@ -92,6 +126,13 @@ impl Record {
                 "PPT record at offset {offset} has a data length that exceeds this platform"
             ))
         })?;
+        let available_data_size = data.len() - header_end;
+        if strict && declared_data_size > available_data_size {
+            return Err(Error::Corrupted(format!(
+                "PPT record at offset {offset} extends beyond its containing data"
+            )));
+        }
+        budget.charge_record(depth, declared_data_size)?;
 
         // Extract version and instance from the packed field
         // Format: bits 0-3 = version, bits 4-15 = instance (POI's format)
@@ -101,13 +142,7 @@ impl Record {
         let record_type_enum = RecordType::from(record_type);
 
         // Check if record data extends beyond available data
-        let available_data_size = data.len() - header_end;
         if declared_data_size > available_data_size {
-            if strict {
-                return Err(Error::Corrupted(format!(
-                    "PPT record at offset {offset} extends beyond its containing data"
-                )));
-            }
             // If this is a container record and we have at least some data, try to parse partially
             if Self::is_container_record(record_type_enum) && available_data_size > 0 {
                 // For container records, we can still parse what we have
@@ -123,14 +158,17 @@ impl Record {
         let record_end = header_end.checked_add(actual_data_size).ok_or_else(|| {
             Error::Corrupted(format!("PPT record at offset {offset} size overflow"))
         })?;
-        let record_data = data
-            .get(header_end..record_end)
-            .ok_or_else(|| {
-                Error::Corrupted(format!(
-                    "PPT record at offset {offset} extends beyond its containing data"
-                ))
-            })?
-            .to_vec();
+        let source = data.get(header_end..record_end).ok_or_else(|| {
+            Error::Corrupted(format!(
+                "PPT record at offset {offset} extends beyond its containing data"
+            ))
+        })?;
+        budget.charge_copy(source.len())?;
+        let mut record_data = Vec::new();
+        record_data
+            .try_reserve_exact(source.len())
+            .map_err(|_| Error::AllocationFailed("PPT record payload"))?;
+        record_data.extend_from_slice(source);
 
         let mut record = Record {
             record_type: record_type_enum,
@@ -150,9 +188,9 @@ impl Record {
                 ))
             })?;
             record.children = if strict {
-                Self::parse_container_children_strict(children_data)?
+                Self::parse_container_children_strict(children_data, depth, budget)?
             } else {
-                Self::parse_container_children(children_data)?
+                Self::parse_container_children(children_data, depth, budget)?
             };
         }
 
@@ -221,19 +259,29 @@ impl Record {
     }
 
     /// Parse child records from a container record.
-    fn parse_container_children(data: &[u8]) -> Result<Vec<Record>> {
+    fn parse_container_children(
+        data: &[u8],
+        parent_depth: usize,
+        budget: &mut ParseBudget,
+    ) -> Result<Vec<Record>> {
         let mut children = Vec::new();
         let mut offset = 0;
 
         while offset + 8 <= data.len() {
-            match Self::parse(data, offset) {
+            match Self::parse_impl(data, offset, false, parent_depth + 1, budget) {
                 Ok((child, consumed)) => {
+                    children
+                        .try_reserve(1)
+                        .map_err(|_| Error::AllocationFailed("PPT child-record table"))?;
                     children.push(child);
                     offset += consumed;
 
                     if consumed == 0 {
                         break;
                     }
+                },
+                Err(error @ (Error::ResourceLimit(_) | Error::AllocationFailed(_))) => {
+                    return Err(error);
                 },
                 Err(_) => {
                     offset += 1;
@@ -247,7 +295,11 @@ impl Record {
         Ok(children)
     }
 
-    fn parse_container_children_strict(data: &[u8]) -> Result<Vec<Record>> {
+    fn parse_container_children_strict(
+        data: &[u8],
+        parent_depth: usize,
+        budget: &mut ParseBudget,
+    ) -> Result<Vec<Record>> {
         let mut children = Vec::new();
         let mut offset = 0usize;
         while offset < data.len() {
@@ -256,12 +308,15 @@ impl Record {
                     "container ends with a truncated record header".to_string(),
                 ));
             }
-            let (child, consumed) = Self::parse_impl(data, offset, true)?;
+            let (child, consumed) = Self::parse_impl(data, offset, true, parent_depth + 1, budget)?;
             if consumed == 0 {
                 return Err(Error::Corrupted(
                     "zero-length progress while parsing a PPT container".to_string(),
                 ));
             }
+            children
+                .try_reserve(1)
+                .map_err(|_| Error::AllocationFailed("PPT child-record table"))?;
             children.push(child);
             offset += consumed;
         }
@@ -288,6 +343,15 @@ impl Record {
     /// `BinaryTagData` is an atom whose payload is itself a strict sequence of
     /// PPT records, so these records do not appear in the ordinary child tree.
     pub fn versioned_binary_tag_records(&self, version: u8) -> Result<Vec<Record>> {
+        self.versioned_binary_tag_records_with_limits(version, RecordLimits::default())
+    }
+
+    /// Return versioned programmable-tag records with explicit parse limits.
+    pub fn versioned_binary_tag_records_with_limits(
+        &self,
+        version: u8,
+        limits: RecordLimits,
+    ) -> Result<Vec<Record>> {
         if !matches!(version, 9..=12) {
             return Err(Error::Corrupted(
                 "Unsupported PowerPoint programmable-tag version".to_string(),
@@ -295,19 +359,27 @@ impl Record {
         }
         let expected_name = format!("___PPT{version}");
         let expected_name: Vec<u16> = expected_name.encode_utf16().collect();
-        let mut prog_tags = Vec::new();
-        collect_prog_tags(self, &mut prog_tags);
+        let mut session = RecordParseSession::new(limits, self.data.len())?;
+        let prog_tags = collect_prog_tags(self, &mut session)?;
         let mut records = Vec::new();
 
-        for container in prog_tags {
-            for tag in
-                Self::parse_sequence_strict(&container.data, &format!("PPT{version} ProgTags"))?
-            {
+        for (container, depth) in prog_tags {
+            let tag_depth = checked_logical_depth(depth, 1)?;
+            let tag_child_depth = checked_logical_depth(depth, 2)?;
+            let blob_depth = checked_logical_depth(depth, 3)?;
+            for tag in session.parse_sequence(
+                &container.data,
+                &format!("PPT{version} ProgTags"),
+                tag_depth,
+            )? {
                 if tag.record_type != RecordType::ProgBinaryTag {
                     continue;
                 }
-                let children =
-                    Self::parse_sequence_strict(&tag.data, &format!("PPT{version} ProgBinaryTag"))?;
+                let children = session.parse_sequence(
+                    &tag.data,
+                    &format!("PPT{version} ProgBinaryTag"),
+                    tag_child_depth,
+                )?;
                 let Some(name) = children
                     .iter()
                     .find(|child| child.record_type == RecordType::CString)
@@ -333,16 +405,39 @@ impl Record {
                             "___PPT{version} programmable tag is missing BinaryTagData"
                         ))
                     })?;
-                records.extend(Self::parse_sequence_strict(
+                let decoded = session.parse_sequence(
                     &blob.data,
                     &format!("___PPT{version} BinaryTagData"),
-                )?);
+                    blob_depth,
+                )?;
+                records
+                    .try_reserve(decoded.len())
+                    .map_err(|_| Error::AllocationFailed("versioned binary-tag records"))?;
+                records.extend(decoded);
             }
         }
         Ok(records)
     }
 
     pub(crate) fn parse_sequence_strict(data: &[u8], context: &str) -> Result<Vec<Record>> {
+        Self::parse_sequence_strict_with_limits(data, context, RecordLimits::default())
+    }
+
+    pub(crate) fn parse_sequence_strict_with_limits(
+        data: &[u8],
+        context: &str,
+        limits: RecordLimits,
+    ) -> Result<Vec<Record>> {
+        let mut session = RecordParseSession::new(limits, data.len())?;
+        session.parse_sequence(data, context, 0)
+    }
+
+    fn parse_sequence_strict_with_budget(
+        data: &[u8],
+        context: &str,
+        depth: usize,
+        budget: &mut ParseBudget,
+    ) -> Result<Vec<Record>> {
         let mut records = Vec::new();
         let mut offset = 0usize;
         while offset < data.len() {
@@ -368,12 +463,15 @@ impl Record {
             if record_end > data.len() {
                 return Err(Error::Corrupted(format!("Record extends beyond {context}")));
             }
-            let (record, consumed) = Self::parse(&data[offset..record_end], 0)?;
+            let (record, consumed) = Self::parse_impl(data, offset, true, depth, budget)?;
             if consumed != record_end - offset {
                 return Err(Error::Corrupted(format!(
                     "Record in {context} was only partially parsed"
                 )));
             }
+            records
+                .try_reserve(1)
+                .map_err(|_| Error::AllocationFailed("PPT strict record sequence"))?;
             records.push(record);
             offset = record_end;
         }
@@ -611,14 +709,155 @@ impl Record {
     }
 }
 
-fn collect_prog_tags<'a>(record: &'a Record, output: &mut Vec<&'a Record>) {
-    if record.record_type == RecordType::ProgTags {
-        output.push(record);
-        return;
+pub(crate) struct ParseBudget {
+    limits: RecordLimits,
+    records: usize,
+    copied_payload_bytes: usize,
+}
+
+/// Shared budget for semantic record sequences embedded in already-parsed records.
+///
+/// A session must be reused across every nested byte slice so record, depth,
+/// and copied-payload ceilings cannot be multiplied by restarting a parser.
+pub(crate) struct RecordParseSession {
+    budget: ParseBudget,
+}
+
+impl RecordParseSession {
+    pub(crate) fn new(limits: RecordLimits, input_bytes: usize) -> Result<Self> {
+        Ok(Self {
+            budget: ParseBudget::new(limits, input_bytes)?,
+        })
     }
-    for child in &record.children {
-        collect_prog_tags(child, output);
+
+    pub(crate) fn parse_sequence(
+        &mut self,
+        data: &[u8],
+        context: &str,
+        logical_depth: usize,
+    ) -> Result<Vec<Record>> {
+        Record::parse_sequence_strict_with_budget(data, context, logical_depth, &mut self.budget)
     }
+
+    /// Charge traversal of an existing record without charging a payload copy.
+    pub(crate) fn account_existing(&mut self, logical_depth: usize) -> Result<()> {
+        self.budget.charge_visit(logical_depth)
+    }
+}
+
+impl ParseBudget {
+    pub(crate) fn new(limits: RecordLimits, input_bytes: usize) -> Result<Self> {
+        if input_bytes > limits.max_input_bytes {
+            return Err(Error::ResourceLimit(format!(
+                "PPT input size {input_bytes} exceeds limit {}",
+                limits.max_input_bytes
+            )));
+        }
+        Ok(Self {
+            limits,
+            records: 0,
+            copied_payload_bytes: 0,
+        })
+    }
+
+    fn charge_record(&mut self, depth: usize, payload_bytes: usize) -> Result<()> {
+        if depth > self.limits.max_depth {
+            return Err(Error::ResourceLimit(format!(
+                "PPT record nesting depth {depth} exceeds limit {}",
+                self.limits.max_depth
+            )));
+        }
+        if payload_bytes > self.limits.max_record_payload_bytes {
+            return Err(Error::ResourceLimit(format!(
+                "PPT record payload size {payload_bytes} exceeds limit {}",
+                self.limits.max_record_payload_bytes
+            )));
+        }
+        let encoded_bytes = payload_bytes
+            .checked_add(8)
+            .ok_or_else(|| Error::Corrupted("PPT encoded record size overflow".to_string()))?;
+        if encoded_bytes > self.limits.max_record_bytes {
+            return Err(Error::ResourceLimit(format!(
+                "PPT record size {encoded_bytes} exceeds limit {}",
+                self.limits.max_record_bytes
+            )));
+        }
+        self.charge_visit(depth)
+    }
+
+    fn charge_visit(&mut self, depth: usize) -> Result<()> {
+        if depth > self.limits.max_depth {
+            return Err(Error::ResourceLimit(format!(
+                "PPT record nesting depth {depth} exceeds limit {}",
+                self.limits.max_depth
+            )));
+        }
+        self.records = self
+            .records
+            .checked_add(1)
+            .ok_or_else(|| Error::Corrupted("PPT record count overflow".to_string()))?;
+        if self.records > self.limits.max_records {
+            return Err(Error::ResourceLimit(format!(
+                "PPT record count exceeds limit {}",
+                self.limits.max_records
+            )));
+        }
+        Ok(())
+    }
+
+    fn charge_copy(&mut self, bytes: usize) -> Result<()> {
+        self.copied_payload_bytes = self
+            .copied_payload_bytes
+            .checked_add(bytes)
+            .ok_or_else(|| Error::Corrupted("PPT copied payload size overflow".to_string()))?;
+        if self.copied_payload_bytes > self.limits.max_copied_payload_bytes {
+            return Err(Error::ResourceLimit(format!(
+                "PPT copied payload bytes exceed limit {}",
+                self.limits.max_copied_payload_bytes
+            )));
+        }
+        Ok(())
+    }
+}
+
+fn collect_prog_tags<'a>(
+    record: &'a Record,
+    session: &mut RecordParseSession,
+) -> Result<Vec<(&'a Record, usize)>> {
+    let mut output = Vec::new();
+    let mut pending = Vec::new();
+    pending
+        .try_reserve(1)
+        .map_err(|_| Error::AllocationFailed("programmable-tag traversal stack"))?;
+    pending.push((record, 0usize));
+    while let Some((record, depth)) = pending.pop() {
+        session.account_existing(depth)?;
+        if record.record_type == RecordType::ProgTags {
+            output
+                .try_reserve(1)
+                .map_err(|_| Error::AllocationFailed("programmable-tag table"))?;
+            output.push((record, depth));
+            continue;
+        }
+        pending
+            .try_reserve(record.children.len())
+            .map_err(|_| Error::AllocationFailed("programmable-tag traversal stack"))?;
+        let child_depth = checked_logical_depth(depth, 1)?;
+        pending.extend(
+            record
+                .children
+                .iter()
+                .rev()
+                .map(|child| (child, child_depth)),
+        );
+    }
+    Ok(output)
+}
+
+fn checked_logical_depth(depth: usize, increment: usize) -> Result<usize> {
+    depth
+        .checked_add(increment)
+        .ok_or_else(|| Error::ResourceLimit("PPT logical record depth overflow".to_string()))
 }
 
 #[cfg(test)]
@@ -632,6 +871,35 @@ mod tests {
         bytes.extend_from_slice(&(payload.len() as u32).to_le_bytes());
         bytes.extend_from_slice(payload);
         bytes
+    }
+
+    fn canonical_record(record_type: RecordType, payload: &[u8]) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(8 + payload.len());
+        bytes.extend_from_slice(&0u16.to_le_bytes());
+        bytes.extend_from_slice(&record_type.as_u16().to_le_bytes());
+        bytes.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(payload);
+        bytes
+    }
+
+    fn versioned_tag_root(tag_count: usize) -> Record {
+        let mut name = Vec::new();
+        for code_unit in "___PPT10".encode_utf16() {
+            name.extend_from_slice(&code_unit.to_le_bytes());
+        }
+        let name = canonical_record(RecordType::CString, &name);
+        let leaf = canonical_record(RecordType::Unknown, &[0u8; 16]);
+        let blob = canonical_record(RecordType::BinaryTagData, &leaf);
+        let mut tag_payload = name;
+        tag_payload.extend_from_slice(&blob);
+        let tag = canonical_record(RecordType::ProgBinaryTag, &tag_payload);
+        let mut tags = Vec::new();
+        for _ in 0..tag_count {
+            tags.extend_from_slice(&tag);
+        }
+        let tags = canonical_record(RecordType::ProgTags, &tags);
+        let root = canonical_record(RecordType::Document, &tags);
+        Record::parse(&root, 0).unwrap().0
     }
 
     #[test]
@@ -705,6 +973,192 @@ mod tests {
             error,
             Error::Corrupted(message)
                 if message.contains("extends beyond its containing data")
+        ));
+    }
+
+    #[test]
+    fn explicit_payload_and_record_limits_accept_exact_boundaries() {
+        let bytes = atom(0x2222, &[1, 2, 3, 4]);
+        let limits = RecordLimits {
+            max_package_bytes: bytes.len(),
+            max_input_bytes: bytes.len(),
+            max_aggregate_input_bytes: bytes.len(),
+            max_record_bytes: bytes.len(),
+            max_record_payload_bytes: 4,
+            max_copied_payload_bytes: 4,
+            max_records: 1,
+            max_depth: 0,
+        };
+
+        let (record, consumed) = Record::parse_with_limits(&bytes, 0, limits).unwrap();
+        assert_eq!(record.data, [1, 2, 3, 4]);
+        assert_eq!(consumed, bytes.len());
+    }
+
+    #[test]
+    fn explicit_limits_reject_input_payload_and_copied_bytes_over_boundary() {
+        let bytes = atom(0x2222, &[1, 2, 3, 4]);
+        for limits in [
+            RecordLimits {
+                max_input_bytes: bytes.len() - 1,
+                ..RecordLimits::default()
+            },
+            RecordLimits {
+                max_record_payload_bytes: 3,
+                ..RecordLimits::default()
+            },
+            RecordLimits {
+                max_copied_payload_bytes: 3,
+                ..RecordLimits::default()
+            },
+        ] {
+            assert!(Record::parse_with_limits(&bytes, 0, limits).is_err());
+        }
+    }
+
+    #[test]
+    fn explicit_limits_bound_depth_record_count_and_aggregate_container_copies() {
+        let leaf = atom(0x2222, &[1]);
+        let container = atom(RecordType::Document.as_u16(), &leaf);
+
+        assert!(
+            Record::parse_with_limits(
+                &container,
+                0,
+                RecordLimits {
+                    max_depth: 0,
+                    ..RecordLimits::default()
+                }
+            )
+            .is_err()
+        );
+        assert!(
+            Record::parse_with_limits(
+                &container,
+                0,
+                RecordLimits {
+                    max_records: 1,
+                    ..RecordLimits::default()
+                }
+            )
+            .is_err()
+        );
+        assert!(
+            Record::parse_with_limits(
+                &container,
+                0,
+                RecordLimits {
+                    max_copied_payload_bytes: leaf.len(),
+                    ..RecordLimits::default()
+                }
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn semantic_session_shares_count_copy_and_logical_depth_across_sequences() {
+        let bytes = atom(0x2222, &[1, 2, 3, 4]);
+        let mut session = RecordParseSession::new(
+            RecordLimits {
+                max_records: 2,
+                max_copied_payload_bytes: 7,
+                max_depth: 2,
+                ..RecordLimits::default()
+            },
+            bytes.len(),
+        )
+        .unwrap();
+
+        session.parse_sequence(&bytes, "first", 1).unwrap();
+        let error = session.parse_sequence(&bytes, "second", 2).unwrap_err();
+        assert!(
+            matches!(error, Error::ResourceLimit(message) if message.contains("copied payload"))
+        );
+
+        let mut session = RecordParseSession::new(
+            RecordLimits {
+                max_records: 1,
+                ..RecordLimits::default()
+            },
+            0,
+        )
+        .unwrap();
+        session.account_existing(0).unwrap();
+        assert!(matches!(
+            session.account_existing(0),
+            Err(Error::ResourceLimit(_))
+        ));
+
+        let mut session = RecordParseSession::new(
+            RecordLimits {
+                max_depth: 1,
+                ..RecordLimits::default()
+            },
+            bytes.len(),
+        )
+        .unwrap();
+        assert!(matches!(
+            session.parse_sequence(&bytes, "deep", 2),
+            Err(Error::ResourceLimit(_))
+        ));
+    }
+
+    #[test]
+    fn versioned_tags_share_record_count_across_many_nested_payloads() {
+        let one = versioned_tag_root(1);
+        assert_eq!(
+            one.versioned_binary_tag_records_with_limits(
+                10,
+                RecordLimits {
+                    max_records: 10,
+                    max_depth: 8,
+                    ..RecordLimits::default()
+                },
+            )
+            .unwrap()
+            .len(),
+            1
+        );
+        let many = versioned_tag_root(2);
+        assert!(matches!(
+            many.versioned_binary_tag_records_with_limits(
+                10,
+                RecordLimits {
+                    max_records: 10,
+                    max_depth: 8,
+                    ..RecordLimits::default()
+                },
+            ),
+            Err(Error::ResourceLimit(message)) if message.contains("record count")
+        ));
+    }
+
+    #[test]
+    fn versioned_tags_share_copied_payload_budget_across_nested_payloads() {
+        let one = versioned_tag_root(1);
+        one.versioned_binary_tag_records_with_limits(
+            10,
+            RecordLimits {
+                max_records: 100,
+                max_depth: 8,
+                max_copied_payload_bytes: 200,
+                ..RecordLimits::default()
+            },
+        )
+        .unwrap();
+        let many = versioned_tag_root(2);
+        assert!(matches!(
+            many.versioned_binary_tag_records_with_limits(
+                10,
+                RecordLimits {
+                    max_records: 100,
+                    max_depth: 8,
+                    max_copied_payload_bytes: 200,
+                    ..RecordLimits::default()
+                },
+            ),
+            Err(Error::ResourceLimit(message)) if message.contains("copied payload")
         ));
     }
 }

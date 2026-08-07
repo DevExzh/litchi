@@ -1,3 +1,5 @@
+#![cfg(feature = "encryption")]
+
 use litchi_cfb::OleFile;
 use litchi_ppt::writer::{EncryptionProfile, PictureKind, Writer};
 use litchi_ppt::{Error, OpenOptions, Package};
@@ -60,13 +62,15 @@ fn assert_round_trip(profile: EncryptionProfile, password: &str, picture: bool) 
     ));
     assert!(matches!(
         package.presentation_with_options(OpenOptions {
-            password: Some("wrong")
+            password: Some("wrong"),
+            ..OpenOptions::default()
         }),
         Err(Error::InvalidPassword)
     ));
     let presentation = package
         .presentation_with_options(OpenOptions {
             password: Some(password),
+            ..OpenOptions::default()
         })
         .unwrap();
     assert!(presentation.text().unwrap().contains("Encrypted 文本"));

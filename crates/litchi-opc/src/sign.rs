@@ -118,14 +118,6 @@ impl Report {
     }
 }
 
-/// Cheaply checks for a package-level signature-origin relationship.
-pub(crate) fn is_signed(package: &OpcPackage) -> bool {
-    package
-        .rels()
-        .iter()
-        .any(|relationship| relationship.reltype() == ORIGIN_REL)
-}
-
 /// Discovers and verifies every signature with an explicit policy.
 pub(crate) fn signatures(package: &OpcPackage, policy: &Policy) -> Result<Vec<Report>> {
     let graph = Graph::read(package, policy.limits())?;

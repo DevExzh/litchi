@@ -201,7 +201,7 @@ fn create_shape_container(
     }
     if let Some(runs) = &shape.smart_tag_runs
         && let Some(programmable_tags) =
-            crate::writer::smart_tags::build_shape_programmable_tags(runs)
+            crate::writer::smart_tags::build_shape_text_extensions(runs)
                 .map_err(|error| std::io::Error::other(error.to_string()))?
     {
         append_client_data_payload(&mut client_data, &programmable_tags)?;

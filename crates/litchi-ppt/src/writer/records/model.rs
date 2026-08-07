@@ -27,7 +27,9 @@ pub mod record_type {
     pub const PP_DRAWING_GROUP: u16 = 1035;
     pub const PP_DRAWING: u16 = 1036;
     pub const FONT_COLLECTION: u16 = 2005;
+    pub const FONT_COLLECTION_10: u16 = 2006;
     pub const FONT_ENTITY_ATOM: u16 = 4023;
+    pub const FONT_EMBED_FLAGS_10_ATOM: u16 = 0x32C8;
     pub const COLOR_SCHEME_ATOM: u16 = 2032;
     pub const TX_MASTER_STYLE_ATOM: u16 = 4003; // TxMasterStyleAtom
     pub const TX_CF_STYLE_ATOM: u16 = 4004; // TxCFStyleAtom

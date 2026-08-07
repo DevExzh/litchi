@@ -13,7 +13,7 @@ use crate::{Error, Result};
 pub struct Package {
     pub(crate) opc: OpcPackage,
     pub(crate) mutable_pres: Option<MutablePresentation>,
-    #[cfg(feature = "fonts")]
+    #[cfg(feature = "automatic-fonts")]
     pub(crate) font_embedding_dirty: bool,
 }
 

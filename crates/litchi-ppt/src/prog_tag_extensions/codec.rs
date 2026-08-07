@@ -46,7 +46,12 @@ pub(super) const ATOM_VERSION: u16 = 0x00;
 // records, exactly as the spec tables list them. Slots are declared in
 // grammar order: `array(label, field, type, version)` for a record-type
 // array, `opt(label, field, type, instance, version)` for an optional
-// record, and `req(label, field, type, version)` for a required record.
+// record.
+#[allow(
+    unused_macro_rules,
+    reason = "schema variants use different required/optional field combinations"
+)]
+#[allow(unused_macro_rules)]
 macro_rules! extension_struct {
     (
         $name:ident, $context:literal,
@@ -80,20 +85,12 @@ macro_rules! extension_struct {
     (@parse $cursor:ident, opt($label:literal, $field:ident, $ty:expr, $instance:expr, $version:expr)) => {
         let $field = $cursor.take_optional($ty, $instance, $version, $label)?;
     };
-    (@parse $cursor:ident, req($label:literal, $field:ident, $ty:expr, $version:expr)) => {
-        let $field = Some($cursor.take_required($ty, $version, $label)?);
-    };
     (@encode $this:ident, $payload:ident, array, $field:ident) => {
         for record in &$this.$field {
             $payload.extend_from_slice(&encode_record(record)?);
         }
     };
     (@encode $this:ident, $payload:ident, opt, $field:ident) => {
-        if let Some(record) = &$this.$field {
-            $payload.extend_from_slice(&encode_record(record)?);
-        }
-    };
-    (@encode $this:ident, $payload:ident, req, $field:ident) => {
         if let Some(record) = &$this.$field {
             $payload.extend_from_slice(&encode_record(record)?);
         }
@@ -121,7 +118,7 @@ extension_struct! {
     opt("FontCollection10Container", font_collection, RecordType::FontCollection10.as_u16(), None, CONTAINER_VERSION),
     array("TextMasterStyle10Atom", text_master_styles, RecordType::TextMasterStyle10Atom.as_u16(), ATOM_VERSION),
     opt("TextDefaults10Atom", text_defaults, RecordType::TextDefaults10Atom.as_u16(), None, ATOM_VERSION),
-    req("GridSpacing10Atom", grid_spacing, RecordType::GridSpacing10Atom.as_u16(), ATOM_VERSION),
+    opt("GridSpacing10Atom", grid_spacing, RecordType::GridSpacing10Atom.as_u16(), None, ATOM_VERSION),
     array("CommentIndex10Container", comment_indices, RecordType::CommentIndex10.as_u16(), CONTAINER_VERSION),
     opt("FontEmbedFlags10Atom", font_embed_flags, RecordType::FontEmbedFlags10Atom.as_u16(), None, ATOM_VERSION),
     opt("CopyrightAtom", copyright, RecordType::CString.as_u16(), Some(COPYRIGHT_INSTANCE), ATOM_VERSION),
@@ -481,13 +478,6 @@ impl RecordCursor {
             ));
         }
         Ok(Some(record))
-    }
-
-    fn take_required(&mut self, kind: u16, version: u16, label: &str) -> Result<Record> {
-        match self.take_optional(kind, None, version, label)? {
-            Some(record) => Ok(record),
-            None => corrupted(format!("{} is missing its required {label}", self.context)),
-        }
     }
 
     fn finish(&mut self) -> Result<()> {

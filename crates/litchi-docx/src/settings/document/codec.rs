@@ -610,17 +610,17 @@ fn relationship_attribute_value(
 }
 
 struct SettingsXmlLayout {
-    #[cfg(any(feature = "fonts", test))]
+    #[cfg(any(feature = "automatic-fonts", test))]
     embed_true_type_fonts_range: Option<Range<usize>>,
-    #[cfg(any(feature = "fonts", test))]
+    #[cfg(any(feature = "automatic-fonts", test))]
     embed_true_type_fonts_enabled: Option<bool>,
-    #[cfg(any(feature = "fonts", test))]
+    #[cfg(any(feature = "automatic-fonts", test))]
     embed_true_type_fonts_insert_at: Option<usize>,
-    #[cfg(any(feature = "fonts", test))]
+    #[cfg(any(feature = "automatic-fonts", test))]
     save_subset_fonts_range: Option<Range<usize>>,
-    #[cfg(any(feature = "fonts", test))]
+    #[cfg(any(feature = "automatic-fonts", test))]
     save_subset_fonts_enabled: Option<bool>,
-    #[cfg(any(feature = "fonts", test))]
+    #[cfg(any(feature = "automatic-fonts", test))]
     save_subset_fonts_insert_at: Option<usize>,
     attached_template_range: Option<Range<usize>>,
     doc_vars_range: Option<Range<usize>>,
@@ -635,14 +635,14 @@ struct SettingsXmlLayout {
     strict: bool,
 }
 
-#[cfg(any(feature = "fonts", test))]
+#[cfg(any(feature = "automatic-fonts", test))]
 #[derive(Clone, Copy)]
 enum FontFlag {
     EmbedTrueType,
     SaveSubset,
 }
 
-#[cfg(any(feature = "fonts", test))]
+#[cfg(any(feature = "automatic-fonts", test))]
 impl FontFlag {
     const fn local_name(self) -> &'static str {
         match self {
@@ -653,13 +653,13 @@ impl FontFlag {
 }
 
 /// Losslessly enable Word font embedding and synchronize subset intent.
-#[cfg(any(feature = "fonts", test))]
+#[cfg(any(feature = "automatic-fonts", test))]
 pub(crate) fn patch_font_embedding(xml: &[u8], subsetted: bool) -> Result<Vec<u8>> {
     let xml = patch_font_flag(xml, FontFlag::EmbedTrueType, true)?;
     patch_font_flag(&xml, FontFlag::SaveSubset, subsetted)
 }
 
-#[cfg(any(feature = "fonts", test))]
+#[cfg(any(feature = "automatic-fonts", test))]
 fn patch_font_flag(xml: &[u8], flag: FontFlag, enabled: bool) -> Result<Vec<u8>> {
     DocumentSettings::extract_from_xml(xml)?;
     let layout = scan_settings_xml_layout(xml)?;
@@ -732,7 +732,7 @@ fn patch_font_flag(xml: &[u8], flag: FontFlag, enabled: bool) -> Result<Vec<u8>>
     Ok(output)
 }
 
-#[cfg(any(feature = "fonts", test))]
+#[cfg(any(feature = "automatic-fonts", test))]
 fn word_empty_element(layout: &SettingsXmlLayout, flag: FontFlag) -> String {
     let local_name = flag.local_name();
     match &layout.word_prefix {
@@ -741,7 +741,7 @@ fn word_empty_element(layout: &SettingsXmlLayout, flag: FontFlag) -> String {
     }
 }
 
-#[cfg(any(feature = "fonts", test))]
+#[cfg(any(feature = "automatic-fonts", test))]
 fn settings_patch_buffer(capacity: usize) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     output
@@ -927,21 +927,21 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
     let mut strict = false;
     let mut root_empty_range = None;
     let mut root_end = None;
-    #[cfg(any(feature = "fonts", test))]
+    #[cfg(any(feature = "automatic-fonts", test))]
     let mut embed_true_type_fonts_range = None;
-    #[cfg(any(feature = "fonts", test))]
+    #[cfg(any(feature = "automatic-fonts", test))]
     let mut embed_true_type_fonts_enabled = None;
-    #[cfg(any(feature = "fonts", test))]
+    #[cfg(any(feature = "automatic-fonts", test))]
     let mut embed_true_type_fonts_start = None;
-    #[cfg(any(feature = "fonts", test))]
+    #[cfg(any(feature = "automatic-fonts", test))]
     let mut embed_true_type_fonts_insert_at = None;
-    #[cfg(any(feature = "fonts", test))]
+    #[cfg(any(feature = "automatic-fonts", test))]
     let mut save_subset_fonts_range = None;
-    #[cfg(any(feature = "fonts", test))]
+    #[cfg(any(feature = "automatic-fonts", test))]
     let mut save_subset_fonts_enabled = None;
-    #[cfg(any(feature = "fonts", test))]
+    #[cfg(any(feature = "automatic-fonts", test))]
     let mut save_subset_fonts_start = None;
-    #[cfg(any(feature = "fonts", test))]
+    #[cfg(any(feature = "automatic-fonts", test))]
     let mut save_subset_fonts_insert_at = None;
     let mut attached_template_range = None;
     let mut attached_start = None;
@@ -1025,7 +1025,7 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
                 {
                     doc_vars_insert_at = Some(event_start);
                 }
-                #[cfg(any(feature = "fonts", test))]
+                #[cfg(any(feature = "automatic-fonts", test))]
                 if depth == 2 && is_wordprocessing_namespace(&namespace) {
                     let local = element.local_name();
                     let local = local.as_ref();
@@ -1114,7 +1114,7 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
                 {
                     doc_vars_insert_at = Some(event_start);
                 }
-                #[cfg(any(feature = "fonts", test))]
+                #[cfg(any(feature = "automatic-fonts", test))]
                 if child_depth == 2 && is_wordprocessing_namespace(&namespace) {
                     let local = element.local_name();
                     let local = local.as_ref();
@@ -1154,13 +1154,13 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
                 }
             },
             Event::End(_) => {
-                #[cfg(any(feature = "fonts", test))]
+                #[cfg(any(feature = "automatic-fonts", test))]
                 if depth == 2
                     && let Some(start) = embed_true_type_fonts_start.take()
                 {
                     embed_true_type_fonts_range = Some(start..event_end);
                 }
-                #[cfg(any(feature = "fonts", test))]
+                #[cfg(any(feature = "automatic-fonts", test))]
                 if depth == 2
                     && let Some(start) = save_subset_fonts_start.take()
                 {
@@ -1194,17 +1194,17 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
     }
 
     Ok(SettingsXmlLayout {
-        #[cfg(any(feature = "fonts", test))]
+        #[cfg(any(feature = "automatic-fonts", test))]
         embed_true_type_fonts_range,
-        #[cfg(any(feature = "fonts", test))]
+        #[cfg(any(feature = "automatic-fonts", test))]
         embed_true_type_fonts_enabled,
-        #[cfg(any(feature = "fonts", test))]
+        #[cfg(any(feature = "automatic-fonts", test))]
         embed_true_type_fonts_insert_at,
-        #[cfg(any(feature = "fonts", test))]
+        #[cfg(any(feature = "automatic-fonts", test))]
         save_subset_fonts_range,
-        #[cfg(any(feature = "fonts", test))]
+        #[cfg(any(feature = "automatic-fonts", test))]
         save_subset_fonts_enabled,
-        #[cfg(any(feature = "fonts", test))]
+        #[cfg(any(feature = "automatic-fonts", test))]
         save_subset_fonts_insert_at,
         attached_template_range,
         doc_vars_range,
@@ -1221,7 +1221,7 @@ fn scan_settings_xml_layout(xml: &[u8]) -> Result<SettingsXmlLayout> {
     })
 }
 
-#[cfg(any(feature = "fonts", test))]
+#[cfg(any(feature = "automatic-fonts", test))]
 fn is_before_embed_true_type_fonts(local_name: &[u8]) -> bool {
     matches!(
         local_name,
@@ -1239,7 +1239,7 @@ fn is_before_embed_true_type_fonts(local_name: &[u8]) -> bool {
     )
 }
 
-#[cfg(any(feature = "fonts", test))]
+#[cfg(any(feature = "automatic-fonts", test))]
 fn is_before_save_subset_fonts(local_name: &[u8]) -> bool {
     is_before_embed_true_type_fonts(local_name)
         || matches!(local_name, b"embedTrueTypeFonts" | b"embedSystemFonts")

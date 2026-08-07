@@ -33,7 +33,7 @@ pub const MAX_SETTINGS_XML_DEPTH: usize = 256;
 
 pub use colors::*;
 pub use compatibility::*;
-#[cfg(feature = "fonts")]
+#[cfg(feature = "automatic-fonts")]
 pub(crate) use document::patch_font_embedding;
 pub(crate) use document::{
     ATTACHED_TEMPLATE_RELATIONSHIP, extract_document_variables, patch_attached_template,

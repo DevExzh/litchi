@@ -3,7 +3,7 @@
 /// The CurrentUser stream contains information about the current editing session,
 /// including the offset to the current user edit record. This follows Apache POI's
 /// CurrentUserAtom implementation.
-use super::package::{Error, Result};
+use super::package::{Error, RecordLimits, Result};
 
 /// Minimum size of CurrentUser stream in bytes
 const CURRENT_USER_MIN_SIZE: usize = 28;
@@ -46,6 +46,18 @@ impl CurrentUser {
     /// - Bytes 8-27: Fixed CurrentUserAtom fields
     /// - Bytes 28+: ANSI username, release version, and optional UTF-16LE username
     pub fn parse(data: &[u8]) -> Result<Self> {
+        Self::parse_with_limits(data, RecordLimits::default())
+    }
+
+    /// Parse a Current User stream with the same input bound as the document.
+    pub fn parse_with_limits(data: &[u8], limits: RecordLimits) -> Result<Self> {
+        if data.len() > limits.max_input_bytes {
+            return Err(Error::ResourceLimit(format!(
+                "CurrentUser stream size {} exceeds limit {}",
+                data.len(),
+                limits.max_input_bytes
+            )));
+        }
         if data.len() < CURRENT_USER_MIN_SIZE {
             return Err(Error::Corrupted("CurrentUser stream too short".to_string()));
         }
@@ -255,5 +267,27 @@ mod tests {
 
         assert_eq!(current_user.username(), "\u{80}é");
         assert!(current_user.is_encrypted());
+    }
+
+    #[test]
+    fn current_user_input_limit_accepts_exact_size_and_rejects_one_less() {
+        let data = current_user_stream(b"A", Some("A"), UNENCRYPTED_HEADER_TOKEN);
+        CurrentUser::parse_with_limits(
+            &data,
+            RecordLimits {
+                max_input_bytes: data.len(),
+                ..RecordLimits::default()
+            },
+        )
+        .unwrap();
+        let error = CurrentUser::parse_with_limits(
+            &data,
+            RecordLimits {
+                max_input_bytes: data.len() - 1,
+                ..RecordLimits::default()
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ResourceLimit(message) if message.contains("CurrentUser")));
     }
 }

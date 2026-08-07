@@ -18,13 +18,15 @@ use super::{Collection, ExternalObject};
 use crate::embedded::storage::Storage;
 use crate::package::Error;
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::Arc;
 
 type Result<T> = std::result::Result<T, Error>;
 
 /// Appends a new PPT incremental edit; existing persisted bytes never move.
 #[derive(Clone)]
 pub struct Editor {
-    pub(super) original: Vec<u8>,
+    pub(super) original: Arc<[u8]>,
+    pub(super) max_output_bytes: usize,
     pub(super) streams: Vec<(Vec<String>, Vec<u8>)>,
     pub(super) document_path: Vec<String>,
     pub(super) current_user_path: Vec<String>,
@@ -41,15 +43,39 @@ pub struct Editor {
 }
 
 impl Editor {
+    /// Resolve the exact live clear-text document through the current
+    /// UserEdit/PersistDirectory chain without applying a mutation gate.
+    #[allow(
+        dead_code,
+        reason = "used by capability-specific package snapshot paths"
+    )]
+    pub(crate) fn inspect_live_document(bytes: &[u8]) -> Result<(u32, Vec<u8>)> {
+        lifecycle::inspect_live_document(bytes)
+    }
+
+    pub(crate) fn inspect_live_mapping(
+        document: &[u8],
+        current_user: &[u8],
+    ) -> Result<crate::persist::PersistMapping> {
+        lifecycle::inspect_live_mapping(document, current_user)
+    }
+
     /// Opens a transactional editor over an OLE-backed PowerPoint package.
     pub fn open(bytes: Vec<u8>, collection: Collection) -> Result<Self> {
-        lifecycle::open(bytes, collection)
+        lifecycle::open(Arc::from(bytes), collection)
     }
 
     /// Opens the shared incremental persisted-record editor without requiring
     /// an external-object collection. Used by non-OLE record editors.
     pub fn open_records(bytes: Vec<u8>) -> Result<Self> {
-        lifecycle::open_records(bytes)
+        lifecycle::open_records(Arc::from(bytes))
+    }
+
+    pub(crate) fn open_records_arc_with_limit(
+        bytes: Arc<[u8]>,
+        max_output_bytes: usize,
+    ) -> Result<Self> {
+        lifecycle::open::open_records_arc_with_limit(bytes, max_output_bytes)
     }
 
     /// Live persisted identifiers in ascending order.

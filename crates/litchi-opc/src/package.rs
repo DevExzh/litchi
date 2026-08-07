@@ -394,15 +394,19 @@ impl OpcPackage {
     /// validation and cryptographic verification are required.
     #[must_use]
     pub fn is_signed(&self) -> bool {
-        crate::sign::is_signed(self)
+        self.rels.iter().any(|relationship| {
+            relationship.reltype() == relationship_type::DIGITAL_SIGNATURE_ORIGIN
+        })
     }
 
     /// Verifies every OPC signature with the safe strict policy.
+    #[cfg(feature = "sign")]
     pub fn signatures(&self) -> crate::sign::Result<Vec<crate::sign::Report>> {
         crate::sign::signatures(self, &litchi_sign::Policy::strict())
     }
 
     /// Verifies every OPC signature with an explicit trust-neutral policy.
+    #[cfg(feature = "sign")]
     pub fn signatures_with(
         &self,
         policy: &litchi_sign::Policy,
@@ -411,11 +415,13 @@ impl OpcPackage {
     }
 
     /// Adds a signature while retaining every existing valid signature.
+    #[cfg(feature = "sign")]
     pub fn sign(&mut self, signer: &litchi_sign::Signer) -> crate::sign::Result<PackURI> {
         crate::sign::sign(self, signer, &litchi_sign::Limits::standard())
     }
 
     /// Adds a signature with explicit authoring resource bounds.
+    #[cfg(feature = "sign")]
     pub fn sign_with(
         &mut self,
         signer: &litchi_sign::Signer,
@@ -425,11 +431,13 @@ impl OpcPackage {
     }
 
     /// Atomically replaces the validated signature graph with one signature.
+    #[cfg(feature = "sign")]
     pub fn resign(&mut self, signer: &litchi_sign::Signer) -> crate::sign::Result<PackURI> {
         crate::sign::resign(self, signer, &litchi_sign::Limits::standard())
     }
 
     /// Atomically replaces signatures with explicit authoring resource bounds.
+    #[cfg(feature = "sign")]
     pub fn resign_with(
         &mut self,
         signer: &litchi_sign::Signer,
@@ -586,22 +594,22 @@ impl OpcPackage {
         let infrastructure: HashSet<PackURI> = self
             .parts
             .values()
-            .filter(|part| crate::sign::is_infrastructure(&***part))
+            .filter(|part| is_signature_infrastructure(&***part))
             .map(|part| part.partname().clone())
             .collect();
 
         self.rels.retain(|relationship| {
-            !crate::sign::is_signature_relationship(relationship.reltype())
+            !is_signature_relationship(relationship.reltype())
                 && !targets_any(relationship, &infrastructure)
         });
         for part in self.parts.values_mut() {
             part.rels_mut().retain(|relationship| {
-                !crate::sign::is_signature_relationship(relationship.reltype())
+                !is_signature_relationship(relationship.reltype())
                     && !targets_any(relationship, &infrastructure)
             });
         }
         self.parts
-            .retain(|_, part| !crate::sign::is_infrastructure(&**part));
+            .retain(|_, part| !is_signature_infrastructure(&**part));
     }
 }
 
@@ -613,8 +621,36 @@ fn targets_any(relationship: &crate::Relationship, infrastructure: &HashSet<Pack
         Ok(target) => infrastructure
             .iter()
             .any(|part| part.as_str().eq_ignore_ascii_case(target.as_str())),
-        Err(_) => crate::sign::is_signature_path(relationship.target_path()),
+        Err(_) => is_signature_path(relationship.target_path()),
     }
+}
+
+fn is_signature_relationship(kind: &str) -> bool {
+    matches!(
+        kind,
+        relationship_type::DIGITAL_SIGNATURE_ORIGIN
+            | "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature"
+            | "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/certificate"
+    )
+}
+
+fn is_signature_path(path: &str) -> bool {
+    const DIRECTORY: &[u8] = b"/_xmlsignatures/";
+    path.as_bytes()
+        .get(..DIRECTORY.len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(DIRECTORY))
+}
+
+fn is_signature_infrastructure(part: &dyn Part) -> bool {
+    use crate::constants::content_type;
+
+    is_signature_path(part.partname().as_str())
+        || matches!(
+            part.content_type(),
+            content_type::OPC_DIGITAL_SIGNATURE_ORIGIN
+                | content_type::OPC_DIGITAL_SIGNATURE_XMLSIGNATURE
+                | content_type::OPC_DIGITAL_SIGNATURE_CERTIFICATE
+        )
 }
 
 fn part_name_conflict_error(

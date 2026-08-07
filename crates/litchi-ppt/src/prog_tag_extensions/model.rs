@@ -38,10 +38,8 @@ pub struct DocBinaryTagExtension10 {
     pub text_master_styles: Vec<Record>,
     /// `textDefaultsAtom`: optional `TextDefaults10Atom`.
     pub text_defaults: Option<Record>,
-    /// `gridSpacingAtom`: the `GridSpacing10Atom`. It is grammatically required,
-    /// so [`Self::parse_records`] always yields `Some`; the field is an `Option`
-    /// only so the struct stays constructible, and [`Self::to_payload`]
-    /// rejects a missing value.
+    /// `gridSpacingAtom`: optional `GridSpacing10Atom`. Real producers omit it
+    /// when grid preferences were never materialized.
     pub grid_spacing: Option<Record>,
     /// `rgCommentIndex10`: `CommentIndex10Container` records.
     pub comment_indices: Vec<Record>,

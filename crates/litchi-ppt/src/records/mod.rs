@@ -10,5 +10,7 @@ pub mod slide_info;
 // Re-export commonly used types
 pub use document_info::DocumentInfo;
 pub use record::Record;
+#[allow(unused_imports)]
+pub(crate) use record::RecordParseSession;
 pub use slide_atoms_set::SlideAtomsSet;
 pub use slide_info::SlideInfo;

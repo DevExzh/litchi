@@ -80,6 +80,7 @@ pub mod chart;
 pub mod smart_tags;
 
 // Re-export public types from core
+#[cfg(feature = "encryption")]
 pub use crate::encryption::EncryptionProfile;
 pub use crate::view_info::{
     Guide, GuideOrientation, Ratio, SlideViewInfo, SlideViewPreferences, ViewKind, ViewOrigin,

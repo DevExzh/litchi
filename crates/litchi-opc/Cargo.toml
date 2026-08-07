@@ -8,11 +8,15 @@ license.workspace      = true
 repository.workspace   = true
 rust-version.workspace = true
 
+[features]
+default = []
+sign = ["dep:litchi-sign"]
+
 [dependencies]
 atoi_simd     = { workspace = true }
 itoa          = { workspace = true }
 litchi-core   = { workspace = true }
-litchi-sign   = { workspace = true }
+litchi-sign   = { workspace = true, optional = true }
 memchr        = { workspace = true }
 quick-xml     = { workspace = true }
 smallvec      = { workspace = true }
