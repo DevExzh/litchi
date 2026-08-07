@@ -3,6 +3,30 @@
 //! This crate owns the presentation vocabulary used by Keynote readers and
 //! editors.  Archive objects, protobuf messages, package identifiers, and
 //! mutation transactions remain in the concrete format crate.
+//!
+//! # Edit slide playback state
+//!
+//! Select slides by an exact navigator name or a checked semantic position;
+//! native IWA identifiers never enter the public transaction.
+//!
+//! ```no_run
+//! use std::fs::OpenOptions;
+//! use std::io::Write as _;
+//!
+//! use litchi_keynote::{Package, SlideSelector};
+//!
+//! let package = Package::open("input.key")?;
+//! let mut edit = package.edit();
+//! edit.skip_slide(SlideSelector::name("Appendix"))?;
+//! let commit = edit.commit()?;
+//! let mut output = OpenOptions::new()
+//!     .write(true)
+//!     .create_new(true)
+//!     .open("output.key")?;
+//! output.write_all(commit.package().source_bytes())?;
+//! output.sync_all()?;
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
 
 #![forbid(unsafe_code)]
 
@@ -25,7 +49,7 @@ pub use build::{AnimationType, Build};
 pub use chart::ChartSelector;
 pub use document::Document;
 pub use error::{Error, Result};
-pub use package::{Limits, Package, ReadError, Stats};
+pub use package::{Commit, Diagnostics, Edit, EditError, Limits, Package, Patch, ReadError, Stats};
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use show::{Mode, Settings, Show, Size};
 pub use slide::media::MovieKind;

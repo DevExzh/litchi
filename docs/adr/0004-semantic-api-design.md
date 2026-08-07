@@ -713,6 +713,19 @@ removed rather than publishing a transaction whose internal model disagreed
 with the native application. A future name edit must identify the additional
 producer metadata or graph mutation and pass native content-preservation gates.
 
+Slide playback omission is a separate, supported semantic property.
+`Slide::is_skipped` projects the required singular Boolean field 4 of the one
+type-4 slide-node payload. Ingress rejects a missing, duplicate, wrong-wire,
+noncanonical, or non-Boolean occurrence. Mutation starts from
+`Package::edit()` and accepts an exact navigator-name or typed-position
+selector through `skip_slide`, `include_slide`, or `set_slide_skipped`; it never
+accepts a native node identifier. Because canonical `false` and `true` are both
+one byte, a real edit changes exactly that payload byte while preserving the
+object header, every other decompressed IWA byte, and every unrelated package
+member. Full reopen and semantic readback precede publication. Native Keynote
+open, save-as, close, and reopen verification remains a required gate for this
+and future Keynote mutations.
+
 Bitflags represent small orthogonal settings, Roaring bitmaps represent large
 sparse integer sets, enums represent exclusive states, and inheritance uses an
 explicit tri-state. The facade exposes named operations rather than bit math.

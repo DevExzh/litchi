@@ -41,6 +41,7 @@ impl Transition {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Slide {
     index: usize,
+    is_skipped: bool,
     name: Option<Box<str>>,
     title: Option<Box<str>>,
     text_content: Box<[String]>,
@@ -61,6 +62,12 @@ impl Slide {
     #[must_use]
     pub const fn index(&self) -> usize {
         self.index
+    }
+
+    /// Return whether Keynote omits this slide during presentation playback.
+    #[must_use]
+    pub const fn is_skipped(&self) -> bool {
+        self.is_skipped
     }
 
     /// Return the optional developer-facing navigator name.
@@ -171,6 +178,7 @@ impl Slide {
 #[derive(Debug, Default)]
 pub struct Builder {
     index: usize,
+    is_skipped: bool,
     name: Option<Box<str>>,
     title: Option<Box<str>>,
     text_content: Vec<String>,
@@ -188,6 +196,11 @@ impl Builder {
             index,
             ..Self::default()
         }
+    }
+
+    /// Set whether the detached slide is skipped during presentation playback.
+    pub fn set_skipped(&mut self, is_skipped: bool) {
+        self.is_skipped = is_skipped;
     }
 
     /// Set or clear the developer-facing navigator name.
@@ -235,6 +248,7 @@ impl Builder {
     pub fn build(self) -> Slide {
         Slide {
             index: self.index,
+            is_skipped: self.is_skipped,
             name: self.name,
             title: self.title,
             text_content: self.text_content.into_boxed_slice(),

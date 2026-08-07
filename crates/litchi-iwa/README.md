@@ -1134,7 +1134,6 @@ if let Some(text_box) = keynote
     keynote.remove_slide_text_box(0, copy.drawable_object_id)?;
 }
 keynote.set_slide_name(0, Some("Opening"))?;
-keynote.set_slide_skipped(0, false)?;
 keynote.set_slide_number_visible(0, true)?;
 let layout = keynote.default_slide_layout()?;
 let fresh = keynote.add_slide(layout)?;
@@ -1248,6 +1247,12 @@ keynote.remove_slide(0)?;
 keynote.save("updated.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
+
+Keynote slide skip/include transactions have moved to the concrete
+`litchi-keynote` owner. Use `Package::edit()` with an exact-name or typed
+position `SlideSelector`; the focused `set_slide_skipped` example demonstrates
+the raw-ID-free path. The compatibility editor remains available for the other
+operations in this legacy example while migration continues.
 
 Text ranges use UTF-16 indexes, matching iWork's attribute tables. Shared
 `TSWP.StorageArchive` edits patch only text chunks and affected attribute

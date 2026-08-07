@@ -4,6 +4,8 @@
 //! package member in its original byte stream. The archive, Snappy, detection,
 //! and protobuf layers remain in their focused IWA infrastructure crates.
 
+mod edit;
+
 use std::fmt;
 use std::fs::File;
 use std::io::{Cursor, Read};
@@ -12,6 +14,7 @@ use std::sync::{Arc, OnceLock};
 
 use litchi_iwa_archive::ComponentCatalog;
 use litchi_iwa_archive::package::Catalog;
+use litchi_iwa_common::{WireLimits, wire::WireView};
 use litchi_iwa_core::ArchiveObject;
 use litchi_iwa_detect::Format;
 use litchi_iwa_protos::{kn, tswp};
@@ -22,6 +25,8 @@ use thiserror::Error;
 use crate::{
     AnimationType, Build, Document, Effect, Mode, Seconds, Settings, Show, Size, Slide, Transition,
 };
+
+pub use edit::{Commit, Diagnostics, Edit, EditError, Patch};
 
 /// Checked physical resource limits for Keynote package ingress.
 pub use litchi_iwa_archive::Limits;
@@ -78,6 +83,13 @@ struct State {
     limits: Limits,
     components: ComponentCatalog,
     semantic: OnceLock<Document>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SlideRecord {
+    node_identifier: u64,
+    slide_identifier: u64,
+    is_skipped: bool,
 }
 
 /// Deterministic measurements for one Keynote package snapshot.
@@ -177,6 +189,12 @@ impl Package {
     #[must_use]
     pub fn snapshot(&self) -> Self {
         self.clone()
+    }
+
+    /// Start a focused immutable slide-state edit from this package snapshot.
+    #[must_use]
+    pub fn edit(&self) -> Edit<'_> {
+        Edit::new(self)
     }
 
     /// Borrow the original package bytes without normalizing unknown content.
@@ -383,45 +401,108 @@ impl Package {
         let mut builder = Show::builder();
         builder.set_settings(settings_from_show(&show)?);
         builder.set_title(Self::object_text(show_object).into_iter().next());
-        for (index, slide_id) in self.slide_ids(&show)?.into_iter().enumerate() {
-            let object = self.object(slide_id).ok_or_else(|| {
+        for (index, slide) in self.slide_records(&show)?.into_iter().enumerate() {
+            let object = self.object(slide.slide_identifier).ok_or_else(|| {
                 ReadError::Decode(format!(
-                    "Keynote slide tree references missing object {slide_id}"
+                    "Keynote slide tree references missing object {}",
+                    slide.slide_identifier
                 ))
             })?;
-            builder.push_slide(self.parse_slide(index, object)?);
+            builder.push_slide(self.parse_slide(index, object, slide.is_skipped)?);
         }
         Ok(builder.build())
     }
 
-    fn slide_ids(&self, show: &kn::ShowArchive) -> ReadResult<Vec<u64>> {
-        let mut ids = Vec::with_capacity(show.slide_tree.slides.len());
+    fn slide_records(&self, show: &kn::ShowArchive) -> ReadResult<Vec<SlideRecord>> {
+        let mut records = Vec::new();
+        records
+            .try_reserve_exact(show.slide_tree.slides.len())
+            .map_err(|_error| {
+                ReadError::Archive(litchi_iwa_archive::Error::Allocation {
+                    resource: "Keynote semantic slide records",
+                    amount: show.slide_tree.slides.len(),
+                })
+            })?;
+        let wire_limits = self.wire_limits().map_err(|error| {
+            ReadError::InvalidFormat(format!("invalid Keynote wire limits: {error}"))
+        })?;
         for reference in &show.slide_tree.slides {
-            let node_object = self.object(reference.identifier).ok_or_else(|| {
+            let mut node_objects = self
+                .objects()
+                .filter(|object| object.archive_info.identifier == Some(reference.identifier));
+            let node_object = node_objects.next().ok_or_else(|| {
                 ReadError::Decode(format!(
                     "Keynote slide node {} is missing",
                     reference.identifier
                 ))
             })?;
-            let node_archive = node_object
+            if node_objects.next().is_some() {
+                return Err(ReadError::Decode(format!(
+                    "Keynote slide node {} is ambiguous",
+                    reference.identifier
+                )));
+            }
+            let mut node_messages = node_object
                 .messages
                 .iter()
-                .find_map(|message| kn::SlideNodeArchive::decode(message.data.as_slice()).ok())
-                .ok_or_else(|| {
-                    ReadError::Decode(format!(
-                        "object {} has no Keynote slide-node payload",
-                        reference.identifier
-                    ))
+                .filter(|message| message.type_ == 4);
+            let node_message = node_messages.next().ok_or_else(|| {
+                ReadError::Decode(format!(
+                    "object {} has no Keynote slide-node payload",
+                    reference.identifier
+                ))
+            })?;
+            if node_messages.next().is_some() {
+                return Err(ReadError::Decode(format!(
+                    "object {} has multiple Keynote slide-node payloads",
+                    reference.identifier
+                )));
+            }
+            let is_skipped =
+                strict_slide_node_skipped(&node_message.data, wire_limits).map_err(|error| {
+                    ReadError::Decode(format!("invalid Keynote slide-node skip state: {error}"))
                 })?;
+            let node_archive =
+                kn::SlideNodeArchive::decode(node_message.data.as_slice()).map_err(|error| {
+                    ReadError::Decode(format!("invalid Keynote slide-node payload: {error}"))
+                })?;
+            if node_archive.is_skipped != is_skipped {
+                return Err(ReadError::Decode(
+                    "Keynote slide-node skip state disagrees with its wire value".to_owned(),
+                ));
+            }
             if let Some(slide) = node_archive.slide {
-                ids.push(slide.identifier);
+                records.push(SlideRecord {
+                    node_identifier: reference.identifier,
+                    slide_identifier: slide.identifier,
+                    is_skipped,
+                });
             }
         }
-        Ok(ids)
+        Ok(records)
     }
 
-    fn parse_slide(&self, index: usize, object: &ArchiveObject) -> ReadResult<Slide> {
+    fn slide_record_at(&self, index: usize) -> ReadResult<Option<SlideRecord>> {
+        let document = self.root_document()?;
+        let show_object = self
+            .object(document.show.identifier)
+            .ok_or_else(|| ReadError::Decode("Keynote show object is missing".to_owned()))?;
+        let show = show_object
+            .messages
+            .iter()
+            .find_map(|message| kn::ShowArchive::decode(message.data.as_slice()).ok())
+            .ok_or_else(|| ReadError::Decode("Keynote show payload is missing".to_owned()))?;
+        Ok(self.slide_records(&show)?.get(index).copied())
+    }
+
+    fn parse_slide(
+        &self,
+        index: usize,
+        object: &ArchiveObject,
+        is_skipped: bool,
+    ) -> ReadResult<Slide> {
         let mut builder = Slide::builder(index);
+        builder.set_skipped(is_skipped);
         let slide_text = Self::object_text(object);
         if let Some(title) = slide_text.first() {
             builder.set_title(Some(title.clone()));
@@ -646,6 +727,58 @@ impl Package {
             .iter()
             .find_map(|message| tswp::StorageArchive::decode(message.data.as_slice()).ok())
             .map(|storage| Storage::from_text(storage.text.concat()))
+    }
+
+    fn wire_limits(&self) -> litchi_iwa_common::Result<WireLimits> {
+        let maximum = self
+            .state
+            .limits
+            .effective_archive_limits()
+            .map_err(|error| litchi_iwa_common::Error::InvalidFormat(error.to_string()))?
+            .max_message_bytes();
+        WireLimits::default()
+            .with_input_bytes(maximum)?
+            .with_output_bytes(maximum)
+    }
+}
+
+fn strict_slide_node_skipped(data: &[u8], limits: WireLimits) -> litchi_iwa_common::Result<bool> {
+    let view = WireView::parse_with_limits(data, limits)?;
+    let mut fields = view.fields().filter(|field| field.number() == 4);
+    let field = fields.next().ok_or_else(|| {
+        litchi_iwa_common::Error::InvalidFormat(
+            "Keynote slide node is missing required field 4".to_owned(),
+        )
+    })?;
+    if fields.next().is_some() {
+        return Err(litchi_iwa_common::Error::InvalidFormat(
+            "Keynote slide node contains duplicate field 4".to_owned(),
+        ));
+    }
+    field.validate_canonical_key()?;
+    if field.wire_type() != 0 {
+        return Err(litchi_iwa_common::Error::InvalidFormat(
+            "Keynote slide-node field 4 is not a varint".to_owned(),
+        ));
+    }
+    let payload = field.payload();
+    let (value, consumed) =
+        litchi_iwa_common::decode_varint_from_bytes(payload).map_err(|error| {
+            litchi_iwa_common::Error::InvalidFormat(format!(
+                "Keynote slide-node field 4 has an invalid varint: {error}"
+            ))
+        })?;
+    if consumed != payload.len() || litchi_iwa_common::varint::encoded_len(value) != payload.len() {
+        return Err(litchi_iwa_common::Error::InvalidFormat(
+            "Keynote slide-node field 4 has noncanonical varint framing".to_owned(),
+        ));
+    }
+    match value {
+        0 => Ok(false),
+        1 => Ok(true),
+        _ => Err(litchi_iwa_common::Error::InvalidFormat(
+            "Keynote slide-node field 4 is not a canonical Boolean".to_owned(),
+        )),
     }
 }
 

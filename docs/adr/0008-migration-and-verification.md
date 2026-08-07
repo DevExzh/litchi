@@ -6779,6 +6779,93 @@ targets, focused-format Prost payload decoders, format-owned error/limit
 vocabularies, the strict Keynote storage-type audit, and a native-correct
 Keynote name mutation design.
 
+## 2026-08-08 Keynote skip-state transaction and native gate
+
+The concrete Keynote owner now provides the first supported package mutation
+outside the monolithic editor. `Slide::is_skipped` exposes playback omission as
+a semantic Boolean. `Package::edit()` stages one bounded operation through
+`set_slide_skipped`, `skip_slide`, or `include_slide`; callers select by exact
+navigator name or checked zero-based `Position`, never by an IWA object ID.
+`commit()` returns a named immutable package, compact diagnostics, and a
+reversible patch. `Package::apply()` requires the exact retained source bytes,
+checks the semantic precondition, fully reopens the retained target under the
+source limits, and validates semantic readback. Equal-state commits share the
+original source allocation and are byte-exact no-ops.
+
+The private adapter requires one type-4 slide-node payload and a singular,
+canonical varint field 4 whose value is exactly zero or one. It rejects missing
+and duplicate occurrences, wrong wire types, noncanonical keys and values,
+out-of-domain Booleans, ambiguous payload ownership, and candidate readback
+mismatches. Canonical `false` and `true` have equal length, so mutation does not
+change `ArchiveInfo.MessageInfo.length`: preserve-mode serialization retains
+the original object header and changes exactly one decompressed IWA byte. ZIP
+reassembly rewrites only the owning component and then the complete Keynote
+package is reopened before publication. Generated protobuf values and native
+component/object identities stay private; raw source bytes remain the
+preservation authority.
+
+The adversarial integration suite proves selector misses and duplicate-name
+ambiguity are typed, missing-name display is redacted without cloning the
+input, empty and second operations fail without publication, exact no-ops share
+their allocation, the source snapshot never changes, unknown slide-node field
+99, an unknown target `ArchiveInfo` field, and all non-target wire bytes remain
+exact, and the complete decompressed target component has exactly one `0 -> 1`
+byte change. In a target-last synthetic ZIP, unrelated local and central
+records remain exact. The inverse patch restores the complete source artifact
+byte-for-byte, unrelated exact sources conflict, patch debug output omits
+fingerprints and byte lengths, and the public transaction values are
+`Send + Sync`. The focused crate's all-target run contains 63 passing tests: 53
+units, five skip-state adversarial tests, and five existing integration tests.
+The former
+`litchi-iwa` skip-slide example was removed and replaced by the selector-first
+`litchi-keynote` example; the legacy editor method remains temporarily for
+compatibility with the larger unmigrated editor surface.
+
+Strict Clippy passes for the Keynote production library, the migrated example,
+and the new adversarial integration target. Rustdoc with denied warnings and
+the new crate-level doctest pass. A `keynote`-only root-facade integration test
+proves the transaction is reachable without the migration host, and two legacy
+skip/preservation regressions still pass. The dependency gate reports 63
+workspace packages, 217 internal declarations, and the same 17 explicit host
+debts; all 40 checker tests pass. The broader Keynote all-target Clippy command
+still reports 33 pre-existing warnings in unrelated test modules, while none
+comes from this slice.
+
+Computer Use created a two-slide source and verified the generated output in
+Keynote version 14.4 (7043.0.93). The source
+`/private/tmp/litchi-keynote-skip-source-20260808.key` is 513,913 bytes with
+SHA-256
+`a5bd6289eaf1a82043585621d606f53f03719c4488eade6edf254055162fe05f`.
+The Litchi-authored output
+`/private/tmp/litchi-keynote-skip-output-20260808.key` is 513,916 bytes with
+SHA-256
+`cc7bb4fc4397efbb561047bca5548fba253d8c74468c87feb474e4f109e4c687`.
+It opened without a repair, recovery, or conversion sheet; the navigator
+identified slide two as `Skipped slide, Litchi SKIP TARGET 20260808`, and the
+native Slide menu exposed `Unskip Slide`. Of 58 ZIP entries, only
+`Index/Document.iwa` changed payload, no compared entry metadata changed, and
+the decompressed comparison reported exactly one changed component with
+unchanged archive metadata.
+
+Keynote then saved the opened Litchi result as
+`/private/tmp/litchi-keynote-skip-native-save-20260808.key` (513,870 bytes,
+SHA-256
+`503c5edcea5a42455b776326674ad56016d770ab99de090ac798973337b9267b`).
+After close and reopen, the navigator still marked the slide skipped and the
+menu still exposed `Unskip Slide`. Feeding that app-authored package back to the
+focused example read `skipped true`, produced `false`, touched one component,
+and emitted a valid ZIP. This distinguishes Litchi's source-preserving write
+from Keynote's own package normalization while proving native semantic
+round-trip compatibility.
+
+Remaining debt is explicit. This in-memory patch is not yet the ADR 0003
+durable JSON envelope, the focused crate does not yet provide an atomic
+filesystem save API, most Keynote editor operations and compatibility tests
+remain in `litchi-iwa`, and format payload projection still uses generated
+Prost values. Promoting a bounded Buffa slide-node projection must preserve the
+same raw-wire authority and cannot weaken the canonical/preflight or native
+application gates.
+
 - Stable Rust with workspace MSRV 1.89. The initial 1.85 placeholder was
   corrected because the workspace deliberately uses Rust 2024 `let` chains
   (stable in 1.88) and its measured x86 acceleration path uses stable AVX-512

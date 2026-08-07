@@ -960,6 +960,15 @@ publish archive-free semantic documents. In particular,
 `litchi-pages::package` owns native Pages ZIP, IWA, and protobuf traversal;
 `litchi-pages::{document,section}` remain semantic and archive-free.
 
+`litchi-keynote::package` owns source-backed Keynote playback-state
+transactions. It resolves slides by exact navigator name or checked semantic
+position, privately maps that selection to the required slide-node payload,
+and publishes only after bounded ZIP/IWA reassembly plus full semantic
+readback. Raw component names, protobuf values, and native object identifiers
+remain inside the package adapter. Shared ZIP, Snappy, archive framing, and raw
+wire patching remain owned by the focused infrastructure crates; the Keynote
+semantic slide exposes only `is_skipped`.
+
 `litchi-numbers-wire` owns the shared low-level Binary Numbers Cell codec. It
 is a versioned physical adapter so the migration host can depend on it without
 re-exporting a format implementation. `litchi-numbers` uses it privately, and

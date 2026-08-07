@@ -50,6 +50,18 @@ IWA boundary. Pages and Keynote share the value type; their remaining native
 model-object selectors are an explicit migration debt and do not become a
 precedent for new semantic APIs.
 
+The first concrete Keynote package transaction applies this model to slide
+playback state. `Package::edit()` resolves an exact-name or checked-position
+`SlideSelector` against the immutable base snapshot, accepts one bounded
+skip/include operation, and returns a named `Commit` with a new package,
+diagnostics, and a reversible exact-source-checked `Patch`. Equal state reuses
+the original shared allocation and bytes. A real change is published only
+after the one length-stable Boolean wire field is patched, the complete package
+is reopened under the retained limits, and the same semantic position reads
+back the requested value. The package-local patch currently retains immutable
+source and target byte handles; it is reversible in memory but is not yet the
+durable deterministic JSON patch envelope required for cross-process use.
+
 ## Identity and selection
 
 Handles carry snapshot lineage and stable internal identity. Public lookup is
