@@ -486,45 +486,6 @@ fn parse_u32(value: &str, description: &str) -> Result<u32> {
         .map_err(|_| invalid(format!("invalid {description} '{value}'")))
 }
 
-/// Serialize one series-level `c:extLst` carrying `c14:pivotOptions` drop
-/// zones, for embedding in an authored chart part.
-pub(crate) fn options_extension_xml(options: &Options) -> Vec<u8> {
-    let mut xml = Vec::new();
-    xml.extend_from_slice(b"<c:extLst xmlns:c=\"");
-    xml.extend_from_slice(litchi_ooxml_common::xml::DRAWINGML_CHART_NAMESPACE);
-    xml.extend_from_slice(b"\"><c:ext uri=\"");
-    xml.extend_from_slice(OPTIONS_EXTENSION_URI.as_bytes());
-    xml.extend_from_slice(b"\" xmlns:c14=\"");
-    xml.extend_from_slice(C14_CHART_NAMESPACE.as_bytes());
-    xml.extend_from_slice(b"\"><c14:pivotOptions>");
-    if let Some(visible) = options.drop_zone_visible {
-        write_drop_zone_element(&mut xml, "dropZoneVisible", visible);
-    }
-    for zone in &options.drop_zones {
-        write_drop_zone_element(
-            &mut xml,
-            zone.field_type.drop_zone_element_name(),
-            zone.visible,
-        );
-    }
-    xml.extend_from_slice(b"</c14:pivotOptions></c:ext></c:extLst>");
-    xml
-}
-
-/// Default all-visible drop-zone extension list for authored pivot charts.
-pub(crate) fn default_options_extension_xml() -> Vec<u8> {
-    options_extension_xml(&Options::all_visible())
-}
-
-fn write_drop_zone_element(xml: &mut Vec<u8>, element: &str, visible: bool) {
-    xml.extend_from_slice(b"<c14:");
-    xml.extend_from_slice(element.as_bytes());
-    xml.extend_from_slice(if visible {
-        b" val=\"1\"/>"
-    } else {
-        b" val=\"0\"/>"
-    });
-}
 pub(super) fn xml_error(error: impl std::fmt::Display) -> Error {
     Error::Invalid(error.to_string())
 }

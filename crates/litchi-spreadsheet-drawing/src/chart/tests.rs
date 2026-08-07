@@ -1,17 +1,21 @@
-use super::anchor::{validate_chart_anchor, write_worksheet_chart_anchors};
-use super::codec::chart_user_shapes_relationship_ids;
+#![allow(
+    clippy::unwrap_used,
+    reason = "Tests use unwrap to keep successful chart-construction assertions concise."
+)]
+
+use super::anchor::{validate, write_all};
 use super::relationship::{
-    ExternalDataPart, ExternalDataTarget, is_chart_external_data_relationship_type,
-    is_chart_user_shapes_relationship_type,
+    ExternalDataPart, ExternalDataTarget, is_external_data_type, is_user_shapes_type,
+    user_shapes_ids,
 };
-use super::{Anchor, Chart, Series, generate_chart_xml, parse_chart_from_xml};
+use super::{Anchor, Chart, Series, read, write};
 
 #[test]
 fn anchor_validation_preserves_worksheet_bounds_and_offsets() {
-    assert!(validate_chart_anchor(&Anchor::new(0, 0, 16_383, 1_048_575)).is_ok());
-    assert!(validate_chart_anchor(&Anchor::new(0, 0, 16_384, 1)).is_err());
-    assert!(validate_chart_anchor(&Anchor::new(2, 0, 1, 1)).is_err());
-    assert!(validate_chart_anchor(&Anchor::with_offsets(0, -1, 0, 0, 1, 0, 1, 0)).is_err());
+    assert!(validate(&Anchor::new(0, 0, 16_383, 1_048_575)).is_ok());
+    assert!(validate(&Anchor::new(0, 0, 16_384, 1)).is_err());
+    assert!(validate(&Anchor::new(2, 0, 1, 1)).is_err());
+    assert!(validate(&Anchor::with_offsets(0, -1, 0, 0, 1, 0, 1, 0)).is_err());
 }
 
 #[test]
@@ -24,7 +28,7 @@ fn anchor_writer_emits_cell_anchored_chart_frame() {
     )
     .unwrap();
     let mut xml = String::new();
-    write_worksheet_chart_anchors(&mut xml, &[chart], 4, 8).unwrap();
+    write_all(&mut xml, &[chart], 4, 8).unwrap();
     assert!(xml.contains("<xdr:from><xdr:col>1</xdr:col>"));
     assert!(xml.contains("<xdr:to><xdr:col>7</xdr:col>"));
     assert!(xml.contains("id=\"5\""));
@@ -42,8 +46,8 @@ fn chart_model_round_trips_through_shared_drawingml_codec() {
         Anchor::default(),
     )
     .unwrap();
-    let xml = generate_chart_xml(&chart.chart).unwrap();
-    let parsed = parse_chart_from_xml(&xml, chart.anchor.clone()).unwrap();
+    let xml = write(&chart.chart).unwrap();
+    let parsed = read(&xml, chart.anchor.clone()).unwrap();
     assert_eq!(parsed.series_count(), 1);
     assert_eq!(parsed.anchor.from_col, chart.anchor.from_col);
     assert_eq!(parsed.chart_type(), chart.chart_type());
@@ -58,7 +62,7 @@ fn strict_and_transitional_chart_namespaces_are_accepted() {
         let xml = format!(
             r#"<c:chartSpace xmlns:c="{namespace}"><c:chart><c:plotArea/></c:chart></c:chartSpace>"#
         );
-        let chart = parse_chart_from_xml(xml.as_bytes(), Anchor::default()).unwrap();
+        let chart = read(xml.as_bytes(), Anchor::default()).unwrap();
         assert_eq!(chart.series_count(), 0);
     }
 }
@@ -75,10 +79,10 @@ fn relationship_vocabulary_keeps_external_resources_inert() {
         linked.target,
         ExternalDataTarget::Linked { ref target } if target == "https://example.test/book.xlsx"
     ));
-    assert!(is_chart_external_data_relationship_type(
+    assert!(is_external_data_type(
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package"
     ));
-    assert!(is_chart_user_shapes_relationship_type(
+    assert!(is_user_shapes_type(
         "http://purl.oclc.org/ooxml/officeDocument/relationships/chartUserShapes"
     ));
     let _series = Series::new(0);
@@ -87,6 +91,6 @@ fn relationship_vocabulary_keeps_external_resources_inert() {
 #[test]
 fn strict_user_shapes_scan_retains_relationship_references() {
     let xml = br#"<c:userShapes xmlns:c="http://purl.oclc.org/ooxml/drawingml/chart" xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships"><c:sp r:id="rIdShape"/></c:userShapes>"#;
-    let ids = chart_user_shapes_relationship_ids(xml).unwrap();
+    let ids = user_shapes_ids(xml).unwrap();
     assert!(ids.contains("rIdShape"));
 }

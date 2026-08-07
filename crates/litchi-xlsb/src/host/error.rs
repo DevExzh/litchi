@@ -306,6 +306,17 @@ impl From<litchi_drawingml::Error> for Error {
     }
 }
 
+impl From<litchi_spreadsheet_drawing::Error> for Error {
+    fn from(error: litchi_spreadsheet_drawing::Error) -> Self {
+        match error {
+            litchi_spreadsheet_drawing::Error::Drawing(error) => Self::Drawing(error),
+            litchi_spreadsheet_drawing::Error::Invalid(message) => Self::InvalidFormat(message),
+            litchi_spreadsheet_drawing::Error::Encoding(message) => Self::Encoding(message),
+            other => Self::InvalidFormat(other.to_string()),
+        }
+    }
+}
+
 impl From<litchi_ooxml_common::Error> for Error {
     fn from(error: litchi_ooxml_common::Error) -> Self {
         Self::Common(error)

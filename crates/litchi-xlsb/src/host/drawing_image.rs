@@ -195,7 +195,7 @@ impl Image {
     }
 
     pub(crate) fn validate(&self) -> Result<()> {
-        crate::chart::validate_chart_anchor(&self.anchor)?;
+        crate::chart::anchor::validate(&self.anchor)?;
         self.format.validate_payload(&self.data)?;
         if let Some(description) = &self.description {
             if description.len() > MAX_XLSB_IMAGE_DESCRIPTION_BYTES {

@@ -26,6 +26,7 @@
       "litchi-pptx",
       "litchi-rtf",
       "litchi-sign",
+      "litchi-spreadsheet-drawing",
       "litchi-xls",
       "litchi-xlsb",
       "litchi-xlsx"
@@ -202,6 +203,11 @@
     "litchi-slide": [
       "litchi-core"
     ],
+    "litchi-spreadsheet-drawing": [
+      "litchi-drawingml",
+      "litchi-ooxml-common",
+      "litchi-opc"
+    ],
     "litchi-vba": [
       "litchi-cfb",
       "litchi-codepage"
@@ -227,6 +233,7 @@
       "litchi-ooxml-common",
       "litchi-opc",
       "litchi-sign",
+      "litchi-spreadsheet-drawing",
       "litchi-vba"
     ],
     "litchi-xlsx": [
@@ -235,6 +242,7 @@
       "litchi-ooxml-common",
       "litchi-opc",
       "litchi-sheet",
+      "litchi-spreadsheet-drawing",
       "litchi-vba"
     ],
     "soapberry-zip": [],
@@ -268,6 +276,7 @@
     "litchi-sheet",
     "litchi-sign",
     "litchi-slide",
+    "litchi-spreadsheet-drawing",
     "litchi-vba",
     "litchi-word",
     "litchi-xlsb"

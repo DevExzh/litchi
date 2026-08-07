@@ -186,6 +186,17 @@ impl From<std::convert::Infallible> for Error {
     }
 }
 
+impl From<litchi_spreadsheet_drawing::Error> for Error {
+    fn from(error: litchi_spreadsheet_drawing::Error) -> Self {
+        match error {
+            litchi_spreadsheet_drawing::Error::Drawing(error) => Self::Drawing(error),
+            litchi_spreadsheet_drawing::Error::Invalid(message)
+            | litchi_spreadsheet_drawing::Error::Encoding(message) => Self::Invalid(message),
+            other => Self::Invalid(other.to_string()),
+        }
+    }
+}
+
 impl From<JoinError> for Error {
     fn from(error: JoinError) -> Self {
         Self::Join(Box::new(error))

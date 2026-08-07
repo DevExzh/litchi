@@ -47,8 +47,39 @@ COMMON_FAMILY_GUARDS = {
 RETIRED_MONOLITHS = frozenset({"litchi-ooxml", "litchi-ole"})
 RETIRED_FACADE_FEATURES = frozenset({"ole"})
 XLSB_SOURCE_ROOT = Path("crates/litchi-xlsb/src")
+XLSX_SOURCE_ROOT = Path("crates/litchi-xlsx/src")
 PUBLIC_XLSX_MODULE = re.compile(r"^\s*pub(?:\([^)]*\))?\s+mod\s+xlsx\s*;")
 PACKAGE_XLSX_PATH = re.compile(r"(?<![A-Za-z0-9_])package::xlsx\b")
+RETIRED_XLSX_CHART_FILES = (
+    Path("chart/anchor.rs"),
+    Path("chart/codec.rs"),
+    Path("chart/model.rs"),
+    Path("chart/relationship.rs"),
+)
+SPREADSHEET_CHART_FACADES = {
+    "litchi-xlsb": (XLSB_SOURCE_ROOT / "chart.rs", XLSB_SOURCE_ROOT / "chart/mod.rs"),
+    "litchi-xlsx": (XLSX_SOURCE_ROOT / "chart.rs", XLSX_SOURCE_ROOT / "chart/mod.rs"),
+}
+SHARED_SPREADSHEET_CHART_TYPES = (
+    "Anchor",
+    "Chart",
+    "ExternalDataPart",
+    "ExternalDataTarget",
+    "Relationship",
+    "RelationshipTarget",
+    "Target",
+    "UserShapesPart",
+)
+LOCAL_SHARED_CHART_TYPE = re.compile(
+    r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:struct|enum|type)\s+(?:"
+    + "|".join(SHARED_SPREADSHEET_CHART_TYPES)
+    + r")\b"
+)
+DRAWINGML_CHART_CODEC = re.compile(
+    r"\blitchi_drawingml::chart::(?:"
+    r"reader|writer|read_chart|write_chart|ChartReader|ChartWriter)\b"
+)
+MAX_SPREADSHEET_CHART_FACADE_LINES = 200
 
 
 @dataclass(frozen=True, order=True)
@@ -590,6 +621,45 @@ def audit_xlsb_source_topology(root: Path = ROOT) -> list[str]:
     return sorted(set(violations))
 
 
+def audit_spreadsheet_chart_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep shared spreadsheet-chart ownership out of OOXML format hosts."""
+
+    violations: list[str] = []
+    for retired in RETIRED_XLSX_CHART_FILES:
+        path = root / XLSX_SOURCE_ROOT / retired
+        if path.exists():
+            violations.append(
+                "retired XLSX chart owner source returned: "
+                + str(path.relative_to(root))
+            )
+
+    for host, facades in SPREADSHEET_CHART_FACADES.items():
+        for path in facades:
+            absolute_path = root / path
+            if not absolute_path.is_file():
+                continue
+            lines = absolute_path.read_text(encoding="utf-8").splitlines()
+            if len(lines) > MAX_SPREADSHEET_CHART_FACADE_LINES:
+                violations.append(
+                    f"{host} chart facade exceeds "
+                    f"{MAX_SPREADSHEET_CHART_FACADE_LINES} lines: "
+                    f"{path}"
+                )
+            for line_number, line in enumerate(lines, start=1):
+                if LOCAL_SHARED_CHART_TYPE.match(line):
+                    violations.append(
+                        f"{host} chart facade defines shared chart type: "
+                        f"{path}:{line_number}"
+                    )
+                if DRAWINGML_CHART_CODEC.search(line):
+                    violations.append(
+                        f"{host} chart facade directly uses litchi_drawingml chart codec: "
+                        f"{path}:{line_number}"
+                    )
+
+    return sorted(set(violations))
+
+
 def debt_report(policy: Policy, explain: bool) -> list[str]:
     lines = ["ordered migration debt:"]
     items: list[tuple[int, str, str, str]] = []
@@ -639,6 +709,7 @@ def main(argv: list[str] | None = None) -> int:
         audit_manifest_inventory(snapshot)
         + audit_snapshot(snapshot, policy)
         + audit_xlsb_source_topology()
+        + audit_spreadsheet_chart_source_topology()
     )
     if violations:
         for violation in sorted(set(violations)):

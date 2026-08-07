@@ -18,8 +18,6 @@ pub use model::{
 };
 pub use package::{load, load_sheet};
 
-pub(crate) use codec::default_options_extension_xml;
-
 #[cfg(test)]
 pub(crate) use package::resolve_source_name;
 

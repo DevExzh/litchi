@@ -856,8 +856,7 @@ fn worksheet_charts_round_trip_through_binary_drawing_graphs() {
 #[test]
 fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
     use crate::chart::{
-        Anchor, Chart, ExternalDataPart, ExternalDataTarget, Relationship, RelationshipTarget,
-        UserShapesPart,
+        Anchor, Chart, ExternalDataPart, ExternalDataTarget, Relationship, Target, UserShapesPart,
     };
     use litchi_drawingml::chart::{ExtensionList, ShapeProperties};
 
@@ -884,7 +883,7 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
             .with_additional_relationship(Relationship {
                 relationship_id: "rId9".to_string(),
                 relationship_type: rel::IMAGE.to_string(),
-                target: RelationshipTarget::Embedded {
+                target: Target::Embedded {
                     data: b"chart background".to_vec(),
                     content_type: "image/png".to_string(),
                     extension: "png".to_string(),
@@ -893,7 +892,7 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
             .with_additional_relationship(Relationship {
                 relationship_id: "rId10".to_string(),
                 relationship_type: rel::HYPERLINK.to_string(),
-                target: RelationshipTarget::External {
+                target: Target::External {
                     target: "https://example.test/chart".to_string(),
                 },
             })
@@ -906,7 +905,7 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
                 relationships: vec![Relationship {
                     relationship_id: "rId5".to_string(),
                     relationship_type: rel::IMAGE.to_string(),
-                    target: RelationshipTarget::Embedded {
+                    target: Target::Embedded {
                         data: b"shape image".to_vec(),
                         content_type: "image/png".to_string(),
                         extension: "png".to_string(),
@@ -948,7 +947,7 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
     let user_shapes = worksheet_chart.user_shapes_part.as_ref().unwrap();
     assert_eq!(user_shapes.relationships.len(), 1);
     match &user_shapes.relationships[0].target {
-        RelationshipTarget::Embedded { data, .. } => {
+        Target::Embedded { data, .. } => {
             assert_eq!(data, b"shape image");
         },
         other => panic!("unexpected user-shapes target: {other:?}"),
@@ -960,7 +959,7 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
         .find(|relationship| relationship.relationship_id == "rId9")
         .unwrap();
     match &background.target {
-        RelationshipTarget::Embedded { data, .. } => {
+        Target::Embedded { data, .. } => {
             assert_eq!(data, b"chart background");
         },
         other => panic!("unexpected background target: {other:?}"),
@@ -971,7 +970,7 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
         .find(|relationship| relationship.relationship_id == "rId10")
         .unwrap();
     match &hyperlink.target {
-        RelationshipTarget::External { target } => {
+        Target::External { target } => {
             assert_eq!(target, "https://example.test/chart");
         },
         other => panic!("unexpected hyperlink target: {other:?}"),
@@ -995,7 +994,7 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
 
 #[test]
 fn worksheet_chart_validation_and_crud_are_lossless_or_refuse() {
-    use crate::chart::{Anchor, Chart, Relationship, RelationshipTarget, UserShapesPart};
+    use crate::chart::{Anchor, Chart, Relationship, Target, UserShapesPart};
 
     let mut sheet = MutableWorksheet::new("Charts");
     let valid = Chart::bar_chart(
@@ -1025,7 +1024,7 @@ fn worksheet_chart_validation_and_crud_are_lossless_or_refuse() {
     let invalid_relationship = valid.clone().with_additional_relationship(Relationship {
         relationship_id: "not an id".to_string(),
         relationship_type: rel::HYPERLINK.to_string(),
-        target: RelationshipTarget::External {
+        target: Target::External {
             target: "https://example.test".to_string(),
         },
     });

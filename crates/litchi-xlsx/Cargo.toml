@@ -18,6 +18,7 @@ litchi-drawingml = { workspace = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
 litchi-sheet = { workspace = true }
+litchi-spreadsheet-drawing = { workspace = true }
 litchi-vba = { workspace = true }
 memchr = { workspace = true }
 once_cell = { workspace = true }

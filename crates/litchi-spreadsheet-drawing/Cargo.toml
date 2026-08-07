@@ -1,6 +1,6 @@
 [package]
-name = "litchi-xlsb"
-description = "Strict, typed BIFF12 record and workbook semantics for Litchi."
+name = "litchi-spreadsheet-drawing"
+description = "Shared SpreadsheetML chart drawing primitives for Litchi."
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -9,15 +9,9 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-bitflags = { workspace = true }
-chrono = { workspace = true }
-litchi-core = { workspace = true }
 litchi-drawingml = { workspace = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
-litchi-sign = { workspace = true }
-litchi-spreadsheet-drawing = { workspace = true }
-litchi-vba = { workspace = true }
 quick-xml = { workspace = true }
 thiserror = { workspace = true }
 

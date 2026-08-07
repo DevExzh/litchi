@@ -16,7 +16,7 @@ const CHART_SHEET_EXTENT_X: u64 = 8_582_025;
 const CHART_SHEET_EXTENT_Y: u64 = 5_838_825;
 
 pub(crate) fn validate_chart(chart: &Chart) -> Result<()> {
-    crate::chart::validate_chart_anchor(&chart.anchor)?;
+    crate::chart::anchor::validate(&chart.anchor)?;
     crate::package::chart_resources::validate_chart_resources(chart)
 }
 
@@ -93,7 +93,7 @@ pub(crate) fn serialize_drawing(
         write_image_anchor(&mut xml, image, index)?;
         ensure_drawing_size(xml.len())?;
     }
-    crate::chart::write_worksheet_chart_anchors(&mut xml, charts, images.len(), images.len())?;
+    crate::chart::anchor::write_all(&mut xml, charts, images.len(), images.len())?;
     let mut object_count = 0usize;
     for shape in shapes {
         shape

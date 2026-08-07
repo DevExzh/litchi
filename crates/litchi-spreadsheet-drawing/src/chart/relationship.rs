@@ -30,7 +30,7 @@ pub struct ExternalDataPart {
 
 /// Target of a relationship owned by a chart or chart user-shapes part.
 #[derive(Debug, Clone)]
-pub enum RelationshipTarget {
+pub enum Target {
     /// A directly related part embedded in the containing package
     Embedded {
         /// Complete target-part bytes
@@ -55,7 +55,7 @@ pub struct Relationship {
     /// Relationship type URI
     pub relationship_type: String,
     /// Internal payload or external target
-    pub target: RelationshipTarget,
+    pub target: Target,
 }
 
 /// Lossless chart user-shapes XML and its direct relationship targets.
@@ -69,6 +69,7 @@ pub struct UserShapesPart {
 
 impl UserShapesPart {
     /// Create a relationship-free user-shapes drawing part.
+    #[must_use]
     pub fn new(xml: Vec<u8>) -> Self {
         Self {
             xml,
@@ -79,6 +80,7 @@ impl UserShapesPart {
 
 impl ExternalDataPart {
     /// Create an embedded OOXML spreadsheet payload.
+    #[must_use]
     pub fn embedded_workbook(data: Vec<u8>) -> Self {
         Self {
             relationship_type: litchi_opc::constants::relationship_type::PACKAGE.to_string(),
@@ -91,6 +93,7 @@ impl ExternalDataPart {
     }
 
     /// Create a linked OOXML package relationship.
+    #[must_use]
     pub fn linked_package(target: impl Into<String>) -> Self {
         Self {
             relationship_type: litchi_opc::constants::relationship_type::PACKAGE.to_string(),
@@ -101,11 +104,13 @@ impl ExternalDataPart {
     }
 }
 
-pub(crate) fn is_chart_external_data_relationship_type(relationship_type: &str) -> bool {
-    chart_external_data_content_type(relationship_type).is_some()
+#[must_use]
+pub fn is_external_data_type(relationship_type: &str) -> bool {
+    external_data_content_type(relationship_type).is_some()
 }
 
-pub(crate) fn chart_external_data_content_type(relationship_type: &str) -> Option<&'static str> {
+#[must_use]
+pub fn external_data_content_type(relationship_type: &str) -> Option<&'static str> {
     match relationship_type {
         litchi_opc::constants::relationship_type::PACKAGE
         | "http://purl.oclc.org/ooxml/officeDocument/relationships/package" => {
@@ -119,10 +124,31 @@ pub(crate) fn chart_external_data_content_type(relationship_type: &str) -> Optio
     }
 }
 
-pub(crate) fn is_chart_user_shapes_relationship_type(relationship_type: &str) -> bool {
+#[must_use]
+pub fn is_user_shapes_type(relationship_type: &str) -> bool {
     matches!(
         relationship_type,
         litchi_opc::constants::relationship_type::CHART_USER_SHAPES
             | "http://purl.oclc.org/ooxml/officeDocument/relationships/chartUserShapes"
     )
+}
+
+/// Scan relationship IDs referenced from `DrawingML` chart fragments.
+///
+/// # Errors
+///
+/// Returns an error when a chart fragment cannot be parsed as XML.
+pub fn fragment_ids(
+    chart: &litchi_drawingml::chart::model::Chart,
+) -> crate::Result<std::collections::HashSet<String>> {
+    super::codec::fragment_ids(chart)
+}
+
+/// Validate chart user-shapes XML and collect its relationship IDs.
+///
+/// # Errors
+///
+/// Returns an error when the user-shapes XML is malformed or has an invalid root.
+pub fn user_shapes_ids(xml: &[u8]) -> crate::Result<std::collections::HashSet<String>> {
+    super::codec::user_shapes_ids(xml)
 }

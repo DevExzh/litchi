@@ -1,13 +1,11 @@
-//! XLSX chart model and its host integration behavior.
+//! Spreadsheet chart model and host-neutral authoring behavior.
 //!
-//! This module provides integration between the XLSX worksheet API and the
+//! This module provides integration between spreadsheet hosts and the
 //! comprehensive chart implementation in `litchi_drawingml::chart`.
-
-#![allow(dead_code)]
 
 use super::anchor::Anchor;
 use super::relationship::{ExternalDataPart, Relationship, UserShapesPart};
-use crate::error::{Error, Result};
+use crate::{Error, Result};
 use litchi_drawingml::chart::{
     axis::{Axis, CategoryAxis, ValueAxis},
     data::{DataSourceRef, NumericData, RichText, StringData, TitleText},
@@ -44,6 +42,7 @@ pub struct Chart {
 
 impl Chart {
     /// Create a new worksheet chart.
+    #[must_use]
     pub fn new(chart: ChartModel, anchor: Anchor) -> Self {
         Self {
             chart,
@@ -55,6 +54,7 @@ impl Chart {
     }
 
     /// Attach an embedded OOXML workbook as the chart's external data.
+    #[must_use]
     pub fn with_embedded_workbook(mut self, data: Vec<u8>) -> Self {
         self.chart.external_data = Some(litchi_drawingml::chart::ExternalData::pending());
         self.external_data_part = Some(ExternalDataPart::embedded_workbook(data));
@@ -62,6 +62,7 @@ impl Chart {
     }
 
     /// Attach a package-backed external-data relationship.
+    #[must_use]
     pub fn with_external_data_part(
         mut self,
         part: ExternalDataPart,
@@ -75,6 +76,7 @@ impl Chart {
     }
 
     /// Attach a chart user-shapes drawing part.
+    #[must_use]
     pub fn with_user_shapes_part(mut self, part: UserShapesPart) -> Self {
         self.chart.user_shapes = Some(litchi_drawingml::chart::UserShapes::pending());
         self.user_shapes_part = Some(part);
@@ -82,38 +84,10 @@ impl Chart {
     }
 
     /// Add a direct chart-part relationship retained with the worksheet chart.
+    #[must_use]
     pub fn with_additional_relationship(mut self, relationship: Relationship) -> Self {
         self.additional_relationships.push(relationship);
         self
-    }
-
-    /// Convert this chart into a pivot chart bound to a pivot table by name.
-    ///
-    /// Sets the chart's pivot source to `pivot_table_name` (with the default
-    /// format ID) and gives every existing series without an extension list
-    /// the default all-visible drop-zone options. The name is validated
-    /// against the workbook's pivot tables and normalized to its
-    /// sheet-qualified form when the workbook is saved.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the built-in pivot-options fragment fails its
-    /// DrawingML validation. This keeps construction panic-free even if the
-    /// internal fragment changes in a future version.
-    pub fn into_pivot_chart(mut self, pivot_table_name: &str) -> Result<Self> {
-        self.chart.pivot_source = Some(litchi_drawingml::chart::model::PivotSource::new(
-            pivot_table_name,
-            crate::pivot_chart::DEFAULT_PIVOT_CHART_FORMAT_ID,
-        ));
-        let extension = litchi_drawingml::chart::ExtensionList::from_xml(
-            crate::pivot_chart::default_pivot_options_extension_xml(),
-        )?;
-        for_each_series_mut(&mut self.chart, |series| {
-            if series.extension_list.is_none() {
-                series.extension_list = Some(extension.clone());
-            }
-        });
-        Ok(self)
     }
 
     /// Create a simple bar chart from data ranges.
@@ -135,11 +109,19 @@ impl Chart {
     ///     Anchor::new(1, 1, 7, 14),
     /// );
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the chart cannot be constructed.
     pub fn bar_chart(title: &str, categories: &str, values: &str, anchor: Anchor) -> Result<Self> {
         Self::bar_chart_with_cache(title, categories, &[], values, &[], anchor)
     }
 
     /// Create a bar chart with cached data values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the chart cannot be constructed.
     pub fn bar_chart_with_cache(
         title: &str,
         categories: &str,
@@ -157,7 +139,7 @@ impl Chart {
                 source_ref: Some(DataSourceRef {
                     formula: categories.to_string(),
                 }),
-                values: cached_categories.iter().map(|s| s.to_string()).collect(),
+                values: cached_categories.iter().map(ToString::to_string).collect(),
             })
             .with_values(NumericData {
                 source_ref: Some(DataSourceRef {
@@ -182,11 +164,19 @@ impl Chart {
     }
 
     /// Create a simple line chart from data ranges.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the chart cannot be constructed.
     pub fn line_chart(title: &str, categories: &str, values: &str, anchor: Anchor) -> Result<Self> {
         Self::line_chart_with_cache(title, categories, &[], values, &[], anchor)
     }
 
     /// Create a line chart with cached data values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the chart cannot be constructed.
     pub fn line_chart_with_cache(
         title: &str,
         categories: &str,
@@ -204,7 +194,7 @@ impl Chart {
                 source_ref: Some(DataSourceRef {
                     formula: categories.to_string(),
                 }),
-                values: cached_categories.iter().map(|s| s.to_string()).collect(),
+                values: cached_categories.iter().map(ToString::to_string).collect(),
             })
             .with_values(NumericData {
                 source_ref: Some(DataSourceRef {
@@ -229,10 +219,19 @@ impl Chart {
     }
 
     /// Create a simple pie chart from data ranges.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the chart cannot be constructed.
     pub fn pie_chart(title: &str, categories: &str, values: &str, anchor: Anchor) -> Result<Self> {
         Self::pie_chart_with_cache(title, categories, &[], values, &[], anchor)
     }
 
+    /// Create a pie chart with cached data values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the chart cannot be constructed.
     pub fn pie_chart_with_cache(
         title: &str,
         categories: &str,
@@ -250,7 +249,7 @@ impl Chart {
                 source_ref: Some(DataSourceRef {
                     formula: categories.to_string(),
                 }),
-                values: cached_categories.iter().map(|s| s.to_string()).collect(),
+                values: cached_categories.iter().map(ToString::to_string).collect(),
             })
             .with_values(NumericData {
                 source_ref: Some(DataSourceRef {
@@ -269,11 +268,19 @@ impl Chart {
     }
 
     /// Create a simple area chart from data ranges.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the chart cannot be constructed.
     pub fn area_chart(title: &str, categories: &str, values: &str, anchor: Anchor) -> Result<Self> {
         Self::area_chart_with_cache(title, categories, &[], values, &[], anchor)
     }
 
     /// Create an area chart with cached data values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the chart cannot be constructed.
     pub fn area_chart_with_cache(
         title: &str,
         categories: &str,
@@ -291,7 +298,7 @@ impl Chart {
                 source_ref: Some(DataSourceRef {
                     formula: categories.to_string(),
                 }),
-                values: cached_categories.iter().map(|s| s.to_string()).collect(),
+                values: cached_categories.iter().map(ToString::to_string).collect(),
             })
             .with_values(NumericData {
                 source_ref: Some(DataSourceRef {
@@ -316,6 +323,10 @@ impl Chart {
     }
 
     /// Create a simple scatter (XY) chart from data ranges.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the chart cannot be constructed.
     pub fn scatter_chart(
         title: &str,
         x_values: &str,
@@ -325,12 +336,17 @@ impl Chart {
         Self::scatter_chart_with_cache(title, x_values, &[], y_values, &[], anchor)
     }
 
+    /// Create a scatter chart with cached data values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the chart cannot be constructed.
     pub fn scatter_chart_with_cache(
         title: &str,
         x_values: &str,
         cached_x_values: &[f64],
         y_values: &str,
-        cached_y_values: &[f64],
+        cached_ordinate_values: &[f64],
         anchor: Anchor,
     ) -> Result<Self> {
         let mut chart = ChartModel::new();
@@ -349,7 +365,7 @@ impl Chart {
             source_ref: Some(DataSourceRef {
                 formula: y_values.to_string(),
             }),
-            values: cached_y_values.to_vec(),
+            values: cached_ordinate_values.to_vec(),
             format_code: None,
         });
 
@@ -368,6 +384,7 @@ impl Chart {
     }
 
     /// Get the chart type.
+    #[must_use]
     pub fn chart_type(&self) -> ChartModelType {
         if let Some(type_group) = self.chart.plot_area.type_groups.first() {
             match type_group {
@@ -394,6 +411,10 @@ impl Chart {
     /// # Note
     ///
     /// This adds the series to the first type group in the plot area.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the chart has no type group.
     pub fn add_series(&mut self, series: Series) -> Result<()> {
         if let Some(type_group) = self.chart.plot_area.type_groups.first_mut() {
             match type_group {
@@ -423,6 +444,7 @@ impl Chart {
     }
 
     /// Get the number of series in the chart.
+    #[must_use]
     pub fn series_count(&self) -> usize {
         if let Some(type_group) = self.chart.plot_area.type_groups.first() {
             match type_group {
@@ -449,7 +471,7 @@ impl Chart {
     }
 }
 
-fn for_each_series_mut(chart: &mut ChartModel, mut apply: impl FnMut(&mut Series)) {
+pub(super) fn for_each_series_mut(chart: &mut ChartModel, mut apply: impl FnMut(&mut Series)) {
     for type_group in &mut chart.plot_area.type_groups {
         match type_group {
             TypeGroup::Area(g) => g.common.series.iter_mut().for_each(&mut apply),

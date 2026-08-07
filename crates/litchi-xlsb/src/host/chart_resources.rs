@@ -5,7 +5,7 @@
 //! those inert resources without opening linked targets or embedded payloads.
 
 use crate::chart::{
-    Chart, ExternalDataPart, ExternalDataTarget, Relationship, RelationshipTarget, UserShapesPart,
+    Chart, ExternalDataPart, ExternalDataTarget, Relationship, Target, UserShapesPart,
 };
 use crate::package::error::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rel};
@@ -119,7 +119,7 @@ fn validate_chart_resource_metadata(chart: &Chart) -> Result<(Option<String>, Op
         }
     }
 
-    for id in crate::chart::chart_fragment_relationship_ids(&chart.chart)? {
+    for id in crate::chart::relationship::fragment_ids(&chart.chart)? {
         if !chart_ids.contains(id.as_str()) {
             return Err(invalid(format!(
                 "chart fragment references undeclared relationship {id:?}"
@@ -244,7 +244,7 @@ pub(crate) fn parse_chart_resources(
     if chart_relationship_count > MAX_RELATIONSHIPS {
         return Err(limit("chart relationship count"));
     }
-    let chart = litchi_drawingml::chart::reader::read(chart_part.blob())?;
+    let chart = crate::chart::decode(chart_part.blob())?;
     let mut total = 0usize;
     let mut consumed = HashSet::new();
 
@@ -259,7 +259,7 @@ pub(crate) fn parse_chart_resources(
                 "chart external data references missing relationship {id:?}"
             ))
         })?;
-        if !crate::chart::is_chart_external_data_relationship_type(relationship.reltype()) {
+        if !crate::chart::relationship::is_external_data_type(relationship.reltype()) {
             return Err(invalid(format!(
                 "chart external-data relationship {id:?} has invalid type {:?}",
                 relationship.reltype()
@@ -273,8 +273,9 @@ pub(crate) fn parse_chart_resources(
             }
         } else {
             let part = package.get_part(&relationship.target_partname()?)?;
-            let expected = crate::chart::chart_external_data_content_type(relationship.reltype())
-                .expect("external-data relationship type was validated");
+            let expected =
+                crate::chart::relationship::external_data_content_type(relationship.reltype())
+                    .expect("external-data relationship type was validated");
             if part.content_type() != expected || part.rels().iter().next().is_some() {
                 return Err(invalid(
                     "embedded chart external-data part has invalid content type or relationships",
@@ -306,7 +307,7 @@ pub(crate) fn parse_chart_resources(
                 "chart user shapes reference missing relationship {id:?}"
             ))
         })?;
-        if !crate::chart::is_chart_user_shapes_relationship_type(relationship.reltype())
+        if !crate::chart::relationship::is_user_shapes_type(relationship.reltype())
             || relationship.is_external()
         {
             return Err(invalid(format!(
@@ -328,7 +329,7 @@ pub(crate) fn parse_chart_resources(
             return Err(limit("combined chart relationship count"));
         }
         add_resource_bytes(&mut total, part.blob().len())?;
-        let referenced = crate::chart::chart_user_shapes_relationship_ids(part.blob())?;
+        let referenced = crate::chart::relationship::user_shapes_ids(part.blob())?;
         if referenced.len() != part.rels().iter().count()
             || !referenced.iter().all(|id| part.rels().get(id).is_some())
         {
@@ -362,7 +363,7 @@ pub(crate) fn parse_chart_resources(
     for relationship in remaining {
         additional.push(resolve_relationship(package, relationship, &mut total)?);
     }
-    let fragment_ids = crate::chart::chart_fragment_relationship_ids(&chart)?;
+    let fragment_ids = crate::chart::relationship::fragment_ids(&chart)?;
     if !fragment_ids.iter().all(|id| {
         additional
             .iter()
@@ -383,7 +384,7 @@ pub(crate) fn parse_chart_resources(
 
 fn validate_external_data(value: &ExternalDataPart, total: &mut usize) -> Result<()> {
     validate_relationship_type(&value.relationship_type)?;
-    let expected = crate::chart::chart_external_data_content_type(&value.relationship_type)
+    let expected = crate::chart::relationship::external_data_content_type(&value.relationship_type)
         .ok_or_else(|| {
             invalid(format!(
                 "unsupported chart external-data relationship type {:?}",
@@ -413,7 +414,7 @@ fn validate_user_shapes(value: &UserShapesPart, total: &mut usize) -> Result<()>
         return Err(limit("chart user-shapes XML bytes"));
     }
     add_resource_bytes(total, value.xml.len())?;
-    let referenced = crate::chart::chart_user_shapes_relationship_ids(&value.xml)?;
+    let referenced = crate::chart::relationship::user_shapes_ids(&value.xml)?;
     let mut declared = HashSet::with_capacity(value.relationships.len());
     for relationship in &value.relationships {
         validate_relationship(relationship, total)?;
@@ -438,12 +439,12 @@ fn validate_relationship(value: &Relationship, total: &mut usize) -> Result<()> 
     validate_relationship_id(&value.relationship_id)?;
     validate_relationship_type(&value.relationship_type)?;
     match &value.target {
-        RelationshipTarget::Embedded {
+        Target::Embedded {
             data,
             content_type,
             extension,
         } => validate_embedded(data, content_type, extension, total),
-        RelationshipTarget::External { target } => validate_external_target(target),
+        Target::External { target } => validate_external_target(target),
     }
 }
 
@@ -530,13 +531,13 @@ fn add_resource_bytes(total: &mut usize, size: usize) -> Result<()> {
 }
 
 fn author_relationship_target(
-    target: &RelationshipTarget,
+    target: &Target,
     directory: &str,
     stem: &str,
     parts: &mut Vec<BlobPart>,
 ) -> Result<(String, bool)> {
     match target {
-        RelationshipTarget::Embedded {
+        Target::Embedded {
             data,
             content_type,
             extension,
@@ -549,7 +550,7 @@ fn author_relationship_target(
             ));
             Ok((format!("../{directory}/{filename}"), false))
         },
-        RelationshipTarget::External { target } => Ok((target.clone(), true)),
+        Target::External { target } => Ok((target.clone(), true)),
     }
 }
 
@@ -599,15 +600,12 @@ fn validated_chart_xml(
     external_data_id: Option<&str>,
     user_shapes_id: Option<&str>,
 ) -> Result<Vec<u8>> {
-    let xml = crate::chart::generate_chart_xml_with_external_data_id(
-        &chart.chart,
-        external_data_id,
-        user_shapes_id,
-    )?;
+    let xml =
+        crate::chart::write_with_external_data_id(&chart.chart, external_data_id, user_shapes_id)?;
     if xml.len() > MAX_CHART_XML_BYTES {
         return Err(limit("chart XML bytes"));
     }
-    litchi_drawingml::chart::reader::read(xml.as_slice())?;
+    crate::chart::decode(xml.as_slice())?;
     Ok(xml)
 }
 
@@ -647,7 +645,7 @@ fn resolve_relationship(
     validate_relationship_type(relationship.reltype())?;
     let target = if relationship.is_external() {
         validate_external_target(relationship.target_ref())?;
-        RelationshipTarget::External {
+        Target::External {
             target: relationship.target_ref().to_string(),
         }
     } else {
@@ -659,7 +657,7 @@ fn resolve_relationship(
             )));
         }
         add_resource_bytes(total, part.blob().len())?;
-        RelationshipTarget::Embedded {
+        Target::Embedded {
             data: part.blob().to_vec(),
             content_type: part.content_type().to_string(),
             extension: validated_part_extension(part.partname())?,
@@ -704,7 +702,7 @@ mod tests {
         )
         .unwrap();
         worksheet_chart.chart.external_data = Some(ExternalData::new("rId1"));
-        let xml = crate::chart::generate_chart_xml(&worksheet_chart.chart).unwrap();
+        let xml = crate::chart::write(&worksheet_chart.chart).unwrap();
         let uri = PackURI::new("/xl/charts/chart1.xml").unwrap();
         let mut package = OpcPackage::new();
         package.add_part(Box::new(BlobPart::new(

@@ -136,6 +136,7 @@ litchi-pptx         = { version = "0.0.1", path = "crates/litchi-pptx" }
 litchi-rtf          = { version = "0.0.1", path = "crates/litchi-rtf" }
 litchi-sheet        = { version = "0.0.1", path = "crates/litchi-sheet" }
 litchi-sign         = { version = "0.0.1", path = "crates/litchi-sign" }
+litchi-spreadsheet-drawing = { version = "0.0.1", path = "crates/litchi-spreadsheet-drawing" }
 litchi-slide        = { version = "0.0.1", path = "crates/litchi-slide" }
 litchi-vba          = { version = "0.0.1", path = "crates/litchi-vba" }
 litchi-word         = { version = "0.0.1", path = "crates/litchi-word" }

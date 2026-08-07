@@ -1,8 +1,8 @@
-//! DrawingML chart and user-shapes XML boundaries.
+//! `DrawingML` chart and user-shapes XML boundaries.
 
 use super::anchor::Anchor;
 use super::model::Chart;
-use crate::error::{Error, Result};
+use crate::{Error, Result};
 use litchi_drawingml::chart::{axis::Axis, model::Chart as ChartModel, plot_area::TypeGroup};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
@@ -11,20 +11,43 @@ use quick_xml::reader::NsReader;
 use std::collections::HashSet;
 
 /// Parse a chart from chart XML and its worksheet anchor.
-pub fn parse_chart_from_xml(chart_xml: &[u8], anchor: Anchor) -> Result<Chart> {
-    let chart = litchi_drawingml::chart::reader::read(chart_xml)?;
+///
+/// # Errors
+///
+/// Returns an error when the chart XML cannot be decoded.
+pub fn read(chart_xml: &[u8], anchor: Anchor) -> Result<Chart> {
+    let chart = decode(chart_xml)?;
     Ok(Chart::new(chart, anchor))
 }
 
+/// Decode one `c:chartSpace` payload without attaching a worksheet anchor.
+///
+/// # Errors
+///
+/// Returns an error when the `DrawingML` chart payload is malformed or violates
+/// a modeled chart invariant.
+pub fn decode(chart_xml: &[u8]) -> Result<ChartModel> {
+    Ok(litchi_drawingml::chart::reader::read(chart_xml)?)
+}
+
 /// Generate chart XML for a worksheet chart.
-pub fn generate_chart_xml(chart: &ChartModel) -> Result<Vec<u8>> {
+///
+/// # Errors
+///
+/// Returns an error when the chart cannot be encoded as XML.
+pub fn write(chart: &ChartModel) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     litchi_drawingml::chart::writer::write(&mut output, chart)
-        .map_err(|e| Error::Invalid(e.to_string()))?;
+        .map_err(|error| Error::Encoding(error.to_string()))?;
     Ok(output)
 }
 
-pub(crate) fn generate_chart_xml_with_external_data_id(
+/// Generate chart XML with external-data and user-shapes relationship IDs.
+///
+/// # Errors
+///
+/// Returns an error when the chart cannot be encoded as XML.
+pub fn write_with_external_data_id(
     chart: &ChartModel,
     external_data_relationship_id: Option<&str>,
     user_shapes_relationship_id: Option<&str>,
@@ -36,18 +59,22 @@ pub(crate) fn generate_chart_xml_with_external_data_id(
         external_data_relationship_id,
         user_shapes_relationship_id,
     )
-    .map_err(|e| Error::Invalid(e.to_string()))?;
+    .map_err(|error| Error::Encoding(error.to_string()))?;
     Ok(output)
 }
 
-pub(crate) fn chart_user_shapes_relationship_ids(xml: &[u8]) -> Result<HashSet<String>> {
+/// # Errors
+///
+/// Returns an error when the user-shapes XML is malformed or has an invalid root.
+pub(crate) fn user_shapes_ids(xml: &[u8]) -> Result<HashSet<String>> {
     const RELATIONSHIPS_NAMESPACE: &[u8] =
         b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     const STRICT_RELATIONSHIPS_NAMESPACE: &[u8] =
         b"http://purl.oclc.org/ooxml/officeDocument/relationships";
 
-    let xml = litchi_ooxml_common::mce::process_ooxml(xml)?;
-    let mut reader = NsReader::from_reader(xml.as_ref());
+    let processed_xml = litchi_ooxml_common::mce::process_ooxml(xml)
+        .map_err(|error| Error::Encoding(error.to_string()))?;
+    let mut reader = NsReader::from_reader(processed_xml.as_ref());
     let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut saw_root = false;
@@ -56,7 +83,7 @@ pub(crate) fn chart_user_shapes_relationship_ids(xml: &[u8]) -> Result<HashSet<S
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::Invalid(error.to_string()))?;
+            .map_err(|error| Error::Encoding(error.to_string()))?;
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
                 if depth == 0 {
@@ -73,8 +100,9 @@ pub(crate) fn chart_user_shapes_relationship_ids(xml: &[u8]) -> Result<HashSet<S
                     }
                     saw_root = true;
                 }
-                for attribute in element.attributes() {
-                    let attribute = attribute.map_err(|error| Error::Invalid(error.to_string()))?;
+                for attribute_result in element.attributes() {
+                    let attribute =
+                        attribute_result.map_err(|error| Error::Encoding(error.to_string()))?;
                     let (attribute_namespace, _) =
                         reader.resolver().resolve_attribute(attribute.key);
                     if matches!(
@@ -89,7 +117,7 @@ pub(crate) fn chart_user_shapes_relationship_ids(xml: &[u8]) -> Result<HashSet<S
                                     XmlVersion::Explicit1_0,
                                     reader.decoder(),
                                 )
-                                .map_err(|error| Error::Invalid(error.to_string()))?
+                                .map_err(|error| Error::Encoding(error.to_string()))?
                                 .into_owned(),
                         );
                     }
@@ -126,7 +154,7 @@ pub(crate) fn chart_user_shapes_relationship_ids(xml: &[u8]) -> Result<HashSet<S
                 if depth == 0
                     && !text
                         .decode()
-                        .map_err(|error| Error::Invalid(error.to_string()))?
+                        .map_err(|error| Error::Encoding(error.to_string()))?
                         .trim()
                         .is_empty() =>
             {
@@ -145,7 +173,12 @@ pub(crate) fn chart_user_shapes_relationship_ids(xml: &[u8]) -> Result<HashSet<S
                 ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_) => {},
         }
         buffer.clear();
     }
@@ -161,7 +194,9 @@ fn append_chart_line_fragment<'a>(
     fragments: &mut Vec<&'a [u8]>,
     lines: Option<&'a litchi_drawingml::chart::Lines>,
 ) {
-    if let Some(shape_properties) = lines.and_then(|lines| lines.shape_properties.as_ref()) {
+    if let Some(shape_properties) =
+        lines.and_then(|chart_lines| chart_lines.shape_properties.as_ref())
+    {
         fragments.push(shape_properties.as_xml());
     }
 }
@@ -170,12 +205,12 @@ fn append_up_down_bar_fragments<'a>(
     fragments: &mut Vec<&'a [u8]>,
     bars: Option<&'a litchi_drawingml::chart::UpDownBars>,
 ) {
-    let Some(bars) = bars else {
+    let Some(up_down_bars) = bars else {
         return;
     };
-    append_chart_line_fragment(fragments, bars.up_bars.as_ref());
-    append_chart_line_fragment(fragments, bars.down_bars.as_ref());
-    if let Some(extension_list) = bars.extension_list.as_ref() {
+    append_chart_line_fragment(fragments, up_down_bars.up_bars.as_ref());
+    append_chart_line_fragment(fragments, up_down_bars.down_bars.as_ref());
+    if let Some(extension_list) = up_down_bars.extension_list.as_ref() {
         fragments.push(extension_list.as_xml());
     }
 }
@@ -184,16 +219,16 @@ fn append_point_data_label_fragments<'a>(
     fragments: &mut Vec<&'a [u8]>,
     label: Option<&'a litchi_drawingml::chart::DataLabel>,
 ) {
-    let Some(label) = label else {
+    let Some(data_label) = label else {
         return;
     };
-    if let Some(shape_properties) = label.shape_properties.as_ref() {
+    if let Some(shape_properties) = data_label.shape_properties.as_ref() {
         fragments.push(shape_properties.as_xml());
     }
-    if let Some(text_properties) = label.text_properties.as_ref() {
+    if let Some(text_properties) = data_label.text_properties.as_ref() {
         fragments.push(text_properties.as_xml());
     }
-    if let Some(extension_list) = label.extension_list.as_ref() {
+    if let Some(extension_list) = data_label.extension_list.as_ref() {
         fragments.push(extension_list.as_xml());
     }
 }
@@ -202,25 +237,25 @@ fn append_data_label_fragments<'a>(
     fragments: &mut Vec<&'a [u8]>,
     labels: Option<&'a litchi_drawingml::chart::DataLabels>,
 ) {
-    let Some(labels) = labels else {
+    let Some(data_labels) = labels else {
         return;
     };
-    if let Some(shape_properties) = labels.shape_properties.as_ref() {
+    if let Some(shape_properties) = data_labels.shape_properties.as_ref() {
         fragments.push(shape_properties.as_xml());
     }
-    if let Some(text_properties) = labels.text_properties.as_ref() {
+    if let Some(text_properties) = data_labels.text_properties.as_ref() {
         fragments.push(text_properties.as_xml());
     }
-    append_chart_line_fragment(fragments, labels.leader_lines.as_ref());
-    if let Some(extension_list) = labels.extension_list.as_ref() {
+    append_chart_line_fragment(fragments, data_labels.leader_lines.as_ref());
+    if let Some(extension_list) = data_labels.extension_list.as_ref() {
         fragments.push(extension_list.as_xml());
     }
-    for label in &labels.labels {
+    for label in &data_labels.labels {
         append_point_data_label_fragments(fragments, Some(label));
     }
 }
 
-pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<HashSet<String>> {
+pub(crate) fn fragment_ids(chart: &ChartModel) -> Result<HashSet<String>> {
     const RELATIONSHIPS_NAMESPACE: &[u8] =
         b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     const STRICT_RELATIONSHIPS_NAMESPACE: &[u8] =
@@ -438,8 +473,8 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
             .into_iter()
             .flatten(),
         );
-        if let Axis::Value(axis) = axis
-            && let Some(display_units) = axis.display_units.as_ref()
+        if let Axis::Value(value_axis) = axis
+            && let Some(display_units) = value_axis.display_units.as_ref()
         {
             fragments.extend(
                 [
@@ -461,39 +496,39 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
             );
         }
     }
-    for group in &chart.plot_area.type_groups {
-        match group {
-            TypeGroup::Area(group) => {
-                append_chart_line_fragment(&mut fragments, group.drop_lines.as_ref());
+    for type_group in &chart.plot_area.type_groups {
+        match type_group {
+            TypeGroup::Area(area_group) => {
+                append_chart_line_fragment(&mut fragments, area_group.drop_lines.as_ref());
             },
-            TypeGroup::Area3D(group) => {
-                append_chart_line_fragment(&mut fragments, group.drop_lines.as_ref());
+            TypeGroup::Area3D(area_group) => {
+                append_chart_line_fragment(&mut fragments, area_group.drop_lines.as_ref());
             },
-            TypeGroup::Bar(group) => {
-                for lines in &group.series_lines {
+            TypeGroup::Bar(bar_group) => {
+                for lines in &bar_group.series_lines {
                     append_chart_line_fragment(&mut fragments, Some(lines));
                 }
             },
-            TypeGroup::Line(group) => {
-                append_chart_line_fragment(&mut fragments, group.drop_lines.as_ref());
-                append_chart_line_fragment(&mut fragments, group.high_low_lines.as_ref());
-                append_up_down_bar_fragments(&mut fragments, group.up_down_bars.as_ref());
+            TypeGroup::Line(line_group) => {
+                append_chart_line_fragment(&mut fragments, line_group.drop_lines.as_ref());
+                append_chart_line_fragment(&mut fragments, line_group.high_low_lines.as_ref());
+                append_up_down_bar_fragments(&mut fragments, line_group.up_down_bars.as_ref());
             },
-            TypeGroup::Line3D(group) => {
-                append_chart_line_fragment(&mut fragments, group.drop_lines.as_ref());
+            TypeGroup::Line3D(line_group) => {
+                append_chart_line_fragment(&mut fragments, line_group.drop_lines.as_ref());
             },
-            TypeGroup::OfPie(group) => {
-                for lines in &group.series_lines {
+            TypeGroup::OfPie(of_pie_group) => {
+                for lines in &of_pie_group.series_lines {
                     append_chart_line_fragment(&mut fragments, Some(lines));
                 }
             },
-            TypeGroup::Stock(group) => {
-                append_chart_line_fragment(&mut fragments, group.drop_lines.as_ref());
-                append_chart_line_fragment(&mut fragments, group.high_low_lines.as_ref());
-                append_up_down_bar_fragments(&mut fragments, group.up_down_bars.as_ref());
+            TypeGroup::Stock(stock_group) => {
+                append_chart_line_fragment(&mut fragments, stock_group.drop_lines.as_ref());
+                append_chart_line_fragment(&mut fragments, stock_group.high_low_lines.as_ref());
+                append_up_down_bar_fragments(&mut fragments, stock_group.up_down_bars.as_ref());
             },
-            TypeGroup::Surface(group) => {
-                if let Some(formats) = group.band_formats.as_ref() {
+            TypeGroup::Surface(surface_group) => {
+                if let Some(formats) = surface_group.band_formats.as_ref() {
                     for format in formats {
                         if let Some(shape_properties) = format.shape_properties.as_ref() {
                             fragments.push(shape_properties.as_xml());
@@ -501,8 +536,8 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                     }
                 }
             },
-            TypeGroup::Surface3D(group) => {
-                if let Some(formats) = group.band_formats.as_ref() {
+            TypeGroup::Surface3D(surface_group) => {
+                if let Some(formats) = surface_group.band_formats.as_ref() {
                     for format in formats {
                         if let Some(shape_properties) = format.shape_properties.as_ref() {
                             fragments.push(shape_properties.as_xml());
@@ -510,9 +545,15 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                     }
                 }
             },
-            _ => {},
+            TypeGroup::Bar3D(_)
+            | TypeGroup::Bubble(_)
+            | TypeGroup::Doughnut(_)
+            | TypeGroup::Pie(_)
+            | TypeGroup::Pie3D(_)
+            | TypeGroup::Radar(_)
+            | TypeGroup::Scatter(_) => {},
         }
-        for series in &group.common().series {
+        for series in &type_group.common().series {
             fragments.extend(
                 [
                     series
@@ -597,7 +638,7 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                 );
             }
         }
-        if let Some(extension_list) = group.common().extension_list.as_ref() {
+        if let Some(extension_list) = type_group.common().extension_list.as_ref() {
             fragments.push(extension_list.as_xml());
         }
     }
@@ -607,12 +648,12 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
         loop {
             let (_, event) = reader
                 .read_resolved_event_into(&mut buffer)
-                .map_err(|error| Error::Invalid(error.to_string()))?;
+                .map_err(|error| Error::Encoding(error.to_string()))?;
             match event {
                 Event::Start(ref element) | Event::Empty(ref element) => {
-                    for attribute in element.attributes() {
+                    for attribute_result in element.attributes() {
                         let attribute =
-                            attribute.map_err(|error| Error::Invalid(error.to_string()))?;
+                            attribute_result.map_err(|error| Error::Encoding(error.to_string()))?;
                         let (attribute_namespace, _) =
                             reader.resolver().resolve_attribute(attribute.key);
                         if matches!(
@@ -627,14 +668,21 @@ pub(crate) fn chart_fragment_relationship_ids(chart: &ChartModel) -> Result<Hash
                                         XmlVersion::Explicit1_0,
                                         reader.decoder(),
                                     )
-                                    .map_err(|error| Error::Invalid(error.to_string()))?
+                                    .map_err(|error| Error::Encoding(error.to_string()))?
                                     .into_owned(),
                             );
                         }
                     }
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::End(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
             }
             buffer.clear();
         }

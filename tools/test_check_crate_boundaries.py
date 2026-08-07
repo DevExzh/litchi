@@ -168,6 +168,27 @@ class BoundaryPolicyTests(unittest.TestCase):
         self.assertIn(edge, self.policy.canonical_edges)
         self.assertNotIn(edge, self.policy.migration_edges)
 
+    def test_spreadsheet_drawing_owner_and_host_edges_are_canonical(self) -> None:
+        owner = "litchi-spreadsheet-drawing"
+        dependencies = {
+            "litchi-drawingml",
+            "litchi-ooxml-common",
+            "litchi-opc",
+        }
+
+        self.assertEqual(
+            {
+                edge.dependency
+                for edge in self.policy.canonical_edges
+                if edge.dependent == owner
+            },
+            dependencies,
+        )
+        for host in ("litchi-xlsb", "litchi-xlsx"):
+            edge = boundaries.Edge(host, owner)
+            self.assertIn(edge, self.policy.canonical_edges)
+            self.assertNotIn(edge, self.policy.migration_edges)
+
     def test_resolved_migration_edge_requires_policy_cleanup(self) -> None:
         snapshot = valid_snapshot(self.policy)
         edge = boundaries.Edge("litchi-pptx", "litchi-drawingml")
@@ -309,6 +330,93 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [
                     "retired XLSB package::xlsx path: "
                     "crates/litchi-xlsb/src/writer.rs:1"
+                ],
+            )
+
+    def test_retired_xlsx_chart_owner_sources_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for retired in boundaries.RETIRED_XLSX_CHART_FILES:
+                path = root / boundaries.XLSX_SOURCE_ROOT / retired
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("// retired owner\n", encoding="utf-8")
+
+            violations = boundaries.audit_spreadsheet_chart_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "retired XLSX chart owner source returned: "
+                    f"{boundaries.XLSX_SOURCE_ROOT / retired}"
+                    for retired in boundaries.RETIRED_XLSX_CHART_FILES
+                ],
+            )
+
+    def test_spreadsheet_chart_facades_must_remain_thin(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for facades in boundaries.SPREADSHEET_CHART_FACADES.values():
+                path = root / facades[0]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "// facade\n"
+                    * (boundaries.MAX_SPREADSHEET_CHART_FACADE_LINES + 1),
+                    encoding="utf-8",
+                )
+
+            violations = boundaries.audit_spreadsheet_chart_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "litchi-xlsb chart facade exceeds "
+                    f"{boundaries.MAX_SPREADSHEET_CHART_FACADE_LINES} lines: "
+                    "crates/litchi-xlsb/src/chart.rs",
+                    "litchi-xlsx chart facade exceeds "
+                    f"{boundaries.MAX_SPREADSHEET_CHART_FACADE_LINES} lines: "
+                    "crates/litchi-xlsx/src/chart.rs",
+                ],
+            )
+
+    def test_chart_facades_cannot_define_shared_chart_types(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for host, facades in boundaries.SPREADSHEET_CHART_FACADES.items():
+                path = root / facades[0]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("pub struct Chart;\n", encoding="utf-8")
+
+            violations = boundaries.audit_spreadsheet_chart_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "litchi-xlsb chart facade defines shared chart type: "
+                    "crates/litchi-xlsb/src/chart.rs:1",
+                    "litchi-xlsx chart facade defines shared chart type: "
+                    "crates/litchi-xlsx/src/chart.rs:1",
+                ],
+            )
+
+    def test_chart_facades_cannot_directly_use_drawingml_chart_codecs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for host, facades in boundaries.SPREADSHEET_CHART_FACADES.items():
+                path = root / facades[0]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "litchi_drawingml::chart::read_chart();\n", encoding="utf-8"
+                )
+
+            violations = boundaries.audit_spreadsheet_chart_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "litchi-xlsb chart facade directly uses litchi_drawingml chart codec: "
+                    "crates/litchi-xlsb/src/chart.rs:1",
+                    "litchi-xlsx chart facade directly uses litchi_drawingml chart codec: "
+                    "crates/litchi-xlsx/src/chart.rs:1",
                 ],
             )
 
