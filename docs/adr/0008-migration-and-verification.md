@@ -7352,3 +7352,65 @@ This is not full host retirement, a durable patch, atomic filesystem
 publication, an aggregate transaction peak-memory policy, fuzz/sanitizer
 completion, or a performance result. The host legacy-normalizing compatibility
 writer and the 16 ordered dependency debts remain deletion blockers.
+
+## 2026-08-08 amendment: Pages section-pagination transaction evidence
+
+The concrete Pages package now reads and edits native section-start,
+continue/restart, and starting-page-number fields through `SectionSelector` and
+the presence-preserving `Pagination` value. A strict bounded `WireView`
+preflight rejects duplicate selected fields, wrong wire types, noncanonical
+keys or values, values outside `u32`, and page zero. A private generated Buffa
+lazy view then independently projects only fields 20--22 with zero unknown-field
+and repeated-element retention. The projection is provenance-checked against
+`TPArchives.proto`, has a 1 KiB source ceiling, generates five files under a
+64 KiB build ceiling, and has no production encode path.
+
+The mutation rewrites one selected section payload in one component. Unchanged
+recognized records and every unrelated or unknown field record remain exact;
+changed recognized records keep their source position, and newly present fields
+are appended in numeric order. The complete IWA object header is preserved with
+the bounded core replacement helper, the ZIP is reassembled with one entry
+edit, and the candidate is fully reopened under the source limits before
+semantic publication. Exact no-ops retain the original `Arc` and bytes, public
+inverse replay restores the exact source, and changed legacy nested-`Index.zip`
+sources fail as `UnsupportedSource`. The legacy settings and background writers
+were also moved to the same header-preserving bounded replacement helper.
+
+Focused adversarial coverage exercises all 27 absent/default/nondefault
+combinations, exact-name and position selectors, missing and ambiguous
+selection, duplicate fields, wrong wire types, noncanonical keys and varints,
+page zero, changed-legacy refusal, unknown payload/header/ZIP-record
+preservation, one-component mutation, patch conflict and inverse behavior,
+retained output limits, exact no-op allocation identity, redacted diagnostics,
+and `Send + Sync`. The executed Pages all-features/all-targets gate passed 53
+library tests, one native-fixture test, five section-name tests, and all six
+new pagination tests. The root Pages facade passed three tests;
+`litchi-iwa-protos` passed 41 tests; and both focused migration-host regressions
+passed. Warning-denied Clippy passed for all Pages targets, the protobuf crate,
+and the focused facade. Warning-denied rustdoc, formatting, diff checks, the
+iWork public-API gate, and the boundary checker passed. The boundary checker
+reports 63 workspace packages, 223 internal dependency declarations, and 16
+ordered debts. The unrelated root `litchi` manifest remains rejected by the
+repository-wide sort check and is not represented as newly green.
+
+Computer Use exercised the Rust-authored artifact in Apple Pages 14.4. The
+candidate
+`/private/tmp/litchi-pages-pagination-20260808.3xZUeE/pagination-right-restart-7.pages`
+has SHA-256
+`41f7bfc700a4d6342f5fc5f1324574775c5c1fa77d7edc2ab4d520d7da7b3737`;
+its public inverse restored the exact fixture hash
+`21107bc9323fba6f1589152454c0b0b0cc8e239313c6a369bc4a891116601b42`.
+Pages opened it without repair, recovery, or conversion, retained all three
+fixture body markers, labeled the canvas page 7, and showed restarted numbering
+with `Start at: 7` in the Section inspector. Save As, close, and reopen produced
+`/private/tmp/litchi-pages-pagination-20260808.3xZUeE/pages-resaved.pages`
+with SHA-256
+`0a9f7e1238f295fee38da2745a77c9bd92101341a783d8ce75389c72a2be3abe`.
+Focused reverse-read recovered right-page start, restarted numbering, and page
+7; restaging those settings emitted a byte-identical no-op with the same hash.
+
+This is not full host retirement, durable patch serialization, atomic
+filesystem publication, an aggregate transaction peak-memory policy, a
+latency/RSS/allocation result, or fuzz/sanitizer completion. The remaining
+Pages editors, host compatibility surface, examples/tests/fuzz inventory, and
+all 16 ordered dependency debts remain deletion blockers.

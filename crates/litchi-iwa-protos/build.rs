@@ -15,6 +15,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed={BUFFA_PROJECTION_DIRECTORY}");
     println!("cargo:rerun-if-changed=src/group_node_category_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
+    println!("cargo:rerun-if-changed=src/pages_section_codec.rs");
 
     let mut proto_files = fs::read_dir(proto_directory)?
         .map(|directory_entry| directory_entry.map(|entry| entry.path()))
@@ -32,6 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     enforce_group_node_category_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_document_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_show_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_pages_section_projection_provenance(proto_directory, buffa_projection_directory)?;
 
     prost_build::Config::new()
         .include_file("iwa_protos.rs")
@@ -140,6 +142,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_keynote_show_projection_budget(&buffa_keynote_show_out_directory)?;
+
+    // Pages section pagination is three optional scalar values. Keep all
+    // template, name, and fill data outside generated code and decode the
+    // selected values through a borrowed lazy view.
+    let buffa_pages_section_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-pages-section");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TPSectionArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_pages_section_out_directory)
+        .include_file("iwa_pages_section_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_pages_section_projection_budget(&buffa_pages_section_out_directory)?;
 
     Ok(())
 }
@@ -329,6 +351,42 @@ fn enforce_keynote_show_projection_provenance(
     Ok(())
 }
 
+fn enforce_pages_section_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const CANONICAL_FIELDS: [&str; 3] = [
+        "optional uint32 section_start_kind = 20;",
+        "optional uint32 section_page_number_kind = 21;",
+        "optional uint32 section_page_number_start = 22;",
+    ];
+    const PROJECTION_MESSAGE: &str = "message PagesSectionPaginationArchive {\n  optional uint32 section_start_kind = 20;\n  optional uint32 section_page_number_kind = 21;\n  optional uint32 section_page_number_start = 22;\n}";
+
+    let pages = fs::read_to_string(proto_directory.join("TPArchives.proto"))?;
+    let projection = fs::read_to_string(projection_directory.join("TPSectionArchive.proto"))?;
+    let codec = fs::read_to_string("src/pages_section_codec.rs")?;
+    let production_codec = codec
+        .split_once("#[cfg(test)]")
+        .map_or(codec.as_str(), |(production, _tests)| production);
+    if !CANONICAL_FIELDS
+        .iter()
+        .all(|declaration| pages.matches(declaration).count() == 1)
+        || projection.matches(PROJECTION_MESSAGE).count() != 1
+        || projection.len() > 1024
+        || projection.contains("repeated ")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "derived Pages section projection drifted from TP.SectionArchive fields 20--22, exceeded its 1 KiB source budget, introduced generated repeated storage, or added production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 fn enforce_text_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
     const EXPECTED_FILES: usize = 5;
     const MAX_GENERATED_BYTES: u64 = 32 * 1024;
@@ -446,6 +504,42 @@ fn enforce_keynote_show_projection_budget(directory: &Path) -> Result<(), Box<dy
     if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || generated_repeated_views != 0 {
         return Err(format!(
             "Keynote show projection generated {files} files/{bytes} bytes/{generated_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_pages_section_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 64 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut generated_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        generated_repeated_views = generated_repeated_views
+            .checked_add(
+                fs::read_to_string(entry.path())?
+                    .matches("LazyRepeatedView")
+                    .count(),
+            )
+            .ok_or("generated repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || generated_repeated_views != 0 {
+        return Err(format!(
+            "Pages section projection generated {files} files/{bytes} bytes/{generated_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

@@ -39,6 +39,7 @@ impl PagesEditor {
         }
 
         let mut staged = self.text.package().clone();
+        let archive_limits = staged.limits().effective_archive_limits()?;
         let archive_name = find_section_archive(&staged, section_id)?;
         staged.update_archive(&archive_name, |archive| {
             let object = archive.object_mut(section_id).ok_or_else(|| {
@@ -138,12 +139,13 @@ impl PagesEditor {
                     "Pages section {section_id} settings patch failed validation"
                 )));
             }
-            object.replace_message(
+            object.replace_message_preserving_header_with_limits(
                 message_index,
                 RawMessage {
                     type_: SECTION_MESSAGE_TYPE,
                     data,
                 },
+                archive_limits,
             )?;
             Ok(())
         })?;
@@ -182,6 +184,7 @@ impl PagesEditor {
         }
 
         let mut staged = self.text.package().clone();
+        let archive_limits = staged.limits().effective_archive_limits()?;
         let archive_name = find_section_archive(&staged, section_id)?;
         staged.update_archive(&archive_name, |archive| {
             let object = archive.object_mut(section_id).ok_or_else(|| {
@@ -215,12 +218,13 @@ impl PagesEditor {
                 payload,
             )?;
             decode_section_settings(&data)?;
-            object.replace_message(
+            object.replace_message_preserving_header_with_limits(
                 message_index,
                 RawMessage {
                     type_: SECTION_MESSAGE_TYPE,
                     data,
                 },
+                archive_limits,
             )?;
             Ok(())
         })?;

@@ -5,6 +5,7 @@
 //! semantic content is represented by the archive-free [`crate::Document`].
 
 mod section_name;
+mod section_pagination;
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -34,6 +35,10 @@ use crate::{
 pub use section_name::{
     SectionNameCommit, SectionNameDiagnostics, SectionNameEdit, SectionNameError,
     SectionNameLimitKind, SectionNamePatch,
+};
+pub use section_pagination::{
+    SectionPaginationCommit, SectionPaginationDiagnostics, SectionPaginationEdit,
+    SectionPaginationError, SectionPaginationLimitKind, SectionPaginationPatch,
 };
 
 const SECTION_MESSAGE_TYPE: u32 = 10_011;

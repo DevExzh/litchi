@@ -28,6 +28,104 @@ pub enum Error {
 /// Result type for section pagination construction.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Lossless pagination settings stored directly on a Pages section.
+///
+/// Every value retains native protobuf presence. In particular, an absent
+/// start or numbering mode remains distinct from an explicitly encoded
+/// default value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct Pagination {
+    start: Option<Start>,
+    page_numbering: Option<PageNumbering>,
+    starting_page_number: Option<PageNumber>,
+}
+
+impl Pagination {
+    /// Construct pagination with every optional native field absent.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            start: None,
+            page_numbering: None,
+            starting_page_number: None,
+        }
+    }
+
+    /// Return the optional section-start behavior.
+    #[must_use]
+    pub const fn start(self) -> Option<Start> {
+        self.start
+    }
+
+    /// Set or clear the section-start behavior.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NonCanonicalStart`] when a known native value is
+    /// represented by an `Unknown` variant.
+    pub const fn set_start(&mut self, value: Option<Start>) -> Result<()> {
+        if let Some(candidate) = value
+            && !candidate.is_canonical()
+        {
+            return Err(Error::NonCanonicalStart);
+        }
+        self.start = value;
+        Ok(())
+    }
+
+    /// Return the optional page-numbering behavior.
+    #[must_use]
+    pub const fn page_numbering(self) -> Option<PageNumbering> {
+        self.page_numbering
+    }
+
+    /// Set or clear the page-numbering behavior.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NonCanonicalNumbering`] when a known native value is
+    /// represented by an `Unknown` variant.
+    pub const fn set_page_numbering(&mut self, value: Option<PageNumbering>) -> Result<()> {
+        if let Some(candidate) = value
+            && !candidate.is_canonical()
+        {
+            return Err(Error::NonCanonicalNumbering);
+        }
+        self.page_numbering = value;
+        Ok(())
+    }
+
+    /// Return the optional first page number.
+    #[must_use]
+    pub const fn starting_page_number(self) -> Option<PageNumber> {
+        self.starting_page_number
+    }
+
+    /// Set or clear the first page number.
+    pub const fn set_starting_page_number(&mut self, value: Option<PageNumber>) {
+        self.starting_page_number = value;
+    }
+
+    /// Validate every semantic invariant before archive publication.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a known native enumeration value is represented by
+    /// an `Unknown` variant.
+    pub fn validate(self) -> Result<()> {
+        if self.start.is_some_and(|value| !value.is_canonical()) {
+            return Err(Error::NonCanonicalStart);
+        }
+        if self
+            .page_numbering
+            .is_some_and(|value| !value.is_canonical())
+        {
+            return Err(Error::NonCanonicalNumbering);
+        }
+        Ok(())
+    }
+}
+
 /// Page on which a Pages section begins when facing pages are enabled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -188,7 +286,7 @@ impl From<PageNumber> for u32 {
 mod tests {
     use std::mem::size_of;
 
-    use super::{Error, PageNumber, PageNumbering, Start};
+    use super::{Error, PageNumber, PageNumbering, Pagination, Start};
 
     #[test]
     fn native_values_round_trip_without_aliasing_unknowns() {
@@ -213,5 +311,34 @@ mod tests {
         assert_eq!(size_of::<PageNumber>(), size_of::<u32>());
         assert_eq!(PageNumber::new(0), Err(Error::ZeroPageNumber));
         assert_eq!(PageNumber::new(42).map(PageNumber::get), Ok(42));
+    }
+
+    #[test]
+    fn pagination_retains_presence_and_rejects_enum_aliases() -> super::Result<()> {
+        let mut pagination = Pagination::new();
+        assert_eq!(pagination.start(), None);
+        assert_eq!(pagination.page_numbering(), None);
+        assert_eq!(pagination.starting_page_number(), None);
+
+        pagination.set_start(Some(Start::RightPage))?;
+        pagination.set_page_numbering(Some(PageNumbering::Restart))?;
+        pagination.set_starting_page_number(Some(PageNumber::new(7)?));
+        assert_eq!(pagination.start(), Some(Start::RightPage));
+        assert_eq!(pagination.page_numbering(), Some(PageNumbering::Restart));
+        assert_eq!(
+            pagination.starting_page_number().map(PageNumber::get),
+            Some(7)
+        );
+        assert_eq!(
+            pagination.set_start(Some(Start::Unknown(0))),
+            Err(Error::NonCanonicalStart)
+        );
+        assert_eq!(pagination.start(), Some(Start::RightPage));
+        assert_eq!(
+            pagination.set_page_numbering(Some(PageNumbering::Unknown(1))),
+            Err(Error::NonCanonicalNumbering)
+        );
+        assert_eq!(pagination.page_numbering(), Some(PageNumbering::Restart));
+        Ok(())
     }
 }

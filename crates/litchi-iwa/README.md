@@ -939,7 +939,7 @@ use litchi_iwa::pages::PagesEditor;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_pages::header_footer::Kind;
 use litchi_pages::page_layout::Orientation;
-use litchi_pages::section::{Background, PageNumber, PageNumbering, Start};
+use litchi_pages::section::Background;
 use litchi_iwa::keynote::{
     KeynoteBuildSettings, KeynoteBuildStart, KeynoteEditor, KeynoteFlipDirection,
     KeynoteHorizontalBuildDirection, KeynoteKeyboardDirection, KeynoteRotationDirection,
@@ -1082,10 +1082,9 @@ pages.set_header_footer_text(first_header.storage.object_id, "Quarterly report")
 let mut section_settings = pages.section_settings(section_id)?;
 section_settings.set_inherit_previous_header_footer(Some(false));
 section_settings.set_first_page_hides_header_footer(Some(true));
-section_settings.set_start(Some(Start::NextPage))?;
-section_settings.set_page_numbering(Some(PageNumbering::Restart))?;
-section_settings.set_starting_page_number(Some(PageNumber::new(3)?));
 pages.set_section_settings(section_id, section_settings)?;
+// Section-pagination editing now lives in litchi-pages and uses
+// SectionSelector; see litchi-pages/examples/edit_section_pagination.rs.
 pages.set_section_background(
     section_id,
     Background::Solid(Rgba::new(1.0, 0.59, 0.55, 1.0, RgbColorSpace::Srgb)?),
@@ -1441,8 +1440,8 @@ effective defaults. See `edit_pages_document_options`. Page orientation,
 facing-page section
 starts, and continue/restart numbering behavior use lossless enums; future
 native values remain available as typed `Unknown` variants. Starting page
-numbers use a validated non-zero type. See `edit_pages_layout` and
-`edit_pages_section_pagination`.
+numbers use a validated non-zero type. See `edit_pages_layout`; selector-first
+section pagination now lives in `litchi-pages/examples/edit_section_pagination.rs`.
 Reachable `TP.PlaceholderArchive` and `TSWP.ShapeInfoArchive` drawables expose
 their owned text storages in stable object order. Text-box content supports
 UTF-16 range replacement, whole-value update, and clear operations; detached

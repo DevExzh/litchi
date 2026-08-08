@@ -31,5 +31,9 @@ pub use package::{
     SectionNameCommit, SectionNameDiagnostics, SectionNameEdit, SectionNameError,
     SectionNameLimitKind, SectionNamePatch,
 };
+pub use package::{
+    SectionPaginationCommit, SectionPaginationDiagnostics, SectionPaginationEdit,
+    SectionPaginationError, SectionPaginationLimitKind, SectionPaginationPatch,
+};
 pub use section::{Section, SectionType};
 pub use selector::{SectionSelector, SelectorError, SelectorResult};

@@ -1,0 +1,15 @@
+// Wire-only Buffa projection derived from TP.SectionArchive fields 20--22 in
+// `TPArchives.proto`.
+//
+// The generated lazy view decodes only the three scalar pagination values.
+// Every template reference, section name, background, and unknown field stays
+// opaque in caller-owned IWA bytes, which remain the preservation authority.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message PagesSectionPaginationArchive {
+  optional uint32 section_start_kind = 20;
+  optional uint32 section_page_number_kind = 21;
+  optional uint32 section_page_number_start = 22;
+}

@@ -4,7 +4,7 @@ use crate::selector::SectionSelector;
 use litchi_iwa_text::storage::Storage;
 use thiserror::Error;
 
-pub use pagination::{PageNumber, PageNumbering, Start};
+pub use pagination::{PageNumber, PageNumbering, Pagination, Start};
 
 const INHERIT_PREVIOUS_HEADER_FOOTER: u8 = 1;
 const FIRST_PAGE_DIFFERENT: u8 = 2;

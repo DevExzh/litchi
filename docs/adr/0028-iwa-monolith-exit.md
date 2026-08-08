@@ -805,3 +805,33 @@ artifact exactly. This evidence advances one focused Pages exit condition; it
 does not satisfy durable patch serialization, atomic save, aggregate peak
 memory, fuzz/sanitizer, remaining editor/test/example ownership, or complete
 host deletion.
+
+## 2026-08-08 focused Pages section-pagination ownership
+
+`litchi-pages` now owns exact-source read, edit, reversible patch application,
+and inverse replay for `TP.SectionArchive` pagination fields 20--22. The public
+surface selects an existing section by exact semantic name or checked position
+and exchanges only the presence-preserving `Pagination` value. Native object
+identifiers, component names, protobuf messages, wire records, and exact patch
+artifacts stay private. The private Buffa sidecar is a bounded lazy scalar
+projection; validated caller-owned records remain the preservation and rewrite
+authority.
+
+Changed edits preserve unknown section fields and the complete IWA object
+header, mutate one package member, fully reopen the candidate, and verify the
+semantic result. Exact no-ops share the source allocation even for legacy
+nested packages, while changed legacy sources are refused. The host raw-ID
+pagination example is removed in favor of the focused selector-first example.
+The host settings/background compatibility writers remain, but now use the
+bounded header-preserving message replacement helper instead of replacing the
+message and silently rebuilding its header metadata.
+
+Apple Pages 14.4 opened the Rust-authored right-page/restart-at-7 artifact
+without repair or conversion, retained the fixture content, displayed page 7
+and `Start at: 7`, saved a native copy, and reopened it successfully. Focused
+reverse-read recovered all three requested pagination values and an identical
+restaging reproduced the native artifact byte-for-byte. This retires one more
+raw-ID example and transfers one focused mutation capability, but removes no
+manifest edge: all 16 ordered debts remain. Durable patches, atomic save,
+aggregate peak-memory policy, fuzz/sanitizer completion, the remaining Pages
+editor/example/test inventory, and complete host deletion remain open gates.

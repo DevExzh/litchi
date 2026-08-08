@@ -891,3 +891,27 @@ only. It does not imply section creation, deletion, ordering, body mutation,
 identifier allocation, legacy package normalization, or a public collection of
 raw references. Those capabilities retain separate dependency-closure and
 native-application gates.
+
+## 2026-08-08 amendment: Pages section-pagination semantics
+
+Section pagination is a lossless semantic value selected through
+`SectionSelector`, never through a section object identifier, component name,
+or protobuf object. `Pagination` retains independent optional presence for
+`Start`, `PageNumbering`, and `PageNumber`; therefore absent native fields stay
+distinct from explicitly encoded defaults. `PageNumber` excludes zero, while
+the two lossless enums preserve future native values without allowing a known
+discriminant to be constructed through `Unknown`.
+
+`Package::section_pagination` reads the value for an exact name or checked
+position. `Package::edit_section_pagination` resolves the selector immediately
+and retains only the public semantic `Position`; the staged editor can replace
+the complete value, change one setting, or clear all three fields. Exact no-ops
+share the immutable source allocation. Changed edits publish only after a full
+retained-limit package reopen and semantic readback. Reversible patches keep
+exact authorization artifacts private and expose only the position, semantic
+before/after values, compact fingerprints, and content-free diagnostics.
+
+This capability owns `TP.SectionArchive` fields 20--22 only. Header/footer
+inheritance and first-page flags, section background, section names, template
+references, section creation/deletion/order, and legacy package normalization
+remain separate capabilities with independent preservation and native gates.
