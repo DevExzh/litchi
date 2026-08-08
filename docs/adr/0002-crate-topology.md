@@ -1193,3 +1193,24 @@ This slice transfers a substantial Pages mutation vertical but removes no
 manifest edge: the inventory remains 63
 workspace packages, 223 internal dependency declarations, and 16 ordered
 migration debts.
+
+## 2026-08-08 amendment: physical cache state and focused projection boundary
+
+The preceding 16-debt ledger is historical and is superseded by this
+amendment. Cache-backed `PackageState` has moved from the `litchi-iwa`
+migration host to the physical `litchi-iwa-archive` owner. The archive now owns
+the bounded physical parsed-component state; `litchi-iwa-cache` remains a
+dependency-free cache leaf. The host retains format selection and error-policy
+decisions, so the move does not transfer application semantics or make the
+cache responsible for archive policy. The direct `litchi-iwa ->
+litchi-iwa-cache` debt, identity 003, is retired without renumbering later
+identities. The current boundary inventory is 63 workspace packages, 223
+internal dependency declarations, and 15 ordered migration debts.
+
+For Numbers, this is a deliberately narrow decoder boundary: focused
+`TableInfo.tableModel` reads use a strict,
+small private Buffa projection. A bounded raw-wire preflight precedes Buffa,
+the selected table-model reference must be nonzero, and the projection neither
+encodes, retains unknown content, nor stores repeated fields. Accepted raw
+source remains authoritative for preservation. This does not claim migration of
+the broader table model or the wider Numbers graph.

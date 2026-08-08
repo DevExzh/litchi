@@ -11,6 +11,7 @@ rust-version.workspace = true
 [dependencies]
 flate2             = { workspace = true }
 litchi-core        = { workspace = true }
+litchi-iwa-cache   = { workspace = true }
 litchi-iwa-core    = { workspace = true }
 litchi-iwa-package = { workspace = true }
 soapberry-zip      = { workspace = true }

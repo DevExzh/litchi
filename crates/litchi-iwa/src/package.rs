@@ -11,11 +11,66 @@ use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits};
 use crate::snappy::{SnappyLimits, SnappyStream};
 use crate::{Error, Result};
 use litchi_core::ReadAt;
-use litchi_iwa_package::{Entry, Patch};
+use litchi_iwa_archive::package::{GetOrInsertError, PackageState, ParseError};
+use litchi_iwa_package::{Entry, Error as EntryStoreError, Patch};
 
-#[path = "package_state.rs"]
-mod package_state;
-use package_state::{PackageState, entry_store_error, package_patch_error};
+fn entry_store_error(error: EntryStoreError) -> Error {
+    match error {
+        EntryStoreError::DuplicateEntry(name) => {
+            Error::Bundle(format!("Duplicate package entry is ambiguous: {name}"))
+        },
+        EntryStoreError::InvalidPosition { position, len } => Error::Bundle(format!(
+            "Package entry position {position} is outside a table of length {len}"
+        )),
+        EntryStoreError::Allocation { requested } => Error::Bundle(format!(
+            "Failed to allocate package entry index for {requested} entries"
+        )),
+        error => Error::Bundle(format!("Package entry storage error: {error}")),
+    }
+}
+
+fn package_patch_error(error: EntryStoreError) -> Error {
+    if matches!(error, EntryStoreError::PatchSourceMismatch) {
+        Error::InvalidFormat("iWork package patch source does not match".to_owned())
+    } else {
+        entry_store_error(error)
+    }
+}
+
+fn cache_error(error: GetOrInsertError) -> Error {
+    if let GetOrInsertError::Parse(shared) = error {
+        if let Some(error) = shared.downcast_ref::<Error>() {
+            return clone_error(error);
+        }
+        return Error::ParseError(shared.to_string());
+    }
+    Error::Archive(format!("IWA archive cache lookup failed: {error}"))
+}
+
+fn clone_error(error: &Error) -> Error {
+    match error {
+        Error::Io(error) => Error::Io(std::io::Error::new(error.kind(), error.to_string())),
+        Error::SourceChanged { expected, observed } => Error::SourceChanged {
+            expected: *expected,
+            observed: *observed,
+        },
+        Error::IwaCore(error) => Error::IwaCore(error.clone()),
+        Error::IwaCommon(error) => Error::IwaCommon(error.clone()),
+        Error::PagesSemantic(error) => Error::PagesSemantic(error.clone()),
+        Error::TextHyperlink(error) => Error::TextHyperlink(*error),
+        Error::TextHighlight(error) => Error::TextHighlight(*error),
+        Error::TextNumberAttachment(error) => Error::TextNumberAttachment(*error),
+        Error::TextComment(error) => Error::TextComment(*error),
+        Error::ParagraphStyle(error) => Error::ParagraphStyle(*error),
+        Error::InvalidFormat(message) => Error::InvalidFormat(message.clone()),
+        Error::Snappy(message) => Error::Snappy(message.clone()),
+        Error::ProtobufDecode(error) => Error::ProtobufDecode(error.clone()),
+        Error::UnsupportedMessageType(type_) => Error::UnsupportedMessageType(*type_),
+        Error::Archive(message) => Error::Archive(message.clone()),
+        Error::Bundle(message) => Error::Bundle(message.clone()),
+        Error::ParseError(message) => Error::ParseError(message.clone()),
+    }
+}
 
 /// A mutable single-file Pages, Numbers, or Keynote package.
 ///
@@ -478,7 +533,9 @@ impl IWorkPackage {
         }
         let archive_limits = limits.effective_archive_limits()?;
         let package = Self {
-            state: Arc::new(PackageState::from_entries(entries, archive_limits)?),
+            state: Arc::new(
+                PackageState::from_entries(entries, archive_limits).map_err(entry_store_error)?,
+            ),
             limits,
             mutation_revision: 0,
             source,
@@ -488,11 +545,11 @@ impl IWorkPackage {
     }
 
     pub fn len(&self) -> usize {
-        self.state.entries.len()
+        self.state.entries().len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.state.entries.is_empty()
+        self.state.entries().is_empty()
     }
 
     /// Return the resource profile retained for lazy archive reads and edits.
@@ -520,7 +577,7 @@ impl IWorkPackage {
     }
 
     pub fn entry_names(&self) -> impl Iterator<Item = &str> {
-        self.state.entries.iter().map(Entry::name)
+        self.state.entries().iter().map(Entry::name)
     }
 
     /// Enumerate package members that contain IWA object archives.
@@ -530,7 +587,7 @@ impl IWorkPackage {
     /// retained as a raw entry but excluded from object-archive scans.
     pub fn iwa_entry_names(&self) -> impl Iterator<Item = &str> {
         self.state
-            .entries
+            .entries()
             .iter()
             .filter(|entry| {
                 entry.name().ends_with(".iwa")
@@ -566,7 +623,7 @@ impl IWorkPackage {
 
     pub fn entry(&self, name: &str) -> Option<&[u8]> {
         let position = self.entry_position(normalize_entry_name(name))?;
-        Some(self.state.entries.get_at(position)?.data())
+        Some(self.state.entries().get_at(position)?.data())
     }
 
     /// Borrow a raw package member for package invariant tests.
@@ -577,11 +634,12 @@ impl IWorkPackage {
     #[cfg(test)]
     fn entry_mut(&mut self, name: &str) -> Option<&mut Vec<u8>> {
         let name = normalize_entry_name(name);
-        let position = self.entry_position(name)?;
+        if self.entry_position(name).is_none() {
+            return None;
+        }
         self.mark_mutated();
         let state = Arc::make_mut(&mut self.state);
-        state.invalidate_archive(name);
-        Some(state.entries.get_at_mut(position)?.data_mut())
+        Some(state.entry_data_mut(name)?)
     }
 
     /// Create or replace a package member.
@@ -595,14 +653,13 @@ impl IWorkPackage {
         validate_entry_name(&name)?;
         let position = self.entry_position(&name);
         self.validate_entry_update(position, &data)?;
-        if let Some(position) = position {
+        if position.is_some() {
             let state = Arc::make_mut(&mut self.state);
-            let Some(previous) = state.entries.replace_data(position, data) else {
+            let Some(previous) = state.replace_entry_data(&name, data) else {
                 return Err(Error::Bundle(
                     "package entry index became invalid during replacement".to_owned(),
                 ));
             };
-            state.invalidate_archive(&name);
             self.mark_mutated();
             return Ok(Some(previous));
         }
@@ -614,10 +671,9 @@ impl IWorkPackage {
     /// Delete a package member.
     pub fn remove_entry(&mut self, name: &str) -> Option<Vec<u8>> {
         let normalized = normalize_entry_name(name);
-        let position = self.entry_position(normalized)?;
+        self.entry_position(normalized)?;
         let state = Arc::make_mut(&mut self.state);
-        let removed = state.entries.remove_at(position)?.into_parts().1;
-        state.invalidate_archive(normalized);
+        let removed = state.remove_entry(normalized)?.into_parts().1;
         self.mark_mutated();
         Some(removed)
     }
@@ -648,7 +704,11 @@ impl IWorkPackage {
     pub(crate) fn parsed_archive(&self, name: &str) -> Result<Arc<Archive>> {
         let normalized = normalize_entry_name(name);
         self.state
-            .get_or_parse_archive(normalized, |limits| self.parse_archive(normalized, limits))
+            .get_or_parse_archive(normalized, |limits| {
+                self.parse_archive(normalized, limits)
+                    .map_err(|error| Box::new(error) as ParseError)
+            })
+            .map_err(cache_error)
     }
 
     fn parse_archive(
@@ -720,8 +780,7 @@ impl IWorkPackage {
         self.validate_entry_update(None, &compressed)?;
         let state = Arc::make_mut(&mut self.state);
         state
-            .entries
-            .try_insert_at(position, Entry::new(normalized, compressed))
+            .try_insert_entry_at(position, Entry::new(normalized, compressed))
             .map_err(entry_store_error)?;
         self.mark_mutated();
         Ok(())
@@ -769,7 +828,7 @@ impl IWorkPackage {
         }
         litchi_iwa_archive::package::to_bytes(
             self.state
-                .entries
+                .entries()
                 .as_slice()
                 .iter()
                 .map(|entry| (entry.name(), entry.data())),
@@ -792,7 +851,7 @@ impl IWorkPackage {
         }
         litchi_iwa_archive::package::write_to(
             self.state
-                .entries
+                .entries()
                 .as_slice()
                 .iter()
                 .map(|entry| (entry.name(), entry.data())),
@@ -854,7 +913,7 @@ impl IWorkPackage {
     fn validate_entry_update(&self, position: Option<usize>, data: &[u8]) -> Result<()> {
         let current_total = self.validate_state()?;
         self.validate_entry_data(data)?;
-        if position.is_none() && self.state.entries.len() >= self.limits.max_entries {
+        if position.is_none() && self.state.entries().len() >= self.limits.max_entries {
             return Err(Error::Bundle(format!(
                 "iWork package entry count exceeds the {} entry limit",
                 self.limits.max_entries
@@ -862,7 +921,7 @@ impl IWorkPackage {
         }
 
         let previous_size = position
-            .and_then(|index| self.state.entries.get_at(index))
+            .and_then(|index| self.state.entries().get_at(index))
             .map_or(0, |entry| entry.data().len());
         let previous_size = u64::try_from(previous_size)
             .map_err(|_| Error::Bundle("package member length does not fit u64".to_owned()))?;
@@ -882,23 +941,28 @@ impl IWorkPackage {
     }
 
     fn validate_state(&self) -> Result<u64> {
-        if self.state.entries.len() > self.limits.max_entries {
+        if self.state.entries().len() > self.limits.max_entries {
             return Err(Error::Bundle(format!(
                 "iWork package entry count exceeds the {} entry limit",
                 self.limits.max_entries
             )));
         }
-        for entry in self.state.entries.iter() {
+        for entry in self.state.entries().iter() {
             validate_entry_name(entry.name())?;
             self.validate_entry_data(entry.data())?;
         }
-        let total = self.state.entries.iter().try_fold(0_u64, |total, entry| {
-            let size = u64::try_from(entry.data().len())
-                .map_err(|_| Error::Bundle("package member length does not fit u64".to_owned()))?;
-            total
-                .checked_add(size)
-                .ok_or_else(|| Error::Bundle("iWork package total size overflow".to_owned()))
-        })?;
+        let total = self
+            .state
+            .entries()
+            .iter()
+            .try_fold(0_u64, |total, entry| {
+                let size = u64::try_from(entry.data().len()).map_err(|_| {
+                    Error::Bundle("package member length does not fit u64".to_owned())
+                })?;
+                total
+                    .checked_add(size)
+                    .ok_or_else(|| Error::Bundle("iWork package total size overflow".to_owned()))
+            })?;
         if total > self.limits.max_total_bytes {
             return Err(Error::Bundle(format!(
                 "iWork package total size exceeds the {} byte limit",
@@ -922,10 +986,9 @@ impl IWorkPackage {
 
     fn insert_new_entry(&mut self, name: String, data: Vec<u8>) -> Result<()> {
         let state = Arc::make_mut(&mut self.state);
-        let position = usize::from(name != "Index/Document.iwa") * state.entries.len();
+        let position = usize::from(name != "Index/Document.iwa") * state.entries().len();
         state
-            .entries
-            .try_insert_at(position, Entry::new(name, data))
+            .try_insert_entry_at(position, Entry::new(name, data))
             .map_err(entry_store_error)?;
         Ok(())
     }
@@ -939,12 +1002,12 @@ impl IWorkPackage {
 impl Snapshot {
     /// Return the number of retained package members.
     pub fn len(&self) -> usize {
-        self.state.entries.len()
+        self.state.entries().len()
     }
 
     /// Report whether the package contains no members.
     pub fn is_empty(&self) -> bool {
-        self.state.entries.is_empty()
+        self.state.entries().is_empty()
     }
 
     /// Return the resource profile retained by this immutable snapshot.
@@ -954,14 +1017,14 @@ impl Snapshot {
 
     /// Enumerate package members in preserved source order.
     pub fn entry_names(&self) -> impl Iterator<Item = &str> {
-        self.state.entries.iter().map(Entry::name)
+        self.state.entries().iter().map(Entry::name)
     }
 
     /// Borrow one package member without copying it.
     pub fn entry(&self, name: &str) -> Option<&[u8]> {
         let name = normalize_entry_name(name);
         let position = self.state.position(name)?;
-        Some(self.state.entries.get_at(position)?.data())
+        Some(self.state.entries().get_at(position)?.data())
     }
 
     /// Validate this immutable snapshot without creating serialized output.
@@ -976,7 +1039,7 @@ impl Snapshot {
     pub fn apply(&self, patch: &Patch) -> Result<Self> {
         self.validate()?;
         let entries = patch
-            .apply(&self.state.entries)
+            .apply(self.state.entries())
             .map_err(package_patch_error)?;
         let state = PackageState::from_store(entries, self.limits.effective_archive_limits()?);
         let target = Self {
@@ -1014,7 +1077,7 @@ impl Snapshot {
         let snapshot = candidate.snapshot();
         Ok(Commit {
             value,
-            patch: Patch::between(&self.state.entries, &snapshot.state.entries),
+            patch: Patch::between(self.state.entries(), snapshot.state.entries()),
             snapshot,
         })
     }
@@ -1043,7 +1106,7 @@ impl Snapshot {
     /// Enumerate object-archive members in preserved source order.
     pub fn iwa_entry_names(&self) -> impl Iterator<Item = &str> {
         self.state
-            .entries
+            .entries()
             .iter()
             .filter(|entry| {
                 entry.name().ends_with(".iwa")
@@ -1662,7 +1725,9 @@ mod tests {
                         if parse_count.fetch_add(1, Ordering::SeqCst) == 0 {
                             first_parse_started.wait();
                         }
-                        Err(Error::InvalidFormat("synthetic parse failure".to_owned()))
+                        Err(Box::new(Error::InvalidFormat(
+                            "synthetic parse failure".to_owned(),
+                        )))
                     })
                 })
             })

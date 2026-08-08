@@ -915,3 +915,75 @@ publication, aggregate peak-memory policy, fuzz/sanitizer completion, an
 app-authored multi-section/boundary-shift gate, native clear/range and rich
 dependent-content gates, the remaining examples/tests, and the complete host
 deletion gate remain open.
+
+## 2026-08-08 amendment: cache-state transfer and focused clear/range evidence
+
+The preceding claim that all 16 debts and the native clear/range gates remain
+open is historical and is superseded by this amendment. Cache-backed
+`PackageState` has transferred from `litchi-iwa` to the physical
+`litchi-iwa-archive` owner. Archive ownership is bounded physical
+parsed-component state; the dependency-free `litchi-iwa-cache` leaf remains
+free of archive and format policy, while the host retains format/error policy.
+The direct `litchi-iwa -> litchi-iwa-cache` debt identity 003 is retired
+without renumbering. The current boundary count is 63 packages, 223 internal
+declarations, and 15 ordered debts.
+
+Numbers changes only one focused read boundary. `TableInfo.tableModel` uses a
+strict small private Buffa projection instead of eager Prost reads
+with bounded raw preflight and a required nonzero reference. Buffa does not
+encode, retain unknown content, or store repeated fields, and raw source stays
+authoritative. This is explicitly not a wider table-model or whole Numbers
+graph migration.
+
+Pages 14.4 opened the Rust-authored
+`/private/tmp/litchi-pages-example.KdlErn/clear.pages`
+(`63c2aa20f6064b9a8c5a536475d1a71b34175f4c6924a4d384f24c39fd5155e6`)
+and `range.pages`
+(`dd0405249a56e3e2b535e6a9541f02feda6299ce1a0959f4d68f7e44a0ae307a`)
+without repair. The clear artifact was visibly empty; the range artifact
+displayed exactly `Range prefix: Litchi native Pages fixture`, `Buffa lazy-view
+migration verification`, and `2026-08-07`. Native Save As, close, and reopen
+yielded `clear-native-resaved-20260808.pages`
+(`3ba278e1934688c653ab73f1ee2a194f670545dd160aa5d8e33c2054463a9676`)
+and `range-native-resaved-20260808.pages`
+(`74072d9d813282618db8e47f7ebc26cc59f7c17b1abf9d22c5bbf5473b942a9f`).
+Focused semantic reread matched each expected result; focused no-op and inverse
+outputs over each native-resaved artifact were byte-identical to the
+corresponding hash.
+
+This advances the focused Pages clear/range evidence only. App-authored
+multi-section/boundary-shift and rich dependent-content gates, durable patch
+serialization, atomic publication, aggregate peak-memory policy,
+fuzz/sanitizer completion, remaining ownership, and complete host deletion
+remain open.
+
+## 2026-08-08 amendment: Numbers TableInfo model-reference projection
+
+The focused Numbers owner no longer eagerly Prost-decodes
+`TST.TableInfoArchive` merely to reach `tableModel`. A two-message private
+Buffa lazy projection exposes only a typed nonzero model reference. A strict
+raw preflight precedes Buffa, requiring unique canonical length-delimited
+`TableInfoArchive.super` and `tableModel` fields and a unique canonical,
+nonzero nested `TSP.Reference.identifier`. The base drawable envelope and all
+unselected TableInfo/reference metadata remain opaque caller-owned source
+bytes; neither Buffa unknown retention nor encoding participates in
+preservation.
+
+The derived schema is provenance-checked against `TSTArchives.proto` and
+`TSPMessages.proto`, is capped at 1 KiB of source and five generated files / 64
+KiB, and fails if Buffa generates a repeated view. Its explicit bytes, field,
+work, and two-level recursion budgets bound the strict and deferred scans.
+Both the rooted table reader and formula-name enrichment now use the same
+generated-type-free codec. Rooted failures map to the existing content-free
+Numbers semantic location, while formula discovery deliberately remains
+best-effort. Focused regressions cover Prost parity, opaque native metadata,
+required and duplicate fields, wrong wire types, noncanonical framing, zero and
+malformed identifiers, exact limits, and the checked-in native Numbers
+fixture's rooted and compatibility readers. A formula-bearing constructed
+package also proves that valid references still enrich sheet/table names while
+malformed TableInfo metadata remains best-effort and falls back safely.
+
+This is only a TableInfo reference seam. Table-model, tile, sidecar, and
+formula payloads still use their existing bounded eager Prost paths, so it does
+not claim whole-graph Buffa laziness or advance the remaining monolith deletion
+gates.

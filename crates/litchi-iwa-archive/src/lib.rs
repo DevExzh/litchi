@@ -1,11 +1,11 @@
 //! Bounded physical ingress for Apple iWork bundles.
 //!
-//! This crate owns only the ZIP container boundary: central-directory limits,
-//! legacy nested `Index.zip` handling, and the checksum-free Snappy/IWA
-//! component stream. It deliberately does not depend
-//! on the iWork facade or semantic format crates. Already-decoded logical
-//! package entries enter through an explicitly immutable, fully revalidated
-//! snapshot.
+//! This crate owns the physical iWork package boundary: central-directory
+//! limits, legacy nested `Index.zip` handling, the checksum-free Snappy/IWA
+//! component stream, and cache-backed immutable logical package snapshots.
+//! It deliberately does not depend on the iWork facade or semantic format
+//! crates. Already-decoded logical package entries enter through an explicitly
+//! immutable, fully revalidated snapshot.
 //!
 //! Application readers should consume [`SourceCatalog`] when they need both
 //! physical members and parsed components, or [`ComponentCatalog::iter`] for
@@ -19,6 +19,7 @@ mod error;
 mod limits;
 mod logical;
 pub mod package;
+mod package_state;
 mod zip;
 
 pub use catalog::{Component, ComponentCatalog, SourceCatalog};

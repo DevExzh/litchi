@@ -16,6 +16,12 @@ use litchi_core::ReadAt;
 
 use crate::zip::{PhysicalEntry, PhysicalHeader, ZipArchive};
 use crate::{Error, Limits, Result};
+
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "PackageState is the explicit cache-coherent state for physical package snapshots."
+)]
+pub use crate::package_state::{GetOrInsertError, PackageState, ParseError};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 #[derive(Debug)]

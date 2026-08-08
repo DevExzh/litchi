@@ -86,6 +86,7 @@
     "litchi-iwa": [],
     "litchi-iwa-archive": [
       "litchi-core",
+      "litchi-iwa-cache",
       "litchi-iwa-core",
       "litchi-iwa-package",
       "soapberry-zip"
@@ -347,13 +348,6 @@
       "dependency": "litchi-iwa-archive",
       "reason": "Legacy mutation paths still coordinate physical package ingress, preservation, and reassembly.",
       "exit": "Move all remaining package transactions into Pages, Numbers, or Keynote and delete litchi-iwa."
-    },
-    {
-      "order": 3,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-iwa-cache",
-      "reason": "The legacy package facade still owns parsed-archive cache integration.",
-      "exit": "Give each concrete package owner its required bounded caches and delete litchi-iwa."
     },
     {
       "order": 4,

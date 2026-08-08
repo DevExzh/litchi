@@ -7606,3 +7606,44 @@ full host retirement. The raw-ID migration-host methods remain compatibility
 surfaces, changed legacy nested packages remain unsupported by the focused
 transaction, changed no-root/fallback bodies remain unsupported, and all 16
 ordered dependency debts remain open.
+
+## 2026-08-08 amendment: cache boundary, focused Numbers projection, and Pages clear/range gate
+
+The preceding 16-debt status is historical and is superseded here. Cache-backed
+`PackageState` moved from `litchi-iwa` to the physical
+`litchi-iwa-archive` owner. The archive owns bounded physical parsed-component
+state, while `litchi-iwa-cache` remains a dependency-free leaf and the host
+retains format and error policy. Direct host-to-cache debt identity 003 is
+retired without renumbering later identities. The checked boundary inventory is
+now 63 workspace packages, 223 internal dependency declarations, and 15
+ordered migration debts.
+
+The Numbers change is intentionally limited to focused
+`TableInfo.tableModel` reads. A strict small private Buffa projection replaces
+those eager Prost reads only after bounded raw-wire preflight and requires a
+nonzero table-model reference. It performs no encoding, retains no unknown
+content, and stores no repeated fields; accepted raw source remains the
+preservation authority. This is not a broader table-model or Numbers graph
+migration.
+
+The previously outstanding native Pages clear/range gates passed in Pages 14.4.
+Pages opened
+`/private/tmp/litchi-pages-example.KdlErn/clear.pages`
+(`63c2aa20f6064b9a8c5a536475d1a71b34175f4c6924a4d384f24c39fd5155e6`)
+and
+`/private/tmp/litchi-pages-example.KdlErn/range.pages`
+(`dd0405249a56e3e2b535e6a9541f02feda6299ce1a0959f4d68f7e44a0ae307a`)
+without repair. The clear result was visibly empty. The range result displayed
+exactly these three lines: `Range prefix: Litchi native Pages fixture`, `Buffa
+lazy-view migration verification`, and `2026-08-07`.
+
+Native Save As, close, and reopen produced
+`clear-native-resaved-20260808.pages`
+(`3ba278e1934688c653ab73f1ee2a194f670545dd160aa5d8e33c2054463a9676`)
+and `range-native-resaved-20260808.pages`
+(`74072d9d813282618db8e47f7ebc26cc59f7c17b1abf9d22c5bbf5473b942a9f`).
+Focused semantic reread matched each expected result, and both the focused
+no-op and inverse over each native-resaved artifact were byte-identical to its
+respective hash. These observations close those two native gates only; they do
+not claim the remaining dependent-content, multi-section, durability,
+performance, fuzz/sanitizer, or host-retirement gates.

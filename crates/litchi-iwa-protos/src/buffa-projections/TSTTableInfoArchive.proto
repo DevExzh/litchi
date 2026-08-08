@@ -1,0 +1,20 @@
+// Wire-only Buffa projection derived from these canonical IWA declarations:
+//
+// - `TSPMessages.proto`: `TSP.Reference.identifier`, field 1;
+// - `TSTArchives.proto`: `TST.TableInfoArchive.tableModel`, field 2.
+//
+// `TableInfoArchive.super` and every other table-info/reference metadata
+// field deliberately remain outside this generated closure. The Numbers
+// adapter preserves caller-owned IWA bytes as authoritative and applies its
+// own strict raw-wire preflight before forcing this borrowed lazy view.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message TableModelReference {
+  required uint64 identifier = 1;
+}
+
+message TableInfoArchive {
+  required .LitchiIwaProjection.TableModelReference table_model = 2;
+}

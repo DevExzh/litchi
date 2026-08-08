@@ -46,7 +46,8 @@ use litchi_iwa_core::{Archive, RawMessage};
 #[cfg(feature = "internal-iwork-source")]
 use litchi_iwa_detect::PreparedSource;
 use litchi_iwa_detect::{Format, detect_application_from_document};
-use litchi_iwa_protos::{tn, tst, tswp};
+use litchi_iwa_protos::table_info_codec;
+use litchi_iwa_protos::{tn, tswp};
 use prost::Message;
 use thiserror::Error;
 
@@ -68,6 +69,7 @@ const FORM_BASED_SHEET_MESSAGE_TYPE: u32 = 3;
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
 const LEGACY_TABLE_INFO_MESSAGE_TYPE: u32 = 6_003;
+const TABLE_INFO_PROJECTION_RECURSION_LIMIT: u32 = 2;
 
 /// Content-free semantic location associated with a Numbers read failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -595,13 +597,13 @@ impl Package {
             (Some(message), None) | (None, Some(message)) => message,
             (None, None) => return Ok(None),
         };
-        let info = tst::TableInfoArchive::decode(message.data.as_slice()).map_err(|error| {
-            Error::InvalidFormat(format!(
-                "Numbers {path} table-info payload is malformed: {error}"
-            ))
-        })?;
+        let model_reference = table_info_codec::decode_table_model_reference(
+            message.data.as_slice(),
+            table_info_decode_options(message.data.as_slice()),
+        )
+        .map_err(|_error| Error::MalformedPayload { path })?;
         budget.charge_references(1, path)?;
-        let model_id = info.table_model.identifier;
+        let model_id = model_reference.identifier().get();
         let model = index.resolve_ref_id(components, model_id)?.ok_or_else(|| {
             Error::InvalidFormat(format!("Numbers {path} table model is missing"))
         })?;
@@ -615,6 +617,20 @@ impl Package {
             .extract_reachable_table_from_object(&model, path)
             .map(Some)
     }
+}
+
+/// Bounded policy for the focused table-info reference projection.
+///
+/// The raw message was already admitted under the caller's physical IWA
+/// message ceiling. Its exact source width therefore bounds every projection
+/// budget, while the codec independently bounds strict and Buffa scans.
+pub(super) fn table_info_decode_options(source: &[u8]) -> table_info_codec::DecodeOptions {
+    table_info_codec::DecodeOptions::new(
+        source.len().max(1),
+        source.len().max(1),
+        source.len().saturating_mul(4).max(1),
+        TABLE_INFO_PROJECTION_RECURSION_LIMIT,
+    )
 }
 
 /// Extract the allocating, legacy-compatible global table projection from
@@ -969,7 +985,7 @@ const fn input_too_large(observed: u64, limits: Limits) -> Error {
 mod tests {
     use super::*;
     use litchi_iwa_core::{ArchiveObject, RawMessage, SnappyStream};
-    use litchi_iwa_protos::{kn, tp, tsa, tsk};
+    use litchi_iwa_protos::{kn, tp, tsa, tsce, tsk, tst};
     use soapberry_zip::office::StreamingArchiveWriter;
     use std::io::Write;
 
@@ -1062,6 +1078,141 @@ mod tests {
             objects.push(object(tile_id, 6_002, tile.encode_to_vec())?);
         }
         package_bytes_from_archive(Archive { objects })
+    }
+
+    fn package_with_formula_reference(table_info_data: Vec<u8>) -> Result<Vec<u8>> {
+        const OWNER_WORDS: [u32; 4] = [0x89ab_cdef, 0x0123_4567, 0x7654_3210, 0xfedc_ba98];
+        let owner_uuid = litchi_iwa_protos::tsp::Uuid {
+            lower: u64::from(OWNER_WORDS[0]) | (u64::from(OWNER_WORDS[1]) << 32),
+            upper: u64::from(OWNER_WORDS[2]) | (u64::from(OWNER_WORDS[3]) << 32),
+        };
+        let cross_table_id = litchi_iwa_protos::tsp::CfuuidArchive {
+            uuid_w0: Some(OWNER_WORDS[0]),
+            uuid_w1: Some(OWNER_WORDS[1]),
+            uuid_w2: Some(OWNER_WORDS[2]),
+            uuid_w3: Some(OWNER_WORDS[3]),
+            ..Default::default()
+        };
+        let formula = tsce::FormulaArchive {
+            ast_node_array: tsce::AstNodeArrayArchive {
+                ast_node: vec![tsce::ast_node_array_archive::AstNodeArchive {
+                    ast_node_type: tsce::ast_node_array_archive::AstNodeType::CellReferenceNode
+                        as i32,
+                    ast_column: Some(tsce::ast_node_array_archive::AstColumnCoordinateArchive {
+                        column: 0,
+                        absolute: Some(false),
+                    }),
+                    ast_row: Some(tsce::ast_node_array_archive::AstRowCoordinateArchive {
+                        row: 0,
+                        absolute: Some(false),
+                    }),
+                    ast_cross_table_reference_extra_info: Some(
+                        tsce::ast_node_array_archive::AstCrossTableReferenceExtraInfoArchive {
+                            table_id: cross_table_id,
+                            ..Default::default()
+                        },
+                    ),
+                    ..Default::default()
+                }],
+            },
+            ..Default::default()
+        };
+        let sidecars = ArchiveObject::new(
+            5,
+            [
+                tst::TableDataList {
+                    list_type: tst::table_data_list::ListType::String as i32,
+                    next_list_id: 1,
+                    ..Default::default()
+                },
+                tst::TableDataList {
+                    list_type: tst::table_data_list::ListType::Formula as i32,
+                    next_list_id: 2,
+                    entries: vec![tst::table_data_list::ListEntry {
+                        key: 1,
+                        refcount: 1,
+                        formula: Some(formula),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                },
+            ]
+            .into_iter()
+            .map(|list| RawMessage {
+                type_: 6_005,
+                data: list.encode_to_vec(),
+            })
+            .collect(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let mut formula_cell = crate::cell::wire::BncCell::minimal();
+        formula_cell.set_formula_reference(1);
+        let model = tst::TableModelArchive {
+            table_name: "Table".to_owned(),
+            number_of_rows: 1,
+            number_of_columns: 1,
+            base_data_store: tst::DataStore {
+                tiles: tst::TileStorage {
+                    tiles: vec![tst::tile_storage::Tile {
+                        tileid: 0,
+                        tile: reference(6),
+                    }],
+                    tile_size: Some(256),
+                    ..Default::default()
+                },
+                string_table: reference(5),
+                formula_table: reference(5),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let tile = tst::Tile {
+            numrows: 1,
+            row_infos: vec![tst::TileRowInfo {
+                tile_row_index: 0,
+                cell_count: 1,
+                storage_version: Some(5),
+                cell_storage_buffer: Some(formula_cell.encode()),
+                cell_offsets: Some(vec![0, 0]),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let formula_owner = tsce::FormulaOwnerDependenciesArchive {
+            formula_owner_uid: owner_uuid,
+            internal_formula_owner_id: 1,
+            formula_owner: Some(reference(3)),
+            ..Default::default()
+        };
+
+        package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive {
+                        sheets: vec![reference(2)],
+                        ..Default::default()
+                    }
+                    .encode_to_vec(),
+                )?,
+                object(
+                    2,
+                    SHEET_MESSAGE_TYPE,
+                    tn::SheetArchive {
+                        name: "Sheet".to_owned(),
+                        drawable_infos: vec![reference(3)],
+                        ..Default::default()
+                    }
+                    .encode_to_vec(),
+                )?,
+                object(3, TABLE_INFO_MESSAGE_TYPE, table_info_data)?,
+                object(4, TABLE_MODEL_MESSAGE_TYPE, model.encode_to_vec())?,
+                sidecars,
+                object(6, 6_002, tile.encode_to_vec())?,
+                object(7, 4_008, formula_owner.encode_to_vec())?,
+            ],
+        })
     }
 
     fn package_bytes_from_archive(archive: Archive) -> Result<Vec<u8>> {
@@ -1290,6 +1441,36 @@ mod tests {
             ReadOptions::new(Limits::default(), semantic),
         )?;
         assert!(package.document().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn formula_reference_enrichment_uses_table_info_projection_and_is_best_effort() -> Result<()> {
+        let valid_table_info = tst::TableInfoArchive {
+            table_model: reference(4),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let valid =
+            compatibility_tables_from_bytes(&package_with_formula_reference(valid_table_info)?)?;
+        assert!(matches!(
+            valid.first().and_then(|table| table.get_a1("A1").ok().flatten()),
+            Some(crate::cell::Value::Formula(formula)) if formula == "=Sheet::Table::A1"
+        ));
+
+        // Canonical field 2 still points at the model, but required field 1
+        // is absent. Formula-name discovery must ignore this malformed
+        // best-effort metadata rather than aborting the table projection.
+        let malformed_table_info = vec![0x12, 0x02, 0x08, 0x04];
+        let malformed = compatibility_tables_from_bytes(&package_with_formula_reference(
+            malformed_table_info,
+        )?)?;
+        assert!(matches!(
+            malformed
+                .first()
+                .and_then(|table| table.get_a1("A1").ok().flatten()),
+            Some(crate::cell::Value::Formula(formula)) if formula == "=Table::A1"
+        ));
         Ok(())
     }
 
@@ -1805,6 +1986,34 @@ mod tests {
         let package = Package::from_bytes(&bytes)?;
         assert_eq!(package.sheets().len(), 1);
         assert_eq!(package.sheets()[0].tables().len(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn rooted_malformed_table_info_reports_a_content_free_location() -> Result<()> {
+        let root = tn::DocumentArchive {
+            sheets: vec![reference(2)],
+            ..Default::default()
+        };
+        let sheet = tn::SheetArchive {
+            name: "Strict".to_owned(),
+            drawable_infos: vec![reference(3)],
+            ..Default::default()
+        };
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(1, DOCUMENT_MESSAGE_TYPE, root.encode_to_vec())?,
+                object(2, SHEET_MESSAGE_TYPE, sheet.encode_to_vec())?,
+                // `super` is valid opaque framing, but field 2 is absent.
+                object(3, TABLE_INFO_MESSAGE_TYPE, vec![0x0a, 0x00])?,
+            ],
+        })?;
+        assert!(matches!(
+            Package::from_bytes(&bytes),
+            Err(Error::MalformedPayload {
+                path: SemanticPath::Drawable { sheet: 0, index: 0 },
+            })
+        ));
         Ok(())
     }
 

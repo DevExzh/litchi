@@ -582,3 +582,34 @@ migration host's raw-ID rename example has moved to a semantic focused-crate
 example, but its legacy-normalizing compatibility writer remains. This vertical
 ownership move changes no manifest edge: the current inventory remains 63
 packages, 223 internal declarations, and 16 ordered debts.
+
+## 2026-08-08 current-status amendment: archive cache state and focused gates
+
+The preceding 16-debt inventory is historical and is superseded by this
+current-status amendment. `litchi-iwa-archive` now owns cache-backed
+`PackageState` and its bounded physical parsed-component state. The
+`litchi-iwa-cache` crate remains a dependency-free leaf; `litchi-iwa` retains
+format and error policy. Direct host-to-cache debt identity 003 is retired
+without renumbering later identities. The current checker inventory is 63
+packages, 223 internal dependency declarations, and 15 ordered debts.
+
+Numbers narrows one read seam only: `TableInfo.tableModel` uses a strict small
+private Buffa projection after bounded raw preflight, rejects a zero reference,
+does not encode or retain unknown data, and stores no repeated fields. Raw
+source remains authoritative. The broader table model and Numbers graph have
+not migrated by this change.
+
+Pages 14.4 opened the focused clear and range outputs without repair:
+`/private/tmp/litchi-pages-example.KdlErn/clear.pages`
+(`63c2aa20f6064b9a8c5a536475d1a71b34175f4c6924a4d384f24c39fd5155e6`)
+was visibly empty, and `range.pages`
+(`dd0405249a56e3e2b535e6a9541f02feda6299ce1a0959f4d68f7e44a0ae307a`)
+rendered exactly `Range prefix: Litchi native Pages fixture`, `Buffa lazy-view
+migration verification`, and `2026-08-07`. Native Save As/close/reopen yielded
+`clear-native-resaved-20260808.pages`
+(`3ba278e1934688c653ab73f1ee2a194f670545dd160aa5d8e33c2054463a9676`)
+and `range-native-resaved-20260808.pages`
+(`74072d9d813282618db8e47f7ebc26cc59f7c17b1abf9d22c5bbf5473b942a9f`).
+Focused semantic reread matched, and no-op and inverse output over each
+native-resaved artifact remained byte-identical. This closes the clear/range
+native gates, not the broader Pages or monolith-exit gates.

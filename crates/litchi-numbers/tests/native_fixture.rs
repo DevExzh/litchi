@@ -21,6 +21,8 @@ fn assert_expected_cells(package: &Package) -> Result<(), Box<dyn std::error::Er
     let table = sheet
         .at(0)?
         .ok_or_else(|| std::io::Error::other("native Numbers fixture has no first table"))?;
+    assert_eq!(table.row_count(), 22);
+    assert_eq!(table.column_count(), 7);
 
     let marker = table.get_a1("B2")?;
     assert!(
@@ -43,7 +45,8 @@ fn assert_expected_cells(package: &Package) -> Result<(), Box<dyn std::error::Er
 }
 
 #[test]
-fn native_numbers_fixture_opens_from_path_and_bytes() -> Result<(), Box<dyn std::error::Error>> {
+fn native_numbers_table_info_projection_opens_rooted_and_compatibility_paths()
+-> Result<(), Box<dyn std::error::Error>> {
     let path = fixture_path();
     let package = Package::open(&path)?;
     assert_expected_cells(&package)?;
@@ -51,6 +54,10 @@ fn native_numbers_fixture_opens_from_path_and_bytes() -> Result<(), Box<dyn std:
 
     let bytes = std::fs::read(path)?;
     let from_bytes = Package::from_bytes(&bytes)?;
+    // The rooted reader reaches its table model through the strict private
+    // TableInfo Buffa projection. The separate global-compatibility entry
+    // must retain the same native table result without first constructing the
+    // rooted package snapshot.
     assert_expected_cells(&from_bytes)?;
     assert_eq!(
         compatibility_tables_from_bytes(&bytes)?,

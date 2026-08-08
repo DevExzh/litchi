@@ -22,6 +22,7 @@ use super::Components;
 use super::table::Table;
 use super::{
     Error, Result, SemanticLimitKind, SemanticLimits, SemanticPath, TABLE_MODEL_MESSAGE_TYPE,
+    table_info_decode_options,
 };
 use super::{Index, Resolved};
 use crate::DEFAULT_MAX_TEXT_BYTES;
@@ -32,6 +33,7 @@ use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
 use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};
 use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_protos::group_node_category_codec::{self, CategoryValueView, GroupNodeView};
+use litchi_iwa_protos::table_info_codec;
 use litchi_iwa_protos::{tn, tsce, tsd, tst};
 use prost::Message;
 use std::borrow::Cow;
@@ -2176,12 +2178,14 @@ fn formula_table_name(
             continue;
         }
         budget.charge_work(1)?;
-        let Ok(table_info) = tst::TableInfoArchive::decode(table_info_message.data.as_slice())
-        else {
+        let Ok(model_reference) = table_info_codec::decode_table_model_reference(
+            table_info_message.data.as_slice(),
+            table_info_decode_options(table_info_message.data.as_slice()),
+        ) else {
             continue;
         };
         let Some(model_object) =
-            object_index.resolve_ref_id(bundle, table_info.table_model.identifier)?
+            object_index.resolve_ref_id(bundle, model_reference.identifier().get())?
         else {
             continue;
         };

@@ -18,6 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_slide_transition_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_body_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_section_codec.rs");
+    println!("cargo:rerun-if-changed=src/table_info_codec.rs");
 
     let mut proto_files = fs::read_dir(proto_directory)?
         .map(|directory_entry| directory_entry.map(|entry| entry.path()))
@@ -41,6 +42,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
     enforce_pages_body_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_section_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_table_info_projection_provenance(proto_directory, buffa_projection_directory)?;
 
     prost_build::Config::new()
         .include_file("iwa_protos.rs")
@@ -128,6 +130,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_keynote_document_projection_budget(&buffa_keynote_document_out_directory)?;
+
+    // Numbers reaches a table model through field 2 of TableInfo. Keep the
+    // drawable base archive and all display metadata out of generated code;
+    // the format adapter owns strict source validation and raw preservation.
+    let buffa_table_info_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-table-info");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSTTableInfoArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_table_info_out_directory)
+        .include_file("iwa_table_info_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_table_info_projection_budget(&buffa_table_info_out_directory)?;
 
     // Keynote's show reader projects only scalar settings, required direct
     // references, and presentation size. The repeated slide tree is routed by
@@ -323,6 +345,52 @@ fn enforce_keynote_document_projection_provenance(
     {
         return Err(
             "derived Keynote document projection is out of sync with KN.DocumentArchive.show or TSP.Reference.identifier"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_table_info_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const TSP_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const TST_TABLE_INFO: &str = "message TableInfoArchive {\n  required .TSD.DrawableArchive super = 1;\n  required .TSP.Reference tableModel = 2;\n  optional .TSP.Reference editing_state = 3 [deprecated = true];\n  optional .TSP.Reference summary_model = 4;\n  optional .TSP.Reference category_order = 5;\n  optional .TSP.Reference view_column_row_uids = 6;\n  optional .TSP.UUID group_by_uuid = 7;\n  optional .TSP.UUID hidden_states_uuid = 8;\n  optional uint32 formula_coord_space_in_pre40 = 9 [deprecated = true];\n  optional uint32 formula_coord_space = 10;\n  optional .TSCE.CoordMapperArchive pasteboard_coord_mapper = 13;\n  optional .TST.LayoutEngineArchive layout_engine = 14;\n  optional .TSP.Reference pivot_data_model = 15;\n  optional bool is_a_pivot_table = 16;\n  optional .TSP.Reference pivot_order = 17;\n}";
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaProjection;\n\
+message TableModelReference {\n\
+required uint64 identifier = 1;\n\
+}\n\
+message TableInfoArchive {\n\
+required .LitchiIwaProjection.TableModelReference table_model = 2;\n\
+}";
+
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let tst = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
+    let projection = fs::read_to_string(projection_directory.join("TSTTableInfoArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let codec = fs::read_to_string("src/table_info_codec.rs")?;
+    let production_codec = codec
+        .split_once("#[cfg(test)]")
+        .map_or(codec.as_str(), |(production, _tests)| production);
+    if tsp.matches(TSP_REFERENCE).count() != 1
+        || tst.matches(TST_TABLE_INFO).count() != 1
+        || projection_schema != PROJECTION_SCHEMA
+        || projection.len() > 1024
+        || projection.contains("repeated ")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "derived Numbers TableInfo projection drifted from TST.TableInfoArchive.tableModel or TSP.Reference.identifier, exceeded its 1 KiB source budget, introduced generated repeated storage, or added production encoding"
                 .into(),
         );
     }
@@ -697,6 +765,42 @@ fn enforce_keynote_document_projection_budget(directory: &Path) -> Result<(), Bo
     if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES {
         return Err(format!(
             "Keynote document projection generated {files} files/{bytes} bytes; expected {EXPECTED_FILES} files and at most {MAX_GENERATED_BYTES} bytes"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_table_info_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 64 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut generated_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        generated_repeated_views = generated_repeated_views
+            .checked_add(
+                fs::read_to_string(entry.path())?
+                    .matches("LazyRepeatedView")
+                    .count(),
+            )
+            .ok_or("generated repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || generated_repeated_views != 0 {
+        return Err(format!(
+            "Numbers TableInfo projection generated {files} files/{bytes} bytes/{generated_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }
