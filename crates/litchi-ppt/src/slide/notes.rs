@@ -302,7 +302,8 @@ impl SpeakerNotes {
         let parsed = crate::odraw::parse(&drawing.data)?;
         let mut shapes = Vec::with_capacity(parsed.len());
         for shape in &parsed {
-            if let Some(shape) = Slide::<'static>::convert_odraw_to_shape_enum(shape)? {
+            if let Some(mut shape) = Slide::<'static>::convert_odraw_to_shape_enum(shape)? {
+                shape.mark_source_bound_recursive();
                 shapes.push(shape);
             }
         }
@@ -485,5 +486,103 @@ mod tests {
             "reader writer notes round trip"
         );
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn parsed_notes_shape_clone_refuses_public_mutation() {
+        use crate::shapes::{Mutation, MutationError, Shape, ShapeEnum};
+
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/poi/test-data/slideshow/basic_test_ppt_file.ppt"
+        );
+        let package = Package::open(path);
+        assert!(package.is_ok());
+        let Ok(mut package) = package else {
+            return;
+        };
+        let presentation = package.presentation();
+        assert!(presentation.is_ok());
+        let Ok(presentation) = presentation else {
+            return;
+        };
+        let slides = presentation.slides();
+        assert!(slides.is_ok());
+        let Ok(slides) = slides else {
+            return;
+        };
+
+        let mut candidate = None;
+        'slides: for slide in &slides {
+            let notes = slide.speaker_notes();
+            assert!(notes.is_ok());
+            let Ok(Some(notes)) = notes else {
+                continue;
+            };
+            let shapes = notes.shapes();
+            assert!(shapes.is_ok());
+            let Ok(shapes) = shapes else {
+                continue;
+            };
+            for shape in shapes {
+                if !matches!(
+                    shape,
+                    ShapeEnum::TextBox(_) | ShapeEnum::Placeholder(_) | ShapeEnum::AutoShape(_)
+                ) {
+                    continue;
+                }
+                let text = shape.text();
+                assert!(text.is_ok());
+                let Ok(text) = text else {
+                    continue;
+                };
+                if !text.is_empty() {
+                    candidate = Some(shape.clone());
+                    break 'slides;
+                }
+            }
+        }
+
+        assert!(candidate.is_some());
+        let Some(mut shape) = candidate else {
+            return;
+        };
+        let before_text = shape.text();
+        assert!(before_text.is_ok());
+        let Ok(before_text) = before_text else {
+            return;
+        };
+        let before_fill = match &shape {
+            ShapeEnum::TextBox(shape) => shape.properties().fill_color,
+            ShapeEnum::Placeholder(shape) => shape.properties().fill_color,
+            ShapeEnum::AutoShape(shape) => shape.properties().fill_color,
+            _ => return,
+        };
+        let mutation = match &mut shape {
+            ShapeEnum::TextBox(shape) => Shape::set_fill_color(shape, Some(0x0012_3456)),
+            ShapeEnum::Placeholder(shape) => Shape::set_fill_color(shape, Some(0x0012_3456)),
+            ShapeEnum::AutoShape(shape) => Shape::set_fill_color(shape, Some(0x0012_3456)),
+            _ => return,
+        };
+
+        assert_eq!(
+            mutation,
+            Err(MutationError::SourceBound {
+                mutation: Mutation::Fill,
+            })
+        );
+        let after_text = shape.text();
+        assert!(after_text.is_ok());
+        let Ok(after_text) = after_text else {
+            return;
+        };
+        assert_eq!(after_text, before_text);
+        let after_fill = match &shape {
+            ShapeEnum::TextBox(shape) => shape.properties().fill_color,
+            ShapeEnum::Placeholder(shape) => shape.properties().fill_color,
+            ShapeEnum::AutoShape(shape) => shape.properties().fill_color,
+            _ => return,
+        };
+        assert_eq!(after_fill, before_fill);
     }
 }

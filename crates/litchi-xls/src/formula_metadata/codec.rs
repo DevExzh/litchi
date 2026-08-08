@@ -5,7 +5,10 @@ use crate::utils;
 use crate::{Error, Result};
 
 use super::Metadata;
-use super::validation::{FORMULA_FIXED_SIZE, MAX_FORMULA_PAYLOAD, decode_flags, invalid};
+use super::validation::{
+    FORMULA_FIXED_SIZE, FlagDefect, MAX_FORMULA_PAYLOAD, decode_flags, decode_flags_preserving,
+    invalid,
+};
 
 /// Parsed cell and formula fields needed by `CellRecord`.
 #[derive(Debug)]
@@ -20,6 +23,16 @@ pub(crate) struct Parsed {
 
 /// Parse the payload of a BIFF8 `Formula` record.
 pub(crate) fn parse_record(data: &[u8]) -> Result<Parsed> {
+    parse_record_with(data, false).map(|(parsed, _)| parsed)
+}
+
+/// Parse a Formula while preserving the one explicitly modeled producer
+/// defect. All framing, size, reserved-bit, and value checks remain strict.
+pub(crate) fn parse_record_preserving(data: &[u8]) -> Result<(Parsed, Option<FlagDefect>)> {
+    parse_record_with(data, true)
+}
+
+fn parse_record_with(data: &[u8], preserve_defect: bool) -> Result<(Parsed, Option<FlagDefect>)> {
     if data.len() < FORMULA_FIXED_SIZE {
         return Err(Error::InvalidLength {
             expected: FORMULA_FIXED_SIZE,
@@ -55,17 +68,24 @@ pub(crate) fn parse_record(data: &[u8]) -> Result<Parsed> {
     if formula.is_empty() && !matches!(value, FormulaValue::StringPending) {
         return Err(invalid("Formula token stream cannot be empty"));
     }
-    let mut metadata = decode_flags(flags, &formula)?;
+    let (mut metadata, defect) = if preserve_defect {
+        decode_flags_preserving(flags, &formula)?
+    } else {
+        (decode_flags(flags, &formula)?, None)
+    };
     metadata = metadata.with_calculation_cache(calculation_cache);
 
-    Ok(Parsed {
-        row,
-        col,
-        xf_index,
-        value,
-        metadata,
-        formula,
-    })
+    Ok((
+        Parsed {
+            row,
+            col,
+            xf_index,
+            value,
+            metadata,
+            formula,
+        },
+        defect,
+    ))
 }
 
 fn read_u16(data: &[u8], offset: usize) -> u16 {

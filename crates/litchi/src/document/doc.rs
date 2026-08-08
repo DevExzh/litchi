@@ -132,6 +132,22 @@ pub struct Document {
 }
 
 impl Document {
+    /// Resolve list semantics while the format owner and its definitions remain available.
+    #[cfg(feature = "markdown")]
+    #[allow(unreachable_patterns)]
+    pub(crate) fn markdown_list_items(&self) -> Result<Vec<Option<crate::markdown::ListItemInfo>>> {
+        match &self.inner {
+            #[cfg(feature = "doc")]
+            DocumentImpl::Doc(document, _) => crate::markdown::resolve_doc_lists(document),
+            #[cfg(feature = "docx")]
+            DocumentImpl::Docx(package, _) => {
+                let document = package.document().map_err(crate::map_ooxml_error)?;
+                crate::markdown::resolve_docx_lists(&document)
+            },
+            _ => Ok(Vec::new()),
+        }
+    }
+
     /// Open a Word document from a file path.
     ///
     /// The file format (.doc or .docx) is automatically detected by examining

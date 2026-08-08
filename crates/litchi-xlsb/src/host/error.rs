@@ -8,6 +8,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Errors that can occur during XLSB file parsing
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// I/O error
     Io(std::io::Error),

@@ -9,6 +9,7 @@
 pub mod annotation;
 pub mod calculation;
 pub mod chart;
+pub mod compact_xml;
 pub mod constants;
 pub mod coordinates;
 pub mod core;

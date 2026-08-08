@@ -87,7 +87,14 @@ impl Length {
         let number = if value.fract() == 0.0 {
             format!("{}", value as i64)
         } else {
-            format!("{value:.2}")
+            let mut number = format!("{value:.2}");
+            while number.ends_with('0') {
+                number.pop();
+            }
+            if number.ends_with('.') {
+                number.pop();
+            }
+            number
         };
         Self(format!("{number}{unit}"))
     }
@@ -191,7 +198,7 @@ mod tests {
     #[test]
     fn length_construction_and_parsing() {
         assert_eq!(Length::centimeters(5.0).as_str(), "5cm");
-        assert_eq!(Length::inches(2.5).as_str(), "2.50in");
+        assert_eq!(Length::inches(2.5).as_str(), "2.5in");
         assert_eq!(Length::points(12.0).as_str(), "12pt");
         assert_eq!(Length::parse("10mm").unwrap().as_str(), "10mm");
         assert_eq!(Length::parse("3.25px").unwrap().as_str(), "3.25px");

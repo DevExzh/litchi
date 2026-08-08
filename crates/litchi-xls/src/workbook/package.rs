@@ -114,8 +114,8 @@ impl<R: Read + Seek> Workbook<R> {
             .ole_file
             .open_stream(&["Workbook"])
             .or_else(|_| self.ole_file.open_stream(&["Book"]))?;
-        let workbook_data = prepare_workbook_stream(workbook_data, options.password)?;
-        let mut tolerance = ToleranceLog::new(options.leniency);
+        let workbook_data = prepare_workbook_stream(workbook_data, options.password())?;
+        let mut tolerance = ToleranceLog::new(options.leniency());
 
         let mut records = Records::new(&workbook_data);
         let mut encoding = Encoding::from_codepage(1252)?; // Default codepage
@@ -185,7 +185,12 @@ impl<R: Read + Seek> Workbook<R> {
             if bound_sheet.sheet_type != crate::records::SheetType::WorkSheet {
                 continue;
             }
-            match self.parse_worksheet_from_position(&workbook_data, bound_sheet, &encoding) {
+            match self.parse_worksheet_from_position(
+                &workbook_data,
+                bound_sheet,
+                &encoding,
+                options.compatibility_profile(),
+            ) {
                 Ok(worksheet) => {
                     let worksheet_index = self.worksheets.len();
                     self.worksheet_names.push(bound_sheet.name.clone());

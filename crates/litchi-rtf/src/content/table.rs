@@ -626,6 +626,10 @@ impl TableCellBorders {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TableShading {
     pub amount: Option<u16>,
+    /// Raw cell shading amount (`\\clshdngraw`).
+    pub raw_amount: Option<u16>,
+    /// Whether cell shading is explicitly raw-nil (`\\clshdrawnil`).
+    pub raw_nil: bool,
     pub foreground_color: Option<crate::ColorRef>,
     pub background_color: Option<crate::ColorRef>,
     pub pattern: Option<crate::ShadingPattern>,
@@ -633,7 +637,12 @@ pub struct TableShading {
 }
 impl TableShading {
     pub fn validate(&self) -> crate::RtfResult<()> {
-        if self.amount.is_some_and(|value| value > 10_000) {
+        if self
+            .amount
+            .into_iter()
+            .chain(self.raw_amount)
+            .any(|value| value > 10_000)
+        {
             return Err(crate::RtfError::MalformedDocument(
                 "RTF table shading must be in 0..=10000".to_string(),
             ));

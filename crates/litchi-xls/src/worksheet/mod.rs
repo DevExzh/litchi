@@ -73,6 +73,7 @@ pub struct Worksheet {
     conditional_format_extensions: Vec<crate::conditional_format::ConditionalExtension>,
     consolidation: Option<crate::consolidation::Consolidation>,
     formula_error_features: Vec<crate::formula_errors::FormulaErrorFeature>,
+    formula_metadata_defects: Vec<crate::formula_metadata::Defect>,
     list_objects: Vec<crate::list_object::ListObject>,
     row_block_index: Result<Option<crate::row_block_index::RowBlockIndex>, String>,
     /// Sheet tab color and publish state (SHEETEXT record).
@@ -125,6 +126,7 @@ impl Worksheet {
             conditional_format_extensions: Vec::new(),
             consolidation: None,
             formula_error_features: Vec::new(),
+            formula_metadata_defects: Vec::new(),
             list_objects: Vec::new(),
             row_block_index: Ok(None),
             sheet_ext: None,
@@ -171,6 +173,7 @@ impl Worksheet {
             conditional_format_extensions: Vec::new(),
             consolidation: None,
             formula_error_features: Vec::new(),
+            formula_metadata_defects: Vec::new(),
             list_objects: Vec::new(),
             row_block_index: Ok(None),
             sheet_ext: None,
@@ -443,6 +446,19 @@ impl Worksheet {
         features: Vec<crate::formula_errors::FormulaErrorFeature>,
     ) {
         self.formula_error_features = features;
+    }
+
+    /// Nonconforming Formula metadata preserved without evaluating or
+    /// normalizing the source token stream.
+    pub fn formula_metadata_defects(&self) -> &[crate::formula_metadata::Defect] {
+        &self.formula_metadata_defects
+    }
+
+    pub(crate) fn set_formula_metadata_defects(
+        &mut self,
+        defects: Vec<crate::formula_metadata::Defect>,
+    ) {
+        self.formula_metadata_defects = defects;
     }
 
     /// Legacy BIFF8 worksheet tables in feature-record order.

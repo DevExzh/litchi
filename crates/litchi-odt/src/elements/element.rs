@@ -324,7 +324,7 @@ impl Element {
         }
 
         if self.children.is_empty() && self.text_content.is_empty() {
-            len += 3;
+            len += 2;
             return len;
         }
 
@@ -369,7 +369,7 @@ impl Element {
 
         if self.children.is_empty() && self.text_content.is_empty() {
             // Self-closing tag
-            output.push_str(" />");
+            output.push_str("/>");
         } else {
             output.push('>');
 
@@ -604,7 +604,7 @@ mod tests {
     fn test_element_to_xml_self_closing() {
         let element = Element::new("text:line-break");
         let xml = element.to_xml_string();
-        assert!(xml.contains("/>"));
+        assert_eq!(xml, "<text:line-break/>");
     }
 
     #[test]

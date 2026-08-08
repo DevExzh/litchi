@@ -1,4 +1,4 @@
-//! Bounded, inert PresentationML notes-slide and notes-master package graphs.
+//! Bounded, inert `PresentationML` notes-slide and notes-master package graphs.
 
 mod codec;
 mod model;
@@ -8,7 +8,11 @@ mod validation;
 
 pub use codec::{master_xml, write_text, write_text_with};
 pub use model::{Conformance, Graph, Link, Master, Slide, Theme};
-pub use package::{apply_commit, apply_patch, clear, load, load_snapshot, put, remove, slide};
+pub(crate) use package::{
+    apply_commit, apply_patch, clear_checked, load, load_snapshot, remove_checked,
+};
+#[cfg(test)]
+pub(crate) use package::{clear, put, remove};
 pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
 
 pub(crate) const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -27,6 +31,7 @@ pub(crate) const MAX_MASTER_XML: usize = 16 * 1024 * 1024;
 pub(crate) const MAX_THEME_XML: usize = 16 * 1024 * 1024;
 pub(crate) const MAX_TOTAL_BYTES: usize = 64 * 1024 * 1024;
 pub(crate) const MAX_NOTES_SLIDES: usize = 4096;
+pub(crate) const MAX_OWNED_PARTS: usize = 4_096;
 pub(crate) const MAX_NODES: usize = 100_000;
 pub(crate) const MAX_DEPTH: usize = 128;
 pub(crate) const MAX_ATTRIBUTES: usize = 500_000;

@@ -6,6 +6,71 @@ use super::super::package::Error;
 use std::borrow::Cow;
 use std::fmt;
 
+/// Semantic shape mutation that requires a persistence-capable edit transaction.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mutation {
+    /// Replace shape text.
+    Text,
+    /// Replace the shape fill.
+    Fill,
+    /// Replace the shape outline.
+    Line,
+    /// Change shape geometry or adjustment data.
+    Geometry,
+    /// Change text layout or character formatting.
+    Formatting,
+    /// Change placeholder identity or sizing.
+    Placeholder,
+    /// Change picture identity, framing, bounds, or retained OfficeArt data.
+    Picture,
+    /// Change a shape's child structure.
+    Structure,
+    /// Obtain unrestricted mutable access to common shape properties.
+    Properties,
+}
+
+/// Refusal returned when a parsed shape cannot be mutated losslessly in place.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MutationError {
+    /// The shape belongs to an opened presentation, but no source-checked
+    /// transaction can faithfully publish this mutation yet.
+    SourceBound { mutation: Mutation },
+    /// A one-based picture-store index was zero or otherwise invalid.
+    InvalidPictureIndex { index: u32 },
+}
+
+impl MutationError {
+    pub(crate) const fn source_bound(mutation: Mutation) -> Self {
+        Self::SourceBound { mutation }
+    }
+
+    /// Return the refused semantic mutation.
+    pub const fn mutation(self) -> Mutation {
+        match self {
+            Self::SourceBound { mutation } => mutation,
+            Self::InvalidPictureIndex { .. } => Mutation::Picture,
+        }
+    }
+}
+
+impl fmt::Display for MutationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SourceBound { mutation } => write!(
+                formatter,
+                "source-bound PPT shape mutation {mutation:?} requires a persistence transaction"
+            ),
+            Self::InvalidPictureIndex { index } => {
+                write!(formatter, "invalid one-based PPT picture index {index}")
+            },
+        }
+    }
+}
+
+impl std::error::Error for MutationError {}
+
 /// Types of shapes in PowerPoint presentations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapeType {
@@ -70,7 +135,7 @@ impl fmt::Display for ShapeType {
 }
 
 /// Common properties shared by all shape types.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShapeProperties {
     /// Shape ID
     pub id: u32,
@@ -128,8 +193,30 @@ pub trait Shape: std::any::Any {
     /// Get the shape's properties.
     fn properties(&self) -> &ShapeProperties;
 
-    /// Get the shape's properties as mutable reference.
-    fn properties_mut(&mut self) -> &mut ShapeProperties;
+    /// Get the shape's properties for a detached semantic value.
+    ///
+    /// Parsed presentation shapes return [`MutationError::SourceBound`]
+    /// before exposing mutable state.
+    fn properties_mut(&mut self) -> Result<&mut ShapeProperties, MutationError>;
+
+    /// Replace the fill color on a detached shape.
+    fn set_fill_color(&mut self, color: Option<u32>) -> Result<(), MutationError> {
+        let properties = self
+            .properties_mut()
+            .map_err(|_| MutationError::source_bound(Mutation::Fill))?;
+        properties.fill_color = color;
+        Ok(())
+    }
+
+    /// Replace the line color and width on a detached shape.
+    fn set_line(&mut self, color: Option<u32>, width: Option<u16>) -> Result<(), MutationError> {
+        let properties = self
+            .properties_mut()
+            .map_err(|_| MutationError::source_bound(Mutation::Line))?;
+        properties.line_color = color;
+        properties.line_width = width;
+        Ok(())
+    }
 
     /// Get the shape type.
     fn shape_type(&self) -> ShapeType {
@@ -184,73 +271,75 @@ impl Clone for Box<dyn Shape> {
 #[derive(Clone)]
 pub struct ShapeContainer<'a> {
     /// Shape properties
-    pub properties: ShapeProperties,
+    pub(crate) properties: ShapeProperties,
     /// Raw shape data (for parsing) - uses Cow to avoid unnecessary clones
-    pub raw_data: Cow<'a, [u8]>,
+    pub(crate) raw_data: Cow<'a, [u8]>,
     /// Text content (if applicable)
-    pub text_content: Option<String>,
+    pub(crate) text_content: Option<String>,
     /// Child shapes (for group shapes) - must have 'static lifetime for trait object safety
-    pub children: Vec<Box<dyn Shape>>,
+    pub(crate) children: Vec<Box<dyn Shape>>,
 
     // Escher text properties (from OfficeArtFOPT records)
     /// Text left margin in EMUs
     /// Property ID: 0x0081 (TEXT_LEFT)
-    pub text_left: Option<i32>,
+    pub(crate) text_left: Option<i32>,
 
     /// Text top margin in EMUs
     /// Property ID: 0x0082 (TEXT_TOP)
-    pub text_top: Option<i32>,
+    pub(crate) text_top: Option<i32>,
 
     /// Text right margin in EMUs
     /// Property ID: 0x0083 (TEXT_RIGHT)
-    pub text_right: Option<i32>,
+    pub(crate) text_right: Option<i32>,
 
     /// Text bottom margin in EMUs
     /// Property ID: 0x0084 (TEXT_BOTTOM)
-    pub text_bottom: Option<i32>,
+    pub(crate) text_bottom: Option<i32>,
 
     /// Text flow direction
     /// Property ID: 0x0088 (TEXT_FLOW)
     /// Values: 0=horizontal, 1=vertical, 2=vertical rotated, 3=word art vertical
-    pub text_flow: Option<u16>,
+    pub(crate) text_flow: Option<u16>,
 
     /// Text wrapping mode (`MSOWRAPMODE`)
     /// Property ID: 0x0085 (WRAP_TEXT)
-    pub wrap_text: Option<u16>,
+    pub(crate) wrap_text: Option<u16>,
 
     /// Text anchor (vertical alignment)
     /// Property ID: 0x0087 (ANCHOR_TEXT)
     /// Values: 0=top, 1=middle, 2=bottom, 3=top centered, 4=middle centered,
     ///         5=bottom centered, 6=top baseline, 7=bottom baseline, 8=top centered baseline
-    pub anchor_text: Option<u16>,
+    pub(crate) anchor_text: Option<u16>,
 
     /// Text ID (identifier for the text)
     /// Property ID: 0x0080 (TEXT_ID)
-    pub text_id: Option<i32>,
+    pub(crate) text_id: Option<i32>,
 
     /// Size shape to fit text content
     /// Packed Boolean property ID: 0x00BE (fFitShapeToText)
-    pub size_shape_to_fit_text: Option<bool>,
+    pub(crate) size_shape_to_fit_text: Option<bool>,
 
     /// Font rotation (`MSOCDIR`)
     /// Property ID: 0x0089 (cdirFont)
-    pub font_rotation: Option<u16>,
+    pub(crate) font_rotation: Option<u16>,
 
     /// Text direction (`MSOTXDIR`)
     /// Property ID: 0x008B (txdir)
-    pub text_direction: Option<u16>,
+    pub(crate) text_direction: Option<u16>,
 
     /// Use automatic default text margins
     /// Packed Boolean property ID: 0x00BC (fAutoTextMargin)
-    pub auto_text_margin: Option<bool>,
+    pub(crate) auto_text_margin: Option<bool>,
 
     /// Enter text editing mode when the contained text area is clicked
     /// Packed Boolean property ID: 0x00BB (fSelectText)
-    pub select_text: Option<bool>,
+    pub(crate) select_text: Option<bool>,
 
     /// ID of next shape in sequence
     /// Property ID: 0x008A (hspNext)
-    pub id_of_next_shape: Option<u32>,
+    pub(crate) id_of_next_shape: Option<u32>,
+
+    source_bound: bool,
 }
 
 impl<'a> fmt::Debug for ShapeContainer<'a> {
@@ -291,6 +380,91 @@ impl<'a> fmt::Debug for ShapeContainer<'a> {
 }
 
 impl<'a> ShapeContainer<'a> {
+    /// Return the immutable common shape properties.
+    pub const fn properties(&self) -> &ShapeProperties {
+        &self.properties
+    }
+
+    /// Return the retained OfficeArt bytes.
+    pub fn raw_data(&self) -> &[u8] {
+        self.raw_data.as_ref()
+    }
+
+    /// Return the decoded text, when present.
+    pub fn text_content(&self) -> Option<&str> {
+        self.text_content.as_deref()
+    }
+
+    /// Return the explicit left text margin.
+    pub const fn text_left(&self) -> Option<i32> {
+        self.text_left
+    }
+
+    /// Return the explicit top text margin.
+    pub const fn text_top(&self) -> Option<i32> {
+        self.text_top
+    }
+
+    /// Return the explicit right text margin.
+    pub const fn text_right(&self) -> Option<i32> {
+        self.text_right
+    }
+
+    /// Return the explicit bottom text margin.
+    pub const fn text_bottom(&self) -> Option<i32> {
+        self.text_bottom
+    }
+
+    /// Return the raw text-flow value.
+    pub const fn text_flow(&self) -> Option<u16> {
+        self.text_flow
+    }
+
+    /// Return the raw text-wrapping value.
+    pub const fn wrap_text(&self) -> Option<u16> {
+        self.wrap_text
+    }
+
+    /// Return the raw text-anchor value.
+    pub const fn anchor_text(&self) -> Option<u16> {
+        self.anchor_text
+    }
+
+    /// Return the retained text identifier.
+    pub const fn text_id(&self) -> Option<i32> {
+        self.text_id
+    }
+
+    /// Return the explicit fit-shape-to-text flag.
+    pub const fn size_shape_to_fit_text(&self) -> Option<bool> {
+        self.size_shape_to_fit_text
+    }
+
+    /// Return the raw font-rotation value.
+    pub const fn font_rotation(&self) -> Option<u16> {
+        self.font_rotation
+    }
+
+    /// Return the raw text-direction value.
+    pub const fn text_direction(&self) -> Option<u16> {
+        self.text_direction
+    }
+
+    /// Return the explicit automatic-margin flag.
+    pub const fn auto_text_margin(&self) -> Option<bool> {
+        self.auto_text_margin
+    }
+
+    /// Return the explicit select-text flag.
+    pub const fn select_text(&self) -> Option<bool> {
+        self.select_text
+    }
+
+    /// Return the next shape identifier in the sequence.
+    pub const fn id_of_next_shape(&self) -> Option<u32> {
+        self.id_of_next_shape
+    }
+
     /// Create a new shape container with owned data.
     ///
     /// All Escher text properties are initialized to `None` and can be
@@ -322,6 +496,7 @@ impl<'a> ShapeContainer<'a> {
             auto_text_margin: None,
             select_text: None,
             id_of_next_shape: None,
+            source_bound: false,
         }
     }
 
@@ -360,12 +535,15 @@ impl<'a> ShapeContainer<'a> {
             auto_text_margin: None,
             select_text: None,
             id_of_next_shape: None,
+            source_bound: false,
         }
     }
 
     /// Add a child shape to this shape (for group shapes).
-    pub fn add_child(&mut self, shape: Box<dyn Shape>) {
+    pub fn add_child(&mut self, shape: Box<dyn Shape>) -> Result<(), MutationError> {
+        self.ensure_mutable(Mutation::Structure)?;
         self.children.push(shape);
+        Ok(())
     }
 
     /// Get all child shapes.
@@ -373,9 +551,32 @@ impl<'a> ShapeContainer<'a> {
         &self.children
     }
 
-    /// Set the text content of this shape.
-    pub fn set_text(&mut self, text: String) {
+    /// Set the text content of a detached shape.
+    pub fn set_text(&mut self, text: String) -> Result<(), MutationError> {
+        self.ensure_mutable(Mutation::Text)?;
+        self.set_decoded_text(text);
+        Ok(())
+    }
+
+    pub(crate) fn set_decoded_text(&mut self, text: String) {
         self.text_content = Some(text);
+    }
+
+    pub(crate) fn ensure_mutable(&self, mutation: Mutation) -> Result<(), MutationError> {
+        if self.source_bound {
+            Err(MutationError::source_bound(mutation))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub(crate) fn properties_mut_checked(&mut self) -> Result<&mut ShapeProperties, MutationError> {
+        self.ensure_mutable(Mutation::Properties)?;
+        Ok(&mut self.properties)
+    }
+
+    pub(crate) fn mark_source_bound(&mut self) {
+        self.source_bound = true;
     }
 
     /// Set text margins from a 4-value tuple (left, top, right, bottom).
@@ -389,13 +590,18 @@ impl<'a> ShapeContainer<'a> {
     /// ```ignore
     /// container.set_text_margins(Some((91440, 45720, 91440, 45720)));
     /// ```
-    pub fn set_text_margins(&mut self, margins: Option<(i32, i32, i32, i32)>) {
+    pub fn set_text_margins(
+        &mut self,
+        margins: Option<(i32, i32, i32, i32)>,
+    ) -> Result<(), MutationError> {
+        self.ensure_mutable(Mutation::Formatting)?;
         if let Some((left, top, right, bottom)) = margins {
             self.text_left = Some(left);
             self.text_top = Some(top);
             self.text_right = Some(right);
             self.text_bottom = Some(bottom);
         }
+        Ok(())
     }
 
     /// Get text margins as a 4-value tuple.
@@ -435,8 +641,10 @@ impl<'a> ShapeContainer<'a> {
     /// - 1: Vertical (top to bottom)
     /// - 2: Vertical rotated
     /// - 3: Word art vertical
-    pub fn set_text_flow(&mut self, flow: Option<u16>) {
+    pub fn set_text_flow(&mut self, flow: Option<u16>) -> Result<(), MutationError> {
+        self.ensure_mutable(Mutation::Formatting)?;
         self.text_flow = flow;
+        Ok(())
     }
 
     /// Set text anchor (vertical alignment).
@@ -452,13 +660,17 @@ impl<'a> ShapeContainer<'a> {
     /// - 6: Top baseline
     /// - 7: Bottom baseline
     /// - 8: Top centered baseline
-    pub fn set_anchor_text(&mut self, anchor: Option<u16>) {
+    pub fn set_anchor_text(&mut self, anchor: Option<u16>) -> Result<(), MutationError> {
+        self.ensure_mutable(Mutation::Formatting)?;
         self.anchor_text = anchor;
+        Ok(())
     }
 
     /// Set the raw `MSOWRAPMODE` text wrapping value.
-    pub fn set_wrap_text(&mut self, wrap: Option<u16>) {
+    pub fn set_wrap_text(&mut self, wrap: Option<u16>) -> Result<(), MutationError> {
+        self.ensure_mutable(Mutation::Formatting)?;
         self.wrap_text = wrap;
+        Ok(())
     }
 
     /// Whether the wrapping mode allows wrapping within the shape.
@@ -469,8 +681,10 @@ impl<'a> ShapeContainer<'a> {
     }
 
     /// Set the raw `MSOCDIR` font rotation value.
-    pub fn set_font_rotation(&mut self, rotation: Option<u16>) {
+    pub fn set_font_rotation(&mut self, rotation: Option<u16>) -> Result<(), MutationError> {
+        self.ensure_mutable(Mutation::Formatting)?;
         self.font_rotation = rotation;
+        Ok(())
     }
 }
 
@@ -482,8 +696,8 @@ where
         &self.properties
     }
 
-    fn properties_mut(&mut self) -> &mut ShapeProperties {
-        &mut self.properties
+    fn properties_mut(&mut self) -> Result<&mut ShapeProperties, MutationError> {
+        self.properties_mut_checked()
     }
 
     fn text(&self) -> Result<String, Error> {
@@ -500,5 +714,135 @@ where
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+}
+
+#[cfg(test)]
+mod persistence_tests {
+    use super::{Mutation, MutationError, Shape, ShapeContainer, ShapeProperties};
+
+    #[derive(Clone)]
+    struct ExternalShape {
+        properties: ShapeProperties,
+    }
+
+    impl Shape for ExternalShape {
+        fn properties(&self) -> &ShapeProperties {
+            &self.properties
+        }
+
+        fn properties_mut(&mut self) -> Result<&mut ShapeProperties, MutationError> {
+            Ok(&mut self.properties)
+        }
+
+        fn text(&self) -> crate::package::Result<String> {
+            Ok(String::new())
+        }
+
+        fn has_text(&self) -> bool {
+            false
+        }
+
+        fn clone_box(&self) -> Box<dyn Shape> {
+            Box::new(self.clone())
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+    }
+
+    #[test]
+    fn external_shape_implementers_have_no_lineage_contract() {
+        let mut shape = ExternalShape {
+            properties: ShapeProperties::default(),
+        };
+        assert!(Shape::set_fill_color(&mut shape, Some(0x0011_2233)).is_ok());
+        assert_eq!(shape.properties.fill_color, Some(0x0011_2233));
+    }
+
+    #[test]
+    fn source_bound_text_fill_and_line_mutations_are_atomic_refusals() {
+        let mut shape = ShapeContainer::new(ShapeProperties::default(), Vec::new());
+        assert!(shape.set_text("before".to_string()).is_ok());
+        assert!(Shape::set_fill_color(&mut shape, Some(0x0011_2233)).is_ok());
+        assert!(Shape::set_line(&mut shape, Some(0x0044_5566), Some(2)).is_ok());
+        shape.mark_source_bound();
+        let before = shape.clone();
+
+        assert_eq!(
+            shape.set_text("after".to_string()),
+            Err(MutationError::SourceBound {
+                mutation: Mutation::Text,
+            })
+        );
+        assert_eq!(
+            Shape::set_fill_color(&mut shape, None),
+            Err(MutationError::SourceBound {
+                mutation: Mutation::Fill,
+            })
+        );
+        assert_eq!(
+            Shape::set_line(&mut shape, None, None),
+            Err(MutationError::SourceBound {
+                mutation: Mutation::Line,
+            })
+        );
+        assert_eq!(shape.text_content, before.text_content);
+        assert_eq!(shape.properties, before.properties);
+    }
+
+    #[test]
+    fn source_bound_properties_never_expose_a_mutable_reference() {
+        let mut shape = ShapeContainer::new(ShapeProperties::default(), Vec::new());
+        shape.mark_source_bound();
+        assert!(matches!(
+            Shape::properties_mut(&mut shape),
+            Err(MutationError::SourceBound {
+                mutation: Mutation::Properties,
+            })
+        ));
+    }
+
+    #[test]
+    fn source_bound_container_structure_and_formatting_are_atomic_refusals() {
+        let mut shape = ShapeContainer::new(ShapeProperties::default(), Vec::new());
+        assert!(shape.set_text_margins(Some((1, 2, 3, 4))).is_ok());
+        assert!(shape.set_text_flow(Some(1)).is_ok());
+        assert!(shape.set_anchor_text(Some(2)).is_ok());
+        assert!(shape.set_wrap_text(Some(1)).is_ok());
+        assert!(shape.set_font_rotation(Some(2)).is_ok());
+        shape.mark_source_bound();
+        let before = shape.clone();
+
+        assert_eq!(
+            shape.add_child(Box::new(ShapeContainer::new(
+                ShapeProperties::default(),
+                Vec::new(),
+            ))),
+            Err(MutationError::SourceBound {
+                mutation: Mutation::Structure,
+            })
+        );
+        for refusal in [
+            shape.set_text_margins(Some((5, 6, 7, 8))),
+            shape.set_text_flow(None),
+            shape.set_anchor_text(None),
+            shape.set_wrap_text(None),
+            shape.set_font_rotation(None),
+        ] {
+            assert_eq!(
+                refusal,
+                Err(MutationError::SourceBound {
+                    mutation: Mutation::Formatting,
+                })
+            );
+        }
+        assert_eq!(shape.children.len(), before.children.len());
+        assert_eq!(shape.text_margins(), before.text_margins());
+        assert_eq!(shape.text_flow, before.text_flow);
+        assert_eq!(shape.anchor_text, before.anchor_text);
+        assert_eq!(shape.wrap_text, before.wrap_text);
+        assert_eq!(shape.font_rotation, before.font_rotation);
     }
 }

@@ -4,10 +4,35 @@ use litchi_xls::writer::Writer;
 use litchi_xls::{
     ExternalTableField, ExternalTableMetadata, ExternalTableVersion, ListColumnId, ListObject,
     ListObjectColumn, ListObjectFeatureVersion, ListObjectId, ListObjectRange,
-    ListObjectSourceMetadata, ListObjectStyleOptions, WebColumnType, WebDefaultValue, WebFieldInfo,
-    WebInvalidCell, WebTableField, WebTableMetadata, Workbook, XmlColumnMapping, XmlDataType,
-    XmlTableField, XmlTableMetadata,
+    ListObjectSourceMetadata, ListObjectStyleOptions, Map, MapId, MapInfo, OpaqueXml, Schema,
+    SchemaId, WebColumnType, WebDefaultValue, WebFieldInfo, WebInvalidCell, WebTableField,
+    WebTableMetadata, Workbook, XmlColumnMapping, XmlDataType, XmlTableField, XmlTableMetadata,
 };
+
+fn map_info(id: u32, name: &str, root: &str) -> MapInfo {
+    let schema_id = SchemaId::new(format!("schema-{id}")).unwrap();
+    let schema_xml = format!(
+        "<x:schema xmlns:x=\"http://www.w3.org/2001/XMLSchema\"><x:element name=\"{root}\"/></x:schema>"
+    );
+    let schema = Schema::try_new(
+        schema_id.clone(),
+        OpaqueXml::try_new(schema_xml.into_bytes()).unwrap(),
+    )
+    .unwrap();
+    let map = Map::try_new(
+        MapId::new(id).unwrap(),
+        name,
+        root,
+        schema_id,
+        false,
+        true,
+        false,
+        true,
+        true,
+    )
+    .unwrap();
+    MapInfo::try_new("", vec![schema], vec![map]).unwrap()
+}
 
 fn external_table() -> ListObject {
     let columns = vec![
@@ -209,10 +234,33 @@ fn feature11_xml_source_round_trips_typed_mapping() {
     .unwrap();
     let mut writer = Writer::new();
     let sheet = writer.add_worksheet("XML").unwrap();
+    assert!(writer.add_list_object(sheet, table.clone()).is_err());
+    assert!(writer.xml_map().is_none());
+    assert!(
+        writer
+            .put_xml_map(map_info(9, "Names", "root"))
+            .unwrap()
+            .is_none()
+    );
     writer.add_list_object(sheet, table).unwrap();
+    assert!(writer.put_xml_map(map_info(10, "Other", "other")).is_err());
+    assert_eq!(writer.xml_map().unwrap().maps()[0].id().get(), 9);
+    assert!(writer.remove_xml_map().is_err());
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let bytes = output.into_inner();
+    let mut package = litchi_cfb::OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let xml_streams = package
+        .list_streams()
+        .into_iter()
+        .filter(|path| path.as_slice() == ["XML"])
+        .collect::<Vec<_>>();
+    assert_eq!(xml_streams.len(), 1);
+    let xml = package.open_stream(&["XML"]).unwrap();
+    assert!(!xml.iter().any(|byte| matches!(byte, b'\n' | b'\r' | b'\t')));
+    assert!(!xml.windows(2).any(|bytes| bytes == b"> "));
+    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    assert_eq!(workbook.xml_map().unwrap().maps()[0].id().get(), 9);
     let table = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
     let ListObjectSourceMetadata::Xml(metadata) = table.source_metadata().unwrap() else {
         panic!("expected XML source")
@@ -311,6 +359,9 @@ fn feature12_xml_source_round_trips_typed_with_loaded_total_formula() {
     .unwrap();
     let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Xml12").unwrap();
+    writer
+        .put_xml_map(map_info(12, "Feature12", "root"))
+        .unwrap();
     writer.add_list_object(sheet, table).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();

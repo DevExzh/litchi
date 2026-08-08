@@ -12,11 +12,15 @@ pub(crate) struct Snapshot(Package);
 
 impl Snapshot {
     pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Package::open(path, MIMETYPE, BODY_MARKER, "ODM").map(Self)
+        let package = Package::open(path, MIMETYPE, BODY_MARKER, "ODM")?;
+        crate::codec::validate(package.content_xml())?;
+        Ok(Self(package))
     }
 
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODM").map(Self)
+        let package = Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODM")?;
+        crate::codec::validate(package.content_xml())?;
+        Ok(Self(package))
     }
 
     pub(crate) fn content_xml(&self) -> &str {

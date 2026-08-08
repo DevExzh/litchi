@@ -590,8 +590,7 @@ impl Workbook {
     }
 
     fn load_workbook_info(&mut self) -> Result<()> {
-        let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
-        let workbook_part = self.package.get_part(&workbook_uri)?;
+        let workbook_part = self.package.main_document_part()?;
 
         let blob = workbook_part.blob();
         let mut iter = Records::new(blob);

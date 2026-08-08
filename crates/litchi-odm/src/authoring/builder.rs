@@ -1,7 +1,7 @@
 //! Master-document package authoring.
 
 use litchi_core::Result;
-use litchi_odf_common::core::PackageWriter;
+use litchi_odf_common::{compact_xml, core::PackageWriter};
 
 /// Detached builder; publication validates through the package facade.
 #[derive(Clone, Debug)]
@@ -32,6 +32,7 @@ impl Builder {
     ///
     /// Returns an error if content validation or package writing fails.
     pub fn build(self) -> Result<Vec<u8>> {
+        compact_xml::validate(self.content_xml.as_bytes())?;
         crate::codec::validate(&self.content_xml)?;
         let mut writer = PackageWriter::new();
         writer.set_mimetype(crate::package::MIMETYPE)?;

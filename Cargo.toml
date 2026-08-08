@@ -159,7 +159,8 @@ litchi-xls          = { version = "0.0.1", path = "crates/litchi-xls" }
 litchi-xlsb         = { version = "0.0.1", path = "crates/litchi-xlsb" }
 litchi-xlsx         = { version = "0.0.1", path = "crates/litchi-xlsx" }
 soapberry-zip       = { path = "crates/soapberry-zip" }
-xml-minifier        = { path = "crates/xml-minifier" }
+xml-minifier        = { version = "0.1.0", path = "crates/xml-minifier" }
+xml-minifier-macros = { version = "0.1.0", path = "crates/xml-minifier-macros" }
 
 # External deps used by ≥2 crates — declared once, inherited by members.
 # VERSIONS PRESERVED VERBATIM FROM CURRENT root Cargo.toml.

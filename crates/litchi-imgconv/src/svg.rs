@@ -2,7 +2,107 @@
 //
 // Provides high-performance SVG generation from vector graphics operations
 
-use std::fmt::Write;
+const INERT_IMAGE_HREF: &str = "data:,";
+
+fn write_compact_xml_escaped(output: &mut String, value: &str) {
+    for ch in value.chars() {
+        match ch {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '>' => output.push_str("&gt;"),
+            '"' => output.push_str("&quot;"),
+            '\'' => output.push_str("&apos;"),
+            '\t' => output.push_str("&#x9;"),
+            '\n' => output.push_str("&#xA;"),
+            '\r' => output.push_str("&#xD;"),
+            '\u{20}'..='\u{d7ff}' | '\u{e000}'..='\u{10ffff}' => output.push(ch),
+            _ => output.push('\u{fffd}'),
+        }
+    }
+}
+
+fn push_string_attr(output: &mut String, name: &str, value: &str) {
+    output.push(' ');
+    output.push_str(name);
+    output.push_str("=\"");
+    write_compact_xml_escaped(output, value);
+    output.push('"');
+}
+
+fn safe_paint(value: &str) -> &str {
+    if value.contains('\\') || contains_css_reference_function(value) {
+        let trimmed = value.trim();
+        if is_local_fragment_paint(trimmed) {
+            trimmed
+        } else {
+            "none"
+        }
+    } else {
+        value
+    }
+}
+
+fn contains_css_reference_function(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let mut index = 0usize;
+    while index + 3 <= bytes.len() {
+        if bytes[index..index + 3].eq_ignore_ascii_case(b"url")
+            || bytes[index..index + 3].eq_ignore_ascii_case(b"var")
+        {
+            let mut after = index + 3;
+            while after < bytes.len() && bytes[after].is_ascii_whitespace() {
+                after += 1;
+            }
+            if bytes.get(after) == Some(&b'(') {
+                return true;
+            }
+        }
+        index += 1;
+    }
+    false
+}
+
+fn is_local_fragment_paint(value: &str) -> bool {
+    let Some(fragment) = value
+        .strip_prefix("url(#")
+        .and_then(|value| value.strip_suffix(')'))
+    else {
+        return false;
+    };
+    !fragment.is_empty()
+        && fragment
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.' | b':'))
+}
+
+fn safe_image_href(value: &str) -> &str {
+    let payload = value
+        .strip_prefix("data:image/png;base64,")
+        .or_else(|| value.strip_prefix("data:image/jpeg;base64,"));
+    if payload.is_some_and(valid_base64_payload) {
+        value
+    } else {
+        INERT_IMAGE_HREF
+    }
+}
+
+fn valid_base64_payload(payload: &str) -> bool {
+    if payload.len() % 4 != 0 || !payload.is_ascii() {
+        return false;
+    }
+    let padding = payload
+        .bytes()
+        .rev()
+        .take_while(|&byte| byte == b'=')
+        .count();
+    padding <= 2
+        && payload[..payload.len().saturating_sub(padding)]
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/'))
+        && payload[payload.len().saturating_sub(padding)..]
+            .bytes()
+            .all(|byte| byte == b'=')
+}
 
 /// SVG path commands
 #[derive(Debug, Clone)]
@@ -189,40 +289,40 @@ impl SvgPath {
         let mut attrs = format!(r#"d="{}""#, path_data);
 
         if let Some(ref stroke) = self.stroke {
-            write!(attrs, r#" stroke="{}""#, stroke).unwrap();
+            push_string_attr(&mut attrs, "stroke", safe_paint(stroke));
         } else {
             attrs.push_str(r#" stroke="none""#);
         }
 
-        write!(attrs, r#" stroke-width="{}""#, self.stroke_width).unwrap();
+        attrs.push_str(&format!(r#" stroke-width="{}""#, self.stroke_width));
 
         if let Some(ref fill) = self.fill {
-            write!(attrs, r#" fill="{}""#, fill).unwrap();
+            push_string_attr(&mut attrs, "fill", safe_paint(fill));
         } else {
             attrs.push_str(r#" fill="none""#);
         }
 
         if self.fill_opacity < 1.0 {
-            write!(attrs, r#" fill-opacity="{}""#, self.fill_opacity).unwrap();
+            attrs.push_str(&format!(r#" fill-opacity="{}""#, self.fill_opacity));
         }
 
         if self.stroke_opacity < 1.0 {
-            write!(attrs, r#" stroke-opacity="{}""#, self.stroke_opacity).unwrap();
+            attrs.push_str(&format!(r#" stroke-opacity="{}""#, self.stroke_opacity));
         }
 
         if let Some(ref dasharray) = self.stroke_dasharray {
-            write!(attrs, r#" stroke-dasharray="{}""#, dasharray).unwrap();
+            push_string_attr(&mut attrs, "stroke-dasharray", dasharray);
         }
 
         if let Some(ref linecap) = self.stroke_linecap {
-            write!(attrs, r#" stroke-linecap="{}""#, linecap).unwrap();
+            push_string_attr(&mut attrs, "stroke-linecap", linecap);
         }
 
         if let Some(ref linejoin) = self.stroke_linejoin {
-            write!(attrs, r#" stroke-linejoin="{}""#, linejoin).unwrap();
+            push_string_attr(&mut attrs, "stroke-linejoin", linejoin);
         }
 
-        format!(r#"<path {} />"#, attrs)
+        format!(r#"<path {}/>"#, attrs)
     }
 }
 
@@ -247,17 +347,17 @@ impl SvgRect {
         );
 
         if let Some(ref fill) = self.fill {
-            write!(attrs, r#" fill="{}""#, fill).unwrap();
+            push_string_attr(&mut attrs, "fill", safe_paint(fill));
         } else {
             attrs.push_str(r#" fill="none""#);
         }
 
         if let Some(ref stroke) = self.stroke {
-            write!(attrs, r#" stroke="{}""#, stroke).unwrap();
-            write!(attrs, r#" stroke-width="{}""#, self.stroke_width).unwrap();
+            push_string_attr(&mut attrs, "stroke", safe_paint(stroke));
+            attrs.push_str(&format!(r#" stroke-width="{}""#, self.stroke_width));
         }
 
-        format!(r#"<rect {} />"#, attrs)
+        format!(r#"<rect {}/>"#, attrs)
     }
 }
 
@@ -282,17 +382,17 @@ impl SvgEllipse {
         );
 
         if let Some(ref fill) = self.fill {
-            write!(attrs, r#" fill="{}""#, fill).unwrap();
+            push_string_attr(&mut attrs, "fill", safe_paint(fill));
         } else {
             attrs.push_str(r#" fill="none""#);
         }
 
         if let Some(ref stroke) = self.stroke {
-            write!(attrs, r#" stroke="{}""#, stroke).unwrap();
-            write!(attrs, r#" stroke-width="{}""#, self.stroke_width).unwrap();
+            push_string_attr(&mut attrs, "stroke", safe_paint(stroke));
+            attrs.push_str(&format!(r#" stroke-width="{}""#, self.stroke_width));
         }
 
-        format!(r#"<ellipse {} />"#, attrs)
+        format!(r#"<ellipse {}/>"#, attrs)
     }
 }
 
@@ -400,24 +500,24 @@ impl SvgText {
 
     /// Generate SVG text string
     pub fn to_svg(&self) -> String {
-        let mut style_parts = Vec::new();
+        let mut attrs = format!(r#"x="{}" y="{}""#, self.x, self.y);
 
         if let Some(ref family) = self.font_family {
-            style_parts.push(format!("font-family:{}", family));
+            push_string_attr(&mut attrs, "font-family", family);
         }
 
-        style_parts.push(format!("font-size:{}px", self.font_size));
+        attrs.push_str(&format!(r#" font-size="{}px""#, self.font_size));
 
         if let Some(weight) = self.font_weight {
-            style_parts.push(format!("font-weight:{}", weight));
+            attrs.push_str(&format!(r#" font-weight="{}""#, weight));
         }
 
         if self.italic {
-            style_parts.push("font-style:italic".to_string());
+            attrs.push_str(r#" font-style="italic""#);
         }
 
         if let Some(ref fill) = self.fill {
-            style_parts.push(format!("fill:{}", fill));
+            push_string_attr(&mut attrs, "fill", safe_paint(fill));
         }
 
         // Build text decorations
@@ -429,45 +529,28 @@ impl SvgText {
             decorations.push("line-through");
         }
         if !decorations.is_empty() {
-            style_parts.push(format!("text-decoration:{}", decorations.join(" ")));
+            push_string_attr(&mut attrs, "text-decoration", &decorations.join(" "));
         }
-
-        let style = style_parts.join("; ");
 
         // Build transform attribute
-        let mut transform_str = String::new();
         if let Some(matrix) = self.transform {
             // Transform matrix: matrix(a b c d e f)
-            write!(
-                transform_str,
+            attrs.push_str(&format!(
                 r#" transform="matrix({} {} {} {} {} {})""#,
                 matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]
-            )
-            .unwrap();
+            ));
         } else if let Some(rotation) = self.rotation {
             // Simple rotation around (x, y)
-            write!(
-                transform_str,
+            attrs.push_str(&format!(
                 r#" transform="rotate({} {} {})""#,
                 rotation, self.x, self.y
-            )
-            .unwrap();
+            ));
         }
 
-        // Escape XML special characters in text
-        let escaped_text = self
-            .text
-            .replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('"', "&quot;");
+        let mut escaped_text = String::with_capacity(self.text.len());
+        write_compact_xml_escaped(&mut escaped_text, &self.text);
 
-        format!(
-            r#"<text x="{}" y="{}" style="{}"{}>{}
-
-</text>"#,
-            self.x, self.y, style, transform_str, escaped_text
-        )
+        format!(r#"<text {}>{}</text>"#, attrs, escaped_text)
     }
 }
 
@@ -517,10 +600,13 @@ impl SvgImage {
 
     /// Generate SVG image string
     pub fn to_svg(&self) -> String {
-        format!(
-            r#"<image x="{}" y="{}" width="{}" height="{}" href="{}" />"#,
-            self.x, self.y, self.width, self.height, self.href
-        )
+        let mut output = format!(
+            r#"<image x="{}" y="{}" width="{}" height="{}""#,
+            self.x, self.y, self.width, self.height
+        );
+        push_string_attr(&mut output, "href", safe_image_href(&self.href));
+        output.push_str("/>");
+        output
     }
 }
 
@@ -613,23 +699,23 @@ impl SvgBuilder {
 
         // XML declaration
         svg.push_str(r#"<?xml version="1.0" encoding="UTF-8"?>"#);
-        svg.push('\n');
 
         // SVG opening tag
         svg.push_str(r#"<svg xmlns="http://www.w3.org/2000/svg" "#);
-        write!(svg, r#"width="{}" height="{}""#, self.width, self.height).unwrap();
+        svg.push_str(&format!(
+            r#"width="{}" height="{}""#,
+            self.width, self.height
+        ));
 
         if let Some((x, y, w, h)) = self.viewbox {
-            write!(svg, r#" viewBox="{} {} {} {}""#, x, y, w, h).unwrap();
+            svg.push_str(&format!(r#" viewBox="{} {} {} {}""#, x, y, w, h));
         }
 
-        svg.push_str(">\n");
+        svg.push('>');
 
         // Add elements
         for element in &self.elements {
-            svg.push_str("  ");
             svg.push_str(&element.to_svg());
-            svg.push('\n');
         }
 
         // SVG closing tag
@@ -665,20 +751,124 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_svg_path() {
+    fn element_helpers_emit_compact_exact_bytes() {
         let path = SvgPath::new(vec![
             PathCommand::MoveTo { x: 0.0, y: 0.0 },
             PathCommand::LineTo { x: 100.0, y: 100.0 },
         ])
         .with_stroke("#000000".to_string());
 
-        let svg = path.to_svg();
-        assert!(svg.contains("M 0 0 L 100 100"));
+        assert_eq!(
+            path.to_svg().as_bytes(),
+            br##"<path d="M 0 0 L 100 100" stroke="#000000" stroke-width="1" fill="none"/>"##
+        );
+
+        let ellipse = SvgEllipse {
+            cx: 10.0,
+            cy: 20.0,
+            rx: 3.0,
+            ry: 4.0,
+            fill: None,
+            stroke: Some("#00FF00".to_string()),
+            stroke_width: 2.0,
+        };
+        assert_eq!(
+            ellipse.to_svg().as_bytes(),
+            br##"<ellipse cx="10" cy="20" rx="3" ry="4" fill="none" stroke="#00FF00" stroke-width="2"/>"##
+        );
+
+        let image = SvgImage::from_png_data(1.0, 2.0, 3.0, 4.0, &[0, 1, 2]);
+        assert_eq!(
+            image.to_svg().as_bytes(),
+            br#"<image x="1" y="2" width="3" height="4" href="data:image/png;base64,AAEC"/>"#
+        );
+
+        let text = SvgText::new(1.0, 2.0, "a<b&c".to_string(), 12.0);
+        assert_eq!(
+            text.to_svg().as_bytes(),
+            br##"<text x="1" y="2" font-size="12px" fill="#000000">a&lt;b&amp;c</text>"##
+        );
     }
 
     #[test]
-    fn test_svg_builder() {
-        let mut builder = SvgBuilder::new(100.0, 100.0);
+    fn adversarial_strings_are_escaped_and_external_references_are_inert() {
+        let path = SvgPath::new(vec![PathCommand::MoveTo { x: 0.0, y: 0.0 }])
+            .with_stroke("\" onload=\"alert(1)&<>\n".to_string())
+            .with_fill("URL ( https://example.invalid/pixel )".to_string())
+            .with_stroke_dasharray("1\"/><script>&\n".to_string())
+            .with_stroke_linecap("round\0\"".to_string());
+        assert_eq!(
+            path.to_svg().as_bytes(),
+            r##"<path d="M 0 0" stroke="&quot; onload=&quot;alert(1)&amp;&lt;&gt;&#xA;" stroke-width="1" fill="none" stroke-dasharray="1&quot;/&gt;&lt;script&gt;&amp;&#xA;" stroke-linecap="round�&quot;"/>"##.as_bytes()
+        );
+
+        let text = SvgText::new(1.0, 2.0, "<&\0\n".to_string(), 12.0)
+            .with_font_family("x';fill:url(https://example.invalid);\"&\n".to_string())
+            .with_fill("var(--host-paint)".to_string());
+        assert_eq!(
+            text.to_svg().as_bytes(),
+            r##"<text x="1" y="2" font-family="x&apos;;fill:url(https://example.invalid);&quot;&amp;&#xA;" font-size="12px" fill="none">&lt;&amp;�&#xA;</text>"##.as_bytes()
+        );
+
+        let image = SvgImage {
+            x: 1.0,
+            y: 2.0,
+            width: 3.0,
+            height: 4.0,
+            href: "https://example.invalid/x\" onload=\"alert(1)".to_string(),
+        };
+        assert_eq!(
+            image.to_svg().as_bytes(),
+            br#"<image x="1" y="2" width="3" height="4" href="data:,"/>"#
+        );
+
+        assert_eq!(safe_paint("url(#safe-id)"), "url(#safe-id)");
+        assert_eq!(safe_paint("u\\72l(https://example.invalid)"), "none");
+    }
+
+    #[test]
+    fn adversarial_document_is_well_formed_single_line_xml() {
+        use quick_xml::Reader;
+        use quick_xml::events::Event;
+
+        let mut builder = SvgBuilder::new(10.0, 10.0);
+        builder.add_text(
+            SvgText::new(
+                0.0,
+                1.0,
+                "</text><script>alert(1)</script>\n".to_string(),
+                1.0,
+            )
+            .with_font_family("\" onload=\"alert(1)".to_string()),
+        );
+        builder.add_image(SvgImage {
+            x: 0.0,
+            y: 0.0,
+            width: 1.0,
+            height: 1.0,
+            href: "javascript:alert(1)".to_string(),
+        });
+        let svg = builder.build();
+        assert!(!svg.as_bytes().contains(&b'\n'));
+        assert!(!svg.contains("javascript:"));
+
+        let mut reader = Reader::from_str(&svg);
+        let mut starts = Vec::new();
+        loop {
+            match reader.read_event().expect("adversarial SVG must parse") {
+                Event::Start(event) | Event::Empty(event) => {
+                    starts.push(String::from_utf8_lossy(event.name().as_ref()).into_owned());
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+        assert_eq!(starts, ["svg", "text", "image"]);
+    }
+
+    #[test]
+    fn builder_emits_single_line_compact_exact_bytes() {
+        let mut builder = SvgBuilder::new(100.0, 100.0).with_viewbox(0.0, 0.0, 100.0, 100.0);
         builder.add_rect(SvgRect {
             x: 10.0,
             y: 10.0,
@@ -690,9 +880,12 @@ mod tests {
         });
 
         let svg = builder.build();
-        assert!(svg.contains("<svg"));
-        assert!(svg.contains("</svg>"));
-        assert!(svg.contains("<rect"));
+        assert_eq!(
+            svg.as_bytes(),
+            br##"<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect x="10" y="10" width="80" height="80" fill="#FF0000"/></svg>"##
+        );
+        assert!(!svg.as_bytes().contains(&b'\n'));
+        assert!(!svg.as_bytes().windows(3).any(|window| window == b" />"));
     }
 
     #[test]

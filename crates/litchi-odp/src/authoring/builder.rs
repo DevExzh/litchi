@@ -10,6 +10,10 @@ use crate::model::legacy_animation::validate_legacy_animation_root;
 use crate::model::media::{EmbeddedMedia, embed_media};
 use crate::model::slide::validate_z_index;
 use litchi_core::{Metadata, Result, xml::escape_xml};
+use litchi_odf_common::{
+    drawing::authoring::Length,
+    media::authoring::{allocate_picture_path, validate_payload},
+};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -20,12 +24,16 @@ mod transition;
 mod validation;
 mod xml;
 
-use self::transition::{generate_transition_styles, slide_style_name};
+pub(crate) use self::transition::{
+    DEFAULT_DRAWING_PAGE_STYLE, DEFAULT_DRAWING_PAGE_STYLE_NAME, generate_transition_styles,
+    push_transition_style, slide_style_name,
+};
 use self::validation::{
     push_drawing_attributes, validate_drawing_shape_parent,
     validate_required_three_dimensional_attributes, validate_three_dimensional_child_order,
 };
-use self::xml::{generate_text_paragraphs, push_optional_attribute};
+pub(crate) use self::xml::generate_text_paragraphs;
+use self::xml::push_optional_attribute;
 
 /// Builder for creating new ODP presentations.
 ///
@@ -222,6 +230,52 @@ impl Builder {
         media_type: impl Into<String>,
     ) -> Result<Reference> {
         embed_media(&mut self.media_files, path, bytes, media_type)
+    }
+
+    /// Embed a PNG, JPEG, or GIF image and add it as a picture frame to a slide.
+    pub fn insert_image(
+        &mut self,
+        slide_index: usize,
+        bytes: &[u8],
+        x: &Length,
+        y: &Length,
+        width: &Length,
+        height: &Length,
+    ) -> Result<&mut Self> {
+        if slide_index >= self.slides.len() {
+            return Err(litchi_core::Error::InvalidFormat(format!(
+                "slide index {slide_index} is out of bounds"
+            )));
+        }
+
+        let format = validate_payload(bytes)?;
+        let extension = format.extension();
+        let path = allocate_picture_path(extension, |candidate| {
+            let stem = candidate
+                .rsplit_once('.')
+                .map_or(candidate, |(stem, _)| stem);
+            self.media_files.keys().any(|existing| {
+                existing.starts_with(stem) && existing.as_bytes().get(stem.len()) == Some(&b'.')
+            })
+        })?;
+
+        // All fallible input validation is complete before staging the media.
+        // The known-safe path, bounded bytes, and fixed MIME type leave no
+        // fallible work between this insertion and adding the picture frame.
+        embed_media(
+            &mut self.media_files,
+            path.clone(),
+            bytes.to_vec(),
+            format.media_type(),
+        )?;
+
+        let mut picture = crate::Shape::new().with_image_href(path);
+        picture.x = Some(x.as_str().to_owned());
+        picture.y = Some(y.as_str().to_owned());
+        picture.width = Some(width.as_str().to_owned());
+        picture.height = Some(height.as_str().to_owned());
+        self.slides[slide_index].shapes.push(picture);
+        Ok(self)
     }
 
     /// Add a slide with title and text content

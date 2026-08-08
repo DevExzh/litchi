@@ -17,6 +17,9 @@ pub struct ParseLimits {
     max_binary_bytes: usize,
     max_total_binary_bytes: usize,
     max_decompressed_bytes: usize,
+    max_opaque_nodes: usize,
+    max_opaque_node_bytes: usize,
+    max_total_opaque_bytes: usize,
 }
 
 impl ParseLimits {
@@ -35,6 +38,15 @@ impl ParseLimits {
     /// Default maximum expanded size of compressed RTF (256 MiB).
     pub const DEFAULT_MAX_DECOMPRESSED_BYTES: usize = DEFAULT_MAX_DECOMPRESSED_RTF_BYTES;
 
+    /// Default maximum number of unsupported syntax nodes retained per document.
+    pub const DEFAULT_MAX_OPAQUE_NODES: usize = 65_536;
+
+    /// Default maximum size of one retained unsupported syntax node (8 MiB).
+    pub const DEFAULT_MAX_OPAQUE_NODE_BYTES: usize = 8 * MEBIBYTE;
+
+    /// Default aggregate size of retained unsupported syntax (32 MiB).
+    pub const DEFAULT_MAX_TOTAL_OPAQUE_BYTES: usize = 32 * MEBIBYTE;
+
     /// The production-safe default resource profile.
     pub const DEFAULT: Self = Self {
         max_source_bytes: Self::DEFAULT_MAX_SOURCE_BYTES,
@@ -42,6 +54,9 @@ impl ParseLimits {
         max_binary_bytes: Self::DEFAULT_MAX_BINARY_BYTES,
         max_total_binary_bytes: Self::DEFAULT_MAX_TOTAL_BINARY_BYTES,
         max_decompressed_bytes: Self::DEFAULT_MAX_DECOMPRESSED_BYTES,
+        max_opaque_nodes: Self::DEFAULT_MAX_OPAQUE_NODES,
+        max_opaque_node_bytes: Self::DEFAULT_MAX_OPAQUE_NODE_BYTES,
+        max_total_opaque_bytes: Self::DEFAULT_MAX_TOTAL_OPAQUE_BYTES,
     };
 
     /// Create the default finite resource profile.
@@ -74,6 +89,21 @@ impl ParseLimits {
         self.max_decompressed_bytes
     }
 
+    /// Maximum number of unsupported syntax nodes retained per document.
+    pub const fn max_opaque_nodes(self) -> usize {
+        self.max_opaque_nodes
+    }
+
+    /// Maximum transport bytes retained by one unsupported syntax node.
+    pub const fn max_opaque_node_bytes(self) -> usize {
+        self.max_opaque_node_bytes
+    }
+
+    /// Maximum aggregate transport bytes retained as unsupported syntax.
+    pub const fn max_total_opaque_bytes(self) -> usize {
+        self.max_total_opaque_bytes
+    }
+
     /// Return a profile with a different source-byte ceiling.
     pub const fn with_max_source_bytes(mut self, limit: usize) -> Self {
         self.max_source_bytes = limit;
@@ -103,6 +133,24 @@ impl ParseLimits {
         self.max_decompressed_bytes = limit;
         self
     }
+
+    /// Return a profile with a different unsupported-node count ceiling.
+    pub const fn with_max_opaque_nodes(mut self, limit: usize) -> Self {
+        self.max_opaque_nodes = limit;
+        self
+    }
+
+    /// Return a profile with a different per-node unsupported-byte ceiling.
+    pub const fn with_max_opaque_node_bytes(mut self, limit: usize) -> Self {
+        self.max_opaque_node_bytes = limit;
+        self
+    }
+
+    /// Return a profile with a different aggregate unsupported-byte ceiling.
+    pub const fn with_max_total_opaque_bytes(mut self, limit: usize) -> Self {
+        self.max_total_opaque_bytes = limit;
+        self
+    }
 }
 
 impl Default for ParseLimits {
@@ -123,11 +171,17 @@ mod tests {
             .with_max_tokens(2)
             .with_max_binary_bytes(3)
             .with_max_total_binary_bytes(4)
-            .with_max_decompressed_bytes(5);
+            .with_max_decompressed_bytes(5)
+            .with_max_opaque_nodes(6)
+            .with_max_opaque_node_bytes(7)
+            .with_max_total_opaque_bytes(8);
         assert_eq!(limits.max_source_bytes(), 1);
         assert_eq!(limits.max_tokens(), 2);
         assert_eq!(limits.max_binary_bytes(), 3);
         assert_eq!(limits.max_total_binary_bytes(), 4);
         assert_eq!(limits.max_decompressed_bytes(), 5);
+        assert_eq!(limits.max_opaque_nodes(), 6);
+        assert_eq!(limits.max_opaque_node_bytes(), 7);
+        assert_eq!(limits.max_total_opaque_bytes(), 8);
     }
 }

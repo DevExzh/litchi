@@ -1350,6 +1350,23 @@ impl CellRecord {
             formula: parsed.formula,
         })
     }
+
+    pub(crate) fn parse_formula_preserving_defect(
+        data: &[u8],
+    ) -> Result<(Self, Option<crate::formula_metadata::FlagDefect>)> {
+        let (parsed, defect) = crate::formula_metadata::parse_record_preserving(data)?;
+        Ok((
+            CellRecord::Formula {
+                row: parsed.row,
+                col: parsed.col,
+                xf_index: parsed.xf_index,
+                value: parsed.value,
+                metadata: parsed.metadata,
+                formula: parsed.formula,
+            },
+            defect,
+        ))
+    }
 }
 
 #[cfg(test)]

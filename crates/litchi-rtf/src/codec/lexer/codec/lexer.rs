@@ -2,6 +2,8 @@ use super::model::Token;
 use crate::codec::error::{RtfError, RtfResult};
 use crate::codec::limits::ParseLimits;
 use bumpalo::Bump;
+use std::mem::size_of;
+use std::ops::Range;
 
 /// RTF Lexer using arena allocation.
 pub struct Lexer<'a> {
@@ -39,7 +41,13 @@ impl<'a> Lexer<'a> {
 
     /// Tokenize the entire input.
     pub fn tokenize(&mut self) -> RtfResult<Vec<Token<'a>>> {
+        self.tokenize_with_spans().map(|(tokens, _)| tokens)
+    }
+
+    /// Tokenize while retaining exact source ranges for lossless syntax nodes.
+    pub(crate) fn tokenize_with_spans(&mut self) -> RtfResult<(Vec<Token<'a>>, Vec<Range<usize>>)> {
         let mut tokens = Vec::new();
+        let mut spans = Vec::new();
 
         while self.pos < self.input.len() {
             let observed = tokens.len().saturating_add(1);
@@ -50,10 +58,25 @@ impl<'a> Lexer<'a> {
                     limit: self.limits.max_tokens(),
                 });
             }
+            tokens
+                .try_reserve(1)
+                .map_err(|_| RtfError::AllocationFailed {
+                    resource: "lexer tokens",
+                    requested: observed.saturating_mul(size_of::<Token<'a>>()),
+                })?;
+            spans
+                .try_reserve(1)
+                .map_err(|_| RtfError::AllocationFailed {
+                    resource: "lexer token spans",
+                    requested: observed.saturating_mul(size_of::<Range<usize>>()),
+                })?;
+            let start = self.pos;
             let token = self.next_token()?;
+            let end = self.pos;
             tokens.push(token);
+            spans.push(start..end);
         }
 
-        Ok(tokens)
+        Ok((tokens, spans))
     }
 }

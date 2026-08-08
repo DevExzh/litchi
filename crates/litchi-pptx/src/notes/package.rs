@@ -1,19 +1,33 @@
-//! Transactional OPC graph ownership for PresentationML notes.
+//! Transactional OPC graph ownership for `PresentationML` notes.
 
 use super::codec::{root_conformance, scan_xml, validate_resource_xml};
 use super::model::{Conformance, Graph, Link, Master, Slide, Theme};
 use super::transaction::{PartState, Patch, Snapshot};
 use super::{
-    MAX_MASTER_XML, MAX_NOTES_SLIDES, MAX_NOTES_XML, MAX_PRESENTATION_XML, MAX_SLIDE_XML,
-    MAX_THEME_XML, MAX_TOTAL_BYTES, SLIDE_CT, THEME_CT, allocation, checked_add, invalid, limit,
-    own_blob,
+    MAX_MASTER_XML, MAX_NOTES_SLIDES, MAX_NOTES_XML, MAX_OWNED_PARTS, MAX_PRESENTATION_XML,
+    MAX_SLIDE_XML, MAX_THEME_XML, MAX_TOTAL_BYTES, SLIDE_CT, THEME_CT, allocation, checked_add,
+    invalid, limit, own_blob,
 };
 use crate::{Error, Result};
+#[cfg(test)]
+use litchi_opc::TargetMode;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::part::{BlobPart, Part};
-use litchi_opc::{OpcPackage, PackURI, TargetMode};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+#[cfg(test)]
+use litchi_opc::part::BlobPart;
+use litchi_opc::part::Part;
+use litchi_opc::{OpcPackage, PackURI};
+#[cfg(test)]
+use std::collections::BTreeMap;
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
+
+#[derive(Clone, Copy)]
+enum Disposition {
+    Retain,
+    Follow,
+    External,
+}
+
 #[derive(Debug)]
 struct ThemeIndex {
     relationship_id: String,
@@ -50,7 +64,7 @@ struct GraphIndex {
 /// The returned graph is lifetime-free and independently editable, so each
 /// validated notes, master, and theme payload is copied exactly once. Package
 /// deletion uses the metadata-only index and does not perform these copies.
-pub fn load(package: &OpcPackage, presentation_name: &PackURI) -> Result<Option<Graph>> {
+pub(crate) fn load(package: &OpcPackage, presentation_name: &PackURI) -> Result<Option<Graph>> {
     let Some(index) = load_index(package, presentation_name)? else {
         return Ok(None);
     };
@@ -58,7 +72,7 @@ pub fn load(package: &OpcPackage, presentation_name: &PackURI) -> Result<Option<
 }
 
 /// Capture a complete source-checked snapshot of an existing notes graph.
-pub fn load_snapshot(
+pub(crate) fn load_snapshot(
     package: &OpcPackage,
     presentation_name: &PackURI,
 ) -> Result<Option<Snapshot>> {
@@ -93,7 +107,7 @@ pub fn load_snapshot(
 }
 
 /// Apply a source-checked notes patch atomically.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
     let current = load_snapshot(package, patch.before().presentation_part_name())?
         .ok_or_else(|| invalid("notes patch source graph is absent"))?;
     if !current.same_source(patch.before()) {
@@ -135,11 +149,12 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
 }
 
 /// Apply a committed notes edit atomically.
-pub fn apply_commit(
+pub(crate) fn apply_commit(
     package: &mut OpcPackage,
     commit: super::transaction::Commit,
 ) -> Result<Snapshot> {
-    apply_patch(package, commit.patch())
+    let patch = commit.into_patch();
+    apply_patch(package, &patch)
 }
 
 /// Validate and index the complete notes graph without copying resource payloads.
@@ -480,7 +495,12 @@ impl From<&SlideIndex> for Removal {
 /// The complete notes graph and every inbound edge to the selected resource
 /// are validated before mutation. Missing notes are an idempotent `Ok(false)`.
 /// Shared notes-master and theme resources are retained.
-pub fn remove(
+///
+/// # Errors
+///
+/// Returns an error when the notes graph, selected slide, relationships, or
+/// descendant ownership is malformed or exceeds a resource limit.
+pub(crate) fn remove(
     package: &mut OpcPackage,
     presentation_name: &PackURI,
     slide_name: &PackURI,
@@ -497,9 +517,18 @@ pub fn remove(
         return Ok(false);
     };
     let removals = [Removal::from(slide)];
-    validate_notes_removals(package, &removals)?;
-    apply_notes_removals(package, &removals)?;
+    let descendants = validate_notes_removals(package, &removals)?;
+    apply_notes_removals(package, &removals, &descendants)?;
     Ok(true)
+}
+
+pub(crate) fn remove_checked(
+    package: &mut OpcPackage,
+    source: &Snapshot,
+    slide_name: &PackURI,
+) -> Result<bool> {
+    require_current_source(package, source)?;
+    remove(package, source.presentation_part_name(), slide_name)
 }
 
 /// Remove every speaker-notes resource from a presentation.
@@ -507,7 +536,12 @@ pub fn remove(
 /// Returns the number of removed notes slides. The operation is idempotent,
 /// validates the complete graph before mutation, and retains the shared notes
 /// master and its theme so ordinary presentation layout remains unchanged.
-pub fn clear(package: &mut OpcPackage, presentation_name: &PackURI) -> Result<usize> {
+///
+/// # Errors
+///
+/// Returns an error when the notes graph, relationships, or descendant
+/// ownership is malformed or exceeds a resource limit.
+pub(crate) fn clear(package: &mut OpcPackage, presentation_name: &PackURI) -> Result<usize> {
     let Some(index) = load_index(package, presentation_name)? else {
         return Ok(0);
     };
@@ -519,11 +553,26 @@ pub fn clear(package: &mut OpcPackage, presentation_name: &PackURI) -> Result<us
     if removals.is_empty() {
         return Ok(0);
     }
-    validate_notes_removals(package, &removals)?;
-    apply_notes_removals(package, &removals)
+    let descendants = validate_notes_removals(package, &removals)?;
+    apply_notes_removals(package, &removals, &descendants)
 }
 
-fn validate_notes_removals(package: &OpcPackage, removals: &[Removal]) -> Result<()> {
+pub(crate) fn clear_checked(package: &mut OpcPackage, source: &Snapshot) -> Result<usize> {
+    require_current_source(package, source)?;
+    clear(package, source.presentation_part_name())
+}
+
+fn require_current_source(package: &OpcPackage, source: &Snapshot) -> Result<()> {
+    let current = load_snapshot(package, source.presentation_part_name())?
+        .ok_or_else(|| invalid("notes mutation source graph is absent"))?;
+    if current.same_source(source) {
+        Ok(())
+    } else {
+        Err(invalid("notes mutation source is stale"))
+    }
+}
+
+fn validate_notes_removals(package: &OpcPackage, removals: &[Removal]) -> Result<Vec<PackURI>> {
     let mut by_target = HashMap::new();
     by_target
         .try_reserve(removals.len())
@@ -569,7 +618,180 @@ fn validate_notes_removals(package: &OpcPackage, removals: &[Removal]) -> Result
             "notes-removal target does not have exactly one owning slide relationship",
         ));
     }
-    Ok(())
+    plan_owned_descendants(package, removals)
+}
+
+fn relationship_disposition(value: &str, notes_root: bool) -> Option<Disposition> {
+    const TRANSITIONAL: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+    const STRICT: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/";
+    const OFFICE_2007: &str = "http://schemas.microsoft.com/office/2007/relationships/";
+    const OFFICE_2011: &str = "http://schemas.microsoft.com/office/2011/relationships/";
+    let kind = value
+        .strip_prefix(TRANSITIONAL)
+        .or_else(|| value.strip_prefix(STRICT))
+        .or_else(|| value.strip_prefix(OFFICE_2007))
+        .or_else(|| value.strip_prefix(OFFICE_2011))?;
+    match kind {
+        "slide" | "notesMaster" => Some(Disposition::Retain),
+        "hyperlink" => Some(Disposition::External),
+        "additionalCharacteristics"
+        | "bibliography"
+        | "customXml"
+        | "themeOverride"
+        | "thumbnail"
+        | "audio"
+        | "chart"
+        | "contentPart"
+        | "diagramColors"
+        | "diagramData"
+        | "diagramLayout"
+        | "diagramQuickStyle"
+        | "control"
+        | "oleObject"
+        | "package"
+        | "image"
+        | "video" => Some(Disposition::Follow),
+        "chartUserShapes" | "chartStyle" | "chartColorStyle" | "ctrlProp" | "worksheet"
+            if !notes_root =>
+        {
+            Some(Disposition::Follow)
+        },
+        _ => None,
+    }
+}
+
+fn plan_owned_descendants(package: &OpcPackage, removals: &[Removal]) -> Result<Vec<PackURI>> {
+    let mut roots = HashSet::new();
+    roots
+        .try_reserve(removals.len())
+        .map_err(|reserve_error| allocation("notes-removal roots", reserve_error))?;
+    roots.extend(
+        removals
+            .iter()
+            .map(|removal| removal.notes_part_name.clone()),
+    );
+
+    let mut closure = HashSet::new();
+    closure
+        .try_reserve(removals.len())
+        .map_err(|reserve_error| allocation("notes-owned part closure", reserve_error))?;
+    closure.extend(roots.iter().cloned());
+    let mut pending = Vec::new();
+    pending
+        .try_reserve(removals.len())
+        .map_err(|reserve_error| allocation("notes-owned part work list", reserve_error))?;
+    pending.extend(roots.iter().cloned());
+
+    let mut cursor = 0usize;
+    while let Some(source_name) = pending.get(cursor).cloned() {
+        cursor = cursor
+            .checked_add(1)
+            .ok_or_else(|| invalid("notes-owned part work-list index overflow"))?;
+        let source = package.get_part(&source_name)?;
+        for relationship in source.rels().iter() {
+            let disposition =
+                relationship_disposition(relationship.reltype(), roots.contains(&source_name))
+                    .ok_or_else(|| {
+                        invalid(format!(
+                            "notes deletion refuses unknown relationship type '{}' from '{}'",
+                            relationship.reltype(),
+                            source_name.as_str(),
+                        ))
+                    })?;
+            match disposition {
+                Disposition::Retain if relationship.is_external() => {
+                    return Err(invalid(format!(
+                        "retained notes relationship '{}' cannot be external",
+                        relationship.r_id(),
+                    )));
+                },
+                Disposition::Retain => continue,
+                Disposition::External => {
+                    if relationship.is_external() {
+                        continue;
+                    }
+                    return Err(invalid(format!(
+                        "notes hyperlink relationship '{}' must be external",
+                        relationship.r_id(),
+                    )));
+                },
+                Disposition::Follow => {
+                    if relationship.is_external() {
+                        continue;
+                    }
+                },
+            }
+            let target = relationship.target_partname()?;
+            let stored = package.get_part(&target)?.partname().clone();
+            if !closure.contains(&stored) {
+                if closure.len().saturating_sub(roots.len()) >= MAX_OWNED_PARTS {
+                    return Err(limit("notes-owned related parts", MAX_OWNED_PARTS));
+                }
+                closure.try_reserve(1).map_err(|reserve_error| {
+                    allocation("notes-owned part closure", reserve_error)
+                })?;
+                pending.try_reserve(1).map_err(|reserve_error| {
+                    allocation("notes-owned part work list", reserve_error)
+                })?;
+                closure.insert(stored.clone());
+                pending.push(stored);
+            }
+        }
+    }
+
+    for relationship in package.rels().iter() {
+        validate_descendant_inbound(package, None, relationship, &roots, &closure)?;
+    }
+    for source in package.iter_parts() {
+        for relationship in source.rels().iter() {
+            validate_descendant_inbound(
+                package,
+                Some(source.partname()),
+                relationship,
+                &roots,
+                &closure,
+            )?;
+        }
+    }
+
+    let mut descendants = Vec::new();
+    descendants
+        .try_reserve(closure.len().saturating_sub(roots.len()))
+        .map_err(|reserve_error| allocation("notes-owned descendant plan", reserve_error))?;
+    descendants.extend(closure.into_iter().filter(|name| !roots.contains(name)));
+    descendants.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+    Ok(descendants)
+}
+
+fn validate_descendant_inbound(
+    package: &OpcPackage,
+    source: Option<&PackURI>,
+    relationship: &litchi_opc::Relationship,
+    roots: &HashSet<PackURI>,
+    closure: &HashSet<PackURI>,
+) -> Result<()> {
+    if relationship.is_external() {
+        return Ok(());
+    }
+    let Ok(target_reference) = relationship.target_partname() else {
+        return Ok(());
+    };
+    let Some(stored_target) = package.get_part(&target_reference).ok().map(Part::partname) else {
+        return Ok(());
+    };
+    if roots.contains(stored_target) || !closure.contains(stored_target) {
+        return Ok(());
+    }
+    if source.is_some_and(|source_name| closure.contains(source_name)) {
+        return Ok(());
+    }
+    Err(invalid(format!(
+        "notes-owned descendant '{}' has a shared inbound relationship '{}' from '{}'",
+        stored_target.as_str(),
+        relationship.r_id(),
+        source.map_or("package root", PackURI::as_str),
+    )))
 }
 
 fn validate_notes_inbound(
@@ -611,7 +833,11 @@ fn validate_notes_inbound(
     Ok(())
 }
 
-fn apply_notes_removals(package: &mut OpcPackage, removals: &[Removal]) -> Result<usize> {
+fn apply_notes_removals(
+    package: &mut OpcPackage,
+    removals: &[Removal],
+    descendants: &[PackURI],
+) -> Result<usize> {
     // Stage cloned slide owners before the first package mutation. Built-in
     // parts retain their shared payload allocation while relationships are
     // detached on the staged clone.
@@ -643,6 +869,9 @@ fn apply_notes_removals(package: &mut OpcPackage, removals: &[Removal]) -> Resul
         }
         staged_slides.push(staged);
     }
+    for descendant in descendants {
+        package.get_part(descendant)?;
+    }
 
     // Every operation below is infallible after validation and staging. Exact
     // stored part names avoid the case-insensitive lookup/exact-removal trap.
@@ -652,13 +881,40 @@ fn apply_notes_removals(package: &mut OpcPackage, removals: &[Removal]) -> Resul
     for removal in removals {
         package.remove_part(&removal.notes_part_name);
     }
+    for descendant in descendants {
+        package.remove_part(descendant);
+    }
     package.unsign();
     Ok(removals.len())
 }
 
 /// Deterministically replace the resources of an already coherent notes graph.
 /// Validation completes before the first package mutation.
-pub fn put(package: &mut OpcPackage, presentation_name: &PackURI, graph: Graph) -> Result<()> {
+///
+/// # Errors
+///
+/// Returns an error when graph validation, ownership validation, allocation,
+/// or staged relationship publication fails.
+#[cfg(test)]
+pub(crate) fn put(
+    package: &mut OpcPackage,
+    presentation_name: &PackURI,
+    graph: Graph,
+) -> Result<()> {
+    put_changed(package, presentation_name, graph).map(|_| ())
+}
+
+/// Replace a graph and report whether package bytes changed.
+///
+/// # Errors
+///
+/// Returns the same failures as [`put`].
+#[cfg(test)]
+pub(crate) fn put_changed(
+    package: &mut OpcPackage,
+    presentation_name: &PackURI,
+    graph: Graph,
+) -> Result<bool> {
     let current = load_index(package, presentation_name)?
         .ok_or_else(|| invalid("store requires an existing coherent notes graph"))?;
     validate_graph(&graph)?;
@@ -668,7 +924,7 @@ pub fn put(package: &mut OpcPackage, presentation_name: &PackURI, graph: Graph) 
         ));
     }
     if graph_matches(package, &current, &graph)? {
-        return Ok(());
+        return Ok(false);
     }
     let presentation = package.get_part(presentation_name)?;
     let presentation_scan = scan_xml(
@@ -842,40 +1098,7 @@ pub fn put(package: &mut OpcPackage, presentation_name: &PackURI, graph: Graph) 
         package.add_part(slide);
     }
     package.unsign();
-    Ok(())
-}
-
-/// Load the validated notes resource owned by one physical slide part.
-///
-/// This is a focused package-layer operation. Semantic slide selection belongs
-/// to the higher-level PPTX facade.
-pub fn slide(package: &OpcPackage, slide_name: &PackURI) -> Result<Option<Slide>> {
-    let presentation_name = package.main_document_part()?.partname().clone();
-    let Some(index) = load_index(package, &presentation_name)? else {
-        return Ok(None);
-    };
-    let slide_name = package.get_part(slide_name)?.partname();
-    let Some(slide) = index
-        .slides
-        .into_iter()
-        .find(|slide| &slide.slide_part_name == slide_name)
-    else {
-        return Ok(None);
-    };
-    let data = own_blob(
-        package.get_part(&slide.part_name)?.blob(),
-        "notes-slide payload",
-    )?;
-    Ok(Some(Slide {
-        slide_part_name: slide.slide_part_name.as_str().to_owned(),
-        slide_relationship_id: slide.slide_relationship_id,
-        part_name: slide.part_name.as_str().to_owned(),
-        content_type: slide.content_type,
-        data,
-        relationships: relationship_links(package.get_part(&slide.part_name)?.rels()),
-        backlink_relationship_id: slide.backlink_relationship_id,
-        notes_master_relationship_id: slide.notes_master_relationship_id,
-    }))
+    Ok(true)
 }
 
 pub(crate) fn validate_graph(graph: &Graph) -> Result<()> {
@@ -954,6 +1177,7 @@ pub(crate) fn validate_graph(graph: &Graph) -> Result<()> {
     }
     Ok(())
 }
+#[cfg(test)]
 fn ownership(graph: &Graph) -> BTreeSet<&str> {
     std::iter::once(graph.master.part_name.as_str())
         .chain(std::iter::once(graph.master.theme.part_name.as_str()))
@@ -961,6 +1185,7 @@ fn ownership(graph: &Graph) -> BTreeSet<&str> {
         .collect()
 }
 
+#[cfg(test)]
 fn indexed_ownership(graph: &GraphIndex) -> BTreeSet<&str> {
     std::iter::once(graph.master.part_name.as_str())
         .chain(std::iter::once(graph.master.theme.part_name.as_str()))
@@ -968,6 +1193,7 @@ fn indexed_ownership(graph: &GraphIndex) -> BTreeSet<&str> {
         .collect()
 }
 
+#[cfg(test)]
 fn graph_matches(package: &OpcPackage, index: &GraphIndex, graph: &Graph) -> Result<bool> {
     if index.conformance != graph.conformance
         || index.master.presentation_relationship_id != graph.master.presentation_relationship_id
@@ -1024,6 +1250,7 @@ fn relationship_links(relationships: &litchi_opc::Relationships) -> Vec<Link> {
     links
 }
 
+#[cfg(test)]
 fn add_links(part: &mut dyn Part, links: &[Link]) -> Result<()> {
     for link in links {
         part.rels_mut().try_add_relationship(

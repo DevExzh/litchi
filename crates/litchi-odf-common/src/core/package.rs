@@ -8,6 +8,7 @@
 use crate::package::{self, Archive};
 use litchi_core::{Error, Result};
 use std::io::Read;
+use std::sync::Arc;
 use zeroize::Zeroizing;
 
 /// An ODF package (ZIP file containing XML documents)
@@ -22,8 +23,9 @@ pub struct Package<'data> {
 }
 
 /// Owned version of Package that owns the data buffer.
+#[derive(Clone)]
 pub struct OwnedPackage {
-    data: Vec<u8>,
+    data: Arc<Vec<u8>>,
     password: Option<Zeroizing<String>>,
 }
 
@@ -33,14 +35,7 @@ impl OwnedPackage {
     pub fn from_reader<R: Read>(mut reader: R) -> Result<Self> {
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
-
-        // Validate the archive can be parsed
-        let _ = Archive::new(&data)?;
-
-        Ok(Self {
-            data,
-            password: None,
-        })
+        Self::from_bytes(data)
     }
 
     /// Create an ODF package from bytes
@@ -48,6 +43,15 @@ impl OwnedPackage {
         // Validate the archive can be parsed
         let _ = Archive::new(&data)?;
 
+        Ok(Self {
+            data: Arc::new(data),
+            password: None,
+        })
+    }
+
+    /// Adopt shared ODF package bytes without copying the archive buffer.
+    pub fn from_shared_bytes(data: Arc<Vec<u8>>) -> Result<Self> {
+        let _ = Archive::new(data.as_slice())?;
         Ok(Self {
             data,
             password: None,
@@ -68,7 +72,7 @@ impl OwnedPackage {
     pub fn from_bytes_with_password(data: Vec<u8>, password: impl Into<String>) -> Result<Self> {
         let _ = Archive::new(&data)?;
         Ok(Self {
-            data,
+            data: Arc::new(data),
             password: Some(Zeroizing::new(password.into())),
         })
     }
@@ -83,12 +87,17 @@ impl OwnedPackage {
 
     /// Get the underlying data
     pub fn into_inner(self) -> Vec<u8> {
-        self.data
+        Arc::try_unwrap(self.data).unwrap_or_else(|data| (*data).clone())
     }
 
     /// Get a reference to the underlying data
     pub fn as_bytes(&self) -> &[u8] {
-        &self.data
+        self.data.as_slice()
+    }
+
+    /// Clone the shared handle to the exact archive allocation.
+    pub fn shared_bytes(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.data)
     }
 
     // Convenience methods that delegate to Package

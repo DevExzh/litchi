@@ -882,11 +882,11 @@ impl<'a> Parser<'a> {
                         },
                         _ => {},
                     }
-                    // Mark as other destination and skip
+                    // Retain an unsupported destination as bounded inert syntax.
+                    self.preserve_unknown_destination()?;
                     if let Some(state) = self.states.last_mut() {
                         state.destination = Destination::Other;
                     }
-                    self.skip_until_close_brace()?;
                     self.states.pop();
                     return Ok(true);
                 },

@@ -61,7 +61,8 @@ impl<'doc> Slide<'doc> {
         // Convert Escher shapes to ShapeEnum with full property extraction
         let mut shapes = Vec::with_capacity(escher_shapes.len());
         for escher_shape in &escher_shapes {
-            if let Some(shape) = Self::convert_odraw_to_shape_enum(escher_shape)? {
+            if let Some(mut shape) = Self::convert_odraw_to_shape_enum(escher_shape)? {
+                shape.mark_source_bound_recursive();
                 shapes.push(shape);
             }
         }
@@ -180,20 +181,20 @@ impl<'doc> Slide<'doc> {
                 // Create PictureShape
                 let mut picture = PictureShape::new(shape_id);
 
-                picture.set_frame_kind(match escher_shape.frame_kind()? {
+                picture.set_decoded_frame_kind(match escher_shape.frame_kind()? {
                     FrameKind::Object => PictureFrameKind::OleObject,
                     FrameKind::Media => PictureFrameKind::Media,
                     FrameKind::Picture => PictureFrameKind::Picture,
                 });
 
                 if let Some(external_object_id) = escher_shape.external_object_id()? {
-                    picture.set_external_object_id(external_object_id);
+                    picture.set_decoded_external_object_id(external_object_id);
                 }
 
                 if let Some(a) = anchor {
-                    picture.set_bounds(a.left(), a.top(), a.width(), a.height());
+                    picture.set_decoded_bounds(a.left(), a.top(), a.width(), a.height());
                 }
-                picture.properties_mut().powerpoint12_shape_metadata = powerpoint12_shape_metadata;
+                picture.set_powerpoint12_shape_metadata(powerpoint12_shape_metadata);
 
                 // Extract the one-based BLIP store index from the pib property.
                 use litchi_odraw::prop::Id;
@@ -203,7 +204,7 @@ impl<'doc> Slide<'doc> {
                             reason: "BlipToDisplay must be a positive one-based image identifier",
                         }
                     })?;
-                    picture.set_blip_index(blip_id)?;
+                    picture.set_decoded_blip_index(blip_id)?;
                 }
 
                 Ok(Some(ShapeEnum::Picture(picture)))
@@ -233,10 +234,10 @@ impl<'doc> Slide<'doc> {
                     // Extract line properties
                     use litchi_odraw::prop::Id;
                     if let Some(width) = escher_shape.props().get_int(Id::LineWidth) {
-                        line.set_width(width);
+                        line.set_decoded_width(width);
                     }
                     if let Some(color) = escher_shape.props().get_color(Id::LineColor) {
-                        line.set_color(color.raw());
+                        line.set_decoded_color(color.raw());
                     }
                     line.set_powerpoint12_shape_metadata(powerpoint12_shape_metadata);
 
@@ -251,7 +252,7 @@ impl<'doc> Slide<'doc> {
                 let mut group = shape_enum::GroupShape::new(shape_id);
 
                 if let Some(a) = anchor {
-                    group.set_bounds(a.left(), a.top(), a.width(), a.height());
+                    group.set_decoded_bounds(a.left(), a.top(), a.width(), a.height());
                 }
                 group.set_powerpoint12_shape_metadata(powerpoint12_shape_metadata);
 
@@ -259,7 +260,7 @@ impl<'doc> Slide<'doc> {
                 // This follows Apache POI's approach: iterate child shapes and convert them
                 for child_escher in escher_shape.children() {
                     if let Some(child_shape) = Self::convert_odraw_shape(child_escher, depth + 1)? {
-                        group.add_child(child_shape);
+                        group.add_decoded_child(child_shape);
                     }
                 }
 
@@ -335,7 +336,7 @@ impl<'doc> Slide<'doc> {
                     escher_shape.props(),
                 );
                 if let Some(text) = escher_shape.text()?.filter(|text| !text.is_empty()) {
-                    autoshape.set_text(text);
+                    autoshape.set_decoded_text(text);
                 }
                 Ok(Some(ShapeEnum::AutoShape(autoshape)))
             },

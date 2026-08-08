@@ -107,6 +107,11 @@ impl FlatDocument {
         )])
     }
 
+    /// Return the unnamed fallback page layout, when one is declared.
+    pub fn default_page_layout(&self) -> Result<Option<crate::page_layout::PageLayout>> {
+        crate::page_layout::parse_default_page_layout(self.xml())
+    }
+
     /// Atomically insert or replace one variable declaration container.
     ///
     /// The group must target the flat part. Formulas and cached values remain

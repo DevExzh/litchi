@@ -108,7 +108,10 @@ pub use header_footer::HeaderFooter;
 pub use hyperlink::Hyperlink;
 pub use image::{Image, ImageError};
 pub use leniency::{Leniency, StylesheetDefect, ToleranceReport, ToleratedDefect};
-pub use package::{EncryptionKind, Error, OpenOptions, Package, Result};
+pub use package::{
+    EncryptionKind, Error, Limits, LimitsError, OpenOptions, Package, ResourceKind, ResourceLimit,
+    Result,
+};
 pub use paragraph::{Paragraph, Run};
 pub use parts::associated_strings::{AssociatedStringSlot, DocumentAssociatedStrings};
 pub use parts::auto_summary::{AutoSummaryRange, DocumentAutoSummary};

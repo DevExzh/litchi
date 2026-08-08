@@ -462,6 +462,21 @@ integration, validation, and source-checked `Snapshot`/`Transaction`/`Commit`/
 `Patch` layers; opaque XML, BIFF, and CFB tails remain preserved and external
 links, macros, add-ins, broadcasts, and formula/runtime behavior remain inert.
 
+## Conversion and interchange
+
+[`litchi-markdown`](../../crates/litchi-markdown/Cargo.toml) is the
+dependency-light owner of Markdown configuration, Unicode helpers, and the
+format-neutral `ToMarkdown` trait. It does not parse documents and does not
+depend on any concrete Office or OpenDocument format crate.
+
+Concrete format adapters currently live in the top-level
+[`litchi` facade](../../crates/litchi/src/markdown), where the selected format
+features and their semantic models are available. This placement is an adapter
+boundary, not a claim that each format crate implements `ToMarkdown`, and it
+does not make Markdown a document-format owner or a bidirectional conversion
+layer. Rendering, pagination, external retrieval, and active-content execution
+remain outside this helper crate.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

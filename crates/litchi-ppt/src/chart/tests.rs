@@ -94,16 +94,20 @@ fn payload_decoding_is_move_first_and_bounded() {
 #[test]
 fn ole_frames_are_semantically_attributed_and_first_wins() {
     let mut chart = PictureShape::new(7);
-    chart.set_frame_kind(PictureFrameKind::OleObject);
-    chart.set_external_object_id(42);
+    assert!(chart.set_frame_kind(PictureFrameKind::OleObject).is_ok());
+    assert!(chart.set_external_object_id(42).is_ok());
     let mut nested = PictureShape::new(9);
-    nested.set_frame_kind(PictureFrameKind::OleObject);
-    nested.set_external_object_id(77);
+    assert!(nested.set_frame_kind(PictureFrameKind::OleObject).is_ok());
+    assert!(nested.set_external_object_id(77).is_ok());
     let mut group = crate::shapes::shape_enum::GroupShape::new(10);
-    group.add_child(ShapeEnum::Picture(nested));
+    assert!(group.add_child(ShapeEnum::Picture(nested)).is_ok());
     let mut duplicate = PictureShape::new(11);
-    duplicate.set_frame_kind(PictureFrameKind::OleObject);
-    duplicate.set_external_object_id(42);
+    assert!(
+        duplicate
+            .set_frame_kind(PictureFrameKind::OleObject)
+            .is_ok()
+    );
+    assert!(duplicate.set_external_object_id(42).is_ok());
     let shapes = vec![
         ShapeEnum::Picture(chart),
         ShapeEnum::Group(group),

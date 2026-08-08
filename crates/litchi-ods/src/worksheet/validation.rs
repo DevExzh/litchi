@@ -73,7 +73,8 @@ pub(crate) fn validate_sheet(sheet: &Sheet) -> Result<()> {
                 sheet.name
             )));
         }
-        let row_cells = columns.checked_mul(row.repeat()).ok_or_else(|| {
+        let semantic_columns = semantic_cell_footprint(row)?;
+        let row_cells = semantic_columns.checked_mul(row.repeat()).ok_or_else(|| {
             Error::InvalidFormat("ODS logical cell count overflows address space".to_string())
         })?;
         logical_cells = logical_cells.checked_add(row_cells).ok_or_else(|| {
@@ -87,6 +88,45 @@ pub(crate) fn validate_sheet(sheet: &Sheet) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Count stored payload and grid coverage without charging sparse empty runs.
+///
+/// ODF producers commonly terminate a sheet with one repeated row containing
+/// unstyled empty cell runs across the remaining grid height. Those runs are
+/// address-space padding, not materialized cells. Direct/default cell styles,
+/// values, displayed text, formulas, and merge coverage remain semantic and
+/// therefore consume the logical-cell budget.
+fn semantic_cell_footprint(row: &Row) -> Result<usize> {
+    let default_cell_style = row.default_cell_style_name.is_some();
+    row.cells.iter().try_fold(0usize, |total, cell| {
+        let per_cell = match cell.merge {
+            Merge::Span { rows, columns } => {
+                rows.get().checked_mul(columns.get()).ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "ODS merged-cell coverage overflows address space".to_string(),
+                    )
+                })?
+            },
+            Merge::Covered => 1,
+            Merge::None
+                if default_cell_style
+                    || cell.style_name.is_some()
+                    || !matches!(cell.value, CellValue::Empty)
+                    || !cell.text.is_empty()
+                    || cell.formula.is_some() =>
+            {
+                1
+            },
+            Merge::None => 0,
+        };
+        let run_footprint = per_cell.checked_mul(cell.repeat()).ok_or_else(|| {
+            Error::InvalidFormat("ODS logical cell footprint overflows address space".to_string())
+        })?;
+        total.checked_add(run_footprint).ok_or_else(|| {
+            Error::InvalidFormat("ODS logical cell footprint overflows address space".to_string())
+        })
+    })
 }
 
 fn validate_row(row: &Row) -> Result<()> {
@@ -163,8 +203,8 @@ pub(crate) fn validate_content_xml_size(xml: &str) -> Result<()> {
 }
 
 fn validate_optional_name(value: Option<&str>, label: &str) -> Result<()> {
-    if let Some(value) = value {
-        validate_non_empty_text(value, label)?;
+    if let Some(name) = value {
+        validate_non_empty_text(name, label)?;
     }
     Ok(())
 }
@@ -191,4 +231,71 @@ pub(crate) fn validate_text(value: &str, label: &str) -> Result<()> {
         )));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod sparse_accounting_tests {
+    use super::{MAX_LOGICAL_CELLS, MAX_LOGICAL_COLUMNS, MAX_LOGICAL_ROWS, validate_sheet};
+    use crate::worksheet::{Cell, CellValue, Merge, Row, Sheet};
+    use std::num::NonZeroUsize;
+
+    fn row(cell: Cell, repeat: usize) -> Row {
+        Row {
+            cells: vec![cell],
+            style_name: None,
+            default_cell_style_name: None,
+            repeat: NonZeroUsize::new(repeat).unwrap(),
+        }
+    }
+
+    fn sheet(rows: Vec<Row>) -> Sheet {
+        Sheet {
+            name: "Sheet1".to_string(),
+            rows,
+            style_name: None,
+        }
+    }
+
+    #[test]
+    fn meaningful_cells_accept_exact_limit_and_reject_one_more() {
+        let cell =
+            Cell::repeated(CellValue::Text("x".to_string()), "x", MAX_LOGICAL_COLUMNS).unwrap();
+        let exact_rows = MAX_LOGICAL_CELLS / MAX_LOGICAL_COLUMNS;
+        let exact = row(cell, exact_rows);
+        assert!(validate_sheet(&sheet(vec![exact.clone()])).is_ok());
+
+        let one_more = row(Cell::new(CellValue::Text("x".to_string()), "x"), 1);
+        assert!(validate_sheet(&sheet(vec![exact, one_more])).is_err());
+    }
+
+    #[test]
+    fn trailing_empty_repeated_grid_padding_is_sparse() {
+        let mut padding = row(
+            Cell::repeated(CellValue::Empty, "", 7).unwrap(),
+            MAX_LOGICAL_ROWS,
+        );
+        padding.style_name = Some("row-style".to_string());
+        assert!(validate_sheet(&sheet(vec![padding])).is_ok());
+    }
+
+    #[test]
+    fn cell_formatting_and_coverage_still_consume_the_budget() {
+        let mut styled = row(
+            Cell::repeated(CellValue::Empty, "", MAX_LOGICAL_COLUMNS).unwrap(),
+            5,
+        );
+        styled.default_cell_style_name = Some("Default".to_string());
+        assert!(validate_sheet(&sheet(vec![styled])).is_err());
+
+        let mut covered = Cell::repeated(CellValue::Empty, "", MAX_LOGICAL_COLUMNS).unwrap();
+        covered.merge = Merge::Covered;
+        assert!(validate_sheet(&sheet(vec![row(covered, 5)])).is_err());
+
+        let mut span = Cell::empty();
+        span.merge = Merge::Span {
+            rows: NonZeroUsize::new(MAX_LOGICAL_ROWS).unwrap(),
+            columns: NonZeroUsize::new(5).unwrap(),
+        };
+        assert!(validate_sheet(&sheet(vec![row(span, 1)])).is_err());
+    }
 }

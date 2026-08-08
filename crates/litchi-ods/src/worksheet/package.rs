@@ -104,6 +104,256 @@ pub(crate) fn replace_tables(xml: &str, sheets: &[Sheet]) -> Result<String> {
     Ok(updated)
 }
 
+/// Patch only changed physical row runs in flat spreadsheet XML.
+///
+/// Direct table children outside the changed rows remain byte-exact. A row
+/// whose attributes or descendants are not completely represented by the
+/// compact worksheet model is refused before any bytes are published.
+pub(crate) fn replace_changed_rows(
+    xml: &str,
+    original: &[Sheet],
+    candidate: &[Option<Sheet>],
+    max_output_bytes: usize,
+) -> Result<String> {
+    validation::validate_content_xml_size(xml)?;
+    if candidate.len() > validation::MAX_PHYSICAL_RUNS {
+        return Err(Error::InvalidFormat(format!(
+            "flat ODS sheet count exceeds the {} safety limit",
+            validation::MAX_PHYSICAL_RUNS
+        )));
+    }
+    for sheet in candidate.iter().flatten() {
+        validation::validate_sheet(sheet)?;
+    }
+    if original.len() != candidate.len() {
+        return Err(invalid(
+            "flat ODS row transaction cannot add or remove worksheets",
+        ));
+    }
+
+    let spans = scan(xml)?;
+    let spreadsheet = one_spreadsheet(&spans)?;
+    let mut tables = direct_children(&spans, spreadsheet, TABLE_NAMESPACE, "table");
+    tables.sort_unstable_by_key(|index| spans[*index].start);
+    if tables.len() != original.len() {
+        return Err(invalid("flat ODS table inventory changed since parsing"));
+    }
+
+    let mut edits = Vec::new();
+    for (sheet_index, ((before, after), table)) in
+        original.iter().zip(candidate).zip(tables).enumerate()
+    {
+        let Some(after) = after else { continue };
+        if before.name != after.name {
+            return Err(invalid("flat ODS row transaction cannot rename worksheets"));
+        }
+        let mut rows = direct_children(&spans, table, TABLE_NAMESPACE, "table-row");
+        rows.sort_unstable_by_key(|index| spans[*index].start);
+        if rows.len() != before.rows.len() {
+            return Err(Error::InvalidFormat(format!(
+                "flat ODS sheet {sheet_index} row inventory changed since parsing"
+            )));
+        }
+
+        let prefix = before
+            .rows
+            .iter()
+            .zip(&after.rows)
+            .take_while(|(left, right)| left == right)
+            .count();
+        let suffix = before.rows[prefix..]
+            .iter()
+            .rev()
+            .zip(after.rows[prefix..].iter().rev())
+            .take_while(|(left, right)| left == right)
+            .count();
+        let old_end = before.rows.len() - suffix;
+        let new_end = after.rows.len() - suffix;
+        if prefix == old_end {
+            return Err(invalid(
+                "flat ODS row insertion requires an existing physical row anchor",
+            ));
+        }
+
+        for row in &rows[prefix..old_end] {
+            validate_rewritable_row(xml, &spans, &spans[*row])?;
+        }
+        edits.push((
+            spans[rows[prefix]].start,
+            spans[rows[old_end - 1]].end,
+            codec::write_rows_bounded(&after.rows[prefix..new_end], max_output_bytes)?,
+        ));
+    }
+
+    apply_edits_bounded(xml, edits, max_output_bytes)
+}
+
+fn apply_edits_bounded(
+    xml: &str,
+    mut edits: Vec<(usize, usize, String)>,
+    max_output_bytes: usize,
+) -> Result<String> {
+    edits.sort_unstable_by_key(|(start, _, _)| *start);
+    let mut cursor = 0usize;
+    let mut removed = 0usize;
+    let mut added = 0usize;
+    for (start, end, replacement) in &edits {
+        if *start < cursor || *end < *start || *end > xml.len() {
+            return Err(invalid("overlapping or out-of-bounds flat ODS edit"));
+        }
+        removed = removed
+            .checked_add(end - start)
+            .ok_or_else(|| invalid("flat ODS removed-byte count overflow"))?;
+        added = added
+            .checked_add(replacement.len())
+            .ok_or_else(|| invalid("flat ODS replacement-byte count overflow"))?;
+        cursor = *end;
+    }
+    let output_len = xml
+        .len()
+        .checked_sub(removed)
+        .and_then(|value| value.checked_add(added))
+        .ok_or_else(|| invalid("flat ODS output size overflow"))?;
+    if output_len > max_output_bytes {
+        return Err(Error::InvalidFormat(format!(
+            "flat ODS output exceeds the {max_output_bytes} byte limit"
+        )));
+    }
+    let mut output = String::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|_| invalid("flat ODS output allocation failed"))?;
+    cursor = 0;
+    for (start, end, replacement) in edits {
+        output.push_str(&xml[cursor..start]);
+        output.push_str(&replacement);
+        cursor = end;
+    }
+    output.push_str(&xml[cursor..]);
+    Ok(output)
+}
+
+fn validate_rewritable_row(xml: &str, spans: &[Span], span: &Span) -> Result<()> {
+    let row = xml
+        .get(span.start..span.end)
+        .ok_or_else(|| invalid("flat ODS row span is invalid"))?;
+    let root = spans
+        .iter()
+        .find(|candidate| candidate.parent.is_none())
+        .ok_or_else(|| invalid("flat ODS document root is missing"))?;
+    if root.empty {
+        return Err(invalid("flat ODS document root cannot be empty"));
+    }
+    let opening = xml
+        .get(root.start..root.tag_end)
+        .ok_or_else(|| invalid("flat ODS document root span is invalid"))?;
+    let mut source = String::with_capacity(opening.len() + row.len() + root.qname.len() + 4);
+    source.push_str(opening);
+    source.push_str(row);
+    source.push_str("</");
+    source.push_str(&root.qname);
+    source.push('>');
+    let mut reader = NsReader::from_str(&source);
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    let mut first_element = true;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid flat ODS row XML: {error}")))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if first_element {
+                    first_element = false;
+                    buffer.clear();
+                    continue;
+                }
+                let namespace = resolve_namespace(&namespace)?;
+                let local = decode(element.local_name().as_ref(), "row element local name")?;
+                if !is_modeled_row_element(namespace.as_deref(), &local) {
+                    return Err(Error::InvalidFormat(format!(
+                        "flat ODS edit would discard unmodeled row element '{local}'"
+                    )));
+                }
+                validate_modeled_attributes(&reader, &element, namespace.as_deref(), &local)?;
+            },
+            Event::Comment(_) | Event::PI(_) | Event::DocType(_) => {
+                return Err(invalid("flat ODS edit would discard unmodeled row markup"));
+            },
+            Event::End(_) => {},
+            Event::Eof => break,
+            Event::Decl(_) | Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) => {},
+        }
+        buffer.clear();
+    }
+    Ok(())
+}
+
+fn is_modeled_row_element(namespace: Option<&str>, local: &str) -> bool {
+    (namespace == Some(TABLE_NAMESPACE)
+        && matches!(local, "table-row" | "table-cell" | "covered-table-cell"))
+        || (namespace == Some(codec::TEXT_NAMESPACE) && local == "p")
+}
+
+fn validate_modeled_attributes(
+    reader: &NsReader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+    element_namespace: Option<&str>,
+    local: &str,
+) -> Result<()> {
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| {
+            Error::InvalidFormat(format!("invalid flat ODS attribute: {error}"))
+        })?;
+        let name = attribute.key.as_ref();
+        if name == b"xmlns" || name.starts_with(b"xmlns:") {
+            continue;
+        }
+        let (namespace, attribute_local) = reader.resolver().resolve_attribute(attribute.key);
+        let namespace = resolve_namespace(&namespace)?;
+        let attribute_local = decode(attribute_local.as_ref(), "row attribute local name")?;
+        let modeled = match (element_namespace, local, namespace.as_deref()) {
+            (Some(TABLE_NAMESPACE), "table-row", Some(TABLE_NAMESPACE)) => matches!(
+                attribute_local.as_str(),
+                "number-rows-repeated" | "style-name" | "default-cell-style-name"
+            ),
+            (Some(TABLE_NAMESPACE), "table-cell" | "covered-table-cell", Some(TABLE_NAMESPACE)) => {
+                matches!(
+                    attribute_local.as_str(),
+                    "number-columns-repeated"
+                        | "number-rows-spanned"
+                        | "number-columns-spanned"
+                        | "formula"
+                        | "style-name"
+                )
+            },
+            (
+                Some(TABLE_NAMESPACE),
+                "table-cell" | "covered-table-cell",
+                Some(OFFICE_NAMESPACE),
+            ) => {
+                matches!(
+                    attribute_local.as_str(),
+                    "value-type"
+                        | "value"
+                        | "date-value"
+                        | "time-value"
+                        | "boolean-value"
+                        | "currency"
+                )
+            },
+            (Some(codec::TEXT_NAMESPACE), "p", _) => false,
+            _ => false,
+        };
+        if !modeled {
+            return Err(Error::InvalidFormat(format!(
+                "flat ODS edit would discard unmodeled attribute '{attribute_local}'"
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn scan(xml: &str) -> Result<Vec<Span>> {
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
@@ -204,10 +454,19 @@ fn push_span(
 }
 
 fn tag_start(xml: &str, tag_end: usize) -> Result<usize> {
-    xml.as_bytes()[..tag_end]
-        .iter()
-        .rposition(|&byte| byte == b'<')
-        .ok_or_else(|| Error::InvalidFormat("ODS XML element start is missing".to_string()))
+    let mut quote = None;
+    for (index, byte) in xml.as_bytes()[..tag_end].iter().enumerate().rev() {
+        match (quote, byte) {
+            (Some(delimiter), current) if current == &delimiter => quote = None,
+            (Some(_), _) => {},
+            (None, b'\'' | b'"') => quote = Some(*byte),
+            (None, b'<') => return Ok(index),
+            _ => {},
+        }
+    }
+    Err(Error::InvalidFormat(
+        "ODS XML element start is missing".to_string(),
+    ))
 }
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {

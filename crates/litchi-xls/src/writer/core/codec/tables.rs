@@ -1,9 +1,41 @@
 use super::super::model::validate_list_object_style;
 use super::super::*;
-use crate::ListObject;
 use crate::error::{Error, Result};
+use crate::{ListObject, MapInfo};
 
 impl Writer {
+    /// Install or replace the inert root-level XML-map catalog.
+    ///
+    /// Every existing mapped list column is resolved against the candidate
+    /// before publication. Schemas, bindings, and XPath values are serialized
+    /// as metadata only; no referenced resource is opened or refreshed.
+    pub fn put_xml_map(&mut self, map_info: MapInfo) -> Result<Option<MapInfo>> {
+        crate::xml_map::validate_info(&map_info)?;
+        crate::xml_map::validate_list_objects(
+            Some(&map_info),
+            self.worksheets
+                .iter()
+                .flat_map(|worksheet| worksheet.list_objects.iter()),
+        )?;
+        Ok(self.xml_map.replace(map_info))
+    }
+
+    /// Remove the XML-map catalog when no mapped list column references it.
+    pub fn remove_xml_map(&mut self) -> Result<Option<MapInfo>> {
+        crate::xml_map::validate_list_objects(
+            None,
+            self.worksheets
+                .iter()
+                .flat_map(|worksheet| worksheet.list_objects.iter()),
+        )?;
+        Ok(self.xml_map.take())
+    }
+
+    /// Return the XML-map catalog configured for the next write.
+    pub fn xml_map(&self) -> Option<&MapInfo> {
+        self.xml_map.as_ref()
+    }
+
     /// Installs a complete custom table-style family.
     ///
     /// Validation happens before assignment, so an error leaves the current
@@ -22,6 +54,7 @@ impl Writer {
     /// Adds a legacy BIFF8 worksheet table and writes its header captions.
     pub fn add_list_object(&mut self, sheet: usize, table: ListObject) -> Result<()> {
         table.validate()?;
+        crate::xml_map::validate_list_objects(self.xml_map.as_ref(), std::iter::once(&table))?;
         let style = table.style().ok_or_else(|| {
             Error::InvalidData("validated table is missing its style".to_string())
         })?;

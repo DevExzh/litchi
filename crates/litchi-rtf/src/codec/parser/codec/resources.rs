@@ -218,8 +218,25 @@ impl<'a> Parser<'a> {
                     self.font_table.borrow().validate()?;
                     return Ok(());
                 },
+                Token::OpenBrace
+                    if matches!(
+                        self.tokens.get(self.pos + 1..self.pos + 3),
+                        Some([
+                            Token::Control(ControlWord::IgnorableDestination),
+                            Token::Control(ControlWord::Unknown(_, _))
+                        ])
+                    ) =>
+                {
+                    self.pos += 1;
+                    self.preserve_unknown_destination_in(crate::opaque::Context::Metadata)?;
+                },
                 Token::OpenBrace => {
                     self.parse_font_entry()?;
+                },
+                Token::Control(ControlWord::Unknown(_, _)) => {
+                    let token = self.pos;
+                    self.pos += 1;
+                    self.preserve_unknown_control_in(token, crate::opaque::Context::Metadata)?;
                 },
                 _ => {
                     self.pos += 1;
@@ -240,6 +257,7 @@ impl<'a> Parser<'a> {
         let mut pitch = crate::FontPitch::Default;
         let mut code_page = None;
         let mut theme = None;
+        let mut bidi = false;
         let mut alternate_name = None;
         let mut non_tagged_name = None;
         let mut panose = None;
@@ -332,7 +350,8 @@ impl<'a> Parser<'a> {
                             "RTF font entry cannot contain fields or objects".to_string(),
                         ));
                     }
-                    self.skip_group()?;
+                    self.pos += 1;
+                    self.preserve_unknown_destination_in(crate::opaque::Context::Metadata)?;
                 },
                 Token::Control(ControlWord::FontNumber(n)) => {
                     if !seen.insert("font-number") {
@@ -421,6 +440,20 @@ impl<'a> Parser<'a> {
                     theme = super::super::super::types::FontTheme::from_control_word(word);
                     self.pos += 1;
                 },
+                Token::Control(ControlWord::FontBidi(parameter)) => {
+                    if !seen.insert("bidi") {
+                        return Err(RtfError::MalformedDocument(
+                            "duplicate RTF fbidi font property".to_string(),
+                        ));
+                    }
+                    if parameter.is_some() {
+                        return Err(RtfError::MalformedDocument(
+                            "RTF fbidi font property must not have a numeric parameter".to_string(),
+                        ));
+                    }
+                    bidi = true;
+                    self.pos += 1;
+                },
                 Token::Text(text) => {
                     name.push_transport(text)?;
                     self.pos += 1;
@@ -435,6 +468,11 @@ impl<'a> Parser<'a> {
                 Token::Control(control) if control_symbol_text(control).is_some() => {
                     name.push_unicode(control_symbol_text(control).unwrap_or_default());
                     self.pos += 1;
+                },
+                Token::Control(ControlWord::Unknown(_, _)) => {
+                    let token = self.pos;
+                    self.pos += 1;
+                    self.preserve_unknown_control_in(token, crate::opaque::Context::Metadata)?;
                 },
                 _ => {
                     self.pos += 1;
@@ -500,6 +538,7 @@ impl<'a> Parser<'a> {
         font.code_page = code_page;
         font.embedded = embedded;
         font.theme = theme;
+        font.bidi = bidi;
         font.validate()?;
         if let Some(existing) = self.font_table.borrow().get(font_num) {
             if existing == &font {
@@ -701,7 +740,8 @@ impl<'a> Parser<'a> {
                         embedded.file_name = Some(Cow::Owned(file_name));
                         embedded.file_code_page = file_code_page;
                     } else {
-                        self.skip_group()?;
+                        self.pos += 1;
+                        self.preserve_unknown_destination_in(crate::opaque::Context::Metadata)?;
                     }
                 },
                 Token::Text(text) => {
@@ -857,6 +897,15 @@ impl<'a> Parser<'a> {
                     current_blue = (*b).clamp(0, 255) as u8;
                     has_component = true;
                     self.pos += 1;
+                },
+                Token::OpenBrace => {
+                    self.pos += 1;
+                    self.preserve_unknown_destination_in(crate::opaque::Context::Metadata)?;
+                },
+                Token::Control(ControlWord::Unknown(_, _)) => {
+                    let token = self.pos;
+                    self.pos += 1;
+                    self.preserve_unknown_control_in(token, crate::opaque::Context::Metadata)?;
                 },
                 Token::Text(text) if text.trim() == ";" => {
                     // An empty entry is the RTF automatic/default color.

@@ -14,6 +14,27 @@ pub enum ListMarker {
     UnsupportedFormat { format: String, value: i64 },
 }
 
+/// Markdown-relevant semantic kind of a resolved numbering level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListKind {
+    /// A numbering level with a visible bullet marker.
+    Unordered,
+    /// A numbering level whose marker is derived from a counter.
+    Ordered,
+    /// A `none` numbering level with no visible marker.
+    Unmarked,
+}
+
+/// Detailed result of advancing one numbering instance.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedListMarker {
+    pub format: Format,
+    pub kind: ListKind,
+    pub value: i64,
+    pub marker: ListMarker,
+    pub suffix: Suffix,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ListItem {
     pub paragraph_index: usize,
@@ -21,6 +42,31 @@ pub struct ListItem {
     pub marker: ListMarker,
     pub suffix: Suffix,
     pub text: String,
+}
+
+/// A package-resolved list item with its counter and level semantics retained.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedListItem {
+    pub paragraph_index: usize,
+    pub numbering: Paragraph,
+    pub format: Format,
+    pub kind: ListKind,
+    pub value: i64,
+    pub marker: ListMarker,
+    pub suffix: Suffix,
+    pub text: String,
+}
+
+impl From<ResolvedListItem> for ListItem {
+    fn from(value: ResolvedListItem) -> Self {
+        Self {
+            paragraph_index: value.paragraph_index,
+            numbering: value.numbering,
+            marker: value.marker,
+            suffix: value.suffix,
+            text: value.text,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -69,6 +115,16 @@ impl ListCounterState {
         numbering: &Collection,
         properties: Paragraph,
     ) -> Result<(ListMarker, Suffix)> {
+        let resolved = self.advance_resolved(numbering, properties)?;
+        Ok((resolved.marker, resolved.suffix))
+    }
+
+    /// Advance one numbered paragraph while retaining format and counter data.
+    pub fn advance_resolved(
+        &mut self,
+        numbering: &Collection,
+        properties: Paragraph,
+    ) -> Result<ResolvedListMarker> {
         if properties.num_id == 0 {
             return Err(invalid("numId 0 cancels numbering and cannot be advanced"));
         }
@@ -82,13 +138,17 @@ impl ListCounterState {
             }
         }
 
-        let slot = &mut counters[usize::from(properties.level)];
-        *slot = Some(match *slot {
-            None => current_level.start,
-            Some(value) => value
-                .checked_add(1)
-                .ok_or_else(|| invalid("numbering counter overflow"))?,
-        });
+        let current_value = {
+            let slot = &mut counters[usize::from(properties.level)];
+            let value = match *slot {
+                None => current_level.start,
+                Some(value) => value
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("numbering counter overflow"))?,
+            };
+            *slot = Some(value);
+            value
+        };
 
         for deeper in properties.level.saturating_add(1)..=8 {
             let should_reset = match resolve_level(numbering, properties.num_id, deeper) {
@@ -105,7 +165,22 @@ impl ListCounterState {
         }
 
         let marker = render_marker(numbering, properties, counters, &current_level)?;
-        Ok((marker, current_level.suffix))
+        let kind = if current_level.picture_bullet_id.is_some()
+            || current_level.format == Format::Bullet
+        {
+            ListKind::Unordered
+        } else if current_level.format == Format::None {
+            ListKind::Unmarked
+        } else {
+            ListKind::Ordered
+        };
+        Ok(ResolvedListMarker {
+            format: current_level.format,
+            kind,
+            value: current_value,
+            marker,
+            suffix: current_level.suffix,
+        })
     }
 }
 
@@ -372,6 +447,42 @@ mod tests {
             ListMarker::Text("7".to_owned())
         );
         assert_eq!(value.abstract_nums[0].levels[0].start, 1);
+    }
+
+    #[test]
+    fn detailed_advance_retains_kind_format_and_current_value() {
+        let value = numbering(vec![
+            level(0, 7, Format::UpperRoman, "%1."),
+            level(1, 1, Format::Bullet, "-"),
+        ]);
+        let mut state = ListCounterState::new();
+        let ordered = state
+            .advance_resolved(
+                &value,
+                Paragraph {
+                    num_id: 4,
+                    level: 0,
+                },
+            )
+            .unwrap();
+        assert_eq!(ordered.format, Format::UpperRoman);
+        assert_eq!(ordered.kind, ListKind::Ordered);
+        assert_eq!(ordered.value, 7);
+        assert_eq!(ordered.marker, ListMarker::Text("VII.".to_owned()));
+
+        let bullet = state
+            .advance_resolved(
+                &value,
+                Paragraph {
+                    num_id: 4,
+                    level: 1,
+                },
+            )
+            .unwrap();
+        assert_eq!(bullet.format, Format::Bullet);
+        assert_eq!(bullet.kind, ListKind::Unordered);
+        assert_eq!(bullet.value, 1);
+        assert_eq!(bullet.marker, ListMarker::Text("-".to_owned()));
     }
 
     #[test]

@@ -10,14 +10,13 @@ use crate::document::{Paragraph, Run};
 ///
 /// **Note**: Some functionality requires the `doc` or `ooxml` feature to be enabled.
 use litchi_core::{Error, Metadata, Result};
-use litchi_markdown::MarkdownOptions;
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 use litchi_markdown::TableStyle;
+use litchi_markdown::{MarkdownOptions, escape};
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 use memchr::memchr;
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use std::fmt::Write as FmtWrite;
 
 /// Minimum number of table rows to justify parallel processing overhead.
 /// Tables are typically smaller than documents, so we use a lower threshold.
@@ -26,7 +25,7 @@ const TABLE_PARALLEL_THRESHOLD: usize = 20;
 
 /// Information about a detected list item.
 #[derive(Debug, Clone)]
-struct ListItemInfo {
+pub(crate) struct ListItemInfo {
     /// The type of list
     list_type: ListType,
     /// The nesting level (0 = top level)
@@ -35,6 +34,16 @@ struct ListItemInfo {
     marker: String,
     /// The content after the marker
     content: String,
+    /// Byte offset at which content begins in the original paragraph text.
+    content_start: usize,
+    /// Whether owner metadata or literal text identified the list.
+    origin: ListOrigin,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ListOrigin {
+    Semantic,
+    Text,
 }
 
 /// Types of lists supported.
@@ -44,6 +53,31 @@ enum ListType {
     Ordered,
     /// Unordered list (bulleted)
     Unordered,
+}
+
+impl ListItemInfo {
+    pub(crate) fn bullet(level: usize) -> Self {
+        Self {
+            list_type: ListType::Unordered,
+            level,
+            marker: "-".to_owned(),
+            content: String::new(),
+            content_start: 0,
+            origin: ListOrigin::Semantic,
+        }
+    }
+
+    #[cfg(feature = "docx")]
+    pub(crate) fn ordered(level: usize, marker: String) -> Self {
+        Self {
+            list_type: ListType::Ordered,
+            level,
+            marker,
+            content: String::new(),
+            content_start: 0,
+            origin: ListOrigin::Semantic,
+        }
+    }
 }
 
 /// Information about cell span (colspan and rowspan) for HTML rendering.
@@ -145,7 +179,7 @@ fn analyze_table_spans(table: &Table, use_parallel: bool) -> Result<Vec<Vec<Cell
                             Ok(CellData {
                                 grid_span: cell.grid_span().unwrap_or(1),
                                 #[cfg(feature = "docx")]
-                                v_merge: cell.v_merge().ok().flatten(),
+                                v_merge: cell.v_merge()?,
                             })
                         })
                         .collect()
@@ -162,7 +196,7 @@ fn analyze_table_spans(table: &Table, use_parallel: bool) -> Result<Vec<Vec<Cell
                             Ok(CellData {
                                 grid_span: cell.grid_span().unwrap_or(1),
                                 #[cfg(feature = "docx")]
-                                v_merge: cell.v_merge().ok().flatten(),
+                                v_merge: cell.v_merge()?,
                             })
                         })
                         .collect()
@@ -299,6 +333,170 @@ impl MarkdownWriter {
         }
     }
 
+    #[cfg(feature = "docx")]
+    fn heading_level_from_style_id(style_id: &str) -> Option<u8> {
+        let mut characters = style_id
+            .chars()
+            .filter(|character| !matches!(character, ' ' | '-' | '_'));
+        for expected in "heading".chars() {
+            if !characters
+                .next()
+                .is_some_and(|actual| actual.eq_ignore_ascii_case(&expected))
+            {
+                return None;
+            }
+        }
+        let level = characters
+            .next()?
+            .to_digit(10)
+            .and_then(|value| u8::try_from(value).ok())?;
+        (characters.next().is_none() && (1..=6).contains(&level)).then_some(level)
+    }
+
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "odt",
+        feature = "rtf",
+        feature = "pages"
+    ))]
+    fn heading_level(&self, para: &Paragraph) -> Result<Option<u8>> {
+        let level = match para {
+            #[cfg(feature = "doc")]
+            Paragraph::Doc(paragraph) => paragraph
+                .properties()
+                .outline_level
+                .and_then(|level| level.checked_add(1)),
+            #[cfg(feature = "docx")]
+            Paragraph::Docx(paragraph) => paragraph
+                .style_id()
+                .map_err(crate::map_ooxml_error)?
+                .as_deref()
+                .and_then(Self::heading_level_from_style_id),
+            #[cfg(feature = "rtf")]
+            Paragraph::Rtf(paragraph) => paragraph
+                .properties
+                .outline_level
+                .and_then(|level| level.checked_add(1)),
+            #[cfg(feature = "odt")]
+            Paragraph::Odt(_) => None,
+            #[cfg(feature = "pages")]
+            Paragraph::Pages(_) => None,
+        };
+        Ok(level.filter(|level| (1..=6).contains(level)))
+    }
+
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "odt",
+        feature = "rtf",
+        feature = "pages"
+    ))]
+    fn reject_unresolved_list(&self, para: &Paragraph) -> Result<()> {
+        let unresolved = match para {
+            #[cfg(feature = "doc")]
+            Paragraph::Doc(paragraph) => {
+                let properties = paragraph.properties();
+                properties.list_format_override.is_some() && properties.list_level != Some(12)
+            },
+            #[cfg(feature = "docx")]
+            Paragraph::Docx(paragraph) => paragraph
+                .numbering()
+                .map_err(crate::map_ooxml_error)?
+                .is_some_and(|numbering| numbering.num_id != 0),
+            #[cfg(feature = "rtf")]
+            Paragraph::Rtf(_) => false,
+            #[cfg(feature = "odt")]
+            Paragraph::Odt(_) => false,
+            #[cfg(feature = "pages")]
+            Paragraph::Pages(_) => false,
+        };
+        if unresolved {
+            return Err(Error::Unsupported(
+                "Markdown export requires resolved numbering definitions to distinguish bullets, ordered lists, and unsupported formats"
+                    .to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "odt",
+        feature = "rtf",
+        feature = "pages"
+    ))]
+    fn permits_text_list_fallback(para: &Paragraph) -> bool {
+        match para {
+            #[cfg(feature = "doc")]
+            Paragraph::Doc(_) => false,
+            #[cfg(feature = "docx")]
+            Paragraph::Docx(_) => false,
+            #[cfg(feature = "rtf")]
+            Paragraph::Rtf(_) => true,
+            #[cfg(feature = "odt")]
+            Paragraph::Odt(_) => true,
+            #[cfg(feature = "pages")]
+            Paragraph::Pages(_) => true,
+        }
+    }
+
+    fn write_literal(&mut self, text: &str) {
+        self.buffer.push_str(&escape::text(text));
+    }
+
+    fn write_html_literal(&mut self, text: &str) {
+        let mut start = 0usize;
+        for (index, character) in text.char_indices() {
+            match character {
+                '&' | '<' | '>' => {
+                    self.write_literal(&text[start..index]);
+                    self.buffer.push_str(match character {
+                        '&' => "&amp;",
+                        '<' => "&lt;",
+                        '>' => "&gt;",
+                        _ => "",
+                    });
+                    start = index + character.len_utf8();
+                },
+                _ => {},
+            }
+        }
+        self.write_literal(&text[start..]);
+    }
+
+    fn write_list_prefix(&mut self, list_info: &ListItemInfo) -> Result<()> {
+        let spaces = list_info
+            .level
+            .checked_mul(self.options.list_indent)
+            .ok_or_else(|| {
+                Error::Unsupported("Markdown list indentation exceeds limits".to_owned())
+            })?;
+        let marker = match list_info.list_type {
+            ListType::Unordered => "-".to_owned(),
+            ListType::Ordered if list_info.marker.ends_with('.') => list_info.marker.clone(),
+            ListType::Ordered => format!(
+                "{}.",
+                list_info
+                    .marker
+                    .trim_start_matches('(')
+                    .trim_end_matches(')')
+            ),
+        };
+        self.buffer
+            .try_reserve(spaces.saturating_add(marker.len()).saturating_add(1))
+            .map_err(|source| Error::Allocation {
+                resource: "Markdown list output",
+                source,
+            })?;
+        self.buffer.extend(std::iter::repeat_n(' ', spaces));
+        self.buffer.push_str(&marker);
+        self.buffer.push(' ');
+        Ok(())
+    }
+
     /// Write a paragraph to the buffer.
     ///
     /// **Note**: This method requires the `doc` or `ooxml` feature to be enabled.
@@ -314,6 +512,31 @@ impl MarkdownWriter {
     ))]
     #[allow(irrefutable_let_patterns)]
     pub fn write_paragraph(&mut self, para: &Paragraph) -> Result<()> {
+        self.write_paragraph_with_list(para, None)
+    }
+
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "odt",
+        feature = "rtf",
+        feature = "pages"
+    ))]
+    #[allow(irrefutable_let_patterns)]
+    pub(crate) fn write_paragraph_with_list(
+        &mut self,
+        para: &Paragraph,
+        resolved_list: Option<&ListItemInfo>,
+    ) -> Result<()> {
+        if resolved_list.is_none() {
+            self.reject_unresolved_list(para)?;
+        }
+        if let Some(level) = self.heading_level(para)? {
+            self.buffer
+                .extend(std::iter::repeat_n('#', usize::from(level)));
+            self.buffer.push(' ');
+        }
+
         // First check for paragraph-level formulas (display math)
         #[cfg(feature = "docx")]
         {
@@ -344,39 +567,20 @@ impl MarkdownWriter {
             if runs.is_empty() {
                 let text = para.text()?;
                 if !text.is_empty() {
-                    // Check if this is a list item
-                    if let Some(list_info) = self.detect_list_item(&text) {
-                        // For plain text lists, write the content directly
-                        let indent = " ".repeat(list_info.level * self.options.list_indent);
-                        let marker = match list_info.list_type {
-                            ListType::Ordered => {
-                                if list_info.marker.contains('.') {
-                                    list_info.marker.clone()
-                                } else if list_info.marker.starts_with('(') {
-                                    format!(
-                                        "{}.",
-                                        list_info
-                                            .marker
-                                            .trim_start_matches('(')
-                                            .trim_end_matches(')')
-                                    )
-                                } else {
-                                    "1.".to_string()
-                                }
-                            },
-                            ListType::Unordered => "-".to_string(),
-                        };
-                        self.buffer.push_str(&indent);
-                        self.buffer.push_str(&marker);
-                        self.buffer.push(' ');
-                        self.buffer.push_str(
-                            text.trim_start()
-                                .trim_start_matches(&list_info.marker)
-                                .trim_start(),
-                        );
+                    let list_info = resolved_list.cloned().or_else(|| {
+                        Self::permits_text_list_fallback(para)
+                            .then(|| self.detect_list_item(&text))
+                            .flatten()
+                    });
+                    if let Some(list_info) = list_info {
+                        self.write_list_prefix(&list_info)?;
+                        if list_info.origin == ListOrigin::Semantic {
+                            self.write_literal(&text);
+                        } else {
+                            self.write_literal(&list_info.content);
+                        }
                     } else {
-                        // Regular paragraph - just write the text
-                        self.buffer.push_str(&text);
+                        self.write_literal(&text);
                     }
                 }
             } else {
@@ -384,8 +588,12 @@ impl MarkdownWriter {
                 // Derive text from runs for list detection (cheaper than parsing XML again)
                 let text = self.extract_text_from_runs(&runs)?;
 
-                // Check if this is a list item
-                if let Some(list_info) = self.detect_list_item(&text) {
+                let list_info = resolved_list.cloned().or_else(|| {
+                    Self::permits_text_list_fallback(para)
+                        .then(|| self.detect_list_item(&text))
+                        .flatten()
+                });
+                if let Some(list_info) = list_info {
                     self.write_list_item_from_runs(&runs, &list_info)?;
                 } else {
                     // Write runs with style information
@@ -398,31 +606,20 @@ impl MarkdownWriter {
             // Plain text mode - just get text directly (single XML parse)
             let text = para.text()?;
 
-            // Check if this is a list item
-            if let Some(list_info) = self.detect_list_item(&text) {
-                // For plain text lists, we can just write the content directly
-                let indent = " ".repeat(list_info.level * self.options.list_indent);
-                let marker = match list_info.list_type {
-                    ListType::Ordered => {
-                        // Normalize to markdown style "1."
-                        if list_info.marker.contains('.') {
-                            list_info.marker.clone()
-                        } else if list_info.marker.starts_with('(')
-                            && list_info.marker.ends_with(')')
-                        {
-                            let inner = &list_info.marker[1..list_info.marker.len() - 1];
-                            format!("{}.", inner)
-                        } else {
-                            list_info.marker.replace(')', ".")
-                        }
-                    },
-                    ListType::Unordered => "-".to_string(),
-                };
-                write!(self.buffer, "{}{} {}", indent, marker, list_info.content)
-                    .map_err(|e| Error::Other(e.to_string()))?;
+            let list_info = resolved_list.cloned().or_else(|| {
+                Self::permits_text_list_fallback(para)
+                    .then(|| self.detect_list_item(&text))
+                    .flatten()
+            });
+            if let Some(list_info) = list_info {
+                self.write_list_prefix(&list_info)?;
+                if list_info.origin == ListOrigin::Semantic {
+                    self.write_literal(&text);
+                } else {
+                    self.write_literal(&list_info.content);
+                }
             } else {
-                // Write plain text
-                self.buffer.push_str(&text);
+                self.write_literal(&text);
             }
         }
 
@@ -464,10 +661,8 @@ impl MarkdownWriter {
 
         // Write display formulas
         for omml_xml in display_formulas {
-            let latex = match omml_to_latex(&omml_xml) {
-                Ok(l) => l,
-                Err(_) => "[Formula conversion error]".to_string(),
-            };
+            let latex = omml_to_latex(&omml_xml)
+                .map_err(|error| Error::ParseError(format!("OMML conversion failed: {error}")))?;
 
             // Display formulas use display style (false = display mode)
             let formula_md = self.format_formula(&latex, false);
@@ -485,21 +680,12 @@ impl MarkdownWriter {
         para: &Paragraph,
         display_formulas: Vec<String>,
     ) -> Result<()> {
-        // Write runs normally
-        let runs = para.runs()?;
-        for run in runs {
-            let text = run.text()?;
-            if !text.trim().is_empty() {
-                self.buffer.push_str(&text);
-            }
+        if !display_formulas.is_empty() {
+            return Err(Error::FeatureDisabled("formula".to_owned()));
         }
-
-        // Add placeholder for formulas
-        for _ in display_formulas {
-            self.buffer
-                .push_str("\n[Formula - enable 'formula' feature]\n");
+        for run in para.runs()? {
+            self.write_run(&run)?;
         }
-
         Ok(())
     }
 
@@ -524,40 +710,23 @@ impl MarkdownWriter {
     /// Apply formatting changes by closing/opening markers as needed.
     /// Returns the text with appropriate formatting markers applied.
     fn apply_formatting(&mut self, bold: bool, italic: bool, strikethrough: bool) {
-        // Determine what needs to change
-        let bold_changed = bold != self.current_bold;
-        let italic_changed = italic != self.current_italic;
-        let strike_changed = strikethrough != self.current_strikethrough;
-
-        // If nothing changed, we're done
-        if !bold_changed && !italic_changed && !strike_changed {
+        if bold == self.current_bold
+            && italic == self.current_italic
+            && strikethrough == self.current_strikethrough
+        {
             return;
         }
 
-        // Close formatting that's being removed (in reverse order)
-        if strike_changed && self.current_strikethrough {
-            self.buffer.push_str("~~");
-            self.current_strikethrough = false;
-        }
-        if italic_changed && self.current_italic {
-            self.buffer.push('*');
-            self.current_italic = false;
-        }
-        if bold_changed && self.current_bold {
-            self.buffer.push_str("**");
-            self.current_bold = false;
-        }
-
-        // Open new formatting (in forward order)
-        if bold_changed && bold {
+        self.close_formatting();
+        if bold {
             self.buffer.push_str("**");
             self.current_bold = true;
         }
-        if italic_changed && italic {
+        if italic {
             self.buffer.push('*');
             self.current_italic = true;
         }
-        if strike_changed && strikethrough {
+        if strikethrough {
             self.buffer.push_str("~~");
             self.current_strikethrough = true;
         }
@@ -580,6 +749,7 @@ impl MarkdownWriter {
     pub fn write_run(&mut self, run: &Run) -> Result<()> {
         // First check if this run contains a formula
         if let Some(formula_markdown) = self.extract_formula_from_run(run)? {
+            self.close_formatting();
             self.buffer.push_str(&formula_markdown);
             return Ok(());
         }
@@ -675,20 +845,21 @@ impl MarkdownWriter {
 
             // For superscript/subscript, we apply them directly and skip other formatting
             if let Some(pos) = vertical_pos {
+                self.close_formatting();
                 match self.options.script_style {
                     litchi_markdown::ScriptStyle::Html => match pos {
                         VerticalPosition::Superscript => {
                             self.buffer.push_str("<sup>");
-                            self.buffer.push_str(&text);
+                            self.write_html_literal(&text);
                             self.buffer.push_str("</sup>");
                         },
                         VerticalPosition::Subscript => {
                             self.buffer.push_str("<sub>");
-                            self.buffer.push_str(&text);
+                            self.write_html_literal(&text);
                             self.buffer.push_str("</sub>");
                         },
                         VerticalPosition::Normal => {
-                            self.buffer.push_str(&text);
+                            self.write_literal(&text);
                         },
                     },
                     litchi_markdown::ScriptStyle::Unicode => {
@@ -704,7 +875,7 @@ impl MarkdownWriter {
                                 } else {
                                     // Fall back to HTML for partial support
                                     self.buffer.push_str("<sup>");
-                                    self.buffer.push_str(&text);
+                                    self.write_html_literal(&text);
                                     self.buffer.push_str("</sup>");
                                 }
                             },
@@ -717,12 +888,12 @@ impl MarkdownWriter {
                                 } else {
                                     // Fall back to HTML for partial support
                                     self.buffer.push_str("<sub>");
-                                    self.buffer.push_str(&text);
+                                    self.write_html_literal(&text);
                                     self.buffer.push_str("</sub>");
                                 }
                             },
                             VerticalPosition::Normal => {
-                                self.buffer.push_str(&text);
+                                self.write_literal(&text);
                             },
                         }
                     },
@@ -761,28 +932,28 @@ impl MarkdownWriter {
             match (bold, italic) {
                 (true, true) => {
                     self.buffer.push_str("***");
-                    self.buffer.push_str(&text);
+                    self.write_literal(&text);
                     self.buffer.push_str("***");
                 },
                 (true, false) => {
                     self.buffer.push_str("**");
-                    self.buffer.push_str(&text);
+                    self.write_literal(&text);
                     self.buffer.push_str("**");
                 },
                 (false, true) => {
                     self.buffer.push('*');
-                    self.buffer.push_str(&text);
+                    self.write_literal(&text);
                     self.buffer.push('*');
                 },
                 (false, false) => {
-                    self.buffer.push_str(&text);
+                    self.write_html_literal(&text);
                 },
             }
             self.buffer.push_str("</del>");
         } else {
             // Markdown-style formatting: can span across runs
             self.apply_formatting(bold, italic, strikethrough);
-            self.buffer.push_str(&text);
+            self.write_literal(&text);
         }
 
         Ok(())
@@ -839,7 +1010,7 @@ impl MarkdownWriter {
                 // Check vertical merge (vMerge) - only available for OOXML
                 #[cfg(feature = "docx")]
                 {
-                    if cell.v_merge().ok().flatten().is_some() {
+                    if cell.v_merge()?.is_some() {
                         return Ok(true);
                     }
                 }
@@ -943,40 +1114,19 @@ impl MarkdownWriter {
     /// Uses SIMD-accelerated memchr for fast searching.
     #[cfg(any(feature = "doc", feature = "docx", feature = "odt", feature = "rtf"))]
     fn escape_markdown_to_buffer(buffer: &mut String, text: &str) {
-        let bytes = text.as_bytes();
-        let mut pos = 0;
-
-        while pos < bytes.len() {
-            // Use memchr to quickly find the next character that needs escaping
-            let next_special = if let Some(pipe_pos) = memchr(b'|', &bytes[pos..]) {
-                if let Some(newline_pos) = memchr(b'\n', &bytes[pos..]) {
-                    pos + pipe_pos.min(newline_pos)
-                } else {
-                    pos + pipe_pos
-                }
-            } else if let Some(newline_pos) = memchr(b'\n', &bytes[pos..]) {
-                pos + newline_pos
-            } else {
-                // No more special characters, write rest and return
-                if pos < bytes.len() {
-                    buffer.push_str(&text[pos..]);
-                }
-                return;
-            };
-
-            // Write everything up to the special character
-            if next_special > pos {
-                buffer.push_str(&text[pos..next_special]);
+        let escaped = escape::text(text);
+        let mut characters = escaped.chars().peekable();
+        while let Some(character) = characters.next() {
+            match character {
+                '\r' => {
+                    if characters.peek() == Some(&'\n') {
+                        characters.next();
+                    }
+                    buffer.push(' ');
+                },
+                '\n' => buffer.push(' '),
+                other => buffer.push(other),
             }
-
-            // Write the escape sequence
-            match bytes[next_special] {
-                b'|' => buffer.push_str("\\|"),
-                b'\n' => buffer.push(' '),
-                _ => unreachable!(),
-            }
-
-            pos = next_special + 1;
         }
     }
 
@@ -1229,7 +1379,7 @@ impl MarkdownWriter {
                     b'<' => buffer.push_str("&lt;"),
                     b'>' => buffer.push_str("&gt;"),
                     b'\n' => buffer.push_str("<br>"),
-                    _ => unreachable!(),
+                    _ => return,
                 }
 
                 pos = special_pos + 1;
@@ -1289,12 +1439,18 @@ impl MarkdownWriter {
         Ok(())
     }
 
+    /// Refuse metadata output when its serializer is not compiled in.
+    #[cfg(not(feature = "yaml"))]
+    pub fn write_metadata(&mut self, _metadata: &Metadata) -> Result<()> {
+        Err(Error::FeatureDisabled("yaml".to_owned()))
+    }
+
     /// Detect if a paragraph is a list item and extract list information.
     fn detect_list_item(&self, text: &str) -> Option<ListItemInfo> {
-        let text = text.trim_start();
+        let trimmed = text.trim_start();
 
         // Check for ordered lists: 1. 2. 3. or 1) 2) 3) or (1) (2) (3)
-        if let Some(captures) = self.extract_ordered_list_marker(text) {
+        if let Some(captures) = self.extract_ordered_list_marker(trimmed) {
             let marker = captures.0;
             let content = captures.1;
             let level = self.calculate_indent_level(text);
@@ -1303,11 +1459,13 @@ impl MarkdownWriter {
                 level,
                 marker: marker.to_string(),
                 content: content.to_string(),
+                content_start: text.len().saturating_sub(content.len()),
+                origin: ListOrigin::Text,
             });
         }
 
         // Check for unordered lists: - * •
-        if let Some(captures) = self.extract_unordered_list_marker(text) {
+        if let Some(captures) = self.extract_unordered_list_marker(trimmed) {
             let marker = captures.0;
             let content = captures.1;
             let level = self.calculate_indent_level(text);
@@ -1316,6 +1474,8 @@ impl MarkdownWriter {
                 level,
                 marker: marker.to_string(),
                 content: content.to_string(),
+                content_start: text.len().saturating_sub(content.len()),
+                origin: ListOrigin::Text,
             });
         }
 
@@ -1376,8 +1536,11 @@ impl MarkdownWriter {
     /// Calculate the indentation level based on leading spaces/tabs.
     fn calculate_indent_level(&self, text: &str) -> usize {
         let leading = text.len() - text.trim_start().len();
-        // Each indent level corresponds to list_indent spaces
-        leading / self.options.list_indent
+        if self.options.list_indent == 0 {
+            0
+        } else {
+            leading / self.options.list_indent
+        }
     }
 
     /// Extract formula content from a run and convert to markdown.
@@ -1400,17 +1563,16 @@ impl MarkdownWriter {
             // Parse OMML and convert to LaTeX
             #[cfg(feature = "formula")]
             {
-                let latex = self.convert_omml_to_latex(&omml_xml);
+                let latex = litchi_formula::omml_to_latex(&omml_xml).map_err(|error| {
+                    Error::ParseError(format!("OMML conversion failed: {error}"))
+                })?;
                 return Ok(Some(self.format_formula(&latex, true))); // true = inline
             }
 
             #[cfg(not(feature = "formula"))]
             {
-                // omml_xml is captured but not used when formula feature is disabled
                 let _ = omml_xml;
-                return Ok(Some(
-                    self.format_formula("[Formula - enable 'formula' feature]", true),
-                ));
+                return Err(Error::FeatureDisabled("formula".to_owned()));
             }
         }
 
@@ -1425,55 +1587,16 @@ impl MarkdownWriter {
             if let crate::document::Run::Doc(ole_run) = _run
                 && ole_run.has_mtef_formula()
             {
-                return Ok(Some(match ole_run.mtef_formula_latex() {
-                    Some(latex) => self.format_formula(latex, true),
-                    // Fallback placeholder if rendered formula text is unavailable.
-                    None => self.format_formula("[Formula]", true),
-                }));
+                let latex = ole_run.mtef_formula_latex().ok_or_else(|| {
+                    Error::Unsupported(
+                        "MTEF formula has no semantic LaTeX representation".to_owned(),
+                    )
+                })?;
+                return Ok(Some(self.format_formula(latex, true)));
             }
         }
 
         Ok(None)
-    }
-
-    /// Convert MTEF AST nodes to LaTeX string
-    #[cfg(feature = "formula")]
-    #[allow(dead_code)] // Used conditionally based on feature flags
-    fn convert_mtef_to_latex(&self, nodes: &[litchi_formula::MathNode]) -> String {
-        use litchi_formula::latex::LatexConverter;
-
-        let mut converter = LatexConverter::new();
-        match converter.convert_nodes(nodes) {
-            Ok(latex) => latex.to_string(),
-            Err(_) => "[Formula conversion error]".to_string(),
-        }
-    }
-
-    /// Convert MTEF AST nodes to LaTeX string (fallback when formula feature is disabled)
-    #[cfg(not(feature = "formula"))]
-    #[allow(dead_code)]
-    fn convert_mtef_to_latex(&self, _nodes: &[()]) -> String {
-        "[Formula support disabled - enable 'formula' feature]".to_string()
-    }
-
-    /// Convert OMML XML to LaTeX string
-    #[cfg(all(feature = "docx", feature = "formula"))]
-    #[allow(dead_code)] // Used conditionally based on feature flags
-    fn convert_omml_to_latex(&self, omml_xml: &str) -> String {
-        use litchi_formula::omml_to_latex;
-
-        // Use the high-level conversion function
-        match omml_to_latex(omml_xml) {
-            Ok(latex) => latex,
-            Err(_) => "[Formula conversion error]".to_string(),
-        }
-    }
-
-    /// Convert OMML XML to LaTeX string (fallback when formula feature is disabled)
-    #[cfg(all(feature = "docx", not(feature = "formula")))]
-    #[allow(dead_code)] // Used conditionally based on feature flags
-    fn convert_omml_to_latex(&self, _omml_xml: &str) -> String {
-        "[Formula support disabled - enable 'formula' feature]".to_string()
     }
 
     /// Format a formula with the appropriate delimiters.
@@ -1511,45 +1634,17 @@ impl MarkdownWriter {
         feature = "pages"
     ))]
     fn write_list_item(&mut self, _para: &Paragraph, list_info: &ListItemInfo) -> Result<()> {
-        // Add indentation for nested lists
-        let indent = " ".repeat(list_info.level * self.options.list_indent);
-
-        // Generate the appropriate marker
-        let marker = match list_info.list_type {
-            ListType::Ordered => {
-                // For ordered lists, we need to determine the number
-                // For now, use a simple approach - in a real implementation
-                // we'd track list state across paragraphs
-                if list_info.marker.contains('.') {
-                    // Keep "1." as is
-                    list_info.marker.clone()
-                } else {
-                    // Convert "1)" or "(1)" to "1." for markdown
-                    if list_info.marker.starts_with('(') && list_info.marker.ends_with(')') {
-                        // Extract number from (1) -> 1.
-                        let inner = &list_info.marker[1..list_info.marker.len() - 1];
-                        format!("{}.", inner)
-                    } else {
-                        // Convert "1)" to "1."
-                        list_info.marker.replace(')', ".")
-                    }
-                }
-            },
-            ListType::Unordered => "-".to_string(),
-        };
-
-        // Write the list item
-        write!(self.buffer, "{}{} ", indent, marker).map_err(|e| Error::Other(e.to_string()))?;
+        self.write_list_prefix(list_info)?;
 
         // Write the content with styles if enabled
         if self.options.include_styles && !list_info.content.trim().is_empty() {
             // For styled content, we need to skip the marker part and write the remaining runs
             // This is a simplified approach - in practice, we'd need more sophisticated
             // parsing to handle cases where the marker spans multiple runs
-            self.buffer.push_str(&list_info.content);
+            self.write_literal(&list_info.content);
         } else {
             // Write the content directly
-            self.buffer.push_str(&list_info.content);
+            self.write_literal(&list_info.content);
         }
 
         Ok(())
@@ -1593,33 +1688,13 @@ impl MarkdownWriter {
         feature = "pages"
     ))]
     fn write_list_item_from_runs(&mut self, runs: &[Run], list_info: &ListItemInfo) -> Result<()> {
-        // Add indentation for nested lists
-        let indent = " ".repeat(list_info.level * self.options.list_indent);
-
-        // Generate the appropriate marker
-        let marker = match list_info.list_type {
-            ListType::Ordered => {
-                // Normalize to markdown style "1."
-                if list_info.marker.contains('.') {
-                    list_info.marker.clone()
-                } else if list_info.marker.starts_with('(') && list_info.marker.ends_with(')') {
-                    let inner = &list_info.marker[1..list_info.marker.len() - 1];
-                    format!("{}.", inner)
-                } else {
-                    list_info.marker.replace(')', ".")
-                }
-            },
-            ListType::Unordered => "-".to_string(),
-        };
-
-        // Write the list item marker
-        write!(self.buffer, "{}{} ", indent, marker).map_err(|e| Error::Other(e.to_string()))?;
+        self.write_list_prefix(list_info)?;
 
         // Write runs, skipping the list marker portion
         // This is a simplified approach - we write all runs with their formatting
         // A more sophisticated implementation would skip the marker text in the first run
         let mut accumulated_len = 0;
-        let marker_end_pos = list_info.marker.len() + 1; // marker + space
+        let marker_end_pos = list_info.content_start;
 
         for run in runs {
             // OPTIMIZATION: Get text first to check if we need to skip/process this run
@@ -1637,11 +1712,13 @@ impl MarkdownWriter {
             if accumulated_len < marker_end_pos && accumulated_len + run_len > marker_end_pos {
                 let skip_chars = marker_end_pos - accumulated_len;
                 // Write the portion after the marker
-                let text_after_marker = &run_text[skip_chars..];
+                let text_after_marker = run_text.get(skip_chars..).ok_or_else(|| {
+                    Error::ParseError("list marker splits a UTF-8 code point".to_owned())
+                })?;
 
                 // Create a temporary run-like structure with the remaining text
                 // For now, just write the text - ideally we'd preserve formatting
-                self.buffer.push_str(text_after_marker);
+                self.write_literal(text_after_marker);
                 accumulated_len += run_len;
             } else {
                 // Write the entire run with formatting
@@ -1651,5 +1728,111 @@ impl MarkdownWriter {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(all(test, feature = "docx"))]
+mod tests {
+    use super::{ListItemInfo, ListOrigin, ListType, MarkdownWriter};
+    use crate::document::Paragraph;
+    use litchi_markdown::{MarkdownOptions, ToMarkdown};
+
+    fn paragraph(properties: &str, text: &str) -> Paragraph {
+        Paragraph::Docx(crate::docx::Paragraph::new(
+            format!(
+                r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pPr>{properties}</w:pPr><w:r><w:t>{text}</w:t></w:r></w:p>"#
+            )
+            .into_bytes(),
+        ))
+    }
+
+    #[test]
+    fn golden_heading_uses_style_and_escapes_literal_markdown() -> litchi_core::Result<()> {
+        let paragraph = paragraph(r#"<w:pStyle w:val="Heading3"/>"#, "A *literal* [title]");
+        assert_eq!(paragraph.to_markdown()?, "### A \\*literal\\* \\[title\\]");
+        Ok(())
+    }
+
+    #[test]
+    fn literal_number_prefix_is_not_guessed_as_docx_numbering() -> litchi_core::Result<()> {
+        let literal = paragraph("", "1. not a semantic list");
+        assert_eq!(literal.to_markdown()?, "1\\. not a semantic list");
+        Ok(())
+    }
+
+    fn assert_unresolved_numbering_refused(num_id: u32) {
+        let properties =
+            format!(r#"<w:numPr><w:ilvl w:val="2"/><w:numId w:val="{num_id}"/></w:numPr>"#);
+        let paragraph = paragraph(&properties, "item");
+        assert!(matches!(
+            paragraph.to_markdown(),
+            Err(litchi_core::Error::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn bullet_numbering_without_package_definitions_is_refused() {
+        assert_unresolved_numbering_refused(7);
+    }
+
+    #[test]
+    fn ordered_numbering_without_package_definitions_is_refused() {
+        assert_unresolved_numbering_refused(8);
+    }
+
+    #[test]
+    fn unknown_numbering_without_package_definitions_is_refused() {
+        assert_unresolved_numbering_refused(4_294_967_295);
+    }
+
+    #[test]
+    fn zero_list_indent_is_safe_for_textual_fallback() -> litchi_core::Result<()> {
+        let mut writer = MarkdownWriter::new(MarkdownOptions::new().with_list_indent(0));
+        let item = ListItemInfo {
+            list_type: ListType::Unordered,
+            level: 4,
+            marker: "•".to_owned(),
+            content: "item".to_owned(),
+            content_start: 0,
+            origin: ListOrigin::Text,
+        };
+        writer.write_list_prefix(&item)?;
+        writer.write_literal(&item.content);
+        assert_eq!(writer.finish(), "- item");
+        Ok(())
+    }
+
+    #[test]
+    fn textual_fallback_tracks_multibyte_prefix_boundaries() {
+        let writer = MarkdownWriter::new(MarkdownOptions::new());
+        let Some(info) = writer.detect_list_item("\u{2003}• text") else {
+            panic!("textual bullet should be recognized");
+        };
+        assert_eq!(info.content, "text");
+        assert_eq!("\u{2003}• text".get(info.content_start..), Some("text"));
+        assert!("\u{2003}• text".is_char_boundary(info.content_start));
+    }
+
+    #[cfg(feature = "formula")]
+    #[test]
+    fn formula_conversion_failure_is_propagated() {
+        let paragraph = Paragraph::Docx(crate::docx::Paragraph::new(
+            br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath/></w:p>"#.to_vec(),
+        ));
+        assert!(paragraph.to_markdown().is_err());
+    }
+
+    #[test]
+    fn html_script_text_is_entity_and_markdown_escaped() {
+        let mut writer = MarkdownWriter::new(MarkdownOptions::new());
+        writer.write_html_literal("<&> *");
+        assert_eq!(writer.finish(), "&lt;&amp;&gt; \\*");
+    }
+
+    #[test]
+    fn markdown_table_text_escapes_ampersands_and_normalizes_crlf() {
+        let mut output = String::new();
+        MarkdownWriter::escape_markdown_to_buffer(&mut output, "&copy;\r\nnext");
+        assert_eq!(output, "\\&copy; next");
     }
 }

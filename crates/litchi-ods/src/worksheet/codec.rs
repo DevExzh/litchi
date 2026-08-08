@@ -14,12 +14,15 @@ use std::{fmt::Write as _, num::NonZeroUsize};
 pub(crate) const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 pub(crate) const TABLE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 pub(crate) const TEXT_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const MAX_XML_DEPTH: usize = 1_024;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Kind {
     Root,
     Body,
     Spreadsheet,
+    DdeLink,
+    DdeCache,
     Table,
     Row,
     Cell,
@@ -208,12 +211,23 @@ struct OpenCell {
 
 /// Parse all direct spreadsheet tables from an ODS content part.
 pub(crate) fn parse(xml: &str) -> Result<Vec<Sheet>> {
+    parse_impl(xml, true)
+}
+
+/// Parse flat spreadsheet tables while retaining duplicate names for
+/// selector-time ambiguity reporting.
+pub(crate) fn parse_flat(xml: &str) -> Result<Vec<Sheet>> {
+    parse_impl(xml, false)
+}
+
+fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
     validation::validate_content_xml_size(xml)?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut stack = Vec::<Kind>::new();
+    let mut dde_cache_depth = None;
     let mut sheets = Vec::new();
     let mut current_sheet: Option<Sheet> = None;
     let mut current_row: Option<Row> = None;
@@ -227,11 +241,27 @@ pub(crate) fn parse(xml: &str) -> Result<Vec<Sheet>> {
         let event = event.into_owned();
         match event {
             Event::Start(element) => {
+                if stack.len() >= MAX_XML_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODS worksheet XML nesting exceeds {MAX_XML_DEPTH} elements"
+                    )));
+                }
                 let local = element.local_name();
-                let kind = classify(namespace, local.as_ref());
+                let mut kind = classify(namespace, local.as_ref());
+                if dde_cache_depth.is_some() {
+                    kind = Kind::Other;
+                } else if kind == Kind::Table && stack.last() == Some(&Kind::DdeLink) {
+                    kind = Kind::DdeCache;
+                    dde_cache_depth = Some(stack.len() + 1);
+                }
                 match kind {
                     Kind::Root => {},
-                    Kind::Body | Kind::Spreadsheet | Kind::Other | Kind::Text => {},
+                    Kind::Body
+                    | Kind::Spreadsheet
+                    | Kind::DdeLink
+                    | Kind::DdeCache
+                    | Kind::Other
+                    | Kind::Text => {},
                     Kind::Table => {
                         if stack.last() != Some(&Kind::Spreadsheet) {
                             return Err(Error::InvalidFormat(
@@ -289,8 +319,18 @@ pub(crate) fn parse(xml: &str) -> Result<Vec<Sheet>> {
                 stack.push(kind);
             },
             Event::Empty(element) => {
+                if stack.len() >= MAX_XML_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODS worksheet XML nesting exceeds {MAX_XML_DEPTH} elements"
+                    )));
+                }
                 let local = element.local_name();
-                let kind = classify(namespace, local.as_ref());
+                let mut kind = classify(namespace, local.as_ref());
+                if dde_cache_depth.is_some() {
+                    kind = Kind::Other;
+                } else if kind == Kind::Table && stack.last() == Some(&Kind::DdeLink) {
+                    kind = Kind::DdeCache;
+                }
                 match kind {
                     Kind::Table => {
                         if stack.last() != Some(&Kind::Spreadsheet) {
@@ -370,6 +410,9 @@ pub(crate) fn parse(xml: &str) -> Result<Vec<Sheet>> {
                 let kind = stack.pop().ok_or_else(|| {
                     Error::InvalidFormat("ODS XML element stack underflow".to_string())
                 })?;
+                if kind == Kind::DdeCache {
+                    dde_cache_depth = None;
+                }
                 if kind == Kind::Text && current_cell.is_some() {
                     current_cell.as_mut().expect("cell is present").text_depth = current_cell
                         .as_ref()
@@ -428,8 +471,74 @@ pub(crate) fn parse(xml: &str) -> Result<Vec<Sheet>> {
             "ODS content ended with an unfinished worksheet object".to_string(),
         ));
     }
-    validation::validate_sheets(&sheets)?;
+    if require_unique_names {
+        validation::validate_sheets(&sheets)?;
+    } else {
+        if sheets.len() > validation::MAX_PHYSICAL_RUNS {
+            return Err(Error::InvalidFormat(format!(
+                "ODS sheet count exceeds the {} safety limit",
+                validation::MAX_PHYSICAL_RUNS
+            )));
+        }
+        for sheet in &sheets {
+            validation::validate_sheet(sheet)?;
+        }
+    }
     Ok(sheets)
+}
+
+#[cfg(test)]
+mod bounded_depth_tests {
+    use super::{MAX_XML_DEPTH, parse};
+
+    const PREFIX: &str = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:x="urn:litchi:test"><office:body><office:spreadsheet>"#;
+    const SUFFIX: &str = "</office:spreadsheet></office:body></office:document-content>";
+
+    fn nested_unknown(total_depth: usize) -> String {
+        let nested = total_depth - 3;
+        let mut xml = String::with_capacity(PREFIX.len() + SUFFIX.len() + nested * 7);
+        xml.push_str(PREFIX);
+        for _ in 0..nested {
+            xml.push_str("<x:n>");
+        }
+        for _ in 0..nested {
+            xml.push_str("</x:n>");
+        }
+        xml.push_str(SUFFIX);
+        xml
+    }
+
+    fn nested_dde_cache(total_depth: usize) -> String {
+        const CACHE_PREFIX: &str = "<table:dde-links><table:dde-link><office:dde-source office:dde-application=\"app\" office:dde-topic=\"topic\" office:dde-item=\"item\"/><table:table>";
+        const CACHE_SUFFIX: &str = "</table:table></table:dde-link></table:dde-links>";
+        let nested = total_depth - 6;
+        let mut xml = String::with_capacity(
+            PREFIX.len() + CACHE_PREFIX.len() + CACHE_SUFFIX.len() + SUFFIX.len() + nested * 7,
+        );
+        xml.push_str(PREFIX);
+        xml.push_str(CACHE_PREFIX);
+        for _ in 0..nested {
+            xml.push_str("<x:n>");
+        }
+        for _ in 0..nested {
+            xml.push_str("</x:n>");
+        }
+        xml.push_str(CACHE_SUFFIX);
+        xml.push_str(SUFFIX);
+        xml
+    }
+
+    #[test]
+    fn accepts_exact_depth_and_rejects_next_depth_outside_dde() {
+        assert!(parse(&nested_unknown(MAX_XML_DEPTH)).is_ok());
+        assert!(parse(&nested_unknown(MAX_XML_DEPTH + 1)).is_err());
+    }
+
+    #[test]
+    fn accepts_exact_depth_and_rejects_next_depth_inside_inert_dde_cache() {
+        assert!(parse(&nested_dde_cache(MAX_XML_DEPTH)).is_ok());
+        assert!(parse(&nested_dde_cache(MAX_XML_DEPTH + 1)).is_err());
+    }
 }
 
 fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
@@ -454,6 +563,8 @@ fn classify(namespace: NamespaceKind, local: &[u8]) -> Kind {
         Kind::Body
     } else if namespace == NamespaceKind::Office && local == b"spreadsheet" {
         Kind::Spreadsheet
+    } else if namespace == NamespaceKind::Table && local == b"dde-link" {
+        Kind::DdeLink
     } else if namespace == NamespaceKind::Table && local == b"table" {
         Kind::Table
     } else if namespace == NamespaceKind::Table && local == b"table-row" {
@@ -587,9 +698,220 @@ pub(crate) fn write_sheet(sheet: &Sheet) -> Result<String> {
     Ok(output)
 }
 
+/// Render row fragments under an exact allocation and output byte bound.
+pub(crate) fn write_rows_bounded(rows: &[Row], max_bytes: usize) -> Result<String> {
+    let mut output = String::new();
+    for row in rows {
+        write_row_bounded(&mut output, row, max_bytes)?;
+    }
+    Ok(output)
+}
+
+fn bounded_push(output: &mut String, value: &str, max_bytes: usize) -> Result<()> {
+    let next = output.len().checked_add(value.len()).ok_or_else(|| {
+        Error::InvalidFormat("flat ODS rendered size overflows usize".to_string())
+    })?;
+    if next > max_bytes {
+        return Err(Error::InvalidFormat(format!(
+            "flat ODS rendered rows exceed the {max_bytes} byte limit"
+        )));
+    }
+    output.try_reserve(value.len()).map_err(|_| {
+        Error::InvalidFormat("flat ODS row rendering allocation failed".to_string())
+    })?;
+    output.push_str(value);
+    Ok(())
+}
+
+fn write_row_bounded(output: &mut String, row: &Row, max_bytes: usize) -> Result<()> {
+    validation::validate_cell_runs(&row.cells)?;
+    bounded_push(
+        output,
+        concat!(
+            "<table:table-row xmlns:table=\"",
+            "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
+            "\" xmlns:office=\"",
+            "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
+            "\" xmlns:text=\"",
+            "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
+            "\""
+        ),
+        max_bytes,
+    )?;
+    if row.repeat() > 1 {
+        bounded_push(output, " table:number-rows-repeated=\"", max_bytes)?;
+        bounded_push(output, &row.repeat().to_string(), max_bytes)?;
+        bounded_push(output, "\"", max_bytes)?;
+    }
+    if let Some(value) = &row.style_name {
+        bounded_push(output, " table:style-name=\"", max_bytes)?;
+        bounded_push(output, &escape_xml(value), max_bytes)?;
+        bounded_push(output, "\"", max_bytes)?;
+    }
+    if let Some(value) = &row.default_cell_style_name {
+        bounded_push(output, " table:default-cell-style-name=\"", max_bytes)?;
+        bounded_push(output, &escape_xml(value), max_bytes)?;
+        bounded_push(output, "\"", max_bytes)?;
+    }
+    if row.cells.is_empty() {
+        return bounded_push(output, "/>", max_bytes);
+    }
+    bounded_push(output, ">", max_bytes)?;
+    for cell in &row.cells {
+        write_cell_bounded(output, cell, max_bytes)?;
+    }
+    bounded_push(output, "</table:table-row>", max_bytes)
+}
+
+fn write_cell_bounded(output: &mut String, cell: &Cell, max_bytes: usize) -> Result<()> {
+    validation::validate_cell(cell)?;
+    let covered = matches!(cell.merge, Merge::Covered);
+    bounded_push(
+        output,
+        if covered {
+            "<table:covered-table-cell"
+        } else {
+            "<table:table-cell"
+        },
+        max_bytes,
+    )?;
+    if cell.repeat() > 1 {
+        bounded_push(output, " table:number-columns-repeated=\"", max_bytes)?;
+        bounded_push(output, &cell.repeat().to_string(), max_bytes)?;
+        bounded_push(output, "\"", max_bytes)?;
+    }
+    if let Merge::Span { rows, columns } = cell.merge {
+        bounded_push(output, " table:number-rows-spanned=\"", max_bytes)?;
+        bounded_push(output, &rows.to_string(), max_bytes)?;
+        bounded_push(output, "\" table:number-columns-spanned=\"", max_bytes)?;
+        bounded_push(output, &columns.to_string(), max_bytes)?;
+        bounded_push(output, "\"", max_bytes)?;
+    }
+    if let Some(value) = &cell.formula {
+        bounded_push(output, " table:formula=\"", max_bytes)?;
+        bounded_push(output, &escape_xml(value), max_bytes)?;
+        bounded_push(output, "\"", max_bytes)?;
+    }
+    if let Some(value) = &cell.style_name {
+        bounded_push(output, " table:style-name=\"", max_bytes)?;
+        bounded_push(output, &escape_xml(value), max_bytes)?;
+        bounded_push(output, "\"", max_bytes)?;
+    }
+    if !covered {
+        write_value_attributes_bounded(output, &cell.value, max_bytes)?;
+    }
+    if cell.text.is_empty() && matches!(cell.value, CellValue::Empty) && cell.formula.is_none() {
+        return bounded_push(output, "/>", max_bytes);
+    }
+    bounded_push(output, ">", max_bytes)?;
+    if !cell.text.is_empty() || matches!(cell.value, CellValue::Text(_)) {
+        bounded_push(output, "<text:p>", max_bytes)?;
+        bounded_push(output, &escape_xml(&cell.text), max_bytes)?;
+        bounded_push(output, "</text:p>", max_bytes)?;
+    }
+    bounded_push(
+        output,
+        if covered {
+            "</table:covered-table-cell>"
+        } else {
+            "</table:table-cell>"
+        },
+        max_bytes,
+    )
+}
+
+fn write_value_attributes_bounded(
+    output: &mut String,
+    value: &CellValue,
+    max_bytes: usize,
+) -> Result<()> {
+    match value {
+        CellValue::Empty => Ok(()),
+        CellValue::Text(_) => bounded_push(output, " office:value-type=\"string\"", max_bytes),
+        CellValue::Number(value) => {
+            bounded_push(
+                output,
+                " office:value-type=\"float\" office:value=\"",
+                max_bytes,
+            )?;
+            bounded_push(output, &value.to_string(), max_bytes)?;
+            bounded_push(output, "\"", max_bytes)
+        },
+        CellValue::Currency { value, currency } => {
+            bounded_push(
+                output,
+                " office:value-type=\"currency\" office:value=\"",
+                max_bytes,
+            )?;
+            bounded_push(output, &value.to_string(), max_bytes)?;
+            bounded_push(output, "\" office:currency=\"", max_bytes)?;
+            bounded_push(output, &escape_xml(currency), max_bytes)?;
+            bounded_push(output, "\"", max_bytes)
+        },
+        CellValue::Percentage(value) => {
+            bounded_push(
+                output,
+                " office:value-type=\"percentage\" office:value=\"",
+                max_bytes,
+            )?;
+            bounded_push(output, &value.to_string(), max_bytes)?;
+            bounded_push(output, "\"", max_bytes)
+        },
+        CellValue::Boolean(value) => bounded_push(
+            output,
+            if *value {
+                " office:value-type=\"boolean\" office:boolean-value=\"true\""
+            } else {
+                " office:value-type=\"boolean\" office:boolean-value=\"false\""
+            },
+            max_bytes,
+        ),
+        CellValue::Date(value) => {
+            bounded_push(
+                output,
+                " office:value-type=\"date\" office:date-value=\"",
+                max_bytes,
+            )?;
+            bounded_push(output, &escape_xml(value), max_bytes)?;
+            bounded_push(output, "\"", max_bytes)
+        },
+        CellValue::Time(value) => {
+            bounded_push(
+                output,
+                " office:value-type=\"time\" office:time-value=\"",
+                max_bytes,
+            )?;
+            bounded_push(output, &escape_xml(value), max_bytes)?;
+            bounded_push(output, "\"", max_bytes)
+        },
+        CellValue::Unknown { kind, value } => {
+            bounded_push(output, " office:value-type=\"", max_bytes)?;
+            bounded_push(output, &escape_xml(kind), max_bytes)?;
+            if let Some(value) = value {
+                bounded_push(output, "\" office:value=\"", max_bytes)?;
+                bounded_push(output, &escape_xml(value), max_bytes)?;
+            }
+            bounded_push(output, "\"", max_bytes)
+        },
+    }
+}
+
 fn write_row(output: &mut String, row: &Row) -> Result<()> {
+    write_row_inner(output, row, false)
+}
+
+fn write_row_inner(output: &mut String, row: &Row, bind_namespaces: bool) -> Result<()> {
     validation::validate_cell_runs(&row.cells)?;
     output.push_str("<table:table-row");
+    if bind_namespaces {
+        output.push_str(" xmlns:table=\"");
+        output.push_str(TABLE_NAMESPACE);
+        output.push_str("\" xmlns:office=\"");
+        output.push_str(OFFICE_NAMESPACE);
+        output.push_str("\" xmlns:text=\"");
+        output.push_str(TEXT_NAMESPACE);
+        output.push('"');
+    }
     if row.repeat() > 1 {
         output.push_str(" table:number-rows-repeated=\"");
         write!(output, "{}", row.repeat()).expect("writing a number to String cannot fail");

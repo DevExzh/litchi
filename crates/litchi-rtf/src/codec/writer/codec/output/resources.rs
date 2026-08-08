@@ -36,6 +36,9 @@ impl<W: Write> RtfWriter<W> {
                 FontFamily::Tech => self.write_control_word("ftech", None)?,
                 FontFamily::Nil => self.write_control_word("fnil", None)?,
             }
+            if font.bidi {
+                self.write_control_word("fbidi", None)?;
+            }
 
             // Write charset
             if let Some(charset) = font.charset {

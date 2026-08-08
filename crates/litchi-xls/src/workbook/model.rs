@@ -74,10 +74,11 @@ pub struct Workbook<R: Read + Seek> {
 }
 
 /// Options for opening a legacy XLS workbook.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct OpenOptions<'a> {
     /// Password used for BIFF8 password-to-open encryption.
-    pub password: Option<&'a str>,
+    password: Option<&'a str>,
     /// How non-structural formatting defects are treated.
     ///
     /// Defaults to [`Leniency::Strict`], which rejects any deviation from
@@ -86,7 +87,66 @@ pub struct OpenOptions<'a> {
     /// self-contradictory; everything repaired is then enumerable through
     /// [`Workbook::tolerance_report`]. Structural defects — record framing,
     /// stream grammar, and encryption — remain hard errors either way.
-    pub leniency: Leniency,
+    leniency: Leniency,
+    /// Explicit compatibility profile for precisely scoped producer quirks.
+    ///
+    /// The default is [`crate::CompatibilityProfile::Strict`]. Selecting a
+    /// profile never relaxes low-level codecs or writer validation, and every
+    /// accepted quirk remains available as a typed worksheet diagnostic.
+    compatibility_profile: crate::CompatibilityProfile,
+}
+
+impl<'a> OpenOptions<'a> {
+    /// Construct strict options without a password.
+    pub const fn new() -> Self {
+        Self {
+            password: None,
+            leniency: Leniency::Strict,
+            compatibility_profile: crate::CompatibilityProfile::Strict,
+        }
+    }
+
+    /// Password used for BIFF8 password-to-open encryption.
+    pub const fn password(&self) -> Option<&'a str> {
+        self.password
+    }
+
+    /// Set the optional BIFF8 password-to-open password.
+    pub fn with_password(mut self, password: impl Into<Option<&'a str>>) -> Self {
+        self.password = password.into();
+        self
+    }
+
+    /// Current formatting-defect policy.
+    pub const fn leniency(&self) -> Leniency {
+        self.leniency
+    }
+
+    /// Set the formatting-defect policy.
+    pub const fn with_leniency(mut self, leniency: Leniency) -> Self {
+        self.leniency = leniency;
+        self
+    }
+
+    /// Current explicit workbook compatibility profile.
+    pub const fn compatibility_profile(&self) -> crate::CompatibilityProfile {
+        self.compatibility_profile
+    }
+
+    /// Select an explicit, versioned workbook compatibility profile.
+    pub const fn with_compatibility_profile(
+        mut self,
+        compatibility_profile: crate::CompatibilityProfile,
+    ) -> Self {
+        self.compatibility_profile = compatibility_profile;
+        self
+    }
+}
+
+impl Default for OpenOptions<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<R: Read + Seek> Workbook<R> {

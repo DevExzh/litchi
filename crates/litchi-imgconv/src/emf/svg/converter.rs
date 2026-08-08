@@ -462,11 +462,7 @@ impl<'a> EmfSvgConverter<'a> {
                     let transformed = state
                         .dc
                         .transform_point(state.dc.current_pos.0, state.dc.current_pos.1);
-                    state
-                        .path_builder
-                        .as_mut()
-                        .expect("path state")
-                        .move_to(transformed.0, transformed.1);
+                    active_path(state)?.move_to(transformed.0, transformed.1);
                 }
                 Ok(Vec::new())
             },
@@ -479,7 +475,7 @@ impl<'a> EmfSvgConverter<'a> {
                 let end = state.dc.transform_point(logical_end.0, logical_end.1);
                 state.dc.current_pos = logical_end;
                 if state.in_path {
-                    let builder = state.path_builder.as_mut().expect("path state");
+                    let builder = active_path(state)?;
                     if builder.is_empty() {
                         builder.move_to(start.0, start.1);
                     }
@@ -509,7 +505,7 @@ impl<'a> EmfSvgConverter<'a> {
                 if !state.in_path {
                     return malformed(kind, "CloseFigure outside path bracket");
                 }
-                state.path_builder.as_mut().expect("path state").close();
+                active_path(state)?.close();
                 Ok(Vec::new())
             },
             EmrType::AbortPath => {
@@ -787,7 +783,7 @@ impl<'a> EmfSvgConverter<'a> {
         stroke: bool,
     ) -> Result<Vec<String>> {
         if state.in_path {
-            append_path(state.path_builder.as_mut().expect("path state"), builder);
+            append_path(active_path(state)?, builder);
             Ok(Vec::new())
         } else if state.dc.rop2 == 11 {
             Ok(Vec::new())
@@ -1555,6 +1551,12 @@ fn append_path(target: &mut PathBuilder, source: PathBuilder) {
     target.append(source);
 }
 
+fn active_path(state: &mut RenderState) -> Result<&mut PathBuilder> {
+    state.path_builder.as_mut().ok_or_else(|| {
+        Error::ParseError("EMF path state is inconsistent with an open path bracket".into())
+    })
+}
+
 fn rectangle_path(rect: RectL, dc: &DeviceContext) -> Result<PathBuilder> {
     if rect.left == rect.right || rect.top == rect.bottom {
         return Err(Error::ParseError("empty EMF rectangle".into()));
@@ -2144,7 +2146,10 @@ fn read_u32(data: &[u8], offset: usize, kind: EmrType) -> Result<u32> {
                     .ok_or_else(|| Error::ParseError("field offset overflow".into()))?,
         )
         .ok_or_else(|| Error::ParseError(format!("{} has a truncated u32 field", kind.name())))?;
-    Ok(u32::from_le_bytes(bytes.try_into().expect("four bytes")))
+    let bytes: [u8; 4] = bytes
+        .try_into()
+        .map_err(|_| Error::ParseError(format!("{} has an invalid u32 field", kind.name())))?;
+    Ok(u32::from_le_bytes(bytes))
 }
 fn read_i32(data: &[u8], offset: usize, kind: EmrType) -> Result<i32> {
     Ok(read_u32(data, offset, kind)? as i32)

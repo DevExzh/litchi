@@ -367,8 +367,14 @@ impl<'a> AutoShape<'a> {
     }
 
     /// Set the auto shape type.
-    pub fn set_auto_shape_type(&mut self, auto_shape_type: AutoShapeType) {
+    pub fn set_auto_shape_type(
+        &mut self,
+        auto_shape_type: AutoShapeType,
+    ) -> Result<(), super::shape::MutationError> {
+        self.container
+            .ensure_mutable(super::shape::Mutation::Geometry)?;
         self.auto_shape_type = auto_shape_type;
+        Ok(())
     }
 
     /// Get the adjustment values.
@@ -377,13 +383,22 @@ impl<'a> AutoShape<'a> {
     }
 
     /// Add an adjustment value.
-    pub fn add_adjustment(&mut self, adjustment: i32) {
+    pub fn add_adjustment(&mut self, adjustment: i32) -> Result<(), super::shape::MutationError> {
+        self.container
+            .ensure_mutable(super::shape::Mutation::Geometry)?;
         self.adjustments.push(adjustment);
+        Ok(())
     }
 
     /// Set all adjustment values.
-    pub fn set_adjustments(&mut self, adjustments: Vec<i32>) {
+    pub fn set_adjustments(
+        &mut self,
+        adjustments: Vec<i32>,
+    ) -> Result<(), super::shape::MutationError> {
+        self.container
+            .ensure_mutable(super::shape::Mutation::Geometry)?;
         self.adjustments = adjustments;
+        Ok(())
     }
 
     /// Get the text contained by this shape.
@@ -392,8 +407,16 @@ impl<'a> AutoShape<'a> {
     }
 
     /// Set the text contained by this shape.
-    pub fn set_text(&mut self, text: String) {
-        self.container.set_text(text);
+    pub fn set_text(&mut self, text: String) -> Result<(), super::shape::MutationError> {
+        self.container.set_text(text)
+    }
+
+    pub(crate) fn set_decoded_text(&mut self, text: String) {
+        self.container.set_decoded_text(text);
+    }
+
+    pub(crate) fn mark_source_bound(&mut self) {
+        self.container.mark_source_bound();
     }
 
     /// Return explicit custom/freeform geometry, when the shape defines it.
@@ -437,8 +460,8 @@ where
         &self.container.properties
     }
 
-    fn properties_mut(&mut self) -> &mut ShapeProperties {
-        &mut self.container.properties
+    fn properties_mut(&mut self) -> Result<&mut ShapeProperties, super::shape::MutationError> {
+        self.container.properties_mut_checked()
     }
 
     fn text(&self) -> super::super::package::Result<String> {
@@ -503,9 +526,9 @@ mod tests {
         props.shape_type = ShapeType::AutoShape;
 
         let mut autoshape = AutoShape::new(props, vec![]);
-        autoshape.set_auto_shape_type(AutoShapeType::Oval);
-        autoshape.add_adjustment(1000);
-        autoshape.add_adjustment(2000);
+        assert!(autoshape.set_auto_shape_type(AutoShapeType::Oval).is_ok());
+        assert!(autoshape.add_adjustment(1000).is_ok());
+        assert!(autoshape.add_adjustment(2000).is_ok());
 
         assert_eq!(autoshape.auto_shape_type(), AutoShapeType::Oval);
         assert_eq!(autoshape.adjustments().len(), 2);
@@ -521,13 +544,21 @@ mod tests {
 
         // Test basic shape
         let mut basic_shape = AutoShape::new(props.clone(), vec![]);
-        basic_shape.set_auto_shape_type(AutoShapeType::Rectangle);
+        assert!(
+            basic_shape
+                .set_auto_shape_type(AutoShapeType::Rectangle)
+                .is_ok()
+        );
         assert!(basic_shape.is_basic_shape());
         assert!(!basic_shape.is_complex_shape());
 
         // Test complex shape
         let mut complex_shape = AutoShape::new(props, vec![]);
-        complex_shape.set_auto_shape_type(AutoShapeType::Star);
+        assert!(
+            complex_shape
+                .set_auto_shape_type(AutoShapeType::Star)
+                .is_ok()
+        );
         assert!(!complex_shape.is_basic_shape());
         assert!(complex_shape.is_complex_shape());
     }
@@ -546,5 +577,33 @@ mod tests {
 
         assert_eq!(autoshape.auto_shape_type(), AutoShapeType::Arrow);
         assert_eq!(autoshape.adjustments(), &[25, 0, 75]);
+    }
+
+    #[test]
+    fn source_bound_autoshape_setters_are_atomic() {
+        let mut autoshape = AutoShape::new(ShapeProperties::default(), Vec::new());
+        let before_type = autoshape.auto_shape_type();
+        let before_adjustments = autoshape.adjustments().to_vec();
+        let before_text = autoshape.text().to_owned();
+        autoshape.mark_source_bound();
+        let geometry_error = Err(super::super::shape::MutationError::SourceBound {
+            mutation: super::super::shape::Mutation::Geometry,
+        });
+
+        assert_eq!(
+            autoshape.set_auto_shape_type(AutoShapeType::Oval),
+            geometry_error
+        );
+        assert_eq!(autoshape.add_adjustment(10), geometry_error);
+        assert_eq!(autoshape.set_adjustments(vec![20, 30]), geometry_error);
+        assert_eq!(
+            autoshape.set_text("changed".to_owned()),
+            Err(super::super::shape::MutationError::SourceBound {
+                mutation: super::super::shape::Mutation::Text,
+            })
+        );
+        assert_eq!(autoshape.auto_shape_type(), before_type);
+        assert_eq!(autoshape.adjustments(), before_adjustments);
+        assert_eq!(autoshape.text(), before_text);
     }
 }

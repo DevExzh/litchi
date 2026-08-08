@@ -1,11 +1,12 @@
 //! Main Presentation structure and implementation.
 
 use crate::codec::Parser;
-use crate::core::family::Package;
+use crate::core::{OwnedPackage, family::Package};
 use crate::model::{Reference, Settings, Slide, declaration, page_layout, page_metadata, settings};
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::constants::ODF_PRESENTATION;
 use std::path::Path;
+use std::sync::Arc;
 
 const BODY_MARKER: &str = "<office:presentation";
 
@@ -97,6 +98,18 @@ impl Presentation {
             .map(|package| Self { package })
     }
 
+    /// Create a presentation while sharing an existing archive allocation.
+    pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
+        Package::from_shared_bytes(bytes, ODF_PRESENTATION, BODY_MARKER, "ODP")
+            .map(|package| Self { package })
+    }
+
+    /// Adopt an already validated archive without copying its package bytes.
+    pub(crate) fn from_owned_package(package: OwnedPackage) -> Result<Self> {
+        Package::from_owned_package(package, ODF_PRESENTATION, BODY_MARKER, "ODP")
+            .map(|package| Self { package })
+    }
+
     /// Create a presentation from password-encrypted ODP bytes.
     pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
         Package::from_bytes_with_password(bytes, password, ODF_PRESENTATION, BODY_MARKER, "ODP")
@@ -146,7 +159,7 @@ impl Presentation {
 
     /// Borrow the validated archive for package-level snapshot edits within
     /// the crate's semantic owner modules.
-    pub(crate) fn owned_package(&self) -> &crate::core::OwnedPackage {
+    pub(crate) fn owned_package(&self) -> &OwnedPackage {
         self.package.package()
     }
 
@@ -242,7 +255,66 @@ impl Presentation {
         }
     }
 
+    /// Inspect named drawing fill-image resources without resolving style use sites.
+    pub fn drawing_fill_images(
+        &self,
+    ) -> Result<litchi_odf_common::drawing::resources::fill_image::Collection> {
+        self.package.styles_xml().map_or_else(
+            || Ok(Default::default()),
+            litchi_odf_common::drawing::resources::fill_image::parse_drawing_fill_images,
+        )
+    }
+
     /// Inspect named legacy and SVG drawing gradients without resolving style use sites.
+    pub fn drawing_gradients(
+        &self,
+    ) -> Result<litchi_odf_common::drawing::resources::gradient::Collection> {
+        self.package.styles_xml().map_or_else(
+            || Ok(Default::default()),
+            litchi_odf_common::drawing::resources::gradient::parse_drawing_gradients,
+        )
+    }
+
+    /// Inspect named drawing hatch resources without resolving style use sites.
+    pub fn drawing_hatches(
+        &self,
+    ) -> Result<litchi_odf_common::drawing::resources::hatch::Collection> {
+        self.package.styles_xml().map_or_else(
+            || Ok(Default::default()),
+            litchi_odf_common::drawing::resources::hatch::parse_drawing_hatches,
+        )
+    }
+
+    /// Inspect named drawing marker resources without resolving style use sites.
+    pub fn drawing_markers(
+        &self,
+    ) -> Result<litchi_odf_common::drawing::resources::marker::Collection> {
+        self.package.styles_xml().map_or_else(
+            || Ok(Default::default()),
+            litchi_odf_common::drawing::resources::marker::parse_drawing_markers,
+        )
+    }
+
+    /// Inspect named drawing opacity resources without resolving style use sites.
+    pub fn drawing_opacities(
+        &self,
+    ) -> Result<litchi_odf_common::drawing::resources::opacity::Collection> {
+        self.package.styles_xml().map_or_else(
+            || Ok(Default::default()),
+            litchi_odf_common::drawing::resources::opacity::parse_drawing_opacities,
+        )
+    }
+
+    /// Inspect named drawing stroke-dash resources without resolving style use sites.
+    pub fn drawing_stroke_dashes(
+        &self,
+    ) -> Result<litchi_odf_common::drawing::resources::stroke_dash::Collection> {
+        self.package.styles_xml().map_or_else(
+            || Ok(Default::default()),
+            litchi_odf_common::drawing::resources::stroke_dash::parse_drawing_stroke_dashes,
+        )
+    }
+
     /// Get a slide by index.
     ///
     /// Returns `Some(slide)` if a slide exists at the given index, `None` otherwise.
@@ -365,9 +437,17 @@ impl Presentation {
     }
 
     /// Get the complete format-specific `OpenDocument` metadata model.
-    // Note: For presentation modification operations, see `MutablePresentation` which provides
-    // full CRUD operations on slides and shapes including add/remove/update slides, add/remove
-    // shapes, and clear operations.
+    /// Create an immutable, source-bound editing snapshot.
+    ///
+    /// Transactions never mutate this presentation. Publication returns a new
+    /// snapshot and an exact-source-checked reversible patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the retained package exceeds editing limits or cannot be reparsed.
+    pub fn snapshot(&self) -> Result<crate::edit::Snapshot> {
+        crate::edit::Snapshot::from_shared_bytes(self.package.shared_bytes())
+    }
 
     /// Save the presentation to a new file.
     ///
@@ -391,9 +471,8 @@ impl Presentation {
     ///
     /// # Note
     ///
-    /// Full presentation modification support is planned for future releases. For now,
-    /// to modify a presentation, use `Builder` to create a new one with
-    /// the desired content.
+    /// Use [`Self::snapshot`] for source-checked edits, or [`crate::Builder`]
+    /// for detached construction.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let bytes = self.to_bytes()?;
         std::fs::write(path, bytes)?;
@@ -418,10 +497,4 @@ impl Presentation {
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         Ok(self.package.as_bytes().to_vec())
     }
-
-    // Note: DELETE operations are available via `MutablePresentation`. To modify this presentation:
-    //   1. Convert: `let mut mutable = MutablePresentation::from_presentation(presentation)?`
-    //   2. Modify: `mutable.remove_slide(0)?`, `mutable.add_shape(0, shape)?`, etc.
-    //   3. Save: `mutable.save("output.odp")?`
-    // Available methods: remove_slide, remove_shape, update_slide, clear_slide, clear_slides, etc.
 }

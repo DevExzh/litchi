@@ -42,6 +42,7 @@
     "litchi-core": [],
     "litchi-crypto": [
       "litchi-cfb",
+      "litchi-core",
       "litchi-ole-common"
     ],
     "litchi-doc": [
@@ -223,6 +224,7 @@
     ],
     "litchi-ooxml-common": [
       "litchi-core",
+      "litchi-crypto",
       "litchi-opc",
       "litchi-vba"
     ],
@@ -250,6 +252,7 @@
       "litchi-codepage",
       "litchi-core",
       "litchi-crypto",
+      "litchi-fonts",
       "litchi-formula",
       "litchi-odraw",
       "litchi-ograph",
@@ -259,6 +262,7 @@
       "litchi-vba"
     ],
     "litchi-pptx": [
+      "litchi-crypto",
       "litchi-drawingml",
       "litchi-fonts",
       "litchi-ooxml-common",
@@ -317,6 +321,7 @@
     ],
     "litchi-xlsx": [
       "litchi-core",
+      "litchi-crypto",
       "litchi-drawingml",
       "litchi-ooxml-common",
       "litchi-opc",
@@ -325,7 +330,10 @@
       "litchi-vba"
     ],
     "soapberry-zip": [],
-    "xml-minifier": []
+    "xml-minifier": [
+      "xml-minifier-macros"
+    ],
+    "xml-minifier-macros": []
   },
   "migration_hosts": [],
   "migration_debt": [],

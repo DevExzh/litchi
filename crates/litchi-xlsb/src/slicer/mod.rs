@@ -8,6 +8,7 @@
 mod codec;
 mod model;
 pub mod package;
+pub(crate) mod transaction;
 mod validation;
 
 #[cfg(test)]
@@ -18,3 +19,4 @@ pub use model::{
     Cache, CrossFilter, Item, Native, Olap, PivotTable, SortOrder, Source, Table, View, Views,
 };
 pub use package::{CachePart, ViewPart};
+pub use transaction::{Commit, Content, Patch, Snapshot, Transaction};

@@ -50,7 +50,7 @@ pub mod shape_enum;
 pub mod textbox;
 
 // Re-export the trait and type
-pub use shape::{Shape, ShapeType};
+pub use shape::{Mutation, MutationError, Shape, ShapeType};
 
 // Re-export the high-performance enum
 pub use shape_enum::ShapeEnum;

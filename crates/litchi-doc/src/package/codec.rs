@@ -1,11 +1,11 @@
-use super::model::{Error, OpenOptions, Package, Result};
+use super::model::{Error, Limits, OpenOptions, Package, ResourceKind, ResourceLimit, Result};
 use crate::document::Document;
 use litchi_cfb::{OleError, OleFile};
 use litchi_ole_common::property_set::{
     PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
 use std::fs::File;
-use std::io::{Read, Seek, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 impl Package<File> {
@@ -24,8 +24,13 @@ impl Package<File> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Self::open_with_limits(path, Limits::default())
+    }
+
+    /// Open a `.doc` package with explicit finite read limits.
+    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: Limits) -> Result<Self> {
         let file = File::open(path)?;
-        Package::from_reader(file)
+        Package::from_reader_with_limits(file, limits)
     }
 }
 
@@ -47,6 +52,12 @@ impl<R: Read + Seek> Package<R> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_reader(reader: R) -> Result<Self> {
+        Self::from_reader_with_limits(reader, Limits::default())
+    }
+
+    /// Create a package whose document reads inherit explicit finite limits.
+    pub fn from_reader_with_limits(mut reader: R, limits: Limits) -> Result<Self> {
+        preflight_source_len(&mut reader, limits)?;
         let ole = OleFile::open(reader)?;
 
         // Verify it's a Word document by checking for the WordDocument stream
@@ -56,7 +67,7 @@ impl<R: Read + Seek> Package<R> {
             ));
         }
 
-        Ok(Self { ole })
+        Ok(Self { ole, limits })
     }
 
     /// Create a Package from an already-parsed OLE file.
@@ -81,6 +92,12 @@ impl<R: Read + Seek> Package<R> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn from_ole_file(ole: OleFile<R>) -> Result<Self> {
+        Self::from_ole_file_with_limits(ole, Limits::default())
+    }
+
+    /// Wrap an already-parsed OLE file with explicit document-read limits.
+    pub fn from_ole_file_with_limits(ole: OleFile<R>, limits: Limits) -> Result<Self> {
+        validate_package_size(ole.file_size(), limits)?;
         // Verify it's a Word document by checking for the WordDocument stream
         if !ole.exists(&["WordDocument"]) {
             return Err(Error::InvalidFormat(
@@ -88,7 +105,7 @@ impl<R: Read + Seek> Package<R> {
             ));
         }
 
-        Ok(Self { ole })
+        Ok(Self { ole, limits })
     }
 
     /// Get the main document.
@@ -106,12 +123,35 @@ impl<R: Read + Seek> Package<R> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn document(&mut self) -> Result<Document> {
-        Document::from_ole(&mut self.ole)
+        Document::from_ole_with_limits(&mut self.ole, self.limits)
     }
 
     /// Get the main document using explicit password-to-open options.
     pub fn document_with_options(&mut self, options: OpenOptions<'_>) -> Result<Document> {
-        Document::from_ole_with_options(&mut self.ole, options)
+        Document::from_ole_with_options(&mut self.ole, options, self.limits)
+    }
+
+    /// Open the document with explicit limits and no password.
+    pub fn document_with_limits(&mut self, limits: Limits) -> Result<Document> {
+        Document::from_ole_with_options(
+            &mut self.ole,
+            OpenOptions::default(),
+            limits.constrained_by(self.limits),
+        )
+    }
+
+    /// Open the document with password/leniency options and explicit limits.
+    pub fn document_with_options_and_limits(
+        &mut self,
+        options: OpenOptions<'_>,
+        limits: Limits,
+    ) -> Result<Document> {
+        Document::from_ole_with_options(&mut self.ole, options, limits.constrained_by(self.limits))
+    }
+
+    /// Limits inherited by [`Self::document`].
+    pub const fn limits(&self) -> Limits {
+        self.limits
     }
 
     /// Inspect the package's typed MS-OFFCRYPTO DataSpaces graph.
@@ -285,4 +325,52 @@ impl<R: Read + Seek> Package<R> {
             limits,
         )
     }
+}
+
+fn preflight_source_len<R: Read + Seek>(reader: &mut R, limits: Limits) -> Result<()> {
+    let original_position = reader.stream_position()?;
+    match reader.seek(SeekFrom::End(0)) {
+        Ok(source_len) => {
+            reader.seek(SeekFrom::Start(original_position))?;
+            validate_package_size(source_len, limits)
+        },
+        Err(_seek_error) => {
+            reader.seek(SeekFrom::Start(0))?;
+            let maximum = u64::try_from(limits.max_package_bytes()).unwrap_or(u64::MAX);
+            let probe_len = maximum.saturating_add(1);
+            let mut observed = 0u64;
+            let mut buffer = [0u8; 8192];
+            let count_result = (|| -> std::io::Result<()> {
+                while observed < probe_len {
+                    let remaining = probe_len - observed;
+                    let request = usize::try_from(remaining)
+                        .unwrap_or(usize::MAX)
+                        .min(buffer.len());
+                    let read = reader.read(&mut buffer[..request])?;
+                    if read == 0 {
+                        break;
+                    }
+                    observed = observed.saturating_add(u64::try_from(read).unwrap_or(u64::MAX));
+                }
+                Ok(())
+            })();
+            let restore_result = reader.seek(SeekFrom::Start(original_position));
+            count_result?;
+            restore_result?;
+            validate_package_size(observed, limits)
+        },
+    }
+}
+
+fn validate_package_size(actual: u64, limits: Limits) -> Result<()> {
+    let maximum = u64::try_from(limits.max_package_bytes()).unwrap_or(u64::MAX);
+    if actual > maximum {
+        return Err(Error::ResourceLimit(ResourceLimit::new(
+            ResourceKind::Package,
+            actual,
+            maximum,
+            None,
+        )));
+    }
+    Ok(())
 }

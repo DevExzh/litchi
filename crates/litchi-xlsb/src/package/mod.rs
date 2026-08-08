@@ -8,6 +8,7 @@
 use std::io::{Read, Write};
 use std::path::Path;
 
+use litchi_core::sheet::WorkbookTrait;
 use litchi_opc::{OpcPackage, PackageWriter, ReadLimits};
 
 use crate::Workbook;
@@ -42,6 +43,7 @@ pub mod formula;
 pub(crate) mod frt;
 #[path = "../host/named_ranges.rs"]
 pub mod named_ranges;
+pub(crate) mod owner_transaction;
 #[path = "../host/pivot/mod.rs"]
 pub mod pivot;
 #[path = "../host/pivot_tables.rs"]
@@ -97,6 +99,109 @@ impl Package {
         let mut bytes = std::io::Cursor::new(Vec::new());
         writer.save(&mut bytes)?;
         Self::from_bytes(bytes.into_inner())
+    }
+
+    /// Read workbook slicer caches as an immutable, source-bound snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the slicer owner or its dependency closure is invalid.
+    pub fn slicer_caches(&self) -> Result<crate::slicer::Snapshot> {
+        crate::slicer::transaction::read_caches(&self.0, &self.workbook_uri()?)
+    }
+
+    /// Read worksheet slicer views by checked zero-based worksheet position.
+    ///
+    /// `Ok(None)` means the worksheet selector did not resolve. An existing
+    /// worksheet always returns a snapshot, including when it has no view part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when workbook resolution or the slicer owner is invalid.
+    pub fn slicer_views(&self, worksheet_index: usize) -> Result<Option<crate::slicer::Snapshot>> {
+        let Some(worksheet_uri) = self.worksheet_uri(worksheet_index)? else {
+            return Ok(None);
+        };
+        crate::slicer::transaction::read_views(&self.0, &worksheet_uri).map(Some)
+    }
+
+    /// Read worksheet slicer views by exact worksheet name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when workbook resolution or the slicer owner is invalid.
+    pub fn slicer_views_by_name(
+        &self,
+        worksheet_name: &str,
+    ) -> Result<Option<crate::slicer::Snapshot>> {
+        let Some(worksheet_uri) = self.worksheet_uri_by_name(worksheet_name)? else {
+            return Ok(None);
+        };
+        crate::slicer::transaction::read_views(&self.0, &worksheet_uri).map(Some)
+    }
+
+    /// Apply a source-checked slicer patch and return a new package snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the patch is stale or its exact readback fails.
+    pub fn apply_slicer_patch(&self, patch: &crate::slicer::Patch) -> Result<Self> {
+        let mut candidate = self.0.clone();
+        crate::slicer::transaction::apply(&mut candidate, patch)?;
+        Self::from_opc(candidate)
+    }
+
+    /// Read workbook timeline caches as an immutable, source-bound snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the timeline owner or its dependency closure is invalid.
+    pub fn timeline_caches(&self) -> Result<crate::timeline::Snapshot> {
+        crate::timeline::transaction::read_caches(&self.0, &self.workbook_uri()?)
+    }
+
+    /// Read worksheet timeline views by checked zero-based worksheet position.
+    ///
+    /// `Ok(None)` means the worksheet selector did not resolve. An existing
+    /// worksheet always returns a snapshot, including when it has no view part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when workbook resolution or the timeline owner is invalid.
+    pub fn timeline_views(
+        &self,
+        worksheet_index: usize,
+    ) -> Result<Option<crate::timeline::Snapshot>> {
+        let Some(worksheet_uri) = self.worksheet_uri(worksheet_index)? else {
+            return Ok(None);
+        };
+        crate::timeline::transaction::read_views(&self.0, &worksheet_uri).map(Some)
+    }
+
+    /// Read worksheet timeline views by exact worksheet name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when workbook resolution or the timeline owner is invalid.
+    pub fn timeline_views_by_name(
+        &self,
+        worksheet_name: &str,
+    ) -> Result<Option<crate::timeline::Snapshot>> {
+        let Some(worksheet_uri) = self.worksheet_uri_by_name(worksheet_name)? else {
+            return Ok(None);
+        };
+        crate::timeline::transaction::read_views(&self.0, &worksheet_uri).map(Some)
+    }
+
+    /// Apply a source-checked timeline patch and return a new package snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the patch is stale or its exact readback fails.
+    pub fn apply_timeline_patch(&self, patch: &crate::timeline::Patch) -> Result<Self> {
+        let mut candidate = self.0.clone();
+        crate::timeline::transaction::apply(&mut candidate, patch)?;
+        Self::from_opc(candidate)
     }
 
     /// Open and validate an XLSB package from a filesystem path.
@@ -182,6 +287,30 @@ impl Package {
     /// Atomically save the validated package to a filesystem path.
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
         Ok(PackageWriter::write(path, &self.0)?)
+    }
+
+    fn worksheet_uri(&self, index: usize) -> Result<Option<litchi_opc::PackURI>> {
+        let workbook = self.workbook()?;
+        if index >= workbook.worksheet_names().len() {
+            return Ok(None);
+        }
+        workbook.worksheet_uri(index).map(Some)
+    }
+
+    fn worksheet_uri_by_name(&self, name: &str) -> Result<Option<litchi_opc::PackURI>> {
+        let workbook = self.workbook()?;
+        let Some(index) = workbook
+            .worksheet_names()
+            .iter()
+            .position(|worksheet| worksheet == name)
+        else {
+            return Ok(None);
+        };
+        workbook.worksheet_uri(index).map(Some)
+    }
+
+    fn workbook_uri(&self) -> Result<litchi_opc::PackURI> {
+        Ok(self.0.main_document_part()?.partname().clone())
     }
 }
 

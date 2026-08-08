@@ -2,6 +2,7 @@ use litchi_odp::{
     Presentation, constants,
     handout_master::{Child, ChildKind, Master},
 };
+use std::path::PathBuf;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -77,4 +78,48 @@ fn handout_master_rejects_malformed_xml_and_missing_inheritance() {
     assert!(presentation.set_handout_master(&master).is_err());
     assert_eq!(presentation.styles_xml().unwrap(), before);
     assert!(presentation.handout_master().unwrap().is_none());
+}
+
+fn fixture(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/odf/odp")
+        .join(name)
+}
+
+#[test]
+fn reads_handout_master_from_real_presentations() {
+    for name in [
+        "cellspan.odp",
+        "tdf102223.odp",
+        "tdf105502.odp",
+        "tdf169979.odp",
+        "text-in-image.odp",
+    ] {
+        let presentation = Presentation::open(fixture(name)).unwrap();
+        let master = presentation
+            .handout_master()
+            .unwrap_or_else(|error| panic!("{name}: {error}"))
+            .unwrap_or_else(|| panic!("{name} has no handout master"));
+        assert!(!master.page_layout_name.is_empty(), "{name}");
+        let fragment = master.to_xml_fragment().unwrap();
+        assert!(fragment.starts_with("<style:handout-master"), "{name}");
+    }
+}
+
+#[test]
+fn bom_prefixed_styles_xml_keeps_fragments_exact() {
+    let presentation = Presentation::open(fixture("tdf169979.odp")).unwrap();
+    for page in presentation.master_pages().unwrap() {
+        assert!(
+            page.master_page.xml.starts_with("<style:master-page"),
+            "BOM shifted master-page fragment"
+        );
+    }
+    let fragment = presentation
+        .handout_master()
+        .unwrap()
+        .unwrap()
+        .to_xml_fragment()
+        .unwrap();
+    assert!(fragment.starts_with("<style:handout-master"));
 }

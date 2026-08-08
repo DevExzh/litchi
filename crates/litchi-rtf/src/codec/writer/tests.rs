@@ -37,6 +37,7 @@ fn write_body_story_for_test(
             &[],
             &[],
             story_events,
+            &[],
         )?;
     }
     Ok(output)

@@ -4,6 +4,7 @@
 
 use super::super::error::{RtfError, RtfResult};
 use super::super::lexer::{ControlWord, Token};
+use super::super::limits::ParseLimits;
 use super::super::types::*;
 use bumpalo::Bump;
 use litchi_codepage::Mbcs;
@@ -12,6 +13,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::num::NonZeroU16;
+use std::ops::Range;
 
 #[derive(Debug, Clone, Copy)]
 enum RtfEncoding {
@@ -622,6 +624,7 @@ fn is_section_control(control: &ControlWord<'_>) -> bool {
             | ControlWord::SectionVerticalRendering(_)
             | ControlWord::SectionHorizontalRendering(_)
             | ControlWord::SectionNoColumnBalance(_)
+            | ControlWord::SectionDefaultColumns(_)
             | ControlWord::SectionFootnotePlacement(_)
             | ControlWord::SectionEndnoteHere
             | ControlWord::SectionFootnoteStart(_)
@@ -1320,6 +1323,11 @@ impl Default for State {
 pub struct Parser<'a> {
     /// Token stream
     tokens: &'a [Token<'a>],
+    token_spans: Option<&'a [Range<usize>]>,
+    source: Option<&'a str>,
+    limits: ParseLimits,
+    opaque_nodes: Vec<crate::opaque::Node>,
+    opaque_bytes: usize,
     /// Current position in token stream
     pos: usize,
     /// State stack (for handling groups)
@@ -1919,6 +1927,8 @@ pub struct ParsedDocument<'a> {
     pub color_table: ColorTable,
     /// Style blocks
     pub blocks: Vec<StyleBlock<'a>>,
+    /// Ordered unsupported syntax retained as inert transport fragments.
+    pub opaque_nodes: Vec<crate::opaque::Node>,
     /// Extracted tables
     pub tables: Vec<super::super::table::Table<'a>>,
     /// Extracted pictures

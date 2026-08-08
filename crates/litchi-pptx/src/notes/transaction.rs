@@ -2,7 +2,9 @@
 
 use std::sync::Arc;
 
-use litchi_opc::{OpcPackage, PackURI, Part, TargetMode};
+#[cfg(test)]
+use litchi_opc::OpcPackage;
+use litchi_opc::{PackURI, Part, TargetMode};
 
 use super::codec::{self, validate_resource_xml};
 use super::model::{Graph, Link};
@@ -58,13 +60,9 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Load a source-bound snapshot when the presentation has notes.
-    pub fn load(package: &OpcPackage, presentation_name: &PackURI) -> Result<Option<Self>> {
+    #[cfg(test)]
+    pub(crate) fn load(package: &OpcPackage, presentation_name: &PackURI) -> Result<Option<Self>> {
         super::package::load_snapshot(package, presentation_name)
-    }
-
-    /// Alias emphasizing that the returned value is tied to source bytes.
-    pub fn read(package: &OpcPackage, presentation_name: &PackURI) -> Result<Option<Self>> {
-        Self::load(package, presentation_name)
     }
 
     pub(crate) fn from_parts(
@@ -157,6 +155,26 @@ impl Transaction {
     /// Whether any staged resource bytes or graph metadata differ from source.
     pub fn is_changed(&self) -> bool {
         self.working != self.source.graph
+    }
+
+    /// Replace the complete detached graph without changing physical owners.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the replacement is malformed or retargets any
+    /// presentation, master, theme, slide, or notes relationship identity.
+    pub fn replace(&mut self, graph: Graph) -> Result<bool> {
+        super::package::validate_graph(&graph)?;
+        if !same_ownership(&self.source.graph, &graph) {
+            return Err(invalid(
+                "notes transaction cannot retarget or orphan physical owners",
+            ));
+        }
+        if self.working == graph {
+            return Ok(false);
+        }
+        self.working = graph;
+        Ok(true)
     }
 
     /// Replace one notes slide's inert text projection while preserving XML.
@@ -340,12 +358,14 @@ impl Patch {
     }
 
     /// Publish this patch atomically to an OPC package.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
+    #[cfg(test)]
+    pub(crate) fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
         super::package::apply_patch(package, self)
     }
 
     /// Apply the inverse patch to restore the exact source graph.
-    pub fn undo(&self, package: &mut OpcPackage) -> Result<Snapshot> {
+    #[cfg(test)]
+    pub(crate) fn undo(&self, package: &mut OpcPackage) -> Result<Snapshot> {
         self.inverse().apply(package)
     }
 }
@@ -383,6 +403,22 @@ fn replace_part(parts: &mut [PartState], name: &str, data: &[u8], links: &[Link]
     part.data = Arc::new(data.to_vec());
     part.relationships = links.to_vec();
     Ok(())
+}
+
+fn same_ownership(left: &Graph, right: &Graph) -> bool {
+    left.conformance == right.conformance
+        && left.master.presentation_relationship_id == right.master.presentation_relationship_id
+        && left.master.part_name == right.master.part_name
+        && left.master.theme.relationship_id == right.master.theme.relationship_id
+        && left.master.theme.part_name == right.master.theme.part_name
+        && left.slides.len() == right.slides.len()
+        && left.slides.iter().zip(&right.slides).all(|(left, right)| {
+            left.slide_part_name == right.slide_part_name
+                && left.slide_relationship_id == right.slide_relationship_id
+                && left.part_name == right.part_name
+                && left.backlink_relationship_id == right.backlink_relationship_id
+                && left.notes_master_relationship_id == right.notes_master_relationship_id
+        })
 }
 
 fn fingerprint(parts: &[PartState]) -> Revision {

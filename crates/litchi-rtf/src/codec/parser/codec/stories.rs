@@ -129,6 +129,11 @@ impl<'a> Parser<'a> {
                 Token::Control(control) if inert_section_format && is_section_control(control) => {
                     self.pos += 1;
                 },
+                Token::Control(ControlWord::Unknown(_, _)) => {
+                    let token = self.pos;
+                    self.pos += 1;
+                    self.preserve_unknown_control(token)?;
+                },
                 Token::Control(control) => {
                     self.pos += 1;
                     self.apply_control_word(control)?;
@@ -227,7 +232,8 @@ impl<'a> Parser<'a> {
             self.tokens.get(self.pos + 1),
             Some(Token::Control(ControlWord::IgnorableDestination))
         ) {
-            return self.skip_group();
+            self.pos += 1;
+            return self.preserve_unknown_destination();
         }
         let state = self.current_state()?.clone();
         self.states.push(state);
@@ -307,6 +313,11 @@ impl<'a> Parser<'a> {
                     text_buffer.extend_from_slice(value.as_bytes());
                     self.current_hf_story_offset += value.len();
                     self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::Unknown(_, _))) => {
+                    let token = self.pos;
+                    self.pos += 1;
+                    self.preserve_unknown_control(token)?;
                 },
                 Some(Token::Control(control)) => {
                     let control = *control;
@@ -434,6 +445,11 @@ impl<'a> Parser<'a> {
                         control_symbol_text(control).unwrap_or_default().as_bytes(),
                     );
                 },
+                Token::Control(ControlWord::Unknown(_, _)) => {
+                    let token = self.pos;
+                    self.pos += 1;
+                    self.preserve_unknown_control(token)?;
+                },
                 Token::Control(control) => {
                     self.pos += 1;
                     self.apply_control_word(control)?;
@@ -524,7 +540,8 @@ impl<'a> Parser<'a> {
             self.tokens.get(self.pos + 1),
             Some(Token::Control(ControlWord::IgnorableDestination))
         ) {
-            return self.skip_group();
+            self.pos += 1;
+            return self.preserve_unknown_destination();
         }
         if self.states.len() >= MAX_STORY_GROUP_DEPTH {
             return Err(RtfError::MalformedDocument(
@@ -575,6 +592,11 @@ impl<'a> Parser<'a> {
                     return Err(RtfError::MalformedDocument(
                         "RTF note story cannot contain a nested note destination".to_string(),
                     ));
+                },
+                Some(Token::Control(ControlWord::Unknown(_, _))) => {
+                    let token = self.pos;
+                    self.pos += 1;
+                    self.preserve_unknown_control(token)?;
                 },
                 Some(Token::Control(control)) => {
                     let control = *control;

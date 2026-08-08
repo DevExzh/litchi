@@ -1,4 +1,4 @@
-//! Typed PresentationML package facade and semantic package operations.
+//! Typed `PresentationML` package facade and semantic package operations.
 
 use litchi_opc::OpcPackage;
 use litchi_opc::packuri::PackURI;
@@ -9,7 +9,7 @@ use crate::presentation::Presentation;
 use crate::writer::MutablePresentation;
 use crate::{Error, Result};
 
-/// Main entry point for PresentationML package ownership.
+/// Main entry point for `PresentationML` package ownership.
 pub struct Package {
     pub(crate) opc: OpcPackage,
     pub(crate) mutable_pres: Option<MutablePresentation>,
@@ -64,6 +64,134 @@ impl Package {
             operation: "presentation_mut",
             reason: "the lossless facade cannot hydrate an opened package into the mutable writer",
         })
+    }
+
+    /// Load the complete inert speaker-notes graph, when present.
+    ///
+    /// Physical part names remain diagnostic details of the returned graph;
+    /// ordinary callers do not need them to read or publish notes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when mutable authoring state is stale or the notes
+    /// graph is malformed or exceeds its resource limits.
+    pub fn notes(&self) -> Result<Option<crate::notes::Graph>> {
+        self.ensure_graph_current("notes")?;
+        let presentation = PresentationPart::from_package(&self.opc)?;
+        crate::notes::load(&self.opc, presentation.part().partname())
+    }
+
+    /// Capture the complete notes graph as a source-checked snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when mutable authoring state is stale or the notes
+    /// graph is malformed or exceeds its resource limits.
+    pub fn notes_snapshot(&self) -> Result<Option<crate::notes::Snapshot>> {
+        self.ensure_graph_current("notes_snapshot")?;
+        let presentation = PresentationPart::from_package(&self.opc)?;
+        crate::notes::load_snapshot(&self.opc, presentation.part().partname())
+    }
+
+    /// Replace an existing coherent notes graph atomically.
+    ///
+    /// Exact replacements are byte-stable no-ops. Opaque XML, inert links,
+    /// and related payloads retained by the graph are never interpreted or
+    /// activated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source graph is stale, malformed, encrypted
+    /// against ordinary mutation, or differs in physical ownership.
+    pub fn put_notes(&mut self, graph: crate::notes::Graph) -> Result<()> {
+        self.ensure_graph_current("put_notes")?;
+        let source = self
+            .notes_snapshot()?
+            .ok_or_else(|| Error::Invalid("notes graph is absent".into()))?;
+        let mut edit = source.edit();
+        edit.replace(graph)?;
+        let commit = edit.commit()?;
+        self.apply_notes_commit(commit).map(|_| ())
+    }
+
+    /// Publish a committed source-checked notes edit atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the commit source is stale, the graph is
+    /// malformed, or package policy rejects mutation.
+    pub fn apply_notes_commit(
+        &mut self,
+        commit: crate::notes::Commit,
+    ) -> Result<crate::notes::Snapshot> {
+        self.ensure_graph_current("apply_notes_commit")?;
+        let changed = commit.is_changed();
+        let snapshot = self.edit_typed(move |opc| crate::notes::apply_commit(opc, commit))?;
+        if changed {
+            self.mutable_pres = None;
+        }
+        Ok(snapshot)
+    }
+
+    /// Publish a reversible source-checked notes patch atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the patch source is stale, the graph is
+    /// malformed, or package policy rejects mutation.
+    pub fn apply_notes_patch(
+        &mut self,
+        patch: &crate::notes::Patch,
+    ) -> Result<crate::notes::Snapshot> {
+        self.ensure_graph_current("apply_notes_patch")?;
+        let changed = patch.is_changed();
+        let snapshot = self.edit_typed(|opc| crate::notes::apply_patch(opc, patch))?;
+        if changed {
+            self.mutable_pres = None;
+        }
+        Ok(snapshot)
+    }
+
+    /// Remove one slide's notes by checked position or exact visible name.
+    ///
+    /// Slide-owned classic and modern comments are retained. Descendants of
+    /// the removed Notes Slide are collected only when package-wide inbound
+    /// edge validation proves exclusive ownership.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing, ambiguous, or out-of-range selector,
+    /// malformed ownership, shared descendants, or rejected package policy.
+    pub fn remove_notes<'a>(&mut self, slide: impl Into<crate::slide::Key<'a>>) -> Result<bool> {
+        self.ensure_graph_current("remove_notes")?;
+        let slide_name = self.resolve_slide(slide.into())?;
+        let Some(source) = self.notes_snapshot()? else {
+            return Ok(false);
+        };
+        let removed =
+            self.edit_typed(move |opc| crate::notes::remove_checked(opc, &source, &slide_name))?;
+        if removed {
+            self.mutable_pres = None;
+        }
+        Ok(removed)
+    }
+
+    /// Remove notes from every slide while retaining shared notes resources.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the graph is malformed, descendants have shared
+    /// ownership, or package policy rejects mutation.
+    pub fn clear_notes(&mut self) -> Result<usize> {
+        self.ensure_graph_current("clear_notes")?;
+        let Some(source) = self.notes_snapshot()? else {
+            return Ok(0);
+        };
+        let removed = self.edit_typed(move |opc| crate::notes::clear_checked(opc, &source))?;
+        if removed != 0 {
+            self.mutable_pres = None;
+        }
+        Ok(removed)
     }
 
     /// Read the presentation-owned embedded-font collection.

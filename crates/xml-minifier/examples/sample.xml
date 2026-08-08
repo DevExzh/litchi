@@ -1,10 +1,1 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Input fixture for the compile-time file minification example. -->
-<catalog>
-    <document format="odt">
-        OpenDocument Text
-    </document>
-    <document format="docx">
-        Office Open XML
-    </document>
-</catalog>
+<?xml version="1.0" encoding="UTF-8"?><!-- Input fixture for the compile-time file minification example. --><catalog><document format="odt">OpenDocument Text</document><document format="docx">Office Open XML</document></catalog>

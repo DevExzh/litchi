@@ -211,12 +211,24 @@ fn literal_line_feed_is_text_not_a_structural_break() {
     );
 
     let encoded = document.to_bytes().unwrap();
-    let source = std::str::from_utf8(&encoded).unwrap();
+    assert_eq!(encoded, br"{\rtf1 A\u10?B}");
+
+    let mut canonical = Vec::new();
+    Writer::with_options(
+        &mut canonical,
+        litchi_rtf::write::Options {
+            indent: true,
+            ..Default::default()
+        },
+    )
+    .write(&document)
+    .unwrap();
+    let source = std::str::from_utf8(&canonical).unwrap();
     assert!(source.contains("\\'0a"));
     assert!(!source.contains("\\line "));
     assert!(!source.contains("\\par "));
 
-    let reparsed = Document::from_bytes(&encoded).unwrap();
+    let reparsed = Document::from_bytes(&canonical).unwrap();
     assert_eq!(reparsed.text(), "A\nB");
     assert_eq!(reparsed.paragraph_count(), 1);
 }

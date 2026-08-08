@@ -1,6 +1,6 @@
 //! Verbatim retention of a presentation's original `content.xml` skeleton.
 //!
-//! [`MutablePresentation`](crate::MutablePresentation) models only the
+//! The private transaction staging engine models only the
 //! subset of ODF drawing content it understands. Regenerating `content.xml`
 //! purely from that model discards every construct outside the model — nested
 //! `table:table` shapes, `draw:image` text alternatives, custom shape trees,

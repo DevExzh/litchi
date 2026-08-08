@@ -6,5 +6,8 @@ pub mod property_set;
 #[cfg(test)]
 mod tests;
 
-pub use model::{EncryptionKind, Error, OpenOptions, Package, Result};
+pub use model::{
+    EncryptionKind, Error, Limits, LimitsError, OpenOptions, Package, ResourceKind, ResourceLimit,
+    Result,
+};
 pub use property_set::{Commit, Patch, Snapshot, Transaction};

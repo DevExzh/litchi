@@ -470,3 +470,19 @@ fn source_checked_transaction_inverse_restores_master_and_theme() {
             .same_source(&snapshot)
     );
 }
+
+#[test]
+fn source_bound_removal_rejects_a_stale_bypass_atomically() {
+    let (mut package, presentation) = synthetic(Conformance::Transitional);
+    let source = Snapshot::load(&package, &presentation).unwrap().unwrap();
+    let notes_name = PackURI::new("/ppt/notesSlides/notesSlide1.xml").unwrap();
+    let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+    package
+        .get_part_mut(&notes_name)
+        .unwrap()
+        .set_blob(write_text("stale source").unwrap());
+
+    let error = remove_checked(&mut package, &source, &slide_name).unwrap_err();
+    assert!(matches!(error, crate::Error::Invalid(message) if message.contains("stale")));
+    assert!(package.contains_part(&notes_name));
+}

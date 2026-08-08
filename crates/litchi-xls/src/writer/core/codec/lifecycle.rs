@@ -30,6 +30,7 @@ impl Writer {
             add_in_functions: Vec::new(),
             dde_or_ole_links: Vec::new(),
             custom_table_styles: None,
+            xml_map: None,
             book_ext: None,
             theme: None,
             mdx_metadata: None,

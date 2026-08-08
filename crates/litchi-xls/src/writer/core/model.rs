@@ -1274,6 +1274,8 @@ pub struct Writer {
     pub(super) add_in_functions: Vec<AddInFunctionOptions>,
     pub(super) dde_or_ole_links: Vec<DdeOrOleLinkOptions>,
     pub(super) custom_table_styles: Option<CustomTableStyles>,
+    /// Optional inert root-level `[MS-XLS]` XML-map catalog.
+    pub(super) xml_map: Option<crate::xml_map::MapInfo>,
     pub(super) book_ext: Option<crate::BookExt>,
     pub(super) theme: Option<crate::Theme>,
     /// MDX (OLAP cube) metadata emitted as the globals `METADATA` production.

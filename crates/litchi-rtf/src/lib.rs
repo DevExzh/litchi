@@ -135,6 +135,11 @@ pub mod raw {
     pub use crate::native::*;
 }
 
+/// Unsupported syntax retained as bounded inert data.
+pub mod opaque {
+    pub use crate::model::opaque::{Anchor, Context, Kind, Node};
+}
+
 /// Font resources and checked references.
 pub mod font {
     pub use crate::resource::font::{Catalog, Embedded, Font, Iter, LookupError};

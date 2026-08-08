@@ -73,10 +73,7 @@ fn reads_poi_fill_fixture() {
 fn reads_poi_xor_encrypted_style_xf_reserved_bit() {
     let workbook = Workbook::new_with_options(
         File::open(poi_fixture("xor-encryption-abc.xls")).unwrap(),
-        OpenOptions {
-            password: Some("abc"),
-            ..OpenOptions::default()
-        },
+        OpenOptions::new().with_password("abc"),
     )
     .unwrap();
     assert!(!workbook.extended_formats().is_empty());

@@ -117,6 +117,10 @@ mod writer;
     feature = "pages"
 ))]
 mod document;
+#[cfg(feature = "doc")]
+pub(crate) use document::resolve_doc_lists;
+#[cfg(feature = "docx")]
+pub(crate) use document::resolve_docx_lists;
 
 #[cfg(any(
     feature = "ppt",
@@ -125,6 +129,15 @@ mod document;
     feature = "keynote"
 ))]
 mod presentation;
+
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "odt",
+    feature = "rtf",
+    feature = "pages"
+))]
+pub(crate) use writer::ListItemInfo;
 
 // Re-export public API (format-agnostic helpers live in litchi-markdown)
 pub use litchi_markdown::{

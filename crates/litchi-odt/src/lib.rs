@@ -93,6 +93,7 @@ pub mod document_scripts;
 pub mod drawing;
 pub mod drawing_page_properties;
 pub mod embedded;
+pub mod flat;
 pub mod font_face;
 pub mod footnote_separator;
 pub mod form;
@@ -214,11 +215,7 @@ pub(crate) use package::embedded::{
 };
 #[allow(unused_imports, reason = "ODT facade exposes authored form operations")]
 pub(crate) use package::forms::{AuthoredForm, AuthoredFormControl, AuthoredFormNode};
-#[allow(
-    unused_imports,
-    reason = "ODT facade exposes inert package script resources"
-)]
-pub(crate) use package::scripts::{ScriptResource, ScriptResourceKind, ScriptResourceSpec};
+pub use package::scripts::{ScriptResource, ScriptResourceKind, ScriptResourceSpec};
 #[allow(unused_imports, reason = "ODT facade exposes ruby semantics")]
 pub(crate) use ruby_family::{
     insert_ruby_annotation_xml, parse_ruby_annotations, parse_ruby_styles,

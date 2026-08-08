@@ -64,8 +64,8 @@ pub fn compute(data: &[u8]) -> u32 {
 
 const fn build_cache() -> [u32; 256] {
     let mut cache = [0; 256];
-    let mut index = 0;
-    while index < cache.len() {
+    let mut index = 0_u8;
+    loop {
         let mut value = (index as u32) << 24;
         let mut bit = 0;
         while bit < 8 {
@@ -76,7 +76,10 @@ const fn build_cache() -> [u32; 256] {
             };
             bit += 1;
         }
-        cache[index] = value & CACHE_MASK;
+        cache[index as usize] = value & CACHE_MASK;
+        if index == u8::MAX {
+            break;
+        }
         index += 1;
     }
     cache
@@ -91,6 +94,13 @@ mod tests {
         assert_eq!(compute(b""), 0x0000_0000);
         assert_eq!(compute(&[0x01]), 0x0000_00AF);
         assert_eq!(compute(b"123456789"), 0xBD0B_E338);
+    }
+
+    #[test]
+    fn cache_covers_the_full_byte_domain() {
+        assert_eq!(CACHE.len(), usize::from(u8::MAX) + 1);
+        assert_eq!(compute(&[0]), CACHE[0]);
+        assert_eq!(compute(&[u8::MAX]), CACHE[usize::from(u8::MAX)]);
     }
 
     #[test]

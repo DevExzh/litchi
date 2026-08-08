@@ -5,7 +5,7 @@ use crate::list_object::ListObjectSourceMetadata;
 use crate::{Error, Result};
 use std::collections::HashSet;
 
-pub(super) fn validate(value: &MapInfo) -> Result<()> {
+pub(crate) fn validate(value: &MapInfo) -> Result<()> {
     let mut schema_ids = HashSet::with_capacity(value.schemas().len());
     for schema in value.schemas() {
         if !schema_ids.insert(schema.id()) {
@@ -75,24 +75,34 @@ pub(crate) fn validate_list_columns(
     value: Option<&MapInfo>,
     worksheets: &[crate::worksheet::Worksheet],
 ) -> Result<()> {
-    for worksheet in worksheets {
-        for table in worksheet.list_objects() {
-            let Some(ListObjectSourceMetadata::Xml(metadata)) = table.source_metadata() else {
+    validate_list_objects(
+        value,
+        worksheets
+            .iter()
+            .flat_map(crate::worksheet::Worksheet::list_objects),
+    )
+}
+
+pub(crate) fn validate_list_objects<'a>(
+    value: Option<&MapInfo>,
+    tables: impl IntoIterator<Item = &'a crate::list_object::ListObject>,
+) -> Result<()> {
+    for table in tables {
+        let Some(ListObjectSourceMetadata::Xml(metadata)) = table.source_metadata() else {
+            continue;
+        };
+        for field in metadata.fields() {
+            let Some(mapping) = field.mapping() else {
                 continue;
             };
-            for field in metadata.fields() {
-                let Some(mapping) = field.mapping() else {
-                    continue;
-                };
-                let Some(value) = value else {
-                    return Err(invalid("XML column mapping has no XML MapInfo stream"));
-                };
-                if value.map(mapping.map_identifier()).is_none() {
-                    return Err(invalid(format!(
-                        "XML column mapping references missing Map ID {}",
-                        mapping.map_identifier()
-                    )));
-                }
+            let Some(value) = value else {
+                return Err(invalid("XML column mapping has no XML MapInfo stream"));
+            };
+            if value.map(mapping.map_identifier()).is_none() {
+                return Err(invalid(format!(
+                    "XML column mapping references missing Map ID {}",
+                    mapping.map_identifier()
+                )));
             }
         }
     }

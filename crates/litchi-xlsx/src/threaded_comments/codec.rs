@@ -598,7 +598,6 @@ pub fn write_persons(person_list: &People) -> SheetResult<String> {
     let mut xml = String::with_capacity(1024);
 
     xml.push_str(XML_HEADER);
-    xml.push('\n');
     write!(
         &mut xml,
         r#"<personList xmlns="{}" xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#,
@@ -642,7 +641,6 @@ pub fn write_comments(comments: &Comments) -> SheetResult<String> {
     let mut xml = String::with_capacity(4096);
 
     xml.push_str(XML_HEADER);
-    xml.push('\n');
     write!(
         &mut xml,
         r#"<ThreadedComments xmlns="{}">"#,

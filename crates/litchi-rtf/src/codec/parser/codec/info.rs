@@ -1,4 +1,5 @@
 use super::*;
+use std::mem::size_of;
 
 impl<'a> Parser<'a> {
     pub(super) fn parse_info_text(&mut self, field: InfoTextField) -> RtfResult<()> {
@@ -276,6 +277,176 @@ impl<'a> Parser<'a> {
         }
 
         (depth == 0).then_some(()).ok_or(RtfError::UnexpectedEof)
+    }
+
+    pub(super) fn preserve_unknown_destination(&mut self) -> RtfResult<()> {
+        let start = self.pos.checked_sub(1).ok_or_else(|| {
+            RtfError::ParserError("RTF destination has no opening group".to_string())
+        })?;
+        self.skip_until_close_brace()?;
+        self.preserve_opaque_tokens(start, self.pos, crate::opaque::Kind::Destination, None)
+    }
+
+    pub(super) fn preserve_unknown_control(&mut self, token: usize) -> RtfResult<()> {
+        self.preserve_opaque_tokens(
+            token,
+            token.saturating_add(1),
+            crate::opaque::Kind::ControlWord,
+            None,
+        )
+    }
+
+    pub(super) fn preserve_unknown_destination_in(
+        &mut self,
+        context: crate::opaque::Context,
+    ) -> RtfResult<()> {
+        let start = self.pos.checked_sub(1).ok_or_else(|| {
+            RtfError::ParserError("RTF destination has no opening group".to_string())
+        })?;
+        self.skip_until_close_brace()?;
+        self.preserve_opaque_tokens(
+            start,
+            self.pos,
+            crate::opaque::Kind::Destination,
+            Some(context),
+        )
+    }
+
+    pub(super) fn preserve_unknown_control_in(
+        &mut self,
+        token: usize,
+        context: crate::opaque::Context,
+    ) -> RtfResult<()> {
+        self.preserve_opaque_tokens(
+            token,
+            token.saturating_add(1),
+            crate::opaque::Kind::ControlWord,
+            Some(context),
+        )
+    }
+
+    fn preserve_opaque_tokens(
+        &mut self,
+        start_token: usize,
+        end_token: usize,
+        kind: crate::opaque::Kind,
+        forced_context: Option<crate::opaque::Context>,
+    ) -> RtfResult<()> {
+        let (Some(source), Some(spans)) = (self.source, self.token_spans) else {
+            return Ok(());
+        };
+        let start = spans
+            .get(start_token)
+            .map(|span| span.start)
+            .ok_or_else(|| {
+                RtfError::ParserError("RTF opaque source start is unavailable".to_string())
+            })?;
+        let end_index = end_token
+            .checked_sub(1)
+            .ok_or_else(|| RtfError::ParserError("RTF opaque source range is empty".to_string()))?;
+        let end = spans.get(end_index).map(|span| span.end).ok_or_else(|| {
+            RtfError::ParserError("RTF opaque source end is unavailable".to_string())
+        })?;
+        let fragment = source.get(start..end).ok_or_else(|| {
+            RtfError::ParserError("RTF opaque source range is invalid".to_string())
+        })?;
+        let observed = fragment.chars().count();
+        if observed > self.limits.max_opaque_node_bytes() {
+            return Err(RtfError::LimitExceeded {
+                resource: "opaque node bytes",
+                observed,
+                limit: self.limits.max_opaque_node_bytes(),
+            });
+        }
+        let node_count = self.opaque_nodes.len().saturating_add(1);
+        if node_count > self.limits.max_opaque_nodes() {
+            return Err(RtfError::LimitExceeded {
+                resource: "opaque nodes",
+                observed: node_count,
+                limit: self.limits.max_opaque_nodes(),
+            });
+        }
+        let total =
+            self.opaque_bytes
+                .checked_add(observed)
+                .ok_or_else(|| RtfError::LimitExceeded {
+                    resource: "opaque bytes",
+                    observed: usize::MAX,
+                    limit: self.limits.max_total_opaque_bytes(),
+                })?;
+        if total > self.limits.max_total_opaque_bytes() {
+            return Err(RtfError::LimitExceeded {
+                resource: "opaque bytes",
+                observed: total,
+                limit: self.limits.max_total_opaque_bytes(),
+            });
+        }
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve(observed)
+            .map_err(|_| RtfError::AllocationFailed {
+                resource: "opaque node bytes",
+                requested: observed,
+            })?;
+        for character in fragment.chars() {
+            let byte = u8::try_from(u32::from(character)).map_err(|_| {
+                RtfError::InvalidUnicode(
+                    "RTF opaque transport contains a non-Latin-1 scalar".to_string(),
+                )
+            })?;
+            bytes.push(byte);
+        }
+        let state = self.current_state()?;
+        let anchor = if forced_context.is_none()
+            && state.destination == Destination::DocumentBody
+            && !state.in_table
+            && state.table_nesting_level < 2
+        {
+            crate::opaque::Anchor::Body(self.body_text_len)
+        } else {
+            let context = if let Some(context) = forced_context {
+                context
+            } else if state.in_table
+                || state.table_nesting_level >= 2
+                || state.destination == Destination::NestedTableProperties
+            {
+                crate::opaque::Context::Table
+            } else {
+                match state.destination {
+                    Destination::FontTable
+                    | Destination::ColorTable
+                    | Destination::StyleSheet
+                    | Destination::Info => crate::opaque::Context::Metadata,
+                    Destination::Header | Destination::Footer => {
+                        crate::opaque::Context::HeaderFooter
+                    },
+                    Destination::FieldInstruction | Destination::FieldResult => {
+                        crate::opaque::Context::Field
+                    },
+                    Destination::Footnote | Destination::Endnote => crate::opaque::Context::Note,
+                    Destination::Picture | Destination::Result => crate::opaque::Context::Drawing,
+                    Destination::Revision => crate::opaque::Context::Review,
+                    Destination::DocumentBody
+                    | Destination::NestedTableProperties
+                    | Destination::Other => crate::opaque::Context::Other,
+                }
+            };
+            crate::opaque::Anchor::Structural {
+                context,
+                token: start_token,
+                depth: self.states.len(),
+            }
+        };
+        self.opaque_nodes
+            .try_reserve(1)
+            .map_err(|_| RtfError::AllocationFailed {
+                resource: "opaque nodes",
+                requested: node_count.saturating_mul(size_of::<crate::opaque::Node>()),
+            })?;
+        self.opaque_nodes
+            .push(crate::opaque::Node::new(kind, anchor, bytes));
+        self.opaque_bytes = total;
+        Ok(())
     }
 
     /// Expect a specific token.

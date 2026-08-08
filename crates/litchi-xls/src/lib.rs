@@ -241,6 +241,7 @@ pub mod hyperlinks;
 
 /// Comment/note parsing (NOTE 0x001C)
 pub mod comments;
+pub mod compatibility;
 
 /// Inert BIFF8 Office Toolbars stream (`XCB`) metadata.
 pub mod toolbar;
@@ -330,6 +331,7 @@ pub use chart_3d::Chart3d;
 pub use chart_layout::{CrtLayout12, CrtLayout12A, CrtLayout12Mode};
 pub use chart_property_stream::{RichTextStream, ShapePropsStream, TextPropsStream};
 pub use comments::Visibility;
+pub use compatibility::CompatibilityProfile;
 pub use conditional_format::{
     ConditionalAlignment, ConditionalBorder, ConditionalComparison, ConditionalExtension,
     ConditionalFont, ConditionalFormatRange, ConditionalFormatting, ConditionalFormatting12,

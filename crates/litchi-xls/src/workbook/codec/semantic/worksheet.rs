@@ -5,8 +5,8 @@ use super::super::wire::{SharedFormulaTemplate, parse_shared_formula_template};
 use crate::cell::Cell;
 use crate::error::{Error, Result};
 use crate::formula::{FormulaContext, ptg_exp_anchor, render_formula};
-use crate::formula_metadata::Cell as FormulaCell;
 use crate::formula_metadata::array::{self, Owner as ArrayFormula};
+use crate::formula_metadata::{Cell as FormulaCell, Defect as FormulaDefect, FlagDefect};
 use crate::number_format::Formatting;
 use crate::records::{
     BoundSheetRecord, CellRecord, DimensionsRecord, Encoding, FormulaValue, SharedStringProperties,
@@ -14,8 +14,8 @@ use crate::records::{
 use crate::workbook::model::Workbook;
 use crate::worksheet::Worksheet;
 use crate::{
-    autofilter, comments, conditional_format, hyperlinks, layout, merged_cells, page_setup,
-    pivot_table, protection, utils, view,
+    autofilter, comments, compatibility::CompatibilityProfile, conditional_format, hyperlinks,
+    layout, merged_cells, page_setup, pivot_table, protection, utils, view,
 };
 use litchi_biff::Records;
 use litchi_core::sheet::Cell as _;
@@ -184,6 +184,7 @@ impl<R: Read + Seek> Workbook<R> {
         workbook_data: &[u8],
         bound_sheet: &BoundSheetRecord,
         encoding: &Encoding,
+        compatibility_profile: CompatibilityProfile,
     ) -> Result<Worksheet> {
         let worksheet_position = usize::try_from(bound_sheet.position).map_err(|_| {
             Error::InvalidData("worksheet position does not fit in usize".to_string())
@@ -221,7 +222,7 @@ impl<R: Read + Seek> Workbook<R> {
         let current_position = worksheet_position
             .checked_add(bof.encoded().len() as u64)
             .ok_or_else(|| Error::InvalidData("worksheet position overflows".to_string()))?;
-        Self::parse_worksheet_records(
+        Self::parse_worksheet_records_with_compatibility(
             &mut records,
             workbook_data.len() as u64,
             worksheet_position,
@@ -232,10 +233,12 @@ impl<R: Read + Seek> Workbook<R> {
             shared_string_properties,
             Some(&self.formula_context),
             self.formatting.clone(),
+            compatibility_profile,
         )
     }
 
     /// Parse worksheet records sequentially
+    #[cfg(test)]
     pub(crate) fn parse_worksheet_records(
         records_iter: &mut Records<'_>,
         stream_len: u64,
@@ -247,6 +250,34 @@ impl<R: Read + Seek> Workbook<R> {
         shared_string_properties: Arc<Vec<Option<Box<SharedStringProperties>>>>,
         formula_context: Option<&FormulaContext>,
         formatting: Arc<Formatting>,
+    ) -> Result<Worksheet> {
+        Self::parse_worksheet_records_with_compatibility(
+            records_iter,
+            stream_len,
+            base_position,
+            current_position,
+            encoding,
+            name,
+            shared_strings,
+            shared_string_properties,
+            formula_context,
+            formatting,
+            CompatibilityProfile::Strict,
+        )
+    }
+
+    fn parse_worksheet_records_with_compatibility(
+        records_iter: &mut Records<'_>,
+        stream_len: u64,
+        base_position: u64,
+        current_position: u64,
+        encoding: &Encoding,
+        name: &str,
+        shared_strings: Arc<Vec<String>>,
+        shared_string_properties: Arc<Vec<Option<Box<SharedStringProperties>>>>,
+        formula_context: Option<&FormulaContext>,
+        formatting: Arc<Formatting>,
+        compatibility_profile: CompatibilityProfile,
     ) -> Result<Worksheet> {
         let mut worksheet = Worksheet::with_shared_string_properties(
             name.to_string(),
@@ -288,6 +319,7 @@ impl<R: Read + Seek> Workbook<R> {
         let mut array_occupancy = HashMap::<u16, [u64; 4]>::new();
         let mut ptg_exp_cells = HashMap::<(u16, u16), FormulaLink>::new();
         let mut duplicate_cells = HashSet::<(u16, u16)>::new();
+        let mut formula_metadata_defects = Vec::<FormulaDefect>::new();
         let mut companion_claims = HashMap::<(u16, u16), CompanionKind>::new();
         let mut immediately_preceding_formula: Option<FormulaLink> = None;
         let mut dimensions: Option<DimensionsRecord> = None;
@@ -577,7 +609,35 @@ impl<R: Read + Seek> Workbook<R> {
                 0x00FD | // LabelSst
                 0x0006   // Formula
                 => {
-                    let cell_record = CellRecord::parse(record.kind().get(), record.payload(), encoding)?;
+                    let preserve_formula_defect = record.kind().get() == 0x0006
+                        && compatibility_profile
+                            .preserves_shared_formula_flag_without_ptg_exp();
+                    let (cell_record, formula_defect) = if preserve_formula_defect {
+                        CellRecord::parse_formula_preserving_defect(record.payload())?
+                    } else {
+                        (CellRecord::parse(record.kind().get(), record.payload(), encoding)?, None)
+                    };
+                    if matches!(formula_defect, Some(FlagDefect::SharedWithoutPtgExp)) {
+                        if formula_metadata_defects.len() >= tracking_limit {
+                            return Err(Error::InvalidRecord {
+                                record_type: 0x0006,
+                                message: "Formula metadata defect count exceeds the configured limit"
+                                    .to_string(),
+                            });
+                        }
+                        formula_metadata_defects
+                            .try_reserve(1)
+                            .map_err(|_| Error::Allocation("tracking Formula metadata defects"))?;
+                        formula_metadata_defects.push(
+                            FormulaDefect::SharedFlagWithoutPtgExp {
+                                cell: FormulaCell::try_new(
+                                    u32::from(cell_record.row()),
+                                    cell_record.col(),
+                                )?,
+                                compatibility_profile,
+                            },
+                        );
+                    }
                     formatting.validate_cell_xf(cell_record_xf(&cell_record))?;
                     if let Some(link) = FormulaLink::from_record(&cell_record) {
                         let position = (link.row, link.col);
@@ -934,6 +994,7 @@ impl<R: Read + Seek> Workbook<R> {
         worksheet.set_vba_code_name(vba_collector.finish());
         worksheet.set_consolidation(consolidation_collector.finish());
         worksheet.set_formula_error_features(formula_error_collector.finish()?);
+        worksheet.set_formula_metadata_defects(formula_metadata_defects);
         worksheet.set_list_objects(list_object_collector.finish()?);
         worksheet.set_row_block_index(row_block_index_collector.finish());
 

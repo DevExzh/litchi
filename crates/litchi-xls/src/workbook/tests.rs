@@ -107,14 +107,8 @@ mod defined_name_tests {
     #[test]
     fn parses_names_after_xor_decryption() {
         let file = File::open(poi_fixture("xor-encryption-abc.xls")).unwrap();
-        let workbook = Workbook::new_with_options(
-            file,
-            OpenOptions {
-                password: Some("abc"),
-                ..OpenOptions::default()
-            },
-        )
-        .unwrap();
+        let workbook =
+            Workbook::new_with_options(file, OpenOptions::new().with_password("abc")).unwrap();
         assert!(workbook.defined_names().len() <= usize::from(u16::MAX));
     }
 }

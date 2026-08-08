@@ -45,6 +45,7 @@ impl<W: Write> RtfWriter<W> {
         fields: &[crate::Field<'_>],
         sections: &[Section<'_>],
         body_story_events: &[crate::BodyStoryEvent],
+        opaque_nodes: &[crate::opaque::Node],
     ) -> io::Result<()> {
         if bookmarks.bookmarks().is_empty()
             && custom_xml_tags.is_empty()
@@ -67,6 +68,7 @@ impl<W: Write> RtfWriter<W> {
                 .iter()
                 .all(|field| !matches!(field.owner, crate::FieldOwner::Body))
             && body_story_events.is_empty()
+            && opaque_nodes.is_empty()
         {
             let mut boundary = 0usize;
             let mut body_position = 0usize;
@@ -110,6 +112,7 @@ impl<W: Write> RtfWriter<W> {
         let event_count = event_count.saturating_add(legacy_drawings.len());
         let event_count = event_count.saturating_add(form_fields.len().saturating_mul(2));
         let event_count = event_count.saturating_add(body_story_events.len());
+        let event_count = event_count.saturating_add(opaque_nodes.len());
         let mut events = Vec::new();
         events.try_reserve(event_count).map_err(|_| {
             io::Error::new(
@@ -1152,6 +1155,21 @@ impl<W: Write> RtfWriter<W> {
                 "RTF body story order is incomplete or changes drawing order",
             ));
         }
+        for node in opaque_nodes {
+            if let crate::opaque::Anchor::Body(offset) = node.anchor() {
+                if body.get(offset..offset).is_none() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "RTF opaque node is outside body text or splits a character",
+                    ));
+                }
+                events.push(BodyEvent {
+                    offset,
+                    order: 1,
+                    kind: BodyEventKind::Opaque(node),
+                });
+            }
+        }
         events.sort_by_key(|event| (event.offset, event.order));
 
         let mut event_index = 0usize;
@@ -1301,6 +1319,7 @@ impl<W: Write> RtfWriter<W> {
                 }
                 Ok(())
             },
+            BodyEventKind::Opaque(node) => self.writer.write_all(node.source()),
         }
     }
 

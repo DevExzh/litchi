@@ -249,7 +249,19 @@ fn embedded_facade_accepts_binary_worksheet_sources() {
         content_type::OFC_OLE_OBJECT.to_string(),
         b"opaque XLSB payload".to_vec(),
     );
+    let workbook_target = workbook_part
+        .partname()
+        .as_str()
+        .trim_start_matches('/')
+        .to_owned();
     let mut package = OpcPackage::new();
+    package.rels_mut().add_relationship(
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+            .to_owned(),
+        workbook_target,
+        "rIdWorkbook".to_owned(),
+        false,
+    );
     package.add_part(Box::new(workbook_part));
     package.add_part(Box::new(sheet_part));
     package.add_part(Box::new(payload));
@@ -738,7 +750,19 @@ fn resolves_external_formula_tokens_from_package_relationships() {
         true,
     );
 
+    let workbook_target = workbook_part
+        .partname()
+        .as_str()
+        .trim_start_matches('/')
+        .to_owned();
     let mut package = OpcPackage::new();
+    package.rels_mut().add_relationship(
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+            .to_owned(),
+        workbook_target,
+        "rIdWorkbook".to_owned(),
+        false,
+    );
     package.add_part(Box::new(workbook_part));
     package.add_part(Box::new(external_part));
     let workbook = Workbook::from_opc_package(package).unwrap();
@@ -849,7 +873,19 @@ fn loads_typed_pivot_cache_definitions_from_package_relationships() {
         ]),
     );
 
+    let workbook_target = workbook_part
+        .partname()
+        .as_str()
+        .trim_start_matches('/')
+        .to_owned();
     let mut package = OpcPackage::new();
+    package.rels_mut().add_relationship(
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+            .to_owned(),
+        workbook_target,
+        "rIdWorkbook".to_owned(),
+        false,
+    );
     package.add_part(Box::new(workbook_part));
     package.add_part(Box::new(definition_part));
     let workbook = Workbook::from_opc_package(package).unwrap();

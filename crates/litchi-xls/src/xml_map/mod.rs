@@ -18,7 +18,9 @@ pub use model::{
     XPath,
 };
 
-pub(crate) use validation::validate_list_columns;
+pub(crate) use validation::{
+    validate as validate_info, validate_list_columns, validate_list_objects,
+};
 pub(crate) const STREAM_NAME: &str = "XML";
 
 pub(crate) fn parse_stream_if_present<R: std::io::Read + std::io::Seek>(

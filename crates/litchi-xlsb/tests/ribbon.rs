@@ -73,7 +73,19 @@ fn workbook() -> Workbook {
         ]),
     );
 
+    let workbook_target = workbook_part
+        .partname()
+        .as_str()
+        .trim_start_matches('/')
+        .to_owned();
     let mut package = OpcPackage::new();
+    package.rels_mut().add_relationship(
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+            .to_owned(),
+        workbook_target,
+        "rIdWorkbook".to_owned(),
+        false,
+    );
     package.add_part(Box::new(workbook_part));
     package.add_part(Box::new(sheet_part));
     Workbook::from_opc_package(package).unwrap()

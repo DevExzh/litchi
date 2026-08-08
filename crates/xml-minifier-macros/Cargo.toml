@@ -1,0 +1,20 @@
+[package]
+name = "xml-minifier-macros"
+description = "Procedural macros for the xml-minifier crate"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quick-xml = { workspace = true }
+quote = "1.0"
+syn = "2.0"
+
+[lints]
+workspace = true

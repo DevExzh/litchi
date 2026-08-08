@@ -1,3 +1,5 @@
+#![cfg(feature = "encryption")]
+
 const PASSWORD: &str = "FacadeSecret123";
 const NEW_PASSWORD: &str = "FacadeSecret456";
 

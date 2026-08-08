@@ -834,6 +834,24 @@ impl<W: Write> RtfWriter<W> {
         if let Some(amount) = shading.amount {
             self.write_control_word(&format!("{prefix}shdng"), Some(i32::from(amount)))?;
         }
+        if let Some(amount) = shading.raw_amount {
+            if prefix != "cl" {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "raw table shading is only valid for cells",
+                ));
+            }
+            self.write_control_word("clshdngraw", Some(i32::from(amount)))?;
+        }
+        if shading.raw_nil {
+            if prefix != "cl" {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "raw-nil table shading is only valid for cells",
+                ));
+            }
+            self.write_control_word("clshdrawnil", None)?;
+        }
         Ok(())
     }
 

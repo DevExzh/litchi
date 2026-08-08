@@ -275,8 +275,14 @@ impl<'a> Placeholder<'a> {
     }
 
     /// Set the placeholder type.
-    pub fn set_placeholder_type(&mut self, placeholder_type: PlaceholderType) {
+    pub fn set_placeholder_type(
+        &mut self,
+        placeholder_type: PlaceholderType,
+    ) -> Result<(), super::shape::MutationError> {
+        self.container
+            .ensure_mutable(super::shape::Mutation::Placeholder)?;
         self.placeholder_type = placeholder_type;
+        Ok(())
     }
 
     /// Get the placeholder size (layout index).
@@ -285,8 +291,11 @@ impl<'a> Placeholder<'a> {
     }
 
     /// Set the placeholder size.
-    pub fn set_size(&mut self, size: u8) {
+    pub fn set_size(&mut self, size: u8) -> Result<(), super::shape::MutationError> {
+        self.container
+            .ensure_mutable(super::shape::Mutation::Placeholder)?;
         self.size = Some(size);
+        Ok(())
     }
 
     /// Get the placeholder index within the slide.
@@ -295,8 +304,11 @@ impl<'a> Placeholder<'a> {
     }
 
     /// Set the placeholder index.
-    pub fn set_index(&mut self, index: u16) {
+    pub fn set_index(&mut self, index: u16) -> Result<(), super::shape::MutationError> {
+        self.container
+            .ensure_mutable(super::shape::Mutation::Placeholder)?;
         self.index = Some(index);
+        Ok(())
     }
 
     /// Check if this is a title placeholder.
@@ -341,12 +353,22 @@ impl<'a> Placeholder<'a> {
     }
 
     /// Set the placeholder size.
-    pub fn set_placeholder_size(&mut self, size: PlaceholderSize) {
+    pub fn set_placeholder_size(
+        &mut self,
+        size: PlaceholderSize,
+    ) -> Result<(), super::shape::MutationError> {
+        self.container
+            .ensure_mutable(super::shape::Mutation::Placeholder)?;
         self.size = match size {
             PlaceholderSize::Quarter => Some(2),
             PlaceholderSize::Half => Some(1),
             PlaceholderSize::Full => Some(0),
         };
+        Ok(())
+    }
+
+    pub(crate) fn mark_source_bound(&mut self) {
+        self.container.mark_source_bound();
     }
 }
 
@@ -358,8 +380,8 @@ where
         &self.container.properties
     }
 
-    fn properties_mut(&mut self) -> &mut ShapeProperties {
-        &mut self.container.properties
+    fn properties_mut(&mut self) -> Result<&mut ShapeProperties, super::shape::MutationError> {
+        self.container.properties_mut_checked()
     }
 
     fn text(&self) -> super::super::package::Result<String> {
@@ -413,9 +435,13 @@ mod tests {
         props.shape_type = ShapeType::Placeholder;
 
         let mut placeholder = Placeholder::new(props, vec![]);
-        placeholder.set_placeholder_type(PlaceholderType::Title);
-        placeholder.set_size(1);
-        placeholder.set_index(0);
+        assert!(
+            placeholder
+                .set_placeholder_type(PlaceholderType::Title)
+                .is_ok()
+        );
+        assert!(placeholder.set_size(1).is_ok());
+        assert!(placeholder.set_index(0).is_ok());
 
         assert_eq!(placeholder.placeholder_type(), PlaceholderType::Title);
         assert_eq!(placeholder.size(), Some(1));
@@ -433,12 +459,20 @@ mod tests {
         let mut placeholder = Placeholder::new(props, vec![]);
 
         // Test picture placeholder
-        placeholder.set_placeholder_type(PlaceholderType::Picture);
+        assert!(
+            placeholder
+                .set_placeholder_type(PlaceholderType::Picture)
+                .is_ok()
+        );
         assert!(placeholder.is_media());
         assert!(!placeholder.is_title());
 
         // Test title placeholder
-        placeholder.set_placeholder_type(PlaceholderType::Title);
+        assert!(
+            placeholder
+                .set_placeholder_type(PlaceholderType::Title)
+                .is_ok()
+        );
         assert!(!placeholder.is_media());
         assert!(placeholder.is_title());
     }
@@ -461,7 +495,7 @@ mod tests {
             (1, PlaceholderSize::Half),
             (2, PlaceholderSize::Quarter),
         ] {
-            placeholder.set_size(raw);
+            assert!(placeholder.set_size(raw).is_ok());
             assert_eq!(placeholder.placeholder_size(), expected);
         }
 
@@ -470,8 +504,34 @@ mod tests {
             (PlaceholderSize::Half, 1),
             (PlaceholderSize::Quarter, 2),
         ] {
-            placeholder.set_placeholder_size(size);
+            assert!(placeholder.set_placeholder_size(size).is_ok());
             assert_eq!(placeholder.size(), Some(expected_raw));
         }
+    }
+
+    #[test]
+    fn source_bound_placeholder_setters_are_atomic() {
+        let mut placeholder = Placeholder::new(ShapeProperties::default(), Vec::new());
+        let before_type = placeholder.placeholder_type();
+        let before_size = placeholder.size();
+        let before_index = placeholder.index();
+        placeholder.container.mark_source_bound();
+        let error = Err(super::super::shape::MutationError::SourceBound {
+            mutation: super::super::shape::Mutation::Placeholder,
+        });
+
+        assert_eq!(
+            placeholder.set_placeholder_type(PlaceholderType::Title),
+            error
+        );
+        assert_eq!(placeholder.set_size(1), error);
+        assert_eq!(placeholder.set_index(2), error);
+        assert_eq!(
+            placeholder.set_placeholder_size(PlaceholderSize::Quarter),
+            error
+        );
+        assert_eq!(placeholder.placeholder_type(), before_type);
+        assert_eq!(placeholder.size(), before_size);
+        assert_eq!(placeholder.index(), before_index);
     }
 }

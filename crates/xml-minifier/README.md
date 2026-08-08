@@ -1,15 +1,16 @@
 # XML Minifier
 
-A high-performance Rust procedural macro for compile-time XML minification.
+A bounded XML compactness auditor with compile-time producer-template macros.
 
 ## Features
 
-- **Compile-time minification**: XML files are minified during compilation, zero runtime overhead
-- **Aggressive optimization**:
-  - Removes comments and processing instructions
-  - Trims and collapses whitespace in text nodes
+- **Compile-time compactness enforcement**: producer templates are checked and normalized during compilation with zero runtime overhead
+- **Semantic preservation**:
+  - Removes authoring comments but preserves processing instructions
+  - Rejects CR/LF/tab-only structural text outside inherited `xml:space="preserve"`
+  - Preserves every accepted text event byte-for-byte, including pure-space content
   - Collapses empty tags (`<tag></tag>` → `<tag/>`)
-  - Removes unnecessary whitespace between tags
+- **Source contract**: producer templates must contain no non-semantic formatting whitespace; violations produce `compile_error!`
 - **Safe and standards-compliant**: Preserves XML structure and semantics
 - **Fast**: Single-pass processing with efficient buffer reuse
 - **Memory-efficient**: Pre-allocates buffers and uses zero-copy operations where possible
@@ -71,14 +72,7 @@ const TEMPLATE: &str = minified_xml!("templates/document.xml");
 Given an XML file `template.xml`:
 
 ```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<root>
-    <!-- This is a comment -->
-    <child attr="value">
-        Text content
-    </child>
-    <empty></empty>
-</root>
+<?xml version="1.0" encoding="UTF-8"?><root><!-- This is a comment --><child attr="value">Text content</child><empty></empty></root>
 ```
 
 The macro produces:
@@ -91,10 +85,12 @@ The macro produces:
 
 ### Whitespace Handling
 
-The minifier intelligently handles whitespace:
-- Removes pure whitespace between tags
-- Trims leading and trailing whitespace from text nodes
-- Preserves text content
+The macros never infer an XML schema content model. They reject text consisting
+only of XML whitespace when it contains CR, LF, or tab outside inherited
+`xml:space="preserve"`; they never silently delete it. Pure-space nodes and all
+text containing semantic characters are preserved byte-for-byte, including any
+CR, LF, or tab within that semantic text. Keep producer-template sources compact
+and use `audit::verify` to enforce the same structural whitespace contract.
 
 ### CDATA Sections
 
@@ -124,8 +120,8 @@ DOCTYPE declarations are preserved:
 
 - **Zero runtime cost**: Minification happens at compile time
 - **Efficient processing**: Single-pass with buffer reuse
-- **Memory-efficient**: Pre-allocates approximately half the input size
-- **Zero-copy where possible**: Uses `Cow<[u8]>` and byte slices
+- **Memory-efficient**: Pre-allocates at most the bounded input size
+- **Zero-copy where possible**: Uses borrowed parser events and byte slices
 
 # Tips for Rust Analyzer users
 
@@ -144,4 +140,22 @@ In order not to produce tons of errors and warnings, add the following settings 
 ## License
 
 This is part of the Litchi project so it is licensed under the same license that the project adopts.
+## Compact output auditing
 
+`xml-minifier` also exposes a bounded, non-rewriting verifier for generated
+OOXML and ODF parts and checked-in XML assets:
+
+```rust
+use xml_minifier::audit::{self, Limits};
+
+let report = audit::verify(b"<root key=\"value\">text</root>", Limits::default())?;
+assert_eq!(report.max_depth(), 1);
+# Ok::<(), audit::Error>(())
+```
+
+The verifier rejects structural CR/LF/tab indentation, whitespace before a tag
+close, and nonminimal attribute separators. Character data, CDATA, and plain
+space-only nodes are never normalized. An inherited `xml:space="preserve"`
+keeps line-oriented whitespace exact. `audit::package` verifies borrowed named
+parts under aggregate part and byte budgets without rewriting opaque input.
+DTD and DOCTYPE declarations are rejected without resolving entities.

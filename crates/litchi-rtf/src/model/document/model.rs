@@ -121,6 +121,10 @@ pub struct RtfDocument<'a> {
     color_table: ColorTable,
     /// Style blocks
     blocks: Vec<StyleBlock<'a>>,
+    /// Unsupported syntax retained as bounded inert source fragments.
+    opaque_nodes: Vec<crate::opaque::Node>,
+    /// Original transport for byte-exact writes of immutable snapshots containing opaque syntax.
+    preserved_source: Option<Vec<u8>>,
     /// Extracted tables
     tables: Vec<super::super::table::Table<'a>>,
     /// Extracted pictures
@@ -370,7 +374,17 @@ impl<'a> RtfDocument<'a> {
             Cow::Owned(input_bytes.iter().map(|byte| char::from(*byte)).collect())
         };
 
-        Self::parse_string(input_str.as_ref(), limits)
+        let mut document = Self::parse_string(input_str.as_ref(), limits)?;
+        let mut source = Vec::new();
+        source
+            .try_reserve(bytes.len())
+            .map_err(|_| RtfError::AllocationFailed {
+                resource: "preserved RTF source",
+                requested: bytes.len(),
+            })?;
+        source.extend_from_slice(bytes);
+        document.preserved_source = Some(source);
+        Ok(document)
     }
 
     /// Parse an RTF document from a UTF-8 string (internal)
@@ -380,10 +394,10 @@ impl<'a> RtfDocument<'a> {
 
         // Lexer phase
         let mut lexer = Lexer::new_with_limits(input, &arena, limits);
-        let tokens = lexer.tokenize()?;
+        let (tokens, token_spans) = lexer.tokenize_with_spans()?;
 
         // Parser phase
-        let parser = Parser::new(&tokens, &arena);
+        let parser = Parser::new_with_source(&tokens, &token_spans, input, &arena, limits);
         let parsed = parser.parse()?;
 
         // Convert parsed document to owned document
@@ -484,6 +498,8 @@ impl<'a> RtfDocument<'a> {
             file_table: parsed.file_table.map(crate::FileTable::into_owned),
             color_table: parsed.color_table,
             blocks: owned_blocks,
+            opaque_nodes: parsed.opaque_nodes,
+            preserved_source: None,
             tables: owned_tables,
             pictures: owned_pictures,
             picture_compatibility_records: parsed.picture_compatibility_records,
@@ -917,6 +933,15 @@ impl<'a> RtfDocument<'a> {
     /// Get all style blocks.
     pub fn blocks(&self) -> &[StyleBlock<'_>] {
         &self.blocks
+    }
+
+    /// Borrow unsupported syntax retained as bounded inert data.
+    pub fn opaque_nodes(&self) -> &[crate::opaque::Node] {
+        &self.opaque_nodes
+    }
+
+    pub(crate) fn preserved_source(&self) -> Option<&[u8]> {
+        self.preserved_source.as_deref()
     }
 
     pub(crate) fn retained_blocks(&self) -> &[StyleBlock<'a>] {

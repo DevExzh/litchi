@@ -973,10 +973,7 @@ mod tests {
         let open = |password| {
             Workbook::new_with_options(
                 std::fs::File::open(&path).unwrap(),
-                OpenOptions {
-                    password,
-                    ..OpenOptions::default()
-                },
+                OpenOptions::new().with_password(password),
             )
         };
         assert!(matches!(open(None), Err(Error::PasswordRequired)));
@@ -1072,14 +1069,8 @@ mod tests {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls");
         let file = std::fs::File::open(path).unwrap();
-        let workbook = Workbook::new_with_options(
-            file,
-            OpenOptions {
-                password: Some("abc"),
-                ..OpenOptions::default()
-            },
-        )
-        .unwrap();
+        let workbook =
+            Workbook::new_with_options(file, OpenOptions::new().with_password("abc")).unwrap();
         let cell = workbook.xls_worksheet(0).unwrap().get_cell(0, 0).unwrap();
         assert!(matches!(cell.value(), CellValue::Float(value) if *value == 1.0));
     }
@@ -1092,22 +1083,13 @@ mod tests {
         assert!(matches!(
             Workbook::new_with_options(
                 wrong_password_file,
-                OpenOptions {
-                    password: Some("wrong"),
-                    ..OpenOptions::default()
-                },
+                OpenOptions::new().with_password("wrong"),
             ),
             Err(Error::InvalidPassword)
         ));
         let file = std::fs::File::open(path).unwrap();
-        let workbook = Workbook::new_with_options(
-            file,
-            OpenOptions {
-                password: Some("password"),
-                ..OpenOptions::default()
-            },
-        )
-        .unwrap();
+        let workbook =
+            Workbook::new_with_options(file, OpenOptions::new().with_password("password")).unwrap();
         let worksheet = workbook.xls_worksheet(0).unwrap();
         let found = (0..128).any(|row| {
             (0..32).any(|column| {

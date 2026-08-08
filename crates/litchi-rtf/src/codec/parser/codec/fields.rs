@@ -60,6 +60,11 @@ impl<'a> Parser<'a> {
                     // End of outer field group
                     break;
                 },
+                Token::Control(ControlWord::Unknown(_, _)) => {
+                    let token = self.pos;
+                    self.pos += 1;
+                    self.preserve_unknown_control_in(token, crate::opaque::Context::Field)?;
+                },
                 Token::Control(control) => {
                     let status_control = match control {
                         ControlWord::FieldDirty(parameter) => Some(("flddirty", parameter, 1_u8)),
@@ -152,8 +157,8 @@ impl<'a> Parser<'a> {
                                 state.destination = Destination::FieldResult;
                             }
                         } else {
-                            // Skip unknown nested groups
-                            self.skip_until_close_brace()?;
+                            // Retain unknown field-owned groups without interpreting them.
+                            self.preserve_unknown_destination_in(crate::opaque::Context::Field)?;
                             continue;
                         }
 
@@ -214,6 +219,14 @@ impl<'a> Parser<'a> {
                                     result.push(b'\t');
                                     self.pos += 1;
                                 },
+                                Token::Control(ControlWord::Unknown(_, _)) => {
+                                    let token = self.pos;
+                                    self.pos += 1;
+                                    self.preserve_unknown_control_in(
+                                        token,
+                                        crate::opaque::Context::Field,
+                                    )?;
+                                },
                                 Token::Control(control)
                                     if control_symbol_text(control).is_some() =>
                                 {
@@ -266,6 +279,19 @@ impl<'a> Parser<'a> {
                                                 ));
                                             }
                                             data_field = Some(self.parse_data_field_destination()?);
+                                        },
+                                        Some(ControlWord::Unknown(_, _))
+                                            if matches!(
+                                                self.tokens.get(self.pos + 1),
+                                                Some(Token::Control(
+                                                    ControlWord::IgnorableDestination
+                                                ))
+                                            ) =>
+                                        {
+                                            self.pos += 1;
+                                            self.preserve_unknown_destination_in(
+                                                crate::opaque::Context::Field,
+                                            )?;
                                         },
                                         _ => {
                                             nested_depth =

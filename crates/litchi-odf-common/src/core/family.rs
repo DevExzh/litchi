@@ -2,7 +2,7 @@
 
 use super::{Content, Meta, OwnedPackage, Styles};
 use litchi_core::{Error, Metadata, Result};
-use std::{fs, path::Path};
+use std::{fs, path::Path, sync::Arc};
 
 const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
 
@@ -54,6 +54,21 @@ impl Package {
     ) -> Result<Self> {
         Self::from_owned_package(
             OwnedPackage::from_bytes(bytes)?,
+            mimetype,
+            body_marker,
+            family_name,
+        )
+    }
+
+    /// Decode shared package bytes without copying the archive buffer.
+    pub fn from_shared_bytes(
+        bytes: Arc<Vec<u8>>,
+        mimetype: &str,
+        body_marker: &str,
+        family_name: &str,
+    ) -> Result<Self> {
+        Self::from_owned_package(
+            OwnedPackage::from_shared_bytes(bytes)?,
             mimetype,
             body_marker,
             family_name,
@@ -143,6 +158,11 @@ impl Package {
     /// Borrow the original archive bytes without allocating.
     pub fn as_bytes(&self) -> &[u8] {
         self.archive.as_bytes()
+    }
+
+    /// Clone the shared handle to the exact archive allocation.
+    pub fn shared_bytes(&self) -> Arc<Vec<u8>> {
+        self.archive.shared_bytes()
     }
 
     /// List all safe package paths.

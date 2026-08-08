@@ -39,100 +39,69 @@ impl<'a> Document<'a> {
     ///
     /// This is separate from [`Self::text`], whose behavior remains unchanged.
     pub fn list_items(&self) -> Result<Vec<crate::list::ListItem>> {
-        let Some(numbering) = self.numbering()? else {
-            return Ok(Vec::new());
-        };
+        Ok(self
+            .resolved_list_items()?
+            .into_iter()
+            .map(crate::list::ListItem::from)
+            .collect())
+    }
+
+    /// Return numbered paragraphs with resolved format and counter semantics.
+    pub fn resolved_list_items(&self) -> Result<Vec<crate::list::ResolvedListItem>> {
+        let numbering = self.numbering()?.unwrap_or_default();
         let paragraphs = self.paragraphs()?;
         let mut styles = self.styles()?;
         let mut counters = crate::list::ListCounterState::new();
         let mut items = Vec::new();
 
         for (paragraph_index, paragraph) in paragraphs.iter().enumerate() {
-            let direct = paragraph.numbering()?;
-            let style_id = paragraph.style_id()?;
-            let inherited = if direct.is_none() {
-                match style_id.as_deref() {
-                    Some(style_id) => styles.resolved_numbering(style_id)?,
-                    None => None,
-                }
-            } else {
-                None
-            };
-            let associated = if direct.is_none() && inherited.is_none() {
-                style_id.as_deref().and_then(|style_id| {
-                    let mut found = None;
-                    for num in numbering.nums() {
-                        if let Some(abstract_num) =
-                            numbering.get_abstract_num(num.abstract_num_id())
-                        {
-                            for level in abstract_num.levels() {
-                                if level.paragraph_style.as_deref() == Some(style_id)
-                                    && found.is_none()
-                                {
-                                    found = Some(crate::numbering::Paragraph {
-                                        num_id: num.id(),
-                                        level: level.level,
-                                    });
-                                }
-                            }
-                        }
-                    }
-                    found
-                })
-            } else {
-                None
-            };
-            let Some(mut properties) = direct.or(inherited).or(associated) else {
-                continue;
-            };
-            if properties.num_id == 0 {
-                continue;
-            }
-            let mut linked_num_ids = std::collections::HashSet::new();
-            loop {
-                if !linked_num_ids.insert(properties.num_id) {
-                    return Err(Error::InvalidFormat(format!(
-                        "numbering style-link cycle at numId {}",
-                        properties.num_id
-                    )));
-                }
-                let num = numbering.get_num(properties.num_id).ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "paragraph references missing numId {}",
-                        properties.num_id
-                    ))
-                })?;
-                let abstract_num = numbering
-                    .get_abstract_num(num.abstract_num_id())
-                    .ok_or_else(|| {
-                        Error::InvalidFormat(format!(
-                            "numId {} references a missing abstract numbering definition",
-                            properties.num_id
-                        ))
-                    })?;
-                let Some(style_link) = abstract_num.num_style_link() else {
-                    break;
-                };
-                let linked = styles.resolved_numbering(style_link)?.ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "numbering style link '{style_link}' has no numPr"
-                    ))
-                })?;
-                if linked.num_id == 0 {
-                    break;
-                }
-                properties.num_id = linked.num_id;
-            }
-            let (marker, suffix) = counters.advance(&numbering, properties)?;
-            items.push(crate::list::ListItem {
+            if let Some(item) = resolve_list_item(
                 paragraph_index,
-                numbering: properties,
-                marker,
-                suffix,
-                text: paragraph.text()?,
-            });
+                paragraph,
+                &numbering,
+                &mut styles,
+                &mut counters,
+            )? {
+                items.push(item);
+            }
         }
         Ok(items)
+    }
+
+    /// Return top-level document elements paired with resolved list metadata.
+    ///
+    /// The returned vector is aligned one-to-one with [`Self::elements`], so a
+    /// table never shifts the metadata associated with following paragraphs.
+    pub fn elements_with_resolved_list_items(
+        &self,
+    ) -> Result<Vec<(Element, Option<crate::list::ResolvedListItem>)>> {
+        let numbering = self.numbering()?.unwrap_or_default();
+        let elements = self.elements()?;
+        let mut styles = self.styles()?;
+        let mut counters = crate::list::ListCounterState::new();
+        let mut paragraph_index = 0usize;
+        let mut resolved = Vec::with_capacity(elements.len());
+
+        for element in elements {
+            let item = match &element {
+                Element::Paragraph(paragraph) => {
+                    let item = resolve_list_item(
+                        paragraph_index,
+                        paragraph,
+                        &numbering,
+                        &mut styles,
+                        &mut counters,
+                    )?;
+                    paragraph_index = paragraph_index.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("document paragraph index overflow".to_owned())
+                    })?;
+                    item
+                },
+                Element::Table(_) => None,
+            };
+            resolved.push((element, item));
+        }
+        Ok(resolved)
     }
 
     /// Extract paragraph text with resolvable list labels prepended.
@@ -667,4 +636,116 @@ impl<'a> Document<'a> {
     // - 20+ standard shape types (rectangle, ellipse, arrows, etc.)
     //
     // ✅ Smart tags: namespace-aware reading and mutable nested-tag writing
+}
+
+fn resolve_list_item(
+    paragraph_index: usize,
+    paragraph: &Paragraph,
+    numbering: &crate::numbering::Collection,
+    styles: &mut crate::styles::Styles<'_>,
+    counters: &mut crate::list::ListCounterState,
+) -> Result<Option<crate::list::ResolvedListItem>> {
+    let direct = paragraph.numbering()?;
+    let style_id = paragraph.style_id()?;
+    let inherited = if direct.is_none() {
+        match style_id.as_deref() {
+            Some(style_id) => styles.resolved_numbering(style_id)?,
+            None => None,
+        }
+    } else {
+        None
+    };
+    let associated = if direct.is_none() && inherited.is_none() {
+        resolve_style_association(style_id.as_deref(), numbering)?
+    } else {
+        None
+    };
+    let Some(mut properties) = direct.or(inherited).or(associated) else {
+        return Ok(None);
+    };
+    if properties.num_id == 0 {
+        return Ok(None);
+    }
+
+    let mut linked_num_ids = std::collections::HashSet::new();
+    loop {
+        if !linked_num_ids.insert(properties.num_id) {
+            return Err(Error::InvalidFormat(format!(
+                "numbering style-link cycle at numId {}",
+                properties.num_id
+            )));
+        }
+        let num = numbering.get_num(properties.num_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "paragraph references missing numId {}",
+                properties.num_id
+            ))
+        })?;
+        let abstract_num = numbering
+            .get_abstract_num(num.abstract_num_id())
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "numId {} references a missing abstract numbering definition",
+                    properties.num_id
+                ))
+            })?;
+        let Some(style_link) = abstract_num.num_style_link() else {
+            break;
+        };
+        let linked = styles.resolved_numbering(style_link)?.ok_or_else(|| {
+            Error::InvalidFormat(format!("numbering style link '{style_link}' has no numPr"))
+        })?;
+        if linked.num_id == 0 {
+            return Ok(None);
+        }
+        properties.num_id = linked.num_id;
+    }
+
+    let resolved = counters.advance_resolved(numbering, properties)?;
+    Ok(Some(crate::list::ResolvedListItem {
+        paragraph_index,
+        numbering: properties,
+        format: resolved.format,
+        kind: resolved.kind,
+        value: resolved.value,
+        marker: resolved.marker,
+        suffix: resolved.suffix,
+        text: paragraph.text()?,
+    }))
+}
+
+fn resolve_style_association(
+    style_id: Option<&str>,
+    numbering: &crate::numbering::Collection,
+) -> Result<Option<crate::numbering::Paragraph>> {
+    let Some(style_id) = style_id else {
+        return Ok(None);
+    };
+    let mut found = None;
+    for num in numbering.nums() {
+        let abstract_num = numbering
+            .get_abstract_num(num.abstract_num_id())
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "numId {} references a missing abstract numbering definition",
+                    num.id()
+                ))
+            })?;
+        for level in abstract_num.levels() {
+            if level.paragraph_style.as_deref() != Some(style_id) {
+                continue;
+            }
+            let candidate = crate::numbering::Paragraph {
+                num_id: num.id(),
+                level: level.level,
+            };
+            if found.is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "paragraph style '{style_id}' has ambiguous numbering associations"
+                )));
+            }
+            found = Some(candidate);
+        }
+    }
+    Ok(found)
 }

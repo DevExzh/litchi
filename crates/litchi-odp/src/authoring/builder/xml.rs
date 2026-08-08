@@ -44,7 +44,7 @@ fn encode_text_content(text: &str) -> String {
     output
 }
 
-pub(super) fn generate_text_paragraphs(text: &str, style_name: Option<&str>) -> String {
+pub(crate) fn generate_text_paragraphs(text: &str, style_name: Option<&str>) -> String {
     let escaped_style = style_name.map(escape_xml);
     let mut output = String::with_capacity(text.len() + 32);
     for paragraph in text.split('\n') {

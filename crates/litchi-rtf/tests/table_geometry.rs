@@ -192,9 +192,22 @@ fn parses_real_libreoffice_geometry_fixture() {
     assert!(
         rows.iter()
             .flat_map(|row| row.cells())
+            .any(|cell| cell.shading().raw_amount == Some(500))
+    );
+    assert!(
+        rows.iter()
+            .flat_map(|row| row.cells())
+            .any(|cell| cell.shading().raw_nil)
+    );
+    assert!(
+        rows.iter()
+            .flat_map(|row| row.cells())
             .any(|cell| cell.merge().vertical == Some(TableCellMergeRole::Continuation))
     );
-    let reparsed = RtfDocument::parse(&write(&document)).unwrap();
+    let rewritten = write(&document);
+    assert!(rewritten.contains("\\clshdng500\\clshdngraw500"));
+    assert!(rewritten.contains("\\clshdrawnil"));
+    let reparsed = RtfDocument::parse(&rewritten).unwrap();
     assert!(
         reparsed
             .tables()

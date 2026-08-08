@@ -1,6 +1,7 @@
 //! Retained native RTF snapshot storage.
 
 pub(crate) mod document;
+pub(crate) mod opaque;
 pub(crate) mod types;
 
 pub(crate) use crate::{

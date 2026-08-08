@@ -4,7 +4,7 @@ use litchi_core::{Metadata, Result};
 use litchi_odf_common::core::family::Package;
 use std::path::Path;
 
-pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.database";
+pub(crate) const MIMETYPE: &str = litchi_odf_common::constants::ODF_DATABASE;
 const BODY_MARKER: &str = "<office:database";
 
 /// An immutable, validated package snapshot.

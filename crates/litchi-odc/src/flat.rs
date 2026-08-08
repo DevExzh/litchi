@@ -1,0 +1,691 @@
+//! Bounded, byte-preserving flat OpenDocument Chart snapshots and axis edits.
+
+use litchi_core::{Error, FileFormat, Result};
+use litchi_odf_common::chart::{self, Element, PlotArea};
+use quick_xml::{
+    XmlVersion,
+    events::{BytesStart, Event},
+    name::{Namespace, ResolveResult},
+    reader::NsReader,
+};
+use std::{ops::Range, sync::Arc};
+
+const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+const CHART: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:chart:1.0";
+const MAX_BYTES: usize = 64 * 1024 * 1024;
+const MAX_DEPTH: usize = 256;
+const MAX_AXES: usize = 16_384;
+const MAX_NAME_BYTES: usize = 64 * 1024;
+
+#[derive(Clone, Debug)]
+struct State {
+    bytes: Vec<u8>,
+    chart: Element,
+    axes: Vec<AxisRecord>,
+}
+
+#[derive(Clone, Debug)]
+struct AxisRecord {
+    name: Option<String>,
+    tag: Range<usize>,
+    name_value: Option<Range<usize>>,
+    name_attribute: Option<Range<usize>>,
+    prefix: Option<String>,
+}
+
+/// An immutable, byte-exact flat ODC snapshot.
+#[derive(Clone, Debug)]
+pub struct FlatChart(Arc<State>);
+
+impl FlatChart {
+    /// Opens a flat ODC document from owned UTF-8 XML bytes.
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+        parse(bytes).map(|state| Self(Arc::new(state)))
+    }
+
+    /// Returns the retained semantic chart tree.
+    #[must_use]
+    pub fn chart(&self) -> &Element {
+        &self.0.chart
+    }
+
+    /// Returns the first chart plot area, when present.
+    #[must_use]
+    pub fn plot_area(&self) -> Option<PlotArea<'_>> {
+        self.chart().plot_area()
+    }
+
+    /// Finds the first axis with the requested `chart:name`.
+    #[must_use]
+    pub fn find_axis(&self, name: &str) -> Option<chart::Axis<'_>> {
+        self.plot_area()?
+            .axes()
+            .find(|axis| axis.name() == Some(name))
+    }
+
+    /// Returns the exact original XML bytes.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0.bytes
+    }
+
+    /// Starts a detached transaction bound to this source snapshot.
+    #[must_use]
+    pub fn edit(&self) -> FlatChartEdit {
+        FlatChartEdit {
+            source: self.clone(),
+            changes: Vec::new(),
+        }
+    }
+
+    /// Consumes the snapshot and returns its exact XML bytes.
+    pub fn into_bytes(self) -> Vec<u8> {
+        Arc::try_unwrap(self.0).map_or_else(|state| state.bytes.clone(), |state| state.bytes)
+    }
+
+    fn axis_name(&self, index: usize) -> Result<Option<&str>> {
+        self.0
+            .axes
+            .get(index)
+            .map(|axis| axis.name.as_deref())
+            .ok_or_else(|| invalid_error("flat ODC axis selector is out of bounds"))
+    }
+}
+
+/// A partial update for one chart axis.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct AxisUpdate {
+    /// `None` leaves the name unchanged, `Some(None)` removes it, and
+    /// `Some(Some(name))` sets it.
+    pub name: Option<Option<String>>,
+}
+
+impl AxisUpdate {
+    /// Creates an update that assigns `chart:name`.
+    #[must_use]
+    pub fn named(name: impl Into<String>) -> Self {
+        Self {
+            name: Some(Some(name.into())),
+        }
+    }
+
+    /// Creates an update that removes `chart:name`.
+    #[must_use]
+    pub const fn unnamed() -> Self {
+        Self { name: Some(None) }
+    }
+}
+
+/// A staged, source-bound flat chart transaction.
+pub struct FlatChartEdit {
+    source: FlatChart,
+    changes: Vec<AxisChange>,
+}
+
+impl FlatChartEdit {
+    /// Stages an axis update by plot-area axis index.
+    pub fn update_axis(&mut self, index: usize, update: AxisUpdate) -> Result<()> {
+        let Some(after) = update.name else {
+            return Ok(());
+        };
+        if after
+            .as_ref()
+            .is_some_and(|name| name.len() > MAX_NAME_BYTES)
+        {
+            return Err(invalid_error("flat ODC axis name exceeds 64 KiB"));
+        }
+        let before = self.source.axis_name(index)?.map(str::to_owned);
+        if before == after {
+            self.changes.retain(|change| change.index != index);
+            return Ok(());
+        }
+        let change = AxisChange {
+            index,
+            before,
+            after,
+        };
+        if let Some(existing) = self
+            .changes
+            .iter_mut()
+            .find(|existing| existing.index == index)
+        {
+            *existing = change;
+        } else {
+            self.changes.push(change);
+        }
+        Ok(())
+    }
+
+    /// Validates and atomically publishes all staged changes in memory.
+    pub fn commit(self) -> Result<FlatChartCommit> {
+        let mut replacements = Vec::with_capacity(self.changes.len());
+        for change in &self.changes {
+            let axis = &self.source.0.axes[change.index];
+            match (&change.after, &axis.name_value, &axis.name_attribute) {
+                (Some(name), Some(value), _) => replacements.push(Replacement {
+                    range: value.clone(),
+                    value: escape_attribute(name).into_bytes(),
+                }),
+                (None, _, Some(attribute)) => replacements.push(Replacement {
+                    range: attribute.clone(),
+                    value: Vec::new(),
+                }),
+                (Some(name), None, None) => {
+                    let prefix = axis.prefix.as_deref().ok_or_else(|| {
+                        Error::Unsupported(
+                            "cannot add chart:name without a lossless chart namespace prefix"
+                                .to_string(),
+                        )
+                    })?;
+                    let raw = &self.source.as_bytes()[axis.tag.clone()];
+                    let relative = insertion_offset(raw)?;
+                    replacements.push(Replacement {
+                        range: axis.tag.start + relative..axis.tag.start + relative,
+                        value: format!(" {prefix}:name=\"{}\"", escape_attribute(name))
+                            .into_bytes(),
+                    });
+                },
+                (None, None, None) => {},
+                (None, Some(_), None) => {
+                    return Err(invalid_error("flat ODC axis attribute span is incomplete"));
+                },
+                (Some(_), None, Some(_)) => {
+                    return Err(invalid_error("flat ODC axis attribute span is incomplete"));
+                },
+            }
+        }
+        replacements.sort_unstable_by(|left, right| right.range.start.cmp(&left.range.start));
+        let mut bytes = self.source.as_bytes().to_vec();
+        let mut previous = bytes.len();
+        for replacement in replacements {
+            if replacement.range.end > previous
+                || replacement.range.start > replacement.range.end
+                || replacement.range.end > bytes.len()
+            {
+                return Err(invalid_error("flat ODC edit contains overlapping spans"));
+            }
+            bytes.splice(replacement.range.clone(), replacement.value);
+            previous = replacement.range.start;
+        }
+        let snapshot = FlatChart::from_bytes(bytes)?;
+        for change in &self.changes {
+            if snapshot.axis_name(change.index)? != change.after.as_deref() {
+                return Err(invalid_error("flat ODC edit failed typed readback"));
+            }
+        }
+        Ok(FlatChartCommit {
+            snapshot,
+            patch: FlatChartPatch {
+                changes: self.changes,
+            },
+        })
+    }
+}
+
+/// A committed flat chart snapshot and its reversible semantic patch.
+pub struct FlatChartCommit {
+    snapshot: FlatChart,
+    patch: FlatChartPatch,
+}
+
+impl FlatChartCommit {
+    /// Returns the committed snapshot.
+    #[must_use]
+    pub fn snapshot(&self) -> &FlatChart {
+        &self.snapshot
+    }
+
+    /// Returns the source-bound patch.
+    #[must_use]
+    pub fn patch(&self) -> &FlatChartPatch {
+        &self.patch
+    }
+
+    /// Consumes the commit and returns its snapshot.
+    pub fn into_snapshot(self) -> FlatChart {
+        self.snapshot
+    }
+}
+
+/// A source-checked, reversible collection of axis changes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FlatChartPatch {
+    changes: Vec<AxisChange>,
+}
+
+impl FlatChartPatch {
+    /// Returns the ordered semantic changes.
+    #[must_use]
+    pub fn changes(&self) -> &[AxisChange] {
+        &self.changes
+    }
+
+    /// Returns a patch that reverses this patch.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            changes: self
+                .changes
+                .iter()
+                .map(|change| AxisChange {
+                    index: change.index,
+                    before: change.after.clone(),
+                    after: change.before.clone(),
+                })
+                .collect(),
+        }
+    }
+
+    /// Applies the patch only when every source value still matches.
+    pub fn apply(&self, source: &FlatChart) -> Result<FlatChartCommit> {
+        let mut edit = source.edit();
+        for change in &self.changes {
+            if source.axis_name(change.index)? != change.before.as_deref() {
+                return Err(invalid_error("flat ODC patch source does not match"));
+            }
+            edit.update_axis(
+                change.index,
+                AxisUpdate {
+                    name: Some(change.after.clone()),
+                },
+            )?;
+        }
+        edit.commit()
+    }
+}
+
+/// One selector-bound axis name change.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AxisChange {
+    index: usize,
+    before: Option<String>,
+    after: Option<String>,
+}
+
+impl AxisChange {
+    #[must_use]
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    #[must_use]
+    pub fn before(&self) -> Option<&str> {
+        self.before.as_deref()
+    }
+
+    #[must_use]
+    pub fn after(&self) -> Option<&str> {
+        self.after.as_deref()
+    }
+}
+
+struct Replacement {
+    range: Range<usize>,
+    value: Vec<u8>,
+}
+
+fn parse(bytes: Vec<u8>) -> Result<State> {
+    if bytes.len() > MAX_BYTES {
+        return Err(invalid_error("flat ODC exceeds the 64 MiB input limit"));
+    }
+    if litchi_odf_common::detect::flat(&bytes) != Some(FileFormat::Odc) {
+        return Err(invalid_error("input is not a flat ODC document"));
+    }
+    let xml = std::str::from_utf8(&bytes).map_err(|_| invalid_error("flat ODC is not UTF-8"))?;
+    let mut reader = NsReader::from_reader(xml.as_bytes());
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    let mut depth = 0usize;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut body_depth = None;
+    let mut body_seen = false;
+    let mut office_chart_depth = None;
+    let mut office_chart_seen = false;
+    let mut chart_depth = None;
+    let mut chart_seen = false;
+    let mut plot_depth = None;
+    let mut plot_seen = false;
+    let mut root_start_name = None;
+    let mut root_end_name = None;
+    let mut axes = Vec::new();
+
+    loop {
+        let event_start = reader.buffer_position() as usize;
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid_error(format!("invalid flat ODC XML: {error}")))?;
+        let namespace = classify(&namespace);
+        let event_end = reader.buffer_position() as usize;
+        match event {
+            Event::Start(element) => {
+                let event_depth = checked_depth(depth)?;
+                let local = element.local_name();
+                if event_depth == 1 {
+                    if root_seen
+                        || namespace != NamespaceKind::Office
+                        || local.as_ref() != b"document"
+                    {
+                        return Err(invalid_error("flat ODC requires one office:document root"));
+                    }
+                    root_seen = true;
+                    root_start_name = Some(event_name_span(
+                        &bytes,
+                        event_start..event_end,
+                        element.name().as_ref(),
+                    )?);
+                } else if namespace == NamespaceKind::Office && local.as_ref() == b"body" {
+                    if event_depth != 2 || body_seen {
+                        return Err(invalid_error("office:body is misplaced or duplicated"));
+                    }
+                    body_seen = true;
+                    body_depth = Some(event_depth);
+                } else if namespace == NamespaceKind::Office && local.as_ref() == b"chart" {
+                    if body_depth != Some(event_depth - 1) || office_chart_seen {
+                        return Err(invalid_error("office:chart is misplaced or duplicated"));
+                    }
+                    office_chart_seen = true;
+                    office_chart_depth = Some(event_depth);
+                } else if namespace == NamespaceKind::Chart && local.as_ref() == b"chart" {
+                    if office_chart_depth != Some(event_depth - 1) || chart_seen {
+                        return Err(invalid_error("chart:chart is misplaced or duplicated"));
+                    }
+                    chart_seen = true;
+                    chart_depth = Some(event_depth);
+                } else if namespace == NamespaceKind::Chart && local.as_ref() == b"plot-area" {
+                    if chart_depth != Some(event_depth - 1) || plot_seen {
+                        return Err(invalid_error("chart:plot-area is misplaced or duplicated"));
+                    }
+                    plot_seen = true;
+                    plot_depth = Some(event_depth);
+                } else if namespace == NamespaceKind::Chart
+                    && local.as_ref() == b"axis"
+                    && plot_depth == Some(event_depth - 1)
+                {
+                    push_axis(&reader, &element, event_start..event_end, &bytes, &mut axes)?;
+                }
+                depth = event_depth;
+            },
+            Event::Empty(element) => {
+                let event_depth = checked_depth(depth)?;
+                let local = element.local_name();
+                if event_depth == 1
+                    || (namespace == NamespaceKind::Office
+                        && matches!(local.as_ref(), b"body" | b"chart"))
+                    || (namespace == NamespaceKind::Chart && local.as_ref() == b"chart")
+                {
+                    return Err(invalid_error("flat ODC required structure cannot be empty"));
+                }
+                if namespace == NamespaceKind::Chart && local.as_ref() == b"plot-area" {
+                    if chart_depth != Some(event_depth - 1) || plot_seen {
+                        return Err(invalid_error("chart:plot-area is misplaced or duplicated"));
+                    }
+                    plot_seen = true;
+                }
+                if namespace == NamespaceKind::Chart
+                    && local.as_ref() == b"axis"
+                    && plot_depth == Some(event_depth - 1)
+                {
+                    push_axis(&reader, &element, event_start..event_end, &bytes, &mut axes)?;
+                }
+            },
+            Event::End(element) => {
+                if depth == 0 {
+                    return Err(invalid_error("flat ODC XML depth underflow"));
+                }
+                let local = element.local_name();
+                if depth == 1 {
+                    root_end_name = Some(event_name_span(
+                        &bytes,
+                        event_start..event_end,
+                        element.name().as_ref(),
+                    )?);
+                    root_closed = true;
+                }
+                if plot_depth == Some(depth)
+                    && namespace == NamespaceKind::Chart
+                    && local.as_ref() == b"plot-area"
+                {
+                    plot_depth = None;
+                }
+                if chart_depth == Some(depth)
+                    && namespace == NamespaceKind::Chart
+                    && local.as_ref() == b"chart"
+                {
+                    chart_depth = None;
+                }
+                if office_chart_depth == Some(depth)
+                    && namespace == NamespaceKind::Office
+                    && local.as_ref() == b"chart"
+                {
+                    office_chart_depth = None;
+                }
+                if body_depth == Some(depth)
+                    && namespace == NamespaceKind::Office
+                    && local.as_ref() == b"body"
+                {
+                    body_depth = None;
+                }
+                depth -= 1;
+            },
+            Event::DocType(_) => return Err(invalid_error("DOCTYPE is not allowed in flat ODC")),
+            Event::GeneralRef(reference)
+                if !matches!(
+                    reference.as_ref(),
+                    b"amp" | b"lt" | b"gt" | b"apos" | b"quot"
+                ) =>
+            {
+                return Err(invalid_error("flat ODC contains an unsupported entity"));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if depth != 0
+        || !root_seen
+        || !root_closed
+        || !body_seen
+        || !office_chart_seen
+        || !chart_seen
+        || body_depth.is_some()
+        || office_chart_depth.is_some()
+        || chart_depth.is_some()
+        || plot_depth.is_some()
+    {
+        return Err(invalid_error("flat ODC structure is incomplete"));
+    }
+
+    let mut normalized = bytes.clone();
+    let start = root_start_name.ok_or_else(|| invalid_error("flat ODC root start is missing"))?;
+    let end = root_end_name.ok_or_else(|| invalid_error("flat ODC root end is missing"))?;
+    let replacement = root_content_name(&bytes[start.clone()])?;
+    for span in [end, start] {
+        normalized.splice(span, replacement.iter().copied());
+    }
+    let normalized = std::str::from_utf8(&normalized)
+        .map_err(|_| invalid_error("normalized flat ODC is not UTF-8"))?;
+    let chart = chart::read(normalized)?;
+    if let Some(plot_area) = chart.plot_area() {
+        for axis in plot_area.axes() {
+            let _ = axis.dimension()?;
+        }
+    }
+    Ok(State { bytes, chart, axes })
+}
+
+fn push_axis(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    tag: Range<usize>,
+    bytes: &[u8],
+    axes: &mut Vec<AxisRecord>,
+) -> Result<()> {
+    if axes.len() >= MAX_AXES {
+        return Err(invalid_error("flat ODC axis count exceeds the limit"));
+    }
+    let mut name = None;
+    let mut key = None;
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute
+            .map_err(|error| invalid_error(format!("invalid flat ODC attribute: {error}")))?;
+        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        if resolved(&namespace, CHART) && local.as_ref() == b"name" {
+            if key.is_some() {
+                return Err(invalid_error("flat ODC axis has duplicate chart:name"));
+            }
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(|error| invalid_error(format!("invalid flat ODC axis name: {error}")))?
+                .into_owned();
+            if value.len() > MAX_NAME_BYTES {
+                return Err(invalid_error("flat ODC axis name exceeds 64 KiB"));
+            }
+            name = Some(value);
+            key = Some(attribute.key.as_ref().to_vec());
+        }
+    }
+    let prefix = element
+        .name()
+        .as_ref()
+        .split(|byte| *byte == b':')
+        .next()
+        .filter(|_| element.name().as_ref().contains(&b':'))
+        .map(|value| String::from_utf8_lossy(value).into_owned());
+    let (name_value, name_attribute) = if let Some(key) = key {
+        let (value, attribute) = attribute_spans(&bytes[tag.clone()], &key)?;
+        (
+            Some(tag.start + value.start..tag.start + value.end),
+            Some(tag.start + attribute.start..tag.start + attribute.end),
+        )
+    } else {
+        (None, None)
+    };
+    axes.push(AxisRecord {
+        name,
+        tag,
+        name_value,
+        name_attribute,
+        prefix,
+    });
+    Ok(())
+}
+
+fn attribute_spans(tag: &[u8], wanted: &[u8]) -> Result<(Range<usize>, Range<usize>)> {
+    let mut cursor = 1usize;
+    while cursor < tag.len() && !tag[cursor].is_ascii_whitespace() && tag[cursor] != b'>' {
+        cursor += 1;
+    }
+    while cursor < tag.len() {
+        let whitespace = cursor;
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= tag.len() || matches!(tag[cursor], b'/' | b'>') {
+            break;
+        }
+        let name_start = cursor;
+        while cursor < tag.len()
+            && !tag[cursor].is_ascii_whitespace()
+            && !matches!(tag[cursor], b'=' | b'/' | b'>')
+        {
+            cursor += 1;
+        }
+        let name_end = cursor;
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if tag.get(cursor) != Some(&b'=') {
+            return Err(invalid_error("flat ODC attribute is missing '='"));
+        }
+        cursor += 1;
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        let quote = *tag
+            .get(cursor)
+            .filter(|quote| matches!(quote, b'\'' | b'\"'))
+            .ok_or_else(|| invalid_error("flat ODC attribute is not quoted"))?;
+        cursor += 1;
+        let value_start = cursor;
+        while cursor < tag.len() && tag[cursor] != quote {
+            cursor += 1;
+        }
+        let value_end = cursor;
+        cursor = cursor
+            .checked_add(1)
+            .ok_or_else(|| invalid_error("flat ODC attribute offset overflow"))?;
+        if &tag[name_start..name_end] == wanted {
+            return Ok((value_start..value_end, whitespace..cursor));
+        }
+    }
+    Err(invalid_error("flat ODC axis name span was not found"))
+}
+
+fn insertion_offset(tag: &[u8]) -> Result<usize> {
+    let close = tag
+        .iter()
+        .rposition(|byte| *byte == b'>')
+        .ok_or_else(|| invalid_error("flat ODC axis start tag is incomplete"))?;
+    Ok(if close > 0 && tag[close - 1] == b'/' {
+        close - 1
+    } else {
+        close
+    })
+}
+
+fn event_name_span(bytes: &[u8], event: Range<usize>, name: &[u8]) -> Result<Range<usize>> {
+    let raw = bytes
+        .get(event.clone())
+        .ok_or_else(|| invalid_error("flat ODC event span is invalid"))?;
+    let relative = raw
+        .windows(name.len())
+        .position(|candidate| candidate == name)
+        .ok_or_else(|| invalid_error("flat ODC event name span is missing"))?;
+    Ok(event.start + relative..event.start + relative + name.len())
+}
+
+fn root_content_name(name: &[u8]) -> Result<Vec<u8>> {
+    let name =
+        std::str::from_utf8(name).map_err(|_| invalid_error("flat ODC root name is invalid"))?;
+    let prefix = name
+        .strip_suffix("document")
+        .ok_or_else(|| invalid_error("flat ODC root name is invalid"))?;
+    Ok(format!("{prefix}document-content").into_bytes())
+}
+
+fn checked_depth(depth: usize) -> Result<usize> {
+    let depth = depth
+        .checked_add(1)
+        .ok_or_else(|| invalid_error("flat ODC XML depth overflow"))?;
+    if depth > MAX_DEPTH {
+        return Err(invalid_error("flat ODC XML depth exceeds 256"));
+    }
+    Ok(depth)
+}
+
+fn resolved(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri.as_ref() == expected)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NamespaceKind {
+    Office,
+    Chart,
+    Other,
+}
+
+fn classify(namespace: &ResolveResult<'_>) -> NamespaceKind {
+    match namespace {
+        ResolveResult::Bound(Namespace(uri)) if uri.as_ref() == OFFICE => NamespaceKind::Office,
+        ResolveResult::Bound(Namespace(uri)) if uri.as_ref() == CHART => NamespaceKind::Chart,
+        _ => NamespaceKind::Other,
+    }
+}
+
+fn escape_attribute(value: &str) -> String {
+    quick_xml::escape::escape(value).into_owned()
+}
+
+fn invalid_error(message: impl Into<String>) -> Error {
+    Error::InvalidFormat(message.into())
+}

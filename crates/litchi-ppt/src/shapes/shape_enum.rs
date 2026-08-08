@@ -40,6 +40,23 @@ impl<'a> ShapeEnum<'a>
 where
     'a: 'static,
 {
+    pub(crate) fn mark_source_bound_recursive(&mut self) {
+        match self {
+            ShapeEnum::TextBox(shape) => shape.mark_source_bound(),
+            ShapeEnum::Placeholder(shape) => shape.mark_source_bound(),
+            ShapeEnum::AutoShape(shape) => shape.mark_source_bound(),
+            ShapeEnum::Picture(shape) => shape.mark_source_bound(),
+            ShapeEnum::Table(shape) => shape.mark_source_bound(),
+            ShapeEnum::Group(shape) => {
+                shape.mark_source_bound();
+                for child in &mut shape.children {
+                    child.mark_source_bound_recursive();
+                }
+            },
+            ShapeEnum::Line(shape) => shape.mark_source_bound(),
+        }
+    }
+
     /// Get the shape type.
     pub fn shape_type(&self) -> ShapeType {
         match self {
@@ -148,10 +165,15 @@ where
 
     /// Get shape as mutable PictureShape if it is one.
     #[inline]
-    pub fn as_picture_mut(&mut self) -> Option<&mut PictureShape> {
+    pub fn as_picture_mut(
+        &mut self,
+    ) -> std::result::Result<Option<&mut PictureShape>, crate::shapes::shape::MutationError> {
         match self {
-            ShapeEnum::Picture(pic) => Some(pic),
-            _ => None,
+            ShapeEnum::Picture(picture) => {
+                picture.ensure_mutable(crate::shapes::shape::Mutation::Picture)?;
+                Ok(Some(picture))
+            },
+            _ => Ok(None),
         }
     }
 
@@ -236,6 +258,7 @@ pub struct TableShape {
     /// Height
     height: i32,
     powerpoint12_shape_metadata: Option<ShapeMetadata>,
+    source_bound: bool,
 }
 
 impl TableShape {
@@ -252,6 +275,7 @@ impl TableShape {
             width: 0,
             height: 0,
             powerpoint12_shape_metadata: None,
+            source_bound: false,
         }
     }
 
@@ -314,6 +338,10 @@ impl TableShape {
     pub(crate) fn set_powerpoint12_shape_metadata(&mut self, metadata: Option<ShapeMetadata>) {
         self.powerpoint12_shape_metadata = metadata;
     }
+
+    pub(crate) fn mark_source_bound(&mut self) {
+        self.source_bound = true;
+    }
 }
 
 /// Group shape containing other shapes.
@@ -334,6 +362,7 @@ pub struct GroupShape<'a> {
     /// Height
     height: i32,
     powerpoint12_shape_metadata: Option<ShapeMetadata>,
+    source_bound: bool,
 }
 
 impl<'a> GroupShape<'a> {
@@ -347,11 +376,25 @@ impl<'a> GroupShape<'a> {
             width: 0,
             height: 0,
             powerpoint12_shape_metadata: None,
+            source_bound: false,
         }
     }
 
     /// Add a child shape.
-    pub fn add_child(&mut self, shape: ShapeEnum<'a>) {
+    pub fn add_child(
+        &mut self,
+        shape: ShapeEnum<'a>,
+    ) -> std::result::Result<(), crate::shapes::shape::MutationError> {
+        if self.source_bound {
+            return Err(crate::shapes::shape::MutationError::source_bound(
+                crate::shapes::shape::Mutation::Structure,
+            ));
+        }
+        self.children.push(shape);
+        Ok(())
+    }
+
+    pub(crate) fn add_decoded_child(&mut self, shape: ShapeEnum<'a>) {
         self.children.push(shape);
     }
 
@@ -361,7 +404,23 @@ impl<'a> GroupShape<'a> {
     }
 
     /// Set group bounds.
-    pub fn set_bounds(&mut self, left: i32, top: i32, width: i32, height: i32) {
+    pub fn set_bounds(
+        &mut self,
+        left: i32,
+        top: i32,
+        width: i32,
+        height: i32,
+    ) -> std::result::Result<(), crate::shapes::shape::MutationError> {
+        if self.source_bound {
+            return Err(crate::shapes::shape::MutationError::source_bound(
+                crate::shapes::shape::Mutation::Geometry,
+            ));
+        }
+        self.set_decoded_bounds(left, top, width, height);
+        Ok(())
+    }
+
+    pub(crate) fn set_decoded_bounds(&mut self, left: i32, top: i32, width: i32, height: i32) {
         self.left = left;
         self.top = top;
         self.width = width;
@@ -396,6 +455,10 @@ impl<'a> GroupShape<'a> {
     pub(crate) fn set_powerpoint12_shape_metadata(&mut self, metadata: Option<ShapeMetadata>) {
         self.powerpoint12_shape_metadata = metadata;
     }
+
+    pub(crate) fn mark_source_bound(&mut self) {
+        self.source_bound = true;
+    }
 }
 
 /// Line/connector shape.
@@ -419,6 +482,7 @@ pub struct LineShape {
     /// Line color
     color: Option<u32>,
     powerpoint12_shape_metadata: Option<ShapeMetadata>,
+    source_bound: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -440,6 +504,7 @@ impl LineShape {
             width: 1,
             color: None,
             powerpoint12_shape_metadata: None,
+            source_bound: false,
         }
     }
 
@@ -460,12 +525,38 @@ impl LineShape {
     }
 
     /// Set line width.
-    pub fn set_width(&mut self, width: i32) {
+    pub fn set_width(
+        &mut self,
+        width: i32,
+    ) -> std::result::Result<(), crate::shapes::shape::MutationError> {
+        if self.source_bound {
+            return Err(crate::shapes::shape::MutationError::source_bound(
+                crate::shapes::shape::Mutation::Line,
+            ));
+        }
+        self.width = width;
+        Ok(())
+    }
+
+    pub(crate) fn set_decoded_width(&mut self, width: i32) {
         self.width = width;
     }
 
     /// Set line color.
-    pub fn set_color(&mut self, color: u32) {
+    pub fn set_color(
+        &mut self,
+        color: u32,
+    ) -> std::result::Result<(), crate::shapes::shape::MutationError> {
+        if self.source_bound {
+            return Err(crate::shapes::shape::MutationError::source_bound(
+                crate::shapes::shape::Mutation::Line,
+            ));
+        }
+        self.color = Some(color);
+        Ok(())
+    }
+
+    pub(crate) fn set_decoded_color(&mut self, color: u32) {
         self.color = Some(color);
     }
 
@@ -484,6 +575,10 @@ impl LineShape {
     pub(crate) fn set_powerpoint12_shape_metadata(&mut self, metadata: Option<ShapeMetadata>) {
         self.powerpoint12_shape_metadata = metadata;
     }
+
+    pub(crate) fn mark_source_bound(&mut self) {
+        self.source_bound = true;
+    }
 }
 
 #[cfg(test)]
@@ -497,5 +592,73 @@ mod tests {
 
         assert_eq!(line.shape_type(), ShapeType::Line);
         assert_eq!(connector.shape_type(), ShapeType::Connector);
+    }
+
+    #[test]
+    fn source_bound_line_refuses_mutation() {
+        let mut line = LineShape::new(1, 0, 0, 10, 10);
+        let before_width = line.width;
+        let before_color = line.color;
+        line.mark_source_bound();
+
+        assert_eq!(
+            line.set_width(2),
+            Err(crate::shapes::shape::MutationError::SourceBound {
+                mutation: crate::shapes::shape::Mutation::Line,
+            })
+        );
+        assert_eq!(
+            line.set_color(0x00ff00),
+            Err(crate::shapes::shape::MutationError::SourceBound {
+                mutation: crate::shapes::shape::Mutation::Line,
+            })
+        );
+        assert_eq!(line.width, before_width);
+        assert_eq!(line.color, before_color);
+    }
+
+    #[test]
+    fn source_bound_group_setters_are_atomic() {
+        let mut group = GroupShape::new(1);
+        let before_bounds = (group.left, group.top, group.width, group.height);
+        let before_children = group.children.len();
+        group.mark_source_bound();
+
+        assert_eq!(
+            group.set_bounds(1, 2, 3, 4),
+            Err(crate::shapes::shape::MutationError::SourceBound {
+                mutation: crate::shapes::shape::Mutation::Geometry,
+            })
+        );
+        assert_eq!(
+            group.add_child(ShapeEnum::Picture(PictureShape::new(2))),
+            Err(crate::shapes::shape::MutationError::SourceBound {
+                mutation: crate::shapes::shape::Mutation::Structure,
+            })
+        );
+        assert_eq!(
+            (group.left, group.top, group.width, group.height),
+            before_bounds
+        );
+        assert_eq!(group.children.len(), before_children);
+    }
+
+    #[test]
+    fn source_bound_shape_enum_picture_mut_refuses_typed_access() {
+        let mut picture = PictureShape::new(1);
+        picture.mark_source_bound();
+        let before_name = picture.name.clone();
+        let mut shape: ShapeEnum<'static> = ShapeEnum::Picture(picture);
+
+        assert_eq!(
+            shape.as_picture_mut().map(|picture| picture.is_some()),
+            Err(crate::shapes::shape::MutationError::SourceBound {
+                mutation: crate::shapes::shape::Mutation::Picture,
+            })
+        );
+        assert_eq!(
+            shape.as_picture().and_then(PictureShape::name),
+            before_name.as_deref()
+        );
     }
 }

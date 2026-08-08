@@ -838,6 +838,40 @@ fn autoshape_preserves_native_type_and_sparse_adjustments() {
 }
 
 #[test]
+fn parsed_autoshape_text_is_source_bound_before_exposure() {
+    use crate::shapes::{
+        ShapeEnum,
+        shape::{Mutation, MutationError},
+    };
+
+    let doc_data = vec![0u8; 32];
+    let ppdrawing = create_test_record(
+        RecordType::PPDrawing,
+        create_autoshape_escher_drawing(),
+        Vec::new(),
+    );
+    let record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
+    let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
+
+    let shapes = slide.shapes();
+    assert!(shapes.is_ok());
+    let Ok(shapes) = shapes else {
+        return;
+    };
+    assert_eq!(shapes.len(), 1);
+    let Some(ShapeEnum::AutoShape(mut autoshape)) = shapes.first().cloned() else {
+        return;
+    };
+    assert_eq!(
+        autoshape.set_text("replacement".to_string()),
+        Err(MutationError::SourceBound {
+            mutation: Mutation::Text,
+        })
+    );
+    assert_eq!(autoshape.text(), "Arrow label");
+}
+
+#[test]
 fn non_primitive_shape_with_vertices_is_exposed_as_freeform_autoshape() {
     use crate::shapes::{
         Shape,

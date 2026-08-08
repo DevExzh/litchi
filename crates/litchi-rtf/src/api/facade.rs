@@ -193,6 +193,11 @@ impl Document {
         self.inner.model.revisions()
     }
 
+    /// Borrow unsupported syntax retained as bounded inert data.
+    pub fn opaque(&self) -> &[crate::opaque::Node] {
+        self.inner.model.opaque_nodes()
+    }
+
     /// Serialize this snapshot to a sequential sink.
     ///
     /// A sink failure can leave caller-owned output incomplete. Filesystem

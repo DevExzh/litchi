@@ -4,6 +4,7 @@
 pub mod authoring;
 mod codec;
 mod facade;
+pub mod flat;
 mod package;
 
 pub use authoring::{
@@ -13,4 +14,5 @@ pub use authoring::{
     serialize_axis_fragment, serialize_content, serialize_series_fragment,
 };
 pub use facade::{Builder, Chart};
+pub use flat::{AxisChange, AxisUpdate, FlatChart, FlatChartCommit, FlatChartEdit, FlatChartPatch};
 pub use litchi_odf_common::chart;

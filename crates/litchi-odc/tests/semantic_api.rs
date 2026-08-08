@@ -4,7 +4,7 @@
 )]
 
 use litchi_odc::{
-    AxisSpec, Builder, Chart, Definition,
+    AxisSpec, Builder, Chart, Definition, Text,
     chart::{Dimension, Kind, Position},
 };
 
@@ -15,9 +15,23 @@ fn focused_modules_are_the_canonical_semantic_api() {
 
     let bytes = Builder::new().build().unwrap();
     let chart = Chart::from_bytes(bytes).unwrap();
+    assert!(!chart.content_xml().contains('\n'));
     assert!(chart.content_xml().contains("<office:chart"));
     assert_eq!(chart.chart().kind(), Kind::Chart);
     assert!(chart.plot_area().is_some());
+}
+
+#[test]
+fn semantic_whitespace_in_typed_text_is_preserved() {
+    let mut definition = Definition::new("chart:line");
+    definition.title = Some(Text::new("line one\n  line two"));
+    let chart =
+        Chart::from_bytes(Builder::new().with_definition(definition).build().unwrap()).unwrap();
+    assert!(
+        chart
+            .content_xml()
+            .contains("<text:p>line one\n  line two</text:p>")
+    );
 }
 
 #[test]

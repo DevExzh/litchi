@@ -1,1003 +1,914 @@
-//! Inert Dynamic Data Exchange links and their cached spreadsheet tables.
+//! Bounded, inert inspection of ODF Dynamic Data Exchange metadata.
+//!
+//! This module models declarations and cached XML only. It contains no DDE
+//! client, refresh path, resolver, process launcher, or ambient I/O.
 
-use super::{
-    Cell, Row, Sheet,
-    parser::Parser,
-    protection::{parse_protection, write_sheet_attributes, write_sheet_options},
-    scenario::write_sheet_preamble,
-    structure::{
-        TableStructureAxis, write_columns, write_row_attributes, write_sheet_formatting_attributes,
-        write_table_structure,
-    },
-};
-use litchi_core::{Error, Result, xml::escape_xml};
+use core::fmt;
 use quick_xml::{
-    Reader, XmlVersion,
-    encoding::Decoder,
+    XmlVersion,
     events::{BytesStart, Event},
+    name::{Namespace, ResolveResult},
+    reader::NsReader,
 };
-use std::collections::BTreeMap;
+use std::{ops::Range, sync::Arc};
 
-const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
-const TABLE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
-const TEXT_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
-const MAX_DDE_LINKS: usize = 65_536;
-const MAX_DDE_SOURCE_VALUE_BYTES: usize = 65_536;
-const MAX_DDE_SOURCE_TOTAL_BYTES: usize = 262_144;
+const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+const TABLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+const MAX_INPUT_BYTES: usize = 256 * 1024 * 1024;
+const MAX_LINKS: usize = 65_536;
+const MAX_SHEET_SOURCES: usize = 65_536;
+const MAX_TEXT_BYTES: usize = 65_536;
+const MAX_CACHED_TABLE_BYTES: usize = 64 * 1024 * 1024;
+const MAX_DEPTH: usize = 1_024;
 
-/// How an application converts values obtained from a DDE source.
+/// A DDE metadata inspection result.
+pub type Result<T> = std::result::Result<T, Error>;
+
+/// Errors produced while inspecting inert DDE metadata.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Error {
+    /// A configured or hard resource limit was exceeded.
+    ResourceLimit {
+        /// The bounded resource.
+        resource: &'static str,
+        /// The observed or configured value.
+        actual: usize,
+        /// The maximum accepted value.
+        maximum: usize,
+    },
+    /// The XML stream could not be decoded.
+    InvalidXml(String),
+    /// The document has invalid DDE structure or content.
+    InvalidStructure(String),
+    /// An XML byte position cannot be represented on this platform.
+    PositionOverflow,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ResourceLimit {
+                resource,
+                actual,
+                maximum,
+            } => write!(
+                formatter,
+                "{resource} limit exceeded: observed {actual}, maximum {maximum}"
+            ),
+            Self::InvalidXml(message) => write!(formatter, "invalid XML: {message}"),
+            Self::InvalidStructure(message) => formatter.write_str(message),
+            Self::PositionOverflow => formatter.write_str("XML byte position exceeds usize"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum NamespaceKind {
+    Office,
+    Table,
+    Other,
+}
+
+/// Resource limits for inert DDE inspection.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DdeConversionMode {
-    /// Apply the default cell style and data style.
+pub struct Limits {
+    input_bytes: usize,
+    links: usize,
+    sheet_sources: usize,
+    text_bytes: usize,
+    cached_table_bytes: usize,
+    depth: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            input_bytes: MAX_INPUT_BYTES,
+            links: MAX_LINKS,
+            sheet_sources: MAX_SHEET_SOURCES,
+            text_bytes: MAX_TEXT_BYTES,
+            cached_table_bytes: MAX_CACHED_TABLE_BYTES,
+            depth: MAX_DEPTH,
+        }
+    }
+}
+
+impl Limits {
+    #[must_use]
+    pub const fn with_input_bytes(mut self, value: usize) -> Self {
+        self.input_bytes = value;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_links(mut self, value: usize) -> Self {
+        self.links = value;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_sheet_sources(mut self, value: usize) -> Self {
+        self.sheet_sources = value;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_text_bytes(mut self, value: usize) -> Self {
+        self.text_bytes = value;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_cached_table_bytes(mut self, value: usize) -> Self {
+        self.cached_table_bytes = value;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_depth(mut self, value: usize) -> Self {
+        self.depth = value;
+        self
+    }
+
+    fn validate(self) -> Result<Self> {
+        for (name, value, ceiling) in [
+            ("input bytes", self.input_bytes, MAX_INPUT_BYTES),
+            ("links", self.links, MAX_LINKS),
+            ("sheet sources", self.sheet_sources, MAX_SHEET_SOURCES),
+            ("text bytes", self.text_bytes, MAX_TEXT_BYTES),
+            (
+                "cached table bytes",
+                self.cached_table_bytes,
+                MAX_CACHED_TABLE_BYTES,
+            ),
+            ("XML depth", self.depth, MAX_DEPTH),
+        ] {
+            if value > ceiling {
+                return Err(Error::ResourceLimit {
+                    resource: name,
+                    actual: value,
+                    maximum: ceiling,
+                });
+            }
+        }
+        Ok(self)
+    }
+}
+
+/// ODF conversion policy retained without applying it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ConversionMode {
+    /// No conversion mode was specified.
+    Unspecified,
     IntoDefaultStyleDataStyle,
-    /// Convert numeric text using English number syntax.
     IntoEnglishNumber,
-    /// Preserve all incoming values as text.
     KeepText,
 }
 
-impl DdeConversionMode {
+/// Whether a DDE source requests automatic updates.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum AutomaticUpdate {
+    /// The source did not specify an update policy.
+    #[default]
+    Unspecified,
+    /// Automatic updates were requested by the source document.
+    Enabled,
+    /// Automatic updates were explicitly disabled.
+    Disabled,
+}
+
+impl From<Option<bool>> for AutomaticUpdate {
+    fn from(value: Option<bool>) -> Self {
+        match value {
+            Some(true) => Self::Enabled,
+            Some(false) => Self::Disabled,
+            None => Self::Unspecified,
+        }
+    }
+}
+
+impl ConversionMode {
     fn parse(value: &str) -> Result<Self> {
         match value {
             "into-default-style-data-style" => Ok(Self::IntoDefaultStyleDataStyle),
             "into-english-number" => Ok(Self::IntoEnglishNumber),
             "keep-text" => Ok(Self::KeepText),
-            _ => Err(Error::InvalidFormat(format!(
-                "invalid office:conversion-mode '{value}'"
-            ))),
-        }
-    }
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::IntoDefaultStyleDataStyle => "into-default-style-data-style",
-            Self::IntoEnglishNumber => "into-english-number",
-            Self::KeepText => "keep-text",
+            _ => Err(invalid(format!("invalid office:conversion-mode '{value}'"))),
         }
     }
 }
 
-/// The non-executing source declaration for an OpenDocument DDE link.
+/// A non-executing `office:dde-source` declaration.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DdeSource {
-    /// DDE server/application name.
-    pub application: String,
-    /// DDE topic, commonly a document or resource name.
-    pub topic: String,
-    /// DDE item within the topic.
-    pub item: String,
-    /// Optional declaration name.
-    pub name: Option<String>,
-    /// Optional conversion policy for cached values.
-    pub conversion_mode: Option<DdeConversionMode>,
-    /// Whether an application requested automatic refresh.
-    ///
-    /// Litchi never performs that refresh; the flag is retained as inert metadata.
-    pub automatic_update: Option<bool>,
+pub struct Source {
+    application: String,
+    topic: String,
+    item: String,
+    name: Option<String>,
+    conversion_mode: ConversionMode,
+    automatic_update: AutomaticUpdate,
 }
 
-impl DdeSource {
-    /// Create a DDE source declaration. This never opens or executes the source.
+impl Source {
+    /// Creates a detached, inert DDE source descriptor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a required identifier is empty, too large, or
+    /// contains invalid XML character data.
     pub fn new(
         application: impl Into<String>,
         topic: impl Into<String>,
         item: impl Into<String>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        let source = Self {
             application: application.into(),
             topic: topic.into(),
             item: item.into(),
             name: None,
-            conversion_mode: None,
-            automatic_update: None,
-        }
+            conversion_mode: ConversionMode::Unspecified,
+            automatic_update: AutomaticUpdate::Unspecified,
+        };
+        validate_required_source_value("office:dde-application", &source.application)?;
+        validate_required_source_value("office:dde-topic", &source.topic)?;
+        validate_required_source_value("office:dde-item", &source.item)?;
+        Ok(source)
     }
 
-    /// Validate the source declaration without contacting it.
-    pub fn validate(&self) -> Result<()> {
-        let values = [
-            ("office:dde-application", self.application.as_str(), true),
-            ("office:dde-topic", self.topic.as_str(), true),
-            ("office:dde-item", self.item.as_str(), true),
-        ];
-        let mut total = 0usize;
-        for (name, value, required) in values {
-            if (required && value.is_empty())
-                || value.len() > MAX_DDE_SOURCE_VALUE_BYTES
-                || value.chars().any(|character| {
-                    character == '\0'
-                        || (character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
-                })
-            {
-                return Err(Error::InvalidFormat(format!("invalid or oversized {name}")));
-            }
-            total = total
-                .checked_add(value.len())
-                .ok_or_else(|| Error::InvalidFormat("DDE source text size overflow".to_string()))?;
-        }
-        if let Some(name) = &self.name {
-            if name.len() > MAX_DDE_SOURCE_VALUE_BYTES
-                || name.chars().any(|character| {
-                    character == '\0'
-                        || (character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
-                })
-            {
-                return Err(Error::InvalidFormat(
-                    "invalid or oversized office:name".to_string(),
-                ));
-            }
-            total = total
-                .checked_add(name.len())
-                .ok_or_else(|| Error::InvalidFormat("DDE source text size overflow".to_string()))?;
-        }
-        if total > MAX_DDE_SOURCE_TOTAL_BYTES {
-            return Err(Error::InvalidFormat(format!(
-                "DDE source text exceeds the {MAX_DDE_SOURCE_TOTAL_BYTES} byte safety limit"
-            )));
-        }
-        Ok(())
+    /// Returns a copy with a checked optional source name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `name` is empty, too large, or contains invalid
+    /// XML character data.
+    pub fn named(mut self, source_name: impl Into<String>) -> Result<Self> {
+        let name = source_name.into();
+        validate_required_source_value("office:name", &name)?;
+        self.name = Some(name);
+        Ok(self)
+    }
+
+    /// Returns a copy with the requested conversion policy.
+    #[must_use]
+    pub const fn with_conversion_mode(mut self, mode: ConversionMode) -> Self {
+        self.conversion_mode = mode;
+        self
+    }
+
+    /// Returns a copy with the requested automatic-update policy.
+    #[must_use]
+    pub const fn with_automatic_update(mut self, policy: AutomaticUpdate) -> Self {
+        self.automatic_update = policy;
+        self
+    }
+
+    #[must_use]
+    pub fn application(&self) -> &str {
+        &self.application
+    }
+
+    #[must_use]
+    pub fn topic(&self) -> &str {
+        &self.topic
+    }
+
+    #[must_use]
+    pub fn item(&self) -> &str {
+        &self.item
+    }
+
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    #[must_use]
+    pub const fn conversion_mode(&self) -> ConversionMode {
+        self.conversion_mode
+    }
+
+    #[must_use]
+    pub const fn automatic_update(&self) -> AutomaticUpdate {
+        self.automatic_update
     }
 }
 
-/// A DDE source plus the table of cached values stored in the document.
-#[derive(Clone)]
-pub struct DdeLink {
-    /// Inert source metadata.
-    pub source: DdeSource,
-    /// Cached table content. Reading this table never contacts the source.
-    pub cached_table: Sheet,
+/// One formula DDE link and its exact cached `table:table` subtree.
+#[derive(Clone, Debug)]
+pub struct Link {
+    source: Source,
+    content: Arc<str>,
+    cached_table: Range<usize>,
 }
 
-impl DdeLink {
-    /// Create an inert DDE link from source metadata and cached table content.
-    pub fn new(source: DdeSource, cached_table: Sheet) -> Result<Self> {
-        source.validate()?;
+impl Link {
+    #[must_use]
+    pub fn source(&self) -> &Source {
+        &self.source
+    }
+
+    /// Return cached table XML without copying or interpreting its values.
+    #[must_use]
+    pub fn cached_table_xml(&self) -> &str {
+        &self.content[self.cached_table.clone()]
+    }
+}
+
+/// A sheet-local DDE source declaration.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SheetSource {
+    sheet: String,
+    source: Source,
+}
+
+impl SheetSource {
+    #[must_use]
+    pub fn sheet(&self) -> &str {
+        &self.sheet
+    }
+
+    #[must_use]
+    pub fn source(&self) -> &Source {
+        &self.source
+    }
+}
+
+/// Immutable source-bound inventory of all spreadsheet DDE declarations.
+#[derive(Clone, Debug)]
+pub struct Snapshot {
+    content: Arc<str>,
+    links: Vec<Link>,
+    sheet_sources: Vec<SheetSource>,
+}
+
+impl Snapshot {
+    /// Parse the default-bounded inert DDE inventory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when XML is malformed, violates the ODF DDE grammar,
+    /// or exceeds a default resource limit.
+    pub fn parse(content_xml: &str) -> Result<Self> {
+        Self::parse_with(content_xml, Limits::default())
+    }
+
+    /// Parse the inert DDE inventory under caller-provided resource limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when XML is malformed, violates the ODF DDE grammar,
+    /// or exceeds `limits`.
+    pub fn parse_with(content_xml: &str, requested_limits: Limits) -> Result<Self> {
+        let limits = requested_limits.validate()?;
+        if content_xml.len() > limits.input_bytes {
+            return Err(invalid("content.xml exceeds the DDE input limit"));
+        }
+        let content: Arc<str> = Arc::from(content_xml);
+        let mut reader = NsReader::from_str(content_xml);
+        reader.config_mut().check_end_names = true;
+        reader.config_mut().trim_text(false);
+        let mut buffer = Vec::new();
+        let mut depth = 0usize;
+        let mut spreadsheet_depth = None;
+        let mut links_depth = None;
+        let mut links_seen = false;
+        let mut link: Option<LinkBuilder> = None;
+        let mut source_depth = None;
+        let mut cached_depth = None;
+        let mut sheet: Option<SheetBuilder> = None;
+        let mut links = Vec::new();
+        let mut sheet_sources = Vec::new();
+
+        loop {
+            let event_start = xml_position(&reader)?;
+            let (resolved_namespace, raw_event) = reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| Error::InvalidXml(error.to_string()))?;
+            let namespace = namespace_kind(&resolved_namespace);
+            let event = raw_event.into_owned();
+            let event_end = xml_position(&reader)?;
+            match event {
+                Event::Start(element) => {
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("XML depth overflow"))?;
+                    if depth > limits.depth {
+                        return Err(invalid("DDE XML exceeds the nesting limit"));
+                    }
+                    if is(
+                        namespace,
+                        element.local_name().as_ref(),
+                        NamespaceKind::Office,
+                        b"spreadsheet",
+                    ) {
+                        if spreadsheet_depth.replace(depth).is_some() {
+                            return Err(invalid("duplicate or nested office:spreadsheet"));
+                        }
+                    } else if spreadsheet_depth.is_some_and(|value| depth == value + 1)
+                        && is(
+                            namespace,
+                            element.local_name().as_ref(),
+                            NamespaceKind::Table,
+                            b"dde-links",
+                        )
+                    {
+                        if links_seen || links_depth.replace(depth).is_some() {
+                            return Err(invalid("duplicate table:dde-links owner"));
+                        }
+                        links_seen = true;
+                    } else if links_depth.is_some_and(|value| depth == value + 1)
+                        && is(
+                            namespace,
+                            element.local_name().as_ref(),
+                            NamespaceKind::Table,
+                            b"dde-link",
+                        )
+                    {
+                        if link.replace(LinkBuilder::new(depth)).is_some() {
+                            return Err(invalid("nested table:dde-link"));
+                        }
+                    } else if link.as_ref().is_some_and(|value| depth == value.depth + 1)
+                        && is(
+                            namespace,
+                            element.local_name().as_ref(),
+                            NamespaceKind::Office,
+                            b"dde-source",
+                        )
+                    {
+                        let value = parse_source(&element, &reader, limits.text_bytes)?;
+                        let Some(builder) = link.as_mut() else {
+                            return Err(invalid("DDE link parser state is missing"));
+                        };
+                        if builder.source.replace(value).is_some() || builder.cached.is_some() {
+                            return Err(invalid("office:dde-source must be the first link child"));
+                        }
+                        source_depth = Some(depth);
+                    } else if link.as_ref().is_some_and(|value| depth == value.depth + 1)
+                        && is(
+                            namespace,
+                            element.local_name().as_ref(),
+                            NamespaceKind::Table,
+                            b"table",
+                        )
+                    {
+                        let Some(builder) = link.as_mut() else {
+                            return Err(invalid("DDE link parser state is missing"));
+                        };
+                        if builder.source.is_none() || builder.cached.is_some() {
+                            return Err(invalid("cached table must follow exactly one DDE source"));
+                        }
+                        builder.cached = Some(event_start..event_start);
+                        cached_depth = Some(depth);
+                    } else if source_depth.is_some() {
+                        return Err(invalid("office:dde-source must not contain child elements"));
+                    } else if link.is_some() && cached_depth.is_none() && source_depth.is_none() {
+                        return Err(invalid("unsupported child in table:dde-link"));
+                    } else if spreadsheet_depth.is_some_and(|value| depth == value + 1)
+                        && is(
+                            namespace,
+                            element.local_name().as_ref(),
+                            NamespaceKind::Table,
+                            b"table",
+                        )
+                    {
+                        sheet = Some(SheetBuilder {
+                            depth,
+                            name: required_attr(
+                                &element,
+                                &reader,
+                                TABLE,
+                                b"name",
+                                limits.text_bytes,
+                            )?,
+                            source_seen: false,
+                        });
+                    } else if sheet.as_ref().is_some_and(|value| depth == value.depth + 1)
+                        && is(
+                            namespace,
+                            element.local_name().as_ref(),
+                            NamespaceKind::Office,
+                            b"dde-source",
+                        )
+                    {
+                        let value = parse_source(&element, &reader, limits.text_bytes)?;
+                        let Some(current) = sheet.as_mut() else {
+                            return Err(invalid("DDE sheet parser state is missing"));
+                        };
+                        if current.source_seen {
+                            return Err(invalid("duplicate sheet office:dde-source"));
+                        }
+                        current.source_seen = true;
+                        sheet_sources.push(SheetSource {
+                            sheet: current.name.clone(),
+                            source: value,
+                        });
+                        if sheet_sources.len() > limits.sheet_sources {
+                            return Err(invalid("sheet DDE source count exceeds its limit"));
+                        }
+                        source_depth = Some(depth);
+                    }
+                },
+                Event::Empty(element) => {
+                    let event_depth = depth + 1;
+                    if is(
+                        namespace,
+                        element.local_name().as_ref(),
+                        NamespaceKind::Table,
+                        b"dde-links",
+                    ) && spreadsheet_depth.is_some_and(|value| event_depth == value + 1)
+                    {
+                        return Err(invalid("table:dde-links must contain a link"));
+                    } else if is(
+                        namespace,
+                        element.local_name().as_ref(),
+                        NamespaceKind::Table,
+                        b"dde-link",
+                    ) && links_depth.is_some_and(|value| event_depth == value + 1)
+                    {
+                        return Err(invalid("table:dde-link requires a source and cached table"));
+                    } else if source_depth.is_some() {
+                        return Err(invalid("office:dde-source must not contain child elements"));
+                    } else if link
+                        .as_ref()
+                        .is_some_and(|value| event_depth == value.depth + 1)
+                        && is(
+                            namespace,
+                            element.local_name().as_ref(),
+                            NamespaceKind::Office,
+                            b"dde-source",
+                        )
+                    {
+                        let value = parse_source(&element, &reader, limits.text_bytes)?;
+                        let Some(builder) = link.as_mut() else {
+                            return Err(invalid("DDE link parser state is missing"));
+                        };
+                        if builder.source.replace(value).is_some() || builder.cached.is_some() {
+                            return Err(invalid("office:dde-source must be the first link child"));
+                        }
+                    } else if link
+                        .as_ref()
+                        .is_some_and(|value| event_depth == value.depth + 1)
+                        && is(
+                            namespace,
+                            element.local_name().as_ref(),
+                            NamespaceKind::Table,
+                            b"table",
+                        )
+                    {
+                        let Some(builder) = link.as_mut() else {
+                            return Err(invalid("DDE link parser state is missing"));
+                        };
+                        if builder.source.is_none() || builder.cached.is_some() {
+                            return Err(invalid("cached table must follow exactly one DDE source"));
+                        }
+                        if event_end - event_start > limits.cached_table_bytes {
+                            return Err(invalid("DDE cached table exceeds its byte limit"));
+                        }
+                        builder.cached = Some(event_start..event_end);
+                    } else if sheet
+                        .as_ref()
+                        .is_some_and(|value| event_depth == value.depth + 1)
+                        && is(
+                            namespace,
+                            element.local_name().as_ref(),
+                            NamespaceKind::Office,
+                            b"dde-source",
+                        )
+                    {
+                        let value = parse_source(&element, &reader, limits.text_bytes)?;
+                        let Some(current) = sheet.as_mut() else {
+                            return Err(invalid("DDE sheet parser state is missing"));
+                        };
+                        if current.source_seen {
+                            return Err(invalid("duplicate sheet office:dde-source"));
+                        }
+                        current.source_seen = true;
+                        sheet_sources.push(SheetSource {
+                            sheet: current.name.clone(),
+                            source: value,
+                        });
+                        if sheet_sources.len() > limits.sheet_sources {
+                            return Err(invalid("sheet DDE source count exceeds its limit"));
+                        }
+                    }
+                },
+                Event::End(element) => {
+                    if cached_depth == Some(depth)
+                        && is(
+                            namespace,
+                            element.local_name().as_ref(),
+                            NamespaceKind::Table,
+                            b"table",
+                        )
+                    {
+                        let Some(builder) = link.as_mut() else {
+                            return Err(invalid("DDE cached-table parser state is missing"));
+                        };
+                        let Some(cached) = builder.cached.as_ref() else {
+                            return Err(invalid("DDE cached-table start is missing"));
+                        };
+                        let cached_start = cached.start;
+                        if event_end - cached_start > limits.cached_table_bytes {
+                            return Err(invalid("DDE cached table exceeds its byte limit"));
+                        }
+                        builder.cached = Some(cached_start..event_end);
+                        cached_depth = None;
+                    } else if source_depth == Some(depth)
+                        && is(
+                            namespace,
+                            element.local_name().as_ref(),
+                            NamespaceKind::Office,
+                            b"dde-source",
+                        )
+                    {
+                        source_depth = None;
+                    } else if link.as_ref().is_some_and(|value| depth == value.depth)
+                        && is(
+                            namespace,
+                            element.local_name().as_ref(),
+                            NamespaceKind::Table,
+                            b"dde-link",
+                        )
+                    {
+                        let Some(builder) = link.take() else {
+                            return Err(invalid("DDE link parser state is missing"));
+                        };
+                        links.push(builder.finish(Arc::clone(&content))?);
+                        if links.len() > limits.links {
+                            return Err(invalid("DDE link count exceeds its limit"));
+                        }
+                    } else if links_depth == Some(depth)
+                        && is(
+                            namespace,
+                            element.local_name().as_ref(),
+                            NamespaceKind::Table,
+                            b"dde-links",
+                        )
+                    {
+                        if links.is_empty() {
+                            return Err(invalid("table:dde-links must contain a link"));
+                        }
+                        links_depth = None;
+                    } else if sheet.as_ref().is_some_and(|value| depth == value.depth)
+                        && is(
+                            namespace,
+                            element.local_name().as_ref(),
+                            NamespaceKind::Table,
+                            b"table",
+                        )
+                    {
+                        sheet = None;
+                    } else if spreadsheet_depth == Some(depth)
+                        && is(
+                            namespace,
+                            element.local_name().as_ref(),
+                            NamespaceKind::Office,
+                            b"spreadsheet",
+                        )
+                    {
+                        spreadsheet_depth = None;
+                    }
+                    depth = depth.saturating_sub(1);
+                },
+                Event::Text(text) if source_depth.is_some() => {
+                    let value = text
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| invalid(format!("invalid DDE source text: {error}")))?;
+                    if !value.trim().is_empty() {
+                        return Err(invalid("office:dde-source must be empty"));
+                    }
+                },
+                Event::CData(text) if source_depth.is_some() => {
+                    let value = text
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| invalid(format!("invalid DDE source CDATA: {error}")))?;
+                    if !value.trim().is_empty() {
+                        return Err(invalid("office:dde-source must be empty"));
+                    }
+                },
+                Event::Text(text) if link.is_some() || links_depth.is_some() => {
+                    let value = text
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| invalid(format!("invalid DDE container text: {error}")))?;
+                    if !value.trim().is_empty() {
+                        return Err(invalid("DDE containers must not contain text"));
+                    }
+                },
+                Event::CData(text) if link.is_some() || links_depth.is_some() => {
+                    let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                        invalid(format!("invalid DDE container CDATA: {error}"))
+                    })?;
+                    if !value.trim().is_empty() {
+                        return Err(invalid("DDE containers must not contain CDATA"));
+                    }
+                },
+                Event::GeneralRef(_) if link.is_some() || links_depth.is_some() => {
+                    return Err(invalid("DDE containers must not contain entity references"));
+                },
+                Event::DocType(_) => return Err(invalid("DTD content is not accepted")),
+                Event::Eof => break,
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::GeneralRef(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_) => {},
+            }
+            buffer.clear();
+        }
+        if depth != 0 || link.is_some() || cached_depth.is_some() || source_depth.is_some() {
+            return Err(invalid("unfinished DDE XML structure"));
+        }
         Ok(Self {
-            source,
-            cached_table,
+            content,
+            links,
+            sheet_sources,
         })
     }
 
-    /// Validate this link without contacting or executing its source.
-    pub fn validate(&self) -> Result<()> {
-        self.source.validate()?;
-        self.cached_table
-            .rows
-            .iter()
-            .flat_map(|row| row.cells.iter())
-            .try_for_each(Cell::validate_hyperlinks)
+    #[must_use]
+    pub fn source_xml(&self) -> &str {
+        &self.content
     }
 
-    pub(crate) fn has_formulas(&self) -> bool {
-        self.cached_table
-            .rows
-            .iter()
-            .flat_map(|row| &row.cells)
-            .any(|cell| cell.formula.is_some())
+    #[must_use]
+    pub fn links(&self) -> &[Link] {
+        &self.links
     }
 
-    pub(crate) fn has_annotations(&self) -> bool {
-        self.cached_table
-            .rows
-            .iter()
-            .flat_map(|row| &row.cells)
-            .any(Cell::has_annotation)
-    }
-
-    pub(crate) fn has_hyperlinks(&self) -> bool {
-        self.cached_table
-            .rows
-            .iter()
-            .flat_map(|row| row.cells.iter())
-            .any(Cell::has_hyperlinks)
-    }
-
-    pub(crate) fn has_table_sources(&self) -> bool {
-        self.cached_table.table_source.is_some()
-            || self
-                .cached_table
-                .rows
-                .iter()
-                .flat_map(|row| &row.cells)
-                .any(|cell| cell.range_source.is_some())
+    #[must_use]
+    pub fn sheet_sources(&self) -> &[SheetSource] {
+        &self.sheet_sources
     }
 }
 
-#[derive(Default)]
-struct DdeLinkBuilder {
-    source: Option<DdeSource>,
-    cached_table: Option<Sheet>,
+struct LinkBuilder {
+    depth: usize,
+    source: Option<Source>,
+    cached: Option<Range<usize>>,
 }
 
-impl DdeLinkBuilder {
-    fn finish(self) -> Result<DdeLink> {
-        let source = self.source.ok_or_else(|| {
-            Error::InvalidFormat("table:dde-link requires office:dde-source".to_string())
-        })?;
-        let cached_table = self.cached_table.ok_or_else(|| {
-            Error::InvalidFormat("table:dde-link requires a cached table:table".to_string())
-        })?;
-        DdeLink::new(source, cached_table)
-    }
-}
-
-/// Parse spreadsheet DDE links as inert metadata and cached table content.
-pub(crate) fn parse_dde_links(xml: &str) -> Result<Vec<DdeLink>> {
-    let mut reader = Reader::from_str(xml);
-    let mut buffer = Vec::new();
-    let mut namespaces = BTreeMap::new();
-    let mut namespace_scopes = Vec::new();
-    let mut element_depth = 0usize;
-    let mut spreadsheet_depth = None;
-    let mut links_depth = None;
-    let mut links_seen = false;
-    let mut links_count = 0usize;
-    let mut link_depth = None;
-    let mut source_depth = None;
-    let mut current_link: Option<DdeLinkBuilder> = None;
-    let mut captured_table_depth = None;
-    let mut captured_table_start = None;
-    let mut links = Vec::new();
-
-    loop {
-        let event_start = reader.buffer_position() as usize;
-        let event = reader
-            .read_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
-        let event_end = reader.buffer_position() as usize;
-
-        match event {
-            Event::Start(ref element) => {
-                let scope = push_namespace_scope(element, reader.decoder(), &mut namespaces)?;
-                namespace_scopes.push(scope);
-                element_depth += 1;
-
-                if captured_table_depth.is_some() {
-                    // The normal sheet parser validates the captured table subtree.
-                } else if element_name_is(element, &namespaces, OFFICE_NAMESPACE, "spreadsheet") {
-                    spreadsheet_depth = Some(element_depth);
-                } else if element_name_is(element, &namespaces, TABLE_NAMESPACE, "dde-links")
-                    && spreadsheet_depth.is_some_and(|depth| element_depth == depth + 1)
-                {
-                    if links_seen {
-                        return Err(Error::InvalidFormat(
-                            "duplicate table:dde-links element".to_string(),
-                        ));
-                    }
-                    links_seen = true;
-                    links_depth = Some(element_depth);
-                } else if element_name_is(element, &namespaces, TABLE_NAMESPACE, "dde-link")
-                    && links_depth.is_some_and(|depth| element_depth == depth + 1)
-                {
-                    if current_link.is_some() {
-                        return Err(Error::InvalidFormat(
-                            "nested table:dde-link element".to_string(),
-                        ));
-                    }
-                    current_link = Some(DdeLinkBuilder::default());
-                    link_depth = Some(element_depth);
-                } else if let Some(builder) = current_link.as_mut()
-                    && link_depth.is_some_and(|depth| element_depth == depth + 1)
-                    && element_name_is(element, &namespaces, OFFICE_NAMESPACE, "dde-source")
-                {
-                    if builder.source.is_some() || builder.cached_table.is_some() {
-                        return Err(Error::InvalidFormat(
-                            "office:dde-source must be the first child of table:dde-link"
-                                .to_string(),
-                        ));
-                    }
-                    builder.source = Some(parse_source(element, reader.decoder(), &namespaces)?);
-                    source_depth = Some(element_depth);
-                } else if let Some(builder) = current_link.as_mut()
-                    && link_depth.is_some_and(|depth| element_depth == depth + 1)
-                    && qualified_name_is(
-                        element.name().as_ref(),
-                        &namespaces,
-                        TABLE_NAMESPACE,
-                        "table",
-                    )
-                {
-                    if builder.source.is_none() || builder.cached_table.is_some() {
-                        return Err(Error::InvalidFormat(
-                            "cached table:table must follow exactly one office:dde-source"
-                                .to_string(),
-                        ));
-                    }
-                    captured_table_depth = Some(element_depth);
-                    captured_table_start = Some(event_start);
-                } else if source_depth.is_some() || current_link.is_some() {
-                    return Err(Error::InvalidFormat(
-                        "invalid child element in table:dde-link".to_string(),
-                    ));
-                } else if links_depth.is_some() {
-                    return Err(Error::InvalidFormat(
-                        "table:dde-links may contain only table:dde-link elements".to_string(),
-                    ));
-                }
-            },
-            Event::Empty(ref element) => {
-                let scope = push_namespace_scope(element, reader.decoder(), &mut namespaces)?;
-                if captured_table_depth.is_some() {
-                    // The normal sheet parser validates the captured table subtree.
-                } else if let Some(builder) = current_link.as_mut()
-                    && link_depth == Some(element_depth)
-                    && qualified_name_is(
-                        element.name().as_ref(),
-                        &namespaces,
-                        OFFICE_NAMESPACE,
-                        "dde-source",
-                    )
-                {
-                    if builder.source.is_some() || builder.cached_table.is_some() {
-                        return Err(Error::InvalidFormat(
-                            "office:dde-source must be the first child of table:dde-link"
-                                .to_string(),
-                        ));
-                    }
-                    builder.source = Some(parse_source(element, reader.decoder(), &namespaces)?);
-                } else if let Some(builder) = current_link.as_mut()
-                    && link_depth == Some(element_depth)
-                    && element_name_is(element, &namespaces, TABLE_NAMESPACE, "table")
-                {
-                    if builder.source.is_none() || builder.cached_table.is_some() {
-                        return Err(Error::InvalidFormat(
-                            "cached table:table must follow exactly one office:dde-source"
-                                .to_string(),
-                        ));
-                    }
-                    builder.cached_table = Some(parse_cached_table(
-                        &xml[event_start..event_end],
-                        &namespaces,
-                    )?);
-                } else if element_name_is(element, &namespaces, TABLE_NAMESPACE, "dde-links")
-                    && spreadsheet_depth == Some(element_depth)
-                {
-                    return Err(Error::InvalidFormat(
-                        "table:dde-links requires at least one link".to_string(),
-                    ));
-                } else if element_name_is(element, &namespaces, TABLE_NAMESPACE, "dde-link")
-                    && links_depth == Some(element_depth)
-                {
-                    return Err(Error::InvalidFormat(
-                        "table:dde-link requires a source and cached table".to_string(),
-                    ));
-                } else if current_link.is_some() || links_depth.is_some() {
-                    return Err(Error::InvalidFormat(
-                        "invalid empty element in table:dde-links".to_string(),
-                    ));
-                }
-                pop_namespace_scope(&mut namespaces, Some(scope));
-            },
-            Event::End(ref element) => {
-                if captured_table_depth == Some(element_depth)
-                    && qualified_name_is(
-                        element.name().as_ref(),
-                        &namespaces,
-                        TABLE_NAMESPACE,
-                        "table",
-                    )
-                {
-                    let start = captured_table_start.take().expect("captured table start");
-                    let table = parse_cached_table(&xml[start..event_end], &namespaces)?;
-                    current_link
-                        .as_mut()
-                        .expect("captured table belongs to a DDE link")
-                        .cached_table = Some(table);
-                    captured_table_depth = None;
-                } else if source_depth == Some(element_depth)
-                    && qualified_name_is(
-                        element.name().as_ref(),
-                        &namespaces,
-                        OFFICE_NAMESPACE,
-                        "dde-source",
-                    )
-                {
-                    source_depth = None;
-                } else if link_depth == Some(element_depth)
-                    && qualified_name_is(
-                        element.name().as_ref(),
-                        &namespaces,
-                        TABLE_NAMESPACE,
-                        "dde-link",
-                    )
-                {
-                    links.push(current_link.take().expect("checked link").finish()?);
-                    links_count += 1;
-                    if links_count > MAX_DDE_LINKS {
-                        return Err(Error::InvalidFormat(format!(
-                            "DDE link count exceeds the {MAX_DDE_LINKS} link safety limit"
-                        )));
-                    }
-                    link_depth = None;
-                } else if links_depth == Some(element_depth)
-                    && qualified_name_is(
-                        element.name().as_ref(),
-                        &namespaces,
-                        TABLE_NAMESPACE,
-                        "dde-links",
-                    )
-                {
-                    if links_count == 0 {
-                        return Err(Error::InvalidFormat(
-                            "table:dde-links requires at least one link".to_string(),
-                        ));
-                    }
-                    links_depth = None;
-                } else if spreadsheet_depth == Some(element_depth)
-                    && qualified_name_is(
-                        element.name().as_ref(),
-                        &namespaces,
-                        OFFICE_NAMESPACE,
-                        "spreadsheet",
-                    )
-                {
-                    spreadsheet_depth = None;
-                }
-                element_depth = element_depth.saturating_sub(1);
-                pop_namespace_scope(&mut namespaces, namespace_scopes.pop());
-            },
-            Event::Text(ref text)
-                if captured_table_depth.is_none()
-                    && (current_link.is_some() || links_depth.is_some()) =>
-            {
-                let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid DDE link text: {error}"))
-                })?;
-                if !value.trim().is_empty() {
-                    return Err(Error::InvalidFormat(
-                        "DDE link containers cannot contain text".to_string(),
-                    ));
-                }
-            },
-            Event::CData(ref text)
-                if captured_table_depth.is_none()
-                    && (current_link.is_some() || links_depth.is_some()) =>
-            {
-                let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid DDE link CDATA: {error}"))
-                })?;
-                if !value.trim().is_empty() {
-                    return Err(Error::InvalidFormat(
-                        "DDE link containers cannot contain CDATA".to_string(),
-                    ));
-                }
-            },
-            Event::GeneralRef(_)
-                if captured_table_depth.is_none()
-                    && (current_link.is_some() || links_depth.is_some()) =>
-            {
-                return Err(Error::InvalidFormat(
-                    "DDE link containers cannot contain entity references".to_string(),
-                ));
-            },
-            Event::Eof => break,
-            _ => {},
+impl LinkBuilder {
+    fn new(depth: usize) -> Self {
+        Self {
+            depth,
+            source: None,
+            cached: None,
         }
-        buffer.clear();
     }
 
-    if current_link.is_some()
-        || link_depth.is_some()
-        || source_depth.is_some()
-        || captured_table_depth.is_some()
-        || links_depth.is_some()
-    {
-        return Err(Error::InvalidFormat(
-            "unterminated table:dde-links structure".to_string(),
-        ));
+    fn finish(self, content: Arc<str>) -> Result<Link> {
+        Ok(Link {
+            source: self
+                .source
+                .ok_or_else(|| invalid("DDE link has no source"))?,
+            content,
+            cached_table: self
+                .cached
+                .ok_or_else(|| invalid("DDE link has no cached table"))?,
+        })
     }
-    Ok(links)
 }
 
-pub(crate) fn parse_source(
+struct SheetBuilder {
+    depth: usize,
+    name: String,
+    source_seen: bool,
+}
+
+fn parse_source(
     element: &BytesStart<'_>,
-    decoder: Decoder,
-    namespaces: &BTreeMap<String, String>,
-) -> Result<DdeSource> {
-    let mut application = None;
-    let mut topic = None;
-    let mut item = None;
-    let mut name = None;
-    let mut conversion_mode = None;
-    let mut automatic_update = None;
-
-    for attribute in element.attributes() {
-        let attribute = attribute
-            .map_err(|error| Error::InvalidFormat(format!("invalid DDE attribute: {error}")))?;
-        let attribute_name = std::str::from_utf8(attribute.key.as_ref())
-            .map_err(|_| Error::InvalidFormat("invalid UTF-8 in DDE attribute name".to_string()))?;
-        if attribute_name == "xmlns" || attribute_name.starts_with("xmlns:") {
-            continue;
-        }
-        let Some(local_name) =
-            attribute_local_name(attribute.key.as_ref(), namespaces, OFFICE_NAMESPACE)
-        else {
-            return Err(Error::InvalidFormat(format!(
-                "unsupported or spoofed office:dde-source attribute '{attribute_name}'"
-            )));
-        };
-        let value = attribute
-            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
-            .map_err(|error| Error::InvalidFormat(format!("invalid DDE attribute: {error}")))?
-            .into_owned();
-        let slot = match local_name {
-            "dde-application" => &mut application,
-            "dde-topic" => &mut topic,
-            "dde-item" => &mut item,
-            "name" => &mut name,
-            "conversion-mode" => {
-                if conversion_mode
-                    .replace(DdeConversionMode::parse(&value)?)
-                    .is_some()
-                {
-                    return Err(Error::InvalidFormat(
-                        "duplicate office:conversion-mode attribute".to_string(),
-                    ));
-                }
-                continue;
-            },
-            "automatic-update" => {
-                let parsed = parse_bool(&value)?;
-                if automatic_update.replace(parsed).is_some() {
-                    return Err(Error::InvalidFormat(
-                        "duplicate office:automatic-update attribute".to_string(),
-                    ));
-                }
-                continue;
-            },
-            _ => {
-                return Err(Error::InvalidFormat(format!(
-                    "unsupported office:dde-source attribute 'office:{local_name}'"
-                )));
-            },
-        };
-        if slot.replace(value).is_some() {
-            return Err(Error::InvalidFormat(format!(
-                "duplicate office:{local_name} attribute"
-            )));
-        }
+    reader: &NsReader<&[u8]>,
+    text_bytes: usize,
+) -> Result<Source> {
+    let application = required_attr(element, reader, OFFICE, b"dde-application", text_bytes)?;
+    let topic = required_attr(element, reader, OFFICE, b"dde-topic", text_bytes)?;
+    let item = required_attr(element, reader, OFFICE, b"dde-item", text_bytes)?;
+    let source_name = optional_attr(element, reader, OFFICE, b"name", text_bytes)?;
+    let conversion_mode = optional_attr(element, reader, OFFICE, b"conversion-mode", text_bytes)?
+        .as_deref()
+        .map(ConversionMode::parse)
+        .transpose()?
+        .unwrap_or(ConversionMode::Unspecified);
+    let automatic_update = optional_attr(element, reader, OFFICE, b"automatic-update", text_bytes)?
+        .as_deref()
+        .map(parse_bool)
+        .transpose()?
+        .into();
+    let mut source = Source::new(application, topic, item)?;
+    if let Some(name) = source_name {
+        source = source.named(name)?;
     }
-
-    let source = DdeSource {
-        application: application.ok_or_else(|| {
-            Error::InvalidFormat("office:dde-source requires office:dde-application".to_string())
-        })?,
-        topic: topic.ok_or_else(|| {
-            Error::InvalidFormat("office:dde-source requires office:dde-topic".to_string())
-        })?,
-        item: item.ok_or_else(|| {
-            Error::InvalidFormat("office:dde-source requires office:dde-item".to_string())
-        })?,
-        name,
-        conversion_mode,
-        automatic_update,
-    };
-    source.validate()?;
-    Ok(source)
+    Ok(source
+        .with_conversion_mode(conversion_mode)
+        .with_automatic_update(automatic_update))
 }
 
-fn parse_cached_table(raw_table: &str, namespaces: &BTreeMap<String, String>) -> Result<Sheet> {
-    let office_prefix = unique_prefix("litchi_office", namespaces);
-    let table_prefix = unique_prefix("litchi_table", namespaces);
-    let text_prefix = unique_prefix("litchi_text", namespaces);
-    let mut wrapper = String::with_capacity(raw_table.len() + namespaces.len() * 64 + 256);
-    wrapper.push('<');
-    wrapper.push_str(&office_prefix);
-    wrapper.push_str(":document-content");
-    for (prefix, uri) in namespaces {
-        if prefix == "xml" || prefix == "xmlns" {
-            continue;
-        }
-        if prefix.is_empty() {
-            wrapper.push_str(" xmlns=\"");
-        } else {
-            wrapper.push_str(" xmlns:");
-            wrapper.push_str(prefix);
-            wrapper.push_str("=\"");
-        }
-        wrapper.push_str(&escape_xml(uri));
-        wrapper.push('"');
-    }
-    write_namespace(&mut wrapper, &office_prefix, OFFICE_NAMESPACE);
-    write_namespace(&mut wrapper, &table_prefix, TABLE_NAMESPACE);
-    write_namespace(&mut wrapper, &text_prefix, TEXT_NAMESPACE);
-    wrapper.push('>');
-    wrapper.push('<');
-    wrapper.push_str(&office_prefix);
-    wrapper.push_str(":body><");
-    wrapper.push_str(&office_prefix);
-    wrapper.push_str(":spreadsheet>");
-    wrapper.push_str(raw_table);
-    wrapper.push_str("</");
-    wrapper.push_str(&office_prefix);
-    wrapper.push_str(":spreadsheet></");
-    wrapper.push_str(&office_prefix);
-    wrapper.push_str(":body></");
-    wrapper.push_str(&office_prefix);
-    wrapper.push_str(":document-content>");
-
-    let mut sheets = Parser::parse_sheets(&wrapper)?;
-    if sheets.len() != 1 {
-        return Err(Error::InvalidFormat(format!(
-            "DDE cache must contain exactly one table, found {}",
-            sheets.len()
-        )));
-    }
-    let (_, mut protections) = parse_protection(&wrapper)?;
-    if protections.len() == 1 {
-        sheets[0].protection = protections.remove(0);
-    }
-    Ok(sheets.remove(0))
+fn required_attr(
+    element: &BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+    namespace: &[u8],
+    local: &[u8],
+    limit: usize,
+) -> Result<String> {
+    optional_attr(element, reader, namespace, local, limit)?.ok_or_else(|| {
+        invalid(format!(
+            "missing required attribute {}",
+            String::from_utf8_lossy(local)
+        ))
+    })
 }
 
-fn unique_prefix(base: &str, namespaces: &BTreeMap<String, String>) -> String {
-    if !namespaces.contains_key(base) {
-        return base.to_string();
+fn optional_attr(
+    element: &BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+    namespace: &[u8],
+    local: &[u8],
+    limit: usize,
+) -> Result<Option<String>> {
+    let mut value = None;
+    for raw_attribute in element.attributes().with_checks(true) {
+        let attribute =
+            raw_attribute.map_err(|error| invalid(format!("invalid DDE attribute: {error}")))?;
+        let (resolved, name) = reader.resolver().resolve_attribute(attribute.key);
+        if matches!(resolved, ResolveResult::Bound(Namespace(uri)) if uri == namespace)
+            && name.as_ref() == local
+        {
+            if value.is_some() {
+                return Err(invalid("duplicate DDE attribute"));
+            }
+            let decoded = attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+                .map_err(|error| invalid(format!("invalid DDE attribute value: {error}")))?
+                .into_owned();
+            if decoded.len() > limit || !xml_text_is_valid(&decoded) {
+                return Err(invalid("invalid or oversized DDE attribute value"));
+            }
+            value = Some(decoded);
+        }
     }
-    (1usize..)
-        .map(|index| format!("{base}_{index}"))
-        .find(|candidate| !namespaces.contains_key(candidate))
-        .expect("an unbounded suffix always yields a free XML prefix")
-}
-
-fn write_namespace(output: &mut String, prefix: &str, uri: &str) {
-    output.push_str(" xmlns:");
-    output.push_str(prefix);
-    output.push_str("=\"");
-    output.push_str(uri);
-    output.push('"');
+    Ok(value)
 }
 
 fn parse_bool(value: &str) -> Result<bool> {
     match value {
         "true" | "1" => Ok(true),
         "false" | "0" => Ok(false),
-        _ => Err(Error::InvalidFormat(format!(
-            "invalid office:automatic-update Boolean '{value}'"
-        ))),
+        _ => Err(invalid(format!("invalid XML boolean '{value}'"))),
     }
 }
 
-fn element_name_is(
-    element: &BytesStart<'_>,
-    namespaces: &BTreeMap<String, String>,
-    namespace: &str,
-    local_name: &str,
-) -> bool {
-    qualified_name_is(element.name().as_ref(), namespaces, namespace, local_name)
-}
-
-fn qualified_name_is(
-    name: &[u8],
-    namespaces: &BTreeMap<String, String>,
-    namespace: &str,
-    local_name: &str,
-) -> bool {
-    qualified_name_parts(name).is_some_and(|(prefix, local)| {
-        local == local_name && namespaces.get(prefix).is_some_and(|uri| uri == namespace)
+fn xml_text_is_valid(value: &str) -> bool {
+    !value.chars().any(|character| {
+        matches!(
+            character,
+            '\u{0000}'..='\u{0008}' | '\u{000B}'..='\u{000C}' | '\u{000E}'..='\u{001F}'
+        )
     })
 }
 
-fn attribute_local_name<'a>(
-    qualified_name: &'a [u8],
-    namespaces: &BTreeMap<String, String>,
-    namespace: &str,
-) -> Option<&'a str> {
-    let (prefix, local) = qualified_name_parts(qualified_name)?;
-    namespaces
-        .get(prefix)
-        .is_some_and(|uri| uri == namespace)
-        .then_some(local)
-}
-
-fn qualified_name_parts(name: &[u8]) -> Option<(&str, &str)> {
-    let name = std::str::from_utf8(name).ok()?;
-    Some(name.split_once(':').unwrap_or(("", name)))
-}
-
-fn push_namespace_scope(
-    element: &BytesStart<'_>,
-    decoder: Decoder,
-    namespaces: &mut BTreeMap<String, String>,
-) -> Result<Vec<(String, Option<String>)>> {
-    let mut previous_bindings = Vec::new();
-    for attribute in element.attributes() {
-        let attribute = attribute.map_err(|error| {
-            Error::InvalidFormat(format!("invalid XML namespace declaration: {error}"))
-        })?;
-        let name = std::str::from_utf8(attribute.key.as_ref()).map_err(|_| {
-            Error::InvalidFormat("invalid UTF-8 in XML namespace declaration".to_string())
-        })?;
-        let prefix = if name == "xmlns" {
-            ""
-        } else if let Some(prefix) = name.strip_prefix("xmlns:") {
-            prefix
-        } else {
-            continue;
-        };
-        let value = attribute
-            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
-            .map_err(|error| Error::InvalidFormat(format!("invalid XML namespace URI: {error}")))?
-            .into_owned();
-        let prefix = prefix.to_string();
-        let previous = namespaces.insert(prefix.clone(), value);
-        previous_bindings.push((prefix, previous));
-    }
-    Ok(previous_bindings)
-}
-
-fn pop_namespace_scope(
-    namespaces: &mut BTreeMap<String, String>,
-    scope: Option<Vec<(String, Option<String>)>>,
-) {
-    let Some(scope) = scope else { return };
-    for (prefix, previous) in scope.into_iter().rev() {
-        if let Some(previous) = previous {
-            namespaces.insert(prefix, previous);
-        } else {
-            namespaces.remove(&prefix);
-        }
+fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
+    match namespace {
+        ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE => NamespaceKind::Office,
+        ResolveResult::Bound(Namespace(uri)) if *uri == TABLE => NamespaceKind::Table,
+        ResolveResult::Bound(_) | ResolveResult::Unbound | ResolveResult::Unknown(_) => {
+            NamespaceKind::Other
+        },
     }
 }
 
-/// Write DDE declarations and cached tables without contacting their sources.
-pub(crate) fn write_dde_links(output: &mut String, links: &[DdeLink]) -> Result<()> {
-    if links.is_empty() {
-        return Ok(());
+fn is(namespace: NamespaceKind, local: &[u8], expected_ns: NamespaceKind, expected: &[u8]) -> bool {
+    namespace == expected_ns && local == expected
+}
+
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidStructure(message.into())
+}
+
+fn xml_position(reader: &NsReader<&[u8]>) -> Result<usize> {
+    usize::try_from(reader.buffer_position()).map_err(|_position_error| Error::PositionOverflow)
+}
+
+fn validate_required_source_value(name: &'static str, value: &str) -> Result<()> {
+    if value.is_empty() {
+        return Err(invalid(format!("DDE attribute {name} must not be empty")));
     }
-    if links.len() > MAX_DDE_LINKS {
-        return Err(Error::InvalidFormat(format!(
-            "DDE link count exceeds the {MAX_DDE_LINKS} link safety limit"
+    if value.len() > MAX_TEXT_BYTES {
+        return Err(Error::ResourceLimit {
+            resource: name,
+            actual: value.len(),
+            maximum: MAX_TEXT_BYTES,
+        });
+    }
+    if !xml_text_is_valid(value) {
+        return Err(invalid(format!(
+            "DDE attribute {name} contains invalid XML character data"
         )));
     }
-    output.push_str("<table:dde-links>");
-    for link in links {
-        link.validate()?;
-        output.push_str("<table:dde-link>");
-        write_dde_source(output, &link.source)?;
-        write_cached_table(output, &link.cached_table)?;
-        output.push_str("</table:dde-link>");
-    }
-    output.push_str("</table:dde-links>");
     Ok(())
-}
-
-/// Write one inert DDE source declaration without contacting it.
-pub(crate) fn write_dde_source(output: &mut String, source: &DdeSource) -> Result<()> {
-    source.validate()?;
-    output.push_str("<office:dde-source office:dde-application=\"");
-    output.push_str(&escape_xml(&source.application));
-    output.push_str("\" office:dde-topic=\"");
-    output.push_str(&escape_xml(&source.topic));
-    output.push_str("\" office:dde-item=\"");
-    output.push_str(&escape_xml(&source.item));
-    output.push('"');
-    write_optional_attribute(output, "office:name", source.name.as_deref());
-    write_optional_attribute(
-        output,
-        "office:conversion-mode",
-        source.conversion_mode.map(DdeConversionMode::as_str),
-    );
-    if let Some(value) = source.automatic_update {
-        write_optional_attribute(
-            output,
-            "office:automatic-update",
-            Some(if value { "true" } else { "false" }),
-        );
-    }
-    output.push_str("/>");
-    Ok(())
-}
-
-fn write_cached_table(output: &mut String, sheet: &Sheet) -> Result<()> {
-    output.push_str("<table:table table:name=\"");
-    output.push_str(&escape_xml(&sheet.name));
-    output.push('"');
-    write_sheet_formatting_attributes(output, &sheet.style, &sheet.print_settings)?;
-    write_sheet_attributes(output, &sheet.protection);
-    output.push('>');
-    write_sheet_preamble(
-        output,
-        sheet.title.as_deref(),
-        sheet.description.as_deref(),
-        sheet.table_source.as_ref(),
-        sheet.dde_source.as_ref(),
-        sheet.scenario.as_ref(),
-    )?;
-    write_sheet_options(output, &sheet.protection.options);
-
-    let total_columns = sheet_max_cols(sheet).max(sheet.columns.len()).max(1);
-    write_table_structure(
-        output,
-        &sheet.column_structure,
-        total_columns,
-        TableStructureAxis::Columns,
-        |out, range| {
-            let explicit_end = range.end.min(sheet.columns.len());
-            if range.start < explicit_end {
-                write_columns(out, &sheet.columns[range.start..explicit_end]);
-            }
-            let default_start = range.start.max(sheet.columns.len());
-            if default_start < range.end {
-                write_default_columns(out, range.end - default_start);
-            }
-        },
-    )?;
-    write_table_structure(
-        output,
-        &sheet.row_structure,
-        sheet.rows.len(),
-        TableStructureAxis::Rows,
-        |out, range| {
-            for row in &sheet.rows[range] {
-                write_row(out, row);
-            }
-        },
-    )?;
-    output.push_str("</table:table>");
-    Ok(())
-}
-
-fn sheet_max_cols(sheet: &Sheet) -> usize {
-    sheet
-        .rows
-        .iter()
-        .map(|row| row.cells.len())
-        .max()
-        .unwrap_or(0)
-}
-
-fn write_default_columns(output: &mut String, count: usize) {
-    if count <= 1 {
-        output.push_str("<table:table-column/>");
-    } else {
-        output.push_str("<table:table-column table:number-columns-repeated=\"");
-        output.push_str(&count.to_string());
-        output.push_str("\"/>");
-    }
-}
-
-fn write_row(output: &mut String, row: &Row) {
-    output.push_str("<table:table-row");
-    write_row_attributes(
-        output,
-        row.style_name.as_deref(),
-        row.default_cell_style_name.as_deref(),
-        row.visibility,
-    );
-    output.push('>');
-    for cell in &row.cells {
-        super::cell::write_cell_xml(output, cell);
-    }
-    output.push_str("</table:table-row>");
-}
-
-fn write_optional_attribute(output: &mut String, name: &str, value: Option<&str>) {
-    if let Some(value) = value {
-        output.push(' ');
-        output.push_str(name);
-        output.push_str("=\"");
-        output.push_str(&escape_xml(value));
-        output.push('"');
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_namespace_aliases_and_cached_values() {
-        let xml = r#"<o:document-content
-          xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
-          xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
-          xmlns:x="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
-          <o:body><o:spreadsheet><t:dde-links><t:dde-link>
-            <o:dde-source o:dde-application="soffice&amp;1" o:dde-topic="topic"
-              o:dde-item="item" o:name="Link One" o:conversion-mode="keep-text"
-              o:automatic-update="1"/>
-            <t:table t:name="Cache"><t:table-row><t:table-cell o:value-type="string"><x:p>cached</x:p></t:table-cell></t:table-row></t:table>
-          </t:dde-link></t:dde-links></o:spreadsheet></o:body>
-        </o:document-content>"#;
-
-        let links = parse_dde_links(xml).unwrap();
-        assert_eq!(links.len(), 1);
-        assert_eq!(links[0].source.application, "soffice&1");
-        assert_eq!(
-            links[0].source.conversion_mode,
-            Some(DdeConversionMode::KeepText)
-        );
-        assert_eq!(links[0].source.automatic_update, Some(true));
-        assert_eq!(links[0].cached_table.name, "Cache");
-        assert_eq!(links[0].cached_table.rows[0].cells[0].text, "cached");
-    }
-
-    #[test]
-    fn rejects_invalid_shapes_and_values() {
-        let wrap = |body: &str| {
-            format!(
-                r#"<o:spreadsheet xmlns:o="{OFFICE_NAMESPACE}" xmlns:t="{TABLE_NAMESPACE}">{body}</o:spreadsheet>"#
-            )
-        };
-        for body in [
-            "<t:dde-links/>",
-            "<t:dde-links><t:dde-link/></t:dde-links>",
-            "<t:dde-links><t:dde-link><t:table/></t:dde-link></t:dde-links>",
-            "<t:dde-links><t:dde-link><o:dde-source o:dde-application=\"a\" o:dde-topic=\"t\"/><t:table/></t:dde-link></t:dde-links>",
-            "<t:dde-links><t:dde-link><o:dde-source o:dde-application=\"a\" o:dde-topic=\"t\" o:dde-item=\"i\" o:conversion-mode=\"convert\"/><t:table/></t:dde-link></t:dde-links>",
-            "<t:dde-links><t:dde-link><o:dde-source o:dde-application=\"a\" o:dde-topic=\"t\" o:dde-item=\"i\" o:automatic-update=\"yes\"/><t:table/></t:dde-link></t:dde-links>",
-            "<t:dde-links>&amp;<t:dde-link><o:dde-source o:dde-application=\"a\" o:dde-topic=\"t\" o:dde-item=\"i\"/><t:table/></t:dde-link></t:dde-links>",
-        ] {
-            assert!(parse_dde_links(&wrap(body)).is_err(), "{body}");
-        }
-    }
-
-    #[test]
-    fn writer_escapes_source_and_round_trips_cache() {
-        let source = DdeSource {
-            application: "app&one".to_string(),
-            topic: "<topic>".to_string(),
-            item: "item\"one".to_string(),
-            name: Some("named".to_string()),
-            conversion_mode: Some(DdeConversionMode::IntoEnglishNumber),
-            automatic_update: Some(false),
-        };
-        let cached_table = Parser::parse_sheets(&format!(
-            r#"<o:spreadsheet xmlns:o="{OFFICE_NAMESPACE}" xmlns:t="{TABLE_NAMESPACE}"><t:table t:name="Cache"/></o:spreadsheet>"#
-        ))
-        .unwrap()
-        .remove(0);
-        let mut xml = String::new();
-        write_dde_links(&mut xml, &[DdeLink::new(source, cached_table).unwrap()]).unwrap();
-        assert!(xml.contains("office:dde-application=\"app&amp;one\""));
-        assert!(xml.contains("office:dde-topic=\"&lt;topic&gt;\""));
-
-        let wrapped = format!(
-            r#"<o:spreadsheet xmlns:o="{OFFICE_NAMESPACE}" xmlns:office="{OFFICE_NAMESPACE}" xmlns:table="{TABLE_NAMESPACE}" xmlns:text="{TEXT_NAMESPACE}">{xml}</o:spreadsheet>"#
-        );
-        let parsed = parse_dde_links(&wrapped).unwrap();
-        assert_eq!(parsed.len(), 1);
-        assert_eq!(parsed[0].source.application, "app&one");
-        assert_eq!(parsed[0].cached_table.name, "Cache");
-    }
-
-    #[test]
-    fn round_trips_through_builder_and_mutable_packages() {
-        let cached_table = Parser::parse_sheets(&format!(
-            r#"<o:spreadsheet xmlns:o="{OFFICE_NAMESPACE}" xmlns:t="{TABLE_NAMESPACE}" xmlns:x="{TEXT_NAMESPACE}" xmlns:l="http://www.w3.org/1999/xlink"><t:table t:name="Cache"><t:table-row><t:table-cell o:value-type="string"><x:p><x:a l:href="https://example.test/">stored</x:a> cache</x:p></t:table-cell></t:table-row></t:table></o:spreadsheet>"#
-        ))
-        .unwrap()
-        .remove(0);
-        let mut source = DdeSource::new("app", "topic", "item");
-        source.automatic_update = Some(true);
-
-        let mut builder = crate::Builder::new();
-        builder.add_sheet("Visible").unwrap();
-        builder
-            .add_dde_link(DdeLink::new(source, cached_table).unwrap())
-            .unwrap();
-        let bytes = builder.build().unwrap();
-
-        let mut spreadsheet = crate::Spreadsheet::from_bytes(bytes).unwrap();
-        assert!(spreadsheet.content_xml().contains("xmlns:xlink="));
-        assert_eq!(spreadsheet.dde_links().len(), 1);
-        assert_eq!(
-            spreadsheet.dde_links()[0].cached_table.rows[0].cells[0].text,
-            "stored cache"
-        );
-        assert_eq!(
-            spreadsheet.dde_links()[0].cached_table.rows[0].cells[0].hyperlinks()[0].range(),
-            0.."stored".len()
-        );
-        assert_eq!(spreadsheet.sheets().unwrap().len(), 1);
-
-        let mut mutable = crate::MutableSpreadsheet::from_spreadsheet(spreadsheet).unwrap();
-        mutable.dde_links_mut()[0].source.item = "updated".to_string();
-        let reparsed = crate::Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
-        assert_eq!(reparsed.dde_links()[0].source.item, "updated");
-        assert_eq!(
-            reparsed.dde_links()[0].cached_table.rows[0].cells[0].text,
-            "stored cache"
-        );
-    }
 }

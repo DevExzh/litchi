@@ -390,7 +390,9 @@ impl<'a> TextBox<'a> {
     }
 
     /// Set the text content of the text box.
-    pub fn set_text(&mut self, text: String) {
+    pub fn set_text(&mut self, text: String) -> Result<(), super::shape::MutationError> {
+        self.container
+            .ensure_mutable(super::shape::Mutation::Text)?;
         self.text = text.clone();
         self.runs = if text.is_empty() {
             Vec::new()
@@ -410,7 +412,12 @@ impl<'a> TextBox<'a> {
                 ParagraphRunFormatting::default(),
             )]
         };
-        self.container.set_text(text);
+        self.container.set_decoded_text(text);
+        Ok(())
+    }
+
+    pub(crate) fn mark_source_bound(&mut self) {
+        self.container.mark_source_bound();
     }
 
     /// Get the font size in points.
@@ -419,11 +426,14 @@ impl<'a> TextBox<'a> {
     }
 
     /// Set the font size in points.
-    pub fn set_font_size(&mut self, size: u16) {
+    pub fn set_font_size(&mut self, size: u16) -> Result<(), super::shape::MutationError> {
+        self.container
+            .ensure_mutable(super::shape::Mutation::Formatting)?;
         self.font_size = Some(size);
         for run in &mut self.runs {
             run.formatting.font_size = Some(size);
         }
+        Ok(())
     }
 
     /// Get the font color (RGB).
@@ -432,7 +442,9 @@ impl<'a> TextBox<'a> {
     }
 
     /// Set the font color (RGB).
-    pub fn set_font_color(&mut self, color: u32) {
+    pub fn set_font_color(&mut self, color: u32) -> Result<(), super::shape::MutationError> {
+        self.container
+            .ensure_mutable(super::shape::Mutation::Formatting)?;
         let color = color & 0x00FF_FFFF;
         self.font_color = Some(color);
         let red = (color >> 16) & 0xFF;
@@ -444,6 +456,7 @@ impl<'a> TextBox<'a> {
             run.formatting.font_color_raw = Some(raw);
             run.formatting.font_scheme_color = None;
         }
+        Ok(())
     }
 
     /// Get the raw `ColorIndexStruct` value of the first text run.
@@ -471,12 +484,15 @@ impl<'a> TextBox<'a> {
     }
 
     /// Set bold formatting.
-    pub fn set_bold(&mut self, bold: bool) {
+    pub fn set_bold(&mut self, bold: bool) -> Result<(), super::shape::MutationError> {
+        self.container
+            .ensure_mutable(super::shape::Mutation::Formatting)?;
         self.bold = bold;
         for run in &mut self.runs {
             run.formatting.bold = bold;
             run.formatting.bold_explicit = Some(bold);
         }
+        Ok(())
     }
 
     /// Check if the text is italic.
@@ -485,12 +501,15 @@ impl<'a> TextBox<'a> {
     }
 
     /// Set italic formatting.
-    pub fn set_italic(&mut self, italic: bool) {
+    pub fn set_italic(&mut self, italic: bool) -> Result<(), super::shape::MutationError> {
+        self.container
+            .ensure_mutable(super::shape::Mutation::Formatting)?;
         self.italic = italic;
         for run in &mut self.runs {
             run.formatting.italic = italic;
             run.formatting.italic_explicit = Some(italic);
         }
+        Ok(())
     }
 
     /// Check if the text is underlined.
@@ -499,12 +518,15 @@ impl<'a> TextBox<'a> {
     }
 
     /// Set underline formatting.
-    pub fn set_underline(&mut self, underline: bool) {
+    pub fn set_underline(&mut self, underline: bool) -> Result<(), super::shape::MutationError> {
+        self.container
+            .ensure_mutable(super::shape::Mutation::Formatting)?;
         self.underline = underline;
         for run in &mut self.runs {
             run.formatting.underline = underline;
             run.formatting.underline_explicit = Some(underline);
         }
+        Ok(())
     }
 
     /// Get the text formatting information.
@@ -613,8 +635,8 @@ where
         &self.container.properties
     }
 
-    fn properties_mut(&mut self) -> &mut ShapeProperties {
-        &mut self.container.properties
+    fn properties_mut(&mut self) -> Result<&mut ShapeProperties, super::shape::MutationError> {
+        self.container.properties_mut_checked()
     }
 
     fn text(&self) -> super::super::package::Result<String> {
@@ -774,7 +796,7 @@ mod tests {
         props.shape_type = ShapeType::TextBox;
 
         let mut textbox = TextBox::new(props, vec![]);
-        textbox.set_text("Hello World".to_string());
+        assert!(textbox.set_text("Hello World".to_string()).is_ok());
 
         assert_eq!(textbox.text(), "Hello World");
         assert!(textbox.has_text());
@@ -789,10 +811,10 @@ mod tests {
         props.shape_type = ShapeType::TextBox;
 
         let mut textbox = TextBox::new(props, vec![]);
-        textbox.set_font_size(12);
-        textbox.set_font_color(0xFF0000);
-        textbox.set_bold(true);
-        textbox.set_italic(true);
+        assert!(textbox.set_font_size(12).is_ok());
+        assert!(textbox.set_font_color(0xFF0000).is_ok());
+        assert!(textbox.set_bold(true).is_ok());
+        assert!(textbox.set_italic(true).is_ok());
 
         let formatting = textbox.formatting();
         assert_eq!(formatting.font_size, Some(12));
@@ -863,11 +885,11 @@ mod tests {
     #[test]
     fn setters_keep_character_runs_consistent() {
         let mut textbox = TextBox::new(ShapeProperties::default(), Vec::new());
-        textbox.set_bold(true);
-        textbox.set_font_size(20);
-        textbox.set_font_color(0x12_34_56);
-        textbox.set_text("hello".to_string());
-        textbox.set_italic(true);
+        assert!(textbox.set_bold(true).is_ok());
+        assert!(textbox.set_font_size(20).is_ok());
+        assert!(textbox.set_font_color(0x12_34_56).is_ok());
+        assert!(textbox.set_text("hello".to_string()).is_ok());
+        assert!(textbox.set_italic(true).is_ok());
 
         assert_eq!(textbox.runs().len(), 1);
         assert_eq!(textbox.runs()[0].text, "hello");
@@ -890,5 +912,62 @@ mod tests {
         let data = formatted_textbox_record(0, 0x0132_F541);
         let error = parse_formatted_textbox(&data).unwrap_err();
         assert!(error.to_string().contains("left margin"));
+    }
+
+    #[test]
+    fn source_bound_textbox_setters_are_atomic() {
+        let mut textbox = TextBox::new(ShapeProperties::default(), Vec::new());
+        assert!(textbox.set_text("before".to_owned()).is_ok());
+        let before_text = textbox.text().to_owned();
+        let before_formatting = textbox.formatting();
+        let before_run = textbox.runs().first().map(|run| {
+            (
+                run.text.clone(),
+                run.formatting.font_size,
+                run.formatting.font_color,
+                run.formatting.font_color_raw,
+                run.formatting.bold,
+                run.formatting.italic,
+                run.formatting.underline,
+            )
+        });
+        textbox.mark_source_bound();
+
+        assert_eq!(
+            textbox.set_text("changed".to_owned()),
+            Err(super::super::shape::MutationError::SourceBound {
+                mutation: super::super::shape::Mutation::Text,
+            })
+        );
+        for result in [
+            textbox.set_font_size(24),
+            textbox.set_font_color(0x12_34_56),
+            textbox.set_bold(true),
+            textbox.set_italic(true),
+            textbox.set_underline(true),
+        ] {
+            assert_eq!(
+                result,
+                Err(super::super::shape::MutationError::SourceBound {
+                    mutation: super::super::shape::Mutation::Formatting,
+                })
+            );
+        }
+        assert_eq!(textbox.text(), before_text);
+        assert_eq!(textbox.formatting(), before_formatting);
+        assert_eq!(
+            textbox.runs().first().map(|run| {
+                (
+                    run.text.clone(),
+                    run.formatting.font_size,
+                    run.formatting.font_color,
+                    run.formatting.font_color_raw,
+                    run.formatting.bold,
+                    run.formatting.italic,
+                    run.formatting.underline,
+                )
+            }),
+            before_run
+        );
     }
 }

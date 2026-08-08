@@ -40,10 +40,19 @@ otherwise.
 | `litchi-odt` | OpenDocument text (`.odt`, `.ott`) | ISO/IEC 26300 structures and shared ODF package/style models | [OpenDocument text feature matrix](../crates/litchi-odt/docs/FEATURE_MATRIX.md) |
 | `litchi-ods` | OpenDocument spreadsheet (`.ods`, `.ots`) | ISO/IEC 26300 structures and shared ODF package/style/formula models | [OpenDocument spreadsheet feature matrix](../crates/litchi-ods/docs/FEATURE_MATRIX.md) |
 | `litchi-odp` | OpenDocument presentation (`.odp`, `.otp`) | ISO/IEC 26300 structures and shared ODF package/style/drawing models | [OpenDocument presentation feature matrix](../crates/litchi-odp/docs/FEATURE_MATRIX.md) |
+| `litchi-odg` | OpenDocument drawing (`.odg`) | ISO/IEC 26300 package and drawing structures | [OpenDocument drawing feature matrix](../crates/litchi-odg/docs/FEATURE_MATRIX.md) |
+| `litchi-odc` | OpenDocument chart (`.odc`) | ISO/IEC 26300 package and chart structures | [OpenDocument chart feature matrix](../crates/litchi-odc/docs/FEATURE_MATRIX.md) |
+| `litchi-odi` | OpenDocument image (`.odi`) | ISO/IEC 26300 package and image structures | [OpenDocument image feature matrix](../crates/litchi-odi/docs/FEATURE_MATRIX.md) |
+| `litchi-odb` | OpenDocument database (`.odb`) | ISO/IEC 26300 package and database structures | [OpenDocument database feature matrix](../crates/litchi-odb/docs/FEATURE_MATRIX.md) |
+| `litchi-oth` | OpenDocument HTML template (`.oth`) | ISO/IEC 26300 package and text-web structures | [OpenDocument HTML-template feature matrix](../crates/litchi-oth/docs/FEATURE_MATRIX.md) |
+| `litchi-odm` | OpenDocument master document (`.odm`) | ISO/IEC 26300 package and master-document structures | [OpenDocument master-document feature matrix](../crates/litchi-odm/docs/FEATURE_MATRIX.md) |
+| `litchi-odf-formula` | OpenDocument formula document (`.odf`, `.otf`) | ISO/IEC 26300 formula packages and W3C MathML | [OpenDocument formula feature matrix](../crates/litchi-odf-formula/docs/FEATURE_MATRIX.md) |
 
-The detailed matrices are the source of truth for per-format rows. Shared ODF implementation lives
-primarily in `litchi-odf` and its companion crates; shared Office package and drawing behavior lives
-in the crates named by the specification map below.
+The detailed matrices are the source of truth for per-format rows. Shared ODF models and codecs
+live in `litchi-odf-common` and `litchi-odf-formula`; `litchi-odf` is a thin detector and
+feature-gated family umbrella. Concrete package and semantic ownership remains in each ODF family
+crate. Shared Office package and drawing behavior lives in the crates named by the specification
+map below.
 
 For XLSB sparklines, the detailed XLSB matrix records the strict, bounded Worksheet-ABNF support
 for [MS-XLSB] §2.1.7.62 and records §2.4.228-230, §2.4.581-583, and §2.4.806. The common
@@ -126,7 +135,7 @@ give the authoritative status and limitations for each concrete format.
 | Format detection and unified facades | Office, ODF, RTF, iWork, and tabular APIs where exposed; facade authoring is not implied | `litchi`, `litchi-core`, detailed format crates |
 | OOXML OPC package editing | Parts, relationships, content types, strict/transitional XML, and graph validation. Ingestion has configurable `ReadLimits`; default ceilings protect package input, ZIP members/names/metadata/compressed and uncompressed sizes, materialized parts, `[Content_Types].xml`, and relationship XML, attributes, targets, events, depth, and graph traversal. These are safety policy rather than spec maxima, grounded in ECMA-376 Part 2 §7.3.6/§10 and [MS-OI29500] §2.1.1749-1752. | `litchi-opc`, `litchi-ooxml-common`, DOCX/XLSX/XLSB/PPTX matrices |
 | OLE/CFB package editing | Streams, storages, property sets, inert OLEDS links, directory catalogs, custom XML stores, VBA signature metadata, and package-preserving editors | `litchi-cfb`, `litchi-ole-common`, DOC/XLS/PPT matrices; `object::{directory,link}`, `custom_xml`, and `vba_signature` provide bounded source-checked transactions with reversible patches and opaque-tail preservation |
-| ODF package and flat XML editing | ZIP package, manifest, metadata, styles, settings, resources, and bounded flat-document handling | `litchi-odf` and ODF matrices |
+| ODF package and flat XML editing | ZIP package, manifest, metadata, styles, settings, resources, and bounded flat-document handling | `litchi-odf-common`, concrete ODF family crates, and ODF matrices |
 | Encryption and integrity | Format-specific Office and ODF profiles; bounded password and integrity handling | `litchi-crypto`, `litchi-sign`, format matrices |
 | Properties and metadata | Core, extended, custom, document, and package metadata according to each format. PPTX/XLSX custom properties use typed, inert `litchi_ooxml_common::custom::Props`/`Value` parsing and writing per vendored `[MS-OI29500]` §3.11. Legacy Office reserves `_PID_LINKBASE` and `_PID_HLINKS` as named values in the `UserDefinedProperties` section, not PIDDSI `0x15`: `litchi_ole_common::property_set::user_defined::{Properties, Edit}` lazily decodes and boundedly writes their `[MS-OSHARED]` §§2.3.3.1.18-21 / §2.4.2 wire forms. Those limits bound the typed overlay and secondary decoding after generic property-set parsing, not initial property-stream allocation. Only DOC exposes possible field candidates under `[MS-DOC]` §2.4.7 because `dwApp` can be an `FcCompressed` or collide across stories; callers must resolve a candidate explicitly before canonical reordering or a changed write. PPT/XLS do not claim contextual association. These strings are preserved as inert text and are never normalized, resolved, fetched, opened, or executed. | `litchi-ooxml-common`, `litchi-ole-common`, and format matrices |
 | PPTX Designer metadata | Bounded typed PresentationML Designer design elements, 2020 shape properties, and slide-ID tags per [MS-PPTX] 2.2.17/2.5, 2.2.19/2.17.1, and 2.2.20/2.17.3. Source-bound models/transactions, writer support, finite limits, ordered duplicate inert tag values, and lossless unknown-extension retention are documented by the PPTX matrix; this does not claim unified-facade exposure. No Designer Service invocation, rendering, fetch, or execution occurs. | `litchi-pptx`; [PresentationML feature matrix](../crates/litchi-pptx/docs/FEATURE_MATRIX.md) |

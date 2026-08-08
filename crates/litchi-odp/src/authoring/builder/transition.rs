@@ -4,7 +4,7 @@ use super::xml::push_optional_attribute;
 use crate::Slide;
 use litchi_core::xml::escape_xml;
 
-pub(super) fn slide_style_name(slide: &Slide, index: usize) -> String {
+pub(crate) fn slide_style_name(slide: &Slide, index: usize) -> String {
     if slide
         .transition
         .as_ref()
@@ -16,10 +16,10 @@ pub(super) fn slide_style_name(slide: &Slide, index: usize) -> String {
     }
 }
 
-pub(super) const DEFAULT_DRAWING_PAGE_STYLE_NAME: &str = "dp1";
-pub(super) const DEFAULT_DRAWING_PAGE_STYLE: &str = r#"<style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties/></style:style>"#;
+pub(crate) const DEFAULT_DRAWING_PAGE_STYLE_NAME: &str = "dp1";
+pub(crate) const DEFAULT_DRAWING_PAGE_STYLE: &str = r#"<style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties/></style:style>"#;
 
-pub(super) fn generate_transition_styles(slides: &[Slide]) -> String {
+pub(crate) fn generate_transition_styles(slides: &[Slide]) -> String {
     let mut output = String::from(DEFAULT_DRAWING_PAGE_STYLE);
     for (index, slide) in slides.iter().enumerate() {
         push_transition_style(&mut output, slide, index);
@@ -27,7 +27,7 @@ pub(super) fn generate_transition_styles(slides: &[Slide]) -> String {
     output
 }
 
-pub(super) fn push_transition_style(target: &mut String, slide: &Slide, index: usize) {
+pub(crate) fn push_transition_style(target: &mut String, slide: &Slide, index: usize) {
     let Some(transition) = slide.transition.as_ref().filter(|value| !value.is_empty()) else {
         return;
     };

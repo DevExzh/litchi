@@ -122,10 +122,7 @@ impl HatchStyle {
         match self {
             Self::Horizontal => {
                 minified_xml_format!(
-                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
-  <rect width="{}" height="{}" fill="{}"/>
-  <line x1="0" y1="4" x2="8" y2="4" stroke="{}" stroke-width="1"/>
-</pattern>"#,
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}"><rect width="{}" height="{}" fill="{}"/><line x1="0" y1="4" x2="8" y2="4" stroke="{}" stroke-width="1"/></pattern>"#,
                     pattern_id,
                     pattern_size,
                     pattern_size,
@@ -137,10 +134,7 @@ impl HatchStyle {
             },
             Self::Vertical => {
                 minified_xml_format!(
-                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
-  <rect width="{}" height="{}" fill="{}"/>
-  <line x1="4" y1="0" x2="4" y2="8" stroke="{}" stroke-width="1"/>
-</pattern>"#,
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}"><rect width="{}" height="{}" fill="{}"/><line x1="4" y1="0" x2="4" y2="8" stroke="{}" stroke-width="1"/></pattern>"#,
                     pattern_id,
                     pattern_size,
                     pattern_size,
@@ -152,12 +146,7 @@ impl HatchStyle {
             },
             Self::FDiagonal => {
                 minified_xml_format!(
-                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
-  <rect width="{}" height="{}" fill="{}"/>
-  <line x1="0" y1="0" x2="8" y2="8" stroke="{}" stroke-width="1"/>
-  <line x1="-2" y1="6" x2="2" y2="10" stroke="{}" stroke-width="1"/>
-  <line x1="6" y1="-2" x2="10" y2="2" stroke="{}" stroke-width="1"/>
-</pattern>"#,
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}"><rect width="{}" height="{}" fill="{}"/><line x1="0" y1="0" x2="8" y2="8" stroke="{}" stroke-width="1"/><line x1="-2" y1="6" x2="2" y2="10" stroke="{}" stroke-width="1"/><line x1="6" y1="-2" x2="10" y2="2" stroke="{}" stroke-width="1"/></pattern>"#,
                     pattern_id,
                     pattern_size,
                     pattern_size,
@@ -171,12 +160,7 @@ impl HatchStyle {
             },
             Self::BDiagonal => {
                 minified_xml_format!(
-                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
-  <rect width="{}" height="{}" fill="{}"/>
-  <line x1="0" y1="8" x2="8" y2="0" stroke="{}" stroke-width="1"/>
-  <line x1="-2" y1="2" x2="2" y2="-2" stroke="{}" stroke-width="1"/>
-  <line x1="6" y1="10" x2="10" y2="6" stroke="{}" stroke-width="1"/>
-</pattern>"#,
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}"><rect width="{}" height="{}" fill="{}"/><line x1="0" y1="8" x2="8" y2="0" stroke="{}" stroke-width="1"/><line x1="-2" y1="2" x2="2" y2="-2" stroke="{}" stroke-width="1"/><line x1="6" y1="10" x2="10" y2="6" stroke="{}" stroke-width="1"/></pattern>"#,
                     pattern_id,
                     pattern_size,
                     pattern_size,
@@ -190,11 +174,7 @@ impl HatchStyle {
             },
             Self::Cross => {
                 minified_xml_format!(
-                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
-  <rect width="{}" height="{}" fill="{}"/>
-  <line x1="0" y1="4" x2="8" y2="4" stroke="{}" stroke-width="1"/>
-  <line x1="4" y1="0" x2="4" y2="8" stroke="{}" stroke-width="1"/>
-</pattern>"#,
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}"><rect width="{}" height="{}" fill="{}"/><line x1="0" y1="4" x2="8" y2="4" stroke="{}" stroke-width="1"/><line x1="4" y1="0" x2="4" y2="8" stroke="{}" stroke-width="1"/></pattern>"#,
                     pattern_id,
                     pattern_size,
                     pattern_size,
@@ -207,15 +187,7 @@ impl HatchStyle {
             },
             Self::DiagCross => {
                 minified_xml_format!(
-                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}">
-  <rect width="{}" height="{}" fill="{}"/>
-  <line x1="0" y1="0" x2="8" y2="8" stroke="{}" stroke-width="1"/>
-  <line x1="0" y1="8" x2="8" y2="0" stroke="{}" stroke-width="1"/>
-  <line x1="-2" y1="6" x2="2" y2="10" stroke="{}" stroke-width="1"/>
-  <line x1="6" y1="-2" x2="10" y2="2" stroke="{}" stroke-width="1"/>
-  <line x1="-2" y1="2" x2="2" y2="-2" stroke="{}" stroke-width="1"/>
-  <line x1="6" y1="10" x2="10" y2="6" stroke="{}" stroke-width="1"/>
-</pattern>"#,
+                    r#"<pattern id="{}" patternUnits="userSpaceOnUse" width="{}" height="{}"><rect width="{}" height="{}" fill="{}"/><line x1="0" y1="0" x2="8" y2="8" stroke="{}" stroke-width="1"/><line x1="0" y1="8" x2="8" y2="0" stroke="{}" stroke-width="1"/><line x1="-2" y1="6" x2="2" y2="10" stroke="{}" stroke-width="1"/><line x1="6" y1="-2" x2="10" y2="2" stroke="{}" stroke-width="1"/><line x1="-2" y1="2" x2="2" y2="-2" stroke="{}" stroke-width="1"/><line x1="6" y1="10" x2="10" y2="6" stroke="{}" stroke-width="1"/></pattern>"#,
                     pattern_id,
                     pattern_size,
                     pattern_size,

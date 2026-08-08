@@ -13,6 +13,15 @@ impl<'a> Parser<'a> {
         control: &ControlWord<'a>,
         text_buffer: &mut SmallVec<[u8; 256]>,
     ) -> RtfResult<()> {
+        if matches!(control, ControlWord::Unknown(_, _)) {
+            if !text_buffer.is_empty() {
+                self.flush_text_buffer(text_buffer)?;
+            }
+            let token = self.pos;
+            self.pos += 1;
+            self.preserve_unknown_control(token)?;
+            return Ok(());
+        }
         match control {
             ControlWord::Par | ControlWord::Line => {
                 let structural_table_boundary =

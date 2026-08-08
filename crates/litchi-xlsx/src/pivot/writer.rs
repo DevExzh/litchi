@@ -41,7 +41,6 @@ pub fn write_pivot_table(def: &TableDefinition<'_>) -> SheetResult<String> {
     let mut xml = String::with_capacity(8192);
 
     xml.push_str(XML_HEADER);
-    xml.push('\n');
     write!(
         &mut xml,
         r#"<pivotTableDefinition xmlns="{}" name="{}" cacheId="{}" dataOnRows="0" dataCaption="Values" updatedVersion="3" minRefreshableVersion="3" showCalcMbrs="0" useAutoFormatting="1" itemPrintTitles="1" createdVersion="3" indent="0" compact="0" compactData="0" gridDropZones="1">"#,
@@ -510,7 +509,6 @@ pub fn write_pivot_cache_definition(cache_def: &Definition) -> SheetResult<Strin
     let mut xml = String::with_capacity(4096);
 
     xml.push_str(XML_HEADER);
-    xml.push('\n');
     write!(
         xml,
         r#"<pivotCacheDefinition xmlns="{}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships""#,
@@ -698,7 +696,6 @@ pub fn write_pivot_cache_records(records: &Records) -> SheetResult<String> {
     let mut xml = String::with_capacity(4096);
 
     xml.push_str(XML_HEADER);
-    xml.push('\n');
     write!(
         xml,
         r#"<pivotCacheRecords xmlns="{}" count="{}">"#,
@@ -733,6 +730,48 @@ mod tests {
     use crate::pivot::reader::{read_pivot_cache_definition, read_pivot_cache_records};
 
     use super::*;
+
+    fn assert_compact_xml(xml: &str) {
+        assert!(
+            !xml.bytes()
+                .any(|byte| matches!(byte, b'\n' | b'\r' | b'\t'))
+        );
+        assert!(!xml.contains("> <"));
+    }
+
+    #[test]
+    fn every_public_pivot_writer_emits_compact_xml() {
+        let location = Location {
+            reference: "A1:B2".to_owned(),
+            ..Default::default()
+        };
+        let table = TableDefinition {
+            name: "Pivot",
+            cache_id: 1,
+            location: &location,
+            pivot_fields: &[],
+            row_fields: &[],
+            col_fields: &[],
+            page_fields: &[],
+            data_fields: &[],
+            row_items: &[],
+            col_items: &[],
+            filters: &[],
+            style: None,
+        };
+        assert_compact_xml(&write_pivot_table(&table).unwrap());
+
+        let mut definition = Definition {
+            source_ref: Some("A1:B2".to_owned()),
+            ..Default::default()
+        };
+        definition.cache_fields.push(CacheField {
+            name: "Value".to_owned(),
+            ..Default::default()
+        });
+        assert_compact_xml(&write_pivot_cache_definition(&definition).unwrap());
+        assert_compact_xml(&write_pivot_cache_records(&Records::default()).unwrap());
+    }
 
     #[test]
     fn writes_complete_pivot_cache_definition_round_trip() {
@@ -773,6 +812,7 @@ mod tests {
         });
 
         let xml = write_pivot_cache_definition(&definition).unwrap();
+        assert_compact_xml(&xml);
         let parsed = read_pivot_cache_definition(&xml).unwrap().unwrap();
 
         assert_eq!(parsed.id.as_deref(), Some("records & data"));
@@ -799,6 +839,7 @@ mod tests {
         };
 
         let xml = write_pivot_cache_records(&records).unwrap();
+        assert_compact_xml(&xml);
         let parsed = read_pivot_cache_records(&xml).unwrap().unwrap();
 
         assert!(matches!(parsed.records[0].values[0], Item::Index(3)));

@@ -32,7 +32,7 @@ pub enum DefaultTabWidthPolicy {
 }
 
 /// RTF writer options
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WriterOptions {
     /// Checked legacy character set declared by the document header.
     pub charset: Charset,
@@ -132,6 +132,7 @@ enum BodyEventKind<'b, 'a> {
     PageBreak,
     ColumnBreak,
     SectionBreak(Option<&'b Section<'a>>),
+    Opaque(&'b crate::opaque::Node),
 }
 
 #[derive(Clone, Copy)]
@@ -185,11 +186,26 @@ impl<W: Write> RtfWriter<W> {
 
     /// Serialize an immutable document snapshot.
     pub fn write(&mut self, document: &crate::Document) -> io::Result<()> {
+        if self.options == WriterOptions::default()
+            && let Some(source) = document.model().preserved_source()
+        {
+            return self.writer.write_all(source);
+        }
         self.write_document(document.model())
     }
 
     /// Write a complete RTF document
     pub fn write_document<'a>(&mut self, doc: &RtfDocument<'a>) -> io::Result<()> {
+        if doc
+            .opaque_nodes()
+            .iter()
+            .any(|node| matches!(node.anchor(), crate::opaque::Anchor::Structural { .. }))
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF canonical rewrite cannot preserve a structurally scoped opaque node",
+            ));
+        }
         Self::validate_table_story_metadata_ownership(doc)?;
         Self::validate_generic_field_ownership(doc)?;
         Self::validate_section_boundary_mapping(doc.sections(), doc.body_story_events())?;
@@ -219,6 +235,7 @@ impl<W: Write> RtfWriter<W> {
                     pitch: f.pitch,
                     code_page: f.code_page,
                     embedded: f.embedded.clone().map(crate::EmbeddedFont::into_owned),
+                    bidi: f.bidi,
                 })
                 .collect(),
             defined: doc.font_table().defined.clone(),
@@ -405,6 +422,7 @@ impl<W: Write> RtfWriter<W> {
             doc.fields(),
             doc.sections(),
             doc.body_story_events(),
+            doc.opaque_nodes(),
         )?;
 
         // Write tables

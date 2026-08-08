@@ -346,8 +346,7 @@ impl Workbook {
                     "sheet {name:?} has no worksheet relationship"
                 ))
             })?;
-        let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin")?;
-        let workbook_part = self.package.get_part(&workbook_uri)?;
+        let workbook_part = self.package.main_document_part()?;
         let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
             crate::package::error::Error::FileNotFound(format!(
                 "relationship {rel_id:?} for sheet {name:?}"

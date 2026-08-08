@@ -398,7 +398,7 @@ pub(crate) fn read_document_version(
         })
         .map(|attribute| attribute.value.as_str())
     {
-        None | Some("1.2") => Ok(Version::V1_2),
+        None | Some("1.0" | "1.1" | "1.2") => Ok(Version::V1_2),
         Some("1.3") => Ok(Version::V1_3),
         Some(value) => invalid(format!("unsupported ODF data-style version '{value}'")),
     }

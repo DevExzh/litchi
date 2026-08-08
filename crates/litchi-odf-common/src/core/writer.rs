@@ -9,6 +9,7 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use litchi_core::{Error, Result, xml::escape_xml};
 use soapberry_zip::office::StreamingArchiveWriter;
 use std::collections::HashSet;
+use std::io::{self, Write};
 use zeroize::Zeroizing;
 
 use super::encryption::{Profile, encrypt_entry};
@@ -40,8 +41,8 @@ use super::package::OwnedPackage;
 /// # Ok(())
 /// # }
 /// ```
-pub struct PackageWriter {
-    zip_writer: StreamingArchiveWriter<std::io::Cursor<Vec<u8>>>,
+pub struct PackageWriter<W: Write = io::Cursor<Vec<u8>>> {
+    zip_writer: StreamingArchiveWriter<W>,
     mimetype: Option<String>,
     manifest_entries: Vec<ManifestEntry>,
     wrote_any_entry: bool,
@@ -65,11 +66,79 @@ struct ManifestEntry {
     encryption: Option<ManifestEncryption>,
 }
 
-impl PackageWriter {
+/// A bounded, fallibly growing in-memory package sink.
+///
+/// Every write checks the configured byte limit before reserving exactly the
+/// required capacity. This is intended for package publication paths that must
+/// never first materialize an oversized archive.
+pub struct BoundedBytes {
+    bytes: Vec<u8>,
+    limit: usize,
+}
+
+impl BoundedBytes {
+    fn new(limit: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            limit,
+        }
+    }
+
+    fn into_inner(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+impl Write for BoundedBytes {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let length = self
+            .bytes
+            .len()
+            .checked_add(bytes.len())
+            .ok_or_else(|| io::Error::other("ODF bounded package output size overflow"))?;
+        if length > self.limit {
+            return Err(io::Error::other(
+                "ODF bounded package output exceeds its limit",
+            ));
+        }
+        self.bytes
+            .try_reserve_exact(bytes.len())
+            .map_err(|_| io::Error::other("ODF bounded package output allocation failed"))?;
+        self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl PackageWriter<io::Cursor<Vec<u8>>> {
     /// Create a new package writer that writes to memory
     pub fn new() -> Self {
         Self {
             zip_writer: StreamingArchiveWriter::new(),
+            mimetype: None,
+            manifest_entries: Vec::new(),
+            wrote_any_entry: false,
+            wrote_mimetype: false,
+            wrote_payload_entry: false,
+            encryption: None,
+            document_signer: None,
+        }
+    }
+
+    /// Create a writer whose archive bytes are bounded before materialization.
+    pub fn new_bounded(limit: usize) -> PackageWriter<BoundedBytes> {
+        PackageWriter::with_writer(BoundedBytes::new(limit))
+    }
+}
+
+impl<W: Write> PackageWriter<W> {
+    /// Create a package writer over an arbitrary output sink.
+    pub fn with_writer(writer: W) -> Self {
+        Self {
+            zip_writer: StreamingArchiveWriter::with_writer(writer),
             mimetype: None,
             manifest_entries: Vec::new(),
             wrote_any_entry: false,
@@ -412,7 +481,7 @@ impl PackageWriter {
     /// Returns an error if:
     /// - No MIME type has been set
     /// - Writing to the ZIP archive fails
-    pub fn finish(mut self) -> Result<Vec<u8>> {
+    fn finish_into_writer(mut self) -> Result<(W, Option<crate::signature::DocumentSigner>)> {
         if !self.wrote_mimetype {
             return Err(Error::InvalidFormat("MIME type not set".to_string()));
         }
@@ -439,11 +508,29 @@ impl PackageWriter {
             .map_err(|e| Error::ZipError(e.to_string()))?;
 
         // Finish ZIP archive and return bytes
-        let bytes = self
+        let signer = self.document_signer.take();
+        let writer = self
             .zip_writer
-            .finish_to_bytes()
+            .finish()
             .map_err(|e| Error::ZipError(e.to_string()))?;
-        if let Some(signer) = &self.document_signer {
+        Ok((writer, signer))
+    }
+}
+
+impl PackageWriter<io::Cursor<Vec<u8>>> {
+    /// Finish writing the package and return the bytes.
+    ///
+    /// This method writes the mimetype file, manifest, and finalizes the ZIP archive.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - No MIME type has been set
+    /// - Writing to the ZIP archive fails
+    pub fn finish(self) -> Result<Vec<u8>> {
+        let (cursor, signer) = self.finish_into_writer()?;
+        let bytes = cursor.into_inner();
+        if let Some(signer) = &signer {
             crate::signature::sign_package(&bytes, signer)
         } else {
             Ok(bytes)
@@ -453,6 +540,23 @@ impl PackageWriter {
     /// Alias for `finish()` for API compatibility.
     pub fn finish_to_bytes(self) -> Result<Vec<u8>> {
         self.finish()
+    }
+}
+
+impl PackageWriter<BoundedBytes> {
+    /// Finish a package into the configured bounded sink.
+    ///
+    /// Document signing is refused because signing can create a second package
+    /// representation outside this sink.
+    pub fn finish_to_bounded_bytes(self) -> Result<Vec<u8>> {
+        if self.document_signer.is_some() {
+            return Err(Error::InvalidFormat(
+                "ODF bounded package output does not support document signing".to_string(),
+            ));
+        }
+        let (sink, signer) = self.finish_into_writer()?;
+        debug_assert!(signer.is_none());
+        Ok(sink.into_inner())
     }
 }
 
@@ -732,18 +836,16 @@ mod tests {
 
     #[test]
     fn test_guess_media_type() {
-        assert_eq!(PackageWriter::guess_media_type("content.xml"), "text/xml");
-        assert_eq!(PackageWriter::guess_media_type("image.png"), "image/png");
-        assert_eq!(PackageWriter::guess_media_type("image.jpg"), "image/jpeg");
-        assert_eq!(PackageWriter::guess_media_type("image.jpeg"), "image/jpeg");
-        assert_eq!(PackageWriter::guess_media_type("image.gif"), "image/gif");
+        type MemoryWriter = PackageWriter<Cursor<Vec<u8>>>;
+        assert_eq!(MemoryWriter::guess_media_type("content.xml"), "text/xml");
+        assert_eq!(MemoryWriter::guess_media_type("image.png"), "image/png");
+        assert_eq!(MemoryWriter::guess_media_type("image.jpg"), "image/jpeg");
+        assert_eq!(MemoryWriter::guess_media_type("image.jpeg"), "image/jpeg");
+        assert_eq!(MemoryWriter::guess_media_type("image.gif"), "image/gif");
+        assert_eq!(MemoryWriter::guess_media_type("image.svg"), "image/svg+xml");
+        assert_eq!(MemoryWriter::guess_media_type("META-INF/"), "");
         assert_eq!(
-            PackageWriter::guess_media_type("image.svg"),
-            "image/svg+xml"
-        );
-        assert_eq!(PackageWriter::guess_media_type("META-INF/"), "");
-        assert_eq!(
-            PackageWriter::guess_media_type("data.bin"),
+            MemoryWriter::guess_media_type("data.bin"),
             "application/octet-stream"
         );
     }

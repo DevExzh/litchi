@@ -1267,7 +1267,10 @@ impl<'a> Parser<'a> {
                         "RTF shppict must be nested in listpicture".to_string(),
                     ));
                 },
-                Some(Token::OpenBrace) => self.skip_group()?,
+                Some(Token::OpenBrace) => {
+                    self.pos += 1;
+                    self.preserve_unknown_destination_in(crate::opaque::Context::Metadata)?;
+                },
                 Some(Token::CloseBrace) => {
                     self.pos += 1;
                     self.list_table.validate()?;
@@ -1432,7 +1435,8 @@ impl<'a> Parser<'a> {
                     continue;
                 },
                 Some(Token::OpenBrace) => {
-                    self.skip_group()?;
+                    self.pos += 1;
+                    self.preserve_unknown_destination_in(crate::opaque::Context::Metadata)?;
                     continue;
                 },
                 Some(Token::CloseBrace) => {
@@ -1511,7 +1515,8 @@ impl<'a> Parser<'a> {
                     continue;
                 },
                 Some(Token::OpenBrace) => {
-                    self.skip_group()?;
+                    self.pos += 1;
+                    self.preserve_unknown_destination_in(crate::opaque::Context::Metadata)?;
                     continue;
                 },
                 Some(Token::CloseBrace) => {
@@ -2317,7 +2322,8 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::OpenBrace) => {
                     // Nested extension groups do not form part of the style name.
-                    self.skip_group()?;
+                    self.pos += 1;
+                    self.preserve_unknown_destination_in(crate::opaque::Context::Metadata)?;
                     continue;
                 },
                 Some(Token::Text(text)) if !name_complete => {
@@ -2787,6 +2793,8 @@ impl<'a> Parser<'a> {
         let shading_control = matches!(
             control,
             ControlWord::TableShadingAmount(..)
+                | ControlWord::TableShadingRawAmount(..)
+                | ControlWord::TableShadingRawNil(..)
                 | ControlWord::TableShadingForeground(..)
                 | ControlWord::TableShadingBackground(..)
                 | ControlWord::TableShadingPattern(..)
@@ -2797,6 +2805,8 @@ impl<'a> Parser<'a> {
             state.active_table_border_seen = 0;
             let scope = match control {
                 ControlWord::TableShadingAmount(scope, _)
+                | ControlWord::TableShadingRawAmount(scope, _)
+                | ControlWord::TableShadingRawNil(scope, _)
                 | ControlWord::TableShadingForeground(scope, _)
                 | ControlWord::TableShadingBackground(scope, _)
                 | ControlWord::TableShadingPattern(scope, _, _) => *scope,
@@ -2815,6 +2825,8 @@ impl<'a> Parser<'a> {
             };
             let bit = match control {
                 ControlWord::TableShadingAmount(..) => 1,
+                ControlWord::TableShadingRawAmount(..) => 16,
+                ControlWord::TableShadingRawNil(..) => 32,
                 ControlWord::TableShadingForeground(..) => 2,
                 ControlWord::TableShadingBackground(..) => 4,
                 ControlWord::TableShadingPattern(..)
@@ -2830,6 +2842,14 @@ impl<'a> Parser<'a> {
             match control {
                 ControlWord::TableShadingAmount(_, value) => {
                     shading.amount = Some(required_table_value(*value, "table shading", 10_000)?)
+                },
+                ControlWord::TableShadingRawAmount(_, value) => {
+                    shading.raw_amount =
+                        Some(required_table_value(*value, "raw table shading", 10_000)?)
+                },
+                ControlWord::TableShadingRawNil(_, value) => {
+                    require_parameterless(*value, "clshdrawnil")?;
+                    shading.raw_nil = true;
                 },
                 ControlWord::TableShadingForeground(_, value) => {
                     shading.foreground_color = Some(required_table_value(

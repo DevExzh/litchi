@@ -482,6 +482,8 @@ pub struct Font<'a> {
     pub embedded: Option<EmbeddedFont<'a>>,
     /// Theme-font role from the major/minor theme selectors.
     pub theme: Option<FontTheme>,
+    /// Whether the font is marked as bidirectional by the `fbidi` control.
+    pub bidi: bool,
 }
 
 impl<'a> Font<'a> {
@@ -499,6 +501,7 @@ impl<'a> Font<'a> {
             code_page: None,
             embedded: None,
             theme: None,
+            bidi: false,
         }
     }
 
@@ -541,6 +544,7 @@ impl<'a> Font<'a> {
             pitch: self.pitch,
             code_page: self.code_page,
             embedded: self.embedded.map(EmbeddedFont::into_owned),
+            bidi: self.bidi,
         }
     }
 }

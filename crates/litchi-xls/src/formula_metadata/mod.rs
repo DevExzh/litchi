@@ -14,8 +14,8 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use model::Metadata;
+pub use model::{Defect, Metadata};
 pub use shared::{Cell, Owner, Range};
 
-pub(crate) use codec::parse_record;
-pub(crate) use validation::{encode_flags, validate_for_write};
+pub(crate) use codec::{parse_record, parse_record_preserving};
+pub(crate) use validation::{FlagDefect, encode_flags, validate_for_write};

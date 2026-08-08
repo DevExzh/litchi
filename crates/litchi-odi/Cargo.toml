@@ -11,7 +11,7 @@ rust-version.workspace = true
 [dependencies]
 litchi-core = { workspace = true }
 litchi-odf-common = { workspace = true }
+quick-xml = { workspace = true }
 
 [lints]
 workspace = true
-

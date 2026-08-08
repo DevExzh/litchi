@@ -697,3 +697,22 @@ failures do not become `Other(String)`.
 Reusable queries are typed serializable ASTs; closure predicates remain a local
 convenience. Traversal is lazy and borrowed. Durable bulk/thread selections are
 lineage-checked `Selection<T>` handles.
+
+## Legacy PPT reader-shape mutation migration
+
+During the `0.x` API series, legacy PPT reader-shape mutators intentionally
+migrate from unconditional in-memory mutation to fallible semantic mutation.
+Methods such as text, fill, line, geometry, formatting, placeholder, picture,
+and group setters return `Result<_, litchi_ppt::shapes::MutationError>`.
+Detached values remain editable. Values decoded from an opened presentation
+carry private source lineage and return `MutationError::SourceBound` before
+changing state when no faithful source-checked transaction can publish the
+operation.
+
+This is an intentional pre-1.0 breaking correction: mutable fields that could
+create invalid or silently unpublishable reader state become private and gain
+immutable accessors. The public `shapes::Shape` trait remains externally
+implementable and contains no package-lineage hook. Source binding and parser
+hydration are crate-private companion infrastructure for Litchi's built-in
+shape variants; third-party implementations are not required or permitted to
+model package provenance through the semantic trait.

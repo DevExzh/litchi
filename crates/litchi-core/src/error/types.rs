@@ -5,6 +5,7 @@
 use std::collections::TryReserveError;
 
 use crate::binary::BinaryError;
+use crate::xml::CompactnessKind;
 use thiserror::Error;
 
 /// Main error type for Litchi operations.
@@ -39,6 +40,15 @@ pub enum Error {
     #[error("XML error: {0}")]
     XmlError(String),
 
+    /// XML cannot be represented by a compact parser.
+    #[error("compact XML {kind} at byte offset {offset}")]
+    XmlCompactness {
+        /// Structural cause of the compactness failure.
+        kind: CompactnessKind,
+        /// Byte offset where the parser observed the failure.
+        offset: u64,
+    },
+
     /// Invalid content type
     #[error("Invalid content type: expected {expected}, got {got}")]
     InvalidContentType { expected: String, got: String },
@@ -64,6 +74,10 @@ pub enum Error {
         #[source]
         source: TryReserveError,
     },
+
+    /// A finite resource budget was exceeded.
+    #[error(transparent)]
+    ResourceLimit(#[from] crate::ResourceLimit),
 
     /// Generic error
     #[error("{0}")]

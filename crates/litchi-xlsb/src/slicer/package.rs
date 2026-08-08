@@ -427,6 +427,12 @@ fn remove_cache_parts(package: &mut OpcPackage, workbook: &PackURI) -> Result<Ve
             targets.push((relationship_id.clone(), relationship.target_partname()?));
         }
     }
+    crate::package::owner_transaction::require_exclusive_inbound(
+        package,
+        workbook,
+        &targets,
+        "slicer cache",
+    )?;
     let part = package.get_part_mut(workbook)?;
     for (relationship_id, _) in &targets {
         part.rels_mut().remove(relationship_id);
@@ -564,6 +570,15 @@ pub fn load_views(package: &OpcPackage, worksheet: &PackURI) -> Result<Option<Vi
 /// Replace a worksheet's slicer views and relationship references.
 pub fn store_views(package: &mut OpcPackage, worksheet: &PackURI, views: &Views) -> Result<()> {
     validate_views(views)?;
+    if let Some(existing) = load_views(package, worksheet)? {
+        let target = PackURI::new(&existing.part_name)?;
+        crate::package::owner_transaction::require_exclusive_inbound(
+            package,
+            worksheet,
+            &[(existing.relationship_id, target)],
+            "slicer view",
+        )?;
+    }
     if views.items.len() > MAX_VIEWS {
         return Err(Error::InvalidLength {
             expected: MAX_VIEWS,

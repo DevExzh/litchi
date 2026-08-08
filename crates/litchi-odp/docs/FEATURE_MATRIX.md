@@ -1,8 +1,8 @@
-# ODP/OTP Feature Matrix
+# ODP Feature Matrix
 
 This document tracks the public and source-level feature coverage of the
-`litchi-odp` OpenDocument Presentation implementation for packaged ODP and OTP
-files. It is a capability matrix, not a claim of complete ODF conformance,
+`litchi-odp` OpenDocument Presentation implementation for packaged ODP files.
+OTP template-package preservation is not currently claimed. This is a capability matrix, not a claim of complete ODF conformance,
 PowerPoint compatibility, playback fidelity, or rendering fidelity.
 
 The ODF common package layer is shared with the other OpenDocument families.
@@ -28,10 +28,9 @@ animations, and embedded payloads are inert unless a row says otherwise.
 The public ODP path includes package opening, slide parsing, slide/text and
 shape authoring, package-contained image/media access, page-layout models,
 presentation settings, declarations, page metadata, custom shows, metadata,
-RDF graph editing, and password opening. The source tree also contains richer
-mutable-presentation and master-page helpers, but those modules are not
-connected to the current `litchi_odp` module exports; their source-level
-vocabulary is therefore marked bounded rather than presented as public CRUD.
+RDF graph editing, password opening, and source-checked slide/shape
+transactions. Attached mutable presentation roots are private implementation
+details and cannot be obtained through the public API.
 
 The Microsoft `[MS-PPTX]` Front Matter and ToC describe extensions to OOXML
 PresentationML, not ODP. Their Part Enumerations, Extensions, structure
@@ -42,9 +41,9 @@ the existence of a PPTX feature is never treated as ODP support.
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Open, create, and save ODP/OTP packages | ✅ | ✅ | ✅ | `Presentation` opens paths or bytes and saves/to-bytes; `Builder` creates presentations and templates with presentation MIME handling |
+| Open, create, and save ODP packages | ✅ | ✅ | ✅ | `Presentation` opens paths or bytes and saves/to-bytes; `Builder` creates presentation packages. OTP template-package opening and authoring are not claimed by this facade. |
 | Password-protected ODP opening | ✅ | ✅ | N/A | `open_with_password` and `from_bytes_with_password` use the shared ODF encrypted-package reader; this does not imply password/encryption authoring |
-| ZIP package, manifest, and MIME validation | ✅ | ✅ | ✅ | Shared ODF package validation and deterministic package writing cover manifest/resource access and presentation/template media types |
+| ZIP package, manifest, and MIME validation | ✅ | ✅ | ✅ | Shared ODF package validation and deterministic package writing cover manifest/resource access and the ODP presentation media type |
 | `content.xml`, `styles.xml`, `meta.xml`, and `settings.xml` | ✅ | ✅ | ✅ | The public presentation/package and builder paths parse or write the core package XML parts; unsupported children may remain inert/preserved package data |
 | ODF metadata and statistics | ✅ | ✅ | ✅ | `Presentation::metadata` and `Builder::set_metadata` use the shared typed metadata model, including Dublin Core, user-defined values, template/reload/link metadata, and statistics |
 | Common styles and data styles | 🟡 | 🟡 | 🟡 | Direct presentation/drawing properties and bounded shared style values are supported; there is no complete public style-graph resolver/editor for every ODF style family |
@@ -64,7 +63,7 @@ the existence of a PPTX feature is never treated as ODP support.
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Slides, ordering, and slide count | ✅ | ✅ | ✅ | `Presentation` parses slide order/count; `Builder` adds slides and slide elements with validated names/IDs; public mutable deletion/reordering helpers are not exported |
+| Slides, ordering, and slide count | ✅ | ✅ | ✅ | `Presentation` parses slide order/count; `Builder` constructs detached decks; `edit::{Snapshot, Transaction, Commit, Patch}` provides checked add/insert/remove publication without mutating the source snapshot |
 | Slide titles and body text | ✅ | ✅ | ✅ | Plain title/body text is extracted and authored; `Slide::all_text` includes labeled shape text |
 | Rich text runs, paragraphs, and lists | 🟡 | 🟡 | 🟡 | Shape text and ODF whitespace/spans have bounded parser support, but the public builder primarily authors string stories rather than a complete rich paragraph/list tree |
 | Text boxes and basic shapes | ✅ | ✅ | ✅ | Rectangles, ellipses, lines, connectors, groups, frames/text boxes, and their core geometry/properties are represented by `Shape` and emitted by the builder |
@@ -91,7 +90,7 @@ the existence of a PPTX feature is never treated as ODP support.
 
 | Feature family | Status | Read | Write | Notes |
 |----------------|--------|------|-------|-------|
-| Full rich presentation authoring | 🟡 | 🟡 | 🟡 | Text stories, shapes, notes, layouts, media, settings, and animations have public bounded paths, but complete tables, charts, master pages, forms, style resolution, and arbitrary story editing are not exposed |
+| Full rich presentation authoring | 🟡 | 🟡 | 🟡 | Text stories, shapes, notes, layouts, media, settings, and animations have bounded paths. Existing retained pages containing potentially unmodelled XML are preservation-only for content rewrites; transactions refuse rather than silently discard that XML. Complete tables, charts, forms, style resolution, and arbitrary story editing are not exposed |
 | Rendering, layout, and playback | ❌ | ❌ | ❌ | No slide renderer, font/layout engine, pagination engine, animation/timing player, media player, chart renderer, or transition compositor is included |
 | PPTX sections and zoom objects | ❌ | ❌ | ❌ | `[MS-PPTX]` structures for sections, section zoom, slide zoom, and summary zoom have no ODP typed counterpart here |
 | PPTX vendor transitions and design extensions | ❌ | ❌ | ❌ | Morph, newer 2017-2023 transition families, design elements, and other Microsoft PresentationML extension parts are not implemented or converted to ODF |

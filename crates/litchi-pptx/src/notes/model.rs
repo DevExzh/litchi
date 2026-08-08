@@ -247,8 +247,8 @@ impl Slide {
 /// Complete owned notes graph for one presentation.
 ///
 /// Topology identities remain private. XML payload replacement is explicit,
-/// and [`crate::notes::put`] consumes the graph so successful storage moves
-/// those buffers.
+/// and [`crate::Package::put_notes`] consumes the graph so successful storage
+/// moves those buffers through the semantic package facade.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Graph {
     pub(crate) conformance: Conformance,

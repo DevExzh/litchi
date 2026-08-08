@@ -463,7 +463,9 @@ fn scan(xml: &str) -> Result<Vec<Span>> {
     if xml.len() > MAX_XML {
         return invalid("ODF XML part exceeds 64 MiB");
     }
-    let mut reader = NsReader::from_str(xml);
+    let source = xml.strip_prefix('\u{feff}').unwrap_or(xml);
+    let source_offset = xml.len() - source.len();
+    let mut reader = NsReader::from_str(source);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut spans = Vec::<Span>::new();
@@ -475,12 +477,12 @@ fn scan(xml: &str) -> Result<Vec<Span>> {
         match event {
             Event::Start(element) => {
                 let namespace = resolve_namespace(&namespace)?;
-                let index = push_span(xml, &reader, &mut spans, namespace, &element, false)?;
+                let index = push_span(source, &reader, &mut spans, namespace, &element, false)?;
                 open.push(index);
             },
             Event::Empty(element) => {
                 let namespace = resolve_namespace(&namespace)?;
-                push_span(xml, &reader, &mut spans, namespace, &element, true)?;
+                push_span(source, &reader, &mut spans, namespace, &element, true)?;
             },
             Event::End(_) => {
                 let index = open
@@ -496,6 +498,13 @@ fn scan(xml: &str) -> Result<Vec<Span>> {
     }
     if !open.is_empty() {
         return invalid("ODF XML contains unclosed elements");
+    }
+    if source_offset != 0 {
+        for span in &mut spans {
+            span.start += source_offset;
+            span.tag_end += source_offset;
+            span.end += source_offset;
+        }
     }
     Ok(spans)
 }
@@ -823,19 +832,23 @@ fn masters_from_xml(xml: &str) -> Result<Vec<MasterPage>> {
     if parsed.len() > MAX_DEFINITIONS {
         return invalid("ODP styles exceed 65536 master pages");
     }
+    let spans = scan(xml)?;
+    let roots = select(&spans, STYLE, "master-page");
+    if roots.len() != parsed.len() {
+        return invalid("parsed master-page count does not match source XML");
+    }
     let mut result = Vec::new();
     let mut names = HashSet::new();
-    for master_page in parsed {
+    for (master_page, root) in parsed.into_iter().zip(roots) {
         if !names.insert(master_page.name.clone()) {
             return invalid(format!("duplicate master page '{}'", master_page.name));
         }
-        let spans = scan(&master_page.xml)?;
-        reject_active_content(&spans)?;
-        let roots = select(&spans, STYLE, "master-page");
-        if roots.len() != 1 {
-            return invalid("parsed master XML is not a single master page");
+        if spans
+            .iter()
+            .any(|span| span.start >= root.start && span.end <= root.end && is_active_content(span))
+        {
+            return invalid("scripts and event listeners are not allowed in master XML");
         }
-        let root = roots[0];
         let model = MasterPage {
             master_page,
             page_layout_name: attr(root, PRESENTATION, "presentation-page-layout-name")
@@ -1081,14 +1094,16 @@ fn require(value: Option<&str>, names: &HashSet<String>, context: &str) -> Resul
 }
 
 fn reject_active_content(spans: &[Span]) -> Result<()> {
-    if spans.iter().any(|span| {
-        span.namespace.as_deref() == Some(SCRIPT)
-            || (span.namespace.as_deref() == Some(OFFICE)
-                && matches!(span.local.as_str(), "scripts" | "event-listeners"))
-    }) {
+    if spans.iter().any(is_active_content) {
         return invalid("scripts and event listeners are not allowed in master XML");
     }
     Ok(())
+}
+
+fn is_active_content(span: &Span) -> bool {
+    span.namespace.as_deref() == Some(SCRIPT)
+        || (span.namespace.as_deref() == Some(OFFICE)
+            && matches!(span.local.as_str(), "scripts" | "event-listeners"))
 }
 
 fn validate_name(value: &str, context: &str) -> Result<()> {

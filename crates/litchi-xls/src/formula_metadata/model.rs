@@ -3,7 +3,52 @@
 use std::sync::Arc;
 
 use super::array::Owner as ArrayOwner;
-use super::shared::Owner;
+use super::shared::{Cell, Owner};
+use crate::CompatibilityProfile;
+
+/// A bounded, inert producer defect preserved while opening a workbook.
+///
+/// Defects never authorize formula evaluation or canonical writing. The
+/// strict Formula codec continues to reject these wire combinations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Defect {
+    /// `[MS-XLS]` 2.4.127 requires `fShrFmla` Formula token streams to begin
+    /// with `PtgExp`, but the source record contains another token sequence.
+    SharedFlagWithoutPtgExp {
+        /// Checked BIFF8 cell containing the nonconforming Formula record.
+        cell: Cell,
+        /// Explicit profile selected before this record was parsed.
+        compatibility_profile: CompatibilityProfile,
+    },
+}
+
+impl Defect {
+    /// Checked BIFF8 location of the source Formula record.
+    pub const fn cell(self) -> Cell {
+        match self {
+            Self::SharedFlagWithoutPtgExp { cell, .. } => cell,
+        }
+    }
+
+    /// Explicit compatibility profile that authorized preservation.
+    pub const fn compatibility_profile(self) -> CompatibilityProfile {
+        match self {
+            Self::SharedFlagWithoutPtgExp {
+                compatibility_profile,
+                ..
+            } => compatibility_profile,
+        }
+    }
+
+    pub const fn row(self) -> u16 {
+        self.cell().row()
+    }
+
+    pub const fn column(self) -> u8 {
+        self.cell().col()
+    }
+}
 
 /// Calculation and preservation metadata surrounding one BIFF8 cell formula.
 ///

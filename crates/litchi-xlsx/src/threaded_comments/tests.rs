@@ -10,6 +10,14 @@ const BOB_ID: &str = "{33333333-3333-3333-3333-333333333333}";
 const REPLY_ID: &str = "{33333333-3333-3333-3333-333333333333}";
 const MENTION_ID: &str = "{44444444-4444-4444-4444-444444444444}";
 
+fn assert_compact_xml(xml: &str) {
+    assert!(
+        !xml.bytes()
+            .any(|byte| matches!(byte, b'\n' | b'\r' | b'\t'))
+    );
+    assert!(!xml.contains("> <"));
+}
+
 #[test]
 fn parses_prefixed_people_and_threaded_comments() {
     let people = parse_persons(&format!(
@@ -98,6 +106,7 @@ fn writes_schema_valid_people_and_comments() {
         }],
     };
     let people_xml = write_persons(&people).unwrap();
+    assert_compact_xml(&people_xml);
     assert!(people_xml.contains("Alice &amp; Bob"));
 
     let comments = Comments {
@@ -124,6 +133,7 @@ fn writes_schema_valid_people_and_comments() {
         ],
     };
     let comments_xml = write_comments(&comments).unwrap();
+    assert_compact_xml(&comments_xml);
     assert!(comments_xml.contains("<text>Hi @Bob</text>"));
     assert!(comments_xml.contains(&format!(r#" parentId="{COMMENT_ID}""#)));
 }

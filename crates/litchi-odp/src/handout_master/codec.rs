@@ -784,14 +784,13 @@ fn fragment_parts(xml: &str) -> Result<FragmentParts> {
                 depth += 1;
             },
             Event::Empty(element) => {
-                if depth != 0 {
-                    return Err(invalid("nested empty root in handout fragment"));
+                if depth == 0 {
+                    return Ok(FragmentParts {
+                        qname: element_name(&element)?,
+                        open: xml.to_string(),
+                        inner: String::new(),
+                    });
                 }
-                return Ok(FragmentParts {
-                    qname: element_name(&element)?,
-                    open: xml.to_string(),
-                    inner: String::new(),
-                });
             },
             Event::End(_) => {
                 depth = depth
@@ -854,7 +853,20 @@ fn parse_start_attributes(xml: &str) -> Result<(String, Vec<Attribute>)> {
         let namespace = match namespace {
             ResolveResult::Bound(Namespace(value)) => Some(value.to_vec()),
             ResolveResult::Unbound => None,
-            ResolveResult::Unknown(_) => None,
+            ResolveResult::Unknown(prefix) => {
+                let prefix: &[u8] = prefix.as_ref();
+                match prefix {
+                    b"office" => Some(OFFICE.to_vec()),
+                    b"style" => Some(STYLE.to_vec()),
+                    b"draw" => Some(DRAW.to_vec()),
+                    b"presentation" => Some(PRESENTATION.to_vec()),
+                    b"dr3d" => Some(DR3D.to_vec()),
+                    b"svg" => Some(SVG.to_vec()),
+                    b"text" => Some(TEXT.to_vec()),
+                    b"xlink" => Some(XLINK.to_vec()),
+                    _ => None,
+                }
+            },
         };
         let local = std::str::from_utf8(local.as_ref())
             .map(str::to_owned)
@@ -933,6 +945,21 @@ fn render_open(source: &str, master: &Master) -> Result<String> {
         }) {
             required_namespaces.push((prefix, String::from_utf8_lossy(namespace).into_owned()));
         }
+    }
+    for (prefix, namespace) in [
+        ("office", OFFICE),
+        ("style", STYLE),
+        ("draw", DRAW),
+        ("presentation", PRESENTATION),
+        ("dr3d", DR3D),
+        ("svg", SVG),
+        ("text", TEXT),
+        ("xlink", XLINK),
+    ] {
+        required_namespaces.push((
+            prefix.to_string(),
+            String::from_utf8_lossy(namespace).into_owned(),
+        ));
     }
     for (prefix, namespace) in required_namespaces {
         if !attributes

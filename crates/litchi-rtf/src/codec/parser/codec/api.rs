@@ -3,8 +3,33 @@ use super::*;
 impl<'a> Parser<'a> {
     /// Create a new parser.
     pub fn new(tokens: &'a [Token<'a>], arena: &'a Bump) -> Self {
+        Self::new_inner(tokens, None, None, arena, ParseLimits::default())
+    }
+
+    pub(crate) fn new_with_source(
+        tokens: &'a [Token<'a>],
+        token_spans: &'a [Range<usize>],
+        source: &'a str,
+        arena: &'a Bump,
+        limits: ParseLimits,
+    ) -> Self {
+        Self::new_inner(tokens, Some(token_spans), Some(source), arena, limits)
+    }
+
+    fn new_inner(
+        tokens: &'a [Token<'a>],
+        token_spans: Option<&'a [Range<usize>]>,
+        source: Option<&'a str>,
+        arena: &'a Bump,
+        limits: ParseLimits,
+    ) -> Self {
         Self {
             tokens,
+            token_spans,
+            source,
+            limits,
+            opaque_nodes: Vec::new(),
+            opaque_bytes: 0,
             pos: 0,
             states: vec![State::default()],
             font_table: RefCell::new(FontTable::new()),
@@ -475,6 +500,7 @@ impl<'a> Parser<'a> {
             file_table: self.file_table,
             color_table: self.color_table.into_inner(),
             blocks: self.blocks,
+            opaque_nodes: self.opaque_nodes,
             tables: self.tables,
             pictures: self.pictures,
             picture_compatibility_records: self.picture_compatibility_records,

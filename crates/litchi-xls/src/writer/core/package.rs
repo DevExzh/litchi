@@ -93,6 +93,10 @@ impl Writer {
         if let Some(toolbar) = &streams.toolbar {
             ole_writer.create_stream(&["XCB"], toolbar)?;
         }
+        if let Some(map_info) = &self.xml_map {
+            let xml = crate::xml_map::write(map_info)?;
+            ole_writer.create_stream(&[crate::xml_map::STREAM_NAME], &xml)?;
+        }
         Ok(())
     }
 
@@ -122,6 +126,15 @@ impl Writer {
     /// Generate the complete Workbook stream (plus pivot cache streams) with
     /// all BIFF records.
     fn generate_workbook_streams(&self) -> Result<stream::WorkbookStreams> {
+        if let Some(map_info) = self.xml_map.as_ref() {
+            crate::xml_map::validate_info(map_info)?;
+        }
+        crate::xml_map::validate_list_objects(
+            self.xml_map.as_ref(),
+            self.worksheets
+                .iter()
+                .flat_map(|worksheet| worksheet.list_objects.iter()),
+        )?;
         let mut streams = stream::generate_workbook_stream(
             self.use_1904_dates,
             self.calculation_settings,

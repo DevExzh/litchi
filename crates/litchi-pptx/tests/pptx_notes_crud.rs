@@ -4,10 +4,8 @@ use litchi_pptx::notes;
 use litchi_pptx::{Error, Package};
 use tempfile::NamedTempFile;
 
-const PRESENTATION: &str = "/ppt/presentation.xml";
-
 #[test]
-fn reopened_deck_removes_notes_by_physical_slide_and_preserves_slide_content() {
+fn reopened_deck_removes_notes_by_semantic_slide_and_preserves_slide_content() {
     let source = authored_two_slide_deck();
     let mut package = Package::open(source.path()).unwrap();
     package = name_slide(package, "/ppt/slides/slide1.xml", "Overview");
@@ -20,10 +18,10 @@ fn reopened_deck_removes_notes_by_physical_slide_and_preserves_slide_content() {
         vec!["Overview secret", "Appendix secret"]
     );
 
-    let (next, removed) = remove_notes(package, "/ppt/slides/slide1.xml");
+    let (next, removed) = remove_notes(package, "Overview");
     package = next;
     assert!(removed.unwrap());
-    let (next, removed) = remove_notes(package, "/ppt/slides/slide1.xml");
+    let (next, removed) = remove_notes(package, "Overview");
     package = next;
     assert!(!removed.unwrap());
     assert_eq!(slide_notes(&package), vec!["", "Appendix secret"]);
@@ -32,7 +30,7 @@ fn reopened_deck_removes_notes_by_physical_slide_and_preserves_slide_content() {
     assert_eq!(graph.slides().len(), 1);
     assert_eq!(graph.slides()[0].owner(), "/ppt/slides/slide2.xml");
 
-    let (next, removed) = remove_notes(package, "/ppt/slides/slide2.xml");
+    let (next, removed) = remove_notes(package, "Appendix");
     package = next;
     assert!(removed.unwrap());
     let (next, removed) = clear_notes(package);
@@ -207,7 +205,7 @@ fn slide_xml(package: &Package) -> Vec<Vec<u8>> {
 }
 
 fn slide_notes(package: &Package) -> Vec<String> {
-    let opc = package.opc().unwrap();
+    let graph = package.notes().unwrap().unwrap();
     package
         .presentation()
         .unwrap()
@@ -215,8 +213,10 @@ fn slide_notes(package: &Package) -> Vec<String> {
         .unwrap()
         .iter()
         .map(|slide| {
-            notes::slide(opc, slide.part().part().partname())
-                .unwrap()
+            graph
+                .slides()
+                .iter()
+                .find(|notes| notes.owner() == slide.part().part().partname().as_str())
                 .and_then(|slide| slide.text().unwrap())
                 .unwrap_or_default()
         })
@@ -224,7 +224,7 @@ fn slide_notes(package: &Package) -> Vec<String> {
 }
 
 fn notes_graph(package: &Package) -> Option<notes::Graph> {
-    notes::load(package.opc().unwrap(), &PackURI::new(PRESENTATION).unwrap()).unwrap()
+    package.notes().unwrap()
 }
 
 fn assert_no_speaker_notes(package: &Package) {
@@ -251,19 +251,15 @@ fn assert_no_speaker_notes(package: &Package) {
 }
 
 fn remove_notes(package: Package, slide_name: &str) -> (Package, litchi_pptx::Result<bool>) {
-    edit_package(package, |opc| {
-        notes::remove(
-            opc,
-            &PackURI::new(PRESENTATION).unwrap(),
-            &PackURI::new(slide_name).unwrap(),
-        )
-    })
+    let mut package = package;
+    let result = package.remove_notes(slide_name);
+    (package, result)
 }
 
 fn clear_notes(package: Package) -> (Package, litchi_pptx::Result<usize>) {
-    edit_package(package, |opc| {
-        notes::clear(opc, &PackURI::new(PRESENTATION).unwrap())
-    })
+    let mut package = package;
+    let result = package.clear_notes();
+    (package, result)
 }
 
 fn edit_package<T>(

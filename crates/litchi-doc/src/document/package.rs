@@ -2,7 +2,9 @@
 
 use super::model::Document;
 use crate::encryption::decrypt_document_streams;
-use crate::package::{Error as PackageError, OpenOptions, Result};
+use crate::package::{
+    Error as PackageError, Limits, OpenOptions, ResourceKind, ResourceLimit, Result,
+};
 use crate::parts::associated_strings::DocumentAssociatedStrings;
 use crate::parts::auto_summary::DocumentAutoSummary;
 use crate::parts::bookmarks::BookmarksTable;
@@ -50,18 +52,35 @@ impl Document {
     ///
     /// This is typically called internally by `Package::document()`.
     pub(crate) fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self> {
-        Self::from_ole_with_options(ole, OpenOptions::default())
+        Self::from_ole_with_limits(ole, Limits::default())
+    }
+
+    /// Create a new Document from an OLE file with explicit finite limits.
+    pub(crate) fn from_ole_with_limits<R: Read + Seek>(
+        ole: &mut OleFile<R>,
+        limits: Limits,
+    ) -> Result<Self> {
+        Self::from_ole_with_options(ole, OpenOptions::default(), limits)
     }
 
     /// Create a new Document from an OLE file with password-to-open options.
     pub(crate) fn from_ole_with_options<R: Read + Seek>(
         ole: &mut OleFile<R>,
         options: OpenOptions<'_>,
+        limits: Limits,
     ) -> Result<Self> {
-        // Read the WordDocument stream (main document stream)
-        let mut word_document = ole
-            .open_stream(&["WordDocument"])
-            .map_err(|_| PackageError::StreamNotFound("WordDocument".to_string()))?;
+        // Resolve hostile lengths before materializing the corresponding payload.
+        let word_document_size = locate_stream(
+            ole,
+            &["WordDocument"],
+            limits.max_input_bytes(),
+            "WordDocument",
+        )?
+        .ok_or_else(|| PackageError::StreamNotFound("WordDocument".to_string()))?;
+
+        // The FIB selects the table stream, so only WordDocument must be read
+        // before every remaining DOC-owned stream can be charged as a group.
+        let mut word_document = ole.open_stream(&["WordDocument"])?;
 
         // Parse the File Information Block (FIB) from the start of WordDocument
         let mut fib = FileInformationBlock::parse(&word_document)?;
@@ -73,12 +92,18 @@ impl Document {
             "0Table"
         };
 
-        // Read the table stream. MS-DOC 2.1 requires one of `0Table`/`1Table`
+        // Resolve the table stream. MS-DOC 2.1 requires one of `0Table`/`1Table`
         // to be present, so a file without it is either damaged or predates the
         // format: Word 6.0 and Word 95 keep those structures inside
         // `WordDocument`. Naming the version is far more actionable for the
         // caller than reporting a missing stream.
-        let mut table_stream = ole.open_stream(&[table_stream_name]).map_err(|_| {
+        let table_stream_size = locate_stream(
+            ole,
+            &[table_stream_name],
+            limits.max_input_bytes(),
+            table_stream_name,
+        )?
+        .ok_or_else(|| {
             if fib.version() < WORD_97_NFIB {
                 PackageError::UnsupportedVersion {
                     nfib: fib.version(),
@@ -89,9 +114,33 @@ impl Document {
             }
         })?;
 
-        // Read the Data stream (optional - contains embedded pictures and objects)
-        // According to Apache POI, pictures are stored in Data stream, not WordDocument stream
-        let mut data_stream = ole.open_stream(&["Data"]).ok();
+        let data_stream_size = locate_stream(ole, &["Data"], limits.max_input_bytes(), "Data")?;
+        let aggregate_size = word_document_size
+            .checked_add(table_stream_size)
+            .and_then(|value| value.checked_add(data_stream_size.unwrap_or(0)))
+            .ok_or_else(|| {
+                PackageError::ResourceLimit(ResourceLimit::new(
+                    ResourceKind::Aggregate,
+                    u64::MAX,
+                    u64::try_from(limits.max_aggregate_input_bytes()).unwrap_or(u64::MAX),
+                    None,
+                ))
+            })?;
+        let aggregate_limit = u64::try_from(limits.max_aggregate_input_bytes()).unwrap_or(u64::MAX);
+        if aggregate_size > aggregate_limit {
+            return Err(PackageError::ResourceLimit(ResourceLimit::new(
+                ResourceKind::Aggregate,
+                aggregate_size,
+                aggregate_limit,
+                None,
+            )));
+        }
+
+        let mut table_stream = ole.open_stream(&[table_stream_name])?;
+        // According to Apache POI, pictures are stored in Data, not WordDocument.
+        let mut data_stream = data_stream_size
+            .map(|_| ole.open_stream(&["Data"]))
+            .transpose()?;
 
         if fib.is_encrypted() {
             decrypt_document_streams(
@@ -274,5 +323,29 @@ impl Document {
             mtef_data,
             parsed_mtef,
         })
+    }
+}
+
+fn locate_stream<R: Read + Seek>(
+    ole: &OleFile<R>,
+    path: &[&str],
+    max_bytes: usize,
+    label: &'static str,
+) -> Result<Option<u64>> {
+    match ole.stream_len(path) {
+        Ok(size) => {
+            let maximum = u64::try_from(max_bytes).unwrap_or(u64::MAX);
+            if size > maximum {
+                return Err(PackageError::ResourceLimit(ResourceLimit::new(
+                    ResourceKind::Stream,
+                    size,
+                    maximum,
+                    Some(label),
+                )));
+            }
+            Ok(Some(size))
+        },
+        Err(litchi_cfb::OleError::StreamNotFound) => Ok(None),
+        Err(error) => Err(error.into()),
     }
 }

@@ -94,6 +94,37 @@ impl Spreadsheet {
         crate::tracked_changes::Snapshot::parse_with_limits(self.package.content_xml(), limits)
     }
 
+    /// Inspect all DDE declarations and cached tables as inert, source-bound data.
+    ///
+    /// This method never starts a DDE conversation, refreshes a cache, opens a
+    /// linked document, or performs ambient I/O.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the content XML has invalid or over-budget DDE
+    /// metadata.
+    pub fn dde(&self) -> Result<crate::dde::Snapshot> {
+        crate::dde::Snapshot::parse(self.package.content_xml()).map_err(|error| {
+            litchi_core::Error::InvalidFormat(format!(
+                "ODS DDE metadata inspection failed: {error}"
+            ))
+        })
+    }
+
+    /// Inspect typed scenario declarations without applying their values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the content XML has invalid or over-budget
+    /// scenario metadata.
+    pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
+        crate::scenario::Snapshot::parse(self.package.content_xml()).map_err(|error| {
+            litchi_core::Error::InvalidFormat(format!(
+                "ODS scenario metadata inspection failed: {error}"
+            ))
+        })
+    }
+
     /// Stage, validate, rebuild, and fully rehydrate one inert tracked-change edit.
     pub fn update_tracked_changes<F>(&mut self, edit: F) -> Result<()>
     where

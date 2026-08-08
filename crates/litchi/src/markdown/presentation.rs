@@ -1,3 +1,4 @@
+#[cfg(feature = "yaml")]
 use crate::MetadataYaml;
 use crate::presentation::{Presentation, Slide};
 /// ToMarkdown implementations for Presentation types.
@@ -6,8 +7,10 @@ use crate::presentation::{Presentation, Slide};
 /// including Presentation and Slide.
 ///
 /// **Note**: This module is only available when a presentation feature is enabled.
+#[cfg(not(feature = "yaml"))]
+use litchi_core::Error;
 use litchi_core::Result;
-use litchi_markdown::{MarkdownOptions, ToMarkdown};
+use litchi_markdown::{MarkdownOptions, ToMarkdown, escape};
 use rayon::prelude::*;
 
 /// Minimum number of slides to justify parallel processing overhead.
@@ -16,10 +19,18 @@ const PARALLEL_THRESHOLD: usize = 10;
 impl ToMarkdown for Presentation {
     fn to_markdown_with_options(&self, options: &MarkdownOptions) -> Result<String> {
         // Write metadata as YAML front matter if available and enabled
-        let metadata_md = if options.include_metadata
-            && let Some(metadata) = self.metadata()?
-        {
-            metadata.to_yaml_front_matter()?
+        let metadata_md = if options.include_metadata {
+            #[cfg(feature = "yaml")]
+            {
+                match self.metadata()? {
+                    Some(metadata) => metadata.to_yaml_front_matter()?,
+                    None => String::new(),
+                }
+            }
+            #[cfg(not(feature = "yaml"))]
+            {
+                return Err(Error::FeatureDisabled("yaml".to_owned()));
+            }
         } else {
             String::new()
         };
@@ -37,20 +48,19 @@ impl ToMarkdown for Presentation {
                 .map(|(slide_num, text)| {
                     let mut output = String::new();
 
-                    // Format slide header with first line as title
-                    let first_line = text.lines().next().unwrap_or("");
+                    let (first_line, body) = split_title_and_body(&text);
                     let header_text = if first_line.is_empty() {
                         format!("# Slide {}", slide_num)
                     } else {
-                        format!("# Slide {} {}", slide_num, first_line)
+                        format!("# Slide {} {}", slide_num, escape::text(first_line))
                     };
 
                     output.push_str(&header_text);
                     output.push_str("\n\n");
 
                     // Add slide content
-                    if !text.is_empty() {
-                        output.push_str(&text);
+                    if !body.is_empty() {
+                        output.push_str(&escape::text(body));
                         output.push_str("\n\n");
                     }
 
@@ -81,20 +91,19 @@ impl ToMarkdown for Presentation {
                     output.push_str("\n\n---\n\n");
                 }
 
-                // Format slide header with first line as title
-                let first_line = text.lines().next().unwrap_or("");
+                let (first_line, body) = split_title_and_body(text);
                 let header_text = if first_line.is_empty() {
                     format!("# Slide {}", slide_num)
                 } else {
-                    format!("# Slide {} {}", slide_num, first_line)
+                    format!("# Slide {} {}", slide_num, escape::text(first_line))
                 };
 
                 output.push_str(&header_text);
                 output.push_str("\n\n");
 
                 // Add slide content
-                if !text.is_empty() {
-                    output.push_str(text);
+                if !body.is_empty() {
+                    output.push_str(&escape::text(body));
                     output.push_str("\n\n");
                 }
             }
@@ -103,7 +112,11 @@ impl ToMarkdown for Presentation {
         };
 
         // Combine metadata and content
-        Ok(format!("{}{}", metadata_md, content_md))
+        let mut markdown =
+            String::with_capacity(metadata_md.len().saturating_add(content_md.len()));
+        markdown.push_str(&metadata_md);
+        markdown.push_str(&content_md);
+        Ok(markdown)
     }
 }
 
@@ -111,6 +124,10 @@ impl ToMarkdown for Slide {
     fn to_markdown_with_options(&self, _options: &MarkdownOptions) -> Result<String> {
         // For individual slides, just return the text
         // Formatting is minimal for presentations
-        self.text()
+        Ok(escape::text(&self.text()?).into_owned())
     }
+}
+
+fn split_title_and_body(text: &str) -> (&str, &str) {
+    text.split_once('\n').unwrap_or((text, ""))
 }

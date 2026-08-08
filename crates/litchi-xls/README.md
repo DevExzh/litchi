@@ -18,10 +18,10 @@ litchi-xls = "0.0.1"
 ```
 
 ```rust
-use litchi_xls::XlsWorkbook;
+use litchi_xls::Workbook;
 use std::fs::File;
 
-let workbook = XlsWorkbook::new(File::open("example.xls")?)?;
+let workbook = Workbook::new(File::open("example.xls")?)?;
 let _sheet = workbook.xls_worksheet(0)?;
 println!("sheets: {}", workbook.sheets().len());
 # Ok::<(), Box<dyn std::error::Error>>(())

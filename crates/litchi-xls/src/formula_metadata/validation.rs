@@ -9,17 +9,32 @@ pub(crate) const FORMULA_FIXED_SIZE: usize = 22;
 pub(crate) const MAX_FORMULA_PAYLOAD: usize = 8_224;
 const VALID_FLAGS: u16 = 0x002D;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FlagDefect {
+    SharedWithoutPtgExp,
+}
+
 pub(crate) fn decode_flags(flags: u16, tokens: &[u8]) -> Result<Metadata> {
-    if flags & !VALID_FLAGS != 0 {
-        return Err(invalid("Formula flags contain reserved bits"));
-    }
-    let metadata = Metadata::from_wire(flags, 0);
-    if metadata.shared_formula() && !is_ptg_exp(tokens) {
+    let (metadata, defect) = decode_flags_preserving(flags, tokens)?;
+    if matches!(defect, Some(FlagDefect::SharedWithoutPtgExp)) {
         return Err(invalid(
             "shared Formula metadata requires a leading PtgExp token",
         ));
     }
     Ok(metadata)
+}
+
+pub(crate) fn decode_flags_preserving(
+    flags: u16,
+    tokens: &[u8],
+) -> Result<(Metadata, Option<FlagDefect>)> {
+    if flags & !VALID_FLAGS != 0 {
+        return Err(invalid("Formula flags contain reserved bits"));
+    }
+    let metadata = Metadata::from_wire(flags, 0);
+    let defect = (metadata.shared_formula() && !is_ptg_exp(tokens))
+        .then_some(FlagDefect::SharedWithoutPtgExp);
+    Ok((metadata, defect))
 }
 
 pub(crate) fn encode_flags(metadata: &Metadata, tokens: &[u8]) -> Result<u16> {

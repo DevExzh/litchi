@@ -588,6 +588,10 @@ impl<'a> Parser<'a> {
                 require_parameterless(*param, "nocolbal")?;
                 properties.balance_columns = false;
             },
+            ControlWord::SectionDefaultColumns(param) => {
+                require_parameterless(*param, "sectdefaultcl")?;
+                properties.columns = Default::default();
+            },
             ControlWord::PageNumberFormat(format) => {
                 properties.page_number_format = *format;
             },

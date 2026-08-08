@@ -7,7 +7,7 @@ use std::fmt::Write as FmtWrite;
 // Import shared format types
 use super::super::super::format::ImageFormat;
 // Import from other writer modules
-use super::super::comment::MutableComment;
+use super::super::comment::{Date as CommentDate, MutableComment};
 use super::super::note::Note;
 use super::super::ole_object::MutableOleObject;
 use super::super::paragraph::{MutableParagraph, ParagraphElement};
@@ -781,7 +781,11 @@ impl MutableDocument {
         !self.endnotes.is_empty()
     }
 
-    /// Add a comment and return its ID and mutable reference.
+    /// Add a comment without a timestamp and return its ID and mutable reference.
+    ///
+    /// The optional WordprocessingML `w:date` attribute is omitted so this
+    /// convenience API is deterministic. Use [`Self::add_comment_with_date`]
+    /// when the caller has explicit timestamp metadata.
     ///
     /// # Arguments
     ///
@@ -797,9 +801,27 @@ impl MutableDocument {
     pub fn add_comment(&mut self, author: &str, text: &str) -> (u32, &mut MutableComment) {
         let id = Self::next_note_id(self.comments.iter().map(|comment| comment.id()));
         let comment = MutableComment::new(id, author.to_string(), text.to_string());
+        self.push_comment(comment)
+    }
+
+    /// Add a comment with a caller-supplied, validated timestamp.
+    pub fn add_comment_with_date(
+        &mut self,
+        author: &str,
+        text: &str,
+        date: CommentDate,
+    ) -> (u32, &mut MutableComment) {
+        let id = Self::next_note_id(self.comments.iter().map(|comment| comment.id()));
+        let comment = MutableComment::new_with_date(id, author.to_string(), text.to_string(), date);
+        self.push_comment(comment)
+    }
+
+    fn push_comment(&mut self, comment: MutableComment) -> (u32, &mut MutableComment) {
+        let id = comment.id();
+        let index = self.comments.len();
         self.comments.push(comment);
         self.modified = true;
-        (id, self.comments.last_mut().unwrap())
+        (id, &mut self.comments[index])
     }
 
     /// Remove a comment by ID and return it (`w:comment`,
@@ -1522,5 +1544,28 @@ impl MutableDocument {
 impl Default for MutableDocument {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MutableDocument;
+    use crate::writer::comment::Date;
+
+    #[test]
+    fn comments_part_is_deterministic_and_compact() {
+        let mut document = MutableDocument::new();
+        document.add_comment("A", "first");
+        let Ok(date) = Date::parse("2026-08-08T04:34:56Z") else {
+            panic!("valid test timestamp must parse");
+        };
+        document.add_comment_with_date("B", " second ", date);
+
+        assert_eq!(
+            document.generate_comments_xml().ok().flatten().as_deref(),
+            Some(
+                r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:comment w:id="1" w:author="A"><w:p><w:r><w:t>first</w:t></w:r></w:p></w:comment><w:comment w:id="2" w:author="B" w:date="2026-08-08T04:34:56Z"><w:p><w:r><w:t xml:space="preserve"> second </w:t></w:r></w:p></w:comment></w:comments>"#
+            )
+        );
     }
 }

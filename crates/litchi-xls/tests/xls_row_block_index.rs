@@ -1,6 +1,6 @@
 use std::fs::File;
 
-use litchi_xls::Workbook;
+use litchi_xls::{CompatibilityProfile, OpenOptions, Workbook};
 
 #[test]
 fn parses_poi_simple_and_multirow_indexes() {
@@ -59,13 +59,43 @@ fn parses_real_sparse_and_rowless_dbcell_blocks() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/ole/xls/ConditionalFormattingSamples.xls"
     );
-    let workbook = Workbook::new(File::open(sparse_path).unwrap()).unwrap();
-    let index = workbook
-        .xls_worksheet(13)
-        .unwrap()
-        .row_block_index()
-        .unwrap()
-        .unwrap();
+    let strict = Workbook::new(File::open(sparse_path).unwrap()).unwrap();
+    assert!(
+        strict
+            .sheet(13)
+            .and_then(|sheet| sheet.parsed_worksheet_index())
+            .is_none(),
+        "strict workbook parsing must not accept the malformed Formula metadata"
+    );
+    let compatibility_profile = CompatibilityProfile::SharedFormulaFlagWithoutPtgExpV1;
+    let workbook = Workbook::new_with_options(
+        File::open(sparse_path).unwrap(),
+        OpenOptions::new().with_compatibility_profile(compatibility_profile),
+    )
+    .unwrap();
+    let worksheet_index = workbook
+        .sheet(13)
+        .and_then(|sheet| sheet.parsed_worksheet_index())
+        .expect("workbook tab 13 must project to a parsed worksheet");
+    let worksheet = workbook.xls_worksheet(worksheet_index).unwrap();
+    let defect = worksheet
+        .formula_metadata_defects()
+        .iter()
+        .find(|defect| {
+            matches!(
+                defect,
+                litchi_xls::formula_metadata::Defect::SharedFlagWithoutPtgExp { .. }
+            )
+        })
+        .copied()
+        .expect("the selected profile must report the preserved Formula defect");
+    let _: litchi_xls::formula_metadata::Cell = defect.cell();
+    assert_eq!(defect.compatibility_profile(), compatibility_profile);
+    assert_eq!(
+        compatibility_profile.provenance(),
+        "Apache POI spreadsheet test-data corpus mirror; original producer unknown"
+    );
+    let index = worksheet.row_block_index().unwrap().unwrap();
     assert_eq!(
         (
             index.index_record().first_data_row(),
