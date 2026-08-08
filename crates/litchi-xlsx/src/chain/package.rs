@@ -1,10 +1,21 @@
 //! OPC package ownership for the workbook calculation-chain part.
 
-use crate::error::{Result, invalid};
-use litchi_opc::{OpcPackage, PackURI};
+use std::borrow::Cow;
 
-use super::codec::{read, write};
-use super::model::{CONTENT_TYPE, Chain, Conformance, RELATIONSHIP, STRICT_RELATIONSHIP};
+use crate::error::{Error, Result, allocation, invalid};
+use litchi_opc::{OpcPackage, PackURI};
+use quick_xml::XmlVersion;
+use quick_xml::events::Event;
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
+
+use super::codec::{read, read_with_projection, write};
+use super::model::{
+    CONTENT_TYPE, Chain, Conformance, MAX_XML_BYTES, RELATIONSHIP, STRICT_NS, STRICT_RELATIONSHIP,
+    TRANSITIONAL_NS,
+};
+
+pub(super) const MAX_WORKBOOK_SHEETS: usize = 65_534;
 
 /// Load the optional inert calculation chain and its relationship conformance.
 /// Formula cells are parsed as metadata only; no formula is evaluated.
@@ -32,8 +43,18 @@ pub(crate) fn validate_package(package: &OpcPackage) -> Result<()> {
 /// before any package part is changed. The requested conformance is applied to
 /// both the part XML and its workbook relationship.
 pub fn put(package: &mut OpcPackage, chain: &Chain, conformance: Conformance) -> Result<bool> {
+    let mut staged = package.clone();
+    let changed = put_staged(&mut staged, chain, conformance)?;
+    if changed {
+        *package = staged;
+    }
+    Ok(changed)
+}
+
+fn put_staged(package: &mut OpcPackage, chain: &Chain, conformance: Conformance) -> Result<bool> {
     let xml = write(chain, conformance)?;
     let workbook_uri = main_workbook_uri(package)?;
+    validate_sheet_ids(package, &workbook_uri, chain)?;
     let existing = relationship(package, &workbook_uri)?;
 
     if let Some(existing) = existing {
@@ -43,6 +64,14 @@ pub fn put(package: &mut OpcPackage, chain: &Chain, conformance: Conformance) ->
         let relationship_changed = existing.conformance != conformance;
         if !bytes_changed && !relationship_changed {
             return Ok(false);
+        }
+        if package.is_signed() {
+            return Err(Error::Signed);
+        }
+        if bytes_changed && read_with_projection(package.get_part(&existing.part_name)?.blob())?.1 {
+            return Err(invalid(
+                "cannot replace calculation-chain source projected through MCE",
+            ));
         }
         if bytes_changed {
             package.get_part_mut(&existing.part_name)?.set_blob(xml);
@@ -59,6 +88,9 @@ pub fn put(package: &mut OpcPackage, chain: &Chain, conformance: Conformance) ->
         }
     } else {
         validate_part_set(package, None)?;
+        if package.is_signed() {
+            return Err(Error::Signed);
+        }
         let part_name = next_part_name(package)?;
         let relationship_id = next_relationship_id(package, &workbook_uri)?;
         let target = part_name.relative_ref(workbook_uri.base_uri());
@@ -82,7 +114,6 @@ pub fn put(package: &mut OpcPackage, chain: &Chain, conformance: Conformance) ->
         );
     }
 
-    package.unsign();
     Ok(true)
 }
 
@@ -91,6 +122,15 @@ pub fn put(package: &mut OpcPackage, chain: &Chain, conformance: Conformance) ->
 /// No formulas are changed. A target that is also referenced elsewhere in the
 /// package is retained.
 pub fn remove(package: &mut OpcPackage) -> Result<bool> {
+    let mut staged = package.clone();
+    let changed = remove_staged(&mut staged)?;
+    if changed {
+        *package = staged;
+    }
+    Ok(changed)
+}
+
+fn remove_staged(package: &mut OpcPackage) -> Result<bool> {
     let workbook_uri = main_workbook_uri(package)?;
     let Some(existing) = relationship(package, &workbook_uri)? else {
         validate_part_set(package, None)?;
@@ -104,6 +144,9 @@ pub fn remove(package: &mut OpcPackage) -> Result<bool> {
         &workbook_uri,
         &existing.relationship_id,
     )?;
+    if package.is_signed() {
+        return Err(Error::Signed);
+    }
 
     package
         .get_part_mut(&workbook_uri)?
@@ -112,8 +155,109 @@ pub fn remove(package: &mut OpcPackage) -> Result<bool> {
     if !retain_part {
         package.remove_part(&existing.part_name);
     }
-    package.unsign();
     Ok(true)
+}
+
+fn validate_sheet_ids(package: &OpcPackage, workbook_uri: &PackURI, chain: &Chain) -> Result<()> {
+    let workbook = package.get_part(workbook_uri)?;
+    if workbook.blob().len() > MAX_XML_BYTES {
+        return Err(invalid(format!(
+            "workbook XML exceeds {MAX_XML_BYTES} bytes while validating calculation-chain sheets"
+        )));
+    }
+    let processed = process_workbook_mce_with_limit(workbook.blob(), MAX_XML_BYTES)?;
+    if processed.len() > MAX_XML_BYTES {
+        return Err(invalid(format!(
+            "processed workbook XML exceeds {MAX_XML_BYTES} bytes while validating calculation-chain sheets"
+        )));
+    }
+    let mut reader = NsReader::from_reader(processed.as_ref());
+    // The chain sheet domain provides a hard catalog cardinality bound. Reserve
+    // its complete u32 representation fallibly once, so parsing and insertion
+    // cannot trigger hidden allocator growth after MCE projection.
+    let mut catalog = Vec::<u32>::new();
+    catalog
+        .try_reserve_exact(MAX_WORKBOOK_SHEETS)
+        .map_err(|source| allocation("calculation-chain workbook sheet catalog", source))?;
+    loop {
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|error| invalid(format!("invalid workbook XML: {error}")))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if element.local_name().as_ref() == b"sheet"
+                    && matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == TRANSITIONAL_NS.as_bytes() || value == STRICT_NS.as_bytes()) =>
+            {
+                let mut sheet_id = None;
+                for attribute in element.attributes().with_checks(true) {
+                    let attribute = attribute.map_err(|error| {
+                        invalid(format!("invalid workbook sheet attribute: {error}"))
+                    })?;
+                    if attribute.key.as_ref() == b"sheetId" {
+                        let value = attribute
+                            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                            .map_err(|error| {
+                                invalid(format!("invalid workbook sheetId: {error}"))
+                            })?;
+                        let value = value
+                            .parse::<u32>()
+                            .map_err(|_| invalid("workbook sheetId is not an unsigned integer"))?;
+                        if sheet_id.replace(value).is_some() {
+                            return Err(invalid("duplicate workbook sheetId attribute"));
+                        }
+                    }
+                }
+                let sheet_id =
+                    sheet_id.ok_or_else(|| invalid("workbook sheet requires sheetId"))?;
+                if catalog.len() >= MAX_WORKBOOK_SHEETS {
+                    return Err(invalid(format!(
+                        "workbook sheet catalog exceeds {MAX_WORKBOOK_SHEETS} entries"
+                    )));
+                }
+                catalog.push(sheet_id);
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    catalog.sort_unstable();
+    if let Some(duplicate) = catalog
+        .windows(2)
+        .find_map(|pair| (pair[0] == pair[1]).then_some(pair[0]))
+    {
+        return Err(invalid(format!("duplicate workbook sheet ID {duplicate}")));
+    }
+    for cell in chain.cells() {
+        let sheet_id = u32::from(cell.sheet().get());
+        if catalog.binary_search(&sheet_id).is_err() {
+            return Err(invalid(format!(
+                "calculation-chain sheet ID {sheet_id} does not resolve to a workbook sheet"
+            )));
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn process_workbook_mce_with_limit(
+    xml: &[u8],
+    max_xml_bytes: usize,
+) -> Result<Cow<'_, [u8]>> {
+    let limits = litchi_ooxml_common::mce::Limits {
+        max_input_bytes: max_xml_bytes,
+        max_output_bytes: max_xml_bytes,
+        ..litchi_ooxml_common::mce::Limits::default()
+    };
+    litchi_ooxml_common::mce::process_markup_compatibility(
+        xml,
+        &litchi_ooxml_common::mce::Capabilities::default(),
+        &limits,
+    )
+    .map(|output| output.xml)
+    .map_err(|error| invalid(format!("workbook MCE error: {error}")))
 }
 
 fn load_for_workbook(

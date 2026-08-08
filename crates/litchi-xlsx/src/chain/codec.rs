@@ -1,9 +1,11 @@
 //! SpreadsheetML calculation-chain XML codec.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 
 use crate::error::{Result, allocation, invalid};
 use litchi_sheet::Cell as Address;
+use quick_xml::Reader;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -99,13 +101,19 @@ impl Builder {
 
 /// Parse an isolated Calculation Chain part. Formula text is never evaluated.
 pub fn read(xml: &[u8]) -> Result<Chain> {
+    read_with_projection(xml).map(|(chain, _)| chain)
+}
+
+pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid(format!(
             "calculation-chain XML exceeds {MAX_XML_BYTES} bytes"
         )));
     }
+    preflight_raw_attributes(xml)?;
     let processed = litchi_ooxml_common::mce::process_ooxml(xml)
         .map_err(|error| invalid(format!("calculation-chain MCE error: {error}")))?;
+    let projected = matches!(&processed, Cow::Owned(_));
     let bytes = processed.as_ref();
     if bytes.len() > MAX_XML_BYTES {
         return Err(invalid(format!(
@@ -210,7 +218,28 @@ pub fn read(xml: &[u8]) -> Result<Chain> {
     if !saw_root || !closed_root {
         return Err(invalid("calculation-chain XML has no complete root"));
     }
-    builder.finish()
+    Ok((builder.finish()?, projected))
+}
+
+fn preflight_raw_attributes(xml: &[u8]) -> Result<()> {
+    let mut reader = Reader::from_reader(xml);
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("invalid calculation-chain XML: {error}")))?
+        {
+            Event::Start(element) | Event::Empty(element) => {
+                for attribute in element.attributes().with_checks(true) {
+                    let attribute = attribute.map_err(|error| {
+                        invalid(format!("invalid calculation-chain attribute: {error}"))
+                    })?;
+                    validate_raw_attribute_size(attribute.key.as_ref(), attribute.value.as_ref())?;
+                }
+            },
+            Event::Eof => return Ok(()),
+            _ => {},
+        }
+    }
 }
 fn validate_root(
     namespace: &ResolveResult<'_>,
@@ -239,6 +268,7 @@ fn parse_root_attributes(
     for attribute in element.attributes().with_checks(true) {
         let attribute =
             attribute.map_err(|error| invalid(format!("invalid calcChain attribute: {error}")))?;
+        validate_raw_attribute_size(attribute.key.as_ref(), attribute.value.as_ref())?;
         let raw = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| invalid(format!("calcChain attribute name is not UTF-8: {error}")))?
             .to_owned();
@@ -284,6 +314,7 @@ fn parse_cell(
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid calculation-cell attribute: {error}")))?;
+        validate_raw_attribute_size(attribute.key.as_ref(), attribute.value.as_ref())?;
         let raw = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| {
                 invalid(format!(
@@ -530,6 +561,15 @@ fn write_extension_attributes(xml: &mut String, attributes: &[Attr]) -> Result<(
 }
 
 fn validate_attribute_size(name: &str, value: &str) -> Result<()> {
+    if name.len() > MAX_ATTRIBUTE_BYTES || value.len() > MAX_ATTRIBUTE_BYTES {
+        return Err(invalid(format!(
+            "calculation-chain attribute exceeds {MAX_ATTRIBUTE_BYTES} bytes"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_raw_attribute_size(name: &[u8], value: &[u8]) -> Result<()> {
     if name.len() > MAX_ATTRIBUTE_BYTES || value.len() > MAX_ATTRIBUTE_BYTES {
         return Err(invalid(format!(
             "calculation-chain attribute exceeds {MAX_ATTRIBUTE_BYTES} bytes"

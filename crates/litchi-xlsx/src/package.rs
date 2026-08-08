@@ -240,6 +240,45 @@ impl Package {
         self.0
     }
 
+    /// Read the workbook's source-bound calculation metadata.
+    pub fn calculation_metadata(&self) -> Result<crate::calculation_properties::Snapshot> {
+        crate::calculation_properties::Snapshot::load(&self.0)
+    }
+
+    /// Read calculation metadata with a caller-supplied resource policy.
+    pub fn calculation_metadata_with_limits(
+        &self,
+        limits: &crate::calculation_properties::Limits,
+    ) -> Result<crate::calculation_properties::Snapshot> {
+        crate::calculation_properties::Snapshot::load_with_limits(&self.0, limits)
+    }
+
+    /// Start a source-bound calculation-metadata transaction.
+    pub fn edit_calculation_metadata(
+        &mut self,
+    ) -> Result<crate::calculation_properties::Transaction<'_>> {
+        self.ensure_mutation_allowed("edit_calculation_metadata")?;
+        crate::calculation_properties::Transaction::new(&mut self.0)
+    }
+
+    /// Start a calculation-metadata transaction with explicit limits.
+    pub fn edit_calculation_metadata_with_limits(
+        &mut self,
+        limits: &crate::calculation_properties::Limits,
+    ) -> Result<crate::calculation_properties::Transaction<'_>> {
+        self.ensure_mutation_allowed("edit_calculation_metadata_with_limits")?;
+        crate::calculation_properties::Transaction::with_limits(&mut self.0, limits)
+    }
+
+    /// Atomically apply an exact source-bound calculation-metadata patch.
+    pub fn apply_calculation_metadata_patch(
+        &mut self,
+        patch: &crate::calculation_properties::Patch,
+    ) -> Result<()> {
+        self.ensure_mutation_allowed("apply_calculation_metadata_patch")?;
+        patch.apply(&mut self.0)
+    }
+
     /// Read the inert typed package-level custom document properties.
     ///
     /// An absent custom-properties relationship and part produce the shared

@@ -481,6 +481,19 @@ impl Workbook {
         &self.inner.external_reference_ids
     }
 
+    /// Read the workbook's source-bound calculation metadata.
+    pub fn calculation_metadata(&self) -> Result<crate::calculation_properties::Snapshot> {
+        crate::calculation_properties::Snapshot::load(&self.inner.package)
+    }
+
+    /// Read calculation metadata with a caller-supplied resource policy.
+    pub fn calculation_metadata_with_limits(
+        &self,
+        limits: &crate::calculation_properties::Limits,
+    ) -> Result<crate::calculation_properties::Snapshot> {
+        crate::calculation_properties::Snapshot::load_with_limits(&self.inner.package, limits)
+    }
+
     /// Persisted Office Add-in task panes, when this package contains them.
     ///
     /// The complete package graph is validated on first access. Later calls

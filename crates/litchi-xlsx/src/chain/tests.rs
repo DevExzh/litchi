@@ -1,10 +1,11 @@
 use super::model::{
-    CONTENT_TYPE, MAX_CELL_CONTENT_BYTES, RELATIONSHIP, STRICT_NS, STRICT_RELATIONSHIP,
-    TRANSITIONAL_NS,
+    CONTENT_TYPE, MAX_ATTRIBUTE_BYTES, MAX_CELL_CONTENT_BYTES, RELATIONSHIP, STRICT_NS,
+    STRICT_RELATIONSHIP, TRANSITIONAL_NS,
 };
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_sheet::Cell as Address;
 
+use super::package::{MAX_WORKBOOK_SHEETS, process_workbook_mce_with_limit};
 use super::*;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
@@ -159,6 +160,20 @@ fn rejects_oversized_nested_calculation_content_before_decoding() {
 }
 
 #[test]
+fn rejects_raw_oversized_attributes_before_entity_decoding() {
+    let encoded = "&amp;".repeat(MAX_ATTRIBUTE_BYTES / 5 + 1);
+    let xml = format!(
+        r#"<calcChain xmlns="{TRANSITIONAL_NS}" xmlns:x="urn:test" x:data="{encoded}"><c r="A1" i="1"/></calcChain>"#
+    );
+    let error = read(xml.as_bytes()).unwrap_err();
+    assert!(matches!(
+        error,
+        crate::Error::Invalid(message)
+            if message == format!("calculation-chain attribute exceeds {MAX_ATTRIBUTE_BYTES} bytes")
+    ));
+}
+
+#[test]
 fn adversarial_xml_returns_errors_without_unwinding() {
     let inputs: [&[u8]; 4] = [
         b"<",
@@ -253,6 +268,134 @@ fn removal_retains_a_calculation_chain_part_referenced_elsewhere() {
 }
 
 #[test]
+fn signed_publication_allows_exact_noops_and_rejects_changes() {
+    let mut package = workbook_package();
+    let chain = Chain::new(Cell::new(Sheet::new(1).unwrap(), "A1").unwrap());
+    put(&mut package, &chain, Conformance::Transitional).unwrap();
+    package.rels_mut().add_relationship(
+        rt::DIGITAL_SIGNATURE_ORIGIN.into(),
+        "_xmlsignatures/origin.sigs".into(),
+        "rIdSignature".into(),
+        false,
+    );
+    let part = PackURI::new("/xl/calcChain.xml").unwrap();
+    let before = package.get_part(&part).unwrap().blob_arc();
+
+    assert!(!put(&mut package, &chain, Conformance::Transitional).unwrap());
+    assert!(package.is_signed());
+    assert!(std::sync::Arc::ptr_eq(
+        &before,
+        &package.get_part(&part).unwrap().blob_arc()
+    ));
+
+    let changed = Chain::new(Cell::new(Sheet::new(1).unwrap(), "B2").unwrap());
+    assert!(matches!(
+        put(&mut package, &changed, Conformance::Transitional),
+        Err(crate::Error::Signed)
+    ));
+    assert!(matches!(remove(&mut package), Err(crate::Error::Signed)));
+    assert!(package.is_signed());
+    assert!(std::sync::Arc::ptr_eq(
+        &before,
+        &package.get_part(&part).unwrap().blob_arc()
+    ));
+
+    let mut absent = workbook_package();
+    absent.rels_mut().add_relationship(
+        rt::DIGITAL_SIGNATURE_ORIGIN.into(),
+        "_xmlsignatures/origin.sigs".into(),
+        "rIdSignature".into(),
+        false,
+    );
+    assert!(!remove(&mut absent).unwrap());
+    assert!(absent.is_signed());
+}
+
+#[test]
+fn refuses_to_canonicalize_mce_projected_chain_sources() {
+    let sources = [
+        format!(
+            r#"<calcChain xmlns="{TRANSITIONAL_NS}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future" mc:Ignorable="x"><mc:AlternateContent><mc:Choice Requires="x"><x:c/></mc:Choice><mc:Fallback><c r="C3" i="1"/></mc:Fallback></mc:AlternateContent></calcChain>"#
+        ),
+        format!(
+            r#"<calcChain xmlns="{TRANSITIONAL_NS}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future" mc:Ignorable="x" mc:ProcessContent="x:wrap"><x:wrap><c r="C3" i="1"/></x:wrap></calcChain>"#
+        ),
+    ];
+    for source in sources {
+        let mut package = synthetic_package(RELATIONSHIP, false, CONTENT_TYPE, false);
+        let part = PackURI::new("/xl/calcChain.xml").unwrap();
+        package
+            .get_part_mut(&part)
+            .unwrap()
+            .set_blob(source.into_bytes());
+        let (chain, conformance) = load(&package).unwrap().unwrap();
+        assert_eq!(chain.cells()[0].reference(), "C3");
+        let before = package.get_part(&part).unwrap().blob_arc();
+        let error = put(&mut package, &chain, conformance).unwrap_err();
+        assert!(matches!(
+            error,
+            crate::Error::Invalid(message)
+                if message == "cannot replace calculation-chain source projected through MCE"
+        ));
+        assert!(std::sync::Arc::ptr_eq(
+            &before,
+            &package.get_part(&part).unwrap().blob_arc()
+        ));
+    }
+}
+
+#[test]
+fn rejects_chain_sheet_ids_absent_from_workbook_catalog_exactly() {
+    let mut package = workbook_package();
+    let chain = Chain::new(Cell::new(Sheet::new(2).unwrap(), "A1").unwrap());
+    let error = put(&mut package, &chain, Conformance::Transitional).unwrap_err();
+    assert!(matches!(
+        error,
+        crate::Error::Invalid(message)
+            if message == "calculation-chain sheet ID 2 does not resolve to a workbook sheet"
+    ));
+    assert!(load(&package).unwrap().is_none());
+}
+
+#[test]
+fn workbook_sheet_catalog_enforces_its_exact_projected_boundary() {
+    let mut boundary = workbook_package_with_sheet_count(MAX_WORKBOOK_SHEETS, false);
+    let chain = Chain::new(
+        Cell::new(
+            Sheet::new(u32::try_from(MAX_WORKBOOK_SHEETS).unwrap()).unwrap(),
+            "A1",
+        )
+        .unwrap(),
+    );
+    assert!(put(&mut boundary, &chain, Conformance::Transitional).unwrap());
+
+    let mut oversized = workbook_package_with_sheet_count(MAX_WORKBOOK_SHEETS + 1, true);
+    let chain = Chain::new(Cell::new(Sheet::new(1).unwrap(), "A1").unwrap());
+    let error = put(&mut oversized, &chain, Conformance::Transitional).unwrap_err();
+    assert!(matches!(
+        error,
+        crate::Error::Invalid(message)
+            if message == format!(
+                "workbook sheet catalog exceeds {MAX_WORKBOOK_SHEETS} entries"
+            )
+    ));
+    assert!(load(&oversized).unwrap().is_none());
+}
+
+#[test]
+fn workbook_mce_expansion_is_rejected_during_bounded_processing() {
+    let source = format!(
+        r#"<workbook xmlns="{TRANSITIONAL_NS}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><sheets><sheet name="Sheet1" sheetId="1"/></sheets></workbook>"#
+    );
+    let error = process_workbook_mce_with_limit(source.as_bytes(), source.len()).unwrap_err();
+    assert!(matches!(
+        error,
+        crate::Error::Invalid(message)
+            if message == "workbook MCE error: markup compatibility resource limit exceeded: output bytes"
+    ));
+}
+
+#[test]
 fn package_calculation_chain_mutators_reject_invalid_existing_graphs() {
     let mut package = synthetic_package(RELATIONSHIP, false, ct::XML, false);
     let chain_part = PackURI::new("/xl/calcChain.xml").unwrap();
@@ -316,12 +459,34 @@ fn loads_real_poi_and_synthetic_packages_and_validates_relationships() {
 }
 
 fn workbook_package() -> OpcPackage {
+    workbook_package_with_sheet_count(1, false)
+}
+
+fn workbook_package_with_sheet_count(count: usize, projected: bool) -> OpcPackage {
+    use std::fmt::Write as _;
+
     let mut package = OpcPackage::new();
     let workbook_uri = PackURI::new("/xl/workbook.xml").unwrap();
+    let mut sheets = String::new();
+    sheets.try_reserve(count.saturating_mul(48)).unwrap();
+    for sheet_id in 1..=count {
+        write!(
+            sheets,
+            r#"<sheet name="Sheet{sheet_id}" sheetId="{sheet_id}"/>"#
+        )
+        .unwrap();
+    }
+    let workbook_xml = if projected {
+        format!(
+            r#"<workbook xmlns="{TRANSITIONAL_NS}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future" mc:Ignorable="x" mc:ProcessContent="x:wrap"><x:wrap><sheets>{sheets}</sheets></x:wrap></workbook>"#
+        )
+    } else {
+        format!(r#"<workbook xmlns="{TRANSITIONAL_NS}"><sheets>{sheets}</sheets></workbook>"#)
+    };
     let workbook = BlobPart::new(
         workbook_uri,
         ct::SML_SHEET_MAIN.into(),
-        format!(r#"<workbook xmlns="{TRANSITIONAL_NS}"><sheets/></workbook>"#).into_bytes(),
+        workbook_xml.into_bytes(),
     );
     package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
     package.add_part(Box::new(workbook));
@@ -339,7 +504,7 @@ fn synthetic_package(
     let mut workbook = BlobPart::new(
         workbook_uri.clone(),
         ct::SML_SHEET_MAIN.into(),
-        format!(r#"<workbook xmlns="{TRANSITIONAL_NS}"><sheets/></workbook>"#).into_bytes(),
+        format!(r#"<workbook xmlns="{TRANSITIONAL_NS}"><sheets><sheet name="Sheet1" sheetId="1"/></sheets></workbook>"#).into_bytes(),
     );
     if external {
         workbook.relate_to_ext("https://example.invalid/calcChain.xml", relationship_type);
