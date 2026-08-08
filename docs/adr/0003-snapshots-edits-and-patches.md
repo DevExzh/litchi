@@ -152,3 +152,41 @@ Deprecated and unknown reference fields therefore travel with their slide
 instead of being normalized through Buffa or Prost. This in-memory reversible
 patch is still not the durable deterministic JSON envelope required for
 cross-process patch exchange.
+
+## 2026-08-08 amendment: Keynote show-settings transactions
+
+Presentation settings are a singleton semantic value and therefore require no
+object selector. `Package::show_settings()` reads that value directly, while
+`Package::edit_show_settings()` stages a complete checked `Settings` value
+against one immutable package. `ShowSettingsCommit`, `ShowSettingsPatch`, and
+`ShowSettingsDiagnostics` remain separate from the skip-state and slide-order
+families so those established patch vocabularies do not change.
+
+An exact semantic no-op shares the original source allocation, touches zero
+components, and performs no candidate reopen. This includes a package whose
+root show reference is null, which reads as `Settings::default()` and has no
+physical Show owner to change. A real edit of an exact package rewrites only
+the component owning the unique Show payload. It then reopens the complete
+candidate under the source package's retained `ReadOptions` and verifies the
+requested settings through the focused reader before publication. The source
+snapshot never changes.
+
+`ShowSettingsPatch` exposes only before/after semantic settings and compact
+diagnostic fingerprints. Exact immutable source and target bytes remain
+private and exact byte equality, not the fingerprint, authorizes application.
+`inverse()` restores the accepted source artifact byte for byte. Semantic-only
+prepared sources and changed legacy nested-`Index.zip` sources are refused as
+`UnsupportedSource`; an exact no-op against a physical legacy source remains
+valid. The host retains the separate legacy normalization compatibility path.
+Like the other current Keynote patches, this reversible patch is in-memory and
+is not yet ADR 0003's durable deterministic JSON envelope.
+
+Preservation is measured at the changed dependency closure. Untouched ZIP
+members and their raw local and central records, every non-setting Show field
+record, including its encoded key and length header, nested unknown Size
+records, and the immutable source artifact remain exact. The edited Show
+payload's effective message type and length, its
+`MessageInfo`, and any enclosing length/framing bytes required to represent a
+size change are part of the mutation closure and must not be described as
+untouched archive metadata. Raw source records, rather than Buffa's generated
+view, preserve unknown content.

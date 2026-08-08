@@ -674,6 +674,184 @@ fn hostile_native_header_bytes_remain_the_no_op_authority() -> Result<(), Error>
 }
 
 #[test]
+fn preserving_replacement_retains_adversarial_header_bytes_and_restores_exactly()
+-> Result<(), Error> {
+    let mut message_info = vec![
+        0x08, 0x01, // duplicate type = 1
+        0x88, 0x00, 0x87, 0x00, // effective type = 7, overlong key and value
+        0x12, 0x03, 0x01, 0x00, 0x05, // conventional version
+        0x18, 0x01, // duplicate length = 1
+        0x98, 0x00, 0x83, 0x00, // effective length = 3, overlong key and value
+    ];
+    message_info.extend_from_slice(&[0xa0, 0x06, 0x81, 0x00]);
+    message_info.extend_from_slice(&[0xa9, 0x06, 1, 2, 3, 4, 5, 6, 7, 8]);
+    message_info.extend_from_slice(&[0xb2, 0x06, 0x81, 0x00, 0xff]);
+    message_info.extend_from_slice(&[0xc5, 0x06, 9, 10, 11, 12]);
+
+    let mut header = vec![
+        0x08,
+        0x01, // duplicate identifier = 1
+        0x88,
+        0x00,
+        0xaa,
+        0x00, // effective identifier = 42, overlong
+        0xd1,
+        0x06,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8, // unknown fixed64
+        0x92,
+        0x00, // overlong MessageInfo field key
+        0x80 | one_byte_length(message_info.len()),
+        0x00, // overlong MessageInfo length prefix
+    ];
+    header.extend_from_slice(&message_info);
+    header.extend_from_slice(&[0xda, 0x06, 0x81, 0x00, 0xee]);
+    header.extend_from_slice(&[0x18, 0x81, 0x00]); // overlong should_merge = true
+
+    let mut source = vec![one_byte_length(header.len())];
+    source.extend_from_slice(&header);
+    source.extend_from_slice(&[0xde, 0xad, 0xbe]);
+    let mut archive = Archive::parse(&source)?;
+
+    let old = archive.objects[0].replace_message_preserving_header(
+        0,
+        RawMessage {
+            type_: 9,
+            data: vec![0x5a; 130],
+        },
+    )?;
+    assert_eq!(old.type_, 7);
+    assert_eq!(old.data, [0xde, 0xad, 0xbe]);
+
+    let changed = archive.to_bytes()?;
+    let (changed_header_length, changed_prefix_length) = decode_test_varint(&changed);
+    let changed_header =
+        &changed[changed_prefix_length..changed_prefix_length + changed_header_length];
+    let mut expected_header = header.clone();
+    assert!(replace_unique_bytes(
+        &mut expected_header,
+        &[0x87, 0x00],
+        &[0x89, 0x00]
+    ));
+    assert!(replace_unique_bytes(
+        &mut expected_header,
+        &[0x83, 0x00],
+        &[0x82, 0x01]
+    ));
+    assert_eq!(changed_header, expected_header);
+
+    let reparsed = Archive::parse(&changed)?;
+    assert_eq!(reparsed.objects[0].messages[0].type_, 9);
+    assert_eq!(reparsed.objects[0].messages[0].data, vec![0x5a; 130]);
+
+    let replaced = archive.objects[0].replace_message_preserving_header(0, old)?;
+    assert_eq!(replaced.type_, 9);
+    assert_eq!(replaced.data, vec![0x5a; 130]);
+    assert_eq!(archive.to_bytes()?, source);
+
+    let object_before_failure = archive.objects[0].clone();
+    let object_limit = header.len() + 3;
+    let rollback_limits = ArchiveLimits::default()
+        .with_object_bytes(object_limit)?
+        .with_header_bytes(header.len())?;
+    let error = archive.objects[0]
+        .replace_message_preserving_header_with_limits(
+            0,
+            RawMessage {
+                type_: 9,
+                data: vec![0xaa, 0xbb, 0xcc],
+            },
+            rollback_limits,
+        )
+        .err();
+    assert!(matches!(
+        error,
+        Some(Error::Limit {
+            kind: LimitKind::ObjectBytes,
+            observed,
+            maximum,
+        }) if observed == object_limit + 1 && maximum == object_limit
+    ));
+    assert_eq!(archive.objects[0], object_before_failure);
+    assert_eq!(archive.to_bytes()?, source);
+    Ok(())
+}
+
+#[test]
+fn preserving_replacement_grows_scalar_and_enclosing_length_widths() -> Result<(), Error> {
+    let mut message_info = vec![
+        0x08, 0x01, // type = 1
+        0x18, 0x01, // length = 1
+        0xa2, 0x06, 0x78, // unknown field 100, 120-byte payload
+    ];
+    message_info.extend(std::iter::repeat_n(0x5a, 120));
+    assert_eq!(message_info.len(), 127);
+
+    let mut header = vec![
+        0x08, 0x01, // identifier = 1
+        0x12, 0x7f, // MessageInfo with a one-byte length prefix
+    ];
+    header.extend_from_slice(&message_info);
+    let mut source = vec![0x83, 0x01]; // 131-byte ArchiveInfo
+    source.extend_from_slice(&header);
+    source.push(0xcc);
+    let mut archive = Archive::parse(&source)?;
+
+    archive.objects[0].replace_message_preserving_header(
+        0,
+        RawMessage {
+            type_: 1,
+            data: vec![0xdd; 130],
+        },
+    )?;
+    let changed = archive.to_bytes()?;
+    let (changed_header_length, changed_prefix_length) = decode_test_varint(&changed);
+    assert_eq!(changed_header_length, 133);
+    let changed_header =
+        &changed[changed_prefix_length..changed_prefix_length + changed_header_length];
+
+    let mut expected_message_info = vec![
+        0x08, 0x01, // unchanged type
+        0x18, 0x82, 0x01, // length = 130, now a two-byte scalar
+        0xa2, 0x06, 0x78,
+    ];
+    expected_message_info.extend(std::iter::repeat_n(0x5a, 120));
+    assert_eq!(expected_message_info.len(), 128);
+    let mut expected_header = vec![
+        0x08, 0x01, 0x12, 0x80, 0x01, // MessageInfo length = 128, now two bytes
+    ];
+    expected_header.extend_from_slice(&expected_message_info);
+    assert_eq!(changed_header, expected_header);
+    assert_eq!(
+        &changed[changed_prefix_length + changed_header_length..],
+        vec![0xdd; 130]
+    );
+    Ok(())
+}
+
+fn replace_unique_bytes(bytes: &mut [u8], from: &[u8], to: &[u8]) -> bool {
+    assert_eq!(from.len(), to.len());
+    let mut matches = bytes
+        .windows(from.len())
+        .enumerate()
+        .filter_map(|(index, candidate)| (candidate == from).then_some(index));
+    let Some(index) = matches.next() else {
+        return false;
+    };
+    if matches.next().is_some() {
+        return false;
+    }
+    bytes[index..index + to.len()].copy_from_slice(to);
+    true
+}
+
+#[test]
 fn buffa_preflight_rejects_malformed_deferred_children() {
     // Each case is a complete MessageInfo with one malformed deferred child.
     // A root-only lazy decode would otherwise publish the parent and postpone

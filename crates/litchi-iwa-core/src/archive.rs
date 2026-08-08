@@ -32,7 +32,8 @@ use std::io::Read;
 use std::mem::size_of;
 
 use litchi_iwa_common::wire::{
-    WireDescent, WirePreflight, WireVisit, preflight_wire_tree_with_limits,
+    WireDescent, WirePreflight, WireVisit, parse_wire_fields_with_limits,
+    preflight_wire_tree_with_limits,
 };
 use litchi_iwa_common::{Error as WireError, LimitKind as WireLimitKind, WireLimits};
 use litchi_iwa_protos::archive_codec;
@@ -503,13 +504,27 @@ pub struct RawMessage {
 pub struct ArchiveObject {
     pub archive_info: ArchiveInfo,
     pub messages: Vec<RawMessage>,
-    /// Offset of the object's length prefix in the decompressed stream.
+    /// Offset of the object's length prefix in the parsed decompressed source.
+    ///
+    /// This is source provenance: it is zero for a newly constructed object
+    /// and is not recomputed by in-memory message mutations.
     pub header_offset: u64,
-    /// Size of the length prefix and encoded `ArchiveInfo` header.
+    /// Size of the length prefix and encoded `ArchiveInfo` header in the
+    /// parsed decompressed source.
+    ///
+    /// This is source provenance: it is zero for a newly constructed object
+    /// and is not recomputed by in-memory message mutations.
     pub header_length: u64,
-    /// Offset of the first payload in the decompressed stream.
+    /// Offset of the first payload in the parsed decompressed source.
+    ///
+    /// This is source provenance: it is zero for a newly constructed object
+    /// and is not recomputed by in-memory message mutations.
     pub data_offset: u64,
-    /// Total bytes occupied by the object's payloads.
+    /// Total bytes occupied by the object's payloads in the parsed source.
+    ///
+    /// This is source provenance: it is zero for a newly constructed object
+    /// and is not recomputed by in-memory message mutations. Current payload
+    /// size is available by summing [`Self::messages`].
     pub data_length: u64,
     /// Original encoded header, retained only when it differs from the
     /// canonical encoding so untouched unknown protobuf fields survive a
@@ -657,6 +672,96 @@ impl ArchiveObject {
             restored_info.type_ = old_type;
             restored_info.length = old_length;
             return Err(error);
+        }
+        Ok(old)
+    }
+
+    /// Replace one payload while preserving untouched `ArchiveInfo` bytes.
+    ///
+    /// Unlike [`Self::replace_message`], this variant surgically updates only
+    /// the effective `MessageInfo.type` and `MessageInfo.length` scalar values
+    /// plus an enclosing length prefix when its width must change. Unknown
+    /// fields, duplicate metadata, non-canonical keys and every unrelated raw
+    /// header byte remain untouched. The mutation is atomic: validation or
+    /// allocation failure leaves the object unchanged.
+    pub fn replace_message_preserving_header(
+        &mut self,
+        index: usize,
+        message: RawMessage,
+    ) -> Result<RawMessage> {
+        self.replace_message_preserving_header_with_limits(index, message, Limits::default())
+    }
+
+    /// Replace one payload while preserving untouched `ArchiveInfo` bytes
+    /// under explicit resource limits.
+    pub fn replace_message_preserving_header_with_limits(
+        &mut self,
+        index: usize,
+        message: RawMessage,
+        limits: Limits,
+    ) -> Result<RawMessage> {
+        let limits = limits.validate()?;
+        self.validate_with_limits(limits)?;
+        let current_info = self
+            .archive_info
+            .message_infos
+            .get(index)
+            .ok_or_else(|| Error::invalid_archive(index, "message index is out of bounds"))?;
+        let replacement_length = u32::try_from(message.data.len())
+            .map_err(|_| Error::invalid_archive(index, "message payload exceeds u32"))?;
+        check_message_length(message.data.len(), limits)?;
+
+        let canonical_before = encode_archive_info(&self.archive_info, limits)?;
+        let source_header = match (
+            self.original_header.as_deref(),
+            self.original_canonical_header.as_deref(),
+        ) {
+            (Some(original), Some(canonical)) if canonical == canonical_before.as_slice() => {
+                original
+            },
+            _ => canonical_before.as_slice(),
+        };
+        // Re-apply the caller's current limit profile to retained raw bytes.
+        // An object may have been opened under a broader profile.
+        preflight_header(source_header, HeaderKind::ArchiveInfo, limits)?;
+        let rewritten_header = rewrite_message_metadata_in_header(
+            source_header,
+            index,
+            current_info.type_,
+            current_info.length,
+            message.type_,
+            replacement_length,
+            limits,
+        )?;
+
+        let old_type = current_info.type_;
+        let old_length = current_info.length;
+        let old = self.replace_message_with_limits(index, message, limits)?;
+        let verification = (|| {
+            let decoded = ArchiveInfo::decode_with_limits(&rewritten_header, limits)?;
+            if decoded != self.archive_info {
+                return Err(Error::invalid_archive(
+                    index,
+                    "raw ArchiveInfo rewrite changed unrelated metadata",
+                ));
+            }
+            validate_raw_object_size(self, rewritten_header.len(), limits)?;
+            encode_archive_info(&self.archive_info, limits)
+        })();
+        let canonical_after = match verification {
+            Ok(canonical) => canonical,
+            Err(error) => {
+                restore_replaced_message(self, index, old, old_type, old_length);
+                return Err(error);
+            },
+        };
+
+        if rewritten_header == canonical_after {
+            self.original_header = None;
+            self.original_canonical_header = None;
+        } else {
+            self.original_header = Some(rewritten_header.into_boxed_slice());
+            self.original_canonical_header = Some(canonical_after.into_boxed_slice());
         }
         Ok(old)
     }
@@ -1046,6 +1151,274 @@ impl Default for Archive {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn rewrite_message_metadata_in_header(
+    source: &[u8],
+    message_index: usize,
+    current_type: u32,
+    current_length: u32,
+    replacement_type: u32,
+    replacement_length: u32,
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    if current_type == replacement_type && current_length == replacement_length {
+        return try_copy_bytes(source, "IWA preserved ArchiveInfo header");
+    }
+
+    let wire_limits = header_wire_limits(limits)?;
+    let fields = parse_wire_fields_with_limits(source, wire_limits)
+        .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))?;
+    let message_field = fields
+        .iter()
+        .copied()
+        .filter(|field| field.number() == 2 && field.wire_type() == 2)
+        .nth(message_index)
+        .ok_or_else(|| {
+            Error::invalid_archive(
+                message_index,
+                "message metadata is missing from ArchiveInfo",
+            )
+        })?;
+    let message_source = message_field
+        .payload(source)
+        .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))?;
+    let rewritten_message = rewrite_effective_message_scalars(
+        message_source,
+        current_type,
+        current_length,
+        replacement_type,
+        replacement_length,
+        wire_limits,
+        message_index,
+    )?;
+    let message_start = message_field.payload_start();
+    let message_end = message_field.end();
+
+    let length_prefix = source
+        .get(message_field.key_end()..message_start)
+        .ok_or_else(|| Error::invalid_archive(message_index, "message prefix range is invalid"))?;
+    let mut encoded_length = [0u8; MAX_VARINT_BYTES];
+    let encoded_length = encode_varint_with_width(
+        u64::try_from(rewritten_message.len()).map_err(|_| {
+            Error::invalid_archive(message_index, "message metadata length exceeds u64")
+        })?,
+        length_prefix.len(),
+        &mut encoded_length,
+    );
+    let output_length = source
+        .len()
+        .checked_sub(message_source.len())
+        .and_then(|length| length.checked_sub(length_prefix.len()))
+        .and_then(|length| length.checked_add(encoded_length.len()))
+        .and_then(|length| length.checked_add(rewritten_message.len()))
+        .ok_or_else(|| Error::invalid_archive(message_index, "ArchiveInfo rewrite overflow"))?;
+    check_header_length(output_length, limits)?;
+
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_length)
+        .map_err(|_| Error::allocation("IWA preserved ArchiveInfo header", output_length))?;
+    output.extend_from_slice(
+        source
+            .get(..message_field.key_end())
+            .ok_or_else(|| Error::invalid_archive(message_index, "message key range is invalid"))?,
+    );
+    output.extend_from_slice(encoded_length);
+    output.extend_from_slice(&rewritten_message);
+    output.extend_from_slice(source.get(message_end..).ok_or_else(|| {
+        Error::invalid_archive(message_index, "message metadata range is invalid")
+    })?);
+    if output.len() != output_length {
+        return Err(Error::invalid_archive(
+            message_index,
+            "ArchiveInfo rewrite length mismatch",
+        ));
+    }
+    Ok(output)
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the helper keeps both old and new required MessageInfo scalars explicit"
+)]
+fn rewrite_effective_message_scalars(
+    source: &[u8],
+    current_type: u32,
+    current_length: u32,
+    replacement_type: u32,
+    replacement_length: u32,
+    wire_limits: WireLimits,
+    message_index: usize,
+) -> Result<Vec<u8>> {
+    let fields = parse_wire_fields_with_limits(source, wire_limits)
+        .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
+    let type_field = (current_type != replacement_type)
+        .then(|| {
+            fields
+                .iter()
+                .rposition(|field| field.number() == 1 && field.wire_type() == 0)
+                .ok_or_else(|| {
+                    Error::invalid_archive(message_index, "MessageInfo type field is missing")
+                })
+        })
+        .transpose()?;
+    let length_field = (current_length != replacement_length)
+        .then(|| {
+            fields
+                .iter()
+                .rposition(|field| field.number() == 3 && field.wire_type() == 0)
+                .ok_or_else(|| {
+                    Error::invalid_archive(message_index, "MessageInfo length field is missing")
+                })
+        })
+        .transpose()?;
+
+    let mut output_length = source.len();
+    for (field_index, value) in [
+        type_field.map(|index| (index, u64::from(replacement_type))),
+        length_field.map(|index| (index, u64::from(replacement_length))),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        let payload_length = fields[field_index]
+            .payload(source)
+            .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?
+            .len();
+        let encoded_length = encoded_varint_width(value, payload_length);
+        output_length = output_length
+            .checked_sub(payload_length)
+            .and_then(|length| length.checked_add(encoded_length))
+            .ok_or_else(|| Error::invalid_archive(message_index, "MessageInfo rewrite overflow"))?;
+    }
+
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_length)
+        .map_err(|_| Error::allocation("IWA preserved MessageInfo header", output_length))?;
+    for (field_index, field) in fields.iter().copied().enumerate() {
+        let replacement = if type_field == Some(field_index) {
+            Some(u64::from(replacement_type))
+        } else if length_field == Some(field_index) {
+            Some(u64::from(replacement_length))
+        } else {
+            None
+        };
+        if let Some(value) = replacement {
+            output.extend_from_slice(
+                field
+                    .key(source)
+                    .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?,
+            );
+            let preferred_width = field
+                .payload(source)
+                .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?
+                .len();
+            let mut encoded = [0u8; MAX_VARINT_BYTES];
+            output.extend_from_slice(encode_varint_with_width(
+                value,
+                preferred_width,
+                &mut encoded,
+            ));
+        } else {
+            output.extend_from_slice(
+                field
+                    .raw(source)
+                    .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?,
+            );
+        }
+    }
+    if output.len() != output_length {
+        return Err(Error::invalid_archive(
+            message_index,
+            "MessageInfo rewrite length mismatch",
+        ));
+    }
+    Ok(output)
+}
+
+fn encoded_varint_width(value: u64, preferred_width: usize) -> usize {
+    let canonical = if value == 0 {
+        1
+    } else {
+        (u64::BITS as usize - value.leading_zeros() as usize).div_ceil(7)
+    };
+    canonical.max(preferred_width.min(MAX_VARINT_BYTES))
+}
+
+fn encode_varint_with_width(
+    mut value: u64,
+    preferred_width: usize,
+    output: &mut [u8; MAX_VARINT_BYTES],
+) -> &[u8] {
+    let width = encoded_varint_width(value, preferred_width);
+    for (index, byte) in output.iter_mut().take(width).enumerate() {
+        *byte = u8::try_from(value & 0x7f).unwrap_or_default();
+        value >>= 7;
+        if index + 1 != width {
+            *byte |= 0x80;
+        }
+    }
+    &output[..width]
+}
+
+fn header_wire_limits(limits: Limits) -> Result<WireLimits> {
+    let scanned_bytes = limits
+        .max_header_bytes()
+        .saturating_mul(4)
+        .min(WireLimits::MAX_INPUT_BYTES);
+    WireLimits::default()
+        .with_input_bytes(scanned_bytes)
+        .and_then(|profile| profile.with_fields(limits.max_header_fields()))
+        .and_then(|profile| profile.with_nesting(limits.max_header_nesting()))
+        .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))
+}
+
+fn try_copy_bytes(source: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(source.len())
+        .map_err(|_| Error::allocation(resource, source.len()))?;
+    output.extend_from_slice(source);
+    Ok(output)
+}
+
+fn validate_raw_object_size(
+    object: &ArchiveObject,
+    header_length: usize,
+    limits: Limits,
+) -> Result<()> {
+    check_header_length(header_length, limits)?;
+    let mut object_length = varint_len(header_length)?
+        .checked_add(header_length)
+        .ok_or_else(|| Error::invalid_archive(0, "object prefix overflow"))?;
+    for message in &object.messages {
+        object_length = object_length
+            .checked_add(message.data.len())
+            .ok_or_else(|| Error::invalid_archive(0, "object length overflow"))?;
+        if object_length > limits.max_object_bytes() {
+            return Err(limit(
+                LimitKind::ObjectBytes,
+                object_length,
+                limits.max_object_bytes(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn restore_replaced_message(
+    object: &mut ArchiveObject,
+    index: usize,
+    old: RawMessage,
+    old_type: u32,
+    old_length: u32,
+) {
+    drop(std::mem::replace(&mut object.messages[index], old));
+    let info = &mut object.archive_info.message_infos[index];
+    info.type_ = old_type;
+    info.length = old_length;
 }
 
 fn archive_info_from_proto(value: tsp::ArchiveInfo) -> Result<ArchiveInfo> {

@@ -14,7 +14,7 @@ use crate::object_index::ObjectIndex;
 use crate::protobuf::{tp, tswp};
 use crate::text::{Storage, TextExtractor};
 use crate::{Error, Result};
-use litchi_iwa_graph::ObjectId;
+use litchi_iwa_index::ObjectId;
 
 /// High-level interface for Pages documents
 #[derive(Debug, Clone)]

@@ -73,3 +73,22 @@ search over compact immutable storage; temporary builder hash sets are dropped
 after `build`. The adapter still owns the cost of reading and decoding IWA
 archives, and the follow-up integration must preserve that ownership rather
 than reintroducing archive dependencies into the leaf.
+
+## 2026-08-08 amendment: direct builder integration
+
+`IndexBuilder::add_reference_if_absent` is now the explicit idempotent adapter
+path: it returns whether an edge was inserted and preserves the same allocation
+and endpoint checks as strict insertion. `IndexBuilder::add_reference` remains
+strict and continues to report `DuplicateReference`, so general callers do not
+silently lose duplicate diagnostics.
+
+The migration host's private adapter now inserts authoritative
+`MessageInfo.object_references` and schema-directed compatibility fallback
+references directly into `IndexBuilder` instead of constructing a temporary
+mutable `ReferenceGraph`. Null identifiers remain ignored, any non-empty
+authoritative native reference list suppresses fallback even when its entries
+are null, repeated edges are deduplicated, final ordering remains deterministic,
+and `build_allow_missing_targets` continues to preserve dangling targets.
+`litchi-iwa-index` retains its canonical internal dependency on
+`litchi-iwa-graph`; only the redundant direct `litchi-iwa ->
+litchi-iwa-graph` edge and ordered debt 007 are removed.

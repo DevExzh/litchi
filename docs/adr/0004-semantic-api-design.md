@@ -844,3 +844,27 @@ This capability authorizes ordering only. It does not imply slide insertion,
 duplication, deletion, navigator-name mutation, layout reassignment, or an
 ordinary public raw-reference collection. Those operations retain their own
 dependency-closure and native-application acceptance gates.
+
+## 2026-08-08 amendment: focused Keynote presentation settings
+
+Presentation settings are exposed as the singleton semantic value returned by
+`litchi_keynote::Package::show_settings()`. Callers stage changes with
+`edit_show_settings()` and the existing archive-free
+`litchi_keynote::show::Settings`; they never select a native object, component,
+package member, or generated message. The value covers checked presentation
+size, optional slide-number visibility, looping, presentation mode, autoplay
+transition and build delays, idle-timer activation and delay, and automatic
+play-on-open. `Size`, `Seconds`, and `Mode` continue to enforce finite/domain
+rules, preserve optional presence, and retain unknown future mode values
+without permitting a named discriminant to masquerade as `Unknown`.
+
+The direct reader validates the full known Show/SlideTree envelope and its
+resource ceilings but does not initialize the full semantic slide cache or
+retain slide-node identifiers. A null root show has the semantic default
+settings. It cannot acquire a synthesized physical Show through this API, so
+only an exact no-op edit is valid until creation owns identifier allocation and
+component registration. Format-owned show-settings errors and limit kinds
+remain content-free, and the public patch vocabulary contains semantic values
+rather than raw identities. Changed legacy package normalization remains an
+explicit host compatibility capability, not implicit behavior of the ordinary
+focused transaction.

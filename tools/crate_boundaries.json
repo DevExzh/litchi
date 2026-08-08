@@ -377,13 +377,6 @@
       "exit": "Route root facade opening directly to concrete packages and delete litchi-iwa."
     },
     {
-      "order": 7,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-iwa-graph",
-      "reason": "Legacy media and editor code still traverses native object-reference graphs.",
-      "exit": "Move graph-backed traversal into private concrete-format adapters and delete litchi-iwa."
-    },
-    {
       "order": 8,
       "dependent": "litchi-iwa",
       "dependency": "litchi-iwa-index",

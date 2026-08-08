@@ -174,3 +174,14 @@ structural optimization rather than a measured throughput claim.
 Instrumentation is an opt-in runtime-neutral observer with optional tracing and
 profiling adapters. It never records document content, credentials, or sensitive
 paths by default.
+
+## 2026-08-08 amendment: direct Keynote settings projection
+
+The focused Keynote settings reader uses the existing schema-directed Show and
+SlideTree preflight, including the caller's slide-reference ceiling, before a
+private Buffa settings projection is forced. Unlike the full Show projection,
+it does not allocate or retain the slide-node identifier collection and does
+not initialize the package's full semantic slide cache. This is a bounded
+allocation-shape statement only. The format and codec validation layers may
+both scan the payload, and no O(1), single-pass, latency, RSS, allocation-count,
+or throughput result is inferred without measurement.

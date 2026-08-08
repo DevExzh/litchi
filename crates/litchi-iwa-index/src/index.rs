@@ -108,8 +108,30 @@ impl IndexBuilder {
     /// [`IndexError::Allocation`] when the builder cannot grow its storage.
     pub fn add_reference(&mut self, source: ObjectId, target: ObjectId) -> Result<(), IndexError> {
         let reference = Reference::new(source, target);
-        if self.reference_catalog.contains(&reference) {
+        if !self.add_reference_if_absent(source, target)? {
             return Err(IndexError::DuplicateReference(reference));
+        }
+        Ok(())
+    }
+
+    /// Register one directed object reference unless it is already present.
+    ///
+    /// The endpoint and build-time validation semantics are identical to
+    /// [`Self::add_reference`]. A newly inserted edge returns `true`; an
+    /// existing edge is left unchanged and returns `false`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Allocation`] when the builder cannot grow its
+    /// storage. Duplicate references are successful idempotent operations.
+    pub fn add_reference_if_absent(
+        &mut self,
+        source: ObjectId,
+        target: ObjectId,
+    ) -> Result<bool, IndexError> {
+        let reference = Reference::new(source, target);
+        if self.reference_catalog.contains(&reference) {
+            return Ok(false);
         }
         self.references
             .try_reserve(1)
@@ -125,7 +147,7 @@ impl IndexBuilder {
             })?;
         self.reference_catalog.insert(reference);
         self.references.push(reference);
-        Ok(())
+        Ok(true)
     }
 
     /// Finish the builder as a deterministic immutable index.
@@ -496,6 +518,36 @@ mod tests {
             builder.build(),
             Err(IndexError::UnknownTarget(target)) if target == second
         ));
+    }
+
+    #[test]
+    fn idempotent_reference_insertion_preserves_strict_duplicate_rejection() {
+        let fragment = fragment(1);
+        let source = object(1);
+        let target = object(2);
+        let mut builder = IndexBuilder::new();
+        builder.add_fragment(fragment).expect("fragment");
+        builder
+            .add_object(ObjectRecord::new(source, fragment, span(0, 1)))
+            .expect("source");
+        builder
+            .add_object(ObjectRecord::new(target, fragment, span(1, 1)))
+            .expect("target");
+
+        assert_eq!(builder.add_reference_if_absent(source, target), Ok(true));
+        assert_eq!(builder.add_reference_if_absent(source, target), Ok(false));
+        assert_eq!(
+            builder.add_reference(source, target),
+            Err(IndexError::DuplicateReference(Reference::new(
+                source, target
+            )))
+        );
+
+        let index = builder.build().expect("deduplicated index");
+        assert_eq!(
+            index.outgoing(source).map(Iterator::collect::<Vec<_>>),
+            Some(vec![target])
+        );
     }
 
     #[test]

@@ -10,9 +10,9 @@ use std::sync::Arc;
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::bundle::Bundle;
 use crate::{Error, Result};
-use litchi_iwa_graph::{ObjectId, ObjectIdIter, ReferenceGraph};
 use litchi_iwa_index::{
-    ByteSpan, FragmentId, IndexBuilder, IndexError, ObjectIndex as NeutralObjectIndex, ObjectRecord,
+    ByteSpan, FragmentId, IndexBuilder, IndexError, ObjectId, ObjectIdIter,
+    ObjectIndex as NeutralObjectIndex, ObjectRecord, ReferenceGraphSnapshot,
 };
 
 mod reference_extraction;
@@ -208,7 +208,7 @@ impl ObjectIndex {
         for source in graph.iter_object_ids() {
             if let Some(targets) = graph.outgoing(source) {
                 for target in targets {
-                    add_reference(&mut builder, source, target)?;
+                    builder.add_reference(source, target).map_err(index_error)?;
                 }
             }
         }
@@ -352,7 +352,7 @@ impl ObjectIndex {
     ///     println!("{} objects use this style", refs.len());
     /// }
     /// ```
-    pub fn reference_graph(&self) -> &litchi_iwa_graph::ReferenceGraphSnapshot {
+    pub fn reference_graph(&self) -> &ReferenceGraphSnapshot {
         self.snapshot.locations.reference_graph()
     }
 
@@ -677,13 +677,12 @@ fn append_archive(
 
         // MessageInfo is the authoritative, application-independent
         // reference index emitted by iWork for every payload.
-        let mut graph = ReferenceGraph::new();
         let mut has_indexed_references = false;
         for message_info in &object.archive_info.message_infos {
             has_indexed_references |= !message_info.object_references.is_empty();
             for &reference in &message_info.object_references {
                 if let Some(target_id) = ObjectId::new(reference) {
-                    graph.add_object_reference(object_id, target_id);
+                    add_reference_if_absent(builder, object_id, target_id)?;
                 }
             }
         }
@@ -692,21 +691,20 @@ fn append_archive(
         // unambiguous high-numbered payloads as a compatibility fallback;
         // low message types overlap between Numbers and Keynote.
         if !has_indexed_references && object_type >= 2000 {
-            reference_extraction::extract(object_id, object, &mut graph)?;
-        }
-
-        let graph = graph.snapshot();
-        if let Some(targets) = graph.outgoing(object_id) {
-            for target in targets {
-                add_reference(builder, object_id, target)?;
-            }
+            reference_extraction::extract(object_id, object, builder)?;
         }
     }
     Ok(())
 }
 
-fn add_reference(builder: &mut IndexBuilder, source: ObjectId, target: ObjectId) -> Result<()> {
-    builder.add_reference(source, target).map_err(index_error)
+fn add_reference_if_absent(
+    builder: &mut IndexBuilder,
+    source: ObjectId,
+    target: ObjectId,
+) -> Result<bool> {
+    builder
+        .add_reference_if_absent(source, target)
+        .map_err(index_error)
 }
 
 fn finish_snapshot(
@@ -1148,7 +1146,7 @@ mod tests {
             }],
         )
         .unwrap();
-        object.archive_info.message_infos[0].object_references = vec![0, 20, 30, 20, 0];
+        object.archive_info.message_infos[0].object_references = vec![0, 30, 20, 30, 0];
         let archive = Archive {
             objects: vec![object],
         };
@@ -1205,6 +1203,41 @@ mod tests {
                 .is_none()
         );
         assert_eq!(index.stats().total_references, 0);
+    }
+
+    #[test]
+    fn fallback_deduplicates_repeated_payload_references() {
+        let repeated = Reference {
+            identifier: 20,
+            ..Default::default()
+        };
+        let table_data = TableDataList {
+            list_type: tst::table_data_list::ListType::RichTextPayload as i32,
+            entries: Vec::new(),
+            segments: vec![repeated.clone(), repeated],
+            ..Default::default()
+        };
+        let object = ArchiveObject::new(
+            10,
+            vec![RawMessage {
+                type_: 6005,
+                data: table_data.encode_to_vec(),
+            }],
+        )
+        .unwrap();
+        let archive = Archive {
+            objects: vec![object],
+        };
+        let mut index = ObjectIndex::new();
+        index.parse_archive("Index/Test.iwa", &archive).unwrap();
+
+        assert_eq!(
+            index
+                .dependencies(ObjectId::try_from(10).unwrap())
+                .map(|references| references.collect::<Vec<_>>()),
+            Some(vec![ObjectId::try_from(20).unwrap()])
+        );
+        assert_eq!(index.stats().total_references, 1);
     }
 
     #[test]

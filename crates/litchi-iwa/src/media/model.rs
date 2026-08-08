@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use crate::{Error, Result};
 pub use litchi_iwa_common::media::Type as MediaType;
-use litchi_iwa_graph::ObjectId;
+use litchi_iwa_index::ObjectId;
 
 const DEFAULT_MAX_MEDIA_ASSETS: usize = 100_000;
 const DEFAULT_MAX_MEDIA_ASSET_BYTES: u64 = 512 * 1024 * 1024;

@@ -679,3 +679,101 @@ values. Protobuf groups remain transactionally fail-closed at shared package
 preflight. The unavailable sanitizer campaign, missing aggregate transaction
 peak-memory option, durable JSON patch envelope, atomic filesystem save, and
 remaining examples/tests/fuzz targets keep the monolith deletion gate open.
+
+## 2026-08-08 focused Keynote settings and direct graph-edge retirement
+
+The preceding Show/SlideTree section's 17-debt count and its statement that all
+show-settings mutation remains in the host are superseded by this amendment.
+`litchi-keynote::Package::show_settings()` now reads validated presentation
+settings directly from the retained Show payload. It validates the complete
+known Show and SlideTree envelope and the slide-reference ceiling, then forces
+only the private Buffa size/scalar projection. It does not initialize the full
+semantic slide cache or retain slide-node identifiers. Buffa does not retain
+unknown content; accepted raw source records remain authoritative.
+
+For a present Show in an exact package, `edit_show_settings()` stages the
+archive-free `Settings` value and publishes a changed candidate only after one
+owning IWA component is rewritten, the complete package is reopened under the
+retained `ReadOptions`, and the focused reader reproduces every requested
+setting. Exact no-ops share the original source allocation and bytes. A null
+root show reads as `Settings::default()` and supports only that exact no-op,
+because this transaction does not allocate an object or register a component.
+The reversible patch retains exact source/target artifacts privately and uses
+exact bytes, rather than its public diagnostic fingerprint, for conflict
+authorization.
+
+The preservation boundary is explicit. Untouched ZIP entries and raw ZIP
+records, non-setting Show field records, nested unknown Size records, and the
+source snapshot remain exact, including unchanged encoded field keys and
+length headers. The changed Show message's effective type and length, its
+`MessageInfo`, and the enclosing framing required by a changed length are part
+of the intended mutation closure. They are not claimed as unchanged metadata.
+Changed legacy nested-`Index.zip` sources return typed
+`UnsupportedSource`; silently flattening them would violate preserve-by-default.
+The migration host therefore retains its normalizing compatibility method,
+example, and assertions. This is focused exact-source ownership, not full host
+show-settings retirement.
+
+Ordered dependency debt 007 is independently retired. The host reference
+adapter inserts authoritative and fallback edges directly into
+`litchi-iwa-index::IndexBuilder`, and other host users obtain `ObjectId` and
+immutable graph snapshots through the index owner's reexports. Strict builder
+insertion still rejects duplicate references, while the new adapter-specific
+idempotent insertion preserves native duplicate-deduplication behavior. Null
+handling, authoritative-list suppression of fallback, deterministic ordering,
+and missing-target visibility remain unchanged. `litchi-iwa-index` still owns
+the canonical graph dependency; this does not claim migration of the remaining
+graph-backed editors. The ledger now contains 16 debts, with identity 007
+absent and identities 008 through 017 unchanged.
+
+Executed Rust evidence includes 31 `litchi-iwa-core` tests, 38
+`litchi-iwa-protos` tests, 9 `litchi-iwa-index` tests, all 11 focused
+`show_settings` integration tests, 1,479 migration-host library tests, 3 direct
+root Keynote facade tests, and 3 Keynote doctests. The final Keynote
+all-features/all-targets run passed 68 library tests and 48 integration tests
+across eight integration binaries. Scoped warning-denied Clippy
+passed for the changed Keynote, protobuf, index, example, and focused test
+targets. A full Keynote dependency Clippy traversal remains blocked by 88
+pre-existing `litchi-core` ARM SIMD lint failures and is not represented as a
+passing gate. Formatting, diff checks, supported rustdoc public API checks,
+and the boundary checker passed; the latter reports 63 packages, 223 internal dependency
+declarations, and exactly 16 ordered debts.
+
+Computer Use verified the exact-source writer in Apple Keynote 14.4
+(7043.0.93). The source
+`/private/tmp/litchi-keynote-show-settings-20260808.g4cipH/source.key` has
+SHA-256
+`f3adcde9315b6df580805bcb63c995cc1e1ef569a4befa06a102485e13c883b2`.
+The pristine Rust candidate was reproduced after the final code gate as
+`/private/tmp/litchi-keynote-show-settings-20260808.g4cipH/final-rust-reproduced.key`
+with SHA-256
+`c8364bb21713892f6c3c5dfb37207f8d293f48010ad16c1ff3da0547ea9f0644`;
+its public inverse reproduced the exact source hash. These are the same
+candidate bytes originally presented to Keynote. The opened working path after
+Keynote's in-place autosave is
+`/private/tmp/litchi-keynote-show-settings-20260808.g4cipH/final-self-playing.key`
+with SHA-256
+`a106977db366e794be087a87ddfd874e7af3c26fa84d9fb5d573ca74efec739a`.
+Keynote opened and automatically played it without a repair, recovery, or
+conversion prompt. The inspector reported Self-Playing, loop enabled,
+automatic play on open enabled, 1920-by-1080 Widescreen, a five-second
+transition delay, and a two-second build delay.
+
+Native Save As, close, and reopen produced
+`/private/tmp/litchi-keynote-show-settings-20260808.g4cipH/final-keynote-resaved.key`
+with SHA-256
+`a9109add346eb26c8a9cb6f7db7e6bd6f1a6366a6ba1c9d073ac1c7c64bc6857`.
+The focused reader recovered the inspected settings; focused no-op and inverse
+outputs over that final native artifact remained byte-identical to the
+`a9109add...` artifact. Before native application normalization, applying the
+Rust transaction's public inverse restored the exact original
+`f3adcde9...` source. ZIP entry names were unchanged and only
+`Index/Document.iwa` content changed in the pristine `c8364bb2...`
+Rust-authored package.
+
+No O(1), single-pass, latency, RSS, allocation-performance, fuzz, sanitizer,
+or complete Buffa-laziness claim is made. The legacy settings normalization
+path, most Keynote editors and generated Prost graph paths, durable patch
+serialization, an aggregate transaction peak-memory option, atomic filesystem
+save, remaining examples/tests/fuzz ownership, and all 16 remaining host debts
+keep the monolith deletion gate open.

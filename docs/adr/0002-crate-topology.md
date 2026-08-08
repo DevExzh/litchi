@@ -1078,3 +1078,41 @@ duplication, deletion, show-setting mutation, and the larger slide, build,
 shape, note, table, chart, and media editors remain host migration work. This
 vertical move does not remove a dependency edge: all 17 ordered
 `litchi-iwa` debt entries remain until their complete exit conditions hold.
+
+## 2026-08-08 amendment: focused Keynote show settings and graph-edge retirement
+
+The preceding show-setting and dependency counts describe the slide-order
+slice and are superseded by this amendment. `litchi-keynote::Package` now owns
+`show_settings`, `edit_show_settings`, exact-source patch application, and the
+format-owned `ShowSettingsEdit`, `ShowSettingsCommit`, `ShowSettingsPatch`,
+`ShowSettingsDiagnostics`, `ShowSettingsError`, and `ShowSettingsLimitKind`
+types. The focused reader validates the complete known `KN.ShowArchive` and
+embedded `KN.SlideTreeArchive` envelope, including the slide-reference ceiling,
+but projects only the presentation size and scalar settings through the private
+Buffa view. It neither initializes the full semantic slide cache nor retains a
+slide-node identifier list. Generated Buffa and Prost values, native object
+identifiers, component names, and raw wire objects remain outside the supported
+API. Buffa does not retain unknown content; validated raw source field records
+remain the preservation authority.
+
+A null root show reference reads as `Settings::default()`. Because there is no
+owning Show component to rewrite, only an exact no-op edit is publishable for
+that state. For a present Show, changed exact-package sources rewrite one
+owning IWA component and publish only after complete reopening under the
+retained `ReadOptions` and focused semantic readback. Changed legacy nested
+`Index.zip` sources remain a typed `UnsupportedSource`: their historical
+normalizing mutation stays in the migration host together with its compatibility
+method, example, and assertions. This is therefore focused exact-source
+ownership, not complete retirement of the host's show-settings compatibility
+path.
+
+The migration host also no longer depends directly on `litchi-iwa-graph`.
+Authoritative `MessageInfo` references and schema fallback references are
+inserted directly into `litchi-iwa-index::IndexBuilder`; graph identities and
+the immutable graph snapshot are consumed through the index owner's existing
+reexports. Ordered debt 007 is removed without renumbering later debt
+identities. The boundary inventory is now 63 workspace packages, 223 internal
+dependency declarations, and 16 ordered migration debts. The canonical
+`litchi-iwa-index -> litchi-iwa-graph` edge remains, and this direct-edge
+retirement does not claim that the host's remaining graph-backed editors have
+migrated.

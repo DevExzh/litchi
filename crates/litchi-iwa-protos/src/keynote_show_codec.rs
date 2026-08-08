@@ -335,6 +335,32 @@ impl RawSettings {
     }
 }
 
+/// Owned, generated-type-free projection of Keynote presentation settings.
+///
+/// Unlike [`ShowSnapshot`], this value does not retain the presentation's
+/// slide-node identifiers. The complete known show envelope and slide tree
+/// are still checked by the strict bounded preflight before Buffa projects the
+/// size and scalar settings.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SettingsSnapshot {
+    size: RawSize,
+    raw_settings: RawSettings,
+}
+
+impl SettingsSnapshot {
+    /// Raw native presentation size.
+    #[must_use]
+    pub const fn size(self) -> RawSize {
+        self.size
+    }
+
+    /// Optional scalar show settings.
+    #[must_use]
+    pub const fn raw_settings(self) -> RawSettings {
+        self.raw_settings
+    }
+}
+
 /// Owned, generated-type-free Keynote show projection.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ShowSnapshot {
@@ -527,6 +553,46 @@ enum ParseItem<'source> {
 /// are then retained after one exact fallible reservation and projected in
 /// source order. Generated Buffa types never cross this API boundary.
 pub fn decode_show(source: &[u8], options: DecodeOptions) -> Result<ShowSnapshot, DecodeError> {
+    validate_decode_input(source, options)?;
+    let preflight = preflight_show(source, options)?;
+    let mut slide_node_identifiers = Vec::new();
+    slide_node_identifiers
+        .try_reserve_exact(preflight.slide_count)
+        .map_err(|_error| DecodeError::allocation(preflight.slide_count))?;
+
+    let settings = project_settings(source, options, preflight.size)?;
+
+    project_slide_tree(
+        preflight.slide_tree,
+        options.descend()?,
+        preflight.slide_count,
+        &mut slide_node_identifiers,
+    )?;
+    Ok(ShowSnapshot {
+        slide_node_identifiers: slide_node_identifiers.into_boxed_slice(),
+        size: settings.size,
+        raw_settings: settings.raw_settings,
+        has_deprecated_root_slide_node: preflight.has_deprecated_root_slide_node,
+        has_slide_list: preflight.has_slide_list,
+    })
+}
+
+/// Decode only the bounded Keynote presentation settings projection.
+///
+/// The strict handwritten pass validates the complete known show envelope and
+/// slide tree, including the caller's slide-reference ceiling. Buffa then
+/// projects the presentation size and scalar settings without allocating or
+/// retaining the slide-node identifier list.
+pub fn decode_settings(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<SettingsSnapshot, DecodeError> {
+    validate_decode_input(source, options)?;
+    let preflight = preflight_show(source, options)?;
+    project_settings(source, options, preflight.size)
+}
+
+fn validate_decode_input(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
     const MAX_RECURSION_LIMIT: u32 = 64;
 
     let max_buffa_message_bytes = usize::try_from(buffa::MAX_MESSAGE_BYTES)
@@ -539,44 +605,34 @@ pub fn decode_show(source: &[u8], options: DecodeOptions) -> Result<ShowSnapshot
     if options.recursion_limit == 0 || options.recursion_limit > MAX_RECURSION_LIMIT {
         return Err(DecodeError::recursion_limit());
     }
+    Ok(())
+}
 
-    let preflight = preflight_show(source, options)?;
-    let mut slide_node_identifiers = Vec::new();
-    slide_node_identifiers
-        .try_reserve_exact(preflight.slide_count)
-        .map_err(|_error| DecodeError::allocation(preflight.slide_count))?;
-
+fn project_settings(
+    source: &[u8],
+    options: DecodeOptions,
+    preflight_size: RawSize,
+) -> Result<SettingsSnapshot, DecodeError> {
     let view: projection::KeynoteShowArchiveLazyView<'_> =
         options.buffa().decode_lazy_view(source)?;
     let projected_size = force_show_projection(&view)?;
-    if projected_size.width.to_bits() != preflight.size.width.to_bits()
-        || projected_size.height.to_bits() != preflight.size.height.to_bits()
+    if projected_size.width.to_bits() != preflight_size.width.to_bits()
+        || projected_size.height.to_bits() != preflight_size.height.to_bits()
     {
         return Err(DecodeError::projection());
     }
-
-    project_slide_tree(
-        preflight.slide_tree,
-        options.descend()?,
-        preflight.slide_count,
-        &mut slide_node_identifiers,
-    )?;
-    let raw_settings = RawSettings {
-        slide_numbers_visible: view.slide_numbers_visible,
-        loop_presentation: view.loop_presentation,
-        mode: view.mode,
-        autoplay_transition_delay: view.autoplay_transition_delay,
-        autoplay_build_delay: view.autoplay_build_delay,
-        idle_timer_active: view.idle_timer_active,
-        idle_timer_delay: view.idle_timer_delay,
-        automatically_plays_upon_open: view.automatically_plays_upon_open,
-    };
-    Ok(ShowSnapshot {
-        slide_node_identifiers: slide_node_identifiers.into_boxed_slice(),
+    Ok(SettingsSnapshot {
         size: projected_size,
-        raw_settings,
-        has_deprecated_root_slide_node: preflight.has_deprecated_root_slide_node,
-        has_slide_list: preflight.has_slide_list,
+        raw_settings: RawSettings {
+            slide_numbers_visible: view.slide_numbers_visible,
+            loop_presentation: view.loop_presentation,
+            mode: view.mode,
+            autoplay_transition_delay: view.autoplay_transition_delay,
+            autoplay_build_delay: view.autoplay_build_delay,
+            idle_timer_active: view.idle_timer_active,
+            idle_timer_delay: view.idle_timer_delay,
+            automatically_plays_upon_open: view.automatically_plays_upon_open,
+        },
     })
 }
 
@@ -1218,6 +1274,7 @@ mod tests {
         let source = expected.encode_to_vec();
         let native = kn::ShowArchive::decode(source.as_slice())?;
         let snapshot = decode_show(&source, options(&source, 3))?;
+        let settings_only = decode_settings(&source, options(&source, 3))?;
 
         assert_eq!(
             snapshot.slide_node_identifiers(),
@@ -1236,6 +1293,8 @@ mod tests {
             snapshot.size().height().to_bits(),
             native.size.height.to_bits()
         );
+        assert_eq!(settings_only.size(), snapshot.size());
+        assert_eq!(settings_only.raw_settings(), snapshot.raw_settings());
         let settings = snapshot.raw_settings();
         assert_eq!(
             settings.slide_numbers_visible(),
@@ -1646,8 +1705,16 @@ mod tests {
             .map(u64::try_from)
             .collect::<Result<Vec<_>, _>>()?;
         let source = minimal_show(&identifiers);
+        let settings = decode_settings(&source, options(&source, SLIDES))?;
+        assert_eq!(settings.size().width().to_bits(), 1_024.0_f32.to_bits());
+        assert_eq!(settings.size().height().to_bits(), 768.0_f32.to_bits());
         let snapshot = decode_show(&source, options(&source, SLIDES))?;
         assert_eq!(snapshot.slide_node_identifiers(), identifiers);
+        assert_eq!(
+            assert_error(decode_settings(&source, options(&source, SLIDES - 1)))
+                .slide_reference_limit_values(),
+            Some((SLIDES, SLIDES - 1))
+        );
         Ok(())
     }
 

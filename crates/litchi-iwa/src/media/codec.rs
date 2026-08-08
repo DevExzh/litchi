@@ -11,7 +11,7 @@ use crate::protobuf;
 use crate::{Error, Result};
 use litchi_iwa_common::varint::{decode_varint_from_bytes, encode_varint_into};
 use litchi_iwa_common::wire::{WireField, parse_wire_fields};
-use litchi_iwa_graph::ObjectId;
+use litchi_iwa_index::ObjectId;
 
 use super::model::{EmbeddedMediaAsset, MediaAsset, MediaAssetId, MediaLimits, MediaType};
 

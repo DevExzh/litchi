@@ -55,7 +55,7 @@ use crate::wire::{
     transform_length_delimited_field, transform_length_delimited_fields_at_path,
 };
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
-use litchi_iwa_graph::ObjectId;
+use litchi_iwa_index::ObjectId;
 use litchi_keynote::build as semantic_build;
 pub use litchi_keynote::build::{Acceleration as BuildAcceleration, Start as BuildStart};
 use litchi_keynote::transition::Settings as TransitionSettings;

@@ -17,7 +17,7 @@ use crate::shapes::{
 };
 use litchi_iwa_common::comment::DrawableId;
 use litchi_iwa_common::shape::image::ImageAdjustments;
-use litchi_iwa_graph::ObjectId;
+use litchi_iwa_index::ObjectId;
 
 mod graph;
 

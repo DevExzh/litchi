@@ -151,7 +151,7 @@ impl SnappyStream {
     pub const MAX_COMPRESSED_STREAM: usize = 2 * 1024 * 1024 * 1024;
     /// Hard ceiling for the number of frames, including empty frames.
     pub const MAX_FRAMES: usize = 1_000_000;
-    /// Size of independently compressed frames emitted by [`compress`].
+    /// Size of independently compressed frames emitted by [`Self::compress`].
     pub const WRITE_CHUNK_SIZE: usize = 64 * 1024;
 
     /// Decode one complete Apple IWA Snappy stream.

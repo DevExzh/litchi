@@ -542,3 +542,27 @@ decisions in [ADR 0002](0002-crate-topology.md) and
 [ADR 0023](0023-odf-family-crate-split.md), plus the current iWork exit in
 [ADR 0028](0028-iwa-monolith-exit.md). The layered owner paths are
 verified by the affected-crate all-target compile and boundary-policy check.
+
+## 2026-08-08 focused settings and graph-boundary continuation
+
+The preceding 17-debt snapshot is historical and is superseded here.
+`litchi-keynote::Package` now owns a direct bounded `show_settings` reader and
+exact-source `edit_show_settings` transaction. The reader validates the full
+known Show/SlideTree envelope without initializing full slide semantics or
+retaining slide identifiers. A changed exact source rewrites one owning
+component and is fully reopened under retained options; a null show permits
+only its exact semantic no-op. Raw source field records, not Buffa, remain the
+unknown-content authority.
+
+Changed legacy nested-`Index.zip` settings edits are still a host compatibility
+capability because the ordinary focused edit must not silently normalize its
+physical provenance. The host method, example, and compatibility tests remain
+until that behavior gains an explicit preservation-safe owner. This slice is
+therefore not complete show-settings host retirement.
+
+The redundant direct `litchi-iwa -> litchi-iwa-graph` manifest edge is retired.
+The host consumes graph identities and snapshots through `litchi-iwa-index`,
+whose own graph dependency remains canonical. Debt identity 007 is deleted and
+later identities are not renumbered. The current checker inventory is 63
+workspace packages, 223 internal dependency declarations, and 16 ordered
+migration debts.

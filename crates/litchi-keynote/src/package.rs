@@ -6,6 +6,7 @@
 
 mod edit;
 mod limits;
+mod show_settings;
 mod slide_order;
 
 use std::fmt;
@@ -44,6 +45,10 @@ pub use edit::{Commit, Diagnostics, Edit, EditError, Patch};
 pub use limits::{
     MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES,
     ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError,
+};
+pub use show_settings::{
+    ShowSettingsCommit, ShowSettingsDiagnostics, ShowSettingsEdit, ShowSettingsError,
+    ShowSettingsLimitKind, ShowSettingsPatch,
 };
 pub use slide_order::{
     SlideOrderCommit, SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind,
@@ -1469,6 +1474,43 @@ fn decode_show_snapshot(
     })
 }
 
+fn decode_show_settings_snapshot(
+    payload: &[u8],
+    max_slide_references: usize,
+    wire_limits: WireLimits,
+) -> ReadResult<keynote_show_codec::SettingsSnapshot> {
+    let recursion_limit = u32::try_from(wire_limits.max_nesting()).map_err(|_error| {
+        ReadError::InvalidFormat("Keynote show nesting limit does not fit u32".to_owned())
+    })?;
+    keynote_show_codec::decode_settings(
+        payload,
+        keynote_show_codec::DecodeOptions::new(
+            payload.len(),
+            max_slide_references,
+            recursion_limit,
+        ),
+    )
+    .map_err(|error| {
+        if let Some((observed, maximum)) = error.slide_reference_limit_values() {
+            ReadError::SemanticLimit {
+                kind: SemanticLimitKind::Slides,
+                observed,
+                maximum,
+                path: SemanticPath::Show,
+            }
+        } else if let Some(amount) = error.allocation_amount() {
+            ReadError::Allocation {
+                resource: "Keynote show settings projection",
+                amount,
+            }
+        } else {
+            ReadError::InvalidFormat(format!(
+                "Keynote show settings projection is malformed: {error}"
+            ))
+        }
+    })
+}
+
 fn preflight_show(
     payload: &[u8],
     wire_limits: WireLimits,
@@ -2574,10 +2616,15 @@ fn input_limit_error(observed: u64, limits: Limits) -> ReadError {
 }
 
 fn settings_from_show(show: &keynote_show_codec::ShowSnapshot) -> ReadResult<Settings> {
-    let raw_size = show.size();
+    settings_from_show_projection(show.size(), show.raw_settings())
+}
+
+fn settings_from_show_projection(
+    raw_size: keynote_show_codec::RawSize,
+    raw: keynote_show_codec::RawSettings,
+) -> ReadResult<Settings> {
     let semantic_size = Size::new(raw_size.width(), raw_size.height())
         .map_err(|error| ReadError::Decode(format!("invalid Keynote show size: {error}")))?;
-    let raw = show.raw_settings();
     let mut settings = Settings::new(semantic_size);
     settings.set_slide_numbers_visible(raw.slide_numbers_visible());
     settings.set_loop_presentation(raw.loop_presentation());
@@ -2649,6 +2696,41 @@ mod tests {
     #[test]
     fn package_handles_are_send_sync() {
         assert_send_sync::<Package>();
+    }
+
+    #[test]
+    fn focused_show_settings_does_not_initialize_full_slide_semantics()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let package = Package::open(native_fixture_path())?;
+        assert!(package.state.semantic.get().is_none());
+        assert_eq!(
+            package
+                .state
+                .semantic_decode_attempts
+                .load(Ordering::Relaxed),
+            0
+        );
+
+        let focused = package.show_settings()?;
+        assert!(package.state.semantic.get().is_none());
+        assert_eq!(
+            package
+                .state
+                .semantic_decode_attempts
+                .load(Ordering::Relaxed),
+            0
+        );
+
+        assert_eq!(focused, *package.show()?.settings());
+        assert!(package.state.semantic.get().is_some());
+        assert_eq!(
+            package
+                .state
+                .semantic_decode_attempts
+                .load(Ordering::Relaxed),
+            1
+        );
+        Ok(())
     }
 
     #[cfg(feature = "internal-iwork-source")]
