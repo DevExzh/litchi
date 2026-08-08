@@ -135,6 +135,20 @@ pkg.save("output.pptx")?;
     let sheet_count = numbers.worksheet_count();
 }
 
+// Detect any immutable packaged iWork document once (requires "iwork")
+#[cfg(feature = "iwork")]
+{
+    use litchi::iwork::Document;
+
+    // `package_bytes` can be borrowed or supplied as `Arc<[u8]>`.
+    let document = Document::from_bytes(package_bytes)?;
+    let snapshot = document.snapshot();
+    println!("{}: {}", document.format(), snapshot.summary());
+    for text in snapshot.iter_text() {
+        println!("{:?}: {}", text.role(), text.value());
+    }
+}
+
 // Formula conversion (requires "formula" feature)
 #[cfg(feature = "formula")]
 {
@@ -210,8 +224,12 @@ OLE vocabulary; it is not a legacy format owner or compatibility facade.
 
 iWork follows the same ownership rule: `litchi::pages`, `litchi::keynote`, and
 `litchi::numbers` expose the concrete format owners, while `Document`,
-`Presentation`, and `sheet::Workbook` provide the corresponding unified
-high-level entry points. The `iwork` feature is only their aggregate.
+`Presentation`, and `sheet::Workbook` provide their established format-family
+entry points. With the aggregate `iwork` feature, `litchi::iwork::Document`
+also provides one bounded, format-neutral reader for immutable packaged Pages,
+Keynote, and Numbers bytes. It exposes only root-owned semantic handles and
+never native object identifiers or Protocol Buffer values. Directory bundles
+remain format-specific until their frozen-source adapter lands.
 
 ## Documentation
 

@@ -170,6 +170,24 @@ impl Limits {
         Ok(())
     }
 
+    /// Charge decompressed IWA stream bytes before another parsed component is
+    /// retained in the catalog.
+    ///
+    /// The aggregate reuses the package-wide uncompressed-byte ceiling rather
+    /// than adding a second caller-facing knob. Individual components are
+    /// still bounded independently by [`Self::max_iwa_stream_bytes`].
+    pub(crate) fn charge_iwa_total_bytes(self, current: u64, added: u64) -> Result<u64> {
+        let observed = current.saturating_add(added);
+        if observed > self.max_total_bytes {
+            return Err(Error::Limit {
+                kind: LimitKind::IwaTotalBytes,
+                observed,
+                maximum: self.max_total_bytes,
+            });
+        }
+        Ok(observed)
+    }
+
     pub(crate) fn validate(self) -> Result<Self> {
         if self.max_input_bytes == 0
             || self.max_entries == 0

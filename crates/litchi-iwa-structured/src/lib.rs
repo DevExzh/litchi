@@ -37,6 +37,54 @@ pub struct Limits {
     max_text_bytes: usize,
 }
 
+/// A structured-snapshot resource selected by [`Limits::try_new`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Number of retained Numbers tables.
+    Tables,
+    /// Number of retained Keynote slides.
+    Slides,
+    /// Number of retained Pages sections.
+    Sections,
+    /// Aggregate UTF-8 bytes retained by the structured projection.
+    TextBytes,
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Tables => "tables",
+            Self::Slides => "slides",
+            Self::Sections => "sections",
+            Self::TextBytes => "text bytes",
+        })
+    }
+}
+
+/// An invalid caller-selected structured-snapshot resource ceiling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LimitsError {
+    /// Resource category whose requested ceiling is invalid.
+    pub kind: LimitKind,
+    /// Requested resource ceiling.
+    pub value: usize,
+    /// Hard maximum for this resource category.
+    pub maximum: usize,
+}
+
+impl fmt::Display for LimitsError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "structured {} limit must be non-zero and no greater than {}, got {}",
+            self.kind, self.maximum, self.value
+        )
+    }
+}
+
+impl std::error::Error for LimitsError {}
+
 impl Limits {
     /// Create a bounded profile. Values above the hard semantic ceilings are
     /// clamped immediately, so the accessors always report the effective
@@ -54,6 +102,58 @@ impl Limits {
             max_sections: clamp_limit(max_sections, MAX_SECTIONS),
             max_text_bytes: clamp_limit(max_text_bytes, DEFAULT_MAX_TEXT_BYTES),
         }
+    }
+
+    /// Create a checked bounded profile without silently changing a requested
+    /// ceiling.
+    ///
+    /// Unlike [`Self::new`], this constructor rejects zero and values above a
+    /// hard semantic ceiling. `new` retains its historical clamping behavior
+    /// for compatibility; security-sensitive ingress should use this method.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LimitsError`] identifying the first invalid resource ceiling.
+    pub const fn try_new(
+        max_tables: usize,
+        max_slides: usize,
+        max_sections: usize,
+        max_text_bytes: usize,
+    ) -> std::result::Result<Self, LimitsError> {
+        if max_tables == 0 || max_tables > MAX_TABLES {
+            return Err(LimitsError {
+                kind: LimitKind::Tables,
+                value: max_tables,
+                maximum: MAX_TABLES,
+            });
+        }
+        if max_slides == 0 || max_slides > MAX_SLIDES {
+            return Err(LimitsError {
+                kind: LimitKind::Slides,
+                value: max_slides,
+                maximum: MAX_SLIDES,
+            });
+        }
+        if max_sections == 0 || max_sections > MAX_SECTIONS {
+            return Err(LimitsError {
+                kind: LimitKind::Sections,
+                value: max_sections,
+                maximum: MAX_SECTIONS,
+            });
+        }
+        if max_text_bytes == 0 || max_text_bytes > DEFAULT_MAX_TEXT_BYTES {
+            return Err(LimitsError {
+                kind: LimitKind::TextBytes,
+                value: max_text_bytes,
+                maximum: DEFAULT_MAX_TEXT_BYTES,
+            });
+        }
+        Ok(Self {
+            max_tables,
+            max_slides,
+            max_sections,
+            max_text_bytes,
+        })
     }
 
     /// Return the configured table ceiling.
@@ -128,8 +228,10 @@ pub enum Error {
     },
     /// Semantic text values exceed the selected byte budget.
     TextTooLarge {
+        /// UTF-8 bytes required at the point the budget was exceeded.
+        observed: usize,
         /// Maximum accepted UTF-8 bytes.
-        limit: usize,
+        maximum: usize,
     },
 }
 
@@ -156,9 +258,9 @@ impl fmt::Display for Error {
                 formatter,
                 "structured section index {actual} is not the expected index {expected}"
             ),
-            Self::TextTooLarge { limit } => write!(
+            Self::TextTooLarge { observed, maximum } => write!(
                 formatter,
-                "structured snapshot semantic text exceeds {limit} bytes"
+                "structured snapshot semantic text requires {observed} bytes; maximum is {maximum}"
             ),
         }
     }
@@ -649,11 +751,15 @@ const fn clamp_limit(value: usize, maximum: usize) -> usize {
 }
 
 fn checked_text_add(current: usize, added: usize, limit: usize) -> Result<usize> {
-    let total = current
-        .checked_add(added)
-        .ok_or(Error::TextTooLarge { limit })?;
+    let total = current.checked_add(added).ok_or(Error::TextTooLarge {
+        observed: usize::MAX,
+        maximum: limit,
+    })?;
     if total > limit {
-        return Err(Error::TextTooLarge { limit });
+        return Err(Error::TextTooLarge {
+            observed: total,
+            maximum: limit,
+        });
     }
     Ok(total)
 }
@@ -838,6 +944,172 @@ mod tests {
     }
 
     #[test]
+    fn checked_limits_accept_hard_ceilings_and_reject_zero_or_one_over() {
+        let exact = Limits::try_new(MAX_TABLES, MAX_SLIDES, MAX_SECTIONS, DEFAULT_MAX_TEXT_BYTES)
+            .unwrap_or_else(|error| panic!("hard ceilings should be valid: {error}"));
+        assert_eq!(exact, Limits::default());
+
+        let invalid = [
+            (
+                Limits::try_new(0, MAX_SLIDES, MAX_SECTIONS, DEFAULT_MAX_TEXT_BYTES),
+                LimitKind::Tables,
+                0,
+                MAX_TABLES,
+            ),
+            (
+                Limits::try_new(
+                    MAX_TABLES + 1,
+                    MAX_SLIDES,
+                    MAX_SECTIONS,
+                    DEFAULT_MAX_TEXT_BYTES,
+                ),
+                LimitKind::Tables,
+                MAX_TABLES + 1,
+                MAX_TABLES,
+            ),
+            (
+                Limits::try_new(MAX_TABLES, 0, MAX_SECTIONS, DEFAULT_MAX_TEXT_BYTES),
+                LimitKind::Slides,
+                0,
+                MAX_SLIDES,
+            ),
+            (
+                Limits::try_new(
+                    MAX_TABLES,
+                    MAX_SLIDES + 1,
+                    MAX_SECTIONS,
+                    DEFAULT_MAX_TEXT_BYTES,
+                ),
+                LimitKind::Slides,
+                MAX_SLIDES + 1,
+                MAX_SLIDES,
+            ),
+            (
+                Limits::try_new(MAX_TABLES, MAX_SLIDES, 0, DEFAULT_MAX_TEXT_BYTES),
+                LimitKind::Sections,
+                0,
+                MAX_SECTIONS,
+            ),
+            (
+                Limits::try_new(
+                    MAX_TABLES,
+                    MAX_SLIDES,
+                    MAX_SECTIONS + 1,
+                    DEFAULT_MAX_TEXT_BYTES,
+                ),
+                LimitKind::Sections,
+                MAX_SECTIONS + 1,
+                MAX_SECTIONS,
+            ),
+            (
+                Limits::try_new(MAX_TABLES, MAX_SLIDES, MAX_SECTIONS, 0),
+                LimitKind::TextBytes,
+                0,
+                DEFAULT_MAX_TEXT_BYTES,
+            ),
+            (
+                Limits::try_new(
+                    MAX_TABLES,
+                    MAX_SLIDES,
+                    MAX_SECTIONS,
+                    DEFAULT_MAX_TEXT_BYTES + 1,
+                ),
+                LimitKind::TextBytes,
+                DEFAULT_MAX_TEXT_BYTES + 1,
+                DEFAULT_MAX_TEXT_BYTES,
+            ),
+        ];
+
+        for (result, kind, value, maximum) in invalid {
+            assert_eq!(
+                result,
+                Err(LimitsError {
+                    kind,
+                    value,
+                    maximum,
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn structured_resources_accept_exact_limits_and_reject_one_over() {
+        let limits = Limits::try_new(1, 1, 1, 4)
+            .unwrap_or_else(|error| panic!("small checked limits should be valid: {error}"));
+
+        let one_table = vec![Table::new("Data", litchi_numbers::Dimensions::new(1, 1))];
+        assert!(
+            StructuredData::from_parts_with_limits(one_table, Vec::new(), Vec::new(), limits,)
+                .is_ok()
+        );
+        let two_tables = vec![
+            Table::new("a", litchi_numbers::Dimensions::new(1, 1)),
+            Table::new("b", litchi_numbers::Dimensions::new(1, 1)),
+        ];
+        assert!(matches!(
+            StructuredData::from_parts_with_limits(two_tables, Vec::new(), Vec::new(), limits,),
+            Err(Error::TooManyTables {
+                actual: 2,
+                limit: 1,
+            })
+        ));
+
+        assert!(
+            StructuredData::from_parts_with_limits(
+                Vec::new(),
+                vec![Slide::builder(0).build()],
+                Vec::new(),
+                limits,
+            )
+            .is_ok()
+        );
+        assert!(matches!(
+            StructuredData::from_parts_with_limits(
+                Vec::new(),
+                vec![Slide::builder(0).build(), Slide::builder(1).build()],
+                Vec::new(),
+                limits,
+            ),
+            Err(Error::TooManySlides {
+                actual: 2,
+                limit: 1,
+            })
+        ));
+
+        let section = |index| Section::builder(index, litchi_pages::SectionType::Body).build();
+        assert!(
+            StructuredData::from_parts_with_limits(
+                Vec::new(),
+                Vec::new(),
+                vec![section(0)],
+                limits,
+            )
+            .is_ok()
+        );
+        assert!(matches!(
+            StructuredData::from_parts_with_limits(
+                Vec::new(),
+                Vec::new(),
+                vec![section(0), section(1)],
+                limits,
+            ),
+            Err(Error::TooManySections {
+                actual: 2,
+                limit: 1,
+            })
+        ));
+
+        let text_one_over = vec![Table::new("Datum", litchi_numbers::Dimensions::new(1, 1))];
+        assert!(matches!(
+            StructuredData::from_parts_with_limits(text_one_over, Vec::new(), Vec::new(), limits,),
+            Err(Error::TextTooLarge {
+                observed: 5,
+                maximum: 4,
+            })
+        ));
+    }
+
+    #[test]
     fn construction_rejects_malformed_order_and_tightened_budgets() {
         let invalid_slide = Slide::builder(1).build();
         assert!(matches!(
@@ -879,7 +1151,10 @@ mod tests {
         );
         assert!(matches!(
             too_much_text,
-            Err(Error::TextTooLarge { limit: 3 })
+            Err(Error::TextTooLarge {
+                observed: 4,
+                maximum: 3,
+            })
         ));
 
         let limits = Limits::new(usize::MAX, usize::MAX, usize::MAX, usize::MAX);
@@ -891,8 +1166,7 @@ mod tests {
 
     #[test]
     fn snapshot_clones_share_semantic_storage_and_transfer_input_allocation() {
-        let mut tables = Vec::new();
-        tables.push(Table::new("Data", litchi_numbers::Dimensions::new(1, 1)));
+        let tables = vec![Table::new("Data", litchi_numbers::Dimensions::new(1, 1))];
         let table_ptr = tables.as_ptr();
         let data = StructuredData::from_parts(tables, Vec::new(), Vec::new())
             .unwrap_or_else(|error| panic!("semantic values should be valid: {error}"));

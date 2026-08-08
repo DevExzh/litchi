@@ -445,6 +445,14 @@ pub mod numbers {
     pub use litchi_numbers::*;
 }
 
+/// Format-neutral, bounded Apple iWork reading APIs.
+///
+/// This facade detects Pages, Keynote, and Numbers from one immutable package
+/// snapshot, then publishes only archive-free semantic values. Enable the
+/// aggregate `iwork` feature to use it.
+#[cfg(feature = "iwork")]
+pub mod iwork;
+
 /// OpenDocument Presentation (`.odp`) package and semantic APIs.
 #[cfg(feature = "odp")]
 pub mod odp {

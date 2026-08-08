@@ -385,3 +385,65 @@ Numbers exposed `Table 1` as 22 rows by 7 columns with the expected B2 text and
 B3 numeric value; Keynote exposed separate title, body, and date text boxes.
 No application presented repair or conversion UI. Each document was closed
 without saving and all three SHA-256 hashes remained unchanged.
+
+## 2026-08-08 root-owned immutable structured coordinator
+
+The root `litchi` package now owns the supported read-only cross-format API at
+`litchi::iwork`. Borrowed bytes and caller-owned immutable shared bytes enter
+one finite physical profile, form one opaque `PreparedSource`, and are
+classified exactly once. That single-use value is consumed by precisely one
+selected Pages, Keynote, or Numbers owner. A successful root `Document` is
+eagerly decoded and aggregate-validated, so its `snapshot`, table, slide, and
+section operations are infallible views rather than deferred parse points.
+
+The public boundary is facade-owned. `Format`, `Options`, physical and
+semantic limits, content-free errors, `Document`, `Snapshot`, lifetime-free
+table/slide/section handles, borrowed text roles, and Numbers cell values are
+root types. A rustdoc-JSON gate rejects public lower iWork crates, concrete
+format types, Buffa/Prost types, archive/catalog/prepared capabilities, and raw
+identifier vocabulary. The root package has a canonical edge to the neutral
+archive-free structured owner, but still has no edge to `litchi-iwa` or the
+archive crate.
+
+The selected semantic contracts are deliberately format-owned:
+
+- Pages uses the focused semantic document. An empty root therefore has zero
+  sections; bounded fallback bodies, native section names, and UTF-16 section
+  boundaries remain authoritative instead of preserving the narrower host
+  projection.
+- Keynote preserves navigator name separately from visible title, retains
+  skip/build/transition state on its lifetime-free slide handle, and orders
+  root text as title, ordinary content, additional rich text, then notes.
+- Numbers consumes the global compatibility projection, including detached or
+  orphan tables and its established candidate ordering. It never substitutes
+  the stricter rooted workbook constructor.
+
+Pages and Keynote transfer their cheaply shared semantic documents into the
+neutral aggregate without cloning their contained values. Numbers transfers
+the first unavoidable global `Vec<Table>` without a second materialization.
+After aggregate construction, the concrete package and physical source are
+dropped. Native fixture tests use `Weak<[u8]>` to prove that the original
+package allocation is released while cloned root handles remain usable.
+`SourceCatalog::into_components` also releases the physical Numbers catalog
+before compatibility-table projection. Aggregate decompressed IWA retention is
+now charged across all component streams against the existing total expanded
+byte profile, with exact and one-over coverage for both component ingress
+routes.
+
+Root tests cover all three native fixtures, unrecognized input, format
+isolation, typed Numbers cells, role-aware text order, `Send + Sync`, cheap
+snapshot/handle lifetime, and exact versus one-over input and semantic text
+ceilings. The three native files were reopened through Computer Use in Pages,
+Numbers, and Keynote without repair or conversion UI, closed without saving,
+and retained their documented hashes. This evidence proves provenance and
+nonmutation of those fixtures only.
+
+This amendment does not authorize deletion of the migration-host structured
+adapter. Frozen directory bundles and mutable logical-entry snapshots still
+lack a source-owning root route; host parity/property/concurrency/fuzz/example
+ownership is incomplete; Numbers retains eager Prost/sidecar allocation debt;
+and concrete editing, atomic saving, and native save/reopen gates remain.
+Consequently `litchi-iwa::Document::extract_structured_data`, its structured
+modules, dependency, and boundary-debt entry remain until those gates close.
+No performance gain, complete Buffa laziness, directory parity, or resave
+fidelity is inferred from the new dependency shape.

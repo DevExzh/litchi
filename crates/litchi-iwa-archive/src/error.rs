@@ -23,6 +23,8 @@ pub enum LimitKind {
     TotalBytes,
     /// Decompressed bytes in one IWA component.
     IwaStreamBytes,
+    /// Aggregate decompressed bytes retained by all parsed IWA components.
+    IwaTotalBytes,
 }
 
 impl fmt::Display for LimitKind {
@@ -37,6 +39,7 @@ impl fmt::Display for LimitKind {
             Self::EntryBytes => "ZIP entry bytes",
             Self::TotalBytes => "ZIP total bytes",
             Self::IwaStreamBytes => "IWA stream bytes",
+            Self::IwaTotalBytes => "total decompressed IWA bytes",
         })
     }
 }

@@ -681,8 +681,7 @@ pub fn __compatibility_tables_from_prepared_source(
     }
     let source_catalog = source.__into_source_catalog();
     let archive_limits = source_catalog.limits();
-    let (_package, catalog) = source_catalog.into_parts();
-    let components = Components::from_catalog(catalog);
+    let components = Components::from_catalog(source_catalog.into_components());
     compatibility_tables_from_components(&components, archive_limits, semantic)
 }
 

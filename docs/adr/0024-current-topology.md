@@ -477,9 +477,12 @@ supported format and root facades.
 compatibility tests that have not reached the concrete packages. Its 17
 internal workspace dependencies are all explicit ordered debt, with no
 canonical edge. Physical preservation and comparison examples have moved to
-`litchi-iwa-archive`; structured cross-format extraction remains temporarily
-because the three direct package projections do not yet have exact behavioral
-parity. [ADR 0028](0028-iwa-monolith-exit.md) is the authoritative exit gate.
+`litchi-iwa-archive`. The root `litchi::iwork` coordinator now owns supported,
+immutable-ZIP cross-format reading and publishes only root-owned archive-free
+semantic views. The host structured path remains temporary migration debt for
+uncovered frozen-directory and logical-entry sources plus outstanding
+parity/property/fuzz/example ownership; it is not the supported root boundary.
+[ADR 0028](0028-iwa-monolith-exit.md) is the authoritative exit gate.
 
 ## Conversion and interchange
 

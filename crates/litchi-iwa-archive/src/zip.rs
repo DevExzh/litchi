@@ -511,12 +511,17 @@ pub(crate) fn parse_iwa_components(
 
 fn parse_direct_iwa_components(archive: &ZipArchive<'_>, limits: Limits) -> Result<Vec<Component>> {
     let mut components = Vec::new();
+    let mut decompressed_iwa_bytes = 0;
     for name in archive.file_names() {
         if !is_iwa_name(name) {
             continue;
         }
         let compressed_data = archive.read(name)?;
-        if let Some(component) = parse_component(name, &compressed_data, limits)? {
+        if let Some((component, decompressed_bytes)) =
+            parse_component(name, &compressed_data, limits)?
+        {
+            decompressed_iwa_bytes =
+                limits.charge_iwa_total_bytes(decompressed_iwa_bytes, decompressed_bytes)?;
             components.push(component);
         }
     }
