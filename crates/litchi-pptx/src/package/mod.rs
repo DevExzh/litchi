@@ -5,6 +5,8 @@
 //! to use `crate::package` and the re-exported [`Package`] type.
 
 mod codec;
+#[cfg(feature = "encryption")]
+mod encryption;
 mod model;
 
 #[cfg(test)]

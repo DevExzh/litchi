@@ -17,6 +17,7 @@ impl Package {
         &mut self,
         embedding: litchi_fonts::embedding::Mode,
     ) -> Result<&mut Self> {
+        self.ensure_plain_mutation("set_font_embedding")?;
         if self.mutable_pres.is_none() {
             return Err(Error::UnsafeEdit {
                 operation: "set_font_embedding",

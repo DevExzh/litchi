@@ -1,18 +1,16 @@
-use litchi::crypto::ooxml::{self, Mode};
-use litchi::pptx::Package;
+use litchi::pptx::{Package, encryption::Mode};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    const PASSWORD: &str = "Secret123";
+    let password = std::env::var("LITCHI_PPTX_PASSWORD")?;
 
     println!("Generating PPTX files with open-password encryption...\n");
 
-    generate_standard_2007(PASSWORD)?;
-    generate_agile(PASSWORD)?;
+    generate_standard_2007(&password)?;
+    generate_agile(&password)?;
 
     println!("\nDone. Files written:");
     println!("  - pptx_open_password_standard2007.pptx");
     println!("  - pptx_open_password_agile.pptx");
-    println!("Password: {}", PASSWORD);
 
     Ok(())
 }
@@ -24,7 +22,7 @@ fn generate_standard_2007(password: &str) -> Result<(), Box<dyn std::error::Erro
         let slide = pres.add_slide()?;
         slide.set_title("Standard 2007 Encryption");
         slide.add_text_box(
-            "This presentation is encrypted with Standard 2007.\nPassword: Secret123",
+            "This presentation is encrypted with Standard 2007.",
             914_400,
             1_828_800,
             7_315_200,
@@ -48,7 +46,7 @@ fn generate_agile(password: &str) -> Result<(), Box<dyn std::error::Error>> {
         let slide = pres.add_slide()?;
         slide.set_title("Agile Encryption");
         slide.add_text_box(
-            "This presentation is encrypted with Agile encryption.\nPassword: Secret123",
+            "This presentation is encrypted with Agile encryption.",
             914_400,
             1_828_800,
             7_315_200,
@@ -68,15 +66,11 @@ fn write_encrypted(
     password: &str,
     mode: Mode,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let clear_package = package.to_bytes()?;
-    let encrypted_package = ooxml::encrypt(clear_package, password, mode)?;
-    std::fs::write(output, &encrypted_package)?;
+    package.save_encrypted(output, password, mode)?;
 
-    // Exercise the canonical read path as well: decrypt the package through
-    // the bounded crypto service, then validate the clear OPC graph with the
-    // typed PPTX facade.
-    let opened = ooxml::open(encrypted_package, password)?;
-    assert_eq!(opened.mode(), Some(mode));
-    Package::from_vec(opened.into_bytes())?;
+    // Exercise the managed read path as well. The package retains its source
+    // encryption profile so subsequent writes cannot silently downgrade it.
+    let reopened = Package::open_with_password(output, password)?;
+    assert_eq!(reopened.encryption(), Some(mode));
     Ok(())
 }

@@ -63,6 +63,16 @@ pub use comments::{
 pub use error::{Error, Result};
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;
+#[cfg(feature = "encryption")]
+pub use litchi_crypto::ooxml as encryption;
+#[cfg(feature = "encryption")]
+pub use litchi_crypto::ooxml::{
+    Limits as EncryptionLimits, Mode as EncryptionMode, Password as EncryptionPassword,
+};
+#[cfg(feature = "encryption")]
+pub use litchi_ooxml_common::package_encryption::{
+    PackageEncryption, PolicyError as EncryptionPolicyError,
+};
 /// Resource policy for package ingestion through [`Package`].
 pub use litchi_opc::ReadLimits;
 pub use master_layout::{

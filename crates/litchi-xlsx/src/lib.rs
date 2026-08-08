@@ -70,6 +70,10 @@ pub mod workbook_metadata;
 pub mod writer;
 pub mod xml_maps;
 
+/// Runtime-neutral `[MS-OFFCRYPTO]` managed-package encryption.
+#[cfg(feature = "encryption")]
+pub use litchi_crypto::ooxml as encryption;
+
 /// OPC resource limits used by XLSX package and workbook ingress.
 pub use litchi_opc::ReadLimits;
 

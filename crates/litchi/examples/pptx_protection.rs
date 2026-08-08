@@ -1,13 +1,20 @@
 //! Presentation protection example - demonstrates security settings.
 
-use litchi::crypto::ooxml::{self, Mode};
-use litchi_pptx::Package;
-use litchi_pptx::presentation_properties::metadata::protection::{
+use litchi::pptx::presentation_properties::metadata::protection::{
     Algorithm, Settings, Slide, Type,
 };
+use litchi::pptx::{Package, encryption::Mode};
 
 fn main() {
     println!("=== Presentation Protection Example ===\n");
+
+    let password = match std::env::var("LITCHI_PPTX_PASSWORD") {
+        Ok(password) => password,
+        Err(error) => {
+            eprintln!("LITCHI_PPTX_PASSWORD is required: {error}");
+            return;
+        },
+    };
 
     // Create unprotected settings
     let unprotected = Settings::new();
@@ -38,7 +45,7 @@ fn main() {
 
     // Test password protection
     let mut password_protected = Settings::new();
-    if let Err(e) = password_protected.set_modify_password("secret123") {
+    if let Err(e) = password_protected.set_modify_password(&password) {
         println!("\nError setting modify password: {e}");
         return;
     }
@@ -116,7 +123,7 @@ fn main() {
 
     // Generate XML
     let mut with_password = Settings::new();
-    if let Err(error) = with_password.set_modify_password("secret123") {
+    if let Err(error) = with_password.set_modify_password(&password) {
         println!("\nError setting XML example password: {error}");
         return;
     }
@@ -129,14 +136,14 @@ fn main() {
     // PowerPoint's own modifyVerifier output.
     assert!(xml.contains("hashData"));
 
-    if let Err(e) = generate_protection_pptx() {
+    if let Err(e) = generate_protection_pptx(&password) {
         println!("\nError generating protection PPTX: {e}");
     }
 
     println!("\n✅ Presentation protection example completed successfully!");
 }
 
-fn generate_protection_pptx() -> Result<(), Box<dyn std::error::Error>> {
+fn generate_protection_pptx(password: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mut pkg = Package::new()?;
     {
         let pres = pkg.presentation_mut()?;
@@ -154,14 +161,10 @@ fn generate_protection_pptx() -> Result<(), Box<dyn std::error::Error>> {
             914400,
         );
     }
-    let clear_package = pkg.to_bytes()?;
-    std::fs::write("pptx_protection_clear.pptx", &clear_package)?;
+    pkg.save_plain("pptx_protection_clear.pptx")?;
+    pkg.save_encrypted("pptx_protection_open_password.pptx", password, Mode::Agile)?;
 
-    let encrypted_package = ooxml::encrypt(clear_package, "open-secret", Mode::Agile)?;
-    std::fs::write("pptx_protection_open_password.pptx", &encrypted_package)?;
-
-    let opened = ooxml::open(encrypted_package, "open-secret")?;
-    assert_eq!(opened.mode(), Some(Mode::Agile));
-    Package::from_vec(opened.into_bytes())?;
+    let opened = Package::open_with_password("pptx_protection_open_password.pptx", password)?;
+    assert_eq!(opened.encryption(), Some(Mode::Agile));
     Ok(())
 }

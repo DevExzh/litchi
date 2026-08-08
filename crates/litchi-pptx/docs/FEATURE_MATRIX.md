@@ -100,7 +100,7 @@ for DrawingML, charts, diagrams, ink, math, and 3D extensions, [MS-OWEXML] for w
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Password encryption | ✅ | ✅ | ✅ | Supported-profile encrypted open/save/password change with retained mode; ordinary save refuses implicit plaintext downgrade and explicit plaintext save is separate |
+| Password encryption | ✅ | ✅ | ✅ | Optional `encryption` feature supporting Standard AES-128/ECB with SHA-1 and Agile AES-128/CBC with SHA-1; bounded password-aware ingress keeps crypto and OPC limits independent, retains source mode, refuses implicit plaintext downgrade and semantic mutation, and provides explicit plaintext, selected-mode, retained-mode/rekey, and atomic save paths without changing inner OPC signature parts |
 | Digital signatures | ✅ | ✅ | ✅ | Trust-neutral OPC XMLDSig verification, signing, re-signing, and clearing for RSA-SHA256/ECDSA; certificate trust and revocation are outside the model |
 | VBA projects and PPTM/PPSM/POTM macros | 🟡 | 🟡 | 🟡 | Macro-enabled relationship metadata plus bounded vbaProject.bin CFB/MS-OVBA project/module source parsing, deterministic cache-free authoring/removal, and kind-preserving package mutation; VBA is never executed |
 | Selected 2010/2012 extension metadata | ✅ | ✅ | ✅ | Typed image-edit flags and DPI, chart-tracking reference mode, browse mode, laser color, media-control visibility, narration flags, and preservation of unknown extension entries under limits |

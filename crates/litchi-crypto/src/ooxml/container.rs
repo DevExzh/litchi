@@ -137,10 +137,13 @@ impl Seek for Bounded {
 pub(super) fn read_info(bytes: &[u8], limits: &Limits) -> Result<Vec<u8>> {
     Limits::bytes("compound input", bytes.len(), limits.max_input_bytes)?;
     let mut ole = OleFile::open(Cursor::new(bytes)).map_err(map_reader_error)?;
+    let info_len = ole
+        .stream_len(&["EncryptionInfo"])
+        .map_err(map_reader_error)?;
+    declared_bytes("EncryptionInfo", info_len, limits.max_info_bytes)?;
     let info = ole
         .open_stream(&["EncryptionInfo"])
         .map_err(map_reader_error)?;
-    Limits::bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
     Ok(info)
 }
 
@@ -222,10 +225,13 @@ pub(super) fn read(bytes: Vec<u8>, limits: &Limits) -> Result<(Vec<u8>, Vec<u8>)
     Limits::bytes("compound input", bytes.len(), limits.max_input_bytes)?;
     let mut ole = OleFile::open(Cursor::new(bytes)).map_err(map_reader_error)?;
 
+    let info_len = ole
+        .stream_len(&["EncryptionInfo"])
+        .map_err(map_reader_error)?;
+    declared_bytes("EncryptionInfo", info_len, limits.max_info_bytes)?;
     let info = ole
         .open_stream(&["EncryptionInfo"])
         .map_err(map_reader_error)?;
-    Limits::bytes("EncryptionInfo", info.len(), limits.max_info_bytes)?;
     let mode = mode(&info)?;
 
     // LibreOffice has emitted otherwise valid encrypted packages without the
@@ -241,16 +247,35 @@ pub(super) fn read(bytes: Vec<u8>, limits: &Limits) -> Result<(Vec<u8>, Vec<u8>)
         },
     }
 
+    let encrypted_len = ole
+        .stream_len(&["EncryptedPackage"])
+        .map_err(map_reader_error)?;
+    declared_bytes(
+        "EncryptedPackage",
+        encrypted_len,
+        limits.max_encrypted_bytes,
+    )?;
     let encrypted = ole
         .open_stream(&["EncryptedPackage"])
         .map_err(map_reader_error)?;
-    Limits::bytes(
-        "EncryptedPackage",
-        encrypted.len(),
-        limits.max_encrypted_bytes,
-    )?;
     drop(ole);
     Ok((info, encrypted))
+}
+
+fn declared_bytes(resource: &'static str, actual: u64, maximum: usize) -> Result<()> {
+    let Ok(maximum) = u64::try_from(maximum) else {
+        // On a target with a wider usize, every possible declared u64 length
+        // is necessarily within this limit.
+        return Ok(());
+    };
+    if actual > maximum {
+        return Err(Error::Limit {
+            resource,
+            actual,
+            maximum,
+        });
+    }
+    Ok(())
 }
 
 fn validate_graph(graph: &spaces::Graph, mode: Mode) -> Result<()> {
@@ -286,16 +311,11 @@ fn validate_graph(graph: &spaces::Graph, mode: Mode) -> Result<()> {
             "StrongEncryptionTransform is missing its encryption parameters",
         ));
     };
-    let expected_name = match mode {
-        Mode::Standard => Some("AES 128"),
-        Mode::Agile => None,
-    };
-    if encryption.encryption_name.as_deref() != expected_name
-        || encryption.encryption_block_size != 16
-        || encryption.cipher_mode != 0
-    {
+    // EncryptionInfo is authoritative when these advisory parameters disagree.
+    // Agile is the one exception: its EncryptionName MUST be a null string.
+    if mode == Mode::Agile && encryption.encryption_name.is_some() {
         return Err(malformed(
-            "StrongEncryptionTransform parameters are unsupported",
+            "Agile StrongEncryptionTransform EncryptionName is not null",
         ));
     }
     if graph.irm.is_some()
@@ -405,6 +425,54 @@ mod tests {
     }
 
     #[test]
+    fn standard_encryption_info_overrides_mismatched_transform_parameters() {
+        let info = [3, 0, 2, 0, 0x24, 0, 0, 0];
+        let bytes = write(&info, vec![0; 8], &Limits::default()).expect("valid wrapper");
+        let mut graph = inspect_bytes(&bytes)
+            .expect("valid DataSpaces")
+            .expect("present DataSpaces");
+        let encryption = graph.transforms[0]
+            .encryption
+            .as_mut()
+            .expect("encryption parameters");
+        encryption.encryption_name = Some("AES 256".to_string());
+        encryption.encryption_block_size = 32;
+        encryption.cipher_mode = 1;
+
+        validate_graph(&graph, Mode::Standard)
+            .expect("EncryptionInfo is authoritative for Standard encryption");
+    }
+
+    #[test]
+    fn agile_encryption_name_must_remain_null() {
+        let info = [4, 0, 4, 0, 0x40, 0, 0, 0];
+        let bytes = write(&info, vec![0; 8], &Limits::default()).expect("valid wrapper");
+        let mut graph = inspect_bytes(&bytes)
+            .expect("valid DataSpaces")
+            .expect("present DataSpaces");
+        {
+            let encryption = graph.transforms[0]
+                .encryption
+                .as_mut()
+                .expect("encryption parameters");
+            encryption.encryption_block_size = 32;
+            encryption.cipher_mode = 1;
+        }
+        validate_graph(&graph, Mode::Agile)
+            .expect("EncryptionInfo is authoritative for Agile parameters");
+
+        graph.transforms[0]
+            .encryption
+            .as_mut()
+            .expect("encryption parameters")
+            .encryption_name = Some("AES 128".to_string());
+        assert!(matches!(
+            validate_graph(&graph, Mode::Agile),
+            Err(Error::Malformed(_))
+        ));
+    }
+
+    #[test]
     fn accepts_the_narrow_libreoffice_no_dataspaces_profile() {
         let info = [3, 0, 2, 0, 0x24, 0, 0, 0];
         let encrypted = [0; 8];
@@ -431,6 +499,77 @@ mod tests {
             read(bytes.into_inner(), &limits).expect("read compatibility package");
         assert_eq!(parsed_info, info);
         assert_eq!(parsed_package, encrypted);
+    }
+
+    #[test]
+    fn encryption_info_declared_size_is_limited_before_materialization() {
+        let info = [3, 0, 2, 0, 0x24, 0, 0, 0, 1, 2, 3, 4, 5];
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["EncryptionInfo"], &info)
+            .expect("EncryptionInfo");
+        let mut bytes = Cursor::new(Vec::new());
+        writer.write_to(&mut bytes).expect("write CFB");
+
+        let at_boundary = Limits {
+            max_info_bytes: info.len(),
+            ..Limits::default()
+        };
+        assert_eq!(
+            read_info(bytes.get_ref(), &at_boundary).expect("declared size at limit"),
+            info
+        );
+
+        let over_boundary = Limits {
+            max_info_bytes: info.len() - 1,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            read_info(bytes.get_ref(), &over_boundary),
+            Err(Error::Limit {
+                resource: "EncryptionInfo",
+                actual: 13,
+                maximum: 12,
+            })
+        ));
+    }
+
+    #[test]
+    fn encrypted_package_declared_size_is_limited_before_materialization() {
+        let info = [3, 0, 2, 0, 0x24, 0, 0, 0];
+        let encrypted = [0; 25];
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["EncryptionInfo"], &info)
+            .expect("EncryptionInfo");
+        writer
+            .create_stream(&["EncryptedPackage"], &encrypted)
+            .expect("EncryptedPackage");
+        let mut bytes = Cursor::new(Vec::new());
+        writer.write_to(&mut bytes).expect("write CFB");
+
+        let at_boundary = Limits {
+            max_encrypted_bytes: encrypted.len(),
+            allow_missing_data_spaces: true,
+            ..Limits::default()
+        };
+        let (_, parsed_package) =
+            read(bytes.get_ref().clone(), &at_boundary).expect("declared size at limit");
+        assert_eq!(parsed_package, encrypted);
+
+        let over_boundary = Limits {
+            max_encrypted_bytes: encrypted.len() - 1,
+            allow_missing_data_spaces: true,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            read(bytes.into_inner(), &over_boundary),
+            Err(Error::Limit {
+                resource: "EncryptedPackage",
+                actual: 25,
+                maximum: 24,
+            })
+        ));
     }
 
     #[test]

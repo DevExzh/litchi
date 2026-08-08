@@ -11,6 +11,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// Filesystem access or atomic output replacement failed.
+    #[error("PPTX I/O error: {0}")]
+    Io(#[from] std::io::Error),
+
     /// The underlying OPC graph is malformed or could not be read safely.
     #[error("PPTX OPC error: {0}")]
     Opc(#[from] litchi_opc::OpcError),
@@ -186,6 +190,22 @@ pub enum Error {
         operation: &'static str,
         /// Reason the bounded facade rejected it.
         reason: &'static str,
+    },
+
+    /// Managed package encryption or decryption failed.
+    #[cfg(feature = "encryption")]
+    #[error("PPTX package encryption error: {0}")]
+    Encryption(#[from] litchi_crypto::ooxml::Error),
+
+    /// An operation would violate retained package-encryption policy.
+    #[cfg(feature = "encryption")]
+    #[error("PPTX encryption policy rejected {operation}: {source}")]
+    EncryptionPolicy {
+        /// Operation rejected by the policy.
+        operation: &'static str,
+        /// Host-independent retained-provenance failure.
+        #[source]
+        source: litchi_ooxml_common::package_encryption::PolicyError,
     },
 
     /// A semantic shape selector is missing, ambiguous, or outside checked bounds.

@@ -604,10 +604,18 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
     let prefix = bytes
         .get(..8)
         .ok_or_else(|| malformed("Agile EncryptionInfo is shorter than its header"))?;
-    if prefix != [4, 0, 4, 0, 0x40, 0, 0, 0] {
-        return Err(Error::Unsupported(
-            "Agile EncryptionInfo must use version 4.4 and reserved value 0x40".into(),
-        ));
+    let major = u16::from_le_bytes([prefix[0], prefix[1]]);
+    let minor = u16::from_le_bytes([prefix[2], prefix[3]]);
+    if (major, minor) != (4, 4) {
+        return Err(Error::Unsupported(format!(
+            "Agile EncryptionInfo version {major}.{minor}"
+        )));
+    }
+    let reserved = u32::from_le_bytes([prefix[4], prefix[5], prefix[6], prefix[7]]);
+    if reserved != 0x40 {
+        return Err(malformed(format!(
+            "Agile EncryptionInfo reserved field is {reserved:#x}, expected 0x40"
+        )));
     }
     let xml = bytes
         .get(8..)
@@ -680,17 +688,31 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
                         phase = 2;
                     },
                     3 => {
-                        element_is(&namespace, &element, ENC_NS, b"dataIntegrity")?;
-                        let (key, value) = parse_data_integrity(
-                            &reader,
-                            &element,
-                            decoder,
-                            &mut attributes,
-                            limits,
-                        )?;
-                        parsed.encrypted_hmac_key = Some(key);
-                        parsed.encrypted_hmac_value = Some(value);
-                        phase = 4;
+                        if element.local_name().as_ref() == b"keyEncryptors" {
+                            element_is(&namespace, &element, ENC_NS, b"keyEncryptors")?;
+                            exact_attributes(
+                                &reader,
+                                &element,
+                                decoder,
+                                &[],
+                                &mut attributes,
+                                limits,
+                                |_, _| Ok(()),
+                            )?;
+                            phase = 6;
+                        } else {
+                            element_is(&namespace, &element, ENC_NS, b"dataIntegrity")?;
+                            let (key, value) = parse_data_integrity(
+                                &reader,
+                                &element,
+                                decoder,
+                                &mut attributes,
+                                limits,
+                            )?;
+                            parsed.encrypted_hmac_key = Some(key);
+                            parsed.encrypted_hmac_value = Some(value);
+                            phase = 4;
+                        }
                     },
                     5 => {
                         element_is(&namespace, &element, ENC_NS, b"keyEncryptors")?;
@@ -793,6 +815,16 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
     if phase != 12 || depth != 0 {
         return Err(malformed("Agile XML descriptor is incomplete"));
     }
+    let (encrypted_hmac_key, encrypted_hmac_value) =
+        match (parsed.encrypted_hmac_key, parsed.encrypted_hmac_value) {
+            (Some(key), Some(value)) => (key, value),
+            (None, None) => {
+                return Err(Error::Unsupported(
+                    "Agile profile without authenticated dataIntegrity".into(),
+                ));
+            },
+            _ => return Err(malformed("Agile dataIntegrity is incomplete")),
+        };
 
     Ok(Info {
         spin_count: parsed
@@ -813,12 +845,8 @@ fn parse(bytes: &[u8], limits: &Limits) -> Result<Info> {
         encrypted_key: parsed
             .encrypted_key
             .ok_or_else(|| malformed("Agile XML has no encrypted content key"))?,
-        encrypted_hmac_key: parsed
-            .encrypted_hmac_key
-            .ok_or_else(|| malformed("Agile XML has no encrypted HMAC key"))?,
-        encrypted_hmac_value: parsed
-            .encrypted_hmac_value
-            .ok_or_else(|| malformed("Agile XML has no encrypted HMAC value"))?,
+        encrypted_hmac_key,
+        encrypted_hmac_value,
     })
 }
 
@@ -1336,6 +1364,51 @@ mod tests {
                 0xd6, 0x9d,
             ]
         );
+    }
+
+    #[test]
+    fn header_distinguishes_unsupported_version_from_malformed_reserved_field() {
+        let limits = Limits::default();
+        let mut unsupported = published_info();
+        unsupported[..4].copy_from_slice(&[5, 0, 0, 0]);
+        assert!(matches!(
+            parse(&unsupported, &limits),
+            Err(Error::Unsupported(_))
+        ));
+
+        let mut malformed_reserved = published_info();
+        malformed_reserved[4..8].copy_from_slice(&0x41u32.to_le_bytes());
+        assert!(matches!(
+            parse(&malformed_reserved, &limits),
+            Err(Error::Malformed(_))
+        ));
+    }
+
+    #[test]
+    fn missing_data_integrity_is_unsupported_after_structural_validation() {
+        let limits = Limits::default();
+        let info = published_info();
+        let xml = std::str::from_utf8(&info[8..]).expect("published XML is UTF-8");
+        let integrity_start = xml
+            .find("<dataIntegrity ")
+            .expect("published XML has dataIntegrity");
+        let integrity_end = integrity_start
+            + xml[integrity_start..]
+                .find("/>")
+                .expect("dataIntegrity is empty")
+            + 2;
+        let without_integrity = format!("{}{}", &xml[..integrity_start], &xml[integrity_end..]);
+        assert!(matches!(
+            parse(&with_prefix(&without_integrity), &limits),
+            Err(Error::Unsupported(_))
+        ));
+
+        let malformed =
+            without_integrity.replacen("spinCount=\"100000\"", "spinCount=\"invalid\"", 1);
+        assert!(matches!(
+            parse(&with_prefix(&malformed), &limits),
+            Err(Error::Malformed(_))
+        ));
     }
 
     #[test]

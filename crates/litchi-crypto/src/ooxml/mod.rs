@@ -99,7 +99,10 @@ pub struct Limits {
     pub max_xml_attributes: usize,
     /// Maximum password-hash iterations accepted from Agile input.
     pub max_spin_count: u32,
-    /// Maximum Unicode scalar values in a password (at most 255 by specification).
+    /// Maximum Unicode scalar values in a password.
+    ///
+    /// This crate caps the configurable ceiling at 255 as an interoperability
+    /// and security policy.
     pub max_password_chars: usize,
     /// Maximum declared or supplied clear OPC package bytes.
     pub max_plaintext_bytes: usize,

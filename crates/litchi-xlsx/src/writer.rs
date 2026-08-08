@@ -30,3 +30,13 @@ pub(crate) fn write_to(package: &OpcPackage, writer: impl Write) -> Result<()> {
 pub(crate) fn save(package: &OpcPackage, path: impl AsRef<Path>) -> Result<()> {
     Ok(PackageWriter::write(path, package)?)
 }
+
+/// Atomically publish already-encrypted managed-package bytes.
+#[cfg(feature = "encryption")]
+pub(crate) fn save_encrypted(bytes: &[u8], path: impl AsRef<Path>) -> Result<()> {
+    litchi_opc::atomic::replace_with::<crate::Error>(path.as_ref(), |temporary| {
+        temporary
+            .write_all(bytes)
+            .map_err(|source| crate::Error::Encryption(litchi_crypto::ooxml::Error::Io(source)))
+    })
+}

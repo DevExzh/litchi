@@ -157,6 +157,8 @@ impl Package {
         Ok(Self {
             opc: package,
             mutable_pres: Some(MutablePresentation::new()),
+            #[cfg(feature = "encryption")]
+            encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
             #[cfg(feature = "automatic-fonts")]
             font_embedding_dirty: false,
         })
@@ -215,6 +217,8 @@ impl Package {
         Ok(Self {
             opc,
             mutable_pres: None,
+            #[cfg(feature = "encryption")]
+            encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
             #[cfg(feature = "automatic-fonts")]
             font_embedding_dirty: false,
         })
@@ -222,6 +226,13 @@ impl Package {
 
     /// Save the package atomically through the OPC writer.
     pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        #[cfg(feature = "encryption")]
+        self.encryption
+            .ordinary_output()
+            .map_err(|source| Error::EncryptionPolicy {
+                operation: "save",
+                source,
+            })?;
         self.flush_presentation()?;
         PackageWriter::write(path, &self.opc)?;
         Ok(())
@@ -229,11 +240,26 @@ impl Package {
 
     /// Serialize the package into a new ZIP buffer.
     pub fn to_bytes(&mut self) -> Result<Vec<u8>> {
+        #[cfg(feature = "encryption")]
+        self.encryption
+            .ordinary_output()
+            .map_err(|source| Error::EncryptionPolicy {
+                operation: "to_bytes",
+                source,
+            })?;
         self.flush_presentation()?;
         Ok(PackageWriter::to_bytes(&self.opc)?)
     }
 
     pub(super) fn edit_typed<T>(
+        &mut self,
+        operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
+    ) -> Result<T> {
+        self.ensure_plain_mutation("typed package mutation")?;
+        self.edit_raw(operation)
+    }
+
+    pub(super) fn edit_raw<T>(
         &mut self,
         operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
     ) -> Result<T> {

@@ -17,6 +17,8 @@ const FLAGS: u32 = 0x24;
 const REQUIRED_FLAGS: u32 = 0x24;
 const FORBIDDEN_FLAGS: u32 = 0x18;
 const ALG_AES_128: u32 = 0x660e;
+const ALG_AES_192: u32 = 0x660f;
+const ALG_AES_256: u32 = 0x6610;
 const ALG_SHA1: u32 = 0x8004;
 const KEY_BITS: u32 = 128;
 const PROVIDER_AES: u32 = 0x18;
@@ -212,9 +214,10 @@ fn parse(info: &[u8]) -> Result<Verifier> {
         ));
     }
     require_u32(header, 4, 0, "EncryptionHeader.SizeExtra")?;
-    require_u32(header, 8, ALG_AES_128, "EncryptionHeader.AlgID")?;
-    require_u32(header, 12, ALG_SHA1, "EncryptionHeader.AlgIDHash")?;
-    require_u32(header, 16, KEY_BITS, "EncryptionHeader.KeySize")?;
+    let algorithm = read_u32(header, 8, "EncryptionHeader.AlgID")?;
+    let hash_algorithm = read_u32(header, 12, "EncryptionHeader.AlgIDHash")?;
+    let key_bits = read_u32(header, 16, "EncryptionHeader.KeySize")?;
+    validate_profile(algorithm, hash_algorithm, key_bits)?;
     // ProviderType is a SHOULD in the specification and is not security
     // authoritative, so any value remains readable.
     let _provider = read_u32(header, 20, "EncryptionHeader.ProviderType")?;
@@ -382,8 +385,37 @@ fn read_u32(bytes: &[u8], offset: usize, field: &'static str) -> Result<u32> {
 
 fn validate_flags(flags: u32) -> Result<()> {
     if flags & REQUIRED_FLAGS != REQUIRED_FLAGS || flags & FORBIDDEN_FLAGS != 0 {
+        return Err(malformed(format!(
+            "Standard EncryptionHeader flags {flags:#010x} violate the Standard profile"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_profile(algorithm: u32, hash_algorithm: u32, key_bits: u32) -> Result<()> {
+    let required_key_bits = match algorithm {
+        ALG_AES_128 => 128,
+        ALG_AES_192 => 192,
+        ALG_AES_256 => 256,
+        _ => {
+            return Err(malformed(format!(
+                "EncryptionHeader.AlgID {algorithm:#010x} is not a Standard AES algorithm"
+            )));
+        },
+    };
+    if hash_algorithm != ALG_SHA1 {
+        return Err(malformed(format!(
+            "EncryptionHeader.AlgIDHash is {hash_algorithm:#010x}, expected {ALG_SHA1:#010x}"
+        )));
+    }
+    if key_bits != required_key_bits {
+        return Err(malformed(format!(
+            "EncryptionHeader.KeySize {key_bits} contradicts AlgID {algorithm:#010x}"
+        )));
+    }
+    if algorithm != ALG_AES_128 {
         return Err(Error::Unsupported(format!(
-            "Standard EncryptionHeader flags {flags:#010x} do not select ECMA-376 AES"
+            "Standard AES-{key_bits}/SHA-1 encryption"
         )));
     }
     Ok(())
@@ -392,7 +424,7 @@ fn validate_flags(flags: u32) -> Result<()> {
 fn require_u32(bytes: &[u8], offset: usize, expected: u32, field: &'static str) -> Result<()> {
     let actual = read_u32(bytes, offset, field)?;
     if actual != expected {
-        return Err(Error::Unsupported(format!(
+        return Err(malformed(format!(
             "{field} is {actual:#010x}, expected {expected:#010x}"
         )));
     }
@@ -508,11 +540,39 @@ mod tests {
     }
 
     #[test]
-    fn header_profile_is_validated_instead_of_skipped() {
+    fn contradictory_algorithm_and_key_size_are_malformed() {
         let (encrypted, hash) = encrypt_verifier(&[0u8; BLOCK], &VERIFIER).expect("verifier");
         let mut info = build_info(&SALT, &encrypted, &hash).expect("info");
         info[20] ^= 1;
-        assert!(matches!(parse(&info), Err(Error::Unsupported(_))));
+        assert!(matches!(parse(&info), Err(Error::Malformed(_))));
+    }
+
+    #[test]
+    fn valid_unimplemented_aes_profiles_are_unsupported() {
+        let (encrypted, hash) = encrypt_verifier(&[0u8; BLOCK], &VERIFIER).expect("verifier");
+        for (algorithm, key_bits) in [(ALG_AES_192, 192u32), (ALG_AES_256, 256u32)] {
+            let mut info = build_info(&SALT, &encrypted, &hash).expect("info");
+            info[20..24].copy_from_slice(&algorithm.to_le_bytes());
+            info[28..32].copy_from_slice(&key_bits.to_le_bytes());
+            assert!(matches!(parse(&info), Err(Error::Unsupported(_))));
+        }
+    }
+
+    #[test]
+    fn mandatory_constants_and_reserved_values_are_malformed() {
+        let (encrypted, hash) = encrypt_verifier(&[0u8; BLOCK], &VERIFIER).expect("verifier");
+        for offset in [16usize, 24, 40] {
+            let mut info = build_info(&SALT, &encrypted, &hash).expect("info");
+            info[offset..offset + 4].copy_from_slice(&1u32.to_le_bytes());
+            assert!(matches!(parse(&info), Err(Error::Malformed(_))));
+        }
+
+        let mut info = build_info(&SALT, &encrypted, &hash).expect("info");
+        let verifier_offset = 12
+            + usize::try_from(read_u32(&info, 8, "header size").expect("size"))
+                .expect("usize header size");
+        info[verifier_offset..verifier_offset + 4].copy_from_slice(&15u32.to_le_bytes());
+        assert!(matches!(parse(&info), Err(Error::Malformed(_))));
     }
 
     #[test]
@@ -530,7 +590,7 @@ mod tests {
         let forbidden = FLAGS | 0x08;
         info[4..8].copy_from_slice(&forbidden.to_le_bytes());
         info[12..16].copy_from_slice(&forbidden.to_le_bytes());
-        assert!(matches!(parse(&info), Err(Error::Unsupported(_))));
+        assert!(matches!(parse(&info), Err(Error::Malformed(_))));
     }
 
     fn hex(value: &str) -> Vec<u8> {

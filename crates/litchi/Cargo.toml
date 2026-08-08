@@ -77,7 +77,13 @@ sign = [
     "litchi-ppt?/sign",
     "litchi-xlsb?/sign",
 ]
-encryption = ["dep:litchi-crypto", "litchi-docx?/encryption", "litchi-ppt?/encryption"]
+encryption = [
+    "dep:litchi-crypto",
+    "litchi-docx?/encryption",
+    "litchi-ppt?/encryption",
+    "litchi-pptx?/encryption",
+    "litchi-xlsx?/encryption",
+]
 vba-inspection = [
     "litchi-docx?/vba-inspection",
     "litchi-ooxml-common?/vba-inspection",

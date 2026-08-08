@@ -133,7 +133,7 @@ fn strict_task_panes_round_trip_through_facade() {
 
 #[test]
 fn malformed_task_pane_graph_is_rejected_without_mutation() {
-    let mut raw: OpcPackage = Package::create().unwrap().into();
+    let mut raw = Package::create().unwrap().into_plain_opc();
     let part_name = PackURI::new("/xl/webextensions/taskpanes.xml").unwrap();
     raw.try_add_part(Box::new(BlobPart::new(
         part_name.clone(),
@@ -156,7 +156,7 @@ fn malformed_task_pane_graph_is_rejected_without_mutation() {
 #[test]
 fn unknown_root_parts_survive_task_pane_edits() {
     let mut package: Package = {
-        let mut raw: OpcPackage = Package::create().unwrap().into();
+        let mut raw = Package::create().unwrap().into_plain_opc();
         let opaque_name = PackURI::new("/xl/opaque.bin").unwrap();
         raw.try_add_part(Box::new(BlobPart::new(
             opaque_name.clone(),

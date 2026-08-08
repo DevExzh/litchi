@@ -9,6 +9,8 @@ pub mod custom_xml;
 pub mod embedded;
 pub mod external_link;
 pub mod mce;
+#[cfg(feature = "encryption")]
+pub mod package_encryption;
 pub mod properties;
 pub mod relationships;
 pub mod ribbon;

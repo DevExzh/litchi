@@ -13,6 +13,7 @@ on:
       - '.github/workflows/rust-ci.yml'
       - 'README.md'
       - 'crates/**/README.md'
+      - 'crates/**/docs/**'
       - 'docs/FEATURE_MATRIX.md'
       - 'docs/OFFICE_API_GUIDE.md'
       - 'docs/adr/**'
@@ -33,6 +34,7 @@ on:
       - '.github/workflows/rust-ci.yml'
       - 'README.md'
       - 'crates/**/README.md'
+      - 'crates/**/docs/**'
       - 'docs/FEATURE_MATRIX.md'
       - 'docs/OFFICE_API_GUIDE.md'
       - 'docs/adr/**'
@@ -169,6 +171,31 @@ jobs:
           cargo check -p litchi --no-default-features --features pptx,vba-inspection
           cargo check -p litchi --no-default-features --features xlsb,vba-inspection
           cargo check -p litchi --no-default-features --features xlsx,vba-inspection
+
+      - name: Check optional OOXML encryption boundaries
+        run: |
+          set -euo pipefail
+          for package in litchi-xlsx litchi-pptx; do
+            if cargo tree -p "$package" --no-default-features --edges normal | rg -q 'litchi-crypto'; then
+              echo "$package unexpectedly enables litchi-crypto without encryption" >&2
+              exit 1
+            fi
+            cargo tree -p "$package" --no-default-features --features encryption --edges normal \
+              | rg -q 'litchi-crypto'
+          done
+          for feature in xlsx pptx; do
+            if cargo tree -p litchi --no-default-features --features "$feature" --edges normal \
+              | rg -q 'litchi-crypto'; then
+              echo "litchi unexpectedly enables litchi-crypto with bare $feature" >&2
+              exit 1
+            fi
+          done
+          cargo check -p litchi --no-default-features --features xlsx
+          cargo check -p litchi --no-default-features --features pptx
+          cargo test -p litchi --no-default-features --features xlsx,encryption \
+            --test encryption_facade
+          cargo test -p litchi --no-default-features --features pptx,encryption \
+            --test encryption_facade
 
       - name: Check if code adheres to best practices
         run: cargo clippy --workspace --all-targets --all-features --no-deps -- -D warnings

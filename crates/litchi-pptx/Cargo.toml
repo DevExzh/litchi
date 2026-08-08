@@ -15,6 +15,10 @@ font-subset = ["fonts", "litchi-fonts/subset"]
 font-discovery = ["fonts", "litchi-fonts/discovery"]
 automatic-fonts = ["font-subset", "font-discovery", "litchi-fonts/automatic"]
 vba-inspection = ["litchi-ooxml-common/vba-inspection"]
+encryption = [
+    "dep:litchi-crypto",
+    "litchi-ooxml-common/encryption",
+]
 
 [dependencies]
 base64 = { workspace = true }
@@ -22,6 +26,7 @@ bitflags = { workspace = true }
 caseless = { workspace = true }
 chrono = { workspace = true }
 litchi-drawingml = { workspace = true }
+litchi-crypto = { workspace = true, optional = true, features = ["ooxml"] }
 litchi-fonts = { workspace = true, optional = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }

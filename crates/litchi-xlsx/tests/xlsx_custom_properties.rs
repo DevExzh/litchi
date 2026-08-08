@@ -7,7 +7,9 @@ use litchi_xlsx::{Error, Package};
 const CUSTOM_PART: &str = "/docProps/custom.xml";
 
 fn package() -> OpcPackage {
-    Package::create().expect("create XLSX package").into()
+    Package::create()
+        .expect("create XLSX package")
+        .into_plain_opc()
 }
 
 fn install_custom_part(package: &mut OpcPackage, xml: &[u8]) {
@@ -117,7 +119,7 @@ fn removing_custom_properties_removes_the_complete_package_graph() {
     package.remove_custom_props().unwrap();
     assert!(package.custom_props().unwrap().is_empty());
 
-    let raw: OpcPackage = package.into();
+    let raw = package.into_plain_opc();
     assert!(
         raw.rels()
             .iter()
@@ -173,10 +175,10 @@ fn custom_property_noops_preserve_and_changes_invalidate_signatures() {
     let mut package = signed_package();
     assert!(package.custom_props().unwrap().is_empty());
     package.put_custom_props(Props::new()).unwrap();
-    assert!(OpcPackage::from(package.clone()).is_signed());
+    assert!(package.clone().into_plain_opc().is_signed());
 
     let mut props = Props::new();
     props.insert("Project", "Litchi").unwrap();
     package.put_custom_props(props).unwrap();
-    assert!(!OpcPackage::from(package).is_signed());
+    assert!(!package.into_plain_opc().is_signed());
 }

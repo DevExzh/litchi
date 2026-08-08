@@ -10,12 +10,14 @@ rust-version.workspace = true
 
 [features]
 default = []
+encryption = ["dep:litchi-crypto", "litchi-crypto/ooxml"]
 vba-inspection = ["dep:litchi-vba"]
 
 [dependencies]
 caseless = { workspace = true }
 chrono = { workspace = true }
 litchi-core = { workspace = true }
+litchi-crypto = { workspace = true, optional = true }
 litchi-opc = { workspace = true }
 litchi-vba = { workspace = true, optional = true }
 quick-xml = { workspace = true }

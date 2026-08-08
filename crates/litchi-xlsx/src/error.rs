@@ -22,6 +22,21 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// Runtime-neutral OOXML managed-package encryption failed.
+    #[cfg(feature = "encryption")]
+    #[error("OOXML encryption error: {0}")]
+    Encryption(#[from] litchi_crypto::ooxml::Error),
+    /// An operation would silently discard or incorrectly assume encryption
+    /// provenance.
+    #[cfg(feature = "encryption")]
+    #[error("XLSX encryption policy rejected {operation}: {source}")]
+    EncryptionPolicy {
+        /// Operation rejected at the XLSX boundary.
+        operation: &'static str,
+        /// Host-independent provenance policy failure.
+        #[source]
+        source: litchi_ooxml_common::package_encryption::PolicyError,
+    },
     /// The OPC package is malformed or inaccessible.
     #[error("OPC package error: {0}")]
     Package(#[from] litchi_opc::OpcError),

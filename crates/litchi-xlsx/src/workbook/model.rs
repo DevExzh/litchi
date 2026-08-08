@@ -19,6 +19,9 @@ use crate::raw;
 use crate::style::StyleLineage;
 use crate::{Cells, Column, Columns, LocalStyle, Row, Rows, Style, Styles};
 
+#[cfg(feature = "encryption")]
+use litchi_ooxml_common::package_encryption::PackageEncryption;
+
 /// Semantic selector accepted by [`Workbook::sheet`].
 ///
 /// Names and checked zero-based positions are the ordinary entry points. The
@@ -131,6 +134,8 @@ pub(crate) struct Inner {
 #[derive(Debug, Clone)]
 pub struct Workbook {
     pub(super) inner: Arc<Inner>,
+    #[cfg(feature = "encryption")]
+    encryption: PackageEncryption,
 }
 
 impl Workbook {
@@ -155,6 +160,31 @@ impl Workbook {
         Self::from_package(OpcPackage::open_with_limits(path, limits)?)
     }
 
+    /// Open an ordinary or encrypted workbook using safe independent resource
+    /// policies.
+    #[cfg(feature = "encryption")]
+    pub fn open_with_password(path: impl AsRef<Path>, password: &str) -> Result<Self> {
+        crate::Package::open_with_password(path, password)?.into_workbook()
+    }
+
+    /// Open an ordinary or encrypted workbook with independent outer
+    /// encryption and inner OPC resource policies.
+    #[cfg(feature = "encryption")]
+    pub fn open_with_password_and_limits(
+        path: impl AsRef<Path>,
+        password: &str,
+        encryption_limits: &crate::encryption::Limits,
+        opc_limits: ReadLimits,
+    ) -> Result<Self> {
+        crate::Package::open_with_password_and_limits(
+            path,
+            password,
+            encryption_limits,
+            opc_limits,
+        )?
+        .into_workbook()
+    }
+
     /// Move bytes into the XLSX parser.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Self::from_bytes_with_limits(bytes, ReadLimits::default())
@@ -166,6 +196,31 @@ impl Workbook {
         Self::from_package(package)
     }
 
+    /// Move ordinary or encrypted bytes into the workbook parser using safe
+    /// independent resource policies.
+    #[cfg(feature = "encryption")]
+    pub fn from_bytes_with_password(bytes: Vec<u8>, password: &str) -> Result<Self> {
+        crate::Package::from_bytes_with_password(bytes, password)?.into_workbook()
+    }
+
+    /// Move ordinary or encrypted bytes into the workbook parser with
+    /// independent outer encryption and inner OPC resource policies.
+    #[cfg(feature = "encryption")]
+    pub fn from_bytes_with_password_and_limits(
+        bytes: Vec<u8>,
+        password: &str,
+        encryption_limits: &crate::encryption::Limits,
+        opc_limits: ReadLimits,
+    ) -> Result<Self> {
+        crate::Package::from_bytes_with_password_and_limits(
+            bytes,
+            password,
+            encryption_limits,
+            opc_limits,
+        )?
+        .into_workbook()
+    }
+
     /// Open a borrowed XLSX byte slice.
     pub fn from_slice(bytes: &[u8]) -> Result<Self> {
         Self::from_slice_with_limits(bytes, ReadLimits::default())
@@ -174,6 +229,31 @@ impl Workbook {
     /// Open a borrowed XLSX byte slice with explicit OPC resource limits.
     pub fn from_slice_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Self> {
         Self::from_package(OpcPackage::from_bytes_with_limits(bytes, limits)?)
+    }
+
+    /// Read an ordinary or encrypted borrowed byte slice using safe
+    /// independent resource policies.
+    #[cfg(feature = "encryption")]
+    pub fn from_slice_with_password(bytes: &[u8], password: &str) -> Result<Self> {
+        crate::Package::from_slice_with_password(bytes, password)?.into_workbook()
+    }
+
+    /// Read an ordinary or encrypted borrowed byte slice with independent
+    /// outer encryption and inner OPC resource policies.
+    #[cfg(feature = "encryption")]
+    pub fn from_slice_with_password_and_limits(
+        bytes: &[u8],
+        password: &str,
+        encryption_limits: &crate::encryption::Limits,
+        opc_limits: ReadLimits,
+    ) -> Result<Self> {
+        crate::Package::from_slice_with_password_and_limits(
+            bytes,
+            password,
+            encryption_limits,
+            opc_limits,
+        )?
+        .into_workbook()
     }
 
     /// Read an XLSX package from a synchronous reader.
@@ -187,8 +267,36 @@ impl Workbook {
         Self::from_package(OpcPackage::from_reader_with_limits(reader, limits)?)
     }
 
+    /// Read an ordinary or encrypted workbook from a synchronous reader using
+    /// safe independent resource policies.
+    #[cfg(feature = "encryption")]
+    pub fn from_reader_with_password(reader: impl Read, password: &str) -> Result<Self> {
+        crate::Package::from_reader_with_password(reader, password)?.into_workbook()
+    }
+
+    /// Read an ordinary or encrypted workbook from a synchronous reader with
+    /// independent outer encryption and inner OPC resource policies.
+    #[cfg(feature = "encryption")]
+    pub fn from_reader_with_password_and_limits(
+        reader: impl Read,
+        password: &str,
+        encryption_limits: &crate::encryption::Limits,
+        opc_limits: ReadLimits,
+    ) -> Result<Self> {
+        crate::Package::from_reader_with_password_and_limits(
+            reader,
+            password,
+            encryption_limits,
+            opc_limits,
+        )?
+        .into_workbook()
+    }
+
     /// Build a snapshot from a validated OPC package without exposing it in
     /// ordinary sheet APIs.
+    ///
+    /// This raw compatibility boundary deliberately treats the supplied clear
+    /// OPC graph as plaintext and does not infer encryption provenance.
     pub fn from_package(package: OpcPackage) -> Result<Self> {
         Self::from_package_with_styles(package, None)
     }
@@ -196,6 +304,16 @@ impl Workbook {
     /// Adopt a parsed OPC package after validating its SpreadsheetML graph.
     pub fn from_opc(package: OpcPackage) -> Result<Self> {
         Self::from_package(package)
+    }
+
+    #[cfg(feature = "encryption")]
+    pub(crate) fn from_package_with_encryption(
+        package: OpcPackage,
+        encryption: PackageEncryption,
+    ) -> Result<Self> {
+        let mut workbook = Self::from_package(package)?;
+        workbook.encryption = encryption;
+        Ok(workbook)
     }
 
     pub(super) fn from_package_with_styles(
@@ -281,6 +399,8 @@ impl Workbook {
                 pivot_caches: catalog.pivot_caches.into_boxed_slice(),
                 external_reference_ids: catalog.external_reference_ids.into_boxed_slice(),
             }),
+            #[cfg(feature = "encryption")]
+            encryption: source.map_or_else(PackageEncryption::plain, |source| source.encryption),
         })
     }
 
@@ -391,7 +511,14 @@ impl Workbook {
 
     /// Serialize the immutable package snapshot to bytes.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        Ok(crate::writer::to_bytes(&self.inner.package)?)
+        self.ensure_ordinary_output("to_bytes")?;
+        self.to_plain_bytes()
+    }
+
+    /// Explicitly serialize a plaintext OPC package, declassifying encrypted
+    /// source provenance for this output only.
+    pub fn to_plain_bytes(&self) -> Result<Vec<u8>> {
+        crate::writer::to_bytes(&self.inner.package)
     }
 
     /// Stream a finalized workbook to any sequential sink without seeking.
@@ -399,7 +526,13 @@ impl Workbook {
     /// A sink failure can leave caller-owned output incomplete. Use [`Self::save`]
     /// for atomic filesystem replacement.
     pub fn write_to(&self, writer: impl Write) -> Result<()> {
-        Ok(crate::writer::write_to(&self.inner.package, writer)?)
+        self.ensure_ordinary_output("write_to")?;
+        self.write_plain_to(writer)
+    }
+
+    /// Explicitly stream the plaintext OPC package to a sequential sink.
+    pub fn write_plain_to(&self, writer: impl Write) -> Result<()> {
+        crate::writer::write_to(&self.inner.package, writer)
     }
 
     /// Atomically save through a finalized sibling temporary artifact.
@@ -408,17 +541,145 @@ impl Workbook {
     /// destination is replaced. Existing symbolic-link destinations are
     /// refused instead of being followed or silently replaced.
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
-        Ok(crate::writer::save(&self.inner.package, path)?)
+        self.ensure_ordinary_output("save")?;
+        self.save_plain(path)
+    }
+
+    /// Explicitly save the plaintext OPC package atomically.
+    pub fn save_plain(&self, path: impl AsRef<Path>) -> Result<()> {
+        crate::writer::save(&self.inner.package, path)
+    }
+
+    /// Encryption profile retained from source ingress or the latest
+    /// successful encrypted save. In-memory byte generation is side-effect-free.
+    #[cfg(feature = "encryption")]
+    pub const fn encryption(&self) -> Option<crate::encryption::Mode> {
+        self.encryption.mode()
+    }
+
+    /// Serialize and encrypt using an explicitly selected profile.
+    #[cfg(feature = "encryption")]
+    pub fn to_encrypted(&self, password: &str, mode: crate::encryption::Mode) -> Result<Vec<u8>> {
+        self.to_encrypted_with_limits(password, mode, &crate::encryption::Limits::default())
+    }
+
+    /// Serialize and encrypt using an explicit encryption resource policy.
+    #[cfg(feature = "encryption")]
+    pub fn to_encrypted_with_limits(
+        &self,
+        password: &str,
+        mode: crate::encryption::Mode,
+        limits: &crate::encryption::Limits,
+    ) -> Result<Vec<u8>> {
+        self.encrypt_with_mode(password, mode, limits)
+    }
+
+    /// Serialize and encrypt using the source package's retained profile.
+    #[cfg(feature = "encryption")]
+    pub fn to_reencrypted(&self, password: &str) -> Result<Vec<u8>> {
+        self.to_reencrypted_with_limits(password, &crate::encryption::Limits::default())
+    }
+
+    /// Re-encrypt using the retained profile and explicit resource policy.
+    #[cfg(feature = "encryption")]
+    pub fn to_reencrypted_with_limits(
+        &self,
+        password: &str,
+        limits: &crate::encryption::Limits,
+    ) -> Result<Vec<u8>> {
+        let mode = self.retained_mode("to_reencrypted")?;
+        self.to_encrypted_with_limits(password, mode, limits)
+    }
+
+    /// Atomically save with an explicitly selected encryption profile.
+    #[cfg(feature = "encryption")]
+    pub fn save_encrypted(
+        &mut self,
+        path: impl AsRef<Path>,
+        password: &str,
+        mode: crate::encryption::Mode,
+    ) -> Result<()> {
+        self.save_encrypted_with_limits(path, password, mode, &crate::encryption::Limits::default())
+    }
+
+    /// Atomically save with explicit encryption profile and resource policy.
+    #[cfg(feature = "encryption")]
+    pub fn save_encrypted_with_limits(
+        &mut self,
+        path: impl AsRef<Path>,
+        password: &str,
+        mode: crate::encryption::Mode,
+        limits: &crate::encryption::Limits,
+    ) -> Result<()> {
+        let output = self.encrypt_with_mode(password, mode, limits)?;
+        crate::writer::save_encrypted(&output, path)?;
+        self.encryption.mark_encrypted(mode);
+        Ok(())
+    }
+
+    /// Atomically save using the encrypted source's retained profile.
+    #[cfg(feature = "encryption")]
+    pub fn save_reencrypted(&mut self, path: impl AsRef<Path>, password: &str) -> Result<()> {
+        self.save_reencrypted_with_limits(path, password, &crate::encryption::Limits::default())
+    }
+
+    /// Atomically save using the retained profile and explicit resource policy.
+    #[cfg(feature = "encryption")]
+    pub fn save_reencrypted_with_limits(
+        &mut self,
+        path: impl AsRef<Path>,
+        password: &str,
+        limits: &crate::encryption::Limits,
+    ) -> Result<()> {
+        let mode = self.retained_mode("save_reencrypted")?;
+        self.save_encrypted_with_limits(path, password, mode, limits)
     }
 
     /// Start an isolated semantic transaction over this immutable snapshot.
     pub fn edit(&self) -> Result<Edit> {
+        self.ensure_mutation_allowed("edit")?;
         Edit::new(self.clone())
     }
 
     /// Apply a reversible patch after checking every expected source part.
     pub fn apply(&self, patch: &Patch) -> Result<Commit> {
+        self.ensure_mutation_allowed("apply")?;
         patch.apply_to(self)
+    }
+
+    fn ensure_ordinary_output(&self, _operation: &'static str) -> Result<()> {
+        #[cfg(feature = "encryption")]
+        self.encryption
+            .ordinary_output()
+            .map_err(|source| Error::EncryptionPolicy {
+                operation: _operation,
+                source,
+            })?;
+        Ok(())
+    }
+
+    fn ensure_mutation_allowed(&self, operation: &'static str) -> Result<()> {
+        self.ensure_ordinary_output(operation)
+    }
+
+    #[cfg(feature = "encryption")]
+    fn retained_mode(&self, operation: &'static str) -> Result<crate::encryption::Mode> {
+        self.encryption
+            .require_retained_mode()
+            .map_err(|source| Error::EncryptionPolicy { operation, source })
+    }
+
+    #[cfg(feature = "encryption")]
+    fn encrypt_with_mode(
+        &self,
+        password: &str,
+        mode: crate::encryption::Mode,
+        limits: &crate::encryption::Limits,
+    ) -> Result<Vec<u8>> {
+        let plaintext = self.to_plain_bytes()?;
+        Ok(crate::encryption::encrypt_with(
+            plaintext, password, mode, limits,
+        )?)
     }
 }
 

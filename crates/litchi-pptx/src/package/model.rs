@@ -13,6 +13,8 @@ use crate::{Error, Result};
 pub struct Package {
     pub(crate) opc: OpcPackage,
     pub(crate) mutable_pres: Option<MutablePresentation>,
+    #[cfg(feature = "encryption")]
+    pub(crate) encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
     #[cfg(feature = "automatic-fonts")]
     pub(crate) font_embedding_dirty: bool,
 }
@@ -57,6 +59,7 @@ impl Package {
 
     /// Borrow the mutable presentation model for a newly authored package.
     pub fn presentation_mut(&mut self) -> Result<&mut MutablePresentation> {
+        self.ensure_plain_mutation("presentation_mut")?;
         self.mutable_pres.as_mut().ok_or(Error::UnsafeEdit {
             operation: "presentation_mut",
             reason: "the lossless facade cannot hydrate an opened package into the mutable writer",
@@ -89,13 +92,20 @@ impl Package {
             .is_some_and(MutablePresentation::is_modified)
     }
 
-    /// Borrow the underlying OPC graph when it is current.
+    /// Borrow the underlying clear OPC graph when it is current.
+    ///
+    /// For a package with retained encryption provenance, this is an explicit
+    /// declassification boundary: the borrowed graph is plaintext. Merely
+    /// borrowing it does not discard the retained output policy.
     pub fn opc(&self) -> Result<&OpcPackage> {
         self.ensure_graph_current("opc")?;
         Ok(&self.opc)
     }
 
-    /// Run a read-only operation against the current OPC graph.
+    /// Run a read-only operation against the current clear OPC graph.
+    ///
+    /// For encrypted provenance this explicitly exposes plaintext OPC content;
+    /// retained output policy remains active after the closure returns.
     pub fn with_opc<T>(&self, operation: impl FnOnce(&OpcPackage) -> Result<T>) -> Result<T> {
         self.ensure_graph_current("with_opc")?;
         operation(&self.opc)
@@ -619,23 +629,51 @@ impl Package {
         })
     }
 
-    /// Run one transactional low-level OPC edit.
+    /// Run one transactional low-level clear-OPC edit.
     ///
     /// The closure receives the current graph only after pending authoring
     /// state has been published. Any error rolls the graph back to its exact
     /// pre-edit snapshot; successful edits commit the candidate in place.
     /// Callers that need a typed, semantic operation should prefer the
-    /// contextual methods on this facade.
+    /// contextual methods on this facade. For retained encryption provenance,
+    /// choosing this raw escape hatch explicitly declassifies the package. A
+    /// successful edit clears provenance; a failed edit preserves it.
     pub fn edit_opc<T>(
         &mut self,
         operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
     ) -> Result<T> {
-        let value = self.edit_typed(operation)?;
+        let value = self.edit_raw(|opc| {
+            let signed_source = opc
+                .is_signed()
+                .then(|| litchi_opc::PackageWriter::to_bytes(opc))
+                .transpose()?;
+            let value = operation(opc)?;
+            if let Some(source) = signed_source {
+                let candidate = litchi_opc::PackageWriter::to_bytes(opc)?;
+                if candidate != source {
+                    opc.unsign();
+                }
+            }
+            Ok(value)
+        })?;
         // A raw graph edit cannot be reflected into the lossless mutable
         // writer. Retire that facade after publication so later authoring
         // cannot overwrite the committed OPC graph with stale state.
         self.mutable_pres = None;
+        #[cfg(feature = "encryption")]
+        {
+            self.encryption = litchi_ooxml_common::package_encryption::PackageEncryption::plain();
+        }
         Ok(value)
+    }
+
+    pub(crate) fn ensure_plain_mutation(&self, operation: &'static str) -> Result<()> {
+        let _ = operation;
+        #[cfg(feature = "encryption")]
+        self.encryption
+            .ordinary_output()
+            .map_err(|source| Error::EncryptionPolicy { operation, source })?;
+        Ok(())
     }
 
     fn ensure_graph_current(&self, operation: &'static str) -> Result<()> {
