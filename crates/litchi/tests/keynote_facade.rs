@@ -3,7 +3,7 @@
 use std::io;
 use std::path::PathBuf;
 
-use litchi::keynote::{Package, Position, SlideSelector};
+use litchi::keynote::{Package, Position, SlideNotesError, SlideSelector};
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/keynote/basic.key")
@@ -91,5 +91,34 @@ fn slide_transition_transaction_is_available_through_the_root_facade()
     assert!(reapplied.patch().is_noop());
     assert!(!reapplied.diagnostics().changed());
     assert_eq!(reapplied.package().source_bytes().as_ptr(), source_pointer);
+    Ok(())
+}
+
+#[test]
+fn slide_notes_transaction_is_available_through_the_root_facade()
+-> Result<(), Box<dyn std::error::Error>> {
+    let package = Package::open(fixture_path())?;
+    let selector = SlideSelector::index(0);
+    let source_pointer = package.source_bytes().as_ptr();
+
+    if let Some(notes) = package.slide_notes(selector)? {
+        let mut edit = package.edit_slide_notes(selector)?;
+        edit.set(&notes)?;
+        let commit = edit.commit()?;
+
+        assert!(commit.patch().is_noop());
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(commit.package().source_bytes().as_ptr(), source_pointer);
+
+        let reapplied = package.apply_slide_notes(commit.patch())?;
+        assert!(reapplied.patch().is_noop());
+        assert_eq!(reapplied.package().source_bytes().as_ptr(), source_pointer);
+    } else {
+        assert!(matches!(
+            package.edit_slide_notes(selector),
+            Err(SlideNotesError::NotesStorageNotFound)
+        ));
+        assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    }
     Ok(())
 }

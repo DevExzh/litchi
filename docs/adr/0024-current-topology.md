@@ -613,3 +613,32 @@ and `range-native-resaved-20260808.pages`
 Focused semantic reread matched, and no-op and inverse output over each
 native-resaved artifact remained byte-identical. This closes the clear/range
 native gates, not the broader Pages or monolith-exit gates.
+
+## 2026-08-08 current-status amendment: Keynote existing speaker notes
+
+The concrete Keynote owner now provides selector-first speaker-notes reads and
+checked UTF-16 text transactions for an existing slide-to-note-to-storage
+graph. Its public facade contains archive-free semantic edit, commit, patch,
+diagnostic, error, limit, position, and span types; native identities and
+generated protobuf values remain private. The migration host's raw-ID example
+is removed in favor of the focused format example, while its wider notes
+compatibility and graph-creation/deletion surfaces remain.
+
+Only the selected owner-reference projection uses a private Buffa lazy view.
+Strict bounded wire preflight, package-wide ownership scans, exact note and
+reference shapes, preserved raw records and IWA headers, one-component changed
+reassembly, complete retained-limit reopening, and semantic/topology readback
+form the publication boundary. This is not whole-Keynote-graph lazy decoding.
+
+Keynote 14.4 opened the public example's set, range, and clear artifacts
+without repair, saved each natively, closed it, and reopened the exact saved
+path. Focused reread matched the requested Unicode values or empty note, exact
+no-ops over all three native-resaved files were byte-identical, and temporary
+edits inverted to each native hash exactly.
+
+Development-only internal edges are now classified and stale-checked as such;
+two redundant Numbers/Pages test-only ZIP edges were removed. The checker
+reports 63 workspace packages, 221 internal declarations, and 15 ordered
+migration debts. No host debt is retired by the notes transfer, so durable
+patches, atomic publication, aggregate memory policy, fuzz/sanitizer gates,
+remaining format ownership, and deletion of `litchi-iwa` are still required.

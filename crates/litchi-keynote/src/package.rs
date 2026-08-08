@@ -7,6 +7,7 @@
 mod edit;
 mod limits;
 mod show_settings;
+mod slide_notes;
 mod slide_order;
 mod slide_transition;
 
@@ -50,6 +51,10 @@ pub use limits::{
 pub use show_settings::{
     ShowSettingsCommit, ShowSettingsDiagnostics, ShowSettingsEdit, ShowSettingsError,
     ShowSettingsLimitKind, ShowSettingsPatch,
+};
+pub use slide_notes::{
+    SlideNotesCommit, SlideNotesDiagnostics, SlideNotesEdit, SlideNotesError, SlideNotesLimitKind,
+    SlideNotesPatch,
 };
 pub use slide_order::{
     SlideOrderCommit, SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind,

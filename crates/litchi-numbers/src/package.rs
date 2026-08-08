@@ -986,7 +986,6 @@ mod tests {
     use super::*;
     use litchi_iwa_core::{ArchiveObject, RawMessage, SnappyStream};
     use litchi_iwa_protos::{kn, tp, tsa, tsce, tsk, tst};
-    use soapberry_zip::office::StreamingArchiveWriter;
     use std::io::Write;
 
     fn reference(identifier: u64) -> litchi_iwa_protos::tsp::Reference {
@@ -1222,7 +1221,7 @@ mod tests {
     fn package_bytes_from_archives(
         archives: impl IntoIterator<Item = (&'static str, Archive)>,
     ) -> Result<Vec<u8>> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut entries = Vec::new();
         for (name, archive) in archives {
             let iwa = SnappyStream::compress(
                 &archive
@@ -1230,13 +1229,13 @@ mod tests {
                     .map_err(|error| Error::InvalidFormat(error.to_string()))?,
             )
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-            writer
-                .write_stored(name, &iwa)
-                .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+            entries.push((name, iwa));
         }
-        writer
-            .finish_to_bytes()
-            .map_err(|error| Error::InvalidFormat(error.to_string()))
+        litchi_iwa_archive::package::to_bytes(
+            entries.iter().map(|(name, data)| (*name, data.as_slice())),
+            Limits::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))
     }
 
     fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> Result<ArchiveObject> {

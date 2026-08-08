@@ -987,3 +987,40 @@ This is only a TableInfo reference seam. Table-model, tile, sidecar, and
 formula payloads still use their existing bounded eager Prost paths, so it does
 not claim whole-graph Buffa laziness or advance the remaining monolith deletion
 gates.
+
+## 2026-08-08 amendment: focused Keynote existing-notes vertical
+
+`litchi-keynote` now owns semantic reads and exact-source set, clear,
+insert/delete/replace, reversible patch application, and inverse replay for
+text in an existing speaker-notes graph. Selection is by exact navigator name
+or checked semantic position; ranges are checked UTF-16 values. Supported
+callers never handle a slide, note, or storage object identifier, component
+name, protobuf message, or raw record.
+
+A private strict Buffa projection covers only the selected ownership
+references. Its accepted lazy values follow bounded schema-directed raw
+preflight; original records and exact IWA headers remain the preservation and
+rewrite authority. Package-wide scans prove unique ownership and reject
+aliases, duplicate metadata occurrences, dependent or unknown note shapes,
+reserved markers, malformed selected framing, and noncanonical outer object
+prefixes. A changed transaction rewrites one component and publishes only
+after complete retained-limit reopening plus semantic and topology readback.
+Exact no-ops retain the source, and exact inverses restore it.
+
+The public example's set, range, and clear modes passed Apple Keynote 14.4
+open, native Save As, close, and exact-path reopen without repair or conversion.
+All three native-resaved packages reverse-read correctly; no-op restaging was
+byte-identical, and a one-component temporary edit inverted to the exact native
+hash. The focused codec and transaction suites cover strict framing, ownership
+ambiguity, UTF-16 boundaries, unknown/header/ZIP preservation, limits,
+conflicts, no-op replay, and exact inverse behavior.
+
+This transfers one complete existing-graph text vertical and removes the
+host's raw-ID notes example, but it does not create or delete notes graphs and
+does not retire a host dependency. Boundary cleanup removes two unrelated
+test-only ZIP declarations and makes every exclusively development-only
+internal edge explicit; the current ledger is 63 packages, 221 internal
+declarations, and 15 ordered debts. Remaining host APIs and examples, legacy
+normalization, durable patch serialization, atomic publication, aggregate
+peak-memory policy, fuzz/sanitizer completion, and full host deletion remain
+exit blockers.

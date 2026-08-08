@@ -1894,12 +1894,10 @@ mod tests {
     use std::fs;
     use std::io::{self, Cursor, Write};
 
+    use super::*;
     use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
     use litchi_iwa_protos::tswp::{ObjectAttributeTable, object_attribute_table::ObjectAttribute};
     use litchi_iwa_protos::{tp, tsp::Reference};
-    use soapberry_zip::office::StreamingArchiveWriter;
-
-    use super::*;
 
     struct InterruptedOnce<R> {
         inner: R,
@@ -2061,24 +2059,19 @@ mod tests {
         )
         .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
 
-        let mut writer = StreamingArchiveWriter::new();
-        writer
-            .write_stored("Index/Document.iwa", &compressed)
-            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        let mut entries = vec![("Index/Document.iwa", compressed.as_slice())];
         if metadata {
-            writer
-                .write_stored(
-                    "Metadata/Properties.plist",
-                    br#"<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>Title</key><string>Report</string><key>Author</key><string>Ada</string><key>Application</key><string>Pages</string><key>revision</key><string>3</string><key>fileFormatVersion</key><string>7</string></dict></plist>"#,
-                )
-                .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
-            writer
-                .write_stored("Metadata/DocumentIdentifier", b"pages-id\n")
-                .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+            entries.push((
+                "Metadata/Properties.plist",
+                br#"<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>Title</key><string>Report</string><key>Author</key><string>Ada</string><key>Application</key><string>Pages</string><key>revision</key><string>3</string><key>fileFormatVersion</key><string>7</string></dict></plist>"#
+                    .as_slice(),
+            ));
+            entries.push(("Metadata/DocumentIdentifier", b"pages-id\n".as_slice()));
         }
-        writer
-            .finish_to_bytes()
-            .map_err(|error| PackageError::InvalidFormat(error.to_string()))
+        Ok(litchi_iwa_archive::package::to_bytes(
+            entries,
+            Limits::default(),
+        )?)
     }
 
     fn section_payload(name: Option<&str>) -> RawMessage {

@@ -1214,3 +1214,49 @@ the selected table-model reference must be nonzero, and the projection neither
 encodes, retains unknown content, nor stores repeated fields. Accepted raw
 source remains authoritative for preservation. This does not claim migration of
 the broader table model or the wider Numbers graph.
+
+## 2026-08-08 amendment: focused Keynote speaker-notes ownership
+
+`litchi-keynote::Package` now owns selector-first reads and exact-source text
+transactions for an existing slide's existing speaker-notes graph. The public
+surface exposes `slide_notes`, `edit_slide_notes`, `apply_slide_notes`, the
+format-owned `SlideNotesEdit`, `SlideNotesCommit`, `SlideNotesPatch`,
+diagnostics, error, and limit types, plus the shared archive-free
+`TextPosition` and `TextSpan`. Callers select by exact navigator name or
+checked semantic position and never exchange native object identifiers,
+component names, generated messages, or raw wire values.
+
+A strict private Buffa projection is limited to the selected
+slide-to-note-to-text-storage ownership references. Its generated closure is
+exactly five files and 151,735 bytes under a 160 KiB build cap, contains no
+repeated view, and has no production encoding path. Bounded schema-directed
+raw preflight proves canonical selected fields, required envelopes, nonzero
+references, field/byte/work/nesting ceilings, and forces every lazy value that
+affects publication. Buffa does not retain unknown content and is not the
+preservation representation; accepted caller-owned raw records and exact IWA
+object headers remain authoritative.
+
+The format owner independently scans every slide and note payload to prove a
+unique slide-to-note and note-to-storage edge, counts every metadata reference
+occurrence, requires exact owner/type association, and refuses dependent or
+unknown note shapes. A changed transaction performs checked UTF-16
+set/clear/insert/delete/replace, rejects surrogate splits and reserved native
+markers, rewrites one component, validates all outer IWA header-length
+prefixes, completely reopens under the retained limits, and performs semantic
+and topology readback before publication. Exact no-ops retain the original
+source bytes; exact inverse application restores them.
+
+The migration host's raw-ID notes example has moved to the semantic Keynote
+example. The host's broader notes compatibility API and graph creation or
+deletion behavior remain migration work, as do legacy provenance, durable
+patch serialization, and atomic file publication. No ordered host debt is
+retired by this vertical move.
+
+The boundary checker now distinguishes normal and development-only use for
+every internal declaration. Exclusively development-only edges must have an
+exact stale-checked policy annotation, and promotion, mixed normal/dev use,
+missing annotations, and stale annotations fail closed. Numbers and Pages test
+fixture writers now use the archive owner's package serializer, removing their
+two direct development-only `soapberry-zip` edges. The current inventory is 63
+workspace packages, 221 internal dependency declarations, and 15 ordered
+migration debts; this is dependency hygiene, not debt retirement.

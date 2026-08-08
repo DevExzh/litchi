@@ -1,0 +1,36 @@
+// Wire-only Buffa projection derived from these canonical declarations:
+//
+// - `../protos/TSPMessages.proto`: `TSP.Reference`;
+// - `../protos/KNArchives.proto`: `KN.TransitionArchive`,
+//   `KN.SlideArchive`, and `KN.NoteArchive`.
+//
+// The transition attributes and all unselected slide fields stay opaque. The
+// Keynote adapter owns strict raw preflight and caller-owned source bytes are
+// the sole preservation representation.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}
+
+message TransitionAttributesArchive {}
+
+message TransitionArchive {
+  required .LitchiIwaProjection.TransitionAttributesArchive attributes = 2;
+}
+
+message SlideArchive {
+  required .LitchiIwaProjection.Reference style = 1;
+  required .LitchiIwaProjection.TransitionArchive transition = 4;
+  optional string name = 10;
+  required bool in_document = 19;
+  optional .LitchiIwaProjection.Reference note = 27;
+}
+
+message NoteArchive {
+  required .LitchiIwaProjection.Reference contained_storage = 1;
+}

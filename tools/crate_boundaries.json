@@ -143,8 +143,7 @@
       "litchi-iwa-core",
       "litchi-iwa-detect",
       "litchi-iwa-protos",
-      "litchi-numbers-wire",
-      "soapberry-zip"
+      "litchi-numbers-wire"
     ],
     "litchi-numbers-wire": [
       "litchi-iwa-common"
@@ -240,8 +239,7 @@
       "litchi-iwa-detect",
       "litchi-iwa-protos",
       "litchi-iwa-text",
-      "litchi-iwa-text-wire",
-      "soapberry-zip"
+      "litchi-iwa-text-wire"
     ],
     "litchi-ppt": [
       "litchi-cfb",
@@ -331,6 +329,16 @@
     ],
     "xml-minifier-macros": []
   },
+  "dev_only_edges": [
+    {
+      "dependent": "litchi-iwa-detect",
+      "dependency": "litchi-iwa-protos"
+    },
+    {
+      "dependent": "litchi-iwa-structured",
+      "dependency": "litchi-iwa-text"
+    }
+  ],
   "migration_hosts": [
     "litchi-iwa"
   ],

@@ -13,11 +13,20 @@ from tools import check_crate_boundaries as boundaries
 def valid_snapshot(policy: boundaries.Policy) -> boundaries.Snapshot:
     edges = policy.canonical_edges | policy.migration_edges
     dependencies = {name: set() for name in policy.packages}
+    normal_dependencies = {name: set() for name in policy.packages}
     for edge in edges:
         dependencies[edge.dependent].add(edge.dependency)
+        if edge not in policy.dev_only_edges:
+            normal_dependencies[edge.dependent].add(edge.dependency)
     dependencies["litchi-core"].update(item.name for item in policy.core_dependency_debt)
+    normal_dependencies["litchi-core"].update(
+        item.name for item in policy.core_dependency_debt
+    )
     frozen_dependencies = {
         name: frozenset(items) for name, items in dependencies.items()
+    }
+    frozen_normal_dependencies = {
+        name: frozenset(items) for name, items in normal_dependencies.items()
     }
     features = {name: frozenset() for name in policy.packages}
     features["litchi-core"] = frozenset(item.name for item in policy.core_feature_debt)
@@ -29,9 +38,19 @@ def valid_snapshot(policy: boundaries.Policy) -> boundaries.Snapshot:
     return boundaries.Snapshot(
         packages=policy.packages,
         manifests=frozenset(),
-        edges={edge: ("kind=normal, optional=false, target=*, rename=-",) for edge in edges},
+        edges={
+            edge: (
+                f"kind={'dev' if edge in policy.dev_only_edges else 'normal'}, "
+                "optional=false, target=*, rename=-",
+            )
+            for edge in edges
+        },
+        dependency_kinds={
+            edge: frozenset({"dev" if edge in policy.dev_only_edges else "normal"})
+            for edge in edges
+        },
         dependencies=frozen_dependencies,
-        normal_dependencies=frozen_dependencies,
+        normal_dependencies=frozen_normal_dependencies,
         features=features,
         feature_definitions={
             "litchi": {
@@ -53,6 +72,128 @@ class BoundaryPolicyTests(unittest.TestCase):
 
     def test_checked_in_policy_is_internally_consistent(self) -> None:
         self.assertEqual(boundaries.audit_snapshot(valid_snapshot(self.policy), self.policy), [])
+
+    def test_checked_in_dev_only_edges_are_exact(self) -> None:
+        self.assertEqual(
+            self.policy.dev_only_edges,
+            frozenset(
+                {
+                    boundaries.Edge("litchi-iwa-detect", "litchi-iwa-protos"),
+                    boundaries.Edge("litchi-iwa-structured", "litchi-iwa-text"),
+                }
+            ),
+        )
+
+    def test_dev_only_edge_cannot_be_promoted(self) -> None:
+        edge = min(self.policy.dev_only_edges)
+        for kind in ("build", "normal"):
+            with self.subTest(kind=kind):
+                snapshot = valid_snapshot(self.policy)
+                evidence = dict(snapshot.edges)
+                evidence[edge] = (
+                    f"kind={kind}, optional=false, target=*, rename=-",
+                )
+                dependency_kinds = dict(snapshot.dependency_kinds)
+                dependency_kinds[edge] = frozenset({kind})
+                snapshot = replace(
+                    snapshot,
+                    edges=evidence,
+                    dependency_kinds=dependency_kinds,
+                )
+
+                violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+                self.assertIn(
+                    f"dev-only internal edge used outside dev: {edge.display()} "
+                    f"(kind={kind}, optional=false, target=*, rename=-)",
+                    violations,
+                )
+
+    def test_unannotated_dev_only_edge_is_rejected(self) -> None:
+        edge = min(self.policy.dev_only_edges)
+        policy = replace(
+            self.policy,
+            dev_only_edges=self.policy.dev_only_edges - frozenset({edge}),
+        )
+
+        violations = boundaries.audit_snapshot(valid_snapshot(self.policy), policy)
+
+        self.assertIn(
+            f"dev-only internal edge lacks policy annotation: {edge.display()}",
+            violations,
+        )
+
+    def test_resolved_dev_only_edge_requires_annotation_cleanup(self) -> None:
+        edge = min(self.policy.dev_only_edges)
+        snapshot = valid_snapshot(self.policy)
+        evidence = dict(snapshot.edges)
+        del evidence[edge]
+        dependency_kinds = dict(snapshot.dependency_kinds)
+        del dependency_kinds[edge]
+        dependencies = dict(snapshot.dependencies)
+        dependencies[edge.dependent] -= frozenset({edge.dependency})
+        snapshot = replace(
+            snapshot,
+            edges=evidence,
+            dependency_kinds=dependency_kinds,
+            dependencies=dependencies,
+        )
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertIn(
+            f"resolved dev-only edge still annotated: {edge.display()}; "
+            "remove its policy annotation",
+            violations,
+        )
+
+    def test_dev_only_annotation_must_reference_a_canonical_edge(self) -> None:
+        raw = copy.deepcopy(self.raw_policy)
+        annotation = raw["dev_only_edges"][0]
+        raw["packages"][annotation["dependent"]].remove(annotation["dependency"])
+
+        with self.assertRaisesRegex(
+            boundaries.PolicyError,
+            "dev-only annotations must reference canonical edges",
+        ):
+            boundaries.parse_policy(raw)
+
+    def test_policy_rejects_incoming_migration_host_edge(self) -> None:
+        raw = copy.deepcopy(self.raw_policy)
+        raw["packages"]["litchi-codepage"].append("litchi-iwa")
+
+        with self.assertRaisesRegex(
+            boundaries.PolicyError,
+            "migration hosts cannot be workspace dependencies: "
+            "litchi-codepage -> litchi-iwa",
+        ):
+            boundaries.parse_policy(raw)
+
+    def test_snapshot_rejects_incoming_migration_host_edge(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        edge = boundaries.Edge("litchi-codepage", "litchi-iwa")
+        evidence = dict(snapshot.edges)
+        evidence[edge] = ("kind=normal, optional=false, target=*, rename=-",)
+        dependency_kinds = dict(snapshot.dependency_kinds)
+        dependency_kinds[edge] = frozenset({"normal"})
+        dependencies = dict(snapshot.dependencies)
+        dependencies[edge.dependent] |= frozenset({edge.dependency})
+        normal_dependencies = dict(snapshot.normal_dependencies)
+        normal_dependencies[edge.dependent] |= frozenset({edge.dependency})
+        snapshot = replace(
+            snapshot,
+            edges=evidence,
+            dependency_kinds=dependency_kinds,
+            dependencies=dependencies,
+            normal_dependencies=normal_dependencies,
+        )
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertIn(
+            f"workspace dependency targets migration host: {edge.display()}",
+            violations,
+        )
 
     def test_unclassified_optional_dev_edge_is_rejected(self) -> None:
         snapshot = valid_snapshot(self.policy)

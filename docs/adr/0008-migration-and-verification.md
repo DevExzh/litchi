@@ -7647,3 +7647,65 @@ no-op and inverse over each native-resaved artifact were byte-identical to its
 respective hash. These observations close those two native gates only; they do
 not claim the remaining dependent-content, multi-section, durability,
 performance, fuzz/sanitizer, or host-retirement gates.
+
+## 2026-08-08 amendment: Keynote speaker-notes transaction evidence
+
+The supported Keynote package now reads and edits text in an existing
+speaker-notes graph through semantic slide selectors and checked UTF-16
+positions. Set, clear, insertion, deletion, replacement, exact patch
+application, and inverse replay share one transaction boundary. Publication
+requires unique package-wide ownership, exact known note/reference shapes,
+canonical selected wire framing, complete retained-limit reopening, semantic
+readback, and native topology readback. Changed publication rewrites one
+component; exact no-ops report zero touched components and retain the original
+immutable source.
+
+The private notes projection contains five generated Buffa files totaling
+151,735 bytes under a 160 KiB cap and no repeated view. Eight focused codec
+tests cover Prost parity, opaque metadata, required and duplicate fields,
+wrong wire types, noncanonical framing, zero or malformed references, and
+resource ceilings. Twelve transaction tests additionally cover astral UTF-16
+edits, exact no-op and inverse identity, unknown/header/ZIP preservation,
+duplicate and aliased metadata ownership, dependent and unknown note shapes,
+malformed-metadata replay, retained limits, and unrelated noncanonical outer
+object prefixes. The production example supports semantic set, clear, and
+range replacement with optional inverse output; the migration-host raw-ID
+example is removed.
+
+The app-authored Keynote 14.4 source is
+`/private/tmp/litchi-keynote-buffa-native-20260808.key` with SHA-256
+`b40162d851b29de328f8ee04f32ee2e090852169c2028b29d96da7dd3cd2063b`.
+The public example produced set, range, and clear candidates under
+`/private/tmp/litchi-keynote-notes-final.4JHtRJ/` with respective SHA-256
+values
+`8a1468b3f5706df983770d9ab6cded55321b9e1b9e57edd638ea7335d7be122f`,
+`227a24d6843468115a5219a9f3a25f565e5d256698d3563591a6501bf9e8d7e1`,
+and
+`79187ac2da5c42ce13e58bb5b94b1d1a2aa543807a4aa5dde63c5f92dbc73342`.
+Each changed only `Index/Slide-2652150.iwa`, retained the complete ZIP entry
+list and one-slide/964-object topology, passed ZIP integrity, and produced an
+inverse with the exact source hash.
+
+Computer Use exercised all three candidates in Apple Keynote 14.4
+(7043.0.93). Keynote opened each without a repair, recovery, conversion, or
+warning prompt, retained the surrounding slide markers, and displayed the
+requested three-line Unicode set value, the requested two-line range value,
+or an existing empty notes pane. Native Save As, close, and reopen produced
+`set-native-resaved-20260808.key`, `range-native-resaved-20260808.key`, and
+`clear-native-resaved-20260808.key` with respective SHA-256 values
+`8b8187a6f4e27b15461e0b0dafe90b3fe62b020ad9597bb4c5e2023d1ac76d9b`,
+`86f57c855a5b300001c2ecbcab4278ef693c29184f211aed3e7c3936e1169051`,
+and
+`d359ebbbec7f98a9b30aac809f1ff467814a2cff986cd5934af3022d86cc5c2a`.
+Focused semantic reread recovered the exact values. Over every native-resaved
+artifact, an identical edit remained a zero-component byte-identical no-op;
+a real temporary edit touched one component, and its inverse restored the
+corresponding native-resaved hash exactly.
+
+The checked boundary inventory is now 63 packages, 221 internal declarations,
+and 15 ordered debts. This evidence is deliberately bounded: only the selected
+notes owner references use Buffa lazy views, and only text mutation in an
+existing notes graph has moved. Notes graph creation/deletion, remaining host
+APIs and examples, legacy normalization, durable patch serialization, atomic
+publication, aggregate peak-memory policy, fuzz/sanitizer completion, and
+complete `litchi-iwa` deletion remain open.

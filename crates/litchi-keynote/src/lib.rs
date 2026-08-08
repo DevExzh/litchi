@@ -106,6 +106,33 @@
 //! assert_eq!(cleared.package().slide_transition("Appendix")?.unwrap().effect(), Some(&Effect::None));
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
+//!
+//! # Edit speaker notes
+//!
+//! Existing notes storage can be edited by an exact slide name or checked
+//! position with notes-relative UTF-16 spans. A missing notes graph is kept
+//! distinct from an existing empty storage and is not synthesized implicitly.
+//!
+//! ```no_run
+//! use std::io;
+//!
+//! use litchi_keynote::{Package, TextSpan};
+//!
+//! let package = Package::open("input.key")?;
+//! let before = package
+//!     .slide_notes("Appendix")?
+//!     .ok_or_else(|| io::Error::other("slide has no existing notes storage"))?;
+//! let mut edit = package.edit_slide_notes("Appendix")?;
+//! edit.replace(TextSpan::from_utf16_indexes(0, 0)?, "Draft: ")?;
+//! let commit = edit.commit()?;
+//! assert!(commit.package().slide_notes("Appendix")?.unwrap().starts_with("Draft: "));
+//!
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_notes(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().slide_notes("Appendix")?, Some(before));
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
 
 #![forbid(unsafe_code)]
 
@@ -129,6 +156,7 @@ pub use chart::ChartSelector;
 pub use document::Document;
 pub use error::{Error, Result};
 pub use litchi_core::Position;
+pub use litchi_iwa_text::{TextPosition, TextSpan};
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::__semantic_document_from_prepared_source;
@@ -137,9 +165,10 @@ pub use package::{
     MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package, Patch, PayloadLimitKind,
     ReadError, ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError, SemanticPath,
     ShowSettingsCommit, ShowSettingsDiagnostics, ShowSettingsEdit, ShowSettingsError,
-    ShowSettingsLimitKind, ShowSettingsPatch, SlideOrderCommit, SlideOrderDiagnostics,
-    SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch, SlideTransitionCommit,
-    SlideTransitionDiagnostics, SlideTransitionEdit, SlideTransitionError,
+    ShowSettingsLimitKind, ShowSettingsPatch, SlideNotesCommit, SlideNotesDiagnostics,
+    SlideNotesEdit, SlideNotesError, SlideNotesLimitKind, SlideNotesPatch, SlideOrderCommit,
+    SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch,
+    SlideTransitionCommit, SlideTransitionDiagnostics, SlideTransitionEdit, SlideTransitionError,
     SlideTransitionLimitKind, SlideTransitionPatch, Stats, TextStorageFailure,
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};

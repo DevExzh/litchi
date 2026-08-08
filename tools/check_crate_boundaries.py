@@ -200,6 +200,7 @@ class NamedDebt:
 class Policy:
     packages: frozenset[str]
     canonical_edges: frozenset[Edge]
+    dev_only_edges: frozenset[Edge]
     migration_hosts: frozenset[str]
     migration_debt: tuple[Debt, ...]
     runtime_neutral: frozenset[str]
@@ -219,6 +220,7 @@ class Snapshot:
     packages: frozenset[str]
     manifests: frozenset[Path]
     edges: dict[Edge, tuple[str, ...]]
+    dependency_kinds: dict[Edge, frozenset[str]]
     dependencies: dict[str, frozenset[str]]
     normal_dependencies: dict[str, frozenset[str]]
     features: dict[str, frozenset[str]]
@@ -313,6 +315,32 @@ def parse_policy(raw: Any) -> Policy:
         for dependency in _require_sorted_strings(dependencies, f"packages.{dependent}"):
             canonical.add(Edge(dependent, dependency))
 
+    dev_only_raw = raw.get("dev_only_edges")
+    if not isinstance(dev_only_raw, list):
+        raise PolicyError("dev_only_edges must be a list")
+    dev_only: list[Edge] = []
+    for index, item in enumerate(dev_only_raw):
+        context = f"dev_only_edges[{index}]"
+        if not isinstance(item, dict):
+            raise PolicyError(f"{context} must be an object")
+        dev_only.append(
+            Edge(
+                _require_string(item, "dependent", context),
+                _require_string(item, "dependency", context),
+            )
+        )
+    if dev_only != sorted(dev_only):
+        raise PolicyError("dev_only_edges must be ordered by edge")
+    dev_only_edges = frozenset(dev_only)
+    if len(dev_only_edges) != len(dev_only):
+        raise PolicyError("dev_only_edges contains duplicate edges")
+    noncanonical_dev_only = sorted(dev_only_edges - canonical)
+    if noncanonical_dev_only:
+        raise PolicyError(
+            "dev-only annotations must reference canonical edges: "
+            + ", ".join(edge.display() for edge in noncanonical_dev_only)
+        )
+
     migration_hosts = frozenset(
         _require_sorted_strings(raw.get("migration_hosts"), "migration_hosts")
     )
@@ -369,6 +397,16 @@ def parse_policy(raw: Any) -> Policy:
         raise PolicyError(
             "migration_hosts references unknown packages: "
             + ", ".join(sorted(migration_hosts - packages))
+        )
+    incoming_host_edges = sorted(
+        edge
+        for edge in canonical | migration_edges
+        if edge.dependency in migration_hosts
+    )
+    if incoming_host_edges:
+        raise PolicyError(
+            "migration hosts cannot be workspace dependencies: "
+            + ", ".join(edge.display() for edge in incoming_host_edges)
         )
     host_canonical = sorted(edge for edge in canonical if edge.dependent in migration_hosts)
     if host_canonical:
@@ -439,6 +477,7 @@ def parse_policy(raw: Any) -> Policy:
     return Policy(
         packages=packages,
         canonical_edges=frozenset(canonical),
+        dev_only_edges=dev_only_edges,
         migration_hosts=migration_hosts,
         migration_debt=tuple(migration),
         runtime_neutral=runtime_neutral,
@@ -478,6 +517,7 @@ def snapshot_from_metadata(data: dict[str, Any]) -> Snapshot:
     names = frozenset(package["name"] for package in packages)
 
     evidence: dict[Edge, set[str]] = {}
+    dependency_kinds: dict[Edge, set[str]] = {}
     dependencies: dict[str, frozenset[str]] = {}
     normal_dependencies: dict[str, frozenset[str]] = {}
     features: dict[str, frozenset[str]] = {}
@@ -509,6 +549,7 @@ def snapshot_from_metadata(data: dict[str, Any]) -> Snapshot:
                 continue
             edge = Edge(name, dependency["name"])
             kind = dependency.get("kind") or "normal"
+            dependency_kinds.setdefault(edge, set()).add(kind)
             target = dependency.get("target") or "*"
             optional = str(bool(dependency.get("optional"))).lower()
             rename = dependency.get("rename") or "-"
@@ -520,6 +561,9 @@ def snapshot_from_metadata(data: dict[str, Any]) -> Snapshot:
         packages=names,
         manifests=frozenset(manifests),
         edges={edge: tuple(sorted(items)) for edge, items in evidence.items()},
+        dependency_kinds={
+            edge: frozenset(kinds) for edge, kinds in dependency_kinds.items()
+        },
         dependencies=dependencies,
         normal_dependencies=normal_dependencies,
         features=features,
@@ -602,6 +646,34 @@ def audit_snapshot(snapshot: Snapshot, policy: Policy) -> list[str]:
         violations.append(
             f"resolved migration debt still listed: {edge.display()}; remove its policy entry"
         )
+
+    actual_dev_only = frozenset(
+        edge
+        for edge, kinds in snapshot.dependency_kinds.items()
+        if kinds == frozenset({"dev"})
+    )
+    for edge in sorted(actual_dev_only - policy.dev_only_edges):
+        violations.append(
+            f"dev-only internal edge lacks policy annotation: {edge.display()}"
+        )
+    for edge in sorted(policy.dev_only_edges - actual_edges):
+        violations.append(
+            f"resolved dev-only edge still annotated: {edge.display()}; "
+            "remove its policy annotation"
+        )
+    for edge in sorted(policy.dev_only_edges & actual_edges):
+        kinds = snapshot.dependency_kinds.get(edge, frozenset())
+        if kinds != frozenset({"dev"}):
+            evidence = "; ".join(snapshot.edges[edge])
+            violations.append(
+                f"dev-only internal edge used outside dev: {edge.display()} "
+                f"({evidence})"
+            )
+
+    for edge in sorted(
+        edge for edge in actual_edges if edge.dependency in policy.migration_hosts
+    ):
+        violations.append(f"workspace dependency targets migration host: {edge.display()}")
 
     cycle = _first_cycle(snapshot.packages, actual_edges)
     if cycle is not None:
