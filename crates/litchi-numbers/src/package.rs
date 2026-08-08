@@ -43,6 +43,8 @@ use litchi_iwa_archive::ComponentCatalog;
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};
 use litchi_iwa_core::{Archive, RawMessage};
+#[cfg(feature = "internal-iwork-source")]
+use litchi_iwa_detect::PreparedSource;
 use litchi_iwa_detect::{Format, detect_application_from_document};
 use litchi_iwa_protos::{tn, tst, tswp};
 use prost::Message;
@@ -177,6 +179,11 @@ impl Components {
         Ok(Self {
             catalog: ComponentCatalog::from_bytes_with_limits(bytes, limits)?,
         })
+    }
+
+    #[cfg(feature = "internal-iwork-source")]
+    fn from_catalog(catalog: ComponentCatalog) -> Self {
+        Self { catalog }
     }
 
     fn get_archive(&self, name: &str) -> Option<&Archive> {
@@ -648,10 +655,45 @@ pub fn compatibility_tables_from_bytes_with_options(
     options: ReadOptions,
 ) -> Result<Vec<crate::Table>> {
     let components = Components::from_bytes(bytes, options.archive())?;
-    validate_numbers_application(&components, options.archive())?;
-    let semantic = options.semantic();
-    let index = Index::from_components(&components, semantic.max_objects())?;
-    project_compatibility_tables(&components, &index, semantic)
+    compatibility_tables_from_components(&components, options.archive(), options.semantic())
+}
+
+/// Consume one prepared source into the global Numbers compatibility view.
+///
+/// This explicitly unstable handoff is reserved for the root iWork
+/// coordinator. It retains detached/orphan table behavior while avoiding a
+/// second ZIP traversal and IWA component decode. The source's original
+/// physical profile remains authoritative; callers select only semantic
+/// projection limits here.
+///
+/// # Errors
+///
+/// Returns [`Error`] when the source belongs to another application or the
+/// Numbers compatibility projection is malformed or over budget.
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub fn __compatibility_tables_from_prepared_source(
+    source: PreparedSource,
+    semantic: SemanticLimits,
+) -> Result<Vec<crate::Table>> {
+    if source.format() != Format::Numbers {
+        return Err(Error::NotNumbers);
+    }
+    let source_catalog = source.__into_source_catalog();
+    let archive_limits = source_catalog.limits();
+    let (_package, catalog) = source_catalog.into_parts();
+    let components = Components::from_catalog(catalog);
+    compatibility_tables_from_components(&components, archive_limits, semantic)
+}
+
+fn compatibility_tables_from_components(
+    components: &Components,
+    archive_limits: Limits,
+    semantic: SemanticLimits,
+) -> Result<Vec<crate::Table>> {
+    validate_numbers_application(components, archive_limits)?;
+    let index = Index::from_components(components, semantic.max_objects())?;
+    project_compatibility_tables(components, &index, semantic)
 }
 
 fn validate_numbers_application(components: &Components, archive_limits: Limits) -> Result<()> {

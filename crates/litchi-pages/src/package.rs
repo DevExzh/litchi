@@ -16,6 +16,8 @@ use std::sync::Arc;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_archive::{ComponentCatalog, SourceCatalog};
 use litchi_iwa_common::wire::{WireFieldView, WireView};
+#[cfg(feature = "internal-iwork-source")]
+use litchi_iwa_detect::{Format, PreparedSource};
 use litchi_iwa_protos::{tp, tswp};
 use litchi_iwa_text::storage::{Run, Storage};
 use plist::Value;
@@ -199,6 +201,32 @@ impl Package {
     /// package shape is invalid, or semantic projection is invalid.
     pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> PackageResult<Self> {
         let source = SourceCatalog::from_bytes_with_limits(bytes, limits)?;
+        Self::from_source_catalog(source)
+    }
+
+    /// Consume a source prepared by the focused iWork coordinator.
+    ///
+    /// This cross-crate ingress is intentionally unstable and exists only so
+    /// the root iWork coordinator can dispatch one already parsed immutable
+    /// package without repeating ZIP, Snappy, or IWA work.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError`] when the prepared source belongs to another
+    /// application or its Pages semantic projection is invalid.
+    #[cfg(feature = "internal-iwork-source")]
+    #[doc(hidden)]
+    pub fn __from_prepared_source(source: PreparedSource) -> PackageResult<Self> {
+        if source.format() != Format::Pages {
+            return Err(PackageError::InvalidFormat(
+                "prepared iWork source is not a Pages document".to_owned(),
+            ));
+        }
+        Self::from_source_catalog(source.__into_source_catalog())
+    }
+
+    fn from_source_catalog(source: SourceCatalog) -> PackageResult<Self> {
+        let limits = source.limits();
         let metadata = Metadata::from_catalog(source.package())?;
         let components = source.components();
         let object_count = validate_components(components)?;
@@ -1748,6 +1776,29 @@ mod tests {
             package.semantic_document(),
             snapshot.semantic_document()
         ));
+        Ok(())
+    }
+
+    #[cfg(feature = "internal-iwork-source")]
+    #[test]
+    fn prepared_source_handoff_matches_direct_ingress() -> PackageResult<()> {
+        let bytes = package_bytes(Some("Prepared Pages body"), true, true)?;
+        let direct = Package::from_bytes(&bytes)?;
+        let prepared = PreparedSource::from_bytes(&bytes)
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
+            .ok_or_else(|| {
+                PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
+            })?;
+
+        let handed_off = Package::__from_prepared_source(prepared)?;
+
+        assert_eq!(handed_off.text()?, direct.text()?);
+        assert_eq!(handed_off.sections().len(), direct.sections().len());
+        assert_eq!(
+            handed_off.sections()[0].plain_text(),
+            direct.sections()[0].plain_text()
+        );
+        assert_eq!(handed_off.metadata().title, direct.metadata().title);
         Ok(())
     }
 

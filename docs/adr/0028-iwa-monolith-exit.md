@@ -334,3 +334,54 @@ shared catalog, directory bundles and mutable `EntryStore` snapshots still lack
 a frozen logical-entry adapter, and Pages/Keynote aggregate contract differences
 remain unresolved. The next cutover stage must add those handoffs and
 role-aware root parity tests before deleting any host structured adapter.
+
+## 2026-08-08 limits-preserving prepared-source handoff
+
+The focused detector now owns an opaque, single-use `PreparedSource`. It binds
+application classification to the same immutable `SourceCatalog` that one
+selected format owner consumes, so root coordination no longer needs a direct
+archive dependency or a detect-then-reparse byte path. Borrowed ingress copies
+once into immutable storage and shared `Arc<[u8]>` ingress retains allocation
+identity. Non-ZIP and unrecognized inputs remain unclaimed rather than being
+coerced into an iWork format.
+
+`SourceCatalog` now records and exposes the validated physical `Limits` that
+authorized ZIP, Snappy, and neutral IWA parsing. Pages and Keynote derive their
+physical and text assumptions from that retained profile; a handoff cannot
+silently supply a weaker second profile after validation. Their explicitly
+unstable constructors, and Numbers' corresponding global compatibility
+projection, are enabled only by `internal-iwork-source`. The root `iwork`
+feature forwards those private integration features, but no supported format
+facade returns a prepared source, catalog, archive, protobuf value, or raw
+identifier.
+
+Numbers consumes the prepared catalog directly into its existing compact index
+and global compatibility projector. It deliberately does not construct the
+strict rooted workbook, preserving detached/orphan table behavior and the
+established global source order. Pages and Keynote consume the catalog by move;
+Keynote retains the authoritative source allocation for exact no-op and
+preserve-mode editing.
+
+The archive-free `litchi-iwa-structured` owner can now retain a Pages semantic
+`Document` or Keynote semantic `Document` directly while preserving its public
+slice and text-role APIs. Aggregate construction validates the same count,
+canonical-position, and text budgets but does not clone a section, slide,
+storage, run, build, transition, or string. Numbers remains an owned `Vec<Table>`
+because its required global compatibility projection is the first unavoidable
+materialization and already transfers that allocation without another copy.
+
+Focused tests prove retained physical profiles, shared-source pointer identity,
+direct-versus-handoff semantic parity for all three native fixtures, preserved
+Numbers global semantics, and Pages/Keynote document pointer identity across the
+structured boundary. This completes the no-reparse and no-deep-clone handoff
+foundation. It is still not the supported root coordinator or permission to
+delete a migration-host adapter: directory/`EntryStore` frozen sources,
+root-owned errors and value wrappers, aggregate cache policy, and role-aware
+root parity remain required.
+
+Computer Use reopened the native Pages, Numbers, and Keynote fixtures for this
+handoff gate. Pages exposed one body containing the three expected lines;
+Numbers exposed `Table 1` as 22 rows by 7 columns with the expected B2 text and
+B3 numeric value; Keynote exposed separate title, body, and date text boxes.
+No application presented repair or conversion UI. Each document was closed
+without saving and all three SHA-256 hashes remained unchanged.

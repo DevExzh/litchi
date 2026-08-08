@@ -20,6 +20,8 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_detect::Format;
+#[cfg(feature = "internal-iwork-source")]
+use litchi_iwa_detect::PreparedSource;
 use litchi_iwa_protos::{keynote_document_codec, kn, tswp};
 use litchi_iwa_text::storage::Storage;
 use litchi_iwa_text_wire::{
@@ -367,6 +369,36 @@ impl Package {
     fn from_source_with_options(source: Arc<[u8]>, options: ReadOptions) -> ReadResult<Self> {
         let limits = options.archive();
         let source_catalog = SourceCatalog::from_shared_bytes_with_limits(source, limits)?;
+        Self::from_source_catalog(source_catalog, options.semantic())
+    }
+
+    /// Consume one source prepared by the focused iWork coordinator.
+    ///
+    /// This explicitly unstable handoff preserves the original immutable
+    /// package allocation and its validated physical profile. Only the
+    /// semantic profile is selected at this stage.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReadError`] when the source belongs to another application or
+    /// the Keynote root/index cannot be validated.
+    #[cfg(feature = "internal-iwork-source")]
+    #[doc(hidden)]
+    pub fn __from_prepared_source(
+        source: PreparedSource,
+        semantic: SemanticLimits,
+    ) -> ReadResult<Self> {
+        if source.format() != Format::Keynote {
+            return Err(ReadError::NotKeynote);
+        }
+        Self::from_source_catalog(source.__into_source_catalog(), semantic)
+    }
+
+    fn from_source_catalog(
+        source_catalog: SourceCatalog,
+        semantic: SemanticLimits,
+    ) -> ReadResult<Self> {
+        let options = ReadOptions::new(source_catalog.limits(), semantic);
         match litchi_iwa_detect::component_catalog(source_catalog.components())? {
             Some(Format::Keynote) => {},
             Some(_) => return Err(ReadError::NotKeynote),

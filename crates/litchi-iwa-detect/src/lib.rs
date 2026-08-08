@@ -9,7 +9,7 @@
     reason = "Detection classifiers stay beside the ingress routines they support."
 )]
 
-use litchi_iwa_archive::{self, ComponentCatalog, DetectionRoot};
+use litchi_iwa_archive::{self, ComponentCatalog, DetectionRoot, SourceCatalog};
 use litchi_iwa_common::wire::{WireField, parse_wire_fields};
 use litchi_iwa_core::{Archive, SnappyLimits, SnappyStream};
 use std::{
@@ -17,6 +17,7 @@ use std::{
     fs::{self, File},
     io::{Read, Seek, SeekFrom},
     path::Path,
+    sync::Arc,
 };
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024 * 1024;
@@ -88,6 +89,137 @@ pub enum Format {
     Keynote,
     /// Apple Numbers.
     Numbers,
+}
+
+/// Opaque, single-use iWork source prepared for one concrete format owner.
+///
+/// Construction snapshots and validates the physical package, decodes its IWA
+/// components, and classifies the application from that same immutable state.
+/// Passing this value to a focused Pages, Keynote, or Numbers adapter therefore
+/// avoids a second ZIP traversal or Snappy/IWA decode. The physical catalog is
+/// deliberately not exposed by the ordinary detection API.
+pub struct PreparedSource {
+    catalog: SourceCatalog,
+    format: Format,
+    limits: Limits,
+}
+
+impl fmt::Debug for PreparedSource {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PreparedSource")
+            .field("format", &self.format)
+            .field("limits", &self.limits)
+            .finish_non_exhaustive()
+    }
+}
+
+impl PreparedSource {
+    /// Prepare borrowed package bytes under the default detection profile.
+    ///
+    /// The bytes are copied once into immutable shared ownership. Use
+    /// [`Self::from_shared_bytes`] when the caller already owns an `Arc`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is malformed, ambiguous, encrypted,
+    /// or exceeds a physical resource ceiling. Non-ZIP and unrecognized iWork
+    /// inputs return `Ok(None)`.
+    pub fn from_bytes(value: &[u8]) -> Result<Option<Self>> {
+        Self::from_bytes_with_limits(value, Limits::default())
+    }
+
+    /// Prepare borrowed package bytes under explicit detection limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_bytes`].
+    pub fn from_bytes_with_limits(value: &[u8], limits: Limits) -> Result<Option<Self>> {
+        if !check_prepared_candidate(value, limits)? {
+            return Ok(None);
+        }
+        let catalog = SourceCatalog::from_bytes_with_limits(value, archive_limits(limits)?)
+            .map_err(map_archive_error)?;
+        Self::from_catalog(catalog, limits)
+    }
+
+    /// Prepare already-owned immutable package bytes without copying them.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is malformed, ambiguous, encrypted,
+    /// or exceeds a physical resource ceiling. Non-ZIP and unrecognized iWork
+    /// inputs return `Ok(None)`.
+    pub fn from_shared_bytes(value: Arc<[u8]>) -> Result<Option<Self>> {
+        Self::from_shared_bytes_with_limits(value, Limits::default())
+    }
+
+    /// Prepare an immutable package under explicit physical limits.
+    ///
+    /// The same checked profile is retained by the underlying catalog so a
+    /// selected format owner cannot accidentally reinterpret already-validated
+    /// bytes under a different physical policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is malformed, ambiguous, encrypted,
+    /// or exceeds a physical resource ceiling. Non-ZIP and unrecognized iWork
+    /// inputs return `Ok(None)`.
+    pub fn from_shared_bytes_with_limits(value: Arc<[u8]>, limits: Limits) -> Result<Option<Self>> {
+        if !check_prepared_candidate(&value, limits)? {
+            return Ok(None);
+        }
+        let catalog = SourceCatalog::from_shared_bytes_with_limits(value, archive_limits(limits)?)
+            .map_err(map_archive_error)?;
+        Self::from_catalog(catalog, limits)
+    }
+
+    fn from_catalog(catalog: SourceCatalog, limits: Limits) -> Result<Option<Self>> {
+        let Some(format) = component_catalog(catalog.components())? else {
+            return Ok(None);
+        };
+        Ok(Some(Self {
+            catalog,
+            format,
+            limits,
+        }))
+    }
+
+    /// Return the application selected from the retained component snapshot.
+    #[must_use]
+    pub const fn format(&self) -> Format {
+        self.format
+    }
+
+    /// Return the checked detection profile used to prepare this source.
+    #[must_use]
+    pub const fn limits(&self) -> Limits {
+        self.limits
+    }
+
+    /// Consume this source into its physical catalog for a focused adapter.
+    ///
+    /// This is an explicitly unstable cross-crate handoff. Application code
+    /// should pass `PreparedSource` to a format owner instead of depending on
+    /// archive vocabulary directly.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn __into_source_catalog(self) -> SourceCatalog {
+        self.catalog
+    }
+}
+
+fn check_prepared_candidate(value: &[u8], limits: Limits) -> Result<bool> {
+    let input_size = u64::try_from(value.len()).map_err(|error| {
+        Error::InvalidFormat(format!("iWork input length exceeds u64: {error}"))
+    })?;
+    if input_size > limits.max_input_bytes {
+        return Err(Error::InvalidFormat(format!(
+            "iWork detection input is {input_size} bytes, exceeding the {} byte limit",
+            limits.max_input_bytes
+        )));
+    }
+    Ok(is_zip_signature(value))
 }
 
 /// Resource ceilings for one iWork detection attempt.
@@ -1044,7 +1176,7 @@ mod tests {
     fn detects_from_the_same_parsed_component_snapshot() {
         for expected in [Format::Pages, Format::Numbers, Format::Keynote] {
             let bytes = document_package(expected, &[]);
-            let source = litchi_iwa_archive::SourceCatalog::from_bytes(&bytes).unwrap();
+            let source = SourceCatalog::from_bytes(&bytes).unwrap();
 
             assert_eq!(
                 component_catalog(source.components()).unwrap(),
@@ -1057,13 +1189,13 @@ mod tests {
         }
 
         let media_package = package(&[("Data/image.png", b"not an IWA component")]);
-        let source = litchi_iwa_archive::SourceCatalog::from_bytes(&media_package).unwrap();
+        let source = SourceCatalog::from_bytes(&media_package).unwrap();
         assert_eq!(component_catalog(source.components()).unwrap(), None);
 
         let pages_root = document(Format::Pages);
         let legacy_index = package(&[("Document.iwa", &pages_root)]);
         let legacy = package(&[("legacy.pages/Index.zip", &legacy_index)]);
-        let legacy_source = litchi_iwa_archive::SourceCatalog::from_bytes(&legacy).unwrap();
+        let legacy_source = SourceCatalog::from_bytes(&legacy).unwrap();
         assert_eq!(
             component_catalog(legacy_source.components()).unwrap(),
             Some(Format::Pages)
@@ -1073,8 +1205,45 @@ mod tests {
             ("Index/Document.iwa", &pages_root),
             ("Document.iwa", &pages_root),
         ]);
-        let duplicate_source = litchi_iwa_archive::SourceCatalog::from_bytes(&duplicate).unwrap();
+        let duplicate_source = SourceCatalog::from_bytes(&duplicate).unwrap();
         assert!(component_catalog(duplicate_source.components()).is_err());
+    }
+
+    #[test]
+    fn prepared_source_retains_one_shared_snapshot_and_profile() {
+        let bytes: Arc<[u8]> = document_package(Format::Pages, &[]).into();
+        let limits = Limits::new(
+            u64::try_from(bytes.len()).unwrap(),
+            32,
+            1024 * 1024,
+            2 * 1024 * 1024,
+            4 * 1024 * 1024,
+        )
+        .unwrap();
+
+        let prepared = PreparedSource::from_shared_bytes_with_limits(Arc::clone(&bytes), limits)
+            .unwrap()
+            .unwrap();
+        assert_eq!(prepared.format(), Format::Pages);
+        assert_eq!(prepared.limits(), limits);
+
+        let catalog = prepared.__into_source_catalog();
+        assert!(Arc::ptr_eq(&bytes, &catalog.shared_source()));
+        assert_eq!(catalog.limits().max_input_bytes(), limits.max_input_bytes());
+        assert_eq!(catalog.limits().max_entries(), limits.max_files());
+        assert_eq!(
+            catalog.limits().max_iwa_stream_bytes(),
+            limits.max_iwa_stream_size()
+        );
+    }
+
+    #[test]
+    fn prepared_source_leaves_unrecognized_inputs_unclaimed() {
+        assert!(
+            PreparedSource::from_bytes(b"not a ZIP package")
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

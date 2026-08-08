@@ -10,10 +10,10 @@
 use std::fmt;
 use std::sync::Arc;
 
-use litchi_keynote::Slide;
+use litchi_keynote::{Document as KeynoteDocument, Slide};
 use litchi_numbers::Table;
 use litchi_numbers::cell::Value;
-use litchi_pages::Section;
+use litchi_pages::{Document as PagesDocument, Section};
 
 /// Maximum number of tables retained by one structured snapshot.
 pub const MAX_TABLES: usize = litchi_numbers::MAX_TABLES;
@@ -239,15 +239,58 @@ impl fmt::Display for Text<'_> {
 #[derive(Debug, Default)]
 struct Snapshot {
     tables: Vec<Table>,
-    slides: Vec<Slide>,
-    sections: Vec<Section>,
+    slides: Slides,
+    sections: Sections,
+}
+
+#[derive(Debug)]
+enum Slides {
+    Owned(Vec<Slide>),
+    Keynote(KeynoteDocument),
+}
+
+impl Slides {
+    fn as_slice(&self) -> &[Slide] {
+        match self {
+            Self::Owned(slides) => slides,
+            Self::Keynote(document) => document.slides(),
+        }
+    }
+}
+
+impl Default for Slides {
+    fn default() -> Self {
+        Self::Owned(Vec::new())
+    }
+}
+
+#[derive(Debug)]
+enum Sections {
+    Owned(Vec<Section>),
+    Pages(PagesDocument),
+}
+
+impl Sections {
+    fn as_slice(&self) -> &[Section] {
+        match self {
+            Self::Owned(sections) => sections,
+            Self::Pages(document) => document.sections(),
+        }
+    }
+}
+
+impl Default for Sections {
+    fn default() -> Self {
+        Self::Owned(Vec::new())
+    }
 }
 
 /// An immutable, archive-free structured iWork snapshot.
 ///
-/// The snapshot has one reference-counted owner containing the three original
-/// semantic vectors. A clone or [`Self::snapshot`] shares that owner and never
-/// clones a table, slide, section, sparse cell, or text allocation.
+/// The snapshot has one reference-counted owner containing either consumed
+/// semantic vectors or sharing-aware Pages/Keynote document handles. A clone
+/// or [`Self::snapshot`] shares that owner and never clones a table, slide,
+/// section, sparse cell, or text allocation.
 /// Native archive objects, protobuf messages, and physical identifiers are
 /// intentionally absent from this API.
 #[derive(Debug, Clone)]
@@ -298,96 +341,79 @@ impl StructuredData {
         sections: Vec<Section>,
         limits: Limits,
     ) -> Result<Self> {
-        let max_tables = limits.max_tables;
-        let max_slides = limits.max_slides;
-        let max_sections = limits.max_sections;
-        let max_text_bytes = limits.max_text_bytes;
-
-        if tables.len() > max_tables {
-            return Err(Error::TooManyTables {
-                actual: tables.len(),
-                limit: max_tables,
-            });
-        }
-        if slides.len() > max_slides {
-            return Err(Error::TooManySlides {
-                actual: slides.len(),
-                limit: max_slides,
-            });
-        }
-        if sections.len() > max_sections {
-            return Err(Error::TooManySections {
-                actual: sections.len(),
-                limit: max_sections,
-            });
-        }
-
-        for (expected, slide) in slides.iter().enumerate() {
-            if slide.index() != expected {
-                return Err(Error::InvalidSlideIndex {
-                    expected,
-                    actual: slide.index(),
-                });
-            }
-        }
-        for (expected, section) in sections.iter().enumerate() {
-            if section.index() != expected {
-                return Err(Error::InvalidSectionIndex {
-                    expected,
-                    actual: section.index(),
-                });
-            }
-        }
-
-        let mut text_bytes = 0;
-        for table in &tables {
-            text_bytes = checked_text_add(text_bytes, table.name().len(), max_text_bytes)?;
-            for header in table.column_headers().chain(table.row_headers()) {
-                text_bytes = checked_text_add(text_bytes, header.len(), max_text_bytes)?;
-            }
-            for cell in table.iter_cells() {
-                let value_bytes = match cell.value() {
-                    Value::Text(value) | Value::Formula(value) | Value::Error(value) => value.len(),
-                    Value::Empty
-                    | Value::Number(_)
-                    | Value::Boolean(_)
-                    | Value::Date(_)
-                    | Value::Duration(_) => 0,
-                };
-                text_bytes = checked_text_add(text_bytes, value_bytes, max_text_bytes)?;
-            }
-        }
-        for slide in &slides {
-            if let Some(title) = slide.title() {
-                text_bytes = checked_text_add(text_bytes, title.len(), max_text_bytes)?;
-            }
-            for text in slide.text_content() {
-                text_bytes = checked_text_add(text_bytes, text.len(), max_text_bytes)?;
-            }
-            if let Some(notes) = slide.notes() {
-                text_bytes = checked_text_add(text_bytes, notes.len(), max_text_bytes)?;
-            }
-            for storage in slide.text_storages() {
-                text_bytes = checked_text_add(text_bytes, storage.len(), max_text_bytes)?;
-            }
-        }
-        for section in &sections {
-            if let Some(heading) = section.heading() {
-                text_bytes = checked_text_add(text_bytes, heading.len(), max_text_bytes)?;
-            }
-            for paragraph in section.paragraphs() {
-                text_bytes = checked_text_add(text_bytes, paragraph.len(), max_text_bytes)?;
-            }
-            for storage in section.text_storages() {
-                text_bytes = checked_text_add(text_bytes, storage.len(), max_text_bytes)?;
-            }
-        }
+        validate_parts(&tables, &slides, &sections, limits)?;
 
         Ok(Self {
             snapshot: Arc::new(Snapshot {
                 tables,
-                slides,
-                sections,
+                slides: Slides::Owned(slides),
+                sections: Sections::Owned(sections),
+            }),
+        })
+    }
+
+    /// Build a structured snapshot that shares a Keynote semantic document.
+    ///
+    /// No slide, text storage, build, transition, or string is cloned. The
+    /// supplied document remains the sole semantic owner behind this aggregate
+    /// view.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when slide positions or default aggregate bounds
+    /// are invalid.
+    pub fn from_keynote_document(document: KeynoteDocument) -> Result<Self> {
+        Self::from_keynote_document_with_limits(document, Limits::default())
+    }
+
+    /// Build a sharing-aware Keynote snapshot under explicit aggregate limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when slide positions or selected aggregate bounds
+    /// are invalid.
+    pub fn from_keynote_document_with_limits(
+        document: KeynoteDocument,
+        limits: Limits,
+    ) -> Result<Self> {
+        validate_parts(&[], document.slides(), &[], limits)?;
+        Ok(Self {
+            snapshot: Arc::new(Snapshot {
+                tables: Vec::new(),
+                slides: Slides::Keynote(document),
+                sections: Sections::default(),
+            }),
+        })
+    }
+
+    /// Build a structured snapshot that shares a Pages semantic document.
+    ///
+    /// No section, text storage, run, or string is cloned.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when section positions or default aggregate bounds
+    /// are invalid.
+    pub fn from_pages_document(document: PagesDocument) -> Result<Self> {
+        Self::from_pages_document_with_limits(document, Limits::default())
+    }
+
+    /// Build a sharing-aware Pages snapshot under explicit aggregate limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when section positions or selected aggregate
+    /// bounds are invalid.
+    pub fn from_pages_document_with_limits(
+        document: PagesDocument,
+        limits: Limits,
+    ) -> Result<Self> {
+        validate_parts(&[], &[], document.sections(), limits)?;
+        Ok(Self {
+            snapshot: Arc::new(Snapshot {
+                tables: Vec::new(),
+                slides: Slides::default(),
+                sections: Sections::Pages(document),
             }),
         })
     }
@@ -431,57 +457,57 @@ impl StructuredData {
     /// Borrow slides in stable source order without cloning them.
     #[must_use]
     pub fn slides(&self) -> &[Slide] {
-        &self.snapshot.slides
+        self.snapshot.slides.as_slice()
     }
 
     /// Iterate over slides in stable source order without cloning them.
     #[must_use]
     pub fn iter_slides(&self) -> impl ExactSizeIterator<Item = &Slide> + '_ {
-        self.snapshot.slides.iter()
+        self.snapshot.slides.as_slice().iter()
     }
 
     /// Select a slide by checked zero-based position.
     #[must_use]
     pub fn slide(&self, index: usize) -> Option<&Slide> {
-        self.snapshot.slides.get(index)
+        self.snapshot.slides.as_slice().get(index)
     }
 
     /// Return the number of slides in the snapshot.
     #[must_use]
     pub fn slide_count(&self) -> usize {
-        self.snapshot.slides.len()
+        self.snapshot.slides.as_slice().len()
     }
 
     /// Borrow sections in stable source order without cloning them.
     #[must_use]
     pub fn sections(&self) -> &[Section] {
-        &self.snapshot.sections
+        self.snapshot.sections.as_slice()
     }
 
     /// Iterate over sections in stable source order without cloning them.
     #[must_use]
     pub fn iter_sections(&self) -> impl ExactSizeIterator<Item = &Section> + '_ {
-        self.snapshot.sections.iter()
+        self.snapshot.sections.as_slice().iter()
     }
 
     /// Select a section by checked zero-based position.
     #[must_use]
     pub fn section(&self, index: usize) -> Option<&Section> {
-        self.snapshot.sections.get(index)
+        self.snapshot.sections.as_slice().get(index)
     }
 
     /// Return the number of sections in the snapshot.
     #[must_use]
     pub fn section_count(&self) -> usize {
-        self.snapshot.sections.len()
+        self.snapshot.sections.as_slice().len()
     }
 
     /// Return whether no semantic values were extracted.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.snapshot.tables.is_empty()
-            && self.snapshot.slides.is_empty()
-            && self.snapshot.sections.is_empty()
+            && self.snapshot.slides.as_slice().is_empty()
+            && self.snapshot.sections.as_slice().is_empty()
     }
 
     /// Return deterministic summary counts for the contained values.
@@ -490,8 +516,8 @@ impl StructuredData {
         format!(
             "Tables: {}, Slides: {}, Sections: {}",
             self.snapshot.tables.len(),
-            self.snapshot.slides.len(),
-            self.snapshot.sections.len()
+            self.snapshot.slides.as_slice().len(),
+            self.snapshot.sections.as_slice().len()
         )
     }
 
@@ -505,8 +531,13 @@ impl StructuredData {
     #[must_use = "iterating the borrowed text requires consuming the iterator"]
     pub fn iter_text(&self) -> impl Iterator<Item = Text<'_>> + '_ {
         let tables = self.snapshot.tables.iter().flat_map(table_text);
-        let slides = self.snapshot.slides.iter().flat_map(slide_text);
-        let sections = self.snapshot.sections.iter().flat_map(section_text);
+        let slides = self.snapshot.slides.as_slice().iter().flat_map(slide_text);
+        let sections = self
+            .snapshot
+            .sections
+            .as_slice()
+            .iter()
+            .flat_map(section_text);
         tables.chain(slides).chain(sections)
     }
 
@@ -518,6 +549,99 @@ impl StructuredData {
     pub fn all_text(&self) -> Vec<String> {
         self.iter_text().map(|text| text.to_string()).collect()
     }
+}
+
+fn validate_parts(
+    tables: &[Table],
+    slides: &[Slide],
+    sections: &[Section],
+    limits: Limits,
+) -> Result<()> {
+    let max_tables = limits.max_tables;
+    let max_slides = limits.max_slides;
+    let max_sections = limits.max_sections;
+    let max_text_bytes = limits.max_text_bytes;
+
+    if tables.len() > max_tables {
+        return Err(Error::TooManyTables {
+            actual: tables.len(),
+            limit: max_tables,
+        });
+    }
+    if slides.len() > max_slides {
+        return Err(Error::TooManySlides {
+            actual: slides.len(),
+            limit: max_slides,
+        });
+    }
+    if sections.len() > max_sections {
+        return Err(Error::TooManySections {
+            actual: sections.len(),
+            limit: max_sections,
+        });
+    }
+
+    for (expected, slide) in slides.iter().enumerate() {
+        if slide.index() != expected {
+            return Err(Error::InvalidSlideIndex {
+                expected,
+                actual: slide.index(),
+            });
+        }
+    }
+    for (expected, section) in sections.iter().enumerate() {
+        if section.index() != expected {
+            return Err(Error::InvalidSectionIndex {
+                expected,
+                actual: section.index(),
+            });
+        }
+    }
+
+    let mut text_bytes = 0;
+    for table in tables {
+        text_bytes = checked_text_add(text_bytes, table.name().len(), max_text_bytes)?;
+        for header in table.column_headers().chain(table.row_headers()) {
+            text_bytes = checked_text_add(text_bytes, header.len(), max_text_bytes)?;
+        }
+        for cell in table.iter_cells() {
+            let value_bytes = match cell.value() {
+                Value::Text(value) | Value::Formula(value) | Value::Error(value) => value.len(),
+                Value::Empty
+                | Value::Number(_)
+                | Value::Boolean(_)
+                | Value::Date(_)
+                | Value::Duration(_) => 0,
+            };
+            text_bytes = checked_text_add(text_bytes, value_bytes, max_text_bytes)?;
+        }
+    }
+    for slide in slides {
+        if let Some(title) = slide.title() {
+            text_bytes = checked_text_add(text_bytes, title.len(), max_text_bytes)?;
+        }
+        for text in slide.text_content() {
+            text_bytes = checked_text_add(text_bytes, text.len(), max_text_bytes)?;
+        }
+        if let Some(notes) = slide.notes() {
+            text_bytes = checked_text_add(text_bytes, notes.len(), max_text_bytes)?;
+        }
+        for storage in slide.text_storages() {
+            text_bytes = checked_text_add(text_bytes, storage.len(), max_text_bytes)?;
+        }
+    }
+    for section in sections {
+        if let Some(heading) = section.heading() {
+            text_bytes = checked_text_add(text_bytes, heading.len(), max_text_bytes)?;
+        }
+        for paragraph in section.paragraphs() {
+            text_bytes = checked_text_add(text_bytes, paragraph.len(), max_text_bytes)?;
+        }
+        for storage in section.text_storages() {
+            text_bytes = checked_text_add(text_bytes, storage.len(), max_text_bytes)?;
+        }
+    }
+    Ok(())
 }
 
 const fn clamp_limit(value: usize, maximum: usize) -> usize {
@@ -777,6 +901,32 @@ mod tests {
         assert!(Arc::ptr_eq(&data.snapshot, &snapshot.snapshot));
         assert_eq!(data.tables().as_ptr(), table_ptr);
         assert_eq!(snapshot.table(0).map(Table::name), Some("Data"));
+    }
+
+    #[test]
+    fn document_backed_snapshots_reuse_leaf_allocations() {
+        let mut slide = Slide::builder(0);
+        slide.set_title(Some("Shared slide".to_owned()));
+        let mut show = litchi_keynote::Show::builder();
+        show.push_slide(slide.build());
+        let keynote = KeynoteDocument::from_show(show.build());
+        let slide_ptr = keynote.slides().as_ptr();
+
+        let keynote_data = StructuredData::from_keynote_document(keynote)
+            .unwrap_or_else(|error| panic!("Keynote document should be valid: {error}"));
+        assert_eq!(keynote_data.slides().as_ptr(), slide_ptr);
+        assert_eq!(keynote_data.all_text(), ["Shared slide"]);
+
+        let mut section = Section::builder(0, litchi_pages::SectionType::Body);
+        section.set_heading(Some("Shared section".to_owned()));
+        let pages = PagesDocument::from_sections(vec![section.build()])
+            .unwrap_or_else(|error| panic!("Pages document should be valid: {error}"));
+        let section_ptr = pages.sections().as_ptr();
+
+        let pages_data = StructuredData::from_pages_document(pages)
+            .unwrap_or_else(|error| panic!("Pages document should be valid: {error}"));
+        assert_eq!(pages_data.sections().as_ptr(), section_ptr);
+        assert_eq!(pages_data.all_text(), ["Shared section"]);
     }
 
     #[test]

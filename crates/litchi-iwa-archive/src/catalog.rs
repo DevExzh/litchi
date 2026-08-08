@@ -158,6 +158,7 @@ impl IntoIterator for ComponentCatalog {
 pub struct SourceCatalog {
     package: Catalog,
     components: ComponentCatalog,
+    limits: Limits,
 }
 
 impl SourceCatalog {
@@ -230,11 +231,23 @@ impl SourceCatalog {
     }
 
     fn from_package(package: Catalog, limits: Limits) -> Result<Self> {
-        let components = ComponentCatalog::from_package_catalog(&package, limits)?;
+        let validated_limits = limits.validate()?;
+        let components = ComponentCatalog::from_package_catalog(&package, validated_limits)?;
         Ok(Self {
             package,
             components,
+            limits: validated_limits,
         })
+    }
+
+    /// Return the checked physical profile that authorized this snapshot.
+    ///
+    /// A downstream format projection must derive its physical assumptions
+    /// from this value rather than accepting a second, potentially weaker
+    /// profile after ZIP, Snappy, and IWA validation has already completed.
+    #[must_use]
+    pub const fn limits(&self) -> Limits {
+        self.limits
     }
 
     /// Borrow the physical/logical package catalog retained by this snapshot.
@@ -471,6 +484,22 @@ mod tests {
                 .map(Component::name),
             Some("Index/Document.iwa")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn source_catalog_retains_the_validated_ingress_profile() -> Result<()> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
+        let source: Arc<[u8]> = writer.finish_to_bytes()?.into();
+        let source_len = u64::try_from(source.len()).map_err(|_error| {
+            crate::Error::InvalidBundle("test source length does not fit u64".to_owned())
+        })?;
+        let limits = Limits::new(source_len, 7, source_len, source_len, 1_024 * 1_024)?;
+
+        let catalog = SourceCatalog::from_shared_bytes_with_limits(source, limits)?;
+
+        assert_eq!(catalog.limits(), limits);
         Ok(())
     }
 

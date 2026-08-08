@@ -60,7 +60,14 @@ odp = ["dep:litchi-odp", "odf-common"]
 pages = ["dep:litchi-pages", "dep:litchi-iwa-detect"]
 keynote = ["dep:litchi-keynote", "dep:litchi-iwa-detect"]
 numbers = ["dep:litchi-numbers", "dep:litchi-iwa-detect", "sheet"]
-iwork = ["pages", "keynote", "numbers"]
+iwork = [
+    "pages",
+    "keynote",
+    "numbers",
+    "litchi-pages/internal-iwork-source",
+    "litchi-keynote/internal-iwork-source",
+    "litchi-numbers/internal-iwork-source",
+]
 
 # Low-level and opt-in capabilities
 cfb = ["dep:litchi-cfb"]
@@ -171,15 +178,15 @@ litchi-markdown = { workspace = true, optional = true } # Markdown emission
 litchi-numbers = { workspace = true, optional = true } # Apple Numbers support
 litchi-odf-common = { workspace = true, optional = true } # Shared OpenDocument vocabulary
 litchi-odp = { workspace = true, optional = true } # OpenDocument Presentation support
+litchi-odraw = { workspace = true, optional = true } # OfficeArt image grammar
 litchi-ods = { workspace = true, optional = true } # OpenDocument Spreadsheet support
 litchi-odt = { workspace = true, optional = true } # OpenDocument Text support
-litchi-odraw = { workspace = true, optional = true } # OfficeArt image grammar
 litchi-ole-common = { workspace = true, optional = true } # Shared OLE2 vocabulary
 litchi-ooxml-common = { workspace = true, optional = true } # Shared OOXML vocabulary
 litchi-opc = { workspace = true, optional = true } # Open Packaging Conventions support
+litchi-pages = { workspace = true, optional = true } # Apple Pages support
 litchi-ppt = { workspace = true, optional = true } # Legacy PowerPoint binary support
 litchi-pptx = { workspace = true, optional = true } # PresentationML support
-litchi-pages = { workspace = true, optional = true } # Apple Pages support
 litchi-rtf = { workspace = true, optional = true } # Rich Text Format support
 litchi-sheet = { workspace = true, optional = true } # Shared spreadsheet vocabulary
 litchi-sign = { workspace = true, optional = true } # Office signature support

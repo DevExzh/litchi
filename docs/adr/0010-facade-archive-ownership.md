@@ -91,3 +91,13 @@ time of the decision. Shared physical ZIP and IWA limits live below the three
 concrete format owners, while semantic malformed-input policy remains with
 Pages, Numbers, or Keynote. The root facade composes the focused detector and
 does not regain a raw archive dependency.
+
+## 2026-08-08 amendment: opaque prepared iWork source
+
+The permitted focused, opaque detection plan now exists as
+`litchi_iwa_detect::PreparedSource`. It owns one classified immutable package
+snapshot and is consumed by exactly one format adapter through explicitly
+unstable feature-gated handoffs. The root coordinator can therefore avoid
+duplicate ZIP, Snappy, and IWA work without importing `litchi-iwa-archive`,
+traversing entries, or exposing a container type. Physical grammar and limits
+remain below the facade, preserving this decision's dependency boundary.

@@ -39,6 +39,9 @@ pub use formula::{
     FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
 };
 pub use litchi_iwa_common::table::title::Settings;
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub use package::__compatibility_tables_from_prepared_source;
 pub use package::{
     Error as PackageError, Limits as PackageLimits, MAX_OBJECTS, MAX_REFERENCES, Package,
     ReadOptions as PackageReadOptions, Result as PackageResult, SemanticLimitKind,
