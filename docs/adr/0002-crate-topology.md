@@ -344,10 +344,14 @@ existing `Effect` and scalar values
 (`Direction`, `MosaicType`, `Acceleration`, and `TextDelivery`). The semantic
 constructors enforce bounded ownership plus finite-number, NUL-free text, and
 canonical-value validation before a value is published. No raw native IDs or
-archives leak into this crate or its public API. `litchi-iwa` retains only
-native/protobuf decoding, payload structural validation, wire patching, graph
-lookup, and transactions; opaque payload decoding remains at that IWA
-boundary.
+archives leak into its public API. The concrete `Package` owner also provides
+selector-first, exact-source modern slide-transition transactions. A private
+Buffa lazy view projects the known native fields after strict bounded wire
+preflight; validated raw records remain authoritative for wire-preserving
+rewrites, and a full retained-options reopen verifies each candidate. No
+archive, protobuf value, component name, or native object ID is exposed. The
+legacy `litchi-iwa` Keynote reader/editor compatibility surface remains
+available; this owner transaction does not claim that surface was deleted.
 Pie and donut label semantics follow the same focused boundary at
 `litchi-iwa-common::chart::pie::{LabelVisibility, LeaderLineVisibility}`.
 `LabelVisibility` is a one-byte bitset for data-point names and values, while

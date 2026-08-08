@@ -69,3 +69,27 @@ fn show_settings_transaction_is_available_through_the_root_facade()
     assert_eq!(reapplied.package().source_bytes().as_ptr(), source_pointer);
     Ok(())
 }
+
+#[test]
+fn slide_transition_transaction_is_available_through_the_root_facade()
+-> Result<(), Box<dyn std::error::Error>> {
+    let package = Package::open(fixture_path())?;
+    let source_pointer = package.source_bytes().as_ptr();
+    let selector = SlideSelector::index(0);
+    let transition = package
+        .slide_transition(selector)?
+        .ok_or_else(|| io::Error::other("native Keynote file has no editable transition"))?;
+    let mut edit = package.edit_slide_transition(selector)?;
+    edit.set_transition(transition)?;
+    let commit = edit.commit()?;
+
+    assert!(commit.patch().is_noop());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().source_bytes().as_ptr(), source_pointer);
+
+    let reapplied = package.apply_slide_transition(commit.patch())?;
+    assert!(reapplied.patch().is_noop());
+    assert!(!reapplied.diagnostics().changed());
+    assert_eq!(reapplied.package().source_bytes().as_ptr(), source_pointer);
+    Ok(())
+}

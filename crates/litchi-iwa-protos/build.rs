@@ -15,6 +15,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed={BUFFA_PROJECTION_DIRECTORY}");
     println!("cargo:rerun-if-changed=src/group_node_category_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_slide_transition_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_section_codec.rs");
 
     let mut proto_files = fs::read_dir(proto_directory)?
@@ -33,6 +34,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     enforce_group_node_category_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_document_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_show_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_keynote_slide_transition_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
     enforce_pages_section_projection_provenance(proto_directory, buffa_projection_directory)?;
 
     prost_build::Config::new()
@@ -142,6 +147,28 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_keynote_show_projection_budget(&buffa_keynote_show_out_directory)?;
+
+    // Keynote slide transitions use only a small nested scalar path.  The
+    // source archive remains authoritative for preservation; Buffa supplies a
+    // borrowed semantic cross-check after strict wire preflight.
+    let buffa_keynote_slide_transition_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-slide-transition");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("KNSlideTransitionArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_slide_transition_out_directory)
+        .include_file("iwa_keynote_slide_transition_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_slide_transition_projection_budget(
+        &buffa_keynote_slide_transition_out_directory,
+    )?;
 
     // Pages section pagination is three optional scalar values. Keep all
     // template, name, and fill data outside generated code and decode the
@@ -387,6 +414,129 @@ fn enforce_pages_section_projection_provenance(
     Ok(())
 }
 
+fn enforce_keynote_slide_transition_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const CANONICAL_SLIDE: &str = "required .KN.TransitionArchive transition = 4;";
+    const CANONICAL_TRANSITION: &str = "required .KN.TransitionAttributesArchive attributes = 2;";
+    const CANONICAL_ANIMATION: [&str; 16] = [
+        "optional string animation_type = 1;",
+        "optional string effect = 2;",
+        "optional double duration = 3;",
+        "optional uint32 direction = 4;",
+        "optional double delay = 5;",
+        "optional bool is_automatic = 6;",
+        "optional .TSP.Color color = 7;",
+        "optional .TSD.PathSourceArchive custom_effect_timing_curve_1 = 8;",
+        "optional .TSD.PathSourceArchive custom_effect_timing_curve_2 = 9;",
+        "optional .TSD.PathSourceArchive custom_effect_timing_curve_3 = 10;",
+        "optional uint32 random_number_seed = 11;",
+        "optional double custom_detail = 12;",
+        "optional string custom_effect_timing_curve_theme_name_1 = 13;",
+        "optional string custom_effect_timing_curve_theme_name_2 = 14;",
+        "optional string custom_effect_timing_curve_theme_name_3 = 15;",
+        "optional bool writing_direction_is_rtl = 16;",
+    ];
+    const CANONICAL_ATTRIBUTES: [&str; 10] = [
+        "optional .KN.AnimationAttributesArchive animationAttributes = 8;",
+        "optional float custom_twist = 9;",
+        "optional uint32 custom_mosaic_size = 10;",
+        "optional uint32 custom_mosaic_type = 11;",
+        "optional bool custom_bounce = 12;",
+        "optional bool custom_magic_move_fade_unmatched_objects = 13;",
+        "optional .KN.TransitionAttributesArchive.TransitionCustomAttributesTimingCurveType custom_timing_curve = 15;",
+        "optional .KN.TransitionAttributesArchive.TransitionCustomAttributesTextDeliveryType custom_text_delivery_type = 16;",
+        "optional bool custom_motion_blur = 17;",
+        "optional float custom_travel_distance = 18;",
+    ];
+    const CANONICAL_SLIDE_NODE: &str = "required bool hasTransition = 7;";
+    const PROJECTION_MESSAGES: [&str; 5] = [
+        "message KeynoteAnimationAttributes {",
+        "message KeynoteTransitionAttributes {",
+        "message KeynoteTransitionArchive {",
+        "message KeynoteSlideTransitionArchive {",
+        "message KeynoteSlideNodeTransitionArchive {",
+    ];
+    const PROJECTION_FIELDS: [&str; 29] = [
+        "optional string animation_type = 1;",
+        "optional string effect = 2;",
+        "optional double duration = 3;",
+        "optional uint32 direction = 4;",
+        "optional double delay = 5;",
+        "optional bool is_automatic = 6;",
+        "optional bytes color = 7;",
+        "optional bytes custom_effect_timing_curve_1 = 8;",
+        "optional bytes custom_effect_timing_curve_2 = 9;",
+        "optional bytes custom_effect_timing_curve_3 = 10;",
+        "optional uint32 random_number_seed = 11;",
+        "optional double custom_detail = 12;",
+        "optional string custom_effect_timing_curve_theme_name_1 = 13;",
+        "optional string custom_effect_timing_curve_theme_name_2 = 14;",
+        "optional string custom_effect_timing_curve_theme_name_3 = 15;",
+        "optional bool writing_direction_is_rtl = 16;",
+        "optional .LitchiIwaProjection.KeynoteAnimationAttributes animation_attributes = 8;",
+        "optional float custom_twist = 9;",
+        "optional uint32 custom_mosaic_size = 10;",
+        "optional uint32 custom_mosaic_type = 11;",
+        "optional bool custom_bounce = 12;",
+        "optional bool custom_magic_move_fade_unmatched_objects = 13;",
+        "optional int32 custom_timing_curve = 15;",
+        "optional int32 custom_text_delivery_type = 16;",
+        "optional bool custom_motion_blur = 17;",
+        "optional float custom_travel_distance = 18;",
+        "required .LitchiIwaProjection.KeynoteTransitionAttributes attributes = 2;",
+        "required .LitchiIwaProjection.KeynoteTransitionArchive transition = 4;",
+        "required bool has_transition = 7;",
+    ];
+
+    let keynote = fs::read_to_string(proto_directory.join("KNArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("KNSlideTransitionArchive.proto"))?;
+    let codec = fs::read_to_string("src/keynote_slide_transition_codec.rs")?;
+    let production_codec = codec
+        .split_once("#[cfg(test)]")
+        .map_or(codec.as_str(), |(production, _tests)| production);
+    let animation_block = keynote
+        .split_once("message AnimationAttributesArchive {")
+        .and_then(|(_prefix, remainder)| {
+            remainder.split_once("\n}\n\nmessage TransitionAttributesArchive")
+        })
+        .map_or("", |(block, _suffix)| block);
+    let attributes_block = keynote
+        .split_once("message TransitionAttributesArchive {")
+        .and_then(|(_prefix, remainder)| remainder.split_once("\n}\n\nmessage TransitionArchive"))
+        .map_or("", |(block, _suffix)| block);
+    if keynote.matches(CANONICAL_SLIDE).count() != 1
+        || keynote.matches(CANONICAL_TRANSITION).count() != 1
+        || !CANONICAL_ANIMATION
+            .iter()
+            .all(|declaration| animation_block.matches(declaration).count() == 1)
+        || !CANONICAL_ATTRIBUTES
+            .iter()
+            .all(|declaration| attributes_block.matches(declaration).count() == 1)
+        || keynote.matches(CANONICAL_SLIDE_NODE).count() != 1
+        || !PROJECTION_MESSAGES
+            .iter()
+            .all(|declaration| projection.matches(declaration).count() == 1)
+        || !PROJECTION_FIELDS
+            .iter()
+            .all(|declaration| projection.matches(declaration).count() == 1)
+        || projection.len() > 4 * 1024
+        || projection.contains("repeated ")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "derived Keynote slide-transition projection/router drifted from canonical KN fields, exceeded its 4 KiB source budget, introduced generated repeated storage, or added production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 fn enforce_text_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
     const EXPECTED_FILES: usize = 5;
     const MAX_GENERATED_BYTES: u64 = 32 * 1024;
@@ -504,6 +654,47 @@ fn enforce_keynote_show_projection_budget(directory: &Path) -> Result<(), Box<dy
     if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || generated_repeated_views != 0 {
         return Err(format!(
             "Keynote show projection generated {files} files/{bytes} bytes/{generated_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_keynote_slide_transition_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    // Buffa 0.9.1 emits 207,203 bytes for the five scalar-only message
+    // shells. Leave a small codegen/formatter allowance without permitting a
+    // second schema closure to slip in unnoticed.
+    const MAX_GENERATED_BYTES: u64 = 224 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut generated_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        generated_repeated_views = generated_repeated_views
+            .checked_add(
+                fs::read_to_string(entry.path())?
+                    .matches("LazyRepeatedView")
+                    .count(),
+            )
+            .ok_or("generated repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || generated_repeated_views != 0 {
+        return Err(format!(
+            "Keynote slide-transition projection generated {files} files/{bytes} bytes/{generated_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

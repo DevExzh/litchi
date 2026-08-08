@@ -8,6 +8,7 @@ mod edit;
 mod limits;
 mod show_settings;
 mod slide_order;
+mod slide_transition;
 
 use std::fmt;
 use std::fs::File;
@@ -53,6 +54,10 @@ pub use show_settings::{
 pub use slide_order::{
     SlideOrderCommit, SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind,
     SlideOrderPatch,
+};
+pub use slide_transition::{
+    SlideTransitionCommit, SlideTransitionDiagnostics, SlideTransitionEdit, SlideTransitionError,
+    SlideTransitionLimitKind, SlideTransitionPatch,
 };
 
 /// Checked physical resource limits for Keynote package ingress.

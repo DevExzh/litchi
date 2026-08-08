@@ -67,6 +67,45 @@
 //! assert_eq!(restored.package().source_bytes(), package.source_bytes());
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
+//!
+//! # Edit one slide transition
+//!
+//! Read, replace, or clear a modern transition with the same selector-first,
+//! exact-source transaction model. Clearing writes Keynote's native no-effect
+//! transition; it does not synthesize a transition envelope for a legacy-only
+//! slide. Patches are reversible against the exact committed package bytes.
+//!
+//! ```no_run
+//! use std::io;
+//!
+//! use litchi_keynote::{Effect, Package};
+//!
+//! let package = Package::open("input.key")?;
+//! let before = package
+//!     .slide_transition("Appendix")?
+//!     .ok_or_else(|| io::Error::other("slide has no modern transition"))?;
+//! let mut replacement = before.clone();
+//! replacement.set_effect(Some(Effect::Dissolve))?;
+//!
+//! let mut edit = package.edit_slide_transition("Appendix")?;
+//! edit.set_transition(replacement)?;
+//! let commit = edit.commit()?;
+//! assert_eq!(
+//!     commit.package().slide_transition("Appendix")?,
+//!     commit.patch().after().cloned(),
+//! );
+//!
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_transition(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().slide_transition("Appendix")?, Some(before));
+//!
+//! let mut clear = restored.package().edit_slide_transition("Appendix")?;
+//! clear.clear()?;
+//! let cleared = clear.commit()?;
+//! assert_eq!(cleared.package().slide_transition("Appendix")?.unwrap().effect(), Some(&Effect::None));
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
 
 #![forbid(unsafe_code)]
 
@@ -99,8 +138,9 @@ pub use package::{
     ReadError, ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError, SemanticPath,
     ShowSettingsCommit, ShowSettingsDiagnostics, ShowSettingsEdit, ShowSettingsError,
     ShowSettingsLimitKind, ShowSettingsPatch, SlideOrderCommit, SlideOrderDiagnostics,
-    SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch, Stats,
-    TextStorageFailure,
+    SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch, SlideTransitionCommit,
+    SlideTransitionDiagnostics, SlideTransitionEdit, SlideTransitionError,
+    SlideTransitionLimitKind, SlideTransitionPatch, Stats, TextStorageFailure,
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use show::{Mode, Settings, Show, Size};

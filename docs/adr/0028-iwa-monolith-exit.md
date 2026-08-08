@@ -835,3 +835,34 @@ raw-ID example and transfers one focused mutation capability, but removes no
 manifest edge: all 16 ordered debts remain. Durable patches, atomic save,
 aggregate peak-memory policy, fuzz/sanitizer completion, the remaining Pages
 editor/example/test inventory, and complete host deletion remain open gates.
+
+## 2026-08-08 focused Keynote slide-transition ownership
+
+`litchi-keynote::Package` now owns selector-first read, set, native-none clear,
+exact patch application, and inverse replay for existing modern slide
+transitions. The public boundary exchanges complete archive-free
+`transition::Settings` values and semantic slide selectors; native object IDs,
+component names, protobuf values, wire records, and exact patch artifacts stay
+private. A strict bounded preflight and private Buffa lazy view project the
+known fields, while the accepted raw source records remain authoritative for
+preservation and mutation.
+
+Changed edits patch the modern transition leaves, preserve unknown nested
+records and IWA headers, validate and synchronize the slide-node
+`hasTransition` cache, reassemble only the one or two actual owner components,
+and fully reopen and reverse-read the candidate under retained limits before
+publication. Exact no-ops retain the source allocation, inverse replay restores
+the exact source bytes, and changed legacy nested packages are refused. The
+legacy host transition writer remains available for compatibility and was
+hardened to maintain the same cache invariant; no manifest edge or ordered debt
+is removed, so all 16 debts remain.
+
+Apple Keynote 14.4 opened both the Rust-authored Magic Move and native-none
+artifacts without repair or conversion. The inspector showed the requested
+effect/timing state, native Save As/close/reopen retained it, and focused
+restaging of both native-resaved artifacts was byte-identical. Public inverses
+for both pristine Rust candidates restored the exact app-authored Dissolve
+source. This advances a complete focused mutation vertical but does not satisfy
+durable patch serialization, atomic filesystem save, the aggregate peak-memory
+policy, fuzz/sanitizer gates, migration of the remaining Keynote editor surface,
+or deletion of `litchi-iwa`.

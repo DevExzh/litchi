@@ -8,6 +8,8 @@ use litchi_keynote::transition::{
 };
 
 const SLIDE_ARCHIVE_MESSAGE_TYPE: u32 = 5;
+const SLIDE_NODE_ARCHIVE_MESSAGE_TYPE: u32 = 4;
+const SLIDE_NODE_HAS_TRANSITION_FIELD: u32 = 7;
 
 pub(super) fn settings_from_native(
     attributes: &kn::TransitionAttributesArchive,
@@ -113,15 +115,33 @@ impl KeynoteEditor {
                 slides.len()
             ))
         })?;
-        if slide.transition.is_none() {
+        let Some(current_settings) = slide.transition.as_ref() else {
             return Err(Error::InvalidFormat(format!(
                 "Keynote slide {slide_index} has no modern transition attributes"
             )));
-        }
+        };
+        let current_has_effect = current_settings.has_effect();
+        let replacement_has_effect = settings.has_effect();
         let slide_id = slide.slide_id;
+        let node_id = slide.node_id;
         let graph = ObjectGraph::read(self.text.package())?;
         let archive_name = graph.archive_name(slide_id)?.to_owned();
+        let node_archive_name = graph.archive_name(node_id)?.to_owned();
+        let node: kn::SlideNodeArchive = graph.decode_type(
+            node_id,
+            SLIDE_NODE_ARCHIVE_MESSAGE_TYPE,
+            "KN.SlideNodeArchive",
+        )?;
+        if node.has_transition != current_has_effect {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote slide {slide_index} transition effect disagrees with its slide-node marker"
+            )));
+        }
+        if current_settings == &settings {
+            return Ok(());
+        }
         let mut staged = self.text.package().clone();
+        let archive_limits = staged.limits().effective_archive_limits()?;
         staged.update_archive(&archive_name, |archive| {
             let object = archive.object_mut(slide_id).ok_or_else(|| {
                 Error::InvalidFormat(format!("Keynote slide object {slide_id} is missing"))
@@ -154,15 +174,25 @@ impl KeynoteEditor {
                     "Keynote transition wire patch failed validation".to_owned(),
                 ));
             }
-            object.replace_message(
+            object.replace_message_preserving_header_with_limits(
                 message_index,
                 RawMessage {
                     type_: SLIDE_ARCHIVE_MESSAGE_TYPE,
                     data,
                 },
+                archive_limits,
             )?;
             Ok(())
         })?;
+        if current_has_effect != replacement_has_effect {
+            patch_slide_node_transition_marker(
+                &mut staged,
+                &node_archive_name,
+                node_id,
+                replacement_has_effect,
+                archive_limits,
+            )?;
+        }
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
         if verified
             .slides()?
@@ -174,9 +204,94 @@ impl KeynoteEditor {
                 "Keynote transition update failed round-trip validation".to_owned(),
             ));
         }
+        let verified_graph = ObjectGraph::read(verified.package())?;
+        let verified_node: kn::SlideNodeArchive = verified_graph.decode_type(
+            node_id,
+            SLIDE_NODE_ARCHIVE_MESSAGE_TYPE,
+            "KN.SlideNodeArchive",
+        )?;
+        if verified_node.has_transition != replacement_has_effect {
+            return Err(Error::InvalidFormat(
+                "Keynote transition update failed to synchronize its slide-node marker".to_owned(),
+            ));
+        }
         self.text = IWorkTextEditor::from_package(staged);
         Ok(())
     }
+}
+
+fn patch_slide_node_transition_marker(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    node_id: u64,
+    has_transition: bool,
+    archive_limits: crate::archive::ArchiveLimits,
+) -> Result<()> {
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(node_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Keynote slide node {node_id} is missing"))
+        })?;
+        let message_indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter_map(|(index, message)| {
+                (message.type_ == SLIDE_NODE_ARCHIVE_MESSAGE_TYPE).then_some(index)
+            })
+            .collect::<Vec<_>>();
+        let [message_index] = message_indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote slide node {node_id} must have exactly one SlideNodeArchive payload"
+            )));
+        };
+        let original = object.messages[*message_index].data.as_slice();
+        let marker_present = singular_varint_field_is_present(
+            original,
+            SLIDE_NODE_HAS_TRANSITION_FIELD,
+            "Keynote slide-node transition marker",
+        )?;
+        let data = patch_varint_field(
+            original,
+            SLIDE_NODE_HAS_TRANSITION_FIELD,
+            marker_present,
+            Some(u64::from(has_transition)),
+        )?;
+        if kn::SlideNodeArchive::decode(data.as_slice())?.has_transition != has_transition {
+            return Err(Error::InvalidFormat(
+                "Keynote slide-node transition marker patch failed validation".to_owned(),
+            ));
+        }
+        object.replace_message_preserving_header_with_limits(
+            *message_index,
+            RawMessage {
+                type_: SLIDE_NODE_ARCHIVE_MESSAGE_TYPE,
+                data,
+            },
+            archive_limits,
+        )?;
+        Ok(())
+    })
+}
+
+fn singular_varint_field_is_present(data: &[u8], field_number: u32, context: &str) -> Result<bool> {
+    let fields = parse_wire_fields(data)?;
+    let mut matching = fields
+        .into_iter()
+        .filter(|field| field.number() == field_number);
+    let Some(field) = matching.next() else {
+        return Ok(false);
+    };
+    if matching.next().is_some() {
+        return Err(Error::InvalidFormat(format!(
+            "{context} repeats protobuf field {field_number}"
+        )));
+    }
+    if field.wire_type() != 0 {
+        return Err(Error::InvalidFormat(format!(
+            "{context} protobuf field {field_number} is not a varint"
+        )));
+    }
+    Ok(true)
 }
 
 pub(super) fn validate_transition_settings(settings: &TransitionSettings) -> Result<()> {

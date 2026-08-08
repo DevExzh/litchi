@@ -1,7 +1,7 @@
 //! Mutable iWork ZIP package with entry-order preservation.
 
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Component, Path};
 use std::sync::Arc;
 
@@ -302,6 +302,80 @@ impl Default for PackageLimits {
     }
 }
 
+fn read_bounded_source(
+    reader: &mut impl Read,
+    reported_length: u64,
+    limits: PackageLimits,
+) -> Result<Arc<[u8]>> {
+    limits.check_input_size(reported_length, "iWork package input")?;
+
+    let maximum = usize::try_from(limits.max_input_bytes()).map_err(|_error| {
+        Error::InvalidFormat("iWork package input limit does not fit usize".to_owned())
+    })?;
+    let capacity = usize::try_from(reported_length)
+        .map_err(|_error| {
+            Error::InvalidFormat("iWork package input length does not fit usize".to_owned())
+        })?
+        .min(64 * 1024);
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(capacity).map_err(|_error| {
+        Error::InvalidFormat("could not allocate iWork package input".to_owned())
+    })?;
+
+    let mut buffer = [0u8; 8 * 1024];
+    loop {
+        let remaining = maximum.checked_sub(bytes.len()).ok_or_else(|| {
+            Error::InvalidFormat("iWork package input length exceeds usize".to_owned())
+        })?;
+        if remaining == 0 {
+            let mut extra = [0u8; 1];
+            if read_retrying_interrupted(reader, &mut extra)? != 0 {
+                limits.check_input_size(
+                    limits.max_input_bytes().saturating_add(1),
+                    "iWork package input",
+                )?;
+            }
+            break;
+        }
+
+        let read_limit = remaining.min(buffer.len());
+        let read = read_retrying_interrupted(reader, &mut buffer[..read_limit])?;
+        if read == 0 {
+            break;
+        }
+        let required = bytes.len().checked_add(read).ok_or_else(|| {
+            Error::InvalidFormat("iWork package input length exceeds usize".to_owned())
+        })?;
+        reserve_source_growth(&mut bytes, required, maximum)?;
+        bytes.extend_from_slice(&buffer[..read]);
+    }
+    Ok(bytes.into())
+}
+
+fn read_retrying_interrupted(reader: &mut impl Read, buffer: &mut [u8]) -> std::io::Result<usize> {
+    loop {
+        match reader.read(buffer) {
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {},
+            result => return result,
+        }
+    }
+}
+
+fn reserve_source_growth(bytes: &mut Vec<u8>, required: usize, maximum: usize) -> Result<()> {
+    if required <= bytes.capacity() {
+        return Ok(());
+    }
+
+    let doubled = bytes.capacity().checked_mul(2).unwrap_or(maximum);
+    let target = required.max(doubled).min(maximum);
+    let additional = target.checked_sub(bytes.len()).ok_or_else(|| {
+        Error::InvalidFormat("iWork package input length exceeds usize".to_owned())
+    })?;
+    bytes
+        .try_reserve_exact(additional)
+        .map_err(|_error| Error::InvalidFormat("could not allocate iWork package input".to_owned()))
+}
+
 impl IWorkPackage {
     pub fn new() -> Self {
         Self::default()
@@ -317,10 +391,9 @@ impl IWorkPackage {
     /// can be written back byte-for-byte, including ZIP metadata and comments.
     /// Legacy nested packages still normalize through the archive adapter.
     pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: PackageLimits) -> Result<Self> {
-        let path = path.as_ref();
-        let size = std::fs::metadata(path)?.len();
-        limits.check_input_size(size, "iWork package input")?;
-        let source: Arc<[u8]> = std::fs::read(path)?.into();
+        let mut file = File::open(path.as_ref())?;
+        let size = file.metadata()?.len();
+        let source = read_bounded_source(&mut file, size, limits)?;
         Self::from_shared_bytes_with_limits(source, limits)
     }
 
@@ -740,17 +813,15 @@ impl IWorkPackage {
 
         let existing = match fs::symlink_metadata(path) {
             Ok(metadata) if metadata.file_type().is_symlink() => {
-                return Err(Error::Bundle(format!(
-                    "iWork package destination must not be a symbolic link: {}",
-                    path.display()
-                )));
+                return Err(Error::Bundle(
+                    "iWork package destination must not be a symbolic link".to_owned(),
+                ));
             },
             Ok(metadata) if metadata.is_file() => Some(metadata),
             Ok(_) => {
-                return Err(Error::Bundle(format!(
-                    "iWork package destination is not a regular file: {}",
-                    path.display()
-                )));
+                return Err(Error::Bundle(
+                    "iWork package destination is not a regular file".to_owned(),
+                ));
             },
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
             Err(error) => return Err(error.into()),
@@ -1172,6 +1243,43 @@ mod tests {
         let mut written = Vec::new();
         package.write_to(&mut written)?;
         assert_eq!(written, bytes);
+        Ok(())
+    }
+
+    #[test]
+    fn bounded_path_reader_rejects_growth_past_the_limit() -> crate::Result<()> {
+        struct InterruptOnce<R> {
+            inner: R,
+            interrupted: bool,
+        }
+
+        impl<R: Read> Read for InterruptOnce<R> {
+            fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+                if !self.interrupted {
+                    self.interrupted = true;
+                    return Err(std::io::Error::from(std::io::ErrorKind::Interrupted));
+                }
+                self.inner.read(buffer)
+            }
+        }
+
+        let limits = PackageLimits::default().with_input_bytes(4)?;
+
+        let mut exact = InterruptOnce {
+            inner: std::io::Cursor::new([1, 2, 3, 4]),
+            interrupted: false,
+        };
+        let bytes = read_bounded_source(&mut exact, 4, limits)?;
+        assert_eq!(bytes.as_ref(), &[1, 2, 3, 4]);
+
+        let mut grew_after_metadata = std::io::Cursor::new([1, 2, 3, 4, 5]);
+        let error = read_bounded_source(&mut grew_after_metadata, 4, limits).unwrap_err();
+        assert!(error.to_string().contains("iWork package input"));
+        assert!(error.to_string().contains("exceeding the 4 byte limit"));
+
+        let mut initially_empty = std::io::Cursor::new([1, 2, 3, 4]);
+        let bytes = read_bounded_source(&mut initially_empty, 0, limits)?;
+        assert_eq!(bytes.as_ref(), &[1, 2, 3, 4]);
         Ok(())
     }
 
@@ -1880,6 +1988,11 @@ mod tests {
 
         let error = package.save(directory.path()).unwrap_err();
         assert!(error.to_string().contains("not a regular file"));
+        assert!(
+            !error
+                .to_string()
+                .contains(&directory.path().display().to_string())
+        );
         Ok(())
     }
 
@@ -1898,6 +2011,7 @@ mod tests {
         let error = package.save(&link).unwrap_err();
 
         assert!(error.to_string().contains("symbolic link"));
+        assert!(!error.to_string().contains(&link.display().to_string()));
         assert_eq!(std::fs::read(&target)?, b"sentinel");
         assert!(std::fs::symlink_metadata(&link)?.file_type().is_symlink());
         Ok(())

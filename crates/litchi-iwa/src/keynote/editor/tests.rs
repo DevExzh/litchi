@@ -3766,7 +3766,6 @@ fn slide_text_placeholder_visibility_rejects_missing_or_inconsistent_state() {
 #[test]
 fn transition_lifecycle_is_typed_transactional_and_wire_exact() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let baseline = editor.to_bytes().unwrap();
     let original: Settings = editor.slide_transition(0).unwrap().unwrap();
     assert_eq!(original.effect(), Some(&Effect::None));
     assert!(!original.has_effect());
@@ -3789,14 +3788,154 @@ fn transition_lifecycle_is_typed_transactional_and_wire_exact() {
 
     assert!(editor.clear_slide_transition(0).unwrap());
     assert_eq!(editor.slide_transition(0).unwrap(), Some(original));
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    let cleared = editor.to_bytes().unwrap();
     assert!(!editor.clear_slide_transition(0).unwrap());
     assert!(editor.slide_transition(99).is_err());
     assert!(editor.clear_slide_transition(99).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
+    assert_eq!(editor.to_bytes().unwrap(), cleared);
 
     assert!(Effect::unknown("none").is_err());
+    assert_eq!(editor.to_bytes().unwrap(), cleared);
+}
+
+#[test]
+fn transition_lifecycle_synchronizes_the_separate_slide_node_component() {
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(3).unwrap();
+            let message = object.messages[0].clone();
+            let mut data = patch_varint_field(&message.data, 7, true, Some(0))?;
+            append_unknown_varint(&mut data, 97, 9_700);
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            object.archive_info.message_infos[0]
+                .field_infos
+                .push(FieldInfo {
+                    path: FieldPath { path: vec![7] },
+                    ..Default::default()
+                });
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    let baseline = editor.to_bytes().unwrap();
+    let original = editor.slide_transition(0).unwrap().unwrap();
+    assert!(!original.has_effect());
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    assert_ne!(
+        graph.archive_name(3).unwrap(),
+        graph.archive_name(4).unwrap()
+    );
+    let original_node_wire = graph
+        .message_data_type(3, TEST_SLIDE_NODE_MESSAGE_TYPE, "KN.SlideNodeArchive")
+        .unwrap();
+    let original_unknown = crate::wire::parse_wire_fields(original_node_wire)
+        .unwrap()
+        .into_iter()
+        .find(|field| field.number() == 97)
+        .map(|field| original_node_wire[field.start()..field.end()].to_vec())
+        .unwrap();
+    let original_header_metadata = editor
+        .package()
+        .archive("Index/Document.iwa")
+        .unwrap()
+        .object(3)
+        .unwrap()
+        .archive_info
+        .message_infos[0]
+        .field_infos
+        .clone();
+
+    let mut dissolve = original.clone();
+    dissolve.set_effect(Some(Effect::Dissolve)).unwrap();
+    editor.set_slide_transition(0, dissolve.clone()).unwrap();
+    assert_eq!(editor.slide_transition(0).unwrap(), Some(dissolve.clone()));
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let node: kn::SlideNodeArchive = graph
+        .decode_type(3, TEST_SLIDE_NODE_MESSAGE_TYPE, "KN.SlideNodeArchive")
+        .unwrap();
+    assert!(node.has_transition);
+    let node_wire = graph
+        .message_data_type(3, TEST_SLIDE_NODE_MESSAGE_TYPE, "KN.SlideNodeArchive")
+        .unwrap();
+    let unknown = crate::wire::parse_wire_fields(node_wire)
+        .unwrap()
+        .into_iter()
+        .find(|field| field.number() == 97)
+        .map(|field| node_wire[field.start()..field.end()].to_vec())
+        .unwrap();
+    assert_eq!(unknown, original_unknown);
+    assert_eq!(
+        editor
+            .package()
+            .archive("Index/Document.iwa")
+            .unwrap()
+            .object(3)
+            .unwrap()
+            .archive_info
+            .message_infos[0]
+            .field_infos,
+        original_header_metadata
+    );
+
+    let changed = editor.to_bytes().unwrap();
+    editor.set_slide_transition(0, dissolve).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), changed);
+
+    let reopened = KeynoteEditor::from_bytes(&changed).unwrap();
+    assert_eq!(
+        reopened.slide_transition(0).unwrap().unwrap().has_effect(),
+        true
+    );
+    let reopened_graph = ObjectGraph::read(reopened.package()).unwrap();
+    let reopened_node: kn::SlideNodeArchive = reopened_graph
+        .decode_type(3, TEST_SLIDE_NODE_MESSAGE_TYPE, "KN.SlideNodeArchive")
+        .unwrap();
+    assert!(reopened_node.has_transition);
+
+    assert!(editor.clear_slide_transition(0).unwrap());
+    assert!(!editor.slide_transition(0).unwrap().unwrap().has_effect());
+    let graph = ObjectGraph::read(editor.package()).unwrap();
+    let node: kn::SlideNodeArchive = graph
+        .decode_type(3, TEST_SLIDE_NODE_MESSAGE_TYPE, "KN.SlideNodeArchive")
+        .unwrap();
+    assert!(!node.has_transition);
     assert_eq!(editor.to_bytes().unwrap(), baseline);
+    assert!(!editor.clear_slide_transition(0).unwrap());
+    assert_eq!(editor.to_bytes().unwrap(), baseline);
+
+    let mut malformed = KeynoteEditor::from_package(test_package()).unwrap();
+    let mut invalid = malformed.slide_transition(0).unwrap().unwrap();
+    invalid.set_effect(Some(Effect::Dissolve)).unwrap();
+    let mut corrupted = malformed.into_package();
+    corrupted
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(3).unwrap();
+            let message = object.messages[0].clone();
+            let mut data = message.data;
+            append_unknown_varint(&mut data, 7, 0);
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: TEST_SLIDE_NODE_MESSAGE_TYPE,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    malformed = KeynoteEditor::from_package(corrupted).unwrap();
+    let malformed_before = malformed.to_bytes().unwrap();
+    assert!(malformed.set_slide_transition(0, invalid).is_err());
+    assert_eq!(malformed.to_bytes().unwrap(), malformed_before);
+    assert!(!malformed.slide_transition(0).unwrap().unwrap().has_effect());
 }
 
 #[test]

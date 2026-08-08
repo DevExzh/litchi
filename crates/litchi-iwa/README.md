@@ -87,10 +87,13 @@ println!("{}", structured.summary());
   emphasis actions, typed Keyboard / Shimmer / Skid / Swoosh / Trace build-in/build-out
   effects with native direction models, wire-preserving
   move/reorder operations, validated raw CRUD for unmapped native build parameters,
-  typed transition effects, acceleration and text delivery, semantic transition
-  deletion through Keynote's native `none` state, lossless effect-specific
-  parameters, component UUIDs,
+  component UUIDs,
   and slide-node cache maintenance
+- `litchi-keynote::Package` selector-first modern slide-transition reads and
+  exact-source set/clear transactions with reversible patches. A private Buffa
+  lazy view projects known fields, while validated raw records remain the
+  preservation authority; legacy `litchi-iwa` Keynote transition compatibility
+  APIs remain available.
 - Typed direct-drawable comment CRUD with Pages document-reachability,
   Numbers sheet-ownership, and Keynote slide-ownership guards
 - Native Numbers cell-comment and direct-reply CRUD with table-list refcounts,
@@ -945,7 +948,6 @@ use litchi_iwa::keynote::{
     KeynoteHorizontalBuildDirection, KeynoteKeyboardDirection, KeynoteRotationDirection,
     KeynoteSlideTextRole, KeynoteSwooshDirection,
 };
-use litchi_keynote::transition::{Acceleration, Effect, TextDelivery};
 use litchi_numbers::table::headers::Count as HeaderCount;
 
 let mut numbers = NumbersEditor::open("input.numbers")?;
@@ -1138,15 +1140,6 @@ keynote.set_slide_number_visible(0, true)?;
 let layout = keynote.default_slide_layout()?;
 let fresh = keynote.add_slide(layout)?;
 keynote.set_slide_title(fresh.index, "New from theme")?;
-let mut transition = keynote.slides()?[0].transition.clone().expect("transition");
-transition.effect = Some(Effect::Dissolve);
-transition.duration = Some(1.5);
-transition.custom_parameters.acceleration =
-    Some(Acceleration::EaseInOut);
-transition.custom_parameters.text_delivery =
-    Some(TextDelivery::ByWord);
-keynote.set_slide_transition(0, transition)?;
-keynote.clear_slide_transition(0)?;
 let mut show = keynote.show_settings()?;
 show.set_loop_presentation(Some(true));
 show.set_mode(Some(litchi_iwa::keynote::Mode::SelfPlaying))?;
@@ -1247,12 +1240,43 @@ keynote.save("updated.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
-Keynote slide skip/include and ordering transactions have moved to the concrete
-`litchi-keynote` owner. Use its focused package transactions with exact-name or
-typed-position `SlideSelector` values; the focused skip-state and slide-order
-examples demonstrate the raw-ID-free paths. The compatibility editor remains
-available for the other operations in this legacy example while migration
-continues.
+Keynote slide skip/include, ordering, and modern transition transactions have
+focused `litchi-keynote` package-owner paths. Use exact-name or typed-position
+`SlideSelector` values; transition edits read their current settings, replace
+them or clear them to Keynote's native `none` representation, and carry an
+exact-source-checked inverse patch. A private Buffa lazy view projects known
+native fields, while bounded raw-record rewriting preserves accepted source
+bytes. The legacy `litchi-iwa` Keynote compatibility editor, including its
+transition APIs, remains available while migration continues.
+
+```rust,no_run
+use std::io;
+
+use litchi_keynote::{Effect, Package, SlideSelector};
+
+let package = Package::open("input.key")?;
+let selector = SlideSelector::name("Opening");
+let mut settings = package
+    .slide_transition(selector)?
+    .ok_or_else(|| io::Error::other("slide has no modern transition"))?;
+settings.set_effect(Some(Effect::Dissolve))?;
+
+let mut edit = package.edit_slide_transition(selector)?;
+edit.set_transition(settings)?;
+let commit = edit.commit()?;
+
+let mut clear = commit.package().edit_slide_transition(selector)?;
+clear.clear()?;
+let cleared = clear.commit()?;
+let restored = cleared
+    .package()
+    .apply_slide_transition(&cleared.patch().inverse())?;
+assert_eq!(
+    restored.package().slide_transition(selector)?,
+    cleared.patch().before().cloned(),
+);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
 Text ranges use UTF-16 indexes, matching iWork's attribute tables. Shared
 `TSWP.StorageArchive` edits patch only text chunks and affected attribute
@@ -1468,19 +1492,19 @@ drawable fields. Pages exposes aspect-ratio constraints for anchored text
 boxes but can disable its Lock control for that placement mode. See
 `edit_pages_text_box_properties`.
 
-Keynote show dimensions and playback flags, slide skip state and navigator
-name, and modern transition identifiers/timing fields use the same bounded wire
-mutations. Transition effects are typed, including native None, Dissolve, and
-Magic Move variants plus lossless future identifiers. Clearing an effect emits
-Keynote's real `none` representation while retaining start timing and the native
-random seed. Native twist, mosaic, bounce, Magic Move fading, timing curve, text
-delivery, motion blur, and travel-distance transition parameters are available
-through a lossless CRUD model, with typed acceleration and text delivery.
-Modern animation color, arbitrary native
-timing-curve payloads, random seeds, effect detail, curve theme names, and
-right-to-left writing direction are writable as well. Unknown nested transition
-extensions remain byte-exact at the slide, transition, transition-attributes,
-and animation-attributes levels.
+Keynote show dimensions and playback flags, slide skip state, and navigator
+name use bounded compatibility-editor mutations. Modern slide-transition
+transactions are also available from `litchi_keynote::Package`: selectors never
+expose native identities; exact-source commits and their inverse patches
+reopen and verify the complete candidate; and a clear emits Keynote's real
+`none` representation while retaining start timing and the native random seed.
+The private Buffa projection exposes typed None, Dissolve, Magic Move, and
+future effects plus twist, mosaic, bounce, Magic Move fading, timing curves,
+text delivery, motion blur, travel distance, animation color, seeds, detail,
+curve theme names, and right-to-left writing direction. Validated raw records
+preserve unknown nested extensions at the slide, transition, attributes, and
+animation-attributes levels. The older `litchi-iwa` transition API remains a
+compatibility surface; this Package transaction does not claim it was removed.
 Soundtrack playback values are owned by the archive-free
 `litchi_keynote::soundtrack::{Mode, Settings}` module. `Mode` preserves future
 native discriminants and `Settings` validates finite `0.0..=1.0` volume values;

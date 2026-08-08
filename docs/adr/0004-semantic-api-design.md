@@ -310,9 +310,14 @@ API. The module owns memory-conscious opaque semantic payload containers and
 retains `Effect` plus the existing `Direction`, `MosaicType`, `Acceleration`,
 and `TextDelivery` scalar values; its constructors enforce bounded ownership,
 finite numbers, NUL-free text, and canonical semantic values. No raw native
-IDs or archives leak upward. The IWA adapter is limited to native/protobuf
-decoding, payload structural validation, wire patching, graph lookup, and
-transactions, and opaque payload decoding remains at that boundary.
+IDs or archives leak upward. `litchi_keynote::Package` owns selector-first
+read/set/clear transactions for existing modern slide-transition envelopes and
+their exact-source-checked reversible patches. A private Buffa lazy view
+projects known native fields after strict bounded wire preflight. Validated raw
+records remain authoritative for lossless patching; graph lookup, opaque
+payload validation, and retained-options candidate verification stay private
+to the package boundary. The legacy `litchi-iwa` Keynote compatibility APIs
+remain available and are not claimed to be removed.
 
 Chart series value-label selectors use the focused
 `litchi_iwa_common::chart::series_labels::{Visibility, Index}` module.

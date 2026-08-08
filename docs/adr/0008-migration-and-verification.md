@@ -7414,3 +7414,104 @@ filesystem publication, an aggregate transaction peak-memory policy, a
 latency/RSS/allocation result, or fuzz/sanitizer completion. The remaining
 Pages editors, host compatibility surface, examples/tests/fuzz inventory, and
 all 16 ordered dependency debts remain deletion blockers.
+
+## 2026-08-08 amendment: focused Keynote slide-transition evidence
+
+The concrete Keynote package now owns selector-first read, set, native-none
+clear, exact patch application, and inverse replay for an existing modern slide
+transition. `Package::slide_transition`, `edit_slide_transition`, and
+`apply_slide_transition` exchange only `transition::Settings`, semantic slide
+selectors, and dedicated transition transaction types. All optional scalar
+presence, future effect identifiers and enum values, opaque color and timing
+curve payloads, and the nine effect-specific custom fields round-trip through
+that archive-free value. A clear retains delay, automatic start, random seed,
+and writing direction; writes `Transition`/`none`/one second; and removes
+effect-specific values. A legacy-only envelope is readable as no modern
+settings but is not synthesized or normalized by a changed edit.
+
+A 2,347-byte derived schema supplies five private Buffa lazy-view messages for
+`SlideArchive.transition`, its required attributes, all modern animation and
+custom fields, and `SlideNodeArchive.hasTransition`. The build checks every
+projected declaration against `KNArchives.proto`, prohibits repeated generated
+storage and production encoding, and caps the Buffa 0.9.1 output at five files
+and 224 KiB; the measured generated closure is 207,203 bytes. Strict handwritten
+preflight precedes Buffa and rejects missing required envelopes, duplicate or
+wrong-wire selected fields, noncanonical keys/lengths/varints/bools, excessive
+message bytes, and excessive recursion. Buffa borrows strings and opaque
+payloads and does not retain unknown fields. Validated caller-owned raw records
+remain the sole preservation and rewrite authority.
+
+The transaction patches all 25 modern leaves in their original nested records
+without whole-message Prost or Buffa encoding. A caller-limit preflight bounds
+every intermediate output and the aggregate repeated parse/copy work before
+those compatibility patch helpers allocate. The complete IWA message header is
+replaced with the bounded header-preserving helper. The slide-node cache marker
+is validated even for a no-op and updated atomically with the slide payload; a
+co-located slide and node rewrite one physical component, while a clear in the
+native split topology rewrites the two actual owners. Candidate publication
+then reopens the complete package under retained `ReadOptions`, validates it,
+and performs focused semantic readback. Exact no-ops share the source `Arc` and
+touch zero components. Changed legacy nested-`Index.zip` sources fail as
+`UnsupportedSource`; exact source bytes, not the diagnostic fingerprint,
+authorize patch application.
+
+Adversarial tests cover every modeled field and presence state, future values,
+opaque payload validation, native-none normalization, stale and malformed node
+markers, missing/duplicate/wrong-wire/noncanonical transition records,
+selector miss and ambiguity, exact no-op identity, split and co-located
+components, retained limits, changed-legacy refusal, unknown nested fields,
+hostile IWA headers, untouched ZIP records, patch conflict, inverse byte
+equality, redacted `Debug`, root-facade availability, and `Send + Sync`. The
+legacy host writer remains for compatibility, but now validates and
+synchronizes `hasTransition`, preserves both message headers, and verifies its
+round trip; no host deletion is claimed by this slice. Path ingress in the
+migration host was also hardened to stream from one opened file handle under
+the configured byte ceiling, detecting growth past metadata before
+publication, while save-target errors no longer disclose destination paths.
+
+Executed Rust evidence is reported by stable target. `litchi-iwa-protos`
+passed all 47 unit tests. Keynote passed 68 library tests and 54 integration
+tests across its nine binaries, including all six transition transaction
+tests, and its four doctests passed. The direct root Keynote facade passed all
+four tests, and the migration-host library passed all 1,481 compatibility
+tests. Warning-denied Clippy passed for the changed protobuf, Keynote,
+migration-host, focused example/test, and root-facade targets with dependency
+lints excluded. Warning-denied Keynote rustdoc, formatting, diff checks, the
+iWork rustdoc public-API gate, and the crate-boundary checker passed. The
+boundary checker remains at 63 packages, 223 internal dependency declarations,
+and exactly 16 ordered debts. The broader Keynote all-target Clippy invocation
+remains baseline-red on 35 pre-existing test-only unwrap, float-comparison, and
+shadowing findings and is not represented as a passing gate.
+
+Computer Use exercised both Rust-authored paths in Apple Keynote 14.4
+(7043.0.93). The native one-slide Dissolve source is
+`/private/tmp/litchi-keynote-transition-20260808.udONyg/native-source-dissolve.key`
+with SHA-256
+`ab186d8d59c858e1b3c2596fd45463cec75ddd92e9fda9032da656a940e68dca`.
+The final reproducible Magic Move candidate is
+`final-rust-magic-move.key` (`d5d24386cb544374f4c26da4349f7be961be34180a4536578616886a56af8c1a`)
+and the native-none candidate is `final-rust-cleared.key`
+(`5235a3d03dbabced6d06a03b4873826da8602d97f478c61f6467b35d732a08e5`).
+Each public inverse restored the exact source hash. The pristine Magic Move
+candidate changes only `Index/Slide-2652150.iwa`; the clear additionally changes
+`Index/Document.iwa` because its slide-node marker moves from true to false.
+All other ZIP member payloads and the complete entry-name order remain exact.
+
+Keynote opened the Rust candidate without a repair, recovery, conversion, or
+warning dialog. Its transition inspector showed Magic Move, duration 2 s,
+automatic start, and delay 2.25 s. The clear candidate showed `No Transition
+Effect` while retaining automatic start and the 2.25-second delay. Native Save
+As, close, and reopen reproduced both inspector states. The saved Magic Move
+artifact is `keynote-resaved-magic-move.key` with SHA-256
+`8443a71e58199df4506ebb0896323721e6debdd32c8a055f98f56d98d48cf7ac`;
+the saved clear artifact is `keynote-resaved-cleared.key` with SHA-256
+`e65429be7aa0bfd69c20ee1b3b17b86c9bd9c46b44af1f6db127fc017981c444`.
+Focused reverse-read and restaging over each native artifact produced an exact
+zero-component no-op with the same respective hash.
+
+This is not full host retirement, durable patch serialization, atomic
+filesystem publication, a complete aggregate transaction peak-memory model, a
+latency/RSS/allocation-performance result, or fuzz/sanitizer completion. Prost
+is still used privately to validate bounded opaque Color and PathSource
+payloads, the legacy transition writer and broader Keynote graph editors remain
+available, and all 16 ordered dependency debts remain deletion blockers.
