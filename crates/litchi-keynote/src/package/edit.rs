@@ -4,7 +4,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::package::{Catalog, EntryEdit};
+use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::wire::patch_varint_field;
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use thiserror::Error;
@@ -160,8 +160,8 @@ impl<'a> Edit<'a> {
             return Ok(Commit {
                 package: self.source.snapshot(),
                 patch: Patch {
-                    source: Arc::clone(&self.source.state.source),
-                    target: Arc::clone(&self.source.state.source),
+                    source: self.source.state.source.shared_source(),
+                    target: self.source.state.source.shared_source(),
                     source_fingerprint,
                     target_fingerprint: source_fingerprint,
                     position: intent.position,
@@ -180,8 +180,8 @@ impl<'a> Edit<'a> {
         let target_fingerprint = fingerprint(package.source_bytes());
         Ok(Commit {
             patch: Patch {
-                source: Arc::clone(&self.source.state.source),
-                target: Arc::clone(&package.state.source),
+                source: self.source.state.source.shared_source(),
+                target: package.state.source.shared_source(),
                 source_fingerprint,
                 target_fingerprint,
                 position: intent.position,
@@ -423,7 +423,8 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
 
     let mut components = source
         .state
-        .components
+        .source
+        .components()
         .iter()
         .filter(|component| component.archive().object(record.node_identifier).is_some());
     let component = components.next().ok_or(EditError::InvalidTarget {
@@ -436,10 +437,7 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
     }
     let component_name = component.name();
 
-    let catalog = Catalog::from_shared_bytes_with_limits(
-        Arc::clone(&source.state.source),
-        source.state.options.archive(),
-    )?;
+    let catalog = source.state.source.package();
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == component_name)

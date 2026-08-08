@@ -1,11 +1,25 @@
 use std::ops::Range;
 
-use litchi_iwa_core::{Archive, SnappyStream};
 use soapberry_zip::office::{ArchiveLimits as ZipLimits, ArchiveReader};
 use soapberry_zip::{ZipArchive as RawZipArchive, ZipFileHeaderRecord};
 
-use crate::catalog::Component;
+use crate::catalog::{Component, parse_component};
 use crate::{Error, Limits, Result};
+
+#[cfg(test)]
+std::thread_local! {
+    static TEST_PARSE_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn reset_test_parse_count() {
+    TEST_PARSE_COUNT.with(|count| count.set(0));
+}
+
+#[cfg(test)]
+pub(crate) fn test_parse_count() -> usize {
+    TEST_PARSE_COUNT.with(std::cell::Cell::get)
+}
 
 /// Opaque ZIP reader used by the physical component catalog.
 pub(crate) struct ZipArchive<'data> {
@@ -106,6 +120,9 @@ impl PhysicalEntry {
 
 impl<'data> ZipArchive<'data> {
     pub(crate) fn new_with_limits(data: &'data [u8], limits: Limits) -> Result<Self> {
+        #[cfg(test)]
+        TEST_PARSE_COUNT.with(|count| count.set(count.get().saturating_add(1)));
+
         let validated_limits = limits.validate()?;
         let input_size = u64::try_from(data.len()).map_err(|_error| {
             Error::InvalidBundle("ZIP input length does not fit u64".to_owned())
@@ -499,23 +516,9 @@ fn parse_direct_iwa_components(archive: &ZipArchive<'_>, limits: Limits) -> Resu
             continue;
         }
         let compressed_data = archive.read(name)?;
-
-        // OperationStorage is a separate persistence format despite its `.iwa`
-        // suffix in legacy documents. It remains a raw package member but is
-        // not part of the IWA object graph.
-        if name.rsplit('/').next() == Some("OperationStorage.iwa")
-            && compressed_data.starts_with(b"bvxn")
-        {
-            continue;
+        if let Some(component) = parse_component(name, &compressed_data, limits)? {
+            components.push(component);
         }
-
-        let decompressed =
-            SnappyStream::decompress_with_limits(&compressed_data, limits.snappy_limits()?)?;
-        let parsed = Archive::parse_with_limits(
-            decompressed.as_bytes(),
-            limits.effective_archive_limits()?,
-        )?;
-        components.push(Component::new(name, parsed));
     }
     components.sort_unstable_by(|left, right| left.name().cmp(right.name()));
     Ok(components)

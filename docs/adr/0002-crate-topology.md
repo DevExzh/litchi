@@ -973,11 +973,15 @@ The same concrete package owner now resolves the strict document/show/slide
 graph for semantic text. It consumes the focused `litchi-iwa-text-wire` Buffa
 projection privately after exact message-type and graph-ownership checks; no
 generated Buffa or protobuf value crosses the supported Keynote boundary.
-`litchi-iwa-archive::ComponentCatalog` supplies stable ordinal access so the
-format adapter can retain a compact, sorted package-wide object locator rather
-than depending on the monolith's object index or repeating component scans.
-The dependency remains downward: neither the wire projection nor the archive
-catalog depends on Keynote.
+`litchi-iwa-archive::SourceCatalog` binds the authoritative immutable package
+bytes, physical/logical entries, explicit exact-versus-legacy provenance, and
+stable component ordinals. Keynote therefore classifies, indexes, reads
+metadata, and prepares its focused edit from one snapshot instead of reopening
+the ZIP. Pages likewise reads metadata and semantic components from one
+catalog. The format adapters can retain compact sorted object locators without
+depending on the monolith's object index or repeating component scans. The
+dependency remains downward: neither the wire projection nor the archive
+catalog depends on a concrete format.
 
 `litchi-numbers-wire` owns the shared low-level Binary Numbers Cell codec. It
 is a versioned physical adapter so the migration host can depend on it without

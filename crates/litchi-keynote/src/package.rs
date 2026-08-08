@@ -13,8 +13,7 @@ use std::io::{Cursor, Read};
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use litchi_iwa_archive::package::Catalog;
-use litchi_iwa_archive::{ComponentCatalog, Limits as ArchiveLimits};
+use litchi_iwa_archive::{ComponentCatalog, Limits as ArchiveLimits, SourceCatalog};
 use litchi_iwa_common::{
     WireLimits,
     wire::{WireDescent, WireFieldView, preflight_wire_tree_with_limits},
@@ -252,9 +251,8 @@ impl fmt::Debug for Package {
 
 #[derive(Debug)]
 struct State {
-    source: Arc<[u8]>,
+    source: SourceCatalog,
     options: ReadOptions,
-    components: ComponentCatalog,
     object_index: Box<[ObjectLocator]>,
     total_objects: usize,
     semantic: OnceLock<Document>,
@@ -368,8 +366,8 @@ impl Package {
 
     fn from_source_with_options(source: Arc<[u8]>, options: ReadOptions) -> ReadResult<Self> {
         let limits = options.archive();
-        let components = ComponentCatalog::from_bytes_with_limits(source.as_ref(), limits)?;
-        match litchi_iwa_detect::bytes(source.as_ref())? {
+        let source_catalog = SourceCatalog::from_shared_bytes_with_limits(source, limits)?;
+        match litchi_iwa_detect::component_catalog(source_catalog.components())? {
             Some(Format::Keynote) => {},
             Some(_) => return Err(ReadError::NotKeynote),
             None => {
@@ -379,14 +377,15 @@ impl Package {
             },
         }
 
-        let (object_index, total_objects) =
-            build_object_index(&components, options.semantic().max_objects())?;
+        let (object_index, total_objects) = build_object_index(
+            source_catalog.components(),
+            options.semantic().max_objects(),
+        )?;
 
         let package = Self {
             state: Arc::new(State {
-                source,
+                source: source_catalog,
                 options,
-                components,
                 object_index,
                 total_objects,
                 semantic: OnceLock::new(),
@@ -411,7 +410,7 @@ impl Package {
     /// Borrow the original package bytes without normalizing unknown content.
     #[must_use]
     pub fn source_bytes(&self) -> &[u8] {
-        &self.state.source
+        self.state.source.source_bytes()
     }
 
     /// Return the checked physical limits used when this package was parsed.
@@ -435,13 +434,14 @@ impl Package {
     /// Return the count of parsed native IWA components.
     #[must_use]
     pub fn component_count(&self) -> usize {
-        self.state.components.len()
+        self.state.source.components().len()
     }
 
     /// Iterate normalized names for all parsed native IWA components.
     pub fn component_names(&self) -> impl Iterator<Item = &str> {
         self.state
-            .components
+            .source
+            .components()
             .iter()
             .map(litchi_iwa_archive::Component::name)
     }
@@ -504,11 +504,7 @@ impl Package {
             metadata.title = Some(title.to_owned());
         }
 
-        let catalog = Catalog::from_shared_bytes_with_limits(
-            Arc::clone(&self.state.source),
-            self.state.options.archive(),
-        )?;
-        if let Some(properties) = catalog.iter().find(|entry| {
+        if let Some(properties) = self.state.source.package().iter().find(|entry| {
             entry.name().rsplit('/').next() == Some("Properties.plist") && !entry.is_opaque()
         }) {
             let value = plist::Value::from_reader(Cursor::new(properties.data()))?;
@@ -573,7 +569,8 @@ impl Package {
     fn root_show_identifier(&self) -> ReadResult<u64> {
         let mut roots = self
             .state
-            .components
+            .source
+            .components()
             .iter()
             .filter(|component| component.name().rsplit('/').next() == Some("Document.iwa"));
         let root = roots.next().ok_or_else(|| {
@@ -1013,7 +1010,8 @@ impl Package {
             .ok()
             .map(|index| self.state.object_index[index])?;
         self.state
-            .components
+            .source
+            .components()
             .get_index(locator.component)?
             .archive()
             .objects

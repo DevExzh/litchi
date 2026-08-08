@@ -1,6 +1,10 @@
-use litchi_iwa_core::Archive;
+use std::sync::Arc;
 
-use crate::zip::{ZipArchive, parse_iwa_components};
+use litchi_core::ReadAt;
+use litchi_iwa_core::{Archive, SnappyStream};
+
+use crate::package::{Catalog, SourceProvenance};
+use crate::zip::{ZipArchive, is_iwa_name, parse_iwa_components};
 use crate::{Limits, Result};
 
 /// One parsed `.iwa` component in deterministic member-name order.
@@ -102,6 +106,36 @@ impl ComponentCatalog {
     pub fn get_index(&self, index: usize) -> Option<&Component> {
         self.components.get(index)
     }
+
+    fn from_package_catalog(catalog: &Catalog, limits: Limits) -> Result<Self> {
+        let validated_limits = limits.validate()?;
+        let mut components = Vec::new();
+        for entry in catalog.iter() {
+            if !is_iwa_name(entry.name()) {
+                continue;
+            }
+            if entry.is_opaque() {
+                return Err(crate::Error::InvalidBundle(format!(
+                    "IWA component {} uses an unsupported ZIP compression method",
+                    entry.name()
+                )));
+            }
+            if let Some(component) = parse_component(entry.name(), entry.data(), validated_limits)?
+            {
+                components
+                    .try_reserve(1)
+                    .map_err(|_error| crate::Error::Allocation {
+                        resource: "IWA component catalog",
+                        amount: 1,
+                    })?;
+                components.push(component);
+            }
+        }
+        components.sort_unstable_by(|left, right| left.name().cmp(right.name()));
+        Ok(Self {
+            components: components.into_boxed_slice(),
+        })
+    }
 }
 
 impl IntoIterator for ComponentCatalog {
@@ -113,8 +147,164 @@ impl IntoIterator for ComponentCatalog {
     }
 }
 
+/// One immutable physical package snapshot and its parsed IWA components.
+///
+/// This is the shared ingress boundary for format owners that need both raw
+/// package members (metadata, editing, or exact preservation) and semantic IWA
+/// components. The ZIP envelope is traversed once: components are decoded from
+/// the [`Catalog`]'s already-materialized logical entries instead of reopening
+/// the source bytes through a second ZIP reader.
+#[derive(Debug)]
+pub struct SourceCatalog {
+    package: Catalog,
+    components: ComponentCatalog,
+}
+
+impl SourceCatalog {
+    /// Parse borrowed package bytes using the default physical limits.
+    ///
+    /// The source is copied exactly once into immutable shared storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when ZIP ingress, legacy normalization, Snappy/IWA
+    /// decoding, or a configured physical ceiling fails.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes, Limits::default())
+    }
+
+    /// Parse borrowed package bytes under caller-selected physical limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source or any package component is malformed,
+    /// encrypted, ambiguous, or over budget.
+    pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
+        let package = Catalog::from_bytes_with_limits(bytes, limits)?;
+        Self::from_package(package, limits)
+    }
+
+    /// Parse an already-owned immutable package source without copying it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when ZIP ingress, legacy normalization, Snappy/IWA
+    /// decoding, or a configured physical ceiling fails.
+    pub fn from_shared_bytes(source: Arc<[u8]>) -> Result<Self> {
+        Self::from_shared_bytes_with_limits(source, Limits::default())
+    }
+
+    /// Parse an already-owned immutable package source under explicit limits.
+    ///
+    /// The exact [`Arc`] allocation remains authoritative for the lifetime of
+    /// this snapshot and can be reused by preserve-mode writes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source or any package component is malformed,
+    /// encrypted, ambiguous, or over budget.
+    pub fn from_shared_bytes_with_limits(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
+        let package = Catalog::from_shared_bytes_with_limits(source, limits)?;
+        Self::from_package(package, limits)
+    }
+
+    /// Snapshot an immutable positional source using the default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changes during the bounded read or the
+    /// resulting package cannot be decoded.
+    pub fn from_read_at(source: &dyn ReadAt) -> Result<Self> {
+        Self::from_read_at_with_limits(source, Limits::default())
+    }
+
+    /// Snapshot an immutable positional source under explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changes during the bounded read or the
+    /// resulting package cannot be decoded.
+    pub fn from_read_at_with_limits(source: &dyn ReadAt, limits: Limits) -> Result<Self> {
+        let package = Catalog::from_read_at_with_limits(source, limits)?;
+        Self::from_package(package, limits)
+    }
+
+    fn from_package(package: Catalog, limits: Limits) -> Result<Self> {
+        let components = ComponentCatalog::from_package_catalog(&package, limits)?;
+        Ok(Self {
+            package,
+            components,
+        })
+    }
+
+    /// Borrow the physical/logical package catalog retained by this snapshot.
+    #[must_use]
+    pub const fn package(&self) -> &Catalog {
+        &self.package
+    }
+
+    /// Borrow parsed IWA components in deterministic normalized-name order.
+    #[must_use]
+    pub const fn components(&self) -> &ComponentCatalog {
+        &self.components
+    }
+
+    /// Clone the authoritative immutable source handle without copying bytes.
+    #[must_use]
+    pub fn shared_source(&self) -> Arc<[u8]> {
+        self.package.shared_source()
+    }
+
+    /// Borrow the authoritative physical source bytes.
+    #[must_use]
+    pub fn source_bytes(&self) -> &[u8] {
+        self.package.source_bytes()
+    }
+
+    /// Return whether logical members still describe the source ZIP exactly.
+    #[must_use]
+    pub const fn source_is_exact(&self) -> bool {
+        self.package.source_is_exact()
+    }
+
+    /// Return whether this snapshot is exact or normalized from legacy ZIP.
+    #[must_use]
+    pub const fn source_provenance(&self) -> SourceProvenance {
+        self.package.source_provenance()
+    }
+
+    /// Consume this snapshot without cloning either catalog.
+    #[must_use]
+    pub fn into_parts(self) -> (Catalog, ComponentCatalog) {
+        (self.package, self.components)
+    }
+}
+
+pub(crate) fn parse_component(
+    name: &str,
+    compressed_data: &[u8],
+    limits: Limits,
+) -> Result<Option<Component>> {
+    // OperationStorage is a separate persistence format despite its `.iwa`
+    // suffix in legacy documents. It remains a raw package member but is not
+    // part of the IWA object graph.
+    if name.rsplit('/').next() == Some("OperationStorage.iwa")
+        && compressed_data.starts_with(b"bvxn")
+    {
+        return Ok(None);
+    }
+
+    let decompressed =
+        SnappyStream::decompress_with_limits(compressed_data, limits.snappy_limits()?)?;
+    let archive =
+        Archive::parse_with_limits(decompressed.as_bytes(), limits.effective_archive_limits()?)?;
+    Ok(Some(Component::new(name, archive)))
+}
+
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
     use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -255,6 +445,101 @@ mod tests {
         let limits = Limits::new(1, 10, 100, 100, 100)?;
         let result = ComponentCatalog::from_bytes_with_limits(b"not a zip", limits);
         assert!(matches!(result, Err(crate::Error::Limit { .. })));
+        Ok(())
+    }
+
+    #[test]
+    fn source_catalog_reuses_shared_source_and_traverses_direct_zip_once() -> Result<()> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
+        writer.write_stored("Metadata/DocumentIdentifier", b"shared-source")?;
+        let source: Arc<[u8]> = writer.finish_to_bytes()?.into();
+
+        crate::zip::reset_test_parse_count();
+        let catalog = SourceCatalog::from_shared_bytes(Arc::clone(&source))?;
+
+        assert!(Arc::ptr_eq(&source, &catalog.shared_source()));
+        assert_eq!(crate::zip::test_parse_count(), 1);
+        assert!(catalog.source_is_exact());
+        assert_eq!(catalog.source_provenance(), SourceProvenance::ExactZip);
+        assert_eq!(catalog.package().len(), 2);
+        assert_eq!(catalog.components().len(), 1);
+        assert_eq!(
+            catalog
+                .components()
+                .get("Index/Document.iwa")
+                .map(Component::name),
+            Some("Index/Document.iwa")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn source_catalog_normalizes_legacy_index_during_two_required_traversals() -> Result<()> {
+        let mut index = StreamingArchiveWriter::new();
+        index.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
+        let index_bytes = index.finish_to_bytes()?;
+
+        let mut outer = StreamingArchiveWriter::new();
+        outer.write_stored("legacy.pages/Index.zip", &index_bytes)?;
+        outer.write_stored("legacy.pages/Metadata/DocumentIdentifier", b"legacy-source")?;
+        let source: Arc<[u8]> = outer.finish_to_bytes()?.into();
+
+        crate::zip::reset_test_parse_count();
+        let catalog = SourceCatalog::from_shared_bytes(Arc::clone(&source))?;
+
+        assert!(Arc::ptr_eq(&source, &catalog.shared_source()));
+        assert_eq!(crate::zip::test_parse_count(), 2);
+        assert!(!catalog.source_is_exact());
+        assert_eq!(catalog.source_provenance(), SourceProvenance::LegacyZip);
+        assert!(
+            catalog
+                .package()
+                .iter()
+                .any(|entry| entry.name() == "Metadata/DocumentIdentifier")
+        );
+        assert_eq!(catalog.components().len(), 1);
+        assert_eq!(
+            catalog
+                .components()
+                .get("Index/Document.iwa")
+                .map(Component::name),
+            Some("Index/Document.iwa")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn source_catalog_component_projection_matches_component_only_ingress() -> Result<()> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("Index/Bravo.iwa", &iwa_bytes(2, 6001)?)?;
+        writer.write_stored("Index/Alpha.iwa", &iwa_bytes(1, 6000)?)?;
+        writer.write_stored("Index/OperationStorage.iwa", b"bvxn opaque data")?;
+        let bytes = writer.finish_to_bytes()?;
+
+        let source = SourceCatalog::from_bytes(&bytes)?;
+        let components = ComponentCatalog::from_bytes(&bytes)?;
+        let source_projection = source
+            .components()
+            .iter()
+            .map(|component| {
+                (
+                    component.name(),
+                    component.archive().objects[0].messages[0].type_,
+                )
+            })
+            .collect::<Vec<_>>();
+        let component_projection = components
+            .iter()
+            .map(|component| {
+                (
+                    component.name(),
+                    component.archive().objects[0].messages[0].type_,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(source_projection, component_projection);
         Ok(())
     }
 }

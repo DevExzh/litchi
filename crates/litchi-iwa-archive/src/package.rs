@@ -387,6 +387,16 @@ impl Entry {
     }
 }
 
+/// Physical origin retained by an immutable package snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SourceProvenance {
+    /// Logical entries map directly to the authoritative ZIP source.
+    ExactZip,
+    /// Logical entries were normalized from a nested legacy `Index.zip`.
+    LegacyZip,
+}
+
 /// Ordered raw entries extracted from one physical iWork ZIP input.
 #[derive(Debug)]
 pub struct Catalog {
@@ -555,11 +565,31 @@ impl Catalog {
         Arc::clone(&self.source)
     }
 
+    /// Borrow the authoritative immutable source bytes.
+    ///
+    /// This view is allocation-free and remains valid for the lifetime of the
+    /// catalog. Higher-level format facades should not expose it as semantic
+    /// document state.
+    #[must_use]
+    pub fn source_bytes(&self) -> &[u8] {
+        &self.source
+    }
+
     /// Return whether the catalog's logical entries still describe the
     /// original ZIP envelope exactly.
     #[must_use]
     pub const fn source_is_exact(&self) -> bool {
         self.source_is_exact
+    }
+
+    /// Return the physical origin of this logical package snapshot.
+    #[must_use]
+    pub const fn source_provenance(&self) -> SourceProvenance {
+        if self.source_is_exact {
+            SourceProvenance::ExactZip
+        } else {
+            SourceProvenance::LegacyZip
+        }
     }
 
     /// Borrow entries in their preserved source order.

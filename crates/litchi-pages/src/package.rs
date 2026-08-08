@@ -13,8 +13,8 @@ use std::num::NonZeroU64;
 use std::path::Path;
 use std::sync::Arc;
 
-use litchi_iwa_archive::ComponentCatalog;
 use litchi_iwa_archive::package::Catalog;
+use litchi_iwa_archive::{ComponentCatalog, SourceCatalog};
 use litchi_iwa_common::wire::{WireFieldView, WireView};
 use litchi_iwa_protos::{tp, tswp};
 use litchi_iwa_text::storage::{Run, Storage};
@@ -89,10 +89,10 @@ impl Stats {
 
 /// An immutable, cheaply clonable parsed Pages package.
 ///
-/// The package retains native IWA components for validation and future
-/// Pages-native capabilities. Its ordinary read API exposes only the
-/// immutable semantic [`Document`], never raw object identifiers or protobuf
-/// messages.
+/// The package retains one immutable physical/component source catalog for
+/// validation, metadata, and future Pages-native capabilities. Its ordinary
+/// read API exposes only the immutable semantic [`Document`], never raw object
+/// identifiers or protobuf messages.
 #[derive(Clone)]
 pub struct Package {
     state: Arc<State>,
@@ -106,7 +106,7 @@ impl fmt::Debug for Package {
 
 #[derive(Debug)]
 struct State {
-    components: ComponentCatalog,
+    source: SourceCatalog,
     document: Document,
     metadata: Metadata,
     object_count: usize,
@@ -198,16 +198,17 @@ impl Package {
     /// Returns [`PackageError`] when the bytes exceed a selected limit, the
     /// package shape is invalid, or semantic projection is invalid.
     pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> PackageResult<Self> {
-        let metadata = Metadata::from_package(bytes, limits)?;
-        let components = ComponentCatalog::from_bytes_with_limits(bytes, limits)?;
-        let object_count = validate_components(&components)?;
-        let root_references = root_references(&components)?;
+        let source = SourceCatalog::from_bytes_with_limits(bytes, limits)?;
+        let metadata = Metadata::from_catalog(source.package())?;
+        let components = source.components();
+        let object_count = validate_components(components)?;
+        let root_references = root_references(components)?;
         let text_limit = effective_text_limit(limits);
-        let document = decode_document(&components, root_references, text_limit)?;
+        let document = decode_document(components, root_references, text_limit)?;
 
         Ok(Self {
             state: Arc::new(State {
-                components,
+                source,
                 document,
                 metadata,
                 object_count,
@@ -293,7 +294,7 @@ impl Package {
     /// Returns [`PackageError::InvalidFormat`] if retained object identities
     /// or component structure violate package invariants.
     pub fn validate(&self) -> PackageResult<()> {
-        let object_count = validate_components(&self.state.components)?;
+        let object_count = validate_components(self.state.source.components())?;
         if object_count != self.state.object_count {
             return Err(PackageError::InvalidFormat(
                 "Pages package object inventory changed after parsing".to_owned(),
@@ -313,17 +314,16 @@ impl Package {
 }
 
 impl Metadata {
-    fn from_package(bytes: &[u8], limits: Limits) -> PackageResult<Self> {
-        let catalog = Catalog::from_bytes_with_limits(bytes, limits)?;
+    fn from_catalog(catalog: &Catalog) -> PackageResult<Self> {
         let mut metadata = Self::default();
 
-        if let Some(data) = metadata_entry(&catalog, "Metadata/Properties.plist")? {
+        if let Some(data) = metadata_entry(catalog, "Metadata/Properties.plist")? {
             metadata.apply_properties(data)?;
         }
-        if let Some(data) = metadata_entry(&catalog, "Metadata/BuildVersionHistory.plist")? {
+        if let Some(data) = metadata_entry(catalog, "Metadata/BuildVersionHistory.plist")? {
             metadata.build_version = parse_build_version(data)?;
         }
-        if let Some(data) = metadata_entry(&catalog, "Metadata/DocumentIdentifier")? {
+        if let Some(data) = metadata_entry(catalog, "Metadata/DocumentIdentifier")? {
             let identifier_text = std::str::from_utf8(data).map_err(|error| {
                 PackageError::InvalidFormat(format!(
                     "Pages DocumentIdentifier is not valid UTF-8: {error}"

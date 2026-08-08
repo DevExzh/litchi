@@ -293,3 +293,44 @@ semantics. Duplicate v5 flag walking and decimal conversion were removed.
 Unit tests cover numeric and precedence cases, and a whole-package
 focused-versus-legacy differential fixture locks the behavior while this host
 reader still exists.
+
+## 2026-08-08 immutable source-catalog prerequisite
+
+`litchi-iwa-archive` now owns a `SourceCatalog` that binds one authoritative
+immutable byte snapshot to both the physical/logical package catalog and its
+deterministically ordered IWA components. Borrowed ingress copies the source
+once, shared `Arc<[u8]>` ingress retains the exact allocation, and positional
+ingress inherits the existing bounded source-version check. Direct ZIP sources
+carry `ExactZip` provenance; normalized nested `Index.zip` sources carry
+`LegacyZip` provenance and cannot be mislabeled as exact preserve-mode input.
+Component decoding consumes the package catalog's already-decoded logical
+members, so it does not reopen the ZIP or decompress the same ZIP member a
+second time. Operation storage remains opaque and unsupported compression on
+an IWA member fails closed.
+
+Focused Pages and Keynote packages now retain this shared snapshot. Pages
+extracts metadata and native components from the same catalog instead of
+performing two complete package ingresses. Keynote classifies the already
+parsed component catalog under the caller's original physical profile, reads
+metadata from the retained physical catalog, and reuses that catalog for
+slide-state edits; detection, metadata, and editing no longer reopen its source
+through separate ZIP parsers. Catalog-based detection has differential coverage
+against byte-based detection for all three application roots. Unit evidence
+also counts one physical catalog construction for a direct ZIP and exactly two
+for a genuinely nested legacy ZIP, while proving shared-source allocation
+identity and component parity with component-only ingress.
+
+Computer Use reopened the checked-in native Pages, Numbers, and Keynote
+fixtures in their respective applications without repair or conversion UI and
+closed them without saving. Their hashes and visible semantic markers remained
+the documented native oracle. Focused native fixture tests continue to cover
+the migrated Pages and Keynote readers.
+
+This is the source-owning aggregate prerequisite, not the root coordinator or
+the monolith cutover. The catalog still eagerly materializes decoded package
+members and neutral IWA archives; it is not a claim that the full aggregate
+graph is Buffa-lazy. Numbers compatibility projection has not yet accepted a
+shared catalog, directory bundles and mutable `EntryStore` snapshots still lack
+a frozen logical-entry adapter, and Pages/Keynote aggregate contract differences
+remain unresolved. The next cutover stage must add those handoffs and
+role-aware root parity tests before deleting any host structured adapter.

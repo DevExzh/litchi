@@ -6,9 +6,9 @@
 //! on the iWork facade, semantic format crates, or the archive-neutral package
 //! entry store.
 //!
-//! Application readers should consume [`ComponentCatalog::iter`] and perform
-//! message decoding in their own adapter layer. Raw ZIP implementation types
-//! remain private to this crate.
+//! Application readers should consume [`SourceCatalog`] when they need both
+//! physical members and parsed components, or [`ComponentCatalog::iter`] for
+//! component-only ingress. Raw ZIP implementation types remain private.
 
 #![forbid(unsafe_code)]
 
@@ -18,9 +18,10 @@ mod limits;
 pub mod package;
 mod zip;
 
-pub use catalog::{Component, ComponentCatalog};
+pub use catalog::{Component, ComponentCatalog, SourceCatalog};
 pub use error::{Error, LimitKind, Result};
 pub use limits::Limits;
+pub use package::SourceProvenance;
 
 use litchi_iwa_core::{Archive, SnappyStream};
 use soapberry_zip::office::ArchiveReader;

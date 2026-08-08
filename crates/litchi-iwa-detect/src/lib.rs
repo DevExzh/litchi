@@ -9,7 +9,7 @@
     reason = "Detection classifiers stay beside the ingress routines they support."
 )]
 
-use litchi_iwa_archive::{self, DetectionRoot};
+use litchi_iwa_archive::{self, ComponentCatalog, DetectionRoot};
 use litchi_iwa_common::wire::{WireField, parse_wire_fields};
 use litchi_iwa_core::{Archive, SnappyLimits, SnappyStream};
 use std::{
@@ -271,7 +271,59 @@ pub fn bytes_with_limits(value: &[u8], limits: Limits) -> Result<Option<Format>>
     }
     let root = litchi_iwa_archive::inspect_detection_root(value, archive_limits(limits)?)
         .map_err(map_archive_error)?;
-    classify_root(&root, limits)
+    classify_root(&root)
+}
+
+/// Detect an iWork application from an already-parsed component catalog.
+///
+/// This route is intended for source-owning format coordinators. It performs
+/// no ZIP, Snappy, or IWA work and classifies the same immutable components
+/// that the caller will subsequently project. The catalog's ingress limits
+/// therefore remain authoritative instead of being replaced by detector
+/// defaults during a second parse.
+///
+/// # Errors
+///
+/// Returns a typed error when canonical root evidence is ambiguous,
+/// unrecognized, or conflicts with Keynote component markers. A catalog with
+/// no canonical application root returns `Ok(None)`.
+pub fn component_catalog(catalog: &ComponentCatalog) -> Result<Option<Format>> {
+    if catalog.is_empty() {
+        return Ok(None);
+    }
+
+    let mut marks = Marks::default();
+    let mut root_archive = None;
+    for component in catalog.iter() {
+        let Some(name) = index_name(component.name()) else {
+            continue;
+        };
+        marks.see_index(name);
+        if name == "Document.iwa" && root_archive.replace(component.archive()).is_some() {
+            return Err(Error::InvalidFormat(
+                "iWork package contains multiple Document.iwa components".to_owned(),
+            ));
+        }
+    }
+
+    if !marks.iwa {
+        return Ok(None);
+    }
+    let Some(resolved_root) = root_archive else {
+        return Ok(None);
+    };
+    let Some(format) = root_format_archive(resolved_root)? else {
+        return Err(Error::InvalidFormat(
+            "Document.iwa has no recognized iWork application root".to_owned(),
+        ));
+    };
+    if marks.accepts(format) {
+        Ok(Some(format))
+    } else {
+        Err(Error::InvalidFormat(
+            "iWork component markers conflict with the Document.iwa application root".to_owned(),
+        ))
+    }
 }
 
 fn archive_limits(limits: Limits) -> Result<litchi_iwa_archive::Limits> {
@@ -316,7 +368,7 @@ fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
     }
 }
 
-fn classify_root(root: &DetectionRoot, limits: Limits) -> Result<Option<Format>> {
+fn classify_root(root: &DetectionRoot) -> Result<Option<Format>> {
     if !root.has_iwa_components() {
         return Ok(None);
     }
@@ -327,7 +379,7 @@ fn classify_root(root: &DetectionRoot, limits: Limits) -> Result<Option<Format>>
     let Some(document) = root.document() else {
         return Ok(None);
     };
-    let Some(format) = root_format_archive(document, limits)? else {
+    let Some(format) = root_format_archive(document)? else {
         return Err(Error::InvalidFormat(
             "Document.iwa has no recognized iWork application root".to_owned(),
         ));
@@ -408,10 +460,10 @@ fn valid_shared_document(payload: &[u8]) -> bool {
 fn root_format(data: &[u8], limits: Limits) -> Result<Option<Format>> {
     let stream = SnappyStream::decompress_with_limits(data, limits.snappy_limits()?)?;
     let archive = Archive::parse(stream.as_bytes())?;
-    root_format_archive(&archive, limits)
+    root_format_archive(&archive)
 }
 
-fn root_format_archive(archive: &Archive, _limits: Limits) -> Result<Option<Format>> {
+fn root_format_archive(archive: &Archive) -> Result<Option<Format>> {
     let mut detected = None;
 
     for application in archive
@@ -678,6 +730,11 @@ fn is_component(component_name: &str, stem: &str) -> bool {
                     .split('-')
                     .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
         })
+}
+
+fn index_name(name: &str) -> Option<&str> {
+    name.strip_prefix("Index/")
+        .or_else(|| (!name.contains('/')).then_some(name))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -980,7 +1037,44 @@ mod tests {
                 .unwrap(),
             ],
         };
-        assert!(root_format_archive(&duplicate_root, Limits::default()).is_err());
+        assert!(root_format_archive(&duplicate_root).is_err());
+    }
+
+    #[test]
+    fn detects_from_the_same_parsed_component_snapshot() {
+        for expected in [Format::Pages, Format::Numbers, Format::Keynote] {
+            let bytes = document_package(expected, &[]);
+            let source = litchi_iwa_archive::SourceCatalog::from_bytes(&bytes).unwrap();
+
+            assert_eq!(
+                component_catalog(source.components()).unwrap(),
+                Some(expected)
+            );
+            assert_eq!(
+                component_catalog(source.components()).unwrap(),
+                super::bytes(&bytes).unwrap()
+            );
+        }
+
+        let media_package = package(&[("Data/image.png", b"not an IWA component")]);
+        let source = litchi_iwa_archive::SourceCatalog::from_bytes(&media_package).unwrap();
+        assert_eq!(component_catalog(source.components()).unwrap(), None);
+
+        let pages_root = document(Format::Pages);
+        let legacy_index = package(&[("Document.iwa", &pages_root)]);
+        let legacy = package(&[("legacy.pages/Index.zip", &legacy_index)]);
+        let legacy_source = litchi_iwa_archive::SourceCatalog::from_bytes(&legacy).unwrap();
+        assert_eq!(
+            component_catalog(legacy_source.components()).unwrap(),
+            Some(Format::Pages)
+        );
+
+        let duplicate = package(&[
+            ("Index/Document.iwa", &pages_root),
+            ("Document.iwa", &pages_root),
+        ]);
+        let duplicate_source = litchi_iwa_archive::SourceCatalog::from_bytes(&duplicate).unwrap();
+        assert!(component_catalog(duplicate_source.components()).is_err());
     }
 
     #[test]
