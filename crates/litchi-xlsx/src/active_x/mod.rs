@@ -8,6 +8,7 @@ mod codec;
 mod model;
 mod package;
 mod validation;
+#[cfg(feature = "vba-inspection")]
 pub mod vba;
 
 use crate::error::{Error, Result};
@@ -49,6 +50,7 @@ pub use model::*;
 pub use package::{
     load_from_worksheet, remove_from_worksheet, replace_on_worksheet, store_on_worksheet,
 };
+#[cfg(feature = "vba-inspection")]
 pub use vba::Project;
 
 fn invalid(value: impl Into<String>) -> Error {

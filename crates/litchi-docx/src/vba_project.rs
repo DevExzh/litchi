@@ -11,7 +11,7 @@ use litchi_ooxml_common::vba::{
 };
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{OpcPackage, PackURI, Part};
-use litchi_vba::{Limits, Payload, project::Project};
+use litchi_vba::{Limits, project::Project};
 use std::sync::Arc;
 
 const WORD_VBA_NAMESPACE: &str = "http://schemas.microsoft.com/office/word/2006/wordml";
@@ -403,16 +403,35 @@ pub(crate) fn discover_vba_project(
 pub(crate) fn store_vba_project(
     package: &mut OpcPackage,
     source: &PackURI,
-    payload: Payload,
-    supplemental_data: &VbaSupplementalData,
+    payload: Arc<Vec<u8>>,
+    supplemental_xml: Vec<u8>,
 ) -> Result<VbaProject> {
-    let payload = Arc::new(payload.into_bytes());
-    let supplemental_xml = supplemental_data.to_xml()?;
     store_project_graph(package, source, Host::Word, payload, Some(supplemental_xml))?;
     let source = package.get_part(source)?;
     discover_vba_project(package, source)?.ok_or_else(|| {
         Error::InvalidFormat("stored Word VBA project was not discoverable".to_string())
     })
+}
+
+pub(crate) fn matching_vba_project(
+    package: &OpcPackage,
+    source: &PackURI,
+    payload: &[u8],
+    supplemental_xml: &[u8],
+) -> Result<Option<VbaProject>> {
+    let source_part = package.get_part(source)?;
+    let Some(project) = discover_vba_project(package, source_part)? else {
+        return Ok(None);
+    };
+    if package.get_part(project.project_part_name())?.blob() != payload
+        || package
+            .get_part(project.supplemental_data_part_name())?
+            .blob()
+            != supplemental_xml
+    {
+        return Ok(None);
+    }
+    Ok(Some(project))
 }
 
 pub(crate) fn remove_vba_project(package: &mut OpcPackage, source: &PackURI) -> Result<bool> {

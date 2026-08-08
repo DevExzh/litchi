@@ -12,6 +12,7 @@ pub mod controls;
 pub mod excel;
 pub mod ink;
 pub mod ole;
+#[cfg(feature = "vba-inspection")]
 pub mod vba;
 
 pub(crate) const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";

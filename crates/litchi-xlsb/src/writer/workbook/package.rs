@@ -11,6 +11,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rel};
 use litchi_opc::part::Part;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use std::io::{Seek, Write};
+#[cfg(feature = "vba-inspection")]
 use std::sync::Arc;
 
 pub(super) fn checked_capacity(resource: &'static str, terms: &[usize]) -> Result<usize> {
@@ -92,6 +93,7 @@ impl WorkbookWriter {
             )?));
         }
 
+        #[cfg(feature = "vba-inspection")]
         if let Some(payload) = &self.vba {
             crate::package::vba_project::store_vba_bytes(
                 &mut package,

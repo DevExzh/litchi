@@ -159,6 +159,16 @@ jobs:
           cargo check -p litchi --no-default-features --features ppt
           cargo check -p litchi --no-default-features --features ppt,fonts
           cargo check -p litchi --no-default-features --features ppt,sign
+          cargo check -p litchi-docx --no-default-features --features vba-inspection
+          cargo check -p litchi-ppt --no-default-features --features vba-inspection
+          cargo check -p litchi-pptx --no-default-features --features vba-inspection
+          cargo check -p litchi-xlsb --no-default-features --features vba-inspection
+          cargo check -p litchi-xlsx --no-default-features --features vba-inspection
+          cargo check -p litchi --no-default-features --features docx,vba-inspection
+          cargo check -p litchi --no-default-features --features ppt,vba-inspection
+          cargo check -p litchi --no-default-features --features pptx,vba-inspection
+          cargo check -p litchi --no-default-features --features xlsb,vba-inspection
+          cargo check -p litchi --no-default-features --features xlsx,vba-inspection
 
       - name: Check if code adheres to best practices
         run: cargo clippy --workspace --all-targets --all-features --no-deps -- -D warnings

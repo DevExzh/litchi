@@ -65,13 +65,13 @@ mod preservation_tests {
     }
 
     #[test]
-    fn local_ignorable_redeclaration_resets_inherited_preservation() {
+    fn redundant_ignorable_redeclaration_retains_inherited_preservation() {
         let source = format!(
             r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext" mc:Ignorable="x" mc:PreserveAttributes="x:*"><a mc:Ignorable="x" x:value="discarded"/></r>"#
         );
         let (xml, report) = run(&source).unwrap();
-        assert!(!xml.contains("x:value"));
-        assert_eq!(report.preserved_attributes, 0);
+        assert!(xml.contains("x:value"));
+        assert_eq!(report.preserved_attributes, 1);
     }
 
     #[test]
@@ -103,11 +103,6 @@ mod preservation_tests {
                 "accepted invalid token list: {directive}"
             );
         }
-
-        let wildcard_process = format!(
-            r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext" mc:Ignorable="x" mc:ProcessContent="x:*"/>"#
-        );
-        assert!(run(&wildcard_process).is_err());
 
         let wrong_namespace = format!(
             r#"<r xmlns:mc="{MC}" xmlns:x="urn:ext" xmlns:y="urn:other" mc:Ignorable="x" mc:PreserveElements="y:keep"/>"#
@@ -277,6 +272,76 @@ mod tests {
         assert!(!y.contains("<x:"));
         assert!(y.contains("<yes"))
     }
+
+    #[test]
+    fn process_content_accepts_effective_ignorable_and_namespace_wildcards() {
+        let inherited = r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:x" mc:Ignorable="x"><scope mc:ProcessContent="x:wrap"><x:wrap><kept/></x:wrap><x:drop><lost/></x:drop></scope></r>"#;
+        let output = run(inherited, &Capabilities::new()).unwrap();
+        assert!(output.contains("<kept"));
+        assert!(!output.contains("<lost"));
+        assert!(!output.contains("<x:wrap"));
+
+        let wildcard = r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:x" mc:Ignorable="x" mc:ProcessContent="x:*"><x:first><one/></x:first><x:second><two/></x:second></r>"#;
+        let output = run(wildcard, &Capabilities::new()).unwrap();
+        assert!(output.contains("<one"));
+        assert!(output.contains("<two"));
+        assert!(!output.contains("<x:"));
+    }
+
+    #[test]
+    fn redundant_ignorable_keeps_inherited_process_content() {
+        let xml = r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:x" mc:Ignorable="x" mc:ProcessContent="x:wrap"><scope mc:Ignorable="x"><x:wrap><kept/></x:wrap></scope></r>"#;
+        let output = run(xml, &Capabilities::new()).unwrap();
+        assert!(output.contains("<kept"));
+        assert!(!output.contains("<x:wrap"));
+    }
+
+    #[test]
+    fn alternate_content_allows_ignorable_foreign_children_without_reordering_branches() {
+        let xml = r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:x" xmlns:s="urn:s" mc:Ignorable="x"><mc:AlternateContent x:meta="ok"><x:before/><mc:Choice Requires="s" x:meta="ok"><choice/></mc:Choice><mc:Fallback x:meta="ok"><fallback/></mc:Fallback><x:after/></mc:AlternateContent></r>"#;
+        let output = run(xml, &Capabilities::new()).unwrap();
+        assert!(output.contains("<fallback"));
+        assert!(!output.contains("<choice"));
+        assert!(!output.contains("x:before"));
+        assert!(!output.contains("x:after"));
+    }
+
+    #[test]
+    fn alternate_content_enforces_element_specific_attribute_constraints() {
+        let mc = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+        let invalid = [
+            format!(
+                r#"<r xmlns:mc="{mc}"><mc:AlternateContent bad="1"><mc:Choice Requires="x" xmlns:x="urn:x"/></mc:AlternateContent></r>"#
+            ),
+            format!(
+                r#"<r xmlns:mc="{mc}" xmlns:x="urn:x"><mc:AlternateContent><mc:Choice Requires="x" bad="1"/></mc:AlternateContent></r>"#
+            ),
+            format!(
+                r#"<r xmlns:mc="{mc}" xmlns:x="urn:x"><mc:AlternateContent><mc:Choice Requires="x"/><mc:Fallback bad="1"/></mc:AlternateContent></r>"#
+            ),
+            format!(
+                r#"<r xmlns:mc="{mc}" xmlns:x="urn:x"><mc:AlternateContent><mc:Choice mc:Requires="x"/></mc:AlternateContent></r>"#
+            ),
+            format!(
+                r#"<r xmlns:mc="{mc}" xmlns:x="urn:x"><mc:AlternateContent xml:lang="en"><mc:Choice Requires="x"/></mc:AlternateContent></r>"#
+            ),
+            format!(
+                r#"<r xmlns:mc="{mc}" xmlns:x="urn:x"><mc:AlternateContent><mc:Choice Requires="x"/><mc:Fallback Requires="x"/></mc:AlternateContent></r>"#
+            ),
+            format!(
+                r#"<r xmlns:mc="{mc}" xmlns:x="urn:x"><mc:AlternateContent><mc:Choice Requires="x"/><mc:Fallback/><mc:Choice Requires="x"/></mc:AlternateContent></r>"#
+            ),
+            format!(
+                r#"<r xmlns:mc="{mc}" xmlns:x="urn:x"><mc:AlternateContent><mc:Choice Requires="x" xmlns:u="urn:unknown" u:bad="1"/></mc:AlternateContent></r>"#
+            ),
+        ];
+        for source in invalid {
+            assert!(
+                run(&source, &Capabilities::new()).is_err(),
+                "accepted invalid AlternateContent markup: {source}"
+            );
+        }
+    }
     #[test]
     fn security_and_limits() {
         let x = r#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:x" mc:MustUnderstand="x"/>"#;
@@ -289,6 +354,151 @@ mod tests {
             ..Limits::default()
         };
         assert!(process_markup_compatibility(b"<r xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"><x/></r>",&Capabilities::new(),&l).is_err())
+    }
+
+    #[test]
+    fn input_and_borrowed_output_limits_are_preflighted() {
+        let xml = b"<root/>";
+        let exact = Limits {
+            max_input_bytes: xml.len(),
+            max_output_bytes: xml.len(),
+            ..Limits::default()
+        };
+        assert!(matches!(
+            process_markup_compatibility(xml, &Capabilities::new(), &exact)
+                .unwrap()
+                .xml,
+            Cow::Borrowed(_)
+        ));
+
+        for limits in [
+            Limits {
+                max_input_bytes: xml.len() - 1,
+                ..exact.clone()
+            },
+            Limits {
+                max_output_bytes: xml.len() - 1,
+                ..exact.clone()
+            },
+        ] {
+            assert!(matches!(
+                process_markup_compatibility(xml, &Capabilities::new(), &limits),
+                Err(Error::LimitExceeded(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn transformed_output_limit_is_exact_and_never_overcommitted() {
+        let xml = br#"<r xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><a value="&amp;"/></r>"#;
+        let output =
+            process_markup_compatibility(xml, &Capabilities::new(), &Limits::default()).unwrap();
+        let output_len = output.xml.len();
+        let exact = Limits {
+            max_output_bytes: output_len,
+            ..Limits::default()
+        };
+        assert_eq!(
+            process_markup_compatibility(xml, &Capabilities::new(), &exact)
+                .unwrap()
+                .xml
+                .len(),
+            output_len
+        );
+        let over = Limits {
+            max_output_bytes: output_len - 1,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            process_markup_compatibility(xml, &Capabilities::new(), &over),
+            Err(Error::LimitExceeded(_))
+        ));
+    }
+
+    #[test]
+    fn deep_scopes_do_not_clone_effective_namespace_or_directive_sets() {
+        const DEPTH: usize = 96;
+        let mut xml = format!(r#"<r xmlns:mc="{}">"#, super::super::model::NAMESPACE);
+        for index in 0..DEPTH {
+            xml.push_str(&format!(
+                r#"<e{index} xmlns:p{index}="urn:p{index}" mc:Ignorable="p{index}" mc:PreserveAttributes="p{index}:keep">"#
+            ));
+        }
+        xml.push_str("<leaf/>");
+        for index in (0..DEPTH).rev() {
+            xml.push_str(&format!("</e{index}>"));
+        }
+        xml.push_str("</r>");
+
+        let limits = Limits {
+            max_depth: DEPTH + 2,
+            max_namespace_bindings: DEPTH + 2,
+            max_directive_tokens: 2,
+            max_output_bytes: 8 * 1024 * 1024,
+            ..Limits::default()
+        };
+        let output =
+            process_markup_compatibility(xml.as_bytes(), &Capabilities::new(), &limits).unwrap();
+        assert!(output.xml.windows(5).any(|window| window == b"<leaf"));
+
+        let namespace_over = Limits {
+            max_namespace_bindings: DEPTH + 1,
+            ..limits.clone()
+        };
+        assert!(matches!(
+            process_markup_compatibility(xml.as_bytes(), &Capabilities::new(), &namespace_over,),
+            Err(Error::LimitExceeded(_))
+        ));
+    }
+
+    #[test]
+    fn directive_token_limit_accepts_exact_and_rejects_over() {
+        let xml = format!(
+            r#"<r xmlns:mc="{}" xmlns:a="urn:a" xmlns:b="urn:b" mc:Ignorable="a b"/>"#,
+            super::super::model::NAMESPACE
+        );
+        let exact = Limits {
+            max_directive_tokens: 2,
+            ..Limits::default()
+        };
+        process_markup_compatibility(xml.as_bytes(), &Capabilities::new(), &exact).unwrap();
+        let over = Limits {
+            max_directive_tokens: 1,
+            ..exact
+        };
+        assert!(matches!(
+            process_markup_compatibility(xml.as_bytes(), &Capabilities::new(), &over),
+            Err(Error::LimitExceeded(_))
+        ));
+    }
+
+    #[test]
+    fn dtd_external_identifiers_and_custom_entities_are_never_expanded() {
+        let external = format!(
+            r#"<!DOCTYPE r SYSTEM "https://example.invalid/entity"><r xmlns:mc="{}"/>"#,
+            super::super::model::NAMESPACE
+        );
+        assert!(matches!(
+            process_markup_compatibility(
+                external.as_bytes(),
+                &Capabilities::new(),
+                &Limits::default(),
+            ),
+            Err(Error::NonConformant(_))
+        ));
+
+        let entity = format!(
+            r#"<r xmlns:mc="{}">&external;</r>"#,
+            super::super::model::NAMESPACE
+        );
+        assert!(matches!(
+            process_markup_compatibility(
+                entity.as_bytes(),
+                &Capabilities::new(),
+                &Limits::default(),
+            ),
+            Err(Error::NonConformant(_))
+        ));
     }
 }
 

@@ -3,10 +3,15 @@
 use super::super::model::*;
 
 impl Package {
+    /// Refuse a story snapshot while facade-owned state is not materialized.
+    pub(crate) fn ensure_story_opc_current(&self, operation: &'static str) -> Result<()> {
+        self.ensure_opc_current(operation)
+    }
+
     /// Refuse a conflict-story snapshot when facade-owned state has not yet
     /// been materialized into the OPC graph.
     pub(crate) fn ensure_conflict_opc_current(&self, operation: &'static str) -> Result<()> {
-        self.ensure_opc_current(operation)
+        self.ensure_story_opc_current(operation)
     }
 
     /// Get the underlying OPC package.

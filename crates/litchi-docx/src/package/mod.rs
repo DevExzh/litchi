@@ -6,7 +6,11 @@
 mod codec;
 mod model;
 mod package;
+pub mod story;
 #[cfg(test)]
 mod tests;
 
 pub use model::Package;
+pub use story::{
+    StoryDialect, StoryInventory, StoryKind, StoryLimits, StoryOwner, StoryPart, StoryTopology,
+};

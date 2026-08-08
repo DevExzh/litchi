@@ -19,6 +19,7 @@ bitflags = { workspace = true }
 cbc = { workspace = true, optional = true, features = ["zeroize"] }
 hmac = { workspace = true, optional = true, features = ["zeroize"] }
 litchi-cfb = { workspace = true }
+litchi-core = { workspace = true }
 litchi-ole-common = { workspace = true }
 quick-xml = { workspace = true }
 rand = { workspace = true, optional = true }

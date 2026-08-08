@@ -13,6 +13,7 @@ pub mod properties;
 pub mod relationships;
 pub mod ribbon;
 pub mod spreadsheet_xml_maps;
+#[cfg(feature = "vba-inspection")]
 pub mod vba;
 pub mod web;
 pub mod xml;

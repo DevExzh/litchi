@@ -14,6 +14,7 @@ fonts = ["dep:litchi-fonts"]
 font-subset = ["fonts", "litchi-fonts/subset"]
 font-discovery = ["fonts", "litchi-fonts/discovery"]
 automatic-fonts = ["font-subset", "font-discovery", "litchi-fonts/automatic"]
+vba-inspection = ["litchi-ooxml-common/vba-inspection"]
 
 [dependencies]
 base64 = { workspace = true }

@@ -48,6 +48,7 @@ pub mod template;
 pub mod textbox;
 pub mod theme;
 pub mod variables;
+#[cfg(feature = "vba-inspection")]
 pub mod vba_project;
 pub mod web;
 pub mod writer;

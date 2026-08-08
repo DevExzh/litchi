@@ -7,6 +7,7 @@ use crate::package::formula::excel_name_eq;
 use crate::writer::{
     MutableChartSheet, MutableSharedStringsWriter, MutableWorksheet, StylesWriter,
 };
+#[cfg(feature = "vba-inspection")]
 use std::sync::Arc;
 
 const MAX_AUTHORED_EXTERNAL_LINKS: usize = 4_096;
@@ -50,6 +51,7 @@ pub struct WorkbookWriter {
     pub(super) external_links: Vec<crate::external_link::Link>,
     pub(super) pivot_caches: Vec<AuthoredPivotCache>,
     pub(super) xml_maps: Option<crate::xml_maps::XmlMapInfo>,
+    #[cfg(feature = "vba-inspection")]
     pub(super) vba: Option<Arc<Vec<u8>>>,
 }
 
@@ -98,6 +100,7 @@ impl WorkbookWriter {
             external_links: Vec::new(),
             pivot_caches: Vec::new(),
             xml_maps: None,
+            #[cfg(feature = "vba-inspection")]
             vba: None,
         }
     }
@@ -128,11 +131,13 @@ impl WorkbookWriter {
     }
 
     /// Attach a cache-free, inert MS-OVBA project to generated workbooks.
+    #[cfg(feature = "vba-inspection")]
     pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<&mut Self> {
         self.set_vba_with(project, &litchi_vba::Limits::default())
     }
 
     /// Attach a cache-free project with explicit resource limits.
+    #[cfg(feature = "vba-inspection")]
     pub fn set_vba_with(
         &mut self,
         project: litchi_vba::build::Project,
@@ -143,12 +148,14 @@ impl WorkbookWriter {
     }
 
     /// Attach a prevalidated `vbaProject.bin` payload without executing it.
+    #[cfg(feature = "vba-inspection")]
     pub fn put_vba(&mut self, payload: litchi_vba::Payload) -> &mut Self {
         self.vba = Some(Arc::new(payload.into_bytes()));
         self
     }
 
     /// Remove the project scheduled for insertion into generated workbooks.
+    #[cfg(feature = "vba-inspection")]
     pub fn clear_vba(&mut self) -> bool {
         self.vba.take().is_some()
     }

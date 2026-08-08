@@ -91,7 +91,9 @@ pub use field::{
 pub use style::{MutableStyle, generate_styles_xml};
 
 // Re-export content control types
-pub use content_control::{ContentControlType, MutableContentControl};
+pub use content_control::{
+    Checksum, ContentControlType, DataBinding, FormattingAllowed, MutableContentControl,
+};
 
 // Re-export theme types
 pub use theme::{ColorScheme, MutableTheme};

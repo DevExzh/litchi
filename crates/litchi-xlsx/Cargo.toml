@@ -8,6 +8,10 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = []
+vba-inspection = ["dep:litchi-vba", "litchi-ooxml-common/vba-inspection"]
+
 [dependencies]
 base64 = { workspace = true }
 bitflags = { workspace = true }
@@ -19,7 +23,7 @@ litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
 litchi-sheet = { workspace = true }
 litchi-spreadsheet-drawing = { workspace = true }
-litchi-vba = { workspace = true }
+litchi-vba = { workspace = true, optional = true }
 memchr = { workspace = true }
 once_cell = { workspace = true }
 quick-xml = { workspace = true }

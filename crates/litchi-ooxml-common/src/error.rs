@@ -58,6 +58,7 @@ pub enum Error {
     Uri(String),
 
     /// A bounded inert MS-OVBA project payload failed to decode or validate.
+    #[cfg(feature = "vba-inspection")]
     #[error("VBA error: {0}")]
     Vba(#[from] litchi_vba::Error),
 

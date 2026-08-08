@@ -78,7 +78,14 @@ sign = [
     "litchi-xlsb?/sign",
 ]
 encryption = ["dep:litchi-crypto", "litchi-docx?/encryption", "litchi-ppt?/encryption"]
-vba-inspection = ["litchi-ppt?/vba-inspection"]
+vba-inspection = [
+    "litchi-docx?/vba-inspection",
+    "litchi-ooxml-common?/vba-inspection",
+    "litchi-ppt?/vba-inspection",
+    "litchi-pptx?/vba-inspection",
+    "litchi-xlsb?/vba-inspection",
+    "litchi-xlsx?/vba-inspection",
+]
 formula = ["dep:litchi-formula", "litchi-doc?/formula", "litchi-ppt?/formula"]
 fonts = ["dep:litchi-fonts", "litchi-docx?/fonts", "litchi-ppt?/fonts", "litchi-pptx?/fonts"]
 font-subset = [

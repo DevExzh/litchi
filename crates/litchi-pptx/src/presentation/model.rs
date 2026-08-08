@@ -62,6 +62,7 @@ impl<'a> Presentation<'a> {
 
     /// Discover the optional opaque VBA project relationship owned by this
     /// presentation. The binary payload is never decoded or executed.
+    #[cfg(feature = "vba-inspection")]
     pub fn vba(&self) -> Result<Option<embedded::vba::Project>> {
         package::vba(self.package, &self.part)
     }

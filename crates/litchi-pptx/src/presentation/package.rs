@@ -36,6 +36,7 @@ pub(super) fn notes(
     crate::notes::load(package, presentation.part().partname())
 }
 
+#[cfg(feature = "vba-inspection")]
 pub(super) fn vba(
     package: &OpcPackage,
     presentation: &PresentationPart<'_>,

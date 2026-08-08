@@ -67,6 +67,7 @@ pub(crate) mod template;
 #[path = "../host/utils.rs"]
 #[allow(dead_code, unreachable_pub)]
 pub(crate) mod utils;
+#[cfg(feature = "vba-inspection")]
 #[path = "../host/vba_project.rs"]
 pub mod vba_project;
 #[path = "../host/walker.rs"]

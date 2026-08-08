@@ -20,6 +20,7 @@ font-discovery = ["fonts", "litchi-fonts/discovery"]
 # The existing save-time system-resolution and subsetting workflow.
 automatic-fonts = ["font-subset", "font-discovery", "litchi-fonts/automatic"]
 sign = ["dep:litchi-sign", "litchi-opc/sign"]
+vba-inspection = ["dep:litchi-vba", "litchi-ooxml-common/vba-inspection"]
 
 [dependencies]
 base64 = { workspace = true }
@@ -32,7 +33,7 @@ litchi-drawingml = { workspace = true }
 litchi-sign = { workspace = true, optional = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
-litchi-vba = { workspace = true }
+litchi-vba = { workspace = true, optional = true }
 quick-xml = { workspace = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }

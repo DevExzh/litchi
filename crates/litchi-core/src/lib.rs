@@ -16,6 +16,8 @@ pub mod detection;
 pub mod error;
 pub mod hex;
 pub mod metadata;
+/// Microsoft Office's shared CRC-32 checksum algorithm.
+pub mod mso_crc32;
 pub mod selector;
 pub mod shapes;
 pub mod sheet;

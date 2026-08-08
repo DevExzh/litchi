@@ -11,6 +11,7 @@ rust-version.workspace = true
 [features]
 default = []
 sign = ["dep:litchi-sign", "litchi-opc/sign"]
+vba-inspection = ["dep:litchi-vba", "litchi-ooxml-common/vba-inspection"]
 
 [dependencies]
 bitflags = { workspace = true }
@@ -22,7 +23,7 @@ litchi-opc = { workspace = true }
 litchi-sign = { workspace = true, optional = true }
 litchi-sheet = { workspace = true }
 litchi-spreadsheet-drawing = { workspace = true }
-litchi-vba = { workspace = true }
+litchi-vba = { workspace = true, optional = true }
 quick-xml = { workspace = true }
 thiserror = { workspace = true }
 

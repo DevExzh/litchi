@@ -1,3 +1,4 @@
+use crate::content_control::BindingFlavor;
 /// Custom XML parts support for Word documents.
 ///
 /// Custom XML parts allow storing arbitrary XML data within a Word document.
@@ -21,7 +22,12 @@ pub struct NewStore {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Binding {
     pub source: PackURI,
-    pub control_id: u32,
+    /// Stable source-order occurrence within `source`.
+    pub occurrence: usize,
+    /// Optional producer ID. Absence and repeated IDs retain distinct occurrences.
+    pub control_id: Option<u32>,
+    /// Exact core or Word 2012 binding vocabulary.
+    pub flavor: BindingFlavor,
     pub xpath: String,
     pub store_id: String,
     pub prefixes: Option<String>,

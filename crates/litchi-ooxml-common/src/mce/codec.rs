@@ -5,11 +5,7 @@ use quick_xml::{
     encoding::Decoder,
     events::{BytesStart, Event},
 };
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashSet},
-    str,
-};
+use std::{borrow::Cow, collections::HashSet, str, sync::Arc};
 
 use super::model::{
     Capabilities, Error, Limits, NAMESPACE, Name, OffsetLimits, Output, Report, XML_NS,
@@ -293,14 +289,216 @@ enum NamePattern {
     Exact(Name),
     Namespace(String),
 }
-#[derive(Clone)]
-struct Ctx {
-    ns: BTreeMap<String, String>,
-    ign: HashSet<String>,
-    process: HashSet<Name>,
+
+#[derive(Clone, Default)]
+struct Namespaces {
+    head: Option<Arc<NamespaceLayer>>,
+    bindings: usize,
+}
+
+struct NamespaceLayer {
+    parent: Option<Arc<NamespaceLayer>>,
+    local: Vec<(String, String)>,
+}
+
+impl Namespaces {
+    fn get(&self, prefix: &str) -> Option<&str> {
+        if prefix == "xml" {
+            return Some(XML_NS);
+        }
+        let mut layer = self.head.as_deref();
+        while let Some(current) = layer {
+            if let Some((_, namespace)) = current
+                .local
+                .iter()
+                .rev()
+                .find(|(candidate, _)| candidate == prefix)
+            {
+                return Some(namespace);
+            }
+            layer = current.parent.as_deref();
+        }
+        None
+    }
+
+    fn with_local(&self, local: Vec<(String, String)>, lim: &Limits) -> R<Self> {
+        if local.is_empty() {
+            return Ok(self.clone());
+        }
+        let mut bindings = self.bindings;
+        for (index, (prefix, _)) in local.iter().enumerate() {
+            if local[..index]
+                .iter()
+                .any(|(candidate, _)| candidate == prefix)
+            {
+                return Err(bad("duplicate namespace declaration"));
+            }
+            if self.get(prefix).is_none() {
+                bindings = bindings
+                    .checked_add(1)
+                    .ok_or_else(|| limit("namespace bindings"))?;
+            }
+        }
+        if bindings > lim.max_namespace_bindings {
+            return Err(limit("namespace bindings"));
+        }
+        Ok(Self {
+            head: Some(Arc::new(NamespaceLayer {
+                parent: self.head.clone(),
+                local,
+            })),
+            bindings,
+        })
+    }
+
+    fn for_each_effective(&self, mut visit: impl FnMut(&str, &str) -> R<()>) -> R<()> {
+        let mut layer = self.head.as_ref();
+        while let Some(current) = layer {
+            for (prefix, namespace) in &current.local {
+                if prefix != "xml" && !self.shadowed_before(current, prefix) {
+                    visit(prefix, namespace)?;
+                }
+            }
+            layer = current.parent.as_ref();
+        }
+        Ok(())
+    }
+
+    fn shadowed_before(&self, target: &Arc<NamespaceLayer>, prefix: &str) -> bool {
+        let mut layer = self.head.as_ref();
+        while let Some(current) = layer {
+            if Arc::ptr_eq(current, target) {
+                return false;
+            }
+            if current
+                .local
+                .iter()
+                .any(|(candidate, _)| candidate == prefix)
+            {
+                return true;
+            }
+            layer = current.parent.as_ref();
+        }
+        false
+    }
+}
+
+struct DirectiveLayer {
+    parent: Option<Arc<DirectiveLayer>>,
+    ignorable: HashSet<String>,
+    process: HashSet<NamePattern>,
     preserve_elements: HashSet<NamePattern>,
     preserve_attributes: HashSet<NamePattern>,
+}
+
+#[derive(Clone)]
+struct Ctx {
+    ns: Namespaces,
+    directives: Option<Arc<DirectiveLayer>>,
     opaque: bool,
+}
+
+impl Ctx {
+    fn root() -> Self {
+        Self {
+            ns: Namespaces {
+                head: None,
+                bindings: 1,
+            },
+            directives: None,
+            opaque: false,
+        }
+    }
+
+    fn is_ignorable(&self, namespace: &str) -> bool {
+        let mut layer = self.directives.as_deref();
+        while let Some(current) = layer {
+            if current.ignorable.contains(namespace) {
+                return true;
+            }
+            layer = current.parent.as_deref();
+        }
+        false
+    }
+
+    fn processes(&self, name: &Name) -> bool {
+        pattern_directive_matches(&self.directives, name, |layer| &layer.process)
+    }
+
+    fn preserves_element(&self, name: &Name) -> bool {
+        pattern_directive_matches(&self.directives, name, |layer| &layer.preserve_elements)
+    }
+
+    fn preserves_attribute(&self, name: &Name) -> bool {
+        pattern_directive_matches(&self.directives, name, |layer| &layer.preserve_attributes)
+    }
+}
+
+fn pattern_directive_matches(
+    head: &Option<Arc<DirectiveLayer>>,
+    name: &Name,
+    select: impl Fn(&DirectiveLayer) -> &HashSet<NamePattern>,
+) -> bool {
+    let mut layer = head.as_deref();
+    while let Some(current) = layer {
+        if matches_pattern(select(current), name) {
+            return true;
+        }
+        if current.ignorable.contains(&name.namespace) {
+            return false;
+        }
+        layer = current.parent.as_deref();
+    }
+    false
+}
+
+struct BoundedOutput {
+    bytes: Vec<u8>,
+    max: usize,
+}
+
+impl BoundedOutput {
+    fn new(hint: usize, max: usize) -> R<Self> {
+        let mut bytes = Vec::new();
+        reserve_exact(&mut bytes, hint.min(max), "MCE output")?;
+        Ok(Self { bytes, max })
+    }
+
+    fn extend_from_slice(&mut self, value: &[u8]) -> R<()> {
+        self.reserve(value.len())?;
+        self.bytes.extend_from_slice(value);
+        Ok(())
+    }
+
+    fn push(&mut self, value: u8) -> R<()> {
+        self.reserve(1)?;
+        self.bytes.push(value);
+        Ok(())
+    }
+
+    fn reserve(&mut self, additional: usize) -> R<()> {
+        let len = self
+            .bytes
+            .len()
+            .checked_add(additional)
+            .ok_or_else(|| limit("output bytes"))?;
+        if len > self.max {
+            return Err(limit("output bytes"));
+        }
+        if additional > self.bytes.capacity().saturating_sub(self.bytes.len()) {
+            self.bytes
+                .try_reserve_exact(additional)
+                .map_err(|source| Error::Allocation {
+                    resource: "MCE output",
+                    source,
+                })?;
+        }
+        Ok(())
+    }
+
+    fn into_inner(self) -> Vec<u8> {
+        self.bytes
+    }
 }
 enum Mode {
     Emit(String),
@@ -323,27 +521,28 @@ pub fn process_markup_compatibility<'a>(
     caps: &Capabilities,
     lim: &Limits,
 ) -> R<Output<'a>> {
+    if xml.len() > lim.max_input_bytes {
+        return Err(limit("input bytes"));
+    }
     if !xml
         .windows(NAMESPACE.len())
         .any(|w| w == NAMESPACE.as_bytes())
     {
+        if xml.len() > lim.max_output_bytes {
+            return Err(limit("output bytes"));
+        }
         return Ok(Output {
             xml: Cow::Borrowed(xml),
             report: Report::default(),
         });
     }
-    if xml.len() > lim.max_input_bytes {
-        return Err(limit("input bytes"));
-    }
     let mut r = Reader::from_reader(xml);
     r.config_mut().trim_text(false);
-    let (mut stack, mut out, mut rep, mut root, mut buf) = (
-        Vec::new(),
-        Vec::with_capacity(xml.len()),
-        Report::default(),
-        false,
-        Vec::new(),
-    );
+    let mut stack = Vec::new();
+    let mut out = BoundedOutput::new(xml.len(), lim.max_output_bytes)?;
+    let mut rep = Report::default();
+    let mut root = false;
+    let mut buf = Vec::new();
     loop {
         let d = r.decoder();
         match r.read_event_into(&mut buf) {
@@ -360,37 +559,37 @@ pub fn process_markup_compatibility<'a>(
                         return Err(bad("AlternateContent requires Choice"));
                     },
                     Mode::Emit(q) if f.active => {
-                        out.extend_from_slice(b"</");
-                        out.extend_from_slice(q.as_bytes());
-                        out.push(b'>')
+                        out.extend_from_slice(b"</")?;
+                        out.extend_from_slice(q.as_bytes())?;
+                        out.push(b'>')?
                     },
                     _ => {},
                 }
             },
             Ok(Event::Text(e)) => {
                 if visible(&stack) {
-                    out.extend_from_slice(e.as_ref())
+                    out.extend_from_slice(e.as_ref())?
                 }
             },
             Ok(Event::CData(e)) => {
                 if visible(&stack) {
-                    out.extend_from_slice(b"<![CDATA[");
-                    out.extend_from_slice(e.as_ref());
-                    out.extend_from_slice(b"]]>")
+                    out.extend_from_slice(b"<![CDATA[")?;
+                    out.extend_from_slice(e.as_ref())?;
+                    out.extend_from_slice(b"]]>")?
                 }
             },
             Ok(Event::Comment(e)) => {
                 if visible(&stack) {
-                    out.extend_from_slice(b"<!--");
-                    out.extend_from_slice(e.as_ref());
-                    out.extend_from_slice(b"-->")
+                    out.extend_from_slice(b"<!--")?;
+                    out.extend_from_slice(e.as_ref())?;
+                    out.extend_from_slice(b"-->")?
                 }
             },
             Ok(Event::Decl(e)) => {
                 if stack.is_empty() && !root {
-                    out.extend_from_slice(b"<?");
-                    out.extend_from_slice(e.as_ref());
-                    out.extend_from_slice(b"?>")
+                    out.extend_from_slice(b"<?")?;
+                    out.extend_from_slice(e.as_ref())?;
+                    out.extend_from_slice(b"?>")?
                 } else {
                     return Err(bad("late XML declaration"));
                 }
@@ -403,9 +602,9 @@ pub fn process_markup_compatibility<'a>(
                     {
                         return Err(bad("custom entity"));
                     }
-                    out.push(b'&');
-                    out.extend_from_slice(e.as_ref());
-                    out.push(b';')
+                    out.push(b'&')?;
+                    out.extend_from_slice(e.as_ref())?;
+                    out.push(b';')?
                 }
             },
             Ok(Event::DocType(_) | Event::PI(_)) => {
@@ -414,16 +613,13 @@ pub fn process_markup_compatibility<'a>(
             Ok(Event::Eof) => break,
             Err(e) => return Err(Error::Xml(e.to_string())),
         }
-        if out.len() > lim.max_output_bytes {
-            return Err(limit("output bytes"));
-        }
         buf.clear()
     }
     if !stack.is_empty() {
         return Err(bad("unterminated XML"));
     }
     Ok(Output {
-        xml: Cow::Owned(out),
+        xml: Cow::Owned(out.into_inner()),
         report: rep,
     })
 }
@@ -435,7 +631,7 @@ fn start(
     caps: &Capabilities,
     lim: &Limits,
     st: &mut Vec<Frame>,
-    out: &mut Vec<u8>,
+    out: &mut BoundedOutput,
     rep: &mut Report,
     root: &mut bool,
 ) -> R<()> {
@@ -446,6 +642,7 @@ fn start(
     let mut raw = Vec::new();
     for a in e.attributes().with_checks(true) {
         let a = a.map_err(xerr)?;
+        reserve_exact(&mut raw, 1, "MCE attributes")?;
         raw.push((
             str::from_utf8(a.key.as_ref()).map_err(xerr)?.to_string(),
             a.decoded_and_normalized_value(XmlVersion::Explicit1_0, d)
@@ -453,31 +650,21 @@ fn start(
                 .into_owned(),
         ))
     }
-    let mut c = st.last().map(|f| f.ctx.clone()).unwrap_or_else(|| {
-        let mut ns = BTreeMap::new();
-        ns.insert("xml".into(), XML_NS.into());
-        Ctx {
-            ns,
-            ign: HashSet::new(),
-            process: HashSet::new(),
-            preserve_elements: HashSet::new(),
-            preserve_attributes: HashSet::new(),
-            opaque: false,
-        }
-    });
+    let mut c = st.last().map(|f| f.ctx.clone()).unwrap_or_else(Ctx::root);
+    let mut local_namespaces = Vec::new();
     for (a, v) in &raw {
         if a == "xmlns" {
-            c.ns.insert("".into(), v.clone());
+            reserve_exact(&mut local_namespaces, 1, "MCE namespace declarations")?;
+            local_namespaces.push((String::new(), v.clone()));
         } else if let Some(p) = a.strip_prefix("xmlns:") {
             if !xml_name::is_ncname(p) || v.is_empty() {
                 return Err(bad("invalid namespace"));
             }
-            c.ns.insert(p.into(), v.clone());
+            reserve_exact(&mut local_namespaces, 1, "MCE namespace declarations")?;
+            local_namespaces.push((p.into(), v.clone()));
         }
     }
-    if c.ns.len() > lim.max_namespace_bindings {
-        return Err(limit("namespace bindings"));
-    }
+    c.ns = c.ns.with_local(local_namespaces, lim)?;
     let name = expand(&q, &c.ns, true)?;
     let parent_active = st.last().is_none_or(|f| f.active);
     if c.opaque {
@@ -487,17 +674,7 @@ fn start(
             active: parent_active,
         };
         if parent_active {
-            write_start(
-                out,
-                &q,
-                &c.ns,
-                &raw,
-                &c.ign,
-                &c.preserve_attributes,
-                caps,
-                false,
-                rep,
-            )?
+            write_start(out, &q, &c, &raw, caps, false, rep)?
         }
         return close(st, f, empty, out);
     }
@@ -528,6 +705,7 @@ fn start(
         if tokens > lim.max_directive_tokens {
             return Err(limit("directive tokens"));
         }
+        reserve_exact(&mut directives, 1, "MCE directives")?;
         directives.push((n.local_name, v.as_str()));
     }
 
@@ -544,15 +722,25 @@ fn start(
             if uri == NAMESPACE {
                 return Err(bad("MCE cannot be ignorable"));
             }
-            local_ign.insert(uri.clone());
+            local_ign
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "MCE Ignorable directives",
+                    source,
+                })?;
+            local_ign.insert(uri.to_owned());
         }
-        for uri in &local_ign {
-            c.process.retain(|name| &name.namespace != uri);
-            c.preserve_elements
-                .retain(|pattern| pattern_namespace(pattern) != uri);
-            c.preserve_attributes
-                .retain(|pattern| pattern_namespace(pattern) != uri);
-            c.ign.insert(uri.clone());
+    }
+    let mut new_ignorable = HashSet::new();
+    for namespace in &local_ign {
+        if !c.is_ignorable(namespace) {
+            new_ignorable
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "MCE effective Ignorable directives",
+                    source,
+                })?;
+            new_ignorable.insert(namespace.clone());
         }
     }
 
@@ -564,13 +752,17 @@ fn start(
             "Ignorable" => {},
             "ProcessContent" => {
                 for token in value.split_whitespace() {
-                    let target = parse_qname_target(token, &c.ns, false)?;
-                    let NamePattern::Exact(target) = target else {
-                        unreachable!()
-                    };
-                    if !local_ign.contains(&target.namespace) {
-                        return Err(bad("ProcessContent target is not locally ignorable"));
+                    let target = parse_qname_target(token, &c.ns, true)?;
+                    let namespace = pattern_namespace(&target);
+                    if !local_ign.contains(namespace) && !c.is_ignorable(namespace) {
+                        return Err(bad("ProcessContent target is not effectively ignorable"));
                     }
+                    local_process
+                        .try_reserve(1)
+                        .map_err(|source| Error::Allocation {
+                            resource: "MCE ProcessContent directives",
+                            source,
+                        })?;
                     if !local_process.insert(target) {
                         return Err(bad("duplicate ProcessContent target"));
                     }
@@ -582,6 +774,12 @@ fn start(
                     if !local_ign.contains(pattern_namespace(&target)) {
                         return Err(bad("PreserveElements target is not locally ignorable"));
                     }
+                    local_preserve_elements
+                        .try_reserve(1)
+                        .map_err(|source| Error::Allocation {
+                            resource: "MCE PreserveElements directives",
+                            source,
+                        })?;
                     if !local_preserve_elements.insert(target) {
                         return Err(bad("duplicate PreserveElements target"));
                     }
@@ -593,6 +791,12 @@ fn start(
                     if !local_ign.contains(pattern_namespace(&target)) {
                         return Err(bad("PreserveAttributes target is not locally ignorable"));
                     }
+                    local_preserve_attributes.try_reserve(1).map_err(|source| {
+                        Error::Allocation {
+                            resource: "MCE PreserveAttributes directives",
+                            source,
+                        }
+                    })?;
                     if !local_preserve_attributes.insert(target) {
                         return Err(bad("duplicate PreserveAttributes target"));
                     }
@@ -608,17 +812,38 @@ fn start(
                         c.ns.get(prefix)
                             .ok_or_else(|| bad(format!("unbound MustUnderstand {prefix}")))?;
                     if !caps.understands(uri) {
-                        return Err(Error::MustUnderstand(uri.clone()));
+                        return Err(Error::MustUnderstand(uri.to_owned()));
                     }
                 }
             },
             _ => unreachable!(),
         }
     }
-    c.process.extend(local_process);
-    c.preserve_elements.extend(local_preserve_elements);
-    c.preserve_attributes.extend(local_preserve_attributes);
+    if !new_ignorable.is_empty()
+        || !local_process.is_empty()
+        || !local_preserve_elements.is_empty()
+        || !local_preserve_attributes.is_empty()
+    {
+        c.directives = Some(Arc::new(DirectiveLayer {
+            parent: c.directives.take(),
+            ignorable: new_ignorable,
+            process: local_process,
+            preserve_elements: local_preserve_elements,
+            preserve_attributes: local_preserve_attributes,
+        }));
+    }
     c.opaque = caps.extensions.contains(&name);
+
+    if name.namespace == NAMESPACE {
+        match name.local_name.as_str() {
+            "AlternateContent" => {
+                validate_alternate_attributes(&raw, &c, caps, AlternateKind::Container)?
+            },
+            "Choice" => validate_alternate_attributes(&raw, &c, caps, AlternateKind::Choice)?,
+            "Fallback" => validate_alternate_attributes(&raw, &c, caps, AlternateKind::Fallback)?,
+            _ => {},
+        }
+    }
 
     if let Some(parent) = st.last_mut()
         && let Mode::Alt {
@@ -628,7 +853,20 @@ fn start(
         } = &mut parent.mode
     {
         if name.namespace != NAMESPACE {
-            return Err(bad("non-MCE AlternateContent child"));
+            if c.is_ignorable(&name.namespace) && !caps.understands(&name.namespace) {
+                rep.ignored_elements += 1;
+                return close(
+                    st,
+                    Frame {
+                        ctx: c,
+                        mode: Mode::Skip,
+                        active: false,
+                    },
+                    empty,
+                    out,
+                );
+            }
+            return Err(bad("non-ignorable AlternateContent child"));
         }
         let (active, mode) = match name.local_name.as_str() {
             "Choice" => {
@@ -700,11 +938,11 @@ fn start(
             },
             _ => return Err(bad("Choice/Fallback outside AlternateContent")),
         }
-    } else if c.ign.contains(&name.namespace) && !caps.understands(&name.namespace) {
-        if matches_pattern(&c.preserve_elements, &name) {
+    } else if c.is_ignorable(&name.namespace) && !caps.understands(&name.namespace) {
+        if c.preserves_element(&name) {
             rep.preserved_elements += 1;
             Mode::Emit(q.clone())
-        } else if c.process.contains(&name) {
+        } else if c.processes(&name) {
             for (a, _) in &raw {
                 let n = expand(a, &c.ns, false)?;
                 if n.namespace == XML_NS
@@ -724,17 +962,7 @@ fn start(
         Mode::Emit(q.clone())
     };
     if matches!(mode, Mode::Emit(_)) && active {
-        write_start(
-            out,
-            &q,
-            &c.ns,
-            &raw,
-            &c.ign,
-            &c.preserve_attributes,
-            caps,
-            true,
-            rep,
-        )?
+        write_start(out, &q, &c, &raw, caps, true, rep)?
     }
     if st.is_empty() {
         if *root {
@@ -754,18 +982,19 @@ fn start(
     )
 }
 
-fn close(st: &mut Vec<Frame>, f: Frame, empty: bool, out: &mut Vec<u8>) -> R<()> {
+fn close(st: &mut Vec<Frame>, f: Frame, empty: bool, out: &mut BoundedOutput) -> R<()> {
     if empty {
         match f.mode {
             Mode::Emit(q) if f.active => {
-                out.extend_from_slice(b"</");
-                out.extend_from_slice(q.as_bytes());
-                out.push(b'>')
+                out.extend_from_slice(b"</")?;
+                out.extend_from_slice(q.as_bytes())?;
+                out.push(b'>')?
             },
             Mode::Alt { .. } => return Err(bad("empty AlternateContent")),
             _ => {},
         }
     } else {
+        reserve_exact(st, 1, "MCE element stack")?;
         st.push(f)
     }
     Ok(())
@@ -794,19 +1023,60 @@ fn attr<'a>(r: &'a [(String, String)], n: &str) -> R<Option<&'a str>> {
     }
     Ok(v)
 }
-fn expand(q: &str, ns: &BTreeMap<String, String>, element: bool) -> R<Name> {
+
+#[derive(Clone, Copy)]
+enum AlternateKind {
+    Container,
+    Choice,
+    Fallback,
+}
+
+fn validate_alternate_attributes(
+    raw: &[(String, String)],
+    ctx: &Ctx,
+    caps: &Capabilities,
+    kind: AlternateKind,
+) -> R<()> {
+    for (qualified, _) in raw {
+        if qualified == "xmlns" || qualified.starts_with("xmlns:") {
+            continue;
+        }
+        let name = expand(qualified, &ctx.ns, false)?;
+        if name.namespace.is_empty() {
+            if matches!(kind, AlternateKind::Choice) && name.local_name == "Requires" {
+                continue;
+            }
+            return Err(bad("unexpected unprefixed AlternateContent attribute"));
+        }
+        if name.namespace == XML_NS && matches!(name.local_name.as_str(), "lang" | "space") {
+            return Err(bad(
+                "xml:lang and xml:space are forbidden on AlternateContent markup",
+            ));
+        }
+        if name.namespace == NAMESPACE || name.namespace == XML_NS {
+            continue;
+        }
+        if !caps.understands(&name.namespace) && !ctx.is_ignorable(&name.namespace) {
+            return Err(bad(
+                "AlternateContent attribute namespace is neither understood nor ignorable",
+            ));
+        }
+    }
+    Ok(())
+}
+fn expand(q: &str, ns: &Namespaces, element: bool) -> R<Name> {
     let qualified = QualifiedName::try_from(q).map_err(|_| bad("invalid QName"))?;
     let p = qualified.prefix().unwrap_or_default();
     let l = qualified.local();
     let n = if p.is_empty() {
         if element {
-            ns.get("").cloned().unwrap_or_default()
+            ns.get("").unwrap_or_default().to_owned()
         } else {
             String::new()
         }
     } else {
         ns.get(p)
-            .cloned()
+            .map(str::to_owned)
             .ok_or_else(|| bad(format!("unbound prefix {p}")))?
     };
     Ok(Name {
@@ -821,14 +1091,12 @@ fn pattern_namespace(pattern: &NamePattern) -> &str {
     }
 }
 fn matches_pattern(patterns: &HashSet<NamePattern>, name: &Name) -> bool {
-    patterns.contains(&NamePattern::Exact(name.clone()))
-        || patterns.contains(&NamePattern::Namespace(name.namespace.clone()))
+    patterns.iter().any(|pattern| match pattern {
+        NamePattern::Exact(candidate) => candidate == name,
+        NamePattern::Namespace(namespace) => namespace == &name.namespace,
+    })
 }
-fn parse_qname_target(
-    token: &str,
-    ns: &BTreeMap<String, String>,
-    wildcard: bool,
-) -> R<NamePattern> {
+fn parse_qname_target(token: &str, ns: &Namespaces, wildcard: bool) -> R<NamePattern> {
     let (prefix, local) = token
         .split_once(':')
         .ok_or_else(|| bad("preservation and processing targets must be prefixed QNames"))?;
@@ -837,16 +1105,15 @@ fn parse_qname_target(
     }
     let namespace = ns
         .get(prefix)
-        .cloned()
+        .map(str::to_owned)
         .ok_or_else(|| bad(format!("unbound compatibility target prefix {prefix}")))?;
     if namespace == NAMESPACE {
         return Err(bad("compatibility target cannot use the MCE namespace"));
     }
     if local == "*" {
-        if wildcard {
-            return Ok(NamePattern::Namespace(namespace));
-        }
-        return Err(bad("wildcard is not allowed in ProcessContent"));
+        return wildcard
+            .then_some(NamePattern::Namespace(namespace))
+            .ok_or_else(|| bad("wildcard is not allowed in this compatibility directive"));
     }
     if !xml_name::is_ncname(local) {
         return Err(bad("invalid compatibility target QName"));
@@ -858,75 +1125,71 @@ fn parse_qname_target(
 }
 #[allow(clippy::too_many_arguments)]
 fn write_start(
-    o: &mut Vec<u8>,
+    o: &mut BoundedOutput,
     q: &str,
-    ns: &BTreeMap<String, String>,
+    ctx: &Ctx,
     raw: &[(String, String)],
-    ign: &HashSet<String>,
-    preserve: &HashSet<NamePattern>,
     caps: &Capabilities,
     filter: bool,
     rep: &mut Report,
 ) -> R<()> {
-    o.push(b'<');
-    o.extend_from_slice(q.as_bytes());
-    for (p, u) in ns {
-        if p == "xml" {
-            continue;
-        }
-        o.extend_from_slice(if p.is_empty() { b" xmlns" } else { b" xmlns:" });
+    o.push(b'<')?;
+    o.extend_from_slice(q.as_bytes())?;
+    ctx.ns.for_each_effective(|p, u| {
+        o.extend_from_slice(if p.is_empty() { b" xmlns" } else { b" xmlns:" })?;
         if !p.is_empty() {
-            o.extend_from_slice(p.as_bytes())
+            o.extend_from_slice(p.as_bytes())?;
         }
-        o.extend_from_slice(b"=\"");
-        esc(o, u);
+        o.extend_from_slice(b"=\"")?;
+        esc(o, u)?;
         o.push(b'\"')
-    }
+    })?;
     for (a, v) in raw {
         if a == "xmlns" || a.starts_with("xmlns:") {
             continue;
         }
-        let n = expand(a, ns, false)?;
+        let n = expand(a, &ctx.ns, false)?;
         if filter && n.namespace == NAMESPACE {
             rep.ignored_attributes += 1;
             continue;
         }
         if filter
             && !n.namespace.is_empty()
-            && ign.contains(&n.namespace)
+            && ctx.is_ignorable(&n.namespace)
             && !caps.understands(&n.namespace)
         {
-            if matches_pattern(preserve, &n) {
+            if ctx.preserves_attribute(&n) {
                 rep.preserved_attributes += 1
             } else {
                 rep.ignored_attributes += 1;
                 continue;
             }
         }
-        o.push(b' ');
-        o.extend_from_slice(a.as_bytes());
-        o.extend_from_slice(b"=\"");
-        esc(o, v);
-        o.push(b'\"')
+        o.push(b' ')?;
+        o.extend_from_slice(a.as_bytes())?;
+        o.extend_from_slice(b"=\"")?;
+        esc(o, v)?;
+        o.push(b'\"')?
     }
-    o.push(b'>');
+    o.push(b'>')?;
     Ok(())
 }
-fn esc(o: &mut Vec<u8>, s: &str) {
+fn esc(o: &mut BoundedOutput, s: &str) -> R<()> {
     for c in s.chars() {
         match c {
-            '&' => o.extend_from_slice(b"&amp;"),
-            '<' => o.extend_from_slice(b"&lt;"),
-            '"' => o.extend_from_slice(b"&quot;"),
-            '\t' => o.extend_from_slice(b"&#x9;"),
-            '\n' => o.extend_from_slice(b"&#xA;"),
-            '\r' => o.extend_from_slice(b"&#xD;"),
+            '&' => o.extend_from_slice(b"&amp;")?,
+            '<' => o.extend_from_slice(b"&lt;")?,
+            '"' => o.extend_from_slice(b"&quot;")?,
+            '\t' => o.extend_from_slice(b"&#x9;")?,
+            '\n' => o.extend_from_slice(b"&#xA;")?,
+            '\r' => o.extend_from_slice(b"&#xD;")?,
             _ => {
                 let mut b = [0; 4];
-                o.extend_from_slice(c.encode_utf8(&mut b).as_bytes())
+                o.extend_from_slice(c.encode_utf8(&mut b).as_bytes())?
             },
         }
     }
+    Ok(())
 }
 /// Applies the baseline OOXML markup-compatibility profile.
 pub fn process_ooxml(x: &[u8]) -> R<Cow<'_, [u8]>> {
@@ -939,10 +1202,10 @@ pub fn process_part(part: &dyn litchi_opc::Part) -> R<Cow<'_, [u8]>> {
 }
 
 /// Applies baseline preprocessing while retaining the part's shared blob on the fast path.
-pub fn process_part_arc(part: &dyn litchi_opc::Part) -> R<std::sync::Arc<Vec<u8>>> {
+pub fn process_part_arc(part: &dyn litchi_opc::Part) -> R<Arc<Vec<u8>>> {
     Ok(match process_part(part)? {
         Cow::Borrowed(_) => part.blob_arc(),
-        Cow::Owned(v) => std::sync::Arc::new(v),
+        Cow::Owned(v) => Arc::new(v),
     })
 }
 /// Applies baseline preprocessing to UTF-8 OOXML.

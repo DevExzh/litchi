@@ -8,12 +8,16 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = []
+vba-inspection = ["dep:litchi-vba"]
+
 [dependencies]
 caseless = { workspace = true }
 chrono = { workspace = true }
 litchi-core = { workspace = true }
 litchi-opc = { workspace = true }
-litchi-vba = { workspace = true }
+litchi-vba = { workspace = true, optional = true }
 quick-xml = { workspace = true }
 ryu = { workspace = true }
 thiserror = { workspace = true }

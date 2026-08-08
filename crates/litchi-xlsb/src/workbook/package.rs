@@ -6,6 +6,7 @@ use crate::cell_watches;
 use crate::package::error::Result;
 use crate::package::formula::{Context, View, excel_name_eq, table::Definition as TableDefinition};
 use crate::package::styles_table::StylesTable;
+#[cfg(feature = "vba-inspection")]
 use crate::package::vba_project::{
     VbaProject, discover_vba_project, remove_vba_project as clear_workbook_vba,
     store_vba_project as store_workbook_vba_project,
@@ -242,6 +243,7 @@ impl Workbook {
         // These readers validate relationship cardinality, target mode,
         // target content type, and orphan/inbound graph invariants without
         // parsing or executing opaque payload bytes.
+        #[cfg(feature = "vba-inspection")]
         discover_vba_project(package, main)?;
         Ok(())
     }
@@ -317,17 +319,20 @@ impl Workbook {
     /// This validates only the declared OPC relationship graph and content
     /// types. It does not inspect, parse, verify, or execute VBA project or
     /// signature bytes.
+    #[cfg(feature = "vba-inspection")]
     pub fn vba(&self) -> Result<Option<VbaProject>> {
         let workbook = self.package.main_document_part()?;
         discover_vba_project(&self.package, workbook)
     }
 
     /// Attach a cache-free, inert MS-OVBA project to this binary workbook.
+    #[cfg(feature = "vba-inspection")]
     pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<VbaProject> {
         self.set_vba_with(project, &litchi_vba::Limits::default())
     }
 
     /// Attach a cache-free project with explicit resource limits.
+    #[cfg(feature = "vba-inspection")]
     pub fn set_vba_with(
         &mut self,
         project: litchi_vba::build::Project,
@@ -340,12 +345,14 @@ impl Workbook {
     ///
     /// Any existing legacy or Agile project signature is removed because
     /// replacing the signed project bytes invalidates it.
+    #[cfg(feature = "vba-inspection")]
     pub fn put_vba(&mut self, payload: litchi_vba::Payload) -> Result<VbaProject> {
         let source = self.package.main_document_part()?.partname().clone();
         store_workbook_vba_project(&mut self.package, &source, payload)
     }
 
     /// Remove the VBA project and all declared project-signature parts.
+    #[cfg(feature = "vba-inspection")]
     pub fn clear_vba(&mut self) -> Result<bool> {
         let source = self.package.main_document_part()?.partname().clone();
         clear_workbook_vba(&mut self.package, &source)

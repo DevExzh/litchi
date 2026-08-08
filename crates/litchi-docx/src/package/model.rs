@@ -5,7 +5,6 @@ pub(super) use crate::alt::{Chunk, Conformance, Import, MAX_CHUNKS, Rel, is_rela
 pub(super) use crate::bibliography::{
     BibliographySource, SourceStore, discover_bibliography_source_stores,
 };
-pub(super) use crate::content_control::ContentControl;
 pub(super) use crate::custom_xml::{Binding, NewStore};
 pub(super) use crate::document::Document;
 #[cfg(feature = "encryption")]
@@ -22,8 +21,9 @@ pub(super) use crate::settings::{
     patch_attached_template, patch_document_variables, patch_mail_merge,
     validate_attached_template_target,
 };
+#[cfg(feature = "vba-inspection")]
 pub(super) use crate::vba_project::{
-    VbaProject, VbaSupplementalData, discover_vba_project,
+    VbaProject, VbaSupplementalData, discover_vba_project, matching_vba_project,
     remove_vba_project as clear_vba_graph_from_document,
     store_vba_project as store_vba_project_in_document,
 };
@@ -558,44 +558,74 @@ impl Package {
     /// This validates only the declared OPC relationship graph and content
     /// types. It does not inspect, parse, decompress, or execute the binary
     /// VBA project or Word supplemental-data bytes.
+    #[cfg(feature = "vba-inspection")]
     pub fn vba(&self) -> Result<Option<VbaProject>> {
         let document = self.opc.main_document_part()?;
         discover_vba_project(&self.opc, document)
     }
 
     /// Attach a cache-free, inert MS-OVBA project with empty Word supplemental data.
+    #[cfg(feature = "vba-inspection")]
     pub fn set_vba(&mut self, project: litchi_vba::build::Project) -> Result<VbaProject> {
-        self.set_vba_with(
-            project,
-            &VbaSupplementalData::new(),
-            &litchi_vba::Limits::default(),
-        )
+        let payload = project.finish(&litchi_vba::Limits::default())?;
+        self.put_vba_managed("set_vba", payload, &VbaSupplementalData::new())
     }
 
     /// Attach a cache-free project and typed Word document-event/macro metadata.
+    #[cfg(feature = "vba-inspection")]
     pub fn set_vba_with(
         &mut self,
         project: litchi_vba::build::Project,
         supplemental_data: &VbaSupplementalData,
         limits: &litchi_vba::Limits,
     ) -> Result<VbaProject> {
-        self.put_vba(project.finish(limits)?, supplemental_data)
+        let payload = project.finish(limits)?;
+        self.put_vba_managed("set_vba_with", payload, supplemental_data)
     }
 
     /// Attach a prevalidated `vbaProject.bin` and typed Word supplemental data.
+    #[cfg(feature = "vba-inspection")]
     pub fn put_vba(
         &mut self,
         payload: litchi_vba::Payload,
         supplemental_data: &VbaSupplementalData,
     ) -> Result<VbaProject> {
-        let source = self.opc.main_document_part()?.partname().clone();
-        store_vba_project_in_document(&mut self.opc, &source, payload, supplemental_data)
+        self.put_vba_managed("put_vba", payload, supplemental_data)
     }
 
     /// Remove the VBA project and supplemental-data graph and restore DOCX/DOTX type.
+    #[cfg(feature = "vba-inspection")]
     pub fn clear_vba(&mut self) -> Result<bool> {
         let source = self.opc.main_document_part()?.partname().clone();
-        clear_vba_graph_from_document(&mut self.opc, &source)
+        let source_part = self.opc.get_part(&source)?;
+        if discover_vba_project(&self.opc, source_part)?.is_none() {
+            return Ok(false);
+        }
+        self.edit_semantic_opc("clear_vba", move |candidate| {
+            let source = candidate.main_document_part()?.partname().clone();
+            clear_vba_graph_from_document(candidate, &source)
+        })
+    }
+
+    #[cfg(feature = "vba-inspection")]
+    fn put_vba_managed(
+        &mut self,
+        operation: &'static str,
+        payload: litchi_vba::Payload,
+        supplemental_data: &VbaSupplementalData,
+    ) -> Result<VbaProject> {
+        let source = self.opc.main_document_part()?.partname().clone();
+        let supplemental_xml = supplemental_data.to_xml()?;
+        if let Some(project) =
+            matching_vba_project(&self.opc, &source, payload.bytes(), &supplemental_xml)?
+        {
+            return Ok(project);
+        }
+        let payload = std::sync::Arc::new(payload.into_bytes());
+        self.edit_semantic_opc(operation, move |candidate| {
+            let source = candidate.main_document_part()?.partname().clone();
+            store_vba_project_in_document(candidate, &source, payload, supplemental_xml)
+        })
     }
 
     /// Load inert persisted Office Add-in task panes.

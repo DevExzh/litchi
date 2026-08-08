@@ -5,16 +5,40 @@ use crate::error::{Error, Result};
 /// specific types of content (text, dates, lists, etc.).
 use crate::namespace::{is_wordprocessing_namespace, word_attribute_value};
 use litchi_ooxml_common::custom_xml::valid_guid;
+use litchi_ooxml_common::mce::{self, Capabilities};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
 
+mod authoring;
+mod model;
+mod package;
+mod patch;
+mod snapshot;
+mod transaction;
+
+pub use authoring::{AuthoredProperties, AuthoringView, NamespaceRequirements, write_sdt_pr};
+pub use model::{
+    BindingFlavor, Checksum, ChecksumStatus, ChecksumValue, DataBinding,
+    FORMATTING_ALLOWED_NAMESPACE, FormattingAllowed, Inventory, Limits, Lock, Occurrence,
+    STORE_ITEM_CHECKSUM_NAMESPACE,
+};
+pub use package::{
+    ChecksumEntry, PackageChecksumStatus, PackageCommit, PackageLimits, PackagePatch,
+    PackageSnapshot, PackageTransaction, Story,
+};
+pub use patch::Patch;
+pub use snapshot::{AttributeSpan, BindingSpan, LockSpan, Snapshot, SourceOccurrence, Span};
+pub use transaction::{Commit, Edit, Transaction};
+
 const WORD_2010_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2010/wordml";
 const WORD_2012_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/word/2012/wordml";
+const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
 
 /// Semantic kind of a Word content control.
 ///
@@ -150,7 +174,7 @@ impl std::error::Error for ParseKindError {}
 #[derive(Debug, Clone)]
 pub struct ContentControl {
     /// Control ID
-    id: u32,
+    id: Option<u32>,
     /// Control tag (optional identifier)
     tag: Option<String>,
     /// Control title
@@ -170,11 +194,9 @@ pub struct ContentControl {
     /// Keyboard tab order.
     tab_index: Option<u32>,
     /// XPath of the custom XML data binding.
-    data_binding_xpath: Option<String>,
-    /// Custom XML data-store item identifier.
-    data_binding_store_item_id: Option<String>,
-    /// Namespace prefix mappings used by the data-binding XPath.
-    data_binding_prefix_mappings: Option<String>,
+    data_bindings: Vec<DataBinding>,
+    /// Word 2024 formatting exception attached to a content lock.
+    formatting_allowed: Option<FormattingAllowed>,
     /// Display text and values declared by combo-box or drop-down controls.
     list_items: Vec<(String, String)>,
     /// Checked state for a Word 2010 checkbox control.
@@ -198,7 +220,7 @@ impl ContentControl {
         lock_content: bool,
     ) -> Self {
         Self {
-            id,
+            id: Some(id),
             tag,
             title,
             kind: kind.unwrap_or_default(),
@@ -208,9 +230,8 @@ impl ContentControl {
             showing_placeholder: false,
             placeholder: None,
             tab_index: None,
-            data_binding_xpath: None,
-            data_binding_store_item_id: None,
-            data_binding_prefix_mappings: None,
+            data_bindings: Vec::new(),
+            formatting_allowed: None,
             list_items: Vec::new(),
             checked: None,
             date_format: None,
@@ -222,6 +243,12 @@ impl ContentControl {
     /// Get the control ID.
     #[inline]
     pub fn id(&self) -> u32 {
+        self.id.unwrap_or_default()
+    }
+
+    /// Get the optional source ID without conflating a missing ID with zero.
+    #[inline]
+    pub const fn id_opt(&self) -> Option<u32> {
         self.id
     }
 
@@ -255,6 +282,17 @@ impl ContentControl {
         self.lock_content
     }
 
+    /// Get the typed lock state.
+    #[must_use]
+    pub const fn lock(&self) -> Lock {
+        match (self.lock_delete, self.lock_content) {
+            (false, false) => Lock::Unlocked,
+            (true, false) => Lock::SdtLocked,
+            (false, true) => Lock::ContentLocked,
+            (true, true) => Lock::SdtContentLocked,
+        }
+    }
+
     /// Check whether Word should remove the control after it is edited.
     #[inline]
     pub fn is_temporary(&self) -> bool {
@@ -282,37 +320,52 @@ impl ContentControl {
     /// Get the XPath of the custom XML data binding.
     #[inline]
     pub fn data_binding_xpath(&self) -> Option<&str> {
-        self.data_binding_xpath.as_deref()
+        self.data_binding().map(DataBinding::xpath)
     }
 
     /// Get the custom XML data-store item identifier.
     #[inline]
     pub fn data_binding_store_item_id(&self) -> Option<&str> {
-        self.data_binding_store_item_id.as_deref()
+        self.data_binding().map(DataBinding::store_item_id)
     }
 
     /// Get namespace prefix mappings used by the data-binding XPath.
     #[inline]
     pub fn data_binding_prefix_mappings(&self) -> Option<&str> {
-        self.data_binding_prefix_mappings.as_deref()
+        self.data_binding().and_then(DataBinding::prefix_mappings)
+    }
+
+    /// Get the complete typed inert data binding.
+    #[inline]
+    pub fn data_binding(&self) -> Option<&DataBinding> {
+        self.data_bindings
+            .iter()
+            .find(|binding| binding.flavor() == BindingFlavor::Core)
+            .or_else(|| self.data_bindings.first())
+    }
+
+    /// Get every exact binding occurrence in source order.
+    #[inline]
+    pub fn data_bindings(&self) -> &[DataBinding] {
+        &self.data_bindings
+    }
+
+    /// Get the Word 2024 formatting exception, preserving absence.
+    #[inline]
+    pub const fn formatting_allowed(&self) -> Option<FormattingAllowed> {
+        self.formatting_allowed
     }
 
     /// Validate binding metadata without evaluating the XPath or resolving URIs.
     pub fn validate_data_binding(&self) -> Result<()> {
-        match (
-            self.data_binding_xpath.as_deref(),
-            self.data_binding_store_item_id.as_deref(),
-        ) {
-            (None, None) => Ok(()),
-            (Some(xpath), Some(store_item_id)) => validate_data_binding_values(
-                xpath,
-                store_item_id,
-                self.data_binding_prefix_mappings.as_deref(),
-            ),
-            _ => Err(Error::InvalidFormat(
-                "content-control data binding is incomplete".to_string(),
-            )),
+        for binding in &self.data_bindings {
+            validate_data_binding_values(
+                binding.xpath(),
+                binding.store_item_id(),
+                binding.prefix_mappings(),
+            )?;
         }
+        Ok(())
     }
 
     /// Get the display text and values declared by a list control.
@@ -345,112 +398,253 @@ impl ContentControl {
         self.repeating_section_title.as_deref()
     }
 
+    fn metadata_bytes(&self) -> usize {
+        let mut total = 0usize;
+        for value in [
+            self.tag.as_deref(),
+            self.title.as_deref(),
+            self.placeholder.as_deref(),
+            self.date_format.as_deref(),
+            self.date_value.as_deref(),
+            self.repeating_section_title.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            total = total.saturating_add(value.len());
+        }
+        for binding in &self.data_bindings {
+            total = total
+                .saturating_add(binding.xpath().len())
+                .saturating_add(binding.store_item_id().len())
+                .saturating_add(binding.prefix_mappings().map_or(0, str::len))
+                .saturating_add(
+                    binding
+                        .checksum_value()
+                        .map_or(0, |value| value.lexical().len()),
+                );
+        }
+        for (display, value) in &self.list_items {
+            total = total
+                .saturating_add(display.len())
+                .saturating_add(value.len());
+        }
+        total
+    }
+
     /// Extract content controls from document XML bytes.
     pub(crate) fn extract_from_document(doc_xml: &[u8]) -> Result<Vec<ContentControl>> {
-        let mut reader = NsReader::from_reader(doc_xml);
-        let mut controls = Vec::new();
-        let mut pending = None;
-        let mut depth = 0usize;
-
-        loop {
-            let decoder = reader.decoder();
-            let event = reader
-                .read_event()
-                .map_err(|error| Error::Xml(error.to_string()))?
-                .into_owned();
-            let resolver = reader.resolver().clone();
-            let (namespace, event) = resolver.resolve_event(event);
-
-            match event {
-                Event::Start(element) => {
-                    depth = depth.checked_add(1).ok_or_else(|| {
-                        Error::InvalidFormat("content-control XML nesting is too deep".to_string())
-                    })?;
-                    if is_word_element(&namespace, &element, b"sdtPr") {
-                        if pending.is_some() {
-                            return Err(Error::InvalidFormat(
-                                "nested content-control properties are invalid".to_string(),
-                            ));
-                        }
-                        pending = Some(PendingContentControl::new(depth));
-                    } else if let Some(control) = pending.as_mut() {
-                        parse_property(
-                            &namespace, &element, decoder, &resolver, depth, false, control,
-                        )?;
-                    }
-                },
-                Event::Empty(element) => {
-                    let child_depth = depth.checked_add(1).ok_or_else(|| {
-                        Error::InvalidFormat("content-control XML nesting is too deep".to_string())
-                    })?;
-                    if is_word_element(&namespace, &element, b"sdtPr") {
-                        if pending.is_some() {
-                            return Err(Error::InvalidFormat(
-                                "nested content-control properties are invalid".to_string(),
-                            ));
-                        }
-                        // An empty sdtPr has no ID and cannot be represented by this legacy API.
-                    } else if let Some(control) = pending.as_mut() {
-                        parse_property(
-                            &namespace,
-                            &element,
-                            decoder,
-                            &resolver,
-                            child_depth,
-                            true,
-                            control,
-                        )?;
-                    }
-                },
-                Event::End(element) => {
-                    if pending.as_ref().is_some_and(|control| {
-                        control.depth == depth
-                            && is_wordprocessing_namespace(&namespace)
-                            && element.local_name().as_ref() == b"sdtPr"
-                    }) {
-                        let control = pending.take().ok_or_else(|| {
-                            Error::InvalidFormat("missing content-control properties".to_string())
-                        })?;
-                        if let Some(control) = control.finish()? {
-                            if controls
-                                .iter()
-                                .any(|existing: &ContentControl| existing.id == control.id)
-                            {
-                                return Err(Error::InvalidFormat(format!(
-                                    "duplicate content-control ID {}",
-                                    control.id
-                                )));
-                            }
-                            controls.push(control);
-                        }
-                    } else if let Some(control) = pending.as_mut()
-                        && control
-                            .context
-                            .is_some_and(|(_, context_depth)| context_depth == depth)
-                    {
-                        control.context = None;
-                    }
-                    depth = depth.checked_sub(1).ok_or_else(|| {
-                        Error::InvalidFormat("invalid content-control XML nesting".to_string())
-                    })?;
-                },
-                Event::Eof if pending.is_some() => {
-                    return Err(Error::InvalidFormat(
-                        "unterminated content-control properties".to_string(),
-                    ));
-                },
-                Event::Eof if depth != 0 => {
-                    return Err(Error::InvalidFormat(
-                        "unterminated document XML".to_string(),
-                    ));
-                },
-                Event::Eof => break,
-                _ => {},
-            }
-        }
-
-        Ok(controls)
+        Ok(Inventory::parse(doc_xml)?
+            .into_controls()
+            .into_iter()
+            .filter(|control| control.id_opt().is_some())
+            .collect())
     }
+}
+
+pub(crate) fn parse_inventory(doc_xml: &[u8], limits: &Limits) -> Result<Inventory> {
+    limits.validate()?;
+    if doc_xml.len() > limits.max_input_bytes {
+        return Err(limit("input bytes"));
+    }
+    let capabilities = content_control_capabilities();
+    validate_extension_ignorable(doc_xml, limits, &capabilities)?;
+    let mce_limits = mce::Limits {
+        max_input_bytes: limits.max_input_bytes,
+        max_output_bytes: limits.max_mce_output_bytes,
+        max_depth: limits.max_depth,
+        max_namespace_bindings: limits.max_bindings,
+        max_directive_tokens: limits.max_bindings,
+        max_choices_per_alternate: limits.max_content_controls,
+    };
+    let selected = mce::process_markup_compatibility(doc_xml, &capabilities, &mce_limits)?.xml;
+    if selected.len() > limits.max_mce_output_bytes {
+        return Err(limit("MCE output bytes"));
+    }
+    parse_selected_inventory(selected.as_ref(), limits)
+}
+
+pub(crate) fn content_control_capabilities() -> Capabilities {
+    let mut capabilities = Capabilities::default();
+    for namespace in [
+        std::str::from_utf8(WORD_2010_NAMESPACE).expect("constant namespace is UTF-8"),
+        std::str::from_utf8(WORD_2012_NAMESPACE).expect("constant namespace is UTF-8"),
+        STORE_ITEM_CHECKSUM_NAMESPACE,
+        FORMATTING_ALLOWED_NAMESPACE,
+    ] {
+        capabilities.understand_namespace(namespace);
+    }
+    capabilities
+}
+
+fn parse_selected_inventory(doc_xml: &[u8], limits: &Limits) -> Result<Inventory> {
+    let mut reader = NsReader::from_reader(doc_xml);
+    let mut occurrences = Vec::new();
+    let mut pending = None;
+    let mut depth = 0usize;
+    let mut events = 0usize;
+    let mut bindings = 0usize;
+    let mut list_items = 0usize;
+    let mut metadata_bytes = 0usize;
+
+    loop {
+        events = events.checked_add(1).ok_or_else(|| limit("event count"))?;
+        if events > limits.max_events {
+            return Err(limit("event count"));
+        }
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("content-control XML nesting is too deep".to_string())
+                })?;
+                if depth > limits.max_depth {
+                    return Err(limit("XML depth"));
+                }
+                if is_word_element(&namespace, &element, b"sdtPr") {
+                    if pending.is_some() {
+                        return Err(Error::InvalidFormat(
+                            "nested content-control properties are invalid".to_string(),
+                        ));
+                    }
+                    if occurrences.len() >= limits.max_content_controls {
+                        return Err(limit("content-control count"));
+                    }
+                    pending = Some(PendingContentControl::new(
+                        depth,
+                        limits.max_list_items_per_control,
+                    ));
+                } else if let Some(control) = pending.as_mut() {
+                    parse_property(
+                        &namespace, &element, decoder, &resolver, depth, false, control,
+                    )?;
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("content-control XML nesting is too deep".to_string())
+                })?;
+                if is_word_element(&namespace, &element, b"sdtPr") {
+                    if pending.is_some() {
+                        return Err(Error::InvalidFormat(
+                            "nested content-control properties are invalid".to_string(),
+                        ));
+                    }
+                    push_occurrence(
+                        &mut occurrences,
+                        &mut bindings,
+                        &mut list_items,
+                        &mut metadata_bytes,
+                        PendingContentControl::new(child_depth, limits.max_list_items_per_control)
+                            .finish()?,
+                        limits,
+                    )?;
+                } else if let Some(control) = pending.as_mut() {
+                    parse_property(
+                        &namespace,
+                        &element,
+                        decoder,
+                        &resolver,
+                        child_depth,
+                        true,
+                        control,
+                    )?;
+                }
+            },
+            Event::End(element) => {
+                if pending.as_ref().is_some_and(|control| {
+                    control.depth == depth
+                        && is_wordprocessing_namespace(&namespace)
+                        && element.local_name().as_ref() == b"sdtPr"
+                }) {
+                    let control = pending.take().ok_or_else(|| {
+                        Error::InvalidFormat("missing content-control properties".to_string())
+                    })?;
+                    let control = control.finish()?;
+                    push_occurrence(
+                        &mut occurrences,
+                        &mut bindings,
+                        &mut list_items,
+                        &mut metadata_bytes,
+                        control,
+                        limits,
+                    )?;
+                } else if let Some(control) = pending.as_mut()
+                    && control
+                        .context
+                        .is_some_and(|(_, context_depth)| context_depth == depth)
+                {
+                    control.context = None;
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("invalid content-control XML nesting".to_string())
+                })?;
+            },
+            Event::Eof if pending.is_some() => {
+                return Err(Error::InvalidFormat(
+                    "unterminated content-control properties".to_string(),
+                ));
+            },
+            Event::Eof if depth != 0 => {
+                return Err(Error::InvalidFormat(
+                    "unterminated document XML".to_string(),
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+
+    Ok(Inventory { occurrences })
+}
+
+fn push_occurrence(
+    occurrences: &mut Vec<Occurrence>,
+    bindings: &mut usize,
+    list_items: &mut usize,
+    metadata_bytes: &mut usize,
+    control: ContentControl,
+    limits: &Limits,
+) -> Result<()> {
+    if occurrences.len() >= limits.max_content_controls {
+        return Err(limit("content-control count"));
+    }
+    if !control.data_bindings().is_empty() {
+        *bindings = bindings
+            .checked_add(control.data_bindings().len())
+            .ok_or_else(|| limit("binding count"))?;
+        if *bindings > limits.max_bindings {
+            return Err(limit("binding count"));
+        }
+    }
+    *list_items = list_items
+        .checked_add(control.list_items().len())
+        .ok_or_else(|| limit("list-item count"))?;
+    if *list_items > limits.max_list_items {
+        return Err(limit("list-item count"));
+    }
+    *metadata_bytes = metadata_bytes
+        .checked_add(control.metadata_bytes())
+        .ok_or_else(|| limit("metadata bytes"))?;
+    if *metadata_bytes > limits.max_metadata_bytes {
+        return Err(limit("metadata bytes"));
+    }
+    let ordinal = occurrences.len();
+    occurrences
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "content-control inventory",
+            source,
+        })?;
+    occurrences.push(Occurrence { ordinal, control });
+    Ok(())
 }
 
 /// Validate the lexical form of an SDT data binding without executing XPath.
@@ -483,7 +677,7 @@ pub fn validate_data_binding_values(
             "content-control prefixMappings exceeds lexical limits".to_string(),
         ));
     }
-    let mut prefixes = std::collections::HashSet::new();
+    let mut prefixes = HashSet::new();
     while !remaining.trim_start().is_empty() {
         remaining = remaining.trim_start();
         let after_xmlns = remaining.strip_prefix("xmlns").ok_or_else(|| {
@@ -570,10 +764,10 @@ struct PendingContentControl {
     placeholder: Option<String>,
     placeholder_seen: bool,
     tab_index: Option<u32>,
-    data_binding_xpath: Option<String>,
-    data_binding_store_item_id: Option<String>,
-    data_binding_prefix_mappings: Option<String>,
+    data_bindings: Vec<DataBinding>,
+    formatting_allowed: Option<FormattingAllowed>,
     list_items: Vec<(String, String)>,
+    max_list_items: usize,
     checked: Option<bool>,
     date_format: Option<String>,
     date_value: Option<String>,
@@ -582,7 +776,7 @@ struct PendingContentControl {
 }
 
 impl PendingContentControl {
-    fn new(depth: usize) -> Self {
+    fn new(depth: usize, max_list_items: usize) -> Self {
         Self {
             depth,
             id: None,
@@ -595,10 +789,10 @@ impl PendingContentControl {
             placeholder: None,
             placeholder_seen: false,
             tab_index: None,
-            data_binding_xpath: None,
-            data_binding_store_item_id: None,
-            data_binding_prefix_mappings: None,
+            data_bindings: Vec::new(),
+            formatting_allowed: None,
             list_items: Vec::new(),
+            max_list_items,
             checked: None,
             date_format: None,
             date_value: None,
@@ -607,13 +801,10 @@ impl PendingContentControl {
         }
     }
 
-    fn finish(self) -> Result<Option<ContentControl>> {
-        let Some(id) = self.id else {
-            return Ok(None);
-        };
+    fn finish(self) -> Result<ContentControl> {
         let (lock_delete, lock_content) = self.lock.unwrap_or((false, false));
-        Ok(Some(ContentControl {
-            id,
+        Ok(ContentControl {
+            id: self.id,
             tag: self.tag,
             title: self.title,
             kind: self.kind.unwrap_or_default(),
@@ -623,15 +814,14 @@ impl PendingContentControl {
             showing_placeholder: self.showing_placeholder.unwrap_or(false),
             placeholder: self.placeholder,
             tab_index: self.tab_index,
-            data_binding_xpath: self.data_binding_xpath,
-            data_binding_store_item_id: self.data_binding_store_item_id,
-            data_binding_prefix_mappings: self.data_binding_prefix_mappings,
+            data_bindings: self.data_bindings,
+            formatting_allowed: self.formatting_allowed,
             list_items: self.list_items,
             checked: self.checked,
             date_format: self.date_format,
             date_value: self.date_value,
             repeating_section_title: self.repeating_section_title,
-        }))
+        })
     }
 }
 
@@ -701,7 +891,9 @@ fn parse_direct_property(
                 let value = required_u32(element, b"val", decoder, resolver, "tab index")?;
                 set_once(&mut control.tab_index, value, "content-control tab index")?;
             },
-            b"dataBinding" => parse_data_binding(element, decoder, resolver, control)?,
+            b"dataBinding" => {
+                parse_data_binding(element, decoder, resolver, BindingFlavor::Core, control)?
+            },
             b"placeholder" => {
                 if control.placeholder_seen {
                     return Err(Error::InvalidFormat(
@@ -746,6 +938,9 @@ fn parse_direct_property(
         }
     } else if is_extension_namespace(namespace, WORD_2012_NAMESPACE) {
         match name.as_ref() {
+            b"dataBinding" => {
+                parse_data_binding(element, decoder, resolver, BindingFlavor::Word2012, control)?
+            },
             b"repeatingSection" => {
                 set_kind(control, Kind::RepeatingSection)?;
                 set_context(control, PropertyContext::RepeatingSection, depth, empty);
@@ -786,9 +981,19 @@ fn parse_nested_property(
             )?;
         },
         PropertyContext::List if is_word_element(namespace, element, b"listItem") => {
+            if control.list_items.len() >= control.max_list_items {
+                return Err(limit("per-control list-item count"));
+            }
             let value = required_word_attribute(element, b"value", decoder, resolver, "list item")?;
             let display = word_attribute_value(element, b"displayText", decoder, resolver)?
                 .unwrap_or_else(|| value.clone());
+            control
+                .list_items
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "content-control list items",
+                    source,
+                })?;
             control.list_items.push((display, value));
         },
         PropertyContext::Checkbox
@@ -838,17 +1043,34 @@ fn parse_lock(
         ));
     }
     let value = required_word_attribute(element, b"val", decoder, resolver, "lock")?;
-    control.lock = Some(match value.as_str() {
-        "unlocked" => (false, false),
-        "sdtLocked" => (true, false),
-        "contentLocked" => (false, true),
-        "sdtContentLocked" => (true, true),
+    let lock = match value.as_str() {
+        "unlocked" => Lock::Unlocked,
+        "sdtLocked" => Lock::SdtLocked,
+        "contentLocked" => Lock::ContentLocked,
+        "sdtContentLocked" => Lock::SdtContentLocked,
         _ => {
             return Err(Error::InvalidFormat(format!(
                 "invalid content-control lock value '{value}'"
             )));
         },
-    });
+    };
+    let formatting = exact_extension_attribute_value(
+        element,
+        b"formattingAllowed",
+        FORMATTING_ALLOWED_NAMESPACE.as_bytes(),
+        decoder,
+        resolver,
+    )?;
+    if let Some(value) = formatting {
+        if !lock.locks_content() {
+            return Err(Error::InvalidFormat(
+                "formattingAllowed requires contentLocked or sdtContentLocked".to_string(),
+            ));
+        }
+        control.formatting_allowed =
+            Some(FormattingAllowed::from_bool(parse_on_off_value(&value)?));
+    }
+    control.lock = Some((lock.locks_control(), lock.locks_content()));
     Ok(())
 }
 
@@ -856,29 +1078,41 @@ fn parse_data_binding(
     element: &BytesStart<'_>,
     decoder: Decoder,
     resolver: &NamespaceResolver,
+    flavor: BindingFlavor,
     control: &mut PendingContentControl,
 ) -> Result<()> {
-    if control.data_binding_xpath.is_some() || control.data_binding_store_item_id.is_some() {
-        return Err(Error::InvalidFormat(
-            "duplicate content-control data binding".to_string(),
-        ));
-    }
-    control.data_binding_xpath = Some(required_word_attribute(
-        element,
-        b"xpath",
-        decoder,
-        resolver,
-        "data-binding XPath",
-    )?);
-    control.data_binding_store_item_id = Some(required_word_attribute(
+    let xpath =
+        required_word_attribute(element, b"xpath", decoder, resolver, "data-binding XPath")?;
+    let store_item_id = required_word_attribute(
         element,
         b"storeItemID",
         decoder,
         resolver,
         "data-binding store item ID",
-    )?);
-    control.data_binding_prefix_mappings =
-        word_attribute_value(element, b"prefixMappings", decoder, resolver)?;
+    )?;
+    let prefix_mappings = word_attribute_value(element, b"prefixMappings", decoder, resolver)?;
+    let checksum = exact_extension_attribute_value(
+        element,
+        b"storeItemChecksum",
+        STORE_ITEM_CHECKSUM_NAMESPACE.as_bytes(),
+        decoder,
+        resolver,
+    )?
+    .map(ChecksumValue::from_source);
+    control
+        .data_bindings
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "content-control data bindings",
+            source,
+        })?;
+    control.data_bindings.push(DataBinding::from_parsed(
+        flavor,
+        xpath,
+        store_item_id,
+        prefix_mappings,
+        checksum,
+    ));
     Ok(())
 }
 
@@ -990,6 +1224,413 @@ fn extension_attribute_value(
         );
     }
     Ok(value)
+}
+
+fn exact_extension_attribute_value(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    namespace: &[u8],
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<Option<String>> {
+    let mut value = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() != name {
+            continue;
+        }
+        let (resolved, _) = resolver.resolve_attribute(attribute.key);
+        if !matches!(resolved, ResolveResult::Bound(Namespace(value)) if value == namespace) {
+            continue;
+        }
+        if value.is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate extension attribute '{}'",
+                String::from_utf8_lossy(name)
+            )));
+        }
+        value = Some(
+            attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                .map_err(|error| Error::Xml(error.to_string()))?
+                .into_owned(),
+        );
+    }
+    Ok(value)
+}
+
+#[derive(Clone, Copy, Default)]
+struct IgnorableState {
+    word_2010: bool,
+    checksum: bool,
+    formatting: bool,
+    word_2012: bool,
+}
+
+impl IgnorableState {
+    fn include(&mut self, namespace: &[u8]) {
+        self.word_2010 |= namespace == WORD_2010_NAMESPACE;
+        self.checksum |= namespace == STORE_ITEM_CHECKSUM_NAMESPACE.as_bytes();
+        self.formatting |= namespace == FORMATTING_ALLOWED_NAMESPACE.as_bytes();
+        self.word_2012 |= namespace == WORD_2012_NAMESPACE;
+    }
+
+    fn includes(self, namespace: &[u8]) -> bool {
+        match namespace {
+            value if value == WORD_2010_NAMESPACE => self.word_2010,
+            value if value == STORE_ITEM_CHECKSUM_NAMESPACE.as_bytes() => self.checksum,
+            value if value == FORMATTING_ALLOWED_NAMESPACE.as_bytes() => self.formatting,
+            value if value == WORD_2012_NAMESPACE => self.word_2012,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Default)]
+struct AlternateState {
+    selected: bool,
+}
+
+struct ActivityFrame {
+    active: bool,
+    alternate: Option<AlternateState>,
+}
+
+fn validate_extension_ignorable(
+    xml: &[u8],
+    limits: &Limits,
+    capabilities: &Capabilities,
+) -> Result<()> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut stack: Vec<IgnorableState> = Vec::new();
+    let mut activity: Vec<ActivityFrame> = Vec::new();
+    let mut depth = 0usize;
+    let mut events = 0usize;
+    let mut metadata = 0usize;
+    let mut namespace_bindings = 0usize;
+
+    loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| limit("MCE validation event count"))?;
+        if events > limits.max_events {
+            return Err(limit("MCE validation event count"));
+        }
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or_else(|| limit("XML depth"))?;
+                if depth > limits.max_depth {
+                    return Err(limit("XML depth"));
+                }
+                let active = element_is_active(
+                    &namespace,
+                    &element,
+                    decoder,
+                    &resolver,
+                    &mut activity,
+                    capabilities,
+                )?;
+                let mut effective = stack.last().copied().unwrap_or_default();
+                extend_ignorable(
+                    &element,
+                    decoder,
+                    &resolver,
+                    &mut effective,
+                    limits,
+                    &mut metadata,
+                    &mut namespace_bindings,
+                )?;
+                if active {
+                    require_ignorable_extensions(&namespace, &element, &resolver, &effective)?;
+                }
+                stack.try_reserve(1).map_err(|source| Error::Allocation {
+                    resource: "content-control MCE scope",
+                    source,
+                })?;
+                stack.push(effective);
+                activity
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation {
+                        resource: "content-control MCE activity",
+                        source,
+                    })?;
+                activity.push(ActivityFrame {
+                    active,
+                    alternate: is_mce_element(&namespace, &element, b"AlternateContent")
+                        .then(AlternateState::default),
+                });
+            },
+            Event::Empty(element) => {
+                let child_depth = depth.checked_add(1).ok_or_else(|| limit("XML depth"))?;
+                if child_depth > limits.max_depth {
+                    return Err(limit("XML depth"));
+                }
+                let active = element_is_active(
+                    &namespace,
+                    &element,
+                    decoder,
+                    &resolver,
+                    &mut activity,
+                    capabilities,
+                )?;
+                let mut effective = stack.last().copied().unwrap_or_default();
+                extend_ignorable(
+                    &element,
+                    decoder,
+                    &resolver,
+                    &mut effective,
+                    limits,
+                    &mut metadata,
+                    &mut namespace_bindings,
+                )?;
+                if active {
+                    require_ignorable_extensions(&namespace, &element, &resolver, &effective)?;
+                }
+            },
+            Event::End(_) => {
+                stack.pop().ok_or_else(|| {
+                    Error::InvalidFormat("invalid content-control XML nesting".to_string())
+                })?;
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("invalid content-control XML nesting".to_string())
+                })?;
+                activity.pop().ok_or_else(|| {
+                    Error::InvalidFormat("invalid content-control XML nesting".to_string())
+                })?;
+            },
+            Event::Eof if depth != 0 => {
+                return Err(Error::InvalidFormat(
+                    "unterminated content-control XML".to_string(),
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(())
+}
+
+fn element_is_active(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    activity: &mut [ActivityFrame],
+    capabilities: &Capabilities,
+) -> Result<bool> {
+    let Some(parent) = activity.last_mut() else {
+        return Ok(true);
+    };
+    let Some(alternate) = parent.alternate.as_mut() else {
+        return Ok(parent.active);
+    };
+    if is_mce_element(namespace, element, b"Choice") {
+        let supported = choice_is_supported(element, decoder, resolver, capabilities)?;
+        let active = parent.active && !alternate.selected && supported;
+        alternate.selected |= active;
+        Ok(active)
+    } else if is_mce_element(namespace, element, b"Fallback") {
+        let active = parent.active && !alternate.selected;
+        alternate.selected |= active;
+        Ok(active)
+    } else {
+        Ok(parent.active)
+    }
+}
+
+fn choice_is_supported(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    capabilities: &Capabilities,
+) -> Result<bool> {
+    let mut requires = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.as_ref() == b"Requires" {
+            requires = Some(
+                attribute
+                    .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                    .map_err(|error| Error::Xml(error.to_string()))?,
+            );
+        }
+    }
+    let Some(requires) = requires else {
+        return Ok(false);
+    };
+    for prefix in requires.split_whitespace() {
+        let mut qualified = Vec::new();
+        qualified
+            .try_reserve_exact(prefix.len() + 2)
+            .map_err(|source| Error::Allocation {
+                resource: "content-control MCE Requires prefix",
+                source,
+            })?;
+        qualified.extend_from_slice(prefix.as_bytes());
+        qualified.extend_from_slice(b":_");
+        let (namespace, _) = resolver.resolve(QName(&qualified), false);
+        let ResolveResult::Bound(Namespace(namespace)) = namespace else {
+            return Ok(false);
+        };
+        let Ok(namespace) = std::str::from_utf8(namespace) else {
+            return Ok(false);
+        };
+        if !capabilities.understands(namespace) {
+            return Ok(false);
+        }
+    }
+    Ok(!requires.trim().is_empty())
+}
+
+fn is_mce_element(namespace: &ResolveResult<'_>, element: &BytesStart<'_>, local: &[u8]) -> bool {
+    is_extension_namespace(namespace, MCE_NAMESPACE) && element.local_name().as_ref() == local
+}
+
+fn extend_ignorable(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    effective: &mut IgnorableState,
+    limits: &Limits,
+    metadata: &mut usize,
+    namespace_bindings: &mut usize,
+) -> Result<()> {
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() != b"Ignorable" {
+            continue;
+        }
+        let (namespace, _) = resolver.resolve_attribute(attribute.key);
+        if !matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == MCE_NAMESPACE) {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        *metadata = metadata
+            .checked_add(value.len())
+            .ok_or_else(|| limit("MCE metadata bytes"))?;
+        if *metadata > limits.max_metadata_bytes {
+            return Err(limit("MCE metadata bytes"));
+        }
+        for prefix in value.split_whitespace() {
+            let mut qualified = Vec::new();
+            qualified
+                .try_reserve_exact(prefix.len() + 2)
+                .map_err(|source| Error::Allocation {
+                    resource: "content-control MCE prefix",
+                    source,
+                })?;
+            qualified.extend_from_slice(prefix.as_bytes());
+            qualified.extend_from_slice(b":_");
+            let (namespace, _) = resolver.resolve(QName(&qualified), false);
+            let ResolveResult::Bound(Namespace(namespace)) = namespace else {
+                return Err(Error::InvalidFormat(format!(
+                    "mc:Ignorable prefix '{prefix}' is not bound"
+                )));
+            };
+            *namespace_bindings = namespace_bindings
+                .checked_add(1)
+                .ok_or_else(|| limit("MCE namespace bindings"))?;
+            if *namespace_bindings > limits.max_bindings {
+                return Err(limit("MCE namespace bindings"));
+            }
+            effective.include(namespace);
+        }
+    }
+    Ok(())
+}
+
+fn require_ignorable_extensions(
+    element_namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    resolver: &NamespaceResolver,
+    effective: &IgnorableState,
+) -> Result<()> {
+    let local_name = element.local_name();
+    let required_owner_namespace = if is_extension_namespace(element_namespace, WORD_2010_NAMESPACE)
+        && matches!(local_name.as_ref(), b"checkbox" | b"entityPicker")
+    {
+        Some((WORD_2010_NAMESPACE, "Word 2010 content-control property"))
+    } else if is_extension_namespace(element_namespace, WORD_2012_NAMESPACE)
+        && matches!(
+            local_name.as_ref(),
+            b"dataBinding" | b"repeatingSection" | b"repeatingSectionItem"
+        )
+    {
+        Some((WORD_2012_NAMESPACE, "Word 2012 content-control property"))
+    } else {
+        None
+    };
+    if let Some((namespace, description)) = required_owner_namespace
+        && !effective.includes(namespace)
+    {
+        return Err(Error::InvalidFormat(format!(
+            "{description} namespace is not declared in effective mc:Ignorable"
+        )));
+    }
+    let mut checksum_seen = false;
+    let mut formatting_seen = false;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let local = attribute.key.local_name();
+        let (namespace, _) = resolver.resolve_attribute(attribute.key);
+        let (expected_namespace, expected_owner, seen, description) =
+            match (&namespace, local.as_ref()) {
+                (ResolveResult::Bound(Namespace(value)), b"storeItemChecksum")
+                    if *value == STORE_ITEM_CHECKSUM_NAMESPACE.as_bytes() =>
+                {
+                    (
+                        STORE_ITEM_CHECKSUM_NAMESPACE.as_bytes(),
+                        b"dataBinding".as_slice(),
+                        &mut checksum_seen,
+                        "storeItemChecksum",
+                    )
+                },
+                (ResolveResult::Bound(Namespace(value)), b"formattingAllowed")
+                    if *value == FORMATTING_ALLOWED_NAMESPACE.as_bytes() =>
+                {
+                    (
+                        FORMATTING_ALLOWED_NAMESPACE.as_bytes(),
+                        b"lock".as_slice(),
+                        &mut formatting_seen,
+                        "formattingAllowed",
+                    )
+                },
+                _ => continue,
+            };
+        if *seen {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate expanded-name {description} attribute"
+            )));
+        }
+        *seen = true;
+        let owner_namespace_valid = is_wordprocessing_namespace(element_namespace)
+            || description == "storeItemChecksum"
+                && is_extension_namespace(element_namespace, WORD_2012_NAMESPACE);
+        if !owner_namespace_valid || element.local_name().as_ref() != expected_owner {
+            return Err(Error::InvalidFormat(format!(
+                "{description} is attached to an invalid element"
+            )));
+        }
+        if !effective.includes(expected_namespace) {
+            return Err(Error::InvalidFormat(format!(
+                "{description} namespace is not declared in effective mc:Ignorable"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn limit(resource: &str) -> Error {
+    Error::InvalidFormat(format!("content-control {resource} limit exceeded"))
 }
 
 fn is_word_element(namespace: &ResolveResult<'_>, element: &BytesStart<'_>, name: &[u8]) -> bool {
@@ -1115,8 +1756,10 @@ mod tests {
     fn extracts_checkbox_date_and_repeating_section_metadata() {
         let xml = format!(
             r#"<w:document xmlns:w="{W}"
+                xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
                 xmlns:c="http://schemas.microsoft.com/office/word/2010/wordml"
-                xmlns:r="http://schemas.microsoft.com/office/word/2012/wordml">
+                xmlns:r="http://schemas.microsoft.com/office/word/2012/wordml"
+                mc:Ignorable="c r">
                 <w:sdtPr><w:id w:val="1"/><c:checkbox><c:checked/></c:checkbox></w:sdtPr>
                 <w:sdtPr><w:id w:val="2"/><w:date w:fullDate="2026-07-14T00:00:00Z">
                     <w:dateFormat w:val="yyyy-MM-dd"/></w:date></w:sdtPr>
@@ -1201,12 +1844,289 @@ mod tests {
             r#"<w:document xmlns:w="{W}"><w:sdtPr><w:id w:val="1"/></w:sdtPr>
                 <w:sdtPr><w:id w:val="1"/></w:sdtPr></w:document>"#
         );
-        assert!(ContentControl::extract_from_document(duplicate.as_bytes()).is_err());
+        assert_eq!(
+            ContentControl::extract_from_document(duplicate.as_bytes())
+                .unwrap()
+                .len(),
+            2
+        );
     }
 
     #[test]
     fn rejects_truncated_properties() {
         let xml = format!(r#"<w:document xmlns:w="{W}"><w:sdtPr><w:id w:val="1"/>"#);
         assert!(ContentControl::extract_from_document(xml.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn checksum_is_strict_canonical_base64_over_little_endian_word_value() {
+        let checksum = Checksum::from_word_value(0xBD0B_E338);
+        assert_eq!(checksum.as_bytes(), &[0x38, 0xE3, 0x0B, 0xBD]);
+        assert_eq!(checksum.to_base64(), "OOMLvQ==");
+        assert_eq!(
+            Checksum::parse("OOMLvQ==").unwrap().word_value(),
+            0xBD0B_E338
+        );
+        assert_eq!(
+            Checksum::compute(b"123456789", &Limits::default()).unwrap(),
+            checksum
+        );
+        for invalid in ["", "OOMLvQ=", "OOMLvQ===", "OOMLvQ==\n", "OOMLvQ--"] {
+            assert!(Checksum::parse(invalid).is_err(), "accepted {invalid:?}");
+        }
+    }
+
+    #[test]
+    fn inventories_missing_and_duplicate_ids_as_distinct_occurrences() {
+        let xml = format!(
+            r#"<w:document xmlns:w="{W}"><w:sdtPr/><w:sdtPr><w:id w:val="7"/></w:sdtPr><w:sdtPr><w:id w:val="7"/></w:sdtPr></w:document>"#
+        );
+        let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+        assert_eq!(
+            inventory
+                .occurrences()
+                .iter()
+                .map(Occurrence::id)
+                .collect::<Vec<_>>(),
+            [None, Some(7), Some(7)]
+        );
+        assert_eq!(
+            ContentControl::extract_from_document(xml.as_bytes())
+                .unwrap()
+                .len(),
+            2
+        );
+    }
+
+    #[test]
+    fn parses_checksum_by_expanded_name_and_retains_malformed_lexical_state() {
+        let xml = format!(
+            r#"<w:sdtPr xmlns:w="{W}" xmlns:mc="{mce}" xmlns:h="{hash}" mc:Ignorable="h"><w:id w:val="1"/><w:dataBinding w:xpath="/x" w:storeItemID="{{ABC}}" h:storeItemChecksum="bad"/></w:sdtPr>"#,
+            mce = std::str::from_utf8(MCE_NAMESPACE).unwrap(),
+            hash = STORE_ITEM_CHECKSUM_NAMESPACE,
+        );
+        let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+        let binding = inventory.occurrences()[0].control().data_binding().unwrap();
+        assert!(binding.checksum().is_none());
+        assert!(
+            matches!(binding.checksum_status(), ChecksumStatus::Malformed(value) if &*value == "bad")
+        );
+
+        let missing_ignorable = xml.replace(" mc:Ignorable=\"h\"", "");
+        assert!(Inventory::parse(missing_ignorable.as_bytes()).is_err());
+        let fake_namespace = xml.replace(STORE_ITEM_CHECKSUM_NAMESPACE, "urn:fake");
+        assert!(Inventory::parse(fake_namespace.as_bytes()).is_ok());
+        assert!(
+            Inventory::parse(fake_namespace.as_bytes())
+                .unwrap()
+                .occurrences()[0]
+                .control()
+                .data_binding()
+                .unwrap()
+                .checksum_value()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn formatting_allowed_accepts_all_on_off_tokens_only_on_content_locks() {
+        for (token, expected) in [
+            ("true", true),
+            ("1", true),
+            ("on", true),
+            ("false", false),
+            ("0", false),
+            ("off", false),
+        ] {
+            let xml = format!(
+                r#"<w:sdtPr xmlns:w="{W}" xmlns:mc="{mce}" xmlns:f="{format}" mc:Ignorable="f"><w:id w:val="1"/><w:lock w:val="contentLocked" f:formattingAllowed="{token}"/></w:sdtPr>"#,
+                mce = std::str::from_utf8(MCE_NAMESPACE).unwrap(),
+                format = FORMATTING_ALLOWED_NAMESPACE,
+            );
+            let control = Inventory::parse(xml.as_bytes())
+                .unwrap()
+                .into_controls()
+                .remove(0);
+            assert_eq!(control.formatting_allowed().unwrap().as_bool(), expected);
+        }
+        let invalid = format!(
+            r#"<w:sdtPr xmlns:w="{W}" xmlns:mc="{mce}" xmlns:f="{format}" mc:Ignorable="f"><w:lock w:val="sdtLocked" f:formattingAllowed="true"/></w:sdtPr>"#,
+            mce = std::str::from_utf8(MCE_NAMESPACE).unwrap(),
+            format = FORMATTING_ALLOWED_NAMESPACE,
+        );
+        assert!(Inventory::parse(invalid.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn selects_only_the_active_mce_branch() {
+        let xml = format!(
+            r#"<w:document xmlns:w="{W}" xmlns:mc="{mce}" xmlns:u="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="u"><w:sdtPr><w:id w:val="1"/></w:sdtPr></mc:Choice><mc:Fallback><w:sdtPr><w:id w:val="2"/></w:sdtPr></mc:Fallback></mc:AlternateContent></w:document>"#,
+            mce = std::str::from_utf8(MCE_NAMESPACE).unwrap(),
+        );
+        let inventory = Inventory::parse(xml.as_bytes()).unwrap();
+        assert_eq!(inventory.occurrences().len(), 1);
+        assert_eq!(inventory.occurrences()[0].id(), Some(2));
+    }
+
+    #[test]
+    fn applies_configurable_event_depth_control_and_metadata_limits() {
+        let xml = format!(r#"<w:sdtPr xmlns:w="{W}"><w:id w:val="1"/></w:sdtPr>"#);
+        let mut limits = Limits::default();
+        limits.max_content_controls = 1;
+        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_ok());
+        limits.max_events = 1;
+        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+        limits = Limits::default();
+        limits.max_depth = 1;
+        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+        limits = Limits::default();
+        limits.max_metadata_bytes = 1;
+        let tagged = format!(r#"<w:sdtPr xmlns:w="{W}"><w:tag w:val="ab"/></w:sdtPr>"#);
+        assert!(Inventory::parse_with_limits(tagged.as_bytes(), &limits).is_err());
+    }
+
+    #[test]
+    fn mce_output_budget_is_independent_and_accepts_the_exact_boundary() {
+        let mce = std::str::from_utf8(MCE_NAMESPACE).unwrap();
+        let xml = format!(
+            r#"<w:document xmlns:w="{W}" xmlns:mc="{mce}" xmlns:u="urn:u"><mc:AlternateContent><mc:Choice Requires="u"><w:sdtPr><w:id w:val="1"/></w:sdtPr></mc:Choice><mc:Fallback><w:sdtPr><w:id w:val="2"/></w:sdtPr></mc:Fallback></mc:AlternateContent></w:document>"#
+        );
+        let exact_mce_output = mce::process_markup_compatibility(
+            xml.as_bytes(),
+            &Capabilities::default(),
+            &mce::Limits::default(),
+        )
+        .unwrap()
+        .xml
+        .len();
+        let mut limits = Limits::default();
+        limits.max_output_bytes = 1;
+        limits.max_mce_output_bytes = exact_mce_output;
+        assert_eq!(
+            Inventory::parse_with_limits(xml.as_bytes(), &limits)
+                .unwrap()
+                .occurrences()[0]
+                .id(),
+            Some(2)
+        );
+
+        limits.max_mce_output_bytes = exact_mce_output - 1;
+        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+        limits.max_mce_output_bytes = 1;
+        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+    }
+
+    #[test]
+    fn checksum_equality_hash_and_lexical_access_ignore_source_provenance() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let authored = Checksum::from_word_value(0xBD0B_E338);
+        let parsed = Checksum::parse("OOMLvQ==").unwrap();
+        assert_eq!(authored, parsed);
+        assert_eq!(authored.original_lexical(), None);
+        assert_eq!(parsed.original_lexical(), Some("OOMLvQ=="));
+        assert_eq!(ChecksumValue::Valid(authored.clone()).lexical(), "OOMLvQ==");
+        let mut authored_hash = DefaultHasher::new();
+        let mut parsed_hash = DefaultHasher::new();
+        authored.hash(&mut authored_hash);
+        parsed.hash(&mut parsed_hash);
+        assert_eq!(authored_hash.finish(), parsed_hash.finish());
+    }
+
+    #[test]
+    fn deep_many_prefix_ignorable_scopes_use_constant_semantic_state() {
+        use std::fmt::Write as _;
+
+        assert!(std::mem::size_of::<IgnorableState>() <= 4);
+        const PREFIXES: usize = 64;
+        const SCOPES: usize = 32;
+        let tokens = (0..PREFIXES)
+            .map(|index| format!("x{index}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let mut xml = format!(
+            r#"<w:document xmlns:w="{W}" xmlns:mc="{}""#,
+            std::str::from_utf8(MCE_NAMESPACE).unwrap()
+        );
+        for index in 0..PREFIXES {
+            write!(&mut xml, r#" xmlns:x{index}="urn:{index}""#).unwrap();
+        }
+        write!(&mut xml, r#" mc:Ignorable="{tokens}">"#).unwrap();
+        for _ in 0..SCOPES {
+            write!(&mut xml, r#"<w:body mc:Ignorable="{tokens}">"#).unwrap();
+        }
+        xml.push_str("<w:sdtPr/>");
+        for _ in 0..SCOPES {
+            xml.push_str("</w:body>");
+        }
+        xml.push_str("</w:document>");
+
+        let mut limits = Limits::default();
+        limits.max_depth = SCOPES + 2;
+        limits.max_bindings = PREFIXES * (SCOPES + 1);
+        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_ok());
+        limits.max_bindings -= 1;
+        assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
+    }
+
+    #[test]
+    fn list_item_limits_accept_exact_and_reject_next_allocation() {
+        let one = r#"<w:listItem w:displayText="A" w:value="a"/>"#;
+        let two = r#"<w:listItem w:displayText="B" w:value="b"/>"#;
+        let single_control = format!(
+            r#"<w:sdtPr xmlns:w="{W}"><w:dropDownList>{one}{two}</w:dropDownList></w:sdtPr>"#
+        );
+        let mut limits = Limits::default();
+        limits.max_list_items_per_control = 2;
+        limits.max_list_items = 2;
+        assert_eq!(
+            Inventory::parse_with_limits(single_control.as_bytes(), &limits)
+                .unwrap()
+                .occurrences()[0]
+                .control()
+                .list_items()
+                .len(),
+            2
+        );
+        limits.max_list_items_per_control = 1;
+        assert!(Inventory::parse_with_limits(single_control.as_bytes(), &limits).is_err());
+
+        let two_controls = format!(
+            r#"<w:document xmlns:w="{W}"><w:sdtPr><w:dropDownList>{one}</w:dropDownList></w:sdtPr><w:sdtPr><w:dropDownList>{two}</w:dropDownList></w:sdtPr></w:document>"#
+        );
+        limits.max_list_items_per_control = 1;
+        limits.max_list_items = 2;
+        assert!(Inventory::parse_with_limits(two_controls.as_bytes(), &limits).is_ok());
+        limits.max_list_items = 1;
+        assert!(Inventory::parse_with_limits(two_controls.as_bytes(), &limits).is_err());
+    }
+
+    #[test]
+    fn known_extension_owners_require_expanded_inherited_ignorable_namespaces() {
+        let mce = std::str::from_utf8(MCE_NAMESPACE).unwrap();
+        let aliased_inherited = format!(
+            r#"<w:document xmlns:w="{W}" xmlns:mc="{mce}" xmlns:a="{}" xmlns:b="{}" mc:Ignorable="a b"><w:body><w:sdtPr><a:checkbox><a:checked a:val="1"/></a:checkbox></w:sdtPr><w:sdtPr><b:repeatingSectionItem/></w:sdtPr></w:body></w:document>"#,
+            std::str::from_utf8(WORD_2010_NAMESPACE).unwrap(),
+            std::str::from_utf8(WORD_2012_NAMESPACE).unwrap(),
+        );
+        let inventory = Inventory::parse(aliased_inherited.as_bytes()).unwrap();
+        assert_eq!(inventory.occurrences()[0].control().kind(), Kind::Checkbox);
+        assert_eq!(
+            inventory.occurrences()[1].control().kind(),
+            Kind::RepeatingItem
+        );
+
+        let missing = format!(
+            r#"<w:sdtPr xmlns:w="{W}" xmlns:a="{}"><a:entityPicker/></w:sdtPr>"#,
+            std::str::from_utf8(WORD_2010_NAMESPACE).unwrap(),
+        );
+        assert!(Inventory::parse(missing.as_bytes()).is_err());
+
+        let rebound = format!(
+            r#"<w:sdtPr xmlns:w="{W}" xmlns:mc="{mce}" xmlns:a="urn:foreign" mc:Ignorable="a"><a:wrapper xmlns:a="{}"><a:repeatingSection/></a:wrapper></w:sdtPr>"#,
+            std::str::from_utf8(WORD_2012_NAMESPACE).unwrap(),
+        );
+        assert!(Inventory::parse(rebound.as_bytes()).is_err());
     }
 }

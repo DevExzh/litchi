@@ -45,6 +45,7 @@ pub enum Error {
     Drawing(#[from] litchi_drawingml::Error),
 
     /// Bounded, inert VBA parsing or authoring failed.
+    #[cfg(feature = "vba-inspection")]
     #[error("VBA error: {0}")]
     Vba(#[from] litchi_vba::Error),
 

@@ -81,6 +81,7 @@ pub enum Error {
     /// Shared host-neutral OOXML package-service error.
     Common(litchi_ooxml_common::Error),
     /// Bounded, inert VBA parsing or authoring error.
+    #[cfg(feature = "vba-inspection")]
     Vba(litchi_vba::Error),
     /// Wide string length error
     WideStringLength {
@@ -155,6 +156,7 @@ impl fmt::Display for Error {
             },
             Error::Drawing(error) => write!(f, "DrawingML error: {error}"),
             Error::Common(error) => write!(f, "shared OOXML error: {error}"),
+            #[cfg(feature = "vba-inspection")]
             Error::Vba(error) => write!(f, "VBA error: {error}"),
             Error::WideStringLength { expected, actual } => {
                 write!(
@@ -185,6 +187,7 @@ impl std::error::Error for Error {
             Error::Allocation { source, .. } => Some(source),
             Error::Drawing(e) => Some(e),
             Error::Common(e) => Some(e),
+            #[cfg(feature = "vba-inspection")]
             Error::Vba(e) => Some(e),
             _ => None,
         }
@@ -331,6 +334,7 @@ impl From<litchi_ooxml_common::Error> for Error {
     }
 }
 
+#[cfg(feature = "vba-inspection")]
 impl From<litchi_vba::Error> for Error {
     fn from(error: litchi_vba::Error) -> Self {
         Self::Vba(error)

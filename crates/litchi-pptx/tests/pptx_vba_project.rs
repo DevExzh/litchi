@@ -1,3 +1,5 @@
+#![cfg(feature = "vba-inspection")]
+
 use litchi_opc::OpcPackage;
 use litchi_opc::PackURI;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
