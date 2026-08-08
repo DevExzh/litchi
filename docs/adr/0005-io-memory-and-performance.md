@@ -210,3 +210,21 @@ unknown fields, duplicate ordering, encoded keys, and length headers. This is
 an allocation-shape and boundedness statement only; it makes no O(1),
 single-pass, latency, RSS, allocation-count, or throughput claim without the
 measurement protocol above.
+
+## 2026-08-08 amendment: retained semantic text accounting
+
+The neutral iWork aggregate now measures the UTF-8 bytes of every owned string
+that survives in the archive-free result. Keynote accounting includes the show
+title and owned unknown animation/transition identifiers; known static effect
+labels consume no owned-text budget. Its failure observation follows the same
+title, slide content, additional storage, and speaker-notes order exposed by
+the public semantic model.
+
+Pages now separates rendered text length from retained text. Section names,
+headings, paragraphs, and storage text are charged once, while synthesized
+rendering separators and temporary `Option<Box<str>>` slots are not charged as
+UTF-8. A rejection reports the checked observed byte count (or `usize::MAX` on
+arithmetic overflow) through the focused crate and root facade rather than
+fabricating `limit + 1`. Exact-limit and one-under regressions lock these
+rules. This is a correctness and boundedness result; it makes no latency,
+allocation-count, throughput, or peak-RSS claim.

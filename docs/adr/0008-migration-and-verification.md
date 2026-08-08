@@ -7709,3 +7709,37 @@ existing notes graph has moved. Notes graph creation/deletion, remaining host
 APIs and examples, legacy normalization, durable patch serialization, atomic
 publication, aggregate peak-memory policy, fuzz/sanitizer completion, and
 complete `litchi-iwa` deletion remain open.
+
+## 2026-08-08 amendment: aggregate-budget and native-read gate
+
+Focused regressions now lock Pages empty-root behavior, rooted text-fragment
+preservation, section-name byte charging, exact retained-versus-rendered text
+limits, and exact observed-byte propagation to the root error. Keynote
+regressions lock empty valid shows and null shows as empty semantic results.
+The neutral aggregate additionally tests document-backed Pages section text,
+Keynote show titles, owned unknown identifiers, static effect names, and public
+text-order diagnostics.
+
+One bounded root `parse_iwork` AddressSanitizer/libFuzzer campaign completed
+152,219 executions in 61 seconds with no crash, timeout, or OOM (coverage
+7,454; feature count 12,062; 566 MiB RSS). This closes only that bounded
+root-ingress run, not focused deep-message or complete fuzz verification.
+
+Computer Use opened read-only disposable copies of the documented Pages,
+Numbers, and Keynote fixtures in the matching Apple applications. Pages
+rendered its three documented lines; Numbers exposed a 22-by-7 table with the
+documented text and numeric `42`; Keynote rendered its documented title, body,
+and date. No repair, recovery, conversion, or warning prompt appeared, each
+document was reported locked, and post-close SHA-256 values remained exactly
+`21107bc9...1b42`, `f225d5b1...b693`, and `3a3d0747...b9f42`. Writable
+disposable copies were observed to normalize silently on open, so future
+read-only verification must keep this permission and hash discipline. The
+workspace originals were never opened and retained the same hashes.
+
+The migration ledger intentionally remains at 63 packages, 221 internal
+declarations, and 15 ordered debts. The host-to-structured seam cannot be
+retired until its five Numbers compatibility oracles have focused/root owners:
+detached models, type-9 numeric values, global ordering, canonical-6001 before
+legacy-6000 deduplication, and inclusive/exceeded table limits. No host
+deletion, complete Buffa conversion, edit/save compatibility, performance, or
+exhaustive-fuzz claim follows from this amendment.

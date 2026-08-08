@@ -49,3 +49,21 @@ arbitrary payload mutations therefore fail during physical validation, which
 is appropriate for the root ingress target. Valid deep-message mutation and
 format-specific behavioral invariants belong in focused format-owner fuzz
 targets rather than weakening package validation here.
+
+## 2026-08-08 bounded sanitizer evidence
+
+The three native seeds above were copied to a private temporary corpus and
+their documented SHA-256 values were verified before this run. With
+`cargo-fuzz 0.13.2` and `rustc 1.99.0-nightly (1a98b1e13 2026-08-07)`, the
+root target completed this bounded AddressSanitizer/libFuzzer campaign:
+
+```sh
+cargo +nightly fuzz run parse_iwork /private/tmp/litchi-iwork-root-fuzz-1JVxsJ/corpus -- \
+  -max_total_time=60 -max_len=2097152 -timeout=10 -rss_limit_mb=2048
+```
+
+It executed 152,219 inputs in 61 seconds, ending at coverage 7,454, feature
+count 12,062, a 249-input / 69 MiB corpus, and 566 MiB RSS. There was no crash,
+timeout, or out-of-memory finding. This records one bounded root-ingress
+sanitizer run only; it is not evidence of exhaustive fuzzing or of the focused
+deep-message campaigns still required from the format owners.

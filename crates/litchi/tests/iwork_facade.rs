@@ -331,7 +331,7 @@ fn physical_and_text_limits_are_inclusive_and_report_one_over() {
             .err()
             .unwrap_or_else(|| panic!("one-over semantic text must fail"));
     assert_eq!(text_error.kind(), ErrorKind::LimitExceeded);
-    assert_eq!(text_error.stage(), Stage::Validation);
+    assert_eq!(text_error.stage(), Stage::Semantic);
     assert_eq!(text_error.format(), Some(Format::Pages));
     assert_eq!(text_error.resource(), Some(Resource::TextBytes));
     assert_eq!(text_error.observed(), Some(retained_text_bytes as u64));

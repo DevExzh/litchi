@@ -622,6 +622,9 @@ fn every_setting_round_trips_absent_present_and_present_absent() -> TestResult<(
     let present = present_settings()?;
     assert_eq!(package.show_settings()?, absent);
     assert_eq!(*package.show()?.settings(), absent);
+    assert!(package.show()?.is_empty());
+    assert!(package.slides()?.is_empty());
+    assert_eq!(package.text()?, "");
     assert_optional_fields(&bytes, 0)?;
 
     let mut add = package.edit_show_settings()?;
@@ -952,6 +955,10 @@ fn null_show_reader_matches_full_semantics_and_only_exact_noop_is_editable() -> 
     let package = Package::from_bytes(&bytes)?;
     assert_eq!(package.show_settings()?, Settings::default());
     assert_eq!(*package.show()?.settings(), Settings::default());
+    assert!(package.show()?.is_empty());
+    assert!(package.slides()?.is_empty());
+    assert!(package.semantic_snapshot()?.slides().is_empty());
+    assert_eq!(package.text()?, "");
 
     let noop = package.edit_show_settings()?.commit()?;
     assert!(noop.patch().is_noop());

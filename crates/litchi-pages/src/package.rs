@@ -12,7 +12,6 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::fs::{Metadata as FileMetadata, OpenOptions};
 use std::io::Read;
-use std::mem::size_of;
 use std::num::NonZeroU64;
 use std::path::Path;
 use std::sync::Arc;
@@ -78,12 +77,12 @@ pub enum PackageError {
     /// bound while being projected into an immutable document.
     #[error(transparent)]
     Semantic(#[from] SemanticError),
-    /// Section names exceed the aggregate retained-memory budget.
+    /// Section names exceed the aggregate retained-text budget.
     #[error("Pages section names require at least {observed} bytes; budget is {limit}")]
     SectionNamesTooLarge {
         /// Minimum bytes required by the names decoded so far.
         observed: usize,
-        /// Aggregate semantic metadata budget.
+        /// Aggregate retained UTF-8 budget.
         limit: usize,
     },
 }
@@ -1058,6 +1057,7 @@ fn preflight_body_wire(
                     })?;
                 if text_bytes > max_text_bytes {
                     return Err(PackageError::Semantic(SemanticError::TextTooLarge {
+                        observed: text_bytes,
                         limit: max_text_bytes,
                     }));
                 }
@@ -1410,7 +1410,7 @@ fn project_native_body(
 fn decode_section_names(
     components: &ComponentCatalog,
     references: &[NativeSectionReference],
-    max_name_memory_bytes: usize,
+    max_name_text_bytes: usize,
 ) -> PackageResult<Vec<Option<Box<str>>>> {
     let mut requested = Vec::new();
     requested
@@ -1440,19 +1440,7 @@ fn decode_section_names(
             PackageError::InvalidFormat("could not allocate Pages section-name state".to_owned())
         })?;
     found.resize(references.len(), false);
-    let mut retained_bytes = references
-        .len()
-        .checked_mul(size_of::<Option<Box<str>>>())
-        .ok_or(PackageError::SectionNamesTooLarge {
-            observed: usize::MAX,
-            limit: max_name_memory_bytes,
-        })?;
-    if retained_bytes > max_name_memory_bytes {
-        return Err(PackageError::SectionNamesTooLarge {
-            observed: retained_bytes,
-            limit: max_name_memory_bytes,
-        });
-    }
+    let mut retained_bytes = 0usize;
 
     for component in components.iter() {
         for object in &component.archive().objects {
@@ -1470,12 +1458,12 @@ fn decode_section_names(
                 .checked_add(name.as_deref().map_or(0, str::len))
                 .ok_or(PackageError::SectionNamesTooLarge {
                     observed: usize::MAX,
-                    limit: max_name_memory_bytes,
+                    limit: max_name_text_bytes,
                 })?;
-            if retained_bytes > max_name_memory_bytes {
+            if retained_bytes > max_name_text_bytes {
                 return Err(PackageError::SectionNamesTooLarge {
                     observed: retained_bytes,
-                    limit: max_name_memory_bytes,
+                    limit: max_name_text_bytes,
                 });
             }
             names[destination] = name;
@@ -1778,6 +1766,7 @@ fn extract_storages(
                 }
                 text_bytes = text_bytes.checked_add(storage.len()).ok_or({
                     PackageError::Semantic(SemanticError::TextTooLarge {
+                        observed: usize::MAX,
                         limit: max_text_bytes,
                     })
                 })?;
@@ -1842,6 +1831,7 @@ fn ensure_text_size(
     })?;
     if text_len > max_text_bytes {
         return Err(PackageError::Semantic(SemanticError::TextTooLarge {
+            observed: text_len,
             limit: max_text_bytes,
         }));
     }
@@ -2310,6 +2300,61 @@ mod tests {
     }
 
     #[test]
+    fn package_empty_root_has_no_synthetic_section() -> PackageResult<()> {
+        let package = Package::from_bytes(&package_bytes(None, false, false)?)?;
+
+        assert!(package.sections().is_empty());
+        assert!(package.semantic_document().is_empty());
+        assert_eq!(package.text()?, "");
+        assert_eq!(package.stats().section_count(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn package_preserves_rooted_text_fragments_as_semantic_runs() -> PackageResult<()> {
+        let root = tp::DocumentArchive {
+            body_storage: Some(Reference {
+                identifier: 42,
+                ..Reference::default()
+            }),
+            ..tp::DocumentArchive::default()
+        };
+        let storage = tswp::StorageArchive {
+            text: vec!["first".to_owned(), " second".to_owned()],
+            ..tswp::StorageArchive::default()
+        };
+        let bytes = archive_package_bytes(
+            vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 10_000,
+                        data: root.encode_to_vec(),
+                    }],
+                )
+                .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+                ArchiveObject::new(
+                    42,
+                    vec![RawMessage {
+                        type_: 2_001,
+                        data: storage.encode_to_vec(),
+                    }],
+                )
+                .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+            ],
+            false,
+        )?;
+
+        let package = Package::from_bytes(&bytes)?;
+        assert_eq!(package.sections().len(), 1);
+        let storages = package.sections()[0].text_storages();
+        assert_eq!(storages.len(), 1);
+        assert_eq!(storages[0].text(), "first second");
+        assert_eq!(storages[0].runs(), [Run::new(0, 5), Run::new(5, 7)]);
+        Ok(())
+    }
+
+    #[test]
     fn package_root_projection_requires_unique_base_envelope() -> PackageResult<()> {
         let missing_super = archive_package_bytes(
             vec![
@@ -2554,8 +2599,34 @@ mod tests {
             .unwrap_or_else(|| panic!("one-over text should fail during wire preflight"));
         assert!(matches!(
             error,
-            PackageError::Semantic(SemanticError::TextTooLarge { limit: 4 })
+            PackageError::Semantic(SemanticError::TextTooLarge {
+                observed: 5,
+                limit: 4,
+            })
         ));
+        Ok(())
+    }
+
+    #[cfg(feature = "internal-iwork-source")]
+    #[test]
+    fn semantic_prepared_source_charges_section_name_bytes_not_scratch_slots() -> PackageResult<()>
+    {
+        let bytes = sectioned_package_bytes(
+            vec![String::new()],
+            &[(0, 43)],
+            None,
+            vec![(43, vec![section_payload(Some("X"))])],
+        )?;
+        let exact = PreparedSource::from_bytes(&bytes)
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
+            .ok_or_else(|| {
+                PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
+            })?;
+
+        let document = __semantic_document_from_prepared_source(exact, MAX_SECTIONS, "X".len())?;
+        assert_eq!(document.sections().len(), 1);
+        assert_eq!(document.sections()[0].name(), Some("X"));
+        assert_eq!(document.text_len(), 0);
         Ok(())
     }
 

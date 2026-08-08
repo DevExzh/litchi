@@ -1217,8 +1217,8 @@ fn map_package_error(package_error: PackageError) -> SectionTextError {
     match package_error {
         PackageError::Archive(archive_error) => map_archive_error(archive_error),
         PackageError::SectionNamesTooLarge { observed, limit } => text_limit_error(observed, limit),
-        PackageError::Semantic(crate::Error::TextTooLarge { limit }) => {
-            text_limit_error(usize::MAX, limit)
+        PackageError::Semantic(crate::Error::TextTooLarge { observed, limit }) => {
+            text_limit_error(observed, limit)
         },
         PackageError::Io(_) | PackageError::InvalidFormat(_) | PackageError::Semantic(_) => {
             SectionTextError::InvalidSource

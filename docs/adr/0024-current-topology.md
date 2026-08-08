@@ -642,3 +642,21 @@ reports 63 workspace packages, 221 internal declarations, and 15 ordered
 migration debts. No host debt is retired by the notes transfer, so durable
 patches, atomic publication, aggregate memory policy, fuzz/sanitizer gates,
 remaining format ownership, and deletion of `litchi-iwa` are still required.
+
+## 2026-08-08 current-status amendment: aggregate contracts stay owner-side
+
+The dependency graph is unchanged at 63 workspace packages, 221 internal
+dependency declarations, and 15 ordered migration debts. The neutral
+`litchi-iwa-structured` boundary now enforces complete retained-owned-text
+accounting for Pages and Keynote, while `litchi-pages` owns the distinction
+between retained semantic UTF-8 and synthesized rendered separators. Exact
+Pages observations are preserved by the root facade instead of reconstructed
+there. These are contract hardenings within the existing owners and add no
+manifest edge.
+
+Debt 011 and the host structured adapter remain deliberately present. Five
+Numbers compatibility cases still live only in the migration host: detached
+models, type-9 numeric cells, package-global ordering, canonical/legacy model
+precedence with deduplication, and exact/over table limits. Removing the edge
+before those oracles move would erase migration evidence rather than complete
+ownership transfer.

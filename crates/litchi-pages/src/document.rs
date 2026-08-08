@@ -36,8 +36,10 @@ pub enum Error {
         actual: usize,
     },
     /// The semantic text budget would be exceeded.
-    #[error("Pages document text exceeds {limit} bytes")]
+    #[error("Pages document retains {observed} text bytes; maximum is {limit}")]
     TextTooLarge {
+        /// Observed UTF-8 bytes, or [`usize::MAX`] when addition overflowed.
+        observed: usize,
         /// Maximum permitted UTF-8 bytes.
         limit: usize,
     },
@@ -90,10 +92,16 @@ impl Body {
         let text_len = text_storages.iter().try_fold(0usize, |length, storage| {
             length
                 .checked_add(storage.len())
-                .ok_or(Error::TextTooLarge { limit: text_limit })
+                .ok_or(Error::TextTooLarge {
+                    observed: usize::MAX,
+                    limit: text_limit,
+                })
         })?;
         if text_len > text_limit {
-            return Err(Error::TextTooLarge { limit: text_limit });
+            return Err(Error::TextTooLarge {
+                observed: text_len,
+                limit: text_limit,
+            });
         }
 
         Ok(Self {
@@ -229,6 +237,7 @@ impl Document {
         }
 
         let mut text_len = 0usize;
+        let mut retained_text_len = 0usize;
         for (expected, section) in sections.iter().enumerate() {
             if section.index() != expected {
                 return Err(Error::InvalidSectionIndex {
@@ -236,17 +245,36 @@ impl Document {
                     actual: section.index(),
                 });
             }
-            let section_text_len = section
-                .checked_text_len()
-                .ok_or(Error::TextTooLarge { limit: text_limit })?;
+            let section_text_len = section.checked_text_len().ok_or(Error::TextTooLarge {
+                observed: usize::MAX,
+                limit: text_limit,
+            })?;
             text_len = text_len
                 .checked_add(section_text_len)
                 .and_then(|length| length.checked_add(usize::from(expected != 0)))
-                .ok_or(Error::TextTooLarge { limit: text_limit })?;
+                .ok_or(Error::TextTooLarge {
+                    observed: usize::MAX,
+                    limit: text_limit,
+                })?;
+            retained_text_len =
+                retained_text_len
+                    .checked_add(section.checked_retained_text_len().ok_or(
+                        Error::TextTooLarge {
+                            observed: usize::MAX,
+                            limit: text_limit,
+                        },
+                    )?)
+                    .ok_or(Error::TextTooLarge {
+                        observed: usize::MAX,
+                        limit: text_limit,
+                    })?;
         }
 
-        if text_len > text_limit {
-            return Err(Error::TextTooLarge { limit: text_limit });
+        if retained_text_len > text_limit {
+            return Err(Error::TextTooLarge {
+                observed: retained_text_len,
+                limit: text_limit,
+            });
         }
 
         Ok(Self {
@@ -399,7 +427,22 @@ mod tests {
     #[test]
     fn construction_rejects_over_budget_text_and_noncanonical_positions() {
         let oversized = Body::with_max_text_bytes(vec![Storage::from_text("12345".to_owned())], 4);
-        assert!(matches!(oversized, Err(Error::TextTooLarge { limit: 4 })));
+        assert!(matches!(
+            oversized,
+            Err(Error::TextTooLarge {
+                observed: 5,
+                limit: 4,
+            })
+        ));
+
+        let much_larger = Body::with_max_text_bytes(vec![Storage::from_text("x".repeat(20))], 4);
+        assert!(matches!(
+            much_larger,
+            Err(Error::TextTooLarge {
+                observed: 20,
+                limit: 4,
+            })
+        ));
 
         let mut section_builder = Section::builder(1, SectionType::Body);
         section_builder.push_text_storage(Storage::from_text("body".to_owned()));
@@ -411,6 +454,30 @@ mod tests {
                 actual: 1
             })
         ));
+    }
+
+    #[test]
+    fn retained_text_budget_excludes_rendered_separators_and_metadata_slots() {
+        let mut first = Section::builder(0, SectionType::Body);
+        first.push_text_storage(Storage::from_text("first".to_owned()));
+        let mut second = Section::builder(1, SectionType::Body);
+        second.push_text_storage(Storage::from_text("second".to_owned()));
+        let document = Document::from_sections_with_max_text_bytes(
+            vec![first.build(), second.build()],
+            "firstsecond".len(),
+        )
+        .unwrap_or_else(|error| panic!("rendered separators retain no UTF-8 bytes: {error}"));
+        assert_eq!(document.text_len(), "first\nsecond".len());
+        assert_eq!(document.plain_text(), "first\nsecond");
+
+        let mut named = Section::builder(0, SectionType::Body);
+        named
+            .set_name(Some("X"))
+            .unwrap_or_else(|error| panic!("section name should be valid: {error}"));
+        let named_document = Document::from_sections_with_max_text_bytes(vec![named.build()], 1)
+            .unwrap_or_else(|error| panic!("only the owned name byte should be charged: {error}"));
+        assert_eq!(named_document.sections()[0].name(), Some("X"));
+        assert_eq!(named_document.text_len(), 0);
     }
 
     #[test]

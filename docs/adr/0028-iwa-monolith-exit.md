@@ -1024,3 +1024,28 @@ declarations, and 15 ordered debts. Remaining host APIs and examples, legacy
 normalization, durable patch serialization, atomic publication, aggregate
 peak-memory policy, fuzz/sanitizer completion, and full host deletion remain
 exit blockers.
+
+## 2026-08-08 amendment: structured-seam exit prerequisite
+
+The attempted next deletion slice stopped at the evidence boundary. The
+focused and neutral owners now have exact retained-text accounting and
+semantic-boundary regressions: Pages excludes scratch slots and rendered-only
+separators while reporting actual observations, Keynote charges its show title
+and owned unknown animation identifiers, and empty/null topology behavior is
+locked without publishing partial semantic state. The root preserves the
+focused Pages observation unchanged.
+
+The `litchi-iwa -> litchi-iwa-structured` migration edge is not retired by
+this slice. Before debt 011 can be deleted, focused Numbers and root tests must
+own the five surviving compatibility oracles for detached models, type-9
+numeric values, global object ordering, canonical type-6001 precedence over
+legacy type-6000 with deduplication, and inclusive/exceeded table limits. The
+ledger therefore remains 63 packages, 221 internal declarations, and 15
+ordered debts.
+
+The three native fixtures passed a locked, read-only Apple iWork render gate
+with exact post-close hashes, and one 60-second root ASan/libFuzzer campaign
+completed without a finding. Those results do not replace the remaining
+Numbers oracle transfer, focused deep fuzzing, aggregate peak-memory work,
+edit/save compatibility, full Buffa graph migration, or the final host
+deletion gate.

@@ -328,11 +328,11 @@ fn map_pages(error: litchi_pages::PackageError) -> Error {
                 usize_u64(actual),
                 usize_u64(limit),
             ),
-            litchi_pages::Error::TextTooLarge { limit } => Error::limit(
+            litchi_pages::Error::TextTooLarge { observed, limit } => Error::limit(
                 Some(Format::Pages),
                 Stage::Semantic,
                 Resource::TextBytes,
-                usize_u64(limit).saturating_add(1),
+                usize_u64(observed),
                 usize_u64(limit),
             ),
             litchi_pages::Error::InvalidSectionIndex { .. } => {
@@ -716,6 +716,23 @@ mod tests {
             Stage::Semantic,
             Resource::TextStorages,
         );
+    }
+
+    #[test]
+    fn pages_text_limit_preserves_the_actual_observed_bytes() {
+        let error = map_pages(litchi_pages::PackageError::Semantic(
+            litchi_pages::Error::TextTooLarge {
+                observed: 20,
+                limit: 4,
+            },
+        ));
+        assert_eq!(error.kind(), ErrorKind::LimitExceeded);
+        assert_eq!(error.stage(), Stage::Semantic);
+        assert_eq!(error.format(), Some(Format::Pages));
+        assert_eq!(error.resource(), Some(Resource::TextBytes));
+        assert_eq!(error.observed(), Some(20));
+        assert_eq!(error.maximum(), Some(4));
+        assert!(std::error::Error::source(&error).is_none());
     }
 
     #[test]

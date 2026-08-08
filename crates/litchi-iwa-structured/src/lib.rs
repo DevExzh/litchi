@@ -10,7 +10,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use litchi_keynote::{Document as KeynoteDocument, Slide};
+use litchi_keynote::{AnimationType, Document as KeynoteDocument, Effect, Slide};
 use litchi_numbers::Table;
 use litchi_numbers::cell::Value;
 use litchi_pages::{Document as PagesDocument, Section};
@@ -275,7 +275,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum TextKind {
-    /// A Numbers table name. [`Text::to_string`] adds the `Table: ` label.
+    /// A Numbers table name. [`fmt::Display`] formatting adds the `Table: ` label.
     TableName,
     /// A Numbers column header.
     TableColumnHeader,
@@ -443,7 +443,7 @@ impl StructuredData {
         sections: Vec<Section>,
         limits: Limits,
     ) -> Result<Self> {
-        validate_parts(&tables, &slides, &sections, limits)?;
+        validate_parts(&tables, &slides, &sections, None, limits)?;
 
         Ok(Self {
             snapshot: Arc::new(Snapshot {
@@ -478,7 +478,7 @@ impl StructuredData {
         document: KeynoteDocument,
         limits: Limits,
     ) -> Result<Self> {
-        validate_parts(&[], document.slides(), &[], limits)?;
+        validate_parts(&[], document.slides(), &[], document.show().title(), limits)?;
         Ok(Self {
             snapshot: Arc::new(Snapshot {
                 tables: Vec::new(),
@@ -510,7 +510,7 @@ impl StructuredData {
         document: PagesDocument,
         limits: Limits,
     ) -> Result<Self> {
-        validate_parts(&[], &[], document.sections(), limits)?;
+        validate_parts(&[], &[], document.sections(), None, limits)?;
         Ok(Self {
             snapshot: Arc::new(Snapshot {
                 tables: Vec::new(),
@@ -657,6 +657,7 @@ fn validate_parts(
     tables: &[Table],
     slides: &[Slide],
     sections: &[Section],
+    document_title: Option<&str>,
     limits: Limits,
 ) -> Result<()> {
     let max_tables = limits.max_tables;
@@ -701,6 +702,9 @@ fn validate_parts(
     }
 
     let mut text_bytes = 0;
+    if let Some(title) = document_title {
+        text_bytes = checked_text_add(text_bytes, title.len(), max_text_bytes)?;
+    }
     for table in tables {
         text_bytes = checked_text_add(text_bytes, table.name().len(), max_text_bytes)?;
         for header in table.column_headers().chain(table.row_headers()) {
@@ -728,11 +732,22 @@ fn validate_parts(
         for text in slide.text_content() {
             text_bytes = checked_text_add(text_bytes, text.len(), max_text_bytes)?;
         }
+        for storage in slide.text_storages() {
+            text_bytes = checked_text_add(text_bytes, storage.len(), max_text_bytes)?;
+        }
         if let Some(notes) = slide.notes() {
             text_bytes = checked_text_add(text_bytes, notes.len(), max_text_bytes)?;
         }
-        for storage in slide.text_storages() {
-            text_bytes = checked_text_add(text_bytes, storage.len(), max_text_bytes)?;
+        for build in slide.builds() {
+            if let AnimationType::Unknown(identifier) = build.animation_type() {
+                text_bytes =
+                    checked_text_add(text_bytes, identifier.as_str().len(), max_text_bytes)?;
+            }
+        }
+        if let Some(transition) = slide.transition()
+            && let Effect::Unknown { identifier } = transition.effect()
+        {
+            text_bytes = checked_text_add(text_bytes, identifier.len(), max_text_bytes)?;
         }
     }
     for section in sections {
@@ -998,6 +1013,128 @@ mod tests {
                 observed: 18,
                 maximum: 17,
             })
+        ));
+    }
+
+    #[test]
+    fn document_backed_keynote_budget_counts_every_owned_identifier() {
+        const SHOW_TITLE: &str = "Deck title";
+        const BUILD_IDENTIFIER: &str = "vendor:future-build";
+        const TRANSITION_IDENTIFIER: &str = "vendor:future-transition";
+
+        fn document() -> KeynoteDocument {
+            let animation =
+                AnimationType::from_identifier(BUILD_IDENTIFIER).unwrap_or_else(|error| {
+                    panic!("unknown build identifier should be valid: {error}")
+                });
+            let effect = Effect::unknown(TRANSITION_IDENTIFIER).unwrap_or_else(|error| {
+                panic!("unknown transition identifier should be valid: {error}")
+            });
+            let mut slide = Slide::builder(0);
+            slide.push_build(litchi_keynote::Build::new(
+                animation,
+                litchi_keynote::Seconds::ZERO,
+            ));
+            slide.set_transition(Some(litchi_keynote::Transition::new(
+                effect,
+                litchi_keynote::Seconds::ZERO,
+            )));
+
+            let mut show = litchi_keynote::Show::builder();
+            show.set_title(Some(SHOW_TITLE.to_owned()));
+            show.push_slide(slide.build());
+            KeynoteDocument::from_show(show.build())
+        }
+
+        let retained_bytes =
+            SHOW_TITLE.len() + BUILD_IDENTIFIER.len() + TRANSITION_IDENTIFIER.len();
+        let exact = Limits::try_new(1, 1, 1, retained_bytes)
+            .unwrap_or_else(|error| panic!("exact retained-text limit should be valid: {error}"));
+        StructuredData::from_keynote_document_with_limits(document(), exact)
+            .unwrap_or_else(|error| panic!("exact retained-text limit should pass: {error}"));
+
+        let one_under = Limits::try_new(1, 1, 1, retained_bytes - 1).unwrap_or_else(|error| {
+            panic!("one-under retained-text limit should be valid: {error}")
+        });
+        assert!(matches!(
+            StructuredData::from_keynote_document_with_limits(document(), one_under),
+            Err(Error::TextTooLarge {
+                observed,
+                maximum,
+            }) if observed == retained_bytes && maximum == retained_bytes - 1
+        ));
+    }
+
+    #[test]
+    fn static_keynote_effect_names_do_not_consume_owned_text_budget() {
+        let mut slide = Slide::builder(0);
+        slide.push_build(litchi_keynote::Build::new(
+            AnimationType::Appear,
+            litchi_keynote::Seconds::ZERO,
+        ));
+        slide.set_transition(Some(litchi_keynote::Transition::new(
+            Effect::Dissolve,
+            litchi_keynote::Seconds::ZERO,
+        )));
+        let limits = Limits::try_new(1, 1, 1, 1)
+            .unwrap_or_else(|error| panic!("minimal retained-text limit should be valid: {error}"));
+
+        StructuredData::from_parts_with_limits(Vec::new(), vec![slide.build()], Vec::new(), limits)
+            .unwrap_or_else(|error| panic!("static effect labels retain no owned text: {error}"));
+    }
+
+    #[test]
+    fn keynote_text_budget_diagnostics_follow_public_text_order() {
+        let mut slide = Slide::builder(0);
+        slide.push_text_storage(Storage::from_text("123456".to_owned()));
+        slide.set_notes(Some("12".to_owned()));
+        let limits = Limits::try_new(1, 1, 1, 5)
+            .unwrap_or_else(|error| panic!("test retained-text limit should be valid: {error}"));
+
+        assert!(matches!(
+            StructuredData::from_parts_with_limits(
+                Vec::new(),
+                vec![slide.build()],
+                Vec::new(),
+                limits,
+            ),
+            Err(Error::TextTooLarge {
+                observed: 6,
+                maximum: 5,
+            })
+        ));
+    }
+
+    #[test]
+    fn document_backed_pages_budget_counts_all_section_text() {
+        fn document() -> PagesDocument {
+            let mut section = Section::builder(0, litchi_pages::SectionType::Body);
+            section
+                .set_name(Some("Section"))
+                .unwrap_or_else(|error| panic!("section name should be valid: {error}"));
+            section.set_heading(Some("Heading".to_owned()));
+            section.push_paragraph("Paragraph".to_owned());
+            section.push_text_storage(Storage::from_text("Storage".to_owned()));
+            PagesDocument::from_sections(vec![section.build()])
+                .unwrap_or_else(|error| panic!("Pages document should be valid: {error}"))
+        }
+
+        let retained_bytes =
+            "Section".len() + "Heading".len() + "Paragraph".len() + "Storage".len();
+        let exact = Limits::try_new(1, 1, 1, retained_bytes)
+            .unwrap_or_else(|error| panic!("exact retained-text limit should be valid: {error}"));
+        StructuredData::from_pages_document_with_limits(document(), exact)
+            .unwrap_or_else(|error| panic!("exact retained-text limit should pass: {error}"));
+
+        let one_under = Limits::try_new(1, 1, 1, retained_bytes - 1).unwrap_or_else(|error| {
+            panic!("one-under retained-text limit should be valid: {error}")
+        });
+        assert!(matches!(
+            StructuredData::from_pages_document_with_limits(document(), one_under),
+            Err(Error::TextTooLarge {
+                observed,
+                maximum,
+            }) if observed == retained_bytes && maximum == retained_bytes - 1
         ));
     }
 

@@ -481,6 +481,21 @@ impl Section {
         length.checked_add(values.saturating_sub(1))
     }
 
+    /// Return the UTF-8 bytes owned by this section without rendered separators.
+    pub(crate) fn checked_retained_text_len(&self) -> Option<usize> {
+        let mut length = self.name.as_deref().map_or(0, str::len);
+        if let Some(heading) = &self.heading {
+            length = length.checked_add(heading.len())?;
+        }
+        for paragraph in &self.paragraphs {
+            length = length.checked_add(paragraph.len())?;
+        }
+        for storage in &self.text_storages {
+            length = length.checked_add(storage.len())?;
+        }
+        Some(length)
+    }
+
     pub(crate) fn append_plain_text(&self, output: &mut String) {
         let mut first = true;
         if let Some(heading) = &self.heading {
