@@ -194,15 +194,102 @@ opaque. Filesystem open is nonblocking on Unix, rejects non-regular descriptors,
 obtains metadata from the opened descriptor, fills the bounded destination
 buffer through the standard spare-capacity reader path, and verifies the
 descriptor version afterward. This closes the earlier stat/open race and
-rejects observable in-place mutation. Protobuf failures retain their source
-chain behind a format-owned, content-free wrapper.
+rejects observable in-place mutation. Protobuf failures are mapped to a
+Numbers-owned, content-free semantic location and retain no generated decoder
+source.
 
 This is a cutover prerequisite, not the cutover. Reopening a legacy
 `litchi_iwa::Document` through `Package` would still break in-memory and
 directory-backed inputs, violate immutable snapshot semantics, duplicate
 physical parsing, and impose strict rooted failures on the historical global
 API. A shared immutable catalog/source coordinator and package-wide
-compatibility budgets for cells, sidecars, text, formulas, and error mapping
-remain required before deleting `structured/numbers.rs`. The remaining table
-model, formula-owner, sidecar, and AST Prost decoders still need focused
-pre-decode envelopes or projections.
+compatibility budgets for sidecars and their decoded allocations remain
+required before deleting `structured/numbers.rs`. The remaining table model,
+formula-owner, sidecar, and AST Prost decoders still need focused pre-decode
+envelopes or projections, and the broad public text projection is not yet
+covered by the table-projection text budget.
+
+## 2026-08-08 Numbers aggregate projection and formula-render hardening
+
+The focused rooted and global table projections now share caller-selected,
+package-wide budgets for materialized cells and retained semantic text. A
+table charges its dimensions before allocating cell offsets, and sheet names,
+table names, retained cell text, rich text, formula errors, and rendered
+formula text charge one aggregate output budget. Compatibility candidates use
+a transactional budget snapshot: a malformed speculative legacy candidate
+does not consume retained cell or text capacity, while a successfully
+published table commits those charges. Formula AST work is monotonic across
+both successful and rejected candidates so hostile speculation cannot receive
+a fresh CPU allowance. Existing per-table cell limits remain as a second,
+narrower bound.
+
+Formula rendering no longer recursively builds and copies an intermediate
+`String` at every AST node. It constructs an arena of nodes and string parts,
+charges a shared AST-work budget and a thunk-depth budget, computes the final
+size with checked arithmetic, reserves exactly once, and emits iteratively.
+Differential tests compare this renderer with the former implementation.
+A 4,096-value skewed concatenation proves linear arena growth, and exact-limit
+and one-over tests cover work, depth, output text, and aggregate cells. Formula
+metadata is still initialized after selection of a non-empty formula sidecar;
+deferring it until an individual rendered formula requires cross-table or
+category resolution remains open.
+
+Application classification also fails closed when a package without the
+canonical Numbers type-1 root instead has an unambiguous Pages- or
+Keynote-shaped root. Synthetic coverage and the checked-in native Pages and
+Keynote fixtures return `NotNumbers` through both direct and compatibility
+ingress. A compiler-backed CI ratchet now marks `litchi-numbers-wire` as a
+private dependency and denies exported-private-dependency signatures and
+blanket conversions. The public Prost error wrapper and public wire/comment
+conversions were removed; malformed generated payloads expose only a
+format-owned semantic path.
+
+Computer Use authored, saved, closed, and reopened
+`/private/tmp/litchi-numbers-formula-richtext-native-20260808.numbers` in the
+real Numbers application. The workbook contains a numeric input, a stored
+`SUM` formula whose reopened result is `323`, formatted `Café` text in a
+cell, and a two-line formatted text box. Numbers reopened it without a repair
+or conversion prompt. Its SHA-256 is
+`80deb7b87df27f58b26e6f247acee9d1fc6dcd3d268e85046c3efc16070b2edf`.
+The focused example reads one rooted sheet, one global compatibility table,
+and six materialized cells; reading does not change the hash.
+
+This closes the aggregate cell/text and formula-render allocation gaps for
+materialized table projection, not the complete Numbers cutover. Table-model,
+table-data, formula-table, and AST payloads still enter eager Prost decoders;
+sidecar work and decoded-memory envelopes remain incomplete. The public API
+also still carries archive/common physical debt and low-level formula
+identifiers outside the new wire-dependency ratchet. The root structured
+coordinator and removal of the host Numbers adapter remain separate work.
+
+## 2026-08-08 Keynote root projection and host setter deletion
+
+The concrete Keynote package no longer fully Prost-decodes the root
+`KN.DocumentArchive`. A narrow generated Buffa lazy view selects only the show
+reference, while a Keynote-owned wire preflight requires unique canonical
+fields, validates all currently known reference scalars, and deliberately
+keeps the ignored document-super envelope opaque. The deferred reference is
+forced before publication. The generated closure is provenance-checked,
+forbids unknown retention and element-memory support, and is held to five
+generated files and 64 KiB. Differential and hostile-input tests cover native
+payload parity, malformed references, missing and duplicate identifiers, and
+a 256 KiB opaque super payload.
+
+The migration host's `KeynoteEditor::set_slide_skipped` was deleted together
+with its duplicate legacy assertions. The focused Keynote transaction remains
+the sole owner of this mutation and already proves reversible patching,
+unknown-wire preservation, and native application behavior. This removes one
+concrete host operation, but slide nodes, slides, builds, shapes, notes, and
+most Keynote editor workflows still use larger generated graphs or remain in
+`litchi-iwa`.
+
+## 2026-08-08 legacy Numbers BNC parity
+
+The remaining migration-host table extractor now interprets legacy BNC
+type-9 cells through the same private stored-value model as the focused
+Numbers package. Rich text wins over string, which wins over numeric; formula,
+cached-scalar, error, and comment precedence follows the focused union
+semantics. Duplicate v5 flag walking and decimal conversion were removed.
+Unit tests cover numeric and precedence cases, and a whole-package
+focused-versus-legacy differential fixture locks the behavior while this host
+reader still exists.

@@ -20,7 +20,9 @@
 
 use super::Components;
 use super::table::Table;
-use super::{Error, Result, SemanticLimitKind, SemanticPath, TABLE_MODEL_MESSAGE_TYPE};
+use super::{
+    Error, Result, SemanticLimitKind, SemanticLimits, SemanticPath, TABLE_MODEL_MESSAGE_TYPE,
+};
 use super::{Index, Resolved};
 use crate::DEFAULT_MAX_TEXT_BYTES;
 use crate::cell::FiniteF64;
@@ -49,7 +51,7 @@ const TILE_MESSAGE_TYPE: u32 = 6_002;
 const MAX_TABLE_ROWS: usize = 1 << 20;
 const MAX_TABLE_COLUMNS: usize = 1 << 14;
 const MAX_ADDRESSABLE_CELLS: usize = 1 << 24;
-const MAX_MATERIALIZED_CELLS: usize = 1 << 20;
+const MAX_TABLE_MATERIALIZED_CELLS: usize = 1 << 20;
 const MAX_FORMULA_CATEGORY_DEPTH: usize = 64;
 const MAX_FORMULA_WORK: usize = crate::MAX_REFERENCES;
 const MAX_FORMULA_WIRE_BYTES: usize = DEFAULT_MAX_TEXT_BYTES;
@@ -76,7 +78,7 @@ struct CellBudget {
 impl CellBudget {
     fn new() -> Self {
         Self {
-            remaining: MAX_MATERIALIZED_CELLS,
+            remaining: MAX_TABLE_MATERIALIZED_CELLS,
         }
     }
 
@@ -84,10 +86,10 @@ impl CellBudget {
         if requested > self.remaining {
             return Err(Error::Common(litchi_iwa_common::Error::LimitExceeded {
                 kind: LimitKind::MaterializedCells,
-                observed: MAX_MATERIALIZED_CELLS
+                observed: MAX_TABLE_MATERIALIZED_CELLS
                     .saturating_sub(self.remaining)
                     .saturating_add(requested),
-                limit: MAX_MATERIALIZED_CELLS,
+                limit: MAX_TABLE_MATERIALIZED_CELLS,
             }));
         }
         Ok(())
@@ -98,6 +100,126 @@ impl CellBudget {
         self.remaining -= materialized;
         Ok(())
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ProjectionBudget {
+    materialized_cells: usize,
+    output_text_bytes: usize,
+    formula_render_work: usize,
+    max_materialized_cells: usize,
+    max_output_text_bytes: usize,
+    max_formula_render_work: usize,
+    max_formula_render_depth: usize,
+}
+
+impl ProjectionBudget {
+    const fn new(limits: SemanticLimits) -> Self {
+        Self {
+            materialized_cells: 0,
+            output_text_bytes: 0,
+            formula_render_work: 0,
+            max_materialized_cells: limits.max_materialized_cells(),
+            max_output_text_bytes: limits.max_output_text_bytes(),
+            max_formula_render_work: limits.max_formula_render_work(),
+            max_formula_render_depth: limits.max_formula_render_depth(),
+        }
+    }
+
+    fn charge_materialized_cells(&mut self, amount: usize) -> Result<()> {
+        self.materialized_cells = projection_charge(
+            self.materialized_cells,
+            amount,
+            self.max_materialized_cells,
+            SemanticLimitKind::MaterializedCells,
+        )?;
+        Ok(())
+    }
+
+    fn check_output_text(&self, amount: usize) -> Result<()> {
+        projection_charge(
+            self.output_text_bytes,
+            amount,
+            self.max_output_text_bytes,
+            SemanticLimitKind::OutputTextBytes,
+        )?;
+        Ok(())
+    }
+
+    fn charge_output_text(&mut self, amount: usize) -> Result<()> {
+        self.output_text_bytes = projection_charge(
+            self.output_text_bytes,
+            amount,
+            self.max_output_text_bytes,
+            SemanticLimitKind::OutputTextBytes,
+        )?;
+        Ok(())
+    }
+
+    fn charge_formula_render_work(&mut self, amount: usize) -> Result<()> {
+        let charged = projection_charge(
+            self.formula_render_work,
+            amount,
+            self.max_formula_render_work,
+            SemanticLimitKind::FormulaRenderWork,
+        );
+        match charged {
+            Ok(observed) => self.formula_render_work = observed,
+            Err(error) => {
+                // Work already performed by a rejected candidate cannot be
+                // reclaimed. Saturating the counter makes repeated hostile
+                // candidates fail before receiving a fresh allowance.
+                self.formula_render_work = self.max_formula_render_work;
+                return Err(error);
+            },
+        }
+        Ok(())
+    }
+
+    fn commit_attempt(&mut self, candidate: Self, published: bool) {
+        if published {
+            *self = candidate;
+        } else {
+            // Retained cells and text are transactional, but CPU work is a
+            // package-wide admission cost even when the candidate is rejected.
+            self.formula_render_work = self.formula_render_work.max(candidate.formula_render_work);
+        }
+    }
+
+    fn check_formula_render_depth(&self, depth: usize) -> Result<()> {
+        if depth > self.max_formula_render_depth {
+            return Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::FormulaRenderDepth,
+                observed: depth,
+                maximum: self.max_formula_render_depth,
+                path: SemanticPath::StructuredTables,
+            });
+        }
+        Ok(())
+    }
+}
+
+fn projection_charge(
+    current: usize,
+    amount: usize,
+    maximum: usize,
+    kind: SemanticLimitKind,
+) -> Result<usize> {
+    let observed = current.checked_add(amount).ok_or(Error::SemanticLimit {
+        kind,
+        observed: usize::MAX,
+        maximum,
+        path: SemanticPath::StructuredTables,
+    })?;
+    if observed > maximum {
+        return Err(Error::SemanticLimit {
+            kind,
+            observed,
+            maximum,
+            path: SemanticPath::StructuredTables,
+        });
+    }
+    Ok(observed)
 }
 
 fn allocation_error(resource: &'static str, amount: usize) -> Error {
@@ -144,6 +266,26 @@ fn compact_table_get<T>(table: &[(u32, T)], key: u32) -> Option<&T> {
         .binary_search_by_key(&key, |(entry_key, _)| *entry_key)
         .ok()
         .map(|index| &table[index].1)
+}
+
+fn retain_text(value: &str, budget: &mut ProjectionBudget) -> Result<String> {
+    budget.charge_output_text(value.len())?;
+    let mut retained = String::new();
+    retained
+        .try_reserve_exact(value.len())
+        .map_err(|_| allocation_error("Numbers retained semantic text", value.len()))?;
+    retained.push_str(value);
+    Ok(retained)
+}
+
+fn retained_table_text(
+    table: &[(u32, String)],
+    identifier: u32,
+    budget: &mut ProjectionBudget,
+) -> Result<Option<String>> {
+    compact_table_get(table, identifier)
+        .map(|value| retain_text(value, budget))
+        .transpose()
 }
 
 fn checked_table_dimensions(row_count: u32, column_count: u32) -> Result<(usize, usize)> {
@@ -252,6 +394,7 @@ pub(super) struct TableDataExtractor<'a> {
     bundle: &'a Components,
     object_index: &'a Index,
     formula_references: RefCell<Option<FormulaReferenceMaps>>,
+    projection_budget: RefCell<ProjectionBudget>,
     max_formula_references: usize,
 }
 
@@ -275,13 +418,14 @@ impl<'a> TableDataExtractor<'a> {
     pub(super) fn new(
         bundle: &'a Components,
         object_index: &'a Index,
-        max_formula_references: usize,
+        limits: SemanticLimits,
     ) -> Self {
         Self {
             bundle,
             object_index,
             formula_references: RefCell::new(None),
-            max_formula_references,
+            projection_budget: RefCell::new(ProjectionBudget::new(limits)),
+            max_formula_references: limits.max_references(),
         }
     }
 
@@ -297,6 +441,14 @@ impl<'a> TableDataExtractor<'a> {
         Ref::filter_map(self.formula_references.borrow(), Option::as_ref).map_err(|_references| {
             Error::InvalidFormat("Numbers formula-reference cache was not initialized".to_owned())
         })
+    }
+
+    /// Charge semantic text retained outside table projection, such as rooted
+    /// sheet names, against the same package-wide output budget.
+    pub(super) fn charge_output_text(&self, amount: usize) -> Result<()> {
+        self.projection_budget
+            .borrow_mut()
+            .charge_output_text(amount)
     }
 
     /// Extract all tables from the document
@@ -497,53 +649,74 @@ impl<'a> TableDataExtractor<'a> {
 
     /// Parse a TableModelArchive protobuf message
     fn parse_table_model(&self, table_model: tst::TableModelArchive) -> Result<Table> {
-        let (row_count, column_count) =
-            checked_table_dimensions(table_model.number_of_rows, table_model.number_of_columns)?;
-        let mut table = Table::with_dimensions(table_model.table_name, row_count, column_count)?;
+        // Projection is transactional at the table boundary. A rejected legacy
+        // candidate must not consume retained-cell or retained-text capacity
+        // that belongs to a later schema-proven table. Formula work remains a
+        // monotonic package-wide cost across successful and rejected attempts.
+        let mut projection_budget = *self.projection_budget.borrow();
+        let result = (|| {
+            let (row_count, column_count) = checked_table_dimensions(
+                table_model.number_of_rows,
+                table_model.number_of_columns,
+            )?;
+            projection_budget.charge_output_text(table_model.table_name.len())?;
+            let mut table =
+                Table::with_dimensions(table_model.table_name, row_count, column_count)?;
 
-        // Extract string table for cell text values
-        // string_table is a required field, not Optional
-        let string_table =
-            self.load_string_table(table_model.base_data_store.string_table.identifier)?;
+            // Extract string table for cell text values
+            // string_table is a required field, not Optional
+            let string_table =
+                self.load_string_table(table_model.base_data_store.string_table.identifier)?;
 
-        // Extract formula table for formula cells
-        // formula_table is a required field, not Optional
-        let formula_table =
-            self.load_formula_table(table_model.base_data_store.formula_table.identifier)?;
-        let formula_references = if formula_table.is_empty() {
-            None
-        } else {
-            Some(self.formula_references()?)
-        };
-        let empty_formula_references = FormulaReferenceMaps::default();
-        let formula_error_table = match table_model.base_data_store.formula_error_table {
-            Some(reference) => self.load_formula_error_table(reference.identifier)?,
-            None => Box::default(),
-        };
+            // Extract formula table for formula cells
+            // formula_table is a required field, not Optional
+            let formula_table =
+                self.load_formula_table(table_model.base_data_store.formula_table.identifier)?;
+            let formula_references = if formula_table.is_empty() {
+                None
+            } else {
+                Some(self.formula_references()?)
+            };
+            let empty_formula_references = FormulaReferenceMaps::default();
+            let formula_error_table = match table_model.base_data_store.formula_error_table {
+                Some(reference) => self.load_formula_error_table(reference.identifier)?,
+                None => Box::default(),
+            };
 
-        let rich_text_table = match table_model.base_data_store.rich_text_table {
-            Some(reference) => self.load_rich_text_table(reference.identifier)?,
-            None => Box::default(),
-        };
-        let comment_table = match table_model.base_data_store.comment_storage_table {
-            Some(reference) => self.load_comment_table(reference.identifier)?,
-            None => Box::default(),
-        };
+            let rich_text_table = match table_model.base_data_store.rich_text_table {
+                Some(reference) => self.load_rich_text_table(reference.identifier)?,
+                None => Box::default(),
+            };
+            let comment_table = match table_model.base_data_store.comment_storage_table {
+                Some(reference) => self.load_comment_table(reference.identifier)?,
+                None => Box::default(),
+            };
 
-        // Parse tiles to extract cell data
-        let cell_tables = CellTables {
-            strings: &string_table,
-            formulas: &formula_table,
-            formula_errors: &formula_error_table,
-            rich_text: &rich_text_table,
-            comments: &comment_table,
-            formula_references: formula_references
-                .as_deref()
-                .unwrap_or(&empty_formula_references),
-        };
-        self.parse_tiles(&table_model.base_data_store.tiles, &cell_tables, &mut table)?;
+            // Parse tiles to extract cell data
+            let cell_tables = CellTables {
+                strings: &string_table,
+                formulas: &formula_table,
+                formula_errors: &formula_error_table,
+                rich_text: &rich_text_table,
+                comments: &comment_table,
+                formula_references: formula_references
+                    .as_deref()
+                    .unwrap_or(&empty_formula_references),
+            };
+            self.parse_tiles(
+                &table_model.base_data_store.tiles,
+                &cell_tables,
+                &mut projection_budget,
+                &mut table,
+            )?;
 
-        Ok(table)
+            Ok(table)
+        })();
+
+        self.projection_budget
+            .borrow_mut()
+            .commit_attempt(projection_budget, result.is_ok());
+        result
     }
 
     /// Load a TableDataList from an object reference
@@ -667,18 +840,24 @@ impl<'a> TableDataExtractor<'a> {
                     author_id: comment
                         .author
                         .as_ref()
-                        .map(|author| AuthorId::from_raw(author.identifier))
+                        .map(|author| {
+                            AuthorId::from_raw(author.identifier).map_err(map_comment_error)
+                        })
                         .transpose()?,
                     reply_ids: comment
                         .replies
                         .iter()
-                        .map(|reply| StorageId::from_raw(reply.identifier).map_err(Error::from))
+                        .map(|reply| {
+                            StorageId::from_raw(reply.identifier).map_err(map_comment_error)
+                        })
                         .collect::<Result<Vec<_>>>()?
                         .into_boxed_slice(),
                     storage_uuid: comment
                         .storage_uuid
                         .as_ref()
-                        .map(|uuid| Uuid::from_parts(uuid.lower, uuid.upper))
+                        .map(|uuid| {
+                            Uuid::from_parts(uuid.lower, uuid.upper).map_err(map_comment_error)
+                        })
                         .transpose()?,
                 },
             ));
@@ -785,6 +964,7 @@ impl<'a> TableDataExtractor<'a> {
         &self,
         tile_storage: &tst::TileStorage,
         cell_tables: &CellTables<'_>,
+        projection_budget: &mut ProjectionBudget,
         table: &mut Table,
     ) -> Result<()> {
         let tile_size = usize::try_from(tile_storage.tile_size.unwrap_or(256)).map_err(|_| {
@@ -834,6 +1014,7 @@ impl<'a> TableDataExtractor<'a> {
                 table.column_count(),
                 &mut budget,
                 cell_tables,
+                projection_budget,
                 table,
             )?;
         }
@@ -851,6 +1032,7 @@ impl<'a> TableDataExtractor<'a> {
         column_count: usize,
         budget: &mut CellBudget,
         cell_tables: &CellTables<'_>,
+        projection_budget: &mut ProjectionBudget,
         table: &mut Table,
     ) -> Result<()> {
         let resolved = self
@@ -884,6 +1066,7 @@ impl<'a> TableDataExtractor<'a> {
                 column_count,
                 budget,
                 cell_tables,
+                projection_budget,
                 table,
             )?;
             decoded = true;
@@ -908,6 +1091,7 @@ impl<'a> TableDataExtractor<'a> {
         column_count: usize,
         budget: &mut CellBudget,
         cell_tables: &CellTables<'_>,
+        projection_budget: &mut ProjectionBudget,
         table: &mut Table,
     ) -> Result<()> {
         for row_info in &tile.row_infos {
@@ -919,6 +1103,7 @@ impl<'a> TableDataExtractor<'a> {
                 column_count,
                 budget,
                 cell_tables,
+                projection_budget,
                 table,
             )?;
         }
@@ -936,6 +1121,7 @@ impl<'a> TableDataExtractor<'a> {
         column_count: usize,
         budget: &mut CellBudget,
         cell_tables: &CellTables<'_>,
+        projection_budget: &mut ProjectionBudget,
         table: &mut Table,
     ) -> Result<()> {
         let tile_row_index = usize::try_from(row_info.tile_row_index).map_err(|_| {
@@ -970,6 +1156,7 @@ impl<'a> TableDataExtractor<'a> {
             Error::InvalidFormat("Numbers cell count does not fit the host usize".to_owned())
         })?;
         budget.check(expected_cells)?;
+        projection_budget.charge_materialized_cells(expected_cells)?;
         let cells = Self::parse_cell_offsets(
             cell_offsets,
             cell_storage.len(),
@@ -984,6 +1171,7 @@ impl<'a> TableDataExtractor<'a> {
             let parsed = Self::parse_cell_storage(
                 &cell_storage[range],
                 cell_tables,
+                projection_budget,
                 row_index,
                 column_index,
             )?;
@@ -1100,6 +1288,7 @@ impl<'a> TableDataExtractor<'a> {
     fn parse_cell_storage(
         data: &[u8],
         cell_tables: &CellTables<'_>,
+        projection_budget: &mut ProjectionBudget,
         row: usize,
         column: usize,
     ) -> Result<ParsedCell> {
@@ -1107,8 +1296,8 @@ impl<'a> TableDataExtractor<'a> {
             .first()
             .ok_or_else(|| Error::ParseError("Empty Numbers cell storage".to_string()))?;
         match version {
-            0..=4 => Self::parse_pre_bnc_cell(data, cell_tables, row, column),
-            5 => Self::parse_bnc_cell(data, cell_tables, row, column),
+            0..=4 => Self::parse_pre_bnc_cell(data, cell_tables, projection_budget, row, column),
+            5 => Self::parse_bnc_cell(data, cell_tables, projection_budget, row, column),
             other => Err(Error::ParseError(format!(
                 "Unsupported Numbers cell storage version {other}"
             ))),
@@ -1118,6 +1307,7 @@ impl<'a> TableDataExtractor<'a> {
     fn parse_bnc_cell(
         data: &[u8],
         cell_tables: &CellTables<'_>,
+        projection_budget: &mut ProjectionBudget,
         row: usize,
         column: usize,
     ) -> Result<ParsedCell> {
@@ -1139,6 +1329,7 @@ impl<'a> TableDataExtractor<'a> {
                 row,
                 column,
                 cell_tables.formula_references,
+                projection_budget,
             )
             .map_err(|error| {
                 Error::ParseError(format!(
@@ -1166,12 +1357,12 @@ impl<'a> TableDataExtractor<'a> {
                 },
                 Some(CachedScalar::Unsupported(_)) | None => CellValue::Number(zero),
             },
-            StoredValue::Text(identifier) => compact_table_get(cell_tables.strings, identifier)
-                .cloned()
-                .map_or(CellValue::Empty, CellValue::Text),
+            StoredValue::Text(identifier) => {
+                retained_table_text(cell_tables.strings, identifier, projection_budget)?
+                    .map_or(CellValue::Empty, CellValue::Text)
+            },
             StoredValue::RichText(identifier) => {
-                compact_table_get(cell_tables.rich_text, identifier)
-                    .cloned()
+                retained_table_text(cell_tables.rich_text, identifier, projection_budget)?
                     .map_or(CellValue::Empty, CellValue::Text)
             },
             StoredValue::Date => match scalar {
@@ -1186,11 +1377,13 @@ impl<'a> TableDataExtractor<'a> {
                 Some(CachedScalar::Duration(value)) => CellValue::Duration(value),
                 Some(_) | None => CellValue::Duration(zero),
             },
-            StoredValue::Error => CellValue::Error(
-                cell.formula_error_identifier()
-                    .and_then(|id| compact_table_get(cell_tables.formula_errors, id).cloned())
-                    .unwrap_or_else(|| "FORMULA".to_owned()),
-            ),
+            StoredValue::Error => {
+                let error = cell
+                    .formula_error_identifier()
+                    .and_then(|id| compact_table_get(cell_tables.formula_errors, id))
+                    .map_or("FORMULA", String::as_str);
+                CellValue::Error(retain_text(error, projection_budget)?)
+            },
             StoredValue::Formula(_) => {
                 return Err(Error::InvalidFormat(format!(
                     "Numbers formula BNC cell ({row}, {column}) reached scalar decoding"
@@ -1211,6 +1404,7 @@ impl<'a> TableDataExtractor<'a> {
     fn parse_pre_bnc_cell(
         data: &[u8],
         cell_tables: &CellTables<'_>,
+        projection_budget: &mut ProjectionBudget,
         row: usize,
         column: usize,
     ) -> Result<ParsedCell> {
@@ -1286,6 +1480,7 @@ impl<'a> TableDataExtractor<'a> {
                 row,
                 column,
                 cell_tables.formula_references,
+                projection_budget,
             )
             .map_err(|error| {
                 Error::ParseError(format!(
@@ -1302,20 +1497,29 @@ impl<'a> TableDataExtractor<'a> {
         let value = match cell_type {
             0 => CellValue::Empty,
             2 => CellValue::Number(number.unwrap_or(zero)),
-            3 => string_id
-                .and_then(|id| compact_table_get(cell_tables.strings, id).cloned())
-                .map_or(CellValue::Empty, CellValue::Text),
+            3 => match string_id {
+                Some(identifier) => {
+                    retained_table_text(cell_tables.strings, identifier, projection_budget)?
+                        .map_or(CellValue::Empty, CellValue::Text)
+                },
+                None => CellValue::Empty,
+            },
             5 => CellValue::Date(date.unwrap_or(zero)),
             6 => CellValue::Boolean(number.unwrap_or(zero).get() != 0.0),
             7 => CellValue::Duration(number.unwrap_or(zero)),
-            8 => CellValue::Error(
-                formula_error_id
-                    .and_then(|id| compact_table_get(cell_tables.formula_errors, id).cloned())
-                    .unwrap_or_else(|| "FORMULA".to_owned()),
-            ),
-            9 => rich_text_id
-                .and_then(|id| compact_table_get(cell_tables.rich_text, id).cloned())
-                .map_or(CellValue::Empty, CellValue::Text),
+            8 => {
+                let error = formula_error_id
+                    .and_then(|id| compact_table_get(cell_tables.formula_errors, id))
+                    .map_or("FORMULA", String::as_str);
+                CellValue::Error(retain_text(error, projection_budget)?)
+            },
+            9 => match rich_text_id {
+                Some(identifier) => {
+                    retained_table_text(cell_tables.rich_text, identifier, projection_budget)?
+                        .map_or(CellValue::Empty, CellValue::Text)
+                },
+                None => CellValue::Empty,
+            },
             other => {
                 return Err(Error::ParseError(format!(
                     "Unsupported Numbers pre-BNC cell type {other}"
@@ -1328,7 +1532,25 @@ impl<'a> TableDataExtractor<'a> {
         })
     }
 
-    /// Extract formula string from FormulaArchive
+    /// Render a formula through the bounded, non-copying expression arena.
+    fn extract_formula_string(
+        formula: &tsce::FormulaArchive,
+        host_row: usize,
+        host_column: usize,
+        formula_references: &FormulaReferenceMaps,
+        projection_budget: &mut ProjectionBudget,
+    ) -> Result<String> {
+        render_formula(
+            formula,
+            host_row,
+            host_column,
+            formula_references,
+            projection_budget,
+        )
+    }
+
+    /// Test-only reference renderer retained for differential coverage while
+    /// the streaming FormulaArchive reader is migrated independently.
     ///
     ///   - Reconstructs formula text from Abstract Syntax Tree
     ///   - Handles operators, functions, cell references, and constants
@@ -1343,7 +1565,8 @@ impl<'a> TableDataExtractor<'a> {
     ///
     /// O(n) where n is the number of AST nodes. Uses a stack-based algorithm
     /// for efficient conversion.
-    fn extract_formula_string(
+    #[cfg(test)]
+    fn extract_formula_string_reference(
         formula: &tsce::FormulaArchive,
         host_row: usize,
         host_column: usize,
@@ -1574,7 +1797,7 @@ impl<'a> TableDataExtractor<'a> {
                             ast_node_array: array.clone(),
                             ..Default::default()
                         };
-                        let rendered = Self::extract_formula_string(
+                        let rendered = Self::extract_formula_string_reference(
                             &nested,
                             host_row,
                             host_column,
@@ -1697,6 +1920,10 @@ impl<'a> TableDataExtractor<'a> {
 
         Ok(None)
     }
+}
+
+fn map_comment_error(_error: litchi_iwa_common::comment::Error) -> Error {
+    Error::InvalidFormat("Numbers comment metadata is invalid".to_owned())
 }
 
 #[derive(Debug)]
@@ -2378,16 +2605,768 @@ fn formula_reference_prefix(
         .unwrap_or_else(|| "Table::".to_owned())
 }
 
+type FormulaExpr = usize;
+
+#[derive(Debug)]
+enum FormulaPart {
+    Static(&'static str),
+    Owned(String),
+    Expr(FormulaExpr),
+}
+
+#[derive(Debug)]
+struct FormulaNode {
+    parts: std::ops::Range<usize>,
+    rendered_len: usize,
+}
+
+#[derive(Debug, Default)]
+struct FormulaRenderer {
+    nodes: Vec<FormulaNode>,
+    parts: Vec<FormulaPart>,
+    owned_bytes: usize,
+}
+
+impl FormulaRenderer {
+    fn check_additional_owned(&self, additional: usize, budget: &ProjectionBudget) -> Result<()> {
+        let retained = self
+            .owned_bytes
+            .checked_add(additional)
+            .and_then(|bytes| bytes.checked_add(1))
+            .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
+        budget.check_output_text(retained)
+    }
+
+    fn static_expr(
+        &mut self,
+        value: &'static str,
+        budget: &ProjectionBudget,
+    ) -> Result<FormulaExpr> {
+        self.fixed([FormulaPart::Static(value)], budget)
+    }
+
+    fn owned_expr(&mut self, value: String, budget: &ProjectionBudget) -> Result<FormulaExpr> {
+        self.fixed([FormulaPart::Owned(value)], budget)
+    }
+
+    fn binary(
+        &mut self,
+        left: FormulaExpr,
+        operator: &'static str,
+        right: FormulaExpr,
+        wrapped: bool,
+        budget: &ProjectionBudget,
+    ) -> Result<FormulaExpr> {
+        if wrapped {
+            self.fixed(
+                [
+                    FormulaPart::Static("("),
+                    FormulaPart::Expr(left),
+                    FormulaPart::Static(operator),
+                    FormulaPart::Expr(right),
+                    FormulaPart::Static(")"),
+                ],
+                budget,
+            )
+        } else {
+            self.fixed(
+                [
+                    FormulaPart::Expr(left),
+                    FormulaPart::Static(operator),
+                    FormulaPart::Expr(right),
+                ],
+                budget,
+            )
+        }
+    }
+
+    fn unary(
+        &mut self,
+        prefix: &'static str,
+        expression: FormulaExpr,
+        suffix: &'static str,
+        budget: &ProjectionBudget,
+    ) -> Result<FormulaExpr> {
+        self.fixed(
+            [
+                FormulaPart::Static(prefix),
+                FormulaPart::Expr(expression),
+                FormulaPart::Static(suffix),
+            ],
+            budget,
+        )
+    }
+
+    fn comma_joined(
+        &mut self,
+        function_prefix: Option<String>,
+        arguments: Vec<FormulaExpr>,
+        open: &'static str,
+        close: &'static str,
+        budget: &ProjectionBudget,
+    ) -> Result<FormulaExpr> {
+        let part_count = arguments
+            .len()
+            .checked_mul(2)
+            .and_then(|count| count.checked_add(3))
+            .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
+        let mut parts = Vec::new();
+        parts
+            .try_reserve_exact(part_count)
+            .map_err(|_error| allocation_error("Numbers formula render parts", part_count))?;
+        if let Some(label) = function_prefix {
+            parts.push(FormulaPart::Owned(label));
+        }
+        parts.push(FormulaPart::Static(open));
+        for (index, argument) in arguments.into_iter().enumerate() {
+            if index != 0 {
+                parts.push(FormulaPart::Static(","));
+            }
+            parts.push(FormulaPart::Expr(argument));
+        }
+        parts.push(FormulaPart::Static(close));
+        self.dynamic(parts, budget)
+    }
+
+    fn array(
+        &mut self,
+        values: Vec<FormulaExpr>,
+        columns: usize,
+        budget: &ProjectionBudget,
+    ) -> Result<FormulaExpr> {
+        let part_count = values
+            .len()
+            .checked_mul(2)
+            .and_then(|count| count.checked_add(2))
+            .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
+        let mut parts = Vec::new();
+        parts
+            .try_reserve_exact(part_count)
+            .map_err(|_error| allocation_error("Numbers formula array parts", part_count))?;
+        parts.push(FormulaPart::Static("{"));
+        for (index, value) in values.into_iter().enumerate() {
+            if index != 0 {
+                parts.push(FormulaPart::Static(
+                    if columns != 0 && index % columns == 0 {
+                        ";"
+                    } else {
+                        ","
+                    },
+                ));
+            }
+            parts.push(FormulaPart::Expr(value));
+        }
+        parts.push(FormulaPart::Static("}"));
+        self.dynamic(parts, budget)
+    }
+
+    fn fixed<const N: usize>(
+        &mut self,
+        parts: [FormulaPart; N],
+        budget: &ProjectionBudget,
+    ) -> Result<FormulaExpr> {
+        let (rendered_len, owned_bytes) = self.measure(&parts, budget)?;
+        self.reserve_node(N)?;
+        let start = self.parts.len();
+        self.parts.extend(parts);
+        self.push_node(start, rendered_len, owned_bytes)
+    }
+
+    fn dynamic(
+        &mut self,
+        parts: Vec<FormulaPart>,
+        budget: &ProjectionBudget,
+    ) -> Result<FormulaExpr> {
+        let (rendered_len, owned_bytes) = self.measure(&parts, budget)?;
+        self.reserve_node(parts.len())?;
+        let start = self.parts.len();
+        self.parts.extend(parts);
+        self.push_node(start, rendered_len, owned_bytes)
+    }
+
+    fn measure(&self, parts: &[FormulaPart], budget: &ProjectionBudget) -> Result<(usize, usize)> {
+        let mut rendered_len = 0usize;
+        let mut owned_bytes = 0usize;
+        for part in parts {
+            let part_len = match part {
+                FormulaPart::Static(value) => value.len(),
+                FormulaPart::Owned(value) => {
+                    owned_bytes = owned_bytes
+                        .checked_add(value.len())
+                        .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
+                    value.len()
+                },
+                FormulaPart::Expr(expression) => {
+                    self.nodes
+                        .get(*expression)
+                        .ok_or_else(|| {
+                            Error::ParseError(
+                                "Numbers formula renderer contains an invalid expression"
+                                    .to_owned(),
+                            )
+                        })?
+                        .rendered_len
+                },
+            };
+            rendered_len = rendered_len
+                .checked_add(part_len)
+                .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
+        }
+        let retained_owned = self
+            .owned_bytes
+            .checked_add(owned_bytes)
+            .and_then(|bytes| bytes.checked_add(1))
+            .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
+        budget.check_output_text(retained_owned)?;
+        let output_len = rendered_len
+            .checked_add(1)
+            .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
+        budget.check_output_text(output_len)?;
+        Ok((rendered_len, owned_bytes))
+    }
+
+    fn reserve_node(&mut self, part_count: usize) -> Result<()> {
+        self.nodes.try_reserve(1).map_err(|_error| {
+            allocation_error("Numbers formula render nodes", self.nodes.len() + 1)
+        })?;
+        self.parts.try_reserve(part_count).map_err(|_error| {
+            allocation_error(
+                "Numbers formula render parts",
+                self.parts.len().saturating_add(part_count),
+            )
+        })?;
+        Ok(())
+    }
+
+    fn push_node(
+        &mut self,
+        start: usize,
+        rendered_len: usize,
+        owned_bytes: usize,
+    ) -> Result<FormulaExpr> {
+        self.owned_bytes = self
+            .owned_bytes
+            .checked_add(owned_bytes)
+            .ok_or_else(|| allocation_error("Numbers formula owned text", usize::MAX))?;
+        let end = self.parts.len();
+        let expression = self.nodes.len();
+        self.nodes.push(FormulaNode {
+            parts: start..end,
+            rendered_len,
+        });
+        Ok(expression)
+    }
+
+    fn render(&self, expression: FormulaExpr, budget: &mut ProjectionBudget) -> Result<String> {
+        let node = self.nodes.get(expression).ok_or_else(|| {
+            Error::ParseError("Numbers formula has no renderable expression".to_owned())
+        })?;
+        let output_len = node
+            .rendered_len
+            .checked_add(1)
+            .ok_or_else(|| formula_output_limit_error(usize::MAX, budget))?;
+        budget.charge_output_text(output_len)?;
+
+        let mut output = String::new();
+        output
+            .try_reserve_exact(output_len)
+            .map_err(|_error| allocation_error("Numbers rendered formula", output_len))?;
+        output.push('=');
+
+        let mut pending = Vec::new();
+        self.push_parts_reversed(&mut pending, node.parts.clone())?;
+        while let Some(part) = pending.pop() {
+            match part {
+                FormulaPart::Static(value) => output.push_str(value),
+                FormulaPart::Owned(value) => output.push_str(value),
+                FormulaPart::Expr(child) => {
+                    let child_node = self.nodes.get(*child).ok_or_else(|| {
+                        Error::ParseError(
+                            "Numbers formula renderer contains an invalid child".to_owned(),
+                        )
+                    })?;
+                    self.push_parts_reversed(&mut pending, child_node.parts.clone())?;
+                },
+            }
+        }
+        debug_assert_eq!(output.len(), output_len);
+        Ok(output)
+    }
+
+    fn push_parts_reversed<'a>(
+        &'a self,
+        pending: &mut Vec<&'a FormulaPart>,
+        range: std::ops::Range<usize>,
+    ) -> Result<()> {
+        let count = range.len();
+        pending.try_reserve(count).map_err(|_error| {
+            allocation_error(
+                "Numbers formula render stack",
+                pending.len().saturating_add(count),
+            )
+        })?;
+        pending.extend(self.parts[range].iter().rev());
+        Ok(())
+    }
+}
+
+fn formula_output_limit_error(observed: usize, budget: &ProjectionBudget) -> Error {
+    Error::SemanticLimit {
+        kind: SemanticLimitKind::OutputTextBytes,
+        observed,
+        maximum: budget.max_output_text_bytes,
+        path: SemanticPath::StructuredTables,
+    }
+}
+
+fn render_formula(
+    formula: &tsce::FormulaArchive,
+    host_row: usize,
+    host_column: usize,
+    formula_references: &FormulaReferenceMaps,
+    budget: &mut ProjectionBudget,
+) -> Result<String> {
+    let ast = &formula.ast_node_array;
+    if ast.ast_node.is_empty() {
+        return retain_text("=", budget);
+    }
+
+    let mut renderer = FormulaRenderer::default();
+    let root = match render_formula_ast_array(
+        ast,
+        host_row,
+        host_column,
+        formula_references,
+        budget,
+        &mut renderer,
+        1,
+    )? {
+        Some(root) => root,
+        None => renderer.static_expr("FORMULA()", budget)?,
+    };
+    renderer.render(root, budget)
+}
+
+#[allow(
+    clippy::too_many_lines,
+    reason = "the exhaustive AST match preserves native node semantics"
+)]
+fn render_formula_ast_array(
+    ast: &tsce::AstNodeArrayArchive,
+    host_row: usize,
+    host_column: usize,
+    formula_references: &FormulaReferenceMaps,
+    budget: &mut ProjectionBudget,
+    renderer: &mut FormulaRenderer,
+    depth: usize,
+) -> Result<Option<FormulaExpr>> {
+    use litchi_iwa_protos::tsce::ast_node_array_archive::AstNodeType;
+
+    budget.check_formula_render_depth(depth)?;
+    budget.charge_formula_render_work(ast.ast_node.len())?;
+    let mut stack = Vec::new();
+    stack.try_reserve(ast.ast_node.len()).map_err(|_error| {
+        allocation_error("Numbers formula expression stack", ast.ast_node.len())
+    })?;
+
+    for node in &ast.ast_node {
+        let expression = match node.ast_node_type() {
+            AstNodeType::AdditionNode => Some(render_binary(
+                &mut stack, renderer, "+", "addition", true, budget,
+            )?),
+            AstNodeType::SubtractionNode => Some(render_binary(
+                &mut stack,
+                renderer,
+                "-",
+                "subtraction",
+                true,
+                budget,
+            )?),
+            AstNodeType::MultiplicationNode => Some(render_binary(
+                &mut stack,
+                renderer,
+                "*",
+                "multiplication",
+                true,
+                budget,
+            )?),
+            AstNodeType::DivisionNode => Some(render_binary(
+                &mut stack, renderer, "/", "division", true, budget,
+            )?),
+            AstNodeType::PowerNode => Some(render_binary(
+                &mut stack, renderer, "^", "power", true, budget,
+            )?),
+            AstNodeType::GreaterThanNode => Some(render_binary(
+                &mut stack,
+                renderer,
+                ">",
+                "greater than",
+                true,
+                budget,
+            )?),
+            AstNodeType::GreaterThanOrEqualToNode => Some(render_binary(
+                &mut stack,
+                renderer,
+                ">=",
+                "greater than or equal",
+                true,
+                budget,
+            )?),
+            AstNodeType::LessThanNode => Some(render_binary(
+                &mut stack,
+                renderer,
+                "<",
+                "less than",
+                true,
+                budget,
+            )?),
+            AstNodeType::LessThanOrEqualToNode => Some(render_binary(
+                &mut stack,
+                renderer,
+                "<=",
+                "less than or equal",
+                true,
+                budget,
+            )?),
+            AstNodeType::EqualToNode => Some(render_binary(
+                &mut stack, renderer, "=", "equality", true, budget,
+            )?),
+            AstNodeType::NotEqualToNode => Some(render_binary(
+                &mut stack,
+                renderer,
+                "<>",
+                "inequality",
+                true,
+                budget,
+            )?),
+            AstNodeType::NumberNode => node
+                .ast_number_node_number
+                .map(|number| renderer.owned_expr(number.to_string(), budget))
+                .transpose()?,
+            AstNodeType::StringNode => node
+                .ast_string_node_string
+                .as_deref()
+                .map(|value| formula_string_literal(value, renderer, budget))
+                .transpose()?
+                .map(|value| renderer.owned_expr(value, budget))
+                .transpose()?,
+            AstNodeType::BooleanNode => node
+                .ast_boolean_node_boolean
+                .map(|value| renderer.static_expr(if value { "TRUE" } else { "FALSE" }, budget))
+                .transpose()?,
+            AstNodeType::TokenNode => node
+                .ast_token_node_boolean
+                .map(|value| renderer.static_expr(if value { "TRUE" } else { "FALSE" }, budget))
+                .transpose()?,
+            AstNodeType::DateNode => node
+                .ast_date_node_date_num
+                .map(|seconds| {
+                    renderer.owned_expr(format!("(DATE(2001,1,1)+{})", seconds / 86_400.0), budget)
+                })
+                .transpose()?,
+            AstNodeType::DurationNode => node
+                .ast_duration_node_unit_num
+                .map(|value| renderer.owned_expr(value.to_string(), budget))
+                .transpose()?,
+            AstNodeType::EmptyArgumentNode => Some(renderer.static_expr("", budget)?),
+            AstNodeType::CellReferenceNode => Some(renderer.owned_expr(
+                render_cell_reference(node, host_row, host_column, formula_references)?,
+                budget,
+            )?),
+            AstNodeType::LocalCellReferenceNode => Some(
+                renderer.owned_expr(
+                    node.ast_local_cell_reference_node_reference
+                        .as_ref()
+                        .map_or_else(
+                            || "#REF!".to_owned(),
+                            |cell| {
+                                format!(
+                                    "{}{}",
+                                    TableDataExtractor::column_index_to_letter(cell.column_handle),
+                                    cell.row_handle + 1
+                                )
+                            },
+                        ),
+                    budget,
+                )?,
+            ),
+            AstNodeType::CrossTableCellReferenceNode => Some(
+                renderer.owned_expr(
+                    node.ast_cross_table_cell_reference_node_reference
+                        .as_ref()
+                        .map_or_else(
+                            || "#REF!".to_owned(),
+                            |cell| {
+                                format!(
+                                    "{}{}{}",
+                                    formula_reference_prefix(&cell.table_id, formula_references),
+                                    TableDataExtractor::column_index_to_letter(cell.column_handle),
+                                    cell.row_handle + 1
+                                )
+                            },
+                        ),
+                    budget,
+                )?,
+            ),
+            AstNodeType::FunctionNode => {
+                if let Some(index) = node.ast_function_node_index {
+                    let arguments = pop_formula_arguments(
+                        &mut stack,
+                        node.ast_function_node_num_args.unwrap_or(0),
+                        "function",
+                    )?;
+                    Some(renderer.comma_joined(
+                        Some(TableDataExtractor::get_function_name(index)),
+                        arguments,
+                        "(",
+                        ")",
+                        budget,
+                    )?)
+                } else {
+                    None
+                }
+            },
+            AstNodeType::ListNode => {
+                if let Some(count) = node.ast_list_node_num_args {
+                    let arguments = pop_formula_arguments(&mut stack, count, "list")?;
+                    Some(renderer.comma_joined(None, arguments, "", "", budget)?)
+                } else {
+                    None
+                }
+            },
+            AstNodeType::ArrayNode => {
+                let column_count = node.ast_array_node_num_col.unwrap_or(0);
+                let rows = node.ast_array_node_num_row.unwrap_or(0);
+                let count = column_count.checked_mul(rows).ok_or_else(|| {
+                    Error::ParseError("Numbers formula array size overflow".to_owned())
+                })?;
+                let values = pop_formula_arguments(&mut stack, count, "array")?;
+                let column_count_usize = usize::try_from(column_count).map_err(|_error| {
+                    Error::ParseError("Numbers formula array width exceeds usize".to_owned())
+                })?;
+                Some(renderer.array(values, column_count_usize, budget)?)
+            },
+            AstNodeType::ThunkNode => {
+                if let Some(nested) = &node.ast_thunk_node_array {
+                    let nested_expression = match render_formula_ast_array(
+                        nested,
+                        host_row,
+                        host_column,
+                        formula_references,
+                        budget,
+                        renderer,
+                        depth.checked_add(1).ok_or(Error::SemanticLimit {
+                            kind: SemanticLimitKind::FormulaRenderDepth,
+                            observed: usize::MAX,
+                            maximum: budget.max_formula_render_depth,
+                            path: SemanticPath::StructuredTables,
+                        })?,
+                    )? {
+                        Some(expression) => expression,
+                        None => renderer.static_expr(
+                            if nested.ast_node.is_empty() {
+                                ""
+                            } else {
+                                "FORMULA()"
+                            },
+                            budget,
+                        )?,
+                    };
+                    Some(nested_expression)
+                } else {
+                    None
+                }
+            },
+            AstNodeType::NegationNode => stack
+                .pop()
+                .map(|operand| renderer.unary("-(", operand, ")", budget))
+                .transpose()?,
+            AstNodeType::PercentNode => {
+                let operand = stack.pop().ok_or_else(|| {
+                    Error::ParseError(
+                        "Numbers formula percent operator is missing an operand".to_owned(),
+                    )
+                })?;
+                Some(renderer.unary("(", operand, ")%", budget)?)
+            },
+            AstNodeType::ConcatenationNode => Some(render_binary(
+                &mut stack,
+                renderer,
+                "&",
+                "concatenation",
+                true,
+                budget,
+            )?),
+            AstNodeType::ColonNode | AstNodeType::ColonNodeWithUids => Some(render_binary(
+                &mut stack, renderer, ":", "range", false, budget,
+            )?),
+            AstNodeType::ColonTractNode => Some(renderer.owned_expr(
+                render_colon_tract(node, host_row, host_column, formula_references)?,
+                budget,
+            )?),
+            AstNodeType::ReferenceErrorNode | AstNodeType::ReferenceErrorWithUids => {
+                Some(renderer.static_expr("#REF!", budget)?)
+            },
+            AstNodeType::CategoryRefNode => Some(
+                renderer.owned_expr(render_category_reference(node, formula_references), budget)?,
+            ),
+            AstNodeType::UnknownFunctionNode => {
+                let arguments = pop_formula_arguments(
+                    &mut stack,
+                    node.ast_unknown_function_node_num_args.unwrap_or(0),
+                    "unknown function",
+                )?;
+                Some(
+                    renderer.comma_joined(
+                        Some(
+                            node.ast_unknown_function_node_string
+                                .clone()
+                                .unwrap_or_else(|| "UNKNOWN".to_owned()),
+                        ),
+                        arguments,
+                        "(",
+                        ")",
+                        budget,
+                    )?,
+                )
+            },
+            AstNodeType::PlusSignNode
+            | AstNodeType::BeginThunkNode
+            | AstNodeType::EndThunkNode
+            | AstNodeType::AppendWhitespaceNode
+            | AstNodeType::PrependWhitespaceNode
+            | AstNodeType::UidReferenceNode
+            | AstNodeType::LetBindNode
+            | AstNodeType::VarNode
+            | AstNodeType::EndScopeNode
+            | AstNodeType::LambdaNode
+            | AstNodeType::BeginLambdaThunkNode
+            | AstNodeType::EndLambdaThunkNode
+            | AstNodeType::LinkedCellRefNode
+            | AstNodeType::LinkedColumnRefNode
+            | AstNodeType::LinkedRowRefNode
+            | AstNodeType::ViewTractRefNode
+            | AstNodeType::IntersectionNode
+            | AstNodeType::SpillRangeNode => None,
+        };
+        if let Some(rendered_expression) = expression {
+            stack.push(rendered_expression);
+        }
+    }
+    Ok(stack.pop())
+}
+
+fn render_binary(
+    stack: &mut Vec<FormulaExpr>,
+    renderer: &mut FormulaRenderer,
+    operator: &'static str,
+    operation: &str,
+    wrapped: bool,
+    budget: &ProjectionBudget,
+) -> Result<FormulaExpr> {
+    let (left, right) = pop_binary_operands(stack, operation)?;
+    renderer.binary(left, operator, right, wrapped, budget)
+}
+
+fn formula_string_literal(
+    value: &str,
+    renderer: &FormulaRenderer,
+    budget: &ProjectionBudget,
+) -> Result<String> {
+    let quote_count = value.bytes().filter(|byte| *byte == b'"').count();
+    let length = value
+        .len()
+        .checked_add(quote_count)
+        .and_then(|length| length.checked_add(2))
+        .ok_or_else(|| allocation_error("Numbers formula string literal", usize::MAX))?;
+    renderer.check_additional_owned(length, budget)?;
+    let mut literal = String::new();
+    literal
+        .try_reserve_exact(length)
+        .map_err(|_error| allocation_error("Numbers formula string literal", length))?;
+    literal.push('"');
+    for character in value.chars() {
+        if character == '"' {
+            literal.push('"');
+        }
+        literal.push(character);
+    }
+    literal.push('"');
+    Ok(literal)
+}
+
+fn render_cell_reference(
+    node: &tsce::ast_node_array_archive::AstNodeArchive,
+    host_row: usize,
+    host_column: usize,
+    formula_references: &FormulaReferenceMaps,
+) -> Result<String> {
+    if let (Some(ast_column), Some(ast_row)) = (&node.ast_column, &node.ast_row) {
+        let column = resolve_formula_coordinate(
+            host_column,
+            ast_column.column,
+            ast_column.absolute.unwrap_or(false),
+            "column",
+        )?;
+        let row = resolve_formula_coordinate(
+            host_row,
+            ast_row.row,
+            ast_row.absolute.unwrap_or(false),
+            "row",
+        )?;
+        let prefix = node
+            .ast_cross_table_reference_extra_info
+            .as_ref()
+            .map(|extra| formula_reference_prefix(&extra.table_id, formula_references))
+            .unwrap_or_default();
+        return Ok(format!(
+            "{prefix}{}{}{}{}",
+            if ast_column.absolute.unwrap_or(false) {
+                "$"
+            } else {
+                ""
+            },
+            TableDataExtractor::column_index_to_letter(column),
+            if ast_row.absolute.unwrap_or(false) {
+                "$"
+            } else {
+                ""
+            },
+            row + 1
+        ));
+    }
+    if let Some(cell) = &node.ast_local_cell_reference_node_reference {
+        return Ok(format!(
+            "{}{}{}{}",
+            if cell.column_is_sticky != 0 { "$" } else { "" },
+            TableDataExtractor::column_index_to_letter(cell.column_handle),
+            if cell.row_is_sticky != 0 { "$" } else { "" },
+            cell.row_handle + 1
+        ));
+    }
+    if let Some(cell) = &node.ast_cross_table_cell_reference_node_reference {
+        return Ok(format!(
+            "{}{}{}",
+            formula_reference_prefix(&cell.table_id, formula_references),
+            TableDataExtractor::column_index_to_letter(cell.column_handle),
+            cell.row_handle + 1
+        ));
+    }
+    Ok("#REF!".to_owned())
+}
+
 fn resolve_formula_coordinate(host: usize, stored: i32, absolute: bool, axis: &str) -> Result<u32> {
     let coordinate = if absolute {
         i64::from(stored)
     } else {
         i64::try_from(host)
-            .map_err(|_| Error::ParseError(format!("Numbers formula host {axis} exceeds i64")))?
+            .map_err(|_error| {
+                Error::ParseError(format!("Numbers formula host {axis} exceeds i64"))
+            })?
             .checked_add(i64::from(stored))
             .ok_or_else(|| Error::ParseError(format!("Numbers formula {axis} overflow")))?
     };
-    u32::try_from(coordinate).map_err(|_| {
+    u32::try_from(coordinate).map_err(|_error| {
         Error::ParseError(format!(
             "Numbers formula {axis} coordinate {coordinate} is out of range"
         ))
@@ -2559,7 +3538,7 @@ fn resolve_colon_axis(
     ))
 }
 
-fn pop_binary_operands(stack: &mut Vec<String>, operation: &str) -> Result<(String, String)> {
+fn pop_binary_operands<T>(stack: &mut Vec<T>, operation: &str) -> Result<(T, T)> {
     let right = stack.pop().ok_or_else(|| {
         Error::ParseError(format!(
             "Malformed Numbers formula: {operation} is missing its right operand"
@@ -2573,11 +3552,7 @@ fn pop_binary_operands(stack: &mut Vec<String>, operation: &str) -> Result<(Stri
     Ok((left, right))
 }
 
-fn pop_formula_arguments(
-    stack: &mut Vec<String>,
-    count: u32,
-    node_kind: &str,
-) -> Result<Vec<String>> {
+fn pop_formula_arguments<T>(stack: &mut Vec<T>, count: u32, node_kind: &str) -> Result<Vec<T>> {
     let count = usize::try_from(count).map_err(|_| {
         Error::ParseError(format!(
             "Numbers formula {node_kind} argument count exceeds usize"
@@ -2631,21 +3606,44 @@ fn finite_zero() -> Result<FiniteF64> {
 #[cfg(test)]
 mod tests {
     use super::{
-        CellTables, Error, FormulaReferenceBudget, FormulaReferenceMaps,
-        MAX_FORMULA_CATEGORY_DEPTH, MAX_FORMULA_WIRE_BYTES, MAX_FORMULA_WORK, TableDataExtractor,
-        collect_formula_category_payload,
+        CellTables, Error, FormulaReferenceBudget, FormulaReferenceMaps, FormulaRenderer,
+        MAX_FORMULA_CATEGORY_DEPTH, MAX_FORMULA_WIRE_BYTES, MAX_FORMULA_WORK, ProjectionBudget,
+        TableDataExtractor, collect_formula_category_payload, render_formula,
+        render_formula_ast_array,
     };
-    use crate::SemanticLimitKind;
     use crate::cell::Value as CellValue;
     use crate::cell::wire::{BncCell, decimal128_le};
     use crate::package::SemanticPath;
+    use crate::{PackageSemanticLimits as SemanticLimits, SemanticLimitKind};
     use litchi_iwa_common::comment::Comment;
     use litchi_iwa_common::wire::append_length_delimited_field;
+    use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeType};
     use litchi_iwa_protos::{tsce, tsp, tst};
     use prost::Message as _;
     use std::collections::HashMap;
 
     const TEST_DECIMAL_FLAG: u32 = 0x0000_0001;
+
+    fn formula_node(kind: AstNodeType) -> AstNodeArchive {
+        AstNodeArchive {
+            ast_node_type: kind as i32,
+            ..Default::default()
+        }
+    }
+
+    fn number_node(value: f64) -> AstNodeArchive {
+        AstNodeArchive {
+            ast_number_node_number: Some(value),
+            ..formula_node(AstNodeType::NumberNode)
+        }
+    }
+
+    fn formula(nodes: Vec<AstNodeArchive>) -> tsce::FormulaArchive {
+        tsce::FormulaArchive {
+            ast_node_array: tsce::AstNodeArrayArchive { ast_node: nodes },
+            ..Default::default()
+        }
+    }
 
     #[test]
     fn padded_missing_cell_offset_slots_are_accepted() {
@@ -2699,12 +3697,212 @@ mod tests {
             .unwrap_or_else(|error| panic!("type-nine cell did not parse: {error}"))
             .encode();
 
-        let parsed = TableDataExtractor::parse_bnc_cell(&round_tripped, &tables, 2, 3)
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        let parsed = TableDataExtractor::parse_bnc_cell(&round_tripped, &tables, &mut budget, 2, 3)
             .unwrap_or_else(|error| panic!("type-nine cell did not extract: {error}"));
         let CellValue::Number(value) = parsed.value else {
             panic!("type-nine decimal was not extracted as a number");
         };
         assert_eq!(value.get(), -1_234.5);
+    }
+
+    #[test]
+    fn arena_formula_renderer_matches_reference_output() -> super::Result<()> {
+        let mut string = formula_node(AstNodeType::StringNode);
+        string.ast_string_node_string = Some("a\"b".to_owned());
+        let input = formula(vec![
+            number_node(1.0),
+            number_node(2.0),
+            formula_node(AstNodeType::AdditionNode),
+            string,
+            formula_node(AstNodeType::ConcatenationNode),
+        ]);
+        let references = FormulaReferenceMaps::default();
+        let expected =
+            TableDataExtractor::extract_formula_string_reference(&input, 0, 0, &references)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        let actual = render_formula(&input, 0, 0, &references, &mut budget)?;
+        assert_eq!(actual, expected);
+        assert_eq!(actual, "=((1+2)&\"a\"\"b\")");
+        Ok(())
+    }
+
+    #[test]
+    fn skewed_concatenation_uses_linear_arena_storage() -> super::Result<()> {
+        const VALUES: usize = 4_096;
+        let mut nodes = Vec::new();
+        nodes
+            .try_reserve_exact(VALUES * 2 - 1)
+            .map_err(|_| super::allocation_error("test formula nodes", VALUES * 2 - 1))?;
+        nodes.push(number_node(1.0));
+        for _ in 1..VALUES {
+            nodes.push(number_node(1.0));
+            nodes.push(formula_node(AstNodeType::ConcatenationNode));
+        }
+        let input = formula(nodes);
+        let references = FormulaReferenceMaps::default();
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        let mut renderer = FormulaRenderer::default();
+        let root = render_formula_ast_array(
+            &input.ast_node_array,
+            0,
+            0,
+            &references,
+            &mut budget,
+            &mut renderer,
+            1,
+        )?
+        .unwrap_or_else(|| panic!("skewed formula did not produce an expression"));
+        assert_eq!(renderer.nodes.len(), VALUES * 2 - 1);
+        assert_eq!(renderer.parts.len(), VALUES + (VALUES - 1) * 5);
+        let output = renderer.render(root, &mut budget)?;
+        assert_eq!(output.len(), VALUES * 4 - 2);
+        Ok(())
+    }
+
+    #[test]
+    fn formula_work_text_and_depth_limits_are_inclusive() -> super::Result<()> {
+        let references = FormulaReferenceMaps::default();
+        let input = formula(vec![
+            number_node(1.0),
+            number_node(2.0),
+            formula_node(AstNodeType::AdditionNode),
+        ]);
+
+        let exact_limits = SemanticLimits::default()
+            .with_formula_render_limits(3, 64)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?
+            .with_projection_limits(crate::MAX_MATERIALIZED_CELLS, 6)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let mut exact = ProjectionBudget::new(exact_limits);
+        assert_eq!(
+            render_formula(&input, 0, 0, &references, &mut exact)?,
+            "=(1+2)"
+        );
+
+        let tight_work = SemanticLimits::default()
+            .with_formula_render_limits(2, 64)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let mut work_budget = ProjectionBudget::new(tight_work);
+        assert!(matches!(
+            render_formula(&input, 0, 0, &references, &mut work_budget),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::FormulaRenderWork,
+                observed: 3,
+                maximum: 2,
+                ..
+            })
+        ));
+
+        let tight_text = SemanticLimits::default()
+            .with_projection_limits(crate::MAX_MATERIALIZED_CELLS, 5)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let mut text_budget = ProjectionBudget::new(tight_text);
+        assert!(matches!(
+            render_formula(&input, 0, 0, &references, &mut text_budget),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::OutputTextBytes,
+                observed: 6,
+                maximum: 5,
+                ..
+            })
+        ));
+
+        let mut nested = tsce::AstNodeArrayArchive {
+            ast_node: vec![number_node(1.0)],
+        };
+        for _ in 1..=3 {
+            let mut thunk = formula_node(AstNodeType::ThunkNode);
+            thunk.ast_thunk_node_array = Some(nested);
+            nested = tsce::AstNodeArrayArchive {
+                ast_node: vec![thunk],
+            };
+        }
+        let nested = tsce::FormulaArchive {
+            ast_node_array: nested,
+            ..Default::default()
+        };
+        let depth_limits = SemanticLimits::default()
+            .with_formula_render_limits(4, 3)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let mut depth_budget = ProjectionBudget::new(depth_limits);
+        assert!(matches!(
+            render_formula(&nested, 0, 0, &references, &mut depth_budget),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::FormulaRenderDepth,
+                observed: 4,
+                maximum: 3,
+                ..
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn projection_budget_is_package_aggregate() -> super::Result<()> {
+        let limits = SemanticLimits::default()
+            .with_projection_limits(3, 5)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let mut budget = ProjectionBudget::new(limits);
+        budget.charge_materialized_cells(2)?;
+        budget.charge_materialized_cells(1)?;
+        assert!(matches!(
+            budget.charge_materialized_cells(1),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::MaterializedCells,
+                observed: 4,
+                maximum: 3,
+                ..
+            })
+        ));
+        budget.charge_output_text(2)?;
+        budget.charge_output_text(3)?;
+        assert!(matches!(
+            budget.charge_output_text(1),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::OutputTextBytes,
+                observed: 6,
+                maximum: 5,
+                ..
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn rejected_attempt_rolls_back_retained_values_but_not_formula_work() -> super::Result<()> {
+        let limits = SemanticLimits::default()
+            .with_projection_limits(3, 5)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?
+            .with_formula_render_limits(2, 1)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let mut published = ProjectionBudget::new(limits);
+        published.charge_materialized_cells(1)?;
+        published.charge_output_text(1)?;
+
+        let mut rejected = published;
+        rejected.charge_materialized_cells(2)?;
+        rejected.charge_output_text(4)?;
+        rejected.charge_formula_render_work(1)?;
+        published.commit_attempt(rejected, false);
+
+        assert_eq!(published.materialized_cells, 1);
+        assert_eq!(published.output_text_bytes, 1);
+        assert_eq!(published.formula_render_work, 1);
+
+        let mut over_budget = published;
+        assert!(matches!(
+            over_budget.charge_formula_render_work(2),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::FormulaRenderWork,
+                observed: 3,
+                maximum: 2,
+                ..
+            })
+        ));
+        published.commit_attempt(over_budget, false);
+        assert_eq!(published.formula_render_work, 2);
+        Ok(())
     }
 
     #[test]

@@ -21,7 +21,7 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_detect::Format;
-use litchi_iwa_protos::{kn, tswp};
+use litchi_iwa_protos::{keynote_document_codec, kn, tswp};
 use litchi_iwa_text::storage::Storage;
 use litchi_iwa_text_wire::{
     DEFAULT_MAX_FIELDS as DEFAULT_MAX_TEXT_FIELDS,
@@ -392,7 +392,7 @@ impl Package {
                 semantic: OnceLock::new(),
             }),
         };
-        package.root_document()?;
+        package.root_show_identifier()?;
         Ok(package)
     }
 
@@ -541,7 +541,7 @@ impl Package {
     /// Returns an error when the package root or required semantic references
     /// are missing or malformed.
     pub fn validate(&self) -> ReadResult<()> {
-        self.root_document()?;
+        self.root_show_identifier()?;
         self.semantic_document()?;
         Ok(())
     }
@@ -570,7 +570,7 @@ impl Package {
             .ok_or_else(|| ReadError::Decode("semantic snapshot was not initialized".to_owned()))
     }
 
-    fn root_document(&self) -> ReadResult<kn::DocumentArchive> {
+    fn root_show_identifier(&self) -> ReadResult<u64> {
         let mut roots = self
             .state
             .components
@@ -592,20 +592,19 @@ impl Package {
             &[DOCUMENT_MESSAGE_TYPE],
             "Keynote root document",
         )?;
-        preflight_document(payload, self.semantic_wire_limits()?)?;
-        decode_message(payload, "Keynote root document")
+        decode_root_show_identifier(payload, self.semantic_wire_limits()?)
     }
 
     fn decode_show(&self) -> ReadResult<Show> {
-        let document = self.root_document()?;
+        let show_identifier = self.root_show_identifier()?;
         let mut builder = Show::builder();
-        if document.show.identifier == 0 {
+        if show_identifier == 0 {
             return Ok(builder.build());
         }
 
         let mut budget = SemanticBudget::new(self.semantic_limits());
         budget.charge_references(1, SemanticPath::Show)?;
-        let show_object = self.required_object(document.show.identifier, "Keynote show")?;
+        let show_object = self.required_object(show_identifier, "Keynote show")?;
         let payload = unique_payload(&show_object.messages, &[SHOW_MESSAGE_TYPE], "Keynote show")?;
         let preflight_slide_count =
             preflight_show(payload, self.semantic_wire_limits()?, &mut budget)?;
@@ -697,12 +696,12 @@ impl Package {
     }
 
     fn slide_record_at(&self, index: usize) -> ReadResult<Option<SlideRecord>> {
-        let document = self.root_document()?;
-        if document.show.identifier == 0 {
+        let show_identifier = self.root_show_identifier()?;
+        if show_identifier == 0 {
             return Ok(None);
         }
         let show_object = self
-            .object(document.show.identifier)
+            .object(show_identifier)
             .ok_or_else(|| ReadError::Decode("Keynote show object is missing".to_owned()))?;
         let payload = unique_payload(&show_object.messages, &[SHOW_MESSAGE_TYPE], "Keynote show")?;
         let mut budget = SemanticBudget::new(self.semantic_limits());
@@ -1216,31 +1215,61 @@ impl SemanticBudget {
 
 fn preflight_document(payload: &[u8], wire_limits: WireLimits) -> ReadResult<()> {
     let mut show_fields = 0usize;
+    let mut show_identifier_fields = 0usize;
     let mut super_fields = 0usize;
     preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
         let field = visit.field();
-        if visit.path().is_empty() && field.number() == 2 {
-            require_unique_length_delimited(
-                field,
-                &mut show_fields,
-                "Keynote document show reference",
-            )?;
-        } else if visit.path().is_empty() && field.number() == 3 {
-            require_unique_length_delimited(
-                field,
-                &mut super_fields,
-                "Keynote document base archive",
-            )?;
+        match (visit.path(), field.number()) {
+            ([], 2) => {
+                require_unique_length_delimited(
+                    field,
+                    &mut show_fields,
+                    "Keynote document show reference",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([], 3) => {
+                require_unique_length_delimited(
+                    field,
+                    &mut super_fields,
+                    "Keynote document base archive",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            ([2], 1) => {
+                require_unique_uint64(
+                    field,
+                    &mut show_identifier_fields,
+                    "Keynote document show identifier",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            _ => Ok(WireDescent::Skip),
         }
-        Ok(WireDescent::Skip)
     })
     .map_err(|error| map_wire_preflight_error(error, "Keynote document", SemanticPath::Package))?;
-    if show_fields != 1 || super_fields != 1 {
+    if show_fields != 1 || show_identifier_fields != 1 || super_fields != 1 {
         return Err(ReadError::InvalidFormat(
             "Keynote document is missing a unique required envelope field".to_owned(),
         ));
     }
     Ok(())
+}
+
+fn decode_root_show_identifier(payload: &[u8], wire_limits: WireLimits) -> ReadResult<u64> {
+    preflight_document(payload, wire_limits)?;
+    let recursion_limit = u32::try_from(wire_limits.max_nesting()).map_err(|_error| {
+        ReadError::InvalidFormat("Keynote root nesting limit does not fit u32".to_owned())
+    })?;
+    keynote_document_codec::decode_show_identifier(
+        payload,
+        keynote_document_codec::DecodeOptions::new(payload.len(), recursion_limit),
+    )
+    .map_err(|error| {
+        ReadError::InvalidFormat(format!(
+            "Keynote root document projection is malformed: {error}"
+        ))
+    })
 }
 
 fn preflight_show(
@@ -1589,6 +1618,38 @@ fn require_unique_length_delimited(
         )));
     }
     Ok(())
+}
+
+fn require_unique_uint64(
+    field: WireFieldView<'_>,
+    count: &mut usize,
+    context: &'static str,
+) -> litchi_iwa_common::Result<u64> {
+    increment_wire_count(count, context)?;
+    if *count > 1 {
+        return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+            "{context} is duplicated"
+        )));
+    }
+    field.validate_canonical_key()?;
+    if field.wire_type() != 0 {
+        return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+            "{context} is not a varint"
+        )));
+    }
+    let payload = field.payload();
+    let (value, consumed) =
+        litchi_iwa_common::decode_varint_from_bytes(payload).map_err(|error| {
+            litchi_iwa_common::Error::InvalidFormat(format!(
+                "{context} has an invalid varint: {error}"
+            ))
+        })?;
+    if consumed != payload.len() || litchi_iwa_common::varint::encoded_len(value) != payload.len() {
+        return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+            "{context} has noncanonical varint framing"
+        )));
+    }
+    Ok(value)
 }
 
 fn require_unique_bool(
@@ -2133,6 +2194,53 @@ mod tests {
         assert_input_limit(&error, 2, 1);
         assert_eq!(reader.position(), 2);
         Ok(())
+    }
+
+    #[test]
+    fn root_projection_keeps_the_base_archive_opaque() -> Result<(), Box<dyn std::error::Error>> {
+        const OPAQUE_BYTES: usize = 256 * 1024;
+
+        let mut source = vec![0x12, 0x02, 0x08, 0x2a, 0x1a];
+        litchi_iwa_common::encode_varint_into(&mut source, u64::try_from(OPAQUE_BYTES)?);
+        source.resize(source.len() + OPAQUE_BYTES, 0xff);
+
+        assert_eq!(
+            decode_root_show_identifier(&source, WireLimits::default())?,
+            42
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn root_projection_requires_the_nested_show_identifier() {
+        let Err(error) =
+            decode_root_show_identifier(&[0x12, 0x00, 0x1a, 0x00], WireLimits::default())
+        else {
+            panic!("a show reference without its required identifier must fail");
+        };
+        assert!(matches!(error, ReadError::InvalidFormat(_)));
+    }
+
+    #[test]
+    fn root_projection_forces_complete_reference_validation() {
+        let Err(error) = decode_root_show_identifier(
+            &[0x12, 0x04, 0x08, 0x2a, 0x12, 0x00, 0x1a, 0x00],
+            WireLimits::default(),
+        ) else {
+            panic!("a known Reference field with the wrong wire type must fail");
+        };
+        assert!(matches!(error, ReadError::InvalidFormat(_)));
+    }
+
+    #[test]
+    fn root_preflight_rejects_duplicate_show_identifiers() {
+        let Err(error) = decode_root_show_identifier(
+            &[0x12, 0x04, 0x08, 0x01, 0x08, 0x02, 0x1a, 0x00],
+            WireLimits::default(),
+        ) else {
+            panic!("duplicate required identifiers must fail strict preflight");
+        };
+        assert!(matches!(error, ReadError::InvalidFormat(_)));
     }
 
     #[test]

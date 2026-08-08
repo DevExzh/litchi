@@ -48,9 +48,7 @@ use litchi_iwa_protos::{tn, tst, tswp};
 use prost::Message;
 use thiserror::Error;
 
-use crate::{
-    DEFAULT_MAX_TEXT_BYTES, Document, DocumentError, DocumentLimits, MAX_MATERIALIZED_CELLS, Sheet,
-};
+use crate::{Document, DocumentError, DocumentLimits, Sheet};
 use extractor::TableDataExtractor;
 use index::{Index, Resolved};
 use sheet::DecodedSheet;
@@ -99,27 +97,6 @@ impl fmt::Display for SemanticPath {
     }
 }
 
-/// Format-owned wrapper for a malformed native protobuf payload.
-///
-/// The generated decoder type remains private to the package adapter while
-/// [`std::error::Error::source`] preserves the diagnostic chain for tooling.
-#[derive(Debug)]
-pub struct ProtobufError {
-    source: prost::DecodeError,
-}
-
-impl fmt::Display for ProtobufError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("malformed Numbers protobuf payload")
-    }
-}
-
-impl std::error::Error for ProtobufError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.source)
-    }
-}
-
 /// Errors returned while parsing a native Numbers package.
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -130,9 +107,12 @@ pub enum Error {
     /// ZIP or IWA package ingress failed.
     #[error(transparent)]
     Archive(#[from] litchi_iwa_archive::Error),
-    /// A native protobuf payload could not be decoded.
-    #[error("could not decode Numbers protobuf payload")]
-    Protobuf(#[source] ProtobufError),
+    /// A native payload could not be decoded at a stable semantic location.
+    #[error("malformed Numbers payload at {path}")]
+    MalformedPayload {
+        /// Content-free semantic location of the malformed payload.
+        path: SemanticPath,
+    },
     /// The package is a recognized iWork document owned by another application.
     #[error("package is not a Numbers document")]
     NotNumbers,
@@ -173,23 +153,14 @@ pub enum Error {
 }
 
 impl Error {
-    fn protobuf(error: prost::DecodeError) -> Self {
-        Self::Protobuf(ProtobufError { source: error })
-    }
-}
-
-impl From<crate::cell::wire::Error> for Error {
-    fn from(error: crate::cell::wire::Error) -> Self {
-        match error {
-            crate::cell::wire::Error::InvalidFormat(message) => Self::InvalidFormat(message),
-            crate::cell::wire::Error::ParseError(message) => Self::ParseError(message),
+    fn protobuf(_error: prost::DecodeError) -> Self {
+        Self::MalformedPayload {
+            path: SemanticPath::StructuredTables,
         }
     }
-}
 
-impl From<litchi_iwa_common::comment::Error> for Error {
-    fn from(error: litchi_iwa_common::comment::Error) -> Self {
-        Self::InvalidFormat(error.to_string())
+    fn malformed_payload(_error: prost::DecodeError, path: SemanticPath) -> Self {
+        Self::MalformedPayload { path }
     }
 }
 
@@ -363,8 +334,8 @@ impl Package {
             DocumentLimits::new(
                 semantic.max_sheets(),
                 semantic.max_tables(),
-                MAX_MATERIALIZED_CELLS,
-                DEFAULT_MAX_TEXT_BYTES,
+                semantic.max_materialized_cells(),
+                semantic.max_output_text_bytes(),
             ),
         )?;
         Ok(Self {
@@ -493,7 +464,8 @@ impl Package {
                 "Numbers document root has no canonical document payload".to_owned(),
             )
         })?;
-        tn::DocumentArchive::decode(message.data.as_slice()).map_err(Error::protobuf)
+        tn::DocumentArchive::decode(message.data.as_slice())
+            .map_err(|error| Error::malformed_payload(error, SemanticPath::Document))
     }
 
     fn decode_sheets(
@@ -513,7 +485,7 @@ impl Package {
 
         let mut budget = SemanticBudget::new(limits);
         budget.charge_references(document.sheets.len(), SemanticPath::Document)?;
-        let extractor = TableDataExtractor::new(components, index, limits.max_references());
+        let extractor = TableDataExtractor::new(components, index, limits);
         let mut sheets = Vec::new();
         sheets
             .try_reserve_exact(document.sheets.len())
@@ -552,6 +524,7 @@ impl Package {
                         archive.drawable_infos.len(),
                     )
                 })?;
+            extractor.charge_output_text(archive.name.len())?;
             let mut sheet = DecodedSheet::new(archive.name, position);
             for (drawable_position, drawable) in archive.drawable_infos.into_iter().enumerate() {
                 let drawable_path = SemanticPath::Drawable {
@@ -688,15 +661,25 @@ fn validate_numbers_application(components: &Components, archive_limits: Limits)
         .ok_or_else(|| {
             Error::InvalidFormat("package has no canonical iWork document root".to_owned())
         })?;
-    let canonical = unique_message(
+    let canonical_message = unique_message(
         &root.messages,
         DOCUMENT_MESSAGE_TYPE,
         SemanticPath::Document,
         "document",
-    )?
-    .ok_or_else(|| {
-        Error::InvalidFormat("iWork document root has no canonical document payload".to_owned())
-    })?;
+    )?;
+    let Some(canonical) = canonical_message else {
+        let mut foreign = root
+            .messages
+            .iter()
+            .filter_map(|message| detect_application_from_document(&message.data))
+            .filter(|format| matches!(format, Format::Pages | Format::Keynote));
+        if foreign.next().is_some() && foreign.next().is_none() {
+            return Err(Error::NotNumbers);
+        }
+        return Err(Error::InvalidFormat(
+            "iWork document root has no canonical Numbers payload".to_owned(),
+        ));
+    };
     preflight_application_payload(&canonical.data, archive_limits)?;
     let application = detect_application_from_document(&canonical.data).ok_or_else(|| {
         Error::InvalidFormat(
@@ -744,7 +727,7 @@ fn project_compatibility_tables(
     if !TableDataExtractor::has_table_models(index) {
         return Ok(Vec::new());
     }
-    TableDataExtractor::new(components, index, limits.max_references())
+    TableDataExtractor::new(components, index, limits)
         .extract_all_semantic_tables(limits.max_tables())
 }
 
@@ -804,12 +787,11 @@ fn decode_sheet_payload(messages: &[RawMessage], path: SemanticPath) -> Result<t
         (Some(_), Some(_)) => Err(Error::InvalidFormat(format!(
             "Numbers {path} has ambiguous sheet payload ownership"
         ))),
-        (Some(message), None) => {
-            tn::SheetArchive::decode(message.data.as_slice()).map_err(Error::protobuf)
-        },
+        (Some(message), None) => tn::SheetArchive::decode(message.data.as_slice())
+            .map_err(|error| Error::malformed_payload(error, path)),
         (None, Some(message)) => tn::FormBasedSheetArchive::decode(message.data.as_slice())
             .map(|form_archive| form_archive.super_)
-            .map_err(Error::protobuf),
+            .map_err(|error| Error::malformed_payload(error, path)),
         (None, None) => Err(Error::InvalidFormat(format!(
             "Numbers {path} has no canonical sheet payload"
         ))),
@@ -971,6 +953,77 @@ mod tests {
         })
     }
 
+    fn package_with_two_materialized_empty_tables() -> Result<Vec<u8>> {
+        let sidecars = ArchiveObject::new(
+            20,
+            [
+                tst::table_data_list::ListType::String,
+                tst::table_data_list::ListType::Formula,
+            ]
+            .into_iter()
+            .map(|list_type| RawMessage {
+                type_: 6_005,
+                data: tst::TableDataList {
+                    list_type: list_type as i32,
+                    next_list_id: 1,
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            })
+            .collect(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let empty_cell = crate::cell::wire::BncCell::minimal().encode();
+        let mut objects = vec![
+            object(
+                1,
+                DOCUMENT_MESSAGE_TYPE,
+                tn::DocumentArchive::default().encode_to_vec(),
+            )?,
+            sidecars,
+        ];
+        for (model_id, tile_id, name) in [(10, 30, "A"), (11, 31, "B")] {
+            let model = tst::TableModelArchive {
+                table_name: name.to_owned(),
+                number_of_rows: 1,
+                number_of_columns: 1,
+                base_data_store: tst::DataStore {
+                    tiles: tst::TileStorage {
+                        tiles: vec![tst::tile_storage::Tile {
+                            tileid: 0,
+                            tile: reference(tile_id),
+                        }],
+                        tile_size: Some(256),
+                        ..Default::default()
+                    },
+                    string_table: reference(20),
+                    formula_table: reference(20),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let tile = tst::Tile {
+                numrows: 1,
+                row_infos: vec![tst::TileRowInfo {
+                    tile_row_index: 0,
+                    cell_count: 1,
+                    storage_version: Some(5),
+                    cell_storage_buffer: Some(empty_cell.clone()),
+                    cell_offsets: Some(vec![0, 0]),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            };
+            objects.push(object(
+                model_id,
+                TABLE_MODEL_MESSAGE_TYPE,
+                model.encode_to_vec(),
+            )?);
+            objects.push(object(tile_id, 6_002, tile.encode_to_vec())?);
+        }
+        package_bytes_from_archive(Archive { objects })
+    }
+
     fn package_bytes_from_archive(archive: Archive) -> Result<Vec<u8>> {
         package_bytes_from_archives([("Index/Document.iwa", archive)])
     }
@@ -1050,6 +1103,18 @@ mod tests {
                 Err(Error::NotNumbers)
             ));
         }
+
+        let native_pages = package_bytes_from_archive(Archive {
+            objects: vec![object(1, 10_000, pages.encode_to_vec())?],
+        })?;
+        assert!(matches!(
+            Package::from_bytes(&native_pages),
+            Err(Error::NotNumbers)
+        ));
+        assert!(matches!(
+            compatibility_tables_from_bytes(&native_pages),
+            Err(Error::NotNumbers)
+        ));
 
         let unknown = package_bytes_from_archive(Archive {
             objects: vec![object(1, DOCUMENT_MESSAGE_TYPE, vec![0x08, 0x01])?],
@@ -1450,6 +1515,49 @@ mod tests {
                 observed: 2,
                 maximum: 1,
                 path: SemanticPath::Package,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn compatibility_cell_and_text_budgets_span_all_tables() -> Result<()> {
+        let bytes = package_with_two_materialized_empty_tables()?;
+        let limits = |cells, text| {
+            SemanticLimits::default()
+                .with_projection_limits(cells, text)
+                .map_err(|error| Error::InvalidFormat(error.to_string()))
+        };
+
+        let exact = compatibility_tables_from_bytes_with_options(
+            &bytes,
+            ReadOptions::new(Limits::default(), limits(2, 2)?),
+        )?;
+        assert_eq!(exact.len(), 2);
+        assert_eq!(exact.iter().map(crate::Table::cell_count).sum::<usize>(), 2);
+
+        assert!(matches!(
+            compatibility_tables_from_bytes_with_options(
+                &bytes,
+                ReadOptions::new(Limits::default(), limits(1, 2)?),
+            ),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::MaterializedCells,
+                observed: 2,
+                maximum: 1,
+                ..
+            })
+        ));
+        assert!(matches!(
+            compatibility_tables_from_bytes_with_options(
+                &bytes,
+                ReadOptions::new(Limits::default(), limits(2, 1)?),
+            ),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::OutputTextBytes,
+                observed: 2,
+                maximum: 1,
+                ..
             })
         ));
         Ok(())

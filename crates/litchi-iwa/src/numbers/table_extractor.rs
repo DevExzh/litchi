@@ -29,7 +29,9 @@
 //! }
 //! ```
 
-use super::bnc::read_decimal128_le;
+use super::bnc::{BncCellView, CachedScalar, StoredValue};
+#[cfg(test)]
+use super::bnc::{decimal128_le, read_decimal128_le};
 use super::cell::CellValue;
 use super::table::NumbersTable;
 use crate::bundle::Bundle;
@@ -966,64 +968,14 @@ impl<'a> TableDataExtractor<'a> {
         row: usize,
         column: usize,
     ) -> Result<ParsedCell> {
-        if data.len() < 12 {
-            return Err(Error::ParseError(
-                "Truncated Numbers BNC cell header".to_string(),
-            ));
-        }
-        let cell_type = data[1];
-        let flags = read_u32_le(&data[8..12])?;
-        let mut cursor = 12;
-        let mut decimal: Option<FiniteF64> = None;
-        let mut number: Option<FiniteF64> = None;
-        let mut date: Option<FiniteF64> = None;
-        let mut string_id = None;
-        let mut rich_text_id = None;
-        let mut formula_id = None;
-        let mut formula_error_id = None;
-        let mut comment_identifier = None;
+        let cell = BncCellView::parse(data).map_err(|error| {
+            Error::ParseError(format!(
+                "Numbers BNC cell ({row}, {column}) is invalid: {error}"
+            ))
+        })?;
+        let comment_identifier = cell.comment_identifier();
 
-        for (flag, size) in [
-            (0x000001, 16),
-            (0x000002, 8),
-            (0x000004, 8),
-            (0x000008, 4),
-            (0x000010, 4),
-            (0x000020, 4),
-            (0x000040, 4),
-            (0x000080, 4),
-            (0x000100, 4),
-            (0x000200, 4),
-            (0x000400, 4),
-            (0x000800, 4),
-            (0x001000, 4),
-            (0x002000, 4),
-            (0x004000, 4),
-            (0x008000, 4),
-            (0x010000, 4),
-            (0x020000, 4),
-            (0x040000, 4),
-            (0x080000, 4),
-            (0x100000, 4),
-        ] {
-            if flags & flag == 0 {
-                continue;
-            }
-            let field = take_field(data, &mut cursor, size)?;
-            match flag {
-                0x000001 => decimal = Some(read_finite_decimal128_le(field)?),
-                0x000002 => number = Some(read_f64_le(field)?),
-                0x000004 => date = Some(read_f64_le(field)?),
-                0x000008 => string_id = Some(read_u32_le(field)?),
-                0x000010 => rich_text_id = Some(read_u32_le(field)?),
-                0x000200 => formula_id = Some(read_u32_le(field)?),
-                0x000800 => formula_error_id = Some(read_u32_le(field)?),
-                0x080000 => comment_identifier = Some(read_u32_le(field)?),
-                _ => {},
-            }
-        }
-
-        if let Some(identifier) = formula_id {
+        if let StoredValue::Formula(identifier) = cell.stored_value() {
             let formula = compact_table_get(cell_tables.formulas, identifier).ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Numbers formula table has no entry {identifier} referenced by cell ({row}, {column})"
@@ -1047,24 +999,51 @@ impl<'a> TableDataExtractor<'a> {
         }
 
         let zero = finite_zero()?;
-        let value = match cell_type {
-            0 => CellValue::Empty,
-            2 | 10 => CellValue::Number(decimal.or(number).unwrap_or(zero)),
-            3 => string_id
-                .and_then(|id| compact_table_get(cell_tables.strings, id).cloned())
+        let scalar = cell.cached_scalar();
+        let value = match cell.stored_value() {
+            StoredValue::Empty => CellValue::Empty,
+            StoredValue::Number => match scalar {
+                Some(CachedScalar::Number(value)) => CellValue::Number(value),
+                Some(
+                    CachedScalar::Boolean(_) | CachedScalar::Date(_) | CachedScalar::Duration(_),
+                ) => {
+                    return Err(Error::InvalidFormat(format!(
+                        "Numbers numeric BNC cell ({row}, {column}) has a mismatched scalar encoding"
+                    )));
+                },
+                Some(CachedScalar::Unsupported(_)) | None => CellValue::Number(zero),
+            },
+            StoredValue::Text(identifier) => compact_table_get(cell_tables.strings, identifier)
+                .cloned()
                 .map_or(CellValue::Empty, CellValue::Text),
-            5 => CellValue::Date(date.unwrap_or(zero)),
-            6 => CellValue::Boolean(number.unwrap_or(zero).get() != 0.0),
-            7 => CellValue::Duration(number.unwrap_or(zero)),
-            8 => CellValue::Error(
-                formula_error_id
+            StoredValue::RichText(identifier) => {
+                compact_table_get(cell_tables.rich_text, identifier)
+                    .cloned()
+                    .map_or(CellValue::Empty, CellValue::Text)
+            },
+            StoredValue::Date => match scalar {
+                Some(CachedScalar::Date(value)) => CellValue::Date(value),
+                Some(_) | None => CellValue::Date(zero),
+            },
+            StoredValue::Boolean => match scalar {
+                Some(CachedScalar::Boolean(value)) => CellValue::Boolean(value),
+                Some(_) | None => CellValue::Boolean(false),
+            },
+            StoredValue::Duration => match scalar {
+                Some(CachedScalar::Duration(value)) => CellValue::Duration(value),
+                Some(_) | None => CellValue::Duration(zero),
+            },
+            StoredValue::Error => CellValue::Error(
+                cell.formula_error_identifier()
                     .and_then(|id| compact_table_get(cell_tables.formula_errors, id).cloned())
                     .unwrap_or_else(|| "FORMULA".to_owned()),
             ),
-            9 => rich_text_id
-                .and_then(|id| compact_table_get(cell_tables.rich_text, id).cloned())
-                .map_or(CellValue::Empty, CellValue::Text),
-            other => {
+            StoredValue::Formula(_) => {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers formula BNC cell ({row}, {column}) reached scalar decoding"
+                )));
+            },
+            StoredValue::Unsupported(other) => {
                 return Err(Error::ParseError(format!(
                     "Unsupported Numbers BNC cell type {other}"
                 )));
@@ -1996,12 +1975,6 @@ fn read_f64_le(data: &[u8]) -> Result<FiniteF64> {
     })
 }
 
-fn read_finite_decimal128_le(data: &[u8]) -> Result<FiniteF64> {
-    FiniteF64::new(read_decimal128_le(data)?).map_err(|_| {
-        Error::ParseError("Numbers decimal128 field must contain a finite value".to_string())
-    })
-}
-
 fn finite_zero() -> Result<FiniteF64> {
     FiniteF64::new(0.0).map_err(|_| {
         Error::InvalidFormat("Numbers zero scalar is unexpectedly non-finite".to_string())
@@ -2386,6 +2359,67 @@ mod tests {
         };
         let value = TableDataExtractor::parse_cell_storage(&data, &tables, 0, 0).unwrap();
         assert_eq!(value.value.as_text(), "hello");
+    }
+
+    #[test]
+    fn type_nine_bnc_numeric_cell_uses_union_semantics() {
+        let mut data = vec![5, 9, 0, 0, 0, 0, 0, 0];
+        data.extend_from_slice(&1_u32.to_le_bytes());
+        data.extend_from_slice(&decimal128_le(-1_234.5).unwrap());
+
+        let strings: StringTable = Box::default();
+        let formulas: FormulaTable = Box::default();
+        let errors: FormulaErrorTable = Box::default();
+        let rich_text: StringTable = Box::default();
+        let comments: CommentTable = Box::default();
+        let formula_references = FormulaReferenceMaps::default();
+        let tables = CellTables {
+            strings: &strings,
+            formulas: &formulas,
+            formula_errors: &errors,
+            rich_text: &rich_text,
+            comments: &comments,
+            formula_references: &formula_references,
+        };
+
+        let parsed = TableDataExtractor::parse_cell_storage(&data, &tables, 2, 3).unwrap();
+        let CellValue::Number(value) = parsed.value else {
+            panic!("type-nine decimal was not extracted as a number");
+        };
+        assert_eq!(value.get(), -1_234.5);
+    }
+
+    #[test]
+    fn type_nine_bnc_cell_prefers_rich_text_then_plain_text_over_numeric_cache() {
+        let strings: StringTable = compact_table([(7, "plain".to_owned())]).unwrap();
+        let formulas: FormulaTable = Box::default();
+        let errors: FormulaErrorTable = Box::default();
+        let rich_text: StringTable = compact_table([(8, "rich".to_owned())]).unwrap();
+        let comments: CommentTable = Box::default();
+        let formula_references = FormulaReferenceMaps::default();
+        let tables = CellTables {
+            strings: &strings,
+            formulas: &formulas,
+            formula_errors: &errors,
+            rich_text: &rich_text,
+            comments: &comments,
+            formula_references: &formula_references,
+        };
+
+        let mut plain = vec![5, 9, 0, 0, 0, 0, 0, 0];
+        plain.extend_from_slice(&(0x000001_u32 | 0x000008).to_le_bytes());
+        plain.extend_from_slice(&decimal128_le(42.0).unwrap());
+        plain.extend_from_slice(&7_u32.to_le_bytes());
+        let parsed = TableDataExtractor::parse_cell_storage(&plain, &tables, 0, 0).unwrap();
+        assert_eq!(parsed.value, CellValue::Text("plain".to_owned()));
+
+        let mut rich = vec![5, 9, 0, 0, 0, 0, 0, 0];
+        rich.extend_from_slice(&(0x000001_u32 | 0x000008 | 0x000010).to_le_bytes());
+        rich.extend_from_slice(&decimal128_le(42.0).unwrap());
+        rich.extend_from_slice(&7_u32.to_le_bytes());
+        rich.extend_from_slice(&8_u32.to_le_bytes());
+        let parsed = TableDataExtractor::parse_cell_storage(&rich, &tables, 0, 0).unwrap();
+        assert_eq!(parsed.value, CellValue::Text("rich".to_owned()));
     }
 
     #[test]

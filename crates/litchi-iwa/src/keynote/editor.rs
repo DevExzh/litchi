@@ -4068,64 +4068,6 @@ impl KeynoteEditor {
         Ok(())
     }
 
-    pub fn set_slide_skipped(&mut self, slide_index: usize, skipped: bool) -> Result<()> {
-        let slides = self.slides()?;
-        let slide = slides.get(slide_index).ok_or_else(|| {
-            Error::ParseError(format!(
-                "Keynote slide index {slide_index} is out of range for {} slides",
-                slides.len()
-            ))
-        })?;
-        let node_id = slide.node_id;
-        let graph = ObjectGraph::read(self.text.package())?;
-        let archive_name = graph.archive_name(node_id)?.to_owned();
-        let mut staged = self.text.package().clone();
-        staged.update_archive(&archive_name, |archive| {
-            let object = archive.object_mut(node_id).ok_or_else(|| {
-                Error::InvalidFormat(format!("Keynote slide node {node_id} is missing"))
-            })?;
-            let message_index = object
-                .messages
-                .iter()
-                .position(|message| kn::SlideNodeArchive::decode(message.data.as_slice()).is_ok())
-                .ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Keynote slide node {node_id} has no SlideNodeArchive payload"
-                    ))
-                })?;
-            let message_type = object.messages[message_index].type_;
-            let original = object.messages[message_index].data.as_slice();
-            let data = patch_varint_field(original, 4, true, Some(u64::from(skipped)))?;
-            let node = kn::SlideNodeArchive::decode(data.as_slice())?;
-            if node.is_skipped != skipped {
-                return Err(Error::InvalidFormat(
-                    "Keynote slide skip-state wire patch failed validation".to_owned(),
-                ));
-            }
-            object.replace_message(
-                message_index,
-                RawMessage {
-                    type_: message_type,
-                    data,
-                },
-            )?;
-            Ok(())
-        })?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        if verified
-            .slides()?
-            .get(slide_index)
-            .map(|slide| slide.is_skipped)
-            != Some(skipped)
-        {
-            return Err(Error::InvalidFormat(
-                "Keynote slide skip-state update failed validation".to_owned(),
-            ));
-        }
-        self.text = IWorkTextEditor::from_package(staged);
-        Ok(())
-    }
-
     /// List semantic object builds and their timing chunks for one slide.
     #[allow(deprecated)]
     pub fn slide_builds(&self, slide_index: usize) -> Result<Vec<KeynoteBuildInfo>> {

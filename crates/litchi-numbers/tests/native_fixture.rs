@@ -1,9 +1,16 @@
 use std::path::PathBuf;
 
-use litchi_numbers::{Package, cell::Value, compatibility_tables_from_bytes};
+use litchi_numbers::{Package, PackageError, cell::Value, compatibility_tables_from_bytes};
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/numbers/basic.numbers")
+}
+
+fn iwork_fixture(application: &str, filename: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork")
+        .join(application)
+        .join(filename)
 }
 
 fn assert_expected_cells(package: &Package) -> Result<(), Box<dyn std::error::Error>> {
@@ -54,5 +61,24 @@ fn native_numbers_fixture_opens_from_path_and_bytes() -> Result<(), Box<dyn std:
         package.document().sheet_count()
     );
     assert_eq!(from_bytes.object_count(), package.object_count());
+    Ok(())
+}
+
+#[test]
+fn native_foreign_iwork_fixtures_are_typed_not_numbers() -> Result<(), Box<dyn std::error::Error>> {
+    for path in [
+        iwork_fixture("pages", "basic.pages"),
+        iwork_fixture("keynote", "basic.key"),
+    ] {
+        let bytes = std::fs::read(&path)?;
+        assert!(matches!(
+            Package::from_bytes(&bytes),
+            Err(PackageError::NotNumbers)
+        ));
+        assert!(matches!(
+            compatibility_tables_from_bytes(&bytes),
+            Err(PackageError::NotNumbers)
+        ));
+    }
     Ok(())
 }

@@ -18,8 +18,10 @@ on:
       - 'docs/OFFICE_API_GUIDE.md'
       - 'docs/adr/**'
       - 'tools/check_crate_boundaries.py'
+      - 'tools/check_numbers_public_dependencies.py'
       - 'tools/crate_boundaries.json'
       - 'tools/test_check_crate_boundaries.py'
+      - 'tools/test_check_numbers_public_dependencies.py'
     branches:
       - main
   pull_request:
@@ -39,8 +41,10 @@ on:
       - 'docs/OFFICE_API_GUIDE.md'
       - 'docs/adr/**'
       - 'tools/check_crate_boundaries.py'
+      - 'tools/check_numbers_public_dependencies.py'
       - 'tools/crate_boundaries.json'
       - 'tools/test_check_crate_boundaries.py'
+      - 'tools/test_check_numbers_public_dependencies.py'
     branches:
       - main
 
@@ -68,6 +72,12 @@ jobs:
 
       - name: Check dependency direction
         run: python3 tools/check_crate_boundaries.py
+
+      - name: Test Numbers public-dependency gate
+        run: python3 -m unittest tools/test_check_numbers_public_dependencies.py
+
+      - name: Check Numbers public dependencies
+        run: python3 tools/check_numbers_public_dependencies.py
 
   portable-foundations:
     name: foundation tests (${{ matrix.os }})

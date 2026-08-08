@@ -8034,6 +8034,28 @@ fn focused_structured_projection_preserves_detached_table_compatibility() {
 }
 
 #[test]
+fn focused_structured_projection_matches_legacy_type_nine_numeric_cells() {
+    let bytes = test_package_with_type_nine_numeric_cell()
+        .to_bytes()
+        .unwrap();
+
+    let focused_tables = litchi_numbers::Package::from_bytes(&bytes)
+        .unwrap()
+        .extract_structured_tables()
+        .unwrap();
+    let legacy = crate::Document::from_bytes(&bytes)
+        .unwrap()
+        .extract_structured_data()
+        .unwrap();
+
+    assert_eq!(focused_tables.as_slice(), legacy.tables());
+    assert_eq!(
+        focused_tables[0].get_a1("B1").unwrap(),
+        Some(&cell_number(-1_234.5))
+    );
+}
+
+#[test]
 #[allow(
     deprecated,
     reason = "parity fixture exercises the migration-host table builder"
@@ -8571,6 +8593,32 @@ fn test_package_with_formula_error() -> IWorkPackage {
                 0, 8, 0, 0, // formula-error identifier flag
                 7, 0, 0, 0,
             ]);
+            rebuild_row(&mut tile.row_infos[0], &cells)?;
+            tile_object.replace_message(
+                0,
+                RawMessage {
+                    type_: tile_type,
+                    data: tile.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    package
+}
+
+fn test_package_with_type_nine_numeric_cell() -> IWorkPackage {
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let tile_object = archive.object_mut(30).unwrap();
+            let tile_type = tile_object.messages[0].type_;
+            let mut tile = Tile::decode(tile_object.messages[0].data.as_slice())?;
+            let mut cells = split_row(&tile.row_infos[0])?;
+            let mut numeric = vec![5, 9, 0, 0, 0, 0, 0, 0];
+            numeric.extend_from_slice(&1_u32.to_le_bytes());
+            numeric.extend_from_slice(&crate::numbers::bnc::decimal128_le(-1_234.5)?);
+            cells[1] = Some(numeric);
             rebuild_row(&mut tile.row_infos[0], &cells)?;
             tile_object.replace_message(
                 0,

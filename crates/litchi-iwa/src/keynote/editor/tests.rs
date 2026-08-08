@@ -3142,15 +3142,8 @@ fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
 }
 
 #[test]
-fn show_settings_and_skip_state_are_transactional() {
+fn show_settings_and_transitions_are_transactional() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    assert!(!editor.slides().unwrap()[0].is_skipped);
-    editor.set_slide_skipped(0, true).unwrap();
-    assert!(editor.slides().unwrap()[0].is_skipped);
-    let before = editor.to_bytes().unwrap();
-    assert!(editor.set_slide_skipped(2, true).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
-
     let mut settings = editor.show_settings().unwrap();
     settings.set_size(Size::new(1_920.0, 1_080.0).unwrap());
     settings.set_slide_numbers_visible(Some(true));
@@ -3195,7 +3188,6 @@ fn show_settings_and_skip_state_are_transactional() {
     );
 
     let reparsed = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert!(reparsed.slides().unwrap()[0].is_skipped);
     assert_eq!(reparsed.show_settings().unwrap(), settings);
     assert_eq!(
         reparsed.slides().unwrap()[0].transition.as_ref(),
@@ -4267,8 +4259,6 @@ fn scalar_updates_preserve_unknown_wire_and_restore_exact_components() {
     editor.set_show_settings(changed_show).unwrap();
     editor.set_show_settings(original_show).unwrap();
 
-    editor.set_slide_skipped(0, true).unwrap();
-    editor.set_slide_skipped(0, false).unwrap();
     let mut changed_transition = original_transition.clone();
     changed_transition
         .set_animation_type(Some("Transition"))
