@@ -14,6 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed={PROTO_DIRECTORY}");
     println!("cargo:rerun-if-changed={BUFFA_PROJECTION_DIRECTORY}");
     println!("cargo:rerun-if-changed=src/group_node_category_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
 
     let mut proto_files = fs::read_dir(proto_directory)?
         .map(|directory_entry| directory_entry.map(|entry| entry.path()))
@@ -30,6 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     enforce_text_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_group_node_category_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_document_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_keynote_show_projection_provenance(proto_directory, buffa_projection_directory)?;
 
     prost_build::Config::new()
         .include_file("iwa_protos.rs")
@@ -117,6 +119,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_keynote_document_projection_budget(&buffa_keynote_document_out_directory)?;
+
+    // Keynote's show reader projects only scalar settings, required direct
+    // references, and presentation size. The repeated slide tree is routed by
+    // a bounded handwritten iterator so generated code never owns an
+    // input-width reference vector.
+    let buffa_keynote_show_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-show");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("KNShowArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_show_out_directory)
+        .include_file("iwa_keynote_show_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_show_projection_budget(&buffa_keynote_show_out_directory)?;
 
     Ok(())
 }
@@ -235,6 +258,77 @@ fn enforce_keynote_document_projection_provenance(
     Ok(())
 }
 
+fn enforce_keynote_show_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const TSP_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const TSP_SIZE: &str =
+        "message Size {\n  required float width = 1;\n  required float height = 2;\n}";
+    const KN_SLIDE_TREE: &str = "message SlideTreeArchive {\n  optional .TSP.Reference rootSlideNode = 1 [deprecated = true];\n  repeated .TSP.Reference slides = 2;\n}";
+    const KN_SHOW: &str = "message ShowArchive {\n  enum KNShowMode {\n    kKNShowModeNormal = 0;\n    kKNShowModeAutoPlay = 1;\n    kKNShowModeHyperlinksOnly = 2;\n  }\n  optional .TSP.Reference uiState = 1;\n  required .TSP.Reference theme = 2;\n  required .KN.SlideTreeArchive slideTree = 3;\n  required .TSP.Size size = 4;\n  required .TSP.Reference stylesheet = 5;\n  optional bool slideNumbersVisible = 6;\n  optional .TSP.Reference recording = 7;\n  optional bool loop_presentation = 8;\n  optional .KN.ShowArchive.KNShowMode mode = 9 [default = kKNShowModeNormal];\n  optional double autoplay_transition_delay = 10 [default = 5];\n  optional double autoplay_build_delay = 11 [default = 2];\n  optional bool idle_timer_active = 15;\n  optional double idle_timer_delay = 16 [default = 900];\n  optional .TSP.Reference soundtrack = 17;\n  optional bool automatically_plays_upon_open = 18;\n  optional .TSP.Reference slideList = 19;\n}";
+    const PROJECTION_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const PROJECTION_SIZE: &str =
+        "message Size {\n  required float width = 1;\n  required float height = 2;\n}";
+    const PROJECTION_SHOW: &str = "message KeynoteShowArchive {\n  optional .LitchiIwaProjection.Reference ui_state = 1;\n  required .LitchiIwaProjection.Reference theme = 2;\n  required .LitchiIwaProjection.Size size = 4;\n  required .LitchiIwaProjection.Reference stylesheet = 5;\n  optional bool slide_numbers_visible = 6;\n  optional .LitchiIwaProjection.Reference recording = 7;\n  optional bool loop_presentation = 8;\n  optional int32 mode = 9 [default = 0];\n  optional double autoplay_transition_delay = 10 [default = 5];\n  optional double autoplay_build_delay = 11 [default = 2];\n  optional bool idle_timer_active = 15;\n  optional double idle_timer_delay = 16 [default = 900];\n  optional .LitchiIwaProjection.Reference soundtrack = 17;\n  optional bool automatically_plays_upon_open = 18;\n  optional .LitchiIwaProjection.Reference slide_list = 19;\n}";
+    const ROUTER_DECLARATIONS: [&str; 23] = [
+        "const SHOW_UI_STATE_FIELD: u32 = 1;",
+        "const SHOW_THEME_FIELD: u32 = 2;",
+        "const SHOW_SLIDE_TREE_FIELD: u32 = 3;",
+        "const SHOW_SIZE_FIELD: u32 = 4;",
+        "const SHOW_STYLESHEET_FIELD: u32 = 5;",
+        "const SHOW_SLIDE_NUMBERS_VISIBLE_FIELD: u32 = 6;",
+        "const SHOW_RECORDING_FIELD: u32 = 7;",
+        "const SHOW_LOOP_PRESENTATION_FIELD: u32 = 8;",
+        "const SHOW_MODE_FIELD: u32 = 9;",
+        "const SHOW_AUTOPLAY_TRANSITION_DELAY_FIELD: u32 = 10;",
+        "const SHOW_AUTOPLAY_BUILD_DELAY_FIELD: u32 = 11;",
+        "const SHOW_IDLE_TIMER_ACTIVE_FIELD: u32 = 15;",
+        "const SHOW_IDLE_TIMER_DELAY_FIELD: u32 = 16;",
+        "const SHOW_SOUNDTRACK_FIELD: u32 = 17;",
+        "const SHOW_AUTOMATICALLY_PLAYS_UPON_OPEN_FIELD: u32 = 18;",
+        "const SHOW_SLIDE_LIST_FIELD: u32 = 19;",
+        "const SLIDE_TREE_ROOT_FIELD: u32 = 1;",
+        "const SLIDE_TREE_SLIDES_FIELD: u32 = 2;",
+        "const REFERENCE_IDENTIFIER_FIELD: u32 = 1;",
+        "const REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;",
+        "const REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;",
+        "const SIZE_WIDTH_FIELD: u32 = 1;",
+        "const SIZE_HEIGHT_FIELD: u32 = 2;",
+    ];
+
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let keynote = fs::read_to_string(proto_directory.join("KNArchives.proto"))?;
+    let projection = fs::read_to_string(projection_directory.join("KNShowArchive.proto"))?;
+    let router = fs::read_to_string("src/keynote_show_codec.rs")?;
+    let production_router = router
+        .split_once("#[cfg(test)]")
+        .map_or(router.as_str(), |(production, _tests)| production);
+    if tsp.matches(TSP_REFERENCE).count() != 1
+        || tsp.matches(TSP_SIZE).count() != 1
+        || keynote.matches(KN_SLIDE_TREE).count() != 1
+        || keynote.matches(KN_SHOW).count() != 1
+        || projection.matches(PROJECTION_REFERENCE).count() != 1
+        || projection.matches(PROJECTION_SIZE).count() != 1
+        || projection.matches(PROJECTION_SHOW).count() != 1
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| router.matches(declaration).count() == 1)
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || production_router.contains("to_owned_message")
+        || production_router.contains("encode_to_vec")
+        || production_router.contains("try_encode")
+        || production_router.contains(".encode(")
+    {
+        return Err(
+            "derived Keynote show projection/router drifted from canonical fields, exceeded its 2 KiB source budget, introduced generated repeated storage, or added production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 fn enforce_text_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
     const EXPECTED_FILES: usize = 5;
     const MAX_GENERATED_BYTES: u64 = 32 * 1024;
@@ -313,6 +407,45 @@ fn enforce_keynote_document_projection_budget(directory: &Path) -> Result<(), Bo
     if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES {
         return Err(format!(
             "Keynote document projection generated {files} files/{bytes} bytes; expected {EXPECTED_FILES} files and at most {MAX_GENERATED_BYTES} bytes"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_keynote_show_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    // The current Buffa 0.9.1 output is 138,661 bytes. Keep only a small
+    // formatter/codegen patch allowance so an accidental schema expansion
+    // fails at build time.
+    const MAX_GENERATED_BYTES: u64 = 140 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut generated_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        generated_repeated_views = generated_repeated_views
+            .checked_add(
+                fs::read_to_string(entry.path())?
+                    .matches("LazyRepeatedView")
+                    .count(),
+            )
+            .ok_or("generated repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || generated_repeated_views != 0 {
+        return Err(format!(
+            "Keynote show projection generated {files} files/{bytes} bytes/{generated_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

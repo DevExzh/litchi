@@ -817,3 +817,30 @@ implementable and contains no package-lineage hook. Source binding and parser
 hydration are crate-private companion infrastructure for Litchi's built-in
 shape variants; third-party implementations are not required or permitted to
 model package provenance through the semantic trait.
+
+## 2026-08-08 amendment: Keynote slide-order semantics
+
+Presentation order is a semantic property of a Keynote show, not a public
+`SlideTree` or list of native references. Callers use
+`Package::edit_slide_order()` and `SlideOrderEdit::move_slide`; the source is a
+`SlideSelector` by exact navigator name or checked position, and the
+destination is a typed `Position`. The destination denotes the moved slide's
+final zero-based position in the base list. It is valid only when it is less
+than the current slide count; moving to the current source position is a
+byte-exact no-op rather than an error.
+
+Resolution never falls back from navigator name to visible title text, never
+publishes a node/object identifier, and never asks the caller for a component
+or package member. A successful move preserves the number and identity of
+slides and all attached semantic content. Internally, the transaction reorders
+complete raw slide-reference field records in the one validated show envelope,
+including each encoded key, encoded length, and nested reference payload.
+Unknown and deprecated reference scalars remain attached, and all other show
+fields and slide components remain untouched. The package is fully reopened and
+the requested order is read back before the new immutable snapshot is
+published.
+
+This capability authorizes ordering only. It does not imply slide insertion,
+duplication, deletion, navigator-name mutation, layout reassignment, or an
+ordinary public raw-reference collection. Those operations retain their own
+dependency-closure and native-application acceptance gates.

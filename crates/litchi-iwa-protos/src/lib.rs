@@ -183,6 +183,47 @@ mod buffa_keynote_document_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for Keynote show settings.
+///
+/// The repeated slide tree is deliberately absent from generated code. A
+/// bounded handwritten router streams its references directly from the
+/// caller-owned payload, while this projection validates direct references,
+/// size, and scalar show settings.
+#[doc(hidden)]
+mod buffa_keynote_show_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "buffa-build output is generated from the derived wire projection."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-keynote-show/iwa_keynote_show_buffa_protos.rs"
+    ));
+}
+
 /// Internal archive-header codec implemented by the private Buffa sidecar.
 ///
 /// This module intentionally exchanges only the existing Prost compatibility
@@ -206,6 +247,11 @@ pub mod group_node_category_codec;
 /// Buffa sidecar. Generated types remain inaccessible to downstream crates.
 #[doc(hidden)]
 pub mod keynote_document_codec;
+
+/// Internal Keynote show projection and bounded streaming slide-tree codec.
+/// Generated types remain inaccessible to downstream crates.
+#[doc(hidden)]
+pub mod keynote_show_codec;
 
 pub use generated::{
     kn, knsos, tn, tnsos, tp, tpsos, tsa, tsasos, tsce, tsch, tschsos, tsck, tscksos, tsd, tsdsos,

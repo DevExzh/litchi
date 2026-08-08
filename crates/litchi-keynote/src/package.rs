@@ -6,6 +6,7 @@
 
 mod edit;
 mod limits;
+mod slide_order;
 
 use std::fmt;
 use std::fs::File;
@@ -18,13 +19,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use litchi_iwa_archive::{ComponentCatalog, Limits as ArchiveLimits, SourceCatalog};
 use litchi_iwa_common::{
     WireLimits,
-    wire::{WireDescent, WireFieldView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree_with_limits},
 };
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_detect::Format;
 #[cfg(feature = "internal-iwork-source")]
 use litchi_iwa_detect::PreparedSource;
-use litchi_iwa_protos::{keynote_document_codec, kn, tswp};
+use litchi_iwa_protos::{keynote_document_codec, keynote_show_codec, kn, tswp};
 use litchi_iwa_text::storage::Storage;
 use litchi_iwa_text_wire::{
     DEFAULT_MAX_FIELDS as DEFAULT_MAX_TEXT_FIELDS,
@@ -43,6 +44,10 @@ pub use edit::{Commit, Diagnostics, Edit, EditError, Patch};
 pub use limits::{
     MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES,
     ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError,
+};
+pub use slide_order::{
+    SlideOrderCommit, SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind,
+    SlideOrderPatch,
 };
 
 /// Checked physical resource limits for Keynote package ingress.
@@ -728,13 +733,17 @@ impl Package {
         let payload = unique_payload(&show_object.messages, &[SHOW_MESSAGE_TYPE], "Keynote show")?;
         let preflight_slide_count =
             preflight_show(payload, self.semantic_wire_limits()?, &mut budget)?;
-        let show: kn::ShowArchive = decode_message(payload, "Keynote show")?;
-        if show.slide_tree.slides.len() != preflight_slide_count {
+        let show = decode_show_snapshot(
+            payload,
+            self.semantic_limits().max_slides(),
+            self.semantic_wire_limits()?,
+        )?;
+        if show.slide_node_identifiers().len() != preflight_slide_count {
             return Err(ReadError::Decode(
                 "Keynote show slide count disagrees with wire preflight".to_owned(),
             ));
         }
-        let records = self.slide_records(&show, &mut budget)?;
+        let records = self.slide_records(show.slide_node_identifiers(), &mut budget)?;
         builder
             .try_reserve_slides(records.len())
             .map_err(|_error| ReadError::Allocation {
@@ -757,10 +766,10 @@ impl Package {
 
     fn slide_records(
         &self,
-        show: &kn::ShowArchive,
+        node_identifiers: &[u64],
         budget: &mut SemanticBudget,
     ) -> ReadResult<Vec<SlideRecord>> {
-        let slide_count = show.slide_tree.slides.len();
+        let slide_count = node_identifiers.len();
         let maximum = self.semantic_limits().max_slides();
         if slide_count > maximum {
             return Err(ReadError::SemanticLimit {
@@ -778,8 +787,8 @@ impl Package {
                 amount: slide_count,
             })?;
         let wire_limits = self.semantic_wire_limits()?;
-        for (index, reference) in show.slide_tree.slides.iter().enumerate() {
-            let node_object = self.required_object(reference.identifier, "Keynote slide node")?;
+        for (index, &node_identifier) in node_identifiers.iter().enumerate() {
+            let node_object = self.required_object(node_identifier, "Keynote slide node")?;
             let node_payload = unique_payload(
                 &node_object.messages,
                 &[SLIDE_NODE_MESSAGE_TYPE],
@@ -807,7 +816,7 @@ impl Package {
             })?;
             budget.charge_references(1, SemanticPath::Slide { index })?;
             records.push(SlideRecord {
-                node_identifier: reference.identifier,
+                node_identifier,
                 slide_identifier: slide.identifier,
                 is_skipped,
             });
@@ -826,14 +835,22 @@ impl Package {
         let payload = unique_payload(&show_object.messages, &[SHOW_MESSAGE_TYPE], "Keynote show")?;
         let mut budget = SemanticBudget::new(self.semantic_limits());
         budget.charge_references(1, SemanticPath::Show)?;
-        let slide_count = preflight_show(payload, self.semantic_wire_limits()?, &mut budget)?;
-        let show: kn::ShowArchive = decode_message(payload, "Keynote show")?;
-        if show.slide_tree.slides.len() != slide_count {
+        let preflight_slide_count =
+            preflight_show(payload, self.semantic_wire_limits()?, &mut budget)?;
+        let show = decode_show_snapshot(
+            payload,
+            self.semantic_limits().max_slides(),
+            self.semantic_wire_limits()?,
+        )?;
+        if show.slide_node_identifiers().len() != preflight_slide_count {
             return Err(ReadError::Decode(
                 "Keynote show slide count disagrees with wire preflight".to_owned(),
             ));
         }
-        Ok(self.slide_records(&show, &mut budget)?.get(index).copied())
+        Ok(self
+            .slide_records(show.slide_node_identifiers(), &mut budget)?
+            .get(index)
+            .copied())
     }
 
     fn parse_slide(
@@ -1417,53 +1434,221 @@ fn decode_root_show_identifier(payload: &[u8], wire_limits: WireLimits) -> ReadR
     })
 }
 
+fn decode_show_snapshot(
+    payload: &[u8],
+    max_slide_references: usize,
+    wire_limits: WireLimits,
+) -> ReadResult<keynote_show_codec::ShowSnapshot> {
+    let recursion_limit = u32::try_from(wire_limits.max_nesting()).map_err(|_error| {
+        ReadError::InvalidFormat("Keynote show nesting limit does not fit u32".to_owned())
+    })?;
+    keynote_show_codec::decode_show(
+        payload,
+        keynote_show_codec::DecodeOptions::new(
+            payload.len(),
+            max_slide_references,
+            recursion_limit,
+        ),
+    )
+    .map_err(|error| {
+        if let Some((observed, maximum)) = error.slide_reference_limit_values() {
+            ReadError::SemanticLimit {
+                kind: SemanticLimitKind::Slides,
+                observed,
+                maximum,
+                path: SemanticPath::Show,
+            }
+        } else if let Some(amount) = error.allocation_amount() {
+            ReadError::Allocation {
+                resource: "Keynote show slide references",
+                amount,
+            }
+        } else {
+            ReadError::InvalidFormat(format!("Keynote show projection is malformed: {error}"))
+        }
+    })
+}
+
 fn preflight_show(
     payload: &[u8],
     wire_limits: WireLimits,
     budget: &mut SemanticBudget,
 ) -> ReadResult<usize> {
+    const UI_STATE_FIELD: u32 = 1;
+    const THEME_FIELD: u32 = 2;
+    const SLIDE_TREE_FIELD: u32 = 3;
+    const SIZE_FIELD: u32 = 4;
+    const STYLESHEET_FIELD: u32 = 5;
+    const SLIDE_NUMBERS_FIELD: u32 = 6;
+    const RECORDING_FIELD: u32 = 7;
+    const LOOP_FIELD: u32 = 8;
+    const MODE_FIELD: u32 = 9;
+    const TRANSITION_DELAY_FIELD: u32 = 10;
+    const BUILD_DELAY_FIELD: u32 = 11;
+    const IDLE_ACTIVE_FIELD: u32 = 15;
+    const IDLE_DELAY_FIELD: u32 = 16;
+    const SOUNDTRACK_FIELD: u32 = 17;
+    const PLAY_ON_OPEN_FIELD: u32 = 18;
+    const SLIDE_LIST_FIELD: u32 = 19;
+
+    let mut ui_state_fields = 0usize;
     let mut theme_fields = 0usize;
     let mut slide_tree_fields = 0usize;
     let mut size_fields = 0usize;
     let mut stylesheet_fields = 0usize;
+    let mut recording_fields = 0usize;
+    let mut soundtrack_fields = 0usize;
+    let mut slide_list_fields = 0usize;
+    let mut slide_number_fields = 0usize;
+    let mut loop_fields = 0usize;
+    let mut mode_fields = 0usize;
+    let mut transition_delay_fields = 0usize;
+    let mut build_delay_fields = 0usize;
+    let mut idle_active_fields = 0usize;
+    let mut idle_delay_fields = 0usize;
+    let mut play_on_open_fields = 0usize;
+    let mut root_slide_node_fields = 0usize;
     let mut slides = 0usize;
     let maximum = budget.limits.max_slides();
     let result = preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
         let field = visit.field();
         match (visit.path(), field.number()) {
-            ([], 2) => {
-                require_unique_length_delimited(field, &mut theme_fields, "Keynote show theme")?;
-                Ok(WireDescent::Skip)
+            ([], UI_STATE_FIELD) => {
+                validate_unique_reference(
+                    field,
+                    &mut ui_state_fields,
+                    wire_limits,
+                    "Keynote show UI state",
+                )?;
+                Ok(WireDescent::Descend)
             },
-            ([], 3) => {
-                require_unique_length_delimited(
+            ([], THEME_FIELD) => {
+                validate_unique_reference(
+                    field,
+                    &mut theme_fields,
+                    wire_limits,
+                    "Keynote show theme",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([], SLIDE_TREE_FIELD) => {
+                require_unique_canonical_length_delimited(
                     field,
                     &mut slide_tree_fields,
                     "Keynote show slide tree",
                 )?;
                 Ok(WireDescent::Descend)
             },
-            ([], 4) => {
-                require_unique_length_delimited(field, &mut size_fields, "Keynote show size")?;
-                Ok(WireDescent::Skip)
+            ([], SIZE_FIELD) => {
+                require_unique_canonical_length_delimited(
+                    field,
+                    &mut size_fields,
+                    "Keynote show size",
+                )?;
+                validate_size(field.payload(), wire_limits)?;
+                Ok(WireDescent::Descend)
             },
-            ([], 5) => {
-                require_unique_length_delimited(
+            ([], STYLESHEET_FIELD) => {
+                validate_unique_reference(
                     field,
                     &mut stylesheet_fields,
+                    wire_limits,
                     "Keynote show stylesheet",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([], RECORDING_FIELD) => {
+                validate_unique_reference(
+                    field,
+                    &mut recording_fields,
+                    wire_limits,
+                    "Keynote show recording",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([], SOUNDTRACK_FIELD) => {
+                validate_unique_reference(
+                    field,
+                    &mut soundtrack_fields,
+                    wire_limits,
+                    "Keynote show soundtrack",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([], SLIDE_LIST_FIELD) => {
+                validate_unique_reference(
+                    field,
+                    &mut slide_list_fields,
+                    wire_limits,
+                    "Keynote show slide list",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([], SLIDE_NUMBERS_FIELD) => {
+                require_unique_bool(field, &mut slide_number_fields, "Keynote slide numbers")?;
+                Ok(WireDescent::Skip)
+            },
+            ([], LOOP_FIELD) => {
+                require_unique_bool(field, &mut loop_fields, "Keynote show loop state")?;
+                Ok(WireDescent::Skip)
+            },
+            ([], MODE_FIELD) => {
+                require_unique_canonical_int32(field, &mut mode_fields, "Keynote show mode")?;
+                Ok(WireDescent::Skip)
+            },
+            ([], TRANSITION_DELAY_FIELD) => {
+                require_unique_fixed64(
+                    field,
+                    &mut transition_delay_fields,
+                    "Keynote autoplay transition delay",
                 )?;
                 Ok(WireDescent::Skip)
             },
-            ([3], 2) => {
-                require_length_delimited(field, "Keynote show slide reference")?;
+            ([], BUILD_DELAY_FIELD) => {
+                require_unique_fixed64(
+                    field,
+                    &mut build_delay_fields,
+                    "Keynote autoplay build delay",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            ([], IDLE_ACTIVE_FIELD) => {
+                require_unique_bool(field, &mut idle_active_fields, "Keynote idle timer state")?;
+                Ok(WireDescent::Skip)
+            },
+            ([], IDLE_DELAY_FIELD) => {
+                require_unique_fixed64(field, &mut idle_delay_fields, "Keynote idle timer delay")?;
+                Ok(WireDescent::Skip)
+            },
+            ([], PLAY_ON_OPEN_FIELD) => {
+                require_unique_bool(
+                    field,
+                    &mut play_on_open_fields,
+                    "Keynote play-on-open state",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            ([SLIDE_TREE_FIELD], 1) => {
+                validate_unique_reference(
+                    field,
+                    &mut root_slide_node_fields,
+                    wire_limits,
+                    "Keynote root slide node",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([SLIDE_TREE_FIELD], 2) => {
+                require_canonical_length_delimited(field, "Keynote show slide reference")?;
                 increment_wire_count(&mut slides, "Keynote show slides")?;
                 if slides > maximum {
                     return Err(litchi_iwa_common::Error::InvalidFormat(
                         "Keynote semantic slide limit reached during preflight".to_owned(),
                     ));
                 }
-                Ok(WireDescent::Skip)
+                // The Buffa projection validates the reference and owns the
+                // sole slide-order buffer. Still descend so aggregate wire
+                // bytes, fields, nesting, and work include every reference.
+                Ok(WireDescent::Descend)
             },
             _ => Ok(WireDescent::Skip),
         }
@@ -1484,6 +1669,68 @@ fn preflight_show(
     }
     budget.charge_references(slides, SemanticPath::Show)?;
     Ok(slides)
+}
+
+fn validate_unique_reference(
+    field: WireFieldView<'_>,
+    count: &mut usize,
+    limits: WireLimits,
+    context: &'static str,
+) -> litchi_iwa_common::Result<()> {
+    require_unique_canonical_length_delimited(field, count, context)?;
+    validate_reference_payload(field.payload(), limits, context).map(|_identifier| ())
+}
+
+fn validate_reference_payload(
+    payload: &[u8],
+    limits: WireLimits,
+    context: &'static str,
+) -> litchi_iwa_common::Result<u64> {
+    let view = WireView::parse_with_limits(payload, limits)?;
+    let mut identifier_fields = 0usize;
+    let mut deprecated_type_fields = 0usize;
+    let mut deprecated_external_fields = 0usize;
+    let mut identifier = None;
+    for field in view.fields() {
+        match field.number() {
+            1 => {
+                identifier = Some(require_unique_uint64(
+                    field,
+                    &mut identifier_fields,
+                    context,
+                )?);
+            },
+            2 => {
+                require_unique_canonical_int32(field, &mut deprecated_type_fields, context)?;
+            },
+            3 => {
+                require_unique_bool(field, &mut deprecated_external_fields, context)?;
+            },
+            _ => {},
+        }
+    }
+    identifier.ok_or_else(|| {
+        litchi_iwa_common::Error::InvalidFormat(format!("{context} has no required identifier"))
+    })
+}
+
+fn validate_size(payload: &[u8], limits: WireLimits) -> litchi_iwa_common::Result<()> {
+    let view = WireView::parse_with_limits(payload, limits)?;
+    let mut width_fields = 0usize;
+    let mut height_fields = 0usize;
+    for field in view.fields() {
+        match field.number() {
+            1 => require_unique_fixed32(field, &mut width_fields, "Keynote show width")?,
+            2 => require_unique_fixed32(field, &mut height_fields, "Keynote show height")?,
+            _ => {},
+        }
+    }
+    if width_fields != 1 || height_fields != 1 {
+        return Err(litchi_iwa_common::Error::InvalidFormat(
+            "Keynote show size is missing a unique dimension".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 fn preflight_slide(
@@ -1743,6 +1990,14 @@ fn require_length_delimited(
     Ok(())
 }
 
+fn require_canonical_length_delimited(
+    field: WireFieldView<'_>,
+    context: &'static str,
+) -> litchi_iwa_common::Result<()> {
+    require_length_delimited(field, context)?;
+    field.validate_canonical_framing()
+}
+
 fn increment_wire_count(count: &mut usize, context: &'static str) -> litchi_iwa_common::Result<()> {
     *count = count.checked_add(1).ok_or_else(|| {
         litchi_iwa_common::Error::InvalidFormat(format!("{context} overflowed usize"))
@@ -1760,6 +2015,93 @@ fn require_unique_length_delimited(
     if *count > 1 {
         return Err(litchi_iwa_common::Error::InvalidFormat(format!(
             "{context} is duplicated"
+        )));
+    }
+    Ok(())
+}
+
+fn require_unique_canonical_length_delimited(
+    field: WireFieldView<'_>,
+    count: &mut usize,
+    context: &'static str,
+) -> litchi_iwa_common::Result<()> {
+    require_canonical_length_delimited(field, context)?;
+    increment_wire_count(count, context)?;
+    if *count > 1 {
+        return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+            "{context} is duplicated"
+        )));
+    }
+    Ok(())
+}
+
+fn require_unique_canonical_int32(
+    field: WireFieldView<'_>,
+    count: &mut usize,
+    context: &'static str,
+) -> litchi_iwa_common::Result<()> {
+    increment_wire_count(count, context)?;
+    if *count > 1 {
+        return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+            "{context} is duplicated"
+        )));
+    }
+    field.validate_canonical_key()?;
+    if field.wire_type() != 0 {
+        return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+            "{context} is not a varint"
+        )));
+    }
+    let (value, consumed) =
+        litchi_iwa_common::decode_varint_from_bytes(field.payload()).map_err(|error| {
+            litchi_iwa_common::Error::InvalidFormat(format!(
+                "{context} has an invalid varint: {error}"
+            ))
+        })?;
+    if consumed != field.payload().len()
+        || litchi_iwa_common::varint::encoded_len(value) != consumed
+        || (value > i32::MAX as u64 && value < 0xffff_ffff_8000_0000)
+    {
+        return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+            "{context} has noncanonical int32 framing"
+        )));
+    }
+    Ok(())
+}
+
+fn require_unique_fixed32(
+    field: WireFieldView<'_>,
+    count: &mut usize,
+    context: &'static str,
+) -> litchi_iwa_common::Result<()> {
+    require_unique_fixed(field, count, context, 5, 4)
+}
+
+fn require_unique_fixed64(
+    field: WireFieldView<'_>,
+    count: &mut usize,
+    context: &'static str,
+) -> litchi_iwa_common::Result<()> {
+    require_unique_fixed(field, count, context, 1, 8)
+}
+
+fn require_unique_fixed(
+    field: WireFieldView<'_>,
+    count: &mut usize,
+    context: &'static str,
+    wire_type: u8,
+    width: usize,
+) -> litchi_iwa_common::Result<()> {
+    increment_wire_count(count, context)?;
+    if *count > 1 {
+        return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+            "{context} is duplicated"
+        )));
+    }
+    field.validate_canonical_key()?;
+    if field.wire_type() != wire_type || field.payload().len() != width {
+        return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+            "{context} has the wrong fixed-width wire representation"
         )));
     }
     Ok(())
@@ -2231,17 +2573,19 @@ fn input_limit_error(observed: u64, limits: Limits) -> ReadError {
     })
 }
 
-fn settings_from_show(show: &kn::ShowArchive) -> ReadResult<Settings> {
-    let size = Size::new(show.size.width, show.size.height)
+fn settings_from_show(show: &keynote_show_codec::ShowSnapshot) -> ReadResult<Settings> {
+    let raw_size = show.size();
+    let semantic_size = Size::new(raw_size.width(), raw_size.height())
         .map_err(|error| ReadError::Decode(format!("invalid Keynote show size: {error}")))?;
-    let mut settings = Settings::new(size);
-    settings.set_slide_numbers_visible(show.slide_numbers_visible);
-    settings.set_loop_presentation(show.loop_presentation);
+    let raw = show.raw_settings();
+    let mut settings = Settings::new(semantic_size);
+    settings.set_slide_numbers_visible(raw.slide_numbers_visible());
+    settings.set_loop_presentation(raw.loop_presentation());
     settings
-        .set_mode(show.mode.map(Mode::from_raw))
+        .set_mode(raw.mode_raw().map(Mode::from_raw))
         .map_err(|error| ReadError::Decode(format!("invalid Keynote show mode: {error}")))?;
     settings.set_autoplay_transition_delay(
-        show.autoplay_transition_delay
+        raw.autoplay_transition_delay()
             .map(Seconds::new)
             .transpose()
             .map_err(|error| {
@@ -2249,19 +2593,19 @@ fn settings_from_show(show: &kn::ShowArchive) -> ReadResult<Settings> {
             })?,
     );
     settings.set_autoplay_build_delay(
-        show.autoplay_build_delay
+        raw.autoplay_build_delay()
             .map(Seconds::new)
             .transpose()
             .map_err(|error| ReadError::Decode(format!("invalid Keynote build delay: {error}")))?,
     );
-    settings.set_idle_timer_active(show.idle_timer_active);
+    settings.set_idle_timer_active(raw.idle_timer_active());
     settings.set_idle_timer_delay(
-        show.idle_timer_delay
+        raw.idle_timer_delay()
             .map(Seconds::new)
             .transpose()
             .map_err(|error| ReadError::Decode(format!("invalid Keynote idle delay: {error}")))?,
     );
-    settings.set_automatically_plays_upon_open(show.automatically_plays_upon_open);
+    settings.set_automatically_plays_upon_open(raw.automatically_plays_upon_open());
     settings
         .validate()
         .map_err(|error| ReadError::Decode(format!("invalid Keynote show settings: {error}")))?;

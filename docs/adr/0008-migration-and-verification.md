@@ -7086,3 +7086,110 @@ deferring it until a rendered cell contains a cross-table or category node is
 also still required before the aggregate host edge moves. Other table models,
 formula owners, sidecars, and formula ASTs still use generated Prost values and
 need their own complete pre-decode envelopes.
+
+## 2026-08-08 Keynote Show/SlideTree lazy projection and slide-order migration
+
+The concrete Keynote owner now projects `KN.ShowArchive` through a private
+Buffa lazy view after a Keynote-owned schema-directed wire preflight. Required
+theme, slide-tree, size, and stylesheet envelopes, optional show settings, all
+known references, wire kinds, canonical scalar framing, required-envelope
+uniqueness, and required nested reference identifiers are validated before
+semantic publication. Ordered slide-node references are streamed from the
+preflighted embedded `KN.SlideTreeArchive`; they are not represented as a
+nested generated repeated-message view. This avoids an input-width Buffa
+fragment index while preserving source order exactly. Optional setting
+presence and unknown presentation-mode discriminants retain their existing
+semantic behavior. Unknown content is not retained by the generated view, and
+the accepted raw source remains authoritative for preservation.
+
+`Package::edit_slide_order()` adds a bounded selector-first structural
+transaction without changing the existing skip-state patch API. The source is
+an exact navigator name or checked base position. The destination is the final
+zero-based `Position` in the base list and must be below the original slide
+count. `SlideOrderEdit` stages one move; `SlideOrderCommit` publishes a fully
+reopened package; `SlideOrderDiagnostics` reports changed state, touched
+components, and full-reparse publication; and `SlideOrderPatch` provides
+exact-source-checked forward application and a reversible inverse.
+`SlideOrderError` and `SlideOrderLimitKind` keep the operation and its resource
+failures format-owned and content-free. Equal source and destination positions
+reuse the original allocation and bytes. A changed order moves complete raw
+slide-reference field records, including each encoded key, encoded length, and
+nested reference payload. It preserves their unknown and deprecated fields and
+does not rewrite slide components.
+
+The focused implementation replaces the migration host's
+`KeynoteEditor::move_slide`. Its move-specific compatibility assertions move to
+the Keynote owner, and the raw-index-only host example is replaced by the
+selector-first `litchi-keynote` `move_slide` example. Add, duplicate, and
+remove-slide workflows are not folded into this transaction because they also
+own component registration, identifier allocation, dependency disposition,
+and reclamation.
+
+The root integration and native acceptance gates completed on 2026-08-08:
+
+- `cargo test --locked --offline -p litchi-iwa-protos` passed 38 unit tests;
+  its 86 generated doctest snippets remain intentionally ignored. The focused
+  codec portion passed 13 tests, including known-field canonicality, permissive
+  opaque-unknown framing, direct message/recursion caps, native Prost parity,
+  and a 4,096-reference bounded traversal.
+- `cargo test --locked --offline -p litchi-keynote --all-features` passed 67
+  unit tests, 37 integration tests, and 2 doctests. The slide-order target
+  contributes 12 tests covering all 16 four-slide move pairs, selectors,
+  exact/no-op/inverse patches, full-record preservation, flat-topology
+  refusal, exact/one-under slide limits, fail-early source validation, and
+  concurrent immutable commits. `cargo test --locked --offline -p litchi-iwa
+  --lib` passed all 1,478 migration-host compatibility tests. The direct root
+  Keynote facade passed 2 tests, the aggregate iWork facade passed 8, and
+  `litchi-iwa-structured` passed 12.
+- Warning-denied Clippy passed for `litchi-iwa-protos --all-targets`, for all
+  Keynote production/library/example targets, and for the complete slide-order
+  integration target. `cargo fmt --all -- --check` and `git diff --check`
+  passed. `cargo check --locked --offline -p litchi-iwa --lib` passed. The
+  broader host `--examples` check remains blocked by the pre-existing
+  `list_iwork_chart_radar_grid_shapes` use of private Numbers sheet IDs; that
+  same failure is present at the starting commit and is not represented as a
+  Keynote regression or as a passing gate here.
+- The generated Show projection is 1,682 source bytes and exactly five Buffa
+  0.9.1 output files totaling 138,661 bytes, with zero `LazyRepeatedView`
+  mentions. Build-time provenance matches the canonical `TSP.Reference`,
+  `TSP.Size`, `KN.SlideTreeArchive`, and `KN.ShowArchive` declarations and the
+  handwritten route constants. `tools/check_crate_boundaries.py` reports 63
+  workspace packages, 224 internal declarations, and exactly 17 ordered debt
+  items. `tools/check_iwork_public_api.py` reports no implementation type or
+  raw-ID leak.
+- The retired host implementation was run from detached commit `df1b76b5`
+  against the same disposable source. Both host and focused outputs read back
+  as `B/C/A`, and their extracted `Index/Document.iwa` bytes are identical
+  (SHA-256
+  `9ecd2426425491053898658f5b7584d0633b30d3a3b020bf226d397f7693d310`).
+  The host artifact hash is
+  `0172045ef824a5061564e013568f1343cbcb95a149a179bb8953a3bcac8842ff`;
+  the focused artifact differs because it retains source ZIP metadata that the
+  host normalized to the 1980 epoch.
+- Apple Keynote 14.4 (7043.0.93) created the three-slide `A/B/C` source at
+  `/private/tmp/litchi-keynote-order-oracle-20260808.B6vCko/source-abc.key`
+  (SHA-256
+  `49c7ee349cddb9fcd4671b7cd36c90008a76e457311cd3bb70d4b765f217b3df`).
+  Moving position zero to final position two produced
+  `litchi-moved-bca.key` (SHA-256
+  `62960a755535fd719bffa53f6f9e9f6126fa22d2ae50c3b543e24f926da07779`).
+  Keynote opened it directly with visible `B/C/A` navigator order and no
+  repair, recovery, or conversion prompt. Save As produced
+  `keynote-resaved-bca.key` (SHA-256
+  `81f2e6010f68504fc58b2c948604f05f3651e3252ddba10c98b7eee29aed16e9`);
+  close/reopen again showed `B/C/A`, and the focused reader recovered the same
+  titles and bodies. Applying the public inverse patch restored a byte-exact
+  artifact with the original source hash. ZIP-member comparison found only
+  `Index/Document.iwa` changed; its source member hash is
+  `505d0666be4a7711f952b8b21fea97bc9f54c67ade145f4095aad2843d08d7de`.
+  Decompressed comparison likewise found exactly that component and only Show
+  object 2652385 changed, with its archive metadata equal.
+
+This is not a latency, RSS, allocation-performance, fuzz, or sanitizer claim.
+All 17 migration-host dependency debts remain. Larger slide-node, slide,
+build, drawable, note, table, chart, media, and mutation graphs still use host
+code and/or generated Prost values; protobuf groups remain fail-closed at the
+shared package preflight; durable patch serialization, an aggregate edit
+transient-memory ceiling, atomic filesystem publication, remaining
+example/test/fuzz ownership, and the root sanitizer campaign are open deletion
+blockers.

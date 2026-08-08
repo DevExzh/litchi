@@ -502,6 +502,30 @@ does not make Markdown a document-format owner or a bidirectional conversion
 layer. Rendering, pagination, external retrieval, and active-content execution
 remain outside this helper crate.
 
+### 2026-08-08 Keynote ordering continuation
+
+The root prepared-source coordinator now also admits validated frozen logical
+entries through an internal, semantic-only route; the preceding reference to
+"uncovered frozen logical-entry coordination" is retained as historical state
+and is superseded by this paragraph and ADR 0028's later amendment. That route
+does not publish member names, storage builders, or edit provenance.
+
+Within the concrete Keynote owner, the document-root and show topology use
+narrow private Buffa lazy projections after format-owned wire preflight.
+Ordered slide references are streamed from the embedded slide tree, while raw
+source field records, including their encoded keys, encoded lengths, and
+payloads, remain the preservation authority. The public structural writer is
+selector-first: `Package::edit_slide_order()` directly returns an edit that
+moves one selected slide to a checked final semantic position and produces a
+separate reversible `SlideOrderPatch`. The skip-state transaction remains
+source compatible.
+
+The migration host's move method, focused example, and move-specific tests have
+moved to `litchi-keynote`, but no host dependency edge is removed by that
+vertical capability. The current boundary ledger therefore still contains all
+17 ordered `litchi-iwa` debts. Remaining editor, Prost graph, example, test,
+fuzz, durable-patch, and atomic-save ownership prevents host deletion.
+
 ## Historical terminology
 
 References to `litchi-ooxml` in ADR 0002, ADR 0008, ADR 0011, ADR 0013, ADR

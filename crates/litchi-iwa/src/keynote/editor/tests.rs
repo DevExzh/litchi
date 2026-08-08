@@ -5228,45 +5228,8 @@ fn creates_empty_slide_from_typed_theme_layout_transactionally() {
 }
 
 #[test]
-fn reorders_slides_without_rewriting_slide_components() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let first_component = editor
-        .package()
-        .entry("Index/Slide-4.iwa")
-        .unwrap()
-        .to_vec();
-    editor.move_slide(0, 1).unwrap();
-    let slides = editor.slides().unwrap();
-    assert_eq!(
-        slides
-            .iter()
-            .map(|slide| slide.slide_id)
-            .collect::<Vec<_>>(),
-        [10, 4]
-    );
-    assert_eq!(
-        editor.package().entry("Index/Slide-4.iwa").unwrap(),
-        first_component
-    );
-    assert!(editor.move_slide(2, 0).is_err());
-}
-
-#[test]
-fn slide_tree_move_and_clone_delete_preserve_unknown_reference_bytes() {
+fn slide_tree_clone_delete_preserves_unknown_reference_bytes() {
     let mut editor = KeynoteEditor::from_package(test_package_with_unknown_slide_tree()).unwrap();
-    let document_before = editor
-        .package()
-        .entry("Index/Document.iwa")
-        .unwrap()
-        .to_vec();
-
-    editor.move_slide(0, 1).unwrap();
-    editor.move_slide(1, 0).unwrap();
-    assert_eq!(
-        editor.package().entry("Index/Document.iwa").unwrap(),
-        document_before
-    );
-
     let package_before = editor
         .package()
         .entry_names()
@@ -5320,7 +5283,7 @@ fn duplicate_slide_tree_references_fail_transactionally() {
         .unwrap();
     let mut editor = KeynoteEditor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
-    assert!(editor.move_slide(0, 1).is_err());
+    assert!(editor.duplicate_slide(0).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 

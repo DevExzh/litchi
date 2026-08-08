@@ -119,3 +119,36 @@ lost. Until a disposition is explicitly supplied, the safe facade returns a
 typed refusal instead of guessing whether to cascade, detach, retarget, or
 retain an orphan. Sanitization certification is available only when all
 prohibited content is proven absent.
+
+## 2026-08-08 amendment: Keynote slide-order transactions
+
+Keynote structural ordering uses a separate, source-compatible transaction
+family. `Package::edit_slide_order()` directly returns a `SlideOrderEdit<'_>`
+that accepts one `move_slide` operation. Its source is a `SlideSelector` by
+exact name or checked position; its `Position` destination means the final
+zero-based position in the immutable base list and must be strictly less than
+the base slide count. Selection and destination validation finish before any
+candidate is published. Exact-name ambiguity and either out-of-range position
+are typed failures.
+
+The staged source position identifies the same base-snapshot slide even when
+removal shifts intermediate vector indexes. Moving a slide to its existing
+position is an exact no-op: the commit shares the original source allocation,
+touches no component, and does not perform a redundant full reparse. A real
+move rewrites only the owning show component, then reopens the entire candidate
+under the original `ReadOptions` and verifies the complete semantic slide
+order before publication. The source snapshot never changes.
+
+`SlideOrderPatch` records only semantic source and destination positions in its
+public vocabulary while retaining exact immutable source and target bytes
+privately for conflict authorization. `Package::apply_slide_order()` requires
+the exact source artifact, and `inverse()` restores the accepted source bytes.
+`SlideOrderCommit`, `SlideOrderDiagnostics`, `SlideOrderError`, and
+`SlideOrderLimitKind` remain distinct format-owned types, so the earlier
+skip-state transaction keeps its established Boolean patch accessors.
+The rewrite moves complete validated raw slide-reference field records,
+including each encoded key, encoded length, and nested reference payload.
+Deprecated and unknown reference fields therefore travel with their slide
+instead of being normalized through Buffa or Prost. This in-memory reversible
+patch is still not the durable deterministic JSON envelope required for
+cross-process patch exchange.

@@ -1045,3 +1045,36 @@ prefixes. Legacy Word, PowerPoint, and Excel are independently gated as `doc`,
 - Default `litchi` enables DOCX, PPTX, and XLSX. XLSB, legacy formats, crypto,
   signing, VBA parsing, calculation, rendering, and runtime adapters are opt-in.
   Enabling a feature adds capability and never changes existing semantics.
+
+## 2026-08-08 amendment: Keynote show and slide-order ownership
+
+`litchi-keynote` now owns the application-shaped projection of
+`KN.ShowArchive` and its embedded `KN.SlideTreeArchive`. A narrow generated
+Buffa lazy view is derived from the canonical schema and remains private to the
+protobuf infrastructure crate. Keynote performs schema-directed wire preflight
+before constructing that view, streams the ordered slide references instead of
+materializing an attacker-sized generated repeated-message index, and forces
+every deferred value that affects semantic publication. Generated Buffa and
+Prost values, native object identifiers, component names, and raw slide-tree
+types do not enter the supported format API. The accepted source bytes and
+complete validated raw field records, including each encoded key, encoded
+length, and payload, remain the preservation authority.
+
+The concrete package also owns selector-first slide ordering through the direct
+`Package::edit_slide_order() -> SlideOrderEdit<'_>` entry point,
+`SlideOrderCommit`, and `SlideOrderPatch`, with format-owned
+`SlideOrderDiagnostics`, `SlideOrderError`, and `SlideOrderLimitKind`. The
+source is selected by exact navigator name or checked semantic position and the
+destination is a checked final position in the base slide list. This
+transaction family is deliberately separate from the existing skip/include
+`Edit`, `Commit`, and `Patch` types, whose Boolean accessors remain source
+compatible. Commit and patch application publish only after bounded package
+reassembly, complete reopening under the retained read options, and semantic
+order readback.
+
+The migration host no longer owns `KeynoteEditor::move_slide`, its focused
+example, or its move-specific compatibility assertions. Slide creation,
+duplication, deletion, show-setting mutation, and the larger slide, build,
+shape, note, table, chart, and media editors remain host migration work. This
+vertical move does not remove a dependency edge: all 17 ordered
+`litchi-iwa` debt entries remain until their complete exit conditions hold.

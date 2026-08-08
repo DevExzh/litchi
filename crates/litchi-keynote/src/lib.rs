@@ -27,6 +27,23 @@
 //! output.sync_all()?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
+//!
+//! # Reorder slides
+//!
+//! The destination is a checked final position; the immutable source remains
+//! available and the commit carries an exact-source-checked inverse patch.
+//!
+//! ```no_run
+//! use litchi_keynote::{Package, Position, SlideSelector};
+//!
+//! let package = Package::open("input.key")?;
+//! let mut edit = package.edit_slide_order();
+//! edit.move_slide(SlideSelector::name("Appendix"), Position::new(0))?;
+//! let commit = edit.commit()?;
+//! let restored = commit.package().apply_slide_order(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().source_bytes(), package.source_bytes());
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
 
 #![forbid(unsafe_code)]
 
@@ -49,6 +66,7 @@ pub use build::{AnimationType, Build};
 pub use chart::ChartSelector;
 pub use document::Document;
 pub use error::{Error, Result};
+pub use litchi_core::Position;
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::__semantic_document_from_prepared_source;
@@ -56,7 +74,8 @@ pub use package::{
     Commit, Diagnostics, Edit, EditError, Limits, MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES,
     MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package, Patch, PayloadLimitKind,
     ReadError, ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError, SemanticPath,
-    Stats, TextStorageFailure,
+    SlideOrderCommit, SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind,
+    SlideOrderPatch, Stats, TextStorageFailure,
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use show::{Mode, Settings, Show, Size};

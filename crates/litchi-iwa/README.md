@@ -1242,17 +1242,17 @@ if let Some(drawable) = keynote.slide_drawables(0)?.first() {
     keynote.remove_slide_build(0, trace.object_id)?;
 }
 let copy = keynote.duplicate_slide(0)?;
-keynote.move_slide(copy.index, 0)?;
-keynote.remove_slide(0)?;
+keynote.remove_slide(copy.index)?;
 keynote.save("updated.key")?;
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
-Keynote slide skip/include transactions have moved to the concrete
-`litchi-keynote` owner. Use `Package::edit()` with an exact-name or typed
-position `SlideSelector`; the focused `set_slide_skipped` example demonstrates
-the raw-ID-free path. The compatibility editor remains available for the other
-operations in this legacy example while migration continues.
+Keynote slide skip/include and ordering transactions have moved to the concrete
+`litchi-keynote` owner. Use its focused package transactions with exact-name or
+typed-position `SlideSelector` values; the focused skip-state and slide-order
+examples demonstrate the raw-ID-free paths. The compatibility editor remains
+available for the other operations in this legacy example while migration
+continues.
 
 Text ranges use UTF-16 indexes, matching iWork's attribute tables. Shared
 `TSWP.StorageArchive` edits patch only text chunks and affected attribute

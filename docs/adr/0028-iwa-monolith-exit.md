@@ -599,3 +599,83 @@ sanitizer campaign was executed. Consequently the host structured adapter,
 its dependency, and all 17 recorded monolith debt edges remain. This amendment
 does not authorize monolith deletion, claim complete Buffa laziness, or infer
 edit/resave fidelity from the new source routes.
+
+## 2026-08-08 Keynote Show/SlideTree and slide-order ownership
+
+The concrete Keynote owner now removes two more eager generated-graph uses from
+its show boundary. A derived private Buffa lazy projection covers the supported
+`KN.ShowArchive` settings and required envelopes after a schema-directed wire
+preflight. The embedded `KN.SlideTreeArchive` is routed manually: its ordered
+slide references are streamed from validated source fields so Buffa never
+builds an attacker-width nested repeated-message index. Required reference
+identifiers, known optional reference scalars, canonical wire framing,
+required-envelope uniqueness, setting presence, finite semantic values, slide
+and reference budgets, and every deferred value used for publication are
+checked before the semantic `Show` is visible. Generated Buffa/Prost values and
+the native slide tree remain private; accepted raw source bytes retain
+preservation authority.
+
+`Package::edit_slide_order()` now stages one selector-first move in a separate
+`SlideOrderEdit`. Exact navigator names and checked semantic source positions
+are accepted; the typed destination is the final zero-based position in the
+base list and must be less than its slide count. A same-position move shares
+the source allocation and exact bytes. A real move reorders complete raw
+slide-reference field records, including each encoded key, encoded length, and
+nested reference payload, preserving unknown and deprecated fields with their
+slides. It then reopens the complete package under its retained `ReadOptions`
+and verifies semantic order. `SlideOrderCommit`, `SlideOrderDiagnostics`,
+`SlideOrderPatch`, `SlideOrderError`, `SlideOrderLimitKind`,
+`Package::apply_slide_order`, and the inverse patch keep native identifiers and
+component names private and require exact source bytes for publication.
+
+The migration host's `KeynoteEditor::move_slide`, its raw-index-only example,
+and its move-specific compatibility assertions are retired after their focused
+equivalents take ownership. This is a vertical behavior move, not permission to
+drop slide creation, duplication, deletion, show settings, or the larger
+Keynote editor graph. Those paths have distinct component-registration,
+allocation, dependency-disposition, and reclamation contracts.
+
+Acceptance evidence was executed rather than inferred:
+
+- **Rust:** the protobuf crate passed 38 unit tests; Keynote passed 67 unit, 37
+  integration, and 2 doctests; the migration host passed all 1,478 library
+  tests; the direct Keynote root facade passed 2 tests; the aggregate iWork
+  facade passed 8; and the structured owner passed 12. Warning-denied Clippy
+  passed for every protobuf target, every Keynote production/library/example
+  target, and the full slide-order test target. Formatting and diff checks
+  passed. The host-versus-focused native differential produced `B/C/A` in both
+  readers and byte-identical extracted `Index/Document.iwa` output. The
+  focused writer additionally retained untouched ZIP metadata that the legacy
+  host normalized. The unrelated host-wide examples check remains blocked by
+  a pre-existing Numbers example that accesses a private raw sheet ID; host
+  library compilation and tests pass.
+- **Generated boundary:** the derived schema is 1,682 bytes; Buffa 0.9.1 emits
+  exactly five files/138,661 bytes and no generated repeated view. The build
+  checks canonical schema declarations and handwritten route constants.
+  Public-API audit passes, and the boundary checker reports 63 packages, 224
+  internal declarations, and the expected 17 ordered migration debts.
+- **Native Keynote:** Keynote 14.4 (7043.0.93) authored disposable `A/B/C`
+  source
+  `/private/tmp/litchi-keynote-order-oracle-20260808.B6vCko/source-abc.key`
+  (`49c7ee349cddb9fcd4671b7cd36c90008a76e457311cd3bb70d4b765f217b3df`).
+  The focused move `0 -> 2` produced `litchi-moved-bca.key`
+  (`62960a755535fd719bffa53f6f9e9f6126fa22d2ae50c3b543e24f926da07779`).
+  Keynote opened it without repair, recovery, or conversion and displayed
+  `B/C/A`; native Save As produced `keynote-resaved-bca.key`
+  (`81f2e6010f68504fc58b2c948604f05f3651e3252ddba10c98b7eee29aed16e9`),
+  whose close/reopen navigator and focused reverse read both remained `B/C/A`.
+  The public inverse restored the exact source hash. All ZIP payloads except
+  `Index/Document.iwa` are identical; its focused/legacy output hash is
+  `9ecd2426425491053898658f5b7584d0633b30d3a3b020bf226d397f7693d310`.
+  Decompressed comparison reports only Show object 2652385 changed and its
+  archive metadata unchanged. ADR 0008 records the exact commands and expanded
+  evidence.
+
+No latency, RSS, allocation-performance, fuzz, or sanitizer result is claimed.
+All 17 ordered host dependency debts remain. Slide nodes, slides, builds,
+shapes, notes, tables, charts, media, other mutation paths, and portions of
+semantic graph projection still use the migration host and/or generated Prost
+values. Protobuf groups remain transactionally fail-closed at shared package
+preflight. The unavailable sanitizer campaign, missing aggregate transaction
+peak-memory option, durable JSON patch envelope, atomic filesystem save, and
+remaining examples/tests/fuzz targets keep the monolith deletion gate open.
