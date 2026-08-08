@@ -566,3 +566,19 @@ whose own graph dependency remains canonical. Debt identity 007 is deleted and
 later identities are not renumbered. The current checker inventory is 63
 workspace packages, 223 internal dependency declarations, and 16 ordered
 migration debts.
+
+## 2026-08-08 Pages section-name continuation
+
+The concrete Pages owner now contains its first exact-source mutation family.
+`Package::edit_section_name` selects an existing section by exact semantic name
+or checked position, distinguishes absent and explicitly empty native names,
+and returns a separate reversible exact-artifact patch. One selected section
+payload and its owning IWA member form the mutation closure; complete raw field
+records and object-header bytes remain the preservation authority, and the
+candidate is fully reopened before publication.
+
+The root facade exposes these canonical `litchi-pages` types directly. The
+migration host's raw-ID rename example has moved to a semantic focused-crate
+example, but its legacy-normalizing compatibility writer remains. This vertical
+ownership move changes no manifest edge: the current inventory remains 63
+packages, 223 internal declarations, and 16 ordered debts.

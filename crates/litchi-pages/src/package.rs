@@ -4,6 +4,8 @@
 //! and generated protobuf messages. It publishes [`Package`] snapshots whose
 //! semantic content is represented by the archive-free [`crate::Document`].
 
+mod section_name;
+
 use std::collections::BTreeSet;
 use std::fmt;
 use std::fs;
@@ -27,6 +29,11 @@ use thiserror::Error;
 use crate::{
     Body, DEFAULT_MAX_TEXT_BYTES, Document, Error as SemanticError, MAX_BODY_STORAGES,
     MAX_SECTIONS, Root, Section, SectionType,
+};
+
+pub use section_name::{
+    SectionNameCommit, SectionNameDiagnostics, SectionNameEdit, SectionNameError,
+    SectionNameLimitKind, SectionNamePatch,
 };
 
 const SECTION_MESSAGE_TYPE: u32 = 10_011;
@@ -261,6 +268,17 @@ impl Package {
     #[must_use]
     pub fn snapshot(&self) -> Self {
         self.clone()
+    }
+
+    /// Borrow the authoritative immutable package bytes.
+    ///
+    /// The returned bytes are the exact artifact represented by this
+    /// snapshot. They can be written directly to publish a committed edit;
+    /// callers never need access to native object identifiers or package
+    /// members.
+    #[must_use]
+    pub fn source_bytes(&self) -> &[u8] {
+        self.state.source.source_bytes()
     }
 
     /// Render all native Pages text through the immutable semantic snapshot.

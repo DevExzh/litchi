@@ -7296,3 +7296,59 @@ normalizing settings path, most Keynote editors and Prost graph projections,
 durable patch serialization, aggregate transaction peak-memory policy, atomic
 filesystem publication, remaining examples/tests/fuzz work, the sanitizer
 campaign, and the 16 remaining host debts remain explicit deletion blockers.
+
+## 2026-08-08 amendment: Pages section-name transaction evidence
+
+The concrete Pages owner now exposes selector-first exact-source section-name
+edits, exact patch application and inverse replay, while the root `pages`
+facade reexports the same canonical types. Focused tests cover exact-name and
+position selection, longer and shorter names, clearing, explicit empty
+presence, missing and ambiguous selectors, NUL rejection, duplicate
+destinations, exact no-op allocation identity, changed-legacy refusal,
+header/unknown-field preservation, one-member mutation, exact conflict checks,
+inverse byte equality, tight output limits, redacted `Debug`, and `Send + Sync`.
+The checked native fixture, synthetic adversarial packages, and root facade are
+all exercised.
+
+Executed Rust evidence is reported by stable target: the Pages
+all-features/all-targets run passed 52 library tests, 1 native-fixture test,
+and all 5 section-name integration tests, and built the focused example target.
+The direct root Pages facade passed both tests. Warning-denied Clippy passed
+for every Pages target and the focused root facade; warning-denied rustdoc,
+the migration-host library check, formatting, diff checks, the iWork public-API
+gate, and the boundary checker also passed. The boundary checker reports 63
+workspace packages, 223 internal dependency declarations, and exactly 16
+ordered debts. This scoped evidence does not represent the known baseline-red
+full workspace and migration-host example inventory as green.
+
+The preservation oracle keeps the immutable source, untouched member data,
+raw local records, raw central records apart from required local-header
+offsets, non-target messages, unknown section fields, and unknown IWA object
+header fields exact. A changed section message's length and the enclosing IWA
+and ZIP lengths/offsets form the intended mutation closure. Candidate
+publication performs a full retained-limit reopen and field-by-field semantic
+section verification. Unknown preservation comes from bounded raw-record
+rewriting; no Buffa re-encode is involved.
+
+Computer Use exercised the Rust-authored candidate in Apple Pages 14.4. The
+pre-application Rust candidate had SHA-256
+`9269594edd2ac2c13e1ed04780cf6bc5b3734b1cd4f42067d280de658aca1696`;
+its public inverse restored the exact source hash
+`21107bc9323fba6f1589152454c0b0b0cc8e239313c6a369bc4a891116601b42`.
+Pages opened the candidate without repair, recovery, or conversion and showed
+the unchanged fixture markers `Litchi native Pages fixture`, `Buffa lazy-view
+migration verification`, and `2026-08-07`. Native Save As, close, and reopen
+produced
+`/private/tmp/litchi-pages-section-name-20260808.RM2Cz3/pages-resaved.pages`
+with SHA-256
+`fe879ecc03e0a3673a911c5b7d335f4d0e54c0766590f51d17e7670e8ce1b194`.
+Restaging `Litchi Renamed Section` against that native artifact was an exact
+no-op and emitted the same hash, proving focused semantic reverse-read after
+native normalization. Pages does not expose the section's producer name in
+its accessibility tree, so the claim is intentionally limited to native
+acceptance plus focused reverse-read rather than visual name inspection.
+
+This is not full host retirement, a durable patch, atomic filesystem
+publication, an aggregate transaction peak-memory policy, fuzz/sanitizer
+completion, or a performance result. The host legacy-normalizing compatibility
+writer and the 16 ordered dependency debts remain deletion blockers.

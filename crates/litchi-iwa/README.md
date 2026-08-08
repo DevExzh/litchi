@@ -1077,7 +1077,8 @@ let first_header = pages
     .find(|region| matches!(region.kind, Kind::Header))
     .expect("document header");
 pages.set_header_footer_text(first_header.storage.object_id, "Quarterly report")?;
-pages.set_section_name(section_id, Some("Executive summary"))?;
+// Section-name editing now lives in litchi-pages and uses SectionSelector;
+// see litchi-pages/examples/edit_section_name.rs.
 let mut section_settings = pages.section_settings(section_id)?;
 section_settings.set_inherit_previous_header_footer(Some(false));
 section_settings.set_first_page_hides_header_footer(Some(true));

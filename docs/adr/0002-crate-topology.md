@@ -1116,3 +1116,31 @@ dependency declarations, and 16 ordered migration debts. The canonical
 `litchi-iwa-index -> litchi-iwa-graph` edge remains, and this direct-edge
 retirement does not claim that the host's remaining graph-backed editors have
 migrated.
+
+## 2026-08-08 amendment: focused Pages section-name ownership
+
+`litchi-pages::Package` now owns the first Pages-specific exact-source
+transaction: selector-first section-name replacement through
+`edit_section_name`, `apply_section_name`, and the format-owned
+`SectionNameEdit`, `SectionNameCommit`, `SectionNamePatch`, diagnostics, error,
+and limit types. The supported surface exposes an exact section name or a
+checked semantic `Position`; native object identifiers, IWA member names,
+generated messages, and raw wire values remain private.
+
+The concrete owner rewrites only field 26 of the selected native section
+message, preserves the complete object header through the shared bounded core
+helper, and publishes only after exact-package reassembly, a complete reopen
+under the retained limits, and semantic readback. Raw validated field records
+remain the unknown-content authority. This mutation does not require a Buffa
+projection: decoding into a generated value and re-encoding it would weaken
+the exact-record preservation contract. Buffa lazy views remain the policy for
+schema projections that need semantic decoding, not a replacement for the raw
+preserving mutation primitive.
+
+The migration host's raw-identifier section-renaming example is removed and
+its README directs callers to the focused Pages example. The host's
+normalizing `PagesEditor::set_section_name` compatibility path remains for
+changed legacy nested-`Index.zip` sources, which the exact-source transaction
+deliberately refuses. No dependency edge is retired in this slice; the ledger
+remains at 63 workspace packages, 223 internal declarations, and 16 ordered
+migration debts.

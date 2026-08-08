@@ -868,3 +868,26 @@ remain content-free, and the public patch vocabulary contains semantic values
 rather than raw identities. Changed legacy package normalization remains an
 explicit host compatibility capability, not implicit behavior of the ordinary
 focused transaction.
+
+## 2026-08-08 amendment: Pages section-name semantics
+
+A Pages section name is edited through
+`Package::edit_section_name(SectionSelector)` rather than a native object ID or
+low-level section table. `SectionSelector::name` is an exact producer-name
+match and `SectionSelector::index` resolves to the checked public `Position`
+stored by the transaction. Selection completes against the base snapshot
+before mutation; missing names, missing positions, and ambiguous exact names
+are distinct typed failures.
+
+The semantic value is `Option<&str>`: absence and an explicitly present empty
+name are observably different and round-trip independently. NUL is the only
+format-level string invariant imposed by this slice. Assigning a duplicate
+name is valid, while selecting that duplicate name later is ambiguous. Errors,
+limits, patches, diagnostics, and `Debug` output omit authored names, native
+identifiers, package members, raw bytes, and lower-layer diagnostic strings.
+
+This surface authorizes replacement or removal of one existing section name
+only. It does not imply section creation, deletion, ordering, body mutation,
+identifier allocation, legacy package normalization, or a public collection of
+raw references. Those capabilities retain separate dependency-closure and
+native-application gates.

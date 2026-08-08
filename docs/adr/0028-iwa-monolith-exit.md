@@ -777,3 +777,31 @@ path, most Keynote editors and generated Prost graph paths, durable patch
 serialization, an aggregate transaction peak-memory option, atomic filesystem
 save, remaining examples/tests/fuzz ownership, and all 16 remaining host debts
 keep the monolith deletion gate open.
+
+## 2026-08-08 focused Pages section-name ownership
+
+`litchi-pages` now owns selector-first replacement and removal of existing
+section names for exact package sources. The transaction resolves a semantic
+position, preserves absent versus explicitly empty presence, rewrites only
+native field 26 in one selected section message, preserves the full object
+header with the bounded shared core helper, reassembles one component, reopens
+the complete candidate under retained limits, and verifies the published
+section projection. Generated Buffa and Prost values, raw IDs, member names,
+and wire records remain private; validated raw records are the preservation
+authority for this mutation.
+
+Exact no-ops—including legacy nested-`Index.zip` inputs—share the original
+source allocation. Changed legacy sources return typed `UnsupportedSource`.
+The host's raw-ID rename example is removed in favor of the focused semantic
+example, but its `PagesEditor::set_section_name` normalizing compatibility path
+remains until legacy mutation has an explicit preservation-safe owner. No
+manifest debt is removed, so all 16 current ordered debts remain.
+
+Apple Pages 14.4 opened the Rust artifact without repair or conversion,
+preserved the body markers, completed native Save As/close/reopen, and produced
+a native-resaved artifact whose expected section name reverse-read as an exact
+byte-identical no-op. The public inverse restored the pre-application source
+artifact exactly. This evidence advances one focused Pages exit condition; it
+does not satisfy durable patch serialization, atomic save, aggregate peak
+memory, fuzz/sanitizer, remaining editor/test/example ownership, or complete
+host deletion.

@@ -719,7 +719,7 @@ mod tests {
             section
                 .position_selector()
                 .as_position()
-                .map(|value| value.get()),
+                .map(litchi_core::Position::get),
             Some(0)
         );
         assert_eq!(section.page_count(), Some(3));
@@ -752,7 +752,7 @@ mod tests {
             section
                 .selector()
                 .as_position()
-                .map(|position| position.get()),
+                .map(litchi_core::Position::get),
             Some(7)
         );
     }

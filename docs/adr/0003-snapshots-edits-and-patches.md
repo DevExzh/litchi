@@ -190,3 +190,30 @@ payload's effective message type and length, its
 size change are part of the mutation closure and must not be described as
 untouched archive metadata. Raw source records, rather than Buffa's generated
 view, preserve unknown content.
+
+## 2026-08-08 amendment: Pages section-name transactions
+
+`Package::edit_section_name(selector)` resolves an exact-name or checked
+position selector against one immutable Pages snapshot and stages one optional
+producer-visible name. `None` removes native field presence while `Some("")`
+retains an explicitly present empty string. NUL is rejected before staging;
+duplicate destination names are permitted because native Pages permits them,
+and a later exact-name selection reports typed ambiguity instead of choosing
+one occurrence.
+
+An exact semantic no-op shares the source package allocation and bytes,
+touches no component, and performs no redundant candidate reopen. This remains
+valid for legacy nested-`Index.zip` input. A changed edit requires exact ZIP
+provenance, rewrites one selected section message, reassembles one IWA member,
+reopens the whole package under the retained limits, and verifies every
+published section field before returning a new immutable package. A changed
+legacy source returns `UnsupportedSource` rather than silently normalizing its
+physical topology.
+
+`SectionNamePatch` exposes only the semantic position and optional before/after
+names plus content-free diagnostic fingerprints. Exact private source and
+target artifacts authorize application; the fingerprint is diagnostic only.
+The inverse restores the accepted source artifact byte for byte, and applying
+against any other exact artifact yields `PatchConflict`. This reversible patch
+is intentionally in-memory and does not yet satisfy the durable deterministic
+JSON envelope required for cross-process patch exchange.

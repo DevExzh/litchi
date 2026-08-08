@@ -4,7 +4,7 @@ use std::io;
 use std::path::PathBuf;
 
 use litchi::Document;
-use litchi::pages::Package;
+use litchi::pages::{Package, SectionSelector};
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/pages/basic.pages")
@@ -56,5 +56,30 @@ fn body_storage_reaches_facade_paragraphs() -> Result<(), Box<dyn std::error::Er
         expected
     );
 
+    Ok(())
+}
+
+#[test]
+fn section_name_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::error::Error>> {
+    let package = Package::open(fixture_path())?;
+    let source_pointer = package.source_bytes().as_ptr();
+
+    let mut noop = package.edit_section_name(SectionSelector::index(0))?;
+    noop.set_name(Some("Blank"))?;
+    let noop = noop.commit()?;
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.package().source_bytes().as_ptr(), source_pointer);
+
+    let mut edit = package.edit_section_name(SectionSelector::name("Blank"))?;
+    edit.set_name(Some("Facade Section"))?;
+    let commit = edit.commit()?;
+    assert_eq!(
+        commit.package().sections()[0].name(),
+        Some("Facade Section")
+    );
+    let restored = commit
+        .package()
+        .apply_section_name(&commit.patch().inverse())?;
+    assert_eq!(restored.package().source_bytes(), package.source_bytes());
     Ok(())
 }

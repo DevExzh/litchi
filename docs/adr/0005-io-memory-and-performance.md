@@ -185,3 +185,28 @@ not initialize the package's full semantic slide cache. This is a bounded
 allocation-shape statement only. The format and codec validation layers may
 both scan the payload, and no O(1), single-pass, latency, RSS, allocation-count,
 or throughput result is inferred without measurement.
+
+## 2026-08-08 amendment: bounded Pages section-name rewriting
+
+The Pages section-name transaction retains the package's original limits and
+checks input/output package bytes, entry and aggregate bytes, IWA object and
+message counts, retained name bytes, protobuf bytes, fields, nesting, and
+rewrite work. Fallible reservations precede owned copies, size arithmetic is
+checked, and the complete candidate is reopened under the same limits before
+publication. A no-op shares the existing `Arc` and avoids package reassembly
+and reparsing.
+
+For a changed exact package, the implementation locates the selected native
+section privately, performs a bounded canonical-wire preflight, replaces only
+length-delimited field 26, preserves the complete IWA object header with
+`replace_message_preserving_header_with_limits`, recompresses one component,
+and reassembles the source catalog. Untouched ZIP members and their raw local
+and central records remain exact except for central-directory offsets that
+must move when the changed member length changes.
+
+No generated Buffa or Prost message is materialized for this preservation
+rewrite. That is deliberate: raw validated field records are the authority for
+unknown fields, duplicate ordering, encoded keys, and length headers. This is
+an allocation-shape and boundedness statement only; it makes no O(1),
+single-pass, latency, RSS, allocation-count, or throughput claim without the
+measurement protocol above.
