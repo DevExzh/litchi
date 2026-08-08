@@ -324,7 +324,7 @@ fn map_pages(error: litchi_pages::PackageError) -> Error {
             litchi_pages::Error::TooManyBodyStorages { actual, limit } => Error::limit(
                 Some(Format::Pages),
                 Stage::Semantic,
-                Resource::SemanticWork,
+                Resource::TextStorages,
                 usize_u64(actual),
                 usize_u64(limit),
             ),
@@ -370,11 +370,14 @@ fn map_keynote(error: litchi_keynote::ReadError) -> Error {
             usize_u64(maximum),
         ),
         litchi_keynote::ReadError::PayloadLimit {
-            observed, maximum, ..
+            kind,
+            observed,
+            maximum,
+            ..
         } => Error::limit(
             Some(Format::Keynote),
             Stage::Semantic,
-            Resource::SemanticWork,
+            keynote_payload_resource(kind),
             usize_u64(observed),
             usize_u64(maximum),
         ),
@@ -387,8 +390,22 @@ fn map_keynote(error: litchi_keynote::ReadError) -> Error {
 
 fn keynote_resource(kind: litchi_keynote::SemanticLimitKind) -> Resource {
     match kind {
+        litchi_keynote::SemanticLimitKind::Objects => Resource::Objects,
         litchi_keynote::SemanticLimitKind::Slides => Resource::Slides,
+        litchi_keynote::SemanticLimitKind::References => Resource::References,
+        litchi_keynote::SemanticLimitKind::TextStorages => Resource::TextStorages,
+        litchi_keynote::SemanticLimitKind::TextFragments => Resource::TextFragments,
         litchi_keynote::SemanticLimitKind::TextBytes => Resource::TextBytes,
+        _ => Resource::SemanticWork,
+    }
+}
+
+fn keynote_payload_resource(kind: litchi_keynote::PayloadLimitKind) -> Resource {
+    match kind {
+        litchi_keynote::PayloadLimitKind::Bytes => Resource::PayloadBytes,
+        litchi_keynote::PayloadLimitKind::Fields => Resource::Fields,
+        litchi_keynote::PayloadLimitKind::Nesting => Resource::NestingDepth,
+        litchi_keynote::PayloadLimitKind::Work => Resource::SemanticWork,
         _ => Resource::SemanticWork,
     }
 }
@@ -428,10 +445,18 @@ fn map_numbers(error: litchi_numbers::PackageError) -> Error {
 
 fn numbers_resource(kind: litchi_numbers::SemanticLimitKind) -> Resource {
     match kind {
+        litchi_numbers::SemanticLimitKind::Objects => Resource::Objects,
+        litchi_numbers::SemanticLimitKind::Sheets => Resource::Sheets,
         litchi_numbers::SemanticLimitKind::Tables => Resource::Tables,
+        litchi_numbers::SemanticLimitKind::References => Resource::References,
         litchi_numbers::SemanticLimitKind::MaterializedCells => Resource::Cells,
         litchi_numbers::SemanticLimitKind::OutputTextBytes
         | litchi_numbers::SemanticLimitKind::TextBytes => Resource::TextBytes,
+        litchi_numbers::SemanticLimitKind::FormulaRenderDepth
+        | litchi_numbers::SemanticLimitKind::FormulaDepth => Resource::NestingDepth,
+        litchi_numbers::SemanticLimitKind::FormulaWireBytes => Resource::PayloadBytes,
+        litchi_numbers::SemanticLimitKind::FormulaRenderWork
+        | litchi_numbers::SemanticLimitKind::FormulaWork => Resource::SemanticWork,
         _ => Resource::SemanticWork,
     }
 }
@@ -468,7 +493,7 @@ fn map_aggregate(error: litchi_iwa_structured::Error, format: Format) -> Error {
         ),
         litchi_iwa_structured::Error::InvalidSlideIndex { .. }
         | litchi_iwa_structured::Error::InvalidSectionIndex { .. } => {
-            Error::invalid_data(Some(format), Stage::Validation)
+            Error::invariant(Some(format), Stage::Validation)
         },
         _ => Error::invalid_data(Some(format), Stage::Validation),
     }
@@ -614,5 +639,216 @@ mod tests {
         let invalid = map_detection(litchi_iwa_detect::Error::InvalidLimits);
         assert_eq!(invalid.kind(), ErrorKind::InvalidOptions);
         assert_eq!(invalid.stage(), Stage::Validation);
+    }
+
+    #[test]
+    fn keynote_limits_map_every_known_resource_exactly() {
+        let semantic_resources = [
+            (
+                litchi_keynote::SemanticLimitKind::Objects,
+                Resource::Objects,
+            ),
+            (litchi_keynote::SemanticLimitKind::Slides, Resource::Slides),
+            (
+                litchi_keynote::SemanticLimitKind::References,
+                Resource::References,
+            ),
+            (
+                litchi_keynote::SemanticLimitKind::TextStorages,
+                Resource::TextStorages,
+            ),
+            (
+                litchi_keynote::SemanticLimitKind::TextFragments,
+                Resource::TextFragments,
+            ),
+            (
+                litchi_keynote::SemanticLimitKind::TextBytes,
+                Resource::TextBytes,
+            ),
+        ];
+        for (kind, resource) in semantic_resources {
+            let error = map_keynote(litchi_keynote::ReadError::SemanticLimit {
+                kind,
+                observed: 9,
+                maximum: 8,
+                path: litchi_keynote::SemanticPath::Package,
+            });
+            assert_limit_shape(error, Format::Keynote, Stage::Semantic, resource);
+        }
+
+        let payload_resources = [
+            (
+                litchi_keynote::PayloadLimitKind::Bytes,
+                Resource::PayloadBytes,
+            ),
+            (litchi_keynote::PayloadLimitKind::Fields, Resource::Fields),
+            (
+                litchi_keynote::PayloadLimitKind::Nesting,
+                Resource::NestingDepth,
+            ),
+            (
+                litchi_keynote::PayloadLimitKind::Work,
+                Resource::SemanticWork,
+            ),
+        ];
+        for (kind, resource) in payload_resources {
+            let error = map_keynote(litchi_keynote::ReadError::PayloadLimit {
+                kind,
+                observed: 9,
+                maximum: 8,
+                path: litchi_keynote::SemanticPath::Package,
+            });
+            assert_limit_shape(error, Format::Keynote, Stage::Semantic, resource);
+        }
+    }
+
+    #[test]
+    fn pages_body_storage_limit_uses_the_shared_exact_resource() {
+        let error = map_pages(litchi_pages::PackageError::Semantic(
+            litchi_pages::Error::TooManyBodyStorages {
+                actual: 9,
+                limit: 8,
+            },
+        ));
+        assert_limit_shape(
+            error,
+            Format::Pages,
+            Stage::Semantic,
+            Resource::TextStorages,
+        );
+    }
+
+    #[test]
+    fn numbers_limits_map_every_known_resource_exactly() {
+        let resources = [
+            (
+                litchi_numbers::SemanticLimitKind::Objects,
+                Resource::Objects,
+            ),
+            (litchi_numbers::SemanticLimitKind::Sheets, Resource::Sheets),
+            (litchi_numbers::SemanticLimitKind::Tables, Resource::Tables),
+            (
+                litchi_numbers::SemanticLimitKind::References,
+                Resource::References,
+            ),
+            (
+                litchi_numbers::SemanticLimitKind::MaterializedCells,
+                Resource::Cells,
+            ),
+            (
+                litchi_numbers::SemanticLimitKind::OutputTextBytes,
+                Resource::TextBytes,
+            ),
+            (
+                litchi_numbers::SemanticLimitKind::FormulaRenderWork,
+                Resource::SemanticWork,
+            ),
+            (
+                litchi_numbers::SemanticLimitKind::FormulaRenderDepth,
+                Resource::NestingDepth,
+            ),
+            (
+                litchi_numbers::SemanticLimitKind::FormulaWireBytes,
+                Resource::PayloadBytes,
+            ),
+            (
+                litchi_numbers::SemanticLimitKind::FormulaWork,
+                Resource::SemanticWork,
+            ),
+            (
+                litchi_numbers::SemanticLimitKind::TextBytes,
+                Resource::TextBytes,
+            ),
+            (
+                litchi_numbers::SemanticLimitKind::FormulaDepth,
+                Resource::NestingDepth,
+            ),
+        ];
+        for (kind, resource) in resources {
+            let error = map_numbers(litchi_numbers::PackageError::SemanticLimit {
+                kind,
+                observed: 9,
+                maximum: 8,
+                path: litchi_numbers::PackageSemanticPath::Package,
+            });
+            assert_limit_shape(error, Format::Numbers, Stage::Semantic, resource);
+        }
+    }
+
+    #[test]
+    fn aggregate_index_failures_are_internal_validation_invariants() {
+        for (format, error) in [
+            (
+                Format::Keynote,
+                litchi_iwa_structured::Error::InvalidSlideIndex {
+                    expected: 0,
+                    actual: 1,
+                },
+            ),
+            (
+                Format::Pages,
+                litchi_iwa_structured::Error::InvalidSectionIndex {
+                    expected: 0,
+                    actual: 1,
+                },
+            ),
+        ] {
+            let error = map_aggregate(error, format);
+            assert_eq!(error.kind(), ErrorKind::Invariant);
+            assert_eq!(error.stage(), Stage::Validation);
+            assert_eq!(error.format(), Some(format));
+            assert_eq!(error.resource(), None);
+            assert_eq!(error.observed(), None);
+            assert_eq!(error.maximum(), None);
+        }
+    }
+
+    #[test]
+    fn mapped_errors_are_content_free_and_stage_neutral_in_display() {
+        const PRIVATE: &str = "private-path/member/authored-value";
+        let invalid = [
+            map_keynote(litchi_keynote::ReadError::InvalidFormat(PRIVATE.to_owned())),
+            map_numbers(litchi_numbers::PackageError::InvalidFormat(
+                PRIVATE.to_owned(),
+            )),
+            map_pages(litchi_pages::PackageError::InvalidFormat(
+                PRIVATE.to_owned(),
+            )),
+        ];
+        for error in invalid {
+            assert_eq!(error.kind(), ErrorKind::InvalidData);
+            assert!(!format!("{error:?}").contains(PRIVATE));
+            assert!(!error.to_string().contains(PRIVATE));
+            assert_eq!(error.resource(), None);
+            assert_eq!(error.observed(), None);
+            assert_eq!(error.maximum(), None);
+        }
+
+        let allocation = map_keynote(litchi_keynote::ReadError::Allocation {
+            resource: PRIVATE,
+            amount: 17,
+        });
+        assert_eq!(allocation.kind(), ErrorKind::Allocation);
+        assert_eq!(allocation.resource(), Some(Resource::Memory));
+        assert_eq!(allocation.observed(), Some(17));
+        assert_eq!(allocation.maximum(), None);
+        assert_eq!(allocation.to_string(), "iWork allocation failed");
+        assert!(!format!("{allocation:?}").contains(PRIVATE));
+
+        let invariant = Error::invariant(Some(Format::Numbers), Stage::Validation);
+        assert_eq!(invariant.to_string(), "iWork invariant failed");
+        assert_eq!(invariant.resource(), None);
+        assert_eq!(invariant.observed(), None);
+        assert_eq!(invariant.maximum(), None);
+    }
+
+    fn assert_limit_shape(error: Error, format: Format, stage: Stage, resource: Resource) {
+        assert_eq!(error.kind(), ErrorKind::LimitExceeded);
+        assert_eq!(error.stage(), stage);
+        assert_eq!(error.format(), Some(format));
+        assert_eq!(error.resource(), Some(resource));
+        assert_eq!(error.observed(), Some(9));
+        assert_eq!(error.maximum(), Some(8));
+        assert!(std::error::Error::source(&error).is_none());
     }
 }

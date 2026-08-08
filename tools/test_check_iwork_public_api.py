@@ -95,6 +95,7 @@ class IworkPublicApiGateTests(unittest.TestCase):
                 "litchi_iwa_common",
                 "litchi_iwa_core",
                 "litchi_iwa_detect",
+                "litchi_iwa_package",
                 "litchi_iwa_protos",
                 "litchi_iwa_structured",
                 "litchi_iwa_text",

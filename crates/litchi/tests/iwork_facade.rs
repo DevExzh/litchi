@@ -308,11 +308,12 @@ fn physical_and_text_limits_are_inclusive_and_report_one_over() {
     assert_eq!(input_error.maximum(), Some(PAGES.len() as u64 - 1));
 
     let text = "Litchi native Pages fixture\nBuffa lazy-view migration verification\n2026-08-07";
+    let retained_text_bytes = text.len() + "Blank".len();
     let exact_text = SnapshotLimits::new(
         SnapshotLimits::HARD_MAX_TABLES,
         SnapshotLimits::HARD_MAX_SLIDES,
         SnapshotLimits::HARD_MAX_SECTIONS,
-        text.len(),
+        retained_text_bytes,
     )
     .unwrap_or_else(|error| panic!("exact text profile must be valid: {error}"));
     Document::from_bytes_with_options(PAGES, Options::default().with_snapshot(exact_text))
@@ -322,7 +323,7 @@ fn physical_and_text_limits_are_inclusive_and_report_one_over() {
         SnapshotLimits::HARD_MAX_TABLES,
         SnapshotLimits::HARD_MAX_SLIDES,
         SnapshotLimits::HARD_MAX_SECTIONS,
-        text.len() - 1,
+        retained_text_bytes - 1,
     )
     .unwrap_or_else(|error| panic!("tight text profile must be valid: {error}"));
     let text_error =
@@ -330,9 +331,9 @@ fn physical_and_text_limits_are_inclusive_and_report_one_over() {
             .err()
             .unwrap_or_else(|| panic!("one-over semantic text must fail"));
     assert_eq!(text_error.kind(), ErrorKind::LimitExceeded);
-    assert_eq!(text_error.stage(), Stage::Semantic);
+    assert_eq!(text_error.stage(), Stage::Validation);
     assert_eq!(text_error.format(), Some(Format::Pages));
     assert_eq!(text_error.resource(), Some(Resource::TextBytes));
-    assert_eq!(text_error.observed(), Some(text.len() as u64));
-    assert_eq!(text_error.maximum(), Some(text.len() as u64 - 1));
+    assert_eq!(text_error.observed(), Some(retained_text_bytes as u64));
+    assert_eq!(text_error.maximum(), Some(retained_text_bytes as u64 - 1));
 }

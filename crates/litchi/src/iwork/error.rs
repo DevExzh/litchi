@@ -19,7 +19,7 @@ pub enum ErrorKind {
     InvalidData,
     /// A finite resource ceiling was exceeded.
     LimitExceeded,
-    /// Memory could not be reserved before publishing semantic state.
+    /// Memory could not be reserved while capturing or decoding the document.
     Allocation,
     /// The package is encrypted and cannot be decoded by this reader.
     Encrypted,
@@ -67,6 +67,10 @@ pub enum Resource {
     DecodedBytes,
     /// Aggregate decoded bytes across internal package units.
     AggregateDecodedBytes,
+    /// Native objects indexed by one format-owned semantic decoder.
+    Objects,
+    /// Semantic Numbers sheets.
+    Sheets,
     /// Semantic Numbers tables.
     Tables,
     /// Semantic Keynote slides.
@@ -75,8 +79,20 @@ pub enum Resource {
     Sections,
     /// Materialized Numbers cells.
     Cells,
+    /// Semantic graph-reference occurrences.
+    References,
+    /// Native text-storage objects decoded by a format owner.
+    TextStorages,
+    /// Rich-text fragment ranges retained by a format owner.
+    TextFragments,
     /// Aggregate retained UTF-8 text bytes.
     TextBytes,
+    /// Encoded bytes inspected within one native semantic payload.
+    PayloadBytes,
+    /// Fields inspected within one native semantic payload.
+    Fields,
+    /// Nested native semantic payload traversal depth.
+    NestingDepth,
     /// Other bounded semantic traversal work.
     SemanticWork,
     /// Destination memory.
@@ -256,14 +272,14 @@ impl fmt::Display for Error {
                 self.observed,
                 self.maximum,
             ),
-            ErrorKind::Allocation => formatter.write_str("iWork semantic allocation failed"),
+            ErrorKind::Allocation => formatter.write_str("iWork allocation failed"),
             ErrorKind::Encrypted => {
                 formatter.write_str("password-protected iWork documents are not supported")
             },
             ErrorKind::SourceChanged => {
                 formatter.write_str("iWork source changed while it was being captured")
             },
-            ErrorKind::Invariant => formatter.write_str("iWork semantic invariant failed"),
+            ErrorKind::Invariant => formatter.write_str("iWork invariant failed"),
         }
     }
 }

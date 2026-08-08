@@ -9,14 +9,15 @@ repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
-flate2          = { workspace = true }
-litchi-core     = { workspace = true }
-litchi-iwa-core = { workspace = true }
-soapberry-zip   = { workspace = true }
-thiserror       = { workspace = true }
+flate2             = { workspace = true }
+litchi-core        = { workspace = true }
+litchi-iwa-core    = { workspace = true }
+litchi-iwa-package = { workspace = true }
+soapberry-zip      = { workspace = true }
+thiserror          = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2"
+rustix = { version = "1.1.4", features = ["fs"] }
 
 [lints]
 workspace = true

@@ -10,10 +10,12 @@
 )]
 
 use litchi_iwa_archive::{
-    self, ComponentCatalog, DetectionRoot, DirectoryMarkers, FrozenDirectoryBundle, SourceCatalog,
+    self, ComponentCatalog, DetectionRoot, DirectoryMarkers, FrozenDirectoryBundle,
+    LogicalSourceCatalog, SourceCatalog,
 };
 use litchi_iwa_common::wire::{WireField, parse_wire_fields};
 use litchi_iwa_core::{Archive, SnappyLimits, SnappyStream};
+use litchi_iwa_package::FrozenEntryStore;
 use std::{
     fmt,
     fs::{self, File, Metadata, OpenOptions},
@@ -219,7 +221,10 @@ pub struct PreparedSource {
 
 enum PreparedBacking {
     Package(SourceCatalog),
-    Directory(FrozenDirectoryBundle),
+    Semantic {
+        components: Arc<ComponentCatalog>,
+        limits: litchi_iwa_archive::Limits,
+    },
 }
 
 impl fmt::Debug for PreparedSource {
@@ -290,6 +295,56 @@ impl PreparedSource {
         let catalog = SourceCatalog::from_shared_bytes_with_limits(value, archive_limits(limits)?)
             .map_err(map_archive_error)?;
         Self::from_catalog(catalog, limits)
+    }
+
+    /// Prepare an immutable, already-normalized logical entry snapshot.
+    ///
+    /// This explicitly unstable integration route performs no synthetic ZIP
+    /// serialization and never claims exact-package provenance. The frozen
+    /// entry store remains alive through complete admission and application
+    /// classification, then is released before the selected format decoder
+    /// receives the component-only semantic snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when any entry is unsafe, ambiguous, encrypted,
+    /// malformed, or exceeds a physical resource ceiling. An entry set with
+    /// no recognized canonical application root returns `Ok(None)`.
+    #[doc(hidden)]
+    pub fn from_frozen_entries(value: FrozenEntryStore) -> Result<Option<Self>> {
+        Self::from_frozen_entries_with_limits(value, Limits::default())
+    }
+
+    /// Prepare immutable logical entries under explicit physical limits.
+    ///
+    /// The input-byte ceiling is not reinterpreted as an expanded logical
+    /// payload ceiling; per-entry and aggregate expanded ceilings govern the
+    /// already-decoded member payloads.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_frozen_entries`].
+    #[doc(hidden)]
+    pub fn from_frozen_entries_with_limits(
+        value: FrozenEntryStore,
+        limits: Limits,
+    ) -> Result<Option<Self>> {
+        let logical =
+            LogicalSourceCatalog::from_frozen_entries_with_limits(value, archive_limits(limits)?)
+                .map_err(map_archive_error)?;
+        let Some(format) = component_catalog(logical.components())? else {
+            return Ok(None);
+        };
+        let archive_limits = logical.limits();
+        let components = Arc::new(logical.into_components());
+        Ok(Some(Self {
+            backing: PreparedBacking::Semantic {
+                components,
+                limits: archive_limits,
+            },
+            format,
+            limits,
+        }))
     }
 
     /// Prepare a packaged file or app-authored directory bundle.
@@ -372,7 +427,10 @@ impl PreparedSource {
             },
         }
         Ok(Some(Self {
-            backing: PreparedBacking::Directory(directory),
+            backing: PreparedBacking::Semantic {
+                limits: directory.limits(),
+                components: directory.into_components(),
+            },
             format,
             limits,
         }))
@@ -401,7 +459,7 @@ impl PreparedSource {
     pub fn __into_source_catalog(self) -> Option<SourceCatalog> {
         match self.backing {
             PreparedBacking::Package(catalog) => Some(catalog),
-            PreparedBacking::Directory(_) => None,
+            PreparedBacking::Semantic { .. } => None,
         }
     }
 
@@ -418,10 +476,7 @@ impl PreparedSource {
                 let limits = catalog.limits();
                 (Arc::new(catalog.into_components()), limits)
             },
-            PreparedBacking::Directory(directory) => {
-                let limits = directory.limits();
-                (directory.into_components(), limits)
-            },
+            PreparedBacking::Semantic { components, limits } => (components, limits),
         }
     }
 }
@@ -1267,9 +1322,16 @@ fn kind(value: &Path) -> Result<Kind> {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    clippy::shadow_unrelated,
+    clippy::unwrap_used,
+    reason = "detector tests use fixed fallible package fixtures and compare independent failures"
+)]
 mod tests {
     use super::*;
     use litchi_iwa_core::{ArchiveObject, RawMessage};
+    use litchi_iwa_package::{Entry, EntryStore};
     use litchi_iwa_protos::{kn, tn, tp, tsa, tsk, tsp};
     use prost::Message;
     use std::io::Cursor;
@@ -1380,6 +1442,32 @@ mod tests {
         let mut files = vec![("Index/Document.iwa", root.as_slice())];
         files.extend(extra_names.iter().map(|name| (*name, b"iwa".as_slice())));
         package(&files)
+    }
+
+    fn frozen_package(bytes: &[u8]) -> FrozenEntryStore {
+        let catalog = litchi_iwa_archive::package::Catalog::from_bytes(bytes)
+            .expect("parse logical test package");
+        let entries = catalog
+            .into_iter()
+            .map(|entry| {
+                let (name, data) = entry.into_parts();
+                Entry::new(name, data)
+            })
+            .collect();
+        EntryStore::try_from_entries(entries)
+            .expect("unique logical test entries")
+            .freeze()
+    }
+
+    fn frozen_entries(entries: &[(&str, &[u8])]) -> FrozenEntryStore {
+        EntryStore::try_from_entries(
+            entries
+                .iter()
+                .map(|(name, data)| Entry::new((*name).to_owned(), (*data).to_vec()))
+                .collect(),
+        )
+        .expect("unique logical test entries")
+        .freeze()
     }
 
     #[test]
@@ -1563,6 +1651,107 @@ mod tests {
             catalog.limits().max_iwa_stream_bytes(),
             limits.max_iwa_stream_size()
         );
+    }
+
+    #[test]
+    fn frozen_logical_preparation_matches_packaged_classification() {
+        for expected in [Format::Pages, Format::Numbers, Format::Keynote] {
+            let bytes = document_package(expected, &[]);
+            let prepared = PreparedSource::from_frozen_entries(frozen_package(&bytes))
+                .unwrap()
+                .expect("recognized logical source");
+            assert_eq!(prepared.format(), expected);
+            assert!(prepared.__into_source_catalog().is_none());
+
+            let component_prepared = PreparedSource::from_frozen_entries(frozen_package(&bytes))
+                .unwrap()
+                .expect("recognized logical source");
+            let (logical, retained_limits) = component_prepared.__into_components();
+            let packaged = SourceCatalog::from_bytes(&bytes).unwrap();
+            assert_eq!(retained_limits, archive_limits(Limits::default()).unwrap());
+            assert_eq!(
+                logical
+                    .iter()
+                    .map(litchi_iwa_archive::Component::name)
+                    .collect::<Vec<_>>(),
+                packaged
+                    .components()
+                    .iter()
+                    .map(litchi_iwa_archive::Component::name)
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
+
+    #[test]
+    fn frozen_logical_preparation_skips_operation_storage() {
+        let root = document(Format::Pages);
+        let prepared = PreparedSource::from_frozen_entries(frozen_entries(&[
+            ("Index/Document.iwa", &root),
+            ("Index/OperationStorage.iwa", b"bvxn operation log"),
+        ]))
+        .unwrap()
+        .expect("recognized Pages source");
+        let (components, _limits) = prepared.__into_components();
+        assert_eq!(components.len(), 1);
+        assert_eq!(
+            components
+                .iter()
+                .next()
+                .map(litchi_iwa_archive::Component::name),
+            Some("Index/Document.iwa")
+        );
+    }
+
+    #[test]
+    fn frozen_logical_limits_keep_typed_categories() {
+        let cases = [
+            (
+                frozen_entries(&[("a", b""), ("b", b"")]),
+                Limits::new(16, 1, 1, 1, 1024).unwrap(),
+                LimitKind::Entries,
+            ),
+            (
+                frozen_entries(&[("ab", b"")]),
+                Limits::new(1, 1, 1, 1, 1024).unwrap(),
+                LimitKind::MemberNameBytes,
+            ),
+            (
+                frozen_entries(&[("a", b""), ("b", b"")]),
+                Limits::new(1, 2, 1, 1, 1024).unwrap(),
+                LimitKind::MetadataBytes,
+            ),
+            (
+                frozen_entries(&[("a", b"12")]),
+                Limits::new(16, 1, 1, 2, 1024).unwrap(),
+                LimitKind::EntryBytes,
+            ),
+            (
+                frozen_entries(&[("a", b"1"), ("b", b"2")]),
+                Limits::new(16, 2, 1, 1, 1024).unwrap(),
+                LimitKind::TotalBytes,
+            ),
+        ];
+        for (entries, limits, expected) in cases {
+            let error = PreparedSource::from_frozen_entries_with_limits(entries, limits)
+                .expect_err("logical limit must be retained");
+            assert!(matches!(
+                error,
+                Error::LimitExceeded { kind, .. } if kind == expected
+            ));
+        }
+    }
+
+    #[test]
+    fn frozen_logical_preparation_rejects_encryption_and_unexpanded_indexes() {
+        assert!(matches!(
+            PreparedSource::from_frozen_entries(frozen_entries(&[("Metadata/.iwpv2", b"marker")])),
+            Err(Error::Encrypted)
+        ));
+        assert!(matches!(
+            PreparedSource::from_frozen_entries(frozen_entries(&[("legacy/Index.zip", b"nested")])),
+            Err(Error::Archive(_))
+        ));
     }
 
     #[test]
@@ -1884,7 +2073,7 @@ mod tests {
 
     impl Drop for Temp {
         fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
+            drop(fs::remove_dir_all(&self.0));
         }
     }
 }

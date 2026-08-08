@@ -3,8 +3,9 @@
 //! This crate owns only the ZIP container boundary: central-directory limits,
 //! legacy nested `Index.zip` handling, and the checksum-free Snappy/IWA
 //! component stream. It deliberately does not depend
-//! on the iWork facade, semantic format crates, or the archive-neutral package
-//! entry store.
+//! on the iWork facade or semantic format crates. Already-decoded logical
+//! package entries enter through an explicitly immutable, fully revalidated
+//! snapshot.
 //!
 //! Application readers should consume [`SourceCatalog`] when they need both
 //! physical members and parsed components, or [`ComponentCatalog::iter`] for
@@ -16,6 +17,7 @@ mod catalog;
 mod directory;
 mod error;
 mod limits;
+mod logical;
 pub mod package;
 mod zip;
 
@@ -25,6 +27,7 @@ pub use directory::{
 };
 pub use error::{Error, LimitKind, Result};
 pub use limits::Limits;
+pub use logical::LogicalSourceCatalog;
 pub use package::SourceProvenance;
 
 use litchi_iwa_core::{Archive, SnappyStream};

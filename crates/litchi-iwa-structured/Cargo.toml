@@ -13,5 +13,8 @@ litchi-keynote = { workspace = true }
 litchi-numbers = { workspace = true }
 litchi-pages   = { workspace = true }
 
+[dev-dependencies]
+litchi-iwa-text = { workspace = true }
+
 [lints]
 workspace = true

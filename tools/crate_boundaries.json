@@ -87,6 +87,7 @@
     "litchi-iwa-archive": [
       "litchi-core",
       "litchi-iwa-core",
+      "litchi-iwa-package",
       "soapberry-zip"
     ],
     "litchi-iwa-cache": [],
@@ -99,6 +100,7 @@
       "litchi-iwa-archive",
       "litchi-iwa-common",
       "litchi-iwa-core",
+      "litchi-iwa-package",
       "litchi-iwa-protos"
     ],
     "litchi-iwa-graph": [],
@@ -108,6 +110,7 @@
     "litchi-iwa-package": [],
     "litchi-iwa-protos": [],
     "litchi-iwa-structured": [
+      "litchi-iwa-text",
       "litchi-keynote",
       "litchi-numbers",
       "litchi-pages"

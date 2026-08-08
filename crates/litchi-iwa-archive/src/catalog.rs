@@ -93,8 +93,22 @@ impl ComponentCatalog {
         entries: impl IntoIterator<Item = (&'a str, &'a [u8])>,
         limits: Limits,
     ) -> Result<Self> {
+        Self::from_validated_logical_entries(entries, 0, limits)
+    }
+
+    pub(crate) fn from_validated_logical_entries<'a>(
+        entries: impl IntoIterator<Item = (&'a str, &'a [u8])>,
+        component_capacity: usize,
+        limits: Limits,
+    ) -> Result<Self> {
         let validated_limits = limits.validate()?;
         let mut components = Vec::new();
+        components
+            .try_reserve_exact(component_capacity)
+            .map_err(|_error| crate::Error::Allocation {
+                resource: "logical IWA component catalog",
+                amount: component_capacity,
+            })?;
         let mut decompressed_iwa_bytes = 0;
         for (name, data) in entries {
             if !is_iwa_name(name) {
@@ -105,12 +119,14 @@ impl ComponentCatalog {
             {
                 decompressed_iwa_bytes = validated_limits
                     .charge_iwa_total_bytes(decompressed_iwa_bytes, decompressed_bytes)?;
-                components
-                    .try_reserve(1)
-                    .map_err(|_error| crate::Error::Allocation {
-                        resource: "directory IWA component catalog",
-                        amount: 1,
-                    })?;
+                if components.len() == components.capacity() {
+                    components
+                        .try_reserve(1)
+                        .map_err(|_error| crate::Error::Allocation {
+                            resource: "logical IWA component catalog",
+                            amount: 1,
+                        })?;
+                }
                 components.push(component);
             }
         }

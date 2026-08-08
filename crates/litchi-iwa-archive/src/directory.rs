@@ -5,14 +5,23 @@
     reason = "filesystem acquisition helpers stay beside the state they validate"
 )]
 
+use std::{fmt, fs, io::Read, path::Path, sync::Arc};
+
+#[cfg(not(unix))]
 use std::{
     ffi::OsString,
-    fmt,
-    fs::{self, Metadata, OpenOptions},
-    io::Read,
-    path::{Path, PathBuf},
-    sync::Arc,
+    fs::{Metadata, OpenOptions},
+    path::PathBuf,
     time::SystemTime,
+};
+
+#[cfg(unix)]
+use std::ffi::{CStr, CString};
+
+#[cfg(unix)]
+use rustix::{
+    fd::OwnedFd,
+    fs::{self as unix_fs, AtFlags, Dir, FileType, Mode, OFlags, Stat},
 };
 
 use crate::{ComponentCatalog, Error, LimitKind, Limits, Result};
@@ -155,6 +164,11 @@ impl FrozenDirectoryBundle {
     /// special filesystem nodes are rejected at every traversed boundary.
     /// Loose entries are normalized and sorted before their IWA streams are
     /// decoded, so filesystem enumeration order cannot affect semantics.
+    /// On Unix, pre-existing symbolic links in ancestor directories are
+    /// resolved by the initial root open; the resolved root itself is opened
+    /// with `O_NOFOLLOW` and pinned, and every later lookup is relative to that
+    /// descriptor. Replacing an ancestor, root pathname, or `Index` pathname
+    /// therefore cannot redirect an in-progress capture.
     ///
     /// # Errors
     ///
@@ -162,26 +176,178 @@ impl FrozenDirectoryBundle {
     pub fn open_with_limits(path: impl AsRef<Path>, limits: Limits) -> Result<Self> {
         let checked_limits = limits.validate()?;
         let root = path.as_ref();
-        let root_before = require_directory(root, "directory bundle root")?;
-        let markers_before = snapshot_markers(root)?;
-        let index_zip_path = root.join("Index.zip");
-        let index_path = root.join("Index");
-        let index_zip = inspect_node(&index_zip_path, "directory bundle Index.zip")?;
-        let index = inspect_node(&index_path, "directory bundle Index")?;
+
+        #[cfg(unix)]
+        {
+            Self::open_unix(root, checked_limits)
+        }
+
+        #[cfg(not(unix))]
+        {
+            let root_before = require_directory(root, "directory bundle root")?;
+            reject_path_encryption_markers(root)?;
+            let markers_before = snapshot_markers(root)?;
+            let index_zip_path = root.join("Index.zip");
+            let index_path = root.join("Index");
+            let index_zip = inspect_node(&index_zip_path, "directory bundle Index.zip")?;
+            let index = inspect_node(&index_path, "directory bundle Index")?;
+
+            let snapshot = match (index_zip, index) {
+                (Node::File(version), Node::Missing) => Self::from_index_zip(
+                    &index_zip_path,
+                    version,
+                    markers_before.markers,
+                    checked_limits,
+                )?,
+                (Node::Missing, Node::Directory(version)) => Self::from_loose_index(
+                    &index_path,
+                    version,
+                    markers_before.markers,
+                    checked_limits,
+                )?,
+                (Node::File(_), Node::Directory(_)) => {
+                    return Err(Error::InvalidBundle(
+                        "directory bundle contains both Index.zip and Index/ representations"
+                            .to_owned(),
+                    ));
+                },
+                (Node::Missing, Node::Missing) => {
+                    return Err(Error::InvalidBundle(
+                        "directory bundle contains neither Index.zip nor Index/".to_owned(),
+                    ));
+                },
+                _ => {
+                    return Err(Error::InvalidBundle(
+                        "directory bundle index representation has an invalid node type".to_owned(),
+                    ));
+                },
+            };
+
+            let markers_after = snapshot_markers(root)?;
+            if markers_after != markers_before {
+                return Err(changed("verifying directory bundle application markers"));
+            }
+            ensure_path_version(root, &root_before, "verifying directory bundle root")?;
+            match snapshot.state.provenance {
+                DirectoryProvenance::IndexZip => {
+                    ensure_file_without_peer(
+                        &index_zip_path,
+                        &index_path,
+                        "verifying directory bundle Index.zip representation",
+                    )?;
+                },
+                DirectoryProvenance::LooseIndex => {
+                    ensure_directory_without_peer(
+                        &index_path,
+                        &index_zip_path,
+                        "verifying directory bundle Index/ representation",
+                    )?;
+                },
+            }
+            reject_path_encryption_markers(root)?;
+            Ok(snapshot)
+        }
+    }
+
+    #[cfg(unix)]
+    fn open_unix(root: &Path, limits: Limits) -> Result<Self> {
+        let root_fd = unix_fs::open(
+            root,
+            OFlags::RDONLY
+                | OFlags::DIRECTORY
+                | OFlags::NOFOLLOW
+                | OFlags::NONBLOCK
+                | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .map_err(|error| {
+            let root_is_symlink =
+                matches!(error, rustix::io::Errno::LOOP | rustix::io::Errno::NOTDIR)
+                    && fs::symlink_metadata(root)
+                        .is_ok_and(|metadata| metadata.file_type().is_symlink());
+            if root_is_symlink {
+                Error::InvalidBundle("directory bundle root must not be a symbolic link".to_owned())
+            } else {
+                unix_error(error)
+            }
+        })?;
+        Self::open_unix_root(&root_fd, limits)
+    }
+
+    #[cfg(unix)]
+    fn open_unix_root(root_fd: &OwnedFd, limits: Limits) -> Result<Self> {
+        let root_before = unix_file_version(&unix_fs::fstat(root_fd).map_err(unix_error)?)?;
+        unix_require_kind(root_fd, FileType::Directory, "directory bundle root")?;
+        unix_reject_encryption_markers(root_fd)?;
+        let markers_before = unix_snapshot_markers(root_fd)?;
+        let index_zip = unix_inspect_node(root_fd, c"Index.zip", "directory bundle Index.zip")?;
+        let index = unix_inspect_node(root_fd, c"Index", "directory bundle Index")?;
 
         let snapshot = match (index_zip, index) {
-            (Node::File(version), Node::Missing) => Self::from_index_zip(
-                &index_zip_path,
-                version,
-                markers_before.markers,
-                checked_limits,
-            )?,
-            (Node::Missing, Node::Directory(version)) => Self::from_loose_index(
-                &index_path,
-                version,
-                markers_before.markers,
-                checked_limits,
-            )?,
+            (Node::File(version), Node::Missing) => {
+                let bytes = unix_read_stable_file_at(
+                    root_fd,
+                    c"Index.zip",
+                    &version,
+                    limits,
+                    FileRole::IndexZip,
+                )?;
+                let snapshot =
+                    Self::from_captured_index_zip(bytes, markers_before.markers, limits)?;
+                unix_ensure_node_version(
+                    root_fd,
+                    c"Index.zip",
+                    &version,
+                    "verifying directory bundle Index.zip after component parsing",
+                )?;
+                if !matches!(
+                    unix_inspect_node(root_fd, c"Index", "directory bundle Index")?,
+                    Node::Missing
+                ) {
+                    return Err(changed(
+                        "verifying directory bundle Index.zip representation",
+                    ));
+                }
+                snapshot
+            },
+            (Node::Missing, Node::Directory(version)) => {
+                let index_fd = unix_open_directory_at(root_fd, c"Index", &version)?;
+                let manifest = unix_scan_manifest(&index_fd, limits)?;
+                if manifest.is_empty() {
+                    return Err(Error::InvalidBundle(
+                        "directory bundle Index/ contains no entries".to_owned(),
+                    ));
+                }
+                let entries = unix_read_manifest(&index_fd, &manifest, limits)?;
+                let snapshot = Self::from_captured_loose(entries, markers_before.markers, limits)?;
+
+                let observed = unix_scan_manifest(&index_fd, limits)?;
+                if observed != manifest {
+                    return Err(changed(
+                        "verifying directory bundle Index/ manifest after component parsing",
+                    ));
+                }
+                let index_after =
+                    unix_file_version(&unix_fs::fstat(&index_fd).map_err(unix_error)?)?;
+                if index_after != version {
+                    return Err(changed(
+                        "verifying directory bundle Index/ after component parsing",
+                    ));
+                }
+                unix_ensure_node_version(
+                    root_fd,
+                    c"Index",
+                    &version,
+                    "verifying pinned directory bundle Index/ representation",
+                )?;
+                if !matches!(
+                    unix_inspect_node(root_fd, c"Index.zip", "directory bundle Index.zip")?,
+                    Node::Missing
+                ) {
+                    return Err(changed("verifying directory bundle Index/ representation"));
+                }
+                snapshot
+            },
             (Node::File(_), Node::Directory(_)) => {
                 return Err(Error::InvalidBundle(
                     "directory bundle contains both Index.zip and Index/ representations"
@@ -200,30 +366,18 @@ impl FrozenDirectoryBundle {
             },
         };
 
-        let markers_after = snapshot_markers(root)?;
-        if markers_after != markers_before {
+        unix_reject_encryption_markers(root_fd)?;
+        if unix_snapshot_markers(root_fd)? != markers_before {
             return Err(changed("verifying directory bundle application markers"));
         }
-        ensure_path_version(root, &root_before, "verifying directory bundle root")?;
-        match snapshot.state.provenance {
-            DirectoryProvenance::IndexZip => {
-                ensure_file_without_peer(
-                    &index_zip_path,
-                    &index_path,
-                    "verifying directory bundle Index.zip representation",
-                )?;
-            },
-            DirectoryProvenance::LooseIndex => {
-                ensure_directory_without_peer(
-                    &index_path,
-                    &index_zip_path,
-                    "verifying directory bundle Index/ representation",
-                )?;
-            },
+        let root_after = unix_file_version(&unix_fs::fstat(root_fd).map_err(unix_error)?)?;
+        if root_after != root_before {
+            return Err(changed("verifying pinned directory bundle root"));
         }
         Ok(snapshot)
     }
 
+    #[cfg(not(unix))]
     fn from_index_zip(
         path: &Path,
         expected: FileVersion,
@@ -231,6 +385,20 @@ impl FrozenDirectoryBundle {
         limits: Limits,
     ) -> Result<Self> {
         let bytes = read_stable_file(path, &expected, limits, FileRole::IndexZip)?;
+        let snapshot = Self::from_captured_index_zip(bytes, markers, limits)?;
+        ensure_path_version(
+            path,
+            &expected,
+            "verifying directory bundle Index.zip after component parsing",
+        )?;
+        Ok(snapshot)
+    }
+
+    fn from_captured_index_zip(
+        bytes: Box<[u8]>,
+        markers: DirectoryMarkers,
+        limits: Limits,
+    ) -> Result<Self> {
         let components = ComponentCatalog::from_directory_index_zip(&bytes, limits)?;
         if components.is_empty() {
             return Err(Error::InvalidBundle(
@@ -248,6 +416,7 @@ impl FrozenDirectoryBundle {
         })
     }
 
+    #[cfg(not(unix))]
     fn from_loose_index(
         path: &Path,
         expected: FileVersion,
@@ -275,16 +444,26 @@ impl FrozenDirectoryBundle {
             });
         }
 
+        let snapshot = Self::from_captured_loose(entries, markers, limits)?;
         let observed = scan_manifest(path, limits)?;
         if manifest != observed {
-            return Err(changed("verifying directory bundle Index/ manifest"));
+            return Err(changed(
+                "verifying directory bundle Index/ manifest after component parsing",
+            ));
         }
         ensure_path_version(
             path,
             &expected,
-            "verifying directory bundle Index/ directory",
+            "verifying directory bundle Index/ after component parsing",
         )?;
+        Ok(snapshot)
+    }
 
+    fn from_captured_loose(
+        entries: Vec<FrozenDirectoryEntry>,
+        markers: DirectoryMarkers,
+        limits: Limits,
+    ) -> Result<Self> {
         let components = ComponentCatalog::from_logical_entries(
             entries.iter().map(|entry| (entry.name(), entry.data())),
             limits,
@@ -376,6 +555,332 @@ struct MarkerSnapshot {
     numbers: Option<FileVersion>,
 }
 
+#[cfg(unix)]
+fn unix_snapshot_markers(root_fd: &OwnedFd) -> Result<MarkerSnapshot> {
+    let pages = unix_inspect_marker(root_fd, c"index.xml", "legacy Pages marker")?;
+    let keynote = unix_inspect_marker(root_fd, c"index.apxl", "legacy Keynote marker")?;
+    let numbers = unix_inspect_marker(root_fd, c"index.numbers", "legacy Numbers marker")?;
+    Ok(MarkerSnapshot {
+        markers: DirectoryMarkers {
+            pages: pages.is_some(),
+            keynote: keynote.is_some(),
+            numbers: numbers.is_some(),
+        },
+        pages,
+        keynote,
+        numbers,
+    })
+}
+
+#[cfg(unix)]
+fn unix_inspect_marker(root_fd: &OwnedFd, name: &CStr, label: &str) -> Result<Option<FileVersion>> {
+    match unix_inspect_node(root_fd, name, label)? {
+        Node::Missing => Ok(None),
+        Node::File(version) => Ok(Some(version)),
+        Node::Directory(_) => Err(Error::InvalidBundle(format!(
+            "{label} is not a regular file"
+        ))),
+    }
+}
+
+#[cfg(unix)]
+fn unix_reject_encryption_markers(root_fd: &OwnedFd) -> Result<()> {
+    for name in [c".iwpv2", c".iwph"] {
+        if unix_node_exists(root_fd, name)? {
+            return Err(Error::Encrypted);
+        }
+    }
+
+    match unix_inspect_node(root_fd, c"Metadata", "directory bundle Metadata")? {
+        Node::Missing => Ok(()),
+        Node::Directory(version) => {
+            let metadata_fd = unix_open_directory_at(root_fd, c"Metadata", &version)?;
+            for name in [c".iwpv2", c".iwph"] {
+                if unix_node_exists(&metadata_fd, name)? {
+                    return Err(Error::Encrypted);
+                }
+            }
+            Ok(())
+        },
+        Node::File(_) => Err(Error::InvalidBundle(
+            "directory bundle Metadata is not a directory".to_owned(),
+        )),
+    }
+}
+
+#[cfg(unix)]
+fn unix_node_exists(parent: &OwnedFd, name: &CStr) -> Result<bool> {
+    match unix_fs::statat(parent, name, AtFlags::SYMLINK_NOFOLLOW) {
+        Ok(_stat) => Ok(true),
+        Err(error) if error == rustix::io::Errno::NOENT => Ok(false),
+        Err(error) => Err(unix_error(error)),
+    }
+}
+
+#[cfg(unix)]
+fn unix_inspect_node(parent: &OwnedFd, name: &CStr, label: &str) -> Result<Node> {
+    let stat = match unix_fs::statat(parent, name, AtFlags::SYMLINK_NOFOLLOW) {
+        Ok(stat) => stat,
+        Err(error) if error == rustix::io::Errno::NOENT => return Ok(Node::Missing),
+        Err(error) => return Err(unix_error(error)),
+    };
+    let version = unix_file_version(&stat)?;
+    match FileType::from_raw_mode(stat.st_mode) {
+        FileType::RegularFile => Ok(Node::File(version)),
+        FileType::Directory => Ok(Node::Directory(version)),
+        FileType::Symlink => Err(Error::InvalidBundle(format!(
+            "{label} must not be a symbolic link"
+        ))),
+        FileType::Fifo
+        | FileType::Socket
+        | FileType::CharacterDevice
+        | FileType::BlockDevice
+        | FileType::Unknown => Err(Error::InvalidBundle(format!(
+            "{label} is not a regular file or directory"
+        ))),
+    }
+}
+
+#[cfg(unix)]
+fn unix_require_kind(fd: &OwnedFd, expected: FileType, label: &str) -> Result<()> {
+    let stat = unix_fs::fstat(fd).map_err(unix_error)?;
+    if FileType::from_raw_mode(stat.st_mode) != expected {
+        return Err(Error::InvalidBundle(format!(
+            "{label} has an invalid filesystem node type"
+        )));
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn unix_open_directory_at(
+    parent: &OwnedFd,
+    name: &CStr,
+    expected: &FileVersion,
+) -> Result<OwnedFd> {
+    let fd = unix_fs::openat(
+        parent,
+        name,
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+        Mode::empty(),
+    )
+    .map_err(unix_error)?;
+    unix_require_kind(&fd, FileType::Directory, "directory bundle directory")?;
+    let observed = unix_file_version(&unix_fs::fstat(&fd).map_err(unix_error)?)?;
+    if &observed != expected {
+        return Err(changed("opening pinned directory bundle directory"));
+    }
+    Ok(fd)
+}
+
+#[cfg(unix)]
+fn unix_ensure_node_version(
+    parent: &OwnedFd,
+    name: &CStr,
+    expected: &FileVersion,
+    context: &'static str,
+) -> Result<()> {
+    let observed = match unix_inspect_node(parent, name, "directory bundle source node")? {
+        Node::File(version) | Node::Directory(version) => version,
+        Node::Missing => return Err(changed(context)),
+    };
+    if &observed != expected {
+        return Err(changed(context));
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UnixManifestEntry {
+    logical_name: Box<str>,
+    physical_name: CString,
+    version: FileVersion,
+}
+
+#[cfg(unix)]
+fn unix_scan_manifest(index_fd: &OwnedFd, limits: Limits) -> Result<Vec<UnixManifestEntry>> {
+    let mut directory = Dir::read_from(index_fd).map_err(unix_error)?;
+    let mut entries = Vec::new();
+    let mut total_bytes = 0u64;
+    let mut metadata_bytes = 0u64;
+    for entry_result in &mut directory {
+        let directory_entry = entry_result.map_err(unix_error)?;
+        let physical_name = directory_entry.file_name();
+        if matches!(physical_name.to_bytes(), b"." | b"..") {
+            continue;
+        }
+        let file_name = std::str::from_utf8(physical_name.to_bytes()).map_err(|_error| {
+            Error::InvalidBundle(
+                "directory bundle Index/ contains a non-UTF-8 member name".to_owned(),
+            )
+        })?;
+        validate_loose_basename(file_name)?;
+        if file_name == "Index.zip" {
+            return Err(Error::InvalidBundle(
+                "directory bundle loose Index/ contains a nested Index.zip".to_owned(),
+            ));
+        }
+        if is_encryption_marker(file_name) {
+            return Err(Error::Encrypted);
+        }
+
+        let logical_name = format!("Index/{file_name}");
+        let name_bytes = u64::try_from(logical_name.len()).map_err(|_error| {
+            Error::InvalidBundle("directory entry name length does not fit u64".to_owned())
+        })?;
+        check_member_name(name_bytes, limits)?;
+        metadata_bytes = metadata_bytes.checked_add(name_bytes).ok_or_else(|| {
+            Error::InvalidBundle("directory entry metadata byte count overflowed".to_owned())
+        })?;
+        check_metadata_bytes(metadata_bytes, limits)?;
+
+        let node = unix_inspect_node(index_fd, physical_name, "directory bundle Index/ member")?;
+        let Node::File(version) = node else {
+            return Err(Error::InvalidBundle(format!(
+                "directory bundle Index/ member {logical_name} is not a regular file"
+            )));
+        };
+        check_loose_entry_size(version.len, limits)?;
+        total_bytes = total_bytes.checked_add(version.len).ok_or_else(|| {
+            Error::InvalidBundle("directory bundle Index/ byte count overflowed".to_owned())
+        })?;
+        check_aggregate_input_bytes(total_bytes, limits)?;
+        check_total_bytes(total_bytes, limits)?;
+        entries.try_reserve(1).map_err(|_error| Error::Allocation {
+            resource: "directory bundle manifest",
+            amount: 1,
+        })?;
+        entries.push(UnixManifestEntry {
+            logical_name: logical_name.into_boxed_str(),
+            physical_name: physical_name.to_owned(),
+            version,
+        });
+        check_entry_count(entries.len(), limits)?;
+    }
+    entries.sort_unstable_by(|left, right| left.logical_name.cmp(&right.logical_name));
+    Ok(entries)
+}
+
+#[cfg(unix)]
+fn unix_read_manifest(
+    index_fd: &OwnedFd,
+    manifest: &[UnixManifestEntry],
+    limits: Limits,
+) -> Result<Vec<FrozenDirectoryEntry>> {
+    let mut entries = Vec::new();
+    entries
+        .try_reserve_exact(manifest.len())
+        .map_err(|_error| Error::Allocation {
+            resource: "directory bundle entries",
+            amount: manifest.len(),
+        })?;
+    for item in manifest {
+        let data = unix_read_stable_file_at(
+            index_fd,
+            &item.physical_name,
+            &item.version,
+            limits,
+            FileRole::LooseEntry,
+        )?;
+        entries.push(FrozenDirectoryEntry {
+            name: item.logical_name.clone(),
+            data,
+        });
+    }
+    Ok(entries)
+}
+
+#[cfg(unix)]
+fn unix_read_stable_file_at(
+    parent: &OwnedFd,
+    name: &CStr,
+    expected: &FileVersion,
+    limits: Limits,
+    role: FileRole,
+) -> Result<Box<[u8]>> {
+    check_file_size(expected.len, limits, role)?;
+    let fd = unix_fs::openat(
+        parent,
+        name,
+        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+        Mode::empty(),
+    )
+    .map_err(unix_error)?;
+    unix_require_kind(&fd, FileType::RegularFile, "directory bundle member")?;
+    let opened = unix_file_version(&unix_fs::fstat(&fd).map_err(unix_error)?)?;
+    if &opened != expected {
+        return Err(changed("opening pinned directory bundle member"));
+    }
+
+    let mut file = fs::File::from(fd);
+    let bytes = read_bounded_contents(&mut file, expected.len, limits, role)?;
+    let after = unix_file_version(&unix_fs::fstat(&file).map_err(unix_error)?)?;
+    if after != opened {
+        return Err(changed("reading pinned directory bundle member"));
+    }
+    unix_ensure_node_version(
+        parent,
+        name,
+        expected,
+        "verifying pinned directory bundle member",
+    )?;
+    if u64::try_from(bytes.len()).ok() != Some(expected.len) {
+        return Err(changed("reading pinned directory bundle member"));
+    }
+    Ok(bytes)
+}
+
+#[cfg(unix)]
+fn unix_file_version(stat: &Stat) -> Result<FileVersion> {
+    Ok(FileVersion {
+        len: unix_checked_u64(stat.st_size, "length")?,
+        device: unix_checked_u64(stat.st_dev, "device identity")?,
+        inode: unix_checked_u64(stat.st_ino, "inode identity")?,
+        mode: unix_checked_u32(stat.st_mode, "mode")?,
+        modified_seconds: unix_checked_i64(stat.st_mtime, "modification time")?,
+        modified_nanoseconds: unix_checked_i64(stat.st_mtime_nsec, "modification nanoseconds")?,
+        changed_seconds: unix_checked_i64(stat.st_ctime, "change time")?,
+        changed_nanoseconds: unix_checked_i64(stat.st_ctime_nsec, "change nanoseconds")?,
+    })
+}
+
+#[cfg(unix)]
+fn unix_checked_u64<T>(value: T, field: &'static str) -> Result<u64>
+where
+    u64: TryFrom<T>,
+{
+    u64::try_from(value).map_err(|_error| {
+        Error::InvalidBundle(format!("directory source {field} does not fit u64"))
+    })
+}
+
+#[cfg(unix)]
+fn unix_checked_u32<T>(value: T, field: &'static str) -> Result<u32>
+where
+    u32: TryFrom<T>,
+{
+    u32::try_from(value).map_err(|_error| {
+        Error::InvalidBundle(format!("directory source {field} does not fit u32"))
+    })
+}
+
+#[cfg(unix)]
+fn unix_checked_i64<T>(value: T, field: &'static str) -> Result<i64>
+where
+    i64: TryFrom<T>,
+{
+    i64::try_from(value).map_err(|_error| {
+        Error::InvalidBundle(format!("directory source {field} does not fit i64"))
+    })
+}
+
+#[cfg(unix)]
+fn unix_error(error: rustix::io::Errno) -> Error {
+    Error::Io(std::io::Error::from_raw_os_error(error.raw_os_error()))
+}
+
+#[cfg(not(unix))]
 fn snapshot_markers(root: &Path) -> Result<MarkerSnapshot> {
     let pages = inspect_marker(&root.join("index.xml"), "legacy Pages marker")?;
     let keynote = inspect_marker(&root.join("index.apxl"), "legacy Keynote marker")?;
@@ -392,6 +897,7 @@ fn snapshot_markers(root: &Path) -> Result<MarkerSnapshot> {
     })
 }
 
+#[cfg(not(unix))]
 fn inspect_marker(path: &Path, label: &str) -> Result<Option<FileVersion>> {
     match inspect_node(path, label)? {
         Node::Missing => Ok(None),
@@ -402,6 +908,7 @@ fn inspect_marker(path: &Path, label: &str) -> Result<Option<FileVersion>> {
     }
 }
 
+#[cfg(not(unix))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ManifestEntry {
     logical_name: Box<str>,
@@ -409,6 +916,7 @@ struct ManifestEntry {
     version: FileVersion,
 }
 
+#[cfg(not(unix))]
 fn scan_manifest(path: &Path, limits: Limits) -> Result<Vec<ManifestEntry>> {
     let mut entries = Vec::new();
     let mut total_bytes = 0u64;
@@ -416,10 +924,14 @@ fn scan_manifest(path: &Path, limits: Limits) -> Result<Vec<ManifestEntry>> {
     for entry_result in fs::read_dir(path)? {
         let directory_entry = entry_result?;
         let file_name = utf8_name(directory_entry.file_name())?;
+        validate_loose_basename(&file_name)?;
         if file_name == "Index.zip" {
             return Err(Error::InvalidBundle(
                 "directory bundle loose Index/ contains a nested Index.zip".to_owned(),
             ));
+        }
+        if is_encryption_marker(&file_name) {
+            return Err(Error::Encrypted);
         }
         let logical_name = format!("Index/{file_name}");
         let name_bytes = u64::try_from(logical_name.len()).map_err(|_error| {
@@ -442,6 +954,7 @@ fn scan_manifest(path: &Path, limits: Limits) -> Result<Vec<ManifestEntry>> {
         total_bytes = total_bytes.checked_add(version.len).ok_or_else(|| {
             Error::InvalidBundle("directory bundle Index/ byte count overflowed".to_owned())
         })?;
+        check_aggregate_input_bytes(total_bytes, limits)?;
         check_total_bytes(total_bytes, limits)?;
         entries.try_reserve(1).map_err(|_error| Error::Allocation {
             resource: "directory bundle manifest",
@@ -458,6 +971,7 @@ fn scan_manifest(path: &Path, limits: Limits) -> Result<Vec<ManifestEntry>> {
     Ok(entries)
 }
 
+#[cfg(not(unix))]
 fn utf8_name(name: OsString) -> Result<String> {
     name.into_string().map_err(|_name| {
         Error::InvalidBundle("directory bundle Index/ contains a non-UTF-8 member name".to_owned())
@@ -470,6 +984,7 @@ enum FileRole {
     LooseEntry,
 }
 
+#[cfg(not(unix))]
 fn read_stable_file(
     path: &Path,
     expected: &FileVersion,
@@ -484,12 +999,6 @@ fn read_stable_file(
 
     let mut open = OpenOptions::new();
     open.read(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-
-        open.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK);
-    }
     let mut file = open.open(path)?;
     let opened_metadata = file.metadata()?;
     let opened = FileVersion::from_metadata(&opened_metadata);
@@ -498,8 +1007,27 @@ fn read_stable_file(
     }
     ensure_path_version(path, expected, "opening directory bundle member")?;
 
+    let bytes = read_bounded_contents(&mut file, expected.len, limits, role)?;
+
+    let after = FileVersion::from_metadata(&file.metadata()?);
+    if after != opened {
+        return Err(changed("reading directory bundle member"));
+    }
+    ensure_path_version(path, expected, "verifying directory bundle member")?;
+    if u64::try_from(bytes.len()).ok() != Some(expected.len) {
+        return Err(changed("reading directory bundle member"));
+    }
+    Ok(bytes)
+}
+
+fn read_bounded_contents(
+    reader: &mut impl Read,
+    expected_len: u64,
+    limits: Limits,
+    role: FileRole,
+) -> Result<Box<[u8]>> {
     let mut bytes = Vec::new();
-    let initial = usize::try_from(expected.len)
+    let initial = usize::try_from(expected_len)
         .unwrap_or(READ_CHUNK_BYTES)
         .min(READ_CHUNK_BYTES);
     bytes
@@ -510,7 +1038,7 @@ fn read_stable_file(
         })?;
     let mut buffer = [0u8; READ_CHUNK_BYTES];
     loop {
-        let read = match file.read(&mut buffer) {
+        let read = match reader.read(&mut buffer) {
             Ok(read) => read,
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(error) => return Err(error.into()),
@@ -532,15 +1060,6 @@ fn read_stable_file(
                 amount: read,
             })?;
         bytes.extend_from_slice(&buffer[..read]);
-    }
-
-    let after = FileVersion::from_metadata(&file.metadata()?);
-    if after != opened {
-        return Err(changed("reading directory bundle member"));
-    }
-    ensure_path_version(path, expected, "verifying directory bundle member")?;
-    if u64::try_from(bytes.len()).ok() != Some(expected.len) {
-        return Err(changed("reading directory bundle member"));
     }
     Ok(bytes.into_boxed_slice())
 }
@@ -613,6 +1132,64 @@ fn check_total_bytes(observed: u64, limits: Limits) -> Result<()> {
     Ok(())
 }
 
+fn check_aggregate_input_bytes(observed: u64, limits: Limits) -> Result<()> {
+    if observed > limits.max_input_bytes() {
+        return Err(Error::Limit {
+            kind: LimitKind::InputBytes,
+            observed,
+            maximum: limits.max_input_bytes(),
+        });
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn reject_path_encryption_markers(root: &Path) -> Result<()> {
+    for name in [".iwpv2", ".iwph"] {
+        if !matches!(
+            inspect_node(&root.join(name), "directory encryption marker")?,
+            Node::Missing
+        ) {
+            return Err(Error::Encrypted);
+        }
+    }
+    let metadata = root.join("Metadata");
+    match inspect_node(&metadata, "directory bundle Metadata")? {
+        Node::Missing => Ok(()),
+        Node::Directory(_) => {
+            for name in [".iwpv2", ".iwph"] {
+                if !matches!(
+                    inspect_node(&metadata.join(name), "directory metadata encryption marker")?,
+                    Node::Missing
+                ) {
+                    return Err(Error::Encrypted);
+                }
+            }
+            Ok(())
+        },
+        Node::File(_) => Err(Error::InvalidBundle(
+            "directory bundle Metadata is not a directory".to_owned(),
+        )),
+    }
+}
+
+fn is_encryption_marker(name: &str) -> bool {
+    matches!(name.rsplit('/').next(), Some(".iwpv2" | ".iwph"))
+}
+
+fn validate_loose_basename(name: &str) -> Result<()> {
+    if name.is_empty()
+        || matches!(name, "." | "..")
+        || name.contains(['/', '\\', ':'])
+        || name.chars().any(char::is_control)
+    {
+        return Err(Error::InvalidBundle(format!(
+            "directory bundle Index/ member name is not an exact portable basename: {name:?}"
+        )));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Node {
     Missing,
@@ -620,6 +1197,7 @@ enum Node {
     Directory(FileVersion),
 }
 
+#[cfg(not(unix))]
 fn inspect_node(path: &Path, label: &str) -> Result<Node> {
     match fs::symlink_metadata(path) {
         Ok(metadata) if metadata.file_type().is_symlink() => Err(Error::InvalidBundle(format!(
@@ -637,6 +1215,7 @@ fn inspect_node(path: &Path, label: &str) -> Result<Node> {
     }
 }
 
+#[cfg(not(unix))]
 fn require_file(path: &Path, label: &str) -> Result<FileVersion> {
     match inspect_node(path, label)? {
         Node::File(version) => Ok(version),
@@ -647,6 +1226,7 @@ fn require_file(path: &Path, label: &str) -> Result<FileVersion> {
     }
 }
 
+#[cfg(not(unix))]
 fn require_directory(path: &Path, label: &str) -> Result<FileVersion> {
     match inspect_node(path, label)? {
         Node::Directory(version) => Ok(version),
@@ -655,6 +1235,7 @@ fn require_directory(path: &Path, label: &str) -> Result<FileVersion> {
     }
 }
 
+#[cfg(not(unix))]
 fn ensure_path_version(path: &Path, expected: &FileVersion, context: &'static str) -> Result<()> {
     let observed = fs::symlink_metadata(path).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
@@ -669,6 +1250,7 @@ fn ensure_path_version(path: &Path, expected: &FileVersion, context: &'static st
     Ok(())
 }
 
+#[cfg(not(unix))]
 fn ensure_file_without_peer(file: &Path, peer: &Path, context: &'static str) -> Result<()> {
     if !matches!(
         inspect_node(file, "directory bundle Index.zip")?,
@@ -680,6 +1262,7 @@ fn ensure_file_without_peer(file: &Path, peer: &Path, context: &'static str) -> 
     Ok(())
 }
 
+#[cfg(not(unix))]
 fn ensure_directory_without_peer(
     directory: &Path,
     peer: &Path,
@@ -704,6 +1287,7 @@ const fn changed(context: &'static str) -> Error {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct FileVersion {
     len: u64,
+    #[cfg(not(unix))]
     modified: Option<SystemTime>,
     #[cfg(unix)]
     device: u64,
@@ -722,27 +1306,11 @@ struct FileVersion {
 }
 
 impl FileVersion {
+    #[cfg(not(unix))]
     fn from_metadata(metadata: &Metadata) -> Self {
-        #[cfg(unix)]
-        use std::os::unix::fs::MetadataExt;
-
         Self {
             len: metadata.len(),
             modified: metadata.modified().ok(),
-            #[cfg(unix)]
-            device: metadata.dev(),
-            #[cfg(unix)]
-            inode: metadata.ino(),
-            #[cfg(unix)]
-            mode: metadata.mode(),
-            #[cfg(unix)]
-            modified_seconds: metadata.mtime(),
-            #[cfg(unix)]
-            modified_nanoseconds: metadata.mtime_nsec(),
-            #[cfg(unix)]
-            changed_seconds: metadata.ctime(),
-            #[cfg(unix)]
-            changed_nanoseconds: metadata.ctime_nsec(),
         }
     }
 }
@@ -751,6 +1319,7 @@ impl FileVersion {
 mod tests {
     use std::{
         fs,
+        path::PathBuf,
         sync::atomic::{AtomicU64, Ordering},
     };
 
@@ -855,6 +1424,42 @@ mod tests {
     }
 
     #[test]
+    fn rejects_directory_encryption_markers_in_every_supported_location() -> Result<()> {
+        for location in [".iwpv2", "Metadata/.iwph", "Index/.iwpv2"] {
+            let temp = Temp::new()?;
+            fs::create_dir(temp.path().join("Index"))?;
+            fs::write(temp.path().join("Index/Document.iwa"), iwa(1, 10_000)?)?;
+            if location.starts_with("Metadata/") {
+                fs::create_dir(temp.path().join("Metadata"))?;
+            }
+            fs::write(temp.path().join(location), b"encrypted")?;
+
+            assert!(matches!(
+                FrozenDirectoryBundle::open(temp.path()),
+                Err(Error::Encrypted)
+            ));
+        }
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_nonportable_loose_member_basenames() -> Result<()> {
+        for name in ["colon:name.iwa", "line\nbreak.iwa", r"back\slash.iwa"] {
+            let temp = Temp::new()?;
+            fs::create_dir(temp.path().join("Index"))?;
+            fs::write(temp.path().join("Index").join(name), b"unsafe")?;
+
+            assert!(matches!(
+                FrozenDirectoryBundle::open(temp.path()),
+                Err(Error::InvalidBundle(message))
+                    if message.contains("not an exact portable basename")
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
     fn rejects_ambiguous_and_nested_index_representations() -> Result<()> {
         let temp = Temp::new()?;
         fs::create_dir(temp.path().join("Index"))?;
@@ -925,6 +1530,22 @@ mod tests {
             Err(Error::Limit { kind: LimitKind::TotalBytes, observed, maximum })
                 if observed == total && maximum == total - 1
         ));
+
+        let aggregate_input_limited = Limits::new(
+            total - 1,
+            2,
+            maximum_entry,
+            Limits::MAX_TOTAL_BYTES,
+            Limits::MAX_IWA_STREAM_BYTES,
+        )?;
+        assert!(matches!(
+            FrozenDirectoryBundle::open_with_limits(temp.path(), aggregate_input_limited),
+            Err(Error::Limit {
+                kind: LimitKind::InputBytes,
+                observed,
+                maximum
+            }) if observed == total && maximum == total - 1
+        ));
         Ok(())
     }
 
@@ -979,15 +1600,175 @@ mod tests {
         let temp = Temp::new()?;
         let path = temp.path().join("Document.iwa");
         fs::write(&path, b"first")?;
-        let version = require_file(&path, "test member")?;
+        let root_fd = unix_fs::open(
+            temp.path(),
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .map_err(unix_error)?;
+        let Node::File(version) = unix_inspect_node(&root_fd, c"Document.iwa", "test member")?
+        else {
+            return Err(Error::InvalidBundle(
+                "test member was not a regular file".to_owned(),
+            ));
+        };
         let replacement = temp.path().join("replacement.iwa");
         fs::write(&replacement, b"other")?;
         fs::rename(&replacement, &path)?;
 
         assert!(matches!(
-            read_stable_file(&path, &version, Limits::default(), FileRole::LooseEntry),
+            unix_read_stable_file_at(
+                &root_fd,
+                c"Document.iwa",
+                &version,
+                Limits::default(),
+                FileRole::LooseEntry
+            ),
             Err(Error::DirectoryChanged { .. })
         ));
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn exact_index_revalidation_runs_after_component_parsing() -> Result<()> {
+        let temp = Temp::new()?;
+        let source = index_zip(&[("Index/Document.iwa", iwa(1, 10_000)?)])?;
+        fs::write(temp.path().join("Index.zip"), &source)?;
+        let root_fd = unix_fs::open(
+            temp.path(),
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .map_err(unix_error)?;
+        let Node::File(version) = unix_inspect_node(&root_fd, c"Index.zip", "test Index.zip")?
+        else {
+            return Err(Error::InvalidBundle(
+                "test Index.zip was not a regular file".to_owned(),
+            ));
+        };
+        let captured = unix_read_stable_file_at(
+            &root_fd,
+            c"Index.zip",
+            &version,
+            Limits::default(),
+            FileRole::IndexZip,
+        )?;
+        let snapshot = FrozenDirectoryBundle::from_captured_index_zip(
+            captured,
+            DirectoryMarkers::default(),
+            Limits::default(),
+        )?;
+        assert_eq!(snapshot.components().len(), 1);
+
+        let replacement = temp.path().join("replacement.zip");
+        fs::write(&replacement, &source)?;
+        fs::rename(replacement, temp.path().join("Index.zip"))?;
+        assert!(matches!(
+            unix_ensure_node_version(
+                &root_fd,
+                c"Index.zip",
+                &version,
+                "test final Index.zip verification"
+            ),
+            Err(Error::DirectoryChanged { .. })
+        ));
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn opened_root_is_pinned_when_its_path_is_replaced() -> Result<()> {
+        let parent = Temp::new()?;
+        let source = parent.path().join("source.pages");
+        fs::create_dir(&source)?;
+        fs::create_dir(source.join("Index"))?;
+        fs::write(source.join("Index/Document.iwa"), iwa(1, 10_000)?)?;
+        let root_fd = unix_fs::open(
+            &source,
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .map_err(unix_error)?;
+
+        fs::rename(&source, parent.path().join("original.pages"))?;
+        fs::create_dir(&source)?;
+        fs::create_dir(source.join("Index"))?;
+        fs::write(source.join("Index/not-a-document.iwa"), b"malicious")?;
+
+        let frozen = FrozenDirectoryBundle::open_unix_root(&root_fd, Limits::default())?;
+        assert_eq!(frozen.components().len(), 1);
+        assert!(frozen.components().get("Index/Document.iwa").is_some());
+        assert!(
+            frozen
+                .components()
+                .get("Index/not-a-document.iwa")
+                .is_none()
+        );
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn replaced_index_path_cannot_redirect_or_publish_pinned_capture() -> Result<()> {
+        let temp = Temp::new()?;
+        let index = temp.path().join("Index");
+        fs::create_dir(&index)?;
+        fs::write(index.join("Document.iwa"), iwa(1, 10_000)?)?;
+        let root_fd = unix_fs::open(
+            temp.path(),
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .map_err(unix_error)?;
+        let Node::Directory(version) = unix_inspect_node(&root_fd, c"Index", "test Index")? else {
+            return Err(Error::InvalidBundle(
+                "test Index was not a directory".to_owned(),
+            ));
+        };
+        let index_fd = unix_open_directory_at(&root_fd, c"Index", &version)?;
+        let manifest = unix_scan_manifest(&index_fd, Limits::default())?;
+        let entries = unix_read_manifest(&index_fd, &manifest, Limits::default())?;
+        let frozen = FrozenDirectoryBundle::from_captured_loose(
+            entries,
+            DirectoryMarkers::default(),
+            Limits::default(),
+        )?;
+        assert!(frozen.components().get("Index/Document.iwa").is_some());
+
+        fs::rename(&index, temp.path().join("OriginalIndex"))?;
+        fs::create_dir(&index)?;
+        fs::write(index.join("Document.iwa"), iwa(2, 6_001)?)?;
+        assert_eq!(unix_scan_manifest(&index_fd, Limits::default())?, manifest);
+        assert!(matches!(
+            unix_ensure_node_version(
+                &root_fd,
+                c"Index",
+                &version,
+                "test final pinned Index verification"
+            ),
+            Err(Error::DirectoryChanged { .. })
+        ));
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn preexisting_ancestor_symlink_is_resolved_before_root_is_pinned() -> Result<()> {
+        use std::os::unix::fs::symlink;
+
+        let parent = Temp::new()?;
+        let actual = parent.path().join("actual");
+        fs::create_dir(&actual)?;
+        let source = actual.join("document.pages");
+        fs::create_dir(&source)?;
+        fs::create_dir(source.join("Index"))?;
+        fs::write(source.join("Index/Document.iwa"), iwa(1, 10_000)?)?;
+        let ancestor = parent.path().join("ancestor-link");
+        symlink(&actual, &ancestor)?;
+
+        let frozen = FrozenDirectoryBundle::open(ancestor.join("document.pages"))?;
+        assert_eq!(frozen.components().len(), 1);
         Ok(())
     }
 

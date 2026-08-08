@@ -518,3 +518,84 @@ host-versus-focused parity oracles for every removed behavior, completed fuzz
 execution, and migration of the remaining editors/tests/examples that depend
 on broader host semantics. This slice does not claim complete Buffa conversion;
 the remaining focused Prost graph decoders stay tracked migration work.
+
+## 2026-08-08 validated logical ingress and capability-anchored directories
+
+The archive boundary now owns `LogicalSourceCatalog`, the admission point for
+an immutable `litchi-iwa-package::FrozenEntryStore`. Construction performs a
+complete validation pass over every entry before decoding any IWA stream:
+entry count, exact portable name, individual and aggregate name metadata,
+individual and aggregate payload bytes, encryption markers, and any basename
+equal to `Index.zip` all fail through typed physical categories. Because the
+input is already a logical package, the physical `max_input_bytes` ceiling is
+not reinterpreted as a payload ceiling; entry and expanded-byte limits remain
+authoritative. The same frozen store is retained through one component
+classification and is dropped before format-owned semantic decoding. This
+route never synthesizes ZIP bytes, claims exact-save provenance, or produces a
+`SourceCatalog`.
+
+The detector exposes this only through doc-hidden prepared-source integration
+methods. The supported root API deliberately gains no entry-store constructor:
+the migration host did not expose a direct logical-entry API, and publishing
+one would leak package names and physical capabilities into the semantic
+facade. The root rustdoc gate now rejects `litchi_iwa_package` in addition to
+the other implementation crates. Tests cover copy-on-write isolation without
+payload copying, direct-ZIP classification parity for all three applications,
+operation-log exclusion, exact and one-over logical limits, unsafe names,
+encryption, and unexpanded nested indexes.
+
+Directory capture is now capability-anchored on Unix. The final bundle root is
+opened with no-follow semantics and pinned; `Index`, its manifest, and every
+member are acquired relative to retained descriptors. Descriptor identity,
+node type, byte length, manifest contents, application-marker evidence, and
+the selected `Index.zip` or loose `Index/` representation are revalidated after
+component parsing and before publication. Root and `Metadata` encryption
+markers, loose-index encryption markers, nonportable basenames, exact read
+length, and the aggregate loose payload against both input and expanded-byte
+ceilings are enforced. Replacing an ancestor pathname after the root is open,
+the root pathname itself, `Index`, or an individual member cannot redirect a
+published snapshot. A pre-existing ancestor symlink is still resolved by the
+initial operating-system path lookup and is documented as such.
+
+Non-Unix capture retains the path-based identity/revalidation fallback. It now
+shares the encryption, aggregate accounting, portable-name, read-length, and
+post-parse checks, but it does not claim the same adversarial replacement
+resistance as descriptor-relative Unix acquisition. Cross-file atomicity also
+remains unavailable without a filesystem snapshot or external lock. These are
+explicit portability limits, not inferred security guarantees.
+
+The archive-free aggregate corrected two semantic invariants. Keynote text is
+now consistently ordered as title, ordinary content, additional rich storage,
+then notes, matching the root and focused leaf contracts. Retained text budgets
+now include Keynote navigator names and Pages section names even though those
+identity strings are not emitted by `iter_text`. Exact and one-under tests
+cover the additive budget, storage/notes order, empty storage filtering, and
+leaf/aggregate parity. The root error vocabulary also distinguishes objects,
+sheets, references, text storages/fragments, payload bytes, fields, and nesting
+depth; known Pages, Keynote, and Numbers limits map exactly, while invalid
+aggregate positions report validation invariants. Nested Numbers common-error
+classification remains a leaf-owned follow-up rather than introducing a root
+dependency on `litchi-iwa-common`.
+
+Migration ownership moved forward without deleting behavior. The obsolete
+host `read_iwork` example is superseded by the bounded root example, the
+Numbers structured-extraction example now lives in `litchi-numbers`, and the
+host-only `once_cell` use is a development dependency. The migration host's
+detector compatibility conversion now handles every expanded detector category
+and retains a future-proof fallback; all 1,479 host library tests pass.
+
+Computer Use reopened the checked-in directory fixtures in Pages, Numbers,
+and Keynote. The expected Pages three-line body, Numbers 22-by-7 table with its
+text and numeric marker cells, and Keynote title/body/date were visible without
+repair or conversion UI. The applications nevertheless rewrote each
+`Index.zip`, `Metadata/DocumentIdentifier`, and `Metadata/Properties.plist`
+merely by opening the packages. The manifest gate detected all nine changes;
+the exact tracked bytes were restored and every checked-in member hash passed.
+This is visual compatibility evidence, not a native nonmutation claim, and
+future direct application checks must use disposable copies.
+
+The root fuzz target compiles offline, but `cargo-fuzz` is not installed and no
+sanitizer campaign was executed. Consequently the host structured adapter,
+its dependency, and all 17 recorded monolith debt edges remain. This amendment
+does not authorize monolith deletion, claim complete Buffa laziness, or infer
+edit/resave fidelity from the new source routes.

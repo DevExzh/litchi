@@ -12,6 +12,7 @@ rust-version.workspace = true
 litchi-iwa-archive = { workspace = true }
 litchi-iwa-common  = { workspace = true }
 litchi-iwa-core    = { workspace = true }
+litchi-iwa-package = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

@@ -719,6 +719,9 @@ fn validate_parts(
         }
     }
     for slide in slides {
+        if let Some(name) = slide.name() {
+            text_bytes = checked_text_add(text_bytes, name.len(), max_text_bytes)?;
+        }
         if let Some(title) = slide.title() {
             text_bytes = checked_text_add(text_bytes, title.len(), max_text_bytes)?;
         }
@@ -733,6 +736,9 @@ fn validate_parts(
         }
     }
     for section in sections {
+        if let Some(name) = section.name() {
+            text_bytes = checked_text_add(text_bytes, name.len(), max_text_bytes)?;
+        }
         if let Some(heading) = section.heading() {
             text_bytes = checked_text_add(text_bytes, heading.len(), max_text_bytes)?;
         }
@@ -794,16 +800,16 @@ fn slide_text(slide: &Slide) -> impl Iterator<Item = Text<'_>> + '_ {
         .text_content()
         .iter()
         .map(|text| Text::new(TextKind::SlideContent, text));
-    let notes = slide
-        .notes()
-        .map(|text| Text::new(TextKind::SlideNotes, text))
-        .into_iter();
     let storages = slide
         .text_storages()
         .iter()
         .filter(|storage| !storage.is_empty())
         .map(|storage| Text::new(TextKind::SlideStorage, storage.text()));
-    title.chain(content).chain(notes).chain(storages)
+    let notes = slide
+        .notes()
+        .map(|text| Text::new(TextKind::SlideNotes, text))
+        .into_iter();
+    title.chain(content).chain(storages).chain(notes)
 }
 
 fn section_text(section: &Section) -> impl Iterator<Item = Text<'_>> + '_ {
@@ -826,6 +832,7 @@ fn section_text(section: &Section) -> impl Iterator<Item = Text<'_>> + '_ {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_iwa_text::storage::Storage;
 
     fn empty_parts() -> (Vec<Table>, Vec<Slide>, Vec<Section>) {
         (Vec::new(), Vec::new(), Vec::new())
@@ -905,6 +912,93 @@ mod tests {
             ]
         );
         assert_eq!(data.all_text(), ["Table: Data", "Title", "Body", "Heading"]);
+    }
+
+    #[test]
+    fn keynote_text_iteration_places_rich_storage_before_speaker_notes() {
+        let mut builder = Slide::builder(0);
+        builder.set_title(Some("Title".to_owned()));
+        builder.push_text("Body".to_owned());
+        builder.push_text_storage(Storage::from_text(String::new()));
+        builder.push_text_storage(Storage::from_text("Additional".to_owned()));
+        builder.set_notes(Some("Notes".to_owned()));
+
+        let data = StructuredData::from_parts(Vec::new(), vec![builder.build()], Vec::new())
+            .unwrap_or_else(|error| panic!("semantic values should be valid: {error}"));
+
+        assert_eq!(
+            data.iter_text()
+                .map(|text| (text.kind(), text.value()))
+                .collect::<Vec<_>>(),
+            [
+                (TextKind::SlideTitle, "Title"),
+                (TextKind::SlideContent, "Body"),
+                (TextKind::SlideStorage, "Additional"),
+                (TextKind::SlideNotes, "Notes"),
+            ]
+        );
+        assert_eq!(data.all_text(), ["Title", "Body", "Additional", "Notes"]);
+        assert_eq!(
+            data.slide(0).map(Slide::all_text),
+            Some(vec![
+                "Title".to_owned(),
+                "Body".to_owned(),
+                "Additional".to_owned(),
+                "Notes".to_owned(),
+            ])
+        );
+    }
+
+    #[test]
+    fn retained_text_budget_includes_slide_and_section_names() {
+        fn named_parts() -> (Vec<Table>, Vec<Slide>, Vec<Section>) {
+            let mut slide = Slide::builder(0);
+            slide.set_name(Some("Navigator".to_owned()));
+            slide.set_title(Some("T".to_owned()));
+
+            let mut section = Section::builder(0, litchi_pages::SectionType::Body);
+            section
+                .set_name(Some("Section"))
+                .unwrap_or_else(|error| panic!("section name should be valid: {error}"));
+            section.push_paragraph("P".to_owned());
+
+            (Vec::new(), vec![slide.build()], vec![section.build()])
+        }
+
+        let retained_bytes = "Navigator".len() + "T".len() + "Section".len() + "P".len();
+        assert_eq!(retained_bytes, 18);
+
+        let exact = Limits::try_new(1, 1, 1, retained_bytes)
+            .unwrap_or_else(|error| panic!("exact retained-text limit should be valid: {error}"));
+        let (exact_tables, exact_slides, exact_sections) = named_parts();
+        let data = StructuredData::from_parts_with_limits(
+            exact_tables,
+            exact_slides,
+            exact_sections,
+            exact,
+        )
+        .unwrap_or_else(|error| panic!("exact retained-text limit should pass: {error}"));
+        assert_eq!(
+            data.iter_text().map(Text::value).collect::<Vec<_>>(),
+            ["T", "P"]
+        );
+
+        let one_under = Limits::try_new(1, 1, 1, retained_bytes - 1).unwrap_or_else(|error| {
+            panic!("one-under retained-text limit should be valid: {error}")
+        });
+        let (under_tables, under_slides, under_sections) = named_parts();
+        assert!(matches!(
+            StructuredData::from_parts_with_limits(
+                under_tables,
+                under_slides,
+                under_sections,
+                one_under,
+            ),
+            Err(Error::TextTooLarge {
+                observed: 18,
+                maximum: 17,
+            })
+        ));
     }
 
     #[test]
