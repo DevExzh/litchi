@@ -74,6 +74,24 @@ impl Package {
         Self::from_bytes(bytes)
     }
 
+    /// Publish an exact-source checked tracked-change commit.
+    pub(crate) fn replace_tracked_changes(
+        &self,
+        commit: &crate::tracked_changes::Commit,
+    ) -> Result<Self> {
+        if !commit.changed() {
+            return Err(Error::InvalidFormat(
+                "unchanged tracked-change commit must not rebuild the package".to_string(),
+            ));
+        }
+        if self.content_xml() != commit.patch().source() {
+            return Err(Error::InvalidFormat(
+                "tracked-change package source snapshot does not match".to_string(),
+            ));
+        }
+        self.replace_content_xml(commit.content_xml())
+    }
+
     /// Replace or remove `meta.xml` while preserving every other package
     /// member and all unknown metadata XML not selected by the common patch.
     pub(crate) fn replace_metadata_xml(&self, metadata_xml: Option<&str>) -> Result<Self> {

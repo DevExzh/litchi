@@ -6,7 +6,9 @@
 //! in `tests`.
 
 mod codec;
+mod limits;
 mod model;
+mod transaction;
 
 #[cfg(test)]
 mod tests;
@@ -30,10 +32,13 @@ pub(super) fn append_size(aggregate: &mut usize, amount: usize) -> Result<()> {
     Ok(())
 }
 
+pub use limits::Limits;
 pub use model::{
     Acceptance, Cell, CellAddress, CellValue, Change, Changes, ContentChange, CutOff, Deletion,
-    Dimension, Info, Insertion, Metadata, Movement, NestedDeletion, RangeAddress,
+    Dimension, Info, Insertion, Integer, Metadata, Movement, NestedDeletion, PositiveInteger,
+    RangeAddress,
 };
+pub use transaction::{Commit, Patch, Snapshot, Transaction, update};
 
 #[allow(
     unused_imports,

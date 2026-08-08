@@ -81,6 +81,51 @@ impl Spreadsheet {
         crate::annotations::Snapshot::parse(self.package.content_xml())
     }
 
+    /// Capture the presence-aware, exact-source tracked-change owner.
+    pub fn tracked_changes(&self) -> Result<crate::tracked_changes::Snapshot> {
+        crate::tracked_changes::Snapshot::parse(self.package.content_xml())
+    }
+
+    /// Capture tracked changes under an explicit resource budget.
+    pub fn tracked_changes_with(
+        &self,
+        limits: crate::tracked_changes::Limits,
+    ) -> Result<crate::tracked_changes::Snapshot> {
+        crate::tracked_changes::Snapshot::parse_with_limits(self.package.content_xml(), limits)
+    }
+
+    /// Stage, validate, rebuild, and fully rehydrate one inert tracked-change edit.
+    pub fn update_tracked_changes<F>(&mut self, edit: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::tracked_changes::Transaction) -> Result<()>,
+    {
+        let snapshot = self.tracked_changes()?;
+        let commit = crate::tracked_changes::update(&snapshot, edit)?;
+        if !commit.changed() {
+            return Ok(());
+        }
+        let package = self.package.replace_tracked_changes(&commit)?;
+        let candidate = Self::from_package(package)?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Apply an exact-source tracked-change patch and fully rehydrate the candidate.
+    pub fn apply_tracked_changes_patch(
+        &mut self,
+        patch: &crate::tracked_changes::Patch,
+    ) -> Result<()> {
+        let snapshot = self.tracked_changes()?;
+        let commit = patch.apply(&snapshot)?;
+        if !commit.changed() {
+            return Ok(());
+        }
+        let package = self.package.replace_tracked_changes(&commit)?;
+        let candidate = Self::from_package(package)?;
+        *self = candidate;
+        Ok(())
+    }
+
     /// Publish a validated annotation transaction without rebuilding an
     /// unchanged package.
     pub(crate) fn publish_annotations(&mut self, content_xml: &str) -> Result<()> {
