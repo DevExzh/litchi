@@ -7743,3 +7743,51 @@ detached models, type-9 numeric values, global ordering, canonical-6001 before
 legacy-6000 deduplication, and inclusive/exceeded table limits. No host
 deletion, complete Buffa conversion, edit/save compatibility, performance, or
 exhaustive-fuzz claim follows from this amendment.
+
+## 2026-08-08 amendment: Numbers oracle transfer and structured cutover
+
+The five prerequisite Numbers oracles now have focused and root ownership.
+The focused suite checks a deterministic 535-byte fixture byte-for-byte against
+`test-data/synthetic-iwork/numbers/compatibility-oracles.hex` (SHA-256
+`352ca6ad6891c7222f76cdb5fe48178f1efb340dc82ab5bc6755b71a2d2595bc`).
+It proves detached-versus-rooted behavior, an independently encoded finite
+decimal128 type-9 value with exact `f64` bits, rooted and package-global order
+under physical reordering, canonical type-6001 precedence over legacy
+type-6000 with single emission, and inclusive three-table versus exceeded
+two-table limits. Root-only tests repeat the public semantic contract and add
+exact content-free error tuples for table and late detached-text limits.
+
+Legacy type-6000 admission now uses a bounded wire fingerprint before decode.
+Unrelated payloads remain skippable, while a model-shaped payload propagates
+malformed, limit, and allocation failures. Rooted model admission preserves
+duplicate-error precedence, charges the table budget before decode, and uses a
+fallible reserve. Numbers publishes a format-owned resource-error taxonomy;
+the root maps it exhaustively without depending on `litchi-iwa-common`.
+
+After those transfers, the host structured module, method, re-export, tests,
+support hooks, and dependency were deleted. Verification recorded 100 focused
+Numbers unit tests plus five compatibility oracles and its native/prepared
+integrations; 77 root library tests plus three cutover tests; 1,470 host unit
+tests, the generated-roundtrip integration, and 23 host doctests. Boundary
+policy reported 63 packages, 220 internal declarations, and 14 ordered debts;
+47 boundary-checker and 10 public-API-checker tests passed. Production host,
+root, and neutral structured strict Clippy gates passed, as did a focused
+Numbers gate with the repository's enumerated existing lint allowances.
+Root `parse_iwork` and host `parse_iwa` sanitizer fuzz targets built
+successfully; the earlier bounded root campaign remains the execution
+evidence rather than a claim of exhaustive fuzzing.
+
+Computer Use opened a locked disposable copy of the app-authored Numbers 14.4
+order oracle (`781181e89c655da5c92b677b9ba5c939c85379e7b33ccf10e3846fe8588f9c5b`).
+It showed `SecondCreated` before `FirstCreated`, with the expected
+`B-only-table`, `A-new-table`, and `A-old-table` markers and an unrelated
+non-table drawable. No repair, recovery, conversion, warning, or save prompt
+appeared; close preserved the exact hash. Focused reread produced the same
+rooted order and the documented package-global compatibility order.
+
+This evidence closes debt 011 only. It does not complete `litchi-iwa`
+deletion, whole-graph Buffa lazy decoding, durable patches, atomic native
+publication, deep focused fuzzing, edit/save compatibility, or aggregate
+peak-memory work. In particular, root source preparation currently
+materializes unrelated ZIP members transiently and remains a measured memory
+debt.

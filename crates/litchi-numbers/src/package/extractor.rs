@@ -237,6 +237,80 @@ fn table_limit_error(observed: usize, maximum: usize) -> Error {
     }
 }
 
+fn decode_legacy_table_candidate<T>(
+    data: &[u8],
+    parse: impl FnOnce(tst::TableModelArchive) -> Result<T>,
+) -> Result<Option<T>> {
+    match has_legacy_table_model_wire_shape(data) {
+        Ok(true) => {},
+        Ok(false) => return Ok(None),
+        Err(error) => return Err(error),
+    }
+    let table_model = tst::TableModelArchive::decode(data).map_err(Error::protobuf)?;
+    parse(table_model).map(Some)
+}
+
+/// Require the parse-relevant required fields that distinguish a historical
+/// type-6000 `TableModelArchive` from its modern `TableInfoArchive` owner.
+///
+/// Prost supplies defaults for absent proto2 required fields, so a successful
+/// generated decode alone is not evidence that the payload is a table model.
+/// In particular, protobuf's permissive unknown-field handling lets ordinary
+/// table-info metadata decode into a mostly default model. Scanning only the
+/// flat envelope retains the compatibility fallback without allocating a
+/// second field index. Once this shape is present, the candidate is admitted
+/// and every model-decoding failure must remain observable to the caller.
+fn has_legacy_table_model_wire_shape(data: &[u8]) -> Result<bool> {
+    const DATA_STORE: u8 = 1 << 0;
+    const ROW_COUNT: u8 = 1 << 1;
+    const COLUMN_COUNT: u8 = 1 << 2;
+    const TABLE_NAME: u8 = 1 << 3;
+    const REQUIRED: u8 = DATA_STORE | ROW_COUNT | COLUMN_COUNT | TABLE_NAME;
+
+    let mut present = 0_u8;
+    let mut ambiguous = false;
+    let preflight = preflight_wire_tree_with_limits(data, WireLimits::default(), |visit| {
+        let field = visit.field();
+        let required = match field.number() {
+            4 => Some((DATA_STORE, 2)),
+            6 => Some((ROW_COUNT, 0)),
+            7 => Some((COLUMN_COUNT, 0)),
+            8 => Some((TABLE_NAME, 2)),
+            _ => None,
+        };
+        if let Some((bit, expected_wire_type)) = required {
+            if field.wire_type() != expected_wire_type || present & bit != 0 {
+                ambiguous = true;
+            } else {
+                present |= bit;
+            }
+        }
+        Ok(WireDescent::Skip)
+    });
+    if let Err(error) = preflight {
+        return match error {
+            litchi_iwa_common::Error::InvalidFormat(_) if present == REQUIRED => {
+                Err(Error::MalformedPayload {
+                    path: SemanticPath::StructuredTables,
+                })
+            },
+            litchi_iwa_common::Error::InvalidFormat(_) => Ok(false),
+            common_error @ (litchi_iwa_common::Error::LimitExceeded { .. }
+            | litchi_iwa_common::Error::Allocation { .. }
+            | litchi_iwa_common::Error::InvalidLimit { .. }) => Err(Error::Common(common_error)),
+        };
+    }
+    if present != REQUIRED {
+        return Ok(false);
+    }
+    if ambiguous {
+        return Err(Error::MalformedPayload {
+            path: SemanticPath::StructuredTables,
+        });
+    }
+    Ok(true)
+}
+
 fn compact_table<T>(entries: impl IntoIterator<Item = (u32, T)>) -> Result<CompactTable<T>> {
     let mut compacted = Vec::new();
     let entries = entries.into_iter();
@@ -587,14 +661,9 @@ impl<'a> TableDataExtractor<'a> {
                 "Numbers legacy table candidate has duplicate legacy payloads".to_owned(),
             ));
         }
-        let Ok(table_model) = tst::TableModelArchive::decode(&*message.data) else {
-            return Ok(None);
-        };
-        if let Ok(table) = self.parse_table_model(table_model) {
-            return Ok(Some(table));
-        }
-
-        Ok(None)
+        decode_legacy_table_candidate(&message.data, |table_model| {
+            self.parse_table_model(table_model)
+        })
     }
 
     /// Extract a table model reached through a schema-proven `TableInfo` edge.
@@ -3612,17 +3681,19 @@ mod tests {
     use super::{
         CellTables, Error, FormulaReferenceBudget, FormulaReferenceMaps, FormulaRenderer,
         MAX_FORMULA_CATEGORY_DEPTH, MAX_FORMULA_WIRE_BYTES, MAX_FORMULA_WORK, ProjectionBudget,
-        TableDataExtractor, collect_formula_category_payload, render_formula,
-        render_formula_ast_array,
+        TableDataExtractor, collect_formula_category_payload, decode_legacy_table_candidate,
+        has_legacy_table_model_wire_shape, render_formula, render_formula_ast_array,
     };
     use crate::cell::Value as CellValue;
     use crate::cell::wire::{BncCell, decimal128_le};
-    use crate::package::SemanticPath;
+    use crate::package::{ReadOptions, SemanticPath, compatibility_tables_from_bytes_with_options};
     use crate::{PackageSemanticLimits as SemanticLimits, SemanticLimitKind};
+    use litchi_iwa_archive::Limits;
     use litchi_iwa_common::comment::Comment;
     use litchi_iwa_common::wire::append_length_delimited_field;
+    use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
     use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeType};
-    use litchi_iwa_protos::{tsce, tsp, tst};
+    use litchi_iwa_protos::{tn, tsce, tsp, tst};
     use prost::Message as _;
     use std::collections::HashMap;
 
@@ -3647,6 +3718,203 @@ mod tests {
             ast_node_array: tsce::AstNodeArrayArchive { ast_node: nodes },
             ..Default::default()
         }
+    }
+
+    fn reference(identifier: u64) -> tsp::Reference {
+        tsp::Reference {
+            identifier,
+            ..Default::default()
+        }
+    }
+
+    fn archive_object(identifier: u64, messages: Vec<RawMessage>) -> super::Result<ArchiveObject> {
+        ArchiveObject::new(identifier, messages)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))
+    }
+
+    fn compatibility_package(objects: Vec<ArchiveObject>) -> super::Result<Vec<u8>> {
+        let archive = Archive { objects }
+            .to_bytes()
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let stream = SnappyStream::compress(&archive)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        Ok(litchi_iwa_archive::package::to_bytes(
+            [("Index/Document.iwa", stream.as_slice())],
+            Limits::default(),
+        )?)
+    }
+
+    fn legacy_model(name: &str, sidecar_id: u64) -> tst::TableModelArchive {
+        tst::TableModelArchive {
+            table_name: name.to_owned(),
+            number_of_rows: 1,
+            number_of_columns: 1,
+            base_data_store: tst::DataStore {
+                string_table: reference(sidecar_id),
+                formula_table: reference(sidecar_id),
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn table_info_wire_is_a_legacy_classification_miss() -> super::Result<()> {
+        let table_info = tst::TableInfoArchive::default().encode_to_vec();
+        assert!(!has_legacy_table_model_wire_shape(&table_info)?);
+        assert!(
+            decode_legacy_table_candidate(&table_info, |_model| -> super::Result<()> {
+                panic!("table-info false positive reached model extraction")
+            })?
+            .is_none()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn admitted_legacy_candidate_preserves_common_allocation_error() -> super::Result<()> {
+        let encoded = legacy_model("model", 90).encode_to_vec();
+        assert!(has_legacy_table_model_wire_shape(&encoded)?);
+        let result: super::Result<Option<()>> = decode_legacy_table_candidate(&encoded, |_model| {
+            Err(Error::Common(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers retained semantic text",
+                amount: 5,
+            }))
+        });
+        let error = result
+            .err()
+            .ok_or_else(|| Error::InvalidFormat("allocation error was swallowed".to_owned()))?;
+        assert!(matches!(
+            &error,
+            Error::Common(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers retained semantic text",
+                amount: 5,
+            })
+        ));
+        assert_eq!(
+            error.to_string(),
+            "IWA wire allocation failed for Numbers retained semantic text: 5"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn admitted_legacy_decode_failure_reports_exact_content_free_path() -> super::Result<()> {
+        // Required model fields 4, 6, 7, and 8 are present with their schema
+        // wire types, but the nested DataStore payload is malformed.
+        let encoded = [0x22, 0x01, 0xff, 0x30, 0x01, 0x38, 0x01, 0x42, 0x01, b'x'];
+        assert!(has_legacy_table_model_wire_shape(&encoded)?);
+        let result = decode_legacy_table_candidate(&encoded, |_model| -> super::Result<()> {
+            panic!("malformed admitted model reached semantic extraction")
+        });
+        let error = result.err().ok_or_else(|| {
+            Error::InvalidFormat("admitted model decode error was swallowed".to_owned())
+        })?;
+        assert!(matches!(
+            &error,
+            Error::MalformedPayload {
+                path: SemanticPath::StructuredTables,
+            }
+        ));
+        assert_eq!(
+            error.to_string(),
+            "malformed Numbers payload at structured tables"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn admitted_legacy_duplicate_required_field_fails_closed() -> super::Result<()> {
+        let mut encoded = legacy_model("model", 90).encode_to_vec();
+        encoded.extend_from_slice(&[0x30, 0x01]);
+        let result = decode_legacy_table_candidate(&encoded, |_model| -> super::Result<()> {
+            panic!("ambiguous admitted model reached semantic extraction")
+        });
+        assert!(matches!(
+            result,
+            Err(Error::MalformedPayload {
+                path: SemanticPath::StructuredTables,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn admitted_legacy_malformed_trailing_wire_fails_closed() -> super::Result<()> {
+        let mut encoded = legacy_model("model", 90).encode_to_vec();
+        encoded.push(0xff);
+        assert!(matches!(
+            decode_legacy_table_candidate(&encoded, |_model| -> super::Result<()> {
+                panic!("malformed admitted model reached semantic extraction")
+            }),
+            Err(Error::MalformedPayload {
+                path: SemanticPath::StructuredTables,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn admitted_legacy_name_limit_reports_exact_content_free_error() -> super::Result<()> {
+        let sidecars = archive_object(
+            90,
+            [
+                tst::table_data_list::ListType::String,
+                tst::table_data_list::ListType::Formula,
+            ]
+            .into_iter()
+            .map(|list_type| RawMessage {
+                type_: 6_005,
+                data: tst::TableDataList {
+                    list_type: list_type as i32,
+                    next_list_id: 1,
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            })
+            .collect(),
+        )?;
+        let bytes = compatibility_package(vec![
+            archive_object(
+                1,
+                vec![RawMessage {
+                    type_: 1,
+                    data: tn::DocumentArchive::default().encode_to_vec(),
+                }],
+            )?,
+            sidecars,
+            archive_object(
+                10,
+                vec![RawMessage {
+                    type_: 6_000,
+                    data: legacy_model("\u{e9}", 90).encode_to_vec(),
+                }],
+            )?,
+        ])?;
+        let semantic = SemanticLimits::default()
+            .with_projection_limits(SemanticLimits::MAX_MATERIALIZED_CELLS, 1)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let result = compatibility_tables_from_bytes_with_options(
+            &bytes,
+            ReadOptions::new(Limits::default(), semantic),
+        );
+        let error = result
+            .err()
+            .ok_or_else(|| Error::InvalidFormat("text limit error was swallowed".to_owned()))?;
+        assert!(matches!(
+            &error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::OutputTextBytes,
+                observed: 2,
+                maximum: 1,
+                path: SemanticPath::StructuredTables,
+            }
+        ));
+        assert_eq!(
+            error.to_string(),
+            "Numbers semantic output text bytes limit exceeded at structured tables: observed 2, maximum 1"
+        );
+        Ok(())
     }
 
     #[test]

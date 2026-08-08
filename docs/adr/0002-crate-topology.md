@@ -1260,3 +1260,27 @@ fixture writers now use the archive owner's package serializer, removing their
 two direct development-only `soapberry-zip` edges. The current inventory is 63
 workspace packages, 221 internal dependency declarations, and 15 ordered
 migration debts; this is dependency hygiene, not debt retirement.
+
+## 2026-08-08 amendment: structured read-seam retirement
+
+The historical construction of neutral structured data inside `litchi-iwa`
+is superseded. The root facade now asks each concrete format owner for its
+semantic projection and constructs `litchi-iwa-structured::StructuredData`
+directly. Numbers owns its deliberately allocating package-global
+compatibility projection, including valid detached table models; Pages and
+Keynote retain their focused rooted document projections. The neutral crate
+continues to own only the format-independent aggregate model and aggregate
+budgets.
+
+The host's `structured` module, `StructuredData` re-export,
+`Document::extract_structured_data` method, adapter tests, support-only
+Numbers hooks, and manifest edge to `litchi-iwa-structured` are removed. Debt
+identity 011 is deleted without renumbering later debts. The checked inventory
+is now 63 workspace packages, 220 internal dependency declarations, and 14
+ordered migration debts.
+
+This is the retirement of one read seam, not the monolith. The migration host
+still owns unmigrated editing and compatibility behavior, the wider Numbers
+payload graph still contains bounded eager Prost paths, and root preparation
+can transiently materialize unrelated ZIP members. Those ownership, Buffa,
+and aggregate peak-memory boundaries remain open.

@@ -1,8 +1,9 @@
 //! Transactional semantic editing for Numbers spreadsheets.
 //!
 //! This module is the stable Numbers-editor facade. Typed semantic state and
-//! editor operations live in [`semantic`], while package-boundary adapters live
-//! in [`package`]. The existing contextual owners below remain private seams
+//! editor operations live in the private `semantic` module, while
+//! package-boundary adapters live in the private `package` module. The
+//! existing contextual owners below remain private seams
 //! behind this facade so their snapshot-edit APIs continue to resolve through
 //! the same `numbers::editor` namespace.
 

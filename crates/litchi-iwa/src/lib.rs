@@ -20,9 +20,6 @@
 //! println!("Objects: {}", stats.total_objects);
 //! println!("Application: {:?}", stats.application);
 //!
-//! // Extract structured data (tables, slides, sections)
-//! let structured = doc.extract_structured_data()?;
-//! println!("{}", structured.summary());
 //! # Ok::<(), litchi_iwa::Error>(())
 //! ```
 //!
@@ -54,10 +51,10 @@
 //! - Support for images, videos, audio, PDFs
 //! - Media extraction and statistics
 //!
-//! ### Structured Data
-//! - Tables from Numbers (with CSV export)
-//! - Slides from Keynote (with titles and content)
-//! - Sections from Pages (with headings and paragraphs)
+//! ### Format-owned semantic data
+//! - Use `litchi::iwork` for a supported cross-format snapshot API
+//! - Use `litchi-numbers`, `litchi-keynote`, or `litchi-pages` for concrete
+//!   format semantics
 //!
 //! ### Parsing from Bytes
 //! - No file system access required
@@ -100,14 +97,14 @@
 //! ### Extract tables
 //!
 //! ```rust,no_run
-//! use litchi_iwa::Document;
+//! use litchi_iwa::numbers::NumbersDocument;
 //!
-//! let doc = Document::open("spreadsheet.numbers")?;
-//! let structured = doc.extract_structured_data()?;
+//! let doc = NumbersDocument::open("spreadsheet.numbers")?;
 //!
-//! for table in structured.tables() {
-//!     let csv = table.to_csv();
-//!     println!("Table: {}\n{}", table.name(), csv);
+//! for sheet in doc.semantic_sheets().iter() {
+//!     for table in sheet.tables() {
+//!         println!("Table: {}", table.name());
+//!     }
 //! }
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
@@ -151,7 +148,6 @@ mod protobuf;
 #[cfg(test)]
 mod registry;
 mod snappy;
-mod structured;
 /// Typed copy-on-write appearance controls shared by Pages, Numbers, and Keynote.
 pub mod table_appearance;
 mod table_hidden_axes;
@@ -213,7 +209,6 @@ pub use media::{
 };
 pub(crate) use package::IWorkPackage;
 pub use shapes::DrawableTitleCaption;
-pub use structured::StructuredData;
 pub use text::{
     Format, Fragment, Run, Storage, TextDecorations, TextPointSize, TextStrikethrough, TextStyle,
     TextUnderline,

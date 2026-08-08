@@ -474,16 +474,5 @@ mod tests {
             snapshot.semantic_document().text_len(),
             sections[0].plain_text().len()
         );
-
-        let structured = crate::structured::extract_sections(
-            &document.state.bundle,
-            &document.state.object_index,
-        )
-        .unwrap();
-        assert_eq!(structured.len(), 1);
-        assert_eq!(
-            structured[0].text_storages()[0].text(),
-            "Pages body — café 東京 🚀"
-        );
     }
 }

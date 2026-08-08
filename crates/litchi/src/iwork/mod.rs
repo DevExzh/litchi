@@ -411,6 +411,9 @@ fn keynote_payload_resource(kind: litchi_keynote::PayloadLimitKind) -> Resource 
 }
 
 fn map_numbers(error: litchi_numbers::PackageError) -> Error {
+    if let Some(resource_error) = error.resource_error() {
+        return map_numbers_resource_error(resource_error);
+    }
     match error {
         litchi_numbers::PackageError::Io(_error) => Error::new(
             ErrorKind::Io,
@@ -440,6 +443,41 @@ fn map_numbers(error: litchi_numbers::PackageError) -> Error {
             usize_u64(maximum),
         ),
         _ => Error::invalid_data(Some(Format::Numbers), Stage::Semantic),
+    }
+}
+
+fn map_numbers_resource_error(error: litchi_numbers::PackageResourceError) -> Error {
+    match error {
+        litchi_numbers::PackageResourceError::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Error::limit(
+            Some(Format::Numbers),
+            Stage::Semantic,
+            numbers_payload_resource(kind),
+            usize_u64(observed),
+            usize_u64(maximum),
+        ),
+        litchi_numbers::PackageResourceError::Allocation { amount } => {
+            Error::allocation(Some(Format::Numbers), Stage::Semantic, usize_u64(amount))
+        },
+        _ => Error::invalid_data(Some(Format::Numbers), Stage::Semantic),
+    }
+}
+
+fn numbers_payload_resource(kind: litchi_numbers::PackagePayloadLimitKind) -> Resource {
+    match kind {
+        litchi_numbers::PackagePayloadLimitKind::InputBytes => Resource::PayloadBytes,
+        litchi_numbers::PackagePayloadLimitKind::Fields => Resource::Fields,
+        litchi_numbers::PackagePayloadLimitKind::OutputBytes => Resource::OutputBytes,
+        litchi_numbers::PackagePayloadLimitKind::Nesting => Resource::NestingDepth,
+        litchi_numbers::PackagePayloadLimitKind::RewriteWork => Resource::SemanticWork,
+        litchi_numbers::PackagePayloadLimitKind::TableRows
+        | litchi_numbers::PackagePayloadLimitKind::TableColumns
+        | litchi_numbers::PackagePayloadLimitKind::TableCells
+        | litchi_numbers::PackagePayloadLimitKind::MaterializedCells => Resource::Cells,
+        _ => Resource::SemanticWork,
     }
 }
 
@@ -790,6 +828,46 @@ mod tests {
             });
             assert_limit_shape(error, Format::Numbers, Stage::Semantic, resource);
         }
+    }
+
+    #[test]
+    fn numbers_payload_limits_map_every_known_resource_exactly() {
+        use litchi_numbers::{PackagePayloadLimitKind as LimitKind, PackageResourceError};
+
+        let resources = [
+            (LimitKind::InputBytes, Resource::PayloadBytes),
+            (LimitKind::Fields, Resource::Fields),
+            (LimitKind::OutputBytes, Resource::OutputBytes),
+            (LimitKind::Nesting, Resource::NestingDepth),
+            (LimitKind::RewriteWork, Resource::SemanticWork),
+            (LimitKind::TableRows, Resource::Cells),
+            (LimitKind::TableColumns, Resource::Cells),
+            (LimitKind::TableCells, Resource::Cells),
+            (LimitKind::MaterializedCells, Resource::Cells),
+        ];
+        for (kind, resource) in resources {
+            let error = map_numbers_resource_error(PackageResourceError::LimitExceeded {
+                kind,
+                observed: 9,
+                maximum: 8,
+            });
+            assert_limit_shape(error, Format::Numbers, Stage::Semantic, resource);
+        }
+    }
+
+    #[test]
+    fn numbers_allocation_preserves_amount_without_internal_resource_text() {
+        let error = map_numbers_resource_error(litchi_numbers::PackageResourceError::Allocation {
+            amount: 17,
+        });
+        assert_eq!(error.kind(), ErrorKind::Allocation);
+        assert_eq!(error.stage(), Stage::Semantic);
+        assert_eq!(error.format(), Some(Format::Numbers));
+        assert_eq!(error.resource(), Some(Resource::Memory));
+        assert_eq!(error.observed(), Some(17));
+        assert_eq!(error.maximum(), None);
+        assert_eq!(error.to_string(), "iWork allocation failed");
+        assert!(std::error::Error::source(&error).is_none());
     }
 
     #[test]

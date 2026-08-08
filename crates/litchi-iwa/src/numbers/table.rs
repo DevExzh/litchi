@@ -289,15 +289,6 @@ impl NumbersTable {
     /// remain available through the adapter while the document readers and
     /// editors migrate to the canonical leaf model.
     pub(crate) fn into_semantic(self) -> crate::Result<litchi_numbers::Table> {
-        self.into_semantic_table()
-    }
-
-    /// Consume the archive adapter without allocating a comment sidecar.
-    ///
-    /// Structured extraction only needs the canonical sparse table. Keeping
-    /// this path separate from [`Self::into_semantic_parts`] avoids sorting
-    /// and boxing native comments that would otherwise be discarded.
-    pub(crate) fn into_semantic_table(self) -> crate::Result<litchi_numbers::Table> {
         let Self { model, .. } = self;
         model.finish().map_err(map_table_error)
     }

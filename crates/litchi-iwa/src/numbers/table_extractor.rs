@@ -250,21 +250,6 @@ pub struct TableDataExtractor<'a> {
 }
 
 impl<'a> TableDataExtractor<'a> {
-    /// Return whether the index contains a candidate table-model object.
-    ///
-    /// This cheap type probe lets generic structured extraction avoid building
-    /// formula-reference sidecars for Pages and Keynote packages.
-    pub(crate) fn has_table_models(object_index: &ObjectIndex) -> bool {
-        [TABLE_MODEL_MESSAGE_TYPE, 6_000]
-            .into_iter()
-            .any(|message_type| {
-                object_index
-                    .iter_entries_by_type(message_type)
-                    .next()
-                    .is_some()
-            })
-    }
-
     /// Create a new table data extractor
     pub fn new(bundle: &'a Bundle, object_index: &'a ObjectIndex) -> Self {
         Self {
@@ -282,24 +267,6 @@ impl<'a> TableDataExtractor<'a> {
                 allocation_error("Numbers extracted table results", tables.len() + 1)
             })?;
             tables.push(table);
-            Ok(())
-        })?;
-        Ok(tables)
-    }
-
-    /// Extract all tables directly into the canonical Numbers semantic model.
-    ///
-    /// The archive adapter's builder is consumed one table at a time. Its
-    /// sparse cell and header buffers move into the leaf table, so this path
-    /// avoids first allocating a `Vec<NumbersTable>` only to convert every
-    /// element into a second result vector for structured extraction.
-    pub(crate) fn extract_all_semantic_tables(&self) -> Result<Vec<litchi_numbers::Table>> {
-        let mut tables = Vec::new();
-        self.for_each_table(|table| {
-            tables.try_reserve(1).map_err(|_| {
-                allocation_error("Numbers semantic table results", tables.len() + 1)
-            })?;
-            tables.push(table.into_semantic_table()?);
             Ok(())
         })?;
         Ok(tables)

@@ -23,7 +23,6 @@ use crate::detect::detect_application_from_document;
 use crate::media::{MediaLimits, MediaManager, MediaStats};
 use crate::object_index::ObjectIndex;
 use crate::package::PackageLimits;
-use crate::structured::{self, StructuredData};
 use crate::text::TextExtractor;
 use crate::{Error, Result};
 
@@ -221,14 +220,6 @@ impl Document {
             .as_ref()
             .ok_or_else(|| Error::Bundle("Media manager not available".to_string()))?;
         manager.extract_to_file(filename, output_path.as_ref())
-    }
-
-    /// Extract structured data from the document
-    ///
-    /// This returns tables, slides, sections, and other structured content
-    /// depending on the document type (Numbers, Keynote, or Pages).
-    pub fn extract_structured_data(&self) -> Result<StructuredData> {
-        structured::extract_all(&self.state.bundle, &self.state.object_index)
     }
 
     /// Get document statistics after resolving the indexed object set.

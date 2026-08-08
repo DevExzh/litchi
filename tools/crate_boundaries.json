@@ -400,13 +400,6 @@
       "exit": "Replace those adapters with private bounded format codecs and delete litchi-iwa."
     },
     {
-      "order": 11,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-iwa-structured",
-      "reason": "The legacy unified document API still publishes the archive-free structured snapshot.",
-      "exit": "Provide the verified root-facade aggregation path and delete litchi-iwa without removing litchi-iwa-structured."
-    },
-    {
       "order": 12,
       "dependent": "litchi-iwa",
       "dependency": "litchi-iwa-text",

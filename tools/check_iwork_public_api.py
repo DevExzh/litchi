@@ -31,6 +31,7 @@ FORBIDDEN_CRATES = frozenset(
         "litchi_iwa_common",
         "litchi_iwa_core",
         "litchi_iwa_detect",
+        "litchi_iwa_index",
         "litchi_iwa_package",
         "litchi_iwa_protos",
         "litchi_iwa_structured",
@@ -49,6 +50,7 @@ RAW_ID = re.compile(r"^(?:id|ids|[a-z][a-z0-9_]*_(?:id|ids))$", re.IGNORECASE)
 CAMEL_RAW_ID = re.compile(r"^(?:Id|Ids|[A-Za-z][A-Za-z0-9]*Ids?)$")
 NAME_TOKEN = re.compile(r"[A-Z]+(?=[A-Z][a-z]|$)|[A-Z]?[a-z]+|[0-9]+")
 CAPABILITY_TOKENS = frozenset({"archive", "catalog", "component", "components", "prepared", "raw"})
+RETIRED_API_NAMES = frozenset({"StructuredData", "extract_structured_data"})
 
 
 def rustdoc_command() -> tuple[str, ...]:
@@ -145,6 +147,27 @@ def _argument_names(item: Mapping[str, Any]) -> Iterable[str]:
             yield input_value[0]
 
 
+def _use_name(item: Mapping[str, Any]) -> str | None:
+    """Return a public re-export's visible alias, when this is a use item."""
+    inner = item.get("inner")
+    if not isinstance(inner, dict):
+        return None
+    use = inner.get("use")
+    if not isinstance(use, dict):
+        return None
+    name = use.get("name")
+    return name if isinstance(name, str) else None
+
+
+def _is_glob_use(item: Mapping[str, Any]) -> bool:
+    """Return whether an item is a public glob re-export."""
+    inner = item.get("inner")
+    if not isinstance(inner, dict):
+        return False
+    use = inner.get("use")
+    return isinstance(use, dict) and use.get("is_glob") is True
+
+
 def _path_entry_path(entry: Any) -> tuple[str, ...]:
     if not isinstance(entry, dict):
         return ()
@@ -156,6 +179,8 @@ def _path_entry_path(entry: Any) -> tuple[str, ...]:
 
 def _name_violation(identifier: str) -> str | None:
     """Classify public names that expose physical-package capabilities."""
+    if identifier in RETIRED_API_NAMES:
+        return "retired aggregate API"
     if RAW_ID.fullmatch(identifier) or CAMEL_RAW_ID.fullmatch(identifier):
         return "raw identifier"
 
@@ -237,11 +262,16 @@ def violations(document: Mapping[str, Any]) -> list[str]:
         name = item.get("name")
         if isinstance(name, str):
             names.append(name)
+        use_name = _use_name(item)
+        if use_name is not None:
+            names.append(use_name)
         names.extend(_argument_names(item))
         for identifier in names:
             reason = _name_violation(identifier)
             if reason is not None:
                 failures.add(f"{display} exposes {reason} as `{identifier}`")
+        if _is_glob_use(item):
+            failures.add(f"{display} exposes a public glob re-export")
 
         for referenced_id in _referenced_ids(item):
             referenced_path = _path_entry_path(paths.get(referenced_id))

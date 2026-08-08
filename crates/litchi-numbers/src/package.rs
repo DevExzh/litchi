@@ -87,6 +87,54 @@ pub enum SemanticPath {
     StructuredTables,
 }
 
+/// Bounded payload resource reported by the native Numbers decoder.
+///
+/// This Numbers-owned vocabulary prevents callers from depending on the
+/// format-neutral IWA implementation crate merely to classify package read
+/// failures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum PayloadLimitKind {
+    /// Bytes inspected in one encoded payload.
+    InputBytes,
+    /// Protobuf fields inspected in one encoded payload.
+    Fields,
+    /// Bytes produced while rewriting one encoded payload.
+    OutputBytes,
+    /// Nested length-delimited traversal depth.
+    Nesting,
+    /// Aggregate payload traversal or rewrite work.
+    RewriteWork,
+    /// Addressable rows declared by a table payload.
+    TableRows,
+    /// Addressable columns declared by a table payload.
+    TableColumns,
+    /// Addressable cells implied by table dimensions.
+    TableCells,
+    /// Sparse cells materialized from table payloads.
+    MaterializedCells,
+}
+
+/// Content-free resource failure normalized at the Numbers package boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ResourceError {
+    /// A finite native-payload resource ceiling was exceeded.
+    LimitExceeded {
+        /// Resource that exceeded its ceiling.
+        kind: PayloadLimitKind,
+        /// Observed or requested amount.
+        observed: usize,
+        /// Configured maximum.
+        maximum: usize,
+    },
+    /// A fallible allocation could not reserve the requested capacity.
+    Allocation {
+        /// Elements or bytes requested by the failed reservation.
+        amount: usize,
+    },
+}
+
 impl fmt::Display for SemanticPath {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -157,6 +205,56 @@ pub enum Error {
 }
 
 impl Error {
+    /// Return the content-free bounded-resource classification, when present.
+    ///
+    /// The returned value carries neither authored content nor an internal
+    /// allocation-site label. Callers can therefore log or translate it
+    /// without exposing implementation details from the decoded document.
+    #[must_use]
+    pub const fn resource_error(&self) -> Option<ResourceError> {
+        match self {
+            Self::Common(error) => match error {
+                litchi_iwa_common::Error::LimitExceeded {
+                    kind,
+                    observed,
+                    limit,
+                } => Some(ResourceError::LimitExceeded {
+                    kind: match kind {
+                        litchi_iwa_common::LimitKind::InputBytes => PayloadLimitKind::InputBytes,
+                        litchi_iwa_common::LimitKind::Fields => PayloadLimitKind::Fields,
+                        litchi_iwa_common::LimitKind::OutputBytes => PayloadLimitKind::OutputBytes,
+                        litchi_iwa_common::LimitKind::Nesting => PayloadLimitKind::Nesting,
+                        litchi_iwa_common::LimitKind::RewriteWork => PayloadLimitKind::RewriteWork,
+                        litchi_iwa_common::LimitKind::TableRows => PayloadLimitKind::TableRows,
+                        litchi_iwa_common::LimitKind::TableColumns => {
+                            PayloadLimitKind::TableColumns
+                        },
+                        litchi_iwa_common::LimitKind::TableCells => PayloadLimitKind::TableCells,
+                        litchi_iwa_common::LimitKind::MaterializedCells => {
+                            PayloadLimitKind::MaterializedCells
+                        },
+                    },
+                    observed: *observed,
+                    maximum: *limit,
+                }),
+                litchi_iwa_common::Error::Allocation { amount, .. } => {
+                    Some(ResourceError::Allocation { amount: *amount })
+                },
+                litchi_iwa_common::Error::InvalidFormat(_)
+                | litchi_iwa_common::Error::InvalidLimit { .. } => None,
+            },
+            Self::Io(_)
+            | Self::Archive(_)
+            | Self::MalformedPayload { .. }
+            | Self::NotNumbers
+            | Self::InvalidFormat(_)
+            | Self::ParseError(_)
+            | Self::Semantic(_)
+            | Self::SemanticLimit { .. }
+            | Self::InputTooLarge { .. } => None,
+        }
+    }
+
     fn protobuf(_error: prost::DecodeError) -> Self {
         Self::MalformedPayload {
             path: SemanticPath::StructuredTables,
@@ -607,12 +705,23 @@ impl Package {
         let model = index.resolve_ref_id(components, model_id)?.ok_or_else(|| {
             Error::InvalidFormat(format!("Numbers {path} table model is missing"))
         })?;
-        if !seen_models.insert(model_id) {
+        if seen_models.contains(&model_id) {
             return Err(Error::InvalidFormat(format!(
                 "Numbers {path} reuses a table model owned by an earlier drawable"
             )));
         }
         budget.charge_table(path)?;
+        seen_models.try_reserve(1).map_err(|_error| {
+            allocation_error(
+                "Numbers rooted table model identities",
+                seen_models.len().saturating_add(1),
+            )
+        })?;
+        let inserted = seen_models.insert(model_id);
+        debug_assert!(
+            inserted,
+            "duplicate table models were rejected before admission"
+        );
         extractor
             .extract_reachable_table_from_object(&model, path)
             .map(Some)
@@ -988,6 +1097,90 @@ mod tests {
     use litchi_iwa_protos::{kn, tp, tsa, tsce, tsk, tst};
     use std::io::Write;
 
+    #[test]
+    fn common_limits_normalize_to_every_numbers_payload_resource() {
+        let kinds = [
+            (
+                litchi_iwa_common::LimitKind::InputBytes,
+                PayloadLimitKind::InputBytes,
+            ),
+            (
+                litchi_iwa_common::LimitKind::Fields,
+                PayloadLimitKind::Fields,
+            ),
+            (
+                litchi_iwa_common::LimitKind::OutputBytes,
+                PayloadLimitKind::OutputBytes,
+            ),
+            (
+                litchi_iwa_common::LimitKind::Nesting,
+                PayloadLimitKind::Nesting,
+            ),
+            (
+                litchi_iwa_common::LimitKind::RewriteWork,
+                PayloadLimitKind::RewriteWork,
+            ),
+            (
+                litchi_iwa_common::LimitKind::TableRows,
+                PayloadLimitKind::TableRows,
+            ),
+            (
+                litchi_iwa_common::LimitKind::TableColumns,
+                PayloadLimitKind::TableColumns,
+            ),
+            (
+                litchi_iwa_common::LimitKind::TableCells,
+                PayloadLimitKind::TableCells,
+            ),
+            (
+                litchi_iwa_common::LimitKind::MaterializedCells,
+                PayloadLimitKind::MaterializedCells,
+            ),
+        ];
+
+        for (common, normalized) in kinds {
+            let error = Error::from(litchi_iwa_common::Error::LimitExceeded {
+                kind: common,
+                observed: 9,
+                limit: 8,
+            });
+            assert_eq!(
+                error.resource_error(),
+                Some(ResourceError::LimitExceeded {
+                    kind: normalized,
+                    observed: 9,
+                    maximum: 8,
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn common_allocation_normalization_preserves_amount_and_discards_label() {
+        const PRIVATE: &str = "private-path/member/authored-value";
+        let error = Error::from(litchi_iwa_common::Error::Allocation {
+            resource: PRIVATE,
+            amount: 17,
+        });
+        let normalized = error.resource_error();
+        assert_eq!(normalized, Some(ResourceError::Allocation { amount: 17 }));
+        assert!(!format!("{normalized:?}").contains(PRIVATE));
+    }
+
+    #[test]
+    fn non_resource_common_failures_do_not_acquire_resource_metadata() {
+        for error in [
+            litchi_iwa_common::Error::InvalidFormat("private".to_owned()),
+            litchi_iwa_common::Error::InvalidLimit {
+                field: "private",
+                value: 9,
+                maximum: 8,
+            },
+        ] {
+            assert_eq!(Error::from(error).resource_error(), None);
+        }
+    }
+
     fn reference(identifier: u64) -> litchi_iwa_protos::tsp::Reference {
         litchi_iwa_protos::tsp::Reference {
             identifier,
@@ -1075,6 +1268,80 @@ mod tests {
                 model.encode_to_vec(),
             )?);
             objects.push(object(tile_id, 6_002, tile.encode_to_vec())?);
+        }
+        package_bytes_from_archive(Archive { objects })
+    }
+
+    fn rooted_two_table_package(
+        second_model_id: u64,
+        second_model_payload: Vec<u8>,
+    ) -> Result<Vec<u8>> {
+        let sidecars = ArchiveObject::new(
+            7,
+            [
+                tst::table_data_list::ListType::String,
+                tst::table_data_list::ListType::Formula,
+            ]
+            .into_iter()
+            .map(|list_type| RawMessage {
+                type_: 6_005,
+                data: tst::TableDataList {
+                    list_type: list_type as i32,
+                    next_list_id: 1,
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            })
+            .collect(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let first_model = tst::TableModelArchive {
+            table_name: "First".to_owned(),
+            base_data_store: tst::DataStore {
+                string_table: reference(7),
+                formula_table: reference(7),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let table_info = |model_id| {
+            tst::TableInfoArchive {
+                table_model: reference(model_id),
+                ..Default::default()
+            }
+            .encode_to_vec()
+        };
+        let mut objects = vec![
+            object(
+                1,
+                DOCUMENT_MESSAGE_TYPE,
+                tn::DocumentArchive {
+                    sheets: vec![reference(2)],
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            )?,
+            object(
+                2,
+                SHEET_MESSAGE_TYPE,
+                tn::SheetArchive {
+                    name: "Admission".to_owned(),
+                    drawable_infos: vec![reference(3), reference(4)],
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            )?,
+            object(3, TABLE_INFO_MESSAGE_TYPE, table_info(5))?,
+            object(4, TABLE_INFO_MESSAGE_TYPE, table_info(second_model_id))?,
+            object(5, TABLE_MODEL_MESSAGE_TYPE, first_model.encode_to_vec())?,
+            sidecars,
+        ];
+        if second_model_id != 5 {
+            objects.push(object(
+                second_model_id,
+                TABLE_MODEL_MESSAGE_TYPE,
+                second_model_payload,
+            )?);
         }
         package_bytes_from_archive(Archive { objects })
     }
@@ -1902,6 +2169,42 @@ mod tests {
                 observed: 2,
                 maximum: 1,
                 path: SemanticPath::Document,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn rooted_duplicate_model_precedes_an_exhausted_table_budget() -> Result<()> {
+        let bytes = rooted_two_table_package(5, Vec::new())?;
+        let semantic = SemanticLimits::new(7, 1, 1, 5)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+
+        let error =
+            Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), semantic))
+                .expect_err("the second drawable must not reuse the first table model");
+        assert!(matches!(
+            error,
+            Error::InvalidFormat(message)
+                if message
+                    == "Numbers sheet 0 drawable 1 reuses a table model owned by an earlier drawable"
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn rooted_table_budget_is_charged_before_model_decoding() -> Result<()> {
+        let bytes = rooted_two_table_package(6, vec![0xff])?;
+        let semantic = SemanticLimits::new(7, 1, 1, 5)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+
+        assert!(matches!(
+            Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), semantic),),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::Tables,
+                observed: 2,
+                maximum: 1,
+                path: SemanticPath::Drawable { sheet: 0, index: 1 },
             })
         ));
         Ok(())

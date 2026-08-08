@@ -660,3 +660,26 @@ models, type-9 numeric cells, package-global ordering, canonical/legacy model
 precedence with deduplication, and exact/over table limits. Removing the edge
 before those oracles move would erase migration evidence rather than complete
 ownership transfer.
+
+## 2026-08-08 current-status amendment: neutral aggregate without a host adapter
+
+The preceding debt-011 status is historical. `litchi-numbers` now owns both
+the rooted projection and the explicitly allocating package-global
+compatibility projection. Focused and root tests own the five migration
+oracles: detached models, exact finite type-9 values, global order, canonical
+type-6001 precedence over legacy type-6000 with deduplication, and exact versus
+exceeded table limits. The root facade composes concrete owner results into the
+neutral `litchi-iwa-structured` model; the neutral crate remains the aggregate
+model and budget owner.
+
+`litchi-iwa` no longer publishes or implements `StructuredData` or
+`extract_structured_data`, and it no longer depends on
+`litchi-iwa-structured`. The host adapter, its tests, and support-only Numbers
+hooks are gone. Debt identity 011 is retired without renumbering later
+identities. The current checked topology is 63 workspace packages, 220
+internal dependency declarations, and 14 ordered migration debts.
+
+The host is still required for the remaining compatibility and edit surfaces.
+Focused eager Prost payload paths, full Buffa migration, root preparation's
+unrelated-sidecar peak memory, durable publication, and the final host removal
+remain outside this cutover.

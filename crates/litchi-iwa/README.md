@@ -4,7 +4,12 @@ Apple iWork archive reader and writer for `.pages`, `.numbers`, and `.key` files
 
 ## Overview
 
-`litchi-iwa` reads Apple iWork bundles using their IWA (iWork Archive) layout: a ZIP container holding Snappy-compressed, protobuf-encoded object streams along with media assets and metadata. It exposes a unified `Document` API that handles all three iWork applications, plus lower-level access to archives, the object reference graph, and structured content (tables, slides, sections).
+`litchi-iwa` reads Apple iWork bundles using their IWA (iWork Archive)
+layout: a ZIP container holding Snappy-compressed, protobuf-encoded object
+streams along with media assets and metadata. It remains the migration host
+for editor capabilities that have not yet moved to the concrete format
+packages. New read-only semantic code should use `litchi::iwork`,
+`litchi-pages`, `litchi-numbers`, or `litchi-keynote`.
 
 ## Usage
 
@@ -21,8 +26,6 @@ let text = doc.text()?;
 let stats = doc.stats()?;
 println!("objects: {}", stats.total_objects);
 
-let structured = doc.extract_structured_data()?;
-println!("{}", structured.summary());
 # Ok::<(), litchi_iwa::Error>(())
 ```
 
@@ -33,7 +36,6 @@ println!("{}", structured.summary());
   with no bundled template
 - Snappy decompression and protobuf decoding of `.iwa` streams
 - Text extraction across all iWork applications
-- Structured-data extraction: tables (with CSV export), slides, sections
 - Metadata-backed media discovery, extraction, replacement, and guarded cleanup
 - Typed cross-suite image, movie, and audio-property read/write for hyperlinks,
   locking, aspect-ratio locking, and accessibility descriptions with lossless

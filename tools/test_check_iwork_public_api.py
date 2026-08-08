@@ -95,6 +95,7 @@ class IworkPublicApiGateTests(unittest.TestCase):
                 "litchi_iwa_common",
                 "litchi_iwa_core",
                 "litchi_iwa_detect",
+                "litchi_iwa_index",
                 "litchi_iwa_package",
                 "litchi_iwa_protos",
                 "litchi_iwa_structured",
@@ -165,6 +166,49 @@ class IworkPublicApiGateTests(unittest.TestCase):
                 failures = public_api.violations(document(argument=name))
                 self.assertEqual(len(failures), 1)
                 self.assertIn(f"as `{name}`", failures[0])
+
+    def test_rejects_visible_use_aliases_and_public_globs(self) -> None:
+        for alias, reason in (
+            ("ObjectId", "raw identifier"),
+            ("StructuredData", "retired aggregate API"),
+            ("extract_structured_data", "retired aggregate API"),
+        ):
+            with self.subTest(alias=alias):
+                value = document()
+                value["index"]["1"]["inner"]["module"]["items"].append("4")
+                value["index"]["4"] = {
+                    "name": None,
+                    "inner": {
+                        "use": {
+                            "source": "crate::iwork::Document",
+                            "name": alias,
+                            "id": "2",
+                            "is_glob": False,
+                        }
+                    },
+                }
+                failures = public_api.violations(value)
+                self.assertEqual(len(failures), 1)
+                self.assertIn(reason, failures[0])
+                self.assertIn(f"`{alias}`", failures[0])
+
+        glob = document()
+        glob["index"]["1"]["inner"]["module"]["items"].append("4")
+        glob["index"]["4"] = {
+            "name": None,
+            "inner": {
+                "use": {
+                    "source": "crate::iwork::model",
+                    "name": "model",
+                    "id": "2",
+                    "is_glob": True,
+                }
+            },
+        }
+        self.assertEqual(
+            public_api.violations(glob),
+            ["rustdoc item 4 exposes a public glob re-export"],
+        )
 
     def test_external_types_are_closed_to_a_standard_library_allowlist(self) -> None:
         self.assertEqual(public_api.ALLOWED_EXTERNAL_CRATES, {"alloc", "core", "std"})

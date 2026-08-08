@@ -82,7 +82,6 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
     );
     document.validate()?;
     document.text()?;
-    document.extract_structured_data()?;
 
     let document_from_bytes = Document::from_bytes(&bytes)?;
     assert_eq!(document_from_bytes.application(), application);

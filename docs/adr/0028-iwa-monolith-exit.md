@@ -1049,3 +1049,45 @@ completed without a finding. Those results do not replace the remaining
 Numbers oracle transfer, focused deep fuzzing, aggregate peak-memory work,
 edit/save compatibility, full Buffa graph migration, or the final host
 deletion gate.
+
+## 2026-08-08 amendment: debt 011 structured-read seam deleted
+
+Deletion gate 3 advances for the structured read seam. The five blocking
+Numbers compatibility oracles now live in focused and root tests, backed by a
+deterministic checked-in 535-byte fixture with SHA-256
+`352ca6ad6891c7222f76cdb5fe48178f1efb340dc82ab5bc6755b71a2d2595bc`.
+They preserve the historically important detached-model, decimal128 type-9,
+package-global ordering, canonical-then-legacy deduplication, and inclusive
+table-budget behavior without depending on a host adapter.
+
+The root facade now obtains semantic data from `litchi-pages`,
+`litchi-keynote`, and `litchi-numbers`, then constructs the neutral aggregate
+directly. The obsolete host module, public re-export,
+`Document::extract_structured_data`, support hooks, tests, and
+`litchi-iwa-structured` manifest edge are deleted. This is an intentional
+breaking removal of an unpublished workspace host API at version 0.0.1; the
+workspace and registry-consumer audit found no consumer requiring a temporary
+alias. The neutral `litchi-iwa-structured` crate remains in its intended role.
+
+Legacy type-6000 model admission is now strict once a bounded fingerprint
+classifies a payload as model-shaped, rooted admission is budgeted before
+decode with fallible allocation, and common resource failures cross the
+Numbers public boundary through a content-free format-owned taxonomy. The
+public-API policy rejects the retired symbols, host-index types, visible
+aliases, and public glob re-exports. The current ledger is 63 packages, 220
+internal declarations, and 14 ordered debts.
+
+A locked Numbers 14.4 artifact with SHA-256
+`781181e89c655da5c92b677b9ba5c939c85379e7b33ccf10e3846fe8588f9c5b`
+passed a no-warning, no-save, exact-hash Computer Use read gate and confirmed
+the visible sheet/table order used by the focused oracle. Focused, root, host,
+policy, strict documentation, and sanitizer-target build gates form the
+cutover evidence; the synthetic fixture remains authoritative for native tags
+that the UI cannot expose.
+
+This does not delete the monolith. Remaining host editors and compatibility
+surfaces, focused eager Prost payloads, whole-graph Buffa lazy views, durable
+patches, atomic file publication, native save compatibility, deep fuzzing, and
+performance gates remain open. A 32 MiB unrelated root sidecar currently adds
+approximately 32 MiB of transient RSS during prepared-source construction, so
+this amendment explicitly makes no aggregate peak-memory completion claim.

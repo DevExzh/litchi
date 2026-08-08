@@ -44,7 +44,8 @@ pub use litchi_iwa_common::table::title::Settings;
 pub use package::__compatibility_tables_from_prepared_source;
 pub use package::{
     Error as PackageError, Limits as PackageLimits, MAX_OBJECTS, MAX_REFERENCES, Package,
-    ReadOptions as PackageReadOptions, Result as PackageResult, SemanticLimitKind,
+    PayloadLimitKind as PackagePayloadLimitKind, ReadOptions as PackageReadOptions,
+    ResourceError as PackageResourceError, Result as PackageResult, SemanticLimitKind,
     SemanticLimits as PackageSemanticLimits, SemanticLimitsError as PackageSemanticLimitsError,
     SemanticPath as PackageSemanticPath, compatibility_tables_from_bytes,
     compatibility_tables_from_bytes_with_options,
